@@ -32,7 +32,7 @@ export const createOrderSchema = z.object({
 export type CreateOrderInput = z.input<typeof createOrderSchema>;
 export type CreateOrderOutput = z.output<typeof createOrderSchema>;
 
-// Sửa đơn (web + API mobile dùng chung)
+// Sửa đơn
 export const updateOrderSchema = z.object({
   orderId: z.uuid(),
   projectName: z.string().optional(),
@@ -70,7 +70,7 @@ export const createCustomerSchema = z.object({
 export type CreateCustomerInput = z.input<typeof createCustomerSchema>;
 export type CreateCustomerOutput = z.output<typeof createCustomerSchema>;
 
-// Sửa khách hàng (web + API mobile dùng chung)
+// Sửa khách hàng
 export const updateCustomerSchema = z.object({
   id: z.uuid(),
   name: z.string().trim().min(1, { error: "validation.required" }),

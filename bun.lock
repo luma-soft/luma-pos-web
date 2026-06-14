@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "sales-mgmt",
+      "name": "luma-pos",
       "dependencies": {
         "@hookform/resolvers": "^5.2.2",
         "@supabase/ssr": "^0.10.2",

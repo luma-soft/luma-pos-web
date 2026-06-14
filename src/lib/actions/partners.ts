@@ -10,7 +10,7 @@ import {
   updateCustomerSchema, type UpdateCustomerInput,
   type CreateCustomerOutput, type CreateSupplierOutput,
 } from "@/lib/schemas/order";
-import { type ActionResult, requireUser, toMoney } from "./common";
+import { type ActionResult, generateCode, requireUser, toMoney } from "./common";
 import { createCustomerCore, updateCustomerCore } from "@/lib/customers/write";
 import { Routes } from "@/lib/routes";
 
@@ -22,7 +22,7 @@ export async function createCustomer(
   } catch {
     return { ok: false, error: "errors.unauthorized" };
   }
-  // Lõi dùng chung (web + API mobile). Xem src/lib/customers/write.ts.
+  // Lõi tách riêng. Xem src/lib/customers/write.ts.
   const result = await createCustomerCore(input);
   if (result.ok) revalidatePath(Routes.Customers);
   return result;
@@ -66,7 +66,7 @@ export type { UpdateCustomerInput } from "@/lib/schemas/order";
 
 export async function updateCustomer(input: UpdateCustomerInput): Promise<ActionResult> {
   try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
-  // Lõi dùng chung (web + API mobile). Xem src/lib/customers/write.ts.
+  // Lõi tách riêng. Xem src/lib/customers/write.ts.
   const result = await updateCustomerCore(input);
   if (result.ok) {
     revalidatePath(Routes.Customers);

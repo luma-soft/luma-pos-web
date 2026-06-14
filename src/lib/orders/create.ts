@@ -13,9 +13,7 @@ import { Routes } from "@/lib/routes";
 
 /**
  * Lõi tạo đơn — KHÔNG phải server action (nhận userId đã xác thực).
- * Dùng chung cho:
- *  - server action createOrder (web, lấy userId từ cookie session)
- *  - API route /api/pos/order (mobile, lấy userId từ Bearer token Supabase)
+ * Dùng bởi server action createOrder (web, lấy userId từ cookie session).
  * Idempotent theo clientId: tạo lại cùng clientId → trả về đơn cũ, không nhân đôi.
  *
  * Lưu ý bảo mật: userId PHẢI do server tự xác thực, KHÔNG nhận từ client.

@@ -5,8 +5,8 @@ import { type ActionResult, getProfileId, generateCode, toQty } from "@/lib/acti
 
 /**
  * Lõi chốt báo giá → đơn — KHÔNG phải server action (nhận userId đã xác thực).
- * Dùng chung cho server action convertQuoteToOrder (web) và API route /api/pos/quote
- * (mobile, userId lấy từ Bearer token). Trừ kho + ghi nợ; thu tiền sau qua addPayment.
+ * Dùng bởi server action convertQuoteToOrder (web).
+ * Trừ kho + ghi nợ; thu tiền sau qua addPayment.
  */
 export async function convertQuoteToOrderForUser(
   userId: string,

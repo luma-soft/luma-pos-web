@@ -9,7 +9,7 @@ import { type ActionResult, getProfileId, generateCode, toMoney, toQty } from "@
 /**
  * Lõi sửa đơn — KHÔNG phải server action (nhận userId đã xác thực).
  * Hoàn kho dòng cũ → ghi dòng mới + trừ kho mới → tính lại nợ theo chênh lệch.
- * Dùng chung cho action updateOrder (web) và API /api/pos/order/edit (mobile).
+ * Dùng bởi server action updateOrder (web).
  */
 export async function updateOrderForUser(userId: string, input: UpdateOrderInput): Promise<ActionResult> {
   const parsed = updateOrderSchema.safeParse(input);

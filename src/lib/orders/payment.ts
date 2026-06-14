@@ -9,7 +9,7 @@ import { Routes } from "@/lib/routes";
 
 /**
  * Lõi THU NỢ / thu tiền theo đơn — KHÔNG phải server action (nhận userId đã xác thực).
- * Dùng chung cho server action addPayment (web) và API /api/pos/payment (mobile).
+ * Dùng bởi server action addPayment (web).
  * Ghi payment + cash-in (category debt_collect) + giảm công nợ khách + cập nhật trạng thái đơn.
  */
 export async function addPaymentForUser(userId: string, input: AddPaymentInput): Promise<ActionResult> {

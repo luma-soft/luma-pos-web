@@ -3,15 +3,15 @@ import { db } from "@/db";
 import { customers } from "@/db/schema";
 import {
   createCustomerSchema, updateCustomerSchema,
-  type CreateCustomerOutput, type UpdateCustomerOutput,
+  type CreateCustomerInput, type UpdateCustomerInput,
 } from "@/lib/schemas/order";
 import { type ActionResult, generateCode, toMoney } from "@/lib/actions/common";
 
 /**
  * Lõi tạo/sửa khách hàng — KHÔNG phải server action.
- * Dùng chung cho action (web) và API /api/pos/customer* (mobile). Không revalidate.
+ * Dùng bởi server action (web). Không revalidate.
  */
-export async function createCustomerCore(input: CreateCustomerOutput): Promise<ActionResult<{ id: string }>> {
+export async function createCustomerCore(input: CreateCustomerInput): Promise<ActionResult<{ id: string }>> {
   const parsed = createCustomerSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
@@ -33,7 +33,7 @@ export async function createCustomerCore(input: CreateCustomerOutput): Promise<A
   }
 }
 
-export async function updateCustomerCore(input: UpdateCustomerOutput): Promise<ActionResult> {
+export async function updateCustomerCore(input: UpdateCustomerInput): Promise<ActionResult> {
   const parsed = updateCustomerSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;

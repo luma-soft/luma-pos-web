@@ -26,7 +26,7 @@ export async function createOrder(
   } catch {
     return { ok: false, error: "errors.unauthorized" };
   }
-  // Lõi dùng chung (web + API mobile). Xem src/lib/orders/create.ts.
+  // Lõi tách riêng. Xem src/lib/orders/create.ts.
   return createOrderForUser(userId, input);
 }
 
@@ -37,7 +37,7 @@ export async function addPayment(input: AddPaymentInput): Promise<ActionResult> 
   } catch {
     return { ok: false, error: "errors.unauthorized" };
   }
-  // Lõi dùng chung (web + API mobile). Xem src/lib/orders/payment.ts.
+  // Lõi tách riêng. Xem src/lib/orders/payment.ts.
   return addPaymentForUser(userId, input);
 }
 
@@ -49,7 +49,7 @@ export async function convertQuoteToOrder(quoteId: string): Promise<ActionResult
   } catch {
     return { ok: false, error: "errors.unauthorized" };
   }
-  // Lõi dùng chung (web + API mobile). Xem src/lib/orders/convert.ts.
+  // Lõi tách riêng. Xem src/lib/orders/convert.ts.
   const result = await convertQuoteToOrderForUser(userId, quoteId);
   if (result.ok) {
     revalidatePath(Routes.Orders);
