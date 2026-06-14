@@ -12,12 +12,12 @@ interface PageProps {
 }
 
 const CAT_STYLES: Record<string, string> = {
-  sale: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400",
-  debt_collect: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400",
-  supplier_payment: "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-400",
-  refund: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400",
-  expense: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400",
-  other: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
+  sale: "bg-ok-soft text-ok",
+  debt_collect: "bg-ok-soft text-ok",
+  supplier_payment: "bg-er-soft text-er",
+  refund: "bg-warn-soft text-warn",
+  expense: "bg-warn-soft text-warn",
+  other: "bg-surface-2 text-slate-600",
 };
 
 export default async function CashbookPage({ searchParams }: PageProps) {
@@ -37,29 +37,29 @@ export default async function CashbookPage({ searchParams }: PageProps) {
 
   return (
     <div className="p-6">
-      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-surface border-b border-border flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-[17px] font-bold">{t("cashbook.title")}</h1>
         <CashTxForm />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
         <Link href={href({ fund: params.fund === "cash" ? undefined : "cash", page: undefined })}
-          className={cn("bg-white dark:bg-slate-900 border rounded-xl p-4", params.fund === "cash" ? "border-primary-600" : "border-slate-200 dark:border-slate-800")}>
+          className={cn("bg-surface border rounded-card p-4", params.fund === "cash" ? "border-primary-600" : "border-border")}>
           <div className="text-xs font-medium text-slate-500">💵 {t("cashbook.fundCash")}</div>
           <div className="text-xl font-bold mt-1 tabular-nums">{formatCurrency(data.cash.balance)}</div>
           <div className="text-xs text-slate-400 mt-0.5">
-            <span className="text-emerald-600">+{formatCurrency(data.cash.in)}</span> · <span className="text-red-600">−{formatCurrency(data.cash.out)}</span>
+            <span className="text-ok">+{formatCurrency(data.cash.in)}</span> · <span className="text-er">−{formatCurrency(data.cash.out)}</span>
           </div>
         </Link>
         <Link href={href({ fund: params.fund === "bank" ? undefined : "bank", page: undefined })}
-          className={cn("bg-white dark:bg-slate-900 border rounded-xl p-4", params.fund === "bank" ? "border-primary-600" : "border-slate-200 dark:border-slate-800")}>
+          className={cn("bg-surface border rounded-card p-4", params.fund === "bank" ? "border-primary-600" : "border-border")}>
           <div className="text-xs font-medium text-slate-500">🏦 {t("cashbook.fundBank")}</div>
           <div className="text-xl font-bold mt-1 tabular-nums">{formatCurrency(data.bank.balance)}</div>
           <div className="text-xs text-slate-400 mt-0.5">
-            <span className="text-emerald-600">+{formatCurrency(data.bank.in)}</span> · <span className="text-red-600">−{formatCurrency(data.bank.out)}</span>
+            <span className="text-ok">+{formatCurrency(data.bank.in)}</span> · <span className="text-er">−{formatCurrency(data.bank.out)}</span>
           </div>
         </Link>
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
+        <div className="bg-surface border border-border rounded-card p-4">
           <div className="text-xs font-medium text-slate-500">{t("cashbook.totalBalance")}</div>
           <div className="text-xl font-bold mt-1 tabular-nums">{formatCurrency(data.cash.balance + data.bank.balance)}</div>
           <div className="text-xs text-slate-400 mt-0.5">{t("cashbook.autoHint")}</div>
@@ -71,14 +71,14 @@ export default async function CashbookPage({ searchParams }: PageProps) {
           <Link key={tp || "all"}
             href={href({ type: tp || undefined, page: undefined })}
             className={cn("px-3 py-1.5 rounded-lg text-sm font-medium border",
-              (params.type ?? "") === tp ? "bg-primary-600 text-white border-primary-600" : "border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300")}>
+              (params.type ?? "") === tp ? "bg-primary-600 text-white border-primary-600" : "border-border text-slate-600 dark:text-slate-300")}>
             {t(`cashbook.typeTabs.${tp || "all"}`)}
           </Link>
         ))}
       </div>
 
       {data.rows.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl">
+        <div className="bg-surface border border-border rounded-card">
           <p className="p-10 text-center text-slate-400 text-sm">{t("cashbook.empty")}</p>
         </div>
       ) : (
@@ -87,12 +87,12 @@ export default async function CashbookPage({ searchParams }: PageProps) {
           <div className="lg:hidden space-y-2">
             {data.rows.map((r) => {
               const amount = (
-                <span className={cn("tabular-nums font-semibold whitespace-nowrap", r.type === "in" ? "text-emerald-600" : "text-red-600")}>
+                <span className={cn("tabular-nums font-semibold whitespace-nowrap", r.type === "in" ? "text-ok" : "text-er")}>
                   {r.type === "in" ? "+" : "−"} {formatCurrency(Number(r.amount))}
                 </span>
               );
               return (
-                <div key={r.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3">
+                <div key={r.id} className="bg-surface border border-border rounded-card p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="font-medium">{r.code}</div>
@@ -116,10 +116,10 @@ export default async function CashbookPage({ searchParams }: PageProps) {
           </div>
 
           {/* Desktop: table */}
-          <div className="hidden lg:block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-x-auto">
+          <div className="hidden lg:block bg-surface border border-border rounded-card overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/60 text-left text-xs uppercase text-slate-500">
+              <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
                 <th className="px-4 py-3 font-semibold">{t("cashbook.cols.code")}</th>
                 <th className="px-4 py-3 font-semibold">{t("orders.cols.date")}</th>
                 <th className="px-4 py-3 font-semibold">{t("cashbook.cols.category")}</th>
@@ -128,9 +128,9 @@ export default async function CashbookPage({ searchParams }: PageProps) {
                 <th className="px-4 py-3 font-semibold text-right">{t("cashbook.cols.amount")}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-border-soft">
               {data.rows.map((r) => (
-                <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                <tr key={r.id} className="hover:bg-surface-2">
                   <td className="px-4 py-3 font-medium">{r.code}</td>
                   <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{formatDate(r.createdAt)}</td>
                   <td className="px-4 py-3">
@@ -144,7 +144,7 @@ export default async function CashbookPage({ searchParams }: PageProps) {
                       : r.note ?? "—"}
                   </td>
                   <td className="px-4 py-3 text-slate-500">{r.fund === "cash" ? t("cashbook.fundCash") : t("cashbook.fundBank")}</td>
-                  <td className={cn("px-4 py-3 text-right tabular-nums font-semibold", r.type === "in" ? "text-emerald-600" : "text-red-600")}>
+                  <td className={cn("px-4 py-3 text-right tabular-nums font-semibold", r.type === "in" ? "text-ok" : "text-er")}>
                     {r.type === "in" ? "+" : "−"} {formatCurrency(Number(r.amount))}
                   </td>
                 </tr>

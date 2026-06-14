@@ -42,10 +42,10 @@ export function CashTxForm() {
     );
   }
 
-  const inputCls = "px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900";
+  const inputCls = "px-3 py-2 text-sm rounded-lg border border-border bg-surface";
 
   return (
-    <div className="flex items-end gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3 flex-wrap">
+    <div className="flex items-end gap-2 bg-surface border border-border rounded-card p-3 flex-wrap">
       <div className="flex gap-1">
         {(["in", "out"] as const).map((tp) => (
           <button key={tp} onClick={() => setType(tp)}
@@ -76,7 +76,7 @@ export function CashTxForm() {
         {t("common.save")}
       </button>
       <button onClick={() => setOpen(false)} className="p-2 text-slate-400"><X className="w-4 h-4" /></button>
-      {error && <p className="text-xs text-red-600 w-full">{error}</p>}
+      {error && <p className="text-xs text-er w-full">{error}</p>}
     </div>
   );
 }
