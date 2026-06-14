@@ -26,7 +26,7 @@ export function OrderActions({ orderId }: { orderId: string }) {
     <button
       onClick={onCancel}
       disabled={busy}
-      className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-red-200 dark:border-red-900 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50"
+      className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-red-200 dark:border-red-900 text-er hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50"
     >
       {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
       {t("orders.detail.cancel")}
@@ -58,7 +58,7 @@ export function PaymentForm({ orderId, remaining }: { orderId: string; remaining
   }
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
+    <div className="bg-surface border border-border rounded-card p-4">
       <h2 className="font-semibold text-sm mb-3">{t("orders.detail.addPayment")}</h2>
       <div className="flex flex-wrap items-end gap-3">
         <div>
@@ -66,7 +66,7 @@ export function PaymentForm({ orderId, remaining }: { orderId: string; remaining
           <MoneyInput
             min={0} max={remaining} value={amount}
             onChange={(v) => setAmount(v ?? 0)}
-            className="w-40 px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-right tabular-nums"
+            className="w-40 px-3 py-2 text-sm rounded-lg border border-border bg-surface text-right tabular-nums"
           />
         </div>
         <div className="flex gap-1.5">
@@ -85,7 +85,7 @@ export function PaymentForm({ orderId, remaining }: { orderId: string; remaining
         <input
           value={note} onChange={(e) => setNote(e.target.value)}
           placeholder={t("orders.detail.notePlaceholder")}
-          className="flex-1 min-w-40 px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+          className="flex-1 min-w-40 px-3 py-2 text-sm rounded-lg border border-border bg-surface"
         />
         <button
           onClick={submit} disabled={busy || amount <= 0}
@@ -95,7 +95,7 @@ export function PaymentForm({ orderId, remaining }: { orderId: string; remaining
           {t("orders.detail.receive")} {formatCurrency(amount)}
         </button>
       </div>
-      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+      {error && <p className="text-xs text-er mt-2">{error}</p>}
     </div>
   );
 }

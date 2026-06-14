@@ -34,7 +34,7 @@ export function EInvoiceForm({ orderId, defaultBuyer }: { orderId: string; defau
     );
   }
 
-  const cls = "px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900";
+  const cls = "px-3 py-2 text-sm rounded-lg border border-border bg-surface";
   return (
     <div className="flex items-end gap-2 flex-wrap">
       <div>
@@ -54,7 +54,7 @@ export function EInvoiceForm({ orderId, defaultBuyer }: { orderId: string; defau
         {busy && <Loader2 className="w-4 h-4 animate-spin" />}
         {t("einvoice.issue")}
       </button>
-      {error && <p className="text-xs text-red-600 w-full">{error}</p>}
+      {error && <p className="text-xs text-er w-full">{error}</p>}
     </div>
   );
 }

@@ -2,21 +2,21 @@ import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
 const ORDER_STYLES: Record<string, string> = {
-  completed: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400",
-  cancelled: "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-400",
-  draft: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
-  quote: "bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-400",
-  confirmed: "bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-400",
-  delivering: "bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-400",
-  returned: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400",
+  completed: "bg-ok-soft text-ok",
+  cancelled: "bg-er-soft text-er",
+  draft: "bg-surface-2 text-slate-600",
+  quote: "bg-in-soft text-in",
+  confirmed: "bg-in-soft text-in",
+  delivering: "bg-in-soft text-in",
+  returned: "bg-warn-soft text-warn",
 };
 
 const PAYMENT_STYLES: Record<string, string> = {
-  paid: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400",
-  unpaid: "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-400",
-  deposit: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400",
-  partial: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400",
-  refunded: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
+  paid: "bg-ok-soft text-ok",
+  unpaid: "bg-er-soft text-er",
+  deposit: "bg-warn-soft text-warn",
+  partial: "bg-warn-soft text-warn",
+  refunded: "bg-surface-2 text-slate-600",
 };
 
 export function OrderStatusBadge({ status }: { status: string }) {
