@@ -20,7 +20,7 @@ export function MobileTabBar() {
   const off = "text-slate-400";
 
   return (
-    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 h-14 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-stretch pb-[env(safe-area-inset-bottom)]">
+    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 h-14 bg-surface border-t border-border flex items-stretch pb-[env(safe-area-inset-bottom)]">
       <Link href={Routes.Dashboard} className={cn(item, is(Routes.Dashboard) ? on : off)}>
         <LayoutDashboard className="w-5 h-5" />{t("nav.dashboard")}
       </Link>

@@ -29,12 +29,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const mode = await getMode();
 
   return (
-    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen flex bg-canvas">
       <script dangerouslySetInnerHTML={{ __html: SIDEBAR_INIT }} />
       <MobileNavBackdrop />
-      <aside className="app-sidebar w-60 shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col sticky top-0 h-screen overflow-hidden transition-[width,opacity,transform] duration-200">
+      <aside className="app-sidebar w-60 shrink-0 bg-surface border-r border-border flex flex-col sticky top-0 h-screen overflow-hidden transition-[width,opacity,transform] duration-200">
         {/* brand — theo design: logo gradient + tên cửa hàng */}
-        <div className="flex items-center gap-2.5 px-4 py-4 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex items-center gap-2.5 px-4 py-4 border-b border-border">
           <div className="w-9 h-9 rounded-xl shrink-0 grid place-items-center text-white font-extrabold bg-gradient-to-br from-primary-600 to-primary-400">
             S
           </div>
@@ -47,7 +47,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
         <AppNav />
 
-        <div className="p-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
+        <div className="p-3 border-t border-border space-y-2">
           <ModeSwitcher current={mode} />
           <ThemeSwitcher current={theme} />
           <LanguageSwitcher />
