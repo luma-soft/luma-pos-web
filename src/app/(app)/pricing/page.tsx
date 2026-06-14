@@ -48,7 +48,7 @@ export default async function PricingPage({ searchParams }: PageProps) {
 
   return (
     <div className="p-6">
-      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-surface border-b border-border flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-[17px] font-bold">{t("pricing.booksCount", { n: books.length })}</h1>
         <span className="text-sm text-slate-500">{t("products.list.total", { total })}</span>
       </div>
@@ -59,17 +59,17 @@ export default async function PricingPage({ searchParams }: PageProps) {
           <input
             type="text" name="q" defaultValue={params.q ?? ""}
             placeholder={t("products.list.searchPlaceholder")}
-            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface"
           />
         </div>
         <select
           name="category" defaultValue={params.category ?? ""}
-          className="px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+          className="px-3 py-2 text-sm rounded-lg border border-border bg-surface"
         >
           <option value="">{t("products.list.allCategories")}</option>
           {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <button type="submit" className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900">
+        <button type="submit" className="px-4 py-2 text-sm font-medium rounded-lg border border-border bg-surface">
           {t("common.search")}
         </button>
       </form>
