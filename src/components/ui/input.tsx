@@ -16,7 +16,7 @@ const inputVariants = cva(
         lg: "h-12 text-base",
       },
       variant: {
-        default: "border-slate-300 dark:border-slate-700",
+        default: "border-border",
         error: "border-red-500 focus:ring-red-500",
       },
     },
@@ -88,7 +88,7 @@ const textareaVariants = cva(
   {
     variants: {
       variant: {
-        default: "border-slate-300 dark:border-slate-700",
+        default: "border-border",
         error: "border-red-500 focus:ring-red-500",
       },
     },
