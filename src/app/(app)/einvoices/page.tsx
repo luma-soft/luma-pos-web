@@ -35,13 +35,13 @@ export default async function EInvoicesPage() {
 
   return (
     <div className="p-6">
-      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-surface border-b border-border flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-[17px] font-bold">{t("einvoice.title")}</h1>
       </div>
-      <p className="text-xs text-amber-600 mb-5">⚠ {t("einvoice.stubNote")}</p>
+      <p className="text-xs text-warn mb-5">⚠ {t("einvoice.stubNote")}</p>
 
       {rows.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-12 text-center text-slate-400">
+        <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">
           <FileCheck2 className="w-10 h-10 mx-auto mb-3 opacity-60" />
           <p className="font-medium">{t("einvoice.empty")}</p>
           <p className="text-sm mt-1">{t("einvoice.emptyHint")}</p>
@@ -51,7 +51,7 @@ export default async function EInvoicesPage() {
         {/* mobile: card list */}
         <div className="lg:hidden space-y-2">
           {rows.map((r) => (
-            <div key={r.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3">
+            <div key={r.id} className="bg-surface border border-border rounded-card p-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0"><div className="font-medium">{r.number}<span className="text-xs text-slate-400 ml-1">{r.serial}</span></div><div className="text-xs text-slate-400">{r.issuedAt ? formatDate(r.issuedAt) : "—"} · {r.buyerName}</div></div>
                 <Link href={Routes.order(r.orderId)} className="shrink-0 text-xs text-primary-600 hover:underline">{r.orderCode}</Link>
@@ -65,10 +65,10 @@ export default async function EInvoicesPage() {
         </div>
 
         {/* desktop: bảng */}
-        <div className="hidden lg:block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-x-auto">
+        <div className="hidden lg:block bg-surface border border-border rounded-card overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/60 text-left text-xs uppercase text-slate-500">
+              <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
                 <th className="px-4 py-3 font-semibold">{t("einvoice.cols.number")}</th>
                 <th className="px-4 py-3 font-semibold">{t("einvoice.cols.issuedAt")}</th>
                 <th className="px-4 py-3 font-semibold">{t("einvoice.cols.order")}</th>
@@ -78,9 +78,9 @@ export default async function EInvoicesPage() {
                 <th className="px-4 py-3 font-semibold text-right">{t("orders.cols.total")}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-border-soft">
               {rows.map((r) => (
-                <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                <tr key={r.id} className="hover:bg-surface-2">
                   <td className="px-4 py-3 font-medium">{r.number}<div className="text-xs text-slate-400">{r.serial}</div></td>
                   <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{r.issuedAt ? formatDate(r.issuedAt) : "—"}</td>
                   <td className="px-4 py-3"><Link href={Routes.order(r.orderId)} className="text-primary-600 hover:underline">{r.orderCode}</Link></td>
