@@ -64,9 +64,9 @@ export function PortalClient({ token, customerName, customerType, products }: Pr
 
   if (doneCode) {
     return (
-      <div className="min-h-screen bg-slate-50 grid place-items-center p-6">
+      <div className="min-h-screen bg-canvas grid place-items-center p-6">
         <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center max-w-md shadow-sm">
-          <div className="w-16 h-16 rounded-full bg-emerald-50 grid place-items-center mx-auto text-3xl">✅</div>
+          <div className="w-16 h-16 rounded-full bg-ok-soft grid place-items-center mx-auto text-3xl">✅</div>
           <h1 className="text-xl font-bold mt-4">Đã gửi đơn đặt hàng</h1>
           <p className="text-slate-500 text-sm mt-2">
             Mã đơn: <b className="text-slate-900">{doneCode}</b><br />
@@ -81,11 +81,11 @@ export function PortalClient({ token, customerName, customerType, products }: Pr
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-canvas text-slate-900">
       <header className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3 flex-wrap">
         <div>
           <b>Đặt hàng — {customerName}</b>
-          <span className="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-50 text-amber-700">
+          <span className="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-warn-soft text-warn">
             {TYPE_LABEL[customerType] ?? customerType}
           </span>
         </div>
@@ -103,10 +103,10 @@ export function PortalClient({ token, customerName, customerType, products }: Pr
             <input
               value={search} onChange={(e) => setSearch(e.target.value)}
               placeholder="Tìm vật tư…"
-              className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border border-slate-300 bg-white"
+              className="w-full pl-9 pr-3 py-2.5 text-sm rounded-card border border-slate-300 bg-white"
             />
           </div>
-          <div className="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden">
+          <div className="bg-white border border-slate-200 rounded-card divide-y divide-slate-100 overflow-hidden">
             {filtered.slice(0, 100).map((p) => {
               const qty = cart[p.id] ?? 0;
               return (
@@ -136,7 +136,7 @@ export function PortalClient({ token, customerName, customerType, products }: Pr
         </div>
 
         {/* cart */}
-        <div className="bg-white border border-slate-200 rounded-xl p-4 self-start space-y-3">
+        <div className="bg-white border border-slate-200 rounded-card p-4 self-start space-y-3">
           <b className="text-sm">Đơn đặt hàng</b>
           {lines.length === 0 ? (
             <p className="text-sm text-slate-400 py-6 text-center">Chưa chọn sản phẩm nào</p>
@@ -166,10 +166,10 @@ export function PortalClient({ token, customerName, customerType, products }: Pr
             <b>Tổng tạm tính</b>
             <b className="text-blue-600 tabular-nums">{formatCurrency(total)}</b>
           </div>
-          {error && <p className="text-xs text-red-600">{error}</p>}
+          {error && <p className="text-xs text-er">{error}</p>}
           <button
             onClick={submit} disabled={busy || lines.length === 0}
-            className={cn("w-full py-3 rounded-xl text-white font-semibold text-sm flex items-center justify-center gap-2", "bg-blue-600 hover:bg-blue-700 disabled:opacity-50")}
+            className={cn("w-full py-3 rounded-card text-white font-semibold text-sm flex items-center justify-center gap-2", "bg-blue-600 hover:bg-blue-700 disabled:opacity-50")}
           >
             {busy && <Loader2 className="w-4 h-4 animate-spin" />}
             Gửi đơn đặt hàng
