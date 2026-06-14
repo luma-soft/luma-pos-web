@@ -37,9 +37,9 @@ export function TripCreate({ orders }: { orders: { id: string; label: string }[]
     );
   }
 
-  const cls = "px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900";
+  const cls = "px-3 py-2 text-sm rounded-lg border border-border bg-surface";
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 w-full max-w-xl space-y-3">
+    <div className="bg-surface border border-border rounded-card p-4 w-full max-w-xl space-y-3">
       <div className="flex justify-between items-center">
         <b className="text-sm">{t("delivery.createTrip")}</b>
         <button onClick={() => setOpen(false)} className="p-1 text-slate-400"><X className="w-4 h-4" /></button>
@@ -48,10 +48,10 @@ export function TripCreate({ orders }: { orders: { id: string; label: string }[]
         <input value={vehicle} onChange={(e) => setVehicle(e.target.value)} placeholder={`${t("delivery.vehicle")} *`} className={`${cls} flex-1`} />
         <input value={driver} onChange={(e) => setDriver(e.target.value)} placeholder={`${t("delivery.driver")} *`} className={`${cls} flex-1`} />
       </div>
-      <div className="max-h-52 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-800">
+      <div className="max-h-52 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-border-soft">
         {orders.length === 0 && <p className="p-4 text-sm text-slate-400">{t("delivery.noOrders")}</p>}
         {orders.map((o) => (
-          <label key={o.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/40">
+          <label key={o.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-surface-2">
             <input
               type="checkbox"
               checked={selected.includes(o.id)}
@@ -61,7 +61,7 @@ export function TripCreate({ orders }: { orders: { id: string; label: string }[]
           </label>
         ))}
       </div>
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-er">{error}</p>}
       <button onClick={submit} disabled={busy || !vehicle.trim() || !driver.trim() || selected.length === 0}
         className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium disabled:opacity-50 inline-flex items-center gap-2">
         {busy && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -94,7 +94,7 @@ export function StopActions({ stopId }: { stopId: string }) {
     <button
       onClick={async () => { setBusy(true); const r = await markStopDelivered(stopId); setBusy(false); if (r.ok) router.refresh(); }}
       disabled={busy}
-      className="px-3 py-1.5 rounded-lg border border-emerald-300 dark:border-emerald-800 text-emerald-600 text-xs font-medium disabled:opacity-50 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 whitespace-nowrap"
+      className="px-3 py-1.5 rounded-lg border border-emerald-300 dark:border-emerald-800 text-ok text-xs font-medium disabled:opacity-50 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 whitespace-nowrap"
     >
       ✓ {t("delivery.markDelivered")}
     </button>
