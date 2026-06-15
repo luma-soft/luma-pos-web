@@ -33,7 +33,7 @@ export default async function PromotionsPage() {
 
   return (
     <div className="p-6">
-      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-surface border-b border-border flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-baseline gap-3">
           <h1 className="text-[17px] font-bold">{t("promos.title")}</h1>
           <span className="text-sm text-slate-500">{t("promos.total", { total: rows.length })}</span>
@@ -42,7 +42,7 @@ export default async function PromotionsPage() {
       </div>
 
       {rows.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-12 text-center text-slate-400">
+        <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">
           <Percent className="w-10 h-10 mx-auto mb-3 opacity-60" />
           <p className="font-medium">{t("promos.empty")}</p>
           <p className="text-sm mt-1">{t("promos.emptyHint")}</p>
@@ -54,7 +54,7 @@ export default async function PromotionsPage() {
           {rows.map((p) => {
             const active = isPromoActive(p);
             return (
-              <div key={p.id} className={cn("bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3", !active && "opacity-60")}>
+              <div key={p.id} className={cn("bg-surface border border-border rounded-card p-3", !active && "opacity-60")}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0"><div className="font-medium truncate">{p.name}</div><div className="text-xs text-slate-400 truncate">{p.productName}</div></div>
                   <PromoToggle id={p.id} isActive={p.isActive} />
@@ -72,10 +72,10 @@ export default async function PromotionsPage() {
         </div>
 
         {/* desktop: bảng */}
-        <div className="hidden lg:block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-x-auto">
+        <div className="hidden lg:block bg-surface border border-border rounded-card overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/60 text-left text-xs uppercase text-slate-500">
+              <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
                 <th className="px-4 py-3 font-semibold">{t("promos.cols.name")}</th>
                 <th className="px-4 py-3 font-semibold">{t("orders.cols.product")}</th>
                 <th className="px-4 py-3 font-semibold">{t("promos.cols.tiers")}</th>
@@ -84,11 +84,11 @@ export default async function PromotionsPage() {
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-border-soft">
               {rows.map((p) => {
                 const active = isPromoActive(p);
                 return (
-                  <tr key={p.id} className={cn("hover:bg-slate-50 dark:hover:bg-slate-800/40", !active && "opacity-60")}>
+                  <tr key={p.id} className={cn("hover:bg-surface-2", !active && "opacity-60")}>
                     <td className="px-4 py-3 font-medium">{p.name}</td>
                     <td className="px-4 py-3">{p.productName}</td>
                     <td className="px-4 py-3">
@@ -106,7 +106,7 @@ export default async function PromotionsPage() {
                     <td className="px-4 py-3">
                       <span className={cn(
                         "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
-                        active ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                        active ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-500"
                       )}>
                         {active ? t("promos.active") : t("promos.inactive")}
                       </span>

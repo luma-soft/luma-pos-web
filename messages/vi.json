@@ -16,7 +16,9 @@
     "apply": "Áp dụng",
     "add": "Thêm",
     "saved": "Đã lưu",
-    "done": "Xong"
+    "done": "Xong",
+    "noResults": "Không tìm thấy",
+    "clear": "Xóa chọn"
   },
   "auth": {
     "login": "Đăng nhập",
@@ -545,15 +547,20 @@
     "belowMin": "Dưới tồn tối thiểu",
     "recentMoves": "Biến động gần đây",
     "last20": "20 giao dịch gần nhất",
+    "skuCount": "SKU đang bán",
+    "activeSkus": "Sản phẩm trong kho",
     "searchPlaceholder": "Tìm sản phẩm…",
     "lowOnly": "Chỉ sắp hết",
     "empty": "Không có sản phẩm phù hợp",
     "cols": {
       "stock": "Tồn",
       "min": "Min",
+      "level": "Mức tồn",
       "value": "Giá trị"
     },
-    "statusLow": "Sắp hết",
+    "statusLow": "Nguy hiểm",
+    "statusWarn": "Sắp hết",
+    "statusOut": "Hết hàng",
     "statusOk": "Đủ hàng",
     "movementsTitle": "Lịch sử xuất nhập",
     "noMovements": "Chưa có biến động kho",

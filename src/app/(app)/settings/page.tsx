@@ -6,11 +6,11 @@ export default async function SettingsPage() {
   const t = await getTranslations();
   return (
     <div className="p-6">
-      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center gap-3">
+      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-surface border-b border-border flex items-center gap-3">
         <h1 className="text-[17px] font-bold">{t("nav.settings")}</h1>
       </div>
-      <div className="max-w-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl divide-y divide-slate-100 dark:divide-slate-800">
-        <Link href="/settings/print" className="flex items-center gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/40">
+      <div className="max-w-2xl bg-surface border border-border rounded-card divide-y divide-border-soft">
+        <Link href="/settings/print" className="flex items-center gap-3 p-4 hover:bg-surface-2">
           <div className="w-9 h-9 rounded-lg bg-primary-50 dark:bg-primary-950/40 grid place-items-center">
             <Printer className="w-4.5 h-4.5 text-primary-600" />
           </div>

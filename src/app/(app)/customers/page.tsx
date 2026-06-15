@@ -39,12 +39,12 @@ export default async function CustomersPage({ searchParams }: PageProps) {
 
   return (
     <div className="p-6">
-      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-surface border-b border-border flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-baseline gap-3">
           <h1 className="text-[17px] font-bold">{t("customers.title")}</h1>
           <span className="text-sm text-slate-500">{t("customers.total", { total })}</span>
           <span className="text-sm text-slate-500">·</span>
-          <span className="text-sm text-amber-600 font-medium">{t("customers.totalDebt", { debt: formatCurrency(totalDebt) })}</span>
+          <span className="text-sm text-warn font-medium">{t("customers.totalDebt", { debt: formatCurrency(totalDebt) })}</span>
         </div>
         <Link
           href={Routes.CustomerNew}
@@ -55,7 +55,7 @@ export default async function CustomersPage({ searchParams }: PageProps) {
         </Link>
       </div>
 
-      <div className="flex gap-1 border-b border-slate-200 dark:border-slate-800 mb-4 overflow-x-auto">
+      <div className="flex gap-1 border-b border-border mb-4 overflow-x-auto">
         {TYPE_TABS.map((tab) => (
           <Link
             key={tab}
@@ -83,16 +83,16 @@ export default async function CustomersPage({ searchParams }: PageProps) {
           <input
             type="text" name="q" defaultValue={params.q ?? ""}
             placeholder={t("customers.searchPlaceholder")}
-            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface"
           />
         </div>
-        <button type="submit" className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800">
+        <button type="submit" className="px-4 py-2 text-sm font-medium rounded-lg border border-border bg-surface hover:bg-surface-2">
           {t("common.search")}
         </button>
       </form>
 
       {rows.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-12 text-center text-slate-400">
+        <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">
           <Users className="w-10 h-10 mx-auto mb-3 opacity-60" />
           <p className="font-medium">{t("customers.empty")}</p>
         </div>
@@ -103,7 +103,7 @@ export default async function CustomersPage({ searchParams }: PageProps) {
           {rows.map((c) => {
             const debt = Number(c.currentDebt);
             return (
-              <Link key={c.id} href={Routes.customer(c.id)} className="block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3">
+              <Link key={c.id} href={Routes.customer(c.id)} className="block bg-surface border border-border rounded-card p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="font-medium truncate">{c.name}</div>
@@ -113,7 +113,7 @@ export default async function CustomersPage({ searchParams }: PageProps) {
                 </div>
                 <div className="flex items-center justify-between mt-2 text-sm">
                   <span className="text-slate-500">{t("customers.cols.totalSpent")}: <span className="tabular-nums text-slate-700 dark:text-slate-300">{formatCurrency(Number(c.totalSpent))}</span></span>
-                  {debt > 0 && <span className="text-red-600 font-semibold tabular-nums">{t("customers.cols.debt")}: {formatCurrency(debt)}</span>}
+                  {debt > 0 && <span className="text-er font-semibold tabular-nums">{t("customers.cols.debt")}: {formatCurrency(debt)}</span>}
                 </div>
               </Link>
             );
@@ -121,10 +121,10 @@ export default async function CustomersPage({ searchParams }: PageProps) {
         </div>
 
         {/* desktop: bảng */}
-        <div className="hidden lg:block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-x-auto">
+        <div className="hidden lg:block bg-surface border border-border rounded-card overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/60 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr className="bg-canvas text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-4 py-3 font-semibold">{t("customers.cols.name")}</th>
                 <th className="px-4 py-3 font-semibold">{t("customers.cols.phone")}</th>
                 <th className="px-4 py-3 font-semibold">{t("customers.cols.type")}</th>
@@ -133,12 +133,12 @@ export default async function CustomersPage({ searchParams }: PageProps) {
                 <th className="px-4 py-3 font-semibold text-right">{t("customers.cols.debtLimit")}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-border-soft">
               {rows.map((c) => {
                 const debt = Number(c.currentDebt);
                 const limit = Number(c.debtLimit ?? 0);
                 return (
-                  <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <tr key={c.id} className="hover:bg-surface-2">
                     <td className="px-4 py-3">
                       <Link href={Routes.customer(c.id)} className="font-medium text-primary-600 hover:underline">{c.name}</Link>
                       <div className="text-xs text-slate-400">{c.code}</div>
@@ -146,7 +146,7 @@ export default async function CustomersPage({ searchParams }: PageProps) {
                     <td className="px-4 py-3 text-slate-500">{c.phone ?? "—"}</td>
                     <td className="px-4 py-3"><CustomerTypeBadge type={c.type} /></td>
                     <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(Number(c.totalSpent))}</td>
-                    <td className={cn("px-4 py-3 text-right tabular-nums font-semibold", debt > 0 ? "text-red-600" : "text-slate-400")}>
+                    <td className={cn("px-4 py-3 text-right tabular-nums font-semibold", debt > 0 ? "text-er" : "text-slate-400")}>
                       {debt > 0 ? formatCurrency(debt) : "—"}
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums text-slate-500">

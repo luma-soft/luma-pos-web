@@ -90,7 +90,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
             value={warehouseId}
             onChange={(e) => router.push(`${Routes.StocktakeNew}?wh=${e.target.value}`)}
             disabled={lines.length > 0}
-            className="px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 disabled:opacity-60"
+            className="px-3 py-2 text-sm rounded-lg border border-border bg-surface disabled:opacity-60"
             title={lines.length > 0 ? t("stocktakes.warehouseLocked") : undefined}
           >
             {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
@@ -104,14 +104,14 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
         <input
           value={search} onChange={(e) => setSearch(e.target.value)}
           placeholder={t("stocktakes.searchPlaceholder")}
-          className="w-full pl-9 pr-3 py-2.5 text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+          className="w-full pl-9 pr-3 py-2.5 text-sm rounded-card border border-border bg-surface"
         />
         {suggestions.length > 0 && (
-          <div className="absolute z-20 mt-1 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg overflow-hidden">
+          <div className="absolute z-20 mt-1 w-full bg-surface border border-slate-200 dark:border-slate-700 rounded-card shadow-lg overflow-hidden">
             {suggestions.map((p) => (
               <button
                 key={p.id} onClick={() => addLine(p)}
-                className="w-full flex items-center justify-between px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 text-left"
+                className="w-full flex items-center justify-between px-4 py-2.5 text-sm hover:bg-surface-2 text-left"
               >
                 <span><b>{p.name}</b> <span className="text-slate-400 text-xs">{p.sku}</span></span>
                 <span className="text-slate-500 tabular-nums">{t("pos.stockLabel")}: {formatNumber(p.stock)} {p.baseUnit}</span>
@@ -122,13 +122,13 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
       </div>
 
       {/* lines */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden mb-4">
+      <div className="bg-surface border border-border rounded-card overflow-hidden mb-4">
         {lines.length === 0 ? (
           <p className="p-10 text-center text-sm text-slate-400">{t("stocktakes.noLines")}</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/60 text-left text-xs uppercase text-slate-500">
+              <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
                 <th className="px-4 py-3 font-semibold">{t("orders.cols.product")}</th>
                 <th className="px-4 py-3 font-semibold text-right">{t("stocktakes.cols.systemQty")}</th>
                 <th className="px-4 py-3 font-semibold text-right w-36">{t("stocktakes.cols.actualQty")}</th>
@@ -137,7 +137,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
                 <th className="w-10"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-border-soft">
               {lines.map((l) => {
                 const diff = l.actualQty - l.product.stock;
                 return (
@@ -151,13 +151,13 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
                       <input
                         type="number" min={0} value={l.actualQty}
                         onChange={(e) => setQty(l.product.id, Number(e.target.value))}
-                        className="w-28 px-2 py-1.5 text-right text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 tabular-nums"
+                        className="w-28 px-2 py-1.5 text-right text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-surface tabular-nums"
                       />
                     </td>
-                    <td className={cn("px-4 py-2.5 text-right tabular-nums font-semibold", diff > 0 ? "text-emerald-600" : diff < 0 ? "text-red-600" : "text-slate-400")}>
+                    <td className={cn("px-4 py-2.5 text-right tabular-nums font-semibold", diff > 0 ? "text-ok" : diff < 0 ? "text-er" : "text-slate-400")}>
                       {Math.abs(diff) < 1e-9 ? <Check className="w-4 h-4 inline text-emerald-500" /> : `${diff > 0 ? "+" : ""}${formatNumber(diff)}`}
                     </td>
-                    <td className={cn("px-4 py-2.5 text-right tabular-nums", diff !== 0 ? (diff > 0 ? "text-emerald-600" : "text-red-600") : "text-slate-400")}>
+                    <td className={cn("px-4 py-2.5 text-right tabular-nums", diff !== 0 ? (diff > 0 ? "text-ok" : "text-er") : "text-slate-400")}>
                       {diff !== 0 ? formatCurrency(diff * l.product.costPrice) : "—"}
                     </td>
                     <td className="px-4 py-2.5">
@@ -174,27 +174,27 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
       </div>
 
       {/* summary + actions */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex items-end justify-between flex-wrap gap-4">
+      <div className="bg-surface border border-border rounded-card p-5 flex items-end justify-between flex-wrap gap-4">
         <div className="text-sm space-y-1 min-w-56">
           <div className="flex gap-6 justify-between"><span className="text-slate-500">{t("stocktakes.summary.checked")}</span><b className="tabular-nums">{lines.length}</b></div>
-          <div className="flex gap-6 justify-between"><span className="text-slate-500">{t("stocktakes.summary.matched")}</span><b className="tabular-nums text-emerald-600">{totals.matched}</b></div>
-          <div className="flex gap-6 justify-between"><span className="text-slate-500">{t("stocktakes.summary.diff")}</span><b className="tabular-nums text-amber-600">{totals.diffCount}</b></div>
+          <div className="flex gap-6 justify-between"><span className="text-slate-500">{t("stocktakes.summary.matched")}</span><b className="tabular-nums text-ok">{totals.matched}</b></div>
+          <div className="flex gap-6 justify-between"><span className="text-slate-500">{t("stocktakes.summary.diff")}</span><b className="tabular-nums text-warn">{totals.diffCount}</b></div>
           <div className="flex gap-6 justify-between"><span className="text-slate-500">{t("stocktakes.cols.diffValue")}</span>
-            <b className={cn("tabular-nums", totals.diffValue > 0 ? "text-emerald-600" : totals.diffValue < 0 ? "text-red-600" : "")}>{formatCurrency(totals.diffValue)}</b>
+            <b className={cn("tabular-nums", totals.diffValue > 0 ? "text-ok" : totals.diffValue < 0 ? "text-er" : "")}>{formatCurrency(totals.diffValue)}</b>
           </div>
         </div>
         <div className="flex-1 min-w-60">
           <input
             value={note} onChange={(e) => setNote(e.target.value)}
             placeholder={t("orders.detail.notePlaceholder")}
-            className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+            className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-surface"
           />
-          {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+          {error && <p className="text-xs text-er mt-2">{error}</p>}
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => submit(false)} disabled={!!busy || lines.length === 0}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-medium disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border text-sm font-medium disabled:opacity-50"
           >
             {busy === "draft" ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             {t("stocktakes.saveDraft")}

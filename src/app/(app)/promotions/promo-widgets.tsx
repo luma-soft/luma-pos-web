@@ -47,9 +47,9 @@ export function PromoQuickCreate({ products }: { products: ProductOption[] }) {
     );
   }
 
-  const cls = "px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900";
+  const cls = "px-3 py-2 text-sm rounded-lg border border-border bg-surface";
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 w-full max-w-xl space-y-3">
+    <div className="bg-surface border border-border rounded-card p-4 w-full max-w-xl space-y-3">
       <div className="flex justify-between items-center">
         <b className="text-sm">{t("promos.createNew")}</b>
         <button onClick={() => setOpen(false)} className="p-1 text-slate-400"><X className="w-4 h-4" /></button>
@@ -86,7 +86,7 @@ export function PromoQuickCreate({ products }: { products: ProductOption[] }) {
           + {t("promos.addTier")}
         </button>
       </div>
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-er">{error}</p>}
       <button onClick={submit} disabled={busy || !name.trim() || !productId}
         className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium disabled:opacity-50 inline-flex items-center gap-2">
         {busy && <Loader2 className="w-4 h-4 animate-spin" />}

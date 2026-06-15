@@ -25,7 +25,7 @@ export function MergeConfirm({ ids, disabled }: { ids: string[]; disabled: boole
 
   return (
     <div className="flex flex-col items-end gap-2">
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-er">{error}</p>}
       <button
         onClick={confirm} disabled={disabled || busy}
         className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium disabled:opacity-50"

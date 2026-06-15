@@ -9,7 +9,7 @@ function setMobileNav(open: boolean) {
 
 export function MobileNavButton() {
   return (
-    <button onClick={() => setMobileNav(true)} className="p-2 -ml-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="menu">
+    <button onClick={() => setMobileNav(true)} className="p-2 -ml-1 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-surface-2" aria-label="menu">
       <Menu className="w-5 h-5" />
     </button>
   );

@@ -71,7 +71,7 @@ export function PrintSettingsForm({ templates }: { templates: Record<PrintDocTyp
     }
   }
 
-  const inputCls = "w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900";
+  const inputCls = "w-full px-3 py-2 text-sm rounded-lg border border-border bg-surface";
 
   return (
     <div className="p-6 max-w-5xl">
@@ -83,7 +83,7 @@ export function PrintSettingsForm({ templates }: { templates: Record<PrintDocTyp
       </div>
 
       {/* doc type tabs */}
-      <div className="flex gap-1 border-b border-slate-200 dark:border-slate-800 mb-5 overflow-x-auto">
+      <div className="flex gap-1 border-b border-border mb-5 overflow-x-auto">
         {DOC_TYPES.map((dt) => (
           <button
             key={dt}
@@ -103,7 +103,7 @@ export function PrintSettingsForm({ templates }: { templates: Record<PrintDocTyp
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
         <div className="space-y-4">
           {/* store info */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-3">
+          <div className="bg-surface border border-border rounded-card p-5 space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-sm">{t("printSettings.storeSection")}</h2>
               <button onClick={applyStoreToAll} className="text-xs font-medium text-primary-600 hover:underline">
@@ -150,7 +150,7 @@ export function PrintSettingsForm({ templates }: { templates: Record<PrintDocTyp
           </div>
 
           {/* options */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-3">
+          <div className="bg-surface border border-border rounded-card p-5 space-y-3">
             <h2 className="font-semibold text-sm">{t("printSettings.optionsSection")}</h2>
             <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
               {TOGGLES.map((k) => (
@@ -163,7 +163,7 @@ export function PrintSettingsForm({ templates }: { templates: Record<PrintDocTyp
           </div>
 
           {/* footer */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
+          <div className="bg-surface border border-border rounded-card p-5">
             <label className="block text-xs font-medium text-slate-500 mb-1">{t("printSettings.footerNote")}</label>
             <textarea
               rows={2} value={tpl.footerNote}
@@ -180,7 +180,7 @@ export function PrintSettingsForm({ templates }: { templates: Record<PrintDocTyp
               {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {t("printSettings.saveFor", { type: t(`printSettings.docTypes.${docType}`) })}
             </button>
-            {msg && <span className={cn("text-sm", msg.ok ? "text-emerald-600" : "text-red-600")}>{msg.text}</span>}
+            {msg && <span className={cn("text-sm", msg.ok ? "text-ok" : "text-er")}>{msg.text}</span>}
           </div>
         </div>
 

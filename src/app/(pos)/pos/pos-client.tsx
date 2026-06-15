@@ -496,7 +496,7 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
               "group flex items-center gap-1.5 pl-3 pr-1.5 py-2 rounded-lg cursor-pointer whitespace-nowrap border text-sm transition-colors",
               isActive
                 ? "bg-primary-50 border-primary-300 text-primary-700 font-semibold dark:bg-primary-950/50 dark:border-primary-800 dark:text-primary-300"
-                : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                : "bg-surface border-border text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
             )}
           >
             <ShoppingCart className={cn("w-3.5 h-3.5 shrink-0", isActive ? "text-primary-600" : "text-slate-400")} />
@@ -510,7 +510,7 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
             {invoices.length > 1 && (
               <button
                 onClick={(e) => { e.stopPropagation(); closeInvoice(inv.id); }}
-                className="p-0.5 rounded text-slate-400 hover:text-red-500 hover:bg-slate-200/70 dark:hover:bg-slate-700"
+                className="p-0.5 rounded text-slate-400 hover:text-er hover:bg-slate-200/70 dark:hover:bg-slate-700"
                 title={t("pos.invoice.close")}
               >
                 <X className="w-3 h-3" />
@@ -522,7 +522,7 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
       <button
         onClick={addInvoice}
         title={t("pos.invoice.add")}
-        className="shrink-0 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-primary-600 hover:border-primary-300"
+        className="shrink-0 px-2.5 rounded-lg border border-border text-slate-400 hover:text-primary-600 hover:border-primary-300"
       >
         <Plus className="w-4 h-4" />
       </button>
@@ -531,8 +531,8 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
 
   // Danh sách dòng hàng đã chọn — hiển thị ở khu chính (giống KiotViet).
   const orderLinesPanel = (
-    <div className="flex-1 flex flex-col min-h-0 border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-slate-900 overflow-hidden">
-      <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-800 flex items-center">
+    <div className="flex-1 flex flex-col min-h-0 border border-border rounded-xl bg-surface overflow-hidden">
+      <div className="px-3 py-2 border-b border-border flex items-center">
         <h2 className="font-semibold text-sm">{t("pos.order")} ({cart.length})</h2>
       </div>
       <div className="flex-1 overflow-auto p-3 space-y-2">
@@ -561,7 +561,7 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
                 setOverKey(null);
               }}
               className={cn(
-                "relative bg-slate-50 dark:bg-slate-800 rounded-lg p-3 transition-shadow",
+                "relative bg-surface-2 rounded-lg p-3 transition-shadow",
                 dragKey === l.key && "opacity-50",
                 overKey === l.key && dragKey && dragKey !== l.key &&
                   "ring-2 ring-primary-500 ring-offset-1 dark:ring-offset-slate-900"
@@ -608,7 +608,7 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
                   </button>
                   {m2 > 0 && <div className="text-xs text-primary-600 mt-0.5">≈ {m2.toFixed(2)} m²</div>}
                 </div>
-                <button onClick={() => setCart((c) => c.filter((x) => x.key !== l.key))} className="text-slate-400 hover:text-red-500 shrink-0">
+                <button onClick={() => setCart((c) => c.filter((x) => x.key !== l.key))} className="text-slate-400 hover:text-er shrink-0">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
@@ -622,22 +622,22 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
               )}
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
-                  <button onClick={() => updateQty(l.key, -1)} className="w-7 h-7 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 grid place-items-center">
+                  <button onClick={() => updateQty(l.key, -1)} className="w-7 h-7 rounded-md bg-surface border border-border grid place-items-center">
                     <Minus className="w-3 h-3" />
                   </button>
                   <input
                     type="number"
                     value={l.quantity}
                     onChange={(e) => setQty(l.key, Number(e.target.value))}
-                    className="no-spinner w-14 px-1 py-1 text-center text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                    className="no-spinner w-14 px-1 py-1 text-center text-sm rounded-md border border-border bg-surface"
                   />
-                  <button onClick={() => updateQty(l.key, 1)} className="w-7 h-7 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 grid place-items-center">
+                  <button onClick={() => updateQty(l.key, 1)} className="w-7 h-7 rounded-md bg-surface border border-border grid place-items-center">
                     <Plus className="w-3 h-3" />
                   </button>
                   <select
                     value={l.unitName}
                     onChange={(e) => changeUnit(l.key, e.target.value)}
-                    className="text-xs px-1.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                    className="text-xs px-1.5 py-1 rounded-md border border-border bg-surface"
                   >
                     <option value={l.product.baseUnit}>{l.product.baseUnit}</option>
                     {l.product.units.map((u) => (
@@ -677,7 +677,7 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
         {/* nút sang trang thanh toán — chỉ mobile */}
         {cart.length > 0 && (
           <button onClick={() => setMobileView("cart")}
-            className="lg:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-40 inline-flex items-center gap-2 px-5 py-3 rounded-full bg-primary-600 text-white font-semibold shadow-lg">
+            className="lg:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-40 inline-flex items-center gap-2 px-5 py-3 rounded-full bg-primary-600 text-white font-semibold shadow-e2">
             <ShoppingCart className="w-4 h-4" /> {t("pos.checkout")} ({cart.reduce((s, l) => s + l.quantity, 0)}) · {formatCurrency(total)}
           </button>
         )}
@@ -690,14 +690,14 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
               onChange={(e) => setSearch(e.target.value)}
               onFocus={() => setBrowsing(true)}
               placeholder={t("pos.searchPlaceholder")}
-              className="w-full pl-10 pr-10 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+              className="w-full pl-10 pr-10 py-3 rounded-xl border border-border bg-surface"
             />
             {showResults && (
               <button
                 type="button"
                 onClick={closeSearch}
                 title={t("common.close")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 z-10 grid place-items-center w-7 h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 z-10 grid place-items-center w-7 h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-surface-2"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -705,7 +705,7 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
 
             {/* dropdown kết quả nổi dưới ô tìm — giỏ hàng vẫn hiện phía sau */}
             {showResults && (
-              <div className="absolute left-0 right-0 top-full mt-1 z-40 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl max-h-[64vh] overflow-auto">
+              <div className="absolute left-0 right-0 top-full mt-1 z-40 bg-surface border border-border rounded-xl shadow-e2 max-h-[64vh] overflow-auto">
                 {searching ? (
                   <div className="px-4 py-6 text-center text-sm text-slate-400">
                     <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />{t("common.search")}…</span>
@@ -723,24 +723,24 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
                           onClick={line ? undefined : () => addToCart(p)}
                           className={cn(
                             "flex items-center gap-3 px-3 py-2 text-left",
-                            line ? "bg-primary-50 dark:bg-primary-950/40" : "hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                            line ? "bg-primary-50 dark:bg-primary-950/40" : "hover:bg-surface-2 cursor-pointer"
                           )}
                         >
-                          <div className="w-9 h-9 rounded-md bg-slate-100 dark:bg-slate-800 grid place-items-center text-lg shrink-0">{categoryEmoji(p.categoryName)}</div>
+                          <div className="w-9 h-9 rounded-md bg-surface-2 grid place-items-center text-lg shrink-0">{categoryEmoji(p.categoryName)}</div>
                           <div className="min-w-0 flex-1">
                             <div className="text-sm font-medium truncate">{p.name}</div>
-                            <div className={cn("text-xs", stock <= 0 ? "text-red-500" : "text-slate-400")}>{t("pos.stockLabel")} {formatNumber(stock)} {p.baseUnit}</div>
+                            <div className={cn("text-xs", stock <= 0 ? "text-er" : "text-slate-400")}>{t("pos.stockLabel")} {formatNumber(stock)} {p.baseUnit}</div>
                           </div>
                           {line ? (
                             <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <button onClick={() => updateQty(line.key, -1)} className="w-7 h-7 rounded-md border border-slate-200 dark:border-slate-700 grid place-items-center"><Minus className="w-3 h-3" /></button>
+                              <button onClick={() => updateQty(line.key, -1)} className="w-7 h-7 rounded-md border border-border grid place-items-center"><Minus className="w-3 h-3" /></button>
                               <input
                                 type="number"
                                 value={line.quantity}
                                 onChange={(e) => setQty(line.key, Number(e.target.value))}
-                                className="no-spinner w-12 px-1 py-1 text-center text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                                className="no-spinner w-12 px-1 py-1 text-center text-sm rounded-md border border-border bg-surface"
                               />
-                              <button onClick={() => updateQty(line.key, 1)} className="w-7 h-7 rounded-md border border-slate-200 dark:border-slate-700 grid place-items-center"><Plus className="w-3 h-3" /></button>
+                              <button onClick={() => updateQty(line.key, 1)} className="w-7 h-7 rounded-md border border-border grid place-items-center"><Plus className="w-3 h-3" /></button>
                             </div>
                           ) : (
                             <div className="text-sm font-semibold text-primary-600 tabular-nums shrink-0">{formatCurrency(basePriceFor(p, priceBook))}/{p.baseUnit}</div>
@@ -780,17 +780,17 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
           if (p) addToCart(p);
         }}
         className={cn(
-          "w-full lg:w-[560px] shrink-0 bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-800 flex flex-col transition-colors",
+          "w-full lg:w-[560px] shrink-0 bg-surface border-l border-border flex flex-col transition-colors",
           mobileView === "catalog" && "hidden lg:flex",
           dropHover && "bg-primary-50/60 dark:bg-primary-950/30 border-l-primary-400"
         )}
       >
         {/* nút quay lại danh sách SP — chỉ mobile */}
-        <button onClick={() => setMobileView("catalog")} className="lg:hidden flex items-center gap-1.5 px-3 py-2 text-sm text-primary-600 border-b border-slate-200 dark:border-slate-800">
+        <button onClick={() => setMobileView("catalog")} className="lg:hidden flex items-center gap-1.5 px-3 py-2 text-sm text-primary-600 border-b border-border">
           <X className="w-4 h-4" /> {t("pos.searchPlaceholder")}
         </button>
         {/* customer + bảng giá */}
-        <div className="p-3 border-b border-slate-200 dark:border-slate-800 space-y-2">
+        <div className="p-3 border-b border-border space-y-2">
           <div className="flex gap-2">
             <div className="flex-1 min-w-0">
               <Combobox
@@ -816,7 +816,7 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
             </Button>
           </div>
           {customer && Number(customer.currentDebt) > 0 && (
-            <p className="text-xs text-amber-600">
+            <p className="text-xs text-warn">
               {t("pos.customerDebt", { debt: formatCurrency(Number(customer.currentDebt)) })}
             </p>
           )}
@@ -833,13 +833,13 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
               value={projectName}
               onChange={(e) => { setProjectName(e.target.value); setProjectId(""); }}
               placeholder={t("pos.projectPlaceholder")}
-              className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+              className="flex-1 px-3 py-2 text-sm rounded-lg border border-border bg-surface"
             />
           </div>
         </div>
 
         {/* totals + payment — đẩy lên ngay dưới khách hàng */}
-        <div className="p-3 border-t border-slate-200 dark:border-slate-800 space-y-2 text-sm">
+        <div className="p-3 border-t border-border space-y-2 text-sm">
           <div className="flex justify-between items-center">
             <span className="text-slate-500">{t("pos.subtotal")}</span>
             <span className="tabular-nums">{formatCurrency(subtotal)}</span>
@@ -850,7 +850,7 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
               value={discount || ""}
               onChange={(v) => setDiscount(v ?? 0)}
               placeholder="0"
-              className="no-spinner w-32 px-2 py-1 text-right text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+              className="no-spinner w-32 px-2 py-1 text-right text-sm rounded-md border border-border bg-surface"
             />
           </div>
           <div className="flex justify-between items-center gap-2">
@@ -859,7 +859,7 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
               value={shippingFee || ""}
               onChange={(v) => setShippingFee(v ?? 0)}
               placeholder="0"
-              className="no-spinner w-32 px-2 py-1 text-right text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+              className="no-spinner w-32 px-2 py-1 text-right text-sm rounded-md border border-border bg-surface"
             />
           </div>
           <div className="flex justify-between text-base font-semibold pt-1">
@@ -871,7 +871,7 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
         <div className="flex-1" />
 
         {/* phương thức + nút — ghim đáy panel */}
-        <div className="p-3 border-t border-slate-200 dark:border-slate-800 space-y-2 text-sm">
+        <div className="p-3 border-t border-border space-y-2 text-sm">
           <div className="grid grid-cols-3 gap-1.5">
             {(["cash", "bank_transfer", "credit"] as PayMethod[]).map((m) => (
               <button
@@ -881,7 +881,7 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
                   "py-1.5 rounded-lg text-xs font-medium border",
                   payMethod === m
                     ? "bg-primary-600 text-white border-primary-600"
-                    : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                    : "border-border text-slate-600 dark:text-slate-300"
                 )}
               >
                 {t(`pos.payMethods.${m}`)}
@@ -898,16 +898,16 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
               <MoneyInput
                 value={paidInput ?? total}
                 onChange={(v) => setPaidInput(v ?? 0)}
-                className="no-spinner w-36 px-2 py-1 text-right text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+                className="no-spinner w-36 px-2 py-1 text-right text-sm rounded-md border border-border bg-surface"
               />
             ) : (
-              <span className="w-36 px-2 py-1 text-right text-sm font-semibold text-amber-600 tabular-nums border border-transparent">
+              <span className="w-36 px-2 py-1 text-right text-sm font-semibold text-warn tabular-nums border border-transparent">
                 {formatCurrency(total)}
               </span>
             )}
           </div>
           {payMethod !== "credit" && remaining > 0 && (
-            <p className="text-xs text-amber-600 text-right">
+            <p className="text-xs text-warn text-right">
               {t("pos.willOweAmount", { amount: formatCurrency(remaining) })}
             </p>
           )}
@@ -919,7 +919,7 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
                 disabled={cart.length === 0 || submitting}
                 onClick={() => setPrintMenuOpen((o) => !o)}
                 title={t("pos.printSlip")}
-                className="h-full px-3 py-3 rounded-xl border border-slate-300 dark:border-slate-700 text-sm font-medium disabled:opacity-50 whitespace-nowrap inline-flex items-center gap-1.5"
+                className="h-full px-3 py-3 rounded-xl border border-border text-sm font-medium disabled:opacity-50 whitespace-nowrap inline-flex items-center gap-1.5"
               >
                 <Printer className="w-4 h-4" />
                 {t("pos.printSlip")}
@@ -927,9 +927,9 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
               {printMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setPrintMenuOpen(false)} />
-                  <div className="absolute bottom-full mb-1 left-0 z-50 min-w-[150px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl overflow-hidden py-1">
-                    <button onClick={() => doPrint("a5")} className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800">{t("pos.printA5")}</button>
-                    <button onClick={() => doPrint("k80")} className="w-full text-left px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-800">{t("pos.printK80")}</button>
+                  <div className="absolute bottom-full mb-1 left-0 z-50 min-w-[150px] bg-surface border border-border rounded-lg shadow-e2 overflow-hidden py-1">
+                    <button onClick={() => doPrint("a5")} className="w-full text-left px-3 py-2 text-sm hover:bg-surface-2">{t("pos.printA5")}</button>
+                    <button onClick={() => doPrint("k80")} className="w-full text-left px-3 py-2 text-sm hover:bg-surface-2">{t("pos.printK80")}</button>
                   </div>
                 </>
               )}
@@ -937,7 +937,7 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
             <button
               disabled={cart.length === 0 || submitting || !data.warehouse}
               onClick={() => submitOrder("quote")}
-              className="px-3 py-3 rounded-xl border border-slate-300 dark:border-slate-700 text-sm font-medium disabled:opacity-50 whitespace-nowrap"
+              className="px-3 py-3 rounded-xl border border-border text-sm font-medium disabled:opacity-50 whitespace-nowrap"
             >
               📑 {t("pos.saveQuote")}
             </button>
@@ -960,10 +960,10 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
           onClick={() => setPriceBookOpen(false)}
         >
           <div
-            className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden"
+            className="w-full max-w-sm bg-surface rounded-2xl shadow-e2 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
               <h3 className="font-semibold flex items-center gap-2">
                 <Tag className="w-4 h-4 text-primary-600" /> {t("pos.priceBook.title")}
               </h3>
@@ -1071,13 +1071,13 @@ function LinePriceEditor({
     <>
       {/* lớp nền để click ra ngoài đóng popup */}
       <div className="fixed inset-0 z-30" onClick={onClose} />
-      <div className="absolute z-40 left-3 right-3 top-12 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-xl p-3 space-y-2.5 text-sm">
+      <div className="absolute z-40 left-3 right-3 top-12 bg-surface rounded-xl border border-border shadow-e2 p-3 space-y-2.5 text-sm">
         <div className="flex items-center justify-between gap-2">
           <span className="text-slate-500 shrink-0">{t("pos.priceEditor.unitPrice")}</span>
           <MoneyInput
             value={price} autoFocus
             onChange={(v) => setPrice(v == null ? "" : String(v))}
-            className="no-spinner w-40 px-2 py-1.5 text-right rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+            className="no-spinner w-40 px-2 py-1.5 text-right rounded-md border border-border bg-surface"
           />
         </div>
         <div className="flex items-center justify-between gap-2">
@@ -1086,16 +1086,16 @@ function LinePriceEditor({
             <input
               type="number" min={0} value={disc === "0" ? "" : disc} placeholder="0"
               onChange={(e) => setDisc(e.target.value)}
-              className="no-spinner w-24 px-2 py-1.5 text-right rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+              className="no-spinner w-24 px-2 py-1.5 text-right rounded-md border border-border bg-surface"
             />
-            <div className="flex rounded-md overflow-hidden border border-slate-200 dark:border-slate-700">
+            <div className="flex rounded-md overflow-hidden border border-border">
               {(["vnd", "pct"] as const).map((m) => (
                 <button
                   key={m}
                   onClick={() => setDiscMode(m)}
                   className={cn(
                     "px-2 py-1.5 text-xs font-semibold",
-                    discMode === m ? "bg-primary-600 text-white" : "bg-white dark:bg-slate-900 text-slate-500"
+                    discMode === m ? "bg-primary-600 text-white" : "bg-surface text-slate-500"
                   )}
                 >
                   {m === "vnd" ? "VND" : "%"}
@@ -1109,7 +1109,7 @@ function LinePriceEditor({
           <span className="font-bold text-primary-600 tabular-nums">{formatCurrency(sell)}</span>
         </div>
         <div className="flex gap-2 pt-1">
-          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-medium">
+          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-border text-slate-600 dark:text-slate-300 font-medium">
             {t("common.cancel")}
           </button>
           <button onClick={apply} className="flex-1 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-semibold">

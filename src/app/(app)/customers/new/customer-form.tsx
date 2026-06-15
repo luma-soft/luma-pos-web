@@ -34,7 +34,7 @@ export function CustomerForm() {
         <Heading as="h1" size="lg" tx="customers.createNew" />
       </div>
 
-      <Form form={form} onSubmit={onSubmit} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-4">
+      <Form form={form} onSubmit={onSubmit} className="bg-surface border border-border rounded-card p-6 space-y-4">
         <FormField name="name" labelTx="customers.fields.name" required>
           {(field) => <Input {...field} placeholderTx="customers.fields.namePlaceholder" />}
         </FormField>
@@ -71,7 +71,7 @@ export function CustomerForm() {
         </FormField>
 
         {form.formState.errors.root && (
-          <p className="text-sm text-red-600">{t(form.formState.errors.root.message ?? "errors.serverError")}</p>
+          <p className="text-sm text-er">{t(form.formState.errors.root.message ?? "errors.serverError")}</p>
         )}
 
         <div className="flex justify-end gap-2 pt-2">

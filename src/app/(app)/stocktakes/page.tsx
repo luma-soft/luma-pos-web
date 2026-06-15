@@ -11,9 +11,9 @@ import { StocktakeRowActions } from "./stocktake-actions";
 export const dynamic = "force-dynamic";
 
 const STATUS_STYLES: Record<string, string> = {
-  draft: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400",
-  balanced: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400",
-  cancelled: "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+  draft: "bg-warn-soft text-warn",
+  balanced: "bg-ok-soft text-ok",
+  cancelled: "bg-surface-2 text-slate-500",
 };
 
 export default async function StocktakesPage() {
@@ -41,7 +41,7 @@ export default async function StocktakesPage() {
 
   return (
     <div className="p-6">
-      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-surface border-b border-border flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-[17px] font-bold">{t("stocktakes.title")}</h1>
         <Link href={Routes.StocktakeNew} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium">
           <Plus className="w-4 h-4" />
@@ -50,7 +50,7 @@ export default async function StocktakesPage() {
       </div>
 
       {rows.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-12 text-center text-slate-400">
+        <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">
           <ClipboardCheck className="w-10 h-10 mx-auto mb-3 opacity-60" />
           <p className="font-medium">{t("stocktakes.empty")}</p>
           <p className="text-sm mt-1">{t("stocktakes.emptyHint")}</p>
@@ -62,7 +62,7 @@ export default async function StocktakesPage() {
           {rows.map((r) => {
             const diff = Number(r.totalDiff);
             return (
-              <div key={r.id} className={cn("bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3", r.status === "cancelled" && "opacity-60")}>
+              <div key={r.id} className={cn("bg-surface border border-border rounded-card p-3", r.status === "cancelled" && "opacity-60")}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0"><div className="font-medium">{r.code}</div><div className="text-xs text-slate-400">{formatDate(r.createdAt)} · {r.warehouseName}</div></div>
                   <div className="flex items-center gap-2 shrink-0">
@@ -72,7 +72,7 @@ export default async function StocktakesPage() {
                 </div>
                 <div className="flex items-center justify-between mt-2 text-sm">
                   <span className="text-slate-500">{r.itemCount} {t("stocktakes.cols.items")}</span>
-                  <span className={cn("tabular-nums font-semibold", diff > 0 ? "text-emerald-600" : diff < 0 ? "text-red-600" : "text-slate-400")}>{diff > 0 ? "+" : ""}{formatNumber(diff)}</span>
+                  <span className={cn("tabular-nums font-semibold", diff > 0 ? "text-ok" : diff < 0 ? "text-er" : "text-slate-400")}>{diff > 0 ? "+" : ""}{formatNumber(diff)}</span>
                 </div>
               </div>
             );
@@ -80,10 +80,10 @@ export default async function StocktakesPage() {
         </div>
 
         {/* desktop: bảng */}
-        <div className="hidden lg:block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-x-auto">
+        <div className="hidden lg:block bg-surface border border-border rounded-card overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/60 text-left text-xs uppercase text-slate-500">
+              <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
                 <th className="px-4 py-3 font-semibold">{t("stocktakes.cols.code")}</th>
                 <th className="px-4 py-3 font-semibold">{t("orders.cols.date")}</th>
                 <th className="px-4 py-3 font-semibold">{t("purchases.cols.warehouse")}</th>
@@ -94,11 +94,11 @@ export default async function StocktakesPage() {
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-border-soft">
               {rows.map((r) => {
                 const diff = Number(r.totalDiff);
                 return (
-                  <tr key={r.id} className={cn("hover:bg-slate-50 dark:hover:bg-slate-800/40", r.status === "cancelled" && "opacity-60")}>
+                  <tr key={r.id} className={cn("hover:bg-surface-2", r.status === "cancelled" && "opacity-60")}>
                     <td className="px-4 py-3">
                       <div className="font-medium">{r.code}</div>
                       {r.byName && <div className="text-xs text-slate-400">{r.byName}</div>}
@@ -106,7 +106,7 @@ export default async function StocktakesPage() {
                     <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{formatDate(r.createdAt)}</td>
                     <td className="px-4 py-3">{r.warehouseName}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{r.itemCount}</td>
-                    <td className={cn("px-4 py-3 text-right tabular-nums font-semibold", diff > 0 ? "text-emerald-600" : diff < 0 ? "text-red-600" : "text-slate-400")}>
+                    <td className={cn("px-4 py-3 text-right tabular-nums font-semibold", diff > 0 ? "text-ok" : diff < 0 ? "text-er" : "text-slate-400")}>
                       {diff > 0 ? "+" : ""}{formatNumber(diff)}
                     </td>
                     <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{r.balancedAt ? formatDate(r.balancedAt) : "—"}</td>

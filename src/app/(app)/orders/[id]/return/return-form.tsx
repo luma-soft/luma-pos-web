@@ -81,10 +81,10 @@ export function ReturnForm({ orderId, orderCode, customerName, customerDebt, has
         <h1 className="text-2xl font-bold">{t("returns.titleFor", { code: orderCode })}</h1>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden mb-4">
+      <div className="bg-surface border border-border rounded-card overflow-hidden mb-4">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-slate-50 dark:bg-slate-800/60 text-left text-xs uppercase text-slate-500">
+            <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
               <th className="px-4 py-3 font-semibold">{t("orders.cols.product")}</th>
               <th className="px-4 py-3 font-semibold text-right">{t("returns.cols.bought")}</th>
               <th className="px-4 py-3 font-semibold text-right">{t("returns.cols.returned")}</th>
@@ -93,7 +93,7 @@ export function ReturnForm({ orderId, orderCode, customerName, customerDebt, has
               <th className="px-4 py-3 font-semibold text-right">{t("returns.cols.refund")}</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          <tbody className="divide-y divide-border-soft">
             {items.map((i) => {
               const max = i.quantity - i.returned;
               const q = qty[i.orderItemId] ?? 0;
@@ -110,7 +110,7 @@ export function ReturnForm({ orderId, orderCode, customerName, customerDebt, has
                       type="number" min={0} max={max} value={q}
                       disabled={max <= 0}
                       onChange={(e) => setQty(i.orderItemId, Number(e.target.value), max)}
-                      className="w-24 px-2 py-1.5 text-right text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 tabular-nums disabled:opacity-50"
+                      className="w-24 px-2 py-1.5 text-right text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-surface tabular-nums disabled:opacity-50"
                     />
                   </td>
                   <td className="px-4 py-3">
@@ -118,13 +118,13 @@ export function ReturnForm({ orderId, orderCode, customerName, customerDebt, has
                       value={restock[i.orderItemId] ? "1" : "0"}
                       onChange={(e) => setRestock((m) => ({ ...m, [i.orderItemId]: e.target.value === "1" }))}
                       disabled={q <= 0}
-                      className="px-2 py-1.5 text-xs rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 disabled:opacity-50"
+                      className="px-2 py-1.5 text-xs rounded-md border border-slate-200 dark:border-slate-700 bg-surface disabled:opacity-50"
                     >
                       <option value="1">{t("returns.restockYes")}</option>
                       <option value="0">{t("returns.restockNo")}</option>
                     </select>
                   </td>
-                  <td className="px-4 py-3 text-right tabular-nums font-medium text-red-600">
+                  <td className="px-4 py-3 text-right tabular-nums font-medium text-er">
                     {q > 0 ? `− ${formatCurrency(q * i.unitPrice)}` : "—"}
                   </td>
                 </tr>
@@ -134,12 +134,12 @@ export function ReturnForm({ orderId, orderCode, customerName, customerDebt, has
         </table>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
+      <div className="bg-surface border border-border rounded-card p-5 space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">{t("returns.reason")} *</label>
             <select value={reason} onChange={(e) => setReason(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900">
+              className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-surface">
               <option value="">{t("returns.pickReason")}</option>
               <option value="defective">{t("returns.reasons.defective")}</option>
               <option value="wrong_item">{t("returns.reasons.wrong_item")}</option>
@@ -167,7 +167,7 @@ export function ReturnForm({ orderId, orderCode, customerName, customerDebt, has
               })}
             </div>
             {refundMethod === "debt_deduct" && (
-              <p className={cn("text-xs mt-1", debtTooSmall ? "text-red-600" : "text-slate-400")}>
+              <p className={cn("text-xs mt-1", debtTooSmall ? "text-er" : "text-slate-400")}>
                 {t("returns.currentDebtOf", { name: customerName ?? "", debt: formatCurrency(customerDebt) })}
               </p>
             )}
@@ -177,16 +177,16 @@ export function ReturnForm({ orderId, orderCode, customerName, customerDebt, has
         <input
           value={note} onChange={(e) => setNote(e.target.value)}
           placeholder={t("orders.detail.notePlaceholder")}
-          className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+          className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-surface"
         />
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        {debtTooSmall && <p className="text-sm text-red-600">{t("returns.errors.debtTooSmall")}</p>}
+        {error && <p className="text-sm text-er">{error}</p>}
+        {debtTooSmall && <p className="text-sm text-er">{t("returns.errors.debtTooSmall")}</p>}
 
-        <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800">
+        <div className="flex items-center justify-between pt-2 border-t border-border">
           <div className="text-sm">
             <span className="text-slate-500">{t("returns.totalRefund")}: </span>
-            <b className="text-red-600 tabular-nums text-base">{formatCurrency(totalRefund)}</b>
+            <b className="text-er tabular-nums text-base">{formatCurrency(totalRefund)}</b>
           </div>
           <button
             onClick={submit}

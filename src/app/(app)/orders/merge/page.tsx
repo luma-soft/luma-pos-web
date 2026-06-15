@@ -46,15 +46,15 @@ export default async function MergeOrdersPage({ searchParams }: Props) {
       <h1 className="text-2xl font-bold mb-5">{t("merge.title")}</h1>
 
       {rows.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-10 text-center text-slate-400">
+        <div className="bg-surface border border-dashed border-border rounded-card p-10 text-center text-slate-400">
           <p>{t("merge.noneSelected")}</p>
           <Link href={Routes.Orders} className="text-primary-600 hover:underline text-sm mt-2 inline-block">← {t("orders.title")}</Link>
         </div>
       ) : (
         <>
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden mb-4">
+          <div className="bg-surface border border-border rounded-card overflow-hidden mb-4">
             <table className="w-full text-sm">
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody className="divide-y divide-border-soft">
                 {rows.map((o) => {
                   const bad = o.status !== "completed" || !o.customerId;
                   return (
@@ -65,8 +65,8 @@ export default async function MergeOrdersPage({ searchParams }: Props) {
                       <td className="px-4 py-3 text-right tabular-nums font-medium">{formatCurrency(Number(o.total))}</td>
                       <td className="px-4 py-3 text-xs">
                         {bad
-                          ? <span className="text-red-600 font-medium">{!o.customerId ? t("merge.errNoCustomer") : t("merge.errStatus")}</span>
-                          : <span className="text-emerald-600">✓</span>}
+                          ? <span className="text-er font-medium">{!o.customerId ? t("merge.errNoCustomer") : t("merge.errStatus")}</span>
+                          : <span className="text-ok">✓</span>}
                       </td>
                     </tr>
                   );
@@ -75,15 +75,15 @@ export default async function MergeOrdersPage({ searchParams }: Props) {
             </table>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
+          <div className="bg-surface border border-border rounded-card p-5">
             {!sameCustomer && rows.length > 1 && (
-              <p className="text-sm text-red-600 mb-3">{t("merge.errors.sameCustomer")}</p>
+              <p className="text-sm text-er mb-3">{t("merge.errors.sameCustomer")}</p>
             )}
             <div className="flex items-end justify-between flex-wrap gap-4">
               <div className="text-sm space-y-1">
                 <div className="flex gap-6 justify-between"><span className="text-slate-500">{t("merge.totalMerged", { count: eligible.length })}</span><b className="tabular-nums">{formatCurrency(total)}</b></div>
-                <div className="flex gap-6 justify-between"><span className="text-slate-500">{t("print.paid")}</span><span className="tabular-nums text-emerald-600">{formatCurrency(paid)}</span></div>
-                <div className="flex gap-6 justify-between"><span className="text-slate-500">{t("orders.detail.remaining")}</span><span className="tabular-nums font-semibold text-red-600">{formatCurrency(Math.max(0, total - paid))}</span></div>
+                <div className="flex gap-6 justify-between"><span className="text-slate-500">{t("print.paid")}</span><span className="tabular-nums text-ok">{formatCurrency(paid)}</span></div>
+                <div className="flex gap-6 justify-between"><span className="text-slate-500">{t("orders.detail.remaining")}</span><span className="tabular-nums font-semibold text-er">{formatCurrency(Math.max(0, total - paid))}</span></div>
               </div>
               <MergeConfirm ids={eligible.map((o) => o.id)} disabled={!canMerge} />
             </div>

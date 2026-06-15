@@ -16,7 +16,9 @@
     "apply": "Apply",
     "add": "Add",
     "saved": "Saved",
-    "done": "Done"
+    "done": "Done",
+    "noResults": "No results",
+    "clear": "Clear"
   },
   "auth": {
     "login": "Sign in",
@@ -545,16 +547,21 @@
     "belowMin": "Below minimum",
     "recentMoves": "Recent movements",
     "last20": "Last 20 entries",
+    "skuCount": "Active SKUs",
+    "activeSkus": "Products in stock",
     "searchPlaceholder": "Search products…",
     "lowOnly": "Low only",
     "empty": "No matching products",
     "cols": {
       "stock": "Stock",
       "min": "Min",
+      "level": "Level",
       "value": "Value"
     },
-    "statusLow": "Low",
-    "statusOk": "OK",
+    "statusLow": "Critical",
+    "statusWarn": "Low",
+    "statusOut": "Out",
+    "statusOk": "In stock",
     "movementsTitle": "Stock movements",
     "noMovements": "No movements yet",
     "moveTypes": {

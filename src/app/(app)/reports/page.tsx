@@ -22,7 +22,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
 
   return (
     <div className="p-6 space-y-5">
-      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-surface border-b border-border flex items-center justify-between gap-3 flex-wrap">
         <h1 className="text-[17px] font-bold">{t("reports.title")}</h1>
         <div className="flex gap-1.5">
           {RANGES.map((r) => (
@@ -31,7 +31,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
               href={`${Routes.Reports}?range=${r}`}
               className={cn(
                 "px-3 py-1.5 rounded-lg text-sm font-medium border",
-                range === r ? "bg-primary-600 text-white border-primary-600" : "border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                range === r ? "bg-primary-600 text-white border-primary-600" : "border-border text-slate-600 dark:text-slate-300"
               )}
             >
               {t("reports.lastNDays", { n: r })}
@@ -41,19 +41,19 @@ export default async function ReportsPage({ searchParams }: PageProps) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5">
+        <div className="bg-surface rounded-card border border-border p-5">
           <div className="text-sm text-slate-500">{t("reports.revenue")}</div>
           <div className="text-2xl font-bold tabular-nums mt-1">{formatCurrency(data.summary.revenue)}</div>
         </div>
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5">
+        <div className="bg-surface rounded-card border border-border p-5">
           <div className="text-sm text-slate-500">{t("reports.collected")}</div>
-          <div className="text-2xl font-bold tabular-nums mt-1 text-emerald-600">{formatCurrency(data.summary.collected)}</div>
+          <div className="text-2xl font-bold tabular-nums mt-1 text-ok">{formatCurrency(data.summary.collected)}</div>
         </div>
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5">
+        <div className="bg-surface rounded-card border border-border p-5">
           <div className="text-sm text-slate-500">{t("reports.uncollected")}</div>
-          <div className={cn("text-2xl font-bold tabular-nums mt-1", uncollected > 0 ? "text-red-600" : "")}>{formatCurrency(uncollected)}</div>
+          <div className={cn("text-2xl font-bold tabular-nums mt-1", uncollected > 0 ? "text-er" : "")}>{formatCurrency(uncollected)}</div>
         </div>
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5">
+        <div className="bg-surface rounded-card border border-border p-5">
           <div className="text-sm text-slate-500">{t("reports.orders")}</div>
           <div className="text-2xl font-bold tabular-nums mt-1">{data.summary.orderCount}</div>
           <div className="text-xs text-slate-400 mt-1">
@@ -62,7 +62,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5">
+      <div className="bg-surface rounded-card border border-border p-5">
         <h2 className="font-semibold text-sm mb-4">{t("dashboard.revenueByDay")}</h2>
         {data.byDay.length === 0 ? (
           <p className="text-sm text-slate-400 py-8 text-center">{t("dashboard.noData")}</p>
@@ -82,21 +82,21 @@ export default async function ReportsPage({ searchParams }: PageProps) {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 font-semibold text-sm">{t("reports.topProducts")}</div>
+        <div className="bg-surface rounded-card border border-border overflow-hidden">
+          <div className="px-4 py-3 border-b border-border font-semibold text-sm">{t("reports.topProducts")}</div>
           {data.topProducts.length === 0 ? (
             <p className="text-sm text-slate-400 py-8 text-center">{t("dashboard.noData")}</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-slate-50 dark:bg-slate-800/60 text-left text-xs uppercase text-slate-500">
+                <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
                   <th className="px-4 py-2.5 font-semibold">{t("orders.cols.product")}</th>
                   <th className="px-4 py-2.5 font-semibold text-right">{t("reports.qtySold")}</th>
                   <th className="px-4 py-2.5 font-semibold text-right">{t("reports.revenue")}</th>
                   <th className="px-4 py-2.5 font-semibold text-right">{t("reports.grossProfit")}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody className="divide-y divide-border-soft">
                 {data.topProducts.map((p) => {
                   const profit = Number(p.profit);
                   return (
@@ -104,7 +104,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
                       <td className="px-4 py-2.5 font-medium">{p.productName}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">{formatNumber(Number(p.qtySold))} {p.baseUnit}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatCurrency(Number(p.revenue))}</td>
-                      <td className={cn("px-4 py-2.5 text-right tabular-nums", profit >= 0 ? "text-emerald-600" : "text-red-600")}>
+                      <td className={cn("px-4 py-2.5 text-right tabular-nums", profit >= 0 ? "text-ok" : "text-er")}>
                         {formatCurrency(profit)}
                       </td>
                     </tr>
@@ -115,7 +115,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           )}
         </div>
 
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-5 self-start">
+        <div className="bg-surface rounded-card border border-border p-5 self-start">
           <h2 className="font-semibold text-sm mb-4">{t("reports.byCategory")}</h2>
           {data.byCategory.length === 0 ? (
             <p className="text-sm text-slate-400 py-8 text-center">{t("dashboard.noData")}</p>
@@ -130,7 +130,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
                       <span className="font-medium">{c.categoryName}</span>
                       <span className="tabular-nums text-slate-500">{formatCurrency(v)} · {pct}%</span>
                     </div>
-                    <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                    <div className="h-2 rounded-full bg-surface-2 overflow-hidden">
                       <div className="h-full rounded-full bg-primary-600/85" style={{ width: `${pct}%` }} />
                     </div>
                   </div>
@@ -143,21 +143,21 @@ export default async function ReportsPage({ searchParams }: PageProps) {
 
       {/* theo khách hàng + theo nhân viên — theo design */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 font-semibold text-sm">{t("reports.topCustomers")}</div>
+        <div className="bg-surface rounded-card border border-border overflow-hidden">
+          <div className="px-4 py-3 border-b border-border font-semibold text-sm">{t("reports.topCustomers")}</div>
           {data.byCustomer.length === 0 ? (
             <p className="text-sm text-slate-400 py-8 text-center">{t("dashboard.noData")}</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-slate-50 dark:bg-slate-800/60 text-left text-xs uppercase text-slate-500">
+                <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
                   <th className="px-4 py-2.5 font-semibold">{t("orders.cols.customer")}</th>
                   <th className="px-4 py-2.5 font-semibold text-right">{t("reports.orders")}</th>
                   <th className="px-4 py-2.5 font-semibold text-right">{t("reports.revenue")}</th>
                   <th className="px-4 py-2.5 font-semibold text-right">{t("reports.uncollected")}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody className="divide-y divide-border-soft">
                 {data.byCustomer.map((c) => {
                   const remaining = Number(c.remaining);
                   return (
@@ -170,7 +170,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
                       </td>
                       <td className="px-4 py-2.5 text-right tabular-nums">{c.orderCount}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatCurrency(Number(c.revenue))}</td>
-                      <td className={cn("px-4 py-2.5 text-right tabular-nums", remaining > 0 ? "text-red-600 font-semibold" : "text-slate-400")}>
+                      <td className={cn("px-4 py-2.5 text-right tabular-nums", remaining > 0 ? "text-er font-semibold" : "text-slate-400")}>
                         {remaining > 0 ? formatCurrency(remaining) : "—"}
                       </td>
                     </tr>
@@ -181,27 +181,27 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           )}
         </div>
 
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden self-start">
-          <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 font-semibold text-sm">{t("reports.byEmployee")}</div>
+        <div className="bg-surface rounded-card border border-border overflow-hidden self-start">
+          <div className="px-4 py-3 border-b border-border font-semibold text-sm">{t("reports.byEmployee")}</div>
           {data.byEmployee.length === 0 ? (
             <p className="text-sm text-slate-400 py-8 text-center">{t("dashboard.noData")}</p>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-slate-50 dark:bg-slate-800/60 text-left text-xs uppercase text-slate-500">
+                <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
                   <th className="px-4 py-2.5 font-semibold">{t("reports.employee")}</th>
                   <th className="px-4 py-2.5 font-semibold text-right">{t("reports.orders")}</th>
                   <th className="px-4 py-2.5 font-semibold text-right">{t("reports.revenue")}</th>
                   <th className="px-4 py-2.5 font-semibold text-right">{t("reports.collected")}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody className="divide-y divide-border-soft">
                 {data.byEmployee.map((e) => (
                   <tr key={e.sellerId ?? "system"}>
                     <td className="px-4 py-2.5 font-medium">{e.sellerName}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{e.orderCount}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatCurrency(Number(e.revenue))}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-emerald-600">{formatCurrency(Number(e.collected))}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-ok">{formatCurrency(Number(e.collected))}</td>
                   </tr>
                 ))}
               </tbody>

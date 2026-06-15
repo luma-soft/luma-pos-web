@@ -2,9 +2,9 @@ import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
 const STYLES: Record<string, string> = {
-  retail: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
-  wholesale: "bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-400",
-  contractor: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400",
+  retail: "bg-surface-2 text-slate-600",
+  wholesale: "bg-in-soft text-in",
+  contractor: "bg-warn-soft text-warn",
   agent: "bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-400",
 };
 

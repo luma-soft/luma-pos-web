@@ -41,18 +41,18 @@ export function CustomerEdit({ customer }: {
     else setError(t(res.error));
   }
 
-  const input = "w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900";
+  const input = "w-full px-3 py-2 text-sm rounded-lg border border-border bg-surface";
   const lbl = "text-xs font-medium text-slate-500 mb-1 block";
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800">
+      <button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm font-medium hover:bg-surface-2">
         <Pencil className="w-4 h-4" />{t("common.edit")}
       </button>
 
       {open && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={() => setOpen(false)}>
-          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-5 max-h-[90vh] overflow-auto">
+          <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg bg-surface rounded-2xl shadow-xl p-5 max-h-[90vh] overflow-auto">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold">{t("customers.editTitle")}</h2>
               <button onClick={() => setOpen(false)} className="p-1 text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>

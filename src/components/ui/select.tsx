@@ -39,7 +39,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
     }[size];
 
     const variantCls = {
-      default: "border-slate-300 dark:border-slate-700",
+      default: "border-border",
       error: "border-red-500 focus:ring-red-500",
     }[variant];
 
@@ -48,7 +48,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         <select
           ref={ref}
           className={cn(
-            "ui-select appearance-none w-full rounded-lg border bg-white dark:bg-slate-900 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50",
+            "ui-select appearance-none w-full rounded-lg border bg-surface transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50",
             sizeCls,
             variantCls,
             !props.value && "text-slate-400",

@@ -23,7 +23,7 @@ export default async function ProductDetailPage({ params }: Props) {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <header className="sticky top-0 z-10 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
+      <header className="sticky top-0 z-10 bg-surface border-b border-border px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 min-w-0">
           <Link href={Routes.Products} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500">
             <ArrowLeft className="w-4 h-4" />
@@ -32,7 +32,7 @@ export default async function ProductDetailPage({ params }: Props) {
             <h1 className="text-[17px] font-bold truncate">{product.name}</h1>
             <p className="text-xs text-slate-400">
               {product.sku} · {t("products.list.colStock")}: {Number(product.totalStock).toLocaleString("vi-VN")} {product.baseUnit}
-              {!product.isActive && <span className="ml-2 text-amber-600">· {t("products.list.statusInactive")}</span>}
+              {!product.isActive && <span className="ml-2 text-warn">· {t("products.list.statusInactive")}</span>}
             </p>
           </div>
         </div>
@@ -50,7 +50,7 @@ export default async function ProductDetailPage({ params }: Props) {
           <div className="md:col-span-2 flex flex-wrap gap-3">
             {product.imageUrls.map((url) => (
               // eslint-disable-next-line @next/next/no-img-element
-              <img key={url} src={url} alt={product.name} className="w-32 h-32 rounded-xl object-cover border border-slate-200 dark:border-slate-800" />
+              <img key={url} src={url} alt={product.name} className="w-32 h-32 rounded-card object-cover border border-border" />
             ))}
           </div>
         )}
@@ -79,7 +79,7 @@ export default async function ProductDetailPage({ params }: Props) {
               {product.suppliers.map((s) => (
                 <Link key={s.id} href={Routes.supplier(s.id)} className={cn(
                   "inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-sm hover:underline",
-                  s.isPrimary ? "bg-primary-50 text-primary-700 dark:bg-primary-950/50 dark:text-primary-300" : "bg-slate-100 dark:bg-slate-800"
+                  s.isPrimary ? "bg-primary-50 text-primary-700 dark:bg-primary-950/50 dark:text-primary-300" : "bg-surface-2"
                 )}>
                   {s.isPrimary && <span className="text-[10px] font-bold uppercase">{t("products.fields.primarySupplier")}</span>}
                   {s.name ?? "—"}
@@ -125,7 +125,7 @@ export default async function ProductDetailPage({ params }: Props) {
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 self-start">
+    <section className="bg-surface border border-border rounded-card p-5 self-start">
       <h2 className="font-semibold text-sm mb-3">{title}</h2>
       {children}
     </section>

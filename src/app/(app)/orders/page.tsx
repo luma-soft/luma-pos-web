@@ -37,7 +37,7 @@ export default async function OrdersPage({ searchParams }: PageProps) {
 
   return (
     <div className="p-6">
-      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-surface border-b border-border flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-baseline gap-3">
           <h1 className="text-[17px] font-bold">{t("orders.title")}</h1>
           <span className="text-sm text-slate-500">{t("orders.total", { total })}</span>
@@ -51,7 +51,7 @@ export default async function OrdersPage({ searchParams }: PageProps) {
         </Link>
       </div>
 
-      <div className="flex gap-1 border-b border-slate-200 dark:border-slate-800 mb-4">
+      <div className="flex gap-1 border-b border-border mb-4">
         {TABS.map((tab) => (
           <Link
             key={tab}
@@ -77,23 +77,23 @@ export default async function OrdersPage({ searchParams }: PageProps) {
             <input
               type="text" name="q" defaultValue={params.q ?? ""}
               placeholder={t("orders.searchPlaceholder")}
-              className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+              className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface"
             />
           </div>
         </div>
         <div>
           <label className="block text-xs text-slate-500 mb-1">{t("orders.cols.payment")}</label>
-          <select name="payment" defaultValue={payment} className="px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900">
+          <select name="payment" defaultValue={payment} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface">
             {PAYMENTS.map((p) => <option key={p} value={p}>{t(`orders.paymentFilter.${p}`)}</option>)}
           </select>
         </div>
         <div>
           <label className="block text-xs text-slate-500 mb-1">{t("orders.filter.from")}</label>
-          <input type="date" name="from" defaultValue={from} className="px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900" />
+          <input type="date" name="from" defaultValue={from} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         </div>
         <div>
           <label className="block text-xs text-slate-500 mb-1">{t("orders.filter.to")}</label>
-          <input type="date" name="to" defaultValue={to} className="px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900" />
+          <input type="date" name="to" defaultValue={to} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         </div>
         <button type="submit" className="px-4 py-2 text-sm font-medium rounded-lg bg-primary-600 hover:bg-primary-700 text-white">
           {t("common.search")}
@@ -106,7 +106,7 @@ export default async function OrdersPage({ searchParams }: PageProps) {
       </form>
 
       {rows.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-12 text-center text-slate-400">
+        <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">
           <FileX2 className="w-10 h-10 mx-auto mb-3 opacity-60" />
           <p className="font-medium">{t("orders.empty")}</p>
         </div>
@@ -117,7 +117,7 @@ export default async function OrdersPage({ searchParams }: PageProps) {
           {rows.map((o) => {
             const remaining = Number(o.total) - Number(o.amountPaid);
             return (
-              <Link key={o.id} href={Routes.order(o.id)} className={cn("block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3", o.status === "cancelled" && "opacity-60")}>
+              <Link key={o.id} href={Routes.order(o.id)} className={cn("block bg-surface border border-border rounded-card p-3", o.status === "cancelled" && "opacity-60")}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="font-semibold text-primary-600">{o.code}</div>
@@ -128,7 +128,7 @@ export default async function OrdersPage({ searchParams }: PageProps) {
                 <div className="flex items-center justify-between mt-2 text-sm">
                   <span className="font-semibold tabular-nums">{formatCurrency(Number(o.total))}</span>
                   {remaining > 0 && o.status !== "cancelled"
-                    ? <span className="text-red-600 font-semibold tabular-nums">{t("orders.cols.remaining")}: {formatCurrency(remaining)}</span>
+                    ? <span className="text-er font-semibold tabular-nums">{t("orders.cols.remaining")}: {formatCurrency(remaining)}</span>
                     : <PaymentStatusBadge status={o.paymentStatus} />}
                 </div>
               </Link>
@@ -137,27 +137,27 @@ export default async function OrdersPage({ searchParams }: PageProps) {
         </div>
 
         {/* desktop: bảng + chọn in hàng loạt */}
-        <form action="/orders/print-batch" className="hidden lg:block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-x-auto">
-          <div className="px-4 py-2 border-b border-slate-200 dark:border-slate-800 flex items-center gap-3 text-sm">
+        <form action="/orders/print-batch" className="hidden lg:block bg-surface border border-border rounded-card overflow-x-auto">
+          <div className="px-4 py-2 border-b border-border flex items-center gap-3 text-sm">
             <span className="text-xs text-slate-500">{t("orders.batchHint")}</span>
             <div className="flex-1" />
             <button
               type="submit"
               formAction="/orders/merge"
-              className="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-surface-2"
             >
               🔗 {t("merge.title")}
             </button>
             <button
               type="submit"
-              className="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-surface-2"
             >
               🖨 {t("orders.printSelected")}
             </button>
           </div>
           <table className="w-full min-w-[640px] text-sm">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/60 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr className="bg-canvas text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-4 py-3 w-8"></th>
                 <th className="px-4 py-3 font-semibold">{t("orders.cols.code")}</th>
                 <th className="px-4 py-3 font-semibold">{t("orders.cols.date")}</th>
@@ -169,11 +169,11 @@ export default async function OrdersPage({ searchParams }: PageProps) {
                 <th className="px-4 py-3 font-semibold">{t("orders.cols.status")}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-border-soft">
               {rows.map((o) => {
                 const remaining = Number(o.total) - Number(o.amountPaid);
                 return (
-                  <tr key={o.id} className={cn("hover:bg-slate-50 dark:hover:bg-slate-800/40", o.status === "cancelled" && "opacity-60")}>
+                  <tr key={o.id} className={cn("hover:bg-surface-2", o.status === "cancelled" && "opacity-60")}>
                     <td className="px-4 py-3">
                       <input type="checkbox" name="ids" value={o.id} disabled={o.status === "cancelled"} />
                     </td>
@@ -184,7 +184,7 @@ export default async function OrdersPage({ searchParams }: PageProps) {
                     <td className="px-4 py-3">{o.customerName ?? t("orders.walkIn")}</td>
                     <td className="px-4 py-3 text-slate-500">{o.projectName ?? "—"}</td>
                     <td className="px-4 py-3 text-right tabular-nums font-medium">{formatCurrency(Number(o.total))}</td>
-                    <td className={cn("px-4 py-3 text-right tabular-nums", remaining > 0 && o.status !== "cancelled" ? "text-red-600 font-semibold" : "text-slate-400")}>
+                    <td className={cn("px-4 py-3 text-right tabular-nums", remaining > 0 && o.status !== "cancelled" ? "text-er font-semibold" : "text-slate-400")}>
                       {remaining > 0 && o.status !== "cancelled" ? formatCurrency(remaining) : "—"}
                     </td>
                     <td className="px-4 py-3"><PaymentStatusBadge status={o.paymentStatus} /></td>

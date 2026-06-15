@@ -28,7 +28,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
 
   return (
     <div className="p-6">
-      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-surface border-b border-border flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-baseline gap-3">
           <h1 className="text-[17px] font-bold">{t("products.title")}</h1>
           <span className="text-sm text-slate-500">{t("products.list.total", { total })}</span>
@@ -36,7 +36,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
         <div className="flex items-center gap-2">
           <Link
             href={Routes.Categories}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm font-medium hover:bg-surface-2"
           >
             {t("categories.title")}
           </Link>
@@ -59,13 +59,13 @@ export default async function ProductsPage({ searchParams }: PageProps) {
             name="q"
             defaultValue={params.q ?? ""}
             placeholder={t("products.list.searchPlaceholder")}
-            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface"
           />
         </div>
         <select
           name="category"
           defaultValue={params.category ?? ""}
-          className="px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+          className="px-3 py-2 text-sm rounded-lg border border-border bg-surface"
         >
           <option value="">{t("products.list.allCategories")}</option>
           {categories.map((c) => (
@@ -75,7 +75,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
         <select
           name="status"
           defaultValue={status}
-          className="px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+          className="px-3 py-2 text-sm rounded-lg border border-border bg-surface"
         >
           <option value="active">{t("products.list.statusActive")}</option>
           <option value="inactive">{t("products.list.statusInactive")}</option>
@@ -83,14 +83,14 @@ export default async function ProductsPage({ searchParams }: PageProps) {
         </select>
         <button
           type="submit"
-          className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800"
+          className="px-4 py-2 text-sm font-medium rounded-lg border border-border bg-surface hover:bg-surface-2"
         >
           {t("common.search")}
         </button>
       </form>
 
       {rows.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-12 text-center text-slate-400">
+        <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">
           <PackageOpen className="w-10 h-10 mx-auto mb-3 opacity-60" />
           <p className="font-medium">{t("products.list.empty")}</p>
           <p className="text-sm mt-1">{t("products.list.emptyHint")}</p>
@@ -104,20 +104,20 @@ export default async function ProductsPage({ searchParams }: PageProps) {
             const min = Number(p.minLevel);
             const lowStock = min > 0 && stock <= min;
             return (
-              <Link key={p.id} href={Routes.product(p.id)} className="block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3">
+              <Link key={p.id} href={Routes.product(p.id)} className="block bg-surface border border-border rounded-card p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="font-medium truncate">{p.name}</div>
                     <div className="text-xs text-slate-400">{p.sku}{p.categoryName ? ` · ${p.categoryName}` : ""}</div>
                   </div>
                   <span className={cn("shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium",
-                    p.isActive ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400")}>
+                    p.isActive ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-500")}>
                     {p.isActive ? t("products.list.active") : t("products.list.inactive")}
                   </span>
                 </div>
                 <div className="flex items-center justify-between mt-2 text-sm">
                   <span className="font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(p.retailPrice))}</span>
-                  <span className={cn("tabular-nums", lowStock ? "text-red-600 font-semibold" : "text-slate-500")}>{t("products.list.colStock")}: {stock.toLocaleString("vi-VN")} {p.baseUnit}</span>
+                  <span className={cn("tabular-nums", lowStock ? "text-er font-semibold" : "text-slate-500")}>{t("products.list.colStock")}: {stock.toLocaleString("vi-VN")} {p.baseUnit}</span>
                 </div>
               </Link>
             );
@@ -125,10 +125,10 @@ export default async function ProductsPage({ searchParams }: PageProps) {
         </div>
 
         {/* desktop: bảng */}
-        <div className="hidden lg:block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-x-auto">
+        <div className="hidden lg:block bg-surface border border-border rounded-card overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/60 text-left text-xs uppercase tracking-wide text-slate-500">
+              <tr className="bg-canvas text-left text-xs uppercase tracking-wide text-slate-500">
                 <th className="px-4 py-3 font-semibold">{t("products.list.colProduct")}</th>
                 <th className="px-4 py-3 font-semibold">{t("products.list.colCategory")}</th>
                 <th className="px-4 py-3 font-semibold">{t("products.list.colUnits")}</th>
@@ -138,13 +138,13 @@ export default async function ProductsPage({ searchParams }: PageProps) {
                 <th className="px-4 py-3 font-semibold">{t("products.list.colStatus")}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-border-soft">
               {rows.map((p) => {
                 const stock = Number(p.totalStock);
                 const min = Number(p.minLevel);
                 const lowStock = min > 0 && stock <= min;
                 return (
-                  <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <tr key={p.id} className="hover:bg-surface-2">
                     <td className="px-4 py-3">
                       <Link href={Routes.product(p.id)} className="font-medium text-slate-900 dark:text-slate-100 hover:text-primary-600 hover:underline">
                         {p.name}
@@ -165,7 +165,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
                     </td>
                     <td className={cn(
                       "px-4 py-3 text-right tabular-nums font-semibold",
-                      lowStock ? "text-red-600" : "text-slate-700 dark:text-slate-300"
+                      lowStock ? "text-er" : "text-slate-700 dark:text-slate-300"
                     )}>
                       {stock.toLocaleString("vi-VN")} {p.baseUnit}
                     </td>
@@ -173,8 +173,8 @@ export default async function ProductsPage({ searchParams }: PageProps) {
                       <span className={cn(
                         "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
                         p.isActive
-                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400"
-                          : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"
+                          ? "bg-ok-soft text-ok"
+                          : "bg-surface-2 text-slate-500"
                       )}>
                         {p.isActive ? t("products.list.active") : t("products.list.inactive")}
                       </span>

@@ -8,7 +8,22 @@
    ocean (mặc định) | terra | emerald | violet
    ============================================ */
 
+/* luma — brand warm-neutral + teal (mặc định) */
 :root,
+[data-theme="luma"] {
+  --primary-50:  oklch(0.97 0.02 178);
+  --primary-100: oklch(0.94 0.04 178);
+  --primary-200: oklch(0.88 0.07 178);
+  --primary-300: oklch(0.80 0.10 179);
+  --primary-400: oklch(0.70 0.115 180);
+  --primary-500: oklch(0.60 0.115 181);
+  --primary-600: oklch(0.52 0.10 182);
+  --primary-700: oklch(0.45 0.085 184);
+  --primary-800: oklch(0.39 0.07 186);
+  --primary-900: oklch(0.34 0.055 188);
+  --primary-950: oklch(0.24 0.04 190);
+}
+
 [data-theme="ocean"] {
   --primary-50:  oklch(0.97 0.014 254.604);
   --primary-100: oklch(0.932 0.032 255.585);
@@ -66,14 +81,35 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  /* warm-neutral light surfaces (spec: canvas #FAFAF8) */
+  --background:   oklch(0.985 0.003 95);   /* #FAFAF8 canvas */
+  --foreground:   oklch(0.205 0.004 90);   /* #1F2024 charcoal, không đen tuyệt đối */
+  --canvas:       oklch(0.985 0.003 95);
+  --surface:      oklch(1 0 0);            /* #FFFFFF */
+  --surface-2:    oklch(0.975 0.004 95);   /* #F7F6F3 */
+  --border:       oklch(0.925 0.003 90);   /* #EAEAEA hairline */
+  --border-soft:  oklch(0.955 0.003 90);   /* #F3F2EF */
+  /* muted semantic pastels (text + soft bg) */
+  --ok:   oklch(0.52 0.13 150);  --ok-soft:   oklch(0.97 0.03 150);
+  --warn: oklch(0.55 0.13 70);   --warn-soft: oklch(0.97 0.04 80);
+  --er:   oklch(0.55 0.20 25);   --er-soft:   oklch(0.96 0.03 25);
+  --in:   oklch(0.52 0.18 260);  --in-soft:   oklch(0.96 0.03 260);
   color-scheme: light;
 }
 
 [data-mode="dark"] {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
+  /* warm-neutral dark (không đen tuyệt đối) */
+  --background:   oklch(0.205 0.006 70);   /* #1C1917 */
+  --foreground:   oklch(0.985 0.003 95);
+  --canvas:       oklch(0.205 0.006 70);
+  --surface:      oklch(0.245 0.007 70);   /* #28251F */
+  --surface-2:    oklch(0.285 0.008 70);   /* #332E29 */
+  --border:       oklch(1 0 0 / 0.09);
+  --border-soft:  oklch(1 0 0 / 0.05);
+  --ok:   oklch(0.78 0.16 150);  --ok-soft:   oklch(0.78 0.16 150 / 0.12);
+  --warn: oklch(0.82 0.15 80);   --warn-soft: oklch(0.82 0.15 80 / 0.12);
+  --er:   oklch(0.72 0.17 25);   --er-soft:   oklch(0.72 0.17 25 / 0.12);
+  --in:   oklch(0.72 0.14 260);  --in-soft:   oklch(0.72 0.14 260 / 0.12);
   color-scheme: dark;
 }
 
@@ -91,14 +127,44 @@
   --color-primary-800: var(--primary-800);
   --color-primary-900: var(--primary-900);
   --color-primary-950: var(--primary-950);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* semantic surfaces + hairline (warm-neutral) */
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-soft: var(--border-soft);
+  /* muted status pastels */
+  --color-ok: var(--ok);          --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);      --color-warn-soft: var(--warn-soft);
+  --color-er: var(--er);          --color-er-soft: var(--er-soft);
+  --color-in: var(--in);          --color-in-soft: var(--in-soft);
+
+  /* 16px card radius (spec) */
+  --radius-card: 16px;
+
+  /* diffuse + 1px hairline elevation (<0.06 opacity) — thay shadow-md/lg/xl */
+  --shadow-e1: 0 1px 3px rgba(0,0,0,0.04), 0 0 0 1px var(--border);
+  --shadow-e2: 0 4px 16px rgba(0,0,0,0.05), 0 1px 4px rgba(0,0,0,0.03), 0 0 0 1px var(--border);
+
+  --font-sans: var(--font-be-vietnam), ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+}
+
+/* số liệu (tiền, SL) căn cột — dùng cùng font-mono cho bảng/KPI */
+.tabular { font-variant-numeric: tabular-nums; }
+.font-mono { font-variant-numeric: tabular-nums; }
+
+/* fade nhẹ cho panel picker (≤150ms), tôn trọng reduced-motion */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
 
 /* ẩn nút tăng/giảm mặc định của input[type=number] (POS, form số lượng) */

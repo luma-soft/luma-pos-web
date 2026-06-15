@@ -83,7 +83,7 @@ export function OrderEditForm({ orderId, orderCode, initial, productOptions }: P
     else setError(t(res.error as never));
   }
 
-  const inputCls = "px-2 py-1.5 text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 tabular-nums";
+  const inputCls = "px-2 py-1.5 text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-surface tabular-nums";
 
   return (
     <div className="p-6 max-w-4xl">
@@ -94,14 +94,14 @@ export function OrderEditForm({ orderId, orderCode, initial, productOptions }: P
         <h1 className="text-2xl font-bold">{t("orderEdit.title", { code: orderCode })}</h1>
       </div>
 
-      <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-xl p-3 mb-4 text-sm text-amber-800 dark:text-amber-300">
+      <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-card p-3 mb-4 text-sm text-amber-800 dark:text-amber-300">
         {t("orderEdit.warning")}
       </div>
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden mb-4">
+      <div className="bg-surface border border-border rounded-card overflow-hidden mb-4">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-slate-50 dark:bg-slate-800/60 text-left text-xs uppercase text-slate-500">
+            <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
               <th className="px-4 py-3 font-semibold">{t("orders.cols.product")}</th>
               <th className="px-4 py-3 font-semibold">{t("orders.cols.unit")}</th>
               <th className="px-4 py-3 font-semibold text-right w-28">{t("orders.cols.qty")}</th>
@@ -110,7 +110,7 @@ export function OrderEditForm({ orderId, orderCode, initial, productOptions }: P
               <th className="w-10"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+          <tbody className="divide-y divide-border-soft">
             {items.map((l, idx) => (
               <tr key={`${l.productId}-${idx}`}>
                 <td className="px-4 py-2.5 font-medium">{l.productName}</td>
@@ -135,9 +135,9 @@ export function OrderEditForm({ orderId, orderCode, initial, productOptions }: P
             ))}
           </tbody>
         </table>
-        <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-800">
+        <div className="px-4 py-3 border-t border-border">
           <select value="" onChange={(e) => addProduct(e.target.value)}
-            className="w-full px-3 py-2 text-sm rounded-lg border border-dashed border-slate-300 dark:border-slate-700 bg-transparent text-slate-500">
+            className="w-full px-3 py-2 text-sm rounded-lg border border-dashed border-border bg-transparent text-slate-500">
             <option value="">＋ {t("purchases.addProduct")}</option>
             {productOptions.map((p) => (
               <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
@@ -146,7 +146,7 @@ export function OrderEditForm({ orderId, orderCode, initial, productOptions }: P
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
+      <div className="bg-surface border border-border rounded-card p-5 space-y-4">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">{t("pos.discount")}</label>
@@ -163,19 +163,19 @@ export function OrderEditForm({ orderId, orderCode, initial, productOptions }: P
         </div>
         <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("orders.detail.notePlaceholder")} className={cn(inputCls, "w-full")} />
 
-        <div className="flex items-end justify-between flex-wrap gap-4 pt-2 border-t border-slate-200 dark:border-slate-800">
+        <div className="flex items-end justify-between flex-wrap gap-4 pt-2 border-t border-border">
           <div className="text-sm space-y-1">
             <div className="flex gap-6 justify-between"><span className="text-slate-500">{t("orderEdit.oldTotal")}</span><span className="tabular-nums line-through text-slate-400">{formatCurrency(oldTotal)}</span></div>
             <div className="flex gap-6 justify-between"><b>{t("orderEdit.newTotal")}</b><b className="tabular-nums text-primary-600">{formatCurrency(total)}</b></div>
             <div className="flex gap-6 justify-between"><span className="text-slate-500">{t("orderEdit.delta")}</span>
-              <span className={cn("tabular-nums font-semibold", delta > 0 ? "text-amber-600" : delta < 0 ? "text-emerald-600" : "text-slate-400")}>
+              <span className={cn("tabular-nums font-semibold", delta > 0 ? "text-warn" : delta < 0 ? "text-ok" : "text-slate-400")}>
                 {delta >= 0 ? "+" : ""}{formatCurrency(delta)}
               </span>
             </div>
-            <div className="flex gap-6 justify-between"><span className="text-slate-500">{t("orderEdit.newRemaining")}</span><span className="tabular-nums font-semibold text-red-600">{formatCurrency(newRemaining)}</span></div>
+            <div className="flex gap-6 justify-between"><span className="text-slate-500">{t("orderEdit.newRemaining")}</span><span className="tabular-nums font-semibold text-er">{formatCurrency(newRemaining)}</span></div>
           </div>
           <div className="flex flex-col items-end gap-2">
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="text-sm text-er">{error}</p>}
             <button onClick={save} disabled={busy || items.length === 0}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium disabled:opacity-50">
               {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}

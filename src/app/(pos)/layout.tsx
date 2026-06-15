@@ -11,5 +11,5 @@ export default async function PosLayout({ children }: { children: React.ReactNod
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(Routes.Login);
 
-  return <div className="h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">{children}</div>;
+  return <div className="h-screen overflow-hidden bg-canvas">{children}</div>;
 }

@@ -23,7 +23,7 @@ export default async function PurchasesPage({ searchParams }: PageProps) {
 
   return (
     <div className="p-6">
-      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+      <div className="sticky top-0 z-20 -mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-surface border-b border-border flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-baseline gap-3">
           <h1 className="text-[17px] font-bold">{t("purchases.title")}</h1>
           <span className="text-sm text-slate-500">{t("purchases.total", { total })}</span>
@@ -38,9 +38,9 @@ export default async function PurchasesPage({ searchParams }: PageProps) {
         <div className="relative w-full max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("purchases.searchPlaceholder")}
-            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900" />
+            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         </div>
-        <select name="status" defaultValue={status} className="px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900">
+        <select name="status" defaultValue={status} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface">
           <option value="">{t("orders.tabs.all")}</option>
           <option value="received">{t("purchases.status.received")}</option>
           <option value="returned">{t("purchases.status.returned")}</option>
@@ -50,7 +50,7 @@ export default async function PurchasesPage({ searchParams }: PageProps) {
       </form>
 
       {rows.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-12 text-center text-slate-400">
+        <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">
           <Truck className="w-10 h-10 mx-auto mb-3 opacity-60" />
           <p className="font-medium">{t("purchases.empty")}</p>
           <p className="text-sm mt-1">{t("purchases.emptyHint")}</p>
@@ -62,17 +62,17 @@ export default async function PurchasesPage({ searchParams }: PageProps) {
           {rows.map((p) => {
             const owed = Number(p.total) - Number(p.amountPaid);
             return (
-              <Link key={p.id} href={`${Routes.Purchases}/${p.id}/print`} className="block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-3">
+              <Link key={p.id} href={`${Routes.Purchases}/${p.id}/print`} className="block bg-surface border border-border rounded-card p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0"><div className="font-semibold">{p.code}</div><div className="text-xs text-slate-400">{formatDate(p.createdAt)} · {p.supplierName}</div></div>
                   <span className={cn("shrink-0 inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium",
-                    p.status === "returned" ? "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400"
+                    p.status === "returned" ? "bg-warn-soft text-warn"
                     : p.status === "cancelled" ? "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400"
-                    : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400")}>{t(`purchases.status.${p.status}` as never)}</span>
+                    : "bg-ok-soft text-ok")}>{t(`purchases.status.${p.status}` as never)}</span>
                 </div>
                 <div className="flex items-center justify-between mt-2 text-sm">
                   <span className="font-semibold tabular-nums">{formatCurrency(Number(p.total))}</span>
-                  {owed > 0 && <span className="text-amber-600 font-semibold tabular-nums">{t("purchases.cols.owed")}: {formatCurrency(owed)}</span>}
+                  {owed > 0 && <span className="text-warn font-semibold tabular-nums">{t("purchases.cols.owed")}: {formatCurrency(owed)}</span>}
                 </div>
               </Link>
             );
@@ -80,10 +80,10 @@ export default async function PurchasesPage({ searchParams }: PageProps) {
         </div>
 
         {/* desktop: bảng */}
-        <div className="hidden lg:block bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-x-auto">
+        <div className="hidden lg:block bg-surface border border-border rounded-card overflow-x-auto">
           <table className="w-full min-w-[640px] text-sm">
             <thead>
-              <tr className="bg-slate-50 dark:bg-slate-800/60 text-left text-xs uppercase text-slate-500">
+              <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
                 <th className="px-4 py-3 font-semibold">{t("purchases.cols.code")}</th>
                 <th className="px-4 py-3 font-semibold">{t("orders.cols.date")}</th>
                 <th className="px-4 py-3 font-semibold">{t("purchases.cols.supplier")}</th>
@@ -94,27 +94,27 @@ export default async function PurchasesPage({ searchParams }: PageProps) {
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody className="divide-y divide-border-soft">
               {rows.map((p) => {
                 const owed = Number(p.total) - Number(p.amountPaid);
                 return (
-                  <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                  <tr key={p.id} className="hover:bg-surface-2">
                     <td className="px-4 py-3 font-medium">{p.code}</td>
                     <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{formatDate(p.createdAt)}</td>
                     <td className="px-4 py-3">{p.supplierName}</td>
                     <td className="px-4 py-3 text-slate-500">{p.warehouseName}</td>
                     <td className="px-4 py-3 text-right tabular-nums font-medium">{formatCurrency(Number(p.total))}</td>
-                    <td className={cn("px-4 py-3 text-right tabular-nums", owed > 0 ? "text-amber-600 font-semibold" : "text-slate-400")}>
+                    <td className={cn("px-4 py-3 text-right tabular-nums", owed > 0 ? "text-warn font-semibold" : "text-slate-400")}>
                       {owed > 0 ? formatCurrency(owed) : "—"}
                     </td>
                     <td className="px-4 py-3">
                       <span className={cn(
                         "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium",
                         p.status === "returned"
-                          ? "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400"
+                          ? "bg-warn-soft text-warn"
                           : p.status === "cancelled"
                             ? "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400"
-                            : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400"
+                            : "bg-ok-soft text-ok"
                       )}>
                         {t(`purchases.status.${p.status}` as never)}
                       </span>

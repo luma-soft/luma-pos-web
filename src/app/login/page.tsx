@@ -44,7 +44,7 @@ export default function LoginPage() {
 
   return (
     // split layout — theo design/login.html
-    <div className="min-h-screen grid lg:grid-cols-2 bg-white dark:bg-slate-950">
+    <div className="min-h-screen grid lg:grid-cols-2 bg-canvas">
       {/* trái: form */}
       <div className="flex items-center justify-center p-8 relative">
         <div className="absolute top-4 right-4 lg:right-8">
@@ -53,7 +53,7 @@ export default function LoginPage() {
 
         <div className="w-full max-w-sm">
           <div className="flex items-center gap-3 mb-7">
-            <div className="w-11 h-11 rounded-xl grid place-items-center text-white text-lg font-extrabold bg-gradient-to-br from-primary-600 to-primary-400">
+            <div className="w-11 h-11 rounded-card grid place-items-center text-white text-lg font-extrabold bg-gradient-to-br from-primary-600 to-primary-400">
               S
             </div>
             <div>

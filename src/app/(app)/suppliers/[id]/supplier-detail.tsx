@@ -34,24 +34,24 @@ export function SupplierDetailClient({ supplier, purchases }: { supplier: Suppli
     else setError(t(res.error));
   }
 
-  const input = "w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900";
+  const input = "w-full px-3 py-2 text-sm rounded-lg border border-border bg-surface";
   const lbl = "text-xs font-medium text-slate-500 mb-1 block";
   const debt = Number(supplier.currentDebt);
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <header className="sticky top-0 z-10 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
+      <header className="sticky top-0 z-10 bg-surface border-b border-border px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 min-w-0">
           <Link href={Routes.Suppliers} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500">
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div className="min-w-0">
             <h1 className="text-[17px] font-bold truncate">{supplier.name}</h1>
-            <p className="text-xs text-slate-400">{supplier.code}{debt > 0 ? ` · ${t("suppliers.cols.debt")}: ` : ""}<span className="text-amber-600">{debt > 0 ? formatCurrency(debt) : ""}</span></p>
+            <p className="text-xs text-slate-400">{supplier.code}{debt > 0 ? ` · ${t("suppliers.cols.debt")}: ` : ""}<span className="text-warn">{debt > 0 ? formatCurrency(debt) : ""}</span></p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {saved && <span className="text-sm text-emerald-600 inline-flex items-center gap-1"><Check className="w-4 h-4" />{t("common.saved")}</span>}
+          {saved && <span className="text-sm text-ok inline-flex items-center gap-1"><Check className="w-4 h-4" />{t("common.saved")}</span>}
           <button onClick={save} disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium">
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}{t("common.save")}
           </button>
@@ -61,7 +61,7 @@ export function SupplierDetailClient({ supplier, purchases }: { supplier: Suppli
       <div className="max-w-4xl mx-auto p-6 space-y-5">
         {error && <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-lg px-4 py-2 text-sm text-red-700 dark:text-red-400">{error}</div>}
 
-        <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
+        <section className="bg-surface border border-border rounded-card p-5">
           <h2 className="font-semibold text-sm mb-4">{t("suppliers.cols.name")}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2"><label className={lbl}>{t("suppliers.cols.name")}</label><input className={input} value={name} onChange={(e) => setName(e.target.value)} /></div>
@@ -73,8 +73,8 @@ export function SupplierDetailClient({ supplier, purchases }: { supplier: Suppli
           </div>
         </section>
 
-        <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-x-auto">
-          <div className="px-5 py-3 border-b border-slate-200 dark:border-slate-800 font-semibold text-sm">
+        <section className="bg-surface border border-border rounded-card overflow-x-auto">
+          <div className="px-5 py-3 border-b border-border font-semibold text-sm">
             {t("suppliers.purchaseHistory")} ({purchases.length})
           </div>
           {purchases.length === 0 ? (
@@ -82,7 +82,7 @@ export function SupplierDetailClient({ supplier, purchases }: { supplier: Suppli
           ) : (
             <table className="w-full min-w-[640px] text-sm">
               <thead>
-                <tr className="bg-slate-50 dark:bg-slate-800/60 text-left text-xs uppercase tracking-wide text-slate-500">
+                <tr className="bg-canvas text-left text-xs uppercase tracking-wide text-slate-500">
                   <th className="px-5 py-2.5 font-semibold">{t("purchases.cols.code")}</th>
                   <th className="px-5 py-2.5 font-semibold">{t("orders.cols.date")}</th>
                   <th className="px-5 py-2.5 font-semibold text-right">{t("purchases.cols.itemCount")}</th>
@@ -91,21 +91,21 @@ export function SupplierDetailClient({ supplier, purchases }: { supplier: Suppli
                   <th className="px-5 py-2.5 font-semibold">{t("orders.cols.status")}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              <tbody className="divide-y divide-border-soft">
                 {purchases.map((p) => {
                   const owed = Number(p.total) - Number(p.amountPaid);
                   return (
-                    <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    <tr key={p.id} className="hover:bg-surface-2">
                       <td className="px-5 py-2.5 font-medium">{p.code}</td>
                       <td className="px-5 py-2.5 text-slate-500 whitespace-nowrap">{formatDate(p.createdAt)}</td>
                       <td className="px-5 py-2.5 text-right tabular-nums text-slate-500">{p.itemCount}</td>
                       <td className="px-5 py-2.5 text-right tabular-nums font-medium">{formatCurrency(Number(p.total))}</td>
-                      <td className={cn("px-5 py-2.5 text-right tabular-nums", owed > 0 ? "text-amber-600 font-semibold" : "text-slate-400")}>{owed > 0 ? formatCurrency(owed) : "—"}</td>
+                      <td className={cn("px-5 py-2.5 text-right tabular-nums", owed > 0 ? "text-warn font-semibold" : "text-slate-400")}>{owed > 0 ? formatCurrency(owed) : "—"}</td>
                       <td className="px-5 py-2.5">
                         <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
-                          p.status === "returned" ? "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400"
+                          p.status === "returned" ? "bg-warn-soft text-warn"
                           : p.status === "cancelled" ? "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400"
-                          : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400")}>
+                          : "bg-ok-soft text-ok")}>
                           {t(`purchases.status.${p.status}` as never)}
                         </span>
                       </td>
