@@ -46,7 +46,7 @@ export async function QuotesTab({ searchParams }: { searchParams: SP }) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("orders.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         </div>
-        <button type="submit" className="px-4 py-2 text-sm font-medium rounded-lg bg-primary-600 hover:brightness-110 text-white">{t("common.search")}</button>
+        <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full bg-primary-600 hover:brightness-110 text-white transition active:scale-[0.98]">{t("common.search")}</button>
       </form>
 
       {rows.length === 0 ? (

@@ -57,31 +57,19 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
         ))}
       </div>
 
-      <form className="flex flex-wrap items-end gap-3 mb-4" action={Routes.Sales}>
+      <form className="flex flex-wrap items-center gap-2 mb-4" action={Routes.Sales}>
         <input type="hidden" name="tab" value="orders" />
         {status !== "all" && <input type="hidden" name="status" value={status} />}
-        <div>
-          <label className="block text-xs text-slate-500 mb-1">{t("common.search")}</label>
-          <div className="relative w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("orders.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface" />
-          </div>
+        <div className="relative w-56">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("orders.searchPlaceholder")} aria-label={t("common.search")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         </div>
-        <div>
-          <label className="block text-xs text-slate-500 mb-1">{t("orders.cols.payment")}</label>
-          <select name="payment" defaultValue={payment} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface">
-            {PAYMENTS.map((p) => <option key={p} value={p}>{t(`orders.paymentFilter.${p}`)}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs text-slate-500 mb-1">{t("orders.filter.from")}</label>
-          <input type="date" name="from" defaultValue={from} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface" />
-        </div>
-        <div>
-          <label className="block text-xs text-slate-500 mb-1">{t("orders.filter.to")}</label>
-          <input type="date" name="to" defaultValue={to} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface" />
-        </div>
-        <button type="submit" className="px-4 py-2 text-sm font-medium rounded-lg bg-primary-600 hover:brightness-110 text-white">{t("common.search")}</button>
+        <select name="payment" defaultValue={payment} aria-label={t("orders.cols.payment")} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface">
+          {PAYMENTS.map((p) => <option key={p} value={p}>{t(`orders.paymentFilter.${p}`)}</option>)}
+        </select>
+        <input type="date" name="from" defaultValue={from} aria-label={t("orders.filter.from")} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface" />
+        <input type="date" name="to" defaultValue={to} aria-label={t("orders.filter.to")} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface" />
+        <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full bg-primary-600 hover:brightness-110 text-white transition active:scale-[0.98]">{t("common.search")}</button>
         {(params.q || payment !== "all" || from || to) && (
           <Link href={href({ q: undefined, payment: undefined, from: undefined, to: undefined })} className="px-3 py-2 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">
             {t("orders.filter.clear")}

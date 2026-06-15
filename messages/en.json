@@ -65,6 +65,7 @@
     },
     "pricing": "Price setup",
     "stocktakes": "Stocktake",
+    "internalUse": "Internal Use",
     "collapseSidebar": "Collapse menu",
     "expandSidebar": "Open menu",
     "more": "More"
@@ -349,7 +350,34 @@
   "errors": {
     "unauthorized": "Session expired — please sign in again.",
     "invalidData": "Invalid data.",
-    "serverError": "Something went wrong, please retry."
+    "serverError": "Something went wrong, please retry.",
+    "forbidden": "You don't have permission for this action."
+  },
+  "internalUse": {
+    "formTitle": "Internal-Use Issue",
+    "formSub": "Cost-valued · stock deducted · audit-logged",
+    "department": "Department",
+    "reason": "Reason",
+    "note": "Note",
+    "notePlaceholder": "Optional note…",
+    "searchProduct": "Search to add a product…",
+    "cost": "Cost",
+    "unit": "Unit",
+    "qty": "Qty",
+    "unitCost": "Unit cost",
+    "lineTotal": "Total cost",
+    "totalCost": "Cost expensed",
+    "approvalBanner": "Total cost {amount} exceeds the ₫500,000 threshold — needs manager approval.",
+    "emptyForm": "Search products above to add to this issue.",
+    "submitForApproval": "Submit for approval",
+    "confirm": "Confirm issue",
+    "submitted": "Internal issue posted.",
+    "submittedPending": "Submitted — awaiting manager approval.",
+    "historyTitle": "Internal-use history",
+    "historyCount": "{n} issues",
+    "empty": "No internal-use issues yet.",
+    "cols": { "code": "Ref", "items": "Items", "cost": "Cost", "by": "Staff" },
+    "status": { "pending": "Pending", "approved": "Approved" }
   },
   "orders": {
     "title": "Orders",
@@ -572,7 +600,8 @@
       "return_out": "Return out",
       "transfer": "Transfer",
       "adjust": "Adjustment",
-      "init": "Initial"
+      "init": "Initial",
+      "internal_use": "Internal use"
     },
     "stockFilter": {
       "all": "All stock",

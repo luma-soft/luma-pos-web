@@ -65,6 +65,7 @@
     },
     "pricing": "Thiết lập giá",
     "stocktakes": "Kiểm kho",
+    "internalUse": "Xuất nội bộ",
     "collapseSidebar": "Thu gọn menu",
     "expandSidebar": "Mở menu",
     "more": "Thêm"
@@ -349,7 +350,34 @@
   "errors": {
     "unauthorized": "Phiên đăng nhập hết hạn — đăng nhập lại.",
     "invalidData": "Dữ liệu không hợp lệ.",
-    "serverError": "Có lỗi xảy ra, thử lại sau."
+    "serverError": "Có lỗi xảy ra, thử lại sau.",
+    "forbidden": "Bạn không có quyền thực hiện thao tác này."
+  },
+  "internalUse": {
+    "formTitle": "Phiếu xuất dùng nội bộ",
+    "formSub": "Ghi giá vốn · trừ kho · nhật ký kiểm toán",
+    "department": "Bộ phận nhận",
+    "reason": "Lý do",
+    "note": "Ghi chú",
+    "notePlaceholder": "Ghi chú thêm…",
+    "searchProduct": "Tìm & thêm sản phẩm…",
+    "cost": "Giá vốn",
+    "unit": "ĐVT",
+    "qty": "Số lượng",
+    "unitCost": "Đơn giá vốn",
+    "lineTotal": "Thành tiền vốn",
+    "totalCost": "Giá vốn ghi nhận",
+    "approvalBanner": "Tổng giá vốn {amount} vượt ngưỡng ₫500.000 — cần Quản lý duyệt.",
+    "emptyForm": "Tìm sản phẩm ở trên để thêm vào phiếu.",
+    "submitForApproval": "Gửi duyệt Quản lý",
+    "confirm": "Xác nhận xuất nội bộ",
+    "submitted": "Đã tạo phiếu xuất nội bộ.",
+    "submittedPending": "Đã gửi — chờ Quản lý duyệt.",
+    "historyTitle": "Lịch sử xuất nội bộ",
+    "historyCount": "{n} phiếu",
+    "empty": "Chưa có phiếu xuất nội bộ.",
+    "cols": { "code": "Số phiếu", "items": "SP", "cost": "Giá vốn", "by": "Nhân viên" },
+    "status": { "pending": "Chờ duyệt", "approved": "Đã duyệt" }
   },
   "orders": {
     "title": "Đơn hàng",
@@ -572,7 +600,8 @@
       "return_out": "Trả NCC",
       "transfer": "Chuyển kho",
       "adjust": "Kiểm kê",
-      "init": "Tồn đầu"
+      "init": "Tồn đầu",
+      "internal_use": "Xuất nội bộ"
     },
     "stockFilter": {
       "all": "Tất cả tồn",

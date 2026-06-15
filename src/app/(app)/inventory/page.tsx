@@ -6,6 +6,7 @@ import { ProductsTab } from "./tabs/products";
 import { PricingTab } from "./tabs/pricing";
 import { PurchasesTab } from "./tabs/purchases";
 import { StocktakesTab } from "./tabs/stocktakes";
+import { InternalUseTab } from "./tabs/internal-use";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ const TABS = [
   { tab: "products", labelKey: "nav.products" },
   { tab: "pricing", labelKey: "nav.pricing" },
   { tab: "purchases", labelKey: "nav.purchases" },
+  { tab: "internal", labelKey: "nav.internalUse" },
   { tab: "stocktakes", labelKey: "nav.stocktakes" },
 ];
 
@@ -34,6 +36,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
       {tab === "products" ? <ProductsTab searchParams={params} />
         : tab === "pricing" ? <PricingTab searchParams={params} />
         : tab === "purchases" ? <PurchasesTab searchParams={params} />
+        : tab === "internal" ? <InternalUseTab />
         : tab === "stocktakes" ? <StocktakesTab />
         : <StockTab searchParams={params} />}
     </div>

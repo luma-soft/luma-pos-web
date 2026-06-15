@@ -6,9 +6,15 @@ export default function Loading() {
   return (
     <div className="p-6 animate-pulse">
       {/* header */}
-      <div className="-mx-6 -mt-6 mb-5 min-h-[58px] px-6 py-2.5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-        <div className="h-5 w-40 rounded bg-slate-200 dark:bg-slate-800" />
-        <div className="h-9 w-28 rounded-lg bg-slate-200 dark:bg-slate-800" />
+      <div className="-mx-6 -mt-6 mb-5 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+        <div className="min-h-13 px-6 pt-2.5 flex items-center">
+          <div className="h-5 w-40 rounded bg-slate-200 dark:bg-slate-800" />
+        </div>
+        <div className="px-6 pb-1.5 flex items-center gap-1">
+          {[80, 64, 96, 72, 64].map((w, i) => (
+            <div key={i} className="h-9 rounded-[10px] bg-slate-100 dark:bg-slate-800" style={{ width: w }} />
+          ))}
+        </div>
       </div>
 
       {/* toolbar */}

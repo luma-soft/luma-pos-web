@@ -17,7 +17,7 @@ export const paymentMethodEnum = pgEnum("payment_method", [
   "cash", "bank_transfer", "card", "vnpay", "momo", "credit",
 ]);
 export const stockMovementTypeEnum = pgEnum("stock_movement_type", [
-  "purchase", "sale", "return_in", "return_out", "transfer", "adjust", "init",
+  "purchase", "sale", "return_in", "return_out", "transfer", "adjust", "init", "internal_use",
 ]);
 export const customerTypeEnum = pgEnum("customer_type", [
   "retail", "wholesale", "contractor", "agent",
@@ -501,6 +501,36 @@ export const printTemplates = pgTable("print_templates", {
   options: jsonb("options").$type<Record<string, boolean | string | number>>().notNull().default({}),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ============= Internal-Use Issue (Xuất dùng nội bộ — Part 8.1) =============
+// Phiếu xuất hàng dùng nội bộ (không bán): trừ kho theo giá vốn → COGS, không doanh thu.
+
+export const internalUseIssues = pgTable("internal_use_issues", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: varchar("code", { length: 30 }).notNull().unique(), // XNB-...
+  warehouseId: uuid("warehouse_id").references(() => warehouses.id),
+  department: text("department"),       // bộ phận nhận
+  reason: text("reason"),               // lý do (reason code, text)
+  status: text("status").notNull().default("approved"), // 'pending' | 'approved'
+  totalCost: decimal("total_cost", { precision: 14, scale: 2 }).notNull().default("0"),
+  note: text("note"),
+  createdBy: uuid("created_by").references(() => profiles.id),
+  approvedBy: uuid("approved_by").references(() => profiles.id),
+  approvedAt: timestamp("approved_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const internalUseItems = pgTable("internal_use_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  issueId: uuid("issue_id").notNull().references(() => internalUseIssues.id, { onDelete: "cascade" }),
+  productId: uuid("product_id").notNull().references(() => products.id),
+  productName: text("product_name").notNull(),
+  unitName: varchar("unit_name", { length: 30 }).notNull(),
+  unitMultiplier: decimal("unit_multiplier", { precision: 14, scale: 4 }).notNull(),
+  quantity: decimal("quantity", { precision: 14, scale: 4 }).notNull(),
+  unitCost: decimal("unit_cost", { precision: 14, scale: 2 }).notNull(),
+  total: decimal("total", { precision: 14, scale: 2 }).notNull(),
+}, (t) => [index("internal_use_items_issue_idx").on(t.issueId)]);
 
 // ============= Relations =============
 

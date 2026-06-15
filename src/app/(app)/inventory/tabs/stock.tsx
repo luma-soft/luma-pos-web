@@ -13,7 +13,7 @@ const STOCKS: StockFilter[] = ["all", "instock", "low", "out"];
 
 const MOVE_STYLES: Record<string, string> = {
   purchase: "text-ok", sale: "text-er", return_in: "text-in", return_out: "text-warn",
-  transfer: "text-in", adjust: "text-warn", init: "text-slate-500",
+  transfer: "text-in", adjust: "text-warn", init: "text-slate-500", internal_use: "text-warn",
 };
 
 type Sev = "out" | "crit" | "warn" | "ok";
@@ -55,11 +55,11 @@ export async function StockTab({ searchParams }: { searchParams: SP }) {
           <div className="text-[22px] font-extrabold mt-2 font-mono text-primary-600">{formatCurrency(totalValue)}</div>
           <p className="text-xs text-slate-400 mt-1">{t("inventory.byCost")}</p>
         </div>
-        <Link href={`${Routes.Inventory}?tab=stock&stock=low`} className={cn(kpiCard, "hover:border-er/50 transition")}>
+        <div className={cn(kpiCard, lowCount > 0 && "border-er/40 bg-er/5")}>
           <div className="text-xs font-medium text-slate-500">{t("inventory.lowStock")}</div>
           <div className={cn("text-[28px] font-extrabold mt-2 font-mono", lowCount > 0 ? "text-er" : "text-ok")}>{lowCount}</div>
           <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">{lowCount > 0 && <AlertTriangle className="w-3 h-3 text-er" />}{t("inventory.belowMin")}</p>
-        </Link>
+        </div>
         <div className={kpiCard}>
           <div className="text-xs font-medium text-slate-500">{t("inventory.skuCount")}</div>
           <div className="text-[28px] font-extrabold mt-2 font-mono">{formatNumber(total)}</div>
@@ -78,12 +78,12 @@ export async function StockTab({ searchParams }: { searchParams: SP }) {
             <input type="hidden" name="tab" value="stock" />
             <div className="relative w-full max-w-xs">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("inventory.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-[10px] border border-border bg-surface focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("inventory.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface focus:outline-none focus:ring-2 focus:ring-primary-500" />
             </div>
-            <select name="stock" defaultValue={stock} className="px-3 py-2 text-sm rounded-[10px] border border-border bg-surface">
+            <select name="stock" defaultValue={stock} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface">
               {STOCKS.map((s) => <option key={s} value={s}>{t(`inventory.stockFilter.${s}`)}</option>)}
             </select>
-            <select name="category" defaultValue={category} className="px-3 py-2 text-sm rounded-[10px] border border-border bg-surface">
+            <select name="category" defaultValue={category} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface">
               <option value="">{t("products.list.allCategories")}</option>
               {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
@@ -134,7 +134,7 @@ export async function StockTab({ searchParams }: { searchParams: SP }) {
                         <td className="px-4 py-3"><div className="font-medium">{r.name}</div><div className="text-xs text-slate-400 font-mono">{r.sku}</div></td>
                         <td className={cn("px-4 py-3 text-right font-mono font-bold", (sev === "crit" || sev === "out") && "text-er")}>{formatNumber(s)} <span className="text-[10px] text-slate-400">{r.baseUnit}</span></td>
                         <td className="px-4 py-3 text-right font-mono text-slate-400">{min > 0 ? formatNumber(min) : "—"}</td>
-                        <td className="px-4 py-3"><div className="h-1.5 w-20 rounded-full bg-surface-2 overflow-hidden"><div className={cn("h-full rounded-full", SEV_BAR[sev])} style={{ width: `${pct}%` }} /></div></td>
+                        <td className="px-4 py-3"><div className="h-2 w-28 rounded-full bg-surface-2 overflow-hidden"><div className={cn("h-full rounded-full", SEV_BAR[sev])} style={{ width: `${pct}%` }} /></div></td>
                         <td className="px-4 py-3 text-right font-mono">{formatCurrency(Number(r.stockValue))}</td>
                         <td className="px-4 py-3"><StatusBadge sev={sev} t={t} /></td>
                       </tr>
