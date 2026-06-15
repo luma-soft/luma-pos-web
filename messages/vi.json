@@ -954,7 +954,8 @@
       "light": "Sáng",
       "dark": "Tối",
       "system": "Theo hệ thống"
-    }
+    },
+    "title": "Giao diện"
   },
   "categories": {
     "title": "Nhóm hàng",

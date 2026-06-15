@@ -954,7 +954,8 @@
       "light": "Light",
       "dark": "Dark",
       "system": "System"
-    }
+    },
+    "title": "Theme"
   },
   "categories": {
     "title": "Categories",
