@@ -94,6 +94,7 @@
   --warn: oklch(0.55 0.13 70);   --warn-soft: oklch(0.97 0.04 80);
   --er:   oklch(0.55 0.20 25);   --er-soft:   oklch(0.96 0.03 25);
   --in:   oklch(0.52 0.18 260);  --in-soft:   oklch(0.96 0.03 260);
+  --nav:  #1A1815;               /* rail điều hướng tối (không đổi theo theme) */
   color-scheme: light;
 }
 
@@ -110,6 +111,7 @@
   --warn: oklch(0.82 0.15 80);   --warn-soft: oklch(0.82 0.15 80 / 0.12);
   --er:   oklch(0.72 0.17 25);   --er-soft:   oklch(0.72 0.17 25 / 0.12);
   --in:   oklch(0.72 0.14 260);  --in-soft:   oklch(0.72 0.14 260 / 0.12);
+  --nav:  #15130F;
   color-scheme: dark;
 }
 
@@ -139,6 +141,7 @@
   --color-warn: var(--warn);      --color-warn-soft: var(--warn-soft);
   --color-er: var(--er);          --color-er-soft: var(--er-soft);
   --color-in: var(--in);          --color-in-soft: var(--in-soft);
+  --color-nav: var(--nav);
 
   /* 16px card radius (spec) */
   --radius-card: 16px;
@@ -178,26 +181,10 @@ body {
   appearance: textfield;
 }
 
-/* Thu gọn sidebar (desktop) — toggle qua data-sidebar trên <html> */
-@media (min-width: 1024px) {
-  [data-sidebar="collapsed"] .app-sidebar {
-    width: 0 !important;
-    min-width: 0;
-    opacity: 0;
-    pointer-events: none;
-    border-right-width: 0;
-  }
-  .sidebar-reopen { display: none; }
-  [data-sidebar="collapsed"] .sidebar-reopen { display: grid; }
-  /* chừa chỗ cho nút mở lại (fixed top-3 left-3) — tránh đè tiêu đề trang */
-  [data-sidebar="collapsed"] .app-main { padding-left: 3.25rem; }
-}
-.sidebar-reopen { display: none; }
-
-/* Mobile: sidebar thành drawer trượt từ trái */
+/* Mobile: drawer điều hướng (có chữ) trượt từ trái — desktop dùng rail 64px */
 .mobile-nav-backdrop { display: none; }
 @media (max-width: 1023px) {
-  .app-sidebar {
+  .app-drawer {
     position: fixed;
     top: 0; bottom: 0; left: 0;
     z-index: 60;
@@ -206,7 +193,7 @@ body {
     transition: transform 0.22s ease;
     box-shadow: 0 10px 40px rgba(0,0,0,0.18);
   }
-  [data-mobilenav="open"] .app-sidebar { transform: translateX(0); }
+  [data-mobilenav="open"] .app-drawer { transform: translateX(0); }
   [data-mobilenav="open"] .mobile-nav-backdrop { display: block; }
 }
 
