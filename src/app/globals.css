@@ -189,6 +189,8 @@ body {
   }
   .sidebar-reopen { display: none; }
   [data-sidebar="collapsed"] .sidebar-reopen { display: grid; }
+  /* chừa chỗ cho nút mở lại (fixed top-3 left-3) — tránh đè tiêu đề trang */
+  [data-sidebar="collapsed"] .app-main { padding-left: 3.25rem; }
 }
 .sidebar-reopen { display: none; }
 

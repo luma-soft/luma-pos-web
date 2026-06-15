@@ -55,7 +55,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
 
-      <main className="flex-1 min-w-0 overflow-auto">
+      <main className="app-main flex-1 min-w-0 overflow-auto">
         <div className="hidden lg:block"><SidebarToggle variant="floating" /></div>
         <div className="pb-16 lg:pb-0">{children}</div>
         <MobileTabBar />

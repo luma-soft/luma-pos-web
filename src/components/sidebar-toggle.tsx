@@ -29,7 +29,7 @@ export function SidebarToggle({ variant = "inline" }: { variant?: "inline" | "fl
       <button
         onClick={toggleSidebar}
         title={t("nav.expandSidebar")}
-        className="sidebar-reopen fixed top-3 left-3 z-40 w-9 h-9 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm grid place-items-center text-slate-500 hover:text-primary-600"
+        className="sidebar-reopen fixed top-3 left-3 z-40 w-9 h-9 rounded-lg bg-surface border border-border shadow-e1 grid place-items-center text-slate-500 hover:text-primary-600"
       >
         <PanelLeft className="w-4 h-4" />
       </button>
@@ -39,7 +39,7 @@ export function SidebarToggle({ variant = "inline" }: { variant?: "inline" | "fl
     <button
       onClick={toggleSidebar}
       title={t("nav.collapseSidebar")}
-      className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
+      className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-surface-2"
     >
       <PanelLeftClose className="w-4 h-4" />
     </button>
