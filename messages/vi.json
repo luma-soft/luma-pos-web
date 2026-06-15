@@ -154,6 +154,7 @@
     "projectPlaceholder": "Công trình (tùy chọn)…",
     "customerDebt": "Đang nợ: {debt}",
     "discount": "Giảm giá",
+    "tax": "Thuế",
     "shipping": "Vận chuyển",
     "paidAmount": "Khách trả",
     "willOweAmount": "Ghi nợ: {amount}",

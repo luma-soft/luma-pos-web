@@ -19,13 +19,6 @@ export async function QuotesTab({ searchParams }: { searchParams: SP }) {
 
   return (
     <>
-      <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-        <Link href={Routes.POS} target="_blank" className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98] ml-auto">
-          <ShoppingCart className="w-4 h-4" />
-          {t("quotes.createViaPos")}
-        </Link>
-      </div>
-
       <form className="flex items-center gap-3 mb-4" action={Routes.Sales}>
         <input type="hidden" name="tab" value="quotes" />
         <div className="relative w-full max-w-sm">
@@ -33,6 +26,10 @@ export async function QuotesTab({ searchParams }: { searchParams: SP }) {
           <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("orders.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         </div>
         <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full bg-primary-600 hover:brightness-110 text-white transition active:scale-[0.98]">{t("common.search")}</button>
+        <Link href={Routes.POS} target="_blank" className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98] ml-auto shrink-0">
+          <ShoppingCart className="w-4 h-4" />
+          {t("quotes.createViaPos")}
+        </Link>
       </form>
 
       <Suspense fallback={<TableSkeleton cols={6} rows={10} />}>

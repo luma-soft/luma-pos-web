@@ -154,6 +154,7 @@
     "projectPlaceholder": "Project (optional)…",
     "customerDebt": "Current debt: {debt}",
     "discount": "Discount",
+    "tax": "Tax",
     "shipping": "Shipping",
     "paidAmount": "Paid",
     "willOweAmount": "Will owe: {amount}",

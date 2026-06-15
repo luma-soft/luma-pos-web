@@ -30,8 +30,6 @@ export async function CashbookTab({ searchParams }: { searchParams: SP }) {
 
   return (
     <>
-      <div className="flex justify-end mb-4"><CashTxForm /></div>
-
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
         <Link href={href({ fund: params.fund === "cash" ? undefined : "cash", page: undefined })} className={cn("bg-surface border rounded-card p-4", params.fund === "cash" ? "border-primary-600" : "border-border")}>
           <div className="text-xs font-medium text-slate-500">💵 {t("cashbook.fundCash")}</div>
@@ -50,12 +48,13 @@ export async function CashbookTab({ searchParams }: { searchParams: SP }) {
         </div>
       </div>
 
-      <div className="flex gap-1.5 mb-4">
+      <div className="flex items-center gap-1.5 mb-4">
         {(["", "in", "out"] as const).map((tp) => (
           <Link key={tp || "all"} href={href({ type: tp || undefined, page: undefined })} className={cn("px-3 py-1.5 rounded-lg text-sm font-medium border", (params.type ?? "") === tp ? "bg-primary-600 text-white border-primary-600" : "border-border text-slate-600 dark:text-slate-300")}>
             {t(`cashbook.typeTabs.${tp || "all"}`)}
           </Link>
         ))}
+        <div className="ml-auto"><CashTxForm /></div>
       </div>
 
       {data.rows.length === 0 ? (

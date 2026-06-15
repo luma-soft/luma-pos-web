@@ -47,7 +47,9 @@ interface Invoice {
   projectId: string;
   projectName: string;
   priceBook: PriceBook;
-  discount: number;
+  discountInput: number;
+  discountMode: "vnd" | "pct";
+  taxRate: number;
   shippingFee: number;
   payMethod: PayMethod;
   paidInput: number | null;
@@ -62,14 +64,27 @@ function makeInvoice(id?: string): Invoice {
   return {
     id: id ?? `inv-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
     cart: [], customerId: "", projectId: "", projectName: "", priceBook: "",
-    discount: 0, shippingFee: 0, payMethod: "cash", paidInput: null,
+    discountInput: 0, discountMode: "vnd", taxRate: 0,
+    shippingFee: 0, payMethod: "cash", paidInput: null,
+  };
+}
+
+function normalizeInvoice(raw: Record<string, unknown>): Invoice {
+  const base = makeInvoice(raw.id as string | undefined);
+  return {
+    ...base,
+    ...(raw as Partial<Invoice>),
+    discountInput: (raw.discountInput as number | undefined) ?? (raw.discount as number | undefined) ?? 0,
+    discountMode: (raw.discountMode as "vnd" | "pct" | undefined) ?? "vnd",
+    taxRate: (raw.taxRate as number | undefined) ?? 0,
   };
 }
 
 function loadInvoices(): Invoice[] | null {
   try {
-    const raw = JSON.parse(localStorage.getItem(INV_KEY) ?? "null") as Invoice[] | null;
-    return raw && raw.length > 0 ? raw : null;
+    const raw = JSON.parse(localStorage.getItem(INV_KEY) ?? "null") as Record<string, unknown>[] | null;
+    if (!raw || raw.length === 0) return null;
+    return raw.map(normalizeInvoice);
   } catch {
     return null;
   }
@@ -186,7 +201,7 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
   }, [activeId]);
 
   const active = invoices.find((i) => i.id === activeId) ?? invoices[0];
-  const { cart, customerId, projectId, projectName, discount, shippingFee, payMethod, paidInput } = active;
+  const { cart, customerId, projectId, projectName, discountInput, discountMode, taxRate, shippingFee, payMethod, paidInput } = active;
   const priceBook: PriceBook = active.priceBook ?? ""; // "" = bảng giá mặc định
   const defaultBook = data.priceBooks.find((b) => b.isDefault) ?? data.priceBooks[0];
   const priceBookName = (priceBook && data.priceBooks.find((b) => b.id === priceBook)?.name) || defaultBook?.name || "Giá lẻ";
@@ -203,7 +218,9 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
     patchActive((inv) => ({ cart: typeof v === "function" ? v(inv.cart) : v }));
   const setProjectId = (v: string) => patchActive({ projectId: v });
   const setProjectName = (v: string) => patchActive({ projectName: v });
-  const setDiscount = (v: number) => patchActive({ discount: v });
+  const setDiscountInput = (v: number) => patchActive({ discountInput: v });
+  const setDiscountMode = (v: "vnd" | "pct") => patchActive({ discountMode: v });
+  const setTaxRate = (v: number) => patchActive({ taxRate: v });
   const setShippingFee = (v: number) => patchActive({ shippingFee: v });
   const setPayMethod = (v: PayMethod) => patchActive({ payMethod: v });
   const setPaidInput = (v: number | null) => patchActive({ paidInput: v });
@@ -331,7 +348,9 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
   }
 
   const subtotal = cart.reduce((s, l) => s + effPrice(l).price * l.quantity, 0);
-  const total = Math.max(0, subtotal - discount + shippingFee);
+  const discountVnd = discountMode === "pct" ? Math.round(subtotal * discountInput / 100) : discountInput;
+  const taxAmount = Math.round((subtotal - discountVnd) * taxRate / 100);
+  const total = Math.max(0, subtotal - discountVnd + taxAmount + shippingFee);
   const paid = payMethod === "credit" ? 0 : (paidInput ?? total);
   const remaining = Math.max(0, total - paid);
 
@@ -423,7 +442,7 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
       warehouseId: data.warehouse.id,
       projectId: projectId || null,
       projectName: projectName || undefined,
-      discount,
+      discount: discountVnd,
       shippingFee,
       items: cart.map((l) => ({
         productId: l.product.id,
@@ -846,13 +865,67 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
           </div>
           <div className="flex justify-between items-center gap-2">
             <span className="text-slate-500">{t("pos.discount")}</span>
-            <MoneyInput
-              value={discount || ""}
-              onChange={(v) => setDiscount(v ?? 0)}
-              placeholder="0"
-              className="no-spinner w-32 px-2 py-1 text-right text-sm rounded-md border border-border bg-surface"
-            />
+            <div className="flex items-center gap-1">
+              {discountMode === "pct" ? (
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={discountInput || ""}
+                  onChange={(e) => setDiscountInput(Math.max(0, Number(e.target.value)))}
+                  placeholder="0"
+                  className="no-spinner w-20 px-2 py-1 text-right text-sm rounded-md border border-border bg-surface"
+                />
+              ) : (
+                <MoneyInput
+                  value={discountInput || ""}
+                  onChange={(v) => setDiscountInput(v ?? 0)}
+                  placeholder="0"
+                  className="no-spinner w-20 px-2 py-1 text-right text-sm rounded-md border border-border bg-surface"
+                />
+              )}
+              <div className="flex rounded-md overflow-hidden border border-border shrink-0">
+                {(["vnd", "pct"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setDiscountMode(m)}
+                    className={cn(
+                      "px-2 py-1 text-xs font-semibold",
+                      discountMode === m ? "bg-primary-600 text-white" : "bg-surface text-slate-500"
+                    )}
+                  >
+                    {m === "vnd" ? "₫" : "%"}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
+          {discountMode === "pct" && discountInput > 0 && (
+            <div className="flex justify-end text-xs text-slate-400 -mt-1">
+              − {formatCurrency(discountVnd)}
+            </div>
+          )}
+          <div className="flex justify-between items-center gap-2">
+            <span className="text-slate-500">{t("pos.tax")}</span>
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                min={0}
+                max={100}
+                value={taxRate || ""}
+                onChange={(e) => setTaxRate(Math.max(0, Number(e.target.value)))}
+                placeholder="0"
+                className="no-spinner w-20 px-2 py-1 text-right text-sm rounded-md border border-border bg-surface"
+              />
+              <span className="text-xs text-slate-500 w-8 text-center">%</span>
+            </div>
+          </div>
+          {taxRate > 0 && (
+            <div className="flex justify-end text-xs text-slate-400 -mt-1">
+              + {formatCurrency(taxAmount)}
+            </div>
+          )}
           <div className="flex justify-between items-center gap-2">
             <span className="text-slate-500">{t("pos.shipping")}</span>
             <MoneyInput
@@ -1015,7 +1088,8 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
             })}
             totals={[
               { label: t("pos.subtotal"), value: subtotal },
-              ...(discount > 0 ? [{ label: t("pos.discount"), value: discount, negative: true }] : []),
+              ...(discountVnd > 0 ? [{ label: t("pos.discount"), value: discountVnd, negative: true }] : []),
+              ...(taxAmount > 0 ? [{ label: t("pos.tax"), value: taxAmount }] : []),
               ...(shippingFee > 0 ? [{ label: t("pos.shipping"), value: shippingFee }] : []),
             ]}
             grandTotalLabel={t("print.grandTotal")}

@@ -36,12 +36,6 @@ export async function StockTab({ searchParams }: { searchParams: SP }) {
 
   return (
     <>
-      <div className="flex justify-end mb-4">
-        <Link href={Routes.PurchaseNew} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98]">
-          <Truck className="w-4 h-4" />{t("purchases.createNew")}
-        </Link>
-      </div>
-
       <form className="flex flex-wrap items-center gap-3 mb-3" action={Routes.Inventory}>
         <input type="hidden" name="tab" value="stock" />
         <div className="relative w-full max-w-xs">
@@ -56,6 +50,9 @@ export async function StockTab({ searchParams }: { searchParams: SP }) {
           {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full bg-primary-600 hover:brightness-110 text-white transition active:scale-[0.98]">{t("common.search")}</button>
+        <Link href={Routes.PurchaseNew} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98] ml-auto shrink-0">
+          <Truck className="w-4 h-4" />{t("purchases.createNew")}
+        </Link>
       </form>
 
       <Suspense fallback={<TableSkeleton cols={6} rows={10} />}>

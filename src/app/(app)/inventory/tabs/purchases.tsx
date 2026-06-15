@@ -19,10 +19,6 @@ export async function PurchasesTab({ searchParams }: { searchParams: SP }) {
 
   return (
     <>
-      <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-        <Link href={Routes.PurchaseNew} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98] ml-auto"><Plus className="w-4 h-4" />{t("purchases.createNew")}</Link>
-      </div>
-
       <form className="flex flex-wrap items-center gap-3 mb-4" action={Routes.Inventory}>
         <input type="hidden" name="tab" value="purchases" />
         <div className="relative w-full max-w-xs">
@@ -36,6 +32,7 @@ export async function PurchasesTab({ searchParams }: { searchParams: SP }) {
           <option value="cancelled">{t("purchases.status.cancelled")}</option>
         </select>
         <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full bg-primary-600 hover:brightness-110 text-white">{t("common.search")}</button>
+        <Link href={Routes.PurchaseNew} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98] ml-auto shrink-0"><Plus className="w-4 h-4" />{t("purchases.createNew")}</Link>
       </form>
 
       <Suspense fallback={<TableSkeleton cols={8} rows={10} />}>

@@ -32,26 +32,25 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
 
   return (
     <>
-      <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-        <Link href={Routes.POS} target="_blank" className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98] ml-auto">
+      <div className="flex items-end justify-between gap-3 border-b border-border mb-4">
+        <div className="flex gap-1">
+          {STATUS.map((tab) => (
+            <Link
+              key={tab}
+              href={href({ status: tab, page: undefined })}
+              className={cn(
+                "px-4 py-2 text-sm font-medium border-b-2 -mb-px",
+                status === tab ? "border-primary-600 text-primary-600" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+              )}
+            >
+              {t(`orders.tabs.${tab}`)}
+            </Link>
+          ))}
+        </div>
+        <Link href={Routes.POS} target="_blank" className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98] mb-1.5 shrink-0">
           <ShoppingCart className="w-4 h-4" />
           {t("orders.createViaPos")}
         </Link>
-      </div>
-
-      <div className="flex gap-1 border-b border-border mb-4">
-        {STATUS.map((tab) => (
-          <Link
-            key={tab}
-            href={href({ status: tab, page: undefined })}
-            className={cn(
-              "px-4 py-2 text-sm font-medium border-b-2 -mb-px",
-              status === tab ? "border-primary-600 text-primary-600" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-            )}
-          >
-            {t(`orders.tabs.${tab}`)}
-          </Link>
-        ))}
       </div>
 
       <form className="flex flex-wrap items-center gap-2 mb-4" action={Routes.Sales}>
