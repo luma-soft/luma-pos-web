@@ -67,6 +67,7 @@
     "stocktakes": "Kiểm kho",
     "internalUse": "Xuất nội bộ",
     "shifts": "Ca làm việc",
+    "tables": "Bàn",
     "collapseSidebar": "Thu gọn menu",
     "expandSidebar": "Mở menu",
     "more": "Thêm"
@@ -353,6 +354,20 @@
     "invalidData": "Dữ liệu không hợp lệ.",
     "serverError": "Có lỗi xảy ra, thử lại sau.",
     "forbidden": "Bạn không có quyền thực hiện thao tác này."
+  },
+  "tables": {
+    "title": "Quản lý bàn",
+    "manage": "Quản lý",
+    "tableName": "Tên bàn",
+    "zone": "Khu vực",
+    "addTable": "Thêm bàn",
+    "empty": "Chưa có bàn nào.",
+    "free": "Trống",
+    "occupied": "Đang phục vụ",
+    "order": "Gọi món",
+    "emptyCart": "Chưa có món — tìm để thêm.",
+    "close": "Đóng bàn",
+    "errors": { "occupied": "Bàn đang phục vụ — không xóa được." }
   },
   "shifts": {
     "openTitle": "Mở ca",

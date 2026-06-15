@@ -67,6 +67,7 @@
     "stocktakes": "Stocktake",
     "internalUse": "Internal Use",
     "shifts": "Shifts",
+    "tables": "Tables",
     "collapseSidebar": "Collapse menu",
     "expandSidebar": "Open menu",
     "more": "More"
@@ -353,6 +354,20 @@
     "invalidData": "Invalid data.",
     "serverError": "Something went wrong, please retry.",
     "forbidden": "You don't have permission for this action."
+  },
+  "tables": {
+    "title": "Tables",
+    "manage": "Manage",
+    "tableName": "Table name",
+    "zone": "Zone",
+    "addTable": "Add table",
+    "empty": "No tables yet.",
+    "free": "Free",
+    "occupied": "Occupied",
+    "order": "Order",
+    "emptyCart": "No items yet — search to add.",
+    "close": "Close table",
+    "errors": { "occupied": "Table is occupied — can't delete." }
   },
   "shifts": {
     "openTitle": "Open shift",

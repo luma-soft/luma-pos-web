@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   LayoutDashboard, ShoppingCart, Warehouse, Users, Wallet,
-  BarChart3, Settings, FileText,
+  BarChart3, Settings, FileText, Utensils,
 } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
@@ -40,13 +40,19 @@ const GROUPS: Group[] = [
 ];
 
 /** Sidebar điều hướng có chữ — dùng cho cả desktop (cố định) và drawer mobile. */
-export function AppNav() {
+export function AppNav({ industry }: { industry?: string }) {
   const t = useTranslations();
   const pathname = usePathname();
+  const isFnb = industry === "restaurant" || industry === "cafe";
+  const groups = isFnb
+    ? GROUPS.map((g) => g.labelKey === "nav.groups.manage"
+        ? { ...g, items: [...g.items, { href: "/tables", icon: Utensils, key: "nav.tables" } as Item] }
+        : g)
+    : GROUPS;
 
   return (
     <nav className="flex-1 overflow-y-auto px-3 py-2 text-sm">
-      {GROUPS.map((g) => (
+      {groups.map((g) => (
         <div key={g.labelKey}>
           <div className="px-3 pt-4 pb-1.5 text-[10.5px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-600">
             {t(g.labelKey)}

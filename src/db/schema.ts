@@ -519,6 +519,19 @@ export const shifts = pgTable("shifts", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [index("shifts_status_idx").on(t.status), index("shifts_user_idx").on(t.userId)]);
 
+// ============= F&B dining tables (Part 18) =============
+
+export const diningTables = pgTable("dining_tables", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  zone: text("zone").notNull().default(""),
+  sortOrder: integer("sort_order").notNull().default(0),
+  status: text("status").notNull().default("free"),
+  currentCart: jsonb("current_cart").$type<Array<{ productId: string; productName: string; unitName: string; unitMultiplier: number; quantity: number; unitPrice: number }>>().notNull().default([]),
+  openedAt: timestamp("opened_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [index("dining_tables_zone_idx").on(t.zone, t.sortOrder)]);
+
 // ============= Store settings (singleton) =============
 
 export const storeSettings = pgTable("store_settings", {

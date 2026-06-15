@@ -40,7 +40,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <p className="text-[11px] text-slate-400 truncate">{user.email}</p>
           </div>
         </div>
-        <AppNav />
+        <AppNav industry={store.industry} />
         <div className="p-3 border-t border-border space-y-2">
           <ModeSwitcher current={mode} />
           <ThemeSwitcher current={theme} />
