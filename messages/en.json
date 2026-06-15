@@ -68,6 +68,7 @@
     "internalUse": "Internal Use",
     "shifts": "Shifts",
     "tables": "Tables",
+    "ai": "AI",
     "collapseSidebar": "Collapse menu",
     "expandSidebar": "Open menu",
     "more": "More"
@@ -354,6 +355,21 @@
     "invalidData": "Invalid data.",
     "serverError": "Something went wrong, please retry.",
     "forbidden": "You don't have permission for this action."
+  },
+  "ai": {
+    "restockTab": "Smart restocking",
+    "assistantTab": "Assistant",
+    "restockHint": "Suggested purchases from the last 30 days of sales velocity.",
+    "restockEmpty": "Nothing to restock right now.",
+    "perDay": "day",
+    "createPo": "Create PO",
+    "priority": { "high": "High", "medium": "Medium", "low": "Low" },
+    "cols": { "onHand": "On hand", "velocity": "Avg/day", "daysLeft": "Days left", "suggested": "Suggested", "priority": "Priority" },
+    "assistantNotice": "Assistant preview — connect an AI provider (API key) to get real answers.",
+    "assistantEmpty": "Ask about sales, stock, or what to restock.",
+    "askPlaceholder": "Ask the assistant…",
+    "placeholderReply": "AI provider not configured yet — answers will appear once an API key is enabled.",
+    "q": { "todaySales": "How much did we sell today?", "topSellers": "Top best-sellers?", "lowStock": "What's running low?", "restockToday": "What should I restock today?" }
   },
   "tables": {
     "title": "Tables",

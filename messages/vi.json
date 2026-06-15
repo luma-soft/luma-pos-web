@@ -68,6 +68,7 @@
     "internalUse": "Xuất nội bộ",
     "shifts": "Ca làm việc",
     "tables": "Bàn",
+    "ai": "AI",
     "collapseSidebar": "Thu gọn menu",
     "expandSidebar": "Mở menu",
     "more": "Thêm"
@@ -354,6 +355,21 @@
     "invalidData": "Dữ liệu không hợp lệ.",
     "serverError": "Có lỗi xảy ra, thử lại sau.",
     "forbidden": "Bạn không có quyền thực hiện thao tác này."
+  },
+  "ai": {
+    "restockTab": "Gợi ý nhập hàng",
+    "assistantTab": "Trợ lý",
+    "restockHint": "Đề xuất nhập hàng từ tốc độ bán 30 ngày gần nhất.",
+    "restockEmpty": "Hiện chưa cần nhập thêm.",
+    "perDay": "ngày",
+    "createPo": "Tạo phiếu nhập",
+    "priority": { "high": "Cao", "medium": "Trung bình", "low": "Thấp" },
+    "cols": { "onHand": "Tồn", "velocity": "TB/ngày", "daysLeft": "Ngày còn", "suggested": "Đề xuất", "priority": "Ưu tiên" },
+    "assistantNotice": "Bản xem trước — kết nối nhà cung cấp AI (API key) để có câu trả lời thật.",
+    "assistantEmpty": "Hỏi về doanh số, tồn kho, hay nên nhập gì.",
+    "askPlaceholder": "Hỏi trợ lý…",
+    "placeholderReply": "Chưa cấu hình nhà cung cấp AI — sẽ trả lời khi bật API key.",
+    "q": { "todaySales": "Hôm nay bán được bao nhiêu?", "topSellers": "Mặt hàng bán chạy nhất?", "lowStock": "Sản phẩm nào sắp hết?", "restockToday": "Hôm nay nên nhập gì?" }
   },
   "tables": {
     "title": "Quản lý bàn",
