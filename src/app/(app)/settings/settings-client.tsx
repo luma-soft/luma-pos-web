@@ -98,8 +98,8 @@ const SEC_META: Record<SectionId, { en: string; vi: string; subEn: string; subVi
 /* ── helpers (luma classes mapping prototype) ── */
 function Card({ title, vi, action, children }: { title: string; vi: string; action?: React.ReactNode; children?: React.ReactNode }) {
   return (
-    <div className="bg-surface rounded-card shadow-e2 overflow-hidden mb-4">
-      <div className="px-4.5 py-3 border-b border-border bg-canvas flex items-center justify-between gap-3">
+    <div className="bg-surface rounded-card shadow-e2 mb-4">
+      <div className="px-4.5 py-3 border-b border-border bg-canvas rounded-t-card flex items-center justify-between gap-3">
         <div>
           <div className="text-xs font-bold">{title}</div>
           <div className="text-[10px] italic text-slate-400 mt-px">{vi}</div>
