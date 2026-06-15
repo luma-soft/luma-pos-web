@@ -4,15 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
-  LayoutDashboard, ShoppingCart, Package, Users, Truck,
-  FileText, Warehouse, BarChart3, Settings, FileSpreadsheet,
-  Wallet, Building2, Percent, FileCheck2, PackageMinus,
-  Tags, ClipboardCheck,
+  LayoutDashboard, ShoppingCart, Warehouse, Users, Wallet,
+  BarChart3, Settings, FileText,
 } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
-import { RailControls } from "@/components/rail-controls";
-import type { Theme, Mode } from "@/lib/theme/config";
 
 type Item = { href: string; icon: React.ComponentType<{ className?: string }>; key: string; newTab?: boolean };
 type Group = { labelKey: string; items: Item[] };
@@ -26,110 +22,25 @@ const GROUPS: Group[] = [
     ],
   },
   {
-    labelKey: "nav.groups.sales",
+    labelKey: "nav.groups.manage",
     items: [
-      { href: Routes.Orders, icon: FileText, key: "nav.orders" },
-      { href: Routes.Quotes, icon: FileSpreadsheet, key: "nav.quotes" },
-      { href: Routes.Promotions, icon: Percent, key: "nav.promotions" },
-    ],
-  },
-  {
-    labelKey: "nav.groups.inventory",
-    items: [
-      { href: Routes.Products, icon: Package, key: "nav.products" },
-      { href: Routes.Pricing, icon: Tags, key: "nav.pricing" },
-      { href: Routes.Inventory, icon: Warehouse, key: "nav.inventory" },
-      { href: Routes.Stocktakes, icon: ClipboardCheck, key: "nav.stocktakes" },
-      { href: Routes.Purchases, icon: Truck, key: "nav.purchases" },
-    ],
-  },
-  {
-    labelKey: "nav.groups.partners",
-    items: [
-      { href: Routes.Customers, icon: Users, key: "nav.customers" },
-      { href: Routes.Projects, icon: Building2, key: "nav.projects" },
-      { href: Routes.Suppliers, icon: PackageMinus, key: "nav.suppliers" },
-    ],
-  },
-  {
-    labelKey: "nav.groups.finance",
-    items: [
-      { href: Routes.Cashbook, icon: Wallet, key: "nav.cashbook" },
-      { href: Routes.EInvoices, icon: FileCheck2, key: "nav.einvoices" },
+      { href: Routes.Sales, icon: FileText, key: "nav.groups.sales" },
+      { href: Routes.Inventory, icon: Warehouse, key: "nav.groups.inventory" },
+      { href: Routes.Partners, icon: Users, key: "nav.groups.partners" },
+      { href: Routes.Finance, icon: Wallet, key: "nav.groups.finance" },
     ],
   },
   {
     labelKey: "nav.groups.system",
     items: [
       { href: Routes.Reports, icon: BarChart3, key: "nav.reports" },
+      { href: Routes.Settings, icon: Settings, key: "nav.settings" },
     ],
   },
 ];
 
-function isActive(pathname: string, href: string) {
-  return pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
-}
-
-/* ── Desktop: rail icon 64px nền tối ── */
-export function AppRail({ theme, mode }: { theme: Theme; mode: Mode }) {
-  const t = useTranslations();
-  const pathname = usePathname();
-
-  return (
-    <aside className="hidden lg:flex w-16 shrink-0 bg-nav flex-col items-center py-3.5 sticky top-0 h-screen">
-      <Link href={Routes.Dashboard} className="w-10 h-10 rounded-[10px] bg-primary-600 grid place-items-center text-white text-[15px] font-extrabold tracking-tight mb-3">
-        L
-      </Link>
-
-      <nav className="flex-1 flex flex-col items-center gap-1 overflow-y-auto w-full [&::-webkit-scrollbar]:w-0">
-        {GROUPS.map((g, gi) => (
-          <div key={g.labelKey} className="flex flex-col items-center gap-1 w-full">
-            {gi > 0 && <span className="h-px w-7 bg-white/10 my-1" />}
-            {g.items.map((item) => (
-              <RailLink key={item.href} item={item} active={isActive(pathname, item.href)} label={t(item.key)} />
-            ))}
-          </div>
-        ))}
-      </nav>
-
-      <div className="flex flex-col items-center gap-1 mt-2">
-        <span className="h-px w-7 bg-white/10 my-1" />
-        <RailLink
-          item={{ href: Routes.Settings, icon: Settings, key: "nav.settings" }}
-          active={isActive(pathname, Routes.Settings)}
-          label={t("nav.settings")}
-        />
-        <RailControls theme={theme} mode={mode} />
-      </div>
-    </aside>
-  );
-}
-
-function RailLink({ item, active, label }: { item: Item; active: boolean; label: string }) {
-  return (
-    <Link
-      href={item.href}
-      target={item.newTab ? "_blank" : undefined}
-      title={label}
-      aria-label={label}
-      className={cn(
-        "group relative w-11 h-11 rounded-[10px] grid place-items-center transition-colors",
-        active
-          ? "bg-[rgba(45,212,191,0.15)] text-[#2DD4BF]"
-          : "text-[rgba(250,250,248,0.4)] hover:bg-white/[0.07] hover:text-[rgba(250,250,248,0.85)]"
-      )}
-    >
-      {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.75 h-5 bg-[#2DD4BF] rounded-r" />}
-      <item.icon className="w-5 h-5" />
-      <span className="pointer-events-none absolute left-full ml-2 px-2 py-1 rounded-md bg-nav text-white text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-70 shadow-e2">
-        {label}
-      </span>
-    </Link>
-  );
-}
-
-/* ── Mobile: drawer điều hướng có chữ ── */
-export function AppDrawerNav() {
+/** Sidebar điều hướng có chữ — dùng cho cả desktop (cố định) và drawer mobile. */
+export function AppNav() {
   const t = useTranslations();
   const pathname = usePathname();
 
@@ -142,7 +53,7 @@ export function AppDrawerNav() {
           </div>
           <div className="space-y-0.5">
             {g.items.map((item) => {
-              const active = isActive(pathname, item.href);
+              const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(`${item.href}/`));
               return (
                 <Link
                   key={item.href}

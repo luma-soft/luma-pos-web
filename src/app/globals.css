@@ -181,10 +181,10 @@ body {
   appearance: textfield;
 }
 
-/* Mobile: drawer điều hướng (có chữ) trượt từ trái — desktop dùng rail 64px */
+/* Mobile: sidebar thành drawer trượt từ trái */
 .mobile-nav-backdrop { display: none; }
 @media (max-width: 1023px) {
-  .app-drawer {
+  .app-sidebar {
     position: fixed;
     top: 0; bottom: 0; left: 0;
     z-index: 60;
@@ -193,7 +193,7 @@ body {
     transition: transform 0.22s ease;
     box-shadow: 0 10px 40px rgba(0,0,0,0.18);
   }
-  [data-mobilenav="open"] .app-drawer { transform: translateX(0); }
+  [data-mobilenav="open"] .app-sidebar { transform: translateX(0); }
   [data-mobilenav="open"] .mobile-nav-backdrop { display: block; }
 }
 

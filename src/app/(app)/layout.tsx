@@ -5,14 +5,12 @@ import { LogoutButton } from "@/components/logout-button";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { ModeSwitcher } from "@/components/mode-switcher";
-import { AppRail, AppDrawerNav } from "@/components/app-nav";
+import { AppNav } from "@/components/app-nav";
 import { MobileNavBackdrop } from "@/components/mobile-nav";
 import { MobileTabBar } from "@/components/mobile-tabbar";
 import { Routes } from "@/lib/routes";
 import { getTheme, getMode } from "@/lib/theme/cookie";
 
-// Tất cả trang khu vực app cần đăng nhập + dữ liệu DB → render lúc request,
-// KHÔNG prerender lúc build (tránh query DB chạy lúc build → timeout trên Vercel).
 export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -28,11 +26,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen flex bg-canvas">
       <MobileNavBackdrop />
 
-      {/* Desktop: rail icon 64px nền tối */}
-      <AppRail theme={theme} mode={mode} />
-
-      {/* Mobile: drawer điều hướng có chữ (trượt từ trái qua data-mobilenav) */}
-      <aside className="app-drawer lg:hidden w-64 shrink-0 bg-surface border-r border-border flex flex-col h-screen">
+      <aside className="app-sidebar w-60 shrink-0 bg-surface border-r border-border flex flex-col sticky top-0 h-screen overflow-hidden">
         <div className="flex items-center gap-2.5 px-4 py-4 border-b border-border">
           <div className="w-9 h-9 rounded-xl shrink-0 grid place-items-center text-white font-extrabold bg-gradient-to-br from-primary-600 to-primary-400">
             L
@@ -42,7 +36,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <p className="text-[11px] text-slate-400 truncate">{user.email}</p>
           </div>
         </div>
-        <AppDrawerNav />
+        <AppNav />
         <div className="p-3 border-t border-border space-y-2">
           <ModeSwitcher current={mode} />
           <ThemeSwitcher current={theme} />
