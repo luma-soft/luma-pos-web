@@ -622,7 +622,7 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
               )}
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-1.5">
-                  <button onClick={() => updateQty(l.key, -1)} className="w-7 h-7 rounded-md bg-surface border border-border grid place-items-center">
+                  <button onClick={() => updateQty(l.key, -1)} className="w-9 h-9 lg:w-7 lg:h-7 rounded-md bg-surface border border-border grid place-items-center">
                     <Minus className="w-3 h-3" />
                   </button>
                   <input
@@ -631,7 +631,7 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
                     onChange={(e) => setQty(l.key, Number(e.target.value))}
                     className="no-spinner w-14 px-1 py-1 text-center text-sm rounded-md border border-border bg-surface"
                   />
-                  <button onClick={() => updateQty(l.key, 1)} className="w-7 h-7 rounded-md bg-surface border border-border grid place-items-center">
+                  <button onClick={() => updateQty(l.key, 1)} className="w-9 h-9 lg:w-7 lg:h-7 rounded-md bg-surface border border-border grid place-items-center">
                     <Plus className="w-3 h-3" />
                   </button>
                   <select
@@ -697,7 +697,7 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
                 type="button"
                 onClick={closeSearch}
                 title={t("common.close")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 z-10 grid place-items-center w-7 h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-surface-2"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 z-10 grid place-items-center w-9 h-9 lg:w-7 lg:h-7 rounded-md text-slate-400 hover:text-slate-600 hover:bg-surface-2"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -733,14 +733,14 @@ export function PosClient({ data, printTemplate }: { data: PosData; printTemplat
                           </div>
                           {line ? (
                             <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <button onClick={() => updateQty(line.key, -1)} className="w-7 h-7 rounded-md border border-border grid place-items-center"><Minus className="w-3 h-3" /></button>
+                              <button onClick={() => updateQty(line.key, -1)} className="w-9 h-9 lg:w-7 lg:h-7 rounded-md border border-border grid place-items-center"><Minus className="w-3 h-3" /></button>
                               <input
                                 type="number"
                                 value={line.quantity}
                                 onChange={(e) => setQty(line.key, Number(e.target.value))}
                                 className="no-spinner w-12 px-1 py-1 text-center text-sm rounded-md border border-border bg-surface"
                               />
-                              <button onClick={() => updateQty(line.key, 1)} className="w-7 h-7 rounded-md border border-border grid place-items-center"><Plus className="w-3 h-3" /></button>
+                              <button onClick={() => updateQty(line.key, 1)} className="w-9 h-9 lg:w-7 lg:h-7 rounded-md border border-border grid place-items-center"><Plus className="w-3 h-3" /></button>
                             </div>
                           ) : (
                             <div className="text-sm font-semibold text-primary-600 tabular-nums shrink-0">{formatCurrency(basePriceFor(p, priceBook))}/{p.baseUnit}</div>
