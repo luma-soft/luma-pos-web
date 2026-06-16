@@ -7,9 +7,9 @@ import { Check, Printer, Loader2 } from "lucide-react";
 import { SearchableSelect } from "@/components/combobox";
 import { Toggle } from "@/components/ui/toggle";
 import { cn } from "@/lib/utils";
-import { updateStoreSettings, updateStaffRole, setStaffActive } from "@/lib/actions/settings";
+import { updateStoreSettings, updateStaffRole, setStaffActive, updateStorePrefs } from "@/lib/actions/settings";
 import type { StoreSettings, StaffRow } from "@/lib/data/settings";
-import { STAFF_ROLES, type StaffRole } from "@/lib/schemas/settings";
+import { STAFF_ROLES, PAPER_SIZES, type StaffRole, type StorePrefs } from "@/lib/schemas/settings";
 
 /* ── sample data (design preview — chưa nối backend) ── */
 const ROLE_LABELS: Record<string, [string, string]> = {
@@ -166,11 +166,11 @@ export function SettingsClient({ store, staff, canManage }: { store: StoreSettin
 
         {active === "store" && <StoreSection L={L} locale={locale} store={store} canManage={canManage} />}
         {active === "staff" && <StaffSection L={L} staff={staff} canManage={canManage} />}
-        {active === "hardware" && <HardwareSection L={L} />}
-        {active === "payments" && <PaymentsSection L={L} />}
+        {active === "hardware" && <HardwareSection L={L} prefs={store.prefs.hardware} canManage={canManage} />}
+        {active === "payments" && <PaymentsSection L={L} prefs={store.prefs.payments} canManage={canManage} />}
         {active === "print" && <PrintSection L={L} />}
-        {active === "tax" && <TaxSection L={L} locale={locale} />}
-        {active === "notifications" && <NotificationsSection L={L} />}
+        {active === "tax" && <TaxSection L={L} prefs={store.prefs.tax} canManage={canManage} />}
+        {active === "notifications" && <NotificationsSection L={L} prefs={store.prefs.notifications} canManage={canManage} />}
         {active === "migration" && <MigrationSection L={L} />}
       </div>
     </div>
@@ -320,15 +320,35 @@ function StaffSection({ L, staff, canManage }: { L: boolean; staff: StaffRow[]; 
   );
 }
 
-function HardwareSection({ L }: { L: boolean }) {
+function HardwareSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["hardware"]; canManage: boolean }) {
+  const [form, setForm] = useState(prefs);
+  const [dirty, setDirty] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [pending, start] = useTransition();
+  const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => { setForm((p) => ({ ...p, [k]: v })); setDirty(true); setSaved(false); };
+  function save() { start(async () => { const r = await updateStorePrefs({ hardware: form }); if (r.ok) { setDirty(false); setSaved(true); } }); }
+
   const dot = { connected: "bg-ok", disconnected: "bg-er", unconfigured: "bg-slate-400" } as const;
   const lbl = { connected: [L ? "Đã kết nối" : "Connected", "text-ok"], disconnected: [L ? "Mất kết nối" : "Disconnected", "text-er"], unconfigured: [L ? "Chưa cấu hình" : "Not configured", "text-slate-400"] } as const;
   return (
     <>
-      <Card title={L ? "Thiết bị phần cứng" : "Hardware Devices"} vi={L ? "Máy in · Quét mã · Ngăn kéo · Cân · Đọc thẻ" : "Printer · Scanner · Drawer · Scale · Reader"} action={<button className={btnS}>{L ? "Thêm thiết bị" : "Add Device"}</button>}>
+      <Card title={L ? "Tùy chọn in & ngăn kéo" : "Print & Drawer Options"} vi={L ? "Áp dụng khi in hóa đơn POS" : "Applied when printing POS receipts"}>
+        <div className="p-4.5 flex flex-col gap-3">
+          <div className="flex flex-col gap-1 max-w-50">
+            <span className={FL}>{L ? "Khổ giấy mặc định" : "Default paper size"}</span>
+            <SearchableSelect options={PAPER_SIZES.map((s) => ({ value: s, label: s }))} value={form.paperSize} onChange={(v) => set("paperSize", v as typeof form.paperSize)} allowClear={false} disabled={!canManage} />
+          </div>
+          <CtrlRow title={L ? "In QR hóa đơn điện tử" : "Print e-invoice QR"} desc={L ? "Mã xác thực theo Nghị định 70" : "Decree 70 verification code"} checked={form.printEinvoiceQr} onChange={canManage ? (v) => set("printEinvoiceQr", v) : undefined} />
+          <CtrlRow title={L ? "In tự động sau mỗi đơn" : "Auto-print after each order"} checked={form.autoPrint} onChange={canManage ? (v) => set("autoPrint", v) : undefined} />
+          <CtrlRow title={L ? "Mở ngăn kéo khi thu tiền mặt" : "Open cash drawer on cash payment"} checked={form.openDrawer} onChange={canManage ? (v) => set("openDrawer", v) : undefined} />
+          <div className="flex items-center gap-2"><Link href="/settings/print" className={btnS}><Printer className="w-3 h-3" />{L ? "Mở thiết kế mẫu in →" : "Open template designer →"}</Link></div>
+          <SaveBar L={L} dirty={dirty} saved={saved} pending={pending} canManage={canManage} onSave={save} />
+        </div>
+      </Card>
+      <Card title={L ? "Thiết bị (xem trước)" : "Devices (preview)"} vi={L ? "Phát hiện thiết bị sẽ có ở bản desktop" : "Device detection ships with the desktop app"}>
         <div className="p-4 flex flex-col gap-2">
           {DEVICES.map((d, i) => (
-            <div key={i} className={ROW}>
+            <div key={i} className={cn(ROW, "opacity-70")}>
               <span className="w-9 h-9 rounded-[10px] bg-surface-2 grid place-items-center text-lg shrink-0">{d.ico}</span>
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-bold truncate">{d.name}</div>
@@ -337,42 +357,38 @@ function HardwareSection({ L }: { L: boolean }) {
               <div className="flex items-center gap-2 shrink-0">
                 <span className={cn("w-2 h-2 rounded-full", dot[d.status as keyof typeof dot])} />
                 <span className={cn("text-[10px] font-bold", lbl[d.status as keyof typeof lbl][1])}>{lbl[d.status as keyof typeof lbl][0]}</span>
-                <button className={btnS}>{d.status === "connected" ? (L ? "Kiểm tra" : "Test") : d.status === "disconnected" ? (L ? "Kết nối lại" : "Reconnect") : (L ? "Cấu hình" : "Configure")}</button>
               </div>
             </div>
           ))}
-        </div>
-      </Card>
-      <Card title={L ? "Mẫu in nhanh" : "Quick Print Settings"} vi={L ? "Vào Mẫu in để tùy chỉnh đầy đủ" : "Open Print Templates for full control"} action={<Link href="/settings/print" className={btnF}><Printer className="w-3 h-3" />{L ? "Mở thiết kế mẫu in →" : "Open designer →"}</Link>}>
-        <div className="p-4.5 flex flex-col gap-1.5">
-          <ToggleRow on title={L ? "In QR hóa đơn điện tử" : "Print e-invoice QR"} desc={L ? "Mã xác thực theo Nghị định 70" : "Decree 70 verification code"} />
-          <ToggleRow on title={L ? "In tự động sau mỗi đơn" : "Auto-print after each order"} />
-          <ToggleRow on title={L ? "Mở ngăn kéo khi thu tiền mặt" : "Open cash drawer on cash payment"} />
         </div>
       </Card>
     </>
   );
 }
 
-function PaymentsSection({ L }: { L: boolean }) {
-  const [pm, setPm] = useState(PAYMENTS);
-  const toggle = (id: string) => setPm((p) => p.map((x) => x.id === id ? { ...x, enabled: !x.enabled } : x));
+function PaymentsSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["payments"]; canManage: boolean }) {
+  const [pm, setPm] = useState(prefs);
+  const [dirty, setDirty] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [pending, start] = useTransition();
+  const toggle = (id: keyof typeof pm) => { if (!canManage) return; setPm((p) => ({ ...p, [id]: !p[id] })); setDirty(true); setSaved(false); };
+  function save() { start(async () => { const r = await updateStorePrefs({ payments: pm }); if (r.ok) { setDirty(false); setSaved(true); } }); }
   return (
     <>
-      <Card title={L ? "Phương thức thanh toán" : "Payment Methods"} vi={L ? "Hệ sinh thái thanh toán VN" : "Vietnamese payment ecosystem"}>
+      <Card title={L ? "Phương thức thanh toán" : "Payment Methods"} vi={L ? "Bật phương thức cho màn thanh toán" : "Enable methods for checkout"}>
         <div className="p-4 flex flex-col gap-2">
-          {pm.map((p) => (
-            <div key={p.id} className={ROW}>
-              <span className="w-9 h-9 rounded-[10px] grid place-items-center text-lg shrink-0" style={{ background: p.color + "22", border: `1px solid ${p.color}33` }}>{p.ico}</span>
-              <div className="flex-1 min-w-0"><div className="text-xs font-bold">{L ? p.vi : p.name}</div><div className="text-[10px] text-slate-500">{p.note}</div></div>
-              <Toggle checked={p.enabled} onChange={() => toggle(p.id)} aria-label={p.name} />
-              {p.enabled && p.id !== "cash" && <button className={btnS}>{L ? "Cấu hình" : "Configure"}</button>}
-            </div>
-          ))}
+          {PAYMENTS.map((p) => {
+            const id = p.id as keyof typeof pm;
+            return (
+              <div key={p.id} className={ROW}>
+                <span className="w-9 h-9 rounded-[10px] grid place-items-center text-lg shrink-0" style={{ background: p.color + "22", border: `1px solid ${p.color}33` }}>{p.ico}</span>
+                <div className="flex-1 min-w-0"><div className="text-xs font-bold">{L ? p.vi : p.name}</div><div className="text-[10px] text-slate-500">{p.note}</div></div>
+                <Toggle checked={pm[id]} onChange={() => toggle(id)} aria-label={p.name} />
+              </div>
+            );
+          })}
         </div>
-      </Card>
-      <Card title={L ? "Thanh toán chia đôi" : "Split Payment"} vi={L ? "Một hóa đơn nhiều phương thức" : "Multiple methods per invoice"} action={<Toggle checked onChange={() => {}} aria-label="split" />}>
-        <div className="p-4.5 text-[11px] text-slate-500 leading-relaxed">{L ? "Khách có thể thanh toán một hóa đơn bằng nhiều phương thức (vd: một phần tiền mặt, còn lại VietQR). Bật tại màn thanh toán POS." : "Customers can pay one invoice with a combination of methods (e.g. partial cash + VietQR). Enabled at POS checkout."}</div>
+        <div className="px-4.5 pb-4"><SaveBar L={L} dirty={dirty} saved={saved} pending={pending} canManage={canManage} onSave={save} /></div>
       </Card>
     </>
   );
@@ -388,72 +404,92 @@ function PrintSection({ L }: { L: boolean }) {
   );
 }
 
-function TaxSection({ L, locale }: { L: boolean; locale: string }) {
-  const [provider, setProvider] = useState("VNPT");
-  const providerOpts = ["VNPT e-Invoice", "Viettel-S", "MISA meInvoice", "FPT Invoice", "Bkav eHóa đơn", "CyberLotus", "EasyInvoice"]
-    .map((p) => ({ value: p.split(" ")[0], label: p }));
+function TaxSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["tax"]; canManage: boolean }) {
+  const [form, setForm] = useState(prefs);
+  const [dirty, setDirty] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [pending, start] = useTransition();
+  const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => { setForm((p) => ({ ...p, [k]: v })); setDirty(true); setSaved(false); };
+  function save() { start(async () => { const r = await updateStorePrefs({ tax: form }); if (r.ok) { setDirty(false); setSaved(true); } }); }
+  const providerOpts = ["VNPT e-Invoice", "Viettel-S", "MISA meInvoice", "FPT Invoice", "Bkav eHóa đơn", "CyberLotus", "EasyInvoice"].map((p) => ({ value: p.split(" ")[0], label: p }));
   const pctColor = (r: number) => r === 0 ? "text-slate-400" : r === 5 ? "text-ok" : r === 8 ? "text-warn" : "text-er";
-  void locale;
   return (
     <>
-      <Card title={L ? "Thuế GTGT — Bảng thuế suất" : "VAT Rate Table"} vi={L ? "Theo danh mục sản phẩm" : "Per product category"}>
+      <Card title={L ? "Thuế GTGT — Thuế suất mặc định" : "VAT — Default rate"} vi={L ? "Áp khi tạo đơn / phiếu nhập" : "Applied on new orders / purchases"}>
         <div className="p-3.5 flex flex-col gap-1.5">
-          {VAT_RATES.map((v, i) => (
-            <div key={i} className={ROW}>
-              <span className={cn("font-mono text-base font-extrabold w-10 shrink-0", pctColor(v.rate))}>{v.rate}%</span>
-              <div className="flex-1 min-w-0"><div className="text-xs font-bold">{L ? v.vi : v.en}</div><div className="text-[10px] text-slate-500">{L ? v.itemsVi : v.itemsEn}</div></div>
-              <span className="inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold bg-ok-soft text-ok shrink-0">{L ? "Đang dùng" : "Active"}</span>
-            </div>
-          ))}
+          {VAT_RATES.map((v) => {
+            const on = v.rate === form.defaultRate;
+            return (
+              <button key={v.rate} type="button" disabled={!canManage} onClick={() => set("defaultRate", v.rate)} className={cn(ROW, "text-left transition", on && "border-primary-500 ring-2 ring-primary-500/20", canManage && "hover:border-primary-400")}>
+                <span className={cn("font-mono text-base font-extrabold w-10 shrink-0", pctColor(v.rate))}>{v.rate}%</span>
+                <div className="flex-1 min-w-0"><div className="text-xs font-bold">{L ? v.vi : v.en}</div><div className="text-[10px] text-slate-500">{L ? v.itemsVi : v.itemsEn}</div></div>
+                {on && <span className="inline-flex rounded-full px-2 py-0.5 text-[9px] font-bold bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300 shrink-0">{L ? "Mặc định" : "Default"}</span>}
+              </button>
+            );
+          })}
+          <CtrlRow title={L ? "Giá đã bao gồm thuế" : "Prices include tax"} desc={L ? "Giá niêm yết đã gồm GTGT" : "Listed prices are tax-inclusive"} checked={form.priceIncludesTax} onChange={canManage ? (v) => set("priceIncludesTax", v) : undefined} />
         </div>
       </Card>
-      <Card title={L ? "Hóa đơn điện tử (Nghị định 70/2025)" : "E-Invoice — Decree 70/2025"} vi={L ? "HĐĐT — hàng đợi khi offline" : "Offline queue support"} action={<Toggle checked onChange={() => {}} aria-label="einvoice" />}>
+      <Card title={L ? "Hóa đơn điện tử (Nghị định 70/2025)" : "E-Invoice — Decree 70/2025"} vi={L ? "Cấu hình nhà cung cấp HĐĐT" : "E-invoice provider config"} action={<Toggle checked={form.einvoiceEnabled} onChange={canManage ? (v) => set("einvoiceEnabled", v) : () => {}} aria-label="einvoice" />}>
         <div className="p-4.5 flex flex-col gap-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1"><span className={FL}>{L ? "Mã số thuế (MST)" : "Tax ID (MST)"}</span><input className={cn(FI, "font-mono")} defaultValue="0123456789" /></div>
+            <div className="flex flex-col gap-1"><span className={FL}>{L ? "Mã số thuế (MST)" : "Tax ID (MST)"}</span><input className={cn(FI, "font-mono")} value={form.einvoiceTaxId} disabled={!canManage} placeholder="0123456789" onChange={(e) => set("einvoiceTaxId", e.target.value)} /></div>
             <div className="flex flex-col gap-1"><span className={FL}>{L ? "Nhà cung cấp HĐĐT" : "E-Invoice Provider"}</span>
-              <SearchableSelect options={providerOpts} value={provider} onChange={setProvider} allowClear={false} />
+              <SearchableSelect options={providerOpts} value={form.einvoiceProvider} onChange={(v) => set("einvoiceProvider", v)} allowClear={false} disabled={!canManage} />
             </div>
           </div>
-          <ToggleRow on title={L ? "Hàng đợi khi offline" : "Queue when offline"} desc={L ? "Tự gửi khi có mạng — chống trùng bằng idempotency key" : "Auto-send on reconnect — idempotency prevents dupes"} />
           <div className="px-3.5 py-2.5 bg-in-soft border border-in/20 rounded-[10px] text-[11px] text-in leading-relaxed">
             <strong>Circular 32/2025:</strong> {L ? "Mã xác thực cơ quan thuế bắt buộc trên mọi hóa đơn từ 01/07/2025." : "Tax-authority verification code mandatory on all invoices from 01/07/2025."}
           </div>
-          <div className="flex gap-2"><button className={btnS}>{L ? "Kiểm tra kết nối" : "Test Connection"}</button><button className={btnF}><Check className="w-3 h-3" />{L ? "Lưu cấu hình" : "Save Config"}</button></div>
         </div>
       </Card>
+      <SaveBar L={L} dirty={dirty} saved={saved} pending={pending} canManage={canManage} onSave={save} />
     </>
   );
 }
 
-function NotificationsSection({ L }: { L: boolean }) {
-  const types: [string, string, string][] = [
-    [L ? "Cảnh báo tồn kho thấp" : "Low-stock alert", L ? "Khi tồn < mức tối thiểu" : "When stock < minimum", "1"],
-    [L ? "Hàng chậm bán (>60 ngày)" : "Stagnant stock (>60 days)", L ? "SKU không bán 60 ngày" : "SKU unsold 60+ days", "1"],
-    [L ? "Nhắc đóng ca (18:00)" : "Shift close reminder (18:00)", L ? "Nhắc đóng ca mỗi ngày" : "Daily shift close reminder", "1"],
-    [L ? "Lỗi hóa đơn điện tử" : "E-invoice error", L ? "Khi HĐĐT gửi thất bại" : "When e-invoice fails", "1"],
-    [L ? "Đồng bộ hoàn tất" : "Sync completed", L ? "Khi dữ liệu offline đồng bộ xong" : "When offline data syncs", "0"],
+function NotificationsSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["notifications"]; canManage: boolean }) {
+  const [form, setForm] = useState(prefs);
+  const [dirty, setDirty] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [pending, start] = useTransition();
+  const mark = () => { setDirty(true); setSaved(false); };
+  type TK = "lowStock" | "stagnant" | "shiftClose" | "einvoiceError" | "syncDone";
+  type CK = "zalo" | "email" | "inApp" | "sms";
+  const setType = (k: TK, v: boolean) => { setForm((p) => ({ ...p, [k]: v })); mark(); };
+  const setChannel = (k: CK, v: boolean) => { setForm((p) => ({ ...p, channels: { ...p.channels, [k]: v } })); mark(); };
+  function save() { start(async () => { const r = await updateStorePrefs({ notifications: form }); if (r.ok) { setDirty(false); setSaved(true); } }); }
+
+  const types: { k: TK; title: string; desc: string }[] = [
+    { k: "lowStock", title: L ? "Cảnh báo tồn kho thấp" : "Low-stock alert", desc: L ? "Khi tồn < mức tối thiểu" : "When stock < minimum" },
+    { k: "stagnant", title: L ? "Hàng chậm bán (>60 ngày)" : "Stagnant stock (>60 days)", desc: L ? "SKU không bán 60 ngày" : "SKU unsold 60+ days" },
+    { k: "shiftClose", title: L ? "Nhắc đóng ca (18:00)" : "Shift close reminder (18:00)", desc: L ? "Nhắc đóng ca mỗi ngày" : "Daily shift close reminder" },
+    { k: "einvoiceError", title: L ? "Lỗi hóa đơn điện tử" : "E-invoice error", desc: L ? "Khi HĐĐT gửi thất bại" : "When e-invoice fails" },
+    { k: "syncDone", title: L ? "Đồng bộ hoàn tất" : "Sync completed", desc: L ? "Khi dữ liệu offline đồng bộ xong" : "When offline data syncs" },
   ];
-  const channels: [string, string, boolean][] = [["📱", "Zalo OA", true], ["📧", "Email", true], ["🔔", L ? "Thông báo trong ứng dụng" : "In-app push", true], ["💬", "SMS", false]];
+  const channels: { k: CK; ico: string; name: string }[] = [
+    { k: "zalo", ico: "📱", name: "Zalo OA" }, { k: "email", ico: "📧", name: "Email" },
+    { k: "inApp", ico: "🔔", name: L ? "Thông báo trong ứng dụng" : "In-app push" }, { k: "sms", ico: "💬", name: "SMS" },
+  ];
   return (
     <>
       <Card title={L ? "Loại thông báo" : "Notification Types"} vi={L ? "Ngưỡng & sự kiện" : "Thresholds & events"}>
         <div className="p-4.5 flex flex-col gap-1.5">
-          {types.map(([title, desc, on], i) => <ToggleRow key={i} on={on === "1"} title={title} desc={desc} />)}
+          {types.map((tp) => <CtrlRow key={tp.k} title={tp.title} desc={tp.desc} checked={form[tp.k]} onChange={canManage ? (v) => setType(tp.k, v) : undefined} />)}
         </div>
       </Card>
       <Card title={L ? "Kênh thông báo" : "Notification Channels"} vi={L ? "Nơi gửi thông báo" : "Where alerts are sent"}>
         <div className="p-3.5 flex flex-col gap-1.5">
-          {channels.map(([ico, name, on], i) => (
-            <div key={i} className={ROW}>
-              <span className="text-lg">{ico}</span>
-              <div className="flex-1 text-xs font-bold">{name}</div>
-              <Toggle checked={on} onChange={() => {}} aria-label={name} />
-              <button className={btnS}>{L ? "Cấu hình" : "Configure"}</button>
+          {channels.map((c) => (
+            <div key={c.k} className={ROW}>
+              <span className="text-lg">{c.ico}</span>
+              <div className="flex-1 text-xs font-bold">{c.name}</div>
+              <Toggle checked={form.channels[c.k]} onChange={canManage ? (v) => setChannel(c.k, v) : () => {}} aria-label={c.name} />
             </div>
           ))}
         </div>
       </Card>
+      <SaveBar L={L} dirty={dirty} saved={saved} pending={pending} canManage={canManage} onSave={save} />
     </>
   );
 }
@@ -493,15 +529,27 @@ function MigrationSection({ L }: { L: boolean }) {
   );
 }
 
-function ToggleRow({ on, title, desc }: { on: boolean; title: string; desc?: string }) {
-  const [v, setV] = useState(on);
+function CtrlRow({ title, desc, checked, onChange }: { title: string; desc?: string; checked: boolean; onChange?: (v: boolean) => void }) {
   return (
     <div className={ROW}>
       <div className="flex-1 mr-3">
         <div className="text-xs font-bold">{title}</div>
         {desc && <div className="text-[10px] italic text-slate-500 mt-px">{desc}</div>}
       </div>
-      <Toggle checked={v} onChange={setV} aria-label={title} />
+      <Toggle checked={checked} onChange={onChange ?? (() => {})} aria-label={title} />
+    </div>
+  );
+}
+
+function SaveBar({ L, dirty, saved, pending, canManage, onSave }: { L: boolean; dirty: boolean; saved: boolean; pending: boolean; canManage: boolean; onSave: () => void }) {
+  if (!canManage) return <p className="text-[11px] text-slate-400 italic mt-1">{L ? "Chỉ Chủ/Quản lý mới sửa được." : "Only Owner/Manager can edit."}</p>;
+  if (!dirty && !saved) return null;
+  return (
+    <div className="flex items-center gap-2 pt-1">
+      <span className="text-[11px] text-slate-500 flex-1">{dirty ? (L ? "Có thay đổi chưa lưu" : "Unsaved changes") : (L ? "Đã lưu" : "Saved")}</span>
+      <button disabled={!dirty || pending} onClick={onSave} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-primary-600 text-white text-xs font-semibold disabled:opacity-50">
+        {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{L ? "Lưu" : "Save"}
+      </button>
     </div>
   );
 }

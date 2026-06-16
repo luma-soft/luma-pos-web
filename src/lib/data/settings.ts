@@ -1,14 +1,17 @@
 import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { profiles, storeSettings } from "@/db/schema";
+import { parseStorePrefs, type StorePrefs } from "@/lib/schemas/settings";
 
 export type StoreSettings = {
   name: string; address: string; phone: string; taxCode: string;
   industry: string; currency: string; locale: string; onboarded: boolean;
+  prefs: StorePrefs;
 };
 
 const DEFAULTS: StoreSettings = {
   name: "", address: "", phone: "", taxCode: "", industry: "grocery", currency: "VND", locale: "vi-VN", onboarded: false,
+  prefs: parseStorePrefs({}),
 };
 
 /** Cấu hình cửa hàng (1 dòng id='default'). Trả mặc định nếu chưa có. */
@@ -18,6 +21,7 @@ export async function getStoreSettings(): Promise<StoreSettings> {
   return {
     name: row.name, address: row.address, phone: row.phone, taxCode: row.taxCode,
     industry: row.industry, currency: row.currency, locale: row.locale, onboarded: row.onboarded,
+    prefs: parseStorePrefs(row.prefs),
   };
 }
 
