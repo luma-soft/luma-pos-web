@@ -183,6 +183,9 @@
       "walkIn": "Walk-in"
     },
     "dragToReorder": "Drag to reorder",
+    "unit": "Unit",
+    "lineNotePlaceholder": "Product note…",
+    "orderNotePlaceholder": "Order note…",
     "invoice": {
       "tab": "Order {n}",
       "add": "Add invoice",
@@ -432,6 +435,32 @@
     "serveAll": "Serve all",
     "status": { "pending": "New", "preparing": "Cooking", "ready": "Ready", "served": "Served" },
     "action": { "pending": "Start", "preparing": "Mark ready", "ready": "Serve" }
+  },
+  "import": {
+    "title": "Import data",
+    "template": "Download template",
+    "intro": "Import products from KiotViet, Sapo, POS365 or any spreadsheet — export to CSV, map the columns, preview, then confirm. Existing products are matched by code (SKU).",
+    "choose": "Choose a CSV file",
+    "csvOnly": "CSV file (.csv) — export from your current system",
+    "mapTitle": "Map columns",
+    "rows": "rows",
+    "ignore": "— ignore —",
+    "preview": "Preview (first 5 rows)",
+    "dryRun": "Dry run",
+    "commit": "Import",
+    "fields": { "name": "Product name", "sku": "Code (SKU)", "barcode": "Barcode", "category": "Category", "unit": "Unit", "retailPrice": "Retail price", "costPrice": "Cost price", "stock": "Stock" },
+    "previewTitle": "Dry-run result (nothing saved yet)",
+    "doneTitle": "Import complete",
+    "total": "Rows",
+    "willCreate": "To create",
+    "created": "Created",
+    "willUpdate": "To update",
+    "updated": "Updated",
+    "errCount": "Errors",
+    "newCats": "{count} new categories will be created",
+    "rowN": "Row {n}",
+    "viewProducts": "View products →",
+    "errors": { "empty": "File has no data rows.", "needName": "Map the Product name column first.", "noName": "missing product name" }
   },
   "shifts": {
     "openTitle": "Open shift",

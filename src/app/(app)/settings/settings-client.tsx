@@ -507,7 +507,7 @@ function MigrationSection({ L }: { L: boolean }) {
             <div key={i} className={ROW}>
               <span className="w-9 h-9 rounded-[10px] grid place-items-center text-base shrink-0" style={{ background: s.color + "22", border: `1px solid ${s.color}33` }}>{s.ico}</span>
               <div className="flex-1 min-w-0"><div className="text-xs font-bold">{s.name}</div><div className="text-[10px] text-slate-500">{s.desc}</div></div>
-              <button className={btnS}>{L ? "Nhập →" : "Import →"}</button>
+              <Link href="/settings/import" className={btnS}>{L ? "Nhập →" : "Import →"}</Link>
             </div>
           ))}
         </div>

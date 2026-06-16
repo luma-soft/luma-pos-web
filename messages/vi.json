@@ -183,6 +183,9 @@
       "walkIn": "Khách lẻ"
     },
     "dragToReorder": "Kéo để sắp xếp",
+    "unit": "ĐVT",
+    "lineNotePlaceholder": "Ghi chú sản phẩm…",
+    "orderNotePlaceholder": "Ghi chú đơn hàng…",
     "invoice": {
       "tab": "Đơn {n}",
       "add": "Thêm hóa đơn",
@@ -432,6 +435,32 @@
     "serveAll": "Phục vụ cả phiếu",
     "status": { "pending": "Mới", "preparing": "Đang làm", "ready": "Sẵn sàng", "served": "Đã phục vụ" },
     "action": { "pending": "Bắt đầu", "preparing": "Báo sẵn sàng", "ready": "Phục vụ" }
+  },
+  "import": {
+    "title": "Nhập dữ liệu",
+    "template": "Tải file mẫu",
+    "intro": "Nhập sản phẩm từ KiotViet, Sapo, POS365 hay bảng tính bất kỳ — xuất ra CSV, ghép cột, xem trước rồi xác nhận. Sản phẩm đã có được khớp theo mã hàng (SKU).",
+    "choose": "Chọn file CSV",
+    "csvOnly": "File CSV (.csv) — xuất từ hệ thống hiện tại của bạn",
+    "mapTitle": "Ghép cột dữ liệu",
+    "rows": "dòng",
+    "ignore": "— bỏ qua —",
+    "preview": "Xem trước (5 dòng đầu)",
+    "dryRun": "Chạy thử",
+    "commit": "Nhập dữ liệu",
+    "fields": { "name": "Tên hàng", "sku": "Mã hàng (SKU)", "barcode": "Mã vạch", "category": "Nhóm hàng", "unit": "Đơn vị", "retailPrice": "Giá bán", "costPrice": "Giá vốn", "stock": "Tồn kho" },
+    "previewTitle": "Kết quả chạy thử (chưa lưu)",
+    "doneTitle": "Nhập xong",
+    "total": "Số dòng",
+    "willCreate": "Sẽ tạo",
+    "created": "Đã tạo",
+    "willUpdate": "Sẽ cập nhật",
+    "updated": "Đã cập nhật",
+    "errCount": "Lỗi",
+    "newCats": "Sẽ tạo {count} nhóm hàng mới",
+    "rowN": "Dòng {n}",
+    "viewProducts": "Xem sản phẩm →",
+    "errors": { "empty": "File không có dòng dữ liệu.", "needName": "Hãy ghép cột Tên hàng trước.", "noName": "thiếu tên hàng" }
   },
   "shifts": {
     "openTitle": "Mở ca",
