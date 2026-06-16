@@ -5,7 +5,7 @@ import { z } from "zod";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { stockLevels, stockMovements, stocktakeItems, stocktakes } from "@/db/schema";
-import { type ActionResult, requireUser, getProfileId, generateCode, toQty } from "./common";
+import { type ActionResult, requireManager, requireStockAccess, getProfileId, generateCode, toQty } from "./common";
 import { Routes } from "@/lib/routes";
 
 const createSchema = z.object({
@@ -23,12 +23,9 @@ export type CreateStocktakeInput = z.input<typeof createSchema>;
 export async function createStocktake(
   input: CreateStocktakeInput
 ): Promise<ActionResult<{ id: string; code: string }>> {
-  let userId: string;
-  try {
-    userId = (await requireUser()).id;
-  } catch {
-    return { ok: false, error: "errors.unauthorized" };
-  }
+  const gate = await requireStockAccess();
+  if (!gate.ok) return gate;
+  const userId = gate.userId;
   const parsed = createSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
@@ -86,12 +83,9 @@ export async function createStocktake(
  * (lệch tính theo tồn hệ thống TẠI THỜI ĐIỂM CÂN BẰNG — không phải lúc tạo phiếu).
  */
 export async function balanceStocktake(id: string): Promise<ActionResult> {
-  let userId: string;
-  try {
-    userId = (await requireUser()).id;
-  } catch {
-    return { ok: false, error: "errors.unauthorized" };
-  }
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const userId = gate.userId;
 
   try {
     const profileId = await getProfileId(userId);
@@ -155,11 +149,7 @@ export async function balanceStocktake(id: string): Promise<ActionResult> {
 
 /** Hủy phiếu tạm (chưa cân bằng — không ảnh hưởng kho). */
 export async function cancelStocktake(id: string): Promise<ActionResult> {
-  try {
-    await requireUser();
-  } catch {
-    return { ok: false, error: "errors.unauthorized" };
-  }
+  { const gate = await requireStockAccess(); if (!gate.ok) return gate; }
   try {
     await db.transaction(async (tx) => {
       const [st] = await tx.select().from(stocktakes).where(eq(stocktakes.id, id)).limit(1);

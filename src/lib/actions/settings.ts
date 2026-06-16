@@ -5,16 +5,8 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { profiles, storeSettings } from "@/db/schema";
 import { storeSettingsSchema, storePrefsPatchSchema, parseStorePrefs, STAFF_ROLES, type StoreSettingsInput, type StaffRole, type StorePrefsPatch } from "@/lib/schemas/settings";
-import { type ActionResult, requireUser, getRole } from "./common";
+import { type ActionResult, requireManager } from "./common";
 import { Routes } from "@/lib/routes";
-
-async function requireManager(): Promise<{ ok: true } | { ok: false; error: string }> {
-  let userId: string;
-  try { userId = (await requireUser()).id; } catch { return { ok: false, error: "errors.unauthorized" }; }
-  const role = await getRole(userId);
-  if (role !== "owner" && role !== "manager") return { ok: false, error: "errors.forbidden" };
-  return { ok: true };
-}
 
 export async function updateStoreSettings(input: StoreSettingsInput): Promise<ActionResult> {
   const gate = await requireManager();

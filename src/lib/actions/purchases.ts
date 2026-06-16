@@ -7,7 +7,7 @@ import {
   products, productSuppliers, purchaseOrders, purchaseOrderItems, stockLevels, stockMovements, suppliers,
 } from "@/db/schema";
 import { createPurchaseSchema, type CreatePurchaseOutput } from "@/lib/schemas/order";
-import { type ActionResult, requireUser, getProfileId, generateCode, toMoney, toQty } from "./common";
+import { type ActionResult, requireStockAccess, getProfileId, generateCode, toMoney, toQty } from "./common";
 import { recordCashTx } from "@/lib/cash";
 import { Routes } from "@/lib/routes";
 
@@ -15,12 +15,9 @@ import { Routes } from "@/lib/routes";
 export async function createPurchase(
   input: CreatePurchaseOutput
 ): Promise<ActionResult<{ id: string; code: string }>> {
-  let userId: string;
-  try {
-    userId = (await requireUser()).id;
-  } catch {
-    return { ok: false, error: "errors.unauthorized" };
-  }
+  const gate = await requireStockAccess();
+  if (!gate.ok) return gate;
+  const userId = gate.userId;
 
   const parsed = createPurchaseSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };

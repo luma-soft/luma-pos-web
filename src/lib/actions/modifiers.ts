@@ -5,15 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { modifierGroups } from "@/db/schema";
 import { modifierGroupSchema, type ModifierGroupInput } from "@/lib/schemas/table";
-import { type ActionResult, requireUser, getRole } from "./common";
-
-async function requireManager(): Promise<{ ok: true } | { ok: false; error: string }> {
-  let userId: string;
-  try { userId = (await requireUser()).id; } catch { return { ok: false, error: "errors.unauthorized" }; }
-  const role = await getRole(userId);
-  if (role !== "owner" && role !== "manager") return { ok: false, error: "errors.forbidden" };
-  return { ok: true };
-}
+import { type ActionResult, requireManager } from "./common";
 
 export async function saveModifierGroup(id: string | null, input: ModifierGroupInput): Promise<ActionResult> {
   const gate = await requireManager(); if (!gate.ok) return gate;

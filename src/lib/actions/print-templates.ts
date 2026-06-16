@@ -5,7 +5,7 @@ import { z } from "zod";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { printTemplates } from "@/db/schema";
-import { type ActionResult, requireUser } from "./common";
+import { type ActionResult, requireManager } from "./common";
 
 const saveSchema = z.object({
   docType: z.enum(["order", "quote", "purchase", "return", "receipt"]),
@@ -28,11 +28,7 @@ const saveSchema = z.object({
 export type SavePrintTemplateInput = z.input<typeof saveSchema>;
 
 export async function savePrintTemplate(input: SavePrintTemplateInput): Promise<ActionResult> {
-  try {
-    await requireUser();
-  } catch {
-    return { ok: false, error: "errors.unauthorized" };
-  }
+  { const gate = await requireManager(); if (!gate.ok) return gate; }
   const parsed = saveSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;

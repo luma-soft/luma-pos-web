@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { priceBooks, productPrices, products } from "@/db/schema";
-import { type ActionResult, requireUser, toMoney } from "./common";
+import { type ActionResult, requireManager, toMoney } from "./common";
 import { Routes } from "@/lib/routes";
 
 export type PriceFormulaBase = "current" | "cost" | "lastPurchase";
@@ -30,7 +30,7 @@ export async function applyPriceFormulaAll(input: {
   amount: number;
   unit: "vnd" | "pct";
 }): Promise<ActionResult<{ count: number }>> {
-  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  { const gate = await requireManager(); if (!gate.ok) return gate; }
   try {
     const [book] = await db.select({ isDefault: priceBooks.isDefault }).from(priceBooks).where(eq(priceBooks.id, input.priceBookId)).limit(1);
     if (!book) return { ok: false, error: "errors.invalidData" };
@@ -61,7 +61,7 @@ export async function applyPriceFormulaAll(input: {
 
 /** Tạo bảng giá mới. */
 export async function createPriceBook(name: string): Promise<ActionResult<{ id: string; name: string }>> {
-  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  { const gate = await requireManager(); if (!gate.ok) return gate; }
   const n = name.trim();
   if (!n) return { ok: false, error: "errors.invalidData" };
   try {
@@ -74,7 +74,7 @@ export async function createPriceBook(name: string): Promise<ActionResult<{ id: 
 
 /** Đổi tên bảng giá. */
 export async function renamePriceBook(id: string, name: string): Promise<ActionResult> {
-  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  { const gate = await requireManager(); if (!gate.ok) return gate; }
   const n = name.trim();
   if (!n) return { ok: false, error: "errors.invalidData" };
   try {
@@ -86,7 +86,7 @@ export async function renamePriceBook(id: string, name: string): Promise<ActionR
 
 /** Xóa bảng giá (không xóa bảng mặc định). Override theo bảng tự xóa (cascade). */
 export async function deletePriceBook(id: string): Promise<ActionResult> {
-  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  { const gate = await requireManager(); if (!gate.ok) return gate; }
   try {
     const [book] = await db.select({ isDefault: priceBooks.isDefault }).from(priceBooks).where(eq(priceBooks.id, id)).limit(1);
     if (!book) return { ok: false, error: "errors.invalidData" };
@@ -107,7 +107,7 @@ export async function setProductPrice(input: {
   productId: string;
   price: number | null;
 }): Promise<ActionResult> {
-  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  { const gate = await requireManager(); if (!gate.ok) return gate; }
   try {
     const [book] = await db.select({ isDefault: priceBooks.isDefault }).from(priceBooks).where(eq(priceBooks.id, input.priceBookId)).limit(1);
     if (!book) return { ok: false, error: "errors.invalidData" };

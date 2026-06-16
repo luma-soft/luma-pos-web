@@ -5,7 +5,7 @@ import { z } from "zod";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { customers, projects, promotions } from "@/db/schema";
-import { type ActionResult, requireUser } from "./common";
+import { type ActionResult, requireUser, requireManager } from "./common";
 import { Routes } from "@/lib/routes";
 
 // ============ Công trình ============
@@ -75,11 +75,7 @@ const promoSchema = z.object({
 export type CreatePromotionInput = z.input<typeof promoSchema>;
 
 export async function createPromotion(input: CreatePromotionInput): Promise<ActionResult> {
-  try {
-    await requireUser();
-  } catch {
-    return { ok: false, error: "errors.unauthorized" };
-  }
+  { const gate = await requireManager(); if (!gate.ok) return gate; }
   const parsed = promoSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
@@ -101,11 +97,7 @@ export async function createPromotion(input: CreatePromotionInput): Promise<Acti
 }
 
 export async function togglePromotion(id: string): Promise<ActionResult> {
-  try {
-    await requireUser();
-  } catch {
-    return { ok: false, error: "errors.unauthorized" };
-  }
+  { const gate = await requireManager(); if (!gate.ok) return gate; }
   try {
     await db.update(promotions).set({ isActive: sql`not ${promotions.isActive}` }).where(eq(promotions.id, id));
     revalidatePath(Routes.Promotions);
@@ -120,11 +112,7 @@ export async function togglePromotion(id: string): Promise<ActionResult> {
 // ============ Portal token ============
 
 export async function generatePortalToken(customerId: string): Promise<ActionResult<{ token: string }>> {
-  try {
-    await requireUser();
-  } catch {
-    return { ok: false, error: "errors.unauthorized" };
-  }
+  { const gate = await requireManager(); if (!gate.ok) return gate; }
   try {
     const token = Array.from(crypto.getRandomValues(new Uint8Array(20)))
       .map((b) => b.toString(16).padStart(2, "0"))

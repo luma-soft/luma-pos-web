@@ -10,7 +10,7 @@ import {
   updateCustomerSchema, type UpdateCustomerInput,
   type CreateCustomerOutput, type CreateSupplierOutput,
 } from "@/lib/schemas/order";
-import { type ActionResult, generateCode, requireUser, toMoney } from "./common";
+import { type ActionResult, generateCode, requireUser, requireManager, requireStockAccess, toMoney } from "./common";
 import { createCustomerCore, updateCustomerCore } from "@/lib/customers/write";
 import { Routes } from "@/lib/routes";
 
@@ -40,7 +40,7 @@ const updateSupplierSchema = z.object({
 export type UpdateSupplierInput = z.input<typeof updateSupplierSchema>;
 
 export async function updateSupplier(input: UpdateSupplierInput): Promise<ActionResult> {
-  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  { const gate = await requireManager(); if (!gate.ok) return gate; }
   const parsed = updateSupplierSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
@@ -65,7 +65,7 @@ export async function updateSupplier(input: UpdateSupplierInput): Promise<Action
 export type { UpdateCustomerInput } from "@/lib/schemas/order";
 
 export async function updateCustomer(input: UpdateCustomerInput): Promise<ActionResult> {
-  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  { const gate = await requireManager(); if (!gate.ok) return gate; }
   // Lõi tách riêng. Xem src/lib/customers/write.ts.
   const result = await updateCustomerCore(input);
   if (result.ok) {
@@ -78,11 +78,7 @@ export async function updateCustomer(input: UpdateCustomerInput): Promise<Action
 export async function createSupplier(
   input: CreateSupplierOutput
 ): Promise<ActionResult<{ id: string }>> {
-  try {
-    await requireUser();
-  } catch {
-    return { ok: false, error: "errors.unauthorized" };
-  }
+  { const gate = await requireStockAccess(); if (!gate.ok) return gate; }
   const parsed = createSupplierSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;

@@ -10,7 +10,7 @@ import {
   type CreateOrderOutput, type AddPaymentInput,
 } from "@/lib/schemas/order";
 import {
-  type ActionResult, requireUser, getProfileId, toMoney, toQty,
+  type ActionResult, requireUser, requireManager, getProfileId, toMoney, toQty,
 } from "./common";
 import { Routes } from "@/lib/routes";
 import { createOrderForUser } from "@/lib/orders/create";
@@ -83,12 +83,9 @@ export async function cancelQuote(quoteId: string): Promise<ActionResult> {
 }
 
 export async function cancelOrder(orderId: string): Promise<ActionResult> {
-  let userId: string;
-  try {
-    userId = (await requireUser()).id;
-  } catch {
-    return { ok: false, error: "errors.unauthorized" };
-  }
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const userId = gate.userId;
 
   try {
     const profileId = await getProfileId(userId);

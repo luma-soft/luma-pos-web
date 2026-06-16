@@ -31,6 +31,24 @@ export async function getRole(userId: string): Promise<string> {
   return p?.role ?? "cashier";
 }
 
+export type Role = "owner" | "manager" | "cashier" | "warehouse";
+export type Gate = { ok: true; userId: string; role: Role } | { ok: false; error: string };
+
+/** Cổng RBAC: yêu cầu login + vai trò nằm trong `roles`. Trả userId+role nếu hợp lệ. */
+export async function requireRole(roles: Role[]): Promise<Gate> {
+  let userId: string;
+  try { userId = (await requireUser()).id; } catch { return { ok: false, error: "errors.unauthorized" }; }
+  const role = (await getRole(userId)) as Role;
+  if (!roles.includes(role)) return { ok: false, error: "errors.forbidden" };
+  return { ok: true, userId, role };
+}
+
+/** Chủ/Quản lý — nghiệp vụ quản trị (giá, hủy/sửa đơn, hoàn tiền, KM, sổ quỹ...). */
+export const requireManager = () => requireRole(["owner", "manager"]);
+
+/** Chủ/Quản lý/Thủ kho — hàng hóa & kho (sản phẩm, nhập hàng, kiểm kho). */
+export const requireStockAccess = () => requireRole(["owner", "manager", "warehouse"]);
+
 /** Drizzle bọc lỗi PG vào DrizzleQueryError — lỗi gốc ở e.cause. */
 export function pgErrorCode(e: unknown): string | undefined {
   return (e as { cause?: { code?: string } })?.cause?.code

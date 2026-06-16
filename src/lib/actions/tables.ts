@@ -7,17 +7,9 @@ import { db } from "@/db";
 import { diningTables, warehouses, kitchenTickets, kitchenTicketItems } from "@/db/schema";
 import { tableCartSchema, type TableCartItem } from "@/lib/schemas/table";
 import { createOrderForUser } from "@/lib/orders/create";
-import { type ActionResult, requireUser, getRole, getProfileId, toQty } from "./common";
+import { type ActionResult, requireUser, requireManager, getProfileId, toQty } from "./common";
 
 type Method = "cash" | "bank_transfer" | "credit";
-
-async function requireManager(): Promise<{ ok: true } | { ok: false; error: string }> {
-  let userId: string;
-  try { userId = (await requireUser()).id; } catch { return { ok: false, error: "errors.unauthorized" }; }
-  const role = await getRole(userId);
-  if (role !== "owner" && role !== "manager") return { ok: false, error: "errors.forbidden" };
-  return { ok: true };
-}
 
 function readCart(raw: unknown): TableCartItem[] {
   const parsed = tableCartSchema.safeParse(raw);

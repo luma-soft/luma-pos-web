@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
 import { cashTransactions } from "@/db/schema";
-import { type ActionResult, requireUser, getProfileId, generateCode } from "./common";
+import { type ActionResult, requireManager, getProfileId, generateCode } from "./common";
 import { Routes } from "@/lib/routes";
 
 const schema = z.object({
@@ -18,12 +18,9 @@ const schema = z.object({
 export type CreateCashTxInput = z.input<typeof schema>;
 
 export async function createCashTx(input: CreateCashTxInput): Promise<ActionResult> {
-  let userId: string;
-  try {
-    userId = (await requireUser()).id;
-  } catch {
-    return { ok: false, error: "errors.unauthorized" };
-  }
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const userId = gate.userId;
   const parsed = schema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;

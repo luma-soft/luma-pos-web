@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { type ActionResult, requireUser } from "./common";
+import { type ActionResult, requireManager } from "./common";
 import { Routes } from "@/lib/routes";
 import { type UpdateOrderInput } from "@/lib/schemas/order";
 import { updateOrderForUser, mergeOrdersForUser } from "@/lib/orders/edit";
@@ -10,13 +10,9 @@ export type { UpdateOrderInput } from "@/lib/schemas/order";
 
 /** Sửa đơn đã bán (chưa hủy/chưa trả hàng). Lõi: src/lib/orders/edit.ts. */
 export async function updateOrder(input: UpdateOrderInput): Promise<ActionResult> {
-  let userId: string;
-  try {
-    userId = (await requireUser()).id;
-  } catch {
-    return { ok: false, error: "errors.unauthorized" };
-  }
-  const result = await updateOrderForUser(userId, input);
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const result = await updateOrderForUser(gate.userId, input);
   if (result.ok) {
     revalidatePath(Routes.order(input.orderId));
     revalidatePath(Routes.Orders);
@@ -27,13 +23,9 @@ export async function updateOrder(input: UpdateOrderInput): Promise<ActionResult
 
 /** Gộp nhiều đơn cùng khách thành 1 đơn. Lõi: src/lib/orders/edit.ts. */
 export async function mergeOrders(orderIds: string[]): Promise<ActionResult<{ id: string; code: string }>> {
-  let userId: string;
-  try {
-    userId = (await requireUser()).id;
-  } catch {
-    return { ok: false, error: "errors.unauthorized" };
-  }
-  const result = await mergeOrdersForUser(userId, orderIds);
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const result = await mergeOrdersForUser(gate.userId, orderIds);
   if (result.ok) revalidatePath(Routes.Orders);
   return result;
 }

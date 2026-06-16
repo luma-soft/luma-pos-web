@@ -7,7 +7,7 @@ import {
   customers, orderItems, orders, returnItems, returns, stockLevels, stockMovements,
 } from "@/db/schema";
 import { createReturnSchema, type CreateReturnOutput } from "@/lib/schemas/returns";
-import { type ActionResult, requireUser, getProfileId, generateCode, toMoney, toQty } from "./common";
+import { type ActionResult, requireManager, getProfileId, generateCode, toMoney, toQty } from "./common";
 import { recordCashTx, fundForMethod } from "@/lib/cash";
 import { Routes } from "@/lib/routes";
 
@@ -21,12 +21,9 @@ import { Routes } from "@/lib/routes";
 export async function createReturn(
   input: CreateReturnOutput
 ): Promise<ActionResult<{ id: string; code: string }>> {
-  let userId: string;
-  try {
-    userId = (await requireUser()).id;
-  } catch {
-    return { ok: false, error: "errors.unauthorized" };
-  }
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const userId = gate.userId;
 
   const parsed = createReturnSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };

@@ -7,13 +7,13 @@ import { db } from "@/db";
 import {
   products, productUnits, productSuppliers, categories, brands, stockLevels, stockMovements, warehouses, profiles,
 } from "@/db/schema";
-import { createClient } from "@/lib/supabase/server";
 import { createProductSchema, type CreateProductOutput } from "@/app/(app)/products/new/schema";
 import { Routes } from "@/lib/routes";
+import { requireStockAccess, requireManager } from "./common";
 
 /** Tạo nhóm hàng mới từ form (combobox "+ thêm"). Trả id. */
 export async function createCategory(name: string): Promise<ActionResult<{ id: string; name: string }>> {
-  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  { const gate = await requireStockAccess(); if (!gate.ok) return gate; }
   const n = name.trim();
   if (!n) return { ok: false, error: "errors.invalidData" };
   try {
@@ -25,7 +25,7 @@ export async function createCategory(name: string): Promise<ActionResult<{ id: s
 
 /** Tạo nhóm hàng có nhóm cha (trang quản lý danh mục). */
 export async function createCategoryNode(input: { name: string; parentId?: string | null }): Promise<ActionResult<{ id: string }>> {
-  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  { const gate = await requireStockAccess(); if (!gate.ok) return gate; }
   const n = input.name.trim();
   if (!n) return { ok: false, error: "errors.invalidData" };
   try {
@@ -38,7 +38,7 @@ export async function createCategoryNode(input: { name: string; parentId?: strin
 
 /** Đổi tên / đổi nhóm cha của danh mục. */
 export async function updateCategory(id: string, input: { name?: string; parentId?: string | null }): Promise<ActionResult> {
-  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  { const gate = await requireStockAccess(); if (!gate.ok) return gate; }
   const patch: { name?: string; parentId?: string | null } = {};
   if (input.name !== undefined) { const n = input.name.trim(); if (!n) return { ok: false, error: "errors.invalidData" }; patch.name = n; }
   if (input.parentId !== undefined) patch.parentId = input.parentId === id ? null : (input.parentId || null);
@@ -52,7 +52,7 @@ export async function updateCategory(id: string, input: { name?: string; parentI
 
 /** Xóa danh mục: SP về "chưa phân loại", nhóm con lên cấp gốc. */
 export async function deleteCategory(id: string): Promise<ActionResult> {
-  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  { const gate = await requireStockAccess(); if (!gate.ok) return gate; }
   try {
     await db.update(products).set({ categoryId: null }).where(eq(products.categoryId, id));
     await db.update(categories).set({ parentId: null }).where(eq(categories.parentId, id));
@@ -65,7 +65,7 @@ export async function deleteCategory(id: string): Promise<ActionResult> {
 
 /** Tạo thương hiệu mới từ form. Trả id. */
 export async function createBrand(name: string): Promise<ActionResult<{ id: string; name: string }>> {
-  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  { const gate = await requireStockAccess(); if (!gate.ok) return gate; }
   const n = name.trim();
   if (!n) return { ok: false, error: "errors.invalidData" };
   try {
@@ -100,13 +100,6 @@ function computeM2PerUnit(v: CreateProductOutput): string | null {
   return m2 > 0 ? m2.toFixed(4) : null;
 }
 
-async function requireUser() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("UNAUTHORIZED");
-  return user;
-}
-
 const updatePricesSchema = z.object({
   productId: z.uuid(),
   retailPrice: z.number().min(0),
@@ -118,8 +111,8 @@ export type UpdatePricesInput = z.input<typeof updatePricesSchema>;
 
 /** Thiết lập giá: cập nhật 4 bảng giá của 1 SP (trang /pricing). */
 export async function updateProductPrices(input: UpdatePricesInput): Promise<ActionResult> {
+  { const gate = await requireManager(); if (!gate.ok) return gate; }
   try {
-    await requireUser();
   } catch {
     return { ok: false, error: "errors.unauthorized" };
   }
@@ -175,8 +168,8 @@ export type UpdateProductInput = z.input<typeof updateProductSchema>;
 
 /** Cập nhật thông tin SP (không đụng tồn kho — tồn quản lý ở Kho/Kiểm kho). */
 export async function updateProduct(input: UpdateProductInput): Promise<ActionResult> {
+  { const gate = await requireStockAccess(); if (!gate.ok) return gate; }
   try {
-    await requireUser();
   } catch {
     return { ok: false, error: "errors.unauthorized" };
   }
@@ -247,12 +240,9 @@ export async function updateProduct(input: UpdateProductInput): Promise<ActionRe
 export async function createProduct(
   input: CreateProductOutput
 ): Promise<ActionResult<{ id: string }>> {
-  let userId: string;
-  try {
-    userId = (await requireUser()).id;
-  } catch {
-    return { ok: false, error: "errors.unauthorized" };
-  }
+  const gate = await requireStockAccess();
+  if (!gate.ok) return gate;
+  const userId = gate.userId;
 
   const parsed = createProductSchema.safeParse(input);
   if (!parsed.success) {
