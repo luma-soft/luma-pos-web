@@ -527,10 +527,47 @@ export const diningTables = pgTable("dining_tables", {
   zone: text("zone").notNull().default(""),
   sortOrder: integer("sort_order").notNull().default(0),
   status: text("status").notNull().default("free"),
-  currentCart: jsonb("current_cart").$type<Array<{ productId: string; productName: string; unitName: string; unitMultiplier: number; quantity: number; unitPrice: number }>>().notNull().default([]),
+  currentCart: jsonb("current_cart").$type<Array<{ lineId: string; productId: string; productName: string; unitName: string; unitMultiplier: number; quantity: number; basePrice: number; unitPrice: number; modifiers: { label: string; priceDelta: number }[]; note?: string; sent: boolean }>>().notNull().default([]),
   openedAt: timestamp("opened_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [index("dining_tables_zone_idx").on(t.zone, t.sortOrder)]);
+
+// ============= F&B deep: modifiers + kitchen tickets (Part 18.2) =============
+
+export const modifierGroups = pgTable("modifier_groups", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  multi: boolean("multi").notNull().default(false),
+  required: boolean("required").notNull().default(false),
+  options: jsonb("options").$type<{ id: string; label: string; priceDelta: number }[]>().notNull().default([]),
+  categoryIds: jsonb("category_ids").$type<string[]>().notNull().default([]),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const kitchenTickets = pgTable("kitchen_tickets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tableId: uuid("table_id").references(() => diningTables.id, { onDelete: "set null" }),
+  tableName: text("table_name").notNull().default(""),
+  round: integer("round").notNull().default(1),
+  status: text("status").notNull().default("active"), // active | done
+  createdBy: uuid("created_by").references(() => profiles.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [index("kitchen_tickets_status_idx").on(t.status, t.createdAt)]);
+
+export const kitchenTicketItems = pgTable("kitchen_ticket_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  ticketId: uuid("ticket_id").notNull().references(() => kitchenTickets.id, { onDelete: "cascade" }),
+  productId: uuid("product_id"),
+  productName: text("product_name").notNull(),
+  quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull().default("1"),
+  modifiers: jsonb("modifiers").$type<{ label: string; priceDelta: number }[]>().notNull().default([]),
+  note: text("note"),
+  status: text("status").notNull().default("pending"), // pending | preparing | ready | served
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [index("kitchen_ticket_items_ticket_idx").on(t.ticketId)]);
 
 // ============= Store settings (singleton) =============
 

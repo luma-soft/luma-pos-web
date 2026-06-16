@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   LayoutDashboard, ShoppingCart, Warehouse, Users, Wallet,
-  BarChart3, Settings, FileText, Utensils, Sparkles,
+  BarChart3, Settings, FileText, Utensils, Sparkles, ChefHat,
 } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
@@ -47,7 +47,7 @@ export function AppNav({ industry }: { industry?: string }) {
   const isFnb = industry === "restaurant" || industry === "cafe";
   const groups = isFnb
     ? GROUPS.map((g) => g.labelKey === "nav.groups.manage"
-        ? { ...g, items: [...g.items, { href: "/tables", icon: Utensils, key: "nav.tables" } as Item] }
+        ? { ...g, items: [...g.items, { href: "/tables", icon: Utensils, key: "nav.tables" } as Item, { href: "/kds", icon: ChefHat, key: "nav.kds" } as Item] }
         : g)
     : GROUPS;
 

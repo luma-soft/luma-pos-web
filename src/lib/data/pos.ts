@@ -24,6 +24,7 @@ function posProductSelect(warehouseId: string | null) {
     contractorPrice: products.contractorPrice,
     agentPrice: products.agentPrice,
     m2PerUnit: products.m2PerUnit,
+    categoryId: products.categoryId,
     categoryName: categories.name,
     stock: sql<string>`coalesce((
       select ${stockLevels.quantity} from ${stockLevels}
