@@ -1,0 +1,40 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { and, eq, ne } from "drizzle-orm";
+import { db } from "@/db";
+import { kitchenTickets, kitchenTicketItems } from "@/db/schema";
+import { type ActionResult, requireUser } from "./common";
+
+const STATUSES = ["pending", "preparing", "ready", "served"] as const;
+type ItemStatus = (typeof STATUSES)[number];
+
+async function closeTicketIfDone(ticketId: string) {
+  const [left] = await db
+    .select({ id: kitchenTicketItems.id })
+    .from(kitchenTicketItems)
+    .where(and(eq(kitchenTicketItems.ticketId, ticketId), ne(kitchenTicketItems.status, "served")))
+    .limit(1);
+  if (!left) await db.update(kitchenTickets).set({ status: "done" }).where(eq(kitchenTickets.id, ticketId));
+}
+
+export async function setTicketItemStatus(itemId: string, status: ItemStatus): Promise<ActionResult> {
+  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  if (!STATUSES.includes(status)) return { ok: false, error: "errors.invalidData" };
+  try {
+    const [it] = await db.update(kitchenTicketItems).set({ status, updatedAt: new Date() })
+      .where(eq(kitchenTicketItems.id, itemId)).returning({ ticketId: kitchenTicketItems.ticketId });
+    if (it && status === "served") await closeTicketIfDone(it.ticketId);
+    revalidatePath("/kds"); return { ok: true, data: undefined };
+  } catch (e) { console.error("setTicketItemStatus failed:", e); return { ok: false, error: "errors.serverError" }; }
+}
+
+/** Phục vụ cả phiếu (mọi món → served, phiếu → done). */
+export async function serveTicket(ticketId: string): Promise<ActionResult> {
+  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  try {
+    await db.update(kitchenTicketItems).set({ status: "served", updatedAt: new Date() }).where(eq(kitchenTicketItems.ticketId, ticketId));
+    await db.update(kitchenTickets).set({ status: "done" }).where(eq(kitchenTickets.id, ticketId));
+    revalidatePath("/kds"); return { ok: true, data: undefined };
+  } catch (e) { console.error("serveTicket failed:", e); return { ok: false, error: "errors.serverError" }; }
+}
