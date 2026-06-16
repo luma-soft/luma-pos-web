@@ -3,6 +3,7 @@ import {
   boolean, jsonb, primaryKey, index, uniqueIndex, pgEnum,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
+import type { StorePrefs } from "@/lib/schemas/settings";
 
 // ============= Enums =============
 
@@ -581,6 +582,7 @@ export const storeSettings = pgTable("store_settings", {
   currency: text("currency").notNull().default("VND"),
   locale: text("locale").notNull().default("vi-VN"),
   onboarded: boolean("onboarded").notNull().default(false),
+  prefs: jsonb("prefs").$type<StorePrefs>().notNull().default({} as StorePrefs),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
