@@ -59,11 +59,17 @@ const hardwarePrefs = z.object({
   printEinvoiceQr: z.boolean().default(true),
 });
 
+const appPrefs = z.object({
+  biometricAuth: z.boolean().default(true),
+  offlineMode: z.boolean().default(true),
+});
+
 export const storePrefsSchema = z.object({
   tax: taxPrefs.default({ defaultRate: 8, priceIncludesTax: false, einvoiceEnabled: false, einvoiceProvider: "VNPT", einvoiceTaxId: "" }),
   payments: paymentPrefs.default({ cash: true, qr: true, momo: false, zalopay: false, vnpay: false, card: false }),
   notifications: notificationPrefs.default({ lowStock: true, stagnant: true, shiftClose: true, einvoiceError: true, syncDone: false, channels: { zalo: true, email: true, inApp: true, sms: false } }),
   hardware: hardwarePrefs.default({ paperSize: "K80", autoPrint: false, openDrawer: true, printEinvoiceQr: true }),
+  app: appPrefs.default({ biometricAuth: true, offlineMode: true }),
 });
 export type StorePrefs = z.infer<typeof storePrefsSchema>;
 
