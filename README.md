@@ -88,7 +88,7 @@ Web hoàn chỉnh — đã deploy được lên Vercel (xem `DEPLOY.md`):
 - [ ] Tích hợp HĐĐT thật (Viettel/VNPT/MISA — thay `issueWithProvider()`)
 - [ ] Điều xe giao hàng (đã code, đang tắt — xem `src/app/(app)/delivery/page.tsx`)
 - [ ] Import KiotViet
-- [ ] Mobile app (RN + Expo)
+- [ ] Mobile app (Flutter)
 
 ## Tests
 
