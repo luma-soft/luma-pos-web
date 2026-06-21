@@ -84,6 +84,7 @@ export const getRecentMovements = unstable_cache(
   async (limit = 30) => db
     .select({
       id: stockMovements.id,
+      productId: stockMovements.productId,
       type: stockMovements.type,
       quantity: stockMovements.quantity,
       note: stockMovements.note,
