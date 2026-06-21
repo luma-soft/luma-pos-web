@@ -13,12 +13,16 @@ export async function POST(request: Request) {
       : "";
 
   if (accessToken && refreshToken) {
-    const supabase = createMobileAuthClient();
-    await supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    });
-    await supabase.auth.signOut();
+    try {
+      const supabase = createMobileAuthClient();
+      await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error("mobile auth logout failed:", error);
+    }
   }
 
   return mobileOk({ signedOut: true });

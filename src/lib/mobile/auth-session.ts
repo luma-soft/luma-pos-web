@@ -1,8 +1,6 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import type { Session } from "@supabase/supabase-js";
 import { eq } from "drizzle-orm";
-import { db } from "@/db";
-import { profiles } from "@/db/schema";
 
 export function createMobileAuthClient() {
   return createSupabaseClient(
@@ -18,15 +16,33 @@ export function createMobileAuthClient() {
 }
 
 export async function mobileAuthPayload(session: Session) {
-  const [profile] = await db
-    .select({
-      fullName: profiles.fullName,
-      role: profiles.role,
-      isActive: profiles.isActive,
-    })
-    .from(profiles)
-    .where(eq(profiles.id, session.user.id))
-    .limit(1);
+  let profile:
+    | {
+        fullName: string | null;
+        role: string;
+        isActive: boolean;
+      }
+    | undefined;
+
+  try {
+    const [{ db }, { profiles }] = await Promise.all([
+      import("@/db"),
+      import("@/db/schema"),
+    ]);
+
+    [profile] = await db
+      .select({
+        fullName: profiles.fullName,
+        role: profiles.role,
+        isActive: profiles.isActive,
+      })
+      .from(profiles)
+      .where(eq(profiles.id, session.user.id))
+      .limit(1);
+  } catch (error) {
+    console.error("mobileAuthPayload failed:", error);
+    return { ok: false as const, error: "errors.serverError" };
+  }
 
   if (profile && !profile.isActive) {
     return { ok: false as const, error: "errors.unauthorized" };
