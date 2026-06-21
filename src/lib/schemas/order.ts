@@ -32,7 +32,7 @@ export const createOrderSchema = z.object({
   shippingFee: z.number().min(0).default(0),
   items: z.array(orderItemSchema).min(1, { error: "pos.errors.emptyCart" }),
   payment: z.object({
-    method: z.enum(["cash", "bank_transfer", "credit"]),
+    method: z.enum(["cash", "bank_transfer", "card", "credit"]),
     amount: z.number().min(0),
   }),
 });
