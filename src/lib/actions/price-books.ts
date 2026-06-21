@@ -55,6 +55,7 @@ export async function applyPriceFormulaAll(input: {
 
     const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(products);
     revalidatePath(Routes.Pricing);
+    revalidatePath(Routes.POS);
     return { ok: true, data: { count: Number(n) } };
   } catch (e) { console.error("applyPriceFormulaAll failed:", e); return { ok: false, error: "errors.serverError" }; }
 }
@@ -125,6 +126,7 @@ export async function setProductPrice(input: {
         });
     }
     revalidatePath(Routes.Pricing);
+    revalidatePath(Routes.POS);
     return { ok: true, data: undefined };
   } catch (e) { console.error("setProductPrice failed:", e); return { ok: false, error: "errors.serverError" }; }
 }
