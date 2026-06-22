@@ -20,6 +20,7 @@ export default async function EditProductPage({ params }: Props) {
     categoryId: product.categoryId ?? "",
     brandId: product.brandId ?? "",
     supplierIds: product.suppliers.map((s) => s.id),
+    imageUrls: product.imageUrls ?? [],
     baseUnit: product.baseUnit,
     costPrice: Number(product.costPrice),
     retailPrice: Number(product.retailPrice),
@@ -38,6 +39,7 @@ export default async function EditProductPage({ params }: Props) {
     attributes: Object.entries(specs).map(([name, values]) => ({
       name,
       values: Array.isArray(values) ? values : [String(values)],
+      createsVariants: false,
     })),
   };
 
@@ -45,6 +47,8 @@ export default async function EditProductPage({ params }: Props) {
     <NewProductForm
       mode="edit"
       productId={id}
+      isVariantChild={Boolean(product.parentProductId)}
+      siblingCount={product.siblings.length}
       initialValues={initialValues}
       categories={options.categories}
       brands={options.brands}

@@ -173,6 +173,23 @@ function unitPriceFor(p: PosProduct, unit: PosUnit | null, priceBook: PriceBook 
   return Math.round(base * Number(unit.multiplier));
 }
 
+function productChildren(p: PosProduct): PosProduct[] {
+  return (p.children ?? []) as PosProduct[];
+}
+
+function flattenProducts(products: PosProduct[]): PosProduct[] {
+  return products.flatMap((p) => [p, ...productChildren(p)]);
+}
+
+function priceLabelFor(p: PosProduct, priceBook: PriceBook = ""): string {
+  if (p.isVariantParent) {
+    const min = Number(p.minRetailPrice ?? p.retailPrice);
+    const max = Number(p.maxRetailPrice ?? p.retailPrice);
+    return min !== max ? `${formatCurrency(min)} - ${formatCurrency(max)}` : formatCurrency(max);
+  }
+  return formatCurrency(basePriceFor(p, priceBook));
+}
+
 /** id đơn sinh ở client để khử trùng khi đồng bộ offline (ngoài render scope). */
 function makeClientId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -211,6 +228,7 @@ export function PosClient({
   const [dropHover, setDropHover] = useState(false);
   const [mobileView, setMobileView] = useState<"catalog" | "cart">("catalog"); // chuyển đổi trên mobile
   const [priceBookOpen, setPriceBookOpen] = useState(false); // modal chọn bảng giá
+  const [variantParent, setVariantParent] = useState<PosProduct | null>(null);
   const [browsing, setBrowsing] = useState(false); // click vào ô tìm → mở dropdown SP
   const searchRef = useRef<HTMLDivElement>(null);
   const [printMenuOpen, setPrintMenuOpen] = useState(false); // chọn khổ in
@@ -324,6 +342,7 @@ export function PosClient({
     () => data.customers.find((c) => c.id === customerId) ?? null,
     [customerId, data.customers]
   );
+  const searchableProducts = useMemo(() => flattenProducts(data.products), [data.products]);
 
   // Khi gõ tìm kiếm: hỏi server (quét toàn bộ SP, bỏ dấu) — khớp trang Sản phẩm.
   const [serverResults, setServerResults] = useState<PosProduct[]>([]);
@@ -343,7 +362,7 @@ export function PosClient({
       // offline → lọc cục bộ trên SP đã tải; online → hỏi server
       if (typeof navigator !== "undefined" && !navigator.onLine) {
         const nq = normalizeSearch(q);
-        setServerResults(data.products.filter((p) => normalizeSearch(`${p.name} ${p.sku} ${p.barcode ?? ""}`).includes(nq)));
+        setServerResults(searchableProducts.filter((p) => normalizeSearch(`${p.name} ${p.sku} ${p.barcode ?? ""}`).includes(nq)));
         setSearching(false);
         return;
       }
@@ -352,12 +371,12 @@ export function PosClient({
         .then((res) => { if (!cancelled) { setServerResults(res); setSearching(false); } })
         .catch(() => { if (!cancelled) { // mất mạng giữa chừng → lọc cục bộ
           const nq = normalizeSearch(q);
-          setServerResults(data.products.filter((p) => normalizeSearch(`${p.name} ${p.sku} ${p.barcode ?? ""}`).includes(nq)));
+          setServerResults(searchableProducts.filter((p) => normalizeSearch(`${p.name} ${p.sku} ${p.barcode ?? ""}`).includes(nq)));
           setSearching(false);
         } });
     }, q ? 250 : 0);
     return () => { cancelled = true; clearTimeout(h); };
-  }, [search, data.products]);
+  }, [search, searchableProducts]);
 
   const syncingRef = useRef(false);
   async function flushOutbox() {
@@ -432,6 +451,10 @@ export function PosClient({
   const remaining = Math.max(0, total - paid);
 
   function addToCart(p: PosProduct) {
+    if (p.isVariantParent) {
+      setVariantParent(p);
+      return;
+    }
     setCart((c) => {
       const existing = c.find((l) => l.product.id === p.id);
       if (existing) {
@@ -448,6 +471,14 @@ export function PosClient({
         quantity: 1,
       }];
     });
+  }
+
+  function selectProduct(p: PosProduct) {
+    if (p.isVariantParent && productChildren(p).length > 0) {
+      setVariantParent(p);
+      return;
+    }
+    addToCart(p);
   }
 
   /** Di chuyển dòng `from` đến vị trí của dòng `to` (kéo thả sắp xếp). */
@@ -885,10 +916,11 @@ export function PosClient({
                     {filtered.slice(0, 60).map((p) => {
                       const stock = Number(p.stock);
                       const line = cart.find((l) => l.product.id === p.id);
+                      const children = productChildren(p);
                       return (
                         <div
                           key={p.id}
-                          onClick={line ? undefined : () => addToCart(p)}
+                          onClick={line ? undefined : () => selectProduct(p)}
                           className={cn(
                             "flex items-center gap-3 px-3 py-2 text-left",
                             line ? "bg-primary-50 dark:bg-primary-950/40" : "hover:bg-surface-2 cursor-pointer"
@@ -897,7 +929,9 @@ export function PosClient({
                           <div className="w-9 h-9 rounded-md bg-surface-2 grid place-items-center text-lg shrink-0">{categoryEmoji(p.categoryName)}</div>
                           <div className="min-w-0 flex-1">
                             <div className="text-sm font-medium truncate">{p.name}</div>
-                            <div className={cn("text-xs", stock <= 0 ? "text-er" : "text-slate-400")}>{t("pos.stockLabel")} {formatNumber(stock)} {p.baseUnit}</div>
+                            <div className={cn("text-xs", stock <= 0 ? "text-er" : "text-slate-400")}>
+                              {p.isVariantParent ? `${children.length} SKU con` : `${t("pos.stockLabel")} ${formatNumber(stock)} ${p.baseUnit}`}
+                            </div>
                           </div>
                           <div className="flex items-center justify-end gap-2 w-auto sm:w-64 shrink-0">
                             {line && (
@@ -912,7 +946,9 @@ export function PosClient({
                                 <button onClick={() => updateQty(line.key, 1)} className="w-8 h-8 rounded border border-border grid place-items-center"><Plus className="w-3.5 h-3.5" /></button>
                               </div>
                             )}
-                            <div className="text-sm font-semibold text-primary-600 tabular-nums text-right w-24 sm:w-32">{formatCurrency(basePriceFor(p, priceBook))}/{p.baseUnit}</div>
+                            <div className="text-sm font-semibold text-primary-600 tabular-nums text-right w-24 sm:w-32">
+                              {priceLabelFor(p, priceBook)}{p.isVariantParent ? "" : `/${p.baseUnit}`}
+                            </div>
                           </div>
                         </div>
                       );
@@ -944,8 +980,8 @@ export function PosClient({
           setDropHover(false);
           if (!id) return;
           e.preventDefault();
-          const p = data.products.find((x) => x.id === id);
-          if (p) addToCart(p);
+          const p = searchableProducts.find((x) => x.id === id);
+          if (p) selectProduct(p);
         }}
         className={cn(
           "w-full lg:w-[560px] shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col transition-colors",
@@ -1129,6 +1165,19 @@ export function PosClient({
       </div>
 
       {/* Modal chọn bảng giá áp cho đơn đang mở */}
+      {variantParent && (
+        <VariantPickerModal
+          parent={variantParent}
+          priceBook={priceBook}
+          onClose={() => setVariantParent(null)}
+          onSelect={(child) => {
+            addToCart(child);
+            setVariantParent(null);
+            closeSearch();
+          }}
+        />
+      )}
+
       {priceBookOpen && (
         <div
           className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4"
@@ -1217,6 +1266,66 @@ export function PosClient({
         document.body
       )}
     </div>
+  );
+}
+
+function VariantPickerModal({
+  parent,
+  priceBook,
+  onSelect,
+  onClose,
+}: {
+  parent: PosProduct;
+  priceBook: PriceBook;
+  onSelect: (product: PosProduct) => void;
+  onClose: () => void;
+}) {
+  const t = useTranslations();
+  const children = productChildren(parent);
+
+  return (
+    <>
+      <div className="fixed inset-0 z-55 bg-slate-950/30" onClick={onClose} />
+      <div className="fixed z-60 left-1/2 top-1/2 w-[560px] max-w-[calc(100vw-32px)] max-h-[min(80dvh,640px)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-border bg-surface shadow-e2">
+        <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+          <div className="min-w-0">
+            <div className="font-semibold truncate">{parent.name}</div>
+            <div className="mt-0.5 text-xs text-slate-500">{children.length} SKU con · {priceLabelFor(parent, priceBook)}</div>
+          </div>
+          <button type="button" onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-600">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="max-h-[calc(min(80dvh,640px)-64px)] overflow-auto p-2">
+          {children.length === 0 ? (
+            <div className="px-4 py-8 text-center text-sm text-slate-400">{t("pos.noProducts")}</div>
+          ) : (
+            <div className="grid gap-2">
+              {children.map((child) => {
+                const stock = Number(child.stock);
+                return (
+                  <button
+                    key={child.id}
+                    type="button"
+                    onClick={() => onSelect(child)}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 text-left hover:border-primary-300 hover:bg-primary-50/50 dark:hover:bg-primary-950/20"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold">{child.variantName ?? child.name}</span>
+                      <span className="block text-xs text-slate-500">{child.sku}{child.barcode ? ` · ${child.barcode}` : ""}</span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="block text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(basePriceFor(child, priceBook))}</span>
+                      <span className={cn("block text-xs", stock <= 0 ? "text-er" : "text-slate-500")}>{formatNumber(stock)} {child.baseUnit}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useFormContext } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
-import { ArrowLeft, ImagePlus, Loader2, X } from "lucide-react";
+import { ArrowLeft, ImagePlus, Info, Loader2, X } from "lucide-react";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -24,6 +24,9 @@ import type { ProductFormOptions } from "@/lib/data/products";
 type Tab = "info" | "description" | "variants";
 
 const useFormCtx = () => useFormContext<CreateProductInput>();
+const EMPTY_ATTRIBUTES: NonNullable<CreateProductInput["attributes"]> = [];
+const EMPTY_VARIANT_CHILDREN: NonNullable<CreateProductInput["variantChildren"]> = [];
+const EMPTY_IMAGE_URLS: string[] = [];
 
 export interface NewProductFormProps {
   categories: ProductFormOptions["categories"];
@@ -31,10 +34,20 @@ export interface NewProductFormProps {
   suppliers?: ProductFormOptions["suppliers"]; // NCC tự gắn khi nhập hàng, không sửa ở form
   mode?: "create" | "edit";
   productId?: string;
+  isVariantChild?: boolean;
+  siblingCount?: number;
   initialValues?: Partial<CreateProductInput>;
 }
 
-export function NewProductForm({ categories, brands, mode = "create", productId, initialValues }: NewProductFormProps) {
+export function NewProductForm({
+  categories,
+  brands,
+  mode = "create",
+  productId,
+  isVariantChild = false,
+  siblingCount = 0,
+  initialValues,
+}: NewProductFormProps) {
   const t = useTranslations();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("info");
@@ -59,6 +72,8 @@ export function NewProductForm({ categories, brands, mode = "create", productId,
       baseUnit: "cái",
       units: [],
       attributes: [],
+      variantChildren: [],
+      applyToSiblings: { enabled: false, fields: ["name", "imageUrls", "description"] },
       directSale: true,
       ...initialValues,
     },
@@ -84,8 +99,10 @@ export function NewProductForm({ categories, brands, mode = "create", productId,
         agentPrice: values.agentPrice ?? null,
         location: values.location,
         description: values.description,
+        imageUrls: values.imageUrls,
         isActive: values.directSale,
         specs,
+        applyToSiblings: values.applyToSiblings,
         units: values.units.map((u) => ({
           unitName: u.unitName, multiplier: u.multiplier, barcode: u.barcode, priceOverride: u.priceOverride ?? null,
         })),
@@ -154,7 +171,7 @@ export function NewProductForm({ categories, brands, mode = "create", productId,
 
       <div className="flex-1 overflow-auto p-4 sm:p-6 max-w-5xl mx-auto w-full space-y-4">
         {tab === "info" && <InfoTab categories={categories} brands={brands} />}
-        {tab === "variants" && <VariantsTab />}
+        {tab === "variants" && <VariantsTab isEdit={isEdit} isVariantChild={isVariantChild} siblingCount={siblingCount} />}
         {tab === "description" && <DescriptionTab />}
       </div>
     </Form>
@@ -192,7 +209,15 @@ function DescriptionTab() {
   );
 }
 
-function VariantsTab() {
+function VariantsTab({
+  isEdit,
+  isVariantChild,
+  siblingCount,
+}: {
+  isEdit: boolean;
+  isVariantChild: boolean;
+  siblingCount: number;
+}) {
   return (
     <div className="space-y-4">
       <Section titleTx="products.sections.units" descriptionTx="products.sections.unitsDesc" collapsible={false}>
@@ -200,7 +225,192 @@ function VariantsTab() {
       </Section>
       <Section titleTx="products.sections.attributes" descriptionTx="products.sections.attributesDesc" collapsible={false}>
         <AttributesField />
+        {!isEdit && <VariantChildrenPreview />}
       </Section>
+      {isEdit && isVariantChild && <SiblingApplySection siblingCount={siblingCount} />}
+    </div>
+  );
+}
+
+const APPLY_FIELD_OPTIONS = [
+  { value: "name", label: "Tên hàng hóa" },
+  { value: "imageUrls", label: "Hình ảnh" },
+  { value: "description", label: "Mô tả" },
+  { value: "category", label: "Nhóm hàng" },
+  { value: "brand", label: "Thương hiệu" },
+  { value: "pricing", label: "Giá" },
+  { value: "units", label: "Đơn vị tính" },
+  { value: "directSale", label: "Bán trực tiếp" },
+  { value: "attributes", label: "Thuộc tính" },
+] as const;
+
+function SiblingApplySection({ siblingCount }: { siblingCount: number }) {
+  const { register, watch } = useFormCtx();
+  const enabled = Boolean(watch("applyToSiblings.enabled"));
+
+  return (
+    <Section title="Áp dụng cho hàng hóa con cùng loại" collapsible={false}>
+      <div className="space-y-3">
+        <label className="flex items-start gap-3 rounded-xl border border-border bg-surface px-4 py-3">
+          <input
+            type="checkbox"
+            {...register("applyToSiblings.enabled")}
+            className="mt-1 rounded text-primary-600 focus:ring-primary-500"
+          />
+          <span className="min-w-0">
+            <span className="flex items-center gap-1.5 text-sm font-semibold">
+              Áp dụng thay đổi cho {siblingCount} hàng hóa con còn lại
+              <Info className="h-4 w-4 text-slate-400" />
+            </span>
+            <span className="mt-1 block text-xs text-slate-500">
+              Không áp dụng hàng loạt mã SKU, mã vạch và tồn kho.
+            </span>
+          </span>
+        </label>
+
+        {enabled && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 rounded-xl border border-dashed border-border bg-slate-50 p-3 dark:bg-slate-900/40">
+            {APPLY_FIELD_OPTIONS.map((opt) => (
+              <label key={opt.value} className="flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-sm">
+                <input
+                  type="checkbox"
+                  value={opt.value}
+                  {...register("applyToSiblings.fields")}
+                  className="rounded text-primary-600 focus:ring-primary-500"
+                />
+                <span>{opt.label}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+    </Section>
+  );
+}
+
+function buildVariantCombinations(attributes: CreateProductInput["attributes"]) {
+  const usable = (attributes ?? [])
+    .map((a) => ({
+      name: a.name?.trim() ?? "",
+      values: [...new Set((a.values ?? []).map((v) => v.trim()).filter(Boolean))],
+      createsVariants: Boolean(a.createsVariants),
+    }))
+    .filter((a) => a.createsVariants && a.name && a.values.length > 0);
+
+  if (usable.length === 0) return [];
+
+  const rows: Array<{ variantName: string; specs: Record<string, string[]> }> = [];
+  const walk = (idx: number, picked: Array<{ name: string; value: string }>) => {
+    if (idx === usable.length) {
+      rows.push({
+        variantName: picked.map((p) => p.value).join(" / "),
+        specs: Object.fromEntries(picked.map((p) => [p.name, [p.value]])),
+      });
+      return;
+    }
+    for (const value of usable[idx].values) walk(idx + 1, [...picked, { name: usable[idx].name, value }]);
+  };
+  walk(0, []);
+  return rows;
+}
+
+function VariantChildrenPreview() {
+  const { register, watch, setValue } = useFormCtx();
+  const attributes = watch("attributes") ?? EMPTY_ATTRIBUTES;
+  const children = watch("variantChildren") ?? EMPTY_VARIANT_CHILDREN;
+  const parentName = watch("name") ?? "";
+  const baseUnit = watch("baseUnit") ?? "cái";
+  const costPrice = Number(watch("costPrice") ?? 0);
+  const retailPrice = Number(watch("retailPrice") ?? 0);
+  const wholesalePrice = watch("wholesalePrice") ?? null;
+  const contractorPrice = watch("contractorPrice") ?? null;
+  const agentPrice = watch("agentPrice") ?? null;
+  const minLevel = Number(watch("minLevel") ?? 0);
+  const imageUrls = watch("imageUrls") ?? EMPTY_IMAGE_URLS;
+
+  const generated = useMemo(() => buildVariantCombinations(attributes), [attributes]);
+
+  useEffect(() => {
+    if (generated.length === 0) {
+      if (children.length > 0) setValue("variantChildren", [], { shouldDirty: true });
+      return;
+    }
+    const byName = new Map(children.map((child) => [child.variantName, child]));
+    const next = generated.map((row) => {
+      const current = byName.get(row.variantName);
+      return {
+        variantName: row.variantName,
+        sku: current?.sku ?? "",
+        barcode: current?.barcode ?? "",
+        baseUnit: current?.baseUnit ?? baseUnit,
+        costPrice: current?.costPrice ?? costPrice,
+        retailPrice: current?.retailPrice ?? retailPrice,
+        wholesalePrice: current?.wholesalePrice ?? wholesalePrice,
+        contractorPrice: current?.contractorPrice ?? contractorPrice,
+        agentPrice: current?.agentPrice ?? agentPrice,
+        initialStock: current?.initialStock ?? 0,
+        minLevel: current?.minLevel ?? minLevel,
+        imageUrls: current?.imageUrls?.length ? current.imageUrls : imageUrls,
+        directSale: current?.directSale ?? true,
+        specs: row.specs,
+      };
+    });
+    if (JSON.stringify(next) !== JSON.stringify(children)) {
+      setValue("variantChildren", next, { shouldDirty: true });
+    }
+  }, [agentPrice, baseUnit, children, contractorPrice, costPrice, generated, imageUrls, minLevel, retailPrice, setValue, wholesalePrice]);
+
+  if (generated.length === 0) {
+    return (
+      <p className="mt-4 rounded-lg border border-dashed border-border bg-surface-2 px-3 py-2 text-sm text-slate-500">
+        Bật “SKU con” ở một hoặc nhiều thuộc tính để tự sinh hàng hóa con.
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-4 overflow-hidden rounded-xl border border-border bg-surface">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
+        <div>
+          <div className="text-sm font-semibold">Hàng hóa con</div>
+          <div className="text-xs text-slate-500">{children.length} SKU con sẽ được tạo dưới {parentName || "sản phẩm cha"}</div>
+        </div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[860px] text-sm">
+          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-900/60">
+            <tr>
+              <th className="px-3 py-2 font-semibold">Biến thể</th>
+              <th className="px-3 py-2 font-semibold">SKU</th>
+              <th className="px-3 py-2 font-semibold">Mã vạch</th>
+              <th className="px-3 py-2 font-semibold">ĐVT</th>
+              <th className="px-3 py-2 font-semibold text-right">Giá vốn</th>
+              <th className="px-3 py-2 font-semibold text-right">Giá bán</th>
+              <th className="px-3 py-2 font-semibold text-right">Tồn đầu</th>
+              <th className="px-3 py-2 font-semibold text-center">Bán</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border-soft">
+            {children.map((child, idx) => (
+              <tr key={child.variantName}>
+                <td className="px-3 py-2">
+                  <input type="hidden" {...register(`variantChildren.${idx}.variantName`)} />
+                  <div className="font-medium">{child.variantName}</div>
+                </td>
+                <td className="px-3 py-2"><Input {...register(`variantChildren.${idx}.sku`)} placeholder="Tự sinh" /></td>
+                <td className="px-3 py-2"><Input {...register(`variantChildren.${idx}.barcode`)} /></td>
+                <td className="px-3 py-2"><Input {...register(`variantChildren.${idx}.baseUnit`)} /></td>
+                <td className="px-3 py-2"><input type="number" min={0} {...register(`variantChildren.${idx}.costPrice`, { valueAsNumber: true })} className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-right" /></td>
+                <td className="px-3 py-2"><input type="number" min={0} {...register(`variantChildren.${idx}.retailPrice`, { valueAsNumber: true })} className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-right" /></td>
+                <td className="px-3 py-2"><input type="number" min={0} {...register(`variantChildren.${idx}.initialStock`, { valueAsNumber: true })} className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-right" /></td>
+                <td className="px-3 py-2 text-center">
+                  <input type="checkbox" {...register(`variantChildren.${idx}.directSale`)} className="rounded text-primary-600 focus:ring-primary-500" />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

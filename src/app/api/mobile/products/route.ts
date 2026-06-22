@@ -1,6 +1,6 @@
 import { createProduct } from "@/lib/actions/products";
 import { getProductFormOptions, getProducts } from "@/lib/data/products";
-import type { ProductStatusFilter } from "@/lib/data/products";
+import type { ProductListView, ProductStatusFilter } from "@/lib/data/products";
 import { requireMobileStockAccess } from "@/lib/mobile/auth";
 import {
   mobileAction,
@@ -21,6 +21,7 @@ export async function GET(request: Request) {
       q: searchParam(request, "q"),
       categoryId: searchParam(request, "categoryId"),
       status: searchParam(request, "status") as ProductStatusFilter | undefined,
+      view: searchParam(request, "view") as ProductListView | undefined,
       page: numberParam(request, "page", 1),
       pageSize: numberParam(request, "pageSize", 50),
     }),

@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Fragment, Suspense } from "react";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Plus, Search, PackageOpen } from "lucide-react";
@@ -12,11 +12,14 @@ import { TableSkeleton } from "@/components/table-skeleton";
 type SP = Record<string, string | undefined>;
 const STATUSES = ["active", "inactive", "all"] as const;
 type Status = (typeof STATUSES)[number];
+const VIEWS = ["grouped", "flat"] as const;
+type View = (typeof VIEWS)[number];
 
 export async function ProductsTab({ searchParams }: { searchParams: SP }) {
   const t = await getTranslations();
   const params = searchParams;
   const status: Status = STATUSES.includes(params.status as Status) ? (params.status as Status) : "active";
+  const view: View = VIEWS.includes(params.view as View) ? (params.view as View) : "grouped";
   const { categories } = await getProductFormOptions();
 
   return (
@@ -43,6 +46,10 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
           <option value="inactive">{t("products.list.statusInactive")}</option>
           <option value="all">{t("products.list.statusAll")}</option>
         </select>
+        <select name="view" defaultValue={view} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface">
+          <option value="grouped">Xem theo nhóm</option>
+          <option value="flat">Xem từng SKU</option>
+        </select>
         <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full border border-border bg-surface hover:bg-surface-2">{t("common.search")}</button>
       </form>
 
@@ -59,8 +66,15 @@ async function ProductsContent({ searchParams }: { searchParams: SP }) {
   const page = Number(params.page) || 1;
   const pageSize = parsePageSize(params.size);
   const status: Status = STATUSES.includes(params.status as Status) ? (params.status as Status) : "active";
+  const view: View = VIEWS.includes(params.view as View) ? (params.view as View) : "grouped";
 
-  const { rows, total, pageCount } = await getProducts({ q: params.q, categoryId: params.category, status, page, pageSize });
+  const { rows, total, pageCount } = await getProducts({ q: params.q, categoryId: params.category, status, view, page, pageSize });
+
+  const priceLabel = (p: (typeof rows)[number]) => {
+    const min = Number(p.minRetailPrice ?? p.retailPrice);
+    const max = Number(p.maxRetailPrice ?? p.retailPrice);
+    return min !== max ? `${formatCurrency(min)} - ${formatCurrency(max)}` : formatCurrency(max);
+  };
 
   return (
     <>
@@ -80,16 +94,32 @@ async function ProductsContent({ searchParams }: { searchParams: SP }) {
             {rows.map((p) => {
               const stock = Number(p.totalStock); const min = Number(p.minLevel); const lowStock = min > 0 && stock <= min;
               return (
-                <Link key={p.id} href={Routes.product(p.id)} className="block bg-surface border border-border rounded-card p-3">
+                <div key={p.id} className="block bg-surface border border-border rounded-card p-3">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0"><div className="font-medium truncate">{p.name}</div><div className="text-xs text-slate-400">{p.sku}{p.categoryName ? ` · ${p.categoryName}` : ""}</div></div>
-                    <span className={cn("shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium", p.isActive ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-500")}>{p.isActive ? t("products.list.active") : t("products.list.inactive")}</span>
+                    <Link href={Routes.product(p.id)} className="min-w-0 hover:text-primary-600"><div className="font-medium truncate">{p.name}</div><div className="text-xs text-slate-400">{p.sku}{p.categoryName ? ` · ${p.categoryName}` : ""}</div></Link>
+                    <span className={cn("shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium", p.isVariantParent ? "bg-primary-50 text-primary-700" : p.isActive ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-500")}>{p.isVariantParent ? `${p.childCount} SKU` : p.isActive ? t("products.list.active") : t("products.list.inactive")}</span>
                   </div>
                   <div className="flex items-center justify-between mt-2 text-sm">
-                    <span className="font-semibold text-primary-600 tabular-nums">{formatCurrency(Number(p.retailPrice))}</span>
+                    <span className="font-semibold text-primary-600 tabular-nums">{priceLabel(p)}</span>
                     <span className={cn("tabular-nums", lowStock ? "text-er font-semibold" : "text-slate-500")}>{t("products.list.colStock")}: {stock.toLocaleString("vi-VN")} {p.baseUnit}</span>
                   </div>
-                </Link>
+                  {p.children.length > 0 && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-xs font-semibold text-primary-600">Xem {p.children.length} SKU con</summary>
+                      <div className="mt-2 divide-y divide-border-soft rounded-lg border border-border-soft">
+                        {p.children.map((child) => (
+                          <Link key={child.id} href={Routes.product(child.id)} className="flex items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-surface-2">
+                            <span className="min-w-0">
+                              <span className="block truncate font-medium">{child.variantName ?? child.name}</span>
+                              <span className="block text-xs text-slate-400">{child.sku}</span>
+                            </span>
+                            <span className="shrink-0 text-right text-primary-600">{formatCurrency(Number(child.retailPrice))}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -111,18 +141,40 @@ async function ProductsContent({ searchParams }: { searchParams: SP }) {
                 {rows.map((p) => {
                   const stock = Number(p.totalStock); const min = Number(p.minLevel); const lowStock = min > 0 && stock <= min;
                   return (
-                    <tr key={p.id} className="hover:bg-surface-2">
-                      <td className="px-4 py-3">
-                        <Link href={Routes.product(p.id)} className="font-medium text-slate-900 dark:text-slate-100 hover:text-primary-600 hover:underline">{p.name}</Link>
-                        <div className="text-xs text-slate-400">{p.sku}{p.barcode ? ` · ${p.barcode}` : ""}</div>
-                      </td>
-                      <td className="px-4 py-3 text-slate-500">{p.categoryName ?? "—"}</td>
-                      <td className="px-4 py-3 text-slate-500">{p.baseUnit}{p.unitNames ? ` · ${p.unitNames}` : ""}</td>
-                      <td className="px-4 py-3 text-right tabular-nums font-medium">{formatCurrency(Number(p.retailPrice))}</td>
-                      <td className="px-4 py-3 text-right tabular-nums text-slate-500">{p.contractorPrice ? formatCurrency(Number(p.contractorPrice)) : "—"}</td>
-                      <td className={cn("px-4 py-3 text-right tabular-nums font-semibold", lowStock ? "text-er" : "text-slate-700 dark:text-slate-300")}>{stock.toLocaleString("vi-VN")} {p.baseUnit}</td>
-                      <td className="px-4 py-3"><span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", p.isActive ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-500")}>{p.isActive ? t("products.list.active") : t("products.list.inactive")}</span></td>
-                    </tr>
+                    <Fragment key={p.id}>
+                      <tr className="hover:bg-surface-2">
+                        <td className="px-4 py-3">
+                          <div className="flex items-start gap-2">
+                            <Link href={Routes.product(p.id)} className="font-medium text-slate-900 dark:text-slate-100 hover:text-primary-600 hover:underline">{p.name}</Link>
+                            {p.isVariantParent && <span className="rounded-full bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary-700">{p.childCount} SKU</span>}
+                          </div>
+                          <div className="text-xs text-slate-400">{p.sku}{p.barcode ? ` · ${p.barcode}` : ""}</div>
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">{p.categoryName ?? "—"}</td>
+                        <td className="px-4 py-3 text-slate-500">{p.baseUnit}{p.unitNames ? ` · ${p.unitNames}` : ""}</td>
+                        <td className="px-4 py-3 text-right tabular-nums font-medium">{priceLabel(p)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-slate-500">{p.contractorPrice ? formatCurrency(Number(p.contractorPrice)) : "—"}</td>
+                        <td className={cn("px-4 py-3 text-right tabular-nums font-semibold", lowStock ? "text-er" : "text-slate-700 dark:text-slate-300")}>{stock.toLocaleString("vi-VN")} {p.baseUnit}</td>
+                        <td className="px-4 py-3"><span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", p.isVariantParent ? "bg-primary-50 text-primary-700" : p.isActive ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-500")}>{p.isVariantParent ? "Nhóm" : p.isActive ? t("products.list.active") : t("products.list.inactive")}</span></td>
+                      </tr>
+                      {p.children.length > 0 && p.children.map((child) => {
+                        const childStock = Number(child.totalStock);
+                        return (
+                          <tr key={child.id} className="bg-slate-50/60 hover:bg-surface-2 dark:bg-slate-900/40">
+                            <td className="px-4 py-2 pl-8">
+                              <Link href={Routes.product(child.id)} className="font-medium text-slate-700 hover:text-primary-600 hover:underline dark:text-slate-200">{child.variantName ?? child.name}</Link>
+                              <div className="text-xs text-slate-400">{child.sku}{child.barcode ? ` · ${child.barcode}` : ""}</div>
+                            </td>
+                            <td className="px-4 py-2 text-slate-500">{child.categoryName ?? "—"}</td>
+                            <td className="px-4 py-2 text-slate-500">{child.baseUnit}{child.unitNames ? ` · ${child.unitNames}` : ""}</td>
+                            <td className="px-4 py-2 text-right tabular-nums font-medium">{formatCurrency(Number(child.retailPrice))}</td>
+                            <td className="px-4 py-2 text-right tabular-nums text-slate-500">{child.contractorPrice ? formatCurrency(Number(child.contractorPrice)) : "—"}</td>
+                            <td className="px-4 py-2 text-right tabular-nums text-slate-600">{childStock.toLocaleString("vi-VN")} {child.baseUnit}</td>
+                            <td className="px-4 py-2"><span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", child.isActive ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-500")}>{child.isActive ? t("products.list.active") : t("products.list.inactive")}</span></td>
+                          </tr>
+                        );
+                      })}
+                    </Fragment>
                   );
                 })}
               </tbody>

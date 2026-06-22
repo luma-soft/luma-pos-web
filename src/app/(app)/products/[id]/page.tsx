@@ -113,6 +113,25 @@ export default async function ProductDetailPage({ params }: Props) {
           </Card>
         )}
 
+        {product.children.length > 0 && (
+          <Card title="Hàng hóa con">
+            <div className="divide-y divide-border-soft">
+              {product.children.map((child) => (
+                <Link key={child.id} href={Routes.product(child.id)} className="flex items-center justify-between gap-3 py-2 text-sm hover:text-primary-600">
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium">{child.variantName ?? child.name}</span>
+                    <span className="block text-xs text-slate-400">{child.sku}</span>
+                  </span>
+                  <span className="shrink-0 text-right">
+                    <span className="block tabular-nums font-semibold">{formatCurrency(Number(child.retailPrice))}</span>
+                    <span className="block text-xs text-slate-400">{Number(child.totalStock).toLocaleString("vi-VN")} {child.baseUnit}</span>
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </Card>
+        )}
+
         {product.description && (
           <Card title={t("products.description.main")}>
             <p className="text-sm whitespace-pre-line text-slate-600 dark:text-slate-300">{product.description}</p>

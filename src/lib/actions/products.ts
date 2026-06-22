@@ -2,12 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   products, productUnits, productSuppliers, categories, brands, stockLevels, stockMovements, warehouses, profiles,
 } from "@/db/schema";
-import { createProductSchema, type CreateProductOutput } from "@/app/(app)/products/new/schema";
+import { createProductSchema, siblingApplySchema, type CreateProductOutput } from "@/app/(app)/products/new/schema";
 import { Routes } from "@/lib/routes";
 import { requireStockAccess, requireManager } from "./common";
 
@@ -86,6 +86,38 @@ function generateSku() {
   return `SP${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
 }
 
+function generateVariantSku(parentSku: string, index: number) {
+  return `${parentSku}-${String(index + 1).padStart(2, "0")}`;
+}
+
+function childProductName(parentName: string, variantName: string) {
+  return `${parentName.trim()} - ${variantName.trim()}`;
+}
+
+function baseNameFromChildName(name: string, variantName: string | null) {
+  if (!variantName) return name.trim();
+  const suffix = ` - ${variantName}`;
+  return name.endsWith(suffix) ? name.slice(0, -suffix.length).trim() : name.trim();
+}
+
+function specsFromAttributes(
+  attributes: CreateProductOutput["attributes"],
+  options: { includeVariantAttributes?: boolean } = {}
+) {
+  const entries = attributes
+    .filter((a) => a.name.trim() && (options.includeVariantAttributes || !a.createsVariants))
+    .map((a) => [a.name.trim(), a.values] as const);
+  return entries.length > 0 ? Object.fromEntries(entries) : null;
+}
+
+function mergeSpecs(
+  base: Record<string, string[]> | null,
+  extra: Record<string, string[]> | null | undefined
+) {
+  const merged = { ...(base ?? {}), ...(extra ?? {}) };
+  return Object.keys(merged).length > 0 ? merged : null;
+}
+
 function buildDimensions(v: CreateProductOutput): string | null {
   const parts = [v.width, v.length, v.thickness].filter((n): n is number => n != null && n > 0);
   if (parts.length === 0) return null;
@@ -155,8 +187,10 @@ const updateProductSchema = z.object({
   agentPrice: z.number().min(0).nullable(),
   location: z.string().trim().optional(),
   description: z.string().trim().optional(),
+  imageUrls: z.array(z.string()).optional(),
   isActive: z.boolean(),
   specs: z.record(z.string(), z.array(z.string())).nullable(),
+  applyToSiblings: siblingApplySchema.optional(),
   units: z.array(z.object({
     unitName: z.string().trim().min(1),
     multiplier: z.number().positive(),
@@ -179,6 +213,15 @@ export async function updateProduct(input: UpdateProductInput): Promise<ActionRe
 
   try {
     await db.transaction(async (tx) => {
+      const [current] = await tx
+        .select({
+          parentProductId: products.parentProductId,
+          variantName: products.variantName,
+        })
+        .from(products)
+        .where(eq(products.id, v.id))
+        .limit(1);
+
       await tx.update(products).set({
         sku: v.sku,
         barcode: v.barcode || null,
@@ -194,6 +237,7 @@ export async function updateProduct(input: UpdateProductInput): Promise<ActionRe
         agentPrice: v.agentPrice != null ? String(v.agentPrice) : null,
         location: v.location || null,
         description: v.description || null,
+        ...(v.imageUrls ? { imageUrls: v.imageUrls } : {}),
         specs: v.specs && Object.keys(v.specs).length > 0 ? v.specs : null,
         isActive: v.isActive,
         updatedAt: sql`now()`,
@@ -221,6 +265,64 @@ export async function updateProduct(input: UpdateProductInput): Promise<ActionRe
           await tx.insert(productSuppliers).values(
             sids.map((sid, i) => ({ productId: v.id, supplierId: sid, isPrimary: i === 0 }))
           );
+        }
+      }
+
+      const apply = v.applyToSiblings;
+      if (apply?.enabled && apply.fields.length > 0 && current?.parentProductId) {
+        const fields = new Set(apply.fields);
+        const siblingRows = await tx
+          .select({ id: products.id, variantName: products.variantName })
+          .from(products)
+          .where(and(eq(products.parentProductId, current.parentProductId), ne(products.id, v.id)));
+
+        const patch: Partial<typeof products.$inferInsert> = { updatedAt: sql`now()` as unknown as Date };
+        if (fields.has("description")) patch.description = v.description || null;
+        if (fields.has("imageUrls") && v.imageUrls) patch.imageUrls = v.imageUrls;
+        if (fields.has("category")) patch.categoryId = v.categoryId || null;
+        if (fields.has("brand")) patch.brandId = v.brandId || null;
+        if (fields.has("directSale")) patch.isActive = v.isActive;
+        if (fields.has("attributes")) patch.specs = v.specs && Object.keys(v.specs).length > 0 ? v.specs : null;
+        if (fields.has("pricing")) {
+          patch.costPrice = String(v.costPrice);
+          patch.retailPrice = String(v.retailPrice);
+          patch.wholesalePrice = v.wholesalePrice != null ? String(v.wholesalePrice) : null;
+          patch.contractorPrice = v.contractorPrice != null ? String(v.contractorPrice) : null;
+          patch.agentPrice = v.agentPrice != null ? String(v.agentPrice) : null;
+        }
+        if (fields.has("units")) patch.baseUnit = v.baseUnit;
+
+        const baseName = fields.has("name") ? baseNameFromChildName(v.name, current.variantName) : null;
+        if (baseName) {
+          await tx.update(products).set({ name: baseName, updatedAt: sql`now()` }).where(eq(products.id, current.parentProductId));
+          await tx.update(products).set({
+            name: current.variantName ? childProductName(baseName, current.variantName) : baseName,
+            updatedAt: sql`now()`,
+          }).where(eq(products.id, v.id));
+        }
+
+        const hasPatch = Object.keys(patch).length > 1;
+        for (const sibling of siblingRows) {
+          const nextPatch = {
+            ...(hasPatch ? patch : {}),
+            ...(baseName ? { name: sibling.variantName ? childProductName(baseName, sibling.variantName) : baseName } : {}),
+            updatedAt: sql`now()`,
+          };
+          await tx.update(products).set(nextPatch).where(eq(products.id, sibling.id));
+
+          if (fields.has("units")) {
+            await tx.delete(productUnits).where(eq(productUnits.productId, sibling.id));
+            if (valid.length > 0) {
+              await tx.insert(productUnits).values(valid.map((u, i) => ({
+                productId: sibling.id,
+                unitName: u.unitName,
+                multiplier: String(u.multiplier),
+                barcode: u.barcode || null,
+                priceOverride: u.priceOverride != null ? String(u.priceOverride) : null,
+                sortOrder: i,
+              })));
+            }
+          }
         }
       }
     });
@@ -252,14 +354,106 @@ export async function createProduct(
 
   const sku = v.sku?.trim() || generateSku();
   const weightKg = v.weight != null ? (v.weightUnit === "g" ? v.weight / 1000 : v.weight) : null;
-  const specs =
-    v.attributes.length > 0
-      ? Object.fromEntries(v.attributes.filter((a) => a.name.trim()).map((a) => [a.name, a.values]))
-      : null;
+  const descriptiveSpecs = specsFromAttributes(v.attributes, { includeVariantAttributes: false });
+  const singleProductSpecs = specsFromAttributes(v.attributes, { includeVariantAttributes: true });
+  const variantChildren = v.variantChildren.filter((child) => child.variantName.trim());
+  const validUnits = v.units.filter((u) => u.unitName.trim() && u.multiplier > 0);
+  const supplierIds = [...new Set(v.supplierIds.filter(Boolean))];
 
   try {
     const result = await db.transaction(async (tx) => {
-      const [product] = await tx
+      async function insertUnits(productId: string) {
+        if (validUnits.length === 0) return;
+        await tx.insert(productUnits).values(
+          validUnits.map((u, i) => ({
+            productId,
+            unitName: u.unitName.trim(),
+            multiplier: String(u.multiplier),
+            barcode: u.barcode?.trim() || null,
+            priceOverride: u.priceOverride != null ? String(u.priceOverride) : null,
+            sortOrder: i,
+          }))
+        );
+      }
+
+      async function insertSuppliers(productId: string) {
+        if (supplierIds.length === 0) return;
+        await tx.insert(productSuppliers).values(
+          supplierIds.map((sid, i) => ({ productId, supplierId: sid, isPrimary: i === 0 }))
+        );
+      }
+
+      const [defaultWh] = await tx
+        .select({ id: warehouses.id })
+        .from(warehouses)
+        .where(eq(warehouses.isDefault, true))
+        .limit(1);
+      const [profile] = defaultWh
+        ? await tx
+            .select({ id: profiles.id })
+            .from(profiles)
+            .where(eq(profiles.id, userId))
+            .limit(1)
+        : [null];
+
+      async function insertInitialStock(productId: string, quantity: number, minLevel: number, unitCost: number) {
+        if (!defaultWh) return;
+        await tx.insert(stockLevels).values({
+          productId,
+          warehouseId: defaultWh.id,
+          quantity: String(quantity),
+          minLevel: String(minLevel),
+        });
+
+        if (quantity > 0) {
+          await tx.insert(stockMovements).values({
+            productId,
+            warehouseId: defaultWh.id,
+            type: "init",
+            quantity: String(quantity),
+            unitCost: String(unitCost),
+            refType: "product_init",
+            refId: productId,
+            note: "Tồn đầu khi tạo sản phẩm",
+            createdBy: profile?.id ?? null,
+          });
+        }
+      }
+
+      if (variantChildren.length === 0) {
+        const [product] = await tx
+          .insert(products)
+          .values({
+            sku,
+            barcode: v.barcode?.trim() || null,
+            name: v.name.trim(),
+            description: v.description || null,
+            categoryId: v.categoryId || null,
+            brandId: v.brandId || null,
+            supplierId: v.supplierIds[0] || null, // NCC chính = phần tử đầu
+            baseUnit: v.baseUnit || "cái",
+            costPrice: String(v.costPrice),
+            retailPrice: String(v.retailPrice),
+            wholesalePrice: v.wholesalePrice != null ? String(v.wholesalePrice) : null,
+            contractorPrice: v.contractorPrice != null ? String(v.contractorPrice) : null,
+            agentPrice: v.agentPrice != null ? String(v.agentPrice) : null,
+            m2PerUnit: computeM2PerUnit(v),
+            location: v.location?.trim() || null,
+            weight: weightKg != null ? String(weightKg) : null,
+            dimensions: buildDimensions(v),
+            specs: singleProductSpecs,
+            imageUrls: v.imageUrls,
+            isActive: v.directSale,
+          })
+          .returning({ id: products.id });
+
+        await insertUnits(product.id);
+        await insertSuppliers(product.id);
+        await insertInitialStock(product.id, v.initialStock, v.minLevel, v.costPrice);
+        return product;
+      }
+
+      const [parent] = await tx
         .insert(products)
         .values({
           sku,
@@ -268,7 +462,7 @@ export async function createProduct(
           description: v.description || null,
           categoryId: v.categoryId || null,
           brandId: v.brandId || null,
-          supplierId: v.supplierIds[0] || null, // NCC chính = phần tử đầu
+          supplierId: v.supplierIds[0] || null,
           baseUnit: v.baseUnit || "cái",
           costPrice: String(v.costPrice),
           retailPrice: String(v.retailPrice),
@@ -279,71 +473,54 @@ export async function createProduct(
           location: v.location?.trim() || null,
           weight: weightKg != null ? String(weightKg) : null,
           dimensions: buildDimensions(v),
-          specs,
+          specs: descriptiveSpecs,
           imageUrls: v.imageUrls,
-          isActive: v.directSale,
+          isVariantParent: true,
+          isActive: false,
         })
         .returning({ id: products.id });
 
-      const validUnits = v.units.filter((u) => u.unitName.trim() && u.multiplier > 0);
-      if (validUnits.length > 0) {
-        await tx.insert(productUnits).values(
-          validUnits.map((u, i) => ({
-            productId: product.id,
-            unitName: u.unitName.trim(),
-            multiplier: String(u.multiplier),
-            barcode: u.barcode?.trim() || null,
-            priceOverride: u.priceOverride != null ? String(u.priceOverride) : null,
-            sortOrder: i,
-          }))
-        );
+      await insertUnits(parent.id);
+      await insertSuppliers(parent.id);
+
+      for (const [index, child] of variantChildren.entries()) {
+        const childWholesale = child.wholesalePrice != null ? child.wholesalePrice : v.wholesalePrice;
+        const childContractor = child.contractorPrice != null ? child.contractorPrice : v.contractorPrice;
+        const childAgent = child.agentPrice != null ? child.agentPrice : v.agentPrice;
+        const [childProduct] = await tx
+          .insert(products)
+          .values({
+            sku: child.sku?.trim() || generateVariantSku(sku, index),
+            barcode: child.barcode?.trim() || null,
+            name: childProductName(v.name, child.variantName),
+            parentProductId: parent.id,
+            variantName: child.variantName.trim(),
+            description: v.description || null,
+            categoryId: v.categoryId || null,
+            brandId: v.brandId || null,
+            supplierId: v.supplierIds[0] || null,
+            baseUnit: child.baseUnit || v.baseUnit || "cái",
+            costPrice: String(child.costPrice),
+            retailPrice: String(child.retailPrice),
+            wholesalePrice: childWholesale != null ? String(childWholesale) : null,
+            contractorPrice: childContractor != null ? String(childContractor) : null,
+            agentPrice: childAgent != null ? String(childAgent) : null,
+            m2PerUnit: computeM2PerUnit(v),
+            location: v.location?.trim() || null,
+            weight: weightKg != null ? String(weightKg) : null,
+            dimensions: buildDimensions(v),
+            specs: mergeSpecs(descriptiveSpecs, child.specs),
+            imageUrls: child.imageUrls.length > 0 ? child.imageUrls : v.imageUrls,
+            isActive: child.directSale,
+          })
+          .returning({ id: products.id });
+
+        await insertUnits(childProduct.id);
+        await insertSuppliers(childProduct.id);
+        await insertInitialStock(childProduct.id, child.initialStock, child.minLevel, child.costPrice);
       }
 
-      // Nhiều nhà cung cấp (phần tử đầu = NCC chính)
-      const supplierIds = [...new Set(v.supplierIds.filter(Boolean))];
-      if (supplierIds.length > 0) {
-        await tx.insert(productSuppliers).values(
-          supplierIds.map((sid, i) => ({ productId: product.id, supplierId: sid, isPrimary: i === 0 }))
-        );
-      }
-
-      // Tồn kho ban đầu vào kho mặc định
-      const [defaultWh] = await tx
-        .select({ id: warehouses.id })
-        .from(warehouses)
-        .where(eq(warehouses.isDefault, true))
-        .limit(1);
-
-      if (defaultWh) {
-        await tx.insert(stockLevels).values({
-          productId: product.id,
-          warehouseId: defaultWh.id,
-          quantity: String(v.initialStock),
-          minLevel: String(v.minLevel),
-        });
-
-        if (v.initialStock > 0) {
-          const [profile] = await tx
-            .select({ id: profiles.id })
-            .from(profiles)
-            .where(eq(profiles.id, userId))
-            .limit(1);
-
-          await tx.insert(stockMovements).values({
-            productId: product.id,
-            warehouseId: defaultWh.id,
-            type: "init",
-            quantity: String(v.initialStock),
-            unitCost: String(v.costPrice),
-            refType: "product_init",
-            refId: product.id,
-            note: "Tồn đầu khi tạo sản phẩm",
-            createdBy: profile?.id ?? null,
-          });
-        }
-      }
-
-      return product;
+      return parent;
     });
 
     revalidatePath(Routes.Products);

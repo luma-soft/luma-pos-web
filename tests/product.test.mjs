@@ -145,5 +145,89 @@ ok("filter by category → 1", byCat.total === 1, `got ${byCat.total}`);
 const none = await getProducts({ q: "khongtontai" });
 ok("no result + pageCount=1", none.total === 0 && none.pageCount === 1);
 
+// ---------- 5. Parent product + child SKU variants ----------
+console.log("4) product variants grouped/flat");
+const [parent] = await db.insert(products).values({
+  sku: "LH-ROOT",
+  name: "Gạch Lâm Hưng",
+  baseUnit: "m2",
+  costPrice: "0",
+  retailPrice: "0",
+  categoryId: cat.id,
+  isVariantParent: true,
+  isActive: false,
+}).returning();
+const childRows = await db.insert(products).values([
+  {
+    sku: "LH-1248202",
+    name: "Gạch Lâm Hưng - 1248202",
+    parentProductId: parent.id,
+    variantName: "1248202",
+    baseUnit: "m2",
+    costPrice: "260000",
+    retailPrice: "280000",
+    categoryId: cat.id,
+    isActive: true,
+  },
+  {
+    sku: "LH-7601",
+    name: "Gạch Lâm Hưng - 7601",
+    parentProductId: parent.id,
+    variantName: "7601",
+    baseUnit: "m2",
+    costPrice: "220000",
+    retailPrice: "240000",
+    categoryId: cat.id,
+    isActive: true,
+  },
+]).returning();
+await db.insert(stockLevels).values([
+  { productId: childRows[0].id, warehouseId: sl.warehouseId, quantity: "10", minLevel: "2" },
+  { productId: childRows[1].id, warehouseId: sl.warehouseId, quantity: "20", minLevel: "3" },
+]);
+
+async function getGroupedVariantRows() {
+  return db.select({
+    id: products.id,
+    sku: products.sku,
+    name: products.name,
+    isVariantParent: products.isVariantParent,
+    childCount: dsql`(select count(*)::int from products child where child.parent_product_id = ${products.id})`,
+    minRetailPrice: dsql`case when ${products.isVariantParent} then coalesce((
+      select min(child.retail_price) from products child where child.parent_product_id = ${products.id}
+    ), ${products.retailPrice}) else ${products.retailPrice} end`,
+    maxRetailPrice: dsql`case when ${products.isVariantParent} then coalesce((
+      select max(child.retail_price) from products child where child.parent_product_id = ${products.id}
+    ), ${products.retailPrice}) else ${products.retailPrice} end`,
+    totalStock: dsql`case when ${products.isVariantParent} then (
+      select coalesce(sum(sl.quantity), 0)
+      from products child
+      left join stock_levels sl on sl.product_id = child.id
+      where child.parent_product_id = ${products.id}
+    ) else coalesce(sum(${stockLevels.quantity}), 0) end`,
+  }).from(products)
+    .leftJoin(stockLevels, eq(stockLevels.productId, products.id))
+    .where(dsql`${products.parentProductId} is null`)
+    .groupBy(products.id)
+    .orderBy(desc(products.createdAt));
+}
+
+async function getFlatVariantRows() {
+  return db.select({ sku: products.sku, parentProductId: products.parentProductId, isVariantParent: products.isVariantParent })
+    .from(products)
+    .where(eq(products.isVariantParent, false));
+}
+
+const groupedRows = await getGroupedVariantRows();
+const groupedParent = groupedRows.find((r) => r.sku === "LH-ROOT");
+ok("grouped list shows parent row", !!groupedParent?.isVariantParent);
+ok("parent childCount = 2", Number(groupedParent?.childCount) === 2, `got ${groupedParent?.childCount}`);
+ok("parent stock sums children = 30", Number(groupedParent?.totalStock) === 30, `got ${groupedParent?.totalStock}`);
+ok("parent retail range 240k-280k", Number(groupedParent?.minRetailPrice) === 240000 && Number(groupedParent?.maxRetailPrice) === 280000);
+
+const flatRows = await getFlatVariantRows();
+ok("flat list excludes parent", flatRows.every((r) => r.sku !== "LH-ROOT"));
+ok("flat list includes child SKUs", flatRows.some((r) => r.sku === "LH-1248202") && flatRows.some((r) => r.sku === "LH-7601"));
+
 console.log(`\n${fail === 0 ? "🎉" : "⚠️"} ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

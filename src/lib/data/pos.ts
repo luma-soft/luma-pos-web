@@ -18,6 +18,9 @@ function posProductSelect(warehouseId: string | null) {
     sku: products.sku,
     barcode: products.barcode,
     name: products.name,
+    parentProductId: products.parentProductId,
+    variantName: products.variantName,
+    isVariantParent: products.isVariantParent,
     baseUnit: products.baseUnit,
     retailPrice: products.retailPrice,
     wholesalePrice: products.wholesalePrice,
@@ -26,11 +29,25 @@ function posProductSelect(warehouseId: string | null) {
     m2PerUnit: products.m2PerUnit,
     categoryId: products.categoryId,
     categoryName: categories.name,
-    stock: sql<string>`coalesce((
+    childCount: sql<number>`(
+      select count(*)::int from products child where child.parent_product_id = ${products.id}
+    )`,
+    minRetailPrice: sql<string>`case when ${products.isVariantParent} then coalesce((
+      select min(child.retail_price) from products child where child.parent_product_id = ${products.id}
+    ), ${products.retailPrice}) else ${products.retailPrice} end`,
+    maxRetailPrice: sql<string>`case when ${products.isVariantParent} then coalesce((
+      select max(child.retail_price) from products child where child.parent_product_id = ${products.id}
+    ), ${products.retailPrice}) else ${products.retailPrice} end`,
+    stock: sql<string>`case when ${products.isVariantParent} then (
+      select coalesce(sum(sl.quantity), 0)
+      from products child
+      left join stock_levels sl on sl.product_id = child.id
+      where child.parent_product_id = ${products.id}
+    ) else coalesce((
       select ${stockLevels.quantity} from ${stockLevels}
       where ${stockLevels.productId} = ${products.id}
         and ${stockLevels.warehouseId} = ${warehouseId ?? sql`null`}
-    ), 0)`,
+    ), 0) end`,
     units: sql<PosUnit[]>`coalesce((
       select json_agg(json_build_object(
         'unitName', ${productUnits.unitName},
@@ -44,7 +61,39 @@ function posProductSelect(warehouseId: string | null) {
       select json_object_agg(${productPrices.priceBookId}, ${productPrices.price})
       from ${productPrices} where ${productPrices.productId} = ${products.id}
     ), '{}')`,
+    children: sql<unknown[]>`'[]'::json`,
   };
+}
+
+function attachChildren<
+  T extends { id: string; isVariantParent: boolean; children: unknown[] },
+  C extends T & { parentProductId: string | null }
+>(roots: T[], children: C[]): T[] {
+  const byParent = new Map<string, C[]>();
+  for (const child of children) {
+    if (!child.parentProductId) continue;
+    const group = byParent.get(child.parentProductId) ?? [];
+    group.push({ ...child, children: [] });
+    byParent.set(child.parentProductId, group);
+  }
+  return roots.map((root) => ({
+    ...root,
+    children: root.isVariantParent ? byParent.get(root.id) ?? [] : [],
+  }));
+}
+
+function activeRootCondition() {
+  return and(
+    sql`${products.parentProductId} is null`,
+    or(
+      eq(products.isActive, true),
+      sql`exists (
+        select 1 from products child
+        where child.parent_product_id = ${products.id}
+          and child.is_active = true
+      )`
+    )
+  );
 }
 
 /** Toàn bộ data POS cần khi mở trang: SP active + đơn vị + tồn kho mặc định, KH, kho. */
@@ -56,12 +105,12 @@ export async function getPosData(options?: { includeProductIds?: string[] }) {
     .limit(1);
 
   const includeProductIds = [...new Set(options?.includeProductIds ?? [])];
-  const [productRows, sourceProductRows, customerRows] = await Promise.all([
+  const [rootRows, sourceProductRows, customerRows] = await Promise.all([
     db
       .select(posProductSelect(defaultWh?.id ?? null))
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
-      .where(eq(products.isActive, true))
+      .where(activeRootCondition())
       .orderBy(asc(products.name))
       .limit(200),
     includeProductIds.length
@@ -86,6 +135,17 @@ export async function getPosData(options?: { includeProductIds?: string[] }) {
       .limit(500),
   ]);
 
+  const parentIds = rootRows.filter((p) => p.isVariantParent).map((p) => p.id);
+  const childRows = parentIds.length > 0
+    ? await db
+        .select(posProductSelect(defaultWh?.id ?? null))
+        .from(products)
+        .leftJoin(categories, eq(products.categoryId, categories.id))
+        .where(and(eq(products.isActive, true), inArray(products.parentProductId, parentIds)))
+        .orderBy(asc(products.name))
+    : [];
+
+  const productRows = attachChildren(rootRows, childRows);
   const byId = new Map(productRows.map((p) => [p.id, p]));
   for (const p of sourceProductRows) byId.set(p.id, p);
   const productsForPos = [...byId.values()];
@@ -145,13 +205,40 @@ export async function searchPosProductRows(q: string): Promise<PosProduct[]> {
     accentInsensitiveLike(products.barcode, q)
   );
 
-  return db
-    .select(posProductSelect(defaultWh?.id ?? null))
-    .from(products)
-    .leftJoin(categories, eq(products.categoryId, categories.id))
-    .where(and(eq(products.isActive, true), match))
-    .orderBy(asc(products.name))
-    .limit(60);
+  const [childRows, rootRows] = await Promise.all([
+    db
+      .select(posProductSelect(defaultWh?.id ?? null))
+      .from(products)
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .where(and(eq(products.isActive, true), eq(products.isVariantParent, false), match))
+      .orderBy(asc(products.name))
+      .limit(40),
+    db
+      .select(posProductSelect(defaultWh?.id ?? null))
+      .from(products)
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .where(and(activeRootCondition(), match))
+      .orderBy(asc(products.name))
+      .limit(20),
+  ]);
+
+  const parentIds = rootRows.filter((p) => p.isVariantParent).map((p) => p.id);
+  const pickerChildren = parentIds.length > 0
+    ? await db
+        .select(posProductSelect(defaultWh?.id ?? null))
+        .from(products)
+        .leftJoin(categories, eq(products.categoryId, categories.id))
+        .where(and(eq(products.isActive, true), inArray(products.parentProductId, parentIds)))
+        .orderBy(asc(products.name))
+    : [];
+
+  const rootsWithChildren = attachChildren(rootRows, pickerChildren);
+  const seen = new Set<string>();
+  return [...childRows.map((p) => ({ ...p, children: [] })), ...rootsWithChildren].filter((p) => {
+    if (seen.has(p.id)) return false;
+    seen.add(p.id);
+    return true;
+  });
 }
 
 export type PosData = Awaited<ReturnType<typeof getPosData>>;

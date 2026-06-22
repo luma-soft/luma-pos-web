@@ -20,6 +20,7 @@ export async function GET(request: Request) {
     getPriceBooks(),
     getProducts({
       q: searchParam(request, "q"),
+      view: "flat",
       page: numberParam(request, "page", 1),
       pageSize: numberParam(request, "pageSize", 50),
     }),

@@ -2,6 +2,7 @@ import {
   pgTable, uuid, text, varchar, integer, decimal, timestamp,
   boolean, jsonb, primaryKey, index, uniqueIndex, pgEnum,
 } from "drizzle-orm/pg-core";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import type { StorePrefs } from "@/lib/schemas/settings";
 
@@ -98,6 +99,9 @@ export const products = pgTable("products", {
   barcode: varchar("barcode", { length: 50 }),
   name: text("name").notNull(),
   fullName: text("full_name"), // "Gạch granite Viglacera 60x60 Đỏ Matte"
+  parentProductId: uuid("parent_product_id").references((): AnyPgColumn => products.id, { onDelete: "set null" }),
+  variantName: text("variant_name"),
+  isVariantParent: boolean("is_variant_parent").notNull().default(false),
   description: text("description"),
   categoryId: uuid("category_id").references(() => categories.id),
   brandId: uuid("brand_id").references(() => brands.id),
@@ -141,6 +145,8 @@ export const products = pgTable("products", {
   index("products_barcode_idx").on(t.barcode),
   index("products_name_idx").on(t.name),
   index("products_category_idx").on(t.categoryId),
+  index("products_parent_idx").on(t.parentProductId),
+  index("products_variant_parent_idx").on(t.isVariantParent, t.parentProductId),
   // danh sách SP lọc đang bán + sắp theo ngày tạo (trang Sản phẩm/Thiết lập giá)
   index("products_active_created_idx").on(t.isActive, t.createdAt),
   index("products_total_stock_idx").on(t.totalStock), // lọc/sắp theo tồn (trang Tồn kho)

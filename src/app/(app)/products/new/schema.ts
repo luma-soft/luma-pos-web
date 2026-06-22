@@ -10,6 +10,41 @@ export const productUnitSchema = z.object({
 export const productAttributeSchema = z.object({
   name: z.string().min(1, { error: "validation.required" }),
   values: z.array(z.string()).default([]),
+  createsVariants: z.boolean().default(false),
+});
+
+export const productVariantChildSchema = z.object({
+  variantName: z.string().min(1, { error: "validation.required" }),
+  sku: z.string().optional(),
+  barcode: z.string().optional(),
+  baseUnit: z.string().default("cái"),
+  costPrice: z.number().min(0).default(0),
+  retailPrice: z.number().min(0).default(0),
+  wholesalePrice: z.number().min(0).nullable().optional(),
+  contractorPrice: z.number().min(0).nullable().optional(),
+  agentPrice: z.number().min(0).nullable().optional(),
+  initialStock: z.number().min(0).default(0),
+  minLevel: z.number().min(0).default(0),
+  imageUrls: z.array(z.string()).default([]),
+  directSale: z.boolean().default(true),
+  specs: z.record(z.string(), z.array(z.string())).default({}),
+});
+
+export const siblingApplyFieldSchema = z.enum([
+  "name",
+  "imageUrls",
+  "description",
+  "category",
+  "brand",
+  "pricing",
+  "units",
+  "directSale",
+  "attributes",
+]);
+
+export const siblingApplySchema = z.object({
+  enabled: z.boolean().default(false),
+  fields: z.array(siblingApplyFieldSchema).default([]),
 });
 
 export const createProductSchema = z.object({
@@ -49,6 +84,8 @@ export const createProductSchema = z.object({
 
   // Attributes (replaces VLXD section)
   attributes: z.array(productAttributeSchema).default([]),
+  variantChildren: z.array(productVariantChildSchema).default([]),
+  applyToSiblings: siblingApplySchema.default({ enabled: false, fields: [] }),
 
   // Description
   description: z.string().optional(),
