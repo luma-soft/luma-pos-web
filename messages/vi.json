@@ -252,6 +252,37 @@
     "reload": "Tải lại trang",
     "digest": "mã lỗi: {digest}"
   },
+  "portal": {
+    "title": "Đặt hàng — {customer}",
+    "searchPlaceholder": "Tìm vật tư…",
+    "add": "+ Thêm",
+    "noProducts": "Không tìm thấy sản phẩm",
+    "projectPlaceholder": "Công trình (tùy chọn)",
+    "notePlaceholder": "Ghi chú cho cửa hàng",
+    "submit": "Gửi đơn đặt hàng",
+    "footnote": "Cửa hàng xác nhận xong đơn mới có hiệu lực. Giá hiển thị theo nhóm giá của bạn.",
+    "priceTypes": {
+      "retail": "Giá lẻ",
+      "wholesale": "Giá sỉ",
+      "contractor": "Giá thầu",
+      "agent": "Giá đại lý"
+    },
+    "cart": {
+      "title": "Đơn đặt hàng",
+      "itemCount": "{count} SP",
+      "empty": "Chưa chọn sản phẩm nào",
+      "subtotal": "Tổng tạm tính"
+    },
+    "success": {
+      "title": "Đã gửi đơn đặt hàng",
+      "code": "Mã đơn",
+      "description": "Cửa hàng sẽ xác nhận và báo lại cho bạn. Đơn chưa tính vào công nợ cho đến khi được xác nhận.",
+      "newOrder": "Đặt đơn khác"
+    },
+    "errors": {
+      "submit": "Có lỗi xảy ra — thử lại hoặc gọi cửa hàng."
+    }
+  },
   "products": {
     "title": "Sản phẩm",
     "create": "Tạo hàng hóa",

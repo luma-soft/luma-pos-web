@@ -252,6 +252,37 @@
     "reload": "Reload page",
     "digest": "error id: {digest}"
   },
+  "portal": {
+    "title": "Order — {customer}",
+    "searchPlaceholder": "Search materials…",
+    "add": "+ Add",
+    "noProducts": "No products found",
+    "projectPlaceholder": "Project (optional)",
+    "notePlaceholder": "Note for the store",
+    "submit": "Submit order",
+    "footnote": "The order takes effect after the store confirms it. Prices are shown for your price group.",
+    "priceTypes": {
+      "retail": "Retail",
+      "wholesale": "Wholesale",
+      "contractor": "Contractor",
+      "agent": "Agent"
+    },
+    "cart": {
+      "title": "Order",
+      "itemCount": "{count} items",
+      "empty": "No products selected",
+      "subtotal": "Subtotal"
+    },
+    "success": {
+      "title": "Order sent",
+      "code": "Order code",
+      "description": "The store will confirm and contact you. The order is not counted toward debt until it is confirmed.",
+      "newOrder": "Place another order"
+    },
+    "errors": {
+      "submit": "Something went wrong — try again or call the store."
+    }
+  },
   "products": {
     "title": "Products",
     "create": "Create Product",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Loader2, Minus, Plus, Search, Trash2 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { createPortalOrder } from "@/lib/actions/portal";
@@ -16,11 +17,8 @@ interface Props {
   products: PortalProduct[];
 }
 
-const TYPE_LABEL: Record<string, string> = {
-  retail: "Giá lẻ", wholesale: "Giá sỉ", contractor: "Giá thầu", agent: "Giá đại lý",
-};
-
 export function PortalClient({ token, customerName, customerType, products }: Props) {
+  const t = useTranslations();
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<Record<string, number>>({});
   const [projectName, setProjectName] = useState("");
@@ -58,7 +56,7 @@ export function PortalClient({ token, customerName, customerType, products }: Pr
       setDoneCode(res.data.code);
       setCart({});
     } else {
-      setError("Có lỗi xảy ra — thử lại hoặc gọi cửa hàng.");
+      setError(t("portal.errors.submit"));
     }
   }
 
@@ -67,13 +65,13 @@ export function PortalClient({ token, customerName, customerType, products }: Pr
       <div className="min-h-screen bg-canvas grid place-items-center p-6">
         <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center max-w-md shadow-sm">
           <div className="w-16 h-16 rounded-full bg-ok-soft grid place-items-center mx-auto text-3xl">✅</div>
-          <h1 className="text-xl font-bold mt-4">Đã gửi đơn đặt hàng</h1>
+          <h1 className="text-xl font-bold mt-4">{t("portal.success.title")}</h1>
           <p className="text-slate-500 text-sm mt-2">
-            Mã đơn: <b className="text-slate-900">{doneCode}</b><br />
-            Cửa hàng sẽ xác nhận và báo lại cho bạn. Đơn chưa tính vào công nợ cho đến khi được xác nhận.
+            {t("portal.success.code")}: <b className="text-slate-900">{doneCode}</b><br />
+            {t("portal.success.description")}
           </p>
           <button onClick={() => setDoneCode("")} className="mt-5 px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-medium">
-            Đặt đơn khác
+            {t("portal.success.newOrder")}
           </button>
         </div>
       </div>
@@ -84,14 +82,14 @@ export function PortalClient({ token, customerName, customerType, products }: Pr
     <div className="min-h-screen bg-canvas text-slate-900">
       <header className="sticky top-0 z-10 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3 flex-wrap">
         <div>
-          <b>Đặt hàng — {customerName}</b>
+          <b>{t("portal.title", { customer: customerName })}</b>
           <span className="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-warn-soft text-warn">
-            {TYPE_LABEL[customerType] ?? customerType}
+            {priceTypeLabel(customerType, t)}
           </span>
         </div>
         <div className="flex-1" />
         <div className="text-sm">
-          🛒 {lines.length} SP · <b className="text-blue-600 tabular-nums">{formatCurrency(total)}</b>
+          🛒 {t("portal.cart.itemCount", { count: lines.length })} · <b className="text-blue-600 tabular-nums">{formatCurrency(total)}</b>
         </div>
       </header>
 
@@ -102,7 +100,7 @@ export function PortalClient({ token, customerName, customerType, products }: Pr
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               value={search} onChange={(e) => setSearch(e.target.value)}
-              placeholder="Tìm vật tư…"
+              placeholder={t("portal.searchPlaceholder")}
               className="w-full pl-9 pr-3 py-2.5 text-sm rounded-card border border-slate-300 bg-white"
             />
           </div>
@@ -126,20 +124,20 @@ export function PortalClient({ token, customerName, customerType, products }: Pr
                       <button onClick={() => setQty(p.id, qty + 1)} className="w-7 h-7 rounded-md border border-slate-200 grid place-items-center"><Plus className="w-3 h-3" /></button>
                     </div>
                   ) : (
-                    <button onClick={() => setQty(p.id, 1)} className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium">+ Thêm</button>
+                    <button onClick={() => setQty(p.id, 1)} className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium">{t("portal.add")}</button>
                   )}
                 </div>
               );
             })}
-            {filtered.length === 0 && <p className="p-8 text-center text-sm text-slate-400">Không tìm thấy sản phẩm</p>}
+            {filtered.length === 0 && <p className="p-8 text-center text-sm text-slate-400">{t("portal.noProducts")}</p>}
           </div>
         </div>
 
         {/* cart */}
         <div className="bg-white border border-slate-200 rounded-card p-4 self-start space-y-3">
-          <b className="text-sm">Đơn đặt hàng</b>
+          <b className="text-sm">{t("portal.cart.title")}</b>
           {lines.length === 0 ? (
-            <p className="text-sm text-slate-400 py-6 text-center">Chưa chọn sản phẩm nào</p>
+            <p className="text-sm text-slate-400 py-6 text-center">{t("portal.cart.empty")}</p>
           ) : (
             <div className="divide-y divide-slate-100">
               {lines.map(([id, q]) => {
@@ -158,12 +156,12 @@ export function PortalClient({ token, customerName, customerType, products }: Pr
               })}
             </div>
           )}
-          <input value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="Công trình (tùy chọn)"
+          <input value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder={t("portal.projectPlaceholder")}
             className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300" />
-          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ghi chú cho cửa hàng"
+          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("portal.notePlaceholder")}
             className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300" />
           <div className="flex justify-between text-sm pt-1 border-t border-slate-100">
-            <b>Tổng tạm tính</b>
+            <b>{t("portal.cart.subtotal")}</b>
             <b className="text-blue-600 tabular-nums">{formatCurrency(total)}</b>
           </div>
           {error && <p className="text-xs text-er">{error}</p>}
@@ -172,11 +170,18 @@ export function PortalClient({ token, customerName, customerType, products }: Pr
             className={cn("w-full py-3 rounded-card text-white font-semibold text-sm flex items-center justify-center gap-2", "bg-blue-600 hover:bg-blue-700 disabled:opacity-50")}
           >
             {busy && <Loader2 className="w-4 h-4 animate-spin" />}
-            Gửi đơn đặt hàng
+            {t("portal.submit")}
           </button>
-          <p className="text-[11px] text-slate-400 text-center">Cửa hàng xác nhận xong đơn mới có hiệu lực. Giá hiển thị theo nhóm giá của bạn.</p>
+          <p className="text-[11px] text-slate-400 text-center">{t("portal.footnote")}</p>
         </div>
       </div>
     </div>
   );
+}
+
+function priceTypeLabel(type: string, t: ReturnType<typeof useTranslations>) {
+  if (type === "retail" || type === "wholesale" || type === "contractor" || type === "agent") {
+    return t(`portal.priceTypes.${type}`);
+  }
+  return type;
 }
