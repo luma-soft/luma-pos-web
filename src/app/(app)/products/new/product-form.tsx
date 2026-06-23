@@ -224,7 +224,7 @@ function VariantsTab({
         <MultiUnitField />
       </Section>
       <Section titleTx="products.sections.attributes" descriptionTx="products.sections.attributesDesc" collapsible={false}>
-        <AttributesField />
+        <AttributesField variantToggleEnabled={!isEdit} />
         {!isEdit && <VariantChildrenPreview />}
       </Section>
       {isEdit && isVariantChild && <SiblingApplySection siblingCount={siblingCount} />}
