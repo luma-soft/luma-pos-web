@@ -224,7 +224,7 @@ function VariantsTab({
         <MultiUnitField />
       </Section>
       <Section titleTx="products.sections.attributes" descriptionTx="products.sections.attributesDesc" collapsible={false}>
-        <AttributesField variantToggleEnabled={!isEdit} />
+        <AttributesField />
         {!isEdit && <VariantChildrenPreview />}
       </Section>
       {isEdit && isVariantChild && <SiblingApplySection siblingCount={siblingCount} />}
@@ -289,15 +289,23 @@ function SiblingApplySection({ siblingCount }: { siblingCount: number }) {
 }
 
 function buildVariantCombinations(attributes: CreateProductInput["attributes"]) {
-  const usable = (attributes ?? [])
-    .map((a) => ({
-      name: a.name?.trim() ?? "",
-      values: [...new Set((a.values ?? []).map((v) => v.trim()).filter(Boolean))],
-      createsVariants: Boolean(a.createsVariants),
-    }))
-    .filter((a) => a.createsVariants && a.name && a.values.length > 0);
+  const grouped = new Map<string, Set<string>>();
+  for (const attr of attributes ?? []) {
+    const name = attr.name?.trim() ?? "";
+    if (!name) continue;
+    const values = (attr.values ?? []).map((value) => value.trim()).filter(Boolean);
+    if (values.length === 0) continue;
+    const set = grouped.get(name) ?? new Set<string>();
+    for (const value of values) set.add(value);
+    grouped.set(name, set);
+  }
 
-  if (usable.length === 0) return [];
+  const usable = Array.from(grouped.entries()).map(([name, values]) => ({
+    name,
+    values: Array.from(values),
+  }));
+  const valueCount = usable.reduce((total, attr) => total + attr.values.length, 0);
+  if (valueCount < 2) return [];
 
   const rows: Array<{ variantName: string; specs: Record<string, string[]> }> = [];
   const walk = (idx: number, picked: Array<{ name: string; value: string }>) => {
@@ -363,7 +371,7 @@ function VariantChildrenPreview() {
   if (generated.length === 0) {
     return (
       <p className="mt-4 rounded-lg border border-dashed border-border bg-surface-2 px-3 py-2 text-sm text-slate-500">
-        Bật “SKU con” ở một hoặc nhiều thuộc tính để tự sinh hàng hóa con.
+        Nhập từ 2 lựa chọn thuộc tính trở lên để tự sinh hàng hóa con.
       </p>
     );
   }
