@@ -1,4 +1,7 @@
 import { randomUUID } from "node:crypto";
+import { asc, desc, eq } from "drizzle-orm";
+import { db } from "@/db";
+import { products, suppliers, warehouses } from "@/db/schema";
 import type { RestockRow } from "@/lib/data/ai-restock";
 
 export type AiAssistantState =
@@ -70,6 +73,101 @@ function moneyText(value: unknown) {
   }).format(n);
 }
 
+type InboundProductOption = {
+  id: string;
+  sku: string;
+  name: string;
+  baseUnit: string;
+  costPrice: unknown;
+  lastPurchasePrice: unknown;
+};
+
+type NamedOption = {
+  id: string;
+  name: string;
+  code?: string | null;
+  isDefault?: boolean;
+};
+
+type InboundContext = {
+  products: InboundProductOption[];
+  suppliers: NamedOption[];
+  warehouses: NamedOption[];
+};
+
+async function getInboundContext(): Promise<InboundContext> {
+  const [productRows, supplierRows, warehouseRows] = await Promise.all([
+    db
+      .select({
+        id: products.id,
+        sku: products.sku,
+        name: products.name,
+        baseUnit: products.baseUnit,
+        costPrice: products.costPrice,
+        lastPurchasePrice: products.lastPurchasePrice,
+      })
+      .from(products)
+      .where(eq(products.isActive, true))
+      .orderBy(asc(products.name))
+      .limit(300),
+    db
+      .select({ id: suppliers.id, name: suppliers.name, code: suppliers.code })
+      .from(suppliers)
+      .orderBy(asc(suppliers.name))
+      .limit(200),
+    db
+      .select({ id: warehouses.id, name: warehouses.name, isDefault: warehouses.isDefault })
+      .from(warehouses)
+      .orderBy(desc(warehouses.isDefault), asc(warehouses.name))
+      .limit(50),
+  ]);
+  return {
+    products: productRows,
+    suppliers: supplierRows,
+    warehouses: warehouseRows,
+  };
+}
+
+function parseQuantity(prompt: string) {
+  const match = prompt.match(/\b(\d+(?:[.,]\d+)?)\b/);
+  if (!match) return null;
+  const value = Number(match[1].replace(",", "."));
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function matchNamed<T extends { name: string; sku?: string; code?: string | null }>(
+  prompt: string,
+  options: T[],
+): { match: T | null; ambiguous: T[]; confidence: number } {
+  const q = normalize(prompt);
+  const scored = options
+    .map((option) => {
+      const name = normalize(option.name);
+      const sku = option.sku ? normalize(option.sku) : "";
+      const code = option.code ? normalize(option.code) : "";
+      const score =
+        sku && q.includes(sku) ? 100 :
+        code && q.includes(code) ? 95 :
+        q.includes(name) ? 90 :
+        name.split(/\s+/).filter((part) => part.length > 1 && q.includes(part)).length;
+      return { option, score };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  const [top, second] = scored;
+  if (!top) return { match: null, ambiguous: [], confidence: 0 };
+  if (top.score < 2) return { match: null, ambiguous: scored.slice(0, 3).map((item) => item.option), confidence: 0.35 };
+  if (second && second.score === top.score && top.score < 90) {
+    return { match: null, ambiguous: scored.slice(0, 3).map((item) => item.option), confidence: 0.45 };
+  }
+  return { match: top.option, ambiguous: [], confidence: Math.min(0.95, top.score / 100 || 0.72) };
+}
+
+function defaultCost(product: InboundProductOption | null) {
+  return Number(product?.lastPurchasePrice ?? product?.costPrice ?? 0);
+}
+
 function restockPreview(prompt: string, restock: RestockRow[]): AiActionPreview {
   const rows = restock.filter((row) => row.suggestedQty > 0).slice(0, 5);
   return {
@@ -116,46 +214,81 @@ function restockPreview(prompt: string, restock: RestockRow[]): AiActionPreview 
   };
 }
 
-function inboundPreview(prompt: string): AiActionPreview {
-  const quantity = prompt.match(/\b(\d+[\d.,]*)\b/)?.[1] ?? "";
+async function inboundPreview(prompt: string): Promise<AiActionPreview> {
+  const context = await getInboundContext();
+  const quantity = parseQuantity(prompt);
+  const productMatch = matchNamed(prompt, context.products);
+  const warehouseMatch = matchNamed(prompt, context.warehouses);
+  const supplierMatch = matchNamed(prompt, context.suppliers);
+  const product = productMatch.match;
+  const warehouse = warehouseMatch.match ?? context.warehouses.find((item) => item.isDefault) ?? context.warehouses[0] ?? null;
+  const supplier = supplierMatch.match ?? context.suppliers[0] ?? null;
+  const unitCost = defaultCost(product);
+  const missingFields = [
+    ...(product ? [] : ["product"]),
+    ...(quantity ? [] : ["quantity"]),
+    ...(supplier ? [] : ["supplier"]),
+    ...(warehouse ? [] : ["warehouse"]),
+  ];
+  const hasAmbiguity = productMatch.ambiguous.length > 0 || supplierMatch.ambiguous.length > 0 || warehouseMatch.ambiguous.length > 0;
+  const canPreview = missingFields.length === 0 && !hasAmbiguity;
+  const subtotal = quantity && unitCost ? quantity * unitCost : 0;
   return {
     id: randomUUID(),
     intent: "create_inventory_inbound",
     title: "Xem trước phiếu nhập",
-    description: "Tôi nhận ra đây là yêu cầu nhập hàng. Cần kiểm tra sản phẩm, kho và NCC trước khi tạo phiếu.",
-    confidence: quantity ? 0.78 : 0.62,
-    state: quantity ? "preview" : "needs_input",
+    description: canPreview
+      ? "Tôi đã match được sản phẩm và thông tin nhập kho. Hãy kiểm tra trước khi xác nhận."
+      : "Tôi nhận ra đây là yêu cầu nhập hàng nhưng cần bổ sung hoặc chọn lại dữ liệu mơ hồ.",
+    confidence: Math.min(0.92, 0.45 + productMatch.confidence * 0.35 + (quantity ? 0.12 : 0) + (warehouse ? 0.05 : 0)),
+    state: canPreview ? "preview" : hasAmbiguity ? "needs_selection" : "needs_input",
     confirmationRequired: true,
     strongConfirmation: true,
     entityType: "purchase_order",
     requiredFields: ["product", "quantity", "supplier", "warehouse"],
-    missingFields: [
-      "product",
-      ...(quantity ? [] : ["quantity"]),
-      "supplier",
-      "warehouse",
-    ],
+    missingFields,
     fields: [
-      { label: "Số lượng đọc được", value: quantity || "Chưa rõ", tone: quantity ? "default" : "warning" },
-      { label: "Kho", value: "Cần chọn", tone: "warning" },
-      { label: "Nhà cung cấp", value: "Cần chọn", tone: "warning" },
+      { label: "Sản phẩm", value: product ? `${product.name} (${product.sku})` : "Cần chọn", tone: product ? "success" : "warning" },
+      { label: "Số lượng", value: quantity ? `${quantity} ${product?.baseUnit ?? ""}`.trim() : "Chưa rõ", tone: quantity ? "default" : "warning" },
+      { label: "Kho", value: warehouse ? warehouse.name : "Cần chọn", tone: warehouse ? (warehouseMatch.match ? "success" : "default") : "warning" },
+      { label: "Nhà cung cấp", value: supplier ? supplier.name : "Cần chọn", tone: supplier ? (supplierMatch.match ? "success" : "default") : "warning" },
+      { label: "Giá vốn dự kiến", value: moneyText(unitCost), tone: unitCost > 0 ? "default" : "warning" },
     ],
     lines: [
       {
-        label: "Sản phẩm từ câu lệnh",
-        value: "Cần match catalog",
-        meta: prompt,
-        tone: "warning",
+        label: product?.name ?? "Sản phẩm từ câu lệnh",
+        value: quantity ? `+${quantity} ${product?.baseUnit ?? ""}`.trim() : "Cần số lượng",
+        meta: product ? `${product.sku} · tạm tính ${moneyText(subtotal)}` : prompt,
+        tone: canPreview ? "success" : "warning",
       },
     ],
     warnings: [
       "Nhập hàng thật sẽ tăng tồn kho và có thể cập nhật giá vốn.",
-      "AI chưa được phép tự chọn sản phẩm/NCC/kho khi dữ liệu mơ hồ.",
+      ...(supplierMatch.match ? [] : ["NCC không được nêu rõ; hệ thống sẽ dùng NCC mặc định/đầu danh sách nếu bạn xác nhận."]),
+      ...(warehouseMatch.match ? [] : ["Kho không được nêu rõ; hệ thống sẽ dùng kho mặc định nếu bạn xác nhận."]),
+      ...productMatch.ambiguous.map((item) => `Sản phẩm có thể là: ${item.name} (${item.sku}). Hãy ghi rõ SKU/tên hơn.`),
     ],
     action: {
       type: "create_inventory_inbound",
       target: "inventoryInbound",
-      payload: { prompt, quantity: quantity || null },
+      payload: {
+        prompt,
+        productId: product?.id ?? null,
+        productName: product?.name ?? null,
+        quantity: quantity ?? null,
+        unitCost,
+        supplierId: supplier?.id ?? null,
+        supplierName: supplier?.name ?? null,
+        warehouseId: warehouse?.id ?? null,
+        warehouseName: warehouse?.name ?? null,
+        items: product && quantity
+          ? [{ productId: product.id, quantity, unitCost, discount: 0 }]
+          : [],
+        discount: 0,
+        vatRate: 0,
+        amountPaid: 0,
+        note: `AI inbound: ${prompt}`,
+      },
     },
   };
 }
@@ -191,13 +324,13 @@ function pricePreview(prompt: string): AiActionPreview {
   };
 }
 
-export function buildAiAssistantResponse(input: {
+export async function buildAiAssistantResponse(input: {
   prompt: string;
   revenue: unknown;
   collected: unknown;
   restock: RestockRow[];
   chartRows: unknown[];
-}): AiAssistantResponse {
+}): Promise<AiAssistantResponse> {
   const prompt = input.prompt.trim();
   const q = normalize(prompt);
   const asksRestock =
@@ -218,7 +351,7 @@ export function buildAiAssistantResponse(input: {
   const actionPreview = asksRestock
     ? restockPreview(prompt, input.restock)
     : asksInbound
-      ? inboundPreview(prompt)
+      ? await inboundPreview(prompt)
       : asksPrice
         ? pricePreview(prompt)
         : undefined;

@@ -1,4 +1,5 @@
 import { createDraftPurchaseForUser } from "@/lib/purchases/draft";
+import { createPurchase } from "@/lib/actions/purchases";
 import { writeAuditLog } from "@/lib/audit";
 import { getRestockSuggestions } from "@/lib/data/ai-restock";
 import { requireMobileUser } from "@/lib/mobile/auth";
@@ -14,6 +15,44 @@ function stringArray(value: unknown) {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string")
     : [];
+}
+
+function numberValue(value: unknown, fallback = 0) {
+  const n = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function inboundPayload(preview: Record<string, unknown>) {
+  const action = objectValue(preview.action);
+  const payload = objectValue(action?.payload);
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  const firstItem = objectValue(items[0]);
+  const productId = typeof firstItem?.productId === "string" ? firstItem.productId : null;
+  const quantity = numberValue(firstItem?.quantity);
+  const supplierId = typeof payload?.supplierId === "string" ? payload.supplierId : null;
+  const warehouseId = typeof payload?.warehouseId === "string" ? payload.warehouseId : null;
+
+  if (!productId || quantity <= 0 || !supplierId || !warehouseId) {
+    return null;
+  }
+
+  return {
+    supplierId,
+    warehouseId,
+    discount: numberValue(payload?.discount),
+    vatRate: numberValue(payload?.vatRate),
+    amountPaid: numberValue(payload?.amountPaid),
+    invoiceNumber: typeof payload?.invoiceNumber === "string" ? payload.invoiceNumber : undefined,
+    note: typeof payload?.note === "string" ? payload.note : "AI inventory inbound",
+    items: [
+      {
+        productId,
+        quantity,
+        unitCost: numberValue(firstItem?.unitCost),
+        discount: numberValue(firstItem?.discount),
+      },
+    ],
+  };
 }
 
 async function createRestockingDraftPurchase(userId: string, preview: Record<string, unknown>) {
@@ -118,6 +157,94 @@ export async function POST(request: Request) {
         status: "succeeded",
         executed: true,
         message: `Đã tạo PO nháp ${result.data.code} từ gợi ý nhập hàng AI.`,
+        record: {
+          type: "purchase_order",
+          id: result.data.id,
+          code: result.data.code,
+          href: `/inventory?tab=purchases&q=${encodeURIComponent(result.data.code)}`,
+        },
+      },
+    });
+  }
+
+  if (event === "confirmed" && intent === "create_inventory_inbound") {
+    if (!["owner", "manager", "warehouse"].includes(gate.role)) {
+      await writeAuditLog({
+        actorUserId: gate.userId,
+        source: "ai",
+        action: intent,
+        entityType,
+        entityId,
+        status: "unauthorized",
+        prompt,
+        parsedIntent: preview,
+        metadata: { surface: body.surface ?? "assistant" },
+      });
+      return mobileAction({ ok: false, error: "errors.forbidden" });
+    }
+
+    const payload = preview ? inboundPayload(preview) : null;
+    if (!payload) {
+      await writeAuditLog({
+        actorUserId: gate.userId,
+        source: "ai",
+        action: intent,
+        entityType,
+        entityId,
+        status: "failed",
+        prompt,
+        parsedIntent: preview,
+        metadata: {
+          surface: body.surface ?? "assistant",
+          reason: "missing_required_inbound_fields",
+        },
+      });
+      return mobileAction({ ok: false, error: "errors.invalidData" });
+    }
+
+    const result = await createPurchase(payload);
+    await writeAuditLog({
+      actorUserId: gate.userId,
+      source: "ai",
+      action: intent,
+      entityType: "purchase_order",
+      entityId: result.ok ? result.data.id : entityId,
+      status: result.ok ? "succeeded" : "failed",
+      prompt,
+      parsedIntent: preview,
+      after: result.ok
+        ? {
+            id: result.data.id,
+            code: result.data.code,
+            href: `/inventory?tab=purchases&q=${encodeURIComponent(result.data.code)}`,
+          }
+        : null,
+      affectedRecords: result.ok
+        ? [
+            {
+              type: "purchase_order",
+              id: result.data.id,
+              code: result.data.code,
+            },
+          ]
+        : null,
+      metadata: {
+        surface: body.surface ?? "assistant",
+        event,
+        executedTool: "createPurchase",
+      },
+    });
+
+    if (!result.ok) {
+      return mobileAction(result);
+    }
+
+    return mobileAction({
+      ok: true,
+      data: {
+        status: "succeeded",
+        executed: true,
+        message: `Đã tạo phiếu nhập ${result.data.code} và cập nhật tồn kho.`,
         record: {
           type: "purchase_order",
           id: result.data.id,

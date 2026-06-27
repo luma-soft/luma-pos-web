@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     getReports(30),
     getRestockSuggestions(30),
   ]);
-  const response = buildAiAssistantResponse({
+  const response = await buildAiAssistantResponse({
     prompt,
     revenue: reports.summary.revenue,
     collected: reports.summary.collected,

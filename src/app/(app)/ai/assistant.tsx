@@ -192,6 +192,7 @@ function PreviewCard({
   const isConfirmed = state === "confirmed";
   const succeeded = state === "succeeded";
   const done = isConfirmed || succeeded || state === "cancelled";
+  const canConfirm = preview.state === "preview" && preview.missingFields.length === 0;
   return (
     <div className="w-full max-w-2xl bg-surface border border-border rounded-card shadow-e1 overflow-hidden">
       <div className="p-3 border-b border-border-soft flex items-start justify-between gap-3">
@@ -256,7 +257,7 @@ function PreviewCard({
         ) : (
           <div className="flex gap-2">
             <button disabled={busy} onClick={onCancel} className="px-3 py-1.5 rounded-lg border border-border text-xs font-bold text-slate-500 disabled:opacity-50">Hủy</button>
-            <button disabled={busy} onClick={onConfirm} className="px-3 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-bold disabled:opacity-50">Xác nhận</button>
+            <button disabled={busy || !canConfirm} onClick={onConfirm} className="px-3 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-bold disabled:opacity-50">Xác nhận</button>
           </div>
         )}
       </div>
