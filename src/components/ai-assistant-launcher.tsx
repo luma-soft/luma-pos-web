@@ -467,7 +467,7 @@ function useAssistantState(surface: AssistantSurface) {
     });
   }
 
-  function handlePaste(event: ClipboardEvent<HTMLInputElement>) {
+  function handlePaste(event: ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>) {
     const files = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
     if (files.length === 0) return;
     event.preventDefault();
@@ -943,6 +943,14 @@ function AssistantChatSurface({
   const activeSession = sessions.find((session) => session.id === sessionId) ?? null;
   const [sessionDialog, setSessionDialog] = useState<"rename" | "delete" | null>(null);
   const [sessionTitleDraft, setSessionTitleDraft] = useState("");
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const composer = composerRef.current;
+    if (!composer) return;
+    composer.style.height = "0px";
+    composer.style.height = `${Math.min(composer.scrollHeight, compact ? 128 : 160)}px`;
+  }, [compact, input]);
 
   function openRenameDialog() {
     if (!sessionId) return;
@@ -1238,7 +1246,7 @@ function AssistantChatSurface({
               {attachmentError}
             </div>
           )}
-          <div className="flex items-center gap-2">
+          <div className="flex items-end gap-2">
             <input
               ref={fileRef}
               type="file"
@@ -1275,12 +1283,20 @@ function AssistantChatSurface({
                 <Mic className="w-4 h-4" />
               </button>
             )}
-            <input
+            <textarea
+              ref={composerRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onPaste={handlePaste}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  e.preventDefault();
+                  void send(input);
+                }
+              }}
               placeholder={attachments.length ? "Nhập yêu cầu cho file đính kèm..." : placeholder}
-              className="flex-1 min-w-0 px-3 py-2 text-sm rounded-full border border-border bg-canvas focus:outline-none focus:ring-2 focus:ring-primary-500"
+              rows={1}
+              className="min-h-9 max-h-32 sm:max-h-40 flex-1 min-w-0 resize-none rounded-[18px] border border-border bg-canvas px-3 py-2 text-sm leading-5 focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
             <button
               disabled={sendDisabled}
