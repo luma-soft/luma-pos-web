@@ -42,6 +42,11 @@ export type AiActionPreview = {
   fields: AiActionLine[];
   lines: AiActionLine[];
   warnings: string[];
+  selections?: Array<{
+    type: string;
+    query: string;
+    candidates: { id?: string; label: string; code?: string; confidence?: number }[];
+  }>;
   action: {
     type: string;
     target: string;
@@ -117,6 +122,7 @@ function mergePlannerGuidance(preview: AiActionPreview, plan: AiPlannerResult | 
     missingFields,
     requiredFields: Array.from(new Set([...preview.requiredFields, ...missingFields])),
     warnings,
+    selections: plan.ambiguousEntities.length ? plan.ambiguousEntities : preview.selections,
     confidence: Math.min(preview.confidence, plan.confidence),
   };
 }

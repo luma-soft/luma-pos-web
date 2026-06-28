@@ -878,6 +878,11 @@ function AssistantChatSurface({
                 compact={compact}
                 onConfirm={() => resolvePreview(i, "confirmed")}
                 onCancel={() => resolvePreview(i, "cancelled")}
+                onSelectChoice={(type, candidate) => {
+                  const sourcePrompt = String(m.preview?.action.payload.prompt ?? m.text);
+                  const selected = `${sourcePrompt}\nChọn ${type}: ${candidate.label}${candidate.code ? ` (${candidate.code})` : ""}`;
+                  void send(selected);
+                }}
               />
             )}
           </div>
@@ -1047,6 +1052,7 @@ function PreviewCard({
   compact,
   onConfirm,
   onCancel,
+  onSelectChoice,
 }: {
   preview: AiActionPreview;
   state?: PreviewResolutionState;
@@ -1056,6 +1062,7 @@ function PreviewCard({
   compact?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
+  onSelectChoice: (type: string, candidate: { label: string; code?: string; confidence?: number }) => void;
 }) {
   const isConfirmed = state === "confirmed";
   const succeeded = state === "succeeded";
@@ -1107,6 +1114,30 @@ function PreviewCard({
         {preview.warnings.map((warning) => (
           <div key={warning} className="rounded-lg bg-surface-2 p-2.5 text-xs text-slate-500">{warning}</div>
         ))}
+        {preview.selections && preview.selections.length > 0 && (
+          <div className="rounded-lg border border-border bg-canvas p-2.5 space-y-2">
+            {preview.selections.map((selection) => (
+              <div key={`${selection.type}-${selection.query}`} className="space-y-1.5">
+                <div className="text-[11px] font-bold text-slate-500">
+                  Chọn {selection.type}{selection.query ? ` cho "${selection.query}"` : ""}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {selection.candidates.map((candidate) => (
+                    <button
+                      key={`${candidate.id ?? candidate.label}-${candidate.code ?? ""}`}
+                      type="button"
+                      disabled={busy}
+                      onClick={() => onSelectChoice(selection.type, candidate)}
+                      className="rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-surface-2 disabled:opacity-50"
+                    >
+                      {candidate.label}{candidate.code ? ` · ${candidate.code}` : ""}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div className={cn("p-3 bg-surface-2 border-t border-border flex gap-2", compact ? "flex-col" : "items-center justify-between")}>
         <div className="min-w-0">
