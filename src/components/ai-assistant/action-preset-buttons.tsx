@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
@@ -35,9 +35,28 @@ export function ActionPresetButtons({
 }) {
   const t = useTranslations();
   const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const primaryPresets = presets.filter((preset) => preset.placement === "primary");
   const secondaryPresets = presets.filter((preset) => preset.placement === "secondary");
   const visiblePresets = secondaryPresets.length ? primaryPresets : presets;
+
+  useEffect(() => {
+    if (!open) return;
+    function closeOnOutsideClick(event: PointerEvent) {
+      const menu = menuRef.current;
+      if (!menu || menu.contains(event.target as Node)) return;
+      setOpen(false);
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
 
   return (
     <div className={cn(
@@ -78,7 +97,7 @@ export function ActionPresetButtons({
         );
       })}
       {secondaryPresets.length > 0 && (
-        <div className="relative min-w-0">
+        <div ref={menuRef} className="relative min-w-0">
           <Button
             type="button"
             variant="outline"
