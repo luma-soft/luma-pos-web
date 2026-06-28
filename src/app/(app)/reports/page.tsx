@@ -7,7 +7,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { Text } from "@/components/ui/text";
 
 interface PageProps {
-  searchParams: Promise<{ range?: string }>;
+  searchParams: Promise<{ range?: string; customerId?: string; customer?: string; q?: string; source?: string }>;
 }
 
 const RANGES = [7, 30, 90] as const;
@@ -16,7 +16,19 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   const t = await getTranslations();
   const params = await searchParams;
   const range = RANGES.includes(Number(params.range) as 7) ? Number(params.range) : 30;
-  const data = await getReports(range);
+  const filters = {
+    customerId: typeof params.customerId === "string" ? params.customerId : undefined,
+    customer: typeof params.customer === "string" ? params.customer : undefined,
+    q: typeof params.q === "string" ? params.q : undefined,
+  };
+  const data = await getReports(range, filters);
+  const filterParams = new URLSearchParams();
+  if (filters.customerId) filterParams.set("customerId", filters.customerId);
+  if (filters.customer) filterParams.set("customer", filters.customer);
+  if (filters.q) filterParams.set("q", filters.q);
+  if (params.source) filterParams.set("source", params.source);
+  const filterQuery = filterParams.toString();
+  const filterLabel = filters.customer || filters.q || (filters.customerId ? `ID ${filters.customerId.slice(0, 8)}` : "");
 
   const maxDay = Math.max(1, ...data.byDay.map((d) => Number(d.revenue)));
   const totalCatRevenue = Math.max(1, data.byCategory.reduce((s, c) => s + Number(c.revenue), 0));
@@ -30,7 +42,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           {RANGES.map((r) => (
             <Link
               key={r}
-              href={`${Routes.Reports}?range=${r}`}
+              href={`${Routes.Reports}?range=${r}${filterQuery ? `&${filterQuery}` : ""}`}
               className={cn(
                 buttonVariants({ variant: range === r ? "default" : "outline", size: "sm" }),
                 "h-9 flex-1 sm:flex-none whitespace-nowrap"
@@ -41,6 +53,12 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           ))}
         </div>
       </div>
+
+      {filterLabel && (
+        <div className="rounded-card border border-primary-200 bg-primary-50 px-4 py-3 text-sm font-semibold text-primary-700">
+          Báo cáo đang lọc theo khách: {filterLabel}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-surface rounded-card border border-border p-5">

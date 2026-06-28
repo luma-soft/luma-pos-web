@@ -48,6 +48,7 @@ type PosAiCartDraftPayload = {
   previewId?: string;
   intent?: string;
   items?: unknown[];
+  payload?: Record<string, unknown>;
   createdAt?: number;
 };
 
@@ -571,6 +572,18 @@ export function PosClient({
       const consumed = matched.length > 0;
       if (consumed) {
         for (const line of matched) addQuantityToCart(line.product, line.quantity);
+        const payload = stored?.payload && typeof stored.payload === "object" ? stored.payload : {};
+        const payment = payload.payment && typeof payload.payment === "object" ? payload.payment as Record<string, unknown> : {};
+        patchActive({
+          customerId: typeof payload.customerId === "string" ? payload.customerId : "",
+          discountInput: Number(payload.discount) || 0,
+          discountMode: "vnd",
+          taxRate: Number(payload.taxRate) || 0,
+          shippingFee: Number(payload.shippingFee) || 0,
+          payMethod: payment.method === "credit" || payment.method === "bank_transfer" || payment.method === "cash" ? payment.method : "cash",
+          paidInput: Number(payment.amount) || null,
+          note: typeof payload.note === "string" ? payload.note : undefined,
+        });
         setMobileView("cart");
         setBrowsing(false);
         setSearch("");
@@ -582,7 +595,7 @@ export function PosClient({
       window.history.replaceState(null, "", query ? `/pos?${query}` : "/pos");
     });
     return () => { cancelled = true; };
-  }, [addQuantityToCart, priceBook, searchableProducts]);
+  }, [addQuantityToCart, patchActive, priceBook, searchableProducts]);
 
   function selectProduct(p: PosProduct) {
     if (p.isVariantParent && productChildren(p).length > 0) {

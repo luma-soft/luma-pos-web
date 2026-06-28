@@ -13,7 +13,7 @@ import { Input, Textarea } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
 import { createPurchase, updatePurchase } from "@/lib/actions/purchases";
-import { getPurchaseProductsByIds, searchPurchaseProducts } from "@/lib/actions/purchase-search";
+import { resolvePurchaseDraftProducts, searchPurchaseProducts } from "@/lib/actions/purchase-search";
 import type { PurchaseFormOptions, PurchaseProductRow } from "@/lib/data/inventory";
 import { AI_WORKFLOW_DRAFT_STORAGE_KEY } from "@/components/ai-assistant/utils";
 
@@ -31,6 +31,16 @@ type AiWorkflowDraft = {
   action?: { payload?: Record<string, unknown> };
   lines?: { label?: string; value?: string; meta?: string }[];
   warnings?: string[];
+};
+
+type AiDraftProductLookup = {
+  productId?: string | null;
+  productName?: string | null;
+  sku?: string | null;
+  text?: string | null;
+  quantity?: number | null;
+  unitCost?: number | null;
+  discount?: number | null;
 };
 
 type AiPendingLine = {
@@ -82,6 +92,35 @@ function pendingLinesFromAiDraft(draft: AiWorkflowDraft) {
       }];
     });
   return uniquePendingLines([...fromLines, ...fromWarnings]);
+}
+
+function objectRows(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item)))
+    : [];
+}
+
+function draftLookupFromRow(row: Record<string, unknown>): AiDraftProductLookup {
+  return {
+    productId: typeof row.productId === "string" ? row.productId : null,
+    productName: typeof row.productName === "string" ? row.productName : null,
+    sku: typeof row.sku === "string" ? row.sku : null,
+    text: typeof row.text === "string" ? row.text : null,
+    quantity: Number(row.quantity) || null,
+    unitCost: Number(row.unitCost) || null,
+    discount: Number(row.discount) || null,
+  };
+}
+
+function draftLookupFromPending(line: AiPendingLine): AiDraftProductLookup {
+  return {
+    sku: line.sku ?? null,
+    productName: line.label,
+    text: line.meta ?? line.label,
+    quantity: 1,
+    unitCost: null,
+    discount: 0,
+  };
 }
 
 export type PurchaseFormInitialValues = {
@@ -173,43 +212,44 @@ export function PurchaseForm({
       const draft = JSON.parse(raw) as AiWorkflowDraft;
       if (draft.intent !== "create_inventory_inbound" && draft.intent !== "create_draft_purchase_order" && draft.intent !== "create_draft_purchase_order_from_restocking") return;
       const payload = draft.action?.payload ?? {};
-      const itemRows = Array.isArray(payload.items) ? payload.items.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object" && !Array.isArray(item))) : [];
       const pendingLines = pendingLinesFromAiDraft(draft);
-      setAiPendingLines(pendingLines);
-      const productIds = [
-        typeof payload.productId === "string" ? payload.productId : "",
-        ...itemRows.map((item) => typeof item.productId === "string" ? item.productId : ""),
-      ].filter(Boolean);
-      const products = await getPurchaseProductsByIds(productIds);
+      const itemRows = objectRows(payload.items);
+      const unresolvedRows = objectRows(payload.unresolvedItems);
+      const singleProductRow = typeof payload.productId === "string"
+        ? [{
+            productId: payload.productId,
+            productName: typeof payload.productName === "string" ? payload.productName : null,
+            sku: typeof payload.sku === "string" ? payload.sku : null,
+            quantity: Number(payload.quantity) || 1,
+            unitCost: Number(payload.unitCost) || 0,
+            discount: 0,
+          }]
+        : [];
+      const draftItems = [
+        ...singleProductRow,
+        ...itemRows.map(draftLookupFromRow),
+        ...unresolvedRows.map(draftLookupFromRow),
+        ...pendingLines.map(draftLookupFromPending),
+      ];
+      const resolutions = await resolvePurchaseDraftProducts(draftItems);
       if (cancelled) return;
-      const productById = new Map(products.map((product) => [product.id, product]));
-      const seedByProductId = new Map(itemRows.map((item, index) => [
-        typeof item.productId === "string" ? item.productId : `line-${index}`,
-        {
-          productId: typeof item.productId === "string" ? item.productId : "",
-          quantity: Number(item.quantity) || 1,
-          unitCost: Number(item.unitCost) || Number(payload.unitCost) || 0,
-          discount: Number(item.discount) || 0,
-        },
-      ]));
-      const nextLines = itemRows.flatMap((item) => {
-        const productId = typeof item.productId === "string" ? item.productId : "";
-        const product = productById.get(productId);
-        if (!product) return [];
-        return [productToLine(product, seedByProductId.get(productId) ?? {
-          productId,
-          quantity: Number(item.quantity) || 1,
-          unitCost: Number(item.unitCost) || 0,
-          discount: Number(item.discount) || 0,
-        })];
+      const seenProducts = new Set<string>();
+      const nextLines = resolutions.flatMap((resolution) => {
+        if (!resolution.product || seenProducts.has(resolution.product.id)) return [];
+        seenProducts.add(resolution.product.id);
+        return [productToLine(resolution.product, resolution.seed)];
       });
+      const unresolvedPending = uniquePendingLines([
+        ...resolutions.flatMap((resolution) => resolution.pending ? [resolution.pending] : []),
+      ]);
 
       const supplierIdDraft = typeof payload.supplierId === "string" ? payload.supplierId : "";
       const warehouseIdDraft = typeof payload.warehouseId === "string" ? payload.warehouseId : "";
       if (supplierIdDraft && options.suppliers.some((supplier) => supplier.id === supplierIdDraft)) setSupplierId(supplierIdDraft);
       if (warehouseIdDraft && options.warehouses.some((warehouse) => warehouse.id === warehouseIdDraft)) setWarehouseId(warehouseIdDraft);
       if (nextLines.length) setLines(nextLines);
-      else if (pendingLines[0]) setSearch(pendingLines[0].sku ?? pendingLines[0].label);
+      setAiPendingLines(unresolvedPending);
+      if (!nextLines.length && unresolvedPending[0]) setSearch(unresolvedPending[0].sku ?? unresolvedPending[0].label);
       if (typeof payload.discount === "number") setDiscount(payload.discount);
       if (typeof payload.vatRate === "number") setVatRate(payload.vatRate);
       if (typeof payload.invoiceNumber === "string") setInvoiceNumber(payload.invoiceNumber);

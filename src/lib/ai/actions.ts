@@ -86,6 +86,20 @@ function previewProductIds(preview: AiActionPreview) {
   }))];
 }
 
+function queryValue(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+function hrefWithParams(path: string, params: Record<string, unknown>) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value == null || value === "") continue;
+    search.set(key, String(value));
+  }
+  const qs = search.toString();
+  return qs ? `${path}?${qs}` : path;
+}
+
 function posAiDraftHref(preview: AiActionPreview) {
   const ids = previewProductIds(preview);
   const params = new URLSearchParams({ aiDraft: "1", source: "ai-preview" });
@@ -93,10 +107,15 @@ function posAiDraftHref(preview: AiActionPreview) {
   return `/pos?${params.toString()}`;
 }
 
-function previewReviewAction(preview: AiActionPreview): AiActionPreview["reviewAction"] {
+function buildAiReviewAction(preview: AiActionPreview): AiActionPreview["reviewAction"] {
   const payload = preview.action.payload;
   const orderId = stringValue(payload.orderId) ?? stringValue(preview.entityId);
+  const orderCode = stringValue(payload.orderCode);
   const productId = stringValue(payload.productId) ?? stringValue(preview.entityId);
+  const productQuery = stringValue(payload.sku) ?? stringValue(payload.productName) ?? queryValue(payload.prompt);
+  const reportCustomerId = stringValue(payload.customerId);
+  const reportCustomer = stringValue(payload.customerName) ?? queryValue(payload.customerQuery);
+  const reportQuery = queryValue(payload.query) || queryValue(payload.prompt);
 
   if (preview.intent === "create_inventory_inbound") {
     return { type: "open", href: "/purchases/new?source=ai-preview", label: "Mở trang tạo phiếu nhập", target: "purchase_new" };
@@ -116,8 +135,15 @@ function previewReviewAction(preview: AiActionPreview): AiActionPreview["reviewA
   if (preview.intent === "convert_quote_to_order") {
     return { type: "open", href: orderId ? `/sales?tab=quotes&orderId=${orderId}&expandedOrder=${orderId}` : "/sales?tab=quotes", label: "Mở báo giá liên quan", target: "quotes" };
   }
-  if (preview.intent === "record_invoice_payment" || preview.intent === "cancel_invoice" || preview.intent === "create_return_refund" || preview.intent === "send_einvoice") {
-    return { type: "open", href: orderId ? `/sales?tab=orders&orderId=${orderId}&expandedOrder=${orderId}` : "/sales?tab=orders", label: "Mở hóa đơn liên quan", target: "orders" };
+  if (preview.intent === "find_invoice" || preview.intent === "edit_invoice" || preview.intent === "record_invoice_payment" || preview.intent === "cancel_invoice" || preview.intent === "create_return_refund" || preview.intent === "send_einvoice") {
+    return {
+      type: "open",
+      href: orderId
+        ? `/sales?tab=orders&orderId=${orderId}&expandedOrder=${orderId}`
+        : hrefWithParams("/sales", { tab: "orders", q: orderCode || reportQuery || undefined, source: "ai-preview" }),
+      label: "Mở hóa đơn liên quan",
+      target: "orders",
+    };
   }
   if (preview.intent === "set_product_price" || preview.intent === "apply_price_formula") {
     return { type: "open", href: "/inventory?tab=pricing&source=ai-preview", label: "Mở bảng giá", target: "pricing" };
@@ -125,8 +151,15 @@ function previewReviewAction(preview: AiActionPreview): AiActionPreview["reviewA
   if (preview.intent === "create_product") {
     return { type: "open", href: "/products/new?source=ai-preview", label: "Mở form sản phẩm", target: "product_form" };
   }
-  if (preview.intent === "update_product_min_stock") {
-    return { type: "open", href: productId ? `/products/${productId}/edit?source=ai-preview` : "/inventory?tab=products", label: "Mở form sản phẩm", target: "product_form" };
+  if (preview.intent === "update_product" || preview.intent === "update_product_min_stock") {
+    return {
+      type: "open",
+      href: productId
+        ? `/products/${productId}/edit?source=ai-preview`
+        : hrefWithParams("/inventory", { tab: "products", q: productQuery, source: "ai-preview" }),
+      label: "Mở form sản phẩm",
+      target: "product_form",
+    };
   }
   if (preview.intent === "create_product_category" || preview.intent === "create_product_brand") {
     return { type: "open", href: "/inventory?tab=products&source=ai-preview", label: "Mở màn sản phẩm", target: "products" };
@@ -140,7 +173,28 @@ function previewReviewAction(preview: AiActionPreview): AiActionPreview["reviewA
   if (preview.intent === "create_cashbook_entry") {
     return { type: "open", href: "/finance?tab=cashbook&source=ai-preview", label: "Mở sổ quỹ", target: "cashbook" };
   }
+  if (preview.intent === "inventory_stock_view") {
+    return { type: "open", href: hrefWithParams("/inventory", { tab: "stock", q: productQuery || reportQuery, source: "ai-preview" }), label: "Mở tồn kho", target: "inventory" };
+  }
+  if (preview.intent === "create_stocktake") {
+    return { type: "open", href: "/stocktakes/new?source=ai-preview", label: "Mở phiếu kiểm kho", target: "stocktakes" };
+  }
+  if (preview.intent === "customer_report") {
+    return {
+      type: "open",
+      href: hrefWithParams("/reports", { source: "ai-preview", customerId: reportCustomerId, customer: reportCustomer, q: reportCustomerId ? undefined : reportQuery }),
+      label: "Mở báo cáo theo khách",
+      target: "reports",
+    };
+  }
+  if (preview.intent === "report_summary") {
+    return { type: "open", href: hrefWithParams("/reports", { source: "ai-preview", q: reportQuery }), label: "Mở báo cáo", target: "reports" };
+  }
   return { type: "open", href: "/reports?source=ai-preview", label: "Mở báo cáo", target: "reports" };
+}
+
+function previewReviewAction(preview: AiActionPreview): AiActionPreview["reviewAction"] {
+  return buildAiReviewAction(preview);
 }
 
 export function withAiPreviewReviewAction(preview: AiActionPreview): AiActionPreview {
@@ -185,7 +239,11 @@ export function isAiReportSummaryPrompt(prompt: string) {
     q.includes("ban chay") ||
     q.includes("top seller") ||
     q.includes("top san pham") ||
+    q.includes("loi nhuan") ||
+    q.includes("khach") ||
     q.includes("ton kho") ||
+    q.includes("kiem ton") ||
+    q.includes("kiem kho") ||
     q.includes("mat hang")
   );
 }
@@ -199,7 +257,7 @@ export function buildGeneralAssistantResponse(input: {
   return {
     text:
       "Đúng, đây là AI Assistant của LumaPOS. " +
-      "Mình có thể hỗ trợ xem báo cáo bán hàng, tồn kho, gợi ý nhập hàng, hoặc tạo preview cho đơn hàng, phiếu nhập, giá bán, khách hàng và sổ quỹ. " +
+      "Mình có thể hỗ trợ phân tích thông tin bán hàng, tồn kho và gợi ý vận hành khi nhà cung cấp AI phản hồi được. " +
       (nextQuestion || "Bạn muốn mình hỗ trợ tác vụ nào?"),
     state: "succeeded",
     prompt: input.prompt,
@@ -656,6 +714,22 @@ async function inboundPreviewFromAttachments(
           unitCost: row.unitCost,
           discount: row.discount,
           confidence: row.confidence,
+        })),
+        unresolvedItems: unresolvedRows.map((row) => ({
+          sku: row.row.sku ?? null,
+          text: row.row.text,
+          productName: row.row.text,
+          unitName: row.row.unitName ?? null,
+          quantity: row.quantity,
+          unitCost: row.unitCost,
+          discount: row.discount,
+          lineTotal: row.row.lineTotal ?? null,
+          confidence: row.confidence,
+          candidates: row.ambiguous.slice(0, 5).map((product) => ({
+            productId: product.id,
+            productName: product.name,
+            sku: product.sku,
+          })),
         })),
         discount: 0,
         vatRate: 0,
@@ -1451,6 +1525,7 @@ export async function productCommandPreview(prompt: string): Promise<AiActionPre
   const isCategory = q.includes("danh muc") || q.includes("category");
   const isBrand = q.includes("thuong hieu") || q.includes("brand");
   const isMinStock = q.includes("ton toi thieu") || q.includes("min stock");
+  const isGenericUpdate = q.includes("sua san pham") || q.includes("sửa sản phẩm") || q.includes("cap nhat san pham") || q.includes("cập nhật sản phẩm") || q.includes("edit product") || q.includes("update product");
 
   if (isCategory) {
     const name = textAfter(prompt, [/tạo danh mục\s+(.+)$/i, /tao danh muc\s+(.+)$/i, /category\s+(.+)$/i]);
@@ -1514,6 +1589,35 @@ export async function productCommandPreview(prompt: string): Promise<AiActionPre
         type: "update_product_min_stock",
         target: "products",
         payload: { prompt, productId: product?.id ?? null, productName: product?.name ?? null, sku: product?.sku ?? null, oldMinStock: product ? Number(product.minStock) : null, minStock: value },
+      },
+    };
+  }
+
+  if (isGenericUpdate) {
+    const productMatch = matchNamed(prompt, context.products);
+    const product = productMatch.match;
+    const canPreview = Boolean(product) && productMatch.ambiguous.length === 0;
+    return {
+      id: randomUUID(),
+      intent: "update_product",
+      title: "Mở form sửa sản phẩm",
+      description: canPreview
+        ? "Tôi đã match được sản phẩm. Hãy mở form để kiểm tra/chỉnh sửa trước khi lưu."
+        : "Cần xác định sản phẩm trước khi mở đúng form sửa.",
+      confidence: canPreview ? 0.78 : 0.5,
+      state: canPreview ? "preview" : productMatch.ambiguous.length ? "needs_selection" : "needs_input",
+      confirmationRequired: false,
+      entityType: "product",
+      entityId: product?.id ?? null,
+      requiredFields: ["product"],
+      missingFields: product ? [] : ["product"],
+      fields: [{ label: "Sản phẩm", value: product ? `${product.name} (${product.sku})` : "Cần chọn", tone: product ? "success" : "warning" }],
+      lines: product ? [{ label: product.name, value: product.sku, tone: "success" }] : [],
+      warnings: productMatch.ambiguous.map((item) => `Sản phẩm có thể là: ${item.name} (${item.sku}). Hãy ghi rõ SKU/tên hơn.`),
+      action: {
+        type: "open_product_edit",
+        target: "products",
+        payload: { prompt, productId: product?.id ?? null, productName: product?.name ?? null, sku: product?.sku ?? null },
       },
     };
   }
@@ -1690,15 +1794,154 @@ export function cashbookPreview(prompt: string): AiActionPreview {
   };
 }
 
+export async function reportSummaryPreview(prompt: string): Promise<AiActionPreview> {
+  const q = normalize(prompt);
+  const asksCreateStocktake =
+    (q.includes("tao") || q.includes("lap") || q.includes("create")) &&
+    (q.includes("phieu kiem kho") || q.includes("stocktake"));
+  const asksStockView =
+    !asksCreateStocktake &&
+    (q.includes("ton kho") || q.includes("kiem ton") || q.includes("kiem kho") || q.includes("stock"));
+  const asksCustomerReport =
+    q.includes("khach") ||
+    q.includes("customer") ||
+    q.includes("da mua") ||
+    q.includes("mua bao nhieu") ||
+    q.includes("loi nhuan theo khach");
+
+  if (asksCreateStocktake) {
+    return {
+      id: randomUUID(),
+      intent: "create_stocktake",
+      title: "Mở phiếu kiểm kho",
+      description: "Tôi sẽ mở màn tạo phiếu kiểm kho để bạn kiểm tra/chỉnh sửa trước khi lưu.",
+      confidence: 0.78,
+      state: "preview",
+      confirmationRequired: false,
+      entityType: "stocktake",
+      requiredFields: [],
+      missingFields: [],
+      fields: [{ label: "Màn hình", value: "Tạo phiếu kiểm kho", tone: "success" }],
+      lines: [],
+      warnings: ["CTA chỉ mở form nghiệp vụ; chưa tạo phiếu kiểm kho."],
+      action: { type: "open_stocktake_form", target: "stocktakes", payload: { prompt } },
+    };
+  }
+
+  if (asksStockView) {
+    const context = await getProductCommandContext();
+    const product = matchNamed(prompt, context.products).match;
+    return {
+      id: randomUUID(),
+      intent: "inventory_stock_view",
+      title: "Mở tồn kho",
+      description: product ? "Tôi đã match được sản phẩm để mở tồn kho đã lọc." : "Tôi sẽ mở màn tồn kho để bạn kiểm tra số lượng.",
+      confidence: product ? 0.82 : 0.68,
+      state: "preview",
+      confirmationRequired: false,
+      entityType: "inventory_stock",
+      entityId: product?.id ?? null,
+      requiredFields: [],
+      missingFields: [],
+      fields: [
+        { label: "Màn hình", value: "Tồn kho", tone: "success" },
+        { label: "Bộ lọc", value: product ? `${product.name} (${product.sku})` : prompt },
+      ],
+      lines: product ? [{ label: product.name, value: product.sku, tone: "success" }] : [],
+      warnings: ["CTA chỉ mở màn tồn kho; không thay đổi dữ liệu."],
+      action: {
+        type: "open_inventory_stock_view",
+        target: "inventory",
+        payload: { prompt, productId: product?.id ?? null, productName: product?.name ?? null, sku: product?.sku ?? null, query: product?.sku ?? prompt },
+      },
+    };
+  }
+
+  const customers = await getCustomerContext();
+  const customerMatch = matchNamed(prompt, customers);
+  const customer = asksCustomerReport ? customerMatch.match : null;
+  return {
+    id: randomUUID(),
+    intent: asksCustomerReport ? "customer_report" : "report_summary",
+    title: asksCustomerReport ? "Mở báo cáo theo khách" : "Mở báo cáo",
+    description: customer
+      ? "Tôi đã match được khách hàng để mở báo cáo đã lọc."
+      : asksCustomerReport
+        ? "Tôi sẽ mở báo cáo với bộ lọc từ câu hỏi để bạn kiểm tra."
+        : "Tôi sẽ mở màn báo cáo để bạn xem số liệu.",
+    confidence: customer ? 0.82 : 0.62,
+    state: "preview",
+    confirmationRequired: false,
+    entityType: asksCustomerReport ? "customer_report" : "report",
+    entityId: customer?.id ?? null,
+    requiredFields: [],
+    missingFields: [],
+    fields: [
+      { label: "Màn hình", value: "Báo cáo", tone: "success" },
+      ...(asksCustomerReport ? [{ label: "Khách hàng", value: customer ? customer.name : prompt, tone: customer ? "success" as const : "warning" as const }] : []),
+    ],
+    lines: customer ? [{ label: customer.name, value: customer.code ?? "Khách hàng", meta: customer.phone ?? undefined, tone: "success" }] : [],
+    warnings: ["CTA chỉ mở báo cáo; không thay đổi dữ liệu."],
+    action: {
+      type: "open_report",
+      target: "reports",
+      payload: {
+        prompt,
+        query: prompt,
+        customerId: customer?.id ?? null,
+        customerName: customer?.name ?? null,
+        customerQuery: asksCustomerReport ? prompt : null,
+      },
+    },
+  };
+}
+
 export async function orderActionPreview(prompt: string): Promise<AiActionPreview> {
   const q = normalize(prompt);
   const context = await getSalesContext();
   const isPayment = q.includes("thanh toan") || q.includes("da tra") || q.includes("tra tien");
   const isConvert = q.includes("chuyen") && (q.includes("bao gia") || q.includes("quote"));
-  const isCancel = q.includes("huy hoa don") || q.includes("huy don") || q.includes("cancel invoice") || q.includes("cancel order");
+  const isCancel = q.includes("huy hoa don") || q.includes("huy don") || q.includes("xoa hoa don") || q.includes("xoa don") || q.includes("delete invoice") || q.includes("delete order") || q.includes("cancel invoice") || q.includes("cancel order");
+  const isEditInvoice = q.includes("sua hoa don") || q.includes("sua don") || q.includes("edit invoice") || q.includes("edit order");
+  const isFindInvoice = q.includes("tim hoa don") || q.includes("tim don") || q.includes("xem hoa don") || q.includes("find invoice") || q.includes("find order");
   const isReturn = q.includes("tra hang") || q.includes("hoan hang") || q.includes("hoan tien") || q.includes("refund") || q.includes("return");
   const isEinvoice = q.includes("hoa don dien tu") || q.includes("e invoice") || q.includes("einvoice") || q.includes("e-invoice");
   const orderCode = prompt.match(/\b(?:HD|DH|BG)[A-Z0-9-]+\b/i)?.[0] ?? "";
+
+  if (isEditInvoice || isFindInvoice) {
+    const order = orderCode
+      ? context.orders.find((item) => normalize(item.code) === normalize(orderCode)) ?? null
+      : matchNamed(prompt, context.orders as OrderOption[]).match;
+    const intent = isEditInvoice ? "edit_invoice" : "find_invoice";
+    const missingFields = order ? [] : ["order"];
+    return {
+      id: randomUUID(),
+      intent,
+      title: isEditInvoice ? "Mở hóa đơn để sửa" : "Tìm hóa đơn",
+      description: order
+        ? "Tôi đã tìm thấy hóa đơn/đơn hàng liên quan. Hãy mở màn đơn hàng để kiểm tra trước khi thao tác."
+        : "Cần chọn đúng hóa đơn/đơn hàng từ danh sách.",
+      confidence: order ? 0.78 : 0.5,
+      state: order ? "preview" : "needs_input",
+      confirmationRequired: false,
+      entityType: "order",
+      entityId: order?.id ?? null,
+      requiredFields: ["order"],
+      missingFields,
+      fields: [
+        { label: "Hóa đơn", value: order?.code ?? (orderCode || "Cần mã hóa đơn/đơn"), tone: order ? "success" : "warning" },
+        { label: "Khách", value: order?.customerName ?? "—" },
+        { label: "Tổng", value: order ? moneyText(order.total) : "—" },
+      ],
+      lines: order ? [{ label: order.code, value: moneyText(order.total), meta: order.customerName ?? "Khách lẻ", tone: "success" }] : [],
+      warnings: ["CTA chỉ mở màn đơn hàng; chưa thay đổi dữ liệu."],
+      action: {
+        type: intent,
+        target: "orders",
+        payload: { prompt, orderId: order?.id ?? null, orderCode: order?.code ?? (orderCode || null), query: orderCode || prompt },
+      },
+    };
+  }
 
   if (isCancel || isReturn || isEinvoice) {
     const order = orderCode
@@ -1994,7 +2237,9 @@ function forcedIntentFromActionPreset(prompt: string): AiPlannerIntent | null {
 }
 
 function stripActionPresetMarker(prompt: string) {
-  return prompt.replace(/\[AI_ACTION_PRESET:[a-z_]+\]\s*/g, "").trim();
+  const withoutMarker = prompt.replace(/\[AI_ACTION_PRESET:[a-z_]+\]\s*/g, "").trim();
+  const userInfoMatch = withoutMarker.match(/(?:Thông tin người dùng|User information):\s*([\s\S]*)$/i);
+  return (userInfoMatch?.[1] ?? withoutMarker).trim();
 }
 
 export async function buildAiAssistantResponse(input: {
@@ -2029,116 +2274,18 @@ export async function buildAiAssistantResponse(input: {
       : null;
   const plannerIntent: AiPlannerIntent | null = forcedIntent ?? plannerPlan?.intent ?? null;
   const prompt = forcedIntent ? stripActionPresetMarker(rawPrompt) : plannerPlan?.canonicalPrompt ?? rawPrompt;
-  const q = normalize(prompt);
-  const asksRestock = plannerIntent
-    ? plannerIntent === "create_draft_purchase_order_from_restocking"
-    :
-    q.includes("sap het") ||
-    q.includes("restock") ||
-    q.includes("goi y nhap") ||
-    q.includes("khuyen nghi") ||
-    q.includes("sku can nhap");
-  const asksDraftPurchase = plannerIntent
-    ? plannerIntent === "create_draft_purchase_order"
-    :
-    !asksRestock &&
-    (q.includes("dat hang") ||
-      q.includes("don dat hang") ||
-      q.includes("po nhap") ||
-      q.includes("po ncc") ||
-      q.includes("mua hang") ||
-      q.includes("purchase order")) &&
-    (q.includes("nhap") ||
-      q.includes("ncc") ||
-      q.includes("nha cung cap") ||
-      q.includes("po") ||
-      q.includes("mua"));
-  const asksInbound = plannerIntent
-    ? plannerIntent === "create_inventory_inbound"
-    :
-    !asksRestock &&
-    !asksDraftPurchase &&
-    (q.includes("nhap ") || q.includes("nhap hang") || q.includes("receive"));
-  const asksPrice = plannerIntent
-    ? plannerIntent === "set_product_price"
-    :
-    q.includes("gia") ||
-    q.includes("price") ||
-    q.includes("bang gia");
-  const asksFormula = plannerIntent
-    ? plannerIntent === "apply_price_formula"
-    :
-    asksPrice &&
-    (q.includes("tang") ||
-      q.includes("giam") ||
-      q.includes("cong thuc") ||
-      q.includes("%") ||
-      q.includes("gia von"));
-  const asksProductCommand = plannerIntent
-    ? plannerIntent === "product_command"
-    :
-    q.includes("tao san pham") ||
-    q.includes("tạo sản phẩm") ||
-    q.includes("tao danh muc") ||
-    q.includes("tạo danh mục") ||
-    q.includes("tao thuong hieu") ||
-    q.includes("tạo thương hiệu") ||
-    q.includes("ton toi thieu") ||
-    q.includes("min stock");
-  const asksCustomer = plannerIntent
-    ? plannerIntent === "customer_action"
-    :
-    q.includes("them khach") ||
-    q.includes("thêm khách") ||
-    q.includes("cap nhat khach") ||
-    q.includes("cập nhật khách");
-  const asksCashbook = plannerIntent
-    ? plannerIntent === "cashbook_action"
-    :
-    q.includes("ghi thu") ||
-    q.includes("ghi chi");
-  const asksPosVoice = plannerIntent
-    ? plannerIntent === "pos_voice_cart_draft"
-    :
-    q.includes("pos voice") ||
-    q.includes("gio hang bang giong noi") ||
-    q.includes("doc mon") ||
-    q.includes("doc san pham");
-  const asksPosImage = plannerIntent
-    ? plannerIntent === "pos_image_cart_draft"
-    :
-    q.includes("pos image") ||
-    q.includes("tao gio pos") ||
-    q.includes("tạo giỏ pos") ||
-    q.includes("gio pos") ||
-    q.includes("anh don") ||
-    q.includes("ảnh đơn") ||
-    q.includes("tu anh") ||
-    q.includes("từ ảnh") ||
-    q.includes("chup anh") ||
-    q.includes("ocr");
-  const asksOrderAction = plannerIntent
-    ? plannerIntent === "order_action"
-    :
-    !asksPosVoice &&
-    !asksPosImage &&
-    (q.includes("tao don") ||
-      q.includes("tạo đơn") ||
-      q.includes("tao hoa don") ||
-      q.includes("tạo hóa đơn") ||
-      q.includes("bao gia") ||
-      q.includes("báo giá") ||
-      q.includes("thanh toan") ||
-      q.includes("thanh toán") ||
-      q.includes("huy don") ||
-      q.includes("huy hoa don") ||
-      q.includes("tra hang") ||
-      q.includes("hoan tien") ||
-      q.includes("refund") ||
-      q.includes("return") ||
-      q.includes("hoa don dien tu") ||
-      q.includes("e-invoice") ||
-      q.includes("einvoice"));
+  const asksRestock = plannerIntent === "create_draft_purchase_order_from_restocking";
+  const asksDraftPurchase = plannerIntent === "create_draft_purchase_order";
+  const asksInbound = plannerIntent === "create_inventory_inbound";
+  const asksPrice = plannerIntent === "set_product_price";
+  const asksFormula = plannerIntent === "apply_price_formula";
+  const asksProductCommand = plannerIntent === "product_command";
+  const asksCustomer = plannerIntent === "customer_action";
+  const asksCashbook = plannerIntent === "cashbook_action";
+  const asksPosVoice = plannerIntent === "pos_voice_cart_draft";
+  const asksPosImage = plannerIntent === "pos_image_cart_draft";
+  const asksOrderAction = plannerIntent === "order_action";
+  const asksReportSummary = plannerIntent === "report_summary";
 
   const previewTool =
     asksRestock ? "buildRestockPoPreview"
@@ -2151,6 +2298,7 @@ export async function buildAiAssistantResponse(input: {
     : asksPosVoice ? "buildPosCartPreview:voice"
     : asksPosImage ? "buildPosCartPreview:image"
     : asksOrderAction ? "buildOrderPreview"
+    : asksReportSummary ? "buildReportSummaryPreview"
     : asksPrice ? "buildPriceUpdatePreview"
     : null;
   const toolTrace: AiToolTrace[] = [];
@@ -2179,6 +2327,8 @@ export async function buildAiAssistantResponse(input: {
           ? await posCartPreview(prompt, "image")
         : previewTool === "buildOrderPreview"
           ? await orderActionPreview(prompt)
+        : previewTool === "buildReportSummaryPreview"
+          ? await reportSummaryPreview(prompt)
         : previewTool === "buildPriceUpdatePreview"
           ? await pricePreview(prompt)
           : undefined;
@@ -2231,8 +2381,7 @@ export async function buildAiAssistantResponse(input: {
     };
   }
 
-  const shouldShowReportSummary =
-    plannerIntent === "report_summary" || (!plannerPlan && isAiReportSummaryPrompt(prompt));
+  const shouldShowReportSummary = asksReportSummary;
   if (!shouldShowReportSummary) {
     return buildGeneralAssistantResponse({
       prompt,

@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { categories, customers, orderItems, orders, products, profiles } from "@/db/schema";
 
@@ -9,17 +9,32 @@ function daysAgo(n: number) {
   return d;
 }
 
-export async function getReports(rangeDays = 30) {
+export type ReportFilters = {
+  customerId?: string;
+  customer?: string;
+  q?: string;
+};
+
+export async function getReports(rangeDays = 30, filters: ReportFilters = {}) {
   const since = daysAgo(rangeDays - 1);
   // chỉ đơn bán thật: loại quote/merged/cancelled/draft
   const notCancelled = inArray(orders.status, ["completed", "returned"]);
+  const customerTerm = filters.customer?.trim() || filters.q?.trim() || "";
+  const customerFilter = filters.customerId
+    ? eq(orders.customerId, filters.customerId)
+    : customerTerm
+      ? or(ilike(customers.name, `%${customerTerm}%`), ilike(customers.phone, `%${customerTerm}%`), ilike(customers.code, `%${customerTerm}%`))
+      : undefined;
+  const where = customerFilter
+    ? and(notCancelled, gte(orders.createdAt, since), customerFilter)
+    : and(notCancelled, gte(orders.createdAt, since));
 
   const [summaryRows, byDay, topProducts, byCategory, byCustomer, byEmployee] = await Promise.all([
     db.select({
       revenue: sql<string>`coalesce(sum(${orders.total}), 0)`,
       collected: sql<string>`coalesce(sum(${orders.amountPaid}), 0)`,
       orderCount: sql<number>`count(*)::int`,
-    }).from(orders).where(and(notCancelled, gte(orders.createdAt, since))),
+    }).from(orders).leftJoin(customers, eq(orders.customerId, customers.id)).where(where),
 
     db.select({
       day: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD')`,
@@ -27,7 +42,8 @@ export async function getReports(rangeDays = 30) {
       orderCount: sql<number>`count(*)::int`,
     })
       .from(orders)
-      .where(and(notCancelled, gte(orders.createdAt, since)))
+      .leftJoin(customers, eq(orders.customerId, customers.id))
+      .where(where)
       .groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`)
       .orderBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`),
 
@@ -42,7 +58,8 @@ export async function getReports(rangeDays = 30) {
       .from(orderItems)
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
       .innerJoin(products, eq(orderItems.productId, products.id))
-      .where(and(notCancelled, gte(orders.createdAt, since)))
+      .leftJoin(customers, eq(orders.customerId, customers.id))
+      .where(where)
       .groupBy(orderItems.productId)
       .orderBy(desc(sql`sum(${orderItems.total})`))
       .limit(10),
@@ -55,7 +72,8 @@ export async function getReports(rangeDays = 30) {
       .innerJoin(orders, eq(orderItems.orderId, orders.id))
       .innerJoin(products, eq(orderItems.productId, products.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
-      .where(and(notCancelled, gte(orders.createdAt, since)))
+      .leftJoin(customers, eq(orders.customerId, customers.id))
+      .where(where)
       .groupBy(categories.name)
       .orderBy(desc(sql`sum(${orderItems.total})`)),
 
@@ -70,7 +88,7 @@ export async function getReports(rangeDays = 30) {
     })
       .from(orders)
       .leftJoin(customers, eq(orders.customerId, customers.id))
-      .where(and(notCancelled, gte(orders.createdAt, since)))
+      .where(where)
       .groupBy(orders.customerId)
       .orderBy(desc(sql`sum(${orders.total})`))
       .limit(10),
@@ -85,7 +103,8 @@ export async function getReports(rangeDays = 30) {
     })
       .from(orders)
       .leftJoin(profiles, eq(orders.createdBy, profiles.id))
-      .where(and(notCancelled, gte(orders.createdAt, since)))
+      .leftJoin(customers, eq(orders.customerId, customers.id))
+      .where(where)
       .groupBy(orders.createdBy)
       .orderBy(desc(sql`sum(${orders.total})`)),
   ]);
@@ -93,6 +112,7 @@ export async function getReports(rangeDays = 30) {
   const summary = summaryRows[0];
   return {
     rangeDays,
+    filters,
     summary: {
       revenue: Number(summary.revenue),
       collected: Number(summary.collected),

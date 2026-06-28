@@ -85,6 +85,7 @@ export function storePosDraft(preview: AiActionPreview) {
       previewId: preview.id,
       intent: preview.intent,
       items: posDraftItems(preview),
+      payload: preview.action.payload,
       createdAt: Date.now(),
     }));
   } catch {
