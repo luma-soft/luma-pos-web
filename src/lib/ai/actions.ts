@@ -434,6 +434,13 @@ function parseProductLines(prompt: string, productOptions: PriceProductOption[])
   return matched.slice(0, 20);
 }
 
+function attachmentExtractedText(prompt: string) {
+  const marker = "[AI attachment parse]";
+  const index = prompt.indexOf(marker);
+  if (index < 0) return "";
+  return cleanName(prompt.slice(index + marker.length).replace(/\s+/g, " ")).slice(0, 300);
+}
+
 function formulaPreview(prompt: string, books: PriceBookOption[]): AiActionPreview {
   const q = normalize(prompt);
   const book = matchPriceBook(prompt, books);
@@ -1094,6 +1101,7 @@ async function orderActionPreview(prompt: string): Promise<AiActionPreview> {
 async function posCartPreview(prompt: string, source: "voice" | "image"): Promise<AiActionPreview> {
   const context = await getSalesContext();
   const lines = parseProductLines(prompt, context.products);
+  const unresolvedText = source === "image" ? attachmentExtractedText(prompt) : "";
   const missingFields = lines.length ? [] : ["items"];
   return {
     id: randomUUID(),
@@ -1121,6 +1129,7 @@ async function posCartPreview(prompt: string, source: "voice" | "image"): Promis
     warnings: [
       "AI chỉ tạo giỏ POS nháp, không tự tạo hóa đơn hoặc thanh toán.",
       "Nếu sản phẩm mơ hồ, user cần chọn lại trong POS.",
+      ...(unresolvedText && lines.length === 0 ? [`OCR/unresolved: ${unresolvedText}`] : []),
     ],
     action: {
       type: source === "voice" ? "pos_voice_cart_draft" : "pos_image_cart_draft",
@@ -1195,7 +1204,13 @@ export async function buildAiAssistantResponse(input: {
     q.includes("doc san pham");
   const asksPosImage =
     q.includes("pos image") ||
+    q.includes("tao gio pos") ||
+    q.includes("tạo giỏ pos") ||
+    q.includes("gio pos") ||
     q.includes("anh don") ||
+    q.includes("ảnh đơn") ||
+    q.includes("tu anh") ||
+    q.includes("từ ảnh") ||
     q.includes("chup anh") ||
     q.includes("ocr");
   const asksOrderAction =
