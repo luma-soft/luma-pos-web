@@ -704,7 +704,6 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
             )}>
               {configured ? (L ? "Đã cấu hình API key" : "API key configured") : (L ? "Chưa có API key" : "API key missing")}
             </span>
-            <span className="text-[11px] text-slate-500">{L ? "AI chỉ dùng cấu hình lưu trong Settings; không đọc API key/model từ env." : "AI only uses settings saved here; API keys and models are not read from env."}</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">

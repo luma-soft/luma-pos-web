@@ -30,15 +30,6 @@ type MobileRenderProps<T> = {
   toggle: () => void;
 };
 
-type DataTableToolbarProps = {
-  columnVisibilityMenu: ReactNode;
-};
-
-type ColumnVisibilityTriggerProps = {
-  open: boolean;
-  onToggle: () => void;
-};
-
 export function stopRowToggle(event: SyntheticEvent) {
   event.stopPropagation();
 }
@@ -57,7 +48,6 @@ export function DataTableShell<T>({
   empty,
   rowClassName,
   toolbar,
-  renderColumnVisibilityTrigger,
 }: {
   tableId: string;
   rows: T[];
@@ -71,8 +61,7 @@ export function DataTableShell<T>({
   initialExpandedId?: string | null;
   empty?: ReactNode;
   rowClassName?: (row: T, expanded: boolean) => string | undefined;
-  toolbar?: ReactNode | ((props: DataTableToolbarProps) => ReactNode);
-  renderColumnVisibilityTrigger?: (props: ColumnVisibilityTriggerProps) => ReactNode;
+  toolbar?: ReactNode;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -155,20 +144,12 @@ export function DataTableShell<T>({
       onOpenChange={setMenuOpen}
       onToggle={toggleColumn}
       onReset={resetColumns}
-      renderTrigger={renderColumnVisibilityTrigger}
     />
   );
 
   return (
     <div className="min-w-0">
-      <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
-        {typeof toolbar === "function" ? toolbar({ columnVisibilityMenu }) : (
-          <>
-            {toolbar}
-            {columnVisibilityMenu}
-          </>
-        )}
-      </div>
+      {toolbar && <div className="mb-2 flex flex-wrap items-center justify-end gap-2">{toolbar}</div>}
 
       {rows.length === 0 && empty ? (
         empty
@@ -209,7 +190,7 @@ export function DataTableShell<T>({
                 {visibleColumns.map((column) => (
                   <col key={column.key} style={column.width ? { width: column.width } : undefined} />
                 ))}
-                {renderExpanded && <col style={{ width: "44px" }} />}
+                <col style={{ width: "44px" }} />
               </colgroup>
               <thead>
                 <tr className="bg-primary-50/70 text-left text-xs font-semibold text-slate-700 dark:bg-primary-950/20 dark:text-slate-300">
@@ -226,7 +207,7 @@ export function DataTableShell<T>({
                       {column.label}
                     </th>
                   ))}
-                  {renderExpanded && <th className="px-3 py-3" />}
+                  <th className="px-2 py-2 text-right">{columnVisibilityMenu}</th>
                 </tr>
               </thead>
               <tbody>
@@ -236,7 +217,7 @@ export function DataTableShell<T>({
                       const cell = summaryCells.find((item) => item.key === column.key);
                       return <td key={column.key} className={cn("px-3 py-3", cell?.className)}>{cell?.content}</td>;
                     })}
-                    {renderExpanded && <td className="px-3 py-3" />}
+                    <td className="px-3 py-3" />
                   </tr>
                 )}
                 {rows.map((row) => {
@@ -269,11 +250,11 @@ export function DataTableShell<T>({
                             </td>
                           );
                         })}
-                        {renderExpanded && (
-                          <td className="px-3 py-3 text-right">
+                        <td className="px-3 py-3 text-right">
+                          {renderExpanded && (
                             <ChevronDown className={cn("ml-auto h-4 w-4 text-slate-400 transition-transform", expanded && "rotate-180")} />
-                          </td>
-                        )}
+                          )}
+                        </td>
                       </tr>
                       {expanded && renderExpanded && (
                         <tr className="border-t border-primary-100 dark:border-primary-900/50">
@@ -301,7 +282,6 @@ function ColumnVisibilityMenu<T>({
   onOpenChange,
   onToggle,
   onReset,
-  renderTrigger,
 }: {
   columns: DataTableColumn<T>[];
   visibleKeys: Set<string>;
@@ -309,28 +289,25 @@ function ColumnVisibilityMenu<T>({
   onOpenChange: (open: boolean) => void;
   onToggle: (key: string) => void;
   onReset: () => void;
-  renderTrigger?: (props: ColumnVisibilityTriggerProps) => ReactNode;
 }) {
   return (
-    <div className="relative" onClick={stopRowToggle}>
-      {renderTrigger ? (
-        renderTrigger({ open, onToggle: () => onOpenChange(!open) })
-      ) : (
-        <button
-          type="button"
-          onClick={() => onOpenChange(!open)}
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-slate-600 hover:bg-surface-2"
-          aria-label="Chọn cột hiển thị"
-          title="Chọn cột hiển thị"
-        >
-          <Columns3 className="h-4 w-4" />
-          <span className="hidden sm:inline">Cột</span>
-        </button>
-      )}
+    <div className="relative inline-flex justify-end" onClick={stopRowToggle}>
+      <button
+        type="button"
+        onClick={() => onOpenChange(!open)}
+        className={cn(
+          "inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-white/75 hover:text-slate-800 dark:hover:bg-slate-900/50 dark:hover:text-slate-100",
+          open && "bg-white text-primary-700 shadow-sm dark:bg-slate-900 dark:text-primary-300",
+        )}
+        aria-label="Chọn cột hiển thị"
+        title="Chọn cột hiển thị"
+      >
+        <Columns3 className="h-4 w-4" />
+      </button>
       {open && (
         <>
           <button type="button" className="fixed inset-0 z-30 cursor-default" aria-label="Đóng chọn cột" onClick={() => onOpenChange(false)} />
-          <div className="absolute right-0 z-40 mt-2 w-[320px] rounded-card border border-border bg-surface p-3 shadow-2xl">
+          <div className="absolute right-0 top-full z-40 mt-2 w-[320px] rounded-card border border-border bg-surface p-3 text-left shadow-2xl">
             <div className="mb-2 flex items-center justify-between gap-3">
               <div className="text-sm font-bold">Thông tin hiển thị</div>
               <button type="button" onClick={() => onOpenChange(false)} className="rounded-md p-1 text-slate-400 hover:bg-surface-2 hover:text-slate-700">

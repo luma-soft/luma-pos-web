@@ -21,7 +21,6 @@ import {
   Plus,
   QrCode,
   Search,
-  Settings,
   SlidersHorizontal,
   Trash2,
   User,
@@ -215,7 +214,7 @@ function CustomerRows({
         { key: "grossSales", content: formatCurrency(data.totalGrossSales) },
         { key: "netSales", content: formatCurrency(data.totalNetSales) },
       ]}
-      toolbar={({ columnVisibilityMenu }) => (
+      toolbar={(
         <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <CustomerSearch filters={filters} pageSize={data.pageSize} onOpenFilters={onOpenFilters} activeFilterCount={activeFilterCount} />
           <div className="flex shrink-0 items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
@@ -229,13 +228,9 @@ function CustomerRows({
             </Link>
             <ToolbarIcon icon={MoreHorizontal} label={t("customers.actions.more")} />
             <ToolbarIcon icon={Filter} label={t("customers.filters.title")} onClick={onOpenFilters} />
-            {columnVisibilityMenu}
             <ToolbarIcon icon={HelpCircle} label={t("customers.actions.help")} />
           </div>
         </div>
-      )}
-      renderColumnVisibilityTrigger={({ open, onToggle }) => (
-        <ToolbarIcon icon={Settings} label={t("customers.actions.settings")} onClick={onToggle} pressed={open} />
       )}
       renderExpanded={(customer) => <ExpandedCustomer customer={customer} />}
       renderMobileRow={({ row: customer, expanded, toggle }) => (
@@ -816,18 +811,14 @@ function EmptyPanel({ message }: { message: string }) {
   );
 }
 
-function ToolbarIcon({ icon: Icon, label, onClick, pressed }: { icon: LucideIcon; label: string; onClick?: () => void; pressed?: boolean }) {
+function ToolbarIcon({ icon: Icon, label, onClick }: { icon: LucideIcon; label: string; onClick?: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
       title={label}
       aria-label={label}
-      aria-pressed={pressed}
-      className={cn(
-        "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-slate-600 hover:bg-surface-2",
-        pressed && "border-primary-300 bg-primary-50 text-primary-700 dark:border-primary-800 dark:bg-primary-950/30 dark:text-primary-300",
-      )}
+      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-slate-600 hover:bg-surface-2"
     >
       <Icon className="h-4 w-4" />
     </button>
