@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { brands, categories, customers, orders, priceBooks, productPrices, products, suppliers, warehouses } from "@/db/schema";
 import type { RestockRow } from "@/lib/data/ai-restock";
 import type { ParsedAiAttachment } from "@/lib/ai/attachments";
+import { planAiAssistantIntent, type AiPlannerIntent, type AiPlannerResult } from "@/lib/ai/planner";
+import { recordAiTokenUsage } from "@/lib/ai/usage";
 
 export type AiAssistantState =
   | "idle"
@@ -55,6 +57,8 @@ export type AiAssistantResponse = {
   actions: Array<{ type: string; target: string; label: string }>;
   chart?: { type: string; rows: unknown[] };
 };
+
+const PLANNER_CONFIDENCE_THRESHOLD = 0.55;
 
 function normalize(value: string) {
   return value
@@ -1419,30 +1423,55 @@ export async function buildAiAssistantResponse(input: {
   chartRows: unknown[];
   parsedAttachments?: ParsedAiAttachment[];
 }): Promise<AiAssistantResponse> {
-  const prompt = input.prompt.trim();
+  const rawPrompt = input.prompt.trim();
+  const planner = await planAiAssistantIntent({
+    prompt: rawPrompt,
+    hasAttachments: Boolean(input.parsedAttachments?.length),
+  });
+  if (planner.ok && planner.tokenUsage) {
+    await recordAiTokenUsage(planner.tokenUsage);
+  }
+  const plannerPlan: AiPlannerResult | null =
+    planner.ok &&
+    planner.plan.intent !== "unknown" &&
+    planner.plan.confidence >= PLANNER_CONFIDENCE_THRESHOLD
+      ? planner.plan
+      : null;
+  const plannerIntent: AiPlannerIntent | null = plannerPlan?.intent ?? null;
+  const prompt = plannerPlan?.canonicalPrompt ?? rawPrompt;
   const q = normalize(prompt);
-  const asksRestock =
+  const asksRestock = plannerIntent
+    ? plannerIntent === "create_draft_purchase_order_from_restocking"
+    :
     q.includes("sap het") ||
     q.includes("restock") ||
     q.includes("goi y nhap") ||
     q.includes("khuyen nghi") ||
     q.includes("po nhap") ||
     q.includes("sku can nhap");
-  const asksInbound =
+  const asksInbound = plannerIntent
+    ? plannerIntent === "create_inventory_inbound"
+    :
     !asksRestock &&
     (q.includes("nhap ") || q.includes("nhap hang") || q.includes("receive"));
-  const asksPrice =
+  const asksPrice = plannerIntent
+    ? plannerIntent === "set_product_price"
+    :
     q.includes("gia") ||
     q.includes("price") ||
     q.includes("bang gia");
-  const asksFormula =
+  const asksFormula = plannerIntent
+    ? plannerIntent === "apply_price_formula"
+    :
     asksPrice &&
     (q.includes("tang") ||
       q.includes("giam") ||
       q.includes("cong thuc") ||
       q.includes("%") ||
       q.includes("gia von"));
-  const asksProductCommand =
+  const asksProductCommand = plannerIntent
+    ? plannerIntent === "product_command"
+    :
     q.includes("tao san pham") ||
     q.includes("tạo sản phẩm") ||
     q.includes("tao danh muc") ||
@@ -1451,20 +1480,28 @@ export async function buildAiAssistantResponse(input: {
     q.includes("tạo thương hiệu") ||
     q.includes("ton toi thieu") ||
     q.includes("min stock");
-  const asksCustomer =
+  const asksCustomer = plannerIntent
+    ? plannerIntent === "customer_action"
+    :
     q.includes("them khach") ||
     q.includes("thêm khách") ||
     q.includes("cap nhat khach") ||
     q.includes("cập nhật khách");
-  const asksCashbook =
+  const asksCashbook = plannerIntent
+    ? plannerIntent === "cashbook_action"
+    :
     q.includes("ghi thu") ||
     q.includes("ghi chi");
-  const asksPosVoice =
+  const asksPosVoice = plannerIntent
+    ? plannerIntent === "pos_voice_cart_draft"
+    :
     q.includes("pos voice") ||
     q.includes("gio hang bang giong noi") ||
     q.includes("doc mon") ||
     q.includes("doc san pham");
-  const asksPosImage =
+  const asksPosImage = plannerIntent
+    ? plannerIntent === "pos_image_cart_draft"
+    :
     q.includes("pos image") ||
     q.includes("tao gio pos") ||
     q.includes("tạo giỏ pos") ||
@@ -1475,7 +1512,9 @@ export async function buildAiAssistantResponse(input: {
     q.includes("từ ảnh") ||
     q.includes("chup anh") ||
     q.includes("ocr");
-  const asksOrderAction =
+  const asksOrderAction = plannerIntent
+    ? plannerIntent === "order_action"
+    :
     !asksPosVoice &&
     !asksPosImage &&
     (q.includes("tao don") ||
