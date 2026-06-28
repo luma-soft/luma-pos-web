@@ -897,6 +897,13 @@
     "title": "Nhập hàng",
     "total": "{total} phiếu",
     "createNew": "Tạo phiếu nhập",
+    "editTitle": "Sửa {code}",
+    "copyTitle": "Sao chép {code}",
+    "copy": "Sao chép",
+    "edit": "Sửa",
+    "cancel": "Hủy phiếu",
+    "saveChanges": "Lưu thay đổi",
+    "cancelConfirm": "Hủy phiếu nhập này? Kho, công nợ NCC và tiền đã trả sẽ được đảo lại.",
     "empty": "Chưa có phiếu nhập nào",
     "emptyHint": "Tạo phiếu nhập để cộng tồn kho và cập nhật giá vốn.",
     "cols": {
@@ -924,7 +931,17 @@
     "receiveNow": "Lưu & nhận hàng ngay",
     "receiveHint": "Nhận hàng ngay: cộng tồn kho, cập nhật giá vốn theo giá nhập, phần chưa trả ghi vào nợ NCC.",
     "errors": {
-      "emptyItems": "Phiếu nhập cần ít nhất 1 sản phẩm."
+      "emptyItems": "Phiếu nhập cần ít nhất 1 sản phẩm.",
+      "notFound": "Không tìm thấy phiếu nhập.",
+      "notEditable": "Phiếu nhập này không thể sửa hoặc hủy.",
+      "alreadyCancelled": "Phiếu nhập đã hủy trước đó."
+    },
+    "detail": {
+      "items": "Hàng nhập ({count})",
+      "info": "Thông tin phiếu",
+      "receiver": "Người nhập",
+      "payment": "Thanh toán NCC",
+      "note": "Ghi chú"
     },
     "searchPlaceholder": "Tìm mã phiếu, nhà cung cấp...",
     "searchProduct": "Tìm hàng theo tên / mã (F3)",

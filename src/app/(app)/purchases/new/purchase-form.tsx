@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
-import { createPurchase } from "@/lib/actions/purchases";
+import { createPurchase, updatePurchase } from "@/lib/actions/purchases";
 import { searchPurchaseProducts } from "@/lib/actions/purchase-search";
 import type { PurchaseFormOptions, PurchaseProductRow } from "@/lib/data/inventory";
 
@@ -25,7 +25,26 @@ type Line = {
   discInput: number; discMode: "vnd" | "pct"; // giảm giá dòng
 };
 
-function productToLine(p: PurchaseProductRow): Line {
+export type PurchaseFormInitialValues = {
+  supplierId: string;
+  warehouseId: string;
+  discount: number;
+  vatRate: number;
+  invoiceNumber: string;
+  amountPaid: number;
+  note: string;
+  items: {
+    productId: string;
+    quantity: number;
+    unitCost: number;
+    discount: number;
+  }[];
+};
+
+function productToLine(
+  p: PurchaseProductRow,
+  seed?: PurchaseFormInitialValues["items"][number]
+): Line {
   const baseCost = Number(p.costPrice) || 0;
   const units: PUnit[] = (p.units ?? []).map((u) => ({ unitName: u.unitName, multiplier: Number(u.multiplier) || 1 }));
   return {
@@ -37,9 +56,9 @@ function productToLine(p: PurchaseProductRow): Line {
     units,
     unitName: p.baseUnit,
     multiplier: 1,
-    quantity: 1,
-    unitCost: baseCost,
-    discInput: 0,
+    quantity: seed?.quantity ?? 1,
+    unitCost: seed?.unitCost ?? baseCost,
+    discInput: seed?.discount ?? 0,
     discMode: "vnd",
   };
 }
@@ -47,23 +66,38 @@ function productToLine(p: PurchaseProductRow): Line {
 export function PurchaseForm({
   options,
   initialProducts = [],
+  initialValues,
+  mode = "create",
+  purchaseId,
+  purchaseCode,
 }: {
   options: PurchaseFormOptions;
   initialProducts?: PurchaseProductRow[];
+  initialValues?: PurchaseFormInitialValues;
+  mode?: "create" | "copy" | "edit";
+  purchaseId?: string;
+  purchaseCode?: string;
 }) {
   const t = useTranslations();
   const router = useRouter();
 
-  const [supplierId, setSupplierId] = useState(options.suppliers[0]?.id ?? "");
-  const [warehouseId, setWarehouseId] = useState(options.warehouses[0]?.id ?? "");
-  const [lines, setLines] = useState<Line[]>(() => initialProducts.map(productToLine));
+  const [supplierId, setSupplierId] = useState(initialValues?.supplierId ?? options.suppliers[0]?.id ?? "");
+  const [warehouseId, setWarehouseId] = useState(initialValues?.warehouseId ?? options.warehouses[0]?.id ?? "");
+  const [lines, setLines] = useState<Line[]>(() => {
+    if (!initialValues) return initialProducts.map((p) => productToLine(p));
+    const byId = new Map(initialProducts.map((p) => [p.id, p]));
+    return initialValues.items.flatMap((item) => {
+      const product = byId.get(item.productId);
+      return product ? [productToLine(product, item)] : [];
+    });
+  });
   const [search, setSearch] = useState("");
-  const [discount, setDiscount] = useState(0);
-  const [vatRate, setVatRate] = useState(0);
-  const [invoiceNumber, setInvoiceNumber] = useState("");
-  const [amountPaid, setAmountPaid] = useState(0);
+  const [discount, setDiscount] = useState(initialValues?.discount ?? 0);
+  const [vatRate, setVatRate] = useState(initialValues?.vatRate ?? 0);
+  const [invoiceNumber, setInvoiceNumber] = useState(initialValues?.invoiceNumber ?? "");
+  const [amountPaid, setAmountPaid] = useState(initialValues?.amountPaid ?? 0);
   const [payFull, setPayFull] = useState(false);
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState(initialValues?.note ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -111,7 +145,7 @@ export function PurchaseForm({
   async function submit() {
     if (!supplierId || !warehouseId || lines.length === 0 || busy) return;
     setBusy(true); setError("");
-    const res = await createPurchase({
+    const payload = {
       supplierId, warehouseId,
       discount, vatRate,
       invoiceNumber: invoiceNumber || undefined,
@@ -124,21 +158,37 @@ export function PurchaseForm({
         unitCost: l.multiplier > 0 ? l.unitCost / l.multiplier : l.unitCost,
         discount: lineDiscountVnd(l),
       })),
-    });
+    };
+
+    if (mode === "edit" && purchaseId) {
+      const res = await updatePurchase({ id: purchaseId, ...payload });
+      setBusy(false);
+      if (res.ok) router.push(Routes.purchase(purchaseId));
+      else setError(t(res.error as never));
+      return;
+    }
+
+    const res = await createPurchase(payload);
     setBusy(false);
-    if (res.ok) router.push(Routes.Purchases);
+    if (res.ok) router.push(Routes.purchase(res.data.id));
     else setError(t(res.error as never));
   }
 
   const numCls = "no-spinner w-full px-2 py-1.5 text-right text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-surface tabular-nums";
+  const title = mode === "edit"
+    ? t("purchases.editTitle", { code: purchaseCode ?? "" })
+    : mode === "copy"
+      ? t("purchases.copyTitle", { code: purchaseCode ?? "" })
+      : t("purchases.createNew");
+  const backHref = mode === "edit" && purchaseId ? Routes.purchase(purchaseId) : Routes.Purchases;
 
   return (
     <div className="h-dvh flex flex-col">
       <header className="shrink-0 h-12 px-4 flex items-center gap-3 bg-surface border-b border-border">
-        <Button type="button" variant="ghost" size="iconSm" onClick={() => router.push(Routes.Purchases)} aria-label={t("common.back")}>
+        <Button type="button" variant="ghost" size="iconSm" onClick={() => router.push(backHref)} aria-label={t("common.back")}>
           <ArrowLeft className="w-4 h-4" />
         </Button>
-        <Text as="h1" weight="bold" text={t("purchases.createNew")} />
+        <Text as="h1" weight="bold" text={title} />
       </header>
 
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-auto lg:overflow-hidden">
@@ -269,7 +319,7 @@ export function PurchaseForm({
           {error && <Text as="p" variant="destructive" text={error} />}
 
           <Button type="button" onClick={submit} disabled={lines.length === 0 || !supplierId} loading={busy} block className="mt-auto h-12 rounded-card font-semibold">
-            {t("purchases.receiveNow")} · {formatCurrency(total)}
+            {mode === "edit" ? t("purchases.saveChanges") : t("purchases.receiveNow")} · {formatCurrency(total)}
           </Button>
           <Text as="p" variant="muted" className="text-[11px]" text={t("purchases.receiveHint")} />
         </div>

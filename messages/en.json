@@ -892,6 +892,13 @@
     "title": "Purchasing",
     "total": "{total} receipts",
     "createNew": "New purchase",
+    "editTitle": "Edit {code}",
+    "copyTitle": "Copy {code}",
+    "copy": "Copy",
+    "edit": "Edit",
+    "cancel": "Cancel receipt",
+    "saveChanges": "Save changes",
+    "cancelConfirm": "Cancel this purchase receipt? Stock, supplier debt, and paid amount will be reversed.",
     "empty": "No purchases yet",
     "emptyHint": "Create a purchase to add stock and update cost prices.",
     "cols": {
@@ -919,7 +926,17 @@
     "receiveNow": "Save & receive now",
     "receiveHint": "Receive now: stock is added, cost price updated, unpaid balance recorded as supplier debt.",
     "errors": {
-      "emptyItems": "Add at least 1 product."
+      "emptyItems": "Add at least 1 product.",
+      "notFound": "Purchase receipt not found.",
+      "notEditable": "This purchase receipt cannot be edited or cancelled.",
+      "alreadyCancelled": "This purchase receipt was already cancelled."
+    },
+    "detail": {
+      "items": "Purchased items ({count})",
+      "info": "Receipt information",
+      "receiver": "Receiver",
+      "payment": "Supplier payment",
+      "note": "Note"
     },
     "searchPlaceholder": "Search code, supplier...",
     "searchProduct": "Search products by name / code",

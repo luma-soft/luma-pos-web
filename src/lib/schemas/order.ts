@@ -122,3 +122,9 @@ export const createPurchaseSchema = z.object({
 });
 export type CreatePurchaseInput = z.input<typeof createPurchaseSchema>;
 export type CreatePurchaseOutput = z.output<typeof createPurchaseSchema>;
+
+export const updatePurchaseSchema = createPurchaseSchema.extend({
+  id: z.uuid(),
+});
+export type UpdatePurchaseInput = z.input<typeof updatePurchaseSchema>;
+export type UpdatePurchaseOutput = z.output<typeof updatePurchaseSchema>;

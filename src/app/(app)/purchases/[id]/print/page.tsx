@@ -31,7 +31,7 @@ export default async function PrintPurchasePage({ params, searchParams }: Props)
 
   return (
     <div className="min-h-screen bg-slate-200 dark:bg-slate-950 print:bg-white">
-      <PrintToolbar backHref={Routes.Purchases} baseHref={`${Routes.Purchases}/${po.id}/print`} size={size} />
+      <PrintToolbar backHref={Routes.purchase(po.id)} baseHref={`${Routes.purchase(po.id)}/print`} size={size} />
       <div className="py-8 print:py-0 flex justify-center">
         <PrintDoc
           template={template}

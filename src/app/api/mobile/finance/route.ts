@@ -21,6 +21,7 @@ export async function GET(request: Request) {
   const range = searchParam(request, "range", "month");
   const since = sinceForRange(range);
   const saleStatus = inArray(orders.status, ["completed", "returned"]);
+  const payableStatus = inArray(purchaseOrders.status, ["received", "returned"]);
 
   const [reports, receivableRows, payableRows, cashRows] = await Promise.all([
     getReports(range === "today" ? 1 : range === "week" ? 7 : 30),
@@ -41,7 +42,7 @@ export async function GET(request: Request) {
         count: sql<number>`count(*)::int`,
       })
       .from(purchaseOrders)
-      .where(gte(purchaseOrders.createdAt, since)),
+      .where(and(payableStatus, gte(purchaseOrders.createdAt, since))),
     db
       .select({
         fund: cashTransactions.fund,

@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { Plus, Truck, Search } from "lucide-react";
+import { Plus, Printer, Truck, Search } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { getPurchases } from "@/lib/data/inventory";
@@ -10,7 +10,7 @@ import { parsePageSize } from "@/lib/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
 
 type SP = Record<string, string | undefined>;
-const PSTATUS = ["", "received", "returned", "cancelled"] as const;
+const PSTATUS = ["", "draft", "received", "returned", "cancelled"] as const;
 
 export async function PurchasesTab({ searchParams }: { searchParams: SP }) {
   const t = await getTranslations();
@@ -27,6 +27,7 @@ export async function PurchasesTab({ searchParams }: { searchParams: SP }) {
         </div>
         <select name="status" defaultValue={status} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface">
           <option value="">{t("orders.tabs.all")}</option>
+          <option value="draft">{t("purchases.status.draft")}</option>
           <option value="received">{t("purchases.status.received")}</option>
           <option value="returned">{t("purchases.status.returned")}</option>
           <option value="cancelled">{t("purchases.status.cancelled")}</option>
@@ -66,9 +67,9 @@ async function PurchasesContent({ searchParams }: { searchParams: SP }) {
         <>
           <div className="lg:hidden space-y-2">
             {rows.map((p) => {
-              const owed = Number(p.total) - Number(p.amountPaid);
+              const owed = p.status === "cancelled" ? 0 : Number(p.total) - Number(p.amountPaid);
               return (
-                <Link key={p.id} href={`${Routes.Purchases}/${p.id}/print`} className="block bg-surface border border-border rounded-card p-3">
+                <Link key={p.id} href={Routes.purchase(p.id)} className="block bg-surface border border-border rounded-card p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0"><div className="font-semibold">{p.code}</div><div className="text-xs text-slate-400">{formatDate(p.createdAt)} · {p.supplierName}</div></div>
                     <span className={cn("shrink-0 inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium", p.status === "returned" ? "bg-warn-soft text-warn" : p.status === "cancelled" ? "bg-er-soft text-er" : "bg-ok-soft text-ok")}>{t(`purchases.status.${p.status}` as never)}</span>
@@ -98,17 +99,26 @@ async function PurchasesContent({ searchParams }: { searchParams: SP }) {
               </thead>
               <tbody className="divide-y divide-border-soft">
                 {rows.map((p) => {
-                  const owed = Number(p.total) - Number(p.amountPaid);
+                  const owed = p.status === "cancelled" ? 0 : Number(p.total) - Number(p.amountPaid);
                   return (
                     <tr key={p.id} className="hover:bg-surface-2">
-                      <td className="px-4 py-3 font-medium">{p.code}</td>
+                      <td className="px-4 py-3 font-medium">
+                        <Link href={Routes.purchase(p.id)} className="text-primary-600 hover:underline">
+                          {p.code}
+                        </Link>
+                      </td>
                       <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{formatDate(p.createdAt)}</td>
                       <td className="px-4 py-3">{p.supplierName}</td>
                       <td className="px-4 py-3 text-slate-500">{p.warehouseName}</td>
                       <td className="px-4 py-3 text-right tabular-nums font-medium">{formatCurrency(Number(p.total))}</td>
                       <td className={cn("px-4 py-3 text-right tabular-nums", owed > 0 ? "text-warn font-semibold" : "text-slate-400")}>{owed > 0 ? formatCurrency(owed) : "—"}</td>
                       <td className="px-4 py-3"><span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", p.status === "returned" ? "bg-warn-soft text-warn" : p.status === "cancelled" ? "bg-er-soft text-er" : "bg-ok-soft text-ok")}>{t(`purchases.status.${p.status}` as never)}</span></td>
-                      <td className="px-4 py-3 text-right"><Link href={`${Routes.Purchases}/${p.id}/print`} className="text-xs font-medium text-primary-600 hover:underline">🖨 {t("print.printBtn")}</Link></td>
+                      <td className="px-4 py-3 text-right">
+                        <Link href={`${Routes.purchase(p.id)}/print`} className="inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:underline">
+                          <Printer className="h-3.5 w-3.5" />
+                          {t("print.printBtn")}
+                        </Link>
+                      </td>
                     </tr>
                   );
                 })}

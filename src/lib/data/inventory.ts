@@ -149,9 +149,16 @@ export async function getPurchase(id: string) {
     .select({
       id: purchaseOrders.id,
       code: purchaseOrders.code,
+      supplierId: purchaseOrders.supplierId,
+      warehouseId: purchaseOrders.warehouseId,
       status: purchaseOrders.status,
+      subtotal: purchaseOrders.subtotal,
+      discount: purchaseOrders.discount,
+      vatRate: purchaseOrders.vatRate,
+      tax: purchaseOrders.tax,
       total: purchaseOrders.total,
       amountPaid: purchaseOrders.amountPaid,
+      invoiceNumber: purchaseOrders.invoiceNumber,
       note: purchaseOrders.note,
       createdAt: purchaseOrders.createdAt,
       supplierName: suppliers.name,
@@ -170,8 +177,10 @@ export async function getPurchase(id: string) {
   const items = await db
     .select({
       id: purchaseOrderItems.id,
+      productId: purchaseOrderItems.productId,
       quantity: purchaseOrderItems.quantity,
       unitCost: purchaseOrderItems.unitCost,
+      discount: purchaseOrderItems.discount,
       total: purchaseOrderItems.total,
       productName: products.name,
       sku: products.sku,
