@@ -627,8 +627,6 @@ function useAssistantState(surface: AssistantSurface) {
   async function deleteSession() {
     if (!sessionId || busy) return;
     const currentId = sessionId;
-    const ok = typeof window === "undefined" ? true : window.confirm("Xóa cuộc chat AI này?");
-    if (!ok) return;
     clearLocalMessages();
     if (sessionId) {
       await deleteJson(`/api/mobile/ai/sessions?sessionId=${sessionId}`).catch(() => {});
@@ -651,18 +649,17 @@ function useAssistantState(surface: AssistantSurface) {
     await loadServerSession(id);
   }
 
-  async function renameSession() {
+  async function renameSession(title: string) {
     if (!sessionId) return;
-    const current = sessions.find((item) => item.id === sessionId);
-    const title = window.prompt("Tên cuộc chat", current?.title ?? "AI Assistant")?.trim();
-    if (!title) return;
+    const nextTitle = title.trim().slice(0, 120);
+    if (!nextTitle) return;
     await putJson("/api/mobile/ai/sessions", {
       sessionId,
       surface,
-      title,
+      title: nextTitle,
       messages: sanitizeMessagesForStorage(msgs),
     }).catch(() => {});
-    setSessions((items) => items.map((item) => item.id === sessionId ? { ...item, title } : item));
+    setSessions((items) => items.map((item) => item.id === sessionId ? { ...item, title: nextTitle } : item));
   }
 
   return {
@@ -943,6 +940,33 @@ function AssistantChatSurface({
   const hasUploadingAttachment = attachments.some((item) => item.status === "uploading");
   const hasFailedAttachment = attachments.some((item) => item.status === "failed");
   const sendDisabled = busy || hasUploadingAttachment || hasFailedAttachment || Boolean(usage?.exhausted);
+  const activeSession = sessions.find((session) => session.id === sessionId) ?? null;
+  const [sessionDialog, setSessionDialog] = useState<"rename" | "delete" | null>(null);
+  const [sessionTitleDraft, setSessionTitleDraft] = useState("");
+
+  function openRenameDialog() {
+    if (!sessionId) return;
+    setSessionTitleDraft(activeSession?.title ?? "AI Assistant");
+    setSessionDialog("rename");
+  }
+
+  function openDeleteDialog() {
+    if (!sessionId) return;
+    setSessionTitleDraft(activeSession?.title ?? "AI Assistant");
+    setSessionDialog("delete");
+  }
+
+  async function submitRenameSession() {
+    const title = sessionTitleDraft.trim();
+    if (!title) return;
+    await renameSession(title);
+    setSessionDialog(null);
+  }
+
+  async function confirmDeleteSession() {
+    await deleteSession();
+    setSessionDialog(null);
+  }
 
   return (
     <div className={cn(
@@ -980,7 +1004,7 @@ function AssistantChatSurface({
           </button>
           <button
             type="button"
-            onClick={() => void renameSession()}
+            onClick={openRenameDialog}
             disabled={busy || !sessionId}
             className="h-8 w-8 grid place-items-center rounded-lg border border-border text-slate-500 hover:bg-surface-2 disabled:opacity-50"
             title="Đổi tên cuộc chat"
@@ -1000,7 +1024,7 @@ function AssistantChatSurface({
           </button>
           <button
             type="button"
-            onClick={() => void deleteSession()}
+            onClick={openDeleteDialog}
             disabled={busy || !sessionId}
             className="h-8 w-8 grid place-items-center rounded-lg border border-border text-slate-500 hover:bg-er-soft hover:text-er disabled:opacity-50"
             title="Xóa cuộc chat"
@@ -1008,6 +1032,84 @@ function AssistantChatSurface({
           >
             <Trash2 className="h-4 w-4" />
           </button>
+        </div>
+      )}
+      {sessionDialog && (
+        <div
+          className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-[2px]"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setSessionDialog(null);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="ai-session-dialog-title"
+            className="w-full max-w-sm rounded-card border border-border bg-surface shadow-e2 overflow-hidden"
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-border-soft px-4 py-3">
+              <div className="min-w-0">
+                <div id="ai-session-dialog-title" className="text-sm font-bold text-slate-900 dark:text-slate-100">
+                  {sessionDialog === "rename" ? "Đổi tên cuộc chat" : "Xóa cuộc chat"}
+                </div>
+                <div className="mt-0.5 text-xs text-slate-500">
+                  {sessionDialog === "rename"
+                    ? "Tên mới sẽ được lưu vào lịch sử chat AI."
+                    : "Cuộc chat và tin nhắn sẽ bị ẩn khỏi danh sách lịch sử."}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSessionDialog(null)}
+                className="h-8 w-8 shrink-0 grid place-items-center rounded-lg border border-border text-slate-500 hover:bg-surface-2"
+                aria-label="Đóng"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="px-4 py-4">
+              {sessionDialog === "rename" ? (
+                <label className="block">
+                  <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Tên cuộc chat</span>
+                  <input
+                    autoFocus
+                    value={sessionTitleDraft}
+                    onChange={(event) => setSessionTitleDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") void submitRenameSession();
+                      if (event.key === "Escape") setSessionDialog(null);
+                    }}
+                    maxLength={120}
+                    className="mt-1.5 w-full rounded-xl border border-border bg-canvas px-3 py-2.5 text-sm font-semibold text-slate-700 outline-none focus:ring-2 focus:ring-primary-500 dark:text-slate-200"
+                  />
+                </label>
+              ) : (
+                <div className="rounded-xl border border-er/20 bg-er-soft px-3 py-2.5 text-sm font-semibold text-er">
+                  Xóa "{sessionTitleDraft || "AI Assistant"}"? Thao tác này không ảnh hưởng audit log hoặc dữ liệu nghiệp vụ đã tạo.
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-border-soft bg-canvas px-4 py-3">
+              <button
+                type="button"
+                onClick={() => setSessionDialog(null)}
+                className="rounded-xl border border-border bg-surface px-3.5 py-2 text-sm font-bold text-slate-500 hover:bg-surface-2"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={() => sessionDialog === "rename" ? void submitRenameSession() : void confirmDeleteSession()}
+                disabled={busy || (sessionDialog === "rename" && !sessionTitleDraft.trim())}
+                className={cn(
+                  "rounded-xl px-3.5 py-2 text-sm font-bold text-white disabled:opacity-50",
+                  sessionDialog === "delete" ? "bg-er hover:brightness-95" : "bg-primary-600 hover:brightness-105",
+                )}
+              >
+                {sessionDialog === "rename" ? "Lưu" : "Xóa"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
       {msgs.length > 0 && (

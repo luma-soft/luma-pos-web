@@ -63,6 +63,13 @@ bun dev
 | `bun db:seed` | Insert data mẫu (categories, brands) |
 | `bun import:kiotviet path.xlsx` | Import từ Excel KiotViet |
 
+## UI conventions
+
+- Không dùng native browser modal (`alert`, `confirm`, `prompt`, `window.alert`, `window.confirm`, `window.prompt`) trong production UI.
+- Confirm/alert phải dùng `ConfirmDialogProvider` hoặc component dialog/sheet theo design system.
+- Các flow cần nhập text trong modal phải dùng component UI của app, có overlay, nút hủy/xác nhận, keyboard handling và style Tailwind/Luma tokens.
+- Mobile hoặc bottom-sheet flow cũng phải dùng component UI của app, không gọi modal native của trình duyệt.
+
 ## Schema highlights (đặc thù VLXD)
 
 - `products` có `m2_per_unit` → tính m² gạch tự động
