@@ -68,6 +68,7 @@ export type AiToolTrace = {
   mutation: false;
   status: "succeeded" | "failed";
   durationMs: number;
+  argsSummary?: Record<string, unknown>;
   result: {
     state?: AiAssistantState;
     intent?: string;

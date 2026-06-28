@@ -2,7 +2,8 @@ import { getReports } from "@/lib/data/reports";
 import { getRestockSuggestions } from "@/lib/data/ai-restock";
 import { buildAttachmentNextActionResponse, shouldAskAttachmentNextAction } from "@/lib/ai/attachment-intent";
 import { attachmentPromptBlock, parseAiAttachment, type AiAttachmentMetadata, type ParsedAiAttachment } from "@/lib/ai/attachments";
-import { buildAiAssistantResponse } from "@/lib/ai/actions";
+import { buildAiAssistantResponse, type AiAssistantResponse } from "@/lib/ai/actions";
+import { runAiToolLoop } from "@/lib/ai/tool-loop";
 import { consumeAiUsage, recordAiTokenUsage } from "@/lib/ai/usage";
 import { writeAuditLog } from "@/lib/audit";
 import { requireMobileUser } from "@/lib/mobile/auth";
@@ -161,14 +162,42 @@ export async function POST(request: Request) {
     getReports(30),
     getRestockSuggestions(30),
   ]);
-  const response = await buildAiAssistantResponse({
+  const toolLoop = await runAiToolLoop({
     prompt: enrichedPrompt,
-    revenue: reports.summary.revenue,
-    collected: reports.summary.collected,
     restock,
-    chartRows: reports.byDay,
     parsedAttachments,
+    reportSummary: {
+      revenue: reports.summary.revenue,
+      collected: reports.summary.collected,
+      rangeDays: 30,
+      restockCount: restock.length,
+    },
   });
+  if (toolLoop.tokenUsage) {
+    usage.usage = await recordAiTokenUsage(toolLoop.tokenUsage);
+  }
+  let response: AiAssistantResponse;
+  if (toolLoop.ok && toolLoop.preview) {
+    response = {
+      text: toolLoop.preview.description,
+      state: toolLoop.preview.state,
+      prompt: enrichedPrompt,
+      actionPreview: toolLoop.preview,
+      actions: [{ type: "open", target: toolLoop.preview.action.target, label: "Open related screen" }],
+      chart: { type: "revenueByDay", rows: reports.byDay },
+      toolTrace: toolLoop.trace,
+    };
+  } else {
+    response = await buildAiAssistantResponse({
+      prompt: enrichedPrompt,
+      revenue: reports.summary.revenue,
+      collected: reports.summary.collected,
+      restock,
+      chartRows: reports.byDay,
+      parsedAttachments,
+    });
+    response.toolTrace = [...(toolLoop.trace ?? []), ...(response.toolTrace ?? [])];
+  }
   if (parsedAttachments.length > 0 && response.actionPreview) {
     response.actionPreview = sanitizeAttachmentPreview(
       response.actionPreview,
