@@ -1,6 +1,7 @@
 "use client";
 
 import { type ClipboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   CheckCircle2,
@@ -381,7 +382,7 @@ export function AssistantWorkspace() {
   const assistant = useAssistantState("web");
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="w-full flex min-h-[calc(100dvh-9.5rem)] flex-col">
       <div className="flex items-start gap-2 mb-4 px-3.5 py-2.5 bg-in-soft border border-in/20 rounded-card text-[12px] text-in">
         <Info className="w-4 h-4 shrink-0 mt-px" />
         <span>{t("ai.actionNotice")}</span>
@@ -399,6 +400,7 @@ export function AssistantWorkspace() {
 
 export function AiAssistantLauncher({ surface = "web" }: { surface?: AssistantSurface }) {
   const t = useTranslations();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const fabSize = 56;
@@ -408,6 +410,10 @@ export function AiAssistantLauncher({ surface = "web" }: { surface?: AssistantSu
   const suppressClickRef = useRef(false);
   const assistant = useAssistantState(surface);
   const isPos = surface === "pos";
+
+  if (surface === "web" && pathname?.startsWith("/ai")) {
+    return null;
+  }
 
   function openAssistant() {
     setOpen(true);
@@ -612,7 +618,7 @@ function AssistantChatSurface({
   return (
     <div className={cn(
       "bg-surface border border-border rounded-card shadow-e1 flex flex-col min-h-0",
-      compact ? "border-0 rounded-none shadow-none flex-1" : "h-[68vh]"
+      compact ? "border-0 rounded-none shadow-none flex-1" : "flex-1 min-h-[520px]"
     )}>
       {msgs.length > 0 && (
         <div className={cn(
