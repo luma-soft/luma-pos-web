@@ -157,11 +157,7 @@ export function useAssistantState(surface: AssistantSurface): AssistantControlle
   }, []);
 
   const suggestionGroups = activePreset
-    ? [{
-        id: "active-action",
-        title: t("ai.suggestionGroups.currentAction"),
-        items: activePreset.examples.slice(0, 3),
-      }]
+    ? []
     : surface === "pos"
       ? [
           {
