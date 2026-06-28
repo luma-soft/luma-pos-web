@@ -1,6 +1,6 @@
 "use client";
 
-import { type ClipboardEvent, type PointerEvent, useRef, useState } from "react";
+import { type ClipboardEvent, type PointerEvent, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   CheckCircle2,
@@ -76,6 +76,7 @@ const MAX_ATTACHMENTS = 4;
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const FAB_MARGIN = 12;
 const FAB_MOVE_THRESHOLD = 10;
+const CHAT_HISTORY_LIMIT = 80;
 const ACCEPTED_ATTACHMENT_TYPES = new Set([
   "image/png",
   "image/jpeg",
@@ -109,6 +110,31 @@ function readFabPosition(key: string, size: number): FabPosition | null {
 function saveFabPosition(key: string, position: FabPosition) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(key, JSON.stringify(position));
+}
+
+function sanitizeMessagesForStorage(messages: Msg[]): Msg[] {
+  return messages.slice(-CHAT_HISTORY_LIMIT).map((message) => ({
+    ...message,
+    attachments: message.attachments?.map(({ previewUrl: _previewUrl, localId: _localId, ...attachment }) => ({
+      ...attachment,
+      status: attachment.status === "uploading" ? "uploaded" : attachment.status,
+    })),
+  }));
+}
+
+function readChatHistory(key: string): Msg[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(key) || "[]") as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is Msg => {
+      if (!item || typeof item !== "object") return false;
+      const msg = item as Partial<Msg>;
+      return (msg.role === "user" || msg.role === "assistant") && typeof msg.text === "string";
+    }).slice(-CHAT_HISTORY_LIMIT);
+  } catch {
+    return [];
+  }
 }
 
 function attachmentKind(type: string): ComposerAttachment["kind"] | null {
@@ -152,12 +178,17 @@ async function uploadAiAttachment(file: File): Promise<ComposerAttachment> {
 
 function useAssistantState(surface: AssistantSurface) {
   const t = useTranslations();
+  const chatHistoryKey = `luma-ai-chat-history:${surface}`;
   const [input, setInput] = useState("");
-  const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [msgs, setMsgs] = useState<Msg[]>(() => readChatHistory(chatHistoryKey));
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    window.localStorage.setItem(chatHistoryKey, JSON.stringify(sanitizeMessagesForStorage(msgs)));
+  }, [chatHistoryKey, msgs]);
 
   const suggestions = surface === "pos"
     ? [
@@ -322,6 +353,11 @@ function useAssistantState(surface: AssistantSurface) {
     }
   }
 
+  function clearMessages() {
+    setMsgs([]);
+    if (typeof window !== "undefined") window.localStorage.removeItem(chatHistoryKey);
+  }
+
   return {
     input,
     setInput,
@@ -336,6 +372,7 @@ function useAssistantState(surface: AssistantSurface) {
     suggestions,
     send,
     resolvePreview,
+    clearMessages,
   };
 }
 
@@ -568,6 +605,7 @@ function AssistantChatSurface({
     suggestions,
     send,
     resolvePreview,
+    clearMessages,
   } = assistant;
   const compact = mode === "launcher";
 
@@ -576,6 +614,21 @@ function AssistantChatSurface({
       "bg-surface border border-border rounded-card shadow-e1 flex flex-col min-h-0",
       compact ? "border-0 rounded-none shadow-none flex-1" : "h-[68vh]"
     )}>
+      {msgs.length > 0 && (
+        <div className={cn(
+          "shrink-0 flex justify-end border-b border-border-soft bg-surface",
+          compact ? "px-3 py-2" : "px-4 py-2"
+        )}>
+          <button
+            type="button"
+            onClick={clearMessages}
+            disabled={busy}
+            className="text-[11px] font-semibold text-slate-400 hover:text-er disabled:opacity-50"
+          >
+            Xóa lịch sử
+          </button>
+        </div>
+      )}
       <div className={cn(
         "flex-1 overflow-y-auto flex flex-col gap-3 bg-canvas/50",
         compact ? "p-3" : "p-4"
