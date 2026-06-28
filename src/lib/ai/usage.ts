@@ -35,6 +35,10 @@ const MODEL_PRICE_PER_MILLION_TOKENS: Record<string, { input: number; output: nu
   "gpt-4.1": { input: 2, output: 8 },
   "gpt-4.1-mini": { input: 0.4, output: 1.6 },
   "gpt-4.1-nano": { input: 0.1, output: 0.4 },
+  "deepseek-chat": { input: 0.14, output: 0.28 },
+  "deepseek-reasoner": { input: 0.435, output: 0.87 },
+  "gemini-2.5-flash": { input: 0.3, output: 2.5 },
+  "gemini-2.5-pro": { input: 1.25, output: 10 },
 };
 
 function estimateCostMicrousd(usage: AiTokenUsage) {
