@@ -499,7 +499,7 @@ async function inboundPreviewFromAttachments(
   };
 }
 
-async function getPriceContext() {
+export async function getPriceContext() {
   const [productRows, bookRows] = await Promise.all([
     db
       .select({
@@ -701,7 +701,7 @@ function attachmentExtractedText(prompt: string) {
   return cleanName(prompt.slice(index + marker.length).replace(/\s+/g, " ")).slice(0, 300);
 }
 
-function formulaPreview(prompt: string, books: PriceBookOption[]): AiActionPreview {
+export function formulaPreview(prompt: string, books: PriceBookOption[]): AiActionPreview {
   const q = normalize(prompt);
   const book = matchPriceBook(prompt, books);
   const amount = q.includes("%") ? parseQuantity(prompt) : parseMoneyAmount(prompt);
@@ -753,7 +753,7 @@ function formulaPreview(prompt: string, books: PriceBookOption[]): AiActionPrevi
   };
 }
 
-function restockPreview(prompt: string, restock: RestockRow[]): AiActionPreview {
+export function restockPreview(prompt: string, restock: RestockRow[]): AiActionPreview {
   const rows = restock.filter((row) => row.suggestedQty > 0).slice(0, 5);
   return {
     id: randomUUID(),
@@ -799,7 +799,7 @@ function restockPreview(prompt: string, restock: RestockRow[]): AiActionPreview 
   };
 }
 
-async function inboundPreview(prompt: string, parsedAttachments: ParsedAiAttachment[] = []): Promise<AiActionPreview> {
+export async function inboundPreview(prompt: string, parsedAttachments: ParsedAiAttachment[] = []): Promise<AiActionPreview> {
   const context = await getInboundContext();
   const attachmentPreview = parsedAttachments.length
     ? await inboundPreviewFromAttachments(prompt, context, parsedAttachments)
@@ -883,7 +883,7 @@ async function inboundPreview(prompt: string, parsedAttachments: ParsedAiAttachm
   };
 }
 
-async function pricePreview(prompt: string): Promise<AiActionPreview> {
+export async function pricePreview(prompt: string): Promise<AiActionPreview> {
   const context = await getPriceContext();
   const productMatch = matchNamed(prompt, context.products);
   const product = productMatch.match;
@@ -947,7 +947,7 @@ async function pricePreview(prompt: string): Promise<AiActionPreview> {
   };
 }
 
-async function productCommandPreview(prompt: string): Promise<AiActionPreview> {
+export async function productCommandPreview(prompt: string): Promise<AiActionPreview> {
   const q = normalize(prompt);
   const context = await getProductCommandContext();
   const isCategory = q.includes("danh muc") || q.includes("category");
@@ -1087,7 +1087,7 @@ function simpleCreatePreview(input: {
   };
 }
 
-async function customerPreview(prompt: string): Promise<AiActionPreview> {
+export async function customerPreview(prompt: string): Promise<AiActionPreview> {
   const q = normalize(prompt);
   const customers = await getCustomerContext();
   const isUpdate = q.includes("cap nhat") || q.includes("sua ");
@@ -1160,7 +1160,7 @@ async function customerPreview(prompt: string): Promise<AiActionPreview> {
   };
 }
 
-function cashbookPreview(prompt: string): AiActionPreview {
+export function cashbookPreview(prompt: string): AiActionPreview {
   const q = normalize(prompt);
   const amount = parseMoneyAmount(prompt);
   const isIncome = q.includes("ghi thu") || q.includes("thu ");
@@ -1192,7 +1192,7 @@ function cashbookPreview(prompt: string): AiActionPreview {
   };
 }
 
-async function orderActionPreview(prompt: string): Promise<AiActionPreview> {
+export async function orderActionPreview(prompt: string): Promise<AiActionPreview> {
   const q = normalize(prompt);
   const context = await getSalesContext();
   const isPayment = q.includes("thanh toan") || q.includes("da tra") || q.includes("tra tien");
@@ -1363,7 +1363,7 @@ async function orderActionPreview(prompt: string): Promise<AiActionPreview> {
   };
 }
 
-async function posCartPreview(prompt: string, source: "voice" | "image"): Promise<AiActionPreview> {
+export async function posCartPreview(prompt: string, source: "voice" | "image"): Promise<AiActionPreview> {
   const context = await getSalesContext();
   const lines = parseProductLines(prompt, context.products);
   const unresolvedText = source === "image" ? attachmentExtractedText(prompt) : "";
