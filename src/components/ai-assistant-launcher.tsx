@@ -13,6 +13,8 @@ import {
   Mic,
   Minus,
   Paperclip,
+  Pencil,
+  Plus,
   Send,
   Sparkles,
   X,
@@ -67,6 +69,13 @@ type AiUsageStatus = {
   outputTokens: number;
   totalTokens: number;
   estimatedCostUsd: number;
+};
+
+type AiSessionSummary = {
+  id: string;
+  title: string;
+  surface: AssistantSurface;
+  messageCount?: number;
 };
 
 type FabPosition = {
@@ -240,6 +249,23 @@ function serverMessagesToChat(messages: unknown[]): Msg[] {
   }).filter((msg) => msg.text);
 }
 
+function serverSessions(value: unknown): AiSessionSummary[] {
+  const sessions = value && typeof value === "object" && Array.isArray((value as { sessions?: unknown }).sessions)
+    ? (value as { sessions: unknown[] }).sessions
+    : [];
+  return sessions.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const raw = item as Record<string, unknown>;
+    if (typeof raw.id !== "string") return [];
+    return [{
+      id: raw.id,
+      title: typeof raw.title === "string" && raw.title.trim() ? raw.title : "AI Assistant",
+      surface: raw.surface === "pos" ? "pos" : "web",
+      messageCount: typeof raw.messageCount === "number" ? raw.messageCount : undefined,
+    }];
+  });
+}
+
 async function uploadAiAttachment(file: File): Promise<ComposerAttachment> {
   const form = new FormData();
   form.append("file", file);
@@ -261,6 +287,7 @@ function useAssistantState(surface: AssistantSurface) {
   const [input, setInput] = useState("");
   const [msgs, setMsgs] = useState<Msg[]>(() => readChatHistory(chatHistoryKey));
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<AiSessionSummary[]>([]);
   const [serverHydrated, setServerHydrated] = useState(false);
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
@@ -274,26 +301,35 @@ function useAssistantState(surface: AssistantSurface) {
     window.localStorage.setItem(chatHistoryKey, JSON.stringify(sanitizeMessagesForStorage(msgs)));
   }, [chatHistoryKey, msgs]);
 
+  async function loadServerSession(id: string) {
+    const loaded = await getJson(`/api/mobile/ai/sessions?sessionId=${id}`);
+    const messages = Array.isArray((loaded as { messages?: unknown }).messages)
+      ? (loaded as { messages: unknown[] }).messages
+      : [];
+    setSessionId(id);
+    setMsgs(serverMessagesToChat(messages));
+  }
+
+  async function refreshSessions(selectLatest = false) {
+    const data = await getJson(`/api/mobile/ai/sessions?surface=${surface}`);
+    const next = serverSessions(data);
+    setSessions(next);
+    if (selectLatest && next[0]) await loadServerSession(next[0].id);
+    return next;
+  }
+
   useEffect(() => {
     let cancelled = false;
-    getJson(`/api/mobile/ai/sessions?surface=${surface}`)
+    refreshSessions(false)
       .then(async (data) => {
         if (cancelled) return;
-        const sessions = Array.isArray((data as { sessions?: unknown }).sessions)
-          ? (data as { sessions: Array<{ id?: unknown }> }).sessions
-          : [];
-        const firstId = typeof sessions[0]?.id === "string" ? sessions[0].id : null;
+        const firstId = data[0]?.id ?? null;
         if (!firstId) {
           setServerHydrated(true);
           return;
         }
-        const loaded = await getJson(`/api/mobile/ai/sessions?sessionId=${firstId}`);
         if (cancelled) return;
-        const messages = Array.isArray((loaded as { messages?: unknown }).messages)
-          ? (loaded as { messages: unknown[] }).messages
-          : [];
-        setSessionId(firstId);
-        setMsgs(serverMessagesToChat(messages));
+        await loadServerSession(firstId);
         setServerHydrated(true);
       })
       .catch(() => { if (!cancelled) setServerHydrated(true); });
@@ -313,6 +349,7 @@ function useAssistantState(surface: AssistantSurface) {
       }).then((data) => {
         const id = (data as { session?: { id?: unknown } }).session?.id;
         if (typeof id === "string") setSessionId(id);
+        void refreshSessions(false).catch(() => {});
       }).catch(() => {});
     }, 500);
     return () => {
@@ -532,7 +569,36 @@ function useAssistantState(surface: AssistantSurface) {
     if (sessionId) {
       void deleteJson(`/api/mobile/ai/sessions?sessionId=${sessionId}`).catch(() => {});
       setSessionId(null);
+      setSessions((current) => current.filter((item) => item.id !== sessionId));
     }
+  }
+
+  async function newSession() {
+    setMsgs([]);
+    setInput("");
+    const data = await postJson("/api/mobile/ai/sessions", { surface, title: "AI Assistant" });
+    const id = (data as { session?: { id?: unknown } }).session?.id;
+    if (typeof id === "string") setSessionId(id);
+    await refreshSessions(false).catch(() => {});
+  }
+
+  async function switchSession(id: string) {
+    if (!id || id === sessionId || busy) return;
+    await loadServerSession(id);
+  }
+
+  async function renameSession() {
+    if (!sessionId) return;
+    const current = sessions.find((item) => item.id === sessionId);
+    const title = window.prompt("Tên cuộc chat", current?.title ?? "AI Assistant")?.trim();
+    if (!title) return;
+    await putJson("/api/mobile/ai/sessions", {
+      sessionId,
+      surface,
+      title,
+      messages: sanitizeMessagesForStorage(msgs),
+    }).catch(() => {});
+    setSessions((items) => items.map((item) => item.id === sessionId ? { ...item, title } : item));
   }
 
   return {
@@ -545,6 +611,8 @@ function useAssistantState(surface: AssistantSurface) {
     removeAttachment,
     handlePaste,
     msgs,
+    sessions,
+    sessionId,
     busy,
     listening,
     surface,
@@ -552,6 +620,9 @@ function useAssistantState(surface: AssistantSurface) {
     suggestions,
     send,
     startVoiceInput,
+    newSession,
+    switchSession,
+    renameSession,
     resolvePreview,
     clearMessages,
   };
@@ -787,6 +858,8 @@ function AssistantChatSurface({
     removeAttachment,
     handlePaste,
     msgs,
+    sessions,
+    sessionId,
     busy,
     listening,
     surface,
@@ -794,6 +867,9 @@ function AssistantChatSurface({
     suggestions,
     send,
     startVoiceInput,
+    newSession,
+    switchSession,
+    renameSession,
     resolvePreview,
     clearMessages,
   } = assistant;
@@ -807,6 +883,47 @@ function AssistantChatSurface({
       "bg-surface border border-border rounded-card shadow-e1 flex flex-col min-h-0 overflow-hidden",
       compact ? "border-0 rounded-none shadow-none flex-1" : "flex-1 h-full"
     )}>
+      {(sessions.length > 0 || sessionId) && (
+        <div className={cn(
+          "shrink-0 flex items-center gap-2 border-b border-border-soft bg-surface",
+          compact ? "px-3 py-2" : "px-4 py-2"
+        )}>
+          <select
+            value={sessionId ?? ""}
+            onChange={(event) => void switchSession(event.target.value)}
+            disabled={busy}
+            className="min-w-0 flex-1 rounded-lg border border-border bg-canvas px-2.5 py-1.5 text-xs font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-60 dark:text-slate-300"
+            aria-label="Chọn cuộc chat AI"
+          >
+            {!sessionId && <option value="">Cuộc chat mới</option>}
+            {sessions.map((session) => (
+              <option key={session.id} value={session.id}>
+                {session.title}{typeof session.messageCount === "number" ? ` (${session.messageCount})` : ""}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => void newSession()}
+            disabled={busy}
+            className="h-8 w-8 grid place-items-center rounded-lg border border-border text-slate-500 hover:bg-surface-2 disabled:opacity-50"
+            title="Tạo cuộc chat mới"
+            aria-label="Tạo cuộc chat mới"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => void renameSession()}
+            disabled={busy || !sessionId}
+            className="h-8 w-8 grid place-items-center rounded-lg border border-border text-slate-500 hover:bg-surface-2 disabled:opacity-50"
+            title="Đổi tên cuộc chat"
+            aria-label="Đổi tên cuộc chat"
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+        </div>
+      )}
       {msgs.length > 0 && (
         <div className={cn(
           "shrink-0 flex items-center justify-between gap-3 border-b border-border-soft bg-surface",
