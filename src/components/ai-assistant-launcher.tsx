@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { type ClipboardEvent, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   CheckCircle2,
+  FileText,
+  ImageIcon,
   Info,
   Maximize2,
   MessageSquare,
   Minus,
+  Paperclip,
   Send,
   Sparkles,
   X,
@@ -22,6 +25,7 @@ type AssistantSurface = "web" | "pos";
 type Msg = {
   role: "user" | "assistant";
   text: string;
+  attachments?: ComposerAttachment[];
   state?: PreviewResolutionState;
   preview?: AiActionPreview;
   result?: string;
@@ -38,6 +42,38 @@ type AssistantResponse = {
   state?: AiAssistantState;
   actionPreview?: AiActionPreview;
 };
+
+type ComposerAttachment = {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  kind: "image" | "document";
+  previewUrl?: string;
+};
+
+const MAX_ATTACHMENTS = 4;
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const ACCEPTED_ATTACHMENT_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "application/pdf",
+  "text/csv",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+]);
+
+function attachmentKind(type: string): ComposerAttachment["kind"] | null {
+  if (type.startsWith("image/") && ACCEPTED_ATTACHMENT_TYPES.has(type)) return "image";
+  if (ACCEPTED_ATTACHMENT_TYPES.has(type)) return "document";
+  return null;
+}
+
+function fileSizeText(size: number) {
+  if (size >= 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(size / 1024))} KB`;
+}
 
 async function postJson(path: string, body: unknown) {
   const res = await fetch(path, {
@@ -56,7 +92,10 @@ function useAssistantState(surface: AssistantSurface) {
   const t = useTranslations();
   const [input, setInput] = useState("");
   const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const suggestions = surface === "pos"
     ? [
@@ -74,14 +113,72 @@ function useAssistantState(surface: AssistantSurface) {
         "Đặt giá SKU A là 120.000",
       ];
 
+  function addFiles(files: FileList | File[]) {
+    const next: ComposerAttachment[] = [];
+    setAttachmentError(null);
+    for (const file of Array.from(files)) {
+      if (attachments.length + next.length >= MAX_ATTACHMENTS) {
+        setAttachmentError(`Chỉ đính kèm tối đa ${MAX_ATTACHMENTS} file mỗi tin nhắn.`);
+        break;
+      }
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        setAttachmentError(`${file.name} vượt quá giới hạn 10 MB.`);
+        continue;
+      }
+      const kind = attachmentKind(file.type);
+      if (!kind) {
+        setAttachmentError(`${file.name} chưa được hỗ trợ. Hỗ trợ PNG, JPG, WebP, PDF, CSV, XLSX.`);
+        continue;
+      }
+      next.push({
+        id: `${Date.now()}-${crypto.randomUUID()}`,
+        name: file.name || (kind === "image" ? "clipboard-image.png" : "attachment"),
+        mimeType: file.type,
+        size: file.size,
+        kind,
+        previewUrl: kind === "image" ? URL.createObjectURL(file) : undefined,
+      });
+    }
+    if (next.length) setAttachments((current) => [...current, ...next]);
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments((current) => {
+      const found = current.find((item) => item.id === id);
+      if (found?.previewUrl) URL.revokeObjectURL(found.previewUrl);
+      return current.filter((item) => item.id !== id);
+    });
+  }
+
+  function handlePaste(event: ClipboardEvent<HTMLInputElement>) {
+    const files = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
+    if (files.length === 0) return;
+    event.preventDefault();
+    addFiles(files);
+  }
+
   async function send(text: string) {
     const q = text.trim();
-    if (!q || busy) return;
-    setMsgs((m) => [...m, { role: "user", text: q }]);
+    if ((!q && attachments.length === 0) || busy) return;
+    const outgoingAttachments = attachments;
+    const prompt = outgoingAttachments.length
+      ? `${q || "Phân tích file đính kèm"}\n\n[${outgoingAttachments.length} attachment(s): ${outgoingAttachments.map((item) => item.name).join(", ")}]`
+      : q;
+    setMsgs((m) => [...m, { role: "user", text: q || "File đính kèm", attachments: outgoingAttachments }]);
     setInput("");
+    setAttachments([]);
     setBusy(true);
     try {
-      const data = await postJson("/api/mobile/ai/assistant", { prompt: q }) as AssistantResponse;
+      const data = await postJson("/api/mobile/ai/assistant", {
+        prompt,
+        attachments: outgoingAttachments.map(({ id, name, mimeType, size, kind }) => ({
+          id,
+          name,
+          mimeType,
+          size,
+          kind,
+        })),
+      }) as AssistantResponse;
       setMsgs((m) => [
         ...m,
         {
@@ -140,6 +237,12 @@ function useAssistantState(surface: AssistantSurface) {
   return {
     input,
     setInput,
+    attachments,
+    attachmentError,
+    fileRef,
+    addFiles,
+    removeAttachment,
+    handlePaste,
     msgs,
     busy,
     suggestions,
@@ -297,7 +400,21 @@ function AssistantChatSurface({
   emptyText: string;
   placeholder: string;
 }) {
-  const { input, setInput, msgs, busy, suggestions, send, resolvePreview } = assistant;
+  const {
+    input,
+    setInput,
+    attachments,
+    attachmentError,
+    fileRef,
+    addFiles,
+    removeAttachment,
+    handlePaste,
+    msgs,
+    busy,
+    suggestions,
+    send,
+    resolvePreview,
+  } = assistant;
   const compact = mode === "launcher";
 
   return (
@@ -321,11 +438,18 @@ function AssistantChatSurface({
         ) : msgs.map((m, i) => (
           <div key={`${m.role}-${i}`} className={cn("flex flex-col gap-2", m.role === "user" ? "items-end" : "items-start")}>
             <div className={cn(
-              "px-3.5 py-2 rounded-2xl text-sm leading-relaxed",
+              "px-3.5 py-2 rounded-2xl text-sm leading-relaxed space-y-2",
               compact ? "max-w-[88%]" : "max-w-[82%]",
               m.role === "user" ? "bg-primary-600 text-white rounded-tr-md" : "bg-surface border border-border rounded-tl-md"
             )}>
-              {m.text}
+              <div>{m.text}</div>
+              {m.attachments && m.attachments.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {m.attachments.map((attachment) => (
+                    <AttachmentPill key={attachment.id} attachment={attachment} compact />
+                  ))}
+                </div>
+              )}
             </div>
             {m.preview && (
               <PreviewCard
@@ -357,17 +481,97 @@ function AssistantChatSurface({
         ))}
       </div>
 
-      <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="p-3 flex items-center gap-2 border-t border-border mt-2 shrink-0">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={placeholder}
-          className="flex-1 min-w-0 px-3 py-2 text-sm rounded-full border border-border bg-canvas focus:outline-none focus:ring-2 focus:ring-primary-500"
-        />
-        <button disabled={busy} type="submit" className="w-9 h-9 grid place-items-center rounded-full bg-primary-600 text-white shrink-0 disabled:opacity-50" title="Send">
-          <Send className="w-4 h-4" />
-        </button>
+      <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="p-3 border-t border-border mt-2 shrink-0">
+        {attachments.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-2">
+            {attachments.map((attachment) => (
+              <AttachmentPill
+                key={attachment.id}
+                attachment={attachment}
+                onRemove={() => removeAttachment(attachment.id)}
+              />
+            ))}
+          </div>
+        )}
+        {attachmentError && (
+          <div className="mb-2 rounded-lg bg-er-soft px-3 py-2 text-xs font-semibold text-er">
+            {attachmentError}
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              addFiles(e.target.files ?? []);
+              e.currentTarget.value = "";
+            }}
+          />
+          <button
+            disabled={busy}
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="w-9 h-9 grid place-items-center rounded-full border border-border bg-surface text-slate-600 hover:bg-surface-2 shrink-0 disabled:opacity-50"
+            title="Đính kèm file hoặc ảnh"
+            aria-label="Attach file"
+          >
+            <Paperclip className="w-4 h-4" />
+          </button>
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onPaste={handlePaste}
+            placeholder={attachments.length ? "Nhập yêu cầu cho file đính kèm..." : placeholder}
+            className="flex-1 min-w-0 px-3 py-2 text-sm rounded-full border border-border bg-canvas focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+          <button disabled={busy} type="submit" className="w-9 h-9 grid place-items-center rounded-full bg-primary-600 text-white shrink-0 disabled:opacity-50" title="Send">
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
       </form>
+    </div>
+  );
+}
+
+function AttachmentPill({
+  attachment,
+  compact = false,
+  onRemove,
+}: {
+  attachment: ComposerAttachment;
+  compact?: boolean;
+  onRemove?: () => void;
+}) {
+  return (
+    <div className={cn(
+      "group flex items-center gap-2 rounded-lg border px-2 py-1.5 text-xs",
+      compact ? "border-white/25 bg-white/10 text-current" : "border-border bg-surface-2 text-slate-600 dark:text-slate-300"
+    )}>
+      {attachment.previewUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={attachment.previewUrl} alt="" className="h-8 w-8 rounded-md object-cover" />
+      ) : attachment.kind === "image" ? (
+        <ImageIcon className="h-4 w-4 shrink-0" />
+      ) : (
+        <FileText className="h-4 w-4 shrink-0" />
+      )}
+      <div className="min-w-0">
+        <div className="max-w-40 truncate font-semibold">{attachment.name}</div>
+        {!compact && <div className="text-[10px] opacity-70">{fileSizeText(attachment.size)}</div>}
+      </div>
+      {onRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="rounded-full p-0.5 opacity-60 hover:bg-black/10 hover:opacity-100"
+          aria-label={`Remove ${attachment.name}`}
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
     </div>
   );
 }
