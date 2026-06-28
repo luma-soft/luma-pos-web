@@ -628,9 +628,13 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
     });
   }
   const configured = clearOpenaiApiKey ? false : openaiApiKeySet || Boolean(form.openaiApiKey.trim());
+  const displayLimit = Math.max(0, Math.min(100000, Math.trunc(Number(form.monthlyUsageLimit) || 0)));
+  const displayRemaining = Math.max(0, displayLimit - usage.used);
+  const displayExhausted = displayRemaining <= 0;
+  const limitPreviewChanged = displayLimit !== usage.limit;
   return (
     <>
-      <Card title={L ? "Nhà cung cấp AI" : "AI Provider"} vi={L ? "OCR/vision cho trợ lý AI" : "OCR/vision for AI Assistant"}>
+      <Card title={L ? "Nhà cung cấp AI" : "AI Provider"} vi={L ? "OCR và lập kế hoạch cho trợ lý AI" : "OCR and planning for AI Assistant"}>
         <div className="p-4.5 flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className={cn(
@@ -639,7 +643,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
             )}>
               {configured ? (L ? "Đã cấu hình API key" : "API key configured") : (L ? "Chưa có API key" : "API key missing")}
             </span>
-            <span className="text-[11px] text-slate-500">{L ? "AI sẽ dùng key trong Settings trước, sau đó mới fallback về env." : "AI uses the Settings key first, then falls back to env."}</span>
+            <span className="text-[11px] text-slate-500">{L ? "AI ưu tiên API key trong Settings; nếu trống mới dùng env." : "AI uses the Settings API key first; env is only used when Settings is empty."}</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
@@ -682,7 +686,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <span className={FL}>{L ? "Text planner model" : "Text planner model"}</span>
+              <span className={FL}>{L ? "Model lập kế hoạch" : "Planner model"}</span>
               <SearchableSelect
                 options={AI_TEXT_MODEL_OPTIONS}
                 value={form.textModel}
@@ -693,7 +697,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
               />
             </div>
             <div className="flex flex-col gap-1">
-              <span className={FL}>{L ? "Vision/OCR model" : "Vision/OCR model"}</span>
+              <span className={FL}>{L ? "Model OCR/ảnh" : "OCR/image model"}</span>
               <SearchableSelect
                 options={AI_MODEL_OPTIONS}
                 value={form.visionModel}
@@ -710,7 +714,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <span className={FL}>{L ? "Bucket lưu attachment" : "Attachment bucket"}</span>
+              <span className={FL}>{L ? "Bucket lưu file đính kèm" : "Attachment bucket"}</span>
               <SearchableSelect
                 options={AI_BUCKET_OPTIONS}
                 value={form.attachmentsBucket}
@@ -721,7 +725,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
               />
             </div>
             <div className="flex flex-col gap-1">
-              <span className={FL}>{L ? "Giới hạn AI/tháng" : "Monthly AI limit"}</span>
+              <span className={FL}>{L ? "Giới hạn lượt AI/tháng" : "Monthly AI unit limit"}</span>
               <input
                 className={cn(FI, "font-mono")}
                 type="number"
@@ -736,13 +740,13 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
           </div>
           <div className="grid grid-cols-3 gap-2">
             {[
-              [L ? "Đã dùng" : "Used", usage.used],
-              [L ? "Còn lại" : "Remaining", usage.remaining],
-              [L ? "Giới hạn" : "Limit", usage.limit],
+              [L ? "Lượt đã dùng" : "Units used", usage.used],
+              [L ? "Lượt còn lại" : "Units remaining", displayRemaining],
+              [L ? "Giới hạn lượt/tháng" : "Monthly unit limit", displayLimit],
             ].map(([label, value]) => (
               <div key={String(label)} className="rounded-[10px] border border-border bg-canvas px-3 py-2">
                 <div className={FL}>{label}</div>
-                <div className={cn("mt-1 font-mono text-base font-extrabold", label === (L ? "Còn lại" : "Remaining") && usage.exhausted ? "text-er" : "text-slate-800 dark:text-slate-100")}>{Number(value).toLocaleString("vi-VN")}</div>
+                <div className={cn("mt-1 font-mono text-base font-extrabold", label === (L ? "Lượt còn lại" : "Units remaining") && displayExhausted ? "text-er" : "text-slate-800 dark:text-slate-100")}>{Number(value).toLocaleString("vi-VN")}</div>
               </div>
             ))}
           </div>
@@ -761,8 +765,8 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
           </div>
           <div className="px-3.5 py-2.5 bg-in-soft border border-in/20 rounded-[10px] text-[11px] text-in leading-relaxed">
             {L
-              ? `API key không hiển thị lại sau khi lưu và không được ghi raw vào audit log. Usage được tính theo tháng ${usage.period}; mỗi lần hỏi AI tốn 1 lượt, mỗi attachment tốn thêm 1 lượt. Token/cost là ước tính từ provider/model trả về, không phải billing remaining chính thức.`
-              : `The API key is never shown again after saving and is not written raw into audit logs. Usage is tracked for ${usage.period}; each AI request costs 1 unit, each attachment adds 1 unit. Token/cost totals are provider/model estimates, not official billing remaining.`}
+              ? `API key không hiển thị lại sau khi lưu và không được ghi raw vào audit log. Usage được tính theo tháng ${usage.period}; mỗi lần hỏi AI tốn 1 lượt, mỗi file đính kèm được xử lý (tối đa 4 file/lần) tốn thêm 1 lượt. Giới hạn/còn lại hiển thị theo giá trị đang nhập${limitPreviewChanged ? ", có hiệu lực sau khi lưu" : ""}. Token/chi phí là ước tính từ provider/model trả về, không phải hóa đơn chính thức.`
+              : `The API key is never shown again after saving and is not written raw into audit logs. Usage is tracked for ${usage.period}; each AI request costs 1 unit, and each processed attachment (up to 4 files per request) adds 1 unit. Limit/remaining values follow the current input${limitPreviewChanged ? " and take effect after saving" : ""}. Token/cost totals are provider/model estimates, not official billing.`}
           </div>
         </div>
       </Card>
