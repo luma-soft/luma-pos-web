@@ -18,6 +18,12 @@ function one(value: string | string[] | undefined) {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+function csvUuids(value: string | string[] | undefined) {
+  const raw = one(value);
+  if (!raw) return [];
+  return raw.split(",").map((item) => item.trim()).filter((item) => UUID_RE.test(item));
+}
+
 async function sourceInvoiceFromParams(params: PosSearchParams): Promise<PosSourceInvoice | null> {
   const mode = one(params.sourceMode);
   const orderId = one(params.sourceOrderId);
@@ -51,8 +57,13 @@ async function sourceInvoiceFromParams(params: PosSearchParams): Promise<PosSour
 export default async function POSPage({ searchParams }: { searchParams: Promise<PosSearchParams> }) {
   const params = await searchParams;
   const sourceInvoice = await sourceInvoiceFromParams(params);
+  const aiProductIds = csvUuids(params.aiProducts);
+  const includeProductIds = [
+    ...(sourceInvoice?.items?.map((item) => item.productId) ?? []),
+    ...aiProductIds,
+  ];
   const [data, t, printTemplate] = await Promise.all([
-    getPosData({ includeProductIds: sourceInvoice?.items?.map((item) => item.productId) }),
+    getPosData({ includeProductIds }),
     getTranslations(),
     getPrintTemplate("order"),
   ]);

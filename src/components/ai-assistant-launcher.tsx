@@ -80,8 +80,81 @@ type AiSessionSummary = {
   messageCount?: number;
 };
 
+const POS_AI_DRAFT_STORAGE_KEY = "luma-pos-ai-cart-draft";
+
 function isPosCartPreview(preview: AiActionPreview) {
   return preview.intent === "pos_voice_cart_draft" || preview.intent === "pos_image_cart_draft";
+}
+
+function posDraftItems(preview: AiActionPreview): unknown[] {
+  const items = preview.action.payload.items;
+  return Array.isArray(items) ? items : [];
+}
+
+function posDraftProductIds(preview: AiActionPreview) {
+  return posDraftItems(preview)
+    .map((item) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return "";
+      const productId = (item as { productId?: unknown }).productId;
+      return typeof productId === "string" && productId.trim() ? productId.trim() : "";
+    })
+    .filter(Boolean);
+}
+
+function posDraftHref(preview: AiActionPreview) {
+  const ids = [...new Set(posDraftProductIds(preview))];
+  return ids.length ? `/pos?aiDraft=1&aiProducts=${encodeURIComponent(ids.join(","))}` : "/pos?aiDraft=1";
+}
+
+function recordWithPosDraftHref(record: Msg["record"] | undefined, preview: AiActionPreview): Msg["record"] | undefined {
+  if (!record || !isPosCartPreview(preview)) return record;
+  return { ...record, href: posDraftHref(preview) };
+}
+
+function storePosDraft(preview: AiActionPreview) {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(POS_AI_DRAFT_STORAGE_KEY, JSON.stringify({
+      previewId: preview.id,
+      intent: preview.intent,
+      items: posDraftItems(preview),
+      createdAt: Date.now(),
+    }));
+  } catch {
+    // Ignore quota/private-mode failures; the query link still carries product ids.
+  }
+}
+
+function dispatchPosDraft(preview: AiActionPreview) {
+  window.dispatchEvent(new CustomEvent("luma:pos-ai-cart-draft", {
+    detail: {
+      previewId: preview.id,
+      intent: preview.intent,
+      items: posDraftItems(preview),
+    },
+  }));
+}
+
+function previewSubtitle(preview: AiActionPreview) {
+  if (isPosCartPreview(preview)) {
+    return preview.lines.length
+      ? `${preview.lines.length} dòng đã nhận · kiểm tra trước khi đưa vào POS`
+      : "Chưa tìm được dòng hàng phù hợp";
+  }
+  if (preview.missingFields.length > 0) return "Cần bổ sung thông tin";
+  return preview.confirmationRequired ? "Chưa thay đổi dữ liệu · chờ xác nhận" : "Xem trước";
+}
+
+function previewBadgeText(preview: AiActionPreview) {
+  if (preview.strongConfirmation) return "Cần kiểm tra kỹ";
+  if (isPosCartPreview(preview)) return "Giỏ nháp";
+  return "Xem trước";
+}
+
+function recordLinkText(record: NonNullable<Msg["record"]>) {
+  if (record.type === "pos_cart_draft") return `Mở POS kiểm tra ${record.code}`;
+  if (record.type === "purchase_order") return `Mở PO nháp ${record.code}`;
+  return `Mở ${record.code}`;
 }
 
 function strongConfirmationText(preview: AiActionPreview) {
@@ -568,33 +641,32 @@ function useAssistantState(surface: AssistantSurface) {
   async function resolvePreview(index: number, event: "confirmed" | "cancelled") {
     const msg = msgs[index];
     if (!msg.preview || busy) return;
+    const preview = msg.preview;
     setBusy(true);
     try {
       const result = await postJson("/api/mobile/ai/actions", {
         event,
-        prompt: msg.preview.action.payload.prompt,
-        actionPreview: msg.preview,
+        prompt: preview.action.payload.prompt,
+        actionPreview: preview,
         surface,
       }) as {
         message?: string;
         record?: Msg["record"];
         status?: PreviewResolutionState;
       };
-      if (event === "confirmed" && surface === "pos" && isPosCartPreview(msg.preview)) {
-        window.dispatchEvent(new CustomEvent("luma:pos-ai-cart-draft", {
-          detail: {
-            previewId: msg.preview.id,
-            intent: msg.preview.intent,
-            items: msg.preview.action.payload.items,
-          },
-        }));
+      const confirmedPosDraft = event === "confirmed" && isPosCartPreview(preview) && posDraftItems(preview).length > 0;
+      if (confirmedPosDraft) {
+        storePosDraft(preview);
+        if (surface === "pos") {
+          dispatchPosDraft(preview);
+        }
       }
       setMsgs((m) => m.map((item, i) => i === index
         ? {
             ...item,
             state: result.status ?? event,
             result: result.message ?? (event === "confirmed" ? "Confirmed" : "Cancelled"),
-            record: result.record,
+            record: confirmedPosDraft ? recordWithPosDraftHref(result.record, preview) : result.record,
           }
         : item));
     } catch (e) {
@@ -1399,14 +1471,14 @@ function PreviewCard({
         <div className="min-w-0">
           <div className="font-bold text-sm truncate">{preview.title}</div>
           <div className="text-[11px] text-slate-400 mt-0.5">
-            {preview.intent} · confidence {Math.round(preview.confidence * 100)}%
+            {previewSubtitle(preview)}
           </div>
         </div>
         <span className={cn(
           "shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-bold",
           preview.strongConfirmation ? "bg-warn-soft text-warn" : "bg-primary-50 text-primary-700"
         )}>
-          {preview.strongConfirmation ? "Strong confirm" : "Preview"}
+          {previewBadgeText(preview)}
         </span>
       </div>
       <div className="p-3 space-y-3">
@@ -1482,10 +1554,10 @@ function PreviewCard({
       </div>
       <div className={cn("p-3 bg-surface-2 border-t border-border flex gap-2", compact ? "flex-col" : "items-center justify-between")}>
         <div className="min-w-0">
-          <div className="text-[11px] text-slate-400">{result ?? "Preview đã được ghi audit."}</div>
+          <div className="text-[11px] text-slate-400">{result ?? "Chưa thay đổi dữ liệu. Hãy kiểm tra trước khi xác nhận."}</div>
           {record && (
             <a href={record.href} className="mt-1 block text-xs font-bold text-primary-600 hover:underline">
-              Mở PO nháp {record.code}
+              {recordLinkText(record)}
             </a>
           )}
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -42,6 +42,13 @@ type PosAiCartDraftItem = {
   unitName?: string;
   quantity?: number;
   confidence?: number;
+};
+
+type PosAiCartDraftPayload = {
+  previewId?: string;
+  intent?: string;
+  items?: unknown[];
+  createdAt?: number;
 };
 
 type PayMethod = "cash" | "bank_transfer" | "credit";
@@ -93,6 +100,7 @@ interface Invoice {
 
 const INV_KEY = "pos-invoices";
 const ACT_KEY = "pos-active-invoice";
+const AI_POS_DRAFT_KEY = "luma-pos-ai-cart-draft";
 const FIRST_INV_ID = "inv-1"; // id ổn định cho SSR (tránh hydration mismatch)
 
 /** Đơn rỗng. id truyền vào để lần đầu dùng id cố định, các tab sau dùng Date.now. */
@@ -162,6 +170,34 @@ function saveInvoices(list: Invoice[]) {
   try {
     localStorage.setItem(INV_KEY, JSON.stringify(list));
   } catch { /* đầy quota — bỏ qua */ }
+}
+
+function matchAiCartDraftItems(rawItems: unknown[], products: PosProduct[]) {
+  return rawItems.flatMap((raw): Array<{ product: PosProduct; quantity: number }> => {
+    if (!raw || typeof raw !== "object") return [];
+    const item = raw as PosAiCartDraftItem;
+    const name = normalizeSearch(item.productName ?? "");
+    const sku = normalizeSearch(item.sku ?? "");
+    const product = products.find((candidate) =>
+      (!candidate.isVariantParent) &&
+      (
+        (!!item.productId && candidate.id === item.productId) ||
+        (!!sku && normalizeSearch(candidate.sku ?? "") === sku) ||
+        (!!name && normalizeSearch(candidate.name) === name)
+      )
+    );
+    if (!product) return [];
+    return [{ product, quantity: Math.max(1, Math.trunc(Number(item.quantity) || 1)) }];
+  });
+}
+
+function aiProductDraftItemsFromQuery(params: URLSearchParams) {
+  const raw = params.get("aiProducts");
+  if (!raw) return [];
+  return raw.split(",")
+    .map((productId) => productId.trim())
+    .filter(Boolean)
+    .map((productId) => ({ productId, quantity: 1 }));
 }
 
 /** Giá gốc theo bảng giá đã chọn (id). Bảng mặc định/"" → retailPrice; bảng khác → override, fallback retailPrice. */
@@ -274,6 +310,8 @@ export function PosClient({
   // load đơn đang soạn sau khi mount (tránh lệch SSR; defer cho react-compiler)
   useEffect(() => {
     if (sourceInvoice) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("aiDraft") === "1") return;
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
@@ -309,14 +347,14 @@ export function PosClient({
   const isDefaultBook = !priceBook || priceBook === defaultBook?.id;
 
   /** Patch hóa đơn đang mở (nhận object hoặc hàm cập nhật). */
-  function patchActive(patch: Partial<Invoice> | ((inv: Invoice) => Partial<Invoice>)) {
+  const patchActive = useCallback((patch: Partial<Invoice> | ((inv: Invoice) => Partial<Invoice>)) => {
     setInvoices((list) =>
       list.map((inv) => (inv.id === activeId ? { ...inv, ...(typeof patch === "function" ? patch(inv) : patch) } : inv))
     );
-  }
+  }, [activeId]);
   // setter giữ nguyên chữ ký cũ để JSX bên dưới không phải đổi
-  const setCart = (v: CartLine[] | ((c: CartLine[]) => CartLine[])) =>
-    patchActive((inv) => ({ cart: typeof v === "function" ? v(inv.cart) : v }));
+  const setCart = useCallback((v: CartLine[] | ((c: CartLine[]) => CartLine[])) =>
+    patchActive((inv) => ({ cart: typeof v === "function" ? v(inv.cart) : v })), [patchActive]);
   const setProjectId = (v: string) => patchActive({ projectId: v });
   const setProjectName = (v: string) => patchActive({ projectName: v });
   const setDiscountInput = (v: number) => patchActive({ discountInput: v });
@@ -480,7 +518,7 @@ export function PosClient({
     });
   }
 
-  function addQuantityToCart(p: PosProduct, quantity: number) {
+  const addQuantityToCart = useCallback((p: PosProduct, quantity: number) => {
     const safeQuantity = Math.max(1, Math.trunc(Number(quantity) || 1));
     setCart((c) => {
       const existing = c.find((l) => l.product.id === p.id);
@@ -497,28 +535,13 @@ export function PosClient({
         quantity: safeQuantity,
       }];
     });
-  }
+  }, [priceBook, setCart]);
 
   useEffect(() => {
     const onAiCartDraft = (event: Event) => {
       const detail = (event as CustomEvent<{ items?: unknown }>).detail;
       const rawItems = Array.isArray(detail?.items) ? detail.items : [];
-      const matched = rawItems.flatMap((raw): Array<{ product: PosProduct; quantity: number }> => {
-        if (!raw || typeof raw !== "object") return [];
-        const item = raw as PosAiCartDraftItem;
-        const name = normalizeSearch(item.productName ?? "");
-        const sku = normalizeSearch(item.sku ?? "");
-        const product = searchableProducts.find((candidate) =>
-          (!candidate.isVariantParent) &&
-          (
-            (!!item.productId && candidate.id === item.productId) ||
-            (!!sku && normalizeSearch(candidate.sku ?? "") === sku) ||
-            (!!name && normalizeSearch(candidate.name) === name)
-          )
-        );
-        if (!product) return [];
-        return [{ product, quantity: Math.max(1, Math.trunc(Number(item.quantity) || 1)) }];
-      });
+      const matched = matchAiCartDraftItems(rawItems, searchableProducts);
       if (matched.length === 0) return;
       for (const line of matched) addQuantityToCart(line.product, line.quantity);
       setMobileView("cart");
@@ -527,7 +550,39 @@ export function PosClient({
     };
     window.addEventListener("luma:pos-ai-cart-draft", onAiCartDraft);
     return () => window.removeEventListener("luma:pos-ai-cart-draft", onAiCartDraft);
-  }, [priceBook, searchableProducts]);
+  }, [addQuantityToCart, priceBook, searchableProducts]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("aiDraft") !== "1") return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      let stored: PosAiCartDraftPayload | null = null;
+      try {
+        stored = JSON.parse(localStorage.getItem(AI_POS_DRAFT_KEY) ?? "null") as PosAiCartDraftPayload | null;
+      } catch {
+        stored = null;
+      }
+      const storedItems = Array.isArray(stored?.items) ? stored.items : [];
+      const rawItems = storedItems.length > 0 ? storedItems : aiProductDraftItemsFromQuery(params);
+      if (rawItems.length > 0) hydratedRef.current = true;
+      const matched = matchAiCartDraftItems(rawItems, searchableProducts);
+      const consumed = matched.length > 0;
+      if (consumed) {
+        for (const line of matched) addQuantityToCart(line.product, line.quantity);
+        setMobileView("cart");
+        setBrowsing(false);
+        setSearch("");
+      }
+      if (consumed) localStorage.removeItem(AI_POS_DRAFT_KEY);
+      params.delete("aiDraft");
+      params.delete("aiProducts");
+      const query = params.toString();
+      window.history.replaceState(null, "", query ? `/pos?${query}` : "/pos");
+    });
+    return () => { cancelled = true; };
+  }, [addQuantityToCart, priceBook, searchableProducts]);
 
   function selectProduct(p: PosProduct) {
     if (p.isVariantParent && productChildren(p).length > 0) {

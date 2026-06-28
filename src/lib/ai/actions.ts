@@ -1769,18 +1769,25 @@ export async function orderActionPreview(prompt: string): Promise<AiActionPrevie
   };
 }
 
+function posMatchQualityText(confidence: number) {
+  if (confidence >= 0.9) return "Khớp tốt";
+  if (confidence >= 0.82) return "Cần kiểm tra";
+  return "Khớp tương đối, kiểm tra kỹ";
+}
+
 export async function posCartPreview(prompt: string, source: "voice" | "image"): Promise<AiActionPreview> {
   const context = await getSalesContext();
   const lines = parseProductLines(prompt, context.products);
   const unresolvedText = source === "image" ? attachmentExtractedText(prompt) : "";
   const missingFields = lines.length ? [] : ["items"];
+  const sourceText = source === "voice" ? "Danh sách nhập tay/giọng nói" : "Ảnh/OCR";
   return {
     id: randomUUID(),
     intent: source === "voice" ? "pos_voice_cart_draft" : "pos_image_cart_draft",
-    title: source === "voice" ? "POS giọng nói: nháp giỏ hàng" : "POS hình ảnh: nháp giỏ hàng",
+    title: "Nháp giỏ POS từ AI",
     description: lines.length
-      ? "Tôi đã match được sản phẩm để đưa vào giỏ POS nháp. POS vẫn cần user xác nhận trước khi tạo hóa đơn."
-      : "Chưa match được sản phẩm từ nội dung này. Hãy đọc/nhập rõ tên hoặc SKU hơn.",
+      ? "AI đã tìm được sản phẩm trong danh sách. Hãy kiểm tra tên hàng và số lượng trước khi đưa vào POS."
+      : "Chưa tìm được sản phẩm từ nội dung này. Hãy nhập rõ tên hàng, mã SKU hoặc thông số hơn.",
     confidence: lines.length ? 0.78 : 0.42,
     state: lines.length ? "preview" : "needs_input",
     confirmationRequired: true,
@@ -1788,18 +1795,18 @@ export async function posCartPreview(prompt: string, source: "voice" | "image"):
     requiredFields: ["items"],
     missingFields,
     fields: [
-      { label: "Nguồn", value: source === "voice" ? "Giọng nói/transcript" : "Ảnh/OCR text" },
-      { label: "Số dòng match", value: String(lines.length), tone: lines.length ? "success" : "warning" },
+      { label: "Nguồn", value: sourceText },
+      { label: "Dòng đã nhận", value: String(lines.length), tone: lines.length ? "success" : "warning" },
     ],
     lines: lines.map((line) => ({
       label: line.product.name,
       value: `${line.quantity} ${line.product.baseUnit}`,
-      meta: `${line.product.sku} · confidence ${Math.round(line.confidence * 100)}%`,
+      meta: `Mã ${line.product.sku} · ${posMatchQualityText(line.confidence)}`,
       tone: line.confidence >= 0.9 ? "success" : "warning",
     })),
     warnings: [
-      "AI chỉ tạo giỏ POS nháp, không tự tạo hóa đơn hoặc thanh toán.",
-      "Nếu sản phẩm mơ hồ, user cần chọn lại trong POS.",
+      "AI chỉ chuẩn bị giỏ POS nháp; chưa tạo hóa đơn và chưa thanh toán.",
+      "Các dòng cần kiểm tra vẫn phải được rà lại trong POS trước khi bán.",
       ...(unresolvedText && lines.length === 0 ? [`OCR/unresolved: ${unresolvedText}`] : []),
     ],
     action: {

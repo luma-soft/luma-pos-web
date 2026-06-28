@@ -134,6 +134,14 @@ function stringValue(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function posDraftHref(items: unknown[]) {
+  const ids = [...new Set(items
+    .map((item) => stringValue(objectValue(item)?.productId))
+    .filter((id): id is string => Boolean(id))
+  )];
+  return ids.length ? `/pos?aiDraft=1&aiProducts=${encodeURIComponent(ids.join(","))}` : "/pos?aiDraft=1";
+}
+
 async function logAiExecution(input: {
   userId: string;
   action: string;
@@ -717,6 +725,7 @@ export async function POST(request: Request) {
   if (event === "confirmed" && ["pos_voice_cart_draft", "pos_image_cart_draft"].includes(intent)) {
     const payload = previewPayload(preview);
     const items = Array.isArray(payload?.items) ? payload.items : [];
+    const href = posDraftHref(items);
     await logAiExecution({
       userId: gate.userId,
       action: intent,
@@ -727,7 +736,7 @@ export async function POST(request: Request) {
       preview,
       surface: body.surface,
       executedTool: "createPosCartDraft",
-      after: { itemCount: items.length, href: "/pos" },
+      after: { itemCount: items.length, href },
       affectedRecords: items.length ? [{ type: "pos_cart_draft", id: "draft", count: items.length }] : null,
     });
     return mobileAction({
@@ -738,7 +747,7 @@ export async function POST(request: Request) {
         message: items.length
           ? "Đã tạo nháp giỏ POS. Mở POS để kiểm tra và xác nhận thanh toán."
           : "Chưa có dòng hàng hợp lệ để đưa vào POS.",
-        record: { type: "pos_cart_draft", id: "draft", code: `${items.length} dòng`, href: "/pos" },
+        record: { type: "pos_cart_draft", id: "draft", code: `${items.length} dòng`, href },
       },
     });
   }
