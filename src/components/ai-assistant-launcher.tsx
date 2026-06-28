@@ -75,7 +75,7 @@ type ComposerAttachment = {
 const MAX_ATTACHMENTS = 4;
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 const FAB_MARGIN = 12;
-const FAB_MOVE_THRESHOLD = 5;
+const FAB_MOVE_THRESHOLD = 10;
 const ACCEPTED_ATTACHMENT_TYPES = new Set([
   "image/png",
   "image/jpeg",
@@ -368,6 +368,7 @@ export function AiAssistantLauncher({ surface = "web" }: { surface?: AssistantSu
   const storageKey = `luma-ai-fab-position:${surface}`;
   const [fabPosition, setFabPosition] = useState<FabPosition | null>(() => readFabPosition(storageKey, fabSize));
   const dragRef = useRef<FabDrag | null>(null);
+  const suppressClickRef = useRef(false);
   const assistant = useAssistantState(surface);
   const isPos = surface === "pos";
 
@@ -409,6 +410,10 @@ export function AiAssistantLauncher({ surface = "web" }: { surface?: AssistantSu
       openAssistant();
       return;
     }
+    suppressClickRef.current = true;
+    window.setTimeout(() => {
+      suppressClickRef.current = false;
+    }, 0);
     const rect = event.currentTarget.getBoundingClientRect();
     saveFabPosition(storageKey, clampFabPosition({ x: rect.left, y: rect.top }, fabSize));
   }
@@ -458,6 +463,10 @@ export function AiAssistantLauncher({ surface = "web" }: { surface?: AssistantSu
       onPointerMove={moveDrag}
       onPointerUp={endDrag}
       onPointerCancel={cancelDrag}
+      onClick={() => {
+        if (suppressClickRef.current) return;
+        openAssistant();
+      }}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
