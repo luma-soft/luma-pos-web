@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { completeAiText, loadAiProviderConfig, parseJsonText } from "@/lib/ai/provider-adapter";
 import type { AiTokenUsage } from "@/lib/ai/usage";
+import { normalizeSearch } from "@/lib/normalize";
 
 export type AiPlannerIntent =
   | "create_draft_purchase_order_from_restocking"
@@ -84,12 +85,70 @@ function normalizePlan(raw: unknown, fallbackPrompt: string): AiPlannerResult | 
   };
 }
 
+export function heuristicAiPlannerIntent(input: {
+  prompt: string;
+  hasAttachments?: boolean;
+}): AiPlannerResult | null {
+  const prompt = input.prompt.trim();
+  const normalized = normalizeSearch(prompt);
+  const words = new Set(normalized.split(/[^a-z0-9]+/).filter(Boolean));
+  const hasAiAttachment = normalized.includes("ai attachment parse");
+  const hasPos = normalized.includes("pos") || normalized.includes("gio pos") || normalized.includes("gio hang");
+  const missingFields: string[] = [];
+  let intent: AiPlannerIntent = "unknown";
+
+  if ((normalized.includes("po") || normalized.includes("phieu nhap")) && normalized.includes("sap het")) {
+    intent = "create_draft_purchase_order_from_restocking";
+  } else if (
+    normalized.includes("dat hang nhap") ||
+    normalized.includes("don dat hang nhap") ||
+    (normalized.includes("dat hang") && (normalized.includes("ncc") || normalized.includes("nha cung cap")))
+  ) {
+    intent = "create_draft_purchase_order";
+  } else if (
+    normalized.includes("huy hoa don") ||
+    normalized.includes("huy don") ||
+    normalized.includes("hoa don dien tu") ||
+    normalized.includes("e-invoice") ||
+    normalized.includes("einvoice") ||
+    normalized.includes("hoan tien") ||
+    normalized.includes("tra hang")
+  ) {
+    intent = "order_action";
+  } else if (hasAiAttachment || input.hasAttachments || normalized.includes("ocr") || words.has("anh")) {
+    intent = "pos_image_cart_draft";
+  } else if (hasPos) {
+    intent = "pos_voice_cart_draft";
+  } else if (normalized.includes("tang") && normalized.includes("bang gia") && normalized.includes("%")) {
+    intent = "apply_price_formula";
+  } else if (normalized.includes("dat gia") || normalized.includes("gia ban")) {
+    intent = "set_product_price";
+    if (normalized.includes("san pham nay")) missingFields.push("product");
+  } else if (normalized.includes("nhap") && normalized.includes("kho")) {
+    intent = "create_inventory_inbound";
+  }
+
+  if (intent === "unknown") return null;
+  return {
+    intent,
+    confidence: 0.9,
+    canonicalPrompt: prompt,
+    entities: {},
+    missingFields,
+    ambiguousEntities: [],
+    warnings: [],
+    suggestedNextQuestion: "",
+  };
+}
+
 export async function planAiAssistantIntent(input: {
   prompt: string;
   hasAttachments?: boolean;
 }): Promise<AiPlannerResponse> {
   const prompt = input.prompt.trim();
   if (!prompt) return { ok: false, reason: "empty_prompt" };
+  const heuristicPlan = heuristicAiPlannerIntent({ prompt, hasAttachments: input.hasAttachments });
+  if (heuristicPlan) return { ok: true, plan: heuristicPlan };
   const config = await loadAiProviderConfig();
   if (!config.apiKey) return { ok: false, reason: "missing_api_key" };
   if (!config.capabilities.textPlanning) return { ok: false, reason: `unsupported_provider:${config.provider}` };

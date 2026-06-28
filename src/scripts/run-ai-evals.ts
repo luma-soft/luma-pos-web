@@ -1,7 +1,6 @@
 import { AI_EVALUATION_CASES, type AiEvaluationCase } from "@/lib/ai/evals";
 import { loadAiProviderConfig } from "@/lib/ai/provider-adapter";
-import { planAiAssistantIntent, type AiPlannerIntent } from "@/lib/ai/planner";
-import { normalizeSearch } from "@/lib/normalize";
+import { heuristicAiPlannerIntent, planAiAssistantIntent, type AiPlannerIntent } from "@/lib/ai/planner";
 
 type EvalMode = "rule" | "llm";
 
@@ -26,6 +25,7 @@ type EvalRow = EvalOutput & {
 
 const INTENT_TO_PREVIEW: Partial<Record<AiPlannerIntent, string>> = {
   create_draft_purchase_order_from_restocking: "draft_purchase_order",
+  create_draft_purchase_order: "draft_purchase_order",
   create_inventory_inbound: "inventory_inbound",
   set_product_price: "price_update",
   apply_price_formula: "price_formula",
@@ -49,42 +49,13 @@ function confirmationFor(intent: AiPlannerIntent, previewType: string): AiEvalua
 }
 
 function rulePlanner(prompt: string): EvalOutput {
-  const normalized = normalizeSearch(prompt);
-  const words = new Set(normalized.split(/[^a-z0-9]+/).filter(Boolean));
-  const hasAiAttachment = normalized.includes("ai attachment parse");
-  const hasPos = normalized.includes("pos") || normalized.includes("gio pos") || normalized.includes("gio hang");
-  let intent: AiPlannerIntent = "unknown";
-  const missingFields: string[] = [];
-
-  if ((normalized.includes("po") || normalized.includes("phieu nhap")) && normalized.includes("sap het")) {
-    intent = "create_draft_purchase_order_from_restocking";
-  } else if (hasAiAttachment || normalized.includes("ocr") || words.has("anh")) {
-    intent = "pos_image_cart_draft";
-  } else if (hasPos) {
-    intent = "pos_voice_cart_draft";
-  } else if (normalized.includes("tang") && normalized.includes("bang gia") && normalized.includes("%")) {
-    intent = "apply_price_formula";
-  } else if (normalized.includes("dat gia") || normalized.includes("gia ban")) {
-    intent = "set_product_price";
-    if (normalized.includes("san pham nay")) missingFields.push("product");
-  } else if (normalized.includes("nhap") && normalized.includes("kho")) {
-    intent = "create_inventory_inbound";
-  } else if (
-    normalized.includes("huy hoa don") ||
-    normalized.includes("huy don") ||
-    normalized.includes("hoa don dien tu") ||
-    normalized.includes("e-invoice") ||
-    normalized.includes("einvoice") ||
-    normalized.includes("hoan tien") ||
-    normalized.includes("tra hang")
-  ) {
-    intent = "order_action";
-  }
+  const plan = heuristicAiPlannerIntent({ prompt, hasAttachments: prompt.includes("[AI attachment parse]") });
+  const intent: AiPlannerIntent = plan?.intent ?? "unknown";
 
   const previewType = INTENT_TO_PREVIEW[intent] ?? "none";
   return {
     intent,
-    missingFields,
+    missingFields: plan?.missingFields ?? [],
     previewType,
     confirmation: confirmationFor(intent, previewType),
     shouldFallback: intent === "unknown",
