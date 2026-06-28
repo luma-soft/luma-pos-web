@@ -19,6 +19,37 @@ const ACCEPTED_FILE_INPUT_TYPES = [
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ].join(",");
 
+function AssistantProcessingBubble({ compact, text }: { compact: boolean; text: string }) {
+  return (
+    <div className={cn("self-start", compact ? "max-w-[94%]" : "max-w-[82%]")}>
+      <div className="relative overflow-hidden rounded-2xl rounded-tl-md border border-primary-100 bg-surface px-3.5 py-3 shadow-[0_12px_30px_rgba(15,118,110,0.08)]">
+        <div className="absolute inset-0 -translate-x-full animate-[pulse_1.8s_ease-in-out_infinite] bg-gradient-to-r from-transparent via-primary-50/80 to-transparent" />
+        <div className="relative flex items-center gap-3">
+          <span className="relative grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary-50 text-primary-700">
+            <span className="absolute inset-0 rounded-xl bg-primary-100/70 animate-ping" />
+            <Sparkles className="relative h-4 w-4" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-xs font-bold text-slate-600 dark:text-slate-200">{text}</span>
+            <span className="mt-1 flex items-center gap-1.5">
+              {[0, 1, 2].map((index) => (
+                <span
+                  key={index}
+                  className="h-1.5 w-1.5 rounded-full bg-primary-500 animate-bounce"
+                  style={{ animationDelay: `${index * 120}ms` }}
+                />
+              ))}
+              <span className="ml-1 h-1 w-20 overflow-hidden rounded-full bg-primary-50">
+                <span className="block h-full w-1/2 rounded-full bg-primary-400 animate-pulse" />
+              </span>
+            </span>
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AssistantChatSurface({
   assistant,
   mode,
@@ -359,7 +390,7 @@ export function AssistantChatSurface({
             )}
           </div>
         ))}
-        {busy && <div className="self-start text-xs text-slate-400 px-3 py-2">{t("ai.session.processing")}</div>}
+        {busy && <AssistantProcessingBubble compact={compact} text={t("ai.session.processing")} />}
       </div>
 
       <div className={cn(

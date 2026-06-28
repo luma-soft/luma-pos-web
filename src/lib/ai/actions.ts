@@ -280,9 +280,8 @@ export function buildGeneralAssistantResponse(input: {
   const nextQuestion = input.suggestedNextQuestion?.trim();
   return {
     text:
-      "Đúng, đây là AI Assistant của LumaPOS. " +
-      "Mình có thể hỗ trợ phân tích thông tin bán hàng, tồn kho và gợi ý vận hành khi nhà cung cấp AI phản hồi được. " +
-      (nextQuestion || "Bạn muốn mình hỗ trợ tác vụ nào?"),
+      "Mình có thể giúp xem doanh số, kiểm tồn kho, tìm đơn hàng, tạo nháp hóa đơn/báo giá/phiếu nhập và mở đúng màn nghiệp vụ để bạn kiểm tra trước khi lưu. " +
+      (nextQuestion || "Bạn muốn xử lý việc gì trước?"),
     state: "succeeded",
     prompt: input.prompt,
     actions: [],
