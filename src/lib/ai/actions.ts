@@ -95,6 +95,31 @@ function moneyText(value: unknown) {
   }).format(n);
 }
 
+function mergePlannerGuidance(preview: AiActionPreview, plan: AiPlannerResult | null): AiActionPreview {
+  if (!plan) return preview;
+  const missingFields = Array.from(new Set([...preview.missingFields, ...plan.missingFields.filter(Boolean)]));
+  const ambiguousWarnings = plan.ambiguousEntities.map((item) => {
+    const labels = item.candidates.slice(0, 3).map((candidate) => candidate.label).join(", ");
+    return labels
+      ? `Cần chọn ${item.type} cho "${item.query}": ${labels}.`
+      : `Cần chọn ${item.type}${item.query ? ` cho "${item.query}"` : ""}.`;
+  });
+  const warnings = Array.from(new Set([...preview.warnings, ...plan.warnings, ...ambiguousWarnings]));
+  const hasAmbiguity = plan.ambiguousEntities.length > 0;
+  const state: AiAssistantState =
+    hasAmbiguity ? "needs_selection"
+    : missingFields.length > 0 && preview.state === "preview" ? "needs_input"
+    : preview.state;
+  return {
+    ...preview,
+    state,
+    missingFields,
+    requiredFields: Array.from(new Set([...preview.requiredFields, ...missingFields])),
+    warnings,
+    confidence: Math.min(preview.confidence, plan.confidence),
+  };
+}
+
 type InboundProductOption = {
   id: string;
   sku: string;
@@ -1608,10 +1633,17 @@ export async function buildAiAssistantResponse(input: {
       throw error;
     }
   }
+  if (actionPreview) {
+    actionPreview = mergePlannerGuidance(actionPreview, plannerPlan);
+  }
 
   if (actionPreview) {
+    const followUpText =
+      actionPreview.state === "needs_input" || actionPreview.state === "needs_selection"
+        ? plannerPlan?.suggestedNextQuestion || actionPreview.warnings[0] || actionPreview.description
+        : actionPreview.description;
     return {
-      text: actionPreview.description,
+      text: followUpText,
       state: actionPreview.state,
       prompt,
       actionPreview,
