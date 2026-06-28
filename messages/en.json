@@ -846,10 +846,14 @@
       "agent": "Agent"
     },
     "cols": {
+      "code": "Customer code",
       "name": "Customer",
       "phone": "Phone",
       "type": "Price group",
       "totalSpent": "Total spent",
+      "debtCurrent": "Current debt",
+      "totalGrossSales": "Gross sales",
+      "totalSalesNet": "Sales after returns",
       "debt": "Debt",
       "debtLimit": "Credit limit"
     },
@@ -868,7 +872,83 @@
     "collectHint": "Open each order to record collections.",
     "orderHistory": "Order history",
     "editTitle": "Edit customer",
-    "unitLabel": "customers"
+    "unitLabel": "customers",
+    "selectAll": "Select all customers",
+    "emptyValue": "Not set",
+    "actions": {
+      "importFile": "Import file",
+      "more": "More",
+      "settings": "Settings",
+      "help": "Help",
+      "exportFile": "Export file",
+      "exportDebtFile": "Export debt file",
+      "payment": "Payment",
+      "adjust": "Adjustment",
+      "paymentDiscount": "Payment discount",
+      "createQr": "Create QR",
+      "stop": "Stop activity",
+      "deleteDisabled": "Deleting customers with documents is not supported yet; stop activity to hide them from the active list."
+    },
+    "confirm": {
+      "stop": "Stop this customer? They will no longer appear in active selling lists."
+    },
+    "filters": {
+      "title": "Customer filters",
+      "group": "Customer group",
+      "createNew": "Create new",
+      "allGroups": "All groups",
+      "createdAt": "Created date",
+      "customerType": "Customer type",
+      "debtStatus": "Debt status",
+      "gender": "Gender",
+      "birthday": "Birthday",
+      "lastTransaction": "Last transaction date",
+      "totalSales": "Total sales",
+      "currentDebt": "Current debt",
+      "from": "From date",
+      "to": "To date",
+      "fromValue": "From",
+      "toValue": "To",
+      "apply": "Apply",
+      "clear": "Clear",
+      "noData": "This data field is not available yet"
+    },
+    "expand": {
+      "tabs": {
+        "info": "Info",
+        "sales": "Sales/returns history",
+        "debt": "Receivables"
+      },
+      "profile": "Customer profile",
+      "createdBy": "Created by",
+      "createdAt": "Created date",
+      "group": "Customer group",
+      "birthday": "Birthday",
+      "gender": "Gender",
+      "invoiceInfo": "Invoice information",
+      "emptySales": "No sales or return history yet",
+      "emptyDebt": "No receivable activity yet",
+      "salesCols": {
+        "code": "Invoice code",
+        "time": "Time",
+        "seller": "Seller",
+        "total": "Total",
+        "status": "Status"
+      },
+      "debtCols": {
+        "code": "Voucher code",
+        "time": "Time",
+        "type": "Type",
+        "value": "Value",
+        "balance": "Customer balance"
+      }
+    },
+    "debtFilter": {
+      "all": "All transactions",
+      "sale": "Sale",
+      "payment": "Payment",
+      "return": "Return"
+    }
   },
   "suppliers": {
     "title": "Suppliers",

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { suppliers } from "@/db/schema";
+import { customers, suppliers } from "@/db/schema";
 import {
   createSupplierSchema,
   type UpdateCustomerInput,
@@ -70,9 +70,33 @@ export async function updateCustomer(input: UpdateCustomerInput): Promise<Action
   const result = await updateCustomerCore(input);
   if (result.ok) {
     revalidatePath(Routes.Customers);
+    revalidatePath(Routes.Partners);
     revalidatePath(`/customers/${input.id}`);
   }
   return result;
+}
+
+const setCustomerActiveSchema = z.object({
+  id: z.uuid(),
+  isActive: z.boolean(),
+});
+
+export async function setCustomerActive(input: z.input<typeof setCustomerActiveSchema>): Promise<ActionResult> {
+  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const parsed = setCustomerActiveSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const v = parsed.data;
+
+  try {
+    await db.update(customers).set({ isActive: v.isActive }).where(eq(customers.id, v.id));
+    revalidatePath(Routes.Customers);
+    revalidatePath(Routes.Partners);
+    revalidatePath(`/customers/${v.id}`);
+    return { ok: true, data: undefined };
+  } catch (e) {
+    console.error("setCustomerActive failed:", e);
+    return { ok: false, error: "errors.serverError" };
+  }
 }
 
 export async function createSupplier(

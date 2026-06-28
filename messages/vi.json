@@ -851,10 +851,14 @@
       "agent": "Đại lý"
     },
     "cols": {
+      "code": "Mã khách hàng",
       "name": "Khách hàng",
       "phone": "SĐT",
       "type": "Nhóm giá",
       "totalSpent": "Tổng mua",
+      "debtCurrent": "Nợ hiện tại",
+      "totalGrossSales": "Tổng bán",
+      "totalSalesNet": "Tổng bán trừ trả hàng",
       "debt": "Công nợ",
       "debtLimit": "Hạn mức"
     },
@@ -873,7 +877,83 @@
     "collectHint": "Mở từng đơn để ghi nhận thu nợ.",
     "orderHistory": "Lịch sử đơn hàng",
     "editTitle": "Sửa khách hàng",
-    "unitLabel": "khách hàng"
+    "unitLabel": "khách hàng",
+    "selectAll": "Chọn tất cả khách hàng",
+    "emptyValue": "Chưa có",
+    "actions": {
+      "importFile": "Import file",
+      "more": "Thêm",
+      "settings": "Cài đặt",
+      "help": "Trợ giúp",
+      "exportFile": "Xuất file",
+      "exportDebtFile": "Xuất file công nợ",
+      "payment": "Thanh toán",
+      "adjust": "Điều chỉnh",
+      "paymentDiscount": "Chiết khấu thanh toán",
+      "createQr": "Tạo QR",
+      "stop": "Ngừng hoạt động",
+      "deleteDisabled": "Chưa hỗ trợ xóa khách đã có chứng từ; dùng Ngừng hoạt động để ẩn khách khỏi danh sách."
+    },
+    "confirm": {
+      "stop": "Ngừng hoạt động khách hàng này? Khách sẽ không còn xuất hiện trong danh sách bán hàng đang hoạt động."
+    },
+    "filters": {
+      "title": "Bộ lọc khách hàng",
+      "group": "Nhóm khách hàng",
+      "createNew": "Tạo mới",
+      "allGroups": "Tất cả các nhóm",
+      "createdAt": "Ngày tạo",
+      "customerType": "Loại khách hàng",
+      "debtStatus": "Trạng thái công nợ",
+      "gender": "Giới tính",
+      "birthday": "Sinh nhật",
+      "lastTransaction": "Ngày giao dịch cuối",
+      "totalSales": "Tổng bán",
+      "currentDebt": "Nợ hiện tại",
+      "from": "Từ ngày",
+      "to": "Đến ngày",
+      "fromValue": "Từ",
+      "toValue": "Đến",
+      "apply": "Áp dụng",
+      "clear": "Xóa lọc",
+      "noData": "Chưa có trường dữ liệu này"
+    },
+    "expand": {
+      "tabs": {
+        "info": "Thông tin",
+        "sales": "Lịch sử bán/trả hàng",
+        "debt": "Nợ cần thu từ khách"
+      },
+      "profile": "Hồ sơ khách hàng",
+      "createdBy": "Người tạo",
+      "createdAt": "Ngày tạo",
+      "group": "Nhóm khách",
+      "birthday": "Sinh nhật",
+      "gender": "Giới tính",
+      "invoiceInfo": "Thêm thông tin xuất hóa đơn",
+      "emptySales": "Chưa có lịch sử bán/trả hàng",
+      "emptyDebt": "Chưa có phát sinh công nợ",
+      "salesCols": {
+        "code": "Mã hóa đơn",
+        "time": "Thời gian",
+        "seller": "Người bán",
+        "total": "Tổng cộng",
+        "status": "Trạng thái"
+      },
+      "debtCols": {
+        "code": "Mã phiếu",
+        "time": "Thời gian",
+        "type": "Loại",
+        "value": "Giá trị",
+        "balance": "Dư nợ khách hàng"
+      }
+    },
+    "debtFilter": {
+      "all": "Tất cả giao dịch",
+      "sale": "Bán hàng",
+      "payment": "Thanh toán",
+      "return": "Trả hàng"
+    }
   },
   "suppliers": {
     "title": "Nhà cung cấp",
