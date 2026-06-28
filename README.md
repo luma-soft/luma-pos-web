@@ -70,6 +70,14 @@ bun dev
 - Các flow cần nhập text trong modal phải dùng component UI của app, có overlay, nút hủy/xác nhận, keyboard handling và style Tailwind/Luma tokens.
 - Mobile hoặc bottom-sheet flow cũng phải dùng component UI của app, không gọi modal native của trình duyệt.
 
+## AI assistant conventions
+
+- `src/components/ai-assistant-launcher.tsx` chỉ mount workspace/FAB/panel. Không nhét API client, session state, preview rendering, composer, attachment handling hoặc helper nghiệp vụ vào file launcher.
+- Code assistant phải tách theo boundary dưới `src/components/ai-assistant/`: `api.ts` cho fetch/upload, `use-assistant-state.ts` cho state/effects, `utils.ts` cho helper thuần, và component `.tsx` riêng cho header/chat surface/preview/attachment.
+- Mọi UI text của assistant phải đi qua `messages/en.json` và `messages/vi.json` trong namespace `ai.*`. Không hard-code label tiếng Việt/Anh trong component; chỉ để dữ liệu backend/user-entered text render nguyên trạng.
+- Component assistant phải kế thừa primitives chung trong `src/components/ui` (`Button`, `Input`, `Textarea`, `Select`, `Text`, `Section`, ...). Chỉ dùng thẻ HTML trực tiếp khi primitive hiện có không phù hợp về semantics.
+- Khi thêm action/preview mới, cập nhật đủ i18n key cho badge, mô tả xác nhận, trạng thái, lỗi và test/verification liên quan trước khi merge.
+
 ## Schema highlights (đặc thù VLXD)
 
 - `products` có `m2_per_unit` → tính m² gạch tự động
