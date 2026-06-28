@@ -556,6 +556,15 @@
     },
     "assistantNotice": "Bản xem trước — kết nối nhà cung cấp AI (API key) để có câu trả lời thật.",
     "actionNotice": "Action framework preview - AI sẽ tạo nháp, ghi audit, và chờ xác nhận trước khi mutate dữ liệu.",
+    "help": {
+      "open": "Mở hướng dẫn AI",
+      "title": "Hướng dẫn AI",
+      "subtitle": "Dùng AI để hỏi nhanh dữ liệu bán hàng, tồn kho và tạo nháp thao tác nghiệp vụ.",
+      "itemAsk": "Hỏi trực tiếp về doanh số, tồn kho, hàng bán chạy hoặc hàng sắp hết.",
+      "itemAction": "Chọn các action như Tạo hóa đơn, Đặt hàng, Tạo phiếu nhập hàng hoặc Nhập hàng để AI lập nháp đúng ngữ cảnh.",
+      "itemAttach": "Có thể đính kèm ảnh, PDF, CSV hoặc XLSX để AI trích xuất nội dung trước khi tạo nháp.",
+      "itemAudit": "Các thao tác thay đổi dữ liệu luôn cần xem trước và xác nhận; AI không tự cộng tồn hoặc tạo đơn khi chưa duyệt."
+    },
     "assistantEmpty": "Hỏi về doanh số, tồn kho, hay nên nhập gì.",
     "askPlaceholder": "Hỏi trợ lý…",
     "launcherTitle": "Luma AI",
@@ -609,6 +618,16 @@
         "promptPrefix": "[AI_ACTION_PRESET:create_inventory_inbound]\nTạo phiếu nhập hàng từ thông tin sau. Đây là nhận hàng thật để nhập kho; hãy tạo preview phiếu nhập và yêu cầu xác nhận trước khi cộng tồn.\n\nThông tin người dùng:",
         "example1": "Nhập 20 thùng cà phê Robusta vào kho chính từ NCC A",
         "example2": "Nhận 5 đèn âm trần 8W giá 90.000 từ NCC Rạng Đông"
+      },
+      "receiveStock": {
+        "label": "Nhập hàng",
+        "sessionTitle": "Nhập hàng",
+        "description": "Nhập nhanh hàng đã nhận",
+        "emptyText": "Nhập tên hàng, số lượng, giá nhập, kho và NCC nếu có.",
+        "placeholder": "Ví dụ: Nhập 20 thùng cà phê Robusta vào kho chính, giá 1.200.000/thùng...",
+        "promptPrefix": "[AI_ACTION_PRESET:create_inventory_inbound]\nNhập hàng từ thông tin sau. Đây là hàng đã nhận thực tế; hãy tạo preview phiếu nhập và yêu cầu xác nhận trước khi cộng tồn.\n\nThông tin người dùng:",
+        "example1": "Nhập 20 thùng cà phê Robusta vào kho chính",
+        "example2": "Nhập 12 hộp bánh quy giá 45.000/hộp từ NCC Minh Anh"
       }
     },
     "errors": {

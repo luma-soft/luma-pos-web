@@ -61,7 +61,7 @@ export type AiSessionSummary = {
   messageCount?: number;
 };
 
-export type AssistantActionPresetId = "create_invoice" | "draft_purchase_order" | "create_inventory_inbound";
+export type AssistantActionPresetId = "create_invoice" | "draft_purchase_order" | "create_inventory_inbound" | "receive_stock";
 
 export type AssistantActionPreset = {
   id: AssistantActionPresetId;

@@ -3,7 +3,7 @@
 import { type PointerEvent, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Info, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AssistantChatSurface } from "@/components/ai-assistant/assistant-chat-surface";
@@ -23,11 +23,6 @@ export function AssistantWorkspace() {
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
-      <div className="flex items-start gap-2 mb-4 px-3.5 py-2.5 bg-in-soft border border-in/20 rounded-card text-[12px] text-in">
-        <Info className="w-4 h-4 shrink-0 mt-px" />
-        <span>{t("ai.actionNotice")}</span>
-      </div>
-
       <AssistantChatSurface
         assistant={assistant}
         mode="workspace"

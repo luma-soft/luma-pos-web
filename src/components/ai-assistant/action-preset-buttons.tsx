@@ -30,7 +30,7 @@ export function ActionPresetButtons({
 }) {
   return (
     <div className={cn(
-      variant === "grid" ? "mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3" : "flex flex-wrap gap-1.5"
+      variant === "grid" ? "mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4" : "flex flex-wrap gap-1.5"
     )}>
       {presets.map((preset) => {
         const Icon = preset.icon;

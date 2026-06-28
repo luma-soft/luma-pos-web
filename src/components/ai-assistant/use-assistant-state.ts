@@ -171,18 +171,7 @@ export function useAssistantState(surface: AssistantSurface): AssistantControlle
             items: [t("ai.q.lowStock"), t("ai.q.todaySales")],
           },
         ]
-      : [
-          {
-            id: "business",
-            title: t("ai.suggestionGroups.business"),
-            items: [t("ai.q.todaySales"), t("ai.q.topSellers"), t("ai.q.lowStock")],
-          },
-          {
-            id: "drafts",
-            title: t("ai.suggestionGroups.drafts"),
-            items: [t("ai.q.restockToday"), t("ai.suggestions.receiveRobusta"), t("ai.suggestions.setSkuPrice")],
-          },
-        ];
+      : [];
   const suggestions = suggestionGroups.flatMap((group) => group.items);
 
   function addFiles(files: FileList | File[]) {

@@ -556,6 +556,15 @@
     },
     "assistantNotice": "Assistant preview — connect an AI provider (API key) to get real answers.",
     "actionNotice": "Action framework preview - AI drafts, writes audit, and waits for confirmation before mutating data.",
+    "help": {
+      "open": "Open AI guide",
+      "title": "AI guide",
+      "subtitle": "Use AI to query sales, stock, and draft operational actions faster.",
+      "itemAsk": "Ask directly about revenue, inventory, best sellers, or low-stock items.",
+      "itemAction": "Choose actions such as Create invoice, Order stock, Receive stock, or Stock in so AI drafts with the right context.",
+      "itemAttach": "Attach images, PDFs, CSV, or XLSX files so AI can extract details before drafting.",
+      "itemAudit": "Data-changing actions always require preview and confirmation; AI will not add stock or create records before approval."
+    },
     "assistantEmpty": "Ask about sales, stock, or what to restock.",
     "askPlaceholder": "Ask the assistant…",
     "launcherTitle": "Luma AI",
@@ -609,6 +618,16 @@
         "promptPrefix": "[AI_ACTION_PRESET:create_inventory_inbound]\nCreate an inventory inbound receipt from the following user information. This is real stock receiving; build a preview and require confirmation before adding stock.\n\nUser information:",
         "example1": "Receive 20 cartons of Robusta coffee into the main warehouse from Supplier A",
         "example2": "Receive 5 recessed 8W lights at 90,000 from Rang Dong"
+      },
+      "receiveStock": {
+        "label": "Stock in",
+        "sessionTitle": "Stock in",
+        "description": "Quick receive goods",
+        "emptyText": "Enter item names, quantities, purchase costs, warehouse, and supplier if available.",
+        "placeholder": "Example: Receive 20 cartons of Robusta coffee into the main warehouse at 1,200,000/carton...",
+        "promptPrefix": "[AI_ACTION_PRESET:create_inventory_inbound]\nReceive stock from the following user information. These goods were physically received; build an inbound preview and require confirmation before adding stock.\n\nUser information:",
+        "example1": "Receive 20 cartons of Robusta coffee into the main warehouse",
+        "example2": "Receive 12 boxes of biscuits at 45,000/box from Minh Anh Supplier"
       }
     },
     "errors": {

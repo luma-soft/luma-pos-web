@@ -53,5 +53,20 @@ export function getAssistantActionPresets(t: Translator): AssistantActionPreset[
       icon: PackagePlus,
       tone: "inbound",
     },
+    {
+      id: "receive_stock",
+      label: t("ai.actions.receiveStock.label"),
+      sessionTitle: t("ai.actions.receiveStock.sessionTitle"),
+      description: t("ai.actions.receiveStock.description"),
+      emptyText: t("ai.actions.receiveStock.emptyText"),
+      placeholder: t("ai.actions.receiveStock.placeholder"),
+      promptPrefix: t("ai.actions.receiveStock.promptPrefix"),
+      examples: [
+        t("ai.actions.receiveStock.example1"),
+        t("ai.actions.receiveStock.example2"),
+      ],
+      icon: PackagePlus,
+      tone: "inbound",
+    },
   ];
 }
