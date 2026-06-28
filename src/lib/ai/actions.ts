@@ -715,7 +715,7 @@ async function getSalesContext() {
       .from(products)
       .where(eq(products.isActive, true))
       .orderBy(asc(products.name))
-      .limit(400),
+      .limit(3000),
     getCustomerContext(),
     db
       .select({ id: warehouses.id, name: warehouses.name, isDefault: warehouses.isDefault })
@@ -745,39 +745,300 @@ async function getSalesContext() {
   };
 }
 
-function parseProductLines(prompt: string, productOptions: PriceProductOption[]) {
-  const q = normalize(prompt);
-  const matched: Array<{
-    product: PriceProductOption;
-    quantity: number;
-    confidence: number;
-  }> = [];
-  const seen = new Set<string>();
+const AI_POS_QUANTITY_STARTERS = new Set([
+  "at",
+  "bat",
+  "bo",
+  "bong",
+  "cong",
+  "day",
+  "den",
+  "duong",
+  "hat",
+  "hop",
+  "lang",
+  "mat",
+  "may",
+  "o",
+  "quat",
+  "tam",
+  "vit",
+]);
+
+const AI_POS_SPEC_NUMBER_FOLLOWERS = new Set([
+  "canh",
+  "chan",
+  "chau",
+  "day",
+  "lo",
+  "mau",
+  "pha",
+  "thiet",
+]);
+
+const AI_POS_QUERY_STOPWORDS = new Set([
+  "cai",
+  "chiec",
+  "co",
+  "cho",
+  "cua",
+  "dung",
+  "hop",
+  "loai",
+  "mau",
+  "nang",
+  "nha",
+  "nho",
+  "sinh",
+  "ve",
+  "va",
+]);
+
+const AI_POS_NOISY_PRODUCT_TOKENS = new Set([
+  "cai",
+  "co",
+  "cho",
+  "day",
+  "dung",
+  "full",
+  "mau",
+  "va",
+  "wide",
+]);
+
+const AI_POS_CORE_TOKENS = new Set([
+  "am",
+  "at",
+  "bat",
+  "cam",
+  "chieu",
+  "cong",
+  "den",
+  "doi",
+  "don",
+  "giat",
+  "hat",
+  "hut",
+  "khoi",
+  "mat",
+  "o",
+  "op",
+  "quat",
+  "tac",
+  "tran",
+  "tuong",
+  "vit",
+]);
+
+type ParsedProductLine = {
+  product: PriceProductOption;
+  quantity: number;
+  confidence: number;
+};
+
+type ProductTokenProfile = {
+  product: PriceProductOption;
+  tokens: Set<string>;
+};
+
+function normalizeProductText(value: string) {
+  return normalize(value)
+    .replace(/\bdao\s+chieu\b/g, "2 chieu")
+    .replace(/(\d+)\s*([aw])\b/g, "$1$2")
+    .replace(/(\d+)\s*(at|bat|bo|bong|cong|den|duong|hat|hop|lang|mat|may|o|quat|vit)\b/g, "$1 $2")
+    .replace(/([a-z])(\d+(?:[aw])?)/g, "$1 $2")
+    .replace(/(\d+[aw])([a-z])/g, "$1 $2")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function productTokens(value: string) {
+  return normalizeProductText(value).split(/\s+/).filter(Boolean);
+}
+
+function expandTokenSet(tokens: string[]) {
+  const expanded = new Set(tokens);
+  if (expanded.has("pana")) expanded.add("panasonic");
+  if (expanded.has("panasonic")) expanded.add("pana");
+  if (expanded.has("chan")) expanded.add("chau");
+  if (expanded.has("chau")) expanded.add("chan");
+  if (expanded.has("at") && expanded.has("den")) expanded.add("khoi");
+  if (expanded.has("hat") && expanded.has("chieu")) {
+    expanded.add("cong");
+    expanded.add("tac");
+  }
+  return expanded;
+}
+
+function normalizeQueryTokens(tokens: string[]) {
+  const expanded = expandTokenSet(tokens);
+  if (expanded.has("at") && expanded.has("den")) expanded.delete("den");
+  return [...expanded].filter((token) => {
+    if (!token) return false;
+    if (AI_POS_QUERY_STOPWORDS.has(token)) return false;
+    return token.length > 1 || token === "o" || /\d/.test(token);
+  });
+}
+
+function numericQuantity(value: string) {
+  if (!/^\d+(?:[.,]\d+)?$/.test(value)) return null;
+  const quantity = Number(value.replace(",", "."));
+  return Number.isFinite(quantity) && quantity > 0 ? quantity : null;
+}
+
+function isAiPosQuantityStart(tokens: string[], index: number) {
+  const quantity = numericQuantity(tokens[index] ?? "");
+  if (quantity == null || index >= tokens.length - 1) return false;
+  const next = tokens[index + 1] ?? "";
+  if (!AI_POS_QUANTITY_STARTERS.has(next)) return false;
+  if (AI_POS_SPEC_NUMBER_FOLLOWERS.has(next)) return false;
+  if (numericQuantity(next) != null) return false;
+  return true;
+}
+
+function tokenWeight(token: string) {
+  if (/^\d+[aw]$/.test(token)) return 3.5;
+  if (/^\d+$/.test(token)) return 2.5;
+  if (AI_POS_CORE_TOKENS.has(token)) return 2.2;
+  return 1;
+}
+
+function unitSpecs(tokens: Iterable<string>, unit: "a" | "w") {
+  return new Set(
+    [...tokens]
+      .filter((token) => new RegExp(`^\\d+${unit}$`).test(token))
+  );
+}
+
+function hasConflictingUnitSpec(queryTokens: string[], productTokensSet: Set<string>, unit: "a" | "w") {
+  const querySpecs = unitSpecs(queryTokens, unit);
+  if (querySpecs.size === 0) return false;
+  const productSpecs = unitSpecs(productTokensSet, unit);
+  if (productSpecs.size === 0) return false;
+  return ![...querySpecs].some((spec) => productSpecs.has(spec));
+}
+
+function hasCoreMatch(queryTokens: string[], productTokensSet: Set<string>) {
+  return queryTokens.some((token) => AI_POS_CORE_TOKENS.has(token) && productTokensSet.has(token));
+}
+
+function scoreProductForQuery(queryTokens: string[], profile: ProductTokenProfile) {
+  if (queryTokens.length === 0) return 0;
+  if (!hasCoreMatch(queryTokens, profile.tokens)) return 0;
+  if (hasConflictingUnitSpec(queryTokens, profile.tokens, "a")) return 0;
+  if (hasConflictingUnitSpec(queryTokens, profile.tokens, "w")) return 0;
+
+  let totalWeight = 0;
+  let matchedWeight = 0;
+  for (const token of queryTokens) {
+    const weight = tokenWeight(token);
+    totalWeight += weight;
+    if (profile.tokens.has(token)) matchedWeight += weight;
+  }
+  if (totalWeight <= 0) return 0;
+
+  const ratio = matchedWeight / totalWeight;
+  if (ratio < 0.52) return 0;
+
+  const specBonus =
+    unitSpecs(queryTokens, "a").size || unitSpecs(queryTokens, "w").size ? 0.08 : 0;
+  const brandBonus =
+    (queryTokens.includes("pana") || queryTokens.includes("panasonic")) &&
+    (profile.tokens.has("pana") || profile.tokens.has("panasonic")) ? 0.04 : 0;
+  return Math.min(0.95, 0.36 + ratio * 0.5 + specBonus + brandBonus);
+}
+
+function buildProductProfiles(productOptions: PriceProductOption[]) {
+  return productOptions.map((product) => {
+    const rawTokens = productTokens(`${product.sku} ${product.name}`);
+    const tokens = expandTokenSet(rawTokens.filter((token) => !AI_POS_NOISY_PRODUCT_TOKENS.has(token)));
+    return {
+      product,
+      tokens,
+    };
+  });
+}
+
+function findBestProductMatch(query: string, profiles: ProductTokenProfile[]) {
+  const queryTokens = normalizeQueryTokens(productTokens(query));
+  let best: { profile: ProductTokenProfile; confidence: number } | null = null;
+  for (const profile of profiles) {
+    const confidence = scoreProductForQuery(queryTokens, profile);
+    if (!best || confidence > best.confidence) {
+      best = { profile, confidence };
+    }
+  }
+  return best && best.confidence >= 0.76 ? best : null;
+}
+
+function pushParsedLine(lines: ParsedProductLine[], next: ParsedProductLine) {
+  const existing = lines.find((line) => line.product.id === next.product.id);
+  if (existing) {
+    existing.quantity += next.quantity;
+    existing.confidence = Math.max(existing.confidence, next.confidence);
+    return;
+  }
+  lines.push(next);
+}
+
+function parseSegmentedProductLines(prompt: string, profiles: ProductTokenProfile[]) {
+  const tokens = productTokens(prompt);
+  const starts = tokens
+    .map((_, index) => index)
+    .filter((index) => isAiPosQuantityStart(tokens, index));
+  const lines: ParsedProductLine[] = [];
+  if (starts.length === 0) return lines;
+
+  for (const [index, start] of starts.entries()) {
+    const end = starts[index + 1] ?? tokens.length;
+    const quantity = numericQuantity(tokens[start] ?? "") ?? 1;
+    const query = tokens.slice(start + 1, end).join(" ");
+    const best = findBestProductMatch(query, profiles);
+    if (!best) continue;
+    pushParsedLine(lines, {
+      product: best.profile.product,
+      quantity,
+      confidence: best.confidence,
+    });
+  }
+  return lines;
+}
+
+function parseExactProductLines(prompt: string, productOptions: PriceProductOption[]) {
+  const q = normalizeProductText(prompt);
+  const matched: ParsedProductLine[] = [];
   const productsBySpecificName = [...productOptions].sort((a, b) => b.name.length - a.name.length);
 
   for (const product of productsBySpecificName) {
-    const name = normalize(product.name);
-    const sku = normalize(product.sku);
-    const tokens = q.split(/[^a-z0-9]+/).filter(Boolean);
+    const name = normalizeProductText(product.name);
+    const sku = normalizeProductText(product.sku);
+    const tokens = q.split(/\s+/).filter(Boolean);
     const skuHit = sku ? (sku.length <= 2 ? tokens.includes(sku) : q.includes(sku)) : false;
     const nameHit = name.length > 1 && q.includes(name);
     if (!skuHit && !nameHit) continue;
-    if (seen.has(product.id)) continue;
 
     const source = nameHit ? name : sku;
     const qtyBefore = q.match(new RegExp(`(?:^|\\s)(\\d+(?:[.,]\\d+)?)\\s*(?:x\\s*)?${escapeRegExp(source)}(?:\\s|$)`));
     const qtyAfter = q.match(new RegExp(`${escapeRegExp(source)}\\s*(?:x\\s*)?(\\d+(?:[.,]\\d+)?)(?:\\s|$)`));
     const rawQty = qtyBefore?.[1] ?? qtyAfter?.[1];
     const quantity = rawQty ? Number(rawQty.replace(",", ".")) : 1;
-    matched.push({
+    pushParsedLine(matched, {
       product,
       quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
       confidence: skuHit ? 0.94 : 0.82,
     });
-    seen.add(product.id);
   }
 
-  return matched.slice(0, 20);
+  return matched;
+}
+
+export function parseProductLines(prompt: string, productOptions: PriceProductOption[]) {
+  const profiles = buildProductProfiles(productOptions);
+  const segmented = parseSegmentedProductLines(prompt, profiles);
+  const exact = parseExactProductLines(prompt, productOptions);
+  const lines: ParsedProductLine[] = [];
+  for (const line of [...segmented, ...exact]) pushParsedLine(lines, line);
+  return lines.slice(0, 30);
 }
 
 function attachmentExtractedText(prompt: string) {
