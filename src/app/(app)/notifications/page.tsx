@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, Bot, CheckCircle2, Clock, Filter, Info, ShieldAlert, UserRound, XCircle } from "lucide-react";
+import { Activity, Bot, CheckCircle2, Clock, ExternalLink, Filter, Info, ShieldAlert, UserRound, XCircle } from "lucide-react";
 import { getAuditLogs, type AuditSource, type AuditStatus } from "@/lib/audit";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -46,6 +46,174 @@ function sourceTone(source: AuditSource) {
 
 function titleFor(row: Awaited<ReturnType<typeof getAuditLogs>>[number]) {
   return `${row.action.replaceAll("_", " ")} · ${row.entityType}`;
+}
+
+type AuditRow = Awaited<ReturnType<typeof getAuditLogs>>[number];
+
+function objectValue(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function arrayValue(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function textValue(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function redactText(value: string) {
+  return value
+    .replace(/sk-[A-Za-z0-9_-]{12,}/g, "sk-[redacted]")
+    .replace(/AIza[A-Za-z0-9_-]{12,}/g, "AIza[redacted]")
+    .replace(/Bearer\s+[A-Za-z0-9._-]{12,}/gi, "Bearer [redacted]")
+    .replace(/(api[_-]?key|token|secret|password|authorization)\s*[:=]\s*['"]?[^'",\s}]+/gi, "$1: [redacted]");
+}
+
+function truncateText(value: string, max = 220) {
+  const clean = redactText(value.replace(/\s+/g, " ").trim());
+  return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
+}
+
+function scrubPublicJson(value: unknown, depth = 0): unknown {
+  if (depth > 4) return "[truncated]";
+  if (typeof value === "string") return truncateText(value, depth === 0 ? 260 : 160);
+  if (typeof value !== "object" || value === null) return value;
+  if (Array.isArray(value)) return value.slice(0, 12).map((item) => scrubPublicJson(item, depth + 1));
+
+  const hiddenKeys = /^(raw(content|text)?|content|base64|dataUrl|ocrText|extractedText|image|file)$/i;
+  const sensitiveKeys = /(api[_-]?key|token|secret|password|authorization)/i;
+  const output: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value).slice(0, 24)) {
+    if (sensitiveKeys.test(key)) {
+      output[key] = "[redacted]";
+    } else if (hiddenKeys.test(key)) {
+      output[key] = "[hidden in activity view]";
+    } else {
+      output[key] = scrubPublicJson(item, depth + 1);
+    }
+  }
+  return output;
+}
+
+function intentLabel(row: AuditRow) {
+  const parsed = objectValue(row.parsedIntent);
+  return textValue(parsed?.intent) ?? textValue(parsed?.mode) ?? row.action;
+}
+
+function previewTitle(row: AuditRow) {
+  const parsed = objectValue(row.parsedIntent);
+  return textValue(parsed?.title) ?? textValue(parsed?.description);
+}
+
+function statusText(status: AuditStatus) {
+  switch (status) {
+    case "previewed": return "Đã tạo preview";
+    case "confirmed": return "Đã xác nhận";
+    case "succeeded": return "Thành công";
+    case "failed": return "Thất bại";
+    case "cancelled": return "Đã hủy";
+    case "unauthorized": return "Không đủ quyền";
+    default: return status;
+  }
+}
+
+function recordHref(record: Record<string, unknown>) {
+  const href = textValue(record.href);
+  if (href?.startsWith("/")) return href;
+  const id = textValue(record.id);
+  const type = textValue(record.type);
+  if (!id || id === "draft") return null;
+  if (type === "product") return `/products/${id}`;
+  if (type === "customer") return `/customers/${id}`;
+  if (type === "order" || type === "invoice" || type === "quote") return `/orders/${id}`;
+  if (type === "purchase_order" || type === "purchase" || type === "inbound") return `/purchases/${id}`;
+  if (type === "supplier") return `/suppliers/${id}`;
+  if (type === "pos_cart_draft") return "/pos";
+  if (type === "cashbook" || type === "cash_transaction") return "/cashbook";
+  return null;
+}
+
+function recordLabel(record: Record<string, unknown>) {
+  return textValue(record.code)
+    ?? textValue(record.name)
+    ?? textValue(record.label)
+    ?? textValue(record.id)
+    ?? textValue(record.type)
+    ?? "Record";
+}
+
+function AiAuditSummary({ row }: { row: AuditRow }) {
+  const parsed = objectValue(row.parsedIntent);
+  const metadata = objectValue(row.metadata);
+  const records = arrayValue(row.affectedRecords).map(objectValue).filter(Boolean) as Record<string, unknown>[];
+  const toolTrace = arrayValue(metadata?.toolTrace).map(objectValue).filter(Boolean) as Record<string, unknown>[];
+  const warnings = arrayValue(parsed?.warnings);
+  const fields = [
+    ["Intent", intentLabel(row)],
+    ["Preview", previewTitle(row)],
+    ["Surface", textValue(metadata?.surface)],
+    ["Tool", textValue(metadata?.executedTool)],
+    ["Usage", typeof metadata?.usageUnits === "number" ? `${metadata.usageUnits} unit` : null],
+  ].filter(([, value]) => Boolean(value));
+
+  return (
+    <div className="mt-2 space-y-2 text-xs">
+      <div className="grid gap-1.5 sm:grid-cols-2">
+        {fields.map(([label, value]) => (
+          <div key={label} className="rounded-lg border border-border-soft bg-canvas px-2.5 py-2">
+            <div className="text-[10px] uppercase tracking-wide text-slate-400 font-bold">{label}</div>
+            <div className="mt-0.5 text-slate-700">{truncateText(String(value), 90)}</div>
+          </div>
+        ))}
+      </div>
+
+      {records.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {records.slice(0, 8).map((record, index) => {
+            const href = recordHref(record);
+            const label = recordLabel(record);
+            const chip = (
+              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                {label}
+                {href && <ExternalLink className="w-3 h-3" />}
+              </span>
+            );
+            return href ? <Link key={`${label}-${index}`} href={href}>{chip}</Link> : <span key={`${label}-${index}`}>{chip}</span>;
+          })}
+        </div>
+      )}
+
+      {toolTrace.length > 0 && (
+        <div className="rounded-lg border border-primary-100 bg-primary-50/50 p-2 dark:border-primary-900 dark:bg-primary-950/20">
+          <div className="text-[10px] uppercase tracking-wide text-primary-700 font-bold dark:text-primary-300">Tool trace</div>
+          <div className="mt-1 space-y-1">
+            {toolTrace.slice(0, 4).map((tool, index) => (
+              (() => {
+                const resultIntent = textValue(objectValue(tool.result)?.intent);
+                return (
+                  <div key={index} className="flex flex-wrap items-center gap-1.5 text-slate-600">
+                    <span className="font-semibold">{textValue(tool.tool) ?? "tool"}</span>
+                    <span className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-bold", tool.status === "failed" ? "bg-er-soft text-er" : "bg-ok-soft text-ok")}>
+                      {textValue(tool.status) ?? "succeeded"}
+                    </span>
+                    {typeof tool.durationMs === "number" && <span>{tool.durationMs}ms</span>}
+                    {resultIntent && <span>→ {resultIntent}</span>}
+                  </div>
+                );
+              })()
+            ))}
+          </div>
+        </div>
+      )}
+
+      {warnings.length > 0 && (
+        <div className="rounded-lg bg-warn-soft px-2.5 py-2 text-warn">
+          {truncateText(String(warnings[0]), 160)}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function paramsWith(current: Record<string, string | undefined>, patch: Record<string, string | undefined>) {
@@ -128,9 +296,10 @@ export default async function NotificationsPage({
                             <Icon className="w-4 h-4" />
                           </div>
                           <div className="min-w-0">
-                            <div className="font-semibold capitalize">{titleFor(row)}</div>
+                            <div className="font-semibold capitalize">{row.source === "ai" ? statusText(row.status) : titleFor(row)}</div>
                             <div className="text-xs text-slate-400 font-mono mt-0.5">{row.entityId ?? "—"}</div>
-                            {row.prompt && <div className="text-xs text-slate-500 mt-1 line-clamp-2">Prompt: {row.prompt}</div>}
+                            {row.prompt && <div className="text-xs text-slate-500 mt-1 line-clamp-2">Prompt: {truncateText(row.prompt)}</div>}
+                            {row.source === "ai" && <AiAuditSummary row={row} />}
                           </div>
                         </div>
                       </td>
@@ -146,13 +315,13 @@ export default async function NotificationsPage({
                       <td className="px-4 py-3 max-w-96">
                         <details className="text-xs">
                           <summary className="cursor-pointer font-semibold text-primary-600">Xem metadata</summary>
-                          <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-canvas p-3 text-[11px] leading-relaxed text-slate-600">{JSON.stringify({
+                          <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-canvas p-3 text-[11px] leading-relaxed text-slate-600">{JSON.stringify(scrubPublicJson({
                             parsedIntent: row.parsedIntent,
                             before: row.before,
                             after: row.after,
                             affectedRecords: row.affectedRecords,
                             metadata: row.metadata,
-                          }, null, 2)}</pre>
+                          }), null, 2)}</pre>
                         </details>
                       </td>
                     </tr>
