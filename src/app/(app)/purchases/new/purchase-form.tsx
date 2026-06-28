@@ -373,7 +373,10 @@ export function PurchaseForm({
           </div>
           {aiPendingLines.length > 0 && (
             <div className="mb-3 rounded-card border border-warn/25 bg-warn-soft p-3 text-warn">
-              <div className="text-xs font-bold">Dòng AI cần chọn sản phẩm</div>
+              <div className="text-xs font-bold">AI chưa tìm thấy sản phẩm trong danh mục active</div>
+              <div className="mt-1 text-xs text-warn/80">
+                Những dòng này chưa được thêm vào phiếu nhập. Kiểm tra SKU/tên sản phẩm hoặc tạo lại sản phẩm active trước khi nhận hàng.
+              </div>
               <div className="mt-2 flex flex-wrap gap-2">
                 {aiPendingLines.map((line) => (
                   <button

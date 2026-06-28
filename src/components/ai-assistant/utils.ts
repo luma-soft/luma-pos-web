@@ -117,6 +117,7 @@ export function dispatchPosDraft(preview: AiActionPreview) {
       previewId: preview.id,
       intent: preview.intent,
       items: posDraftItems(preview),
+      payload: preview.action.payload,
     },
   }));
 }

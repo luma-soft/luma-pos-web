@@ -1188,6 +1188,32 @@ function parseExactProductLines(prompt: string, productOptions: PriceProductOpti
   return matched;
 }
 
+function parseUnresolvedProductSegments(prompt: string, productOptions: PriceProductOption[]) {
+  const profiles = buildProductProfiles(productOptions);
+  const tokens = productTokens(prompt);
+  const starts = tokens
+    .map((_, index) => index)
+    .filter((index) => isAiPosQuantityStart(tokens, index));
+  if (starts.length === 0) return [];
+
+  return starts.flatMap((start, index) => {
+    const end = starts[index + 1] ?? tokens.length;
+    const quantity = numericQuantity(tokens[start] ?? "") ?? 1;
+    const query = cleanName(tokens.slice(start + 1, end).join(" "));
+    if (!query) return [];
+    const best = findBestProductMatch(query, profiles);
+    if (best) return [];
+    const sku = query.match(/\b[A-Z]{1,6}\d[A-Z0-9._-]{2,}\b/i)?.[0]?.toUpperCase();
+    return [{
+      productName: query,
+      text: query,
+      sku: sku ?? null,
+      quantity,
+      reason: "not_found_in_catalog",
+    }];
+  }).slice(0, 20);
+}
+
 export function parseProductLines(prompt: string, productOptions: PriceProductOption[]) {
   const profiles = buildProductProfiles(productOptions);
   const segmented = parseSegmentedProductLines(prompt, profiles);
@@ -2096,6 +2122,7 @@ export async function orderActionPreview(prompt: string): Promise<AiActionPrevie
   }
 
   const lines = parseProductLines(prompt, context.products);
+  const unresolvedItems = parseUnresolvedProductSegments(prompt, context.products);
   const customer = matchNamed(prompt, context.customers).match;
   const warehouse = matchNamed(prompt, context.warehouses).match ?? context.warehouses.find((item) => item.isDefault) ?? context.warehouses[0] ?? null;
   const isQuote = q.includes("bao gia") || q.includes("quote");
@@ -2122,7 +2149,7 @@ export async function orderActionPreview(prompt: string): Promise<AiActionPrevie
       { label: "Loại", value: isQuote ? "Báo giá" : "Đơn bán", tone: isQuote ? "default" : "warning" },
       { label: "Khách", value: customer ? customer.name : "Khách lẻ" },
       { label: "Kho", value: warehouse?.name ?? "Cần chọn", tone: warehouse ? "success" : "warning" },
-      { label: "Số dòng", value: String(lines.length), tone: lines.length ? "success" : "warning" },
+      { label: "Số dòng", value: unresolvedItems.length ? `${lines.length}/${lines.length + unresolvedItems.length}` : String(lines.length), tone: unresolvedItems.length ? "warning" : lines.length ? "success" : "warning" },
     ],
     lines: lines.map((line) => ({
       label: line.product.name,
@@ -2135,6 +2162,7 @@ export async function orderActionPreview(prompt: string): Promise<AiActionPrevie
         ? "Tạo báo giá không trừ kho; chỉ chuyển thành đơn sau khi xác nhận riêng."
         : "Tạo đơn bán sẽ trừ kho và có thể ghi công nợ nếu chưa thanh toán.",
       "AI không tự thanh toán hóa đơn; nếu cần thu tiền hãy dùng lệnh ghi nhận thanh toán riêng.",
+      ...unresolvedItems.map((item) => `Không tìm thấy sản phẩm trong danh mục: ${item.sku ? `${item.sku} · ` : ""}${item.productName}. Dòng này chưa được thêm vào POS.`),
     ],
     action: {
       type: "create_order",
@@ -2153,6 +2181,7 @@ export async function orderActionPreview(prompt: string): Promise<AiActionPrevie
           unitMultiplier: 1,
           quantity: line.quantity,
         })),
+        unresolvedItems,
         payment: { method: "credit", amount: 0 },
         discount: 0,
         taxRate: 0,
@@ -2172,6 +2201,7 @@ function posMatchQualityText(confidence: number) {
 export async function posCartPreview(prompt: string, source: "voice" | "image"): Promise<AiActionPreview> {
   const context = await getSalesContext();
   const lines = parseProductLines(prompt, context.products);
+  const unresolvedItems = parseUnresolvedProductSegments(prompt, context.products);
   const unresolvedText = source === "image" ? attachmentExtractedText(prompt) : "";
   const missingFields = lines.length ? [] : ["items"];
   const sourceText = source === "voice" ? "Danh sách nhập tay/giọng nói" : "Ảnh/OCR";
@@ -2190,7 +2220,7 @@ export async function posCartPreview(prompt: string, source: "voice" | "image"):
     missingFields,
     fields: [
       { label: "Nguồn", value: sourceText },
-      { label: "Dòng đã nhận", value: String(lines.length), tone: lines.length ? "success" : "warning" },
+      { label: "Dòng đã nhận", value: unresolvedItems.length ? `${lines.length}/${lines.length + unresolvedItems.length}` : String(lines.length), tone: unresolvedItems.length ? "warning" : lines.length ? "success" : "warning" },
     ],
     lines: lines.map((line) => ({
       label: line.product.name,
@@ -2201,6 +2231,7 @@ export async function posCartPreview(prompt: string, source: "voice" | "image"):
     warnings: [
       "AI chỉ chuẩn bị giỏ POS nháp; chưa tạo hóa đơn và chưa thanh toán.",
       "Các dòng cần kiểm tra vẫn phải được rà lại trong POS trước khi bán.",
+      ...unresolvedItems.map((item) => `Không tìm thấy sản phẩm trong danh mục: ${item.sku ? `${item.sku} · ` : ""}${item.productName}. Dòng này chưa được thêm vào POS.`),
       ...(unresolvedText && lines.length === 0 ? [`OCR/unresolved: ${unresolvedText}`] : []),
     ],
     action: {
@@ -2217,6 +2248,7 @@ export async function posCartPreview(prompt: string, source: "voice" | "image"):
           quantity: line.quantity,
           confidence: line.confidence,
         })),
+        unresolvedItems,
       },
     },
   };

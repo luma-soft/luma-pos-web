@@ -39,9 +39,19 @@ type PosAiCartDraftItem = {
   productId?: string;
   productName?: string;
   sku?: string;
+  text?: string;
   unitName?: string;
   quantity?: number;
   confidence?: number;
+  reason?: string;
+};
+
+type PosAiUnresolvedItem = {
+  key: string;
+  label: string;
+  sku?: string;
+  quantity: number;
+  reason: string;
 };
 
 type PosAiCartDraftPayload = {
@@ -173,9 +183,25 @@ function saveInvoices(list: Invoice[]) {
   } catch { /* đầy quota — bỏ qua */ }
 }
 
+function pendingAiCartItem(raw: unknown, index: number): PosAiUnresolvedItem | null {
+  if (!raw || typeof raw !== "object") return null;
+  const item = raw as PosAiCartDraftItem;
+  const label = (item.productName ?? item.text ?? item.sku ?? `Dòng ${index + 1}`).trim();
+  if (!label) return null;
+  return {
+    key: `ai-unresolved-${index}-${item.sku ?? label}`,
+    label,
+    sku: item.sku?.trim() || undefined,
+    quantity: Math.max(1, Math.trunc(Number(item.quantity) || 1)),
+    reason: item.reason === "inactive_or_not_found" ? "Sản phẩm không active hoặc không có trong danh mục" : "Không tìm thấy sản phẩm active trong danh mục",
+  };
+}
+
 function matchAiCartDraftItems(rawItems: unknown[], products: PosProduct[]) {
-  return rawItems.flatMap((raw): Array<{ product: PosProduct; quantity: number }> => {
-    if (!raw || typeof raw !== "object") return [];
+  const matched: Array<{ product: PosProduct; quantity: number }> = [];
+  const unresolved: PosAiUnresolvedItem[] = [];
+  rawItems.forEach((raw, index) => {
+    if (!raw || typeof raw !== "object") return;
     const item = raw as PosAiCartDraftItem;
     const name = normalizeSearch(item.productName ?? "");
     const sku = normalizeSearch(item.sku ?? "");
@@ -187,9 +213,14 @@ function matchAiCartDraftItems(rawItems: unknown[], products: PosProduct[]) {
         (!!name && normalizeSearch(candidate.name) === name)
       )
     );
-    if (!product) return [];
-    return [{ product, quantity: Math.max(1, Math.trunc(Number(item.quantity) || 1)) }];
+    if (!product) {
+      const pending = pendingAiCartItem(raw, index);
+      if (pending) unresolved.push(pending);
+      return;
+    }
+    matched.push({ product, quantity: Math.max(1, Math.trunc(Number(item.quantity) || 1)) });
   });
+  return { matched, unresolved };
 }
 
 function aiProductDraftItemsFromQuery(params: URLSearchParams) {
@@ -396,6 +427,7 @@ export function PosClient({
   // ===== offline (Mức A) =====
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(0);
+  const [aiUnresolvedItems, setAiUnresolvedItems] = useState<PosAiUnresolvedItem[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [offlineSaved, setOfflineSaved] = useState(false);
 
@@ -540,9 +572,14 @@ export function PosClient({
 
   useEffect(() => {
     const onAiCartDraft = (event: Event) => {
-      const detail = (event as CustomEvent<{ items?: unknown }>).detail;
-      const rawItems = Array.isArray(detail?.items) ? detail.items : [];
-      const matched = matchAiCartDraftItems(rawItems, searchableProducts);
+      const detail = (event as CustomEvent<{ items?: unknown; payload?: Record<string, unknown> }>).detail;
+      const payload = detail?.payload && typeof detail.payload === "object" ? detail.payload : {};
+      const rawItems = [
+        ...(Array.isArray(detail?.items) ? detail.items : []),
+        ...(Array.isArray(payload.unresolvedItems) ? payload.unresolvedItems : []),
+      ];
+      const { matched, unresolved } = matchAiCartDraftItems(rawItems, searchableProducts);
+      setAiUnresolvedItems(unresolved);
       if (matched.length === 0) return;
       for (const line of matched) addQuantityToCart(line.product, line.quantity);
       setMobileView("cart");
@@ -566,13 +603,15 @@ export function PosClient({
         stored = null;
       }
       const storedItems = Array.isArray(stored?.items) ? stored.items : [];
-      const rawItems = storedItems.length > 0 ? storedItems : aiProductDraftItemsFromQuery(params);
+      const payload = stored?.payload && typeof stored.payload === "object" ? stored.payload : {};
+      const payloadUnresolvedItems = Array.isArray(payload.unresolvedItems) ? payload.unresolvedItems : [];
+      const rawItems = storedItems.length > 0 ? [...storedItems, ...payloadUnresolvedItems] : aiProductDraftItemsFromQuery(params);
       if (rawItems.length > 0) hydratedRef.current = true;
-      const matched = matchAiCartDraftItems(rawItems, searchableProducts);
+      const { matched, unresolved } = matchAiCartDraftItems(rawItems, searchableProducts);
+      setAiUnresolvedItems(unresolved);
       const consumed = matched.length > 0;
       if (consumed) {
         for (const line of matched) addQuantityToCart(line.product, line.quantity);
-        const payload = stored?.payload && typeof stored.payload === "object" ? stored.payload : {};
         const payment = payload.payment && typeof payload.payment === "object" ? payload.payment as Record<string, unknown> : {};
         patchActive({
           customerId: typeof payload.customerId === "string" ? payload.customerId : "",
@@ -1002,6 +1041,29 @@ export function PosClient({
                     {t("pos.invoiceEdit.viewOriginal")}
                   </Link>
                 </div>
+              </div>
+            </div>
+          )}
+          {aiUnresolvedItems.length > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-amber-800 dark:border-amber-900 dark:bg-amber-950/20 dark:text-amber-300">
+              <div className="text-xs font-bold uppercase tracking-wide">AI chưa tìm thấy sản phẩm trong danh mục active</div>
+              <div className="mt-1 text-xs">
+                Những dòng này chưa được thêm vào POS. Kiểm tra SKU/tên sản phẩm hoặc bật/tạo sản phẩm active trước khi bán.
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {aiUnresolvedItems.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => setSearch(item.sku ?? item.label)}
+                    className="max-w-full rounded-full border border-amber-300 bg-white px-2.5 py-1 text-left text-xs font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/30"
+                    title={item.reason}
+                  >
+                    <span className="block max-w-[360px] truncate">
+                      {item.sku ? `${item.sku} · ` : ""}{item.label} · SL {item.quantity}
+                    </span>
+                  </button>
+                ))}
               </div>
             </div>
           )}

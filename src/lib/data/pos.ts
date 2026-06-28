@@ -118,7 +118,7 @@ export async function getPosData(options?: { includeProductIds?: string[] }) {
           .select(posProductSelect(defaultWh?.id ?? null))
           .from(products)
           .leftJoin(categories, eq(products.categoryId, categories.id))
-          .where(inArray(products.id, includeProductIds))
+          .where(and(eq(products.isActive, true), inArray(products.id, includeProductIds)))
       : Promise.resolve([]),
     db
       .select({
