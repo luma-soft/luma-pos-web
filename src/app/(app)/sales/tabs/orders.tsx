@@ -2,28 +2,22 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Search, ShoppingCart, FileX2 } from "lucide-react";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { einvoices } from "@/db/schema";
 import { Routes } from "@/lib/routes";
-import { cn, formatCurrency, formatDate } from "@/lib/utils";
-import { getOrders, type OrderStatusFilter, type OrderPaymentFilter } from "@/lib/data/orders";
+import { cn } from "@/lib/utils";
+import { getOrder, getOrders, type OrderStatusFilter, type OrderPaymentFilter } from "@/lib/data/orders";
 import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
-import { OrderStatusBadge, PaymentStatusBadge } from "../../orders/status-badges";
 import { TableSkeleton } from "@/components/table-skeleton";
+import { OrderDetailPanel } from "../../orders/[id]/order-detail-panel";
+import { OrdersTable } from "./orders-table";
 
 type SP = Record<string, string | undefined>;
 
 const STATUS: OrderStatusFilter[] = ["all", "completed", "owing", "returned", "cancelled"];
 const PAYMENTS: OrderPaymentFilter[] = ["all", "paid", "partial", "unpaid"];
-
-function posSourceHref(order: { id: string; code: string; createdAt: Date | string }, mode: "edit" | "copy") {
-  const sp = new URLSearchParams({
-    sourceMode: mode,
-    sourceOrderId: order.id,
-    sourceCode: order.code,
-    sourceSaleTime: formatDate(order.createdAt),
-  });
-  return `${Routes.POS}?${sp.toString()}`;
-}
 
 export async function OrdersTab({ searchParams }: { searchParams: SP }) {
   const t = await getTranslations();
@@ -35,7 +29,7 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
 
   const href = (overrides: Record<string, string | undefined>) => {
     const sp = new URLSearchParams();
-    const merged = { tab: "orders", q: params.q, status, payment, from, to, page: undefined as string | undefined, ...overrides };
+    const merged = { tab: "orders", q: params.q, status, payment, from, to, orderId: params.orderId, expandedOrder: params.expandedOrder, page: undefined as string | undefined, ...overrides };
     for (const [k, v] of Object.entries(merged)) if (v && v !== "all") sp.set(k, v);
     return `${Routes.Sales}?${sp.toString()}`;
   };
@@ -76,8 +70,8 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
         <input type="date" name="from" defaultValue={from} aria-label={t("orders.filter.from")} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         <input type="date" name="to" defaultValue={to} aria-label={t("orders.filter.to")} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full bg-primary-600 hover:brightness-110 text-white transition active:scale-[0.98]">{t("common.search")}</button>
-        {(params.q || payment !== "all" || from || to) && (
-          <Link href={href({ q: undefined, payment: undefined, from: undefined, to: undefined })} className="px-3 py-2 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">
+        {(params.q || payment !== "all" || from || to || params.orderId) && (
+          <Link href={href({ q: undefined, payment: undefined, from: undefined, to: undefined, orderId: undefined, expandedOrder: undefined })} className="px-3 py-2 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">
             {t("orders.filter.clear")}
           </Link>
         )}
@@ -100,7 +94,12 @@ async function OrdersContent({ searchParams }: { searchParams: SP }) {
   const page = Number(params.page) || 1;
   const pageSize = parsePageSize(params.size);
 
-  const { rows, total, pageCount } = await getOrders({ q: params.q, status, payment, from, to, page, pageSize });
+  const expandedId = params.expandedOrder ?? params.orderId ?? null;
+  const { rows, total, pageCount } = await getOrders({ orderId: params.orderId, q: params.q, status, payment, from, to, page, pageSize });
+  const expandedOrder = expandedId ? await getOrder(expandedId).catch(() => null) : null;
+  const [expandedEinvoice] = expandedOrder
+    ? await db.select().from(einvoices).where(eq(einvoices.orderId, expandedOrder.id)).limit(1)
+    : [null];
 
   return (
     <>
@@ -115,87 +114,11 @@ async function OrdersContent({ searchParams }: { searchParams: SP }) {
         </div>
       ) : (
         <>
-          <div className="lg:hidden space-y-2">
-            {rows.map((o) => {
-              const remaining = Number(o.total) - Number(o.amountPaid);
-              return (
-                <Link key={o.id} href={Routes.order(o.id)} className={cn("block bg-surface border border-border rounded-card p-3", o.status === "cancelled" && "opacity-60")}>
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="font-semibold text-primary-600">{o.code}</div>
-                      <div className="text-xs text-slate-400">{formatDate(o.createdAt)} · {o.customerName ?? t("orders.walkIn")}</div>
-                    </div>
-                    <OrderStatusBadge status={o.status} />
-                  </div>
-                  <div className="flex items-center justify-between mt-2 text-sm">
-                    <span className="font-semibold tabular-nums">{formatCurrency(Number(o.total))}</span>
-                    {remaining > 0 && o.status !== "cancelled"
-                      ? <span className="text-er font-semibold tabular-nums">{t("orders.cols.remaining")}: {formatCurrency(remaining)}</span>
-                      : <PaymentStatusBadge status={o.paymentStatus} />}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-
-          <form action="/orders/print-batch" className="hidden lg:block bg-surface border border-border rounded-card overflow-x-auto">
-            <div className="px-4 py-2 border-b border-border flex items-center gap-3 text-sm">
-              <span className="text-xs text-slate-500">{t("orders.batchHint")}</span>
-              <div className="flex-1" />
-              <button type="submit" formAction="/orders/merge" className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-surface-2">🔗 {t("merge.title")}</button>
-              <button type="submit" className="px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:bg-surface-2">🖨 {t("orders.printSelected")}</button>
-            </div>
-            <table className="w-full min-w-170 text-sm">
-              <thead>
-                <tr className="bg-canvas text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="px-4 py-3 w-8"></th>
-                  <th className="px-4 py-3 font-semibold">{t("orders.cols.code")}</th>
-                  <th className="px-4 py-3 font-semibold">{t("orders.cols.date")}</th>
-                  <th className="px-4 py-3 font-semibold">{t("orders.cols.customer")}</th>
-                  <th className="px-4 py-3 font-semibold">{t("orders.cols.project")}</th>
-                  <th className="px-4 py-3 font-semibold text-right">{t("orders.cols.total")}</th>
-                  <th className="px-4 py-3 font-semibold text-right">{t("orders.cols.remaining")}</th>
-                  <th className="px-4 py-3 font-semibold">{t("orders.cols.payment")}</th>
-                  <th className="px-4 py-3 font-semibold">{t("orders.cols.status")}</th>
-                  <th className="px-4 py-3 font-semibold text-right"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-soft">
-                {rows.map((o) => {
-                  const remaining = Number(o.total) - Number(o.amountPaid);
-                  return (
-                    <tr key={o.id} className={cn("hover:bg-surface-2", o.status === "cancelled" && "opacity-60")}>
-                      <td className="px-4 py-3"><input type="checkbox" name="ids" value={o.id} disabled={o.status === "cancelled"} /></td>
-                      <td className="px-4 py-3"><Link href={Routes.order(o.id)} className="font-medium text-primary-600 hover:underline">{o.code}</Link></td>
-                      <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{formatDate(o.createdAt)}</td>
-                      <td className="px-4 py-3">{o.customerName ?? t("orders.walkIn")}</td>
-                      <td className="px-4 py-3 text-slate-500">{o.projectName ?? "—"}</td>
-                      <td className="px-4 py-3 text-right tabular-nums font-medium">{formatCurrency(Number(o.total))}</td>
-                      <td className={cn("px-4 py-3 text-right tabular-nums", remaining > 0 && o.status !== "cancelled" ? "text-er font-semibold" : "text-slate-400")}>
-                        {remaining > 0 && o.status !== "cancelled" ? formatCurrency(remaining) : "—"}
-                      </td>
-                      <td className="px-4 py-3"><PaymentStatusBadge status={o.paymentStatus} /></td>
-                      <td className="px-4 py-3"><OrderStatusBadge status={o.status} /></td>
-                      <td className="px-4 py-3">
-                        {o.status !== "cancelled" && (
-                          <div className="flex items-center justify-end gap-2">
-                            {(o.status === "completed" || o.status === "quote") && (
-                              <Link href={posSourceHref(o, "edit")} className="text-xs font-medium text-primary-600 hover:underline">
-                                {t("common.edit")}
-                              </Link>
-                            )}
-                            <Link href={posSourceHref(o, "copy")} className="text-xs font-medium text-primary-600 hover:underline">
-                              {t("pos.modes.copyShort")}
-                            </Link>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </form>
+          <OrdersTable
+            rows={rows}
+            expandedId={expandedOrder?.id ?? expandedId}
+            expandedContent={expandedOrder ? <OrderDetailPanel order={expandedOrder} einvoice={expandedEinvoice ?? null} compact /> : null}
+          />
         </>
       )}
 

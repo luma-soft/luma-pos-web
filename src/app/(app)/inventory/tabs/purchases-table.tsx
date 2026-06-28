@@ -2,10 +2,10 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ChevronDown, Copy, FilePenLine, Printer, ReceiptText } from "lucide-react";
 import { PurchaseCancelButton } from "../../purchases/purchase-cancel-button";
+import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import type { getPurchases } from "@/lib/data/inventory";
@@ -24,148 +24,48 @@ function purchaseOwed(purchase: PurchaseRow) {
 }
 
 export function PurchasesTable({ rows }: { rows: PurchaseRow[] }) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
-  const expandedId = params.get("expanded");
-
-  function setExpanded(nextId: string | null) {
-    const sp = new URLSearchParams(params.toString());
-    if (nextId) sp.set("expanded", nextId);
-    else sp.delete("expanded");
-    const query = sp.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  }
-
-  return (
-    <>
-      <div className="lg:hidden space-y-2">
-        {rows.map((purchase) => {
-          const expanded = expandedId === purchase.id;
-          const owed = purchaseOwed(purchase);
-          return (
-            <div
-              key={purchase.id}
-              className={cn(
-                "bg-surface border rounded-card overflow-hidden",
-                expanded ? "border-primary-300 shadow-e1" : "border-border",
-              )}
-            >
-              <button
-                type="button"
-                onClick={() => setExpanded(expanded ? null : purchase.id)}
-                className="w-full p-3 text-left"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="font-semibold text-primary-600">{purchase.code}</div>
-                    <div className="text-xs text-slate-400">
-                      {formatDate(purchase.createdAt)} · {purchase.supplierName}
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <StatusBadge status={purchase.status} />
-                    <ChevronDown className={cn("h-4 w-4 text-slate-400 transition-transform", expanded && "rotate-180")} />
-                  </div>
-                </div>
-                <div className="flex items-center justify-between mt-2 text-sm">
-                  <span className="font-semibold tabular-nums">{formatCurrency(Number(purchase.total))}</span>
-                  {owed > 0 && <span className="text-warn font-semibold tabular-nums">{formatCurrency(owed)}</span>}
-                </div>
-              </button>
-              {expanded && <ExpandedPurchase purchase={purchase} compact />}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="hidden lg:block bg-surface border border-border rounded-card overflow-x-auto">
-        <table className="w-full min-w-170 text-sm">
-          <PurchasesTableHead />
-          <tbody>
-            {rows.map((purchase) => {
-              const expanded = expandedId === purchase.id;
-              return (
-                <PurchaseRows
-                  key={purchase.id}
-                  purchase={purchase}
-                  expanded={expanded}
-                  onToggle={() => setExpanded(expanded ? null : purchase.id)}
-                />
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </>
-  );
-}
-
-function PurchasesTableHead() {
   const t = useTranslations();
+  const columns: DataTableColumn<PurchaseRow>[] = [
+    { key: "code", label: t("purchases.cols.code"), required: true, render: (purchase) => <span className="font-semibold text-primary-600">{purchase.code}</span> },
+    { key: "date", label: t("orders.cols.date"), defaultVisible: true, render: (purchase) => <span className="text-slate-500">{formatDate(purchase.createdAt)}</span> },
+    { key: "supplier", label: t("purchases.cols.supplier"), defaultVisible: true, render: (purchase) => purchase.supplierName },
+    { key: "warehouse", label: t("purchases.cols.warehouse"), defaultVisible: true, render: (purchase) => <span className="text-slate-500">{purchase.warehouseName}</span> },
+    { key: "total", label: t("orders.cols.total"), defaultVisible: true, align: "right", cellClassName: "font-semibold", render: (purchase) => formatCurrency(Number(purchase.total)) },
+    { key: "owed", label: t("purchases.cols.owed"), defaultVisible: true, align: "right", cellClassName: (purchase) => purchaseOwed(purchase) > 0 ? "font-semibold text-warn" : "text-slate-400", render: (purchase) => purchaseOwed(purchase) > 0 ? formatCurrency(purchaseOwed(purchase)) : "—" },
+    { key: "status", label: t("orders.cols.status"), defaultVisible: true, render: (purchase) => <StatusBadge status={purchase.status} /> },
+  ];
   return (
-    <thead>
-      <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
-        <th className="px-4 py-3 font-semibold">{t("purchases.cols.code")}</th>
-        <th className="px-4 py-3 font-semibold">{t("orders.cols.date")}</th>
-        <th className="px-4 py-3 font-semibold">{t("purchases.cols.supplier")}</th>
-        <th className="px-4 py-3 font-semibold">{t("purchases.cols.warehouse")}</th>
-        <th className="px-4 py-3 font-semibold text-right">{t("orders.cols.total")}</th>
-        <th className="px-4 py-3 font-semibold text-right">{t("purchases.cols.owed")}</th>
-        <th className="px-4 py-3 font-semibold">{t("orders.cols.status")}</th>
-        <th className="w-10 px-4 py-3" />
-      </tr>
-    </thead>
-  );
-}
-
-function PurchaseRows({
-  purchase,
-  expanded,
-  onToggle,
-}: {
-  purchase: PurchaseRow;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
-  const t = useTranslations();
-  const owed = purchaseOwed(purchase);
-
-  return (
-    <>
-      <tr
-        className={cn(
-          "border-t border-border-soft cursor-pointer transition-colors",
-          expanded ? "bg-primary-50/45 dark:bg-primary-950/15" : "hover:bg-surface-2",
-        )}
-        onClick={onToggle}
-      >
-        <td className="px-4 py-3 font-medium">
-          <div className="font-semibold text-primary-600">{purchase.code}</div>
-          <div className="text-xs text-slate-400">
-            {t("purchases.detail.items", { count: purchase.items.length })}
-          </div>
-        </td>
-        <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{formatDate(purchase.createdAt)}</td>
-        <td className="px-4 py-3">{purchase.supplierName}</td>
-        <td className="px-4 py-3 text-slate-500">{purchase.warehouseName}</td>
-        <td className="px-4 py-3 text-right tabular-nums font-medium">{formatCurrency(Number(purchase.total))}</td>
-        <td className={cn("px-4 py-3 text-right tabular-nums", owed > 0 ? "text-warn font-semibold" : "text-slate-400")}>
-          {owed > 0 ? formatCurrency(owed) : "—"}
-        </td>
-        <td className="px-4 py-3"><StatusBadge status={purchase.status} /></td>
-        <td className="px-4 py-3 text-right">
-          <ChevronDown className={cn("ml-auto h-4 w-4 text-slate-400 transition-transform", expanded && "rotate-180")} />
-        </td>
-      </tr>
-      {expanded && (
-        <tr className="border-t border-primary-100 dark:border-primary-900/50">
-          <td colSpan={8} className="p-0">
-            <ExpandedPurchase purchase={purchase} />
-          </td>
-        </tr>
-      )}
-    </>
+    <DataTableShell
+      tableId="inventory.purchases"
+      rows={rows}
+      columns={columns}
+      getRowId={(purchase) => purchase.id}
+      minWidth="1080px"
+      renderExpanded={(purchase) => <ExpandedPurchase purchase={purchase} />}
+      renderMobileRow={({ row: purchase, expanded, toggle }) => {
+        const owed = purchaseOwed(purchase);
+        return (
+          <>
+            <button type="button" onClick={toggle} className="w-full p-3 text-left">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="font-semibold text-primary-600">{purchase.code}</div>
+                  <div className="text-xs text-slate-400">{formatDate(purchase.createdAt)} · {purchase.supplierName}</div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <StatusBadge status={purchase.status} />
+                  <ChevronDown className={cn("h-4 w-4 text-slate-400 transition-transform", expanded && "rotate-180")} />
+                </div>
+              </div>
+              <div className="mt-2 flex items-center justify-between text-sm">
+                <span className="font-semibold tabular-nums">{formatCurrency(Number(purchase.total))}</span>
+                {owed > 0 && <span className="font-semibold tabular-nums text-warn">{formatCurrency(owed)}</span>}
+              </div>
+            </button>
+          </>
+        );
+      }}
+    />
   );
 }
 

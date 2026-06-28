@@ -1,12 +1,11 @@
-import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Search, Truck } from "lucide-react";
 import { Routes } from "@/lib/routes";
-import { cn, formatCurrency } from "@/lib/utils";
 import { getSuppliers } from "@/lib/data/partners";
 import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
 import { SupplierQuickCreate } from "../../suppliers/supplier-form";
+import { SuppliersTable } from "./suppliers-table";
 
 type SP = Record<string, string | undefined>;
 const OWING = ["", "owing", "clear"] as const;
@@ -47,45 +46,7 @@ export async function SuppliersTab({ searchParams }: { searchParams: SP }) {
           <p className="font-medium">{t("suppliers.empty")}</p>
         </div>
       ) : (
-        <>
-          <div className="lg:hidden space-y-2">
-            {rows.map((s) => {
-              const debt = Number(s.currentDebt);
-              return (
-                <Link key={s.id} href={Routes.supplier(s.id)} className="flex items-center justify-between gap-2 bg-surface border border-border rounded-card p-3">
-                  <div className="min-w-0"><div className="font-medium truncate">{s.name}</div><div className="text-xs text-slate-400">{s.phone ?? s.code}</div></div>
-                  {debt > 0 ? <span className="shrink-0 text-warn font-semibold tabular-nums text-sm">{formatCurrency(debt)}</span> : <span className="text-slate-300">—</span>}
-                </Link>
-              );
-            })}
-          </div>
-
-          <div className="hidden lg:block bg-surface border border-border rounded-card overflow-x-auto">
-            <table className="w-full min-w-170 text-sm">
-              <thead>
-                <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
-                  <th className="px-4 py-3 font-semibold">{t("suppliers.cols.name")}</th>
-                  <th className="px-4 py-3 font-semibold">{t("customers.cols.phone")}</th>
-                  <th className="px-4 py-3 font-semibold">{t("customers.fields.taxCode")}</th>
-                  <th className="px-4 py-3 font-semibold text-right">{t("suppliers.cols.debt")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-soft">
-                {rows.map((s) => {
-                  const debt = Number(s.currentDebt);
-                  return (
-                    <tr key={s.id} className="hover:bg-surface-2">
-                      <td className="px-4 py-3"><Link href={Routes.supplier(s.id)} className="font-medium text-primary-600 hover:underline">{s.name}</Link><div className="text-xs text-slate-400">{s.code}</div></td>
-                      <td className="px-4 py-3 text-slate-500">{s.phone ?? "—"}</td>
-                      <td className="px-4 py-3 text-slate-500">{s.taxCode ?? "—"}</td>
-                      <td className={cn("px-4 py-3 text-right tabular-nums font-semibold", debt > 0 ? "text-warn" : "text-slate-400")}>{debt > 0 ? formatCurrency(debt) : "—"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
+        <SuppliersTable rows={rows} />
       )}
 
       <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("suppliers.unitLabel")} />

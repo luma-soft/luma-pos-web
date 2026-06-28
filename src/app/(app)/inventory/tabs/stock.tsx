@@ -9,6 +9,7 @@ import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
 import { getProductFormOptions } from "@/lib/data/products";
 import { TableSkeleton } from "@/components/table-skeleton";
+import { StockTable } from "./stock-table";
 
 type SP = Record<string, string | undefined>;
 const STOCKS: StockFilter[] = ["all", "instock", "low", "out"];
@@ -17,15 +18,6 @@ const MOVE_STYLES: Record<string, string> = {
   purchase: "text-ok", sale: "text-er", return_in: "text-in", return_out: "text-warn",
   transfer: "text-in", adjust: "text-warn", init: "text-slate-500", internal_use: "text-warn",
 };
-
-type Sev = "out" | "crit" | "warn" | "ok";
-function stockSev(stock: number, min: number): Sev {
-  if (stock <= 0) return "out";
-  if (min > 0 && stock <= min) return "crit";
-  if (min > 0 && stock <= min * 1.5) return "warn";
-  return "ok";
-}
-const SEV_BAR: Record<Sev, string> = { out: "bg-er", crit: "bg-er", warn: "bg-warn", ok: "bg-primary-500" };
 
 export async function StockTab({ searchParams }: { searchParams: SP }) {
   const t = await getTranslations();
@@ -104,60 +96,14 @@ async function StockContent({ searchParams }: { searchParams: SP }) {
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-4">
         <div>
-          {rows.length > 0 && (
-            <div className="lg:hidden space-y-2 mb-3">
-              {rows.map((r) => {
-                const s = Number(r.totalStock); const min = Number(r.minLevel); const sev = stockSev(s, min);
-                return (
-                  <Link key={r.id} href={Routes.product(r.id)} className="block bg-surface border border-border rounded-card shadow-e1 p-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0"><div className="font-medium truncate">{r.name}</div><div className="text-xs text-slate-400 font-mono">{r.sku}</div></div>
-                      <StatusBadge sev={sev} t={t} />
-                    </div>
-                    <div className="flex items-center justify-between mt-2 text-sm">
-                      <span className={cn("font-mono font-semibold", sev === "crit" || sev === "out" ? "text-er" : "text-slate-700 dark:text-slate-300")}>{formatNumber(s)} {r.baseUnit}</span>
-                      <span className="text-slate-500 font-mono">{formatCurrency(Number(r.stockValue))}</span>
-                    </div>
-                  </Link>
-                );
-              })}
+          {rows.length === 0 ? (
+            <div className="rounded-card border border-border bg-surface p-12 text-center text-slate-400 shadow-e1">
+              <Warehouse className="mx-auto mb-3 h-10 w-10 opacity-60" />
+              <p className="font-medium">{t("inventory.empty")}</p>
             </div>
+          ) : (
+            <StockTable rows={rows} />
           )}
-
-          <div className="hidden lg:block bg-surface border border-border rounded-card shadow-e1 overflow-x-auto">
-            {rows.length === 0 ? (
-              <div className="p-12 text-center text-slate-400"><Warehouse className="w-10 h-10 mx-auto mb-3 opacity-60" /><p className="font-medium">{t("inventory.empty")}</p></div>
-            ) : (
-              <table className="w-full min-w-170 text-sm">
-                <thead>
-                  <tr className="bg-canvas text-left text-[10px] uppercase tracking-wide text-slate-400 border-b border-border">
-                    <th className="px-4 py-2.5 font-bold">{t("orders.cols.product")}</th>
-                    <th className="px-4 py-2.5 font-bold text-right">{t("inventory.cols.stock")}</th>
-                    <th className="px-4 py-2.5 font-bold text-right">{t("inventory.cols.min")}</th>
-                    <th className="px-4 py-2.5 font-bold w-28">{t("inventory.cols.level")}</th>
-                    <th className="px-4 py-2.5 font-bold text-right">{t("inventory.cols.value")}</th>
-                    <th className="px-4 py-2.5 font-bold">{t("orders.cols.status")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r) => {
-                    const s = Number(r.totalStock); const min = Number(r.minLevel); const sev = stockSev(s, min);
-                    const pct = min > 0 ? Math.min(100, Math.round((s / (min * 2)) * 100)) : (s > 0 ? 100 : 0);
-                    return (
-                      <tr key={r.id} className="border-b border-border-soft last:border-0 hover:bg-surface-2 transition-colors">
-                        <td className="px-4 py-3"><div className="font-medium">{r.name}</div><div className="text-xs text-slate-400 font-mono">{r.sku}</div></td>
-                        <td className={cn("px-4 py-3 text-right font-mono font-bold", (sev === "crit" || sev === "out") && "text-er")}>{formatNumber(s)} <span className="text-[10px] text-slate-400">{r.baseUnit}</span></td>
-                        <td className="px-4 py-3 text-right font-mono text-slate-400">{min > 0 ? formatNumber(min) : "—"}</td>
-                        <td className="px-4 py-3"><div className="h-2 w-28 rounded-full bg-surface-2 overflow-hidden"><div className={cn("h-full rounded-full", SEV_BAR[sev])} style={{ width: `${pct}%` }} /></div></td>
-                        <td className="px-4 py-3 text-right font-mono">{formatCurrency(Number(r.stockValue))}</td>
-                        <td className="px-4 py-3"><StatusBadge sev={sev} t={t} /></td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
           <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("products.unitLabel")} />
         </div>
 
@@ -182,15 +128,4 @@ async function StockContent({ searchParams }: { searchParams: SP }) {
       </div>
     </>
   );
-}
-
-function StatusBadge({ sev, t }: { sev: Sev; t: Awaited<ReturnType<typeof getTranslations>> }) {
-  const map: Record<Sev, { cls: string; key: string }> = {
-    out: { cls: "bg-er-soft text-er", key: "inventory.statusOut" },
-    crit: { cls: "bg-er-soft text-er", key: "inventory.statusLow" },
-    warn: { cls: "bg-warn-soft text-warn", key: "inventory.statusWarn" },
-    ok: { cls: "bg-ok-soft text-ok", key: "inventory.statusOk" },
-  };
-  const m = map[sev];
-  return <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-bold", m.cls)}>{t(m.key)}</span>;
 }

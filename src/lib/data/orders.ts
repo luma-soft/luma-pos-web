@@ -12,6 +12,7 @@ export type OrderStatusFilter = "all" | "completed" | "cancelled" | "owing" | "r
 export type OrderPaymentFilter = "all" | "paid" | "unpaid" | "partial";
 
 export interface OrderListFilters {
+  orderId?: string;
   q?: string;
   status?: OrderStatusFilter;
   payment?: OrderPaymentFilter;
@@ -25,6 +26,7 @@ export async function getOrders(filters: OrderListFilters = {}) {
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize);
   const conditions: SQL[] = [ne(orders.status, "quote")]; // báo giá có trang riêng
+  if (filters.orderId) conditions.push(eq(orders.id, filters.orderId));
 
   if (filters.q?.trim()) {
     const q = filters.q.trim();
@@ -155,4 +157,5 @@ export async function getOrder(id: string) {
 }
 
 export type OrderListResult = Awaited<ReturnType<typeof getOrders>>;
+export type OrderListRow = OrderListResult["rows"][number];
 export type OrderDetail = NonNullable<Awaited<ReturnType<typeof getOrder>>>;

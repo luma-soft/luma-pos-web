@@ -1,19 +1,21 @@
 "use client";
 
-import { Fragment, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   Ban,
   CalendarDays,
   ChevronDown,
   Download,
+  ExternalLink,
   FileDown,
   FileInput,
   Filter,
   HelpCircle,
   Lock,
+  Loader2,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -28,6 +30,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Pagination } from "@/components/pagination";
+import { DataTableShell, RowPreviewModal, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Routes } from "@/lib/routes";
@@ -40,6 +43,21 @@ import { OrderStatusBadge } from "../../orders/status-badges";
 type CustomerRow = CustomerListResult["rows"][number];
 type CustomerExpandTab = "info" | "sales" | "debt";
 type DebtFilter = "all" | "sale" | "payment" | "return";
+type OrderPreview = {
+  id: string;
+  code: string;
+  status: string;
+  customerName: string | null;
+  createdAt: string;
+  total: string | number;
+  amountPaid: string | number;
+  subtotal: string | number;
+  discount: string | number;
+  tax: string | number;
+  shippingFee: string | number;
+  items: Array<{ id: string; productName: string; unitName: string; quantity: string | number; unitPrice: string | number; discount: string | number; total: string | number }>;
+  payments: Array<{ id: string; createdAt: string; method: string; amount: string | number; note: string | null }>;
+};
 
 const CUSTOMER_EXPAND_TABS: CustomerExpandTab[] = ["info", "sales", "debt"];
 const CUSTOMER_TYPES = ["retail", "wholesale", "contractor", "agent"] as const;
@@ -176,121 +194,54 @@ function CustomerSearch({
 
 function CustomerRows({ data }: { data: CustomerListResult }) {
   const t = useTranslations();
-  const router = useRouter();
-  const pathname = usePathname();
-  const params = useSearchParams();
-  const expandedId = params.get("expandedCustomer");
-
-  function setExpanded(nextId: string | null) {
-    const sp = new URLSearchParams(params.toString());
-    if (nextId) sp.set("expandedCustomer", nextId);
-    else sp.delete("expandedCustomer");
-    const query = sp.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
-  }
+  const columns: DataTableColumn<CustomerRow>[] = [
+    {
+      key: "select",
+      label: <input type="checkbox" className="h-4 w-4 rounded border-slate-300" aria-label={t("customers.selectAll")} />,
+      required: true,
+      width: "44px",
+      align: "center",
+      render: (customer) => <input type="checkbox" className="h-4 w-4 rounded border-slate-300" aria-label={customer.name} onClick={stopRowToggle} />,
+    },
+    { key: "code", label: t("customers.cols.code"), defaultVisible: true, width: "130px", render: (customer) => <span className="font-medium">{customer.code ?? "—"}</span> },
+    { key: "name", label: t("customers.cols.name"), required: true, render: (customer) => <span className="font-semibold text-slate-900 dark:text-slate-100">{customer.name}</span> },
+    { key: "phone", label: t("customers.cols.phone"), defaultVisible: true, width: "130px", render: (customer) => <span className="text-slate-600 dark:text-slate-300">{customer.phone ?? "—"}</span> },
+    { key: "debt", label: t("customers.cols.debtCurrent"), defaultVisible: true, align: "right", width: "150px", cellClassName: (customer) => Number(customer.currentDebt) > 0 ? "font-semibold text-er" : "font-semibold text-slate-400", render: (customer) => formatCurrency(Number(customer.currentDebt)) },
+    { key: "grossSales", label: t("customers.cols.totalGrossSales"), defaultVisible: true, align: "right", width: "170px", render: (customer) => formatCurrency(Number(customer.grossSales)) },
+    { key: "netSales", label: t("customers.cols.totalSalesNet"), defaultVisible: true, align: "right", width: "190px", render: (customer) => formatCurrency(Number(customer.totalSpent)) },
+  ];
 
   return (
-    <>
-      <div className="space-y-2 lg:hidden">
-        {data.rows.map((customer) => {
-          const expanded = expandedId === customer.id;
-          return (
-            <div key={customer.id} className={cn("overflow-hidden rounded-card border bg-surface", expanded ? "border-primary-300 shadow-e1" : "border-border")}>
-              <button type="button" onClick={() => setExpanded(expanded ? null : customer.id)} className="w-full p-3 text-left">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate font-semibold">{customer.name}</div>
-                    <div className="text-xs text-slate-400">{customer.code ?? "—"} · {customer.phone ?? "—"}</div>
-                  </div>
-                  <ChevronDown className={cn("mt-1 h-4 w-4 text-slate-400 transition-transform", expanded && "rotate-180")} />
-                </div>
-                <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-                  <Metric label={t("customers.cols.debt")} value={formatCurrency(Number(customer.currentDebt))} tone={Number(customer.currentDebt) > 0 ? "danger" : "muted"} />
-                  <Metric label={t("customers.cols.totalGrossSales")} value={formatCurrency(Number(customer.grossSales))} />
-                  <Metric label={t("customers.cols.totalSalesNet")} value={formatCurrency(Number(customer.totalSpent))} />
-                </div>
-              </button>
-              {expanded && <ExpandedCustomer customer={customer} />}
+    <DataTableShell
+      tableId="partners.customers"
+      rows={data.rows}
+      columns={columns}
+      getRowId={(customer) => customer.id}
+      expandedParam="expandedCustomer"
+      minWidth="980px"
+      summaryCells={[
+        { key: "debt", content: formatCurrency(data.totalDebt) },
+        { key: "grossSales", content: formatCurrency(data.totalGrossSales) },
+        { key: "netSales", content: formatCurrency(data.totalNetSales) },
+      ]}
+      renderExpanded={(customer) => <ExpandedCustomer customer={customer} />}
+      renderMobileRow={({ row: customer, expanded, toggle }) => (
+        <button type="button" onClick={toggle} className="w-full p-3 text-left">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="truncate font-semibold">{customer.name}</div>
+              <div className="text-xs text-slate-400">{customer.code ?? "—"} · {customer.phone ?? "—"}</div>
             </div>
-          );
-        })}
-      </div>
-
-      <div className="hidden overflow-x-auto rounded-card border border-border bg-surface lg:block">
-        <table className="w-full min-w-[980px] table-fixed text-sm">
-          <colgroup>
-            <col className="w-11" />
-            <col className="w-32" />
-            <col />
-            <col className="w-32" />
-            <col className="w-36" />
-            <col className="w-40" />
-            <col className="w-44" />
-            <col className="w-10" />
-          </colgroup>
-          <thead>
-            <tr className="bg-primary-50/70 text-left text-xs font-semibold text-slate-700 dark:bg-primary-950/20 dark:text-slate-300">
-              <th className="px-3 py-3"><input type="checkbox" className="h-4 w-4 rounded border-slate-300" aria-label={t("customers.selectAll")} /></th>
-              <th className="px-3 py-3">{t("customers.cols.code")}</th>
-              <th className="px-3 py-3">{t("customers.cols.name")}</th>
-              <th className="px-3 py-3">{t("customers.cols.phone")}</th>
-              <th className="px-3 py-3 text-right">{t("customers.cols.debtCurrent")}</th>
-              <th className="px-3 py-3 text-right">{t("customers.cols.totalGrossSales")}</th>
-              <th className="px-3 py-3 text-right">{t("customers.cols.totalSalesNet")}</th>
-              <th className="px-3 py-3" />
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-t border-border-soft bg-surface text-right font-bold tabular-nums">
-              <td className="px-3 py-3" />
-              <td className="px-3 py-3" />
-              <td className="px-3 py-3" />
-              <td className="px-3 py-3" />
-              <td className="px-3 py-3">{formatCurrency(data.totalDebt)}</td>
-              <td className="px-3 py-3">{formatCurrency(data.totalGrossSales)}</td>
-              <td className="px-3 py-3">{formatCurrency(data.totalNetSales)}</td>
-              <td className="px-3 py-3" />
-            </tr>
-            {data.rows.map((customer) => {
-              const expanded = expandedId === customer.id;
-              return (
-                <Fragment key={customer.id}>
-                  <tr
-                    className={cn(
-                      "border-t border-border-soft cursor-pointer transition-colors",
-                      expanded ? "bg-primary-50/45 dark:bg-primary-950/15" : "hover:bg-surface-2",
-                    )}
-                    onClick={() => setExpanded(expanded ? null : customer.id)}
-                  >
-                    <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}>
-                      <input type="checkbox" className="h-4 w-4 rounded border-slate-300" aria-label={customer.name} />
-                    </td>
-                    <td className="truncate px-3 py-3 font-medium">{customer.code ?? "—"}</td>
-                    <td className="truncate px-3 py-3 font-medium text-slate-900 dark:text-slate-100">{customer.name}</td>
-                    <td className="truncate px-3 py-3 text-slate-600 dark:text-slate-300">{customer.phone ?? "—"}</td>
-                    <td className={cn("px-3 py-3 text-right tabular-nums font-semibold", Number(customer.currentDebt) > 0 ? "text-er" : "text-slate-400")}>
-                      {formatCurrency(Number(customer.currentDebt))}
-                    </td>
-                    <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(Number(customer.grossSales))}</td>
-                    <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(Number(customer.totalSpent))}</td>
-                    <td className="px-3 py-3 text-right">
-                      <ChevronDown className={cn("ml-auto h-4 w-4 text-slate-400 transition-transform", expanded && "rotate-180")} />
-                    </td>
-                  </tr>
-                  {expanded && (
-                    <tr className="border-t border-primary-100 dark:border-primary-900/50">
-                      <td colSpan={8} className="p-0">
-                        <ExpandedCustomer customer={customer} />
-                      </td>
-                    </tr>
-                  )}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </>
+            <ChevronDown className={cn("mt-1 h-4 w-4 text-slate-400 transition-transform", expanded && "rotate-180")} />
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+            <Metric label={t("customers.cols.debt")} value={formatCurrency(Number(customer.currentDebt))} tone={Number(customer.currentDebt) > 0 ? "danger" : "muted"} />
+            <Metric label={t("customers.cols.totalGrossSales")} value={formatCurrency(Number(customer.grossSales))} />
+            <Metric label={t("customers.cols.totalSalesNet")} value={formatCurrency(Number(customer.totalSpent))} />
+          </div>
+        </button>
+      )}
+    />
   );
 }
 
@@ -378,6 +329,22 @@ function CustomerInfoPanel({ customer }: { customer: CustomerRow }) {
 
 function CustomerSalesPanel({ customer }: { customer: CustomerRow }) {
   const t = useTranslations();
+  const [preview, setPreview] = useState<{ loading: boolean; error?: string; order?: OrderPreview } | null>(null);
+
+  async function openOrderPreview(orderId: string) {
+    setPreview({ loading: true });
+    try {
+      const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}/preview`, { cache: "no-store" });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        setPreview({ loading: false, error: t("errors.serverError" as never) });
+        return;
+      }
+      setPreview({ loading: false, order: json.data.order as OrderPreview });
+    } catch {
+      setPreview({ loading: false, error: t("errors.serverError" as never) });
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -400,7 +367,7 @@ function CustomerSalesPanel({ customer }: { customer: CustomerRow }) {
                 <tr key={`${row.kind}-${row.id}`}>
                   <td className="px-3 py-3 font-semibold">
                     {row.kind === "order" && row.orderId ? (
-                      <Link href={Routes.order(row.orderId)} className="text-primary-600 hover:underline">{row.code}</Link>
+                      <button type="button" onClick={() => openOrderPreview(row.orderId!)} className="text-primary-600 hover:underline">{row.code}</button>
                     ) : (
                       <Link href={`/returns/${row.id}/print`} className="text-primary-600 hover:underline">{row.code}</Link>
                     )}
@@ -419,6 +386,8 @@ function CustomerSalesPanel({ customer }: { customer: CustomerRow }) {
       <div className="border-t border-border-soft pt-4">
         <ActionButton icon={Download} label={t("customers.actions.exportFile")} disabled />
       </div>
+
+      <OrderPreviewDialog preview={preview} onClose={() => setPreview(null)} />
     </div>
   );
 }
@@ -426,10 +395,26 @@ function CustomerSalesPanel({ customer }: { customer: CustomerRow }) {
 function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
   const t = useTranslations();
   const [filter, setFilter] = useState<DebtFilter>("all");
+  const [preview, setPreview] = useState<{ loading: boolean; error?: string; order?: OrderPreview } | null>(null);
   const rows = useMemo(
     () => customer.debtLedger.filter((row) => filter === "all" || row.kind === filter),
     [customer.debtLedger, filter],
   );
+
+  async function openOrderPreview(orderId: string) {
+    setPreview({ loading: true });
+    try {
+      const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}/preview`, { cache: "no-store" });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        setPreview({ loading: false, error: t("errors.serverError" as never) });
+        return;
+      }
+      setPreview({ loading: false, order: json.data.order as OrderPreview });
+    } catch {
+      setPreview({ loading: false, error: t("errors.serverError" as never) });
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -465,7 +450,7 @@ function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
                 <tr key={`${row.kind}-${row.id}`}>
                   <td className="px-3 py-3 font-semibold">
                     {row.orderId ? (
-                      <Link href={Routes.order(row.orderId)} className="text-primary-600 hover:underline">{row.code}</Link>
+                      <button type="button" onClick={() => openOrderPreview(row.orderId!)} className="text-primary-600 hover:underline">{row.code}</button>
                     ) : (
                       <span className="text-primary-600">{row.code}</span>
                     )}
@@ -497,6 +482,96 @@ function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
           <ActionButton icon={QrCode} label={t("customers.actions.createQr")} disabled />
         </div>
       </div>
+
+      <OrderPreviewDialog preview={preview} onClose={() => setPreview(null)} />
+    </div>
+  );
+}
+
+function OrderPreviewDialog({
+  preview,
+  onClose,
+}: {
+  preview: { loading: boolean; error?: string; order?: OrderPreview } | null;
+  onClose: () => void;
+}) {
+  const t = useTranslations();
+  const order = preview?.order;
+  const openHref = order ? `${Routes.Sales}?tab=orders&orderId=${encodeURIComponent(order.id)}&expandedOrder=${encodeURIComponent(order.id)}` : "#";
+  const total = order ? Number(order.total) : 0;
+  const paid = order ? Number(order.amountPaid) : 0;
+
+  return (
+    <RowPreviewModal
+      open={Boolean(preview)}
+      onClose={onClose}
+      title={order ? order.code : t("orders.title")}
+      subtitle={order ? `${order.customerName ?? t("orders.walkIn")} · ${formatDate(order.createdAt)}` : undefined}
+      footer={order && (
+        <div className="flex justify-end">
+          <Link href={openHref} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110">
+            <ExternalLink className="h-4 w-4" />
+            Mở phiếu
+          </Link>
+        </div>
+      )}
+    >
+      {preview?.loading ? (
+        <div className="grid min-h-60 place-items-center text-sm font-semibold text-slate-500">
+          <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Đang tải...</span>
+        </div>
+      ) : preview?.error ? (
+        <div className="rounded-card border border-dashed border-border px-4 py-10 text-center text-sm font-medium text-er">{preview.error}</div>
+      ) : order ? (
+        <div className="space-y-5">
+          <div className="grid gap-3 text-sm md:grid-cols-3">
+            <InfoField label={t("orders.cols.customer")} value={order.customerName ?? t("orders.walkIn")} />
+            <InfoField label={t("orders.cols.date")} value={formatDate(order.createdAt)} />
+            <InfoField label={t("orders.cols.status")} value={order.status} />
+          </div>
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead>
+                <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">
+                  <th className="px-3 py-3">{t("orders.cols.product")}</th>
+                  <th className="px-3 py-3 text-right">{t("orders.cols.qty")}</th>
+                  <th className="px-3 py-3 text-right">{t("orders.cols.unitPrice")}</th>
+                  <th className="px-3 py-3 text-right">{t("orders.cols.discount")}</th>
+                  <th className="px-3 py-3 text-right">{t("orders.cols.lineTotal")}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-soft">
+                {order.items.map((item) => (
+                  <tr key={item.id}>
+                    <td className="px-3 py-3 font-medium">{item.productName}<div className="text-xs text-slate-400">{item.unitName}</div></td>
+                    <td className="px-3 py-3 text-right tabular-nums">{Number(item.quantity).toLocaleString("vi-VN")}</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(Number(item.unitPrice))}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-slate-500">{Number(item.discount) > 0 ? formatCurrency(Number(item.discount)) : "—"}</td>
+                    <td className="px-3 py-3 text-right tabular-nums font-semibold">{formatCurrency(Number(item.total))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="ml-auto max-w-sm space-y-2 text-sm">
+            <PreviewLine label={t("pos.subtotal")} value={formatCurrency(Number(order.subtotal))} />
+            <PreviewLine label={t("pos.discount")} value={formatCurrency(Number(order.discount))} />
+            <PreviewLine label={t("pos.tax")} value={formatCurrency(Number(order.tax))} />
+            <PreviewLine label={t("pos.shipping")} value={formatCurrency(Number(order.shippingFee))} />
+            <PreviewLine label={t("pos.total")} value={formatCurrency(total)} strong />
+            <PreviewLine label={t("orders.detail.remaining")} value={formatCurrency(Math.max(0, total - paid))} strong />
+          </div>
+        </div>
+      ) : null}
+    </RowPreviewModal>
+  );
+}
+
+function PreviewLine({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <span className="text-slate-500">{label}</span>
+      <span className={cn("tabular-nums", strong && "font-bold")}>{value}</span>
     </div>
   );
 }

@@ -191,7 +191,11 @@ export default async function DashboardPage({ searchParams }: PageProps) {
               <tbody className="divide-y divide-border-soft">
                 {data.recentOrders.map((o) => (
                   <tr key={o.id} className="hover:bg-surface-2">
-                    <td className="px-4 py-3"><Link href={Routes.order(o.id)} className="font-semibold text-primary-600 hover:underline">{o.code}</Link></td>
+                    <td className="px-4 py-3">
+                      <Link href={`${Routes.Sales}?tab=orders&orderId=${o.id}&expandedOrder=${o.id}`} className="font-semibold text-primary-600 hover:underline">
+                        {o.code}
+                      </Link>
+                    </td>
                     <td className="px-4 py-3">
                       {o.customerName ?? t("orders.walkIn")}
                       {o.customerType && o.customerType !== "retail" && (
