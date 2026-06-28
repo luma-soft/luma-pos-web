@@ -6,6 +6,31 @@ import { writeAuditLog } from "@/lib/audit";
 import { requireMobileManager } from "@/lib/mobile/auth";
 import { mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
 
+function sanitizeAttachmentPreview<T>(preview: T, prompt: string, attachmentCount: number): T {
+  if (!preview || typeof preview !== "object" || attachmentCount === 0) return preview;
+  const root = preview as Record<string, unknown>;
+  const action = root.action && typeof root.action === "object"
+    ? root.action as Record<string, unknown>
+    : null;
+  const payload = action?.payload && typeof action.payload === "object"
+    ? action.payload as Record<string, unknown>
+    : null;
+  if (!action || !payload) return preview;
+  const safePrompt = `${prompt || "Attachment command"}\n\n[${attachmentCount} attachment(s) parsed server-side]`;
+  const safePayload = {
+    ...payload,
+    prompt: safePrompt,
+    ...(typeof payload.note === "string" ? { note: "AI attachment-assisted action" } : {}),
+  };
+  return {
+    ...root,
+    action: {
+      ...action,
+      payload: safePayload,
+    },
+  } as T;
+}
+
 export async function POST(request: Request) {
   const gate = await requireMobileManager();
   const blocked = mobileGate(gate);
@@ -40,6 +65,13 @@ export async function POST(request: Request) {
     restock,
     chartRows: reports.byDay,
   });
+  if (parsedAttachments.length > 0 && response.actionPreview) {
+    response.actionPreview = sanitizeAttachmentPreview(
+      response.actionPreview,
+      prompt,
+      parsedAttachments.length,
+    );
+  }
   if (parsedAttachments.length > 0) {
     await writeAuditLog({
       actorUserId: gate.userId,
@@ -65,7 +97,7 @@ export async function POST(request: Request) {
         id: item.id ?? item.path ?? "attachment",
         code: item.name ?? "attachment",
       })),
-      metadata: { surface: "mobile", count: parsedAttachments.length },
+      metadata: { surface: "mobile", count: parsedAttachments.length, rawContentLogged: false },
     });
   }
   await writeAuditLog({
@@ -75,7 +107,7 @@ export async function POST(request: Request) {
     entityType: response.actionPreview?.entityType ?? "ai_assistant",
     entityId: response.actionPreview?.entityId ?? null,
     status: response.actionPreview ? "previewed" : "succeeded",
-    prompt: enrichedPrompt,
+    prompt,
     parsedIntent: response.actionPreview ?? { mode: "summary", rangeDays: 30, attachmentCount: parsedAttachments.length },
     after: {
       revenue: reports.summary.revenue,
