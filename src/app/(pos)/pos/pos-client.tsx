@@ -35,6 +35,15 @@ type CartLine = {
   note?: string;
 };
 
+type PosAiCartDraftItem = {
+  productId?: string;
+  productName?: string;
+  sku?: string;
+  unitName?: string;
+  quantity?: number;
+  confidence?: number;
+};
+
 type PayMethod = "cash" | "bank_transfer" | "credit";
 export type PosSourceInvoice = {
   id?: string;
@@ -470,6 +479,55 @@ export function PosClient({
       }];
     });
   }
+
+  function addQuantityToCart(p: PosProduct, quantity: number) {
+    const safeQuantity = Math.max(1, Math.trunc(Number(quantity) || 1));
+    setCart((c) => {
+      const existing = c.find((l) => l.product.id === p.id);
+      if (existing) {
+        return c.map((l) => (l.key === existing.key ? { ...l, quantity: l.quantity + safeQuantity } : l));
+      }
+      const unit = p.units[0] ?? null;
+      return [...c, {
+        key: `${p.id}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+        product: p,
+        unitName: unit?.unitName ?? p.baseUnit,
+        unitMultiplier: unit ? Number(unit.multiplier) : 1,
+        unitPrice: unitPriceFor(p, unit, priceBook),
+        quantity: safeQuantity,
+      }];
+    });
+  }
+
+  useEffect(() => {
+    const onAiCartDraft = (event: Event) => {
+      const detail = (event as CustomEvent<{ items?: unknown }>).detail;
+      const rawItems = Array.isArray(detail?.items) ? detail.items : [];
+      const matched = rawItems.flatMap((raw): Array<{ product: PosProduct; quantity: number }> => {
+        if (!raw || typeof raw !== "object") return [];
+        const item = raw as PosAiCartDraftItem;
+        const name = normalizeSearch(item.productName ?? "");
+        const sku = normalizeSearch(item.sku ?? "");
+        const product = searchableProducts.find((candidate) =>
+          (!candidate.isVariantParent) &&
+          (
+            (!!item.productId && candidate.id === item.productId) ||
+            (!!sku && normalizeSearch(candidate.sku ?? "") === sku) ||
+            (!!name && normalizeSearch(candidate.name) === name)
+          )
+        );
+        if (!product) return [];
+        return [{ product, quantity: Math.max(1, Math.trunc(Number(item.quantity) || 1)) }];
+      });
+      if (matched.length === 0) return;
+      for (const line of matched) addQuantityToCart(line.product, line.quantity);
+      setMobileView("cart");
+      setBrowsing(false);
+      setSearch("");
+    };
+    window.addEventListener("luma:pos-ai-cart-draft", onAiCartDraft);
+    return () => window.removeEventListener("luma:pos-ai-cart-draft", onAiCartDraft);
+  }, [priceBook, searchableProducts]);
 
   function selectProduct(p: PosProduct) {
     if (p.isVariantParent && productChildren(p).length > 0) {

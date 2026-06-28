@@ -78,6 +78,10 @@ type AiSessionSummary = {
   messageCount?: number;
 };
 
+function isPosCartPreview(preview: AiActionPreview) {
+  return preview.intent === "pos_voice_cart_draft" || preview.intent === "pos_image_cart_draft";
+}
+
 type FabPosition = {
   x: number;
   y: number;
@@ -546,6 +550,15 @@ function useAssistantState(surface: AssistantSurface) {
         record?: Msg["record"];
         status?: PreviewResolutionState;
       };
+      if (event === "confirmed" && surface === "pos" && isPosCartPreview(msg.preview)) {
+        window.dispatchEvent(new CustomEvent("luma:pos-ai-cart-draft", {
+          detail: {
+            previewId: msg.preview.id,
+            intent: msg.preview.intent,
+            items: msg.preview.action.payload.items,
+          },
+        }));
+      }
       setMsgs((m) => m.map((item, i) => i === index
         ? {
             ...item,
