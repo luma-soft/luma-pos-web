@@ -3,8 +3,9 @@ import { getRestockSuggestions } from "@/lib/data/ai-restock";
 import { buildAttachmentNextActionResponse, shouldAskAttachmentNextAction } from "@/lib/ai/attachment-intent";
 import { attachmentPromptBlock, parseAiAttachment, type AiAttachmentMetadata, type ParsedAiAttachment } from "@/lib/ai/attachments";
 import { buildAiAssistantResponse, type AiAssistantResponse } from "@/lib/ai/actions";
+import { loadAiProviderConfig } from "@/lib/ai/provider-adapter";
 import { runAiToolLoop } from "@/lib/ai/tool-loop";
-import { consumeAiUsage, recordAiTokenUsage } from "@/lib/ai/usage";
+import { consumeAiUsage, recordAiTokenUsage, recordAiUsageEvent } from "@/lib/ai/usage";
 import { writeAuditLog } from "@/lib/audit";
 import { requireMobileUser } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
@@ -122,6 +123,19 @@ export async function POST(request: Request) {
     });
     return mobileError("ai.usage.exhausted", 402);
   }
+  const providerConfig = await loadAiProviderConfig().catch(() => null);
+  await recordAiUsageEvent({
+    provider: providerConfig?.provider,
+    model: providerConfig?.textModel,
+    actionType: "assistant_request",
+    eventType: "unit_charge",
+    surface,
+    units: usage.charged,
+    metadata: {
+      attachmentCount: attachments.slice(0, 4).length,
+      providerSupportsTokenUsage: providerConfig?.capabilities.tokenUsage ?? null,
+    },
+  });
   const parsedAttachments = attachments.length
     ? await Promise.all(attachments.slice(0, 4).map((attachment) => parseAiAttachment({
         attachment,
@@ -131,7 +145,28 @@ export async function POST(request: Request) {
     : [];
   for (const item of parsedAttachments) {
     if (item.tokenUsage) {
-      usage.usage = await recordAiTokenUsage(item.tokenUsage);
+      usage.usage = await recordAiTokenUsage(item.tokenUsage, undefined, {
+        provider: item.provider,
+        surface,
+        actionType: "attachment_parse",
+        metadata: {
+          attachmentId: item.id,
+          mimeType: item.mimeType,
+          documentType: item.documentType ?? "unknown",
+        },
+      });
+    } else if (item.provider !== "none") {
+      await recordAiUsageEvent({
+        provider: item.provider,
+        actionType: "attachment_parse",
+        eventType: "token_usage",
+        surface,
+        metadata: {
+          attachmentId: item.id,
+          mimeType: item.mimeType,
+          warning: "provider_did_not_return_token_usage",
+        },
+      });
     }
   }
   const shouldBuildPosImageCart = surface === "pos" && parsedAttachments.length > 0;
@@ -174,7 +209,24 @@ export async function POST(request: Request) {
     },
   });
   if (toolLoop.tokenUsage) {
-    usage.usage = await recordAiTokenUsage(toolLoop.tokenUsage);
+    usage.usage = await recordAiTokenUsage(toolLoop.tokenUsage, undefined, {
+      provider: providerConfig?.provider,
+      surface,
+      actionType: "tool_loop",
+      metadata: { traceCount: toolLoop.trace.length },
+    });
+  } else if (providerConfig?.apiKey) {
+    await recordAiUsageEvent({
+      provider: providerConfig.provider,
+      model: providerConfig.textModel,
+      actionType: "tool_loop",
+      eventType: "token_usage",
+      surface,
+      metadata: {
+        traceCount: toolLoop.trace.length,
+        warning: "provider_did_not_return_token_usage",
+      },
+    });
   }
   let response: AiAssistantResponse;
   if (toolLoop.ok && toolLoop.preview) {
@@ -195,6 +247,7 @@ export async function POST(request: Request) {
       restock,
       chartRows: reports.byDay,
       parsedAttachments,
+      surface,
     });
     response.toolTrace = [...(toolLoop.trace ?? []), ...(response.toolTrace ?? [])];
   }

@@ -1,6 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { aiUsageCounters } from "@/db/schema";
+import { aiUsageCounters, aiUsageEvents } from "@/db/schema";
 import { getAiProviderSettings } from "@/lib/data/settings";
 
 export type AiUsageStatus = {
@@ -22,6 +22,21 @@ export type AiTokenUsage = {
   totalTokens: number;
 };
 
+export type AiUsageEventInput = {
+  period?: string;
+  provider?: string;
+  model?: string;
+  actionType?: string;
+  eventType?: string;
+  surface?: string;
+  units?: number;
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  estimatedCostMicrousd?: number;
+  metadata?: Record<string, unknown> | null;
+};
+
 function currentPeriod() {
   return new Date().toISOString().slice(0, 7);
 }
@@ -41,11 +56,38 @@ const MODEL_PRICE_PER_MILLION_TOKENS: Record<string, { input: number; output: nu
   "gemini-2.5-pro": { input: 1.25, output: 10 },
 };
 
-function estimateCostMicrousd(usage: AiTokenUsage) {
+export function estimateAiCostMicrousd(usage: AiTokenUsage) {
   const price = usage.model ? MODEL_PRICE_PER_MILLION_TOKENS[usage.model] : null;
   if (!price) return 0;
   const usd = (usage.inputTokens / 1_000_000) * price.input + (usage.outputTokens / 1_000_000) * price.output;
   return Math.max(0, Math.round(usd * 1_000_000));
+}
+
+export async function recordAiUsageEvent(input: AiUsageEventInput) {
+  const inputTokens = Math.max(0, Math.trunc(Number(input.inputTokens ?? 0)));
+  const outputTokens = Math.max(0, Math.trunc(Number(input.outputTokens ?? 0)));
+  const totalTokens = Math.max(inputTokens + outputTokens, Math.trunc(Number(input.totalTokens ?? 0)));
+  const model = input.model || undefined;
+  const estimatedCostMicrousd = input.estimatedCostMicrousd ?? estimateAiCostMicrousd({
+    model,
+    inputTokens,
+    outputTokens,
+    totalTokens,
+  });
+  await db.insert(aiUsageEvents).values({
+    period: input.period ?? currentPeriod(),
+    provider: input.provider,
+    model,
+    actionType: input.actionType ?? "assistant_request",
+    eventType: input.eventType ?? "unit_charge",
+    surface: input.surface ?? "web",
+    units: Math.max(0, Math.trunc(Number(input.units ?? 0))),
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    estimatedCostMicrousd: Math.max(0, Math.trunc(estimatedCostMicrousd)),
+    metadata: input.metadata ?? null,
+  });
 }
 
 function toStatus(row: {
@@ -126,11 +168,15 @@ export async function consumeAiUsage(units: number, period = currentPeriod()) {
   return { ok: true as const, usage: toStatus(row), charged: charge };
 }
 
-export async function recordAiTokenUsage(usage: AiTokenUsage, period = currentPeriod()) {
+export async function recordAiTokenUsage(
+  usage: AiTokenUsage,
+  period = currentPeriod(),
+  event?: Omit<AiUsageEventInput, "period" | "inputTokens" | "outputTokens" | "totalTokens" | "estimatedCostMicrousd" | "model">,
+) {
   const inputTokens = Math.max(0, Math.trunc(usage.inputTokens));
   const outputTokens = Math.max(0, Math.trunc(usage.outputTokens));
   const totalTokens = Math.max(inputTokens + outputTokens, Math.trunc(usage.totalTokens));
-  const estimatedCostMicrousd = estimateCostMicrousd({ ...usage, inputTokens, outputTokens, totalTokens });
+  const estimatedCostMicrousd = estimateAiCostMicrousd({ ...usage, inputTokens, outputTokens, totalTokens });
 
   await getAiUsageStatus(period);
   const [row] = await db
@@ -152,5 +198,20 @@ export async function recordAiTokenUsage(usage: AiTokenUsage, period = currentPe
       totalTokens: aiUsageCounters.totalTokens,
       estimatedCostMicrousd: aiUsageCounters.estimatedCostMicrousd,
     });
+  await recordAiUsageEvent({
+    ...event,
+    period,
+    model: usage.model,
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    estimatedCostMicrousd,
+    eventType: event?.eventType ?? "token_usage",
+    metadata: {
+      ...(event?.metadata ?? {}),
+      tokenUsageKnown: totalTokens > 0,
+      ...(totalTokens === 0 ? { warning: "provider_did_not_return_token_usage" } : {}),
+    },
+  });
   return toStatus(row);
 }

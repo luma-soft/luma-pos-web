@@ -717,6 +717,27 @@ export const aiUsageCounters = pgTable("ai_usage_counters", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const aiUsageEvents = pgTable("ai_usage_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  period: varchar("period", { length: 7 }).notNull(),
+  provider: text("provider"),
+  model: text("model"),
+  actionType: text("action_type").notNull().default("assistant_request"),
+  eventType: text("event_type").notNull().default("unit_charge"),
+  surface: text("surface").notNull().default("web"),
+  units: integer("units").notNull().default(0),
+  inputTokens: integer("input_tokens").notNull().default(0),
+  outputTokens: integer("output_tokens").notNull().default(0),
+  totalTokens: integer("total_tokens").notNull().default(0),
+  estimatedCostMicrousd: integer("estimated_cost_microusd").notNull().default(0),
+  metadata: jsonb("metadata").$type<Record<string, unknown> | null>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("ai_usage_events_period_idx").on(t.period, t.createdAt),
+  index("ai_usage_events_action_idx").on(t.actionType, t.createdAt),
+  index("ai_usage_events_provider_idx").on(t.provider, t.model),
+]);
+
 // ============= Internal-Use Issue (Xuất dùng nội bộ — Part 8.1) =============
 // Phiếu xuất hàng dùng nội bộ (không bán): trừ kho theo giá vốn → COGS, không doanh thu.
 

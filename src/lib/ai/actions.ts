@@ -1471,6 +1471,7 @@ export async function buildAiAssistantResponse(input: {
   restock: RestockRow[];
   chartRows: unknown[];
   parsedAttachments?: ParsedAiAttachment[];
+  surface?: string;
 }): Promise<AiAssistantResponse> {
   const rawPrompt = input.prompt.trim();
   const planner = await planAiAssistantIntent({
@@ -1478,7 +1479,13 @@ export async function buildAiAssistantResponse(input: {
     hasAttachments: Boolean(input.parsedAttachments?.length),
   });
   if (planner.ok && planner.tokenUsage) {
-    await recordAiTokenUsage(planner.tokenUsage);
+    await recordAiTokenUsage(planner.tokenUsage, undefined, {
+      surface: input.surface ?? "web",
+      actionType: "planner",
+      metadata: {
+        hasAttachments: Boolean(input.parsedAttachments?.length),
+      },
+    });
   }
   const plannerPlan: AiPlannerResult | null =
     planner.ok &&
