@@ -87,32 +87,7 @@ export function CustomersTable({
   return (
     <div className="min-w-0">
       <section className="min-w-0">
-        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <CustomerSearch filters={filters} pageSize={data.pageSize} onOpenFilters={() => setFilterOpen(true)} activeFilterCount={activeFilterCount} />
-          <div className="flex shrink-0 items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
-            <Link href={Routes.CustomerNew} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-10 shrink-0 rounded-lg")}>
-              <Plus className="h-4 w-4" />
-              {t("customers.createNew")}
-            </Link>
-            <Link href="/settings/import" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-10 shrink-0 rounded-lg")}>
-              <FileInput className="h-4 w-4" />
-              {t("customers.actions.importFile")}
-            </Link>
-            <ToolbarIcon icon={MoreHorizontal} label={t("customers.actions.more")} />
-            <ToolbarIcon icon={Filter} label={t("customers.filters.title")} onClick={() => setFilterOpen(true)} />
-            <ToolbarIcon icon={Settings} label={t("customers.actions.settings")} />
-            <ToolbarIcon icon={HelpCircle} label={t("customers.actions.help")} />
-          </div>
-        </div>
-
-        {data.rows.length === 0 ? (
-          <div className="rounded-card border border-dashed border-border bg-surface p-12 text-center text-slate-400">
-            <User className="mx-auto mb-3 h-10 w-10 opacity-60" />
-            <p className="font-medium">{t("customers.empty")}</p>
-          </div>
-        ) : (
-          <CustomerRows data={data} />
-        )}
+        <CustomerRows data={data} filters={filters} onOpenFilters={() => setFilterOpen(true)} activeFilterCount={activeFilterCount} />
 
         <Pagination
           page={data.page}
@@ -192,7 +167,17 @@ function CustomerSearch({
   );
 }
 
-function CustomerRows({ data }: { data: CustomerListResult }) {
+function CustomerRows({
+  data,
+  filters,
+  onOpenFilters,
+  activeFilterCount,
+}: {
+  data: CustomerListResult;
+  filters: CustomerFilters;
+  onOpenFilters: () => void;
+  activeFilterCount: number;
+}) {
   const t = useTranslations();
   const columns: DataTableColumn<CustomerRow>[] = [
     {
@@ -219,11 +204,39 @@ function CustomerRows({ data }: { data: CustomerListResult }) {
       getRowId={(customer) => customer.id}
       expandedParam="expandedCustomer"
       minWidth="980px"
+      empty={(
+        <div className="rounded-card border border-dashed border-border bg-surface p-12 text-center text-slate-400">
+          <User className="mx-auto mb-3 h-10 w-10 opacity-60" />
+          <p className="font-medium">{t("customers.empty")}</p>
+        </div>
+      )}
       summaryCells={[
         { key: "debt", content: formatCurrency(data.totalDebt) },
         { key: "grossSales", content: formatCurrency(data.totalGrossSales) },
         { key: "netSales", content: formatCurrency(data.totalNetSales) },
       ]}
+      toolbar={({ columnVisibilityMenu }) => (
+        <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <CustomerSearch filters={filters} pageSize={data.pageSize} onOpenFilters={onOpenFilters} activeFilterCount={activeFilterCount} />
+          <div className="flex shrink-0 items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
+            <Link href={Routes.CustomerNew} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-10 shrink-0 rounded-lg")}>
+              <Plus className="h-4 w-4" />
+              {t("customers.createNew")}
+            </Link>
+            <Link href="/settings/import" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-10 shrink-0 rounded-lg")}>
+              <FileInput className="h-4 w-4" />
+              {t("customers.actions.importFile")}
+            </Link>
+            <ToolbarIcon icon={MoreHorizontal} label={t("customers.actions.more")} />
+            <ToolbarIcon icon={Filter} label={t("customers.filters.title")} onClick={onOpenFilters} />
+            {columnVisibilityMenu}
+            <ToolbarIcon icon={HelpCircle} label={t("customers.actions.help")} />
+          </div>
+        </div>
+      )}
+      renderColumnVisibilityTrigger={({ open, onToggle }) => (
+        <ToolbarIcon icon={Settings} label={t("customers.actions.settings")} onClick={onToggle} pressed={open} />
+      )}
       renderExpanded={(customer) => <ExpandedCustomer customer={customer} />}
       renderMobileRow={({ row: customer, expanded, toggle }) => (
         <button type="button" onClick={toggle} className="w-full p-3 text-left">
@@ -803,14 +816,18 @@ function EmptyPanel({ message }: { message: string }) {
   );
 }
 
-function ToolbarIcon({ icon: Icon, label, onClick }: { icon: LucideIcon; label: string; onClick?: () => void }) {
+function ToolbarIcon({ icon: Icon, label, onClick, pressed }: { icon: LucideIcon; label: string; onClick?: () => void; pressed?: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
       title={label}
       aria-label={label}
-      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-slate-600 hover:bg-surface-2"
+      aria-pressed={pressed}
+      className={cn(
+        "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-slate-600 hover:bg-surface-2",
+        pressed && "border-primary-300 bg-primary-50 text-primary-700 dark:border-primary-800 dark:bg-primary-950/30 dark:text-primary-300",
+      )}
     >
       <Icon className="h-4 w-4" />
     </button>

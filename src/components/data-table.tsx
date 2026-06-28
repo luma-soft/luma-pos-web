@@ -30,6 +30,15 @@ type MobileRenderProps<T> = {
   toggle: () => void;
 };
 
+type DataTableToolbarProps = {
+  columnVisibilityMenu: ReactNode;
+};
+
+type ColumnVisibilityTriggerProps = {
+  open: boolean;
+  onToggle: () => void;
+};
+
 export function stopRowToggle(event: SyntheticEvent) {
   event.stopPropagation();
 }
@@ -48,6 +57,7 @@ export function DataTableShell<T>({
   empty,
   rowClassName,
   toolbar,
+  renderColumnVisibilityTrigger,
 }: {
   tableId: string;
   rows: T[];
@@ -61,7 +71,8 @@ export function DataTableShell<T>({
   initialExpandedId?: string | null;
   empty?: ReactNode;
   rowClassName?: (row: T, expanded: boolean) => string | undefined;
-  toolbar?: ReactNode;
+  toolbar?: ReactNode | ((props: DataTableToolbarProps) => ReactNode);
+  renderColumnVisibilityTrigger?: (props: ColumnVisibilityTriggerProps) => ReactNode;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -73,14 +84,21 @@ export function DataTableShell<T>({
   const [storedVisible, setStoredVisible] = useState<Set<string> | null>(null);
 
   useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(storageKey);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) setStoredVisible(new Set(parsed.filter((key) => typeof key === "string")));
-    } catch {
-      setStoredVisible(null);
-    }
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      try {
+        const raw = window.localStorage.getItem(storageKey);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setStoredVisible(new Set(parsed.filter((key) => typeof key === "string")));
+      } catch {
+        setStoredVisible(null);
+      }
+    });
+    return () => {
+      active = false;
+    };
   }, [storageKey]);
 
   const defaultVisible = useMemo(
@@ -129,136 +147,149 @@ export function DataTableShell<T>({
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
 
-  if (rows.length === 0 && empty) return <>{empty}</>;
+  const columnVisibilityMenu = (
+    <ColumnVisibilityMenu
+      columns={columns}
+      visibleKeys={visibleKeys}
+      open={menuOpen}
+      onOpenChange={setMenuOpen}
+      onToggle={toggleColumn}
+      onReset={resetColumns}
+      renderTrigger={renderColumnVisibilityTrigger}
+    />
+  );
 
   return (
     <div className="min-w-0">
       <div className="mb-2 flex flex-wrap items-center justify-end gap-2">
-        {toolbar}
-        <ColumnVisibilityMenu
-          columns={columns}
-          visibleKeys={visibleKeys}
-          open={menuOpen}
-          onOpenChange={setMenuOpen}
-          onToggle={toggleColumn}
-          onReset={resetColumns}
-        />
+        {typeof toolbar === "function" ? toolbar({ columnVisibilityMenu }) : (
+          <>
+            {toolbar}
+            {columnVisibilityMenu}
+          </>
+        )}
       </div>
 
-      <div className="space-y-2 lg:hidden">
-        {rows.map((row) => {
-          const id = getRowId(row);
-          const expanded = expandedId === id;
-          const toggle = () => setExpanded(expanded ? null : id);
-          return (
-            <div key={id} className={cn("overflow-hidden rounded-card border bg-surface", expanded ? "border-primary-300 shadow-e1" : "border-border")}>
-              {renderMobileRow ? (
-                renderMobileRow({ row, expanded, toggle })
-              ) : (
-                <button type="button" onClick={toggle} className="w-full p-3 text-left">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0 space-y-1">
-                      {visibleColumns.slice(0, 3).map((column) => (
-                        <div key={column.key} className={cn("truncate", column.align === "right" && "text-right")}>
-                          {column.mobileRender ? column.mobileRender(row) : column.render(row)}
-                        </div>
-                      ))}
-                    </div>
-                    {renderExpanded && <ChevronDown className={cn("h-4 w-4 shrink-0 text-slate-400 transition-transform", expanded && "rotate-180")} />}
-                  </div>
-                </button>
-              )}
-              {expanded && renderExpanded && <div className="border-t border-border-soft">{renderExpanded(row)}</div>}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="hidden overflow-x-auto rounded-card border border-border bg-surface lg:block">
-        <table className="w-full table-fixed text-sm" style={{ minWidth }}>
-          <colgroup>
-            {visibleColumns.map((column) => (
-              <col key={column.key} style={column.width ? { width: column.width } : undefined} />
-            ))}
-            {renderExpanded && <col style={{ width: "44px" }} />}
-          </colgroup>
-          <thead>
-            <tr className="bg-primary-50/70 text-left text-xs font-semibold text-slate-700 dark:bg-primary-950/20 dark:text-slate-300">
-              {visibleColumns.map((column) => (
-                <th
-                  key={column.key}
-                  className={cn(
-                    "px-3 py-3",
-                    column.align === "right" && "text-right",
-                    column.align === "center" && "text-center",
-                    column.headerClassName,
-                  )}
-                >
-                  {column.label}
-                </th>
-              ))}
-              {renderExpanded && <th className="px-3 py-3" />}
-            </tr>
-          </thead>
-          <tbody>
-            {summaryCells && (
-              <tr className="border-t border-border-soft bg-surface text-right font-bold tabular-nums">
-                {visibleColumns.map((column) => {
-                  const cell = summaryCells.find((item) => item.key === column.key);
-                  return <td key={column.key} className={cn("px-3 py-3", cell?.className)}>{cell?.content}</td>;
-                })}
-                {renderExpanded && <td className="px-3 py-3" />}
-              </tr>
-            )}
+      {rows.length === 0 && empty ? (
+        empty
+      ) : (
+        <>
+          <div className="space-y-2 lg:hidden">
             {rows.map((row) => {
               const id = getRowId(row);
               const expanded = expandedId === id;
+              const toggle = () => setExpanded(expanded ? null : id);
               return (
-                <Fragment key={id}>
-                  <tr
-                    className={cn(
-                      "border-t border-border-soft transition-colors",
-                      renderExpanded && "cursor-pointer",
-                      expanded ? "bg-primary-50/45 dark:bg-primary-950/15" : "hover:bg-surface-2",
-                      rowClassName?.(row, expanded),
-                    )}
-                    onClick={() => setExpanded(expanded ? null : id)}
-                  >
-                    {visibleColumns.map((column) => {
-                      const cellClassName = typeof column.cellClassName === "function" ? column.cellClassName(row) : column.cellClassName;
-                      return (
-                        <td
-                          key={column.key}
-                          className={cn(
-                            "truncate px-3 py-3 align-middle",
-                            column.align === "right" && "text-right tabular-nums",
-                            column.align === "center" && "text-center",
-                            cellClassName,
-                          )}
-                        >
-                          {column.render(row)}
-                        </td>
-                      );
-                    })}
-                    {renderExpanded && (
-                      <td className="px-3 py-3 text-right">
-                        <ChevronDown className={cn("ml-auto h-4 w-4 text-slate-400 transition-transform", expanded && "rotate-180")} />
-                      </td>
-                    )}
-                  </tr>
-                  {expanded && renderExpanded && (
-                    <tr className="border-t border-primary-100 dark:border-primary-900/50">
-                      <td colSpan={visibleColumns.length + 1} className="p-0">
-                        {renderExpanded(row)}
-                      </td>
-                    </tr>
+                <div key={id} className={cn("overflow-hidden rounded-card border bg-surface", expanded ? "border-primary-300 shadow-e1" : "border-border")}>
+                  {renderMobileRow ? (
+                    renderMobileRow({ row, expanded, toggle })
+                  ) : (
+                    <button type="button" onClick={toggle} className="w-full p-3 text-left">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0 space-y-1">
+                          {visibleColumns.slice(0, 3).map((column) => (
+                            <div key={column.key} className={cn("truncate", column.align === "right" && "text-right")}>
+                              {column.mobileRender ? column.mobileRender(row) : column.render(row)}
+                            </div>
+                          ))}
+                        </div>
+                        {renderExpanded && <ChevronDown className={cn("h-4 w-4 shrink-0 text-slate-400 transition-transform", expanded && "rotate-180")} />}
+                      </div>
+                    </button>
                   )}
-                </Fragment>
+                  {expanded && renderExpanded && <div className="border-t border-border-soft">{renderExpanded(row)}</div>}
+                </div>
               );
             })}
-          </tbody>
-        </table>
-      </div>
+          </div>
+
+          <div className="hidden overflow-x-auto rounded-card border border-border bg-surface lg:block">
+            <table className="w-full table-fixed text-sm" style={{ minWidth }}>
+              <colgroup>
+                {visibleColumns.map((column) => (
+                  <col key={column.key} style={column.width ? { width: column.width } : undefined} />
+                ))}
+                {renderExpanded && <col style={{ width: "44px" }} />}
+              </colgroup>
+              <thead>
+                <tr className="bg-primary-50/70 text-left text-xs font-semibold text-slate-700 dark:bg-primary-950/20 dark:text-slate-300">
+                  {visibleColumns.map((column) => (
+                    <th
+                      key={column.key}
+                      className={cn(
+                        "px-3 py-3",
+                        column.align === "right" && "text-right",
+                        column.align === "center" && "text-center",
+                        column.headerClassName,
+                      )}
+                    >
+                      {column.label}
+                    </th>
+                  ))}
+                  {renderExpanded && <th className="px-3 py-3" />}
+                </tr>
+              </thead>
+              <tbody>
+                {summaryCells && (
+                  <tr className="border-t border-border-soft bg-surface text-right font-bold tabular-nums">
+                    {visibleColumns.map((column) => {
+                      const cell = summaryCells.find((item) => item.key === column.key);
+                      return <td key={column.key} className={cn("px-3 py-3", cell?.className)}>{cell?.content}</td>;
+                    })}
+                    {renderExpanded && <td className="px-3 py-3" />}
+                  </tr>
+                )}
+                {rows.map((row) => {
+                  const id = getRowId(row);
+                  const expanded = expandedId === id;
+                  return (
+                    <Fragment key={id}>
+                      <tr
+                        className={cn(
+                          "border-t border-border-soft transition-colors",
+                          renderExpanded && "cursor-pointer",
+                          expanded ? "bg-primary-50/45 dark:bg-primary-950/15" : "hover:bg-surface-2",
+                          rowClassName?.(row, expanded),
+                        )}
+                        onClick={() => setExpanded(expanded ? null : id)}
+                      >
+                        {visibleColumns.map((column) => {
+                          const cellClassName = typeof column.cellClassName === "function" ? column.cellClassName(row) : column.cellClassName;
+                          return (
+                            <td
+                              key={column.key}
+                              className={cn(
+                                "truncate px-3 py-3 align-middle",
+                                column.align === "right" && "text-right tabular-nums",
+                                column.align === "center" && "text-center",
+                                cellClassName,
+                              )}
+                            >
+                              {column.render(row)}
+                            </td>
+                          );
+                        })}
+                        {renderExpanded && (
+                          <td className="px-3 py-3 text-right">
+                            <ChevronDown className={cn("ml-auto h-4 w-4 text-slate-400 transition-transform", expanded && "rotate-180")} />
+                          </td>
+                        )}
+                      </tr>
+                      {expanded && renderExpanded && (
+                        <tr className="border-t border-primary-100 dark:border-primary-900/50">
+                          <td colSpan={visibleColumns.length + 1} className="p-0">
+                            {renderExpanded(row)}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -270,6 +301,7 @@ function ColumnVisibilityMenu<T>({
   onOpenChange,
   onToggle,
   onReset,
+  renderTrigger,
 }: {
   columns: DataTableColumn<T>[];
   visibleKeys: Set<string>;
@@ -277,19 +309,24 @@ function ColumnVisibilityMenu<T>({
   onOpenChange: (open: boolean) => void;
   onToggle: (key: string) => void;
   onReset: () => void;
+  renderTrigger?: (props: ColumnVisibilityTriggerProps) => ReactNode;
 }) {
   return (
     <div className="relative" onClick={stopRowToggle}>
-      <button
-        type="button"
-        onClick={() => onOpenChange(!open)}
-        className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-slate-600 hover:bg-surface-2"
-        aria-label="Chọn cột hiển thị"
-        title="Chọn cột hiển thị"
-      >
-        <Columns3 className="h-4 w-4" />
-        <span className="hidden sm:inline">Cột</span>
-      </button>
+      {renderTrigger ? (
+        renderTrigger({ open, onToggle: () => onOpenChange(!open) })
+      ) : (
+        <button
+          type="button"
+          onClick={() => onOpenChange(!open)}
+          className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-slate-600 hover:bg-surface-2"
+          aria-label="Chọn cột hiển thị"
+          title="Chọn cột hiển thị"
+        >
+          <Columns3 className="h-4 w-4" />
+          <span className="hidden sm:inline">Cột</span>
+        </button>
+      )}
       {open && (
         <>
           <button type="button" className="fixed inset-0 z-30 cursor-default" aria-label="Đóng chọn cột" onClick={() => onOpenChange(false)} />

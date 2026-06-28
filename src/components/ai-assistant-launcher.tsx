@@ -22,7 +22,7 @@ export function AssistantWorkspace() {
   const assistant = useAssistantState("web");
 
   return (
-    <div className="w-full flex h-[calc(100dvh-9.5rem)] min-h-0 flex-col overflow-hidden">
+    <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
       <div className="flex items-start gap-2 mb-4 px-3.5 py-2.5 bg-in-soft border border-in/20 rounded-card text-[12px] text-in">
         <Info className="w-4 h-4 shrink-0 mt-px" />
         <span>{t("ai.actionNotice")}</span>
