@@ -161,6 +161,21 @@ body {
   overflow-x: hidden;
 }
 
+textarea.ai-composer-scrollbar-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+textarea.ai-composer-scrollbar-hidden::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+textarea.ai-composer-scrollbar-hidden::-webkit-scrollbar-track,
+textarea.ai-composer-scrollbar-hidden::-webkit-scrollbar-thumb,
+textarea.ai-composer-scrollbar-hidden::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* số liệu (tiền, SL) căn cột — dùng cùng font-mono cho bảng/KPI */
 .tabular { font-variant-numeric: tabular-nums; }
 .font-mono { font-variant-numeric: tabular-nums; }
