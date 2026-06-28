@@ -17,6 +17,8 @@ export type AiAttachmentCandidate = {
 export type AiAttachmentParseResult = {
   provider: "none" | "openai" | "deepseek" | "gemini";
   status: "succeeded" | "unavailable" | "failed";
+  documentType?: "sales_receipt" | "purchase_invoice" | "handwritten_order" | "menu_note" | "product_shelf" | "unknown";
+  header?: Record<string, unknown> | null;
   extractedText: string;
   candidates: AiAttachmentCandidate[];
   confidence: number;
@@ -56,6 +58,8 @@ function normalizeProviderResult(raw: unknown, provider: AiAttachmentParseResult
     return {
       provider,
       status: "succeeded",
+      documentType: "unknown",
+      header: null,
       extractedText: text,
       candidates: [],
       confidence: text ? 0.5 : 0,
@@ -69,6 +73,8 @@ function normalizeProviderResult(raw: unknown, provider: AiAttachmentParseResult
   return {
     provider,
     status: "succeeded",
+    documentType: typeof root.documentType === "string" ? root.documentType as AiAttachmentParseResult["documentType"] : "unknown",
+    header: root.header && typeof root.header === "object" ? root.header as Record<string, unknown> : null,
     extractedText: typeof root.extractedText === "string" ? root.extractedText : text,
     candidates: Array.isArray(root.candidates)
       ? root.candidates.map((candidate) => ({
@@ -122,13 +128,15 @@ export async function parseAiAttachmentWithProvider(
 
   const imageUrl = `data:${input.mimeType};base64,${input.bytes.toString("base64")}`;
   const prompt =
-    "Extract text from this Vietnamese business document image. Return compact JSON only with keys: " +
+    "Extract text from this Vietnamese business document image. It may be a sales receipt, purchase invoice, handwritten order, menu note, or product shelf/photo. Return compact JSON only with keys: " +
+    "documentType:'sales_receipt'|'purchase_invoice'|'handwritten_order'|'menu_note'|'product_shelf'|'unknown', header:{supplierName?:string,customerName?:string,phone?:string,taxCode?:string,documentCode?:string,documentDate?:string,total?:number,currency?:string}, " +
     "extractedText:string, candidates:[{text:string,sku:string|null,unitName:string|null,quantity:number|null,unitCost:number|null,grossUnitCost:number|null,discount:number|null,discountRate:number|null,lineTotal:number|null,confidence:number}], " +
     "confidence:number, unresolvedItems:string[], warnings:string[]. " +
     "Do not choose an inventory, sales, pricing, or accounting action. " +
     "For candidates, return one item per invoice/table product row. Use the product code under 'Mã Hàng' as sku. " +
     "Use net unit price after discount as unitCost when a 'Giá bán' column exists; keep grossUnitCost for 'Đơn giá'. " +
-    "Do not invent products. Keep Vietnamese product names, document labels, quantities, units, prices, discounts, totals, supplier/header text, and codes as seen. " +
+    "For menu notes or shelf photos, extract visible product/menu names and quantities if shown; leave prices null when not visible. " +
+    "Do not invent products. Keep Vietnamese product names, document labels, quantities, units, prices, discounts, totals, supplier/customer/header text, and codes as seen. " +
     (input.prompt ? `User prompt: ${input.prompt}` : "");
 
   try {

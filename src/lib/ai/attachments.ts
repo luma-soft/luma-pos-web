@@ -140,6 +140,8 @@ export function attachmentPromptBlock(parsed: ParsedAiAttachment[]) {
     return [
       `Attachment ${index + 1}: ${item.name ?? item.id ?? "file"}`,
       `Type: ${item.mimeType ?? "unknown"}`,
+      item.documentType ? `Document type: ${item.documentType}` : "",
+      item.header ? `Header: ${JSON.stringify(item.header).slice(0, 1000)}` : "",
       `Confidence: ${Math.round(item.confidence * 100)}%`,
       item.extractedText ? `Extracted text:\n${item.extractedText}` : "Extracted text: ",
       candidates,

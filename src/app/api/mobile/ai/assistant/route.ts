@@ -40,6 +40,8 @@ function attachmentAuditDetails(parsedAttachments: ParsedAiAttachment[]) {
     mimeType: item.mimeType,
     status: item.status,
     provider: item.provider,
+    documentType: item.documentType ?? "unknown",
+    headerFields: item.header ? Object.keys(item.header) : [],
     confidence: item.confidence,
     candidateCount: item.candidates.length,
     warningCount: item.warnings.length,
