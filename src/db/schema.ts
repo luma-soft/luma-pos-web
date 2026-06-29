@@ -350,6 +350,31 @@ export const suppliers = pgTable("suppliers", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ============= Payment providers / bank accounts =============
+
+export const paymentBankAccounts = pgTable("payment_bank_accounts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  provider: text("provider").notNull().default("sepay"),
+  bankCode: varchar("bank_code", { length: 40 }).notNull(),
+  gateway: varchar("gateway", { length: 80 }),
+  accountNumber: varchar("account_number", { length: 80 }).notNull(),
+  subAccount: varchar("sub_account", { length: 80 }),
+  accountName: text("account_name").notNull(),
+  isDefault: boolean("is_default").notNull().default(false),
+  enabled: boolean("enabled").notNull().default(true),
+  webhookEnabled: boolean("webhook_enabled").notNull().default(true),
+  webhookSecret: text("webhook_secret"),
+  apiKey: text("api_key"),
+  note: text("note"),
+  createdBy: uuid("created_by").references(() => profiles.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("payment_bank_accounts_provider_idx").on(t.provider),
+  index("payment_bank_accounts_enabled_idx").on(t.enabled),
+  uniqueIndex("payment_bank_accounts_provider_account_idx").on(t.provider, t.accountNumber, t.subAccount),
+]);
+
 // ============= Orders (POS + Quotes + Construction) =============
 
 export const orders = pgTable("orders", {
@@ -418,6 +443,14 @@ export const payments = pgTable("payments", {
   id: uuid("id").primaryKey().defaultRandom(),
   orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
   shiftId: uuid("shift_id").references(() => shifts.id, { onDelete: "set null" }),
+  status: text("status").notNull().default("manual_confirmed"),
+  provider: text("provider"),
+  bankAccountId: uuid("bank_account_id").references(() => paymentBankAccounts.id, { onDelete: "set null" }),
+  providerTransactionId: text("provider_transaction_id"),
+  gateway: text("gateway"),
+  accountNumber: text("account_number"),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  rawMatchedEventId: uuid("raw_matched_event_id"),
   amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
   method: paymentMethodEnum("method").notNull(),
   reference: text("reference"), // mã GD ngân hàng
@@ -427,6 +460,37 @@ export const payments = pgTable("payments", {
 }, (t) => [
   index("payments_order_idx").on(t.orderId),
   index("payments_shift_idx").on(t.shiftId),
+  index("payments_status_idx").on(t.status),
+  index("payments_provider_reference_idx").on(t.provider, t.reference),
+  index("payments_bank_account_idx").on(t.bankAccountId),
+  uniqueIndex("payments_provider_transaction_idx").on(t.provider, t.providerTransactionId),
+]);
+
+export const paymentWebhookEvents = pgTable("payment_webhook_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  provider: text("provider").notNull().default("sepay"),
+  providerEventId: text("provider_event_id").notNull(),
+  bankAccountId: uuid("bank_account_id").references(() => paymentBankAccounts.id, { onDelete: "set null" }),
+  matchedPaymentId: uuid("matched_payment_id").references(() => payments.id, { onDelete: "set null" }),
+  referenceCode: text("reference_code"),
+  accountNumber: text("account_number"),
+  subAccount: text("sub_account"),
+  gateway: text("gateway"),
+  transferType: text("transfer_type"),
+  transferAmount: decimal("transfer_amount", { precision: 14, scale: 2 }).notNull().default("0"),
+  transactionDate: timestamp("transaction_date", { withTimezone: true }),
+  content: text("content"),
+  rawPayload: jsonb("raw_payload").$type<Record<string, unknown>>().notNull().default({}),
+  status: text("status").notNull().default("received"),
+  matchStatus: text("match_status").notNull().default("unmatched"),
+  matchReason: text("match_reason"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("payment_webhook_events_provider_event_idx").on(t.provider, t.providerEventId),
+  index("payment_webhook_events_match_idx").on(t.matchStatus),
+  index("payment_webhook_events_payment_idx").on(t.matchedPaymentId),
+  index("payment_webhook_events_account_idx").on(t.accountNumber, t.subAccount),
 ]);
 
 // ============= Purchase Orders (nhập hàng) =============
