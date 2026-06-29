@@ -3,8 +3,11 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ArrowLeft, Check, ClipboardCheck, Loader2, PackageSearch, Save, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, ClipboardCheck, PackageSearch, Save, Search, Trash2 } from "lucide-react";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import { createStocktake } from "@/lib/actions/stocktakes";
@@ -90,41 +93,41 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
   return (
     <div className="p-4 sm:p-6 max-w-7xl">
       <div className="mb-5 flex flex-wrap items-start gap-4">
-        <button onClick={() => router.push(Routes.Stocktakes)} className="mt-1 inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-surface text-slate-500 transition hover:bg-surface-2 hover:text-foreground active:scale-[0.98]">
+        <Button type="button" variant="outline" size="icon" onClick={() => router.push(Routes.Stocktakes)} className="mt-1 rounded-card text-slate-500">
           <ArrowLeft className="w-4 h-4" />
-        </button>
+        </Button>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-extrabold leading-tight">{t("stocktakes.createNew")}</h1>
-            <span className="rounded-lg bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-950 dark:text-primary-200">{t("stocktakes.status.draft")}</span>
+            <span className="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-950 dark:text-primary-200">{t("stocktakes.status.draft")}</span>
           </div>
           <p className="mt-1 max-w-2xl text-sm text-slate-500">{t("stocktakes.balanceHint")}</p>
         </div>
-        <div>
-          <select
+        <div className="min-w-44">
+          <Select
             value={warehouseId}
             onChange={(e) => router.push(`${Routes.StocktakeNew}?wh=${e.target.value}`)}
             disabled={lines.length > 0}
-            className="h-11 rounded-xl border border-border bg-surface px-3 text-sm font-medium shadow-e1 transition focus:outline-none focus:ring-2 focus:ring-primary-200 disabled:opacity-60"
+            options={warehouses.map((w) => ({ value: w.id, label: w.name }))}
+            className="font-medium shadow-e1"
             title={lines.length > 0 ? t("stocktakes.warehouseLocked") : undefined}
-          >
-            {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-          </select>
+          />
         </div>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="overflow-hidden rounded-card border border-border bg-surface shadow-e2">
-          <div className="border-b border-border bg-surface-2 px-4 py-4 sm:px-5">
+        <section className="overflow-hidden rounded-card border border-border bg-surface shadow-e1">
+          <div className="border-b border-border-soft bg-canvas px-4 py-4 sm:px-5">
             <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
+              <Input
                 value={search} onChange={(e) => setSearch(e.target.value)}
                 placeholder={t("stocktakes.searchPlaceholder")}
-                className="h-12 w-full rounded-xl border border-border bg-surface pl-10 pr-3 text-sm shadow-e1 transition focus:outline-none focus:ring-2 focus:ring-primary-200"
+                leftIcon={<Search />}
+                size="lg"
+                className="bg-surface shadow-e1"
               />
               {suggestions.length > 0 && (
-                <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-border bg-surface shadow-e2">
+                <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-card border border-border bg-surface shadow-e2">
                   {suggestions.map((p) => (
                     <button
                       key={p.id} onClick={() => addLine(p)}
@@ -141,7 +144,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
 
           {lines.length === 0 ? (
             <div className="flex min-h-72 flex-col items-center justify-center px-6 py-14 text-center">
-              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-200">
+              <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-card bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-200">
                 <PackageSearch className="h-7 w-7" />
               </div>
               <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">{t("stocktakes.noLines")}</p>
@@ -171,10 +174,11 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums text-slate-500">{formatNumber(l.product.stock)}</td>
                         <td className="px-4 py-3 text-right">
-                          <input
+                          <Input
                             type="number" min={0} value={l.actualQty}
                             onChange={(e) => setQty(l.product.id, Number(e.target.value))}
-                            className="w-28 rounded-lg border border-border bg-surface px-2 py-2 text-right text-sm tabular-nums transition focus:outline-none focus:ring-2 focus:ring-primary-200"
+                            size="sm"
+                            className="ml-auto w-28 text-right tabular-nums"
                           />
                         </td>
                         <td className={cn("px-4 py-3 text-right tabular-nums font-semibold", diff > 0 ? "text-ok" : diff < 0 ? "text-er" : "text-slate-400")}>
@@ -197,9 +201,9 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
           )}
         </section>
 
-        <aside className="rounded-card border border-border bg-surface p-5 shadow-e2 xl:sticky xl:top-24 xl:self-start">
+        <aside className="rounded-card border border-border bg-surface p-5 shadow-e1 xl:sticky xl:top-24 xl:self-start">
           <div className="mb-4 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-200">
+            <div className="flex h-10 w-10 items-center justify-center rounded-card bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-200">
               <ClipboardCheck className="h-5 w-5" />
             </div>
             <div>
@@ -209,48 +213,53 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl bg-canvas p-3">
+            <div className="rounded-card bg-canvas p-3">
               <span className="text-xs text-slate-500">{t("stocktakes.summary.checked")}</span>
               <b className="mt-1 block text-xl tabular-nums">{lines.length}</b>
             </div>
-            <div className="rounded-xl bg-ok-soft p-3">
+            <div className="rounded-card bg-ok-soft p-3">
               <span className="text-xs text-ok">{t("stocktakes.summary.matched")}</span>
               <b className="mt-1 block text-xl text-ok tabular-nums">{totals.matched}</b>
             </div>
-            <div className="rounded-xl bg-warn-soft p-3">
+            <div className="rounded-card bg-warn-soft p-3">
               <span className="text-xs text-warn">{t("stocktakes.summary.diff")}</span>
               <b className="mt-1 block text-xl text-warn tabular-nums">{totals.diffCount}</b>
             </div>
-            <div className="rounded-xl bg-canvas p-3">
+            <div className="rounded-card bg-canvas p-3">
               <span className="text-xs text-slate-500">{t("stocktakes.cols.diffValue")}</span>
               <b className={cn("mt-1 block text-sm tabular-nums", totals.diffValue > 0 ? "text-ok" : totals.diffValue < 0 ? "text-er" : "")}>{formatCurrency(totals.diffValue)}</b>
             </div>
           </div>
 
           <div className="mt-4">
-            <input
+            <Input
               value={note} onChange={(e) => setNote(e.target.value)}
               placeholder={t("orders.detail.notePlaceholder")}
-              className="h-11 w-full rounded-xl border border-border bg-canvas px-3 text-sm transition focus:outline-none focus:ring-2 focus:ring-primary-200"
+              className="bg-canvas"
             />
             {error && <p className="mt-2 text-xs text-er">{error}</p>}
           </div>
 
           <div className="mt-4 grid gap-2">
-            <button
+            <Button
+              type="button"
               onClick={() => submit(true)} disabled={!!busy || lines.length === 0}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 text-sm font-semibold text-white transition hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
+              loading={busy === "balance"}
+              block
             >
-              {busy === "balance" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              {busy !== "balance" && <Check className="h-4 w-4" />}
               {t("stocktakes.complete")}
-            </button>
-            <button
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
               onClick={() => submit(false)} disabled={!!busy || lines.length === 0}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-4 text-sm font-medium transition hover:bg-surface-2 active:scale-[0.98] disabled:opacity-50"
+              loading={busy === "draft"}
+              block
             >
-              {busy === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {busy !== "draft" && <Save className="h-4 w-4" />}
               {t("stocktakes.saveDraft")}
-            </button>
+            </Button>
           </div>
         </aside>
       </div>
