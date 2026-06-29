@@ -609,7 +609,8 @@ function SePayNotificationsSection({ L }: { L: boolean }) {
   const t = useTranslations("settings.payments.sepay");
   const [copied, setCopied] = useState(false);
   const [origin] = useState(() => typeof window !== "undefined" ? window.location.origin : "");
-  const webhookUrl = origin ? `${origin}/api/payments/sepay/webhook` : "/api/payments/sepay/webhook";
+  const webhookOrigin = origin === "https://lumapos.shop" ? "https://www.lumapos.shop" : origin;
+  const webhookUrl = webhookOrigin ? `${webhookOrigin}/api/payments/sepay/webhook` : "/api/payments/sepay/webhook";
   const copyWebhookUrl = async () => {
     try {
       await navigator.clipboard.writeText(webhookUrl);
