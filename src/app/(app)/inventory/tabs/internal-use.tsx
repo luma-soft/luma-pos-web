@@ -2,33 +2,28 @@ import { getTranslations } from "next-intl/server";
 import { getInternalUseIssues } from "@/lib/data/internal-use";
 import { InternalUseForm } from "../internal-use-form";
 import { InternalUseTable } from "./internal-use-table";
-import { ClipboardList } from "lucide-react";
+import { Plus } from "lucide-react";
 
 export async function InternalUseTab() {
   const t = await getTranslations();
   const rows = await getInternalUseIssues(50);
 
   return (
-    <>
-      <InternalUseForm />
-
-      <div className="overflow-hidden rounded-card border border-border bg-surface shadow-e2">
-        <div className="flex items-center justify-between border-b border-border bg-surface-2 px-4 py-4 sm:px-5">
-          <div>
-            <div className="text-base font-extrabold">{t("internalUse.historyTitle")}</div>
-            <div className="mt-px text-xs text-slate-400">{t("internalUse.formSub")}</div>
-          </div>
-          <span className="rounded-xl bg-canvas px-3 py-2 text-xs font-semibold text-slate-500">{t("internalUse.historyCount", { n: rows.length })}</span>
+    <div className="space-y-4">
+      <details id="internal-use-create" className="group rounded-card border border-border bg-surface shadow-e1">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 transition hover:bg-surface-2 sm:px-5">
+          <span className="flex items-center gap-2 text-sm font-bold text-primary-700">
+            <Plus className="h-4 w-4" />
+            {t("internalUse.formTitle")}
+          </span>
+          <span className="text-xs text-slate-400 group-open:hidden">{t("internalUse.formSub")}</span>
+        </summary>
+        <div className="border-t border-border p-3 sm:p-4">
+          <InternalUseForm />
         </div>
-        {rows.length === 0 ? (
-          <div className="flex min-h-40 flex-col items-center justify-center px-4 py-10 text-center">
-            <ClipboardList className="mb-3 h-8 w-8 text-slate-300" />
-            <p className="text-sm font-semibold text-slate-500">{t("internalUse.empty")}</p>
-          </div>
-        ) : (
-          <InternalUseTable rows={rows} />
-        )}
-      </div>
-    </>
+      </details>
+
+      <InternalUseTable rows={rows} />
+    </div>
   );
 }
