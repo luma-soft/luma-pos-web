@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
-import { Check, ChevronDown, Copy, ExternalLink, KeyRound, Loader2, Pencil, Plus, Power, Printer, Save, Star, Trash2 } from "lucide-react";
+import { Check, ChevronDown, Copy, ExternalLink, KeyRound, Loader2, Pencil, Plus, Power, Printer, Save, Star, Trash2, X } from "lucide-react";
 import { SearchableSelect } from "@/components/combobox";
 import { SegmentedTabs } from "@/components/ui/tabs";
 import { Toggle } from "@/components/ui/toggle";
@@ -648,6 +648,7 @@ function SePayNotificationsSection({ L }: { L: boolean }) {
 function SePayAccountsSection({ L, accounts, canManage }: { L: boolean; accounts: PaymentBankAccountRow[]; canManage: boolean }) {
   const t = useTranslations("settings.payments.sepay");
   const [form, setForm] = useState<PaymentBankAccountInput>(EMPTY_BANK_ACCOUNT);
+  const [formOpen, setFormOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [pending, start] = useTransition();
   const isEditing = Boolean(form.id);
@@ -658,6 +659,14 @@ function SePayAccountsSection({ L, accounts, canManage }: { L: boolean; accounts
   const reset = () => {
     setForm(EMPTY_BANK_ACCOUNT);
     setMessage("");
+  };
+  const openNew = () => {
+    reset();
+    setFormOpen(true);
+  };
+  const closeForm = () => {
+    setFormOpen(false);
+    reset();
   };
   const edit = (account: PaymentBankAccountRow) => {
     setForm({
@@ -676,13 +685,15 @@ function SePayAccountsSection({ L, accounts, canManage }: { L: boolean; accounts
       note: account.note ?? "",
     });
     setMessage("");
+    setFormOpen(true);
   };
   const saveAccount = () => {
     start(async () => {
       const res = await savePaymentBankAccount(form);
       if (res.ok) {
         setMessage(t("saved"));
-        reset();
+        setFormOpen(false);
+        setForm(EMPTY_BANK_ACCOUNT);
       } else {
         setMessage(t("saveError"));
       }
@@ -723,7 +734,7 @@ function SePayAccountsSection({ L, accounts, canManage }: { L: boolean; accounts
             <div className="text-[11px] text-slate-500 mt-0.5">{t("help")}</div>
           </div>
           {canManage && (
-            <button type="button" onClick={reset} className={btnS}>
+            <button type="button" onClick={openNew} className={btnS}>
               <Plus className="w-3.5 h-3.5" />{t("newAccount")}
             </button>
           )}
@@ -771,32 +782,60 @@ function SePayAccountsSection({ L, accounts, canManage }: { L: boolean; accounts
           ))}
         </div>
 
-        {canManage && (
-          <div className="border-t border-border pt-4 flex flex-col gap-3">
-            <div className="text-xs font-bold">{isEditing ? t("editAccount") : t("addAccount")}</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1"><span className={FL}>{t("bankCode")}</span><BankSelect value={form.bankCode} onChange={selectBank} placeholder={t("bankPlaceholder")} /></div>
-              <div className="flex flex-col gap-1"><span className={FL}>{t("gateway")}</span><input className={FI} value={form.gateway ?? ""} onChange={(e) => set("gateway", e.target.value)} placeholder="Vietcombank" /></div>
-              <div className="flex flex-col gap-1"><span className={FL}>{t("accountNumber")}</span><input className={cn(FI, "font-mono")} value={form.accountNumber} onChange={(e) => set("accountNumber", e.target.value)} /></div>
-              <div className="flex flex-col gap-1"><span className={FL}>{t("subAccount")}</span><input className={cn(FI, "font-mono")} value={form.subAccount ?? ""} onChange={(e) => set("subAccount", e.target.value)} placeholder={t("optional")} /></div>
-              <div className="flex flex-col gap-1"><span className={FL}>{t("accountName")}</span><input className={FI} value={form.accountName} onChange={(e) => set("accountName", e.target.value)} /></div>
-              <div className="flex flex-col gap-1"><span className={FL}>{t("note")}</span><input className={FI} value={form.note ?? ""} onChange={(e) => set("note", e.target.value)} placeholder={t("optional")} /></div>
+        {message && <div className="text-[11px] font-medium text-slate-500">{message}</div>}
+      </div>
+
+      {canManage && formOpen && (
+        <div
+          className="fixed inset-0 z-[120] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-4"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !pending) closeForm();
+          }}
+        >
+          <div className="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl bg-surface shadow-e2 sm:rounded-card">
+            <header className="flex items-start justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-5">
+              <div className="min-w-0">
+                <div className="text-sm font-bold">{isEditing ? t("editAccount") : t("addAccount")}</div>
+                <div className="mt-0.5 text-[11px] text-slate-500">{L ? "Tài khoản dùng để tạo VietQR và nhận callback SePay." : "Use this account for VietQR and SePay callbacks."}</div>
+              </div>
+              <button
+                type="button"
+                onClick={closeForm}
+                disabled={pending}
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-surface-2 hover:text-slate-700 disabled:opacity-50"
+                aria-label={t("cancel")}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </header>
+
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="flex flex-col gap-1"><span className={FL}>{t("bankCode")}</span><BankSelect value={form.bankCode} onChange={selectBank} placeholder={t("bankPlaceholder")} /></div>
+                <div className="flex flex-col gap-1"><span className={FL}>{t("gateway")}</span><input className={FI} value={form.gateway ?? ""} onChange={(e) => set("gateway", e.target.value)} placeholder="Vietcombank" /></div>
+                <div className="flex flex-col gap-1"><span className={FL}>{t("accountNumber")}</span><input className={cn(FI, "font-mono")} value={form.accountNumber} onChange={(e) => set("accountNumber", e.target.value)} /></div>
+                <div className="flex flex-col gap-1"><span className={FL}>{t("subAccount")}</span><input className={cn(FI, "font-mono")} value={form.subAccount ?? ""} onChange={(e) => set("subAccount", e.target.value)} placeholder={t("optional")} /></div>
+                <div className="flex flex-col gap-1"><span className={FL}>{t("accountName")}</span><input className={FI} value={form.accountName} onChange={(e) => set("accountName", e.target.value)} /></div>
+                <div className="flex flex-col gap-1"><span className={FL}>{t("note")}</span><input className={FI} value={form.note ?? ""} onChange={(e) => set("note", e.target.value)} placeholder={t("optional")} /></div>
+              </div>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <CtrlRow title={t("enabled")} desc={t("enabledHint")} checked={Boolean(form.enabled)} onChange={(v) => set("enabled", v)} />
+                <CtrlRow title={t("webhookEnabled")} desc={t("webhookHint")} checked={Boolean(form.webhookEnabled)} onChange={(v) => set("webhookEnabled", v)} />
+                <CtrlRow title={t("makeDefault")} desc={t("defaultHint")} checked={Boolean(form.isDefault)} onChange={(v) => set("isDefault", v)} />
+              </div>
+              {message && <div className="mt-3 text-[11px] font-medium text-slate-500">{message}</div>}
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <CtrlRow title={t("enabled")} desc={t("enabledHint")} checked={Boolean(form.enabled)} onChange={(v) => set("enabled", v)} />
-              <CtrlRow title={t("webhookEnabled")} desc={t("webhookHint")} checked={Boolean(form.webhookEnabled)} onChange={(v) => set("webhookEnabled", v)} />
-              <CtrlRow title={t("makeDefault")} desc={t("defaultHint")} checked={Boolean(form.isDefault)} onChange={(v) => set("isDefault", v)} />
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex-1 text-[11px] text-slate-500">{message}</div>
-              {isEditing && <button type="button" onClick={reset} className={btnS}>{t("cancel")}</button>}
+
+            <footer className="flex items-center justify-end gap-2 border-t border-border-soft bg-canvas px-4 py-3 sm:px-5">
+              <button type="button" onClick={closeForm} disabled={pending} className={btnS}>{t("cancel")}</button>
               <button type="button" disabled={pending || !form.bankCode || !form.accountNumber || !form.accountName} onClick={saveAccount} className={cn(btnF, "disabled:opacity-50")}>
                 {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}{t("save")}
               </button>
-            </div>
+            </footer>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </Card>
   );
 }
