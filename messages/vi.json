@@ -178,6 +178,20 @@
       "creditNeedsCustomer": "Ghi nợ cần chọn khách hàng có hồ sơ.",
       "emptyCart": "Giỏ hàng trống."
     },
+    "sepay": {
+      "title": "Quét VietQR để thanh toán",
+      "qrAlt": "Mã thanh toán VietQR",
+      "bank": "Ngân hàng",
+      "account": "Tài khoản",
+      "name": "Tên",
+      "reference": "Nội dung",
+      "waiting": "Đang chờ SePay xác nhận...",
+      "confirmed": "Đã xác nhận thanh toán",
+      "viewOrder": "Xem đơn hàng",
+      "onlineRequired": "Thanh toán VietQR cần có kết nối mạng.",
+      "createFailed": "Không tạo được thanh toán VietQR.",
+      "invalidAmount": "Số tiền thanh toán VietQR phải lớn hơn 0."
+    },
     "saveQuote": "Lưu báo giá",
     "noProject": "— Công trình có sẵn —",
     "allCategories": "Tất cả",
@@ -1619,6 +1633,12 @@
     "saved": "Đã lưu mẫu in ✓",
     "preview": "Xem trước (rút gọn)",
     "previewHint": "Khi in thật, mẫu tự dàn trang theo khổ A4/A5/K80 đã chọn."
+  },
+  "payments": {
+    "errors": {
+      "bankAccountNotFound": "Chưa cấu hình tài khoản ngân hàng SePay đang bật.",
+      "notConfirmable": "Thanh toán này không thể xác nhận."
+    }
   },
   "settings": {
     "moreSoon": "Các mục cài đặt khác (nhân viên, phân quyền, HĐĐT…) sẽ bổ sung theo lộ trình.",

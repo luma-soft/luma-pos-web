@@ -1,6 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import {
   cashTransactions,
+  customers,
   orders,
   paymentBankAccounts,
   paymentWebhookEvents,
@@ -83,6 +84,12 @@ async function confirmPaymentInTx(
     paymentStatus: paymentStatusFor(total, newPaid),
     updatedAt: sql`now()`,
   }).where(eq(orders.id, order.id));
+
+  if (order.customerId) {
+    await tx.update(customers).set({
+      currentDebt: sql`greatest(${customers.currentDebt} - ${toMoney(amount)}, 0)`,
+    }).where(eq(customers.id, order.customerId));
+  }
 
   await tx.insert(cashTransactions).values({
     code: generatePaymentReference("PT"),

@@ -178,6 +178,20 @@
       "creditNeedsCustomer": "Credit sales require a saved customer.",
       "emptyCart": "Cart is empty."
     },
+    "sepay": {
+      "title": "Scan VietQR to pay",
+      "qrAlt": "VietQR payment code",
+      "bank": "Bank",
+      "account": "Account",
+      "name": "Name",
+      "reference": "Reference",
+      "waiting": "Waiting for SePay confirmation...",
+      "confirmed": "Payment confirmed",
+      "viewOrder": "View order",
+      "onlineRequired": "VietQR payment requires an online connection.",
+      "createFailed": "Could not create VietQR payment.",
+      "invalidAmount": "VietQR payment amount must be greater than zero."
+    },
     "saveQuote": "Save quote",
     "noProject": "— Existing project —",
     "allCategories": "All",
@@ -1619,6 +1633,12 @@
     "saved": "Template saved ✓",
     "preview": "Preview (condensed)",
     "previewHint": "Actual printing reflows per selected A4/A5/K80 size."
+  },
+  "payments": {
+    "errors": {
+      "bankAccountNotFound": "No enabled SePay bank account is configured.",
+      "notConfirmable": "This payment cannot be confirmed."
+    }
   },
   "settings": {
     "moreSoon": "More settings (staff, permissions, e-invoice…) coming with the roadmap.",

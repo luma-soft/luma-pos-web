@@ -13,6 +13,7 @@ const {
   profiles,
   shifts,
   orders,
+  customers,
   payments,
   cashTransactions,
   paymentBankAccounts,
@@ -162,6 +163,41 @@ const [wrongEventAfter] = await db.select().from(paymentWebhookEvents).where(eq(
 const wrongCashRows = await db.select().from(cashTransactions).where(eq(cashTransactions.refId, wrongOrder.id));
 ok("wrong amount remains unmatched", wrongMatch.ok && wrongMatch.data.matched === false && wrongEventAfter.matchStatus === "wrong_amount");
 ok("wrong amount does not post cashbook", wrongCashRows.length === 0);
+
+console.log("4) Provider confirmation reduces customer debt");
+const [customer] = await db.insert(customers).values({
+  name: "Debt Customer",
+  currentDebt: money(200_000),
+}).returning();
+const [debtOrder] = await db.insert(orders).values({
+  code: "DH-DEBT",
+  status: "completed",
+  paymentStatus: "unpaid",
+  customerId: customer.id,
+  subtotal: money(200_000),
+  total: money(200_000),
+  amountPaid: money(0),
+  createdBy: cashier.id,
+}).returning();
+const debtPending = await service.createPendingSepayPayment(db, {
+  orderId: debtOrder.id,
+  bankAccountId: account.id,
+  amount: 200_000,
+  reference: "LUMA-DH-DEBT",
+  createdBy: cashier.id,
+});
+const [debtEvent] = await db.insert(paymentWebhookEvents).values({
+  provider: "sepay",
+  providerEventId: "sepay-svc-evt-debt",
+  referenceCode: "LUMA-DH-DEBT",
+  accountNumber: account.accountNumber,
+  transferType: "in",
+  transferAmount: money(200_000),
+  rawPayload: { id: "sepay-svc-evt-debt" },
+}).returning();
+const debtMatch = await service.matchSepayWebhookEvent(db, debtEvent.id);
+const [customerAfterPayment] = await db.select().from(customers).where(eq(customers.id, customer.id));
+ok("customer debt reduced after provider confirmation", debtPending.ok && debtMatch.ok && Number(customerAfterPayment.currentDebt) === 0);
 
 console.log(`\n${fail === 0 ? "🎉" : "⚠️"} ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

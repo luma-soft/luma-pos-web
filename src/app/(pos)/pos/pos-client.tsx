@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Search, Plus, Minus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, ChevronDown, Printer, MoreVertical } from "lucide-react";
+import { Search, Plus, Minus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, ChevronDown, Printer, MoreVertical, CheckCircle2 } from "lucide-react";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
 import { normalizeSearch } from "@/lib/normalize";
 import { createPortal } from "react-dom";
@@ -67,6 +67,22 @@ type PosAiCartDraftPayload = {
 };
 
 type PayMethod = "cash" | "bank_transfer" | "credit";
+type SepayCheckout = {
+  paymentId: string;
+  orderId: string;
+  orderCode: string;
+  reference: string;
+  amount: number;
+  qrImageUrl: string;
+  status: string;
+  bankAccount: {
+    bankCode: string;
+    gateway: string | null;
+    accountNumber: string;
+    subAccount: string | null;
+    accountName: string;
+  };
+};
 type PosCustomer = PosData["customers"][number];
 export type PosSourceInvoice = {
   id?: string;
@@ -304,6 +320,7 @@ export function PosClient({
   const [search, setSearch] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [sepayCheckout, setSepayCheckout] = useState<SepayCheckout | null>(null);
   // kéo thả: sắp xếp dòng trong giỏ + thả SP từ danh sách vào giỏ
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [overKey, setOverKey] = useState<string | null>(null);
@@ -378,6 +395,31 @@ export function PosClient({
       try { localStorage.setItem(ACT_KEY, activeId); } catch { /* bỏ qua */ }
     }
   }, [activeId, sourceInvoice]);
+
+  useEffect(() => {
+    if (!sepayCheckout || sepayCheckout.status !== "pending") return;
+    let cancelled = false;
+    const id = window.setInterval(async () => {
+      try {
+        const response = await fetch(`/api/payments/sepay/${sepayCheckout.paymentId}`, { cache: "no-store" });
+        const result = await response.json() as { ok: boolean; data?: { status?: string } };
+        if (cancelled || !result.ok || !result.data?.status) return;
+        setSepayCheckout((current) =>
+          current?.paymentId === sepayCheckout.paymentId ? { ...current, status: result.data?.status ?? current.status } : current
+        );
+        if (["confirmed", "reconciled", "manual_confirmed"].includes(result.data.status)) {
+          window.clearInterval(id);
+          window.setTimeout(() => router.push(Routes.order(sepayCheckout.orderId)), 600);
+        }
+      } catch {
+        // Polling is best-effort; webhook remains source of truth.
+      }
+    }, 2500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [router, sepayCheckout]);
 
   const active = invoices.find((i) => i.id === activeId) ?? invoices[0];
   const { cart, customerId, projectId, projectName, discountInput, discountMode, taxRate, shippingFee, payMethod, paidInput, note: orderNote } = active;
@@ -548,6 +590,7 @@ export function PosClient({
   const taxAmount = Math.round((subtotal - discountVnd) * taxRate / 100);
   const total = Math.max(0, subtotal - discountVnd + taxAmount + shippingFee);
   const paid = payMethod === "credit" ? 0 : (paidInput ?? total);
+  const payableAmount = Math.min(Math.max(0, paid), total);
   const remaining = Math.max(0, total - paid);
 
   function addToCart(p: PosProduct) {
@@ -760,6 +803,10 @@ export function PosClient({
       setError(t("pos.errors.creditNeedsCustomer"));
       return;
     }
+    if (mode === "sale" && payMethod === "bank_transfer" && payableAmount <= 0) {
+      setError(t("pos.sepay.invalidAmount"));
+      return;
+    }
     if (sourceInvoice && mode === "quote") {
       setError(t("pos.invoiceEdit.saleOnly"));
       return;
@@ -789,26 +836,62 @@ export function PosClient({
         manualUnitPrice: l.manualPrice ? l.unitPrice : undefined,
         lineDiscount: l.lineDiscount ?? 0,
       })),
-      payment: { method: payMethod, amount: mode === "quote" ? 0 : paid },
+      payment: { method: payMethod, amount: mode === "quote" || payMethod === "bank_transfer" ? 0 : paid },
     };
     setSubmitting(true);
     setError("");
 
     // offline → xếp hàng chờ đồng bộ
     if (typeof navigator !== "undefined" && !navigator.onLine) {
+      if (payMethod === "bank_transfer") {
+        setSubmitting(false);
+        setError(t("pos.sepay.onlineRequired"));
+        return;
+      }
       await queueOffline(payload);
       return;
     }
     try {
       const res = await createOrder(payload);
-      setSubmitting(false);
       if (res.ok) {
+        if (mode === "sale" && payMethod === "bank_transfer") {
+          const paymentRes = await fetch("/api/payments/sepay", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              orderId: res.data.id,
+              amount: payableAmount,
+              note: res.data.code,
+            }),
+          });
+          const paymentJson = await paymentRes.json() as {
+            ok: boolean;
+            data?: Omit<SepayCheckout, "orderId" | "orderCode">;
+            error?: string;
+          };
+          setSubmitting(false);
+          if (!paymentJson.ok || !paymentJson.data) {
+            setError(paymentJson.error ? t(paymentJson.error) : t("pos.sepay.createFailed"));
+            router.push(Routes.order(res.data.id));
+            return;
+          }
+          closeInvoice(activeId);
+          setSepayCheckout({ ...paymentJson.data, orderId: res.data.id, orderCode: res.data.code });
+          return;
+        }
+        setSubmitting(false);
         closeInvoice(activeId);
         router.push(mode === "quote" ? Routes.Quotes : Routes.order(res.data.id));
       } else {
+        setSubmitting(false);
         setError(t(res.error));
       }
     } catch {
+      if (payMethod === "bank_transfer") {
+        setSubmitting(false);
+        setError(t("pos.sepay.createFailed"));
+        return;
+      }
       // mất mạng giữa chừng → xếp hàng offline
       await queueOffline(payload);
     }
@@ -1410,7 +1493,7 @@ export function PosClient({
               📑 {t("pos.saveQuote")}
             </button>
             <button
-              disabled={cart.length === 0 || submitting || !data.warehouse}
+              disabled={cart.length === 0 || submitting || !data.warehouse || !!sepayCheckout}
               onClick={checkout}
               className="flex-1 py-3 rounded-xl bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2"
             >
@@ -1444,6 +1527,16 @@ export function PosClient({
         onOpenChange={setCustomerCreateOpen}
         onCreated={applyCreatedCustomer}
       />
+      {sepayCheckout && (
+        <SepayCheckoutModal
+          checkout={sepayCheckout}
+          onClose={() => {
+            const orderId = sepayCheckout.orderId;
+            setSepayCheckout(null);
+            router.push(Routes.order(orderId));
+          }}
+        />
+      )}
 
       {/* Modal chọn bảng giá áp cho đơn đang mở */}
       {variantParent && (
@@ -1506,6 +1599,49 @@ export function PosClient({
         document.body
       )}
     </div>
+  );
+}
+
+function SepayCheckoutModal({ checkout, onClose }: { checkout: SepayCheckout; onClose: () => void }) {
+  const t = useTranslations();
+  const confirmed = ["confirmed", "reconciled", "manual_confirmed"].includes(checkout.status);
+  return (
+    <>
+      <div className="fixed inset-0 z-[90] bg-slate-950/45" />
+      <div className="fixed inset-x-3 top-1/2 z-[100] mx-auto max-w-md -translate-y-1/2 overflow-hidden rounded-2xl border border-border bg-surface shadow-e2 sm:inset-x-0">
+        <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
+          <div>
+            <div className="text-sm font-bold">{t("pos.sepay.title")}</div>
+            <div className="mt-0.5 text-xs text-slate-500">{checkout.orderCode} · {formatCurrency(checkout.amount)}</div>
+          </div>
+          <button type="button" onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-600">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="space-y-4 p-4">
+          <div className="mx-auto grid w-56 place-items-center rounded-xl border border-border bg-white p-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={checkout.qrImageUrl} alt={t("pos.sepay.qrAlt")} className="h-52 w-52 object-contain" />
+          </div>
+          <div className="rounded-xl border border-border bg-canvas p-3 text-xs">
+            <div className="flex justify-between gap-3 py-1"><span className="text-slate-500">{t("pos.sepay.bank")}</span><span className="font-semibold text-right">{checkout.bankAccount.gateway ?? checkout.bankAccount.bankCode}</span></div>
+            <div className="flex justify-between gap-3 py-1"><span className="text-slate-500">{t("pos.sepay.account")}</span><span className="font-mono font-semibold text-right">{checkout.bankAccount.accountNumber}</span></div>
+            <div className="flex justify-between gap-3 py-1"><span className="text-slate-500">{t("pos.sepay.name")}</span><span className="font-semibold text-right">{checkout.bankAccount.accountName}</span></div>
+            <div className="flex justify-between gap-3 py-1"><span className="text-slate-500">{t("pos.sepay.reference")}</span><span className="font-mono font-semibold text-right">{checkout.reference}</span></div>
+          </div>
+          <div className={cn(
+            "flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold",
+            confirmed ? "bg-ok-soft text-ok" : "bg-in-soft text-in"
+          )}>
+            {confirmed ? <CheckCircle2 className="h-4 w-4" /> : <Loader2 className="h-4 w-4 animate-spin" />}
+            <span>{confirmed ? t("pos.sepay.confirmed") : t("pos.sepay.waiting")}</span>
+          </div>
+          <button type="button" onClick={onClose} className="w-full rounded-xl border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2">
+            {t("pos.sepay.viewOrder")}
+          </button>
+        </div>
+      </div>
+    </>
   );
 }
 
