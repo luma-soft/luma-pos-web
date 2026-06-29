@@ -66,6 +66,7 @@ export async function POST(request: Request) {
   }
   if (!account) {
     return NextResponse.json({
+      success: true,
       ok: true,
       data: {
         eventId: recorded.data.eventId,
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
   }
   if (!account.webhookEnabled) {
     return NextResponse.json({
+      success: true,
       ok: true,
       data: {
         eventId: recorded.data.eventId,
@@ -93,6 +95,7 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
+    success: true,
     ok: true,
     data: {
       eventId: recorded.data.eventId,
