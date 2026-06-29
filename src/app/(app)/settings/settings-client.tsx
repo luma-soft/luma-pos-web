@@ -623,15 +623,15 @@ function SePayNotificationsSection({ L }: { L: boolean }) {
     <Card title={t("notificationTitle")} vi={L ? "Webhook SePay để tự xác nhận tiền vào" : "SePay webhook for automatic payment confirmation"}>
       <div className="p-4 flex flex-col gap-4">
         <div className="rounded-xl border border-border bg-canvas p-3.5">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <div className="text-xs font-bold">{t("setupTitle")}</div>
-              <div className="mt-1 text-[11px] leading-relaxed text-slate-500">{t("notificationHelp")}</div>
             </div>
-            <a href="https://my.sepay.vn" target="_blank" rel="noreferrer" className={cn(btnS, "justify-center")}>
+            <a href="https://my.sepay.vn" target="_blank" rel="noreferrer" className={cn(btnS, "h-9 shrink-0 justify-center rounded-lg px-3 whitespace-nowrap")}>
               <ExternalLink className="w-3.5 h-3.5" />{t("openSepay")}
             </a>
           </div>
+          <div className="mt-2 max-w-5xl text-[11px] leading-relaxed text-slate-500">{t("notificationHelp")}</div>
           <div className="mt-3 grid gap-1.5 text-[11px] text-slate-600 dark:text-slate-300">
             <div className="flex gap-2"><span className="font-bold text-primary-600">1.</span><span>{t("notifyStep1")}</span></div>
             <div className="flex gap-2"><span className="font-bold text-primary-600">2.</span><span>{t("notifyStep2")}</span></div>
