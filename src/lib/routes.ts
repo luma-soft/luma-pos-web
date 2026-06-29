@@ -32,7 +32,6 @@ export const Routes = {
   Purchases: "/purchases",
   PurchaseNew: "/purchases/new",
   Customers: "/customers",
-  CustomerNew: "/customers/new",
   Suppliers: "/suppliers",
   Reports: "/reports",
   Notifications: "/notifications",

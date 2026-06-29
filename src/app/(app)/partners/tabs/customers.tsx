@@ -24,7 +24,7 @@ export async function CustomersTab({ searchParams }: { searchParams: SP }) {
   const filters = normalizeFilters(params, page, pageSize);
   const data = await getCustomers(filters);
 
-  return <CustomersTable data={data} filters={filters} />;
+  return <CustomersTable data={data} filters={filters} aiPreview={params.source === "ai-preview"} />;
 }
 
 function normalizeFilters(params: SP, page: number, pageSize: number): CustomerFilters {

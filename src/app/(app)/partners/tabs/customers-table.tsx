@@ -31,6 +31,7 @@ import {
 import { Pagination } from "@/components/pagination";
 import { DataTableShell, RowPreviewModal, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
+import { CustomerCreateDialog } from "@/components/partners/customer-create-dialog";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
@@ -75,9 +76,11 @@ const FILTER_KEYS: Array<keyof CustomerFilters> = [
 export function CustomersTable({
   data,
   filters,
+  aiPreview = false,
 }: {
   data: CustomerListResult;
   filters: CustomerFilters;
+  aiPreview?: boolean;
 }) {
   const t = useTranslations();
   const [filterOpen, setFilterOpen] = useState(false);
@@ -86,7 +89,7 @@ export function CustomersTable({
   return (
     <div className="min-w-0">
       <section className="min-w-0">
-        <CustomerRows data={data} filters={filters} onOpenFilters={() => setFilterOpen(true)} activeFilterCount={activeFilterCount} />
+        <CustomerRows data={data} filters={filters} aiPreview={aiPreview} onOpenFilters={() => setFilterOpen(true)} activeFilterCount={activeFilterCount} />
 
         <Pagination
           page={data.page}
@@ -169,15 +172,19 @@ function CustomerSearch({
 function CustomerRows({
   data,
   filters,
+  aiPreview,
   onOpenFilters,
   activeFilterCount,
 }: {
   data: CustomerListResult;
   filters: CustomerFilters;
+  aiPreview: boolean;
   onOpenFilters: () => void;
   activeFilterCount: number;
 }) {
   const t = useTranslations();
+  const router = useRouter();
+  const [createOpen, setCreateOpen] = useState(aiPreview);
   const columns: DataTableColumn<CustomerRow>[] = [
     {
       key: "select",
@@ -196,60 +203,71 @@ function CustomerRows({
   ];
 
   return (
-    <DataTableShell
-      tableId="partners.customers"
-      rows={data.rows}
-      columns={columns}
-      getRowId={(customer) => customer.id}
-      expandedParam="expandedCustomer"
-      minWidth="980px"
-      empty={(
-        <div className="rounded-card border border-dashed border-border bg-surface p-12 text-center text-slate-400">
-          <User className="mx-auto mb-3 h-10 w-10 opacity-60" />
-          <p className="font-medium">{t("customers.empty")}</p>
-        </div>
-      )}
-      summaryCells={[
-        { key: "debt", content: formatCurrency(data.totalDebt) },
-        { key: "grossSales", content: formatCurrency(data.totalGrossSales) },
-        { key: "netSales", content: formatCurrency(data.totalNetSales) },
-      ]}
-      toolbar={(
-        <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <CustomerSearch filters={filters} pageSize={data.pageSize} onOpenFilters={onOpenFilters} activeFilterCount={activeFilterCount} />
-          <div className="flex shrink-0 items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
-            <Link href={Routes.CustomerNew} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-10 shrink-0 rounded-lg")}>
-              <Plus className="h-4 w-4" />
-              {t("customers.createNew")}
-            </Link>
-            <Link href="/settings/import" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-10 shrink-0 rounded-lg")}>
-              <FileInput className="h-4 w-4" />
-              {t("customers.actions.importFile")}
-            </Link>
-            <ToolbarIcon icon={MoreHorizontal} label={t("customers.actions.more")} />
-            <ToolbarIcon icon={Filter} label={t("customers.filters.title")} onClick={onOpenFilters} />
-            <ToolbarIcon icon={HelpCircle} label={t("customers.actions.help")} />
+    <>
+      <DataTableShell
+        tableId="partners.customers"
+        rows={data.rows}
+        columns={columns}
+        getRowId={(customer) => customer.id}
+        expandedParam="expandedCustomer"
+        minWidth="980px"
+        empty={(
+          <div className="rounded-card border border-dashed border-border bg-surface p-12 text-center text-slate-400">
+            <User className="mx-auto mb-3 h-10 w-10 opacity-60" />
+            <p className="font-medium">{t("customers.empty")}</p>
           </div>
-        </div>
-      )}
-      renderExpanded={(customer) => <ExpandedCustomer customer={customer} />}
-      renderMobileRow={({ row: customer, expanded, toggle }) => (
-        <button type="button" onClick={toggle} className="w-full p-3 text-left">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="truncate font-semibold">{customer.name}</div>
-              <div className="text-xs text-slate-400">{customer.code ?? "—"} · {customer.phone ?? "—"}</div>
+        )}
+        summaryCells={[
+          { key: "debt", content: formatCurrency(data.totalDebt) },
+          { key: "grossSales", content: formatCurrency(data.totalGrossSales) },
+          { key: "netSales", content: formatCurrency(data.totalNetSales) },
+        ]}
+        toolbar={(
+          <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <CustomerSearch filters={filters} pageSize={data.pageSize} onOpenFilters={onOpenFilters} activeFilterCount={activeFilterCount} />
+            <div className="flex shrink-0 items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
+              <button type="button" onClick={() => setCreateOpen(true)} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-10 shrink-0 rounded-lg")}>
+                <Plus className="h-4 w-4" />
+                {t("customers.createNew")}
+              </button>
+              <Link href="/settings/import" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-10 shrink-0 rounded-lg")}>
+                <FileInput className="h-4 w-4" />
+                {t("customers.actions.importFile")}
+              </Link>
+              <ToolbarIcon icon={MoreHorizontal} label={t("customers.actions.more")} />
+              <ToolbarIcon icon={Filter} label={t("customers.filters.title")} onClick={onOpenFilters} />
+              <ToolbarIcon icon={HelpCircle} label={t("customers.actions.help")} />
             </div>
-            <ChevronDown className={cn("mt-1 h-4 w-4 text-slate-400 transition-transform", expanded && "rotate-180")} />
           </div>
-          <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-            <Metric label={t("customers.cols.debt")} value={formatCurrency(Number(customer.currentDebt))} tone={Number(customer.currentDebt) > 0 ? "danger" : "muted"} />
-            <Metric label={t("customers.cols.totalGrossSales")} value={formatCurrency(Number(customer.grossSales))} />
-            <Metric label={t("customers.cols.totalSalesNet")} value={formatCurrency(Number(customer.totalSpent))} />
-          </div>
-        </button>
-      )}
-    />
+        )}
+        renderExpanded={(customer) => <ExpandedCustomer customer={customer} />}
+        renderMobileRow={({ row: customer, expanded, toggle }) => (
+          <button type="button" onClick={toggle} className="w-full p-3 text-left">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="truncate font-semibold">{customer.name}</div>
+                <div className="text-xs text-slate-400">{customer.code ?? "—"} · {customer.phone ?? "—"}</div>
+              </div>
+              <ChevronDown className={cn("mt-1 h-4 w-4 text-slate-400 transition-transform", expanded && "rotate-180")} />
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+              <Metric label={t("customers.cols.debt")} value={formatCurrency(Number(customer.currentDebt))} tone={Number(customer.currentDebt) > 0 ? "danger" : "muted"} />
+              <Metric label={t("customers.cols.totalGrossSales")} value={formatCurrency(Number(customer.grossSales))} />
+              <Metric label={t("customers.cols.totalSalesNet")} value={formatCurrency(Number(customer.totalSpent))} />
+            </div>
+          </button>
+        )}
+      />
+      <CustomerCreateDialog
+        open={createOpen}
+        aiPreview={aiPreview}
+        onOpenChange={setCreateOpen}
+        onCreated={() => {
+          setCreateOpen(false);
+          router.refresh();
+        }}
+      />
+    </>
   );
 }
 

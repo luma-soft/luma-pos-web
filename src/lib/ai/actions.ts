@@ -183,7 +183,7 @@ function buildAiReviewAction(preview: AiActionPreview): AiActionPreview["reviewA
     return { type: "open", href: "/inventory?tab=products&source=ai-preview", label: "Mở màn sản phẩm", target: "products" };
   }
   if (preview.intent === "create_customer") {
-    return { type: "open", href: "/customers/new?source=ai-preview", label: "Mở form khách hàng", target: "customers" };
+    return { type: "open", href: "/partners?tab=customers&source=ai-preview", label: "Mở form khách hàng", target: "customers" };
   }
   if (preview.intent === "create_supplier") {
     return { type: "open", href: "/partners?tab=suppliers&source=ai-preview", label: "Mở nhà cung cấp", target: "suppliers" };

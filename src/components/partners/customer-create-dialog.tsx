@@ -143,10 +143,12 @@ export function CustomerCreateDialog({
   open,
   onOpenChange,
   onCreated,
+  aiPreview = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onCreated: (customer: CustomerCreateResult) => void;
+  aiPreview?: boolean;
 }) {
   if (!open) return null;
 
@@ -164,7 +166,7 @@ export function CustomerCreateDialog({
             <X className="h-4 w-4" />
           </Button>
         </div>
-        <CustomerCreateForm onCancel={() => onOpenChange(false)} onCreated={onCreated} />
+        <CustomerCreateForm aiPreview={aiPreview} onCancel={() => onOpenChange(false)} onCreated={onCreated} />
       </div>
     </div>
   );
