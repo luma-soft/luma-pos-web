@@ -1204,6 +1204,7 @@
       "addPayment": "Ghi nhận thanh toán / thu nợ",
       "amount": "Số tiền",
       "receive": "Thu",
+      "referencePlaceholder": "Mã giao dịch…",
       "notePlaceholder": "Ghi chú…",
       "customer": "Khách hàng",
       "info": "Thông tin đơn",

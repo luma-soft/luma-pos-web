@@ -129,7 +129,9 @@ export async function OrderDetailPanel({
                       <tr key={payment.id}>
                         <td className="px-3 py-3 whitespace-nowrap text-slate-500">{formatDate(payment.createdAt)}</td>
                         <td className="px-3 py-3">{t(`pos.payMethods.${payment.method}` as never)}</td>
-                        <td className="px-3 py-3 text-slate-500">{payment.note ?? ""}</td>
+                        <td className="px-3 py-3 text-slate-500">
+                          {[payment.reference, payment.note].filter(Boolean).join(" · ")}
+                        </td>
                         <td className="px-3 py-3 text-right tabular-nums font-semibold text-ok">+ {formatCurrency(Number(payment.amount))}</td>
                       </tr>
                     ))}

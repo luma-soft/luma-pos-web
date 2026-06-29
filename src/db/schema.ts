@@ -360,6 +360,7 @@ export const orders = pgTable("orders", {
   clientId: varchar("client_id", { length: 40 }).unique(),
   status: orderStatusEnum("status").notNull().default("draft"),
   paymentStatus: paymentStatusEnum("payment_status").notNull().default("unpaid"),
+  shiftId: uuid("shift_id").references(() => shifts.id, { onDelete: "set null" }),
 
   customerId: uuid("customer_id").references(() => customers.id),
   warehouseId: uuid("warehouse_id").references(() => warehouses.id),
@@ -391,6 +392,7 @@ export const orders = pgTable("orders", {
   index("orders_status_idx").on(t.status),
   index("orders_customer_idx").on(t.customerId),
   index("orders_created_idx").on(t.createdAt),
+  index("orders_shift_idx").on(t.shiftId),
   index("orders_source_idx").on(t.sourceOrderId),
   index("orders_replaced_by_idx").on(t.replacedByOrderId),
 ]);
@@ -415,13 +417,17 @@ export const orderItems = pgTable("order_items", {
 export const payments = pgTable("payments", {
   id: uuid("id").primaryKey().defaultRandom(),
   orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  shiftId: uuid("shift_id").references(() => shifts.id, { onDelete: "set null" }),
   amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
   method: paymentMethodEnum("method").notNull(),
   reference: text("reference"), // mã GD ngân hàng
   note: text("note"),
   createdBy: uuid("created_by").references(() => profiles.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => [index("payments_order_idx").on(t.orderId)]);
+}, (t) => [
+  index("payments_order_idx").on(t.orderId),
+  index("payments_shift_idx").on(t.shiftId),
+]);
 
 // ============= Purchase Orders (nhập hàng) =============
 
@@ -494,6 +500,7 @@ export const cashFundEnum = pgEnum("cash_fund", ["cash", "bank"]);
 export const cashTransactions = pgTable("cash_transactions", {
   id: uuid("id").primaryKey().defaultRandom(),
   code: varchar("code", { length: 30 }).notNull().unique(), // PT-/PC-
+  shiftId: uuid("shift_id").references(() => shifts.id, { onDelete: "set null" }),
   type: cashTxTypeEnum("type").notNull(),
   fund: cashFundEnum("fund").notNull().default("cash"),
   amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
@@ -504,7 +511,10 @@ export const cashTransactions = pgTable("cash_transactions", {
   note: text("note"),
   createdBy: uuid("created_by").references(() => profiles.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => [index("cash_tx_created_idx").on(t.createdAt)]);
+}, (t) => [
+  index("cash_tx_created_idx").on(t.createdAt),
+  index("cash_tx_shift_idx").on(t.shiftId),
+]);
 
 // ============= Công trình / dự án =============
 

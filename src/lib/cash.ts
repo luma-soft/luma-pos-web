@@ -17,11 +17,13 @@ export async function recordCashTx(
     refId?: string;
     note?: string;
     createdBy?: string | null;
+    shiftId?: string | null;
   }
 ) {
   if (params.amount <= 0) return;
   await tx.insert(cashTransactions).values({
     code: generateCode(params.type === "in" ? "PT" : "PC"),
+    shiftId: params.shiftId ?? null,
     type: params.type,
     fund: params.fund,
     amount: params.amount.toFixed(2),

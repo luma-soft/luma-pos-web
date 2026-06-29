@@ -34,6 +34,7 @@ export const createOrderSchema = z.object({
   payment: z.object({
     method: z.enum(["cash", "bank_transfer", "card", "credit"]),
     amount: z.number().min(0),
+    reference: z.string().trim().optional(),
   }),
 });
 
@@ -62,6 +63,7 @@ export const addPaymentSchema = z.object({
   orderId: z.uuid(),
   amount: z.number().positive(),
   method: z.enum(["cash", "bank_transfer", "card"]),
+  reference: z.string().trim().optional(),
   note: z.string().optional(),
 });
 export type AddPaymentInput = z.infer<typeof addPaymentSchema>;

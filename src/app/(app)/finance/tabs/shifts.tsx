@@ -1,7 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { formatDate } from "@/lib/utils";
 import { requireUser, getProfileId } from "@/lib/actions/common";
-import { getCurrentShift, shiftExpectedCash, getShifts } from "@/lib/data/shifts";
+import { getCurrentShift, getShiftSummary, getShifts } from "@/lib/data/shifts";
 import { ShiftPanel } from "../shift-panel";
 import { ShiftsTable } from "./shifts-table";
 
@@ -14,8 +14,8 @@ export async function ShiftsTab() {
     if (profileId) {
       const cur = await getCurrentShift(profileId);
       if (cur) {
-        const expected = await shiftExpectedCash(Number(cur.openingFloat), cur.openedAt);
-        openProps = { open: true, openingFloat: Number(cur.openingFloat), expected, openedAt: formatDate(cur.openedAt) };
+        const summary = await getShiftSummary(cur);
+        openProps = { open: true, openingFloat: Number(cur.openingFloat), expected: summary.expectedCash ?? 0, openedAt: formatDate(cur.openedAt) };
       }
     }
   } catch { /* layout handles auth */ }

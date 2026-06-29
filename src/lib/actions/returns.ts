@@ -10,6 +10,7 @@ import { createReturnSchema, type CreateReturnOutput } from "@/lib/schemas/retur
 import { type ActionResult, requireManager, getProfileId, generateCode, toMoney, toQty } from "./common";
 import { recordCashTx, fundForMethod } from "@/lib/cash";
 import { Routes } from "@/lib/routes";
+import { getCurrentShift } from "@/lib/data/shifts";
 
 /**
  * Trả hàng theo hóa đơn:
@@ -31,6 +32,7 @@ export async function createReturn(
 
   try {
     const profileId = await getProfileId(userId);
+    const currentShift = profileId ? await getCurrentShift(profileId) : null;
 
     const result = await db.transaction(async (tx) => {
       const [order] = await tx.select().from(orders).where(eq(orders.id, v.orderId)).limit(1);
@@ -131,7 +133,7 @@ export async function createReturn(
         await recordCashTx(tx, {
           type: "out", fund: fundForMethod(v.refundMethod), amount: totalRefund,
           category: "refund", refType: "return", refId: ret.id,
-          note: `Hoàn trả ${ret.code}`, createdBy: profileId,
+          note: `Hoàn trả ${ret.code}`, createdBy: profileId, shiftId: currentShift?.id ?? null,
         });
       }
 

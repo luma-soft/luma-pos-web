@@ -1,27 +1,82 @@
-import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
-import { cashTransactions, profiles, shifts } from "@/db/schema";
+import { cashTransactions, orders, payments, profiles, shifts } from "@/db/schema";
 
 export type Shift = typeof shifts.$inferSelect;
 
 /** Ca đang mở của user (hoặc null). */
-export async function getCurrentShift(userId: string): Promise<Shift | null> {
+export async function getCurrentShift(profileId: string): Promise<Shift | null> {
   const [row] = await db.select().from(shifts)
-    .where(and(eq(shifts.userId, userId), eq(shifts.status, "open")))
+    .where(and(eq(shifts.userId, profileId), eq(shifts.status, "open")))
     .orderBy(desc(shifts.openedAt)).limit(1);
   return row ?? null;
 }
 
-/** Tiền mặt dự kiến = quỹ đầu ca + (thu − chi) quỹ tiền mặt trong khoảng ca. */
-export async function shiftExpectedCash(opening: number, openedAt: Date, closedAt?: Date | null): Promise<number> {
-  const conds = [eq(cashTransactions.fund, "cash"), gte(cashTransactions.createdAt, openedAt)];
-  if (closedAt) conds.push(lte(cashTransactions.createdAt, closedAt));
+/** Tiền mặt dự kiến = quỹ đầu ca + (thu − chi) quỹ tiền mặt thuộc ca. */
+export async function shiftExpectedCash(opening: number, shiftId: string): Promise<number> {
   const [agg] = await db
     .select({ net: sql<string>`coalesce(sum(case when ${cashTransactions.type} = 'in' then ${cashTransactions.amount} else -${cashTransactions.amount} end), 0)` })
     .from(cashTransactions)
-    .where(and(...conds));
+    .where(and(eq(cashTransactions.shiftId, shiftId), eq(cashTransactions.fund, "cash")));
   return opening + Number(agg.net);
+}
+
+export async function getShiftSummary(shift: Shift | null) {
+  if (!shift) {
+    return {
+      expectedCash: null,
+      tenderTotals: { cash: 0, bank_transfer: 0, card: 0 },
+      orderCount: 0,
+      refundTotal: 0,
+      cashIn: 0,
+      cashOut: 0,
+      zReportStatus: "not_available" as const,
+    };
+  }
+
+  const [expectedCash, tenderRows, orderRows, cashRows] = await Promise.all([
+    shiftExpectedCash(Number(shift.openingFloat), shift.id),
+    db
+      .select({
+        method: payments.method,
+        total: sql<string>`coalesce(sum(${payments.amount}), 0)`,
+      })
+      .from(payments)
+      .where(eq(payments.shiftId, shift.id))
+      .groupBy(payments.method),
+    db
+      .select({
+        orderCount: sql<string>`count(distinct ${orders.id})`,
+      })
+      .from(orders)
+      .where(eq(orders.shiftId, shift.id)),
+    db
+      .select({
+        cashIn: sql<string>`coalesce(sum(${cashTransactions.amount}) filter (where ${cashTransactions.type} = 'in' and ${cashTransactions.fund} = 'cash'), 0)`,
+        cashOut: sql<string>`coalesce(sum(${cashTransactions.amount}) filter (where ${cashTransactions.type} = 'out' and ${cashTransactions.fund} = 'cash'), 0)`,
+        refundTotal: sql<string>`coalesce(sum(${cashTransactions.amount}) filter (where ${cashTransactions.category} = 'refund'), 0)`,
+      })
+      .from(cashTransactions)
+      .where(eq(cashTransactions.shiftId, shift.id)),
+  ]);
+
+  const tenderTotals = { cash: 0, bank_transfer: 0, card: 0 };
+  for (const row of tenderRows) {
+    if (row.method === "cash" || row.method === "bank_transfer" || row.method === "card") {
+      tenderTotals[row.method] = Number(row.total);
+    }
+  }
+
+  return {
+    expectedCash,
+    tenderTotals,
+    orderCount: Number(orderRows[0]?.orderCount ?? 0),
+    refundTotal: Number(cashRows[0]?.refundTotal ?? 0),
+    cashIn: Number(cashRows[0]?.cashIn ?? 0),
+    cashOut: Number(cashRows[0]?.cashOut ?? 0),
+    zReportStatus: shift.status === "closed" ? "closed" as const : "open" as const,
+  };
 }
 
 /** Lịch sử ca — mới nhất trước. */

@@ -47,6 +47,7 @@ export function PaymentForm({ orderId, remaining }: { orderId: string; remaining
   const router = useRouter();
   const [amount, setAmount] = useState(remaining);
   const [method, setMethod] = useState<"cash" | "bank_transfer" | "card">("cash");
+  const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -55,9 +56,16 @@ export function PaymentForm({ orderId, remaining }: { orderId: string; remaining
     if (amount <= 0 || busy) return;
     setBusy(true);
     setError("");
-    const res = await addPayment({ orderId, amount, method, note: note || undefined });
+    const res = await addPayment({
+      orderId,
+      amount,
+      method,
+      reference: reference || undefined,
+      note: note || undefined,
+    });
     setBusy(false);
     if (res.ok) {
+      setReference("");
       setNote("");
       router.refresh();
     } else {
@@ -90,6 +98,11 @@ export function PaymentForm({ orderId, remaining }: { orderId: string; remaining
             </button>
           ))}
         </div>
+        <input
+          value={reference} onChange={(e) => setReference(e.target.value)}
+          placeholder={t("orders.detail.referencePlaceholder")}
+          className="w-44 px-3 py-2 text-sm rounded-lg border border-border bg-surface"
+        />
         <input
           value={note} onChange={(e) => setNote(e.target.value)}
           placeholder={t("orders.detail.notePlaceholder")}

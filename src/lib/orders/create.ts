@@ -11,6 +11,7 @@ import {
 import { recordCashTx, fundForMethod } from "@/lib/cash";
 import { Routes } from "@/lib/routes";
 import { normalizeOrderItems } from "@/lib/orders/normalize";
+import { getCurrentShift } from "@/lib/data/shifts";
 
 function revalidateOrderPaths(sourceOrderId?: string) {
   try {
@@ -66,6 +67,7 @@ export async function createOrderForUser(
 
   try {
     const profileId = await getProfileId(userId);
+    const currentShift = profileId ? await getCurrentShift(profileId) : null;
 
     const result = await db.transaction(async (tx) => {
       if (v.source && isQuote) throw new Error("SOURCE_NOT_EDITABLE");
@@ -128,6 +130,7 @@ export async function createOrderForUser(
             refId: sourceOrder.id,
             note: `Hủy đơn gốc ${sourceOrder.code} để sửa`,
             createdBy: profileId,
+            shiftId: currentShift?.id ?? null,
           });
         }
       }
@@ -137,6 +140,7 @@ export async function createOrderForUser(
         clientId: v.clientId ?? null,
         status: isQuote ? "quote" : "completed",
         paymentStatus,
+        shiftId: currentShift?.id ?? null,
         customerId: v.customerId ?? null,
         warehouseId: v.warehouseId,
         projectId: v.projectId ?? null,
@@ -183,14 +187,16 @@ export async function createOrderForUser(
       if (paid > 0) {
         await tx.insert(payments).values({
           orderId: order.id,
+          shiftId: currentShift?.id ?? null,
           amount: toMoney(paid),
           method: v.payment.method,
+          reference: v.payment.reference?.trim() || null,
           createdBy: profileId,
         });
         await recordCashTx(tx, {
           type: "in", fund: fundForMethod(v.payment.method), amount: paid,
           category: "sale", refType: "order", refId: order.id,
-          note: order.code, createdBy: profileId,
+          note: order.code, createdBy: profileId, shiftId: currentShift?.id ?? null,
         });
       }
 

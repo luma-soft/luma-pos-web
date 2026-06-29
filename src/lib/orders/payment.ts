@@ -6,6 +6,7 @@ import { addPaymentSchema, type AddPaymentInput } from "@/lib/schemas/order";
 import { type ActionResult, getProfileId, toMoney, UnauthorizedError } from "@/lib/actions/common";
 import { recordCashTx, fundForMethod } from "@/lib/cash";
 import { Routes } from "@/lib/routes";
+import { getCurrentShift } from "@/lib/data/shifts";
 
 /**
  * Lõi THU NỢ / thu tiền theo đơn — KHÔNG phải server action (nhận userId đã xác thực).
@@ -19,6 +20,7 @@ export async function addPaymentForUser(userId: string, input: AddPaymentInput):
 
   try {
     const profileId = await getProfileId(userId);
+    const currentShift = profileId ? await getCurrentShift(profileId) : null;
 
     await db.transaction(async (tx) => {
       const [order] = await tx.select().from(orders).where(eq(orders.id, v.orderId)).limit(1);
@@ -33,15 +35,17 @@ export async function addPaymentForUser(userId: string, input: AddPaymentInput):
 
       await tx.insert(payments).values({
         orderId: order.id,
+        shiftId: currentShift?.id ?? null,
         amount: toMoney(amount),
         method: v.method,
+        reference: v.reference?.trim() || null,
         note: v.note || null,
         createdBy: profileId,
       });
       await recordCashTx(tx, {
         type: "in", fund: fundForMethod(v.method), amount,
         category: "debt_collect", refType: "order", refId: order.id,
-        note: `Thu nợ ${order.code}`, createdBy: profileId,
+        note: `Thu nợ ${order.code}`, createdBy: profileId, shiftId: currentShift?.id ?? null,
       });
 
       const newPaid = alreadyPaid + amount;

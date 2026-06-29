@@ -1204,6 +1204,7 @@
       "addPayment": "Record payment / collect debt",
       "amount": "Amount",
       "receive": "Collect",
+      "referencePlaceholder": "Reference code…",
       "notePlaceholder": "Note…",
       "customer": "Customer",
       "info": "Order info",

@@ -10,6 +10,7 @@ import { createPurchaseSchema, type CreatePurchaseOutput, updatePurchaseSchema, 
 import { type ActionResult, requireStockAccess, requireManager, getProfileId, generateCode, toMoney, toQty } from "./common";
 import { recordCashTx } from "@/lib/cash";
 import { Routes } from "@/lib/routes";
+import { getCurrentShift } from "@/lib/data/shifts";
 
 type PurchaseCalcInput = Pick<CreatePurchaseOutput, "items" | "discount" | "vatRate" | "amountPaid">;
 
@@ -49,6 +50,7 @@ export async function createPurchase(
 
   try {
     const profileId = await getProfileId(userId);
+    const currentShift = profileId ? await getCurrentShift(profileId) : null;
 
     const result = await db.transaction(async (tx) => {
       // validate product ids tồn tại
@@ -140,7 +142,7 @@ export async function createPurchase(
         await recordCashTx(tx, {
           type: "out", fund: "cash", amount: totals.paid,
           category: "supplier_payment", refType: "purchase", refId: po.id,
-          note: `Trả NCC ${po.code}`, createdBy: profileId,
+          note: `Trả NCC ${po.code}`, createdBy: profileId, shiftId: currentShift?.id ?? null,
         });
       }
 
@@ -170,6 +172,7 @@ export async function updatePurchase(input: UpdatePurchaseOutput): Promise<Actio
 
   try {
     const profileId = await getProfileId(userId);
+    const currentShift = profileId ? await getCurrentShift(profileId) : null;
 
     await db.transaction(async (tx) => {
       const [po] = await tx.select().from(purchaseOrders).where(eq(purchaseOrders.id, v.id)).limit(1);
@@ -287,13 +290,13 @@ export async function updatePurchase(input: UpdatePurchaseOutput): Promise<Actio
         await recordCashTx(tx, {
           type: "out", fund: "cash", amount: paidDiff,
           category: "supplier_payment", refType: "purchase_edit", refId: po.id,
-          note: `Trả thêm NCC ${po.code}`, createdBy: profileId,
+          note: `Trả thêm NCC ${po.code}`, createdBy: profileId, shiftId: currentShift?.id ?? null,
         });
       } else if (paidDiff < -1e-9) {
         await recordCashTx(tx, {
           type: "in", fund: "cash", amount: Math.abs(paidDiff),
           category: "supplier_payment", refType: "purchase_edit", refId: po.id,
-          note: `Giảm tiền đã trả NCC ${po.code}`, createdBy: profileId,
+          note: `Giảm tiền đã trả NCC ${po.code}`, createdBy: profileId, shiftId: currentShift?.id ?? null,
         });
       }
 
@@ -335,6 +338,7 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
 
   try {
     const profileId = await getProfileId(userId);
+    const currentShift = profileId ? await getCurrentShift(profileId) : null;
 
     await db.transaction(async (tx) => {
       const [po] = await tx.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)).limit(1);
@@ -375,7 +379,7 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
           await recordCashTx(tx, {
             type: "in", fund: "cash", amount: paid,
             category: "supplier_payment", refType: "purchase_cancel", refId: po.id,
-            note: `Hoàn tiền đã trả do hủy ${po.code}`, createdBy: profileId,
+            note: `Hoàn tiền đã trả do hủy ${po.code}`, createdBy: profileId, shiftId: currentShift?.id ?? null,
           });
         }
       }

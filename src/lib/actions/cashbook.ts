@@ -7,6 +7,7 @@ import { cashTransactions } from "@/db/schema";
 import { type ActionResult, requireManager, getProfileId, generateCode } from "./common";
 import { Routes } from "@/lib/routes";
 import { writeAuditLog } from "@/lib/audit";
+import { getCurrentShift } from "@/lib/data/shifts";
 
 const schema = z.object({
   type: z.enum(["in", "out"]),
@@ -28,8 +29,10 @@ export async function createCashTx(input: CreateCashTxInput): Promise<ActionResu
 
   try {
     const profileId = await getProfileId(userId);
+    const currentShift = profileId ? await getCurrentShift(profileId) : null;
     await db.insert(cashTransactions).values({
       code: generateCode(v.type === "in" ? "PT" : "PC"),
+      shiftId: currentShift?.id ?? null,
       type: v.type,
       fund: v.fund,
       amount: v.amount.toFixed(2),

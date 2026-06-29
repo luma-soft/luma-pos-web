@@ -14,7 +14,8 @@ export async function openShift(openingFloat: number): Promise<ActionResult<{ id
   if (!(openingFloat >= 0)) return { ok: false, error: "errors.invalidData" };
   try {
     const profileId = await getProfileId(userId);
-    const existing = await getCurrentShift(userId);
+    if (!profileId) return { ok: false, error: "errors.invalidData" };
+    const existing = await getCurrentShift(profileId);
     if (existing) return { ok: false, error: "shifts.errors.alreadyOpen" };
     const [row] = await db.insert(shifts).values({
       code: generateCode("CA"),
@@ -39,7 +40,7 @@ export async function closeShift(countedCash: number, note?: string): Promise<Ac
     if (!profileId) return { ok: false, error: "errors.invalidData" };
     const shift = await getCurrentShift(profileId);
     if (!shift) return { ok: false, error: "shifts.errors.noOpen" };
-    const expected = await shiftExpectedCash(Number(shift.openingFloat), shift.openedAt);
+    const expected = await shiftExpectedCash(Number(shift.openingFloat), shift.id);
     const variance = countedCash - expected;
     await db.update(shifts).set({
       status: "closed",
