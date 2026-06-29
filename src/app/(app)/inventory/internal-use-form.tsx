@@ -105,8 +105,8 @@ export function InternalUseForm() {
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <section className="min-w-0 overflow-hidden rounded-card border border-border bg-surface shadow-e1">
-        <div className="flex flex-wrap items-center gap-3 border-b border-border bg-surface px-4 py-3">
+      <section className="min-w-0 overflow-hidden rounded-card bg-surface shadow-[0_14px_36px_rgba(15,23,42,0.05)]">
+        <div className="flex flex-wrap items-center gap-3 border-b border-border-soft bg-surface px-4 py-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-card bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-200">
               <ClipboardList className="h-5 w-5" />
             </div>
@@ -121,7 +121,7 @@ export function InternalUseForm() {
                 placeholder={t("internalUse.searchProduct")}
                 leftIcon={<Search />}
                 size="lg"
-                className="h-12 bg-canvas text-base shadow-e1"
+                className="h-12 bg-canvas text-base"
               />
               {(results.length > 0 || searching) && q.trim() && (
                 <div className="absolute left-0 right-0 z-30 mt-2 overflow-hidden rounded-card border border-border-soft bg-surface shadow-e2">
@@ -149,7 +149,7 @@ export function InternalUseForm() {
           </div>
         )}
 
-          <div className="grid grid-cols-2 gap-2 border-b border-border bg-canvas/60 px-4 py-3 text-xs sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 border-b border-border-soft bg-canvas/45 px-4 py-3 text-xs sm:grid-cols-4">
             <FormMetric label={t("internalUse.cols.items")} value={String(lines.length)} />
             <FormMetric label={t("internalUse.qty")} value={String(lines.reduce((sum, line) => sum + line.quantity, 0))} />
             <FormMetric label={t("internalUse.totalCost")} value={formatCurrency(totalCost)} tone={needsApproval ? "warn" : "primary" } />
@@ -209,7 +209,7 @@ export function InternalUseForm() {
 
           {lines.length === 0 && (
             <div className="p-4 sm:p-6">
-              <div className="flex min-h-[420px] flex-col items-center justify-center rounded-card border border-dashed border-border bg-canvas/70 px-4 text-center">
+              <div className="flex min-h-[420px] flex-col items-center justify-center rounded-card bg-canvas/55 px-4 text-center">
                 <PackageSearch className="mb-4 h-10 w-10 text-slate-300" />
                 <p className="text-lg font-extrabold">{t("internalUse.emptyForm")}</p>
                 <p className="mt-2 text-sm text-slate-400">{t("internalUse.emptyHint")}</p>
@@ -222,7 +222,7 @@ export function InternalUseForm() {
           )}
       </section>
 
-      <aside className="flex flex-col rounded-card border border-border bg-surface p-4 shadow-e1 xl:sticky xl:top-24 xl:self-start">
+      <aside className="flex flex-col rounded-card bg-surface p-4 shadow-[0_14px_36px_rgba(15,23,42,0.05)] xl:sticky xl:top-24 xl:self-start">
           <div className="mb-5 flex items-center justify-between gap-3">
             <SearchableSelect options={[{ value: "main", label: t("internalUse.defaultBranch") }]} value="main" onChange={() => undefined} placeholder={t("internalUse.defaultBranch")} />
             <div className="h-10 rounded-lg border border-border-soft bg-canvas px-3 py-2 text-sm font-semibold text-slate-400">{new Date().toLocaleDateString("vi-VN")}</div>
@@ -279,7 +279,7 @@ function PanelRow({ label, children }: { label: string; children: ReactNode }) {
 
 function FormMetric({ label, value, tone }: { label: string; value: string; tone?: "primary" | "ok" | "warn" }) {
   return (
-    <div className="rounded-lg border border-border bg-surface px-3 py-2">
+    <div className="rounded-lg bg-surface/80 px-3 py-2">
       <div className="text-[10px] font-semibold uppercase text-slate-400">{label}</div>
       <div className={cn("mt-0.5 font-mono text-sm font-bold tabular-nums", tone === "primary" && "text-primary-700", tone === "ok" && "text-ok", tone === "warn" && "text-warn")}>{value}</div>
     </div>

@@ -93,7 +93,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
   return (
     <div className="min-h-dvh bg-canvas p-4 sm:p-6">
       <div className="mb-5 flex flex-wrap items-start gap-4">
-        <Button type="button" variant="outline" size="icon" onClick={() => router.push(Routes.Stocktakes)} className="mt-1 rounded-card bg-surface text-slate-500 shadow-e1">
+        <Button type="button" variant="outline" size="icon" onClick={() => router.push(Routes.Stocktakes)} className="mt-1 rounded-card bg-surface text-slate-500">
           <ArrowLeft className="w-4 h-4" />
         </Button>
         <div className="min-w-0 flex-1">
@@ -109,22 +109,22 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
             onChange={(e) => router.push(`${Routes.StocktakeNew}?wh=${e.target.value}`)}
             disabled={lines.length > 0}
             options={warehouses.map((w) => ({ value: w.id, label: w.name }))}
-            className="font-medium shadow-e1"
+            className="font-medium"
             title={lines.length > 0 ? t("stocktakes.warehouseLocked") : undefined}
           />
         </div>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="min-w-0 overflow-hidden rounded-card border border-border bg-surface shadow-e1">
-          <div className="border-b border-border bg-surface px-4 py-4 sm:px-5">
+        <section className="min-w-0 overflow-hidden rounded-card bg-surface shadow-[0_14px_36px_rgba(15,23,42,0.05)]">
+          <div className="border-b border-border-soft bg-surface px-4 py-4 sm:px-5">
             <div className="relative">
               <Input
                 value={search} onChange={(e) => setSearch(e.target.value)}
                 placeholder={t("stocktakes.searchPlaceholder")}
                 leftIcon={<Search />}
                 size="lg"
-                className="h-12 bg-canvas text-base shadow-e1"
+                className="h-12 bg-canvas text-base"
               />
               {suggestions.length > 0 && (
                 <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-card border border-border-soft bg-surface shadow-e2">
@@ -142,7 +142,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 border-b border-border bg-canvas/60 px-4 py-3 text-xs sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 border-b border-border-soft bg-canvas/45 px-4 py-3 text-xs sm:grid-cols-4">
             <InlineMetric label={t("stocktakes.summary.checked")} value={String(lines.length)} />
             <InlineMetric label={t("stocktakes.summary.matched")} value={String(totals.matched)} tone="ok" />
             <InlineMetric label={t("stocktakes.summary.diff")} value={String(totals.diffCount)} tone="warn" />
@@ -151,7 +151,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
 
           {lines.length === 0 ? (
             <div className="p-4 sm:p-6">
-              <div className="flex min-h-[420px] flex-col items-center justify-center rounded-card border border-dashed border-border bg-canvas/70 px-6 py-14 text-center">
+              <div className="flex min-h-[420px] flex-col items-center justify-center rounded-card bg-canvas/55 px-6 py-14 text-center">
               <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-card bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-200">
                 <PackageSearch className="h-7 w-7" />
               </div>
@@ -210,7 +210,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
           )}
         </section>
 
-        <aside className="rounded-card border border-border bg-surface p-5 shadow-e1 xl:sticky xl:top-24 xl:self-start">
+        <aside className="rounded-card bg-surface p-5 shadow-[0_14px_36px_rgba(15,23,42,0.05)] xl:sticky xl:top-24 xl:self-start">
           <div className="mb-4 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-card bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-200">
               <ClipboardCheck className="h-5 w-5" />
@@ -278,7 +278,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
 
 function InlineMetric({ label, value, tone }: { label: string; value: string; tone?: "ok" | "warn" | "er" }) {
   return (
-    <div className="rounded-lg border border-border bg-surface px-3 py-2">
+    <div className="rounded-lg bg-surface/80 px-3 py-2">
       <div className="text-[10px] font-semibold uppercase text-slate-400">{label}</div>
       <div className={cn("mt-0.5 font-mono text-sm font-bold tabular-nums", tone === "ok" && "text-ok", tone === "warn" && "text-warn", tone === "er" && "text-er")}>{value}</div>
     </div>
