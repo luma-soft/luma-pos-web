@@ -129,7 +129,7 @@ export function ActionPresetButtons({
           {open && (
             <div className={cn(
               "absolute bottom-full z-50 mb-2 max-h-[min(420px,52vh)] w-[min(92vw,560px)] overflow-y-auto rounded-xl border border-border bg-surface p-3 shadow-e2",
-              variant === "grid" ? "right-0" : "left-0"
+              "right-0"
             )}>
               <div className="grid gap-3 sm:grid-cols-2">
                 {SECONDARY_GROUPS.map((group) => {
