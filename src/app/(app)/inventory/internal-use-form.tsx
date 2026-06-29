@@ -1,9 +1,12 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { type ReactNode, useMemo, useRef, useState, useTransition } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Search, Trash2, Check, Loader2, AlertTriangle, FileSpreadsheet, Printer, Eye, CircleAlert, PackageSearch, Save } from "lucide-react";
 import { SearchableSelect } from "@/components/combobox";
+import { Button } from "@/components/ui/button";
+import { Input, Textarea } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { searchPurchaseProducts } from "@/lib/actions/purchase-search";
 import { createInternalUse } from "@/lib/actions/internal-use";
 import { Routes } from "@/lib/routes";
@@ -101,21 +104,21 @@ export function InternalUseForm() {
   }
 
   return (
-    <div className="overflow-hidden rounded-card border border-border bg-surface shadow-e2">
-      <div className="grid min-h-[620px] xl:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="min-w-0 border-border xl:border-r">
-          <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <section className="min-w-0 overflow-hidden rounded-card border border-border-soft bg-surface shadow-e1">
+        <div className="flex flex-wrap items-center gap-3 border-b border-border-soft bg-canvas px-4 py-3">
             <h2 className="text-xl font-extrabold">{t("nav.internalUse")}</h2>
             <div className="relative min-w-64 flex-1 xl:max-w-xl">
-              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
+              <Input
                 value={q}
                 onChange={(e) => onSearch(e.target.value)}
                 placeholder={t("internalUse.searchProduct")}
-                className="h-11 w-full rounded-xl border border-primary-300 bg-surface pl-10 pr-3 text-sm shadow-e1 transition focus:outline-none focus:ring-2 focus:ring-primary-200"
+                leftIcon={<Search />}
+                size="lg"
+                className="bg-surface shadow-e1"
               />
               {(results.length > 0 || searching) && q.trim() && (
-                <div className="absolute left-0 right-0 z-30 mt-2 overflow-hidden rounded-xl border border-border bg-surface shadow-e2">
+                <div className="absolute left-0 right-0 z-30 mt-2 overflow-hidden rounded-card border border-border-soft bg-surface shadow-e2">
                   {searching ? <div className="px-4 py-4 text-center text-sm text-slate-400"><Loader2 className="w-4 h-4 animate-spin inline" /></div>
                     : results.map((p) => (
                       <button key={p.id} type="button" onClick={() => addItem(p)} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition hover:bg-surface-2">
@@ -131,10 +134,10 @@ export function InternalUseForm() {
               <IconAction label="preview"><Eye className="h-4 w-4" /></IconAction>
               <IconAction label="notice"><CircleAlert className="h-4 w-4" /></IconAction>
             </div>
-          </div>
+        </div>
 
         {needsApproval && (
-          <div className="m-4 flex items-start gap-2 rounded-xl border border-warn/25 bg-warn-soft px-3.5 py-2.5 text-xs text-warn">
+          <div className="m-4 flex items-start gap-2 rounded-card border border-warn/20 bg-warn-soft px-3.5 py-2.5 text-xs text-warn">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-px" />
             <span>{t("internalUse.approvalBanner", { amount: formatCurrency(totalCost) })}</span>
           </div>
@@ -153,7 +156,7 @@ export function InternalUseForm() {
                 <col className="w-12" />
               </colgroup>
               <thead>
-                <tr className="border-b border-primary-200 bg-primary-50/70 text-left text-xs font-bold text-slate-800">
+                <tr className="border-b border-border-soft bg-canvas text-left text-xs font-semibold text-slate-600">
                   <th className="px-3 py-3 text-center">STT</th>
                   <th className="px-3 py-3">Mã hàng hóa</th>
                   <th className="px-3 py-3">Tên hàng hóa</th>
@@ -172,12 +175,16 @@ export function InternalUseForm() {
                       <td className="px-3 py-3 font-mono text-primary-600">{l.productId.slice(0, 8)}</td>
                       <td className="px-3 py-3 font-semibold">{l.productName}</td>
                       <td className="px-3 py-2">
-                        <select value={l.unitName} onChange={(e) => changeUnit(l, e.target.value)} className="w-full rounded-lg border border-border bg-canvas px-2 py-2 text-xs transition focus:outline-none focus:ring-2 focus:ring-primary-200">
-                          {l.units.map((u) => <option key={u.name} value={u.name}>{u.name}{u.mult > 1 ? ` (×${u.mult})` : ""}</option>)}
-                        </select>
+                        <Select
+                          value={l.unitName}
+                          onChange={(e) => changeUnit(l, e.target.value)}
+                          size="sm"
+                          options={l.units.map((u) => ({ value: u.name, label: `${u.name}${u.mult > 1 ? ` (×${u.mult})` : ""}` }))}
+                          className="bg-canvas"
+                        />
                       </td>
-                      <td className="px-3 py-2"><input type="number" min={1} value={l.quantity} onChange={(e) => upd(l.key, { quantity: Math.max(1, Number(e.target.value) || 1) })} className="no-spinner w-full rounded-lg border border-border bg-canvas px-2 py-2 text-right font-mono text-sm transition focus:outline-none focus:ring-2 focus:ring-primary-200" /></td>
-                      <td className="px-3 py-2"><input type="number" min={0} value={l.unitCost} onChange={(e) => upd(l.key, { unitCost: Math.max(0, Number(e.target.value) || 0) })} className="no-spinner w-full rounded-lg border border-border bg-canvas px-2 py-2 text-right font-mono text-sm transition focus:outline-none focus:ring-2 focus:ring-primary-200" /></td>
+                      <td className="px-3 py-2"><Input type="number" min={1} value={l.quantity} onChange={(e) => upd(l.key, { quantity: Math.max(1, Number(e.target.value) || 1) })} size="sm" className="no-spinner bg-canvas text-right font-mono" /></td>
+                      <td className="px-3 py-2"><Input type="number" min={0} value={l.unitCost} onChange={(e) => upd(l.key, { unitCost: Math.max(0, Number(e.target.value) || 0) })} size="sm" className="no-spinner bg-canvas text-right font-mono" /></td>
                       <td className="px-3 py-3 text-right font-mono font-bold">{formatCurrency(l.unitCost * l.quantity)}</td>
                       <td className="px-3 py-2"><button type="button" onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-er-soft hover:text-er active:scale-[0.98]"><Trash2 className="w-4 h-4" /></button></td>
                     </tr>
@@ -192,62 +199,61 @@ export function InternalUseForm() {
               <PackageSearch className="mb-4 h-10 w-10 text-slate-300" />
               <p className="text-lg font-extrabold">{t("internalUse.emptyForm")}</p>
               <p className="mt-2 text-sm text-slate-400">Thêm sản phẩm từ ô tìm kiếm phía trên hoặc nhập từ file excel.</p>
-              <button type="button" className="mt-8 inline-flex h-12 items-center gap-2 rounded-xl bg-primary-600 px-6 text-sm font-extrabold text-white transition hover:brightness-110">
+              <Button type="button" className="mt-8" size="lg">
                 <FileSpreadsheet className="h-4 w-4" />
                 Chọn file dữ liệu
-              </button>
+              </Button>
             </div>
           )}
-        </section>
+      </section>
 
-        <aside className="flex flex-col bg-surface-2/70 p-4">
+      <aside className="flex flex-col rounded-card border border-border-soft bg-surface p-4 shadow-e1">
           <div className="mb-5 flex items-center justify-between gap-3">
             <SearchableSelect options={[{ value: "main", label: "Hải Đăng" }]} value="main" onChange={() => undefined} placeholder="Hải Đăng" />
-            <div className="h-10 rounded-xl border border-border bg-surface px-3 py-2 text-sm font-semibold text-slate-400">{new Date().toLocaleDateString("vi-VN")}</div>
+            <div className="h-10 rounded-lg border border-border-soft bg-canvas px-3 py-2 text-sm font-semibold text-slate-400">{new Date().toLocaleDateString("vi-VN")}</div>
           </div>
 
           <div className="space-y-4 text-sm">
-            <PanelRow label="Mã xuất dùng nội bộ"><span className="rounded-xl border border-border bg-surface px-3 py-2 font-semibold text-slate-400">Mã phiếu tự động</span></PanelRow>
+            <PanelRow label="Mã xuất dùng nội bộ"><span className="rounded-lg border border-border-soft bg-canvas px-3 py-2 font-semibold text-slate-400">Mã phiếu tự động</span></PanelRow>
             <PanelRow label="Trạng thái"><span className="font-semibold">Phiếu tạm</span></PanelRow>
             <PanelRow label={t("internalUse.reason")}><SearchableSelect options={reasonOpts} value={reason} onChange={setReason} placeholder="Chọn loại xuất" /></PanelRow>
             <PanelRow label={t("internalUse.department")}><SearchableSelect options={deptOpts} value={department} onChange={setDepartment} placeholder="Chọn người nhận" /></PanelRow>
             <PanelRow label={t("internalUse.totalCost")}><span className={cn("font-mono text-lg font-extrabold", needsApproval ? "text-warn" : "text-primary-700")}>{formatCurrency(totalCost)}</span></PanelRow>
           </div>
 
-          <textarea
+          <Textarea
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder={t("internalUse.notePlaceholder")}
-            className="mt-6 min-h-28 w-full rounded-xl border border-border bg-surface px-3 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-primary-200"
+            className="mt-6 min-h-28 bg-canvas"
           />
 
           <div className="mt-auto grid grid-cols-2 gap-3 pt-6">
-            <button type="button" disabled={pending || lines.length === 0} onClick={submit} className="inline-flex h-14 items-center justify-center gap-2 rounded-xl border border-primary-500 bg-surface px-5 text-sm font-extrabold text-primary-700 transition active:scale-[0.98] disabled:opacity-50">
-              {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            <Button type="button" variant="outline" size="lg" disabled={pending || lines.length === 0} loading={pending} onClick={submit} block>
+              {!pending && <Save className="h-4 w-4" />}
               {t("stocktakes.saveDraft")}
-            </button>
-            <button type="button" disabled={pending || lines.length === 0} onClick={submit} className={cn("inline-flex h-14 items-center justify-center gap-2 rounded-xl px-5 text-sm font-extrabold text-white transition active:scale-[0.98] disabled:opacity-50", needsApproval ? "bg-warn hover:brightness-110" : "bg-primary-600 hover:brightness-110")}>
-              {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            </Button>
+            <Button type="button" size="lg" disabled={pending || lines.length === 0} loading={pending} onClick={submit} className={needsApproval ? "bg-warn hover:bg-warn/90" : undefined} block>
+              {!pending && <Check className="w-4 h-4" />}
               {needsApproval ? t("internalUse.submitForApproval") : "Hoàn thành"}
-            </button>
+            </Button>
           </div>
-        </aside>
-      </div>
+      </aside>
 
       {toast && <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl bg-ok-soft text-ok border border-ok/25 text-sm font-semibold shadow-e2 flex items-center gap-2"><Check className="w-4 h-4" />{toast}</div>}
     </div>
   );
 }
 
-function IconAction({ label, children }: { label: string; children: React.ReactNode }) {
+function IconAction({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <button type="button" aria-label={label} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface text-slate-600 transition hover:bg-surface-2 active:scale-[0.98]">
+    <button type="button" aria-label={label} className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-soft bg-surface text-slate-500 transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700 active:scale-[0.98]">
       {children}
     </button>
   );
 }
 
-function PanelRow({ label, children }: { label: string; children: React.ReactNode }) {
+function PanelRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="grid grid-cols-[130px_minmax(0,1fr)] items-center gap-3">
       <span className="font-medium text-slate-600">{label}</span>

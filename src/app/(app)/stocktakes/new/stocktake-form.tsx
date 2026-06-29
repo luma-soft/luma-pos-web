@@ -116,7 +116,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="overflow-hidden rounded-card border border-border bg-surface shadow-e1">
+        <section className="overflow-hidden rounded-card border border-border-soft bg-surface shadow-e1">
           <div className="border-b border-border-soft bg-canvas px-4 py-4 sm:px-5">
             <div className="relative">
               <Input
@@ -127,7 +127,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
                 className="bg-surface shadow-e1"
               />
               {suggestions.length > 0 && (
-                <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-card border border-border bg-surface shadow-e2">
+                <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-card border border-border-soft bg-surface shadow-e2">
                   {suggestions.map((p) => (
                     <button
                       key={p.id} onClick={() => addLine(p)}
@@ -154,7 +154,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
             <div className="overflow-x-auto">
               <table className="w-full min-w-210 text-sm">
                 <thead>
-                  <tr className="border-b border-border bg-canvas text-left text-[11px] text-slate-500">
+                  <tr className="border-b border-border-soft bg-canvas text-left text-[11px] text-slate-500">
                     <th className="px-4 py-3 font-semibold">{t("orders.cols.product")}</th>
                     <th className="px-4 py-3 font-semibold text-right">{t("stocktakes.cols.systemQty")}</th>
                     <th className="w-36 px-4 py-3 font-semibold text-right">{t("stocktakes.cols.actualQty")}</th>
@@ -201,7 +201,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
           )}
         </section>
 
-        <aside className="rounded-card border border-border bg-surface p-5 shadow-e1 xl:sticky xl:top-24 xl:self-start">
+        <aside className="rounded-card border border-border-soft bg-surface p-5 shadow-e1 xl:sticky xl:top-24 xl:self-start">
           <div className="mb-4 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-card bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-200">
               <ClipboardCheck className="h-5 w-5" />
