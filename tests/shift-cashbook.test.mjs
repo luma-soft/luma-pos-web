@@ -101,6 +101,16 @@ await db.insert(payments).values([
     reference: "BANK-001",
     createdBy: cashier.id,
   },
+  {
+    orderId: cashOrder.id,
+    shiftId: shift.id,
+    amount: money(999_999),
+    method: "bank_transfer",
+    status: "pending",
+    provider: "sepay",
+    reference: "LUMA-PENDING",
+    createdBy: cashier.id,
+  },
 ]);
 await db.insert(cashTransactions).values([
   { code: "PT-SALE", shiftId: shift.id, type: "in", fund: "cash", amount: money(400_000), category: "sale", refType: "order", refId: cashOrder.id, createdBy: cashier.id },
@@ -124,11 +134,12 @@ const tenderRows = await db
     total: dsql`coalesce(sum(${payments.amount}), 0)`,
   })
   .from(payments)
-  .where(eq(payments.shiftId, shift.id))
+  .where(dsql`${payments.shiftId} = ${shift.id} and ${payments.status} not in ('pending', 'expired')`)
   .groupBy(payments.method);
 const tender = Object.fromEntries(tenderRows.map((row) => [row.method, Number(row.total)]));
 ok("cash tender = 400k", tender.cash === 400_000, `got ${tender.cash}`);
 ok("bank transfer tender = 300k", tender.bank_transfer === 300_000, `got ${tender.bank_transfer}`);
+ok("pending SePay payment is excluded from tender totals", tender.bank_transfer !== 1_299_999, `got ${tender.bank_transfer}`);
 
 const [orderAgg] = await db
   .select({ count: dsql`count(*)::int` })
@@ -137,6 +148,19 @@ const [orderAgg] = await db
 ok("order count includes credit/no-payment order", Number(orderAgg.count) === 2, `got ${orderAgg.count}`);
 ok("payment reference is stored", (await db.select().from(payments).where(eq(payments.reference, "BANK-001"))).length === 1);
 ok("credit order has no payment row but remains in shift", !!creditOrder.id);
+
+let duplicateOpenBlocked = false;
+try {
+  await db.insert(shifts).values({
+    code: "CA-1-DUP",
+    userId: cashier.id,
+    openingFloat: money(123_000),
+    status: "open",
+  });
+} catch {
+  duplicateOpenBlocked = true;
+}
+ok("profile cannot have two open shifts", duplicateOpenBlocked);
 
 console.log(`\n${fail === 0 ? "🎉" : "⚠️"} ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

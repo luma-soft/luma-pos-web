@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { shifts } from "@/db/schema";
 import { getCurrentShift, shiftExpectedCash } from "@/lib/data/shifts";
-import { type ActionResult, requireUser, getProfileId, generateCode, toMoney } from "./common";
+import { type ActionResult, requireUser, getProfileId, generateCode, toMoney, isUniqueViolation } from "./common";
 import { Routes } from "@/lib/routes";
 
 export async function openShift(openingFloat: number): Promise<ActionResult<{ id: string; code: string }>> {
@@ -26,6 +26,7 @@ export async function openShift(openingFloat: number): Promise<ActionResult<{ id
     revalidatePath(Routes.Finance);
     return { ok: true, data: row };
   } catch (e) {
+    if (isUniqueViolation(e)) return { ok: false, error: "shifts.errors.alreadyOpen" };
     console.error("openShift failed:", e);
     return { ok: false, error: "errors.serverError" };
   }

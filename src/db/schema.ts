@@ -3,7 +3,7 @@ import {
   boolean, jsonb, primaryKey, index, uniqueIndex, pgEnum,
 } from "drizzle-orm/pg-core";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import type { StorePrefs } from "@/lib/schemas/settings";
 
 // ============= Enums =============
@@ -710,7 +710,11 @@ export const shifts = pgTable("shifts", {
   status: text("status").notNull().default("open"),
   note: text("note"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => [index("shifts_status_idx").on(t.status), index("shifts_user_idx").on(t.userId)]);
+}, (t) => [
+  index("shifts_status_idx").on(t.status),
+  index("shifts_user_idx").on(t.userId),
+  uniqueIndex("shifts_open_user_unique_idx").on(t.userId).where(sql`${t.status} = 'open'`),
+]);
 
 // ============= F&B dining tables (Part 18) =============
 

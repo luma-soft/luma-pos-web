@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, notInArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { cashTransactions, orders, payments, profiles, shifts } from "@/db/schema";
@@ -43,7 +43,7 @@ export async function getShiftSummary(shift: Shift | null) {
         total: sql<string>`coalesce(sum(${payments.amount}), 0)`,
       })
       .from(payments)
-      .where(eq(payments.shiftId, shift.id))
+      .where(and(eq(payments.shiftId, shift.id), notInArray(payments.status, ["pending", "expired"])))
       .groupBy(payments.method),
     db
       .select({
