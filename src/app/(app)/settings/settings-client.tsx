@@ -907,7 +907,7 @@ function BankSelect({ value, onChange, placeholder }: { value: string; onChange:
         <ChevronDown className="ml-auto w-4 h-4 shrink-0 text-slate-400" />
       </button>
       {open && (
-        <div className="absolute inset-x-0 top-full z-[70] mt-1 overflow-hidden rounded-xl border border-border bg-surface shadow-e2">
+        <div className="mt-1 overflow-hidden rounded-xl border border-border bg-surface shadow-e1">
           <div className="border-b border-border-soft">
             <input
               autoFocus
@@ -917,7 +917,7 @@ function BankSelect({ value, onChange, placeholder }: { value: string; onChange:
               placeholder={t("bankSearch")}
             />
           </div>
-          <div className="max-h-72 overflow-auto py-1">
+          <div className="max-h-56 overflow-auto py-1">
             {filtered.length === 0 ? (
               <div className="px-3 py-4 text-center text-xs text-slate-500">{t("bankNoResults")}</div>
             ) : filtered.map((bank) => (
