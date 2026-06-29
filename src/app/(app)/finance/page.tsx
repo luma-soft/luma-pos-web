@@ -1,16 +1,15 @@
 import { getTranslations } from "next-intl/server";
+import { redirect } from "next/navigation";
 import { Routes } from "@/lib/routes";
 import { GroupTabs } from "@/components/group-tabs";
 import { Text } from "@/components/ui/text";
 import { CashbookTab } from "./tabs/cashbook";
-import { EInvoicesTab } from "./tabs/einvoices";
 import { ShiftsTab } from "./tabs/shifts";
 
 export const dynamic = "force-dynamic";
 
 const TABS = [
   { tab: "cashbook", labelKey: "nav.cashbook" },
-  { tab: "einvoices", labelKey: "nav.einvoices" },
   { tab: "shifts", labelKey: "nav.shifts" },
 ];
 
@@ -18,6 +17,13 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
   const t = await getTranslations();
   const params = await searchParams;
   const tab = params.tab ?? "cashbook";
+
+  if (tab === "einvoices") {
+    const usp = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) if (value) usp.set(key, value);
+    usp.set("tab", "einvoices");
+    redirect(`${Routes.Sales}?${usp.toString()}`);
+  }
 
   return (
     <div className="p-4 sm:p-6">
@@ -28,7 +34,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
         <div className="px-4 sm:px-6 pb-1.5"><GroupTabs base={Routes.Finance} items={TABS} /></div>
       </div>
 
-      {tab === "einvoices" ? <EInvoicesTab /> : tab === "shifts" ? <ShiftsTab /> : <CashbookTab searchParams={params} />}
+      {tab === "shifts" ? <ShiftsTab /> : <CashbookTab searchParams={params} />}
     </div>
   );
 }

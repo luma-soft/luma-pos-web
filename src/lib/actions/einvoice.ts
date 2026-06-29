@@ -68,6 +68,7 @@ export async function issueEInvoice(input: IssueEInvoiceInput): Promise<ActionRe
       note: "Stub provider — chờ tích hợp Viettel/VNPT/MISA",
     });
 
+    revalidatePath(Routes.Sales);
     revalidatePath(Routes.EInvoices);
     revalidatePath(Routes.order(v.orderId));
     return { ok: true, data: { number } };

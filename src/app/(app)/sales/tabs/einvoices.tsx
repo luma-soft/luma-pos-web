@@ -18,7 +18,7 @@ export async function EInvoicesTab() {
 
   return (
     <>
-      <p className="text-xs text-warn mb-5">⚠ {t("einvoice.stubNote")}</p>
+      <p className="text-xs text-warn mb-5">! {t("einvoice.stubNote")}</p>
 
       {rows.length === 0 ? (
         <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">

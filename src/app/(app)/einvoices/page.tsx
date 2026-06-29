@@ -5,5 +5,5 @@ export default async function EInvoicesRedirect({ searchParams }: { searchParams
   const usp = new URLSearchParams();
   for (const [k, v] of Object.entries(sp)) if (typeof v === "string") usp.set(k, v);
   usp.set("tab", "einvoices");
-  redirect(`/finance?${usp.toString()}`);
+  redirect(`/sales?${usp.toString()}`);
 }

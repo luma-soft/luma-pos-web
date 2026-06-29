@@ -5,11 +5,13 @@ import { Text } from "@/components/ui/text";
 import { OrdersTab } from "./tabs/orders";
 import { QuotesTab } from "./tabs/quotes";
 import { PromotionsTab } from "./tabs/promotions";
+import { EInvoicesTab } from "./tabs/einvoices";
 
 export const dynamic = "force-dynamic";
 
 const TABS = [
   { tab: "orders", labelKey: "nav.orders" },
+  { tab: "einvoices", labelKey: "nav.einvoices" },
   { tab: "quotes", labelKey: "nav.quotes" },
   { tab: "promotions", labelKey: "nav.promotions" },
 ];
@@ -29,6 +31,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
       </div>
 
       {tab === "quotes" ? <QuotesTab searchParams={params} />
+        : tab === "einvoices" ? <EInvoicesTab />
         : tab === "promotions" ? <PromotionsTab />
         : <OrdersTab searchParams={params} />}
     </div>

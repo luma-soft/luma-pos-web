@@ -25,8 +25,8 @@ type EInvoiceRow = {
 export function EInvoicesTable({ rows }: { rows: EInvoiceRow[] }) {
   const t = useTranslations();
   const columns: DataTableColumn<EInvoiceRow>[] = [
-    { key: "number", label: t("einvoice.cols.number"), required: true, render: (row) => <span className="font-medium">{row.number ?? "—"}<span className="ml-1 text-xs text-slate-400">{row.serial}</span></span> },
-    { key: "issuedAt", label: t("einvoice.cols.issuedAt"), defaultVisible: true, width: "160px", render: (row) => <span className="text-slate-500">{row.issuedAt ? formatDate(row.issuedAt) : "—"}</span> },
+    { key: "number", label: t("einvoice.cols.number"), required: true, render: (row) => <span className="font-medium">{row.number ?? "-"}<span className="ml-1 text-xs text-slate-400">{row.serial}</span></span> },
+    { key: "issuedAt", label: t("einvoice.cols.issuedAt"), defaultVisible: true, width: "160px", render: (row) => <span className="text-slate-500">{row.issuedAt ? formatDate(row.issuedAt) : "-"}</span> },
     { key: "order", label: t("einvoice.cols.order"), defaultVisible: true, render: (row) => <Link href={`${Routes.Sales}?tab=orders&orderId=${encodeURIComponent(row.orderId)}&expandedOrder=${encodeURIComponent(row.orderId)}`} className="text-primary-600 hover:underline">{row.orderCode}</Link> },
     { key: "buyer", label: t("einvoice.cols.buyer"), defaultVisible: true, render: (row) => <span>{row.buyerName}{row.buyerTaxCode && <span className="ml-1 text-xs text-slate-400">MST: {row.buyerTaxCode}</span>}</span> },
     { key: "beforeVat", label: t("einvoice.cols.beforeVat"), defaultVisible: true, align: "right", render: (row) => formatCurrency(Number(row.totalBeforeVat)) },
@@ -35,14 +35,14 @@ export function EInvoicesTable({ rows }: { rows: EInvoiceRow[] }) {
   ];
   return (
     <DataTableShell
-      tableId="finance.einvoices"
+      tableId="sales.einvoices"
       rows={rows}
       columns={columns}
       getRowId={(row) => row.id}
       minWidth="1040px"
       renderExpanded={(row) => (
         <div className="grid gap-4 bg-surface px-4 py-4 md:grid-cols-4">
-          <Info label={t("einvoice.cols.number")} value={`${row.serial} · ${row.number ?? "—"}`} />
+          <Info label={t("einvoice.cols.number")} value={`${row.serial} · ${row.number ?? "-"}`} />
           <Info label={t("einvoice.cols.buyer")} value={row.buyerName} />
           <Info label="VAT" value={`${formatCurrency(Number(row.vatAmount))} (${Number(row.vatRate)}%)`} />
           <Info label={t("orders.cols.total")} value={formatCurrency(Number(row.orderTotal))} />
