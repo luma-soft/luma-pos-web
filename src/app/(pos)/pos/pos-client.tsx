@@ -14,7 +14,10 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { MoneyInput } from "@/components/ui/money-input";
 import { Text } from "@/components/ui/text";
 import { PrintDoc } from "@/components/print/print-doc";
+import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
+import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
 import type { PaperSize, PrintTemplate } from "@/lib/print/template-shared";
+import type { AiActionPreview } from "@/lib/ai/actions";
 import { createOrder } from "@/lib/actions/orders";
 import { searchPosProducts } from "@/lib/actions/pos-search";
 import { saveCatalog, enqueueOrder, getOutbox, removeOutbox, markFailed } from "@/lib/offline/pos-store";
@@ -428,6 +431,8 @@ export function PosClient({
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(0);
   const [aiUnresolvedItems, setAiUnresolvedItems] = useState<PosAiUnresolvedItem[]>([]);
+  const [aiQuickOpen, setAiQuickOpen] = useState(false);
+  const [aiHighlightedProductIds, setAiHighlightedProductIds] = useState<string[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [offlineSaved, setOfflineSaved] = useState(false);
 
@@ -570,6 +575,45 @@ export function PosClient({
     });
   }, [priceBook, setCart]);
 
+  const applyRawAiCartItems = useCallback((rawItems: unknown[], payload?: Record<string, unknown>) => {
+    const { matched, unresolved } = matchAiCartDraftItems(rawItems, searchableProducts);
+    setAiUnresolvedItems(unresolved);
+    if (matched.length === 0) return false;
+    for (const line of matched) addQuantityToCart(line.product, line.quantity);
+    const productIds = [...new Set(matched.map((line) => line.product.id))];
+    setAiHighlightedProductIds(productIds);
+    window.setTimeout(() => {
+      setAiHighlightedProductIds((current) => current.filter((id) => !productIds.includes(id)));
+    }, 3600);
+    if (payload) {
+      const payment = payload.payment && typeof payload.payment === "object" ? payload.payment as Record<string, unknown> : {};
+      patchActive({
+        customerId: typeof payload.customerId === "string" ? payload.customerId : "",
+        discountInput: Number(payload.discount) || 0,
+        discountMode: "vnd",
+        taxRate: Number(payload.taxRate) || 0,
+        shippingFee: Number(payload.shippingFee) || 0,
+        payMethod: payment.method === "credit" || payment.method === "bank_transfer" || payment.method === "cash" ? payment.method : "cash",
+        paidInput: Number(payment.amount) || null,
+        note: typeof payload.note === "string" ? payload.note : undefined,
+      });
+    }
+    setMobileView("cart");
+    setBrowsing(false);
+    setSearch("");
+    return true;
+  }, [addQuantityToCart, patchActive, searchableProducts]);
+
+  function applyAiCartPreview(preview: AiActionPreview) {
+    if (preview.intent !== "pos_voice_cart_draft" && preview.intent !== "pos_image_cart_draft") return;
+    const payload = preview.action.payload;
+    const rawItems = [
+      ...(Array.isArray(payload.items) ? payload.items : []),
+      ...(Array.isArray(payload.unresolvedItems) ? payload.unresolvedItems : []),
+    ];
+    applyRawAiCartItems(rawItems);
+  }
+
   useEffect(() => {
     const onAiCartDraft = (event: Event) => {
       const detail = (event as CustomEvent<{ items?: unknown; payload?: Record<string, unknown> }>).detail;
@@ -578,17 +622,11 @@ export function PosClient({
         ...(Array.isArray(detail?.items) ? detail.items : []),
         ...(Array.isArray(payload.unresolvedItems) ? payload.unresolvedItems : []),
       ];
-      const { matched, unresolved } = matchAiCartDraftItems(rawItems, searchableProducts);
-      setAiUnresolvedItems(unresolved);
-      if (matched.length === 0) return;
-      for (const line of matched) addQuantityToCart(line.product, line.quantity);
-      setMobileView("cart");
-      setBrowsing(false);
-      setSearch("");
+      applyRawAiCartItems(rawItems);
     };
     window.addEventListener("luma:pos-ai-cart-draft", onAiCartDraft);
     return () => window.removeEventListener("luma:pos-ai-cart-draft", onAiCartDraft);
-  }, [addQuantityToCart, priceBook, searchableProducts]);
+  }, [applyRawAiCartItems]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -607,26 +645,7 @@ export function PosClient({
       const payloadUnresolvedItems = Array.isArray(payload.unresolvedItems) ? payload.unresolvedItems : [];
       const rawItems = storedItems.length > 0 ? [...storedItems, ...payloadUnresolvedItems] : aiProductDraftItemsFromQuery(params);
       if (rawItems.length > 0) hydratedRef.current = true;
-      const { matched, unresolved } = matchAiCartDraftItems(rawItems, searchableProducts);
-      setAiUnresolvedItems(unresolved);
-      const consumed = matched.length > 0;
-      if (consumed) {
-        for (const line of matched) addQuantityToCart(line.product, line.quantity);
-        const payment = payload.payment && typeof payload.payment === "object" ? payload.payment as Record<string, unknown> : {};
-        patchActive({
-          customerId: typeof payload.customerId === "string" ? payload.customerId : "",
-          discountInput: Number(payload.discount) || 0,
-          discountMode: "vnd",
-          taxRate: Number(payload.taxRate) || 0,
-          shippingFee: Number(payload.shippingFee) || 0,
-          payMethod: payment.method === "credit" || payment.method === "bank_transfer" || payment.method === "cash" ? payment.method : "cash",
-          paidInput: Number(payment.amount) || null,
-          note: typeof payload.note === "string" ? payload.note : undefined,
-        });
-        setMobileView("cart");
-        setBrowsing(false);
-        setSearch("");
-      }
+      const consumed = applyRawAiCartItems(rawItems, payload);
       if (consumed) localStorage.removeItem(AI_POS_DRAFT_KEY);
       params.delete("aiDraft");
       params.delete("aiProducts");
@@ -634,7 +653,7 @@ export function PosClient({
       window.history.replaceState(null, "", query ? `/pos?${query}` : "/pos");
     });
     return () => { cancelled = true; };
-  }, [addQuantityToCart, patchActive, priceBook, searchableProducts]);
+  }, [applyRawAiCartItems, searchableProducts]);
 
   function selectProduct(p: PosProduct) {
     if (p.isVariantParent && productChildren(p).length > 0) {
@@ -870,6 +889,7 @@ export function PosClient({
               }}
               className={cn(
                 "border-b border-border-soft last:border-0 transition-colors",
+                aiHighlightedProductIds.includes(l.product.id) && "bg-primary-50/80 shadow-[inset_3px_0_0_var(--primary-500)] dark:bg-primary-950/30",
                 dragKey === l.key && "opacity-50",
                 overKey === l.key && dragKey && dragKey !== l.key && "bg-primary-50/40 dark:bg-primary-950/20"
               )}
@@ -1075,7 +1095,12 @@ export function PosClient({
               onChange={(e) => setSearch(e.target.value)}
               onFocus={() => setBrowsing(true)}
               placeholder={t("pos.searchPlaceholder")}
-              className="w-full pl-10 pr-10 py-3 rounded-xl border border-border bg-surface"
+              className="w-full pl-10 pr-24 py-3 rounded-xl border border-border bg-surface"
+            />
+            <AiQuickActionButton
+              onClick={() => setAiQuickOpen(true)}
+              label={t("aiQuick.pos.open")}
+              className="absolute right-12 top-1/2 z-10 h-8 w-8 -translate-y-1/2 rounded-lg"
             />
             {showResults && (
               <button
@@ -1347,6 +1372,22 @@ export function PosClient({
           )}
         </div>
       </div>
+
+      <AiQuickActionModal
+        open={aiQuickOpen}
+        title={t("aiQuick.pos.title")}
+        description={t("aiQuick.pos.description")}
+        placeholder={t("aiQuick.pos.placeholder")}
+        submitLabel={t("aiQuick.pos.submit")}
+        applyLabel={t("aiQuick.pos.apply")}
+        preset="pos_voice_cart_draft"
+        surface="pos"
+        acceptedIntents={["pos_voice_cart_draft", "pos_image_cart_draft"]}
+        hasExistingData={false}
+        existingDataLabel={t("aiQuick.pos.existingData")}
+        onClose={() => setAiQuickOpen(false)}
+        onApply={applyAiCartPreview}
+      />
 
       {/* Modal chọn bảng giá áp cho đơn đang mở */}
       {variantParent && (

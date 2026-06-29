@@ -929,6 +929,47 @@
       "reports": "Báo cáo"
     }
   },
+  "aiQuick": {
+    "attach": "Đính kèm",
+    "processing": "AI đang đọc dữ liệu...",
+    "emptyTitle": "Gửi nội dung hoặc ảnh để AI tạo nháp",
+    "emptyDescription": "AI chỉ tạo preview để bạn áp dụng vào màn hiện tại.",
+    "noExistingData": "Form hiện tại đang trống",
+    "merge": "Thêm vào hiện tại",
+    "replace": "Thay thế hiện tại",
+    "errors": {
+      "noPreview": "AI chưa tạo được preview phù hợp cho màn này."
+    },
+    "preview": {
+      "status": "Trạng thái",
+      "matched": "Đã match",
+      "unresolved": "Chưa match",
+      "confidence": "Tin cậy",
+      "supplier": "Nhà cung cấp",
+      "warehouse": "Kho",
+      "item": "Dòng hàng",
+      "quantity": "SL",
+      "noMutationYet": "Chưa thay đổi dữ liệu. Bấm áp dụng chỉ fill nháp vào màn hiện tại."
+    },
+    "purchase": {
+      "open": "AI nhập hàng",
+      "title": "AI nhập hàng",
+      "description": "Gửi yêu cầu hoặc ảnh phiếu nhập. AI tạo preview rồi fill nháp vào phiếu này.",
+      "placeholder": "Ví dụ: Nhập 24 bóng LED 9W mã LED9W giá 18.000 từ 3S LED, nhận vào kho chính...",
+      "submit": "Tạo preview",
+      "apply": "Áp dụng vào phiếu nhập",
+      "existingData": "Phiếu nhập hiện tại đã có dữ liệu"
+    },
+    "pos": {
+      "open": "AI thêm hàng vào giỏ",
+      "title": "AI thêm hàng vào giỏ POS",
+      "description": "Nhập, nói hoặc gửi ảnh đơn hàng. AI chỉ tạo giỏ nháp, không thanh toán.",
+      "placeholder": "Ví dụ: 2 cà phê sữa, 1 bánh mì thịt, 1 nước suối...",
+      "submit": "Tạo giỏ nháp",
+      "apply": "Thêm vào giỏ",
+      "existingData": "Giỏ hiện tại sẽ được giữ nguyên"
+    }
+  },
   "tables": {
     "title": "Quản lý bàn",
     "manage": "Quản lý",

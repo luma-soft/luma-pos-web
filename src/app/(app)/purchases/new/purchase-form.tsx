@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ArrowLeft, Search, Trash2 } from "lucide-react";
@@ -12,9 +12,13 @@ import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
+import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
+import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
+import type { AiQuickActionApplyMode } from "@/components/ai-quick-actions/types";
 import { createPurchase, updatePurchase } from "@/lib/actions/purchases";
 import { resolvePurchaseDraftProducts, searchPurchaseProducts } from "@/lib/actions/purchase-search";
 import type { PurchaseFormOptions, PurchaseProductRow } from "@/lib/data/inventory";
+import type { AiActionPreview } from "@/lib/ai/actions";
 import { AI_WORKFLOW_DRAFT_STORAGE_KEY } from "@/components/ai-assistant/utils";
 
 type PUnit = { unitName: string; multiplier: number };
@@ -27,8 +31,11 @@ type Line = {
 };
 
 type AiWorkflowDraft = {
+  previewId?: string;
   intent?: string;
-  action?: { payload?: Record<string, unknown> };
+  entityType?: string;
+  action?: { type?: string; target?: string; payload?: Record<string, unknown> };
+  fields?: { label: string; value: string; meta?: string; tone?: "default" | "warning" | "danger" | "success" }[];
   lines?: { label?: string; value?: string; meta?: string }[];
   warnings?: string[];
 };
@@ -201,65 +208,114 @@ export function PurchaseForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [aiPendingLines, setAiPendingLines] = useState<AiPendingLine[]>([]);
+  const [aiQuickOpen, setAiQuickOpen] = useState(false);
+  const aiPreviewHydratedRef = useRef(false);
 
   useEffect(() => {
     if (mode !== "create" || !aiPreview) return;
+    if (aiPreviewHydratedRef.current) return;
+    aiPreviewHydratedRef.current = true;
     let cancelled = false;
 
     async function hydrateAiDraft() {
       const raw = window.localStorage.getItem(AI_WORKFLOW_DRAFT_STORAGE_KEY);
       if (!raw) return;
       const draft = JSON.parse(raw) as AiWorkflowDraft;
-      if (draft.intent !== "create_inventory_inbound" && draft.intent !== "create_draft_purchase_order" && draft.intent !== "create_draft_purchase_order_from_restocking") return;
-      const payload = draft.action?.payload ?? {};
-      const pendingLines = pendingLinesFromAiDraft(draft);
-      const itemRows = objectRows(payload.items);
-      const unresolvedRows = objectRows(payload.unresolvedItems);
-      const singleProductRow = typeof payload.productId === "string"
-        ? [{
-            productId: payload.productId,
-            productName: typeof payload.productName === "string" ? payload.productName : null,
-            sku: typeof payload.sku === "string" ? payload.sku : null,
-            quantity: Number(payload.quantity) || 1,
-            unitCost: Number(payload.unitCost) || 0,
-            discount: 0,
-          }]
-        : [];
-      const draftItems = [
-        ...singleProductRow,
-        ...itemRows.map(draftLookupFromRow),
-        ...unresolvedRows.map(draftLookupFromRow),
-        ...pendingLines.map(draftLookupFromPending),
-      ];
-      const resolutions = await resolvePurchaseDraftProducts(draftItems);
       if (cancelled) return;
-      const seenProducts = new Set<string>();
-      const nextLines = resolutions.flatMap((resolution) => {
-        if (!resolution.product || seenProducts.has(resolution.product.id)) return [];
-        seenProducts.add(resolution.product.id);
-        return [productToLine(resolution.product, resolution.seed)];
-      });
-      const unresolvedPending = uniquePendingLines([
-        ...resolutions.flatMap((resolution) => resolution.pending ? [resolution.pending] : []),
-      ]);
-
-      const supplierIdDraft = typeof payload.supplierId === "string" ? payload.supplierId : "";
-      const warehouseIdDraft = typeof payload.warehouseId === "string" ? payload.warehouseId : "";
-      if (supplierIdDraft && options.suppliers.some((supplier) => supplier.id === supplierIdDraft)) setSupplierId(supplierIdDraft);
-      if (warehouseIdDraft && options.warehouses.some((warehouse) => warehouse.id === warehouseIdDraft)) setWarehouseId(warehouseIdDraft);
-      if (nextLines.length) setLines(nextLines);
-      setAiPendingLines(unresolvedPending);
-      if (!nextLines.length && unresolvedPending[0]) setSearch(unresolvedPending[0].sku ?? unresolvedPending[0].label);
-      if (typeof payload.discount === "number") setDiscount(payload.discount);
-      if (typeof payload.vatRate === "number") setVatRate(payload.vatRate);
-      if (typeof payload.invoiceNumber === "string") setInvoiceNumber(payload.invoiceNumber);
-      if (typeof payload.amountPaid === "number") setAmountPaid(payload.amountPaid);
-      if (typeof payload.note === "string") setNote(payload.note);
+      const action = {
+        type: typeof draft.action?.type === "string" ? draft.action.type : "",
+        target: typeof draft.action?.target === "string" ? draft.action.target : "",
+        payload: draft.action?.payload ?? {},
+      };
+      await applyAiPreview({
+        id: draft.previewId ?? "stored-ai-draft",
+        intent: draft.intent ?? "",
+        title: "",
+        description: "",
+        confidence: 0,
+        state: "preview",
+        confirmationRequired: true,
+        entityType: draft.entityType ?? "purchase_order",
+        requiredFields: [],
+        missingFields: [],
+        fields: draft.fields ?? [],
+        lines: (draft.lines ?? []).flatMap((line) => typeof line.label === "string" && typeof line.value === "string" ? [{
+          label: line.label,
+          value: line.value,
+          meta: line.meta,
+        }] : []),
+        warnings: draft.warnings ?? [],
+        action,
+      }, "replace");
     }
 
     hydrateAiDraft().catch(() => {});
     return () => { cancelled = true; };
-  }, [aiPreview, mode, options.suppliers, options.warehouses]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiPreview, mode]);
+
+  async function applyAiPreview(preview: AiActionPreview, applyMode: AiQuickActionApplyMode) {
+    if (preview.intent !== "create_inventory_inbound" && preview.intent !== "create_draft_purchase_order" && preview.intent !== "create_draft_purchase_order_from_restocking") return;
+    const draft: AiWorkflowDraft = {
+      intent: preview.intent,
+      action: preview.action,
+      lines: preview.lines,
+      warnings: preview.warnings,
+    };
+    const payload = draft.action?.payload ?? {};
+    const pendingLines = pendingLinesFromAiDraft(draft);
+    const itemRows = objectRows(payload.items);
+    const unresolvedRows = objectRows(payload.unresolvedItems);
+    const singleProductRow = typeof payload.productId === "string"
+      ? [{
+          productId: payload.productId,
+          productName: typeof payload.productName === "string" ? payload.productName : null,
+          sku: typeof payload.sku === "string" ? payload.sku : null,
+          quantity: Number(payload.quantity) || 1,
+          unitCost: Number(payload.unitCost) || 0,
+          discount: 0,
+        }]
+      : [];
+    const draftItems = [
+      ...singleProductRow,
+      ...itemRows.map(draftLookupFromRow),
+      ...unresolvedRows.map(draftLookupFromRow),
+      ...pendingLines.map(draftLookupFromPending),
+    ];
+    const resolutions = await resolvePurchaseDraftProducts(draftItems);
+    const seenProducts = new Set<string>();
+    const nextLines = resolutions.flatMap((resolution) => {
+      if (!resolution.product || seenProducts.has(resolution.product.id)) return [];
+      seenProducts.add(resolution.product.id);
+      return [productToLine(resolution.product, resolution.seed)];
+    });
+    const unresolvedPending = uniquePendingLines(resolutions.flatMap((resolution) => resolution.pending ? [resolution.pending] : []));
+    const supplierIdDraft = typeof payload.supplierId === "string" ? payload.supplierId : "";
+    const warehouseIdDraft = typeof payload.warehouseId === "string" ? payload.warehouseId : "";
+
+    if (supplierIdDraft && options.suppliers.some((supplier) => supplier.id === supplierIdDraft) && (applyMode === "replace" || !supplierId)) setSupplierId(supplierIdDraft);
+    if (warehouseIdDraft && options.warehouses.some((warehouse) => warehouse.id === warehouseIdDraft) && (applyMode === "replace" || !warehouseId)) setWarehouseId(warehouseIdDraft);
+    if (nextLines.length) {
+      setLines((current) => {
+        if (applyMode === "replace") return nextLines;
+        const byProduct = new Map(current.map((line) => [line.productId, line]));
+        for (const line of nextLines) {
+          const existing = byProduct.get(line.productId);
+          byProduct.set(line.productId, existing
+            ? { ...existing, quantity: existing.quantity + line.quantity, unitCost: line.unitCost || existing.unitCost, discInput: existing.discInput + line.discInput }
+            : line);
+        }
+        return Array.from(byProduct.values());
+      });
+    }
+    setAiPendingLines((current) => applyMode === "replace" ? unresolvedPending : uniquePendingLines([...current, ...unresolvedPending]));
+    if (!nextLines.length && unresolvedPending[0]) setSearch(unresolvedPending[0].sku ?? unresolvedPending[0].label);
+    if (typeof payload.discount === "number" && (applyMode === "replace" || discount === 0)) setDiscount(payload.discount);
+    if (typeof payload.vatRate === "number" && (applyMode === "replace" || vatRate === 0)) setVatRate(payload.vatRate);
+    if (typeof payload.invoiceNumber === "string" && (applyMode === "replace" || !invoiceNumber)) setInvoiceNumber(payload.invoiceNumber);
+    if (typeof payload.amountPaid === "number" && (applyMode === "replace" || amountPaid === 0)) setAmountPaid(payload.amountPaid);
+    if (typeof payload.note === "string" && (applyMode === "replace" || !note)) setNote(payload.note);
+  }
 
   // tìm SP query thẳng DB (bỏ dấu, quét toàn bộ) — giống POS/Sản phẩm
   const [results, setResults] = useState<PurchaseProductRow[]>([]);
@@ -342,6 +398,18 @@ export function PurchaseForm({
       ? t("purchases.copyTitle", { code: purchaseCode ?? "" })
       : t("purchases.createNew");
   const backHref = mode === "edit" && purchaseId ? Routes.purchase(purchaseId) : Routes.Purchases;
+  const defaultSupplierId = initialValues?.supplierId ?? options.suppliers[0]?.id ?? "";
+  const defaultWarehouseId = initialValues?.warehouseId ?? options.warehouses[0]?.id ?? "";
+  const hasAiMergeRisk =
+    lines.length > 0 ||
+    aiPendingLines.length > 0 ||
+    supplierId !== defaultSupplierId ||
+    warehouseId !== defaultWarehouseId ||
+    discount !== (initialValues?.discount ?? 0) ||
+    vatRate !== (initialValues?.vatRate ?? 0) ||
+    invoiceNumber !== (initialValues?.invoiceNumber ?? "") ||
+    amountPaid !== (initialValues?.amountPaid ?? 0) ||
+    note !== (initialValues?.note ?? "");
 
   return (
     <div className="h-dvh flex flex-col">
@@ -356,9 +424,20 @@ export function PurchaseForm({
         {/* trái: tìm + bảng hàng */}
         <div className="flex-1 min-w-0 min-h-[420px] lg:min-h-0 flex flex-col p-3 sm:p-4">
           <div className="relative mb-3">
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("purchases.searchProduct")} leftIcon={<Search />} />
+            <div className="flex gap-2">
+              <div className="min-w-0 flex-1">
+                <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("purchases.searchProduct")} leftIcon={<Search />} className="h-11" />
+              </div>
+              {mode === "create" && (
+                <AiQuickActionButton
+                  onClick={() => setAiQuickOpen(true)}
+                  label={t("aiQuick.purchase.open")}
+                  className="h-11 w-12"
+                />
+              )}
+            </div>
             {results.length > 0 && (
-              <div className="absolute z-20 left-0 right-0 mt-1 max-h-80 overflow-auto bg-surface border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
+              <div className="absolute z-20 left-0 right-14 mt-1 max-h-80 overflow-auto bg-surface border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                 {results.map((p) => (
                   <Button key={p.id} type="button" variant="ghost" block onClick={() => addProduct(p)} className="h-auto justify-between rounded-none px-3 py-2 text-left">
                     <Text as="span" className="min-w-0 text-current">
@@ -508,6 +587,24 @@ export function PurchaseForm({
           <Text as="p" variant="muted" className="text-[11px]" text={t("purchases.receiveHint")} />
         </div>
       </div>
+
+      {mode === "create" && (
+        <AiQuickActionModal
+          open={aiQuickOpen}
+          title={t("aiQuick.purchase.title")}
+          description={t("aiQuick.purchase.description")}
+          placeholder={t("aiQuick.purchase.placeholder")}
+          submitLabel={t("aiQuick.purchase.submit")}
+          applyLabel={t("aiQuick.purchase.apply")}
+          preset="create_inventory_inbound"
+          surface="web"
+          acceptedIntents={["create_inventory_inbound", "create_draft_purchase_order", "create_draft_purchase_order_from_restocking"]}
+          hasExistingData={hasAiMergeRisk}
+          existingDataLabel={t("aiQuick.purchase.existingData")}
+          onClose={() => setAiQuickOpen(false)}
+          onApply={applyAiPreview}
+        />
+      )}
     </div>
   );
 }

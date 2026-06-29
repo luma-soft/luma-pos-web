@@ -929,6 +929,47 @@
       "reports": "Reports"
     }
   },
+  "aiQuick": {
+    "attach": "Attach",
+    "processing": "AI is reading the data...",
+    "emptyTitle": "Send text or an image for AI to draft",
+    "emptyDescription": "AI only creates a preview you can apply to the current screen.",
+    "noExistingData": "The current form is empty",
+    "merge": "Add to current",
+    "replace": "Replace current",
+    "errors": {
+      "noPreview": "AI did not create a preview suitable for this screen."
+    },
+    "preview": {
+      "status": "Status",
+      "matched": "Matched",
+      "unresolved": "Unresolved",
+      "confidence": "Confidence",
+      "supplier": "Supplier",
+      "warehouse": "Warehouse",
+      "item": "Item",
+      "quantity": "Qty",
+      "noMutationYet": "No data has changed. Applying only fills a draft into the current screen."
+    },
+    "purchase": {
+      "open": "AI receive stock",
+      "title": "AI receive stock",
+      "description": "Send a request or purchase document image. AI previews and fills a draft into this receipt.",
+      "placeholder": "Example: Receive 24 LED 9W bulbs SKU LED9W at 18,000 from 3S LED into the main warehouse...",
+      "submit": "Create preview",
+      "apply": "Apply to receipt",
+      "existingData": "The current receipt already has data"
+    },
+    "pos": {
+      "open": "AI add items to cart",
+      "title": "AI add items to POS cart",
+      "description": "Type, speak, or upload an order image. AI only creates a cart draft; it does not checkout.",
+      "placeholder": "Example: 2 milk coffees, 1 pork sandwich, 1 bottled water...",
+      "submit": "Create cart draft",
+      "apply": "Add to cart",
+      "existingData": "The current cart will be kept"
+    }
+  },
   "tables": {
     "title": "Tables",
     "manage": "Manage",
