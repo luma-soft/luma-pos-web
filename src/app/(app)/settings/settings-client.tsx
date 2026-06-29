@@ -901,9 +901,9 @@ function BankSelect({ value, onChange, placeholder }: { value: string; onChange:
             </span>
           </>
         ) : (
-          <span className="text-slate-400">{placeholder}</span>
+          <span className="min-w-0 flex-1 truncate text-slate-400">{placeholder}</span>
         )}
-        <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
+        <ChevronDown className="ml-auto w-4 h-4 shrink-0 text-slate-400" />
       </button>
       {open && (
         <div className="absolute inset-x-0 top-full z-[70] mt-1 overflow-hidden rounded-xl border border-border bg-surface shadow-e2">
