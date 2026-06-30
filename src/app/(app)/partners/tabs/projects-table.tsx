@@ -5,24 +5,15 @@ import { useTranslations } from "next-intl";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency } from "@/lib/utils";
-import { ProjectToggle } from "../../projects/project-widgets";
+import type { ProjectRow } from "@/lib/data/projects";
+import { ProjectEdit, ProjectToggle } from "../../projects/project-widgets";
 
-type ProjectRow = {
-  id: string;
-  name: string;
-  address: string | null;
-  status: string;
-  customerName: string | null;
-  orderCount: number;
-  totalValue: string | number;
-  remaining: string | number;
-};
-
-export function ProjectsTable({ rows }: { rows: ProjectRow[] }) {
+export function ProjectsTable({ rows, customers }: { rows: ProjectRow[]; customers: { id: string; name: string }[] }) {
   const t = useTranslations();
   const columns: DataTableColumn<ProjectRow>[] = [
-    { key: "name", label: t("projects.cols.name"), required: true, render: (row) => <span className="font-semibold text-primary-600">{row.name}</span> },
+    { key: "name", label: t("projects.cols.name"), required: true, render: (row) => <Link href={Routes.project(row.id)} className="font-semibold text-primary-600 hover:underline">{row.name}</Link> },
     { key: "customer", label: t("orders.cols.customer"), defaultVisible: true, render: (row) => row.customerName ?? "—" },
+    { key: "address", label: t("customers.fields.address"), defaultVisible: false, render: (row) => <span className="text-slate-500">{row.address ?? "—"}</span> },
     { key: "orders", label: t("projects.cols.orders"), defaultVisible: true, align: "right", width: "110px", render: (row) => row.orderCount },
     { key: "value", label: t("projects.cols.value"), defaultVisible: true, align: "right", render: (row) => formatCurrency(Number(row.totalValue)) },
     {
@@ -38,9 +29,14 @@ export function ProjectsTable({ rows }: { rows: ProjectRow[] }) {
       key: "actions",
       label: "",
       required: true,
-      width: "88px",
+      width: "132px",
       align: "right",
-      render: (row) => <span onClick={stopRowToggle}><ProjectToggle id={row.id} status={row.status} /></span>,
+      render: (row) => (
+        <span onClick={stopRowToggle} className="inline-flex items-center gap-2">
+          <ProjectEdit project={row} customers={customers} />
+          <ProjectToggle id={row.id} status={row.status} />
+        </span>
+      ),
     },
   ];
 
@@ -61,9 +57,10 @@ export function ProjectsTable({ rows }: { rows: ProjectRow[] }) {
             <Info label={t("orders.cols.remaining")} value={formatCurrency(Number(row.remaining))} tone={Number(row.remaining) > 0 ? "danger" : undefined} />
           </div>
           {row.address && <Info label={t("customers.fields.address")} value={row.address} />}
+          {row.note && <Info label={t("customers.fields.note")} value={row.note} />}
           <div className="flex justify-end">
-            <Link href={`${Routes.Sales}?tab=orders&q=${encodeURIComponent(row.name)}`} className="inline-flex h-9 items-center rounded-lg border border-border px-3 text-sm font-semibold text-primary-600 hover:bg-surface-2">
-              Xem hóa đơn
+            <Link href={Routes.project(row.id)} className="inline-flex h-9 items-center rounded-lg border border-border px-3 text-sm font-semibold text-primary-600 hover:bg-surface-2">
+              {t("projects.viewDetail")}
             </Link>
           </div>
         </div>

@@ -51,6 +51,7 @@ export const Routes = {
   purchaseNewForProduct: (id: string) => `/purchases/new?productId=${id}` as const,
   customer: (id: string) => `/customers/${id}` as const,
   supplier: (id: string) => `/suppliers/${id}` as const,
+  project: (id: string) => `/projects/${id}` as const,
 } as const;
 
 export type Route = typeof Routes[keyof typeof Routes];

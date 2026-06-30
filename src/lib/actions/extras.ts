@@ -18,6 +18,12 @@ const projectSchema = z.object({
 });
 export type CreateProjectInput = z.input<typeof projectSchema>;
 
+const projectUpdateSchema = projectSchema.extend({
+  id: z.uuid(),
+  status: z.enum(["active", "done"]).default("active"),
+});
+export type UpdateProjectInput = z.input<typeof projectUpdateSchema>;
+
 export async function createProject(input: CreateProjectInput): Promise<ActionResult<{ id: string }>> {
   try {
     await requireUser();
@@ -34,6 +40,7 @@ export async function createProject(input: CreateProjectInput): Promise<ActionRe
       address: v.address?.trim() || null,
       note: v.note || null,
     }).returning({ id: projects.id });
+    revalidatePath(Routes.Partners);
     revalidatePath(Routes.Projects);
     return { ok: true, data: { id: row.id } };
   } catch (e) {
@@ -52,7 +59,9 @@ export async function toggleProjectStatus(id: string): Promise<ActionResult> {
     await db.update(projects).set({
       status: sql`case when ${projects.status} = 'active' then 'done' else 'active' end`,
     }).where(eq(projects.id, id));
+    revalidatePath(Routes.Partners);
     revalidatePath(Routes.Projects);
+    revalidatePath(Routes.project(id));
     return { ok: true, data: undefined };
   } catch (e) {
     console.error("toggleProjectStatus failed:", e);
@@ -122,6 +131,29 @@ export async function generatePortalToken(customerId: string): Promise<ActionRes
     return { ok: true, data: { token } };
   } catch (e) {
     console.error("generatePortalToken failed:", e);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function updateProject(input: UpdateProjectInput): Promise<ActionResult> {
+  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const parsed = projectUpdateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const v = parsed.data;
+  try {
+    await db.update(projects).set({
+      name: v.name.trim(),
+      customerId: v.customerId ?? null,
+      address: v.address?.trim() || null,
+      note: v.note?.trim() || null,
+      status: v.status,
+    }).where(eq(projects.id, v.id));
+    revalidatePath(Routes.Partners);
+    revalidatePath(Routes.Projects);
+    revalidatePath(Routes.project(v.id));
+    return { ok: true, data: undefined };
+  } catch (e) {
+    console.error("updateProject failed:", e);
     return { ok: false, error: "errors.serverError" };
   }
 }

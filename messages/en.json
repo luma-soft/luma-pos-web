@@ -1830,6 +1830,9 @@
     "createNew": "New project",
     "empty": "No projects yet",
     "emptyHint": "Create projects to attach to POS sales.",
+    "editTitle": "Edit project",
+    "viewDetail": "View detail",
+    "relatedOrders": "Related orders / quotes",
     "cols": {
       "name": "Project",
       "orders": "Orders",

@@ -1830,6 +1830,9 @@
     "createNew": "Thêm công trình",
     "empty": "Chưa có công trình nào",
     "emptyHint": "Tạo công trình để gắn vào đơn khi bán ở POS.",
+    "editTitle": "Sửa công trình",
+    "viewDetail": "Xem chi tiết",
+    "relatedOrders": "Đơn / báo giá liên quan",
     "cols": {
       "name": "Công trình",
       "orders": "Số đơn",

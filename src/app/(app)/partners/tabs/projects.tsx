@@ -1,20 +1,16 @@
 import { getTranslations } from "next-intl/server";
-import { asc, desc, eq, sql } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { Building2 } from "lucide-react";
 import { db } from "@/db";
-import { customers, orders, projects } from "@/db/schema";
+import { customers } from "@/db/schema";
+import { getProjectRows } from "@/lib/data/projects";
 import { ProjectQuickCreate } from "../../projects/project-widgets";
 import { ProjectsTable } from "./projects-table";
 
 export async function ProjectsTab() {
   const t = await getTranslations();
   const [rows, customerOptions] = await Promise.all([
-    db.select({
-      id: projects.id, name: projects.name, address: projects.address, status: projects.status, customerName: customers.name,
-      orderCount: sql<number>`(select count(*) from ${orders} where ${orders.projectId} = ${projects.id} and ${orders.status} != 'cancelled')::int`,
-      totalValue: sql<string>`coalesce((select sum(${orders.total}) from ${orders} where ${orders.projectId} = ${projects.id} and ${orders.status} not in ('cancelled','quote','merged')), 0)`,
-      remaining: sql<string>`coalesce((select sum(${orders.total} - ${orders.amountPaid}) from ${orders} where ${orders.projectId} = ${projects.id} and ${orders.status} = 'completed'), 0)`,
-    }).from(projects).leftJoin(customers, eq(projects.customerId, customers.id)).orderBy(desc(projects.createdAt)),
+    getProjectRows(),
     db.select({ id: customers.id, name: customers.name }).from(customers).where(eq(customers.isActive, true)).orderBy(asc(customers.name)).limit(300),
   ]);
 
@@ -32,7 +28,7 @@ export async function ProjectsTab() {
           <p className="text-sm mt-1">{t("projects.emptyHint")}</p>
         </div>
       ) : (
-        <ProjectsTable rows={rows} />
+        <ProjectsTable rows={rows} customers={customerOptions} />
       )}
     </>
   );
