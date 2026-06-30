@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Search, Plus, Minus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, ChevronDown, Printer, MoreVertical, CheckCircle2 } from "lucide-react";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
@@ -80,6 +79,7 @@ type PosPrintPaymentQr = {
   reference: string;
 };
 type PosPrintJob = {
+  template: PrintTemplate;
   title: string;
   code: string;
   date: string;
@@ -346,18 +346,20 @@ function currentTimestamp(): number {
 export function PosClient({
   data,
   printTemplate,
+  quotePrintTemplate,
   initialSourceInvoice,
 }: {
   data: PosData;
   printTemplate: PrintTemplate;
+  quotePrintTemplate: PrintTemplate;
   initialSourceInvoice?: PosSourceInvoice | null;
 }) {
   const t = useTranslations();
-  const router = useRouter();
 
   const [sourceInvoice] = useState<PosSourceInvoice | null>(initialSourceInvoice ?? null);
   const [search, setSearch] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [submittingMode, setSubmittingMode] = useState<"sale" | "quote" | null>(null);
+  const submitting = submittingMode !== null;
   const [error, setError] = useState("");
   const [sepayCheckout, setSepayCheckout] = useState<SepayCheckout | null>(null);
   // kéo thả: sắp xếp dòng trong giỏ + thả SP từ danh sách vào giỏ
@@ -657,8 +659,9 @@ export function PosClient({
     setPrintMenuOpen(false);
   }
 
-  function buildPrintJob(input: { title: string; code: string; paymentQr?: PosPrintPaymentQr | null }): PosPrintJob {
+  function buildPrintJob(input: { template: PrintTemplate; title: string; code: string; paymentQr?: PosPrintPaymentQr | null }): PosPrintJob {
     return {
+      template: input.template,
       title: input.title,
       code: input.code,
       date: new Date().toISOString(),
@@ -925,13 +928,13 @@ export function PosClient({
       })),
       payment: { method: payMethod, amount: mode === "quote" || payMethod === "bank_transfer" ? 0 : paid },
     };
-    setSubmitting(true);
+    setSubmittingMode(mode);
     setError("");
 
     // offline → xếp hàng chờ đồng bộ
     if (typeof navigator !== "undefined" && !navigator.onLine) {
       if (payMethod === "bank_transfer") {
-        setSubmitting(false);
+        setSubmittingMode(null);
         setError(t("pos.sepay.onlineRequired"));
         return;
       }
@@ -953,10 +956,10 @@ export function PosClient({
           });
           const paymentJson = await paymentRes.json() as {
             ok: boolean;
-            data?: Omit<SepayCheckout, "orderId" | "orderCode">;
+            data?: Omit<SepayCheckout, "orderId" | "orderCode" | "printJob">;
             error?: string;
           };
-          setSubmitting(false);
+          setSubmittingMode(null);
           if (!paymentJson.ok || !paymentJson.data) {
             setError(paymentJson.error ? t(paymentJson.error) : t("pos.sepay.createFailed"));
             return;
@@ -974,6 +977,7 @@ export function PosClient({
             reference: paymentJson.data.reference,
           };
           const printJob = buildPrintJob({
+            template: printTemplate,
             title: t("print.titles.order"),
             code: res.data.code,
             paymentQr,
@@ -983,20 +987,20 @@ export function PosClient({
           return;
         }
         const printJob = buildPrintJob({
+          template: mode === "quote" ? quotePrintTemplate : printTemplate,
           title: mode === "quote" ? t("print.titles.quote") : t("print.titles.order"),
           code: res.data.code,
         });
-        setSubmitting(false);
+        setSubmittingMode(null);
         closeInvoice(activeId);
-        if (mode === "quote") router.push(Routes.Quotes);
-        else startPrint(printJob);
+        startPrint(printJob, mode === "quote" ? quotePrintTemplate.paperDefault : printDefaultSize);
       } else {
-        setSubmitting(false);
+        setSubmittingMode(null);
         setError(t(res.error));
       }
     } catch {
       if (payMethod === "bank_transfer") {
-        setSubmitting(false);
+        setSubmittingMode(null);
         setError(t("pos.sepay.createFailed"));
         return;
       }
@@ -1009,7 +1013,7 @@ export function PosClient({
   async function queueOffline(payload: Parameters<typeof createOrder>[0]) {
     // localId = clientId của đơn → sync lại dùng đúng clientId, server khử trùng.
     await enqueueOrder({ localId: payload.clientId ?? makeClientId(), payload, savedAt: currentTimestamp() });
-    setSubmitting(false);
+    setSubmittingMode(null);
     setPending((c) => c + 1);
     closeInvoice(activeId);
     setOfflineSaved(true);
@@ -1021,6 +1025,7 @@ export function PosClient({
   const doPrint = (size: PaperSize) => {
     const code = makeTempSlipCode();
     startPrint(buildPrintJob({
+      template: printTemplate,
       title: t("pos.tempSlipTitle"),
       code,
       paymentQr: payMethod === "bank_transfer" && data.defaultBankAccount
@@ -1631,14 +1636,14 @@ export function PosClient({
               onClick={() => submitOrder("quote")}
               className="px-3 py-3 rounded-xl border border-border text-sm font-medium disabled:opacity-50 whitespace-nowrap"
             >
-              📑 {t("pos.saveQuote")}
+              {submittingMode === "quote" ? <Loader2 className="mr-1 inline h-4 w-4 animate-spin align-[-2px]" /> : "📑"} {t("pos.saveQuote")}
             </button>
             <button
               disabled={cart.length === 0 || submitting || !data.warehouse || !!sepayCheckout}
               onClick={checkout}
               className="flex-1 py-3 rounded-xl bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2"
             >
-              {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+              {submittingMode === "sale" && <Loader2 className="w-4 h-4 animate-spin" />}
               {isEditMode ? t("pos.invoiceEdit.saveEdited") : isCopyMode ? t("pos.invoiceEdit.createCopy") : t("pos.checkout")} · {formatCurrency(total)}
             </button>
           </div>
@@ -1695,7 +1700,7 @@ export function PosClient({
       {printSize && printJob && createPortal(
         <div className="pos-print-root">
           <PrintDoc
-            template={printTemplate}
+            template={printJob.template}
             size={printSize}
             title={printJob.title}
             code={printJob.code}
@@ -1718,7 +1723,7 @@ export function PosClient({
             grandTotalLabel={t("print.grandTotal")}
             grandTotal={printJob.grandTotal}
             paymentQr={printJob.paymentQr}
-            afterTotals={printTemplate.options.showDebt && printJob.payMethod !== "credit" && printJob.paid > 0
+            afterTotals={printJob.template.options.showDebt && printJob.payMethod !== "credit" && printJob.paid > 0
               ? [
                   { label: t("print.paid"), value: printJob.paid },
                   ...(printJob.remaining > 0 ? [{ label: t("print.remaining"), value: printJob.remaining, bold: true }] : []),

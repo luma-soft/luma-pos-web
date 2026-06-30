@@ -62,10 +62,11 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
     ...(sourceInvoice?.items?.map((item) => item.productId) ?? []),
     ...aiProductIds,
   ];
-  const [data, t, printTemplate] = await Promise.all([
+  const [data, t, orderPrintTemplate, quotePrintTemplate] = await Promise.all([
     getPosData({ includeProductIds }),
     getTranslations(),
     getPrintTemplate("order"),
+    getPrintTemplate("quote"),
   ]);
   return (
     <div className="h-full flex flex-col">
@@ -89,7 +90,12 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
         </Link>
       </header>
       <div className="flex-1 min-h-0">
-        <PosClient data={data} printTemplate={printTemplate} initialSourceInvoice={sourceInvoice} />
+        <PosClient
+          data={data}
+          printTemplate={orderPrintTemplate}
+          quotePrintTemplate={quotePrintTemplate}
+          initialSourceInvoice={sourceInvoice}
+        />
       </div>
     </div>
   );
