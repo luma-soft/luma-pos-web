@@ -29,7 +29,7 @@ export default async function PrintReturnPage({ params, searchParams }: Props) {
   return (
     <div className="min-h-screen bg-slate-200 dark:bg-slate-950 print:bg-white">
       <PrintToolbar
-        backHref={ret.orderId ? Routes.order(ret.orderId) : Routes.Orders}
+        backHref={ret.orderId ? Routes.salesOrder(ret.orderId, "completed") : Routes.Sales}
         baseHref={`/returns/${ret.id}/print`}
         size={size}
         templates={templates}

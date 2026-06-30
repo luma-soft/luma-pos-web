@@ -68,7 +68,7 @@ export async function OrderDetailPanel({
     });
     return `${Routes.POS}?${sp.toString()}`;
   };
-  const openInListHref = `${Routes.Sales}?tab=orders&orderId=${encodeURIComponent(order.id)}&expandedOrder=${encodeURIComponent(order.id)}`;
+  const openInListHref = Routes.salesOrder(order.id, order.status);
   const canSendZalo = Boolean(store.prefs.zalo.enabled && store.prefs.zalo.accessTokenSet && store.prefs.zalo.invoiceTemplateId && order.customerPhone);
 
   return (

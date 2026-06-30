@@ -19,7 +19,7 @@ export function MergeConfirm({ ids, disabled }: { ids: string[]; disabled: boole
     setError("");
     const res = await mergeOrders(ids);
     setBusy(false);
-    if (res.ok) router.push(Routes.order(res.data.id));
+    if (res.ok) router.push(Routes.salesOrder(res.data.id, "completed"));
     else setError(t(res.error as never));
   }
 

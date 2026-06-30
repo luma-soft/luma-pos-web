@@ -1404,7 +1404,7 @@ export function PosClient({
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <Link
-                    href={sourceInvoice.id ? Routes.order(sourceInvoice.id) : Routes.Orders}
+                    href={sourceInvoice.id ? Routes.salesOrder(sourceInvoice.id, sourceInvoice.kind === "quote" ? "quote" : sourceInvoice.kind === "booking" ? "confirmed" : "completed") : Routes.Sales}
                     target="_blank"
                     className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 px-3 text-xs font-semibold text-slate-600")}
                   >

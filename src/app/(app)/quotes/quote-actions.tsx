@@ -31,7 +31,7 @@ export function QuoteCreateOrderButton({
     setBusy(true);
     const res = await convertQuoteToOrder(quoteId);
     setBusy(false);
-    if (res.ok) router.push(Routes.order(quoteId));
+    if (res.ok) router.push(Routes.salesOrder(quoteId, "completed"));
     else await dialog.alert({ description: t(res.error as never), variant: "destructive" });
   }
 
@@ -73,7 +73,7 @@ export function BookingCreateOrderButton({
     setBusy(true);
     const res = await convertQuoteToOrder(bookingId);
     setBusy(false);
-    if (res.ok) router.push(Routes.order(bookingId));
+    if (res.ok) router.push(Routes.salesOrder(bookingId, "completed"));
     else await dialog.alert({ description: t(res.error as never), variant: "destructive" });
   }
 

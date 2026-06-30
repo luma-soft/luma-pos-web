@@ -63,7 +63,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                   const remaining = Number(order.total) - Number(order.amountPaid);
                   return (
                     <tr key={order.id}>
-                      <td className="px-4 py-3"><Link href={Routes.order(order.id)} className="font-semibold text-primary-600 hover:underline">{order.code}</Link></td>
+                      <td className="px-4 py-3"><Link href={Routes.salesOrder(order.id, order.status)} className="font-semibold text-primary-600 hover:underline">{order.code}</Link></td>
                       <td className="px-4 py-3 text-slate-500">{formatDate(order.createdAt)}</td>
                       <td className="px-4 py-3">{order.customerName ?? t("orders.walkIn")}</td>
                       <td className="px-4 py-3"><div className="flex flex-wrap gap-1.5"><OrderStatusBadge status={order.status} /><PaymentStatusBadge status={order.paymentStatus} /></div></td>

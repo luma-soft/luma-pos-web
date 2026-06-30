@@ -67,7 +67,7 @@ export default async function PrintOrderPage({ params, searchParams }: Props) {
 
   return (
     <div className="min-h-screen bg-slate-200 dark:bg-slate-950 print:bg-white">
-      <PrintToolbar backHref={Routes.order(order.id)} baseHref={`${Routes.order(order.id)}/print`} size={size} templates={templates} selectedTemplateId={template.id} />
+      <PrintToolbar backHref={Routes.salesOrder(order.id, order.status)} baseHref={`${Routes.order(order.id)}/print`} size={size} templates={templates} selectedTemplateId={template.id} />
       <div className="py-8 print:py-0 flex justify-center">
         <PrintDoc
           template={template}

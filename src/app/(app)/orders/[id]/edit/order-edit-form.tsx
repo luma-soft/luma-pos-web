@@ -80,7 +80,7 @@ export function OrderEditForm({ orderId, orderCode, initial, productOptions }: P
       items: items.filter((l) => l.quantity > 0),
     });
     setBusy(false);
-    if (res.ok) router.push(Routes.order(orderId));
+    if (res.ok) router.push(Routes.salesOrder(orderId, "completed"));
     else setError(t(res.error as never));
   }
 
@@ -89,7 +89,7 @@ export function OrderEditForm({ orderId, orderCode, initial, productOptions }: P
   return (
     <div className="p-4 sm:p-6 max-w-4xl">
       <div className="flex items-center gap-3 mb-5">
-        <button onClick={() => router.push(Routes.order(orderId))} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+        <button onClick={() => router.push(Routes.salesOrder(orderId, "completed"))} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
           <ArrowLeft className="w-4 h-4" />
         </button>
         <h1 className="text-2xl font-bold">{t("orderEdit.title", { code: orderCode })}</h1>

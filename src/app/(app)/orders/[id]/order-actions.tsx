@@ -9,6 +9,7 @@ import { sendOrderInvoiceZalo } from "@/lib/actions/zalo";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { MoneyInput } from "@/components/ui/money-input";
 import { formatCurrency, cn } from "@/lib/utils";
+import { Routes } from "@/lib/routes";
 
 export function OrderActions({ orderId }: { orderId: string }) {
   const t = useTranslations();
@@ -52,7 +53,7 @@ export function SendOrderZaloButton({ orderId }: { orderId: string }) {
     if (busy) return;
     setBusy(true);
     setStatus("");
-    const url = typeof window === "undefined" ? undefined : `${window.location.origin}/orders/${orderId}`;
+    const url = typeof window === "undefined" ? undefined : `${window.location.origin}${Routes.salesOrder(orderId, "completed")}`;
     const res = await sendOrderInvoiceZalo({ orderId, url });
     setBusy(false);
     setStatus(res.ok ? t("zalo.sent") : t(res.error as never));

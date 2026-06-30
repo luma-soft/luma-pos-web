@@ -7,6 +7,7 @@ import { Bot, CheckCircle2, Clock, ExternalLink, ShieldAlert, UserRound, XCircle
 import { Button } from "@/components/ui/button";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { cn, formatDate } from "@/lib/utils";
+import { Routes } from "@/lib/routes";
 import type { AuditSource, AuditStatus, getAuditLogs } from "@/lib/audit";
 
 type AuditRow = Awaited<ReturnType<typeof getAuditLogs>>[number];
@@ -104,7 +105,8 @@ function recordHref(record: Record<string, unknown>) {
   if (!id || id === "draft") return null;
   if (type === "product") return `/inventory?tab=products&expanded=${id}`;
   if (type === "customer") return `/partners?tab=customers&expandedCustomer=${id}`;
-  if (type === "order" || type === "invoice" || type === "quote") return `/sales?tab=orders&orderId=${id}&expandedOrder=${id}`;
+  if (type === "quote") return Routes.salesOrder(id, "quote");
+  if (type === "order" || type === "invoice") return Routes.salesOrder(id, "completed");
   if (type === "purchase_order" || type === "purchase" || type === "inbound") return `/inventory?tab=purchases&expanded=${id}`;
   if (type === "supplier") return `/partners?tab=suppliers&expanded=${id}`;
   if (type === "pos_cart_draft") return "/pos";
