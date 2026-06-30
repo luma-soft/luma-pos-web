@@ -18,9 +18,9 @@ const GROUPS: Group[] = [
   {
     labelKey: "nav.groups.overview",
     items: [
+      { href: Routes.Dashboard, icon: LayoutDashboard, key: "nav.dashboard" },
       { href: Routes.Notifications, icon: Bell, key: "nav.notifications", badge: "notifications" },
       { href: Routes.Reports, icon: BarChart3, key: "nav.reports" },
-      { href: Routes.Dashboard, icon: LayoutDashboard, key: "nav.dashboard" },
       { href: Routes.POS, icon: ShoppingCart, key: "nav.pos" },
     ],
   },
