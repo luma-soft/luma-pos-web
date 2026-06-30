@@ -307,9 +307,9 @@ function ColumnVisibilityMenu<T>({
       {open && (
         <>
           <button type="button" className="fixed inset-0 z-30 cursor-default" aria-label="Đóng chọn cột" onClick={() => onOpenChange(false)} />
-          <div className="absolute right-0 top-full z-40 mt-2 w-[320px] rounded-card border border-border-soft bg-surface p-3 text-left shadow-e2">
+          <div className="absolute right-0 top-full z-40 mt-2 w-[300px] rounded-card border border-border-soft bg-surface p-3 text-left shadow-e2">
             <div className="mb-2 flex items-center justify-between gap-3">
-              <div className="text-sm font-bold">Thông tin hiển thị</div>
+              <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Thông tin hiển thị</div>
               <button type="button" onClick={() => onOpenChange(false)} className="rounded-md p-1 text-slate-400 hover:bg-surface-2 hover:text-slate-700">
                 <X className="h-4 w-4" />
               </button>
@@ -321,8 +321,8 @@ function ColumnVisibilityMenu<T>({
                   <label
                     key={column.key}
                     className={cn(
-                      "flex min-w-0 items-center gap-2 rounded-lg px-2 py-2 text-sm",
-                      column.required ? "text-slate-400" : "cursor-pointer hover:bg-surface-2",
+                      "flex min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium",
+                      column.required ? "text-slate-400" : "cursor-pointer text-slate-600 hover:bg-surface-2 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100",
                     )}
                   >
                     <input
@@ -330,7 +330,7 @@ function ColumnVisibilityMenu<T>({
                       checked={checked}
                       disabled={column.required}
                       onChange={() => onToggle(column.key)}
-                      className="h-4 w-4 rounded border-slate-300 accent-primary-600"
+                      className="h-3.5 w-3.5 rounded border-slate-300 accent-primary-600"
                     />
                     <span className="truncate">{column.label}</span>
                   </label>
@@ -338,7 +338,7 @@ function ColumnVisibilityMenu<T>({
               })}
             </div>
             <div className="mt-3 border-t border-border-soft pt-2 text-right">
-              <button type="button" onClick={onReset} className="text-xs font-semibold text-primary-600 hover:underline">
+              <button type="button" onClick={onReset} className="text-xs font-medium text-primary-600 hover:underline">
                 Đặt lại mặc định
               </button>
             </div>
