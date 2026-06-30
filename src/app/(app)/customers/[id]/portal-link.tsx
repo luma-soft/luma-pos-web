@@ -3,14 +3,17 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Link2, Loader2 } from "lucide-react";
+import { Link2, Loader2, MessageCircle } from "lucide-react";
 import { generatePortalToken } from "@/lib/actions/extras";
+import { sendCustomerPortalZalo } from "@/lib/actions/zalo";
 
-export function PortalLink({ customerId, token }: { customerId: string; token: string | null }) {
+export function PortalLink({ customerId, token, zaloConfigured }: { customerId: string; token: string | null; zaloConfigured: boolean }) {
   const t = useTranslations();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [sendingZalo, setSendingZalo] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [status, setStatus] = useState("");
 
   const url = token && typeof window !== "undefined" ? `${window.location.origin}/portal/${token}` : null;
 
@@ -28,6 +31,15 @@ export function PortalLink({ customerId, token }: { customerId: string; token: s
     setTimeout(() => setCopied(false), 1500);
   }
 
+  async function sendZalo() {
+    if (!url || sendingZalo) return;
+    setSendingZalo(true);
+    setStatus("");
+    const res = await sendCustomerPortalZalo({ customerId, url });
+    setSendingZalo(false);
+    setStatus(res.ok ? t("zalo.sent") : t(res.error as never));
+  }
+
   return (
     <div className="bg-surface border border-border rounded-card p-4 text-sm">
       <h2 className="font-semibold mb-2 flex items-center gap-2"><Link2 className="w-4 h-4" />{t("portal.linkTitle")}</h2>
@@ -41,8 +53,15 @@ export function PortalLink({ customerId, token }: { customerId: string; token: s
             <button onClick={generate} disabled={busy} className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium disabled:opacity-50">
               {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : t("portal.regenerate")}
             </button>
+            {zaloConfigured && (
+              <button onClick={sendZalo} disabled={sendingZalo} className="px-3 py-1.5 rounded-lg border border-border text-xs font-medium disabled:opacity-50 inline-flex items-center gap-1.5">
+                {sendingZalo ? <Loader2 className="w-3 h-3 animate-spin" /> : <MessageCircle className="w-3 h-3" />}
+                {t("zalo.send")}
+              </button>
+            )}
           </div>
           <p className="text-[11px] text-slate-400 mt-2">{t("portal.hint")}</p>
+          {status && <p className="text-[11px] text-slate-500 mt-2">{status}</p>}
         </>
       ) : (
         <>

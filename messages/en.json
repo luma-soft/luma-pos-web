@@ -534,6 +534,17 @@
     "serverError": "Something went wrong, please retry.",
     "forbidden": "You don't have permission for this action."
   },
+  "zalo": {
+    "send": "Send Zalo",
+    "sent": "Zalo sent",
+    "errors": {
+      "notEnabled": "Zalo OA is not enabled.",
+      "missingAccessToken": "OA access token is missing.",
+      "missingTemplate": "ZNS template is not configured.",
+      "missingPhone": "Customer has no phone number.",
+      "sendFailed": "Could not send Zalo message."
+    }
+  },
   "ai": {
     "restockTab": "Smart restocking",
     "assistantTab": "Assistant",
@@ -1664,6 +1675,7 @@
       "print": "Print",
       "tax": "Tax",
       "notifications": "Notifications",
+      "zalo": "Zalo OA",
       "ai": "AI"
     },
     "payments": {

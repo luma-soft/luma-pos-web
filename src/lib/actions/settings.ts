@@ -9,6 +9,7 @@ import {
   paymentBankAccountInputSchema,
   storeSettingsSchema,
   storePrefsPatchSchema,
+  zaloSettingsInputSchema,
   parseStorePrefs,
   STAFF_ROLES,
   type AiSettingsInput,
@@ -16,6 +17,7 @@ import {
   type StoreSettingsInput,
   type StaffRole,
   type StorePrefsPatch,
+  type ZaloSettingsInput,
 } from "@/lib/schemas/settings";
 import { writeAuditLog } from "@/lib/audit";
 import { buildAiProviderConfig, completeAiText, completeAiVision } from "@/lib/ai/provider-adapter";
@@ -157,6 +159,88 @@ export async function updateAiSettings(input: AiSettingsInput): Promise<ActionRe
     return { ok: true, data: undefined };
   } catch (e) {
     console.error("updateAiSettings failed:", e);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function updateZaloSettings(input: ZaloSettingsInput): Promise<ActionResult> {
+  const gate = await requireOwner();
+  if (!gate.ok) return gate;
+  const parsed = zaloSettingsInputSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const v = parsed.data;
+  try {
+    const [row] = await db.select({ prefs: storeSettings.prefs }).from(storeSettings).where(eq(storeSettings.id, "default")).limit(1);
+    const current = parseStorePrefs(row?.prefs);
+    const nextAppSecret = v.clearAppSecret ? "" : (v.appSecret?.trim() || current.zalo.appSecret);
+    const nextAccessToken = v.clearAccessToken ? "" : (v.accessToken?.trim() || current.zalo.accessToken);
+    const nextRefreshToken = v.clearRefreshToken ? "" : (v.refreshToken?.trim() || current.zalo.refreshToken);
+    const nextWebhookSecret = v.clearWebhookSecret ? "" : (v.webhookSecret?.trim() || current.zalo.webhookSecret);
+    const nextZalo = {
+      ...current.zalo,
+      enabled: v.enabled,
+      oaId: v.oaId,
+      appId: v.appId,
+      appSecret: nextAppSecret,
+      appSecretSet: Boolean(nextAppSecret),
+      accessToken: nextAccessToken,
+      accessTokenSet: Boolean(nextAccessToken),
+      refreshToken: nextRefreshToken,
+      refreshTokenSet: Boolean(nextRefreshToken),
+      webhookSecret: nextWebhookSecret,
+      webhookSecretSet: Boolean(nextWebhookSecret),
+      portalTemplateId: v.portalTemplateId,
+      invoiceTemplateId: v.invoiceTemplateId,
+      debtTemplateId: v.debtTemplateId,
+    };
+    const next = { ...current, zalo: nextZalo };
+    await db.insert(storeSettings)
+      .values({ id: "default", prefs: next })
+      .onConflictDoUpdate({ target: storeSettings.id, set: { prefs: next, updatedAt: sql`now()` } });
+    await writeAuditLog({
+      actorUserId: gate.userId,
+      source: "manual",
+      action: "update_zalo_settings",
+      entityType: "store_settings",
+      entityId: "default",
+      status: "succeeded",
+      before: {
+        enabled: current.zalo.enabled,
+        oaId: current.zalo.oaId,
+        appId: current.zalo.appId,
+        appSecretSet: Boolean(current.zalo.appSecret),
+        accessTokenSet: Boolean(current.zalo.accessToken),
+        refreshTokenSet: Boolean(current.zalo.refreshToken),
+        webhookSecretSet: Boolean(current.zalo.webhookSecret),
+        portalTemplateId: current.zalo.portalTemplateId,
+        invoiceTemplateId: current.zalo.invoiceTemplateId,
+        debtTemplateId: current.zalo.debtTemplateId,
+      },
+      after: {
+        enabled: nextZalo.enabled,
+        oaId: nextZalo.oaId,
+        appId: nextZalo.appId,
+        appSecretSet: Boolean(nextZalo.appSecret),
+        accessTokenSet: Boolean(nextZalo.accessToken),
+        refreshTokenSet: Boolean(nextZalo.refreshToken),
+        webhookSecretSet: Boolean(nextZalo.webhookSecret),
+        portalTemplateId: nextZalo.portalTemplateId,
+        invoiceTemplateId: nextZalo.invoiceTemplateId,
+        debtTemplateId: nextZalo.debtTemplateId,
+      },
+      metadata: {
+        secretsChanged: [
+          v.clearAppSecret || Boolean(v.appSecret?.trim()) ? "appSecret" : null,
+          v.clearAccessToken || Boolean(v.accessToken?.trim()) ? "accessToken" : null,
+          v.clearRefreshToken || Boolean(v.refreshToken?.trim()) ? "refreshToken" : null,
+          v.clearWebhookSecret || Boolean(v.webhookSecret?.trim()) ? "webhookSecret" : null,
+        ].filter(Boolean),
+      },
+    });
+    revalidatePath(Routes.Settings);
+    return { ok: true, data: undefined };
+  } catch (e) {
+    console.error("updateZaloSettings failed:", e);
     return { ok: false, error: "errors.serverError" };
   }
 }

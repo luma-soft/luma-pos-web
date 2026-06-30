@@ -816,6 +816,29 @@ export const aiUsageEvents = pgTable("ai_usage_events", {
   index("ai_usage_events_provider_idx").on(t.provider, t.model),
 ]);
 
+// ============= Zalo OA / ZNS message log =============
+
+export const zaloMessageEvents = pgTable("zalo_message_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  kind: text("kind").notNull(),
+  status: text("status").notNull().default("pending"),
+  customerId: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
+  orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+  invoiceId: uuid("invoice_id").references(() => einvoices.id, { onDelete: "set null" }),
+  phone: varchar("phone", { length: 30 }),
+  templateId: varchar("template_id", { length: 80 }),
+  zaloMessageId: text("zalo_message_id"),
+  payloadSummary: jsonb("payload_summary").$type<Record<string, unknown> | null>(),
+  errorCode: text("error_code"),
+  errorMessage: text("error_message"),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("zalo_message_events_kind_status_idx").on(t.kind, t.status, t.createdAt),
+  index("zalo_message_events_customer_idx").on(t.customerId, t.createdAt),
+  index("zalo_message_events_order_idx").on(t.orderId, t.createdAt),
+]);
+
 // ============= Internal-Use Issue (Xuất dùng nội bộ — Part 8.1) =============
 // Phiếu xuất hàng dùng nội bộ (không bán): trừ kho theo giá vốn → COGS, không doanh thu.
 

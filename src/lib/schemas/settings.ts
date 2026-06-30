@@ -87,6 +87,23 @@ const aiPrefs = z.object({
   monthlyUsageLimit: z.number().int().min(0).max(100000).default(1000),
 });
 
+const zaloPrefs = z.object({
+  enabled: z.boolean().default(false),
+  oaId: z.string().trim().max(80).default(""),
+  appId: z.string().trim().max(80).default(""),
+  appSecret: z.string().trim().max(500).default(""),
+  appSecretSet: z.boolean().default(false),
+  accessToken: z.string().trim().max(2000).default(""),
+  accessTokenSet: z.boolean().default(false),
+  refreshToken: z.string().trim().max(2000).default(""),
+  refreshTokenSet: z.boolean().default(false),
+  webhookSecret: z.string().trim().max(500).default(""),
+  webhookSecretSet: z.boolean().default(false),
+  portalTemplateId: z.string().trim().max(80).default(""),
+  invoiceTemplateId: z.string().trim().max(80).default(""),
+  debtTemplateId: z.string().trim().max(80).default(""),
+});
+
 export const storePrefsSchema = z.object({
   tax: taxPrefs.default({ defaultRate: 8, priceIncludesTax: false, einvoiceEnabled: false, einvoiceProvider: "VNPT", einvoiceTaxId: "" }),
   payments: paymentPrefs.default({ cash: true, qr: true, momo: false, zalopay: false, vnpay: false, card: false }),
@@ -102,6 +119,22 @@ export const storePrefsSchema = z.object({
     openaiVisionModel: "gemini-2.5-flash",
     attachmentsBucket: "ai-attachments",
     monthlyUsageLimit: 1000,
+  }),
+  zalo: zaloPrefs.default({
+    enabled: false,
+    oaId: "",
+    appId: "",
+    appSecret: "",
+    appSecretSet: false,
+    accessToken: "",
+    accessTokenSet: false,
+    refreshToken: "",
+    refreshTokenSet: false,
+    webhookSecret: "",
+    webhookSecretSet: false,
+    portalTemplateId: "",
+    invoiceTemplateId: "",
+    debtTemplateId: "",
   }),
 });
 export type StorePrefs = z.infer<typeof storePrefsSchema>;
@@ -126,6 +159,24 @@ export const aiSettingsInputSchema = z.object({
   monthlyUsageLimit: z.number().int().min(0).max(100000).default(1000),
 });
 export type AiSettingsInput = z.input<typeof aiSettingsInputSchema>;
+
+export const zaloSettingsInputSchema = z.object({
+  enabled: z.boolean().default(false),
+  oaId: z.string().trim().max(80).default(""),
+  appId: z.string().trim().max(80).default(""),
+  appSecret: z.string().trim().max(500).optional(),
+  clearAppSecret: z.boolean().default(false),
+  accessToken: z.string().trim().max(2000).optional(),
+  clearAccessToken: z.boolean().default(false),
+  refreshToken: z.string().trim().max(2000).optional(),
+  clearRefreshToken: z.boolean().default(false),
+  webhookSecret: z.string().trim().max(500).optional(),
+  clearWebhookSecret: z.boolean().default(false),
+  portalTemplateId: z.string().trim().max(80).default(""),
+  invoiceTemplateId: z.string().trim().max(80).default(""),
+  debtTemplateId: z.string().trim().max(80).default(""),
+});
+export type ZaloSettingsInput = z.input<typeof zaloSettingsInputSchema>;
 
 export const paymentBankAccountInputSchema = z.object({
   id: z.string().uuid().optional(),

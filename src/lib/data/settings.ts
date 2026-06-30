@@ -16,12 +16,27 @@ const DEFAULTS: StoreSettings = {
 
 export function sanitizeStorePrefsForClient(prefs: StorePrefs): StorePrefs {
   const hasOpenaiApiKey = Boolean(prefs.ai.openaiApiKey);
+  const hasZaloAppSecret = Boolean(prefs.zalo.appSecret);
+  const hasZaloAccessToken = Boolean(prefs.zalo.accessToken);
+  const hasZaloRefreshToken = Boolean(prefs.zalo.refreshToken);
+  const hasZaloWebhookSecret = Boolean(prefs.zalo.webhookSecret);
   return {
     ...prefs,
     ai: {
       ...prefs.ai,
       openaiApiKey: "",
       openaiApiKeySet: hasOpenaiApiKey || prefs.ai.openaiApiKeySet,
+    },
+    zalo: {
+      ...prefs.zalo,
+      appSecret: "",
+      appSecretSet: hasZaloAppSecret || prefs.zalo.appSecretSet,
+      accessToken: "",
+      accessTokenSet: hasZaloAccessToken || prefs.zalo.accessTokenSet,
+      refreshToken: "",
+      refreshTokenSet: hasZaloRefreshToken || prefs.zalo.refreshTokenSet,
+      webhookSecret: "",
+      webhookSecretSet: hasZaloWebhookSecret || prefs.zalo.webhookSecretSet,
     },
   };
 }
@@ -39,6 +54,11 @@ export async function getAiProviderSettings() {
 export async function getAiAttachmentsBucket() {
   const ai = await getAiProviderSettings();
   return ai.attachmentsBucket || "ai-attachments";
+}
+
+export async function getZaloSettings() {
+  const prefs = await getRawStorePrefs();
+  return prefs.zalo;
 }
 
 /** Cấu hình cửa hàng (1 dòng id='default'). Trả mặc định nếu chưa có. */

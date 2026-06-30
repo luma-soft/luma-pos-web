@@ -534,6 +534,17 @@
     "serverError": "Có lỗi xảy ra, thử lại sau.",
     "forbidden": "Bạn không có quyền thực hiện thao tác này."
   },
+  "zalo": {
+    "send": "Gửi Zalo",
+    "sent": "Đã gửi Zalo",
+    "errors": {
+      "notEnabled": "Zalo OA chưa bật.",
+      "missingAccessToken": "Thiếu OA access token.",
+      "missingTemplate": "Chưa cấu hình template ZNS.",
+      "missingPhone": "Khách chưa có số điện thoại.",
+      "sendFailed": "Chưa gửi được Zalo."
+    }
+  },
   "ai": {
     "restockTab": "Gợi ý nhập hàng",
     "assistantTab": "Trợ lý",
@@ -1664,6 +1675,7 @@
       "print": "Mẫu in",
       "tax": "Thuế",
       "notifications": "Thông báo",
+      "zalo": "Zalo OA",
       "ai": "AI"
     },
     "payments": {

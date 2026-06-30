@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
-import { Check, ChevronDown, Copy, ExternalLink, KeyRound, Loader2, Pencil, Plus, Power, Printer, Save, Star, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, Copy, ExternalLink, KeyRound, Loader2, MessageCircle, Pencil, Plus, Power, Printer, Save, Star, Trash2, X } from "lucide-react";
 import { SearchableSelect } from "@/components/combobox";
 import { SegmentedTabs } from "@/components/ui/tabs";
 import { Toggle } from "@/components/ui/toggle";
@@ -16,6 +16,7 @@ import {
   setPaymentBankAccountEnabled,
   testAiProvider,
   updateAiSettings,
+  updateZaloSettings,
   updateStoreSettings,
   updateStaffRole,
   setStaffActive,
@@ -213,7 +214,7 @@ function formatAiTestMessage(message: string, L: boolean) {
   return map[message] ? (L ? map[message][1] : map[message][0]) : message;
 }
 
-type SectionId = "store" | "staff" | "hardware" | "payments" | "print" | "tax" | "notifications" | "ai";
+type SectionId = "store" | "staff" | "hardware" | "payments" | "print" | "tax" | "notifications" | "zalo" | "ai";
 
 const NAV: { group: [string, string]; items: { id: SectionId; ico: string; en: string; vi: string; badge?: string }[] }[] = [
   { group: ["Store", "Cửa hàng"], items: [
@@ -230,6 +231,7 @@ const NAV: { group: [string, string]; items: { id: SectionId; ico: string; en: s
   ] },
   { group: ["System", "Hệ thống"], items: [
     { id: "notifications", ico: "🔔", en: "Notifications", vi: "Thông báo" },
+    { id: "zalo", ico: "💬", en: "Zalo OA", vi: "Zalo OA" },
     { id: "ai", ico: "✨", en: "AI", vi: "AI" },
   ] },
 ];
@@ -241,6 +243,7 @@ const SEC_META: Record<SectionId, { en: string; vi: string; subEn: string; subVi
   print: { en: "Print Templates", vi: "Mẫu in", subEn: "Receipt & document template designer", subVi: "Thiết kế mẫu hóa đơn & chứng từ" },
   tax: { en: "Tax & E-Invoice", vi: "Thuế & Hóa đơn điện tử", subEn: "VAT rates + Decree 70/2025 e-invoice", subVi: "Thuế GTGT + HĐĐT theo Nghị định 70/2025" },
   notifications: { en: "Notifications", vi: "Thông báo", subEn: "Alert types and channels", subVi: "Loại thông báo và kênh gửi" },
+  zalo: { en: "Zalo OA", vi: "Zalo OA", subEn: "Official Account and ZNS templates", subVi: "Official Account và template ZNS" },
   ai: { en: "AI Settings", vi: "Cấu hình AI", subEn: "Provider key, vision model, and attachment bucket", subVi: "API key, model vision và bucket lưu file AI" },
 };
 
@@ -345,6 +348,7 @@ export function SettingsClient({
         {active === "print" && <PrintSection L={L} />}
         {active === "tax" && <TaxSection L={L} prefs={store.prefs.tax} canManage={canManage} />}
         {active === "notifications" && <NotificationsSection L={L} prefs={store.prefs.notifications} canManage={canManage} />}
+        {active === "zalo" && <ZaloSection L={L} prefs={store.prefs.zalo} canEdit={canEditAi} />}
         {active === "ai" && <AiSection L={L} prefs={store.prefs.ai} canEdit={canEditAi} usage={aiUsage} />}
       </div>
     </div>
@@ -1045,6 +1049,159 @@ function NotificationsSection({ L, prefs, canManage }: { L: boolean; prefs: Stor
         </div>
       </Card>
       <SaveBar L={L} dirty={dirty} saved={saved} pending={pending} canManage={canManage} onSave={save} />
+    </>
+  );
+}
+
+type ZaloSecretKey = "appSecret" | "accessToken" | "refreshToken" | "webhookSecret";
+
+function ZaloSecretInput({
+  id,
+  label,
+  value,
+  setFlag,
+  clear,
+  canEdit,
+  L,
+  onValueChange,
+  onClearChange,
+}: {
+  id: ZaloSecretKey;
+  label: string;
+  value: string;
+  setFlag: boolean;
+  clear: boolean;
+  canEdit: boolean;
+  L: boolean;
+  onValueChange: (id: ZaloSecretKey, value: string) => void;
+  onClearChange: (id: ZaloSecretKey, value: boolean) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className={FL}>{label}</span>
+      <input
+        className={cn(FI, "font-mono")}
+        type="password"
+        value={value}
+        disabled={!canEdit || clear}
+        placeholder={setFlag ? (L ? "Để trống để giữ giá trị hiện tại" : "Leave blank to keep current value") : ""}
+        onChange={(e) => onValueChange(id, e.target.value)}
+      />
+      <label className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
+        <input type="checkbox" checked={clear} disabled={!canEdit} onChange={(e) => onClearChange(id, e.target.checked)} />
+        {L ? "Xóa giá trị đang lưu" : "Clear saved value"}
+      </label>
+    </div>
+  );
+}
+
+function ZaloSection({ L, prefs, canEdit }: { L: boolean; prefs: StorePrefs["zalo"]; canEdit: boolean }) {
+  const [form, setForm] = useState({
+    enabled: prefs.enabled,
+    oaId: prefs.oaId,
+    appId: prefs.appId,
+    appSecret: "",
+    accessToken: "",
+    refreshToken: "",
+    webhookSecret: "",
+    portalTemplateId: prefs.portalTemplateId,
+    invoiceTemplateId: prefs.invoiceTemplateId,
+    debtTemplateId: prefs.debtTemplateId,
+  });
+  const [secretSet, setSecretSet] = useState({
+    appSecret: prefs.appSecretSet,
+    accessToken: prefs.accessTokenSet,
+    refreshToken: prefs.refreshTokenSet,
+    webhookSecret: prefs.webhookSecretSet,
+  });
+  const [clearSecret, setClearSecret] = useState({
+    appSecret: false,
+    accessToken: false,
+    refreshToken: false,
+    webhookSecret: false,
+  });
+  const [dirty, setDirty] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+  const [pending, start] = useTransition();
+  const mark = () => { setDirty(true); setSaved(false); setError(""); };
+  const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => { setForm((p) => ({ ...p, [key]: value })); mark(); };
+  const setSecretValue = (key: ZaloSecretKey, value: string) => set(key, value);
+  const setClear = (key: ZaloSecretKey, value: boolean) => { setClearSecret((p) => ({ ...p, [key]: value })); mark(); };
+  const configured = form.enabled && (secretSet.accessToken || Boolean(form.accessToken.trim())) && Boolean(form.portalTemplateId || form.invoiceTemplateId || form.debtTemplateId);
+  function save() {
+    start(async () => {
+      const res = await updateZaloSettings({
+        ...form,
+        clearAppSecret: clearSecret.appSecret,
+        clearAccessToken: clearSecret.accessToken,
+        clearRefreshToken: clearSecret.refreshToken,
+        clearWebhookSecret: clearSecret.webhookSecret,
+      });
+      if (res.ok) {
+        setSecretSet({
+          appSecret: clearSecret.appSecret ? false : secretSet.appSecret || Boolean(form.appSecret.trim()),
+          accessToken: clearSecret.accessToken ? false : secretSet.accessToken || Boolean(form.accessToken.trim()),
+          refreshToken: clearSecret.refreshToken ? false : secretSet.refreshToken || Boolean(form.refreshToken.trim()),
+          webhookSecret: clearSecret.webhookSecret ? false : secretSet.webhookSecret || Boolean(form.webhookSecret.trim()),
+        });
+        setForm((p) => ({ ...p, appSecret: "", accessToken: "", refreshToken: "", webhookSecret: "" }));
+        setClearSecret({ appSecret: false, accessToken: false, refreshToken: false, webhookSecret: false });
+        setDirty(false);
+        setSaved(true);
+      } else {
+        setError(res.error);
+      }
+    });
+  }
+  return (
+    <>
+      <Card
+        title={L ? "Zalo Official Account" : "Zalo Official Account"}
+        vi={L ? "OA token và trạng thái gửi ZNS" : "OA token and ZNS sending status"}
+        action={<Toggle checked={form.enabled} onChange={canEdit ? (v) => set("enabled", v) : () => {}} aria-label="zalo" />}
+      >
+        <div className="p-4.5 flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold",
+              configured ? "bg-ok-soft text-ok" : "bg-warn-soft text-warn"
+            )}>
+              <MessageCircle className="h-3.5 w-3.5" />
+              {configured ? (L ? "Sẵn sàng gửi ZNS" : "Ready for ZNS") : (L ? "Chưa đủ cấu hình" : "Configuration incomplete")}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1"><span className={FL}>OA ID</span><input className={cn(FI, "font-mono")} value={form.oaId} disabled={!canEdit} onChange={(e) => set("oaId", e.target.value)} /></div>
+            <div className="flex flex-col gap-1"><span className={FL}>App ID</span><input className={cn(FI, "font-mono")} value={form.appId} disabled={!canEdit} onChange={(e) => set("appId", e.target.value)} /></div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <ZaloSecretInput id="accessToken" label="OA access token" value={form.accessToken} setFlag={secretSet.accessToken} clear={clearSecret.accessToken} canEdit={canEdit} L={L} onValueChange={setSecretValue} onClearChange={setClear} />
+            <ZaloSecretInput id="refreshToken" label="OA refresh token" value={form.refreshToken} setFlag={secretSet.refreshToken} clear={clearSecret.refreshToken} canEdit={canEdit} L={L} onValueChange={setSecretValue} onClearChange={setClear} />
+            <ZaloSecretInput id="appSecret" label="App secret" value={form.appSecret} setFlag={secretSet.appSecret} clear={clearSecret.appSecret} canEdit={canEdit} L={L} onValueChange={setSecretValue} onClearChange={setClear} />
+            <ZaloSecretInput id="webhookSecret" label="Webhook secret" value={form.webhookSecret} setFlag={secretSet.webhookSecret} clear={clearSecret.webhookSecret} canEdit={canEdit} L={L} onValueChange={setSecretValue} onClearChange={setClear} />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="flex flex-col gap-1"><span className={FL}>{L ? "Template link đặt hàng" : "Portal link template"}</span><input className={cn(FI, "font-mono")} value={form.portalTemplateId} disabled={!canEdit} onChange={(e) => set("portalTemplateId", e.target.value)} /></div>
+            <div className="flex flex-col gap-1"><span className={FL}>{L ? "Template hóa đơn" : "Invoice template"}</span><input className={cn(FI, "font-mono")} value={form.invoiceTemplateId} disabled={!canEdit} onChange={(e) => set("invoiceTemplateId", e.target.value)} /></div>
+            <div className="flex flex-col gap-1"><span className={FL}>{L ? "Template công nợ" : "Debt template"}</span><input className={cn(FI, "font-mono")} value={form.debtTemplateId} disabled={!canEdit} onChange={(e) => set("debtTemplateId", e.target.value)} /></div>
+          </div>
+          <div className="px-3.5 py-2.5 bg-in-soft border border-in/20 rounded-[10px] text-[11px] text-in leading-relaxed">
+            {L
+              ? "Token và secret chỉ lưu server-side trong Settings. Mobile/web chỉ gọi backend LumaPOS; tin giao dịch cần template ZNS đã được Zalo duyệt."
+              : "Tokens and secrets are stored server-side in Settings only. Web/mobile call the LumaPOS backend; transactional messages require approved ZNS templates."}
+          </div>
+        </div>
+      </Card>
+      {!canEdit && <p className="text-[11px] text-slate-400 italic mt-1">{L ? "Chỉ owner được sửa cấu hình Zalo." : "Only the owner can edit Zalo settings."}</p>}
+      {canEdit && (dirty || saved || error) && (
+        <div className="flex items-center gap-2 pt-1">
+          <span className={cn("text-[11px] flex-1", error ? "text-er" : "text-slate-500")}>{error || (dirty ? (L ? "Có thay đổi chưa lưu" : "Unsaved changes") : (L ? "Đã lưu" : "Saved"))}</span>
+          <button disabled={!dirty || pending} onClick={save} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-primary-600 text-white text-xs font-semibold disabled:opacity-50">
+            {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{L ? "Lưu" : "Save"}
+          </button>
+        </div>
+      )}
     </>
   );
 }

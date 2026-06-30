@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Loader2, XCircle } from "lucide-react";
+import { Loader2, MessageCircle, XCircle } from "lucide-react";
 import { addPayment, cancelOrder } from "@/lib/actions/orders";
+import { sendOrderInvoiceZalo } from "@/lib/actions/zalo";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { MoneyInput } from "@/components/ui/money-input";
 import { formatCurrency, cn } from "@/lib/utils";
@@ -39,6 +40,36 @@ export function OrderActions({ orderId }: { orderId: string }) {
       {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
       {t("orders.detail.cancel")}
     </button>
+  );
+}
+
+export function SendOrderZaloButton({ orderId }: { orderId: string }) {
+  const t = useTranslations();
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
+
+  async function send() {
+    if (busy) return;
+    setBusy(true);
+    setStatus("");
+    const url = typeof window === "undefined" ? undefined : `${window.location.origin}/orders/${orderId}`;
+    const res = await sendOrderInvoiceZalo({ orderId, url });
+    setBusy(false);
+    setStatus(res.ok ? t("zalo.sent") : t(res.error as never));
+  }
+
+  return (
+    <div className="inline-flex items-center gap-2">
+      <button
+        onClick={send}
+        disabled={busy}
+        className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-border hover:bg-surface-2 disabled:opacity-50"
+      >
+        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
+        {t("zalo.send")}
+      </button>
+      {status && <span className="text-xs text-slate-500">{status}</span>}
+    </div>
   );
 }
 

@@ -5,8 +5,9 @@ import { ExternalLink } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import type { OrderDetail } from "@/lib/data/orders";
+import { getStoreSettings } from "@/lib/data/settings";
 import { OrderStatusBadge, PaymentStatusBadge } from "../status-badges";
-import { OrderActions, PaymentForm } from "./order-actions";
+import { OrderActions, PaymentForm, SendOrderZaloButton } from "./order-actions";
 import { EInvoiceForm } from "./einvoice-form";
 import { buttonVariants } from "@/components/ui/button-variants";
 
@@ -32,6 +33,7 @@ export async function OrderDetailPanel({
   showOpenAction?: boolean;
 }) {
   const t = await getTranslations();
+  const store = await getStoreSettings();
   const total = Number(order.total);
   const paid = Number(order.amountPaid);
   const remaining = Math.max(0, total - paid);
@@ -46,6 +48,7 @@ export async function OrderDetailPanel({
     return `${Routes.POS}?${sp.toString()}`;
   };
   const openInListHref = `${Routes.Sales}?tab=orders&orderId=${encodeURIComponent(order.id)}&expandedOrder=${encodeURIComponent(order.id)}`;
+  const canSendZalo = Boolean(store.prefs.zalo.enabled && store.prefs.zalo.accessTokenSet && store.prefs.zalo.invoiceTemplateId && order.customerPhone);
 
   return (
     <div className={cn("bg-surface", compact ? "px-4 py-4" : "space-y-4")}>
@@ -214,6 +217,7 @@ export async function OrderDetailPanel({
       <div className="mt-4 flex flex-col gap-3 border-t border-border-soft pt-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-wrap gap-2">
           {!cancelled && <OrderActions orderId={order.id} />}
+          {canSendZalo && <SendOrderZaloButton orderId={order.id} />}
         </div>
         <div className="flex flex-wrap gap-2 xl:justify-end">
           <Link href={`${Routes.order(order.id)}/print`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9")}>

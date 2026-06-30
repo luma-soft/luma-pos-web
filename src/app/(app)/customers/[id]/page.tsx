@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { getCustomer } from "@/lib/data/partners";
+import { getStoreSettings } from "@/lib/data/settings";
 import { CustomerTypeBadge } from "../type-badge";
 import { OrderStatusBadge, PaymentStatusBadge } from "../../orders/status-badges";
 import { PortalLink } from "./portal-link";
@@ -13,7 +14,10 @@ import { CustomerEdit } from "./customer-edit";
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const t = await getTranslations();
-  const customer = await getCustomer(id).catch(() => null);
+  const [customer, store] = await Promise.all([
+    getCustomer(id).catch(() => null),
+    getStoreSettings(),
+  ]);
   if (!customer) notFound();
 
   const debt = Number(customer.currentDebt);
@@ -76,7 +80,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
       </div>
 
       <div className="mb-5 max-w-md">
-        <PortalLink customerId={customer.id} token={customer.portalToken} />
+        <PortalLink customerId={customer.id} token={customer.portalToken} zaloConfigured={store.prefs.zalo.enabled && store.prefs.zalo.accessTokenSet && Boolean(store.prefs.zalo.portalTemplateId)} />
       </div>
 
       {owingOrders.length > 0 && (
