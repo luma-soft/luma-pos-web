@@ -10,6 +10,7 @@ import { OrderStatusBadge, PaymentStatusBadge } from "../status-badges";
 import { OrderActions, PaymentForm, SendOrderZaloButton } from "./order-actions";
 import { EInvoiceForm } from "./einvoice-form";
 import { buttonVariants } from "@/components/ui/button-variants";
+import { QuoteCreateOrderButton } from "../../quotes/quote-actions";
 
 type EInvoiceSummary = {
   id: string;
@@ -217,13 +218,16 @@ export async function OrderDetailPanel({
 
       <div className="mt-4 flex flex-col gap-3 border-t border-border-soft pt-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-wrap gap-2">
-          {!cancelled && <OrderActions orderId={order.id} />}
+          {!isQuote && !cancelled && <OrderActions orderId={order.id} />}
           {!isQuote && canSendZalo && <SendOrderZaloButton orderId={order.id} />}
         </div>
         <div className="flex flex-wrap gap-2 xl:justify-end">
-          <Link href={`${Routes.order(order.id)}/print`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9")}>
-            {t("print.printBtn")}
-          </Link>
+          {isQuote && <QuoteCreateOrderButton quoteId={order.id} />}
+          {!isQuote && (
+            <Link href={`${Routes.order(order.id)}/print`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9")}>
+              {t("print.printBtn")}
+            </Link>
+          )}
           {(order.status === "completed" || order.status === "quote") && order.returns.length === 0 && (
             <Link href={posSourceHref("edit")} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-9")}>
               {t("orderEdit.action")}

@@ -2,9 +2,8 @@
 
 import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
-import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
+import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { QuoteActions } from "../../quotes/quote-actions";
 
 type QuoteRow = {
   id: string;
@@ -31,7 +30,6 @@ export function QuotesTable({
     { key: "customer", label: t("orders.cols.customer"), defaultVisible: true, render: (row) => row.customerName ?? t("orders.walkIn") },
     { key: "project", label: t("orders.cols.project"), defaultVisible: true, render: (row) => <span className="text-slate-500">{row.projectName ?? "—"}</span> },
     { key: "value", label: t("quotes.cols.value"), defaultVisible: true, align: "right", width: "140px", cellClassName: "font-semibold", render: (row) => formatCurrency(Number(row.total)) },
-    { key: "actions", label: "", required: true, width: "210px", align: "right", render: (row) => <span onClick={stopRowToggle}><QuoteActions quoteId={row.id} /></span> },
   ];
   return (
     <DataTableShell
@@ -41,7 +39,7 @@ export function QuotesTable({
       getRowId={(row) => row.id}
       expandedParam="expandedQuote"
       initialExpandedId={expandedId}
-      minWidth="1080px"
+      minWidth="880px"
       renderExpanded={(row) => (expandedId === row.id ? expandedContent : null)}
     />
   );
