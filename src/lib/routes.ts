@@ -37,6 +37,7 @@ export const Routes = {
   Reports: "/reports",
   Notifications: "/notifications",
   Settings: "/settings",
+  LabelSettings: "/settings/labels",
 
   // Param routes
   order: (id: string) => `/orders/${id}` as const,

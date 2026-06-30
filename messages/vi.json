@@ -1730,6 +1730,41 @@
       "defaultRequired": "Cần có mẫu mặc định khác trước khi ngừng dùng mẫu này."
     }
   },
+  "labelSettings": {
+    "title": "Mẫu tem mã",
+    "settingsDesc": "Tạo bố cục tem mã vạch cho hàng hóa, đặt mẫu mặc định và dùng lại khi in tem.",
+    "templateList": "Danh sách mẫu tem",
+    "templateName": "Tên mẫu",
+    "newTemplateName": "Mẫu tem mới",
+    "defaultTemplate": "Mẫu tem mặc định",
+    "active": "Đang dùng",
+    "inactive": "Ngừng dùng",
+    "duplicate": "Nhân bản",
+    "duplicated": "Đã nhân bản mẫu tem",
+    "setDefault": "Đặt mặc định",
+    "defaultSaved": "Đã đặt làm mẫu mặc định",
+    "deactivate": "Ngừng dùng",
+    "deactivated": "Đã ngừng dùng mẫu tem",
+    "saved": "Đã lưu mẫu tem ✓",
+    "sortOrder": "Thứ tự",
+    "sizeSection": "Kích thước tem và bố cục giấy",
+    "contentSection": "Hiển thị trên tem",
+    "widthMm": "Rộng (mm)",
+    "heightMm": "Cao (mm)",
+    "columns": "Số cột",
+    "columnsShort": "cột",
+    "gapMm": "Khoảng cách (mm)",
+    "preview": "Xem trước",
+    "toggles": {
+      "showName": "Tên hàng",
+      "showSku": "SKU",
+      "showPrice": "Giá bán",
+      "showUnit": "Đơn vị"
+    },
+    "errors": {
+      "defaultRequired": "Cần có mẫu mặc định khác trước khi ngừng dùng mẫu này."
+    }
+  },
   "payments": {
     "errors": {
       "bankAccountNotFound": "Chưa cấu hình tài khoản ngân hàng SePay đang bật.",

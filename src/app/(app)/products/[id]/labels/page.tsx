@@ -17,13 +17,21 @@ interface Props {
 }
 
 type CodeSource = "barcode" | "sku";
+type LabelProduct = {
+  id: string;
+  name: string;
+  sku: string;
+  barcode?: string | null;
+  retailPrice: string;
+  baseUnit: string;
+};
 
 function clampQty(value: string | undefined) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? Math.min(Math.max(Math.round(parsed), 1), 500) : 12;
 }
 
-function pickCode(product: NonNullable<Awaited<ReturnType<typeof getProduct>>>, source: CodeSource) {
+function pickCode(product: LabelProduct, source: CodeSource) {
   if (source === "barcode") return product.barcode || product.sku;
   return product.sku || product.barcode || "";
 }
@@ -53,10 +61,32 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
   const template = await getLabelTemplate(query.templateId);
   const qty = clampQty(query.qty);
   const codeSource: CodeSource = query.codeSource === "sku" ? "sku" : "barcode";
-  const code = pickCode(product, codeSource);
-  const price = formatCurrency(Number(query.price || product.retailPrice));
-  const svg = barcodeSvg(code, template);
-  const labels = Array.from({ length: qty });
+  const labelProducts: LabelProduct[] = product.isVariantParent && product.children.length > 0
+    ? product.children.map((child) => ({
+        id: child.id,
+        name: child.name,
+        sku: child.sku,
+        barcode: child.barcode,
+        retailPrice: child.retailPrice,
+        baseUnit: child.baseUnit,
+      }))
+    : [{
+        id: product.id,
+        name: product.name,
+        sku: product.sku,
+        barcode: product.barcode,
+        retailPrice: product.retailPrice,
+        baseUnit: product.baseUnit,
+      }];
+  const labels = labelProducts.flatMap((item) => Array.from({ length: qty }, () => {
+    const code = pickCode(item, codeSource);
+    return {
+      product: item,
+      code,
+      price: formatCurrency(Number(query.price || item.retailPrice)),
+      svg: barcodeSvg(code, template),
+    };
+  }));
 
   return (
     <div className="min-h-dvh bg-canvas p-4 sm:p-6 print:bg-white print:p-0">
@@ -111,7 +141,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2 print:hidden">
             <h2 className="text-sm font-semibold text-slate-500">{t("products.labels.preview")}</h2>
             <p className="text-xs text-slate-500">
-              {template.name} · {template.widthMm}x{template.heightMm}mm · {qty} {t("products.labels.labelsUnit")}
+              {template.name} · {template.widthMm}x{template.heightMm}mm · {labels.length} {t("products.labels.labelsUnit")}
             </p>
           </div>
           <div
@@ -121,18 +151,18 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
               gap: `${template.gapMm}mm`,
             }}
           >
-            {labels.map((_, index) => (
+            {labels.map((label, index) => (
               <ProductLabel
-                key={index}
+                key={`${label.product.id}-${index}`}
                 template={template}
-                name={product.name}
-                sku={product.sku}
-                unitName={product.baseUnit}
-                code={code}
-                price={price}
+                name={label.product.name}
+                sku={label.product.sku}
+                unitName={label.product.baseUnit}
+                code={label.code}
+                price={label.price}
                 codeLabel={t("products.labels.barcodeValue")}
                 priceLabel={t("products.labels.price")}
-                barcodeSvg={svg}
+                barcodeSvg={label.svg}
               />
             ))}
           </div>

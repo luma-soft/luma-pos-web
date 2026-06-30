@@ -581,6 +581,7 @@ export async function getProduct(id: string) {
         .select({
           id: products.id,
           sku: products.sku,
+          barcode: products.barcode,
           name: products.name,
           variantName: products.variantName,
           retailPrice: products.retailPrice,

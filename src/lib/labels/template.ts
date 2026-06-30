@@ -31,6 +31,14 @@ export async function getLabelTemplates(): Promise<LabelTemplate[]> {
   return rows.length > 0 ? rows.map(mapRow) : [DEFAULT_LABEL_TEMPLATE];
 }
 
+export async function getAllLabelTemplates(): Promise<LabelTemplate[]> {
+  const rows = await db
+    .select()
+    .from(labelTemplates)
+    .orderBy(desc(labelTemplates.isDefault), asc(labelTemplates.sortOrder), asc(labelTemplates.name));
+  return rows.length > 0 ? rows.map(mapRow) : [DEFAULT_LABEL_TEMPLATE];
+}
+
 export async function getLabelTemplate(templateId?: string | null): Promise<LabelTemplate> {
   const templates = await getLabelTemplates();
   return templates.find((template) => template.id === templateId) ?? templates[0] ?? DEFAULT_LABEL_TEMPLATE;

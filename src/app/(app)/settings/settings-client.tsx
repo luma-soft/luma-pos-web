@@ -1004,9 +1004,13 @@ function BankSelect({ value, onChange, placeholder }: { value: string; onChange:
 
 function PrintSection({ L }: { L: boolean }) {
   return (
-    <Card title={L ? "Thiết kế mẫu in (15.1)" : "Print Template Designer (15.1)"} vi={L ? "Hóa đơn · phiếu nhập · báo giá · K80/K57/A5/A4" : "Invoice · receipt · quotation · K80/K57/A5/A4"} action={<Link href="/settings/print" className={btnF}><Printer className="w-3 h-3" />{L ? "Mở thiết kế →" : "Open designer →"}</Link>}>
+    <Card title={L ? "Thiết kế mẫu in (15.1)" : "Print Template Designer (15.1)"} vi={L ? "Hóa đơn · tem mã · K80/K57/A5/A4" : "Documents · barcode labels · K80/K57/A5/A4"} action={<Link href="/settings/print" className={btnF}><Printer className="w-3 h-3" />{L ? "Mẫu chứng từ →" : "Document templates →"}</Link>}>
       <div className="p-4.5 text-[12px] text-slate-500 leading-relaxed">
-        {L ? "Tùy chỉnh đầy đủ mẫu in theo loại phiếu và khổ giấy với xem trước trực tiếp." : "Full per-document, per-paper-size template customization with live preview."}
+        {L ? "Tùy chỉnh mẫu in chứng từ và mẫu tem mã vạch theo từng khổ giấy/tem." : "Customize document print templates and barcode label templates by paper or label size."}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Link href="/settings/print" className={btnS}><Printer className="w-3 h-3" />{L ? "Mẫu chứng từ" : "Document templates"}</Link>
+          <Link href="/settings/labels" className={btnS}><Printer className="w-3 h-3" />{L ? "Mẫu tem mã" : "Label templates"}</Link>
+        </div>
       </div>
     </Card>
   );

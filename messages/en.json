@@ -1730,6 +1730,41 @@
       "defaultRequired": "Set another default before deactivating this template."
     }
   },
+  "labelSettings": {
+    "title": "Barcode label templates",
+    "settingsDesc": "Create label layouts for product barcode printing, choose the default template, and reuse them on product labels.",
+    "templateList": "Label templates",
+    "templateName": "Template name",
+    "newTemplateName": "New label template",
+    "defaultTemplate": "Default label template",
+    "active": "Active",
+    "inactive": "Inactive",
+    "duplicate": "Duplicate",
+    "duplicated": "Template duplicated",
+    "setDefault": "Set default",
+    "defaultSaved": "Default template updated",
+    "deactivate": "Deactivate",
+    "deactivated": "Template deactivated",
+    "saved": "Template saved ✓",
+    "sortOrder": "Sort order",
+    "sizeSection": "Label size and sheet layout",
+    "contentSection": "Show on label",
+    "widthMm": "Width (mm)",
+    "heightMm": "Height (mm)",
+    "columns": "Columns",
+    "columnsShort": "cols",
+    "gapMm": "Gap (mm)",
+    "preview": "Preview",
+    "toggles": {
+      "showName": "Product name",
+      "showSku": "SKU",
+      "showPrice": "Price",
+      "showUnit": "Unit"
+    },
+    "errors": {
+      "defaultRequired": "Set another default before deactivating this template."
+    }
+  },
   "payments": {
     "errors": {
       "bankAccountNotFound": "No enabled SePay bank account is configured.",
