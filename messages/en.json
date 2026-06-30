@@ -256,14 +256,9 @@
       "agent": "Agent"
     },
     "printSlip": "Print",
-    "defaultPrintTemplate": "Default print template",
     "tempSlipTitle": "PROVISIONAL SLIP",
-    "printA4": "Print A4 invoice",
     "printA5": "Print A5",
-    "printK80": "Print K80 receipt",
-    "printA4Short": "A4",
-    "printA5Short": "A5",
-    "printK80Short": "K80"
+    "printK80": "Print K80 receipt"
   },
   "stub": {
     "wip": "Work in progress..."
