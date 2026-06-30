@@ -37,6 +37,7 @@ export async function OrderDetailPanel({
   const total = Number(order.total);
   const paid = Number(order.amountPaid);
   const remaining = Math.max(0, total - paid);
+  const isQuote = order.status === "quote";
   const cancelled = order.status === "cancelled" || order.status === "merged";
   const posSourceHref = (mode: "edit" | "copy") => {
     const sp = new URLSearchParams({
@@ -58,7 +59,7 @@ export async function OrderDetailPanel({
             <h2 className="truncate text-xl font-bold text-slate-900 dark:text-slate-100">{order.customerName ?? t("orders.walkIn")}</h2>
             <span className="text-sm font-semibold text-slate-500">{order.code}</span>
             <OrderStatusBadge status={order.status} />
-            <PaymentStatusBadge status={order.paymentStatus} />
+            {!isQuote && <PaymentStatusBadge status={order.paymentStatus} />}
             {showOpenAction && (
               <Link href={openInListHref} className="inline-flex items-center gap-1 text-sm font-semibold text-primary-600 hover:underline">
                 <ExternalLink className="h-4 w-4" />
@@ -122,7 +123,7 @@ export async function OrderDetailPanel({
             {order.note || "Ghi chú..."}
           </div>
 
-          {order.payments.length > 0 && (
+          {!isQuote && order.payments.length > 0 && (
             <div className="overflow-hidden rounded-lg border border-border">
               <div className="border-b border-border px-3 py-2 text-sm font-semibold">{t("orders.detail.payments")}</div>
               <div className="overflow-x-auto">
@@ -192,7 +193,7 @@ export async function OrderDetailPanel({
             <InfoLine label={t("pos.tax")} value={formatCurrency(Number(order.tax))} />
             <InfoLine label={t("pos.shipping")} value={formatCurrency(Number(order.shippingFee))} />
             <InfoLine label={t("pos.total")} value={formatCurrency(total)} valueClassName="text-base text-primary-600" strong />
-            <InfoLine label={t("orders.detail.remaining")} value={formatCurrency(remaining)} valueClassName={remaining > 0 ? "text-er" : "text-ok"} strong />
+            {!isQuote && <InfoLine label={t("orders.detail.remaining")} value={formatCurrency(remaining)} valueClassName={remaining > 0 ? "text-er" : "text-ok"} strong />}
           </div>
 
           {order.status === "completed" && (
@@ -212,12 +213,12 @@ export async function OrderDetailPanel({
         </div>
       </div>
 
-      {!cancelled && remaining > 0 && <PaymentForm orderId={order.id} remaining={remaining} />}
+      {!isQuote && !cancelled && remaining > 0 && <PaymentForm orderId={order.id} remaining={remaining} />}
 
       <div className="mt-4 flex flex-col gap-3 border-t border-border-soft pt-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-wrap gap-2">
           {!cancelled && <OrderActions orderId={order.id} />}
-          {canSendZalo && <SendOrderZaloButton orderId={order.id} />}
+          {!isQuote && canSendZalo && <SendOrderZaloButton orderId={order.id} />}
         </div>
         <div className="flex flex-wrap gap-2 xl:justify-end">
           <Link href={`${Routes.order(order.id)}/print`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9")}>
