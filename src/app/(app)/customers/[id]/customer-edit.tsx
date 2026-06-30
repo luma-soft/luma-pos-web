@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MoneyInput } from "@/components/ui/money-input";
+import { Select } from "@/components/ui/select";
 import { useTranslations } from "next-intl";
 import { Pencil, Loader2, X } from "lucide-react";
 import { updateCustomer } from "@/lib/actions/partners";
@@ -64,9 +65,12 @@ export function CustomerEdit({ customer }: {
               <div><label className={lbl}>Email</label><input className={input} value={email} onChange={(e) => setEmail(e.target.value)} /></div>
               <div className="sm:col-span-2"><label className={lbl}>{t("customers.fields.address")}</label><input className={input} value={address} onChange={(e) => setAddress(e.target.value)} /></div>
               <div><label className={lbl}>{t("customers.cols.type")}</label>
-                <select className={input} value={type} onChange={(e) => setType(e.target.value as CustomerType)}>
-                  {(["retail", "wholesale", "contractor", "agent"] as CustomerType[]).map((ty) => <option key={ty} value={ty}>{t(`customers.types.${ty}`)}</option>)}
-                </select>
+                <Select
+                  className={input}
+                  value={type}
+                  onChange={(e) => setType(e.target.value as CustomerType)}
+                  options={(["retail", "wholesale", "contractor", "agent"] as CustomerType[]).map((ty) => ({ value: ty, label: t(`customers.types.${ty}`) }))}
+                />
               </div>
               <div><label className={lbl}>{t("customers.fields.taxCode")}</label><input className={input} value={taxCode} onChange={(e) => setTaxCode(e.target.value)} /></div>
               <div><label className={lbl}>{t("customers.fields.debtLimit")}</label><MoneyInput className={`no-spinner text-right ${input}`} value={debtLimit} onChange={(v) => setDebtLimit(String(v ?? 0))} /></div>

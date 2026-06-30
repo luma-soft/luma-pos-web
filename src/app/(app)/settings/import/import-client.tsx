@@ -9,6 +9,7 @@ import * as XLSX from "xlsx";
 import { cn } from "@/lib/utils";
 import { importProducts, type ImportRow, type ImportSummary } from "@/lib/actions/import";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
 
 type FieldKey = "name" | "sku" | "barcode" | "category" | "unit" | "retailPrice" | "costPrice" | "stock";
@@ -179,10 +180,16 @@ export function ImportClient() {
             {FIELDS.map((f) => (
               <div key={f.key} className="flex items-center gap-2">
                 <span className="text-xs font-semibold w-28 shrink-0">{t(`import.fields.${f.key}`)}{f.required && <span className="text-er"> *</span>}</span>
-                <select value={map[f.key] ?? -1} onChange={(e) => setMap((m) => ({ ...m, [f.key]: Number(e.target.value) }))} className="flex-1 px-2.5 py-1.5 text-sm rounded-lg border border-border bg-canvas">
-                  <option value={-1}>{t("import.ignore")}</option>
-                  {headers.map((h, i) => <option key={i} value={i}>{h || `#${i + 1}`}</option>)}
-                </select>
+                <Select
+                  value={map[f.key] ?? -1}
+                  onChange={(e) => setMap((m) => ({ ...m, [f.key]: Number(e.target.value) }))}
+                  size="sm"
+                  options={[
+                    { value: "-1", label: t("import.ignore") },
+                    ...headers.map((h, i) => ({ value: String(i), label: h || `#${i + 1}` })),
+                  ]}
+                  className="flex-1 bg-canvas"
+                />
               </div>
             ))}
           </div>

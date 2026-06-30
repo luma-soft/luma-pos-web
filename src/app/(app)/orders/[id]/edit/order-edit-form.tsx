@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2, Save, Trash2 } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency } from "@/lib/utils";
 import { MoneyInput } from "@/components/ui/money-input";
+import { Select } from "@/components/ui/select";
 import { updateOrder } from "@/lib/actions/order-edit";
 
 interface Line {
@@ -136,13 +137,15 @@ export function OrderEditForm({ orderId, orderCode, initial, productOptions }: P
           </tbody>
         </table>
         <div className="px-4 py-3 border-t border-border">
-          <select value="" onChange={(e) => addProduct(e.target.value)}
-            className="w-full px-3 py-2 text-sm rounded-lg border border-dashed border-border bg-transparent text-slate-500">
-            <option value="">＋ {t("purchases.addProduct")}</option>
-            {productOptions.map((p) => (
-              <option key={p.id} value={p.id}>{p.name} ({p.sku})</option>
-            ))}
-          </select>
+          <Select
+            value=""
+            onChange={(e) => addProduct(e.target.value)}
+            options={[
+              { value: "", label: `＋ ${t("purchases.addProduct")}` },
+              ...productOptions.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` })),
+            ]}
+            className="w-full border-dashed bg-transparent text-slate-500"
+          />
         </div>
       </div>
 

@@ -25,7 +25,7 @@ export interface OrderListFilters {
 export async function getOrders(filters: OrderListFilters = {}) {
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize);
-  const conditions: SQL[] = [ne(orders.status, "quote")]; // báo giá có trang riêng
+  const conditions: SQL[] = [ne(orders.status, "quote"), ne(orders.status, "confirmed")]; // báo giá / đặt hàng có trang riêng
   if (filters.orderId) conditions.push(eq(orders.id, filters.orderId));
 
   if (filters.q?.trim()) {
@@ -103,6 +103,7 @@ export async function getOrder(id: string) {
       paymentStatus: orders.paymentStatus,
       projectName: orders.projectName,
       deliveryAddress: orders.deliveryAddress,
+      deliveryDate: orders.deliveryDate,
       subtotal: orders.subtotal,
       discount: orders.discount,
       tax: orders.tax,

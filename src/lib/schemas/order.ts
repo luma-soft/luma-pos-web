@@ -13,7 +13,7 @@ export const orderItemSchema = z.object({
 });
 
 export const createOrderSchema = z.object({
-  mode: z.enum(["sale", "quote"]).default("sale"),
+  mode: z.enum(["sale", "quote", "booking"]).default("sale"),
   // id sinh ở client để khử trùng khi đồng bộ offline (sync lại không tạo đơn trùng)
   clientId: z.string().max(40).optional(),
   source: z.object({
@@ -26,6 +26,7 @@ export const createOrderSchema = z.object({
   projectId: z.uuid().nullable().optional(),
   projectName: z.string().optional(),
   deliveryAddress: z.string().optional(),
+  deliveryDate: z.coerce.date().optional(),
   note: z.string().optional(),
   discount: z.number().min(0).default(0),
   taxRate: z.number().min(0).max(100).default(0),

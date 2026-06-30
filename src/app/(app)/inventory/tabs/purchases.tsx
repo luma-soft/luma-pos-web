@@ -6,6 +6,7 @@ import { Routes } from "@/lib/routes";
 import { getPurchases } from "@/lib/data/inventory";
 import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
+import { Select } from "@/components/ui/select";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { PurchasesTable } from "./purchases-table";
 
@@ -25,13 +26,17 @@ export async function PurchasesTab({ searchParams }: { searchParams: SP }) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("purchases.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         </div>
-        <select name="status" defaultValue={status} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface">
-          <option value="">{t("orders.tabs.all")}</option>
-          <option value="draft">{t("purchases.status.draft")}</option>
-          <option value="received">{t("purchases.status.received")}</option>
-          <option value="returned">{t("purchases.status.returned")}</option>
-          <option value="cancelled">{t("purchases.status.cancelled")}</option>
-        </select>
+        <Select
+          name="status"
+          defaultValue={status}
+          options={[
+            { value: "", label: t("orders.tabs.all") },
+            { value: "draft", label: t("purchases.status.draft") },
+            { value: "received", label: t("purchases.status.received") },
+            { value: "returned", label: t("purchases.status.returned") },
+            { value: "cancelled", label: t("purchases.status.cancelled") },
+          ]}
+        />
         <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full bg-primary-600 hover:brightness-110 text-white">{t("common.search")}</button>
         <Link href={Routes.PurchaseNew} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98] ml-auto shrink-0"><Plus className="w-4 h-4" />{t("purchases.createNew")}</Link>
       </form>

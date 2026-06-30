@@ -7,6 +7,7 @@ import { Check, Loader2, Pencil, Plus, X, Calculator } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { MoneyInput } from "@/components/ui/money-input";
+import { Select } from "@/components/ui/select";
 import { createPriceBook, renamePriceBook, deletePriceBook, setProductPrice, applyPriceFormulaAll, type PriceFormulaBase } from "@/lib/actions/price-books";
 
 interface Book { id: string; name: string; isDefault: boolean; sortOrder: number; }
@@ -191,11 +192,16 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
                 <div className="text-sm">{t("pricing.formula.newPrice")} <span className="text-primary-600 font-bold">[{formatCurrency(computeNew(r, b.id))}]</span></div>
                 <div className="flex items-center gap-1.5 text-sm flex-wrap">
                   <span className="text-slate-500">{t("pricing.formula.newPrice")} =</span>
-                  <select value={fBase} onChange={(e) => setFBase(e.target.value as PriceFormulaBase)} className="px-2 py-1.5 text-sm rounded-md border border-border bg-surface">
-                    <option value="current">{t("pricing.formula.baseCurrent")}</option>
-                    <option value="cost">{t("pricing.formula.baseCost")}</option>
-                    <option value="lastPurchase">{t("pricing.cols.lastPurchase")}</option>
-                  </select>
+                  <Select
+                    value={fBase}
+                    onChange={(e) => setFBase(e.target.value as PriceFormulaBase)}
+                    size="sm"
+                    options={[
+                      { value: "current", label: t("pricing.formula.baseCurrent") },
+                      { value: "cost", label: t("pricing.formula.baseCost") },
+                      { value: "lastPurchase", label: t("pricing.cols.lastPurchase") },
+                    ]}
+                  />
                   <button type="button" onClick={() => setFOp("+")} className={cn("w-7 h-7 grid place-items-center rounded-full border text-sm", fOp === "+" ? "bg-primary-600 text-white border-primary-600" : "border-border")}>+</button>
                   <button type="button" onClick={() => setFOp("-")} className={cn("w-7 h-7 grid place-items-center rounded-full border text-sm", fOp === "-" ? "bg-primary-600 text-white border-primary-600" : "border-border")}>−</button>
                   <input type="number" min={0} value={fAmount || ""} onChange={(e) => setFAmount(Math.max(0, Number(e.target.value)))} className="no-spinner w-16 px-2 py-1.5 text-right text-sm rounded-md border border-border bg-surface" />

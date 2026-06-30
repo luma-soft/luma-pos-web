@@ -8,6 +8,7 @@ import { getProduct, getProducts, getProductFormOptions } from "@/lib/data/produ
 import { getPriceBooks, getPriceOverridesForProducts } from "@/lib/data/price-books";
 import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
+import { Select } from "@/components/ui/select";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { ProductsTable } from "./products-table";
 import { NewProductForm } from "../../products/new/product-form";
@@ -43,19 +44,29 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         </div>
-        <select name="category" defaultValue={params.category ?? ""} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface">
-          <option value="">{t("products.list.allCategories")}</option>
-          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        <select name="status" defaultValue={status} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface">
-          <option value="active">{t("products.list.statusActive")}</option>
-          <option value="inactive">{t("products.list.statusInactive")}</option>
-          <option value="all">{t("products.list.statusAll")}</option>
-        </select>
-        <select name="view" defaultValue={view} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface">
-          <option value="grouped">{t("products.list.viewGrouped")}</option>
-          <option value="flat">{t("products.list.viewFlat")}</option>
-        </select>
+        <Select
+          name="category"
+          defaultValue={params.category ?? ""}
+          options={[{ value: "", label: t("products.list.allCategories") }, ...categories.map((c) => ({ value: c.id, label: c.name }))]}
+          className="min-w-44"
+        />
+        <Select
+          name="status"
+          defaultValue={status}
+          options={[
+            { value: "active", label: t("products.list.statusActive") },
+            { value: "inactive", label: t("products.list.statusInactive") },
+            { value: "all", label: t("products.list.statusAll") },
+          ]}
+        />
+        <Select
+          name="view"
+          defaultValue={view}
+          options={[
+            { value: "grouped", label: t("products.list.viewGrouped") },
+            { value: "flat", label: t("products.list.viewFlat") },
+          ]}
+        />
         <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full border border-border bg-surface hover:bg-surface-2">{t("common.search")}</button>
       </form>
 

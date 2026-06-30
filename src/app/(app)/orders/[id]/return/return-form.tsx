@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { ArrowLeft, Loader2, RotateCcw } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
+import { Select } from "@/components/ui/select";
 import { createReturn } from "@/lib/actions/returns";
 
 interface ReturnableItem {
@@ -114,15 +115,17 @@ export function ReturnForm({ orderId, orderCode, customerName, customerDebt, has
                     />
                   </td>
                   <td className="px-4 py-3">
-                    <select
+                    <Select
                       value={restock[i.orderItemId] ? "1" : "0"}
                       onChange={(e) => setRestock((m) => ({ ...m, [i.orderItemId]: e.target.value === "1" }))}
                       disabled={q <= 0}
-                      className="px-2 py-1.5 text-xs rounded-md border border-slate-200 dark:border-slate-700 bg-surface disabled:opacity-50"
-                    >
-                      <option value="1">{t("returns.restockYes")}</option>
-                      <option value="0">{t("returns.restockNo")}</option>
-                    </select>
+                      size="sm"
+                      options={[
+                        { value: "1", label: t("returns.restockYes") },
+                        { value: "0", label: t("returns.restockNo") },
+                      ]}
+                      className="text-xs"
+                    />
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums font-medium text-er">
                     {q > 0 ? `− ${formatCurrency(q * i.unitPrice)}` : "—"}
@@ -138,14 +141,18 @@ export function ReturnForm({ orderId, orderCode, customerName, customerDebt, has
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">{t("returns.reason")} *</label>
-            <select value={reason} onChange={(e) => setReason(e.target.value)}
-              className="w-full px-3 py-2 text-sm rounded-lg border border-border bg-surface">
-              <option value="">{t("returns.pickReason")}</option>
-              <option value="defective">{t("returns.reasons.defective")}</option>
-              <option value="wrong_item">{t("returns.reasons.wrong_item")}</option>
-              <option value="changed_mind">{t("returns.reasons.changed_mind")}</option>
-              <option value="other">{t("returns.reasons.other")}</option>
-            </select>
+            <Select
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              options={[
+                { value: "", label: t("returns.pickReason") },
+                { value: "defective", label: t("returns.reasons.defective") },
+                { value: "wrong_item", label: t("returns.reasons.wrong_item") },
+                { value: "changed_mind", label: t("returns.reasons.changed_mind") },
+                { value: "other", label: t("returns.reasons.other") },
+              ]}
+              className="w-full"
+            />
           </div>
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">{t("returns.refundVia")}</label>

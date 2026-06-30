@@ -9,6 +9,7 @@ import { Routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { getOrder, getOrders, type OrderStatusFilter, type OrderPaymentFilter } from "@/lib/data/orders";
 import { Pagination } from "@/components/pagination";
+import { Select } from "@/components/ui/select";
 import { parsePageSize } from "@/lib/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { OrderDetailPanel } from "../../orders/[id]/order-detail-panel";
@@ -64,9 +65,13 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("orders.searchPlaceholder")} aria-label={t("common.search")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         </div>
-        <select name="payment" defaultValue={payment} aria-label={t("orders.cols.payment")} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface">
-          {PAYMENTS.map((p) => <option key={p} value={p}>{t(`orders.paymentFilter.${p}`)}</option>)}
-        </select>
+        <Select
+          name="payment"
+          defaultValue={payment}
+          aria-label={t("orders.cols.payment")}
+          options={PAYMENTS.map((p) => ({ value: p, label: t(`orders.paymentFilter.${p}`) }))}
+          className="min-w-32"
+        />
         <input type="date" name="from" defaultValue={from} aria-label={t("orders.filter.from")} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         <input type="date" name="to" defaultValue={to} aria-label={t("orders.filter.to")} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full bg-primary-600 hover:brightness-110 text-white transition active:scale-[0.98]">{t("common.search")}</button>

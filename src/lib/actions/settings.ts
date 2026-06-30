@@ -93,6 +93,7 @@ export async function updateStorePrefs(patch: StorePrefsPatch): Promise<ActionRe
       .values({ id: "default", prefs: next })
       .onConflictDoUpdate({ target: storeSettings.id, set: { prefs: next, updatedAt: sql`now()` } });
     revalidatePath(Routes.Settings);
+    revalidatePath(Routes.POS);
     return { ok: true, data: undefined };
   } catch (e) {
     console.error("updateStorePrefs failed:", e);

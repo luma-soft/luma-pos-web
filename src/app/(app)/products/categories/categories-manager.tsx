@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Check, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { createCategoryNode, updateCategory, deleteCategory } from "@/lib/actions/products";
 
@@ -127,13 +128,11 @@ export function CategoriesManager({ categories: initial }: { categories: Cat[] }
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">{t("categories.parent")}</label>
-                <select
+                <Select
                   value={newParent} onChange={(e) => setNewParent(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
-                >
-                  <option value="">{t("categories.noParent")}</option>
-                  {roots.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-                </select>
+                  options={[{ value: "", label: t("categories.noParent") }, ...roots.map((r) => ({ value: r.id, label: r.name }))]}
+                  className="w-full border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900"
+                />
               </div>
             </div>
             <div className="flex justify-end gap-2 px-4 py-3 border-t border-slate-200 dark:border-slate-800">

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Search, Plus, Minus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, ChevronDown, Printer, MoreVertical, CheckCircle2 } from "lucide-react";
+import { Search, Plus, Minus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, ChevronDown, Printer, MoreVertical, CheckCircle2, FileText, ClipboardList, UserPlus } from "lucide-react";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
 import { normalizeSearch } from "@/lib/normalize";
 import { createPortal } from "react-dom";
@@ -11,12 +11,14 @@ import { Combobox } from "@/components/combobox";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { MoneyInput } from "@/components/ui/money-input";
+import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
 import { PrintDoc } from "@/components/print/print-doc";
 import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
 import { CustomerCreateDialog, type CustomerCreateResult } from "@/components/partners/customer-create-dialog";
 import type { PaperSize, PrintTemplate } from "@/lib/print/template-shared";
+import type { StorePrefs } from "@/lib/schemas/settings";
 import type { AiActionPreview } from "@/lib/ai/actions";
 import { createOrder } from "@/lib/actions/orders";
 import { searchPosProducts } from "@/lib/actions/pos-search";
@@ -66,6 +68,7 @@ type PosAiCartDraftPayload = {
 };
 
 type PayMethod = "cash" | "bank_transfer" | "credit";
+type PosDraftKind = "invoice" | "quote" | "booking";
 type PosPrintPaymentQr = {
   title: string;
   qrImageUrl: string;
@@ -142,12 +145,14 @@ export type PosSourceInvoice = {
 /** Bảng giá áp cho hóa đơn = id bảng giá ("" = bảng giá mặc định/giá lẻ). */
 export type PriceBook = string;
 
-interface Invoice {
+interface PosDraft {
   id: string;
+  kind: PosDraftKind;
   cart: CartLine[];
   customerId: string;
   projectId: string;
   projectName: string;
+  deliveryDate?: string;
   priceBook: PriceBook;
   discountInput: number;
   discountMode: "vnd" | "pct";
@@ -165,20 +170,25 @@ const AI_POS_DRAFT_KEY = "luma-pos-ai-cart-draft";
 const FIRST_INV_ID = "inv-1"; // id ổn định cho SSR (tránh hydration mismatch)
 
 /** Đơn rỗng. id truyền vào để lần đầu dùng id cố định, các tab sau dùng Date.now. */
-function makeInvoice(id?: string): Invoice {
+function makeDraft(id?: string, kind: PosDraftKind = "invoice"): PosDraft {
   return {
     id: id ?? `inv-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+    kind,
     cart: [], customerId: "", projectId: "", projectName: "", priceBook: "",
     discountInput: 0, discountMode: "vnd", taxRate: 0,
     shippingFee: 0, payMethod: "cash", paidInput: null,
   };
 }
 
-function makeInvoiceFromSource(source: PosSourceInvoice, products: PosProduct[], id = FIRST_INV_ID): Invoice {
+function makeInvoice(id?: string): PosDraft {
+  return makeDraft(id, "invoice");
+}
+
+function makeInvoiceFromSource(source: PosSourceInvoice, products: PosProduct[], id = FIRST_INV_ID): PosDraft {
   const afterDiscount = Math.max(0, (source.subtotal ?? 0) - (source.discount ?? 0));
   const taxRate = afterDiscount > 0 && source.tax ? Math.round(((source.tax / afterDiscount) * 100) * 100) / 100 : 0;
   return {
-    ...makeInvoice(id),
+    ...makeDraft(id, "invoice"),
     cart: (source.items ?? []).flatMap((item) => {
       const product = products.find((p) => p.id === item.productId);
       if (!product) return [];
@@ -206,18 +216,22 @@ function makeInvoiceFromSource(source: PosSourceInvoice, products: PosProduct[],
   };
 }
 
-function normalizeInvoice(raw: Record<string, unknown>): Invoice {
-  const base = makeInvoice(raw.id as string | undefined);
+function draftKind(raw: unknown): PosDraftKind {
+  return raw === "quote" || raw === "booking" ? raw : "invoice";
+}
+
+function normalizeInvoice(raw: Record<string, unknown>): PosDraft {
+  const base = makeDraft(raw.id as string | undefined, draftKind(raw.kind));
   return {
     ...base,
-    ...(raw as Partial<Invoice>),
+    ...(raw as Partial<PosDraft>),
     discountInput: (raw.discountInput as number | undefined) ?? (raw.discount as number | undefined) ?? 0,
     discountMode: (raw.discountMode as "vnd" | "pct" | undefined) ?? "vnd",
     taxRate: (raw.taxRate as number | undefined) ?? 0,
   };
 }
 
-function loadInvoices(): Invoice[] | null {
+function loadInvoices(): PosDraft[] | null {
   try {
     const raw = JSON.parse(localStorage.getItem(INV_KEY) ?? "null") as Record<string, unknown>[] | null;
     if (!raw || raw.length === 0) return null;
@@ -227,7 +241,7 @@ function loadInvoices(): Invoice[] | null {
   }
 }
 
-function saveInvoices(list: Invoice[]) {
+function saveInvoices(list: PosDraft[]) {
   try {
     localStorage.setItem(INV_KEY, JSON.stringify(list));
   } catch { /* đầy quota — bỏ qua */ }
@@ -347,18 +361,22 @@ export function PosClient({
   data,
   printTemplate,
   quotePrintTemplate,
+  bookingPrintTemplate,
   initialSourceInvoice,
+  posPrefs,
 }: {
   data: PosData;
   printTemplate: PrintTemplate;
   quotePrintTemplate: PrintTemplate;
+  bookingPrintTemplate: PrintTemplate;
   initialSourceInvoice?: PosSourceInvoice | null;
+  posPrefs: StorePrefs["pos"];
 }) {
   const t = useTranslations();
 
   const [sourceInvoice] = useState<PosSourceInvoice | null>(initialSourceInvoice ?? null);
   const [search, setSearch] = useState("");
-  const [submittingMode, setSubmittingMode] = useState<"sale" | "quote" | null>(null);
+  const [submittingMode, setSubmittingMode] = useState<"sale" | "quote" | "booking" | null>(null);
   const submitting = submittingMode !== null;
   const [error, setError] = useState("");
   const [sepayCheckout, setSepayCheckout] = useState<SepayCheckout | null>(null);
@@ -372,7 +390,7 @@ export function PosClient({
   const [variantParent, setVariantParent] = useState<PosProduct | null>(null);
   const [browsing, setBrowsing] = useState(false); // click vào ô tìm → mở dropdown SP
   const searchRef = useRef<HTMLDivElement>(null);
-  const [printMenuOpen, setPrintMenuOpen] = useState(false); // chọn khổ in
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [printSize, setPrintSize] = useState<PaperSize | null>(null); // đang in phiếu tạm
   const [printDefaultSize, setPrintDefaultSize] = useState<PaperSize>(printTemplate.paperDefault);
   const [printJob, setPrintJob] = useState<PosPrintJob | null>(null);
@@ -410,7 +428,7 @@ export function PosClient({
   const [editKey, setEditKey] = useState<string | null>(null); // dòng đang mở popup sửa giá
 
   // nhiều hóa đơn cùng lúc (tab). id đầu cố định để khớp SSR.
-  const [invoices, setInvoices] = useState<Invoice[]>(() => [
+  const [invoices, setInvoices] = useState<PosDraft[]>(() => [
     initialSourceInvoice ? makeInvoiceFromSource(initialSourceInvoice, data.products, FIRST_INV_ID) : makeInvoice(FIRST_INV_ID),
   ]);
   const [activeId, setActiveId] = useState(FIRST_INV_ID);
@@ -475,13 +493,17 @@ export function PosClient({
   }, [sepayCheckout, printDefaultSize]);
 
   const active = invoices.find((i) => i.id === activeId) ?? invoices[0];
-  const { cart, customerId, projectId, projectName, discountInput, discountMode, taxRate, shippingFee, payMethod, paidInput, note: orderNote } = active;
+  const { cart, customerId, projectId, projectName, deliveryDate, discountInput, discountMode, taxRate, shippingFee, payMethod, paidInput, note: orderNote } = active;
+  const activeKind = active.kind ?? "invoice";
+  const isInvoiceDraft = activeKind === "invoice";
+  const isQuoteDraft = activeKind === "quote";
+  const isBookingDraft = activeKind === "booking";
   const priceBook: PriceBook = active.priceBook ?? ""; // "" = bảng giá mặc định
   const defaultBook = data.priceBooks.find((b) => b.isDefault) ?? data.priceBooks[0];
   const isDefaultBook = !priceBook || priceBook === defaultBook?.id;
 
   /** Patch hóa đơn đang mở (nhận object hoặc hàm cập nhật). */
-  const patchActive = useCallback((patch: Partial<Invoice> | ((inv: Invoice) => Partial<Invoice>)) => {
+  const patchActive = useCallback((patch: Partial<PosDraft> | ((inv: PosDraft) => Partial<PosDraft>)) => {
     setInvoices((list) =>
       list.map((inv) => (inv.id === activeId ? { ...inv, ...(typeof patch === "function" ? patch(inv) : patch) } : inv))
     );
@@ -491,6 +513,7 @@ export function PosClient({
     patchActive((inv) => ({ cart: typeof v === "function" ? v(inv.cart) : v })), [patchActive]);
   const setProjectId = (v: string) => patchActive({ projectId: v });
   const setProjectName = (v: string) => patchActive({ projectName: v });
+  const setDeliveryDate = (v: string) => patchActive({ deliveryDate: v });
   const setDiscountInput = (v: number) => patchActive({ discountInput: v });
   const setDiscountMode = (v: "vnd" | "pct") => patchActive({ discountMode: v });
   const setTaxRate = (v: number) => patchActive({ taxRate: v });
@@ -499,11 +522,12 @@ export function PosClient({
   const setPayMethod = (v: PayMethod) => patchActive({ payMethod: v });
   const setPaidInput = (v: number | null) => patchActive({ paidInput: v });
 
-  /** Thêm tab hóa đơn mới và chuyển sang nó. */
-  function addInvoice() {
-    const inv = makeInvoice();
+  /** Thêm tab POS mới và chuyển sang nó. */
+  function addDraft(kind: PosDraftKind) {
+    const inv = makeDraft(undefined, kind);
     setInvoices((list) => [...list, inv]);
     setActiveId(inv.id);
+    setAddMenuOpen(false);
     setError("");
   }
 
@@ -537,7 +561,7 @@ export function PosClient({
 
   /** Khi chỉ có một tab, nút X sẽ làm trống hóa đơn thay vì đóng tab. */
   function clearInvoice(id: string) {
-    setInvoices((list) => list.map((inv) => (inv.id === id ? makeInvoice(id) : inv)));
+    setInvoices((list) => list.map((inv) => (inv.id === id ? makeDraft(id, inv.kind ?? "invoice") : inv)));
     setActiveId(id);
     setError("");
     setAiUnresolvedItems([]);
@@ -656,7 +680,6 @@ export function PosClient({
   function startPrint(job: PosPrintJob, size = printDefaultSize) {
     setPrintJob(job);
     setPrintSize(size);
-    setPrintMenuOpen(false);
   }
 
   function buildPrintJob(input: { template: PrintTemplate; title: string; code: string; paymentQr?: PosPrintPaymentQr | null }): PosPrintJob {
@@ -676,9 +699,9 @@ export function PosClient({
         shipping: shippingFee,
       },
       grandTotal: total,
-      paid: payableAmount,
-      remaining,
-      payMethod,
+      paid: isInvoiceDraft ? payableAmount : 0,
+      remaining: isInvoiceDraft ? remaining : total,
+      payMethod: isInvoiceDraft ? payMethod : "credit",
       paymentQr: input.paymentQr ?? null,
     };
   }
@@ -887,8 +910,9 @@ export function PosClient({
     setCart((c) => c.map((l) => (l.key === key ? { ...l, quantity: Math.max(0, qty) } : l)).filter((l) => l.quantity > 0));
   }
 
-  async function submitOrder(mode: "sale" | "quote") {
+  async function submitOrder(mode: "sale" | "quote" | "booking") {
     if (cart.length === 0 || !data.warehouse || submitting) return;
+    const isCheckoutMode = mode === "sale";
     if (mode === "sale" && payMethod === "credit" && !customerId) {
       setError(t("pos.errors.creditNeedsCustomer"));
       return;
@@ -897,7 +921,7 @@ export function PosClient({
       setError(t("pos.sepay.invalidAmount"));
       return;
     }
-    if (sourceInvoice && mode === "quote") {
+    if (sourceInvoice && mode !== "sale") {
       setError(t("pos.invoiceEdit.saleOnly"));
       return;
     }
@@ -913,6 +937,7 @@ export function PosClient({
       warehouseId: data.warehouse.id,
       projectId: projectId || null,
       projectName: projectName || undefined,
+      deliveryDate: mode === "booking" && deliveryDate ? deliveryDate : undefined,
       discount: discountVnd,
       taxRate,
       shippingFee,
@@ -926,7 +951,7 @@ export function PosClient({
         manualUnitPrice: l.manualPrice ? l.unitPrice : undefined,
         lineDiscount: l.lineDiscount ?? 0,
       })),
-      payment: { method: payMethod, amount: mode === "quote" || payMethod === "bank_transfer" ? 0 : paid },
+      payment: { method: isCheckoutMode ? payMethod : "credit", amount: isCheckoutMode && payMethod !== "bank_transfer" ? paid : 0 },
     };
     setSubmittingMode(mode);
     setError("");
@@ -987,13 +1012,13 @@ export function PosClient({
           return;
         }
         const printJob = buildPrintJob({
-          template: mode === "quote" ? quotePrintTemplate : printTemplate,
-          title: mode === "quote" ? t("print.titles.quote") : t("print.titles.order"),
+          template: mode === "quote" ? quotePrintTemplate : mode === "booking" ? bookingPrintTemplate : printTemplate,
+          title: mode === "quote" ? t("print.titles.quote") : mode === "booking" ? t("print.titles.booking") : t("print.titles.order"),
           code: res.data.code,
         });
         setSubmittingMode(null);
         closeInvoice(activeId);
-        startPrint(printJob, mode === "quote" ? quotePrintTemplate.paperDefault : printDefaultSize);
+        startPrint(printJob, mode === "quote" ? quotePrintTemplate.paperDefault : mode === "booking" ? bookingPrintTemplate.paperDefault : printDefaultSize);
       } else {
         setSubmittingMode(null);
         setError(t(res.error));
@@ -1019,7 +1044,7 @@ export function PosClient({
     setOfflineSaved(true);
     setTimeout(() => setOfflineSaved(false), 3500);
   }
-  const checkout = () => submitOrder("sale");
+  const submitActiveDraft = () => submitOrder(isQuoteDraft ? "quote" : isBookingDraft ? "booking" : "sale");
 
   /** Mở in phiếu tạm theo khổ đã chọn. */
   const doPrint = (size: PaperSize) => {
@@ -1062,6 +1087,9 @@ export function PosClient({
       {invoices.map((inv, idx) => {
         const count = inv.cart.reduce((s, l) => s + l.quantity, 0);
         const isActive = inv.id === activeId;
+        const kind = inv.kind ?? "invoice";
+        const ordinal = invoices.slice(0, idx + 1).filter((item) => (item.kind ?? "invoice") === kind).length;
+        const TabIcon = kind === "quote" ? FileText : kind === "booking" ? ClipboardList : ShoppingCart;
         return (
           <div
             key={inv.id}
@@ -1073,8 +1101,8 @@ export function PosClient({
                 : "bg-surface border-border text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
             )}
           >
-            <ShoppingCart className={cn("w-4 h-4 shrink-0", isActive ? "text-primary-600" : "text-slate-400")} />
-            <span>{t("pos.invoice.tab", { n: idx + 1 })}</span>
+            <TabIcon className={cn("w-4 h-4 shrink-0", isActive ? "text-primary-600" : "text-slate-400")} />
+            <span>{t(`pos.draftTabs.${kind}`, { n: ordinal })}</span>
             {count > 0 && (
               <span className={cn(
                 "min-w-[20px] text-center rounded-full px-1.5 text-xs font-bold",
@@ -1099,13 +1127,36 @@ export function PosClient({
           </div>
         );
       })}
-      <button
-        onClick={addInvoice}
-        title={t("pos.invoice.add")}
-        className="shrink-0 px-3 py-2.5 rounded-lg border border-border text-slate-400 hover:text-primary-600 hover:border-primary-300"
-      >
-        <Plus className="w-4 h-4" />
-      </button>
+      <div className="relative shrink-0">
+        <button
+          onClick={() => setAddMenuOpen((open) => !open)}
+          title={t("pos.draftTabs.addLabel")}
+          className="h-full px-3 py-2.5 rounded-lg border border-border text-slate-400 hover:text-primary-600 hover:border-primary-300"
+        >
+          <Plus className="w-4 h-4" />
+        </button>
+        {addMenuOpen && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setAddMenuOpen(false)} />
+            <div className="absolute left-0 top-full z-50 mt-1 min-w-[190px] overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-e2">
+              {(["invoice", "quote", "booking"] as PosDraftKind[]).map((kind) => {
+                const ItemIcon = kind === "quote" ? FileText : kind === "booking" ? ClipboardList : ShoppingCart;
+                return (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => addDraft(kind)}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2"
+                  >
+                    <ItemIcon className="h-4 w-4 text-slate-400" />
+                    {t(`pos.draftTabs.add.${kind}`)}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 
@@ -1122,6 +1173,7 @@ export function PosClient({
         {cart.map((l, idx) => {
           const m2 = l.product.m2PerUnit ? Number(l.product.m2PerUnit) * l.unitMultiplier * l.quantity : 0;
           const eff = effPrice(l);
+          const outOfStock = Number(l.product.stock) <= 0;
           return (
             <div
               key={l.key}
@@ -1168,7 +1220,7 @@ export function PosClient({
                   >
                     <GripVertical className="w-3.5 h-3.5" />
                   </button>
-                  <span className="font-medium text-sm line-clamp-2 break-words">{l.product.name}</span>
+                  <span className={cn("font-medium text-sm line-clamp-2 break-words", outOfStock && "text-er")}>{l.product.name}</span>
                   {eff.pct > 0 && (
                     <span className={cn(
                       "shrink-0 text-xs font-bold rounded px-1",
@@ -1177,29 +1229,45 @@ export function PosClient({
                   )}
                   {m2 > 0 && <span className="shrink-0 text-xs text-primary-600">≈{m2.toFixed(1)}m²</span>}
                 </div>
-                <select
+                <Select
                   value={l.unitName}
                   onChange={(e) => changeUnit(l.key, e.target.value)}
-                  className="shrink-0 text-sm px-2 py-1.5 rounded-md border border-border bg-surface"
-                >
-                  <option value={l.product.baseUnit}>{l.product.baseUnit}</option>
-                  {l.product.units.map((u) => (
-                    <option key={u.unitName} value={u.unitName}>{u.unitName}</option>
-                  ))}
-                </select>
-                <div className="flex items-center shrink-0">
-                  <button onClick={() => updateQty(l.key, -1)} className="w-8 h-8 rounded-l-md border border-border border-r-0 grid place-items-center text-slate-500 hover:text-er hover:bg-surface-2">
+                  size="sm"
+                  options={[
+                    { value: l.product.baseUnit, label: l.product.baseUnit },
+                    ...l.product.units.map((u) => ({ value: u.unitName, label: u.unitName })),
+                  ]}
+                  className="min-w-20 shrink-0 font-medium text-slate-700 dark:text-slate-200"
+                />
+                <div className={cn("group relative flex items-center shrink-0", outOfStock && "text-er")}>
+                  <button
+                    onClick={() => updateQty(l.key, -1)}
+                    className={cn(
+                      "w-8 h-8 rounded-l-md border border-border border-r-0 grid place-items-center text-slate-500 hover:text-er hover:bg-surface-2",
+                      outOfStock && "border-er text-er hover:bg-red-50 dark:hover:bg-red-950/20"
+                    )}
+                  >
                     <Minus className="w-3.5 h-3.5" />
                   </button>
                   <input
                     type="number"
                     value={l.quantity}
                     onChange={(e) => setQty(l.key, Number(e.target.value))}
-                    className="no-spinner w-12 py-1.5 text-center text-sm border-y border-border bg-surface"
+                    className={cn(
+                      "no-spinner w-12 py-1.5 text-center text-sm border-y border-border bg-surface",
+                      outOfStock && "border-er text-er"
+                    )}
                   />
-                  <button onClick={() => updateQty(l.key, 1)} className="w-8 h-8 rounded-r-md border border-border border-l-0 grid place-items-center text-slate-500 hover:text-primary-600 hover:bg-surface-2">
+                  <button
+                    onClick={() => updateQty(l.key, 1)}
+                    className={cn(
+                      "w-8 h-8 rounded-r-md border border-border border-l-0 grid place-items-center text-slate-500 hover:text-primary-600 hover:bg-surface-2",
+                      outOfStock && "border-er text-er hover:text-er hover:bg-red-50 dark:hover:bg-red-950/20"
+                    )}
+                  >
                     <Plus className="w-3.5 h-3.5" />
                   </button>
+                  <StockQuantityTooltip stock={Number(l.product.stock)} ordered={l.quantity * l.unitMultiplier} unit={l.product.baseUnit} />
                 </div>
                 <button
                   onClick={() => setEditKey(editKey === l.key ? null : l.key)}
@@ -1401,15 +1469,35 @@ export function PosClient({
                           </div>
                           <div className="flex items-center justify-end gap-2 w-auto sm:w-64 shrink-0">
                             {line && (
-                              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                <button onClick={() => updateQty(line.key, -1)} className="w-8 h-8 rounded border border-border grid place-items-center"><Minus className="w-3.5 h-3.5" /></button>
+                              <div className="group relative flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  onClick={() => updateQty(line.key, -1)}
+                                  className={cn(
+                                    "w-8 h-8 rounded border border-border grid place-items-center",
+                                    stock <= 0 && "border-er text-er"
+                                  )}
+                                >
+                                  <Minus className="w-3.5 h-3.5" />
+                                </button>
                                 <input
                                   type="number"
                                   value={line.quantity}
                                   onChange={(e) => setQty(line.key, Number(e.target.value))}
-                                  className="no-spinner w-12 px-1 py-1 text-center text-sm rounded border border-border bg-surface"
+                                  className={cn(
+                                    "no-spinner w-12 px-1 py-1 text-center text-sm rounded border border-border bg-surface",
+                                    stock <= 0 && "border-er text-er"
+                                  )}
                                 />
-                                <button onClick={() => updateQty(line.key, 1)} className="w-8 h-8 rounded border border-border grid place-items-center"><Plus className="w-3.5 h-3.5" /></button>
+                                <button
+                                  onClick={() => updateQty(line.key, 1)}
+                                  className={cn(
+                                    "w-8 h-8 rounded border border-border grid place-items-center",
+                                    stock <= 0 && "border-er text-er"
+                                  )}
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                </button>
+                                <StockQuantityTooltip stock={stock} ordered={line.quantity * line.unitMultiplier} unit={p.baseUnit} />
                               </div>
                             )}
                             <div className="text-sm font-semibold text-primary-600 tabular-nums text-right w-24 sm:w-32">
@@ -1462,25 +1550,17 @@ export function PosClient({
         {/* customer + bảng giá */}
         <div className="p-3 border-b border-border space-y-2">
           <div className="flex gap-2">
-            <div className="flex flex-1 min-w-0 gap-1.5">
+            <div className="flex flex-1 min-w-0">
               <Combobox
                 value={customerId}
                 onChange={changeCustomer}
                 placeholder={t("pos.walkInCustomer")}
                 className="min-w-0 flex-1"
                 options={customerOptions.map((c) => ({ value: c.id, label: c.name, hint: c.phone ?? undefined }))}
+                actionLabel={t("customers.createNew")}
+                actionIcon={<UserPlus className="h-4 w-4" />}
+                onAction={() => setCustomerCreateOpen(true)}
               />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => setCustomerCreateOpen(true)}
-                title={t("customers.createNew")}
-                aria-label={t("customers.createNew")}
-                className="h-10 w-10 shrink-0 rounded-[10px]"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
             </div>
             <Combobox
               value={priceBook || defaultBook?.id || ""}
@@ -1500,22 +1580,35 @@ export function PosClient({
               {t("pos.customerDebt", { debt: formatCurrency(Number(customer.currentDebt)) })}
             </p>
           )}
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <Combobox
-                value={projectId}
-                onChange={(id) => { setProjectId(id); const pj = data.projects.find((p) => p.id === id); if (pj) setProjectName(pj.name); }}
-                placeholder={t("pos.noProject")}
-                options={data.projects.filter((p) => !customerId || !p.customerId || p.customerId === customerId).map((p) => ({ value: p.id, label: p.name }))}
+          {posPrefs.showProjectFields && (
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <Combobox
+                  value={projectId}
+                  onChange={(id) => { setProjectId(id); const pj = data.projects.find((p) => p.id === id); if (pj) setProjectName(pj.name); }}
+                  placeholder={t("pos.noProject")}
+                  options={data.projects.filter((p) => !customerId || !p.customerId || p.customerId === customerId).map((p) => ({ value: p.id, label: p.name }))}
+                />
+              </div>
+              <input
+                value={projectName}
+                onChange={(e) => { setProjectName(e.target.value); setProjectId(""); }}
+                placeholder={t("pos.projectPlaceholder")}
+                className="flex-1 px-3 py-2 text-sm rounded-lg border border-border bg-surface"
               />
             </div>
-            <input
-              value={projectName}
-              onChange={(e) => { setProjectName(e.target.value); setProjectId(""); }}
-              placeholder={t("pos.projectPlaceholder")}
-              className="flex-1 px-3 py-2 text-sm rounded-lg border border-border bg-surface"
-            />
-          </div>
+          )}
+          {isBookingDraft && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500">{t("pos.deliveryTime")}</label>
+              <input
+                type="datetime-local"
+                value={deliveryDate ?? ""}
+                onChange={(e) => setDeliveryDate(e.target.value)}
+                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+              />
+            </div>
+          )}
         </div>
 
         {/* totals + payment — đẩy lên ngay dưới khách hàng */}
@@ -1556,56 +1649,65 @@ export function PosClient({
 
         {/* phương thức + nút — ghim đáy panel */}
         <div className="p-3 border-t border-border space-y-2 text-sm">
-          <div className="grid grid-cols-3 gap-1.5">
-            {(["cash", "bank_transfer", "credit"] as PayMethod[]).map((m) => (
-              <button
-                key={m}
-                onClick={() => setPayMethod(m)}
-                className={cn(
-                  "py-1.5 rounded-lg text-xs font-medium border",
-                  payMethod === m
-                    ? "bg-primary-600 text-white border-primary-600"
-                    : "border-border text-slate-600 dark:text-slate-300"
-                )}
-              >
-                {t(`pos.payMethods.${m}`)}
-              </button>
-            ))}
-          </div>
+          {isInvoiceDraft ? (
+            <>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(["cash", "bank_transfer", "credit"] as PayMethod[]).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setPayMethod(m)}
+                    className={cn(
+                      "py-1.5 rounded-lg text-xs font-medium border",
+                      payMethod === m
+                        ? "bg-primary-600 text-white border-primary-600"
+                        : "border-border text-slate-600 dark:text-slate-300"
+                    )}
+                  >
+                    {t(`pos.payMethods.${m}`)}
+                  </button>
+                ))}
+              </div>
 
-          {/* hàng "khách trả" luôn render để không nhảy layout khi đổi ghi nợ */}
-          <div className="flex justify-between items-center gap-2">
-            <span className="text-slate-500">
-              {payMethod === "credit" ? t("pos.payMethods.credit") : t("pos.paidAmount")}
-            </span>
-            {payMethod !== "credit" ? (
-              <MoneyInput
-                value={paidInput ?? total}
-                onChange={(v) => setPaidInput(v ?? 0)}
-                className="no-spinner w-36 px-2 py-1 text-right text-sm rounded-md border border-border bg-surface"
-              />
-            ) : (
-              <span className="w-36 px-2 py-1 text-right text-sm font-semibold text-warn tabular-nums border border-transparent">
-                {formatCurrency(total)}
-              </span>
-            )}
-          </div>
-          {payMethod !== "credit" && remaining > 0 && (
-            <p className="text-xs text-warn text-right">
-              {t("pos.willOweAmount", { amount: formatCurrency(remaining) })}
-            </p>
+              {/* hàng "khách trả" luôn render để không nhảy layout khi đổi ghi nợ */}
+              <div className="flex justify-between items-center gap-2">
+                <span className="text-slate-500">
+                  {payMethod === "credit" ? t("pos.payMethods.credit") : t("pos.paidAmount")}
+                </span>
+                {payMethod !== "credit" ? (
+                  <MoneyInput
+                    value={paidInput ?? total}
+                    onChange={(v) => setPaidInput(v ?? 0)}
+                    className="no-spinner w-36 px-2 py-1 text-right text-sm rounded-md border border-border bg-surface"
+                  />
+                ) : (
+                  <span className="w-36 px-2 py-1 text-right text-sm font-semibold text-warn tabular-nums border border-transparent">
+                    {formatCurrency(total)}
+                  </span>
+                )}
+              </div>
+              {payMethod !== "credit" && remaining > 0 && (
+                <p className="text-xs text-warn text-right">
+                  {t("pos.willOweAmount", { amount: formatCurrency(remaining) })}
+                </p>
+              )}
+            </>
+          ) : (
+            <div className="flex justify-between rounded-lg border border-border bg-surface-2 px-3 py-2">
+              <span className="text-slate-500">{t(isQuoteDraft ? "pos.quoteAmount" : "pos.customerDue")}</span>
+              <span className="font-semibold tabular-nums">{formatCurrency(total)}</span>
+            </div>
           )}
           <div className="flex items-center justify-between gap-2">
             <span className="text-slate-500">{t("pos.defaultPrintTemplate")}</span>
-            <select
+            <PrintSizePicker
               value={printDefaultSize}
-              onChange={(event) => changePrintDefaultSize(event.target.value as PaperSize)}
-              className="h-8 rounded-lg border border-border bg-surface px-2 text-xs font-medium"
-            >
-              <option value="a4">{t("pos.printA4Short")}</option>
-              <option value="a5">{t("pos.printA5Short")}</option>
-              <option value="k80">{t("pos.printK80Short")}</option>
-            </select>
+              options={[
+                { value: "a4", label: t("pos.printA4Short") },
+                { value: "a5", label: t("pos.printA5Short") },
+                { value: "k80", label: t("pos.printK80Short") },
+              ]}
+              onChange={changePrintDefaultSize}
+            />
           </div>
           {error && <p className="text-xs text-red-600">{error}</p>}
 
@@ -1613,38 +1715,29 @@ export function PosClient({
             <div className="relative">
               <button
                 disabled={cart.length === 0 || submitting}
-                onClick={() => setPrintMenuOpen((o) => !o)}
+                onClick={() => doPrint(printDefaultSize)}
                 title={t("pos.printSlip")}
                 className="h-full px-3 py-3 rounded-xl border border-border text-sm font-medium disabled:opacity-50 whitespace-nowrap inline-flex items-center gap-1.5"
               >
                 <Printer className="w-4 h-4" />
                 {t("pos.printSlip")}
               </button>
-              {printMenuOpen && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setPrintMenuOpen(false)} />
-                  <div className="absolute bottom-full mb-1 left-0 z-50 min-w-[150px] bg-surface border border-border rounded-lg shadow-e2 overflow-hidden py-1">
-                    <button onClick={() => doPrint("a4")} className="w-full text-left px-3 py-2 text-sm hover:bg-surface-2">{t("pos.printA4")}</button>
-                    <button onClick={() => doPrint("a5")} className="w-full text-left px-3 py-2 text-sm hover:bg-surface-2">{t("pos.printA5")}</button>
-                    <button onClick={() => doPrint("k80")} className="w-full text-left px-3 py-2 text-sm hover:bg-surface-2">{t("pos.printK80")}</button>
-                  </div>
-                </>
-              )}
             </div>
             <button
-              disabled={cart.length === 0 || submitting || !data.warehouse || !!sourceInvoice}
-              onClick={() => submitOrder("quote")}
-              className="px-3 py-3 rounded-xl border border-border text-sm font-medium disabled:opacity-50 whitespace-nowrap"
-            >
-              {submittingMode === "quote" ? <Loader2 className="mr-1 inline h-4 w-4 animate-spin align-[-2px]" /> : "📑"} {t("pos.saveQuote")}
-            </button>
-            <button
               disabled={cart.length === 0 || submitting || !data.warehouse || !!sepayCheckout}
-              onClick={checkout}
+              onClick={submitActiveDraft}
               className="flex-1 py-3 rounded-xl bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2"
             >
-              {submittingMode === "sale" && <Loader2 className="w-4 h-4 animate-spin" />}
-              {isEditMode ? t("pos.invoiceEdit.saveEdited") : isCopyMode ? t("pos.invoiceEdit.createCopy") : t("pos.checkout")} · {formatCurrency(total)}
+              {submittingMode !== null && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isEditMode
+                ? t("pos.invoiceEdit.saveEdited")
+                : isCopyMode
+                  ? t("pos.invoiceEdit.createCopy")
+                  : isQuoteDraft
+                    ? t("pos.saveQuote")
+                    : isBookingDraft
+                      ? t("pos.placeBooking")
+                      : t("pos.checkout")} · {formatCurrency(total)}
             </button>
           </div>
           {isEditMode && (
@@ -1879,6 +1972,92 @@ function SummaryAdjustRow({
           {hint ?? "\u00a0"}
         </Text>
       </div>
+    </div>
+  );
+}
+
+function StockQuantityTooltip({ stock, ordered, unit }: { stock: number; ordered: number; unit: string }) {
+  return (
+    <div className="pointer-events-none absolute left-1/2 top-full z-60 mt-2 min-w-34 -translate-x-1/2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-semibold text-slate-800 opacity-0 shadow-e2 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 dark:text-slate-100">
+      <div>{`Tồn: ${formatNumber(stock)} ${unit}`}</div>
+      <div>{`Đặt: ${formatNumber(ordered)} ${unit}`}</div>
+    </div>
+  );
+}
+
+function PrintSizePicker({
+  value,
+  options,
+  onChange,
+}: {
+  value: PaperSize;
+  options: { value: PaperSize; label: string }[];
+  onChange: (value: PaperSize) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = options.find((option) => option.value === value) ?? options[0];
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative w-28">
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className={cn(
+          "flex h-8 w-full items-center justify-between gap-2 rounded-lg border border-border bg-surface px-2.5 text-left text-xs font-semibold",
+          "transition hover:bg-surface-2 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
+        )}
+      >
+        <span className="truncate">{selected?.label}</span>
+        <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div
+          role="listbox"
+          className="absolute bottom-full right-0 z-50 mb-1 w-32 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-e2"
+        >
+          {options.map((option) => {
+            const active = option.value === value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={active}
+                onClick={() => {
+                  onChange(option.value);
+                  setOpen(false);
+                }}
+                className={cn(
+                  "flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-surface-2",
+                  active && "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-200"
+                )}
+              >
+                <span>{option.label}</span>
+                {active && <CheckCircle2 className="h-4 w-4 text-primary-600" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

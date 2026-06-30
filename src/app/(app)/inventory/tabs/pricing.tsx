@@ -8,6 +8,7 @@ import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
 import { PricingTable } from "../../pricing/pricing-table";
 import { TableSkeleton } from "@/components/table-skeleton";
+import { Select } from "@/components/ui/select";
 
 type SP = Record<string, string | undefined>;
 type PriceBook = Awaited<ReturnType<typeof getPriceBooks>>[number];
@@ -32,10 +33,12 @@ export async function PricingTab({ searchParams }: { searchParams: SP }) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         </div>
-        <select name="category" defaultValue={params.category ?? ""} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface">
-          <option value="">{t("products.list.allCategories")}</option>
-          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
+        <Select
+          name="category"
+          defaultValue={params.category ?? ""}
+          options={[{ value: "", label: t("products.list.allCategories") }, ...categories.map((c) => ({ value: c.id, label: c.name }))]}
+          className="min-w-44"
+        />
         <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full border border-border bg-surface hover:bg-surface-2">{t("common.search")}</button>
       </form>
 

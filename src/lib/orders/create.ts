@@ -47,6 +47,7 @@ export async function createOrderForUser(
 
   // Server tự tính tiền — không tin client
   const isQuote = v.mode === "quote";
+  const isBooking = v.mode === "booking";
   let trustedItems;
   try {
     trustedItems = await normalizeOrderItems(v.items, v.priceBookId);
@@ -61,7 +62,7 @@ export async function createOrderForUser(
   const afterDiscount = Math.max(0, subtotal - v.discount);
   const tax = Math.round((afterDiscount * v.taxRate) / 100);
   const total = Math.max(0, afterDiscount + tax + v.shippingFee);
-  const paid = isQuote || v.payment.method === "credit" ? 0 : Math.min(v.payment.amount, total);
+  const paid = isQuote || isBooking || v.payment.method === "credit" ? 0 : Math.min(v.payment.amount, total);
   const remaining = total - paid;
   const paymentStatus = paid >= total ? "paid" : paid > 0 ? "deposit" : "unpaid";
 
@@ -138,7 +139,7 @@ export async function createOrderForUser(
       const orderInsert: typeof orders.$inferInsert = {
         code: generateCode(isQuote ? "BG" : "DH"),
         clientId: v.clientId ?? null,
-        status: isQuote ? "quote" : "completed",
+        status: isQuote ? "quote" : isBooking ? "confirmed" : "completed",
         paymentStatus,
         shiftId: currentShift?.id ?? null,
         customerId: v.customerId ?? null,
@@ -146,6 +147,7 @@ export async function createOrderForUser(
         projectId: v.projectId ?? null,
         projectName: v.projectName || null,
         deliveryAddress: v.deliveryAddress || null,
+        deliveryDate: v.deliveryDate ?? null,
         subtotal: toMoney(subtotal),
         discount: toMoney(v.discount),
         tax: toMoney(tax),
@@ -200,8 +202,8 @@ export async function createOrderForUser(
         });
       }
 
-      // Báo giá: không trừ kho, không công nợ
-      if (isQuote) return order;
+      // Báo giá / đặt hàng: không trừ kho, không ghi công nợ doanh thu.
+      if (isQuote || isBooking) return order;
 
       // Trừ kho theo base unit + ghi movement
       for (const i of trustedItems) {

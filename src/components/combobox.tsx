@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Search, Check, Plus, Loader2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ChevronsUpDown, Search, Check, Plus, Loader2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { normalizeSearch } from "@/lib/normalize";
 import { cn } from "@/lib/utils";
@@ -26,7 +26,7 @@ export type SearchableOption = ComboOption;
  * Dùng chung mọi nơi cần chọn thực thể (KH/SP/NCC/ĐVT/bảng giá/kho…).
  */
 export function SearchableSelect({
-  value, onChange, options, placeholder, className, allowClear = true, onCreate, showSearch, disabled,
+  value, onChange, options, placeholder, className, allowClear = true, onCreate, showSearch, disabled, actionLabel, onAction, actionIcon,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -38,6 +38,9 @@ export function SearchableSelect({
   /** Hiện ô tìm. Mặc định auto: bật khi options.length > 8. */
   showSearch?: boolean;
   disabled?: boolean;
+  actionLabel?: string;
+  onAction?: () => void;
+  actionIcon?: ReactNode;
 }) {
   const t = useTranslations("common");
   const [open, setOpen] = useState(false);
@@ -104,7 +107,7 @@ export function SearchableSelect({
           className="text-current"
           text={selected ? selected.label : (placeholder ?? "—")}
         />
-        <ChevronDown className="w-4 h-4 text-slate-400 shrink-0 absolute right-2.5" />
+        <ChevronsUpDown className="w-4 h-4 text-slate-400 shrink-0 absolute right-2.5" />
       </Button>
 
       {open && (
@@ -134,6 +137,18 @@ export function SearchableSelect({
               </div>
             )}
             <div ref={listRef} className="overflow-auto py-1 max-h-[60dvh] lg:max-h-64" onKeyDown={onKeyDown}>
+              {onAction && actionLabel && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  block
+                  onClick={() => { onAction(); setOpen(false); setQ(""); }}
+                  className="justify-start rounded-none px-3 py-3 lg:py-1.5 text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40"
+                >
+                  {actionIcon ?? <Plus className="w-4 h-4" />}
+                  <Text as="span" weight="medium" className="text-current" text={actionLabel} />
+                </Button>
+              )}
               {allowClear && (
                 <Button
                   type="button"

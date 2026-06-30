@@ -33,6 +33,7 @@ import { DataTableShell, RowPreviewModal, stopRowToggle, type DataTableColumn } 
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { CustomerCreateDialog } from "@/components/partners/customer-create-dialog";
 import { buttonVariants } from "@/components/ui/button-variants";
+import { Select } from "@/components/ui/select";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { setCustomerActive } from "@/lib/actions/partners";
@@ -445,16 +446,17 @@ function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
   return (
     <div className="space-y-5">
       <div className="flex justify-end">
-        <select
+        <Select
           value={filter}
           onChange={(event) => setFilter(event.target.value as DebtFilter)}
-          className="h-10 rounded-lg border border-border bg-surface px-3 text-sm font-medium"
-        >
-          <option value="all">{t("customers.debtFilter.all")}</option>
-          <option value="sale">{t("customers.debtFilter.sale")}</option>
-          <option value="payment">{t("customers.debtFilter.payment")}</option>
-          <option value="return">{t("customers.debtFilter.return")}</option>
-        </select>
+          options={[
+            { value: "all", label: t("customers.debtFilter.all") },
+            { value: "sale", label: t("customers.debtFilter.sale") },
+            { value: "payment", label: t("customers.debtFilter.payment") },
+            { value: "return", label: t("customers.debtFilter.return") },
+          ]}
+          className="font-medium"
+        />
       </div>
 
       {rows.length === 0 ? (
@@ -668,9 +670,12 @@ function CustomerFilterForm({ filters, pageSize }: { filters: CustomerFilters; p
           <h3 className="text-sm font-bold">{t("customers.filters.group")}</h3>
           <span className="text-xs font-semibold text-primary-600">{t("customers.filters.createNew")}</span>
         </div>
-        <select disabled className="h-10 w-full rounded-lg border border-border bg-surface-2 px-3 text-sm text-slate-400">
-          <option>{t("customers.filters.allGroups")}</option>
-        </select>
+        <Select
+          disabled
+          value="all"
+          options={[{ value: "all", label: t("customers.filters.allGroups") }]}
+          className="w-full bg-surface-2 text-slate-400"
+        />
       </div>
 
       <DateRangeFilter title={t("customers.filters.createdAt")} fromName="createdFrom" toName="createdTo" fromValue={filters.createdFrom} toValue={filters.createdTo} />

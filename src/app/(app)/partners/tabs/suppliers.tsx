@@ -4,6 +4,7 @@ import { Routes } from "@/lib/routes";
 import { getSuppliers } from "@/lib/data/partners";
 import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
+import { Select } from "@/components/ui/select";
 import { SupplierQuickCreate } from "../../suppliers/supplier-form";
 import { SuppliersTable } from "./suppliers-table";
 
@@ -32,11 +33,15 @@ export async function SuppliersTab({ searchParams }: { searchParams: SP }) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("suppliers.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         </div>
-        <select name="owing" defaultValue={owing} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface">
-          <option value="">{t("suppliers.filter.allDebt")}</option>
-          <option value="owing">{t("suppliers.filter.owing")}</option>
-          <option value="clear">{t("suppliers.filter.clear")}</option>
-        </select>
+        <Select
+          name="owing"
+          defaultValue={owing}
+          options={[
+            { value: "", label: t("suppliers.filter.allDebt") },
+            { value: "owing", label: t("suppliers.filter.owing") },
+            { value: "clear", label: t("suppliers.filter.clear") },
+          ]}
+        />
         <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full border border-border bg-surface hover:bg-surface-2">{t("common.search")}</button>
       </form>
 

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { Check, ChevronDown, Copy, ExternalLink, KeyRound, Loader2, MessageCircle, Pencil, Plus, Power, Printer, Save, Star, Trash2, X } from "lucide-react";
 import { SearchableSelect } from "@/components/combobox";
+import { Select } from "@/components/ui/select";
 import { SegmentedTabs } from "@/components/ui/tabs";
 import { Toggle } from "@/components/ui/toggle";
 import { cn } from "@/lib/utils";
@@ -214,7 +215,7 @@ function formatAiTestMessage(message: string, L: boolean) {
   return map[message] ? (L ? map[message][1] : map[message][0]) : message;
 }
 
-type SectionId = "store" | "staff" | "hardware" | "payments" | "print" | "tax" | "notifications" | "zalo" | "ai";
+type SectionId = "store" | "staff" | "pos" | "hardware" | "payments" | "print" | "tax" | "notifications" | "zalo" | "ai";
 
 const NAV: { group: [string, string]; items: { id: SectionId; ico: string; en: string; vi: string; badge?: string }[] }[] = [
   { group: ["Store", "Cửa hàng"], items: [
@@ -222,6 +223,7 @@ const NAV: { group: [string, string]; items: { id: SectionId; ico: string; en: s
     { id: "staff", ico: "👤", en: "Staff & RBAC", vi: "Nhân viên & Phân quyền" },
   ] },
   { group: ["Operations", "Vận hành"], items: [
+    { id: "pos", ico: "🛒", en: "POS Page", vi: "Trang bán hàng POS" },
     { id: "hardware", ico: "🖨️", en: "Hardware", vi: "Thiết bị phần cứng" },
     { id: "payments", ico: "💳", en: "Payments", vi: "Thanh toán" },
     { id: "print", ico: "📄", en: "Print Templates", vi: "Mẫu in", badge: "15.1" },
@@ -238,6 +240,7 @@ const NAV: { group: [string, string]; items: { id: SectionId; ico: string; en: s
 const SEC_META: Record<SectionId, { en: string; vi: string; subEn: string; subVi: string }> = {
   store: { en: "Store Profile", vi: "Thông tin cửa hàng", subEn: "Business identity, currency & locale", subVi: "Thông tin doanh nghiệp, tiền tệ & ngôn ngữ" },
   staff: { en: "Staff & RBAC", vi: "Nhân viên & Phân quyền", subEn: "Members and role-based access control", subVi: "Nhân viên và phân quyền theo vai trò" },
+  pos: { en: "POS Page", vi: "Trang bán hàng POS", subEn: "Show or hide optional selling controls", subVi: "Ẩn/hiện các trường tùy chọn khi bán hàng" },
   hardware: { en: "Hardware Devices", vi: "Thiết bị phần cứng", subEn: "Printer, scanner, drawer, scale, reader", subVi: "Máy in, quét mã, ngăn kéo, cân, đọc thẻ" },
   payments: { en: "Payment Methods", vi: "Phương thức thanh toán", subEn: "Vietnamese payment ecosystem", subVi: "Hệ sinh thái thanh toán Việt Nam" },
   print: { en: "Print Templates", vi: "Mẫu in", subEn: "Receipt & document template designer", subVi: "Thiết kế mẫu hóa đơn & chứng từ" },
@@ -329,9 +332,12 @@ export function SettingsClient({
       <div className="flex-1 overflow-y-auto px-5 md:px-7 py-6 pb-12">
         {/* mobile section picker */}
         <div className="md:hidden mb-4">
-          <select value={active} onChange={(e) => pick(e.target.value as SectionId)} className={FI}>
-            {NAV.flatMap((g) => g.items).map((it) => <option key={it.id} value={it.id}>{L ? it.vi : it.en}</option>)}
-          </select>
+          <Select
+            value={active}
+            onChange={(e) => pick(e.target.value as SectionId)}
+            options={NAV.flatMap((g) => g.items).map((it) => ({ value: it.id, label: L ? it.vi : it.en }))}
+            className={FI}
+          />
         </div>
 
         <div className="mb-4">
@@ -343,6 +349,7 @@ export function SettingsClient({
 
         {active === "store" && <StoreSection L={L} locale={locale} store={store} canManage={canManage} />}
         {active === "staff" && <StaffSection L={L} staff={staff} canManage={canManage} />}
+        {active === "pos" && <PosSettingsSection L={L} prefs={store.prefs.pos} canManage={canManage} />}
         {active === "hardware" && <HardwareSection L={L} prefs={store.prefs.hardware} canManage={canManage} />}
         {active === "payments" && <PaymentsSection L={L} prefs={store.prefs.payments} canManage={canManage} bankAccounts={bankAccounts} />}
         {active === "print" && <PrintSection L={L} />}
@@ -428,9 +435,13 @@ function StaffRowItem({ s, i, L, canManage }: { s: StaffRow; i: number; L: boole
       </div></td>
       <td className="px-3 py-2.5">
         {canManage ? (
-          <select value={role} onChange={(e) => { const r = e.target.value as StaffRole; setRole(r); start(() => { updateStaffRole(s.id, r); }); }} className="px-2 py-1 text-xs rounded-md border border-border bg-canvas">
-            {STAFF_ROLES.map((r) => <option key={r} value={r}>{L ? ROLE_TEXT[r][1] : ROLE_TEXT[r][0]}</option>)}
-          </select>
+          <Select
+            value={role}
+            onChange={(e) => { const r = e.target.value as StaffRole; setRole(r); start(() => { updateStaffRole(s.id, r); }); }}
+            size="sm"
+            options={STAFF_ROLES.map((r) => ({ value: r, label: L ? ROLE_TEXT[r][1] : ROLE_TEXT[r][0] }))}
+            className="text-xs"
+          />
         ) : <span className={cn("inline-block px-2 py-0.5 rounded-full text-[9px] font-bold", ROLE_PILL[role] ?? "bg-surface-2 text-slate-500")}>{L ? (ROLE_TEXT[role]?.[1] ?? role) : (ROLE_TEXT[role]?.[0] ?? role)}</span>}
       </td>
       <td className="px-3 py-2.5 font-mono text-[11px] text-slate-500">{s.phone ?? "—"}</td>
@@ -440,6 +451,44 @@ function StaffRowItem({ s, i, L, canManage }: { s: StaffRow; i: number; L: boole
           : <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold", active ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-400")}>{active ? (L ? "Hoạt động" : "Active") : (L ? "Vô hiệu" : "Inactive")}</span>}
       </td>
     </tr>
+  );
+}
+
+function PosSettingsSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["pos"]; canManage: boolean }) {
+  const [form, setForm] = useState(prefs);
+  const [dirty, setDirty] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [pending, start] = useTransition();
+  const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => {
+    setForm((p) => ({ ...p, [k]: v }));
+    setDirty(true);
+    setSaved(false);
+  };
+  function save() {
+    start(async () => {
+      const r = await updateStorePrefs({ pos: form });
+      if (r.ok) {
+        setDirty(false);
+        setSaved(true);
+      }
+    });
+  }
+
+  return (
+    <Card
+      title={L ? "Hiển thị trang bán hàng" : "POS Page Display"}
+      vi={L ? "Ẩn/hiện các trường ít dùng trong màn hình POS" : "Show or hide optional controls on the POS screen"}
+    >
+      <div className="p-4.5 flex flex-col gap-3">
+        <CtrlRow
+          title={L ? "Hiện phần Công trình" : "Show project fields"}
+          desc={L ? "Bật khi cần gắn đơn hàng với công trình/dự án." : "Enable when orders need a project/job reference."}
+          checked={form.showProjectFields}
+          onChange={canManage ? (v) => set("showProjectFields", v) : undefined}
+        />
+        <SaveBar L={L} dirty={dirty} saved={saved} pending={pending} canManage={canManage} onSave={save} />
+      </div>
+    </Card>
   );
 }
 

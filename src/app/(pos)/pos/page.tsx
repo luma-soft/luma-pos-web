@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { LayoutDashboard } from "lucide-react";
 import { getPosData } from "@/lib/data/pos";
+import { getStoreSettings } from "@/lib/data/settings";
 import { getOrder } from "@/lib/data/orders";
 import { getPrintTemplate } from "@/lib/print/template";
 import { Routes } from "@/lib/routes";
@@ -62,11 +63,13 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
     ...(sourceInvoice?.items?.map((item) => item.productId) ?? []),
     ...aiProductIds,
   ];
-  const [data, t, orderPrintTemplate, quotePrintTemplate] = await Promise.all([
+  const [data, settings, t, orderPrintTemplate, quotePrintTemplate, bookingPrintTemplate] = await Promise.all([
     getPosData({ includeProductIds }),
+    getStoreSettings(),
     getTranslations(),
     getPrintTemplate("order"),
     getPrintTemplate("quote"),
+    getPrintTemplate("booking"),
   ]);
   return (
     <div className="h-full flex flex-col">
@@ -94,7 +97,9 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
           data={data}
           printTemplate={orderPrintTemplate}
           quotePrintTemplate={quotePrintTemplate}
+          bookingPrintTemplate={bookingPrintTemplate}
           initialSourceInvoice={sourceInvoice}
+          posPrefs={settings.prefs.pos}
         />
       </div>
     </div>

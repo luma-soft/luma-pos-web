@@ -76,6 +76,10 @@ const appPrefs = z.object({
   offlineMode: z.boolean().default(true),
 });
 
+const posPrefs = z.object({
+  showProjectFields: z.boolean().default(false),
+});
+
 const aiPrefs = z.object({
   provider: z.enum(AI_PROVIDERS).default("gemini"),
   textModel: z.string().max(80).default("gemini-2.5-flash"),
@@ -111,6 +115,7 @@ export const storePrefsSchema = z.object({
   notifications: notificationPrefs.default({ lowStock: true, stagnant: true, shiftClose: true, einvoiceError: true, syncDone: false, channels: { zalo: true, email: true, inApp: true, sms: false } }),
   hardware: hardwarePrefs.default({ paperSize: "K80", autoPrint: false, openDrawer: true, printEinvoiceQr: true }),
   app: appPrefs.default({ biometricAuth: true, offlineMode: true }),
+  pos: posPrefs.default({ showProjectFields: false }),
   ai: aiPrefs.default({
     provider: "gemini",
     textModel: "gemini-2.5-flash",
