@@ -227,7 +227,7 @@ export async function OrderDetailPanel({
             {t("print.printBtn")}
           </Link>
           {(order.status === "completed" || order.status === "quote") && order.returns.length === 0 && (
-            <Link href={posSourceHref("edit")} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-9")}>
+            <Link href={posSourceHref("edit")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 bg-white dark:bg-surface")}>
               {t("orderEdit.action")}
             </Link>
           )}

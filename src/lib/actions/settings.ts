@@ -123,6 +123,7 @@ export async function updateAiSettings(input: AiSettingsInput): Promise<ActionRe
       openaiVisionModel: v.visionModel,
       attachmentsBucket: v.attachmentsBucket,
       monthlyUsageLimit: typeof requested.monthlyUsageLimit === "number" ? v.monthlyUsageLimit : current.ai.monthlyUsageLimit,
+      showFloatingLauncher: typeof requested.showFloatingLauncher === "boolean" ? v.showFloatingLauncher : current.ai.showFloatingLauncher,
     };
     const next = { ...current, ai: nextAi };
     await db.insert(storeSettings)
@@ -143,6 +144,7 @@ export async function updateAiSettings(input: AiSettingsInput): Promise<ActionRe
         openaiVisionModel: current.ai.openaiVisionModel,
         attachmentsBucket: current.ai.attachmentsBucket,
         monthlyUsageLimit: current.ai.monthlyUsageLimit,
+        showFloatingLauncher: current.ai.showFloatingLauncher,
       },
       after: {
         provider: nextAi.provider,
@@ -152,6 +154,7 @@ export async function updateAiSettings(input: AiSettingsInput): Promise<ActionRe
         openaiVisionModel: nextAi.openaiVisionModel,
         attachmentsBucket: nextAi.attachmentsBucket,
         monthlyUsageLimit: nextAi.monthlyUsageLimit,
+        showFloatingLauncher: nextAi.showFloatingLauncher,
       },
       metadata: { keyChanged: v.clearOpenaiApiKey || Boolean(v.openaiApiKey?.trim()) },
     });
@@ -268,6 +271,7 @@ export async function testAiProvider(input: AiSettingsInput, kind: AiProviderTes
       openaiApiKeySet: Boolean(nextKey),
       attachmentsBucket: v.attachmentsBucket,
       monthlyUsageLimit: v.monthlyUsageLimit,
+      showFloatingLauncher: v.showFloatingLauncher,
     });
     const base: Omit<AiProviderTestResult, "ok" | "message" | "tokenUsage"> = {
       kind,
@@ -325,6 +329,7 @@ export async function testAiProvider(input: AiSettingsInput, kind: AiProviderTes
       openaiVisionModel: v.visionModel,
       attachmentsBucket: v.attachmentsBucket,
       monthlyUsageLimit: v.monthlyUsageLimit,
+      showFloatingLauncher: v.showFloatingLauncher,
     });
     return {
       ok: true,

@@ -1216,6 +1216,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
     openaiVisionModel: AiVisionModel;
     attachmentsBucket: AiAttachmentBucket;
     monthlyUsageLimit: number;
+    showFloatingLauncher: boolean;
   }>({
     provider: coerceAiProvider(prefs.provider),
     textModel: coerceAiTextModel(prefs.textModel),
@@ -1224,6 +1225,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
     openaiVisionModel: coerceAiVisionModel(prefs.visionModel || prefs.openaiVisionModel),
     attachmentsBucket: coerceAiAttachmentBucket(prefs.attachmentsBucket),
     monthlyUsageLimit: prefs.monthlyUsageLimit,
+    showFloatingLauncher: prefs.showFloatingLauncher,
   });
   const [clearOpenaiApiKey, setClearOpenaiApiKey] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -1381,6 +1383,12 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
               />
             </div>
           </div>
+          <CtrlRow
+            title={L ? "Hiện nút AI nổi" : "Show floating AI button"}
+            desc={L ? "Tắt để ẩn nút AI nổi góc màn hình; trang AI và cấu hình provider vẫn giữ nguyên." : "Turn off to hide the floating AI button; the AI page and provider settings remain available."}
+            checked={form.showFloatingLauncher}
+            onChange={(value) => set("showFloatingLauncher", value)}
+          />
           <div className="grid grid-cols-3 gap-2">
             {[
               [L ? "Lượt đã dùng" : "Units used", usage.used],

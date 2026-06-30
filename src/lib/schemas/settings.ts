@@ -85,6 +85,7 @@ const aiPrefs = z.object({
   openaiVisionModel: z.string().max(80).default("gemini-2.5-flash"),
   attachmentsBucket: z.string().max(80).default("ai-attachments"),
   monthlyUsageLimit: z.number().int().min(0).max(100000).default(1000),
+  showFloatingLauncher: z.boolean().default(true),
 });
 
 const zaloPrefs = z.object({
@@ -119,6 +120,7 @@ export const storePrefsSchema = z.object({
     openaiVisionModel: "gemini-2.5-flash",
     attachmentsBucket: "ai-attachments",
     monthlyUsageLimit: 1000,
+    showFloatingLauncher: true,
   }),
   zalo: zaloPrefs.default({
     enabled: false,
@@ -157,6 +159,7 @@ export const aiSettingsInputSchema = z.object({
   openaiVisionModel: z.enum(AI_VISION_MODELS).default("gemini-2.5-flash"),
   attachmentsBucket: z.enum(AI_ATTACHMENT_BUCKETS).default("ai-attachments"),
   monthlyUsageLimit: z.number().int().min(0).max(100000).default(1000),
+  showFloatingLauncher: z.boolean().default(true),
 });
 export type AiSettingsInput = z.input<typeof aiSettingsInputSchema>;
 

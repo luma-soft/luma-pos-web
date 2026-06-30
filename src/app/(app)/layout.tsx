@@ -65,7 +65,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <main className="flex-1 min-w-0 overflow-auto overflow-x-hidden">
         <div className="pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">{children}</div>
         <MobileTabBar />
-        {store.prefs.ai.openaiApiKeySet && <AiAssistantLauncher />}
+        {store.prefs.ai.openaiApiKeySet && store.prefs.ai.showFloatingLauncher && <AiAssistantLauncher />}
       </main>
     </div>
   );
