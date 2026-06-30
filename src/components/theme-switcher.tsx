@@ -1,18 +1,18 @@
 "use client";
 
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { Palette, Check } from "lucide-react";
-import { setTheme } from "@/lib/theme/cookie";
-import { themes, themeMeta, type Theme } from "@/lib/theme/config";
+import { THEME_COOKIE, themes, themeMeta, type Theme } from "@/lib/theme/config";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Text } from "@/components/ui/text";
 
+function persistThemeCookie(theme: Theme) {
+  document.cookie = `${THEME_COOKIE}=${encodeURIComponent(theme)}; path=/; max-age=31536000; samesite=lax`;
+}
+
 export function ThemeSwitcher({ current }: { current: Theme }) {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
+  const [active, setActive] = useState(current);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -24,13 +24,10 @@ export function ThemeSwitcher({ current }: { current: Theme }) {
   }, [open]);
 
   function pick(t: Theme) {
-    startTransition(async () => {
-      // Optimistic: change html attribute immediately
-      document.documentElement.setAttribute("data-theme", t);
-      await setTheme(t);
-      setOpen(false);
-      router.refresh();
-    });
+    setActive(t);
+    document.documentElement.setAttribute("data-theme", t);
+    persistThemeCookie(t);
+    setOpen(false);
   }
 
   return (
@@ -40,14 +37,13 @@ export function ThemeSwitcher({ current }: { current: Theme }) {
         variant="ghost"
         block
         onClick={() => setOpen(!open)}
-        disabled={pending}
         className="justify-start px-3"
       >
         <Palette className="w-4 h-4" />
-        <Text as="span" variant="subtle" className="flex-1 text-left" text={themeMeta[current].label} />
+        <Text as="span" variant="subtle" className="flex-1 text-left" text={themeMeta[active].label} />
         <span
           className="w-3.5 h-3.5 rounded-full ring-1 ring-slate-300 dark:ring-slate-700"
-          style={{ background: themeMeta[current].swatch }}
+          style={{ background: themeMeta[active].swatch }}
         />
       </Button>
 
@@ -68,7 +64,7 @@ export function ThemeSwitcher({ current }: { current: Theme }) {
                 style={{ background: themeMeta[t].swatch }}
               />
               <Text as="span" className="flex-1 text-left" text={themeMeta[t].label} />
-              {current === t && <Check className="w-3.5 h-3.5 text-primary-600" />}
+              {active === t && <Check className="w-3.5 h-3.5 text-primary-600" />}
             </Button>
           ))}
         </div>

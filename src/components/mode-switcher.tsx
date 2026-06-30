@@ -1,11 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Sun, Moon, Monitor } from "lucide-react";
-import { setMode } from "@/lib/theme/cookie";
-import { modes, type Mode } from "@/lib/theme/config";
+import { MODE_COOKIE, modes, type Mode } from "@/lib/theme/config";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -16,11 +14,13 @@ function applyDomMode(resolved: "light" | "dark") {
   document.documentElement.setAttribute("data-mode", resolved);
 }
 
+function persistModeCookie(mode: Mode) {
+  document.cookie = `${MODE_COOKIE}=${encodeURIComponent(mode)}; path=/; max-age=31536000; samesite=lax`;
+}
+
 export function ModeSwitcher({ current }: { current: Mode }) {
   const t = useTranslations();
-  const router = useRouter();
   const [active, setActive] = useState<Mode>(current);
-  const [, startTransition] = useTransition();
 
   function pick(m: Mode) {
     setActive(m);
@@ -29,10 +29,7 @@ export function ModeSwitcher({ current }: { current: Mode }) {
       ? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
       : m;
     applyDomMode(resolved);
-    startTransition(async () => {
-      await setMode(m);
-      router.refresh();
-    });
+    persistModeCookie(m);
   }
 
   return (
