@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ChevronsUpDown, Search, Check, Plus, Loader2, X } from "lucide-react";
+import { ChevronDown, Search, Check, Plus, Loader2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { normalizeSearch } from "@/lib/normalize";
 import { cn } from "@/lib/utils";
@@ -107,7 +107,7 @@ export function SearchableSelect({
           className="text-current"
           text={selected ? selected.label : (placeholder ?? "—")}
         />
-        <ChevronsUpDown className="w-4 h-4 text-slate-400 shrink-0 absolute right-2.5" />
+        <ChevronDown className={cn("w-4 h-4 text-slate-400 shrink-0 absolute right-2.5 transition-transform", open && "rotate-180")} />
       </Button>
 
       {open && (

@@ -149,6 +149,7 @@ export type PriceBook = string;
 interface PosDraft {
   id: string;
   kind: PosDraftKind;
+  source?: PosSourceInvoice;
   cart: CartLine[];
   customerId: string;
   projectId: string;
@@ -169,6 +170,7 @@ const ACT_KEY = "pos-active-invoice";
 const PRINT_SIZE_KEY = "pos-print-default-size";
 const AI_POS_DRAFT_KEY = "luma-pos-ai-cart-draft";
 const FIRST_INV_ID = "inv-1"; // id ổn định cho SSR (tránh hydration mismatch)
+const SOURCE_INV_ID = "inv-source";
 
 /** Đơn rỗng. id truyền vào để lần đầu dùng id cố định, các tab sau dùng Date.now. */
 function makeDraft(id?: string, kind: PosDraftKind = "invoice"): PosDraft {
@@ -190,6 +192,7 @@ function makeDraftFromSource(source: PosSourceInvoice, products: PosProduct[], i
   const taxRate = afterDiscount > 0 && source.tax ? Math.round(((source.tax / afterDiscount) * 100) * 100) / 100 : 0;
   return {
     ...makeDraft(id, source.kind),
+    source,
     cart: (source.items ?? []).flatMap((item) => {
       const product = products.find((p) => p.id === item.productId);
       if (!product) return [];
@@ -232,11 +235,16 @@ function normalizeInvoice(raw: Record<string, unknown>): PosDraft {
   };
 }
 
+function ensureInvoiceFirst(list: PosDraft[]) {
+  if ((list[0]?.kind ?? "invoice") === "invoice") return list;
+  return [makeInvoice(FIRST_INV_ID), ...list.filter((draft) => draft.id !== FIRST_INV_ID)];
+}
+
 function loadInvoices(): PosDraft[] | null {
   try {
     const raw = JSON.parse(localStorage.getItem(INV_KEY) ?? "null") as Record<string, unknown>[] | null;
     if (!raw || raw.length === 0) return null;
-    return raw.map(normalizeInvoice);
+    return ensureInvoiceFirst(raw.map(normalizeInvoice));
   } catch {
     return null;
   }
@@ -375,7 +383,6 @@ export function PosClient({
 }) {
   const t = useTranslations();
 
-  const [sourceInvoice] = useState<PosSourceInvoice | null>(initialSourceInvoice ?? null);
   const [search, setSearch] = useState("");
   const [submittingMode, setSubmittingMode] = useState<"sale" | "quote" | "booking" | null>(null);
   const submitting = submittingMode !== null;
@@ -432,13 +439,14 @@ export function PosClient({
 
   // nhiều hóa đơn cùng lúc (tab). id đầu cố định để khớp SSR.
   const [invoices, setInvoices] = useState<PosDraft[]>(() => [
-    initialSourceInvoice ? makeDraftFromSource(initialSourceInvoice, data.products, FIRST_INV_ID) : makeInvoice(FIRST_INV_ID),
+    makeInvoice(FIRST_INV_ID),
+    ...(initialSourceInvoice ? [makeDraftFromSource(initialSourceInvoice, data.products, SOURCE_INV_ID)] : []),
   ]);
-  const [activeId, setActiveId] = useState(FIRST_INV_ID);
+  const [activeId, setActiveId] = useState(initialSourceInvoice ? SOURCE_INV_ID : FIRST_INV_ID);
 
   // load đơn đang soạn sau khi mount (tránh lệch SSR; defer cho react-compiler)
   useEffect(() => {
-    if (sourceInvoice) return;
+    if (initialSourceInvoice) return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("aiDraft") === "1") return;
     let cancelled = false;
@@ -452,22 +460,22 @@ export function PosClient({
       }
     });
     return () => { cancelled = true; };
-  }, [sourceInvoice]);
+  }, [initialSourceInvoice]);
 
   // ghi localStorage mỗi khi đơn đổi (bỏ qua lần đầu để không ghi đè bản đã lưu)
   const hydratedRef = useRef(false);
   useEffect(() => {
-    if (sourceInvoice) return;
+    if (initialSourceInvoice) return;
     if (!hydratedRef.current) { hydratedRef.current = true; return; }
     saveInvoices(invoices);
-  }, [invoices, sourceInvoice]);
+  }, [invoices, initialSourceInvoice]);
 
   // nhớ tab đang mở (giữ khi chuyển trang rồi quay lại)
   useEffect(() => {
-    if (!sourceInvoice && hydratedRef.current) {
+    if (!initialSourceInvoice && hydratedRef.current) {
       try { localStorage.setItem(ACT_KEY, activeId); } catch { /* bỏ qua */ }
     }
-  }, [activeId, sourceInvoice]);
+  }, [activeId, initialSourceInvoice]);
 
   useEffect(() => {
     if (!sepayCheckout || sepayCheckout.status !== "pending") return;
@@ -496,6 +504,7 @@ export function PosClient({
   }, [sepayCheckout, printDefaultSize]);
 
   const active = invoices.find((i) => i.id === activeId) ?? invoices[0];
+  const sourceInvoice = active.source ?? null;
   const { cart, customerId, projectId, projectName, deliveryDate, discountInput, discountMode, taxRate, shippingFee, payMethod, paidInput, note: orderNote } = active;
   const activeKind = active.kind ?? "invoice";
   const isInvoiceDraft = activeKind === "invoice";
@@ -548,8 +557,13 @@ export function PosClient({
   /** Đóng 1 tab; luôn giữ tối thiểu 1 đơn. */
   function closeInvoice(id: string) {
     setInvoices((list) => {
+      const closingFirstInvoice = list.length > 1 && list[0]?.id === id && (list[0].kind ?? "invoice") === "invoice";
+      if (closingFirstInvoice) {
+        setActiveId(id);
+        return [makeInvoice(id), ...list.slice(1)];
+      }
       const next = list.filter((i) => i.id !== id);
-      const final = next.length > 0 ? next : [makeInvoice()];
+      const final = ensureInvoiceFirst(next.length > 0 ? next : [makeInvoice()]);
       if (id === activeId) setActiveId(final[Math.max(0, list.findIndex((i) => i.id === id) - 1)]?.id ?? final[0].id);
       return final;
     });
@@ -1247,39 +1261,41 @@ export function PosClient({
                   ]}
                   className="min-w-20 shrink-0 font-medium text-slate-700 dark:text-slate-200"
                 />
-                <div
-                  className={cn(
-                    "group relative grid h-8 w-28 shrink-0 grid-cols-[32px_1fr_32px] overflow-hidden rounded-md border border-border bg-surface",
-                    outOfStock && "border-er text-er"
-                  )}
-                >
-                  <button
-                    onClick={() => updateQty(l.key, -1)}
+                <div className="group relative shrink-0">
+                  <div
                     className={cn(
-                      "grid h-full place-items-center text-slate-500 hover:text-er hover:bg-surface-2",
-                      outOfStock && "text-er hover:bg-red-50 dark:hover:bg-red-950/20"
-                    )}
-                  >
-                    <Minus className="w-3.5 h-3.5" />
-                  </button>
-                  <input
-                    type="number"
-                    value={l.quantity}
-                    onChange={(e) => setQty(l.key, Number(e.target.value))}
-                    className={cn(
-                      "no-spinner h-full w-full border-x border-border bg-surface text-center text-sm outline-none",
+                      "grid h-8 w-28 grid-cols-[32px_1fr_32px] overflow-hidden rounded-md border border-border bg-surface",
                       outOfStock && "border-er text-er"
                     )}
-                  />
-                  <button
-                    onClick={() => updateQty(l.key, 1)}
-                    className={cn(
-                      "grid h-full place-items-center text-slate-500 hover:text-primary-600 hover:bg-surface-2",
-                      outOfStock && "text-er hover:text-er hover:bg-red-50 dark:hover:bg-red-950/20"
-                    )}
                   >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
+                    <button
+                      onClick={() => updateQty(l.key, -1)}
+                      className={cn(
+                        "grid h-full place-items-center text-slate-500 hover:text-er hover:bg-surface-2",
+                        outOfStock && "text-er hover:bg-red-50 dark:hover:bg-red-950/20"
+                      )}
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <input
+                      type="number"
+                      value={l.quantity}
+                      onChange={(e) => setQty(l.key, Number(e.target.value))}
+                      className={cn(
+                        "no-spinner h-full w-full border-x border-border bg-surface text-center text-sm outline-none",
+                        outOfStock && "border-er text-er"
+                      )}
+                    />
+                    <button
+                      onClick={() => updateQty(l.key, 1)}
+                      className={cn(
+                        "grid h-full place-items-center text-slate-500 hover:text-primary-600 hover:bg-surface-2",
+                        outOfStock && "text-er hover:text-er hover:bg-red-50 dark:hover:bg-red-950/20"
+                      )}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                   <StockQuantityTooltip stock={Number(l.product.stock)} ordered={l.quantity * l.unitMultiplier} unit={l.product.baseUnit} />
                 </div>
                 <button
@@ -2015,7 +2031,7 @@ function SummaryAdjustRow({
 
 function StockQuantityTooltip({ stock, ordered, unit }: { stock: number; ordered: number; unit: string }) {
   return (
-    <div className="pointer-events-none absolute left-1/2 top-full z-60 mt-2 min-w-34 -translate-x-1/2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-semibold text-slate-800 opacity-0 shadow-e2 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 dark:text-slate-100">
+    <div className="pointer-events-none absolute left-1/2 top-full z-[80] mt-2 min-w-34 -translate-x-1/2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-semibold text-slate-800 opacity-0 shadow-e2 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 dark:text-slate-100">
       <div>{`Tồn: ${formatNumber(stock)} ${unit}`}</div>
       <div>{`Đặt: ${formatNumber(ordered)} ${unit}`}</div>
     </div>
