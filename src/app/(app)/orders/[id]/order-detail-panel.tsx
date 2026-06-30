@@ -6,9 +6,12 @@ import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import type { OrderDetail } from "@/lib/data/orders";
 import { getStoreSettings } from "@/lib/data/settings";
+import { getPrintTemplate } from "@/lib/print/template";
+import type { ShareablePrintDocType } from "@/lib/print/share-document";
 import { OrderStatusBadge, PaymentStatusBadge } from "../status-badges";
 import { OrderActions, PaymentForm, SendOrderZaloButton } from "./order-actions";
 import { EInvoiceForm } from "./einvoice-form";
+import { SharePrintDocButton } from "./share-print-doc-button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { BookingCreateOrderButton, QuoteCreateOrderButton, QuoteDeleteButton } from "../../quotes/quote-actions";
 
@@ -42,6 +45,19 @@ export async function OrderDetailPanel({
   const isBooking = order.status === "confirmed";
   const cancelled = order.status === "cancelled" || order.status === "merged";
   const sourceKind = isQuote ? "quote" : isBooking ? "booking" : "invoice";
+  const shareDocType: ShareablePrintDocType | null = cancelled
+    ? null
+    : order.status === "completed"
+      ? "order"
+      : isQuote
+        ? "quote"
+        : isBooking
+          ? "booking"
+          : null;
+  const shareTemplate = shareDocType ? await getPrintTemplate(shareDocType) : null;
+  const shareHref = shareTemplate
+    ? `${Routes.order(order.id)}/print?${new URLSearchParams({ templateId: shareTemplate.id, size: shareTemplate.paperDefault }).toString()}`
+    : null;
   const posSourceHref = (mode: "edit" | "copy") => {
     const sp = new URLSearchParams({
       sourceMode: mode,
@@ -227,6 +243,7 @@ export async function OrderDetailPanel({
         <div className="flex flex-wrap gap-2 xl:justify-end">
           {isQuote && <QuoteCreateOrderButton quoteId={order.id} />}
           {isBooking && !cancelled && <BookingCreateOrderButton bookingId={order.id} />}
+          {shareDocType && shareHref && <SharePrintDocButton href={shareHref} code={order.code} docType={shareDocType} />}
           <Link href={`${Routes.order(order.id)}/print`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9")}>
             {t("print.printBtn")}
           </Link>

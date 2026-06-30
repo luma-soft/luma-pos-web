@@ -1628,6 +1628,17 @@
   "print": {
     "title": "Print invoice",
     "printBtn": "Print",
+    "shareBtn": "Share",
+    "sharePreparing": "Preparing...",
+    "shareCopied": "Link copied",
+    "shareOpened": "Print template opened",
+    "shareFailed": "Could not share this document.",
+    "shareUnsupported": "File sharing is not supported in this browser",
+    "shareTitles": {
+      "order": "Sales invoice {code}",
+      "quote": "Quotation {code}",
+      "booking": "Booking slip {code}"
+    },
     "invoiceTitle": "SALES INVOICE",
     "number": "No.",
     "date": "Date",

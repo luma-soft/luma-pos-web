@@ -1628,6 +1628,17 @@
   "print": {
     "title": "In hóa đơn",
     "printBtn": "In",
+    "shareBtn": "Chia sẻ",
+    "sharePreparing": "Đang chuẩn bị...",
+    "shareCopied": "Đã copy link",
+    "shareOpened": "Đã mở mẫu in",
+    "shareFailed": "Không chia sẻ được phiếu.",
+    "shareUnsupported": "Trình duyệt chưa hỗ trợ chia sẻ file",
+    "shareTitles": {
+      "order": "Phiếu bán hàng {code}",
+      "quote": "Báo giá {code}",
+      "booking": "Phiếu đặt hàng {code}"
+    },
     "invoiceTitle": "HÓA ĐƠN BÁN HÀNG",
     "number": "Số",
     "date": "Ngày",
