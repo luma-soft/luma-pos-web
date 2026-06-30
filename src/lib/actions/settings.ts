@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { paymentBankAccounts, profiles, storeSettings } from "@/db/schema";
+import { getPaymentBankAccounts, getStaff } from "@/lib/data/settings";
+import { getAiUsageStatus } from "@/lib/ai/usage";
 import {
   aiSettingsInputSchema,
   paymentBankAccountInputSchema,
@@ -21,7 +23,7 @@ import {
 } from "@/lib/schemas/settings";
 import { writeAuditLog } from "@/lib/audit";
 import { buildAiProviderConfig, completeAiText, completeAiVision } from "@/lib/ai/provider-adapter";
-import { type ActionResult, requireManager, requireOwner } from "./common";
+import { type ActionResult, requireManager, requireOwner, requireUser } from "./common";
 import { Routes } from "@/lib/routes";
 
 type AiProviderTestKind = "text" | "vision";
@@ -43,6 +45,36 @@ type AiProviderTestResult = {
     totalTokens: number;
   };
 };
+
+export async function loadSettingsStaff(): Promise<ActionResult<Awaited<ReturnType<typeof getStaff>>>> {
+  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  try {
+    return { ok: true, data: await getStaff() };
+  } catch (e) {
+    console.error("loadSettingsStaff failed:", e);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function loadSettingsPaymentBankAccounts(): Promise<ActionResult<Awaited<ReturnType<typeof getPaymentBankAccounts>>>> {
+  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  try {
+    return { ok: true, data: await getPaymentBankAccounts() };
+  } catch (e) {
+    console.error("loadSettingsPaymentBankAccounts failed:", e);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function loadSettingsAiUsage(): Promise<ActionResult<Awaited<ReturnType<typeof getAiUsageStatus>>>> {
+  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  try {
+    return { ok: true, data: await getAiUsageStatus() };
+  } catch (e) {
+    console.error("loadSettingsAiUsage failed:", e);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
 
 function safeAiTestError(error: unknown) {
   const raw = error instanceof Error ? error.message : "provider_test_failed";

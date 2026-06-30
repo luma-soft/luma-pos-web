@@ -12,6 +12,9 @@ import { cn } from "@/lib/utils";
 import { normalizeSearch } from "@/lib/normalize";
 import {
   deletePaymentBankAccount,
+  loadSettingsAiUsage,
+  loadSettingsPaymentBankAccounts,
+  loadSettingsStaff,
   savePaymentBankAccount,
   setDefaultPaymentBankAccount,
   setPaymentBankAccountEnabled,
@@ -273,28 +276,58 @@ const btnF = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-prima
 
 export function SettingsClient({
   store,
-  staff,
   canManage,
   canEditAi,
-  aiUsage,
-  bankAccounts,
 }: {
   store: StoreSettings;
-  staff: StaffRow[];
   canManage: boolean;
   canEditAi: boolean;
-  aiUsage: AiUsageStatus;
-  bankAccounts: PaymentBankAccountRow[];
 }) {
   const locale = useLocale();
   const tSettings = useTranslations("settings");
   const L = locale === "vi";
   const [active, setActive] = useState<SectionId>("store");
+  const [staff, setStaff] = useState<StaffRow[] | null>(null);
+  const [bankAccounts, setBankAccounts] = useState<PaymentBankAccountRow[] | null>(null);
+  const [aiUsage, setAiUsage] = useState<AiUsageStatus | null>(null);
+  const [lazyLoading, setLazyLoading] = useState<Partial<Record<"staff" | "payments" | "ai", boolean>>>({});
+  const [lazyError, setLazyError] = useState<Partial<Record<"staff" | "payments" | "ai", string>>>({});
   useEffect(() => {
     const saved = localStorage.getItem("lp-settings-active") as SectionId | null;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client sync of persisted section (SSR-safe)
     if (saved && SEC_META[saved]) setActive(saved);
   }, []);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (active === "staff" && staff === null) {
+        setLazyLoading((prev) => ({ ...prev, staff: true }));
+        const res = await loadSettingsStaff().catch(() => null);
+        if (cancelled) return;
+        if (res?.ok) setStaff(res.data);
+        else setLazyError((prev) => ({ ...prev, staff: res?.error ?? "errors.serverError" }));
+        setLazyLoading((prev) => ({ ...prev, staff: false }));
+      }
+      if (active === "payments" && bankAccounts === null) {
+        setLazyLoading((prev) => ({ ...prev, payments: true }));
+        const res = await loadSettingsPaymentBankAccounts().catch(() => null);
+        if (cancelled) return;
+        if (res?.ok) setBankAccounts(res.data);
+        else setLazyError((prev) => ({ ...prev, payments: res?.error ?? "errors.serverError" }));
+        setLazyLoading((prev) => ({ ...prev, payments: false }));
+      }
+      if (active === "ai" && aiUsage === null) {
+        setLazyLoading((prev) => ({ ...prev, ai: true }));
+        const res = await loadSettingsAiUsage().catch(() => null);
+        if (cancelled) return;
+        if (res?.ok) setAiUsage(res.data);
+        else setLazyError((prev) => ({ ...prev, ai: res?.error ?? "errors.serverError" }));
+        setLazyLoading((prev) => ({ ...prev, ai: false }));
+      }
+    }
+    void load();
+    return () => { cancelled = true; };
+  }, [active, aiUsage, bankAccounts, staff]);
   const pick = (id: SectionId) => { setActive(id); localStorage.setItem("lp-settings-active", id); };
   const sec = SEC_META[active];
   return (
@@ -348,17 +381,28 @@ export function SettingsClient({
         </div>
 
         {active === "store" && <StoreSection L={L} locale={locale} store={store} canManage={canManage} />}
-        {active === "staff" && <StaffSection L={L} staff={staff} canManage={canManage} />}
+        {active === "staff" && (staff ? <StaffSection L={L} staff={staff} canManage={canManage} /> : <LazySectionState L={L} loading={Boolean(lazyLoading.staff)} error={lazyError.staff} />)}
         {active === "pos" && <PosSettingsSection L={L} prefs={store.prefs.pos} canManage={canManage} />}
         {active === "hardware" && <HardwareSection L={L} prefs={store.prefs.hardware} canManage={canManage} />}
-        {active === "payments" && <PaymentsSection L={L} prefs={store.prefs.payments} canManage={canManage} bankAccounts={bankAccounts} />}
+        {active === "payments" && <PaymentsSection L={L} prefs={store.prefs.payments} canManage={canManage} bankAccounts={bankAccounts ?? []} accountsLoading={Boolean(lazyLoading.payments)} accountsError={lazyError.payments} />}
         {active === "print" && <PrintSection L={L} />}
         {active === "tax" && <TaxSection L={L} prefs={store.prefs.tax} canManage={canManage} />}
         {active === "notifications" && <NotificationsSection L={L} prefs={store.prefs.notifications} canManage={canManage} />}
         {active === "zalo" && <ZaloSection L={L} prefs={store.prefs.zalo} canEdit={canEditAi} />}
-        {active === "ai" && <AiSection L={L} prefs={store.prefs.ai} canEdit={canEditAi} usage={aiUsage} />}
+        {active === "ai" && (aiUsage ? <AiSection L={L} prefs={store.prefs.ai} canEdit={canEditAi} usage={aiUsage} /> : <LazySectionState L={L} loading={Boolean(lazyLoading.ai)} error={lazyError.ai} />)}
       </div>
     </div>
+  );
+}
+
+function LazySectionState({ L, loading, error }: { L: boolean; loading: boolean; error?: string }) {
+  return (
+    <Card title={L ? "Đang tải dữ liệu" : "Loading data"} vi={L ? "Chỉ tải khi mở mục này" : "Loaded only when this section is opened"}>
+      <div className="flex items-center gap-2 px-4 py-6 text-sm text-slate-500">
+        {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+        <span>{error ? (L ? "Không tải được dữ liệu. Vui lòng thử lại." : "Could not load data. Please try again.") : (L ? "Đang tải..." : "Loading...")}</span>
+      </div>
+    </Card>
   );
 }
 
@@ -617,11 +661,15 @@ function PaymentsSection({
   prefs,
   canManage,
   bankAccounts,
+  accountsLoading,
+  accountsError,
 }: {
   L: boolean;
   prefs: StorePrefs["payments"];
   canManage: boolean;
   bankAccounts: PaymentBankAccountRow[];
+  accountsLoading: boolean;
+  accountsError?: string;
 }) {
   const [pm, setPm] = useState(prefs);
   const [tab, setTab] = useState<"methods" | "accounts" | "notifications">("methods");
@@ -655,7 +703,11 @@ function PaymentsSection({
           <div className="px-4.5 pb-4"><SaveBar L={L} dirty={dirty} saved={saved} pending={pending} canManage={canManage} onSave={save} /></div>
         </Card>
       )}
-      {tab === "accounts" && <SePayAccountsSection L={L} accounts={bankAccounts} canManage={canManage} />}
+      {tab === "accounts" && (
+        accountsLoading || accountsError
+          ? <LazySectionState L={L} loading={accountsLoading} error={accountsError} />
+          : <SePayAccountsSection L={L} accounts={bankAccounts} canManage={canManage} />
+      )}
       {tab === "notifications" && <SePayNotificationsSection L={L} />}
     </>
   );
