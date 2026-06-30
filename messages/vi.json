@@ -256,9 +256,14 @@
       "agent": "Giá đại lý"
     },
     "printSlip": "In",
+    "defaultPrintTemplate": "Mẫu in mặc định",
     "tempSlipTitle": "PHIẾU TẠM TÍNH",
+    "printA4": "In hóa đơn A4",
     "printA5": "In phiếu A5",
-    "printK80": "In bill K80"
+    "printK80": "In bill K80",
+    "printA4Short": "A4",
+    "printA5Short": "A5",
+    "printK80Short": "K80"
   },
   "stub": {
     "wip": "Đang phát triển..."
