@@ -2,7 +2,7 @@
 
 import { type ReactNode, useMemo, useRef, useState, useTransition } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { Search, Trash2, Check, Loader2, AlertTriangle, FileSpreadsheet, PackageSearch, Save } from "lucide-react";
+import { Search, Trash2, Check, Loader2, AlertTriangle, Save } from "lucide-react";
 import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
 import type { AiQuickActionApplyMode } from "@/components/ai-quick-actions/types";
@@ -254,20 +254,6 @@ export function InternalUseForm() {
               )}
             </table>
           </div>
-
-          {lines.length === 0 && (
-            <div className="p-4 sm:p-6">
-              <div className="flex min-h-[420px] flex-col items-center justify-center rounded-card bg-canvas/55 px-4 text-center">
-                <PackageSearch className="mb-4 h-10 w-10 text-slate-300" />
-                <p className="text-lg font-extrabold">{t("internalUse.emptyForm")}</p>
-                <p className="mt-2 text-sm text-slate-400">{t("internalUse.emptyHint")}</p>
-                <Button type="button" className="mt-8" size="lg">
-                  <FileSpreadsheet className="h-4 w-4" />
-                  {t("internalUse.chooseFile")}
-                </Button>
-              </div>
-            </div>
-          )}
       </section>
 
       <aside className="w-full lg:w-[390px] shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col p-3 sm:p-4 gap-3 overflow-auto">
