@@ -201,7 +201,7 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
                 <col className="w-32" />
                 <col className="w-14" />
               </colgroup>
-              <thead className="sticky top-0 bg-er-soft/60">
+              <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800/80">
                 <tr className="text-left text-xs text-slate-700 dark:text-slate-200">
                   <th className="px-3 py-3 font-semibold text-center">{t("purchaseReturns.cols.index")}</th>
                   <th className="px-3 py-3 font-semibold">{t("purchaseReturns.cols.sku")}</th>
@@ -211,7 +211,7 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
                   <th className="px-3 py-3 font-semibold text-right">{t("purchaseReturns.cols.unitCost")}</th>
                   <th className="px-3 py-3 font-semibold text-right">{t("purchaseReturns.cols.returnUnitCost")}</th>
                   <th className="px-3 py-3 font-semibold text-right">{t("orders.cols.lineTotal")}</th>
-                  <th className="sticky right-0 bg-er-soft/60" />
+                  <th className="sticky right-0 bg-slate-50 dark:bg-slate-800/80" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-soft">
