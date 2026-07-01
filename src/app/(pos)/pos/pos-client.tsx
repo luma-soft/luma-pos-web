@@ -36,6 +36,7 @@ type CartLine = {
   unitMultiplier: number;
   unitPrice: number;      // đơn giá niêm yết của đơn vị đang chọn
   quantity: number;
+  returnSoldQuantity?: number;
   lineDiscount?: number;  // giảm giá tay (VND) trên mỗi đơn vị
   manualPrice?: boolean;  // đã sửa giá/giảm giá tay → bỏ qua KM tự động
   note?: string;
@@ -200,6 +201,23 @@ function makeDraftFromSource(source: PosSourceInvoice, products: PosProduct[], i
     return {
       ...makeDraft(id, "return_invoice"),
       source,
+      cart: (source.items ?? []).flatMap((item) => {
+        const product = products.find((p) => p.id === item.productId);
+        if (!product) return [];
+        const unit = item.unitName === product.baseUnit ? null : product.units.find((u) => u.unitName === item.unitName) ?? null;
+        return [{
+          key: `${item.productId}-${item.unitName}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+          product,
+          unitName: item.unitName,
+          unitMultiplier: unit ? Number(unit.multiplier) : 1,
+          unitPrice: Math.max(0, item.unitPrice),
+          quantity: 0,
+          returnSoldQuantity: item.quantity,
+          lineDiscount: Math.max(0, item.lineDiscount ?? 0),
+          manualPrice: true,
+          note: item.note || undefined,
+        }];
+      }),
       returnOrderId: source.id,
       returnOrderCode: source.code,
       customerId: source.customerId ?? "",
@@ -775,6 +793,8 @@ export function PosClient({
   }
 
   const subtotal = cart.reduce((s, l) => s + effPrice(l).price * l.quantity, 0);
+  const returnQuantity = cart.reduce((sum, line) => sum + line.quantity, 0);
+  const hasReturnQuantity = returnQuantity > 0;
   const discountVnd = isReturnDraft ? 0 : discountMode === "pct" ? Math.round(subtotal * discountInput / 100) : discountInput;
   const taxAmount = isReturnDraft ? 0 : Math.round((subtotal - discountVnd) * taxRate / 100);
   const total = isReturnDraft ? subtotal : Math.max(0, subtotal - discountVnd + taxAmount + shippingFee);
@@ -795,6 +815,7 @@ export function PosClient({
   }
 
   function buildPrintJob(input: { template: PrintTemplate; title: string; code: string; paymentQr?: PosPrintPaymentQr | null }): PosPrintJob {
+    const printLines = isReturnDraft ? cart.filter((line) => line.quantity > 0) : cart;
     return {
       template: input.template,
       title: input.title,
@@ -803,7 +824,7 @@ export function PosClient({
       partyName: customer?.name ?? t("pos.walkInCustomer"),
       partyPhone: customer?.phone,
       projectName: projectName || null,
-      items: cart.map((line) => ({ ...line })),
+      items: printLines.map((line) => ({ ...line })),
       totals: {
         subtotal,
         discount: discountVnd,
@@ -1013,13 +1034,18 @@ export function PosClient({
 
   function updateQty(key: string, delta: number) {
     setCart((c) =>
-      c.map((l) => (l.key === key ? { ...l, quantity: Math.max(0, l.quantity + delta) } : l))
-        .filter((l) => l.quantity > 0)
+      c.map((l) => (l.key === key ? { ...l, quantity: clampLineQuantity(l, l.quantity + delta) } : l))
+        .filter((l) => isReturnDraft || l.quantity > 0)
     );
   }
 
   function setQty(key: string, qty: number) {
-    setCart((c) => c.map((l) => (l.key === key ? { ...l, quantity: Math.max(0, qty) } : l)).filter((l) => l.quantity > 0));
+    setCart((c) => c.map((l) => (l.key === key ? { ...l, quantity: clampLineQuantity(l, qty) } : l)).filter((l) => isReturnDraft || l.quantity > 0));
+  }
+
+  function clampLineQuantity(line: CartLine, qty: number) {
+    const normalized = Math.max(0, qty);
+    return line.returnSoldQuantity == null ? normalized : Math.min(normalized, line.returnSoldQuantity);
   }
 
   async function submitOrder(mode: "sale" | "quote" | "booking") {
@@ -1147,7 +1173,7 @@ export function PosClient({
   }
 
   async function submitReturn() {
-    if (cart.length === 0 || !data.warehouse || submitting) return;
+    if (!hasReturnQuantity || !data.warehouse || submitting) return;
     if (isReturnInvoiceDraft && !returnOrderId) {
       setError(t("pos.returns.sourceRequired"));
       return;
@@ -1172,7 +1198,7 @@ export function PosClient({
         reason: returnReason || "other",
         refundMethod: payMethod === "credit" ? "debt_deduct" : payMethod,
         note: orderNote || undefined,
-        items: cart.map((l) => ({
+        items: cart.filter((l) => l.quantity > 0).map((l) => ({
           productId: l.product.id,
           productName: l.product.name,
           unitName: l.unitName,
@@ -1440,6 +1466,11 @@ export function PosClient({
                       <Plus className="w-3.5 h-3.5" />
                     </button>
                   </div>
+                  {isReturnDraft && l.returnSoldQuantity != null && (
+                    <div className="mt-1 text-center text-xs font-medium tabular-nums text-slate-500">
+                      / {formatNumber(l.returnSoldQuantity)}
+                    </div>
+                  )}
                   <StockQuantityTooltip stock={Number(l.product.stock)} ordered={l.quantity * l.unitMultiplier} unit={l.product.baseUnit} />
                 </div>
                 <button
@@ -1988,7 +2019,7 @@ export function PosClient({
           <div className="flex gap-2">
             <div className="relative">
               <button
-                disabled={cart.length === 0 || submitting}
+                disabled={(isReturnDraft ? !hasReturnQuantity : cart.length === 0) || submitting}
                 onClick={() => doPrint(printDefaultSize)}
                 title={t("pos.printSlip")}
                 className="h-full px-3 py-3 rounded-xl border border-border text-sm font-medium disabled:opacity-50 whitespace-nowrap inline-flex items-center gap-1.5"
@@ -1998,7 +2029,7 @@ export function PosClient({
               </button>
             </div>
             <button
-              disabled={cart.length === 0 || submitting || !data.warehouse || !!sepayCheckout}
+              disabled={(isReturnDraft ? !hasReturnQuantity : cart.length === 0) || submitting || !data.warehouse || !!sepayCheckout}
               onClick={submitActiveDraft}
               className="flex-1 py-3 rounded-xl bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2"
             >
