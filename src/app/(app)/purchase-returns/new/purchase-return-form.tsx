@@ -189,18 +189,29 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
           </div>
 
           <div className="flex-1 min-h-[320px] overflow-auto bg-surface border border-border rounded-card">
-            <table className="w-full min-w-[980px] text-sm">
+            <table className="w-full min-w-[820px] table-fixed text-sm">
+              <colgroup>
+                <col className="w-14" />
+                <col className="w-28" />
+                <col />
+                <col className="w-24" />
+                <col className="w-24" />
+                <col className="w-28" />
+                <col className="w-30" />
+                <col className="w-32" />
+                <col className="w-14" />
+              </colgroup>
               <thead className="sticky top-0 bg-er-soft/60">
                 <tr className="text-left text-xs text-slate-700 dark:text-slate-200">
-                  <th className="px-3 py-3 font-semibold text-center w-14">{t("purchaseReturns.cols.index")}</th>
-                  <th className="px-3 py-3 font-semibold w-32">{t("purchaseReturns.cols.sku")}</th>
+                  <th className="px-3 py-3 font-semibold text-center">{t("purchaseReturns.cols.index")}</th>
+                  <th className="px-3 py-3 font-semibold">{t("purchaseReturns.cols.sku")}</th>
                   <th className="px-3 py-3 font-semibold">{t("purchaseReturns.cols.productName")}</th>
-                  <th className="px-3 py-3 font-semibold w-24">{t("purchaseReturns.cols.unit")}</th>
-                  <th className="px-3 py-3 font-semibold text-right w-28">{t("purchaseReturns.cols.qty")}</th>
-                  <th className="px-3 py-3 font-semibold text-right w-28">{t("purchaseReturns.cols.unitCost")}</th>
-                  <th className="px-3 py-3 font-semibold text-right w-32">{t("purchaseReturns.cols.returnUnitCost")}</th>
-                  <th className="px-3 py-3 font-semibold text-right w-32">{t("orders.cols.lineTotal")}</th>
-                  <th className="w-10" />
+                  <th className="px-3 py-3 font-semibold">{t("purchaseReturns.cols.unit")}</th>
+                  <th className="px-3 py-3 font-semibold text-right">{t("purchaseReturns.cols.qty")}</th>
+                  <th className="px-3 py-3 font-semibold text-right">{t("purchaseReturns.cols.unitCost")}</th>
+                  <th className="px-3 py-3 font-semibold text-right">{t("purchaseReturns.cols.returnUnitCost")}</th>
+                  <th className="px-3 py-3 font-semibold text-right">{t("orders.cols.lineTotal")}</th>
+                  <th className="sticky right-0 bg-er-soft/60" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-soft">
@@ -218,7 +229,7 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
                       <td className="px-3 py-2 text-center text-slate-500">{index + 1}</td>
                       <td className="px-3 py-2 font-medium text-primary-600">{line.sku}</td>
                       <td className="px-3 py-2">
-                        <div className="font-medium">{line.name}</div>
+                        <div className="truncate font-medium">{line.name}</div>
                         <div className={cn("text-xs", overStock ? "text-er" : "text-slate-400")}>
                           {t("purchaseReturns.availableStock", { stock: formatNumber(line.stock), unit: line.unitName })}
                         </div>
@@ -239,8 +250,8 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
                         <MoneyInput value={line.returnUnitCost} onChange={(value) => patch(line.productId, { returnUnitCost: value ?? 0 })} className={numCls} />
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums font-semibold">{formatCurrency(line.quantity * line.returnUnitCost)}</td>
-                      <td className="px-2 py-2 text-right">
-                        <Button type="button" variant="ghost" size="iconSm" onClick={() => setLines((current) => current.filter((item) => item.productId !== line.productId))} className="text-slate-400 hover:text-er">
+                      <td className="sticky right-0 bg-surface px-3 py-2 text-right shadow-[-10px_0_18px_rgba(15,23,42,0.04)]">
+                        <Button type="button" variant="ghost" size="iconSm" aria-label={t("common.delete")} onClick={() => setLines((current) => current.filter((item) => item.productId !== line.productId))} className="text-slate-400 hover:text-er">
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </td>
