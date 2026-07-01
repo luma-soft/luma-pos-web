@@ -1760,12 +1760,17 @@
     "columns": "Số cột",
     "columnsShort": "cột",
     "gapMm": "Khoảng cách (mm)",
+    "barcodeHeightMm": "Cao mã vạch (mm)",
+    "barcodeQuietMm": "Lề trắng mã (mm)",
+    "fontScale": "Cỡ chữ",
     "preview": "Xem trước",
     "toggles": {
       "showName": "Tên hàng",
       "showSku": "SKU",
       "showPrice": "Giá bán",
-      "showUnit": "Đơn vị"
+      "showUnit": "Đơn vị",
+      "showBarcodeText": "Mã đọc được dưới barcode",
+      "showStoreName": "Tên cửa hàng"
     },
     "errors": {
       "defaultRequired": "Cần có mẫu mặc định khác trước khi ngừng dùng mẫu này."

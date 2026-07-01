@@ -10,6 +10,7 @@ import type { LabelTemplate } from "@/lib/labels/template-shared";
 import { Routes } from "@/lib/routes";
 import { formatCurrency } from "@/lib/utils";
 import { LabelPrintButton } from "./label-print-button";
+import { getStoreSettings } from "@/lib/data/settings";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -42,9 +43,9 @@ function barcodeSvg(value: string, template: LabelTemplate) {
       bcid: template.barcodeType,
       text: value || "LUMAPOS",
       scale: 2,
-      height: Math.max(8, Math.min(18, Math.round(template.heightMm * 0.38))),
+      height: Math.max(6, Math.min(40, Math.round(template.barcodeHeightMm))),
       includetext: false,
-      paddingwidth: 0,
+      paddingwidth: Math.max(0, Math.round(template.barcodeQuietMm * 2)),
       paddingheight: 0,
     });
   } catch {
@@ -55,7 +56,7 @@ function barcodeSvg(value: string, template: LabelTemplate) {
 export default async function ProductLabelsPage({ params, searchParams }: Props) {
   const { id } = await params;
   const query = await searchParams;
-  const [t, product, templates] = await Promise.all([getTranslations(), getProduct(id), getLabelTemplates()]);
+  const [t, product, templates, store] = await Promise.all([getTranslations(), getProduct(id), getLabelTemplates(), getStoreSettings()]);
   if (!product) notFound();
 
   const template = await getLabelTemplate(query.templateId);
@@ -162,6 +163,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
                 price={label.price}
                 codeLabel={t("products.labels.barcodeValue")}
                 priceLabel={t("products.labels.price")}
+                storeName={store.name}
                 barcodeSvg={label.svg}
               />
             ))}
@@ -190,6 +192,7 @@ function ProductLabel({
   price,
   codeLabel,
   priceLabel,
+  storeName,
   barcodeSvg,
 }: {
   template: LabelTemplate;
@@ -200,24 +203,31 @@ function ProductLabel({
   price: string;
   codeLabel: string;
   priceLabel: string;
+  storeName: string;
   barcodeSvg: string;
 }) {
+  const nameSize = 10 * template.fontScale;
+  const metaSize = 8 * template.fontScale;
+  const codeSize = 7 * template.fontScale;
   return (
     <div
       className="break-inside-avoid overflow-hidden border border-slate-300 bg-white p-[2mm] text-slate-950 shadow-sm print:shadow-none"
       style={{ width: `${template.widthMm}mm`, height: `${template.heightMm}mm` }}
     >
-      {template.showName && <div className="line-clamp-2 text-[10px] font-bold leading-tight">{name}</div>}
-      <div className="mt-[1mm] flex items-center justify-between gap-1 text-[8px]">
+      {template.showStoreName && <div className="truncate text-center font-bold uppercase tracking-wide text-slate-500" style={{ fontSize: `${6.5 * template.fontScale}px` }}>{storeName || "LumaPOS"}</div>}
+      {template.showName && <div className="line-clamp-2 font-bold leading-tight" style={{ fontSize: `${nameSize}px` }}>{name}</div>}
+      <div className="mt-[1mm] flex items-center justify-between gap-1" style={{ fontSize: `${metaSize}px` }}>
         {template.showSku && <span className="truncate font-mono text-slate-500">{sku}</span>}
         {template.showUnit && <span className="shrink-0 text-slate-500">{unitName}</span>}
         {template.showPrice && <span className="shrink-0 font-semibold">{priceLabel}: {price}</span>}
       </div>
-      <div className="mt-[1mm] flex h-[10mm] items-center justify-center" dangerouslySetInnerHTML={{ __html: barcodeSvg }} />
-      <div className="mt-[1mm] flex items-center justify-between gap-1 text-[7px] font-medium text-slate-600">
-        <span>{codeLabel}</span>
-        <span className="truncate font-mono text-slate-950">{code}</span>
-      </div>
+      <div className="mt-[1mm] flex items-center justify-center overflow-hidden" style={{ height: `${template.barcodeHeightMm}mm`, paddingInline: `${template.barcodeQuietMm}mm` }} dangerouslySetInnerHTML={{ __html: barcodeSvg }} />
+      {template.showBarcodeText && (
+        <div className="mt-[1mm] flex items-center justify-between gap-1 font-medium text-slate-600" style={{ fontSize: `${codeSize}px` }}>
+          <span>{codeLabel}</span>
+          <span className="truncate font-mono text-slate-950">{code}</span>
+        </div>
+      )}
     </div>
   );
 }

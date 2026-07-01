@@ -1760,12 +1760,17 @@
     "columns": "Columns",
     "columnsShort": "cols",
     "gapMm": "Gap (mm)",
+    "barcodeHeightMm": "Barcode height (mm)",
+    "barcodeQuietMm": "Quiet zone (mm)",
+    "fontScale": "Font size",
     "preview": "Preview",
     "toggles": {
       "showName": "Product name",
       "showSku": "SKU",
       "showPrice": "Price",
-      "showUnit": "Unit"
+      "showUnit": "Unit",
+      "showBarcodeText": "Human-readable code",
+      "showStoreName": "Store name"
     },
     "errors": {
       "defaultRequired": "Set another default before deactivating this template."

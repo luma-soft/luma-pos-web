@@ -15,7 +15,13 @@ import { DEFAULT_LABEL_TEMPLATE, type LabelTemplate } from "@/lib/labels/templat
 import { Routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
-const TOGGLES = ["showName", "showSku", "showPrice", "showUnit"] as const;
+const TOGGLES = ["showName", "showSku", "showPrice", "showUnit", "showBarcodeText", "showStoreName"] as const;
+
+const LABEL_PRESETS = [
+  { key: "40x30", widthMm: 40, heightMm: 30, columns: 3, gapMm: 2, barcodeHeightMm: 10, barcodeQuietMm: 2, fontScale: 1 },
+  { key: "50x30", widthMm: 50, heightMm: 30, columns: 2, gapMm: 3, barcodeHeightMm: 11, barcodeQuietMm: 2, fontScale: 1 },
+  { key: "35x22", widthMm: 35, heightMm: 22, columns: 4, gapMm: 2, barcodeHeightMm: 8, barcodeQuietMm: 1.5, fontScale: 0.9 },
+] as const;
 
 export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] }) {
   const t = useTranslations();
@@ -79,6 +85,11 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
         showSku: selected.showSku,
         showPrice: selected.showPrice,
         showUnit: selected.showUnit,
+        showBarcodeText: selected.showBarcodeText,
+        showStoreName: selected.showStoreName,
+        barcodeHeightMm: selected.barcodeHeightMm,
+        barcodeQuietMm: selected.barcodeQuietMm,
+        fontScale: selected.fontScale,
         isDefault: selected.isDefault,
         isActive: selected.isActive,
         sortOrder: selected.sortOrder,
@@ -154,11 +165,26 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
             </Panel>
 
             <Panel title={t("labelSettings.sizeSection")}>
+              <div className="mb-3 flex flex-wrap gap-2">
+                {LABEL_PRESETS.map((preset) => (
+                  <button
+                    key={preset.key}
+                    type="button"
+                    onClick={() => patch(preset)}
+                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2"
+                  >
+                    {preset.widthMm}x{preset.heightMm}mm
+                  </button>
+                ))}
+              </div>
               <div className="grid gap-3 sm:grid-cols-4">
                 <Field label={t("labelSettings.widthMm")}><NumberInput value={selected.widthMm} min={10} max={120} step={1} onChange={(value) => patch({ widthMm: value })} className={inputCls} /></Field>
                 <Field label={t("labelSettings.heightMm")}><NumberInput value={selected.heightMm} min={8} max={80} step={1} onChange={(value) => patch({ heightMm: value })} className={inputCls} /></Field>
                 <Field label={t("labelSettings.columns")}><NumberInput value={selected.columns} min={1} max={6} step={1} onChange={(value) => patch({ columns: Math.round(value) })} className={inputCls} /></Field>
                 <Field label={t("labelSettings.gapMm")}><NumberInput value={selected.gapMm} min={0} max={20} step={0.5} onChange={(value) => patch({ gapMm: value })} className={inputCls} /></Field>
+                <Field label={t("labelSettings.barcodeHeightMm")}><NumberInput value={selected.barcodeHeightMm} min={6} max={40} step={0.5} onChange={(value) => patch({ barcodeHeightMm: value })} className={inputCls} /></Field>
+                <Field label={t("labelSettings.barcodeQuietMm")}><NumberInput value={selected.barcodeQuietMm} min={0} max={10} step={0.5} onChange={(value) => patch({ barcodeQuietMm: value })} className={inputCls} /></Field>
+                <Field label={t("labelSettings.fontScale")}><NumberInput value={selected.fontScale} min={0.75} max={1.5} step={0.05} onChange={(value) => patch({ fontScale: value })} className={inputCls} /></Field>
               </div>
             </Panel>
 
@@ -201,21 +227,24 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
                 className="overflow-hidden border border-slate-300 bg-white p-[2mm] text-slate-950 shadow-sm"
                 style={{ width: `${selected.widthMm}mm`, height: `${selected.heightMm}mm` }}
               >
-                {selected.showName && <div className="line-clamp-2 text-[10px] font-bold leading-tight">Xi mang PCB40</div>}
-                <div className="mt-[1mm] flex items-center justify-between gap-1 text-[8px]">
+                {selected.showStoreName && <div className="truncate text-center font-bold uppercase tracking-wide text-slate-500" style={{ fontSize: `${6.5 * selected.fontScale}px` }}>LumaPOS</div>}
+                {selected.showName && <div className="line-clamp-2 font-bold leading-tight" style={{ fontSize: `${10 * selected.fontScale}px` }}>Xi mang PCB40</div>}
+                <div className="mt-[1mm] flex items-center justify-between gap-1" style={{ fontSize: `${8 * selected.fontScale}px` }}>
                   {selected.showSku && <span className="truncate font-mono text-slate-500">XM-PCB40</span>}
                   {selected.showUnit && <span className="shrink-0 text-slate-500">bao</span>}
                   {selected.showPrice && <span className="shrink-0 font-semibold">92.000 ₫</span>}
                 </div>
-                <div className="mt-[1mm] flex h-[10mm] items-stretch overflow-hidden bg-white">
+                <div className="mt-[1mm] flex items-stretch overflow-hidden bg-white" style={{ height: `${selected.barcodeHeightMm}mm`, paddingInline: `${selected.barcodeQuietMm}mm` }}>
                   {Array.from({ length: 42 }).map((_, index) => (
                     <span key={index} className={index % 2 === 0 ? "bg-slate-950" : "bg-white"} style={{ width: `${index % 5 === 0 ? 3 : 1}px` }} />
                   ))}
                 </div>
-                <div className="mt-[1mm] flex items-center justify-between gap-1 text-[7px] font-medium text-slate-600">
-                  <span>{t("products.labels.barcodeValue")}</span>
-                  <span className="truncate font-mono text-slate-950">893000000001</span>
-                </div>
+                {selected.showBarcodeText && (
+                  <div className="mt-[1mm] flex items-center justify-between gap-1 font-medium text-slate-600" style={{ fontSize: `${7 * selected.fontScale}px` }}>
+                    <span>{t("products.labels.barcodeValue")}</span>
+                    <span className="truncate font-mono text-slate-950">893000000001</span>
+                  </div>
+                )}
               </div>
               <p className="mt-3 text-xs text-slate-500">
                 {selected.widthMm}x{selected.heightMm}mm · {selected.columns} {t("labelSettings.columnsShort")} · {selected.gapMm}mm

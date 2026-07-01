@@ -12,6 +12,11 @@ export interface LabelTemplate {
   showSku: boolean;
   showPrice: boolean;
   showUnit: boolean;
+  showBarcodeText: boolean;
+  showStoreName: boolean;
+  barcodeHeightMm: number;
+  barcodeQuietMm: number;
+  fontScale: number;
   isDefault: boolean;
   isActive: boolean;
   sortOrder: number;
@@ -29,6 +34,11 @@ export const DEFAULT_LABEL_TEMPLATE: LabelTemplate = {
   showSku: true,
   showPrice: true,
   showUnit: false,
+  showBarcodeText: true,
+  showStoreName: false,
+  barcodeHeightMm: 10,
+  barcodeQuietMm: 2,
+  fontScale: 1,
   isDefault: true,
   isActive: true,
   sortOrder: 0,
