@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getZaloConfig } from "@/lib/zalo/config";
+import { logZaloWebhookEvent } from "@/lib/zalo/webhook";
 
 function verifySignature(secret: string, body: string, signature: string | null) {
   if (!signature) return false;
@@ -26,5 +27,11 @@ export async function POST(request: Request) {
   } catch {
     return NextResponse.json({ ok: false, error: "errors.invalidData" }, { status: 400 });
   }
-  return NextResponse.json({ ok: true, received: Boolean(event) });
+  try {
+    const summary = await logZaloWebhookEvent(event);
+    return NextResponse.json({ ok: true, received: true, logged: true, event: summary.eventName });
+  } catch (error) {
+    console.error("logZaloWebhookEvent failed:", error);
+    return NextResponse.json({ ok: true, received: true, logged: false });
+  }
 }

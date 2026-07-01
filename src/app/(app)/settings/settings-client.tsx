@@ -1274,7 +1274,8 @@ function ZaloSection({ L, prefs, canEdit }: { L: boolean; prefs: StorePrefs["zal
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => { setForm((p) => ({ ...p, [key]: value })); mark(); };
   const setSecretValue = (key: ZaloSecretKey, value: string) => set(key, value);
   const setClear = (key: ZaloSecretKey, value: boolean) => { setClearSecret((p) => ({ ...p, [key]: value })); mark(); };
-  const configured = form.enabled && (secretSet.accessToken || Boolean(form.accessToken.trim())) && Boolean(form.portalTemplateId || form.invoiceTemplateId || form.debtTemplateId);
+  const connected = form.enabled && Boolean(form.oaId.trim()) && Boolean(form.appId.trim()) && (secretSet.accessToken || Boolean(form.accessToken.trim()));
+  const znsReady = connected && Boolean(form.portalTemplateId || form.invoiceTemplateId || form.debtTemplateId);
   function save() {
     start(async () => {
       const res = await updateZaloSettings({
@@ -1311,11 +1312,20 @@ function ZaloSection({ L, prefs, canEdit }: { L: boolean; prefs: StorePrefs["zal
           <div className="flex flex-wrap items-center gap-2">
             <span className={cn(
               "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold",
-              configured ? "bg-ok-soft text-ok" : "bg-warn-soft text-warn"
+              znsReady ? "bg-ok-soft text-ok" : connected ? "bg-in-soft text-in" : "bg-warn-soft text-warn"
             )}>
               <MessageCircle className="h-3.5 w-3.5" />
-              {configured ? (L ? "Sẵn sàng gửi ZNS" : "Ready for ZNS") : (L ? "Chưa đủ cấu hình" : "Configuration incomplete")}
+              {znsReady
+                ? (L ? "Sẵn sàng gửi ZNS" : "Ready for ZNS")
+                : connected
+                  ? (L ? "Đã kết nối OA" : "OA connected")
+                  : (L ? "Chưa đủ cấu hình" : "Configuration incomplete")}
             </span>
+            {connected && !znsReady && (
+              <span className="text-[11px] font-semibold text-slate-500">
+                {L ? "Template ZNS có thể bổ sung sau." : "ZNS templates can be added later."}
+              </span>
+            )}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1"><span className={FL}>OA ID</span><input className={cn(FI, "font-mono")} value={form.oaId} disabled={!canEdit} onChange={(e) => set("oaId", e.target.value)} /></div>
