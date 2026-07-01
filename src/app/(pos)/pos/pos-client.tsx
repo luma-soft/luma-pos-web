@@ -1858,13 +1858,14 @@ export function PosClient({
             sellerLabel={t("orders.detail.seller")}
             items={printJob.items.map((l) => {
               const e = effPrice(l);
-              return { id: l.key, name: l.product.name, unitName: l.unitName, quantity: l.quantity, unitPrice: e.price, total: e.price * l.quantity };
+              const lineDiscount = Math.max(0, (l.unitPrice - e.price) * l.quantity);
+              return { id: l.key, name: l.product.name, unitName: l.unitName, quantity: l.quantity, unitPrice: l.unitPrice, discount: lineDiscount, total: e.price * l.quantity };
             })}
             totals={[
-              { label: t("pos.subtotal"), value: printJob.totals.subtotal },
-              ...(printJob.totals.discount > 0 ? [{ label: t("pos.discount"), value: printJob.totals.discount, negative: true }] : []),
-              ...(printJob.totals.tax > 0 ? [{ label: t("pos.tax"), value: printJob.totals.tax }] : []),
-              ...(printJob.totals.shipping > 0 ? [{ label: t("pos.shipping"), value: printJob.totals.shipping }] : []),
+              { label: t("pos.subtotal"), value: printJob.totals.subtotal, kind: "subtotal" },
+              ...(printJob.totals.discount > 0 ? [{ label: t("pos.discount"), value: printJob.totals.discount, negative: true, kind: "discount" as const }] : []),
+              ...(printJob.totals.tax > 0 ? [{ label: t("pos.tax"), value: printJob.totals.tax, kind: "tax" as const }] : []),
+              ...(printJob.totals.shipping > 0 ? [{ label: t("pos.shipping"), value: printJob.totals.shipping, kind: "shipping" as const }] : []),
             ]}
             grandTotalLabel={t("print.grandTotal")}
             grandTotal={printJob.grandTotal}
@@ -1883,6 +1884,7 @@ export function PosClient({
               unit: t("orders.cols.unit"),
               qty: t("orders.cols.qty"),
               unitPrice: t("orders.cols.unitPrice"),
+              discount: t("orders.cols.discount"),
               lineTotal: t("orders.cols.lineTotal"),
             }}
           />

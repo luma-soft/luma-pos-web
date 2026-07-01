@@ -37,9 +37,10 @@ export default async function PrintOrderPage({ params, searchParams }: Props) {
   const remaining = Math.max(0, total - paid);
 
   const totals = [
-    { label: t("pos.subtotal"), value: Number(order.subtotal) },
-    ...(Number(order.discount) > 0 ? [{ label: t("pos.discount"), value: Number(order.discount), negative: true }] : []),
-    ...(Number(order.shippingFee) > 0 ? [{ label: t("pos.shipping"), value: Number(order.shippingFee) }] : []),
+    { label: t("pos.subtotal"), value: Number(order.subtotal), kind: "subtotal" as const },
+    ...(Number(order.discount) > 0 ? [{ label: t("pos.discount"), value: Number(order.discount), negative: true, kind: "discount" as const }] : []),
+    ...(Number(order.tax) > 0 ? [{ label: t("pos.tax"), value: Number(order.tax), kind: "tax" as const }] : []),
+    ...(Number(order.shippingFee) > 0 ? [{ label: t("pos.shipping"), value: Number(order.shippingFee), kind: "shipping" as const }] : []),
   ];
   const afterTotals = isQuote || isBooking ? [] : [
     ...(template.options.showDebt ? [{ label: t("print.paid"), value: paid }] : []),
@@ -89,6 +90,7 @@ export default async function PrintOrderPage({ params, searchParams }: Props) {
             unitName: i.unitName,
             quantity: Number(i.quantity),
             unitPrice: Number(i.unitPrice),
+            discount: Number(i.discount),
             total: Number(i.total),
           }))}
           totals={totals}
@@ -105,6 +107,7 @@ export default async function PrintOrderPage({ params, searchParams }: Props) {
             unit: t("orders.cols.unit"),
             qty: t("orders.cols.qty"),
             unitPrice: t("orders.cols.unitPrice"),
+            discount: t("orders.cols.discount"),
             lineTotal: t("orders.cols.lineTotal"),
           }}
         />

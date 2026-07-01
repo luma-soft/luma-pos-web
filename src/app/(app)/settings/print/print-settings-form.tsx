@@ -25,7 +25,7 @@ import {
   type PrintTemplateStoreInfo,
 } from "@/lib/print/template-shared";
 
-const TOGGLES = ["showSeller", "showProject", "showDebt", "showPaymentQr", "showInWords", "showSignatures", "showSku"] as const;
+const TOGGLES = ["showSeller", "showProject", "showDebt", "showDiscount", "showTax", "showLineDiscount", "showPaymentQr", "showInWords", "showSignatures", "showSku"] as const;
 
 export function PrintSettingsForm({ templates, storeDefaults }: { templates: PrintTemplate[]; storeDefaults: PrintTemplateStoreInfo }) {
   const t = useTranslations();
@@ -265,11 +265,15 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                   deliveryAddress="12 Nguyen Trai"
                   sellerLabel={t("orders.detail.seller")}
                   sellerName="LumaPOS"
-                  items={[{ id: "1", name: "Xi mang PCB40", sku: "HT40", unitName: "bao", quantity: 10, unitPrice: 92000, total: 920000 }]}
-                  totals={[{ label: t("pos.subtotal"), value: 920000 }]}
+                  items={[{ id: "1", name: "Xi mang PCB40", sku: "HT40", unitName: "bao", quantity: 10, unitPrice: 95000, discount: 30000, total: 920000 }]}
+                  totals={[
+                    { label: t("pos.subtotal"), value: 920000, kind: "subtotal" },
+                    { label: t("pos.discount"), value: 20000, negative: true, kind: "discount" },
+                    { label: t("pos.tax"), value: 72000, kind: "tax" },
+                  ]}
                   grandTotalLabel={t("print.grandTotal")}
-                  grandTotal={920000}
-                  afterTotals={[{ label: t("print.paid"), value: 500000 }, { label: t("print.remaining"), value: 420000, bold: true }]}
+                  grandTotal={972000}
+                  afterTotals={[{ label: t("print.paid"), value: 500000 }, { label: t("print.remaining"), value: 472000, bold: true }]}
                   paymentQr={{
                     title: t("pos.sepay.title"),
                     qrImageUrl: "https://qr.sepay.vn/img?bank=VCB&acc=0123456789&amount=420000&des=XX-000",
@@ -286,7 +290,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                   signatures={[t("print.buyerSign"), t("print.delivererSign"), t("print.sellerSign")]}
                   signHint={t("print.signHint")}
                   note={t("printSettings.previewNote")}
-                  cols={{ product: t("orders.cols.product"), unit: t("orders.cols.unit"), qty: t("orders.cols.qty"), unitPrice: t("orders.cols.unitPrice"), lineTotal: t("orders.cols.lineTotal") }}
+                  cols={{ product: t("orders.cols.product"), unit: t("orders.cols.unit"), qty: t("orders.cols.qty"), unitPrice: t("orders.cols.unitPrice"), discount: t("orders.cols.discount"), lineTotal: t("orders.cols.lineTotal") }}
                 />
               </div>
             </div>

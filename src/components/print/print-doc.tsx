@@ -8,12 +8,14 @@ export interface PrintLine {
   unitName: string;
   quantity: number;
   unitPrice: number;
+  discount?: number;
   total: number;
 }
 
 export interface PrintTotalRow {
   label: string;
   value: number;
+  kind?: "subtotal" | "discount" | "tax" | "shipping" | "other";
   bold?: boolean;
   negative?: boolean;
 }
@@ -54,7 +56,7 @@ export interface PrintDocProps {
   signHint?: string;
   note?: string | null;
   /** nhãn cột */
-  cols: { product: string; unit: string; qty: string; unitPrice: string; lineTotal: string };
+  cols: { product: string; unit: string; qty: string; unitPrice: string; discount?: string; lineTotal: string };
 }
 
 export function PrintDoc(p: PrintDocProps) {
@@ -62,6 +64,12 @@ export function PrintDoc(p: PrintDocProps) {
   if (p.size === "k80") return <K80Doc {...p} />;
 
   const isA4 = p.size === "a4";
+  const showLineDiscount = t.options.showLineDiscount && p.items.some((item) => Number(item.discount ?? 0) > 0);
+  const visibleTotals = p.totals.filter((row) => {
+    if (row.kind === "discount") return t.options.showDiscount;
+    if (row.kind === "tax") return t.options.showTax;
+    return true;
+  });
   return (
     <div
       className={
@@ -110,6 +118,7 @@ export function PrintDoc(p: PrintDocProps) {
             <th className="border border-slate-400 px-2 py-1.5">{p.cols.unit}</th>
             <th className="border border-slate-400 px-2 py-1.5">{p.cols.qty}</th>
             <th className="border border-slate-400 px-2 py-1.5 text-right">{p.cols.unitPrice}</th>
+            {showLineDiscount && <th className="border border-slate-400 px-2 py-1.5 text-right">{p.cols.discount ?? "Giảm giá"}</th>}
             <th className="border border-slate-400 px-2 py-1.5 text-right">{p.cols.lineTotal}</th>
           </tr>
         </thead>
@@ -123,6 +132,7 @@ export function PrintDoc(p: PrintDocProps) {
               <td className="border border-slate-400 px-2 py-1.5 text-center">{i.unitName}</td>
               <td className="border border-slate-400 px-2 py-1.5 text-center">{formatNumber(i.quantity)}</td>
               <td className="border border-slate-400 px-2 py-1.5 text-right">{formatNumber(i.unitPrice)}</td>
+              {showLineDiscount && <td className="border border-slate-400 px-2 py-1.5 text-right">{Number(i.discount ?? 0) > 0 ? formatNumber(Number(i.discount)) : "—"}</td>}
               <td className="border border-slate-400 px-2 py-1.5 text-right">{formatNumber(i.total)}</td>
             </tr>
           ))}
@@ -133,7 +143,7 @@ export function PrintDoc(p: PrintDocProps) {
       <div className="flex justify-end mt-3 text-[12px]">
         <table className={isA4 ? "w-[300px]" : "w-[260px]"}>
           <tbody>
-            {p.totals.map((r) => (
+            {visibleTotals.map((r) => (
               <tr key={r.label}>
                 <td className="py-0.5 text-slate-600">{r.label}</td>
                 <td className="text-right">{r.negative ? "− " : ""}{formatNumber(r.value)}</td>
@@ -194,6 +204,11 @@ export function PrintDoc(p: PrintDocProps) {
 
 function K80Doc(p: PrintDocProps) {
   const t = p.template;
+  const visibleTotals = p.totals.filter((row) => {
+    if (row.kind === "discount") return t.options.showDiscount;
+    if (row.kind === "tax") return t.options.showTax;
+    return true;
+  });
   return (
     <div className="bg-white text-black w-[302px] p-4 font-mono text-[12px] leading-relaxed shadow-lg print:shadow-none">
       <div className="text-center">
@@ -215,11 +230,12 @@ function K80Doc(p: PrintDocProps) {
         <div key={i.id} className="mb-1.5">
           {i.name}<br />
           {formatNumber(i.quantity)} {i.unitName} × {formatNumber(i.unitPrice)}
+          {t.options.showLineDiscount && Number(i.discount ?? 0) > 0 && <><br />{p.cols.discount ?? "Giảm giá"}: −{formatNumber(Number(i.discount))}</>}
           <span className="float-right">{formatNumber(i.total)}</span>
         </div>
       ))}
       <div className="border-t border-dashed border-slate-400 my-2" />
-      {p.totals.map((r) => (
+      {visibleTotals.map((r) => (
         <div key={r.label}>{r.label}<span className="float-right">{r.negative ? "−" : ""}{formatNumber(r.value)}</span></div>
       ))}
       <div className="font-bold text-[14px] mt-1">{p.grandTotalLabel}<span className="float-right">{formatNumber(p.grandTotal)}</span></div>

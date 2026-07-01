@@ -101,12 +101,14 @@ export default async function PrintBatchPage({ searchParams }: Props) {
                   unitName: i.unitName,
                   quantity: Number(i.quantity),
                   unitPrice: Number(i.unitPrice),
+                  discount: Number(i.discount),
                   total: Number(i.total),
                 }))}
                 totals={[
-                  { label: t("pos.subtotal"), value: Number(order.subtotal) },
-                  ...(Number(order.discount) > 0 ? [{ label: t("pos.discount"), value: Number(order.discount), negative: true }] : []),
-                  ...(Number(order.shippingFee) > 0 ? [{ label: t("pos.shipping"), value: Number(order.shippingFee) }] : []),
+                  { label: t("pos.subtotal"), value: Number(order.subtotal), kind: "subtotal" },
+                  ...(Number(order.discount) > 0 ? [{ label: t("pos.discount"), value: Number(order.discount), negative: true, kind: "discount" as const }] : []),
+                  ...(Number(order.tax) > 0 ? [{ label: t("pos.tax"), value: Number(order.tax), kind: "tax" as const }] : []),
+                  ...(Number(order.shippingFee) > 0 ? [{ label: t("pos.shipping"), value: Number(order.shippingFee), kind: "shipping" as const }] : []),
                 ]}
                 grandTotalLabel={t("print.grandTotal")}
                 grandTotal={total}
@@ -124,6 +126,7 @@ export default async function PrintBatchPage({ searchParams }: Props) {
                   unit: t("orders.cols.unit"),
                   qty: t("orders.cols.qty"),
                   unitPrice: t("orders.cols.unitPrice"),
+                  discount: t("orders.cols.discount"),
                   lineTotal: t("orders.cols.lineTotal"),
                 }}
               />

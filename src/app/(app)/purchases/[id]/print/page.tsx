@@ -54,9 +54,14 @@ export default async function PrintPurchasePage({ params, searchParams }: Props)
             unitName: i.baseUnit,
             quantity: Number(i.quantity),
             unitPrice: Number(i.unitCost),
+            discount: Number(i.discount),
             total: Number(i.total),
           }))}
-          totals={[]}
+          totals={[
+            { label: t("purchases.subtotal"), value: Number(po.subtotal), kind: "subtotal" },
+            ...(Number(po.discount) > 0 ? [{ label: t("pos.discount"), value: Number(po.discount), negative: true, kind: "discount" as const }] : []),
+            ...(Number(po.tax) > 0 ? [{ label: t("pos.tax"), value: Number(po.tax), kind: "tax" as const }] : []),
+          ]}
           grandTotalLabel={t("print.grandTotal")}
           grandTotal={total}
           afterTotals={[
@@ -72,6 +77,7 @@ export default async function PrintPurchasePage({ params, searchParams }: Props)
             unit: t("orders.cols.unit"),
             qty: t("purchases.cols.qty"),
             unitPrice: t("purchases.cols.unitCost"),
+            discount: t("orders.cols.discount"),
             lineTotal: t("orders.cols.lineTotal"),
           }}
         />

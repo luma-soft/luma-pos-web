@@ -53,6 +53,7 @@ export default async function PrintReturnPage({ params, searchParams }: Props) {
             unitName: i.unitName,
             quantity: Number(i.quantity),
             unitPrice: Number(i.unitPrice),
+            discount: 0,
             total: Number(i.total),
           }))}
           totals={[]}
@@ -72,6 +73,7 @@ export default async function PrintReturnPage({ params, searchParams }: Props) {
             unit: t("orders.cols.unit"),
             qty: t("returns.cols.returnNow"),
             unitPrice: t("orders.cols.unitPrice"),
+            discount: t("orders.cols.discount"),
             lineTotal: t("returns.cols.refund"),
           }}
         />
