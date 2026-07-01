@@ -192,6 +192,7 @@ async function main() {
   // ---- chứng từ đã có (idempotent) ----
   const existOrder = new Set((await db.select({ c: schema.orders.code }).from(schema.orders)).map((r) => r.c));
   const existPO = new Set((await db.select({ c: schema.purchaseOrders.code }).from(schema.purchaseOrders)).map((r) => r.c));
+  const existPurchaseReturn = new Set((await db.select({ c: schema.purchaseReturns.code }).from(schema.purchaseReturns)).map((r) => r.c));
   const existRet = new Set((await db.select({ c: schema.returns.code }).from(schema.returns)).map((r) => r.c));
   const existCash = new Set((await db.select({ c: schema.cashTransactions.code }).from(schema.cashTransactions)).map((r) => r.c));
 
@@ -308,36 +309,63 @@ async function main() {
   for (const b of chunk(poItemIns, 500)) await db.insert(schema.purchaseOrderItems).values(b);
   console.log(`✓ Phiếu nhập: +${poIns.length} (bỏ qua ${pnSkip} đã có) · ${poItemIns.length} dòng hàng`);
 
-  // ============ 3. Trả hàng nhập → purchase_orders (status returned) ============
-  const thnIns: POIns[] = [];
-  const thnItemIns: POItemIns[] = [];
+  // ============ 3. Trả hàng nhập → purchase_returns ============
+  type PurchaseReturnIns = typeof schema.purchaseReturns.$inferInsert;
+  type PurchaseReturnItemIns = typeof schema.purchaseReturnItems.$inferInsert;
+  const thnIns: PurchaseReturnIns[] = [];
+  const thnItemIns: PurchaseReturnItemIns[] = [];
   let thnSkip = 0;
   for (const [code, rows] of thnGroups) {
-    if (existPO.has(code)) { thnSkip++; continue; }
+    if (existPurchaseReturn.has(code)) { thnSkip++; continue; }
     const h = rows[0];
     const supplierId = await ensureSupplier(str(h["Mã nhà cung cấp"]), str(h["Tên nhà cung cấp"]), str(h["Điện thoại"]));
     const id = randomUUID();
+    const subtotal = num(h["Tổng tiền hàng trả"]);
+    const discount = num(h["Giảm giá"]);
+    const tax = num(h["VAT trả hàng nhập"]);
+    const total = num(h["NCC cần trả"]);
+    const paid = Math.min(num(h["Tiền NCC trả"]), total);
+    const debt = Math.max(0, total - paid);
+    const settlementStatus = paid <= 0 && debt <= 0 ? "unsettled" : paid + debt >= total ? "settled" : "partial";
     thnIns.push({
-      id, code, supplierId, warehouseId: wh.id,
-      status: "returned", // phiếu trả hàng nhập NCC
-      total: money(num(h["NCC cần trả"])),
-      amountPaid: money(num(h["Tiền NCC trả"])),
-      note: str(h["Ghi chú"]) || "Trả hàng nhập NCC",
+      id, code,
+      purchaseOrderId: null,
+      supplierId,
+      warehouseId: wh.id,
+      status: str(h["Trạng thái"]) === "Đã hủy" ? "draft" : "completed",
+      settlementStatus,
+      subtotal: money(subtotal),
+      discount: money(discount),
+      vatRate: "0",
+      tax: money(tax),
+      totalRefund: money(total),
+      refundAmount: money(paid),
+      refundMethod: paid > 0 ? "cash" : null,
+      debtAmount: money(debt),
+      note: str(h["Ghi chú"]) || "Import trả hàng nhập KiotViet",
       createdAt: toDate(h["Thời gian"]),
     });
     for (const r of rows) {
       const p = prodBySku.get(str(r["Mã hàng"]));
       if (!p) continue;
+      const unitName = str(r["ĐVT"]) || p.baseUnit;
+      const returnUnitCost = num(r["Giá trả lại"]);
       thnItemIns.push({
-        purchaseOrderId: id, productId: p.id,
+        purchaseReturnId: id,
+        purchaseOrderItemId: null,
+        productId: p.id,
+        productName: str(r["Tên hàng"]) || p.sku,
+        sku: p.sku.slice(0, 50),
+        unitName: unitName.slice(0, 30),
         quantity: qtyS(num(r["Số lượng"])),
-        unitCost: money(num(r["Giá trả lại"])),
+        unitCost: money(returnUnitCost),
+        returnUnitCost: money(returnUnitCost),
         total: money(num(r["Thành tiền"])),
       });
     }
   }
-  for (const b of chunk(thnIns, 200)) await db.insert(schema.purchaseOrders).values(b);
-  for (const b of chunk(thnItemIns, 500)) await db.insert(schema.purchaseOrderItems).values(b);
+  for (const b of chunk(thnIns, 200)) await db.insert(schema.purchaseReturns).values(b);
+  for (const b of chunk(thnItemIns, 500)) await db.insert(schema.purchaseReturnItems).values(b);
   console.log(`✓ Trả hàng nhập: +${thnIns.length} (bỏ qua ${thnSkip} đã có)`);
 
   // ============ 4. Trả hàng → returns ============
