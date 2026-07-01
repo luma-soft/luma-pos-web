@@ -31,7 +31,7 @@ const REASONS = [
 ] as const;
 
 type Line = {
-  key: string; productId: string; productName: string; baseUnit: string; costPrice: number;
+  key: string; productId: string; sku: string; productName: string; baseUnit: string; costPrice: number;
   units: { name: string; mult: number }[]; unitName: string; unitMultiplier: number; quantity: number; unitCost: number;
 };
 
@@ -77,7 +77,7 @@ export function InternalUseForm() {
     setLines((ls) => {
       const ex = ls.findIndex((x) => x.productId === p.id);
       if (ex >= 0) { const c = [...ls]; c[ex] = { ...c[ex], quantity: c[ex].quantity + 1 }; return c; }
-      return [...ls, { key: `${p.id}-${Date.now()}`, productId: p.id, productName: p.name, baseUnit: p.baseUnit, costPrice: cost, units, unitName: p.baseUnit, unitMultiplier: 1, quantity: 1, unitCost: cost }];
+      return [...ls, { key: `${p.id}-${Date.now()}`, productId: p.id, sku: p.sku, productName: p.name, baseUnit: p.baseUnit, costPrice: cost, units, unitName: p.baseUnit, unitMultiplier: 1, quantity: 1, unitCost: cost }];
     });
     setQ(""); setResults([]);
   }
@@ -116,6 +116,7 @@ export function InternalUseForm() {
         next.push({
           key: `${product.id}-${Date.now()}-${next.length}`,
           productId: product.id,
+          sku: product.sku,
           productName: product.name,
           baseUnit: product.baseUnit,
           costPrice: cost,
@@ -200,16 +201,16 @@ export function InternalUseForm() {
           </div>
 
           <div className="flex-1 min-h-[320px] overflow-auto bg-surface border border-border rounded-card">
-            <table className="w-full min-w-[880px] table-fixed text-sm">
+            <table className="w-full min-w-[760px] table-fixed text-sm">
               <colgroup>
-                <col className="w-16" />
-                <col className="w-36" />
-                <col />
-                <col className="w-32" />
+                <col className="w-14" />
                 <col className="w-28" />
-                <col className="w-34" />
-                <col className="w-36" />
-                <col className="w-12" />
+                <col />
+                <col className="w-28" />
+                <col className="w-24" />
+                <col className="w-30" />
+                <col className="w-32" />
+                <col className="w-14" />
               </colgroup>
               <thead>
                 <tr className="border-b border-border-soft bg-canvas text-left text-xs font-semibold text-slate-600">
@@ -220,7 +221,7 @@ export function InternalUseForm() {
                   <th className="px-3 py-3 text-right">{t("internalUse.qty")}</th>
                   <th className="px-3 py-3 text-right">{t("internalUse.unitCost")}</th>
                   <th className="px-3 py-3 text-right">{t("internalUse.lineTotal")}</th>
-                  <th />
+                  <th className="sticky right-0 bg-canvas" />
                 </tr>
               </thead>
               {lines.length > 0 && (
@@ -228,7 +229,7 @@ export function InternalUseForm() {
                   {lines.map((l, index) => (
                     <tr key={l.key} className="border-b border-border-soft transition hover:bg-surface-2/70">
                       <td className="px-3 py-3 text-center font-mono text-slate-500">{index + 1}</td>
-                      <td className="px-3 py-3 font-mono text-primary-600">{l.productId.slice(0, 8)}</td>
+                      <td className="px-3 py-3 font-mono text-primary-600">{l.sku}</td>
                       <td className="px-3 py-3 font-semibold">{l.productName}</td>
                       <td className="px-3 py-2">
                         <Select
@@ -242,7 +243,11 @@ export function InternalUseForm() {
                       <td className="px-3 py-2"><Input type="number" min={1} value={l.quantity} onChange={(e) => upd(l.key, { quantity: Math.max(1, Number(e.target.value) || 1) })} size="sm" className="no-spinner bg-canvas text-right font-mono" /></td>
                       <td className="px-3 py-2"><Input type="number" min={0} value={l.unitCost} onChange={(e) => upd(l.key, { unitCost: Math.max(0, Number(e.target.value) || 0) })} size="sm" className="no-spinner bg-canvas text-right font-mono" /></td>
                       <td className="px-3 py-3 text-right font-mono font-bold">{formatCurrency(l.unitCost * l.quantity)}</td>
-                      <td className="px-3 py-2"><button type="button" onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-er-soft hover:text-er active:scale-[0.98]"><Trash2 className="w-4 h-4" /></button></td>
+                      <td className="sticky right-0 bg-surface px-3 py-2 text-right shadow-[-10px_0_18px_rgba(15,23,42,0.04)]">
+                        <button type="button" aria-label={t("common.delete")} onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-er-soft hover:text-er active:scale-[0.98]">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
