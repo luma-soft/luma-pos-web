@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Printer } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { Routes } from "@/lib/routes";
@@ -81,23 +80,6 @@ export function ReturnsTable({
       width: "150px",
       cellClassName: "font-semibold text-er",
       render: (row) => formatCurrency(Number(row.totalRefund)),
-    },
-    {
-      key: "print",
-      label: "",
-      defaultVisible: true,
-      align: "right",
-      width: "92px",
-      render: (row) => (
-        <Link
-          href={`/returns/${row.id}/print`}
-          onClick={stopRowToggle}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-surface-2 dark:text-slate-300"
-        >
-          <Printer className="h-3.5 w-3.5" />
-          {t("returns.print")}
-        </Link>
-      ),
     },
   ];
 
