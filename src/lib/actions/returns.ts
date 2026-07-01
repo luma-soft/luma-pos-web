@@ -175,6 +175,7 @@ export async function createReturn(
 
     revalidatePath(Routes.order(v.orderId));
     revalidatePath(Routes.Orders);
+    revalidatePath(Routes.Sales);
     revalidatePath(Routes.Inventory);
     revalidatePath(Routes.Customers);
     return { ok: true, data: result };

@@ -79,7 +79,8 @@
     "activity": "Notifications",
     "collapseSidebar": "Collapse menu",
     "expandSidebar": "Open menu",
-    "more": "More"
+    "more": "More",
+    "returns": "Returns"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -1604,7 +1605,10 @@
       "returned": "Returned",
       "returnNow": "Return now",
       "restock": "Restock",
-      "refund": "Refund"
+      "refund": "Refund",
+      "code": "Return code",
+      "warehouse": "Warehouse",
+      "createdBy": "Created by"
     },
     "restockYes": "Restock for sale",
     "restockNo": "Damaged — discard",
@@ -1631,7 +1635,14 @@
       "orderCancelled": "Order is cancelled — cannot return.",
       "debtNeedsCustomer": "Debt deduction requires a customer on the order.",
       "debtTooSmall": "Current debt is less than the refund — use cash/bank instead."
-    }
+    },
+    "title": "Returns",
+    "total": "{total} returns",
+    "searchPlaceholder": "Search return code, order code, customer…",
+    "empty": "No returns yet",
+    "emptyHint": "Open a completed invoice and use Return items to create a return.",
+    "print": "Print return",
+    "sourceOrder": "Source invoice"
   },
   "print": {
     "title": "Print invoice",

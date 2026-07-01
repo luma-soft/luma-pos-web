@@ -79,7 +79,8 @@
     "activity": "Thông báo",
     "collapseSidebar": "Thu gọn menu",
     "expandSidebar": "Mở menu",
-    "more": "Thêm"
+    "more": "Thêm",
+    "returns": "Trả hàng"
   },
   "dashboard": {
     "title": "Tổng quan",
@@ -1604,7 +1605,10 @@
       "returned": "Đã trả",
       "returnNow": "Trả lần này",
       "restock": "Nhập lại kho",
-      "refund": "Hoàn lại"
+      "refund": "Hoàn lại",
+      "code": "Mã phiếu",
+      "warehouse": "Kho",
+      "createdBy": "Người lập"
     },
     "restockYes": "Nhập lại kho bán",
     "restockNo": "Hàng hỏng — bỏ",
@@ -1631,7 +1635,14 @@
       "orderCancelled": "Đơn đã hủy — không thể trả hàng.",
       "debtNeedsCustomer": "Trừ công nợ cần đơn có khách hàng.",
       "debtTooSmall": "Công nợ hiện tại nhỏ hơn số tiền hoàn — chọn hoàn tiền mặt/CK."
-    }
+    },
+    "title": "Trả hàng",
+    "total": "{total} phiếu trả hàng",
+    "searchPlaceholder": "Tìm mã phiếu, mã đơn, khách hàng…",
+    "empty": "Chưa có phiếu trả hàng nào",
+    "emptyHint": "Mở hóa đơn đã hoàn tất rồi bấm Trả hàng để lập phiếu.",
+    "print": "In phiếu",
+    "sourceOrder": "Hóa đơn gốc"
   },
   "print": {
     "title": "In hóa đơn",

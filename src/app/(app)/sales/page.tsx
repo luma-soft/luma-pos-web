@@ -7,11 +7,13 @@ import { QuotesTab } from "./tabs/quotes";
 import { BookingsTab } from "./tabs/bookings";
 import { PromotionsTab } from "./tabs/promotions";
 import { EInvoicesTab } from "./tabs/einvoices";
+import { ReturnsTab } from "./tabs/returns";
 
 export const dynamic = "force-dynamic";
 
 const TABS = [
   { tab: "orders", labelKey: "nav.orders" },
+  { tab: "returns", labelKey: "nav.returns" },
   { tab: "quotes", labelKey: "nav.quotes" },
   { tab: "bookings", labelKey: "nav.bookings" },
   { tab: "einvoices", labelKey: "nav.einvoices" },
@@ -33,6 +35,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
       </div>
 
       {tab === "quotes" ? <QuotesTab searchParams={params} />
+        : tab === "returns" ? <ReturnsTab searchParams={params} />
         : tab === "bookings" ? <BookingsTab searchParams={params} />
         : tab === "einvoices" ? <EInvoicesTab />
         : tab === "promotions" ? <PromotionsTab />
