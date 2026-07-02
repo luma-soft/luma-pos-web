@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
@@ -54,26 +55,60 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
     const controlled = value !== undefined;
     const [internalValue, setInternalValue] = React.useState(() => stringValue(defaultValue));
     const [open, setOpen] = React.useState(false);
+    const [menuStyle, setMenuStyle] = React.useState<React.CSSProperties | null>(null);
     const rootRef = React.useRef<HTMLDivElement>(null);
+    const menuRef = React.useRef<HTMLDivElement>(null);
     const currentValue = controlled ? stringValue(value) : internalValue;
     const selected = options.find((option) => option.value === currentValue);
     const selectedLabel = selected ? optionLabel(selected, t) : ph;
 
+    const updateMenuPosition = React.useCallback(() => {
+      const root = rootRef.current;
+      if (!root || typeof window === "undefined") return;
+      const rect = root.getBoundingClientRect();
+      const margin = 8;
+      const width = rect.width;
+      const left = Math.min(Math.max(rect.left, margin), Math.max(margin, window.innerWidth - width - margin));
+      const availableBelow = window.innerHeight - rect.bottom - margin;
+      const availableAbove = rect.top - margin;
+      const placeAbove = availableBelow < 180 && availableAbove > availableBelow;
+      const maxHeight = Math.max(160, Math.min(256, (placeAbove ? availableAbove : availableBelow) - 4));
+      setMenuStyle({
+        position: "fixed",
+        left,
+        top: placeAbove ? undefined : rect.bottom + 4,
+        bottom: placeAbove ? window.innerHeight - rect.top + 4 : undefined,
+        width,
+        maxHeight,
+      });
+    }, []);
+
+    React.useLayoutEffect(() => {
+      if (open) updateMenuPosition();
+    }, [open, updateMenuPosition]);
+
     React.useEffect(() => {
       if (!open) return;
       const onPointerDown = (event: MouseEvent) => {
-        if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+        const target = event.target as Node;
+        const inRoot = rootRef.current?.contains(target);
+        const inMenu = menuRef.current?.contains(target);
+        if (!inRoot && !inMenu) setOpen(false);
       };
       const onKeyDown = (event: KeyboardEvent) => {
         if (event.key === "Escape") setOpen(false);
       };
       document.addEventListener("mousedown", onPointerDown);
       document.addEventListener("keydown", onKeyDown);
+      window.addEventListener("resize", updateMenuPosition);
+      window.addEventListener("scroll", updateMenuPosition, true);
       return () => {
         document.removeEventListener("mousedown", onPointerDown);
         document.removeEventListener("keydown", onKeyDown);
+        window.removeEventListener("resize", updateMenuPosition);
+        window.removeEventListener("scroll", updateMenuPosition, true);
       };
-    }, [open]);
+    }, [open, updateMenuPosition]);
 
     function pick(nextValue: string) {
       if (!controlled) setInternalValue(nextValue);
@@ -120,10 +155,12 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
           <span className="block truncate">{selectedLabel ?? "—"}</span>
           <ChevronDown className={cn("absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none transition-transform", open && "rotate-180")} />
         </button>
-        {open && !disabled && (
+        {open && !disabled && menuStyle && typeof document !== "undefined" && createPortal(
           <div
+            ref={menuRef}
             role="listbox"
-            className="absolute left-0 right-0 z-50 mt-1 max-h-64 min-w-full overflow-auto rounded-lg border border-border bg-surface py-1 shadow-e2"
+            style={menuStyle}
+            className="z-[100] overflow-auto rounded-lg border border-border bg-surface py-1 shadow-e2"
           >
             {options.map((option) => {
               const active = option.value === currentValue;
@@ -144,7 +181,8 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                 </button>
               );
             })}
-          </div>
+          </div>,
+          document.body
         )}
       </div>
     );
