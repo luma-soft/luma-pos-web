@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { categories, customers, paymentBankAccounts, products, productPrices, productUnits, projects, promotions, stockLevels, warehouses } from "@/db/schema";
 import { isPromoActive, type PromoTier } from "@/lib/promo";
 import { getPriceBooks } from "@/lib/data/price-books";
+import { getMobileProducts } from "@/lib/data/products";
 import { accentInsensitiveLike } from "@/lib/search";
 
 export interface PosUnit {
@@ -195,6 +196,74 @@ export async function getPosData(options?: { includeProductIds?: string[] }) {
     products: productsForPos,
     customers: customerRows,
     promoByProduct,
+    projects: projectRows,
+    priceBooks: priceBookRows,
+    defaultBankAccount: defaultBankAccount[0] ?? null,
+  };
+}
+
+export async function getMobilePosData() {
+  const [defaultWh] = await db
+    .select({ id: warehouses.id, name: warehouses.name })
+    .from(warehouses)
+    .orderBy(desc(warehouses.isDefault))
+    .limit(1);
+
+  const [productPage, customerRows, priceBookRows, projectRows, defaultBankAccount] =
+    await Promise.all([
+      getMobileProducts({ pageSize: 30 }),
+      db
+        .select({
+          id: customers.id,
+          name: customers.name,
+          phone: customers.phone,
+          type: customers.type,
+          currentDebt: customers.currentDebt,
+          debtLimit: customers.debtLimit,
+        })
+        .from(customers)
+        .where(and(eq(customers.isActive, true)))
+        .orderBy(asc(customers.name))
+        .limit(100),
+      getPriceBooks(),
+      db
+        .select({
+          id: projects.id,
+          name: projects.name,
+          customerId: projects.customerId,
+        })
+        .from(projects)
+        .where(eq(projects.status, "active"))
+        .orderBy(asc(projects.name))
+        .limit(100),
+      db
+        .select({
+          id: paymentBankAccounts.id,
+          bankCode: paymentBankAccounts.bankCode,
+          gateway: paymentBankAccounts.gateway,
+          accountNumber: paymentBankAccounts.accountNumber,
+          subAccount: paymentBankAccounts.subAccount,
+          accountName: paymentBankAccounts.accountName,
+        })
+        .from(paymentBankAccounts)
+        .where(
+          and(
+            eq(paymentBankAccounts.provider, "sepay"),
+            eq(paymentBankAccounts.enabled, true),
+          ),
+        )
+        .orderBy(
+          sql`${paymentBankAccounts.isDefault} desc`,
+          asc(paymentBankAccounts.createdAt),
+        )
+        .limit(1),
+    ]);
+
+  return {
+    warehouse: defaultWh ?? null,
+    products: productPage.rows,
+    customers: customerRows,
+    promoByProduct: {},
     projects: projectRows,
     priceBooks: priceBookRows,
     defaultBankAccount: defaultBankAccount[0] ?? null,
