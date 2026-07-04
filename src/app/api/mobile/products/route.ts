@@ -1,5 +1,5 @@
 import { createProduct } from "@/lib/actions/products";
-import { getMobileProducts, getProductFormOptions } from "@/lib/data/products";
+import { getMobileProductOptions, getMobileProducts } from "@/lib/data/products";
 import type { ProductListView, ProductStatusFilter } from "@/lib/data/products";
 import { requireMobileStockAccess } from "@/lib/mobile/auth";
 import {
@@ -25,7 +25,7 @@ export async function GET(request: Request) {
       page: numberParam(request, "page", 1),
       pageSize: numberParam(request, "pageSize", 50),
     }),
-    getProductFormOptions(),
+    getMobileProductOptions(),
   ]);
 
   return mobileOk({ products, options });

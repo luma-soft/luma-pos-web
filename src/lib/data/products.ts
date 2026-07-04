@@ -572,6 +572,27 @@ export async function getMobileProducts(filters: ProductListFilters = {}) {
   };
 }
 
+export async function getMobileProductOptions() {
+  const [cats, brandRows, supplierRows] = await Promise.all([
+    db
+      .select({ id: categories.id, name: categories.name })
+      .from(categories)
+      .orderBy(asc(categories.sortOrder), asc(categories.name))
+      .limit(80),
+    db
+      .select({ id: brands.id, name: brands.name })
+      .from(brands)
+      .orderBy(asc(brands.name))
+      .limit(80),
+    db
+      .select({ id: suppliers.id, name: suppliers.name })
+      .from(suppliers)
+      .orderBy(asc(suppliers.name))
+      .limit(80),
+  ]);
+  return { categories: cats, brands: brandRows, suppliers: supplierRows };
+}
+
 /** Chi tiết 1 SP cho trang xem/sửa (gồm đơn vị quy đổi + tồn kho). */
 export async function getProduct(id: string) {
   const [p] = await db
