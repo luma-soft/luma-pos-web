@@ -1,5 +1,5 @@
 import { createProduct } from "@/lib/actions/products";
-import { getProductFormOptions, getProducts } from "@/lib/data/products";
+import { getMobileProducts, getProductFormOptions } from "@/lib/data/products";
 import type { ProductListView, ProductStatusFilter } from "@/lib/data/products";
 import { requireMobileStockAccess } from "@/lib/mobile/auth";
 import {
@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   if (blocked) return blocked;
 
   const [products, options] = await Promise.all([
-    getProducts({
+    getMobileProducts({
       q: searchParam(request, "q"),
       categoryId: searchParam(request, "categoryId"),
       status: searchParam(request, "status") as ProductStatusFilter | undefined,
