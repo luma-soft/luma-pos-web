@@ -4,6 +4,7 @@ import {
   count,
   desc,
   eq,
+  gte,
   inArray,
   or,
   sql,
@@ -36,6 +37,7 @@ export interface ProductListFilters {
   categoryId?: string;
   status?: ProductStatusFilter;
   view?: ProductListView;
+  updatedSince?: string;
   page?: number;
   pageSize?: number;
 }
@@ -505,6 +507,12 @@ export async function getMobileProducts(filters: ProductListFilters = {}) {
   if (filters.categoryId) {
     conditions.push(eq(products.categoryId, filters.categoryId));
   }
+  if (filters.updatedSince) {
+    const since = new Date(filters.updatedSince);
+    if (!Number.isNaN(since.getTime())) {
+      conditions.push(gte(products.updatedAt, since));
+    }
+  }
   if (status === "active") {
     conditions.push(eq(products.isActive, true));
   } else if (status === "inactive") {
@@ -534,6 +542,7 @@ export async function getMobileProducts(filters: ProductListFilters = {}) {
         variantName: products.variantName,
         isVariantParent: products.isVariantParent,
         isActive: products.isActive,
+        updatedAt: products.updatedAt,
         categoryName: categories.name,
         brandName: brands.name,
         supplierName: suppliers.name,

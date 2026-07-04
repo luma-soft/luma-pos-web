@@ -22,6 +22,7 @@ export async function GET(request: Request) {
       categoryId: searchParam(request, "categoryId"),
       status: searchParam(request, "status") as ProductStatusFilter | undefined,
       view: searchParam(request, "view") as ProductListView | undefined,
+      updatedSince: searchParam(request, "updatedSince"),
       page: numberParam(request, "page", 1),
       pageSize: numberParam(request, "pageSize", 50),
     }),
