@@ -60,6 +60,10 @@ export async function getInventory(filters: { q?: string; low?: boolean; stock?:
         totalStock: products.totalStock,
         minLevel: products.minStock,
         stockValue: sql<string>`${products.totalStock} * ${products.costPrice}`,
+        units: sql<{ unitName: string; multiplier: string; barcode: string | null }[]>`coalesce((
+          select json_agg(json_build_object('unitName', pu.unit_name, 'multiplier', pu.multiplier, 'barcode', pu.barcode) order by pu.sort_order)
+          from product_units pu where pu.product_id = ${products.id}
+        ), '[]')`,
       })
       .from(products)
       .where(where)
