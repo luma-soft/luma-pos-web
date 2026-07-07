@@ -196,7 +196,6 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
                 selectedProduct={product}
                 onSelect={(productId) => {
                   const sp = new URLSearchParams(searchParams.toString());
-                  sp.set("tab", "products");
                   sp.set("onlineListing", "1");
                   sp.set("onlineProductId", productId);
                   router.replace(`${pathname}?${sp.toString()}`, { scroll: false });

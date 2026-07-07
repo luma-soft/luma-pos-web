@@ -3,9 +3,11 @@ import { getLocale } from "next-intl/server";
 import { ExternalLink, Inbox, Layers3, RefreshCw, Send, ShoppingBag, Store } from "lucide-react";
 import { getShopeeDashboard, getShopeeInbox } from "@/lib/data/marketplace";
 import { sendMarketplaceMessage, updateMarketplaceShopSyncPolicy } from "@/lib/actions/marketplace";
+import { getProduct } from "@/lib/data/products";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { disconnectShopeeShop } from "@/lib/actions/marketplace";
+import { ShopeeListingModal } from "../inventory/tabs/shopee-listing-modal";
 import { OnlineSalesListingButton } from "./online-sales-product-search";
 
 type SP = Record<string, string | undefined>;
@@ -18,6 +20,7 @@ const PROVIDERS = [
   { id: "lazada", name: "Lazada", ready: false },
   { id: "tiki", name: "Tiki", ready: false },
 ] as const;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export default async function OnlineSalesPage({ searchParams }: { searchParams: Promise<SP> }) {
   const locale = await getLocale();
@@ -28,6 +31,7 @@ export default async function OnlineSalesPage({ searchParams }: { searchParams: 
   const shop = data.shop;
   const connectedChannels = shop && ["connected", "authorized"].includes(shop.status) ? 1 : 0;
   const onlineOrderCount = data.jobs.filter((job) => job.jobType.includes("order")).length;
+  const listingProduct = params.onlineProductId && UUID_RE.test(params.onlineProductId) ? await getProduct(params.onlineProductId) : null;
 
   return (
     <div className="p-4 sm:p-6 space-y-5">
@@ -121,6 +125,13 @@ export default async function OnlineSalesPage({ searchParams }: { searchParams: 
       {tab === "orders" && <OnlineOrdersSection L={L} />}
       {tab === "inbox" && <InboxSection threads={inbox.threads} L={L} />}
       {tab === "sync" || tab === "overview" ? <SyncSection jobs={data.jobs} L={L} /> : null}
+      {params.onlineListing === "1" && (
+        <ShopeeListingModal
+          key={listingProduct?.id ?? "new-online-listing"}
+          product={listingProduct}
+          closeHref={onlineSalesModalHref(params, {})}
+        />
+      )}
     </div>
   );
 }
@@ -219,6 +230,17 @@ function shopSyncPolicy(metadata: unknown) {
 
 function tabHref(tab: OnlineSalesTab) {
   return `${Routes.OnlineSales}?tab=${tab}`;
+}
+
+function onlineSalesModalHref(params: SP, patch: Record<string, string>) {
+  const sp = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (!value || key === "onlineListing" || key === "onlineProductId" || key === "shopeeProductId") continue;
+    sp.set(key, value);
+  }
+  for (const [key, value] of Object.entries(patch)) sp.set(key, value);
+  const query = sp.toString();
+  return query ? `${Routes.OnlineSales}?${query}` : Routes.OnlineSales;
 }
 
 function tabLabel(tab: OnlineSalesTab, L: boolean) {
