@@ -58,6 +58,13 @@ export function OrdersTable({
       render: (order) => order.customerName ?? t("orders.walkIn"),
     },
     {
+      key: "channel",
+      label: "Channel",
+      defaultVisible: true,
+      width: "110px",
+      render: (order) => <ChannelBadge source={order.sourceMode} />,
+    },
+    {
       key: "project",
       label: t("orders.cols.project"),
       defaultVisible: false,
@@ -134,8 +141,8 @@ export function OrdersTable({
               <button type="button" onClick={toggle} className="w-full p-3 text-left">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="font-semibold text-primary-600">{order.code}</div>
-                    <div className="text-xs text-slate-400">{formatDate(order.createdAt)} · {order.customerName ?? t("orders.walkIn")}</div>
+                  <div className="font-semibold text-primary-600">{order.code}</div>
+                    <div className="text-xs text-slate-400">{formatDate(order.createdAt)} · {order.customerName ?? t("orders.walkIn")} · {order.sourceMode === "shopee" ? "Shopee" : "POS"}</div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     <OrderStatusBadge status={order.status} />
@@ -154,5 +161,17 @@ export function OrdersTable({
         }}
       />
     </form>
+  );
+}
+
+function ChannelBadge({ source }: { source?: string | null }) {
+  const shopee = source === "shopee";
+  return (
+    <span className={cn(
+      "inline-flex rounded-md px-2 py-1 text-xs font-bold",
+      shopee ? "bg-warn-soft text-warn" : "bg-surface-2 text-slate-600",
+    )}>
+      {shopee ? "Shopee" : "POS"}
+    </span>
   );
 }

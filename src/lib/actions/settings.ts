@@ -9,6 +9,7 @@ import { getAiUsageStatus } from "@/lib/ai/usage";
 import {
   aiSettingsInputSchema,
   paymentBankAccountInputSchema,
+  shopeeSettingsInputSchema,
   storeSettingsSchema,
   storePrefsPatchSchema,
   zaloSettingsInputSchema,
@@ -16,6 +17,7 @@ import {
   STAFF_ROLES,
   type AiSettingsInput,
   type PaymentBankAccountInput,
+  type ShopeeSettingsInput,
   type StoreSettingsInput,
   type StaffRole,
   type StorePrefsPatch,
@@ -280,6 +282,75 @@ export async function updateZaloSettings(input: ZaloSettingsInput): Promise<Acti
     return { ok: true, data: undefined };
   } catch (e) {
     console.error("updateZaloSettings failed:", e);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function updateShopeeSettings(input: ShopeeSettingsInput): Promise<ActionResult> {
+  const gate = await requireOwner();
+  if (!gate.ok) return gate;
+  const parsed = shopeeSettingsInputSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const v = parsed.data;
+  try {
+    const [row] = await db.select({ prefs: storeSettings.prefs }).from(storeSettings).where(eq(storeSettings.id, "default")).limit(1);
+    const current = parseStorePrefs(row?.prefs);
+    const nextPartnerKey = v.clearPartnerKey ? "" : (v.partnerKey?.trim() || current.shopee.partnerKey);
+    const nextShopee = {
+      ...current.shopee,
+      enabled: v.enabled,
+      environment: v.environment,
+      region: v.region || "VN",
+      partnerId: v.partnerId,
+      partnerKey: nextPartnerKey,
+      partnerKeySet: Boolean(nextPartnerKey),
+      redirectPath: v.redirectPath || "/api/shopee/callback",
+      defaultShopId: v.defaultShopId,
+      defaultWarehouseId: v.defaultWarehouseId,
+      syncInventory: v.syncInventory,
+      syncOrders: v.syncOrders,
+      syncMessages: v.syncMessages,
+      autoCreateCustomer: v.autoCreateCustomer,
+    };
+    const next = { ...current, shopee: nextShopee };
+    await db.insert(storeSettings)
+      .values({ id: "default", prefs: next })
+      .onConflictDoUpdate({ target: storeSettings.id, set: { prefs: next, updatedAt: sql`now()` } });
+    await writeAuditLog({
+      actorUserId: gate.userId,
+      source: "manual",
+      action: "update_shopee_settings",
+      entityType: "store_settings",
+      entityId: "default",
+      status: "succeeded",
+      before: {
+        enabled: current.shopee.enabled,
+        environment: current.shopee.environment,
+        region: current.shopee.region,
+        partnerId: current.shopee.partnerId,
+        partnerKeySet: Boolean(current.shopee.partnerKey),
+        defaultShopId: current.shopee.defaultShopId,
+        syncInventory: current.shopee.syncInventory,
+        syncOrders: current.shopee.syncOrders,
+        syncMessages: current.shopee.syncMessages,
+      },
+      after: {
+        enabled: nextShopee.enabled,
+        environment: nextShopee.environment,
+        region: nextShopee.region,
+        partnerId: nextShopee.partnerId,
+        partnerKeySet: Boolean(nextShopee.partnerKey),
+        defaultShopId: nextShopee.defaultShopId,
+        syncInventory: nextShopee.syncInventory,
+        syncOrders: nextShopee.syncOrders,
+        syncMessages: nextShopee.syncMessages,
+      },
+      metadata: { partnerKeyChanged: v.clearPartnerKey || Boolean(v.partnerKey?.trim()) },
+    });
+    revalidatePath(Routes.Settings);
+    return { ok: true, data: undefined };
+  } catch (e) {
+    console.error("updateShopeeSettings failed:", e);
     return { ok: false, error: "errors.serverError" };
   }
 }

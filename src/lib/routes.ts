@@ -38,6 +38,8 @@ export const Routes = {
   Suppliers: "/suppliers",
   Reports: "/reports",
   Notifications: "/notifications",
+  Shopee: "/shopee",
+  ShopeeInbox: "/shopee/inbox",
   Settings: "/settings",
   LabelSettings: "/settings/labels",
 

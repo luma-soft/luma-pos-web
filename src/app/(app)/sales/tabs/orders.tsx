@@ -7,7 +7,7 @@ import { db } from "@/db";
 import { einvoices } from "@/db/schema";
 import { Routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
-import { getOrder, getOrders, type OrderStatusFilter, type OrderPaymentFilter } from "@/lib/data/orders";
+import { getOrder, getOrders, type OrderStatusFilter, type OrderPaymentFilter, type OrderSourceFilter } from "@/lib/data/orders";
 import { Pagination } from "@/components/pagination";
 import { Select } from "@/components/ui/select";
 import { parsePageSize } from "@/lib/pagination";
@@ -19,18 +19,20 @@ type SP = Record<string, string | undefined>;
 
 const STATUS: OrderStatusFilter[] = ["all", "completed", "owing", "returned", "cancelled"];
 const PAYMENTS: OrderPaymentFilter[] = ["all", "paid", "partial", "unpaid"];
+const SOURCES: OrderSourceFilter[] = ["all", "pos", "shopee"];
 
 export async function OrdersTab({ searchParams }: { searchParams: SP }) {
   const t = await getTranslations();
   const params = searchParams;
   const status = (STATUS.includes(params.status as OrderStatusFilter) ? params.status : "all") as OrderStatusFilter;
   const payment = (PAYMENTS.includes(params.payment as OrderPaymentFilter) ? params.payment : "all") as OrderPaymentFilter;
+  const source = (SOURCES.includes(params.source as OrderSourceFilter) ? params.source : "all") as OrderSourceFilter;
   const from = params.from ?? "";
   const to = params.to ?? "";
 
   const href = (overrides: Record<string, string | undefined>) => {
     const sp = new URLSearchParams();
-    const merged = { tab: "orders", q: params.q, status, payment, from, to, orderId: params.orderId, expandedOrder: params.expandedOrder, page: undefined as string | undefined, ...overrides };
+    const merged = { tab: "orders", q: params.q, status, payment, source, from, to, orderId: params.orderId, expandedOrder: params.expandedOrder, page: undefined as string | undefined, ...overrides };
     for (const [k, v] of Object.entries(merged)) if (v && v !== "all") sp.set(k, v);
     return `${Routes.Sales}?${sp.toString()}`;
   };
@@ -72,11 +74,22 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
           options={PAYMENTS.map((p) => ({ value: p, label: t(`orders.paymentFilter.${p}`) }))}
           className="min-w-32"
         />
+        <Select
+          name="source"
+          defaultValue={source}
+          aria-label={LumaText(t, "orders.cols.channel", "Channel")}
+          options={[
+            { value: "all", label: LumaText(t, "orders.sourceFilter.all", "All channels") },
+            { value: "pos", label: "POS" },
+            { value: "shopee", label: "Shopee" },
+          ]}
+          className="min-w-36"
+        />
         <input type="date" name="from" defaultValue={from} aria-label={t("orders.filter.from")} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         <input type="date" name="to" defaultValue={to} aria-label={t("orders.filter.to")} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full bg-primary-600 hover:brightness-110 text-white transition active:scale-[0.98]">{t("common.search")}</button>
-        {(params.q || payment !== "all" || from || to || params.orderId) && (
-          <Link href={href({ q: undefined, payment: undefined, from: undefined, to: undefined, orderId: undefined, expandedOrder: undefined })} className="px-3 py-2 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">
+        {(params.q || payment !== "all" || source !== "all" || from || to || params.orderId) && (
+          <Link href={href({ q: undefined, payment: undefined, source: undefined, from: undefined, to: undefined, orderId: undefined, expandedOrder: undefined })} className="px-3 py-2 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">
             {t("orders.filter.clear")}
           </Link>
         )}
@@ -94,13 +107,14 @@ async function OrdersContent({ searchParams }: { searchParams: SP }) {
   const params = searchParams;
   const status = (STATUS.includes(params.status as OrderStatusFilter) ? params.status : "all") as OrderStatusFilter;
   const payment = (PAYMENTS.includes(params.payment as OrderPaymentFilter) ? params.payment : "all") as OrderPaymentFilter;
+  const source = (SOURCES.includes(params.source as OrderSourceFilter) ? params.source : "all") as OrderSourceFilter;
   const from = params.from ?? "";
   const to = params.to ?? "";
   const page = Number(params.page) || 1;
   const pageSize = parsePageSize(params.size);
 
   const expandedId = params.expandedOrder ?? params.orderId ?? null;
-  const { rows, total, pageCount } = await getOrders({ orderId: params.orderId, q: params.q, status, payment, from, to, page, pageSize });
+  const { rows, total, pageCount } = await getOrders({ orderId: params.orderId, q: params.q, status, payment, source, from, to, page, pageSize });
   const expandedOrder = expandedId ? await getOrder(expandedId).catch(() => null) : null;
   const [expandedEinvoice] = expandedOrder
     ? await db.select().from(einvoices).where(eq(einvoices.orderId, expandedOrder.id)).limit(1)
@@ -130,4 +144,12 @@ async function OrdersContent({ searchParams }: { searchParams: SP }) {
       <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("orders.unitLabel")} />
     </>
   );
+}
+
+function LumaText(t: Awaited<ReturnType<typeof getTranslations>>, key: string, fallback: string) {
+  try {
+    return t(key as never);
+  } catch {
+    return fallback;
+  }
 }

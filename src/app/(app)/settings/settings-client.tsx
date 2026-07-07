@@ -21,6 +21,7 @@ import {
   setPaymentBankAccountEnabled,
   testAiProvider,
   updateAiSettings,
+  updateShopeeSettings,
   updateZaloSettings,
   updateStoreSettings,
   updateStaffRole,
@@ -219,7 +220,7 @@ function formatAiTestMessage(message: string, L: boolean) {
   return map[message] ? (L ? map[message][1] : map[message][0]) : message;
 }
 
-type SectionId = "store" | "staff" | "pos" | "hardware" | "payments" | "print" | "promotions" | "tax" | "notifications" | "zalo" | "ai";
+type SectionId = "store" | "staff" | "pos" | "hardware" | "payments" | "print" | "promotions" | "tax" | "notifications" | "zalo" | "shopee" | "ai";
 
 const NAV: { group: [string, string]; items: { id: SectionId; ico: string; en: string; vi: string; badge?: string }[] }[] = [
   { group: ["Store", "Cửa hàng"], items: [
@@ -239,6 +240,7 @@ const NAV: { group: [string, string]; items: { id: SectionId; ico: string; en: s
   { group: ["System", "Hệ thống"], items: [
     { id: "notifications", ico: "🔔", en: "Notifications", vi: "Thông báo" },
     { id: "zalo", ico: "💬", en: "Zalo OA", vi: "Zalo OA" },
+    { id: "shopee", ico: "🛍️", en: "Shopee", vi: "Shopee" },
     { id: "ai", ico: "✨", en: "AI", vi: "AI" },
   ] },
 ];
@@ -253,6 +255,7 @@ const SEC_META: Record<SectionId, { en: string; vi: string; subEn: string; subVi
   tax: { en: "Tax & E-Invoice", vi: "Thuế & Hóa đơn điện tử", subEn: "VAT rates + Decree 70/2025 e-invoice", subVi: "Thuế GTGT + HĐĐT theo Nghị định 70/2025" },
   notifications: { en: "Notifications", vi: "Thông báo", subEn: "Alert types and channels", subVi: "Loại thông báo và kênh gửi" },
   zalo: { en: "Zalo OA", vi: "Zalo OA", subEn: "Official Account and ZNS templates", subVi: "Official Account và template ZNS" },
+  shopee: { en: "Shopee Integration", vi: "Tích hợp Shopee", subEn: "Open Platform app, OAuth, sync rules", subVi: "App Open Platform, OAuth và quy tắc đồng bộ" },
   ai: { en: "AI Settings", vi: "Cấu hình AI", subEn: "Provider key, vision model, and attachment bucket", subVi: "API key, model vision và bucket lưu file AI" },
 };
 
@@ -399,6 +402,7 @@ export function SettingsClient({
         {active === "tax" && <TaxSection L={L} prefs={store.prefs.tax} canManage={canManage} />}
         {active === "notifications" && <NotificationsSection L={L} prefs={store.prefs.notifications} canManage={canManage} />}
         {active === "zalo" && <ZaloSection L={L} prefs={store.prefs.zalo} canEdit={canEditAi} />}
+        {active === "shopee" && <ShopeeSettingsSection L={L} prefs={store.prefs.shopee} canEdit={canEditAi} />}
         {active === "ai" && (aiUsage ? <AiSection L={L} prefs={store.prefs.ai} canEdit={canEditAi} usage={aiUsage} /> : <LazySectionState L={L} loading={Boolean(lazyLoading.ai)} error={lazyError.ai} />)}
       </div>
     </div>
@@ -1247,6 +1251,128 @@ function ZaloSecretInput({
         {L ? "Xóa giá trị đang lưu" : "Clear saved value"}
       </label>
     </div>
+  );
+}
+
+function ShopeeSettingsSection({ L, prefs, canEdit }: { L: boolean; prefs: StorePrefs["shopee"]; canEdit: boolean }) {
+  const [partnerKeySet, setPartnerKeySet] = useState(prefs.partnerKeySet);
+  const [clearPartnerKey, setClearPartnerKey] = useState(false);
+  const [form, setForm] = useState({
+    enabled: prefs.enabled,
+    environment: prefs.environment,
+    region: prefs.region || "VN",
+    partnerId: prefs.partnerId,
+    partnerKey: "",
+    redirectPath: prefs.redirectPath || "/api/shopee/callback",
+    defaultShopId: prefs.defaultShopId,
+    defaultWarehouseId: prefs.defaultWarehouseId,
+    syncInventory: prefs.syncInventory,
+    syncOrders: prefs.syncOrders,
+    syncMessages: prefs.syncMessages,
+    autoCreateCustomer: prefs.autoCreateCustomer,
+  });
+  const [dirty, setDirty] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+  const [pending, start] = useTransition();
+  const mark = () => { setDirty(true); setSaved(false); setError(""); };
+  const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => { setForm((p) => ({ ...p, [key]: value })); mark(); };
+  function save() {
+    start(async () => {
+      const res = await updateShopeeSettings({ ...form, clearPartnerKey });
+      if (res.ok) {
+        setPartnerKeySet(clearPartnerKey ? false : partnerKeySet || Boolean(form.partnerKey.trim()));
+        setForm((p) => ({ ...p, partnerKey: "" }));
+        setClearPartnerKey(false);
+        setDirty(false);
+        setSaved(true);
+      } else {
+        setError(res.error);
+      }
+    });
+  }
+  const callbackUrl = typeof window === "undefined" ? form.redirectPath : `${window.location.origin}${form.redirectPath.startsWith("/") ? form.redirectPath : `/${form.redirectPath}`}`;
+  return (
+    <>
+      <Card title={L ? "Shopee Open Platform" : "Shopee Open Platform"} vi={L ? "Kết nối app, token và webhook" : "App credentials, token and webhook"}>
+        <div className="p-4.5 flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={cn(
+              "inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold",
+              form.enabled ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-500"
+            )}>
+              {form.enabled ? (L ? "Đang bật" : "Enabled") : (L ? "Đang tắt" : "Disabled")}
+            </span>
+            <Link href={Routes.Shopee} className={btnS}>{L ? "Mở dashboard Shopee" : "Open Shopee dashboard"}</Link>
+            <a href="https://open.shopee.com/" target="_blank" rel="noreferrer" className={btnS}>
+              <ExternalLink className="w-3 h-3" /> {L ? "Đăng ký app" : "Register app"}
+            </a>
+          </div>
+          <CtrlRow
+            title={L ? "Bật tích hợp Shopee" : "Enable Shopee integration"}
+            desc={L ? "Cho phép publish listing, sync tồn/đơn và dùng inbox Shopee." : "Allow listing publish, stock/order sync, and Shopee inbox."}
+            checked={form.enabled}
+            onChange={(value) => set("enabled", value)}
+          />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="flex flex-col gap-1">
+              <span className={FL}>{L ? "Môi trường" : "Environment"}</span>
+              <Select
+                value={form.environment}
+                onChange={(e) => set("environment", e.target.value === "production" ? "production" : "sandbox")}
+                options={[{ value: "sandbox", label: "Sandbox" }, { value: "production", label: "Production" }]}
+                disabled={!canEdit}
+                className={FI}
+              />
+            </div>
+            <div className="flex flex-col gap-1"><span className={FL}>{L ? "Vùng" : "Region"}</span><input className={FI} value={form.region} disabled={!canEdit} onChange={(e) => set("region", e.target.value.toUpperCase())} /></div>
+            <div className="flex flex-col gap-1"><span className={FL}>Partner ID</span><input className={cn(FI, "font-mono")} value={form.partnerId} disabled={!canEdit} onChange={(e) => set("partnerId", e.target.value)} /></div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1">
+              <span className={FL}>Partner key</span>
+              <input
+                className={cn(FI, "font-mono")}
+                type="password"
+                value={form.partnerKey}
+                disabled={!canEdit || clearPartnerKey}
+                placeholder={partnerKeySet ? (L ? "Đã lưu, nhập key mới để thay" : "Saved, enter a new key to replace") : (L ? "Chưa cấu hình" : "Not configured")}
+                onChange={(e) => set("partnerKey", e.target.value)}
+              />
+              <label className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
+                <input type="checkbox" checked={clearPartnerKey} disabled={!canEdit} onChange={(e) => { setClearPartnerKey(e.target.checked); mark(); }} />
+                {L ? "Xóa partner key đang lưu" : "Clear saved partner key"}
+              </label>
+            </div>
+            <div className="flex flex-col gap-1"><span className={FL}>OAuth callback</span><input className={cn(FI, "font-mono")} value={form.redirectPath} disabled={!canEdit} onChange={(e) => set("redirectPath", e.target.value)} /><span className="text-[11px] text-slate-500 break-all">{callbackUrl}</span></div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1"><span className={FL}>{L ? "Shop mặc định" : "Default shop"}</span><input className={cn(FI, "font-mono")} value={form.defaultShopId} disabled={!canEdit} onChange={(e) => set("defaultShopId", e.target.value)} /></div>
+            <div className="flex flex-col gap-1"><span className={FL}>{L ? "Kho mặc định" : "Default warehouse"}</span><input className={cn(FI, "font-mono")} value={form.defaultWarehouseId} disabled={!canEdit} onChange={(e) => set("defaultWarehouseId", e.target.value)} /></div>
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <CtrlRow title={L ? "Sync tồn kho" : "Sync stock"} checked={form.syncInventory} onChange={(value) => set("syncInventory", value)} />
+            <CtrlRow title={L ? "Import đơn hàng" : "Import orders"} checked={form.syncOrders} onChange={(value) => set("syncOrders", value)} />
+            <CtrlRow title={L ? "Đồng bộ tin nhắn" : "Sync messages"} checked={form.syncMessages} onChange={(value) => set("syncMessages", value)} />
+            <CtrlRow title={L ? "Tự tạo khách hàng" : "Auto-create customers"} checked={form.autoCreateCustomer} onChange={(value) => set("autoCreateCustomer", value)} />
+          </div>
+          <div className="px-3.5 py-2.5 bg-in-soft border border-in/20 rounded-[10px] text-[11px] text-in leading-relaxed">
+            {L
+              ? "Đăng ký app tại Shopee Open Platform, nhập Partner ID/key, cấu hình callback ở trên rồi dùng dashboard Shopee để kết nối shop. AI chỉ tạo gợi ý listing, không tự publish."
+              : "Register the app in Shopee Open Platform, enter Partner ID/key, configure the callback above, then connect a shop from the Shopee dashboard. AI only drafts listings and never auto-publishes."}
+          </div>
+        </div>
+      </Card>
+      {!canEdit && <p className="text-[11px] text-slate-400 italic mt-1">{L ? "Chỉ owner được sửa cấu hình Shopee." : "Only the owner can edit Shopee settings."}</p>}
+      {canEdit && (dirty || saved || error) && (
+        <div className="flex items-center gap-2 pt-1">
+          <span className={cn("text-[11px] flex-1", error ? "text-er" : "text-slate-500")}>{error || (dirty ? (L ? "Có thay đổi chưa lưu" : "Unsaved changes") : (L ? "Đã lưu" : "Saved"))}</span>
+          <button disabled={!dirty || pending} onClick={save} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-primary-600 text-white text-xs font-semibold disabled:opacity-50">
+            {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{L ? "Lưu" : "Save"}
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 

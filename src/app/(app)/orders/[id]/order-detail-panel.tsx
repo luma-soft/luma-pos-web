@@ -214,6 +214,8 @@ export async function OrderDetailPanel({
 
           <div className="space-y-2 rounded-lg border border-border-soft p-3">
             <div className="font-semibold">{t("orders.detail.info")}</div>
+            {order.sourceMode && <InfoLine label="Channel" value={order.sourceMode === "shopee" ? "Shopee" : order.sourceMode} valueClassName={order.sourceMode === "shopee" ? "font-semibold text-warn" : undefined} />}
+            {order.sourceSaleTime && <InfoLine label="Source time" value={formatDate(order.sourceSaleTime)} />}
             <InfoLine label={t("pos.subtotal")} value={formatCurrency(Number(order.subtotal))} />
             <InfoLine label={t("pos.discount")} value={formatCurrency(Number(order.discount))} />
             <InfoLine label={t("pos.tax")} value={formatCurrency(Number(order.tax))} />

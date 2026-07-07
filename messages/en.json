@@ -75,6 +75,7 @@
     "kds": "Kitchen",
     "ai": "AI",
     "notifications": "Notifications",
+    "shopee": "Shopee",
     "notificationsBadge": "{count} notifications need attention",
     "activity": "Notifications",
     "collapseSidebar": "Collapse menu",
@@ -1902,6 +1903,7 @@
       "tax": "Tax",
       "notifications": "Notifications",
       "zalo": "Zalo OA",
+      "shopee": "Shopee",
       "ai": "AI"
     },
     "payments": {

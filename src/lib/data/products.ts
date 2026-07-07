@@ -628,6 +628,7 @@ export async function getProduct(id: string) {
       agentPrice: products.agentPrice,
       location: products.location,
       weight: products.weight,
+      dimensions: products.dimensions,
       specs: products.specs,
       imageUrls: products.imageUrls,
       isActive: products.isActive,

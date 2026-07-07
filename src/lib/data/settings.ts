@@ -20,6 +20,7 @@ export function sanitizeStorePrefsForClient(prefs: StorePrefs): StorePrefs {
   const hasZaloAccessToken = Boolean(prefs.zalo.accessToken);
   const hasZaloRefreshToken = Boolean(prefs.zalo.refreshToken);
   const hasZaloWebhookSecret = Boolean(prefs.zalo.webhookSecret);
+  const hasShopeePartnerKey = Boolean(prefs.shopee.partnerKey);
   return {
     ...prefs,
     ai: {
@@ -37,6 +38,11 @@ export function sanitizeStorePrefsForClient(prefs: StorePrefs): StorePrefs {
       refreshTokenSet: hasZaloRefreshToken || prefs.zalo.refreshTokenSet,
       webhookSecret: "",
       webhookSecretSet: hasZaloWebhookSecret || prefs.zalo.webhookSecretSet,
+    },
+    shopee: {
+      ...prefs.shopee,
+      partnerKey: "",
+      partnerKeySet: hasShopeePartnerKey || prefs.shopee.partnerKeySet,
     },
   };
 }
@@ -59,6 +65,11 @@ export async function getAiAttachmentsBucket() {
 export async function getZaloSettings() {
   const prefs = await getRawStorePrefs();
   return prefs.zalo;
+}
+
+export async function getShopeeSettings() {
+  const prefs = await getRawStorePrefs();
+  return prefs.shopee;
 }
 
 /** Cấu hình cửa hàng (1 dòng id='default'). Trả mặc định nếu chưa có. */

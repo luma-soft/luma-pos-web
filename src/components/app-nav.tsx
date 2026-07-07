@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   LayoutDashboard, ShoppingCart, Warehouse, Users, Wallet,
-  BarChart3, Settings, FileText, Utensils, Sparkles, ChefHat, Bell,
+  BarChart3, Settings, FileText, Utensils, Sparkles, ChefHat, Bell, Store,
 } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
@@ -29,6 +29,7 @@ const GROUPS: Group[] = [
     items: [
       { href: Routes.Sales, icon: FileText, key: "nav.groups.sales" },
       { href: Routes.Inventory, icon: Warehouse, key: "nav.groups.inventory" },
+      { href: Routes.Shopee, icon: Store, key: "nav.shopee" },
       { href: Routes.Partners, icon: Users, key: "nav.groups.partners" },
       { href: Routes.Finance, icon: Wallet, key: "nav.groups.finance" },
     ],

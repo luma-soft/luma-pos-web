@@ -10,12 +10,14 @@ export const ORDERS_PAGE_SIZE = 20;
 
 export type OrderStatusFilter = "all" | "completed" | "cancelled" | "owing" | "returned";
 export type OrderPaymentFilter = "all" | "paid" | "unpaid" | "partial";
+export type OrderSourceFilter = "all" | "pos" | "shopee";
 
 export interface OrderListFilters {
   orderId?: string;
   q?: string;
   status?: OrderStatusFilter;
   payment?: OrderPaymentFilter;
+  source?: OrderSourceFilter;
   from?: string; // YYYY-MM-DD
   to?: string;   // YYYY-MM-DD
   page?: number;
@@ -54,6 +56,8 @@ export async function getOrders(filters: OrderListFilters = {}) {
     const c = or(eq(orders.paymentStatus, "deposit"), eq(orders.paymentStatus, "partial"));
     if (c) conditions.push(c);
   }
+  if (filters.source === "shopee") conditions.push(eq(orders.sourceMode, "shopee"));
+  else if (filters.source === "pos") conditions.push(sql`coalesce(${orders.sourceMode}, '') <> 'shopee'`);
   // khoảng ngày
   if (filters.from) {
     const d = new Date(`${filters.from}T00:00:00`);
@@ -74,6 +78,7 @@ export async function getOrders(filters: OrderListFilters = {}) {
       projectName: orders.projectName,
       total: orders.total,
       amountPaid: orders.amountPaid,
+      sourceMode: orders.sourceMode,
       createdAt: orders.createdAt,
       customerName: customers.name,
       customerType: customers.type,

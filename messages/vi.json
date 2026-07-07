@@ -75,6 +75,7 @@
     "kds": "Màn hình bếp",
     "ai": "AI",
     "notifications": "Thông báo",
+    "shopee": "Shopee",
     "notificationsBadge": "{count} thông báo cần chú ý",
     "activity": "Thông báo",
     "collapseSidebar": "Thu gọn menu",
@@ -1902,6 +1903,7 @@
       "tax": "Thuế",
       "notifications": "Thông báo",
       "zalo": "Zalo OA",
+      "shopee": "Shopee",
       "ai": "AI"
     },
     "payments": {

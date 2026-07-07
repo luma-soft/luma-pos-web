@@ -922,6 +922,158 @@ export const zaloMessageEvents = pgTable("zalo_message_events", {
   index("zalo_message_events_order_idx").on(t.orderId, t.createdAt),
 ]);
 
+// ============= Marketplace integrations (Shopee first) =============
+
+export const marketplaceShops = pgTable("marketplace_shops", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  provider: text("provider").notNull().default("shopee"),
+  shopId: text("shop_id").notNull(),
+  shopName: text("shop_name").notNull().default(""),
+  region: varchar("region", { length: 10 }).notNull().default("VN"),
+  status: text("status").notNull().default("disconnected"),
+  connectedAt: timestamp("connected_at", { withTimezone: true }),
+  disconnectedAt: timestamp("disconnected_at", { withTimezone: true }),
+  tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
+  lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+  lastError: text("last_error"),
+  metadata: jsonb("metadata").$type<Record<string, unknown> | null>(),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("marketplace_shops_provider_shop_idx").on(t.provider, t.shopId),
+  index("marketplace_shops_provider_status_idx").on(t.provider, t.status),
+]);
+
+export const marketplaceTokens = pgTable("marketplace_tokens", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  shopId: uuid("shop_id").notNull().references(() => marketplaceShops.id, { onDelete: "cascade" }),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  scopes: jsonb("scopes").$type<string[]>().notNull().default([]),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("marketplace_tokens_shop_idx").on(t.shopId),
+]);
+
+export const marketplaceProductMappings = pgTable("marketplace_product_mappings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  provider: text("provider").notNull().default("shopee"),
+  shopId: uuid("shop_id").references(() => marketplaceShops.id, { onDelete: "set null" }),
+  productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  externalItemId: text("external_item_id"),
+  externalModelId: text("external_model_id"),
+  externalSku: text("external_sku"),
+  status: text("status").notNull().default("draft"),
+  title: text("title").notNull().default(""),
+  categoryId: text("category_id"),
+  categoryPath: text("category_path"),
+  price: decimal("price", { precision: 14, scale: 2 }),
+  stock: decimal("stock", { precision: 14, scale: 4 }),
+  syncMode: text("sync_mode").notNull().default("luma_to_shopee"),
+  minStockThreshold: decimal("min_stock_threshold", { precision: 14, scale: 4 }).notNull().default("0"),
+  outOfStockBehavior: text("out_of_stock_behavior").notNull().default("keep_visible"),
+  draftPayload: jsonb("draft_payload").$type<Record<string, unknown>>().notNull().default({}),
+  lastPayload: jsonb("last_payload").$type<Record<string, unknown> | null>(),
+  lastResponse: jsonb("last_response").$type<Record<string, unknown> | null>(),
+  lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+  lastError: text("last_error"),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("marketplace_product_mappings_provider_product_idx").on(t.provider, t.productId),
+  uniqueIndex("marketplace_product_mappings_external_idx").on(t.provider, t.externalItemId),
+  index("marketplace_product_mappings_status_idx").on(t.provider, t.status),
+]);
+
+export const marketplaceOrderMappings = pgTable("marketplace_order_mappings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  provider: text("provider").notNull().default("shopee"),
+  shopId: uuid("shop_id").references(() => marketplaceShops.id, { onDelete: "set null" }),
+  orderId: uuid("order_id").references(() => orders.id, { onDelete: "cascade" }),
+  externalOrderSn: text("external_order_sn").notNull(),
+  externalStatus: text("external_status").notNull().default(""),
+  rawPayload: jsonb("raw_payload").$type<Record<string, unknown>>().notNull().default({}),
+  importedAt: timestamp("imported_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("marketplace_order_mappings_provider_order_idx").on(t.provider, t.externalOrderSn),
+  index("marketplace_order_mappings_luma_order_idx").on(t.orderId),
+]);
+
+export const marketplaceMessageThreads = pgTable("marketplace_message_threads", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  provider: text("provider").notNull().default("shopee"),
+  shopId: uuid("shop_id").references(() => marketplaceShops.id, { onDelete: "set null" }),
+  externalThreadId: text("external_thread_id").notNull(),
+  externalBuyerId: text("external_buyer_id"),
+  buyerName: text("buyer_name").notNull().default(""),
+  customerId: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
+  orderId: uuid("order_id").references(() => orders.id, { onDelete: "set null" }),
+  status: text("status").notNull().default("open"),
+  lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
+  metadata: jsonb("metadata").$type<Record<string, unknown> | null>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("marketplace_message_threads_provider_thread_idx").on(t.provider, t.externalThreadId),
+  index("marketplace_message_threads_last_idx").on(t.provider, t.lastMessageAt),
+]);
+
+export const marketplaceMessages = pgTable("marketplace_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  threadId: uuid("thread_id").notNull().references(() => marketplaceMessageThreads.id, { onDelete: "cascade" }),
+  externalMessageId: text("external_message_id"),
+  direction: text("direction").notNull(),
+  body: text("body").notNull().default(""),
+  attachments: jsonb("attachments").$type<Record<string, unknown>[]>().notNull().default([]),
+  rawPayload: jsonb("raw_payload").$type<Record<string, unknown> | null>(),
+  sentBy: uuid("sent_by").references(() => profiles.id, { onDelete: "set null" }),
+  sentAt: timestamp("sent_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("marketplace_messages_external_idx").on(t.threadId, t.externalMessageId),
+  index("marketplace_messages_thread_idx").on(t.threadId, t.sentAt),
+]);
+
+export const marketplaceSyncJobs = pgTable("marketplace_sync_jobs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  provider: text("provider").notNull().default("shopee"),
+  shopId: uuid("shop_id").references(() => marketplaceShops.id, { onDelete: "set null" }),
+  jobType: text("job_type").notNull(),
+  status: text("status").notNull().default("pending"),
+  idempotencyKey: text("idempotency_key").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  nextRunAt: timestamp("next_run_at", { withTimezone: true }).defaultNow().notNull(),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+  lastResponse: jsonb("last_response").$type<Record<string, unknown> | null>(),
+  lastError: text("last_error"),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("marketplace_sync_jobs_idempotency_idx").on(t.provider, t.idempotencyKey),
+  index("marketplace_sync_jobs_status_idx").on(t.provider, t.status, t.nextRunAt),
+]);
+
+export const aiListingSuggestions = pgTable("ai_listing_suggestions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  provider: text("provider").notNull().default("shopee"),
+  productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  mappingId: uuid("mapping_id").references(() => marketplaceProductMappings.id, { onDelete: "set null" }),
+  model: text("model").notNull().default(""),
+  rawPayload: jsonb("raw_payload").$type<Record<string, unknown>>().notNull().default({}),
+  suggestion: jsonb("suggestion").$type<Record<string, unknown>>().notNull().default({}),
+  editedFields: jsonb("edited_fields").$type<string[]>().notNull().default([]),
+  revertedReason: text("reverted_reason"),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("ai_listing_suggestions_product_idx").on(t.productId, t.createdAt),
+]);
+
 // ============= Internal-Use Issue (Xuất dùng nội bộ — Part 8.1) =============
 // Phiếu xuất hàng dùng nội bộ (không bán): trừ kho theo giá vốn → COGS, không doanh thu.
 

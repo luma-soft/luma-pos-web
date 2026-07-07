@@ -110,6 +110,24 @@ const zaloPrefs = z.object({
   debtTemplateId: z.string().trim().max(80).default(""),
 });
 
+const shopeePrefs = z.object({
+  enabled: z.boolean().default(false),
+  environment: z.enum(["sandbox", "production"]).default("sandbox"),
+  region: z.string().trim().max(10).default("VN"),
+  partnerId: z.string().trim().max(80).default(""),
+  partnerKey: z.string().trim().max(500).default(""),
+  partnerKeySet: z.boolean().default(false),
+  redirectPath: z.string().trim().max(200).default("/api/shopee/callback"),
+  defaultShopId: z.string().trim().max(80).default(""),
+  defaultWarehouseId: z.string().trim().max(80).default(""),
+  syncInventory: z.boolean().default(true),
+  syncOrders: z.boolean().default(true),
+  syncMessages: z.boolean().default(false),
+  autoCreateCustomer: z.boolean().default(true),
+  lastSyncAt: z.string().trim().max(40).default(""),
+  lastError: z.string().trim().max(500).default(""),
+});
+
 export const storePrefsSchema = z.object({
   tax: taxPrefs.default({ defaultRate: 8, priceIncludesTax: false, einvoiceEnabled: false, einvoiceProvider: "VNPT", einvoiceTaxId: "" }),
   payments: paymentPrefs.default({ cash: true, qr: true, momo: false, zalopay: false, vnpay: false, card: false }),
@@ -144,6 +162,23 @@ export const storePrefsSchema = z.object({
     portalTemplateId: "",
     invoiceTemplateId: "",
     debtTemplateId: "",
+  }),
+  shopee: shopeePrefs.default({
+    enabled: false,
+    environment: "sandbox",
+    region: "VN",
+    partnerId: "",
+    partnerKey: "",
+    partnerKeySet: false,
+    redirectPath: "/api/shopee/callback",
+    defaultShopId: "",
+    defaultWarehouseId: "",
+    syncInventory: true,
+    syncOrders: true,
+    syncMessages: false,
+    autoCreateCustomer: true,
+    lastSyncAt: "",
+    lastError: "",
   }),
 });
 export type StorePrefs = z.infer<typeof storePrefsSchema>;
@@ -188,6 +223,23 @@ export const zaloSettingsInputSchema = z.object({
   debtTemplateId: z.string().trim().max(80).default(""),
 });
 export type ZaloSettingsInput = z.input<typeof zaloSettingsInputSchema>;
+
+export const shopeeSettingsInputSchema = z.object({
+  enabled: z.boolean().default(false),
+  environment: z.enum(["sandbox", "production"]).default("sandbox"),
+  region: z.string().trim().max(10).default("VN"),
+  partnerId: z.string().trim().max(80).default(""),
+  partnerKey: z.string().trim().max(500).optional(),
+  clearPartnerKey: z.boolean().default(false),
+  redirectPath: z.string().trim().max(200).default("/api/shopee/callback"),
+  defaultShopId: z.string().trim().max(80).default(""),
+  defaultWarehouseId: z.string().trim().max(80).default(""),
+  syncInventory: z.boolean().default(true),
+  syncOrders: z.boolean().default(true),
+  syncMessages: z.boolean().default(false),
+  autoCreateCustomer: z.boolean().default(true),
+});
+export type ShopeeSettingsInput = z.input<typeof shopeeSettingsInputSchema>;
 
 export const paymentBankAccountInputSchema = z.object({
   id: z.string().uuid().optional(),

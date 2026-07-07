@@ -13,6 +13,7 @@ import {
   PackagePlus,
   Pencil,
   Plus,
+  Store,
   Trash2,
   type LucideIcon,
 } from "lucide-react";
@@ -710,9 +711,11 @@ function ProductActionBar({ product }: { product: ProductRow }) {
   function productModalHref(patch: Record<string, string>) {
     const sp = new URLSearchParams(params.toString());
     sp.set("tab", "products");
+    sp.delete("productModal");
     sp.delete("productId");
     sp.delete("copyFrom");
     sp.delete("sameTypeAs");
+    sp.delete("shopeeProductId");
     for (const [key, value] of Object.entries(patch)) sp.set(key, value);
     return `${pathname}?${sp.toString()}`;
   }
@@ -746,6 +749,13 @@ function ProductActionBar({ product }: { product: ProductRow }) {
               productId: product.id,
             })}
             tone="primary"
+          />
+          <ActionLink
+            icon={Store}
+            label="Shopee"
+            href={productModalHref({
+              shopeeProductId: product.id,
+            })}
           />
           <ActionLink
             icon={Barcode}

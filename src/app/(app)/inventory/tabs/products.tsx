@@ -13,13 +13,14 @@ import { TableSkeleton } from "@/components/table-skeleton";
 import { ProductsTable } from "./products-table";
 import { NewProductForm } from "../../products/new/product-form";
 import { productToFormInitialValues } from "../../products/product-form-values";
+import { ShopeeListingModal } from "./shopee-listing-modal";
 
 type SP = Record<string, string | undefined>;
 const STATUSES = ["active", "inactive", "all"] as const;
 type Status = (typeof STATUSES)[number];
 const VIEWS = ["grouped", "flat"] as const;
 type View = (typeof VIEWS)[number];
-const PRODUCT_MODAL_KEYS = ["productModal", "productId", "copyFrom", "sameTypeAs"] as const;
+const PRODUCT_MODAL_KEYS = ["productModal", "productId", "copyFrom", "sameTypeAs", "shopeeProductId"] as const;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function ProductsTab({ searchParams }: { searchParams: SP }) {
@@ -75,8 +76,18 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
       </Suspense>
 
       <ProductEditorModal searchParams={params} />
+      <ShopeeListingModalShell searchParams={params} />
     </>
   );
+}
+
+async function ShopeeListingModalShell({ searchParams }: { searchParams: SP }) {
+  const productId = searchParams.shopeeProductId;
+  if (!productId) return null;
+  if (!UUID_RE.test(productId)) notFound();
+  const product = await getProduct(productId);
+  if (!product) notFound();
+  return <ShopeeListingModal product={product} closeHref={productModalHref(searchParams, {})} />;
 }
 
 async function ProductEditorModal({ searchParams }: { searchParams: SP }) {
