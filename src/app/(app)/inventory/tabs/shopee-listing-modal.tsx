@@ -10,6 +10,7 @@ import { generateShopeeListingAiFill, publishShopeeListing, saveShopeeListingDra
 import { searchPosProducts } from "@/lib/actions/pos-search";
 import type { ProductDetail } from "@/lib/data/products";
 import type { PosProduct } from "@/lib/data/pos";
+import { MoneyInput } from "@/components/ui/money-input";
 import { Select } from "@/components/ui/select";
 import { categoryEmoji } from "@/lib/category-emoji";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
@@ -308,7 +309,7 @@ function ShopeeListingFields({ form, set, L }: { form: FormState; set: <K extend
           <Field label={L ? "Shopee category_id / path" : "Shopee category_id / path"}><input className={FIELD} value={form.categoryPath} onChange={(e) => set("categoryPath", e.target.value)} placeholder={L ? "ID hoặc path từ Shopee category API" : "ID or path from Shopee category API"} /></Field>
           <Field label={L ? "Shopee brand_id / brand" : "Shopee brand_id / brand"}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
           <Field label="Seller SKU"><input className={FIELD} value={form.sku} onChange={(e) => set("sku", e.target.value)} /></Field>
-          <Field label={L ? "Giá bán" : "Price"}><input className={FIELD} type="number" min={0} value={form.price} onChange={(e) => set("price", Number(e.target.value))} /></Field>
+          <Field label={L ? "Giá bán" : "Price"}><MoneyInput className={FIELD} value={form.price} min={0} onChange={(value) => set("price", value ?? 0)} /></Field>
           <Field label={L ? "Normal stock" : "Normal stock"}><input className={FIELD} type="number" min={0} value={form.stock} onChange={(e) => set("stock", Number(e.target.value))} /></Field>
         </div>
       </FormSection>
@@ -337,7 +338,7 @@ function TikTokListingFields({ form, set, L }: { form: FormState; set: <K extend
           <Field label={L ? "TikTok category" : "TikTok category"}><input className={FIELD} value={form.categoryPath} onChange={(e) => set("categoryPath", e.target.value)} /></Field>
           <Field label={L ? "Brand" : "Brand"}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
           <Field label="Seller SKU"><input className={FIELD} value={form.sku} onChange={(e) => set("sku", e.target.value)} /></Field>
-          <Field label={L ? "Giá SKU" : "SKU price"}><input className={FIELD} type="number" min={0} value={form.price} onChange={(e) => set("price", Number(e.target.value))} /></Field>
+          <Field label={L ? "Giá SKU" : "SKU price"}><MoneyInput className={FIELD} value={form.price} min={0} onChange={(value) => set("price", value ?? 0)} /></Field>
           <Field label={L ? "Warehouse inventory" : "Warehouse inventory"}><input className={FIELD} type="number" min={0} value={form.stock} onChange={(e) => set("stock", Number(e.target.value))} /></Field>
           <Field label={L ? "Package weight" : "Package weight"}><input className={FIELD} type="number" min={0} value={form.weight} onChange={(e) => set("weight", Number(e.target.value))} /></Field>
           <Field label={L ? "Package dimensions" : "Package dimensions"}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} /></Field>
@@ -361,8 +362,8 @@ function LazadaListingFields({ form, set, L }: { form: FormState; set: <K extend
           <Field label={L ? "Model" : "Model"}><input className={FIELD} placeholder={L ? "Model hoặc dòng sản phẩm" : "Model or product line"} /></Field>
           <Field label="SellerSku"><input className={FIELD} value={form.sku} onChange={(e) => set("sku", e.target.value)} /></Field>
           <Field label={L ? "Quantity" : "Quantity"}><input className={FIELD} type="number" min={0} value={form.stock} onChange={(e) => set("stock", Number(e.target.value))} /></Field>
-          <Field label={L ? "Price" : "Price"}><input className={FIELD} type="number" min={0} value={form.price} onChange={(e) => set("price", Number(e.target.value))} /></Field>
-          <Field label={L ? "Special price" : "Special price"}><input className={FIELD} type="number" min={0} value={form.compareAtPrice} onChange={(e) => set("compareAtPrice", Number(e.target.value))} /></Field>
+          <Field label={L ? "Price" : "Price"}><MoneyInput className={FIELD} value={form.price} min={0} onChange={(value) => set("price", value ?? 0)} /></Field>
+          <Field label={L ? "Special price" : "Special price"}><MoneyInput className={FIELD} value={form.compareAtPrice} min={0} onChange={(value) => set("compareAtPrice", value ?? 0)} /></Field>
           <Field label={L ? "Package weight" : "Package weight"}><input className={FIELD} type="number" min={0} value={form.weight} onChange={(e) => set("weight", Number(e.target.value))} /></Field>
           <Field label={L ? "Package dimensions" : "Package dimensions"}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} /></Field>
         </div>
@@ -383,7 +384,7 @@ function TikiListingFields({ form, set, L }: { form: FormState; set: <K extends 
           <Field label={L ? "Tên sản phẩm" : "Product name"}><input className={FIELD} value={form.title} onChange={(e) => set("title", e.target.value)} /></Field>
           <Field label={L ? "Brand" : "Brand"}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
           <Field label="Seller SKU"><input className={FIELD} value={form.sku} onChange={(e) => set("sku", e.target.value)} /></Field>
-          <Field label={L ? "Giá" : "Price"}><input className={FIELD} type="number" min={0} value={form.price} onChange={(e) => set("price", Number(e.target.value))} /></Field>
+          <Field label={L ? "Giá" : "Price"}><MoneyInput className={FIELD} value={form.price} min={0} onChange={(value) => set("price", value ?? 0)} /></Field>
           <Field label={L ? "Tồn" : "Inventory"}><input className={FIELD} type="number" min={0} value={form.stock} onChange={(e) => set("stock", Number(e.target.value))} /></Field>
           <Field label={L ? "Khối lượng" : "Weight"}><input className={FIELD} type="number" min={0} value={form.weight} onChange={(e) => set("weight", Number(e.target.value))} /></Field>
           <Field label={L ? "Kích thước" : "Dimensions"}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} /></Field>
