@@ -22,6 +22,7 @@ const GROUPS: Group[] = [
       { href: Routes.Notifications, icon: Bell, key: "nav.notifications", badge: "notifications" },
       { href: Routes.Reports, icon: BarChart3, key: "nav.reports" },
       { href: Routes.POS, icon: ShoppingCart, key: "nav.pos" },
+      { href: Routes.OnlineSales, icon: Store, key: "nav.onlineSales" },
     ],
   },
   {
@@ -29,7 +30,6 @@ const GROUPS: Group[] = [
     items: [
       { href: Routes.Sales, icon: FileText, key: "nav.groups.sales" },
       { href: Routes.Inventory, icon: Warehouse, key: "nav.groups.inventory" },
-      { href: Routes.OnlineSales, icon: Store, key: "nav.onlineSales" },
       { href: Routes.Partners, icon: Users, key: "nav.groups.partners" },
       { href: Routes.Finance, icon: Wallet, key: "nav.groups.finance" },
     ],
