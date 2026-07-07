@@ -8,6 +8,7 @@ import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { disconnectShopeeShop } from "@/lib/actions/marketplace";
 import { ShopeeListingModal } from "../inventory/tabs/shopee-listing-modal";
+import { Select } from "@/components/ui/select";
 import { OnlineSalesListingButton } from "./online-sales-product-search";
 
 type SP = Record<string, string | undefined>;
@@ -169,10 +170,12 @@ function ShopPolicyForm({
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         <label className="flex flex-col gap-1">
           <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{L ? "Kho nguồn" : "Source warehouse"}</span>
-          <select name="warehouseId" defaultValue={policy.warehouseId} className="rounded-lg border border-border bg-canvas px-3 py-2 text-sm">
-            <option value="">{L ? "Kho mặc định" : "Default warehouse"}</option>
-            {warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
-          </select>
+          <Select
+            name="warehouseId"
+            defaultValue={policy.warehouseId}
+            options={[{ value: "", label: L ? "Kho mặc định" : "Default warehouse" }, ...warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))]}
+            className="w-full bg-canvas"
+          />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{L ? "Tồn đệm" : "Stock buffer"}</span>
@@ -184,11 +187,16 @@ function ShopPolicyForm({
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{L ? "Khi hết hàng" : "Out of stock"}</span>
-          <select name="outOfStockBehavior" defaultValue={policy.outOfStockBehavior} className="rounded-lg border border-border bg-canvas px-3 py-2 text-sm">
-            <option value="keep_visible">{L ? "Giữ hiển thị" : "Keep visible"}</option>
-            <option value="unlist">{L ? "Ẩn listing" : "Unlist"}</option>
-            <option value="set_zero">{L ? "Set tồn = 0" : "Set zero"}</option>
-          </select>
+          <Select
+            name="outOfStockBehavior"
+            defaultValue={policy.outOfStockBehavior}
+            options={[
+              { value: "keep_visible", label: L ? "Giữ hiển thị" : "Keep visible" },
+              { value: "unlist", label: L ? "Ẩn listing" : "Unlist" },
+              { value: "set_zero", label: L ? "Set tồn = 0" : "Set zero" },
+            ]}
+            className="w-full bg-canvas"
+          />
         </label>
         {[
           ["syncStock", L ? "Sync tồn" : "Sync stock", policy.syncStock],

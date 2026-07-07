@@ -498,19 +498,29 @@ function SyncFields({ form, set, L }: { form: FormState; set: <K extends keyof F
     <FormSection title={L ? "Chính sách đồng bộ" : "Sync policy"}>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         <Field label={L ? "Sync mode" : "Sync mode"}>
-          <select className={FIELD} value={form.syncMode} onChange={(e) => set("syncMode", e.target.value as FormState["syncMode"])}>
-            <option value="luma_to_shopee">{L ? "Luma → Kênh online" : "Luma → Online channel"}</option>
-            <option value="shopee_to_luma">{L ? "Kênh online → Luma" : "Online channel → Luma"}</option>
-            <option value="manual">Manual</option>
-          </select>
+          <Select
+            value={form.syncMode}
+            onValueChange={(value) => set("syncMode", value as FormState["syncMode"])}
+            options={[
+              { value: "luma_to_shopee", label: L ? "Luma → Kênh online" : "Luma → Online channel" },
+              { value: "shopee_to_luma", label: L ? "Kênh online → Luma" : "Online channel → Luma" },
+              { value: "manual", label: "Manual" },
+            ]}
+            className="w-full"
+          />
         </Field>
         <Field label={L ? "Ngưỡng tồn thấp" : "Min stock threshold"}><input className={FIELD} type="number" min={0} value={form.minStockThreshold} onChange={(e) => set("minStockThreshold", Number(e.target.value))} /></Field>
         <Field label={L ? "Khi hết hàng" : "Out of stock"}>
-          <select className={FIELD} value={form.outOfStockBehavior} onChange={(e) => set("outOfStockBehavior", e.target.value as FormState["outOfStockBehavior"])}>
-            <option value="keep_visible">{L ? "Giữ hiển thị" : "Keep visible"}</option>
-            <option value="unlist">{L ? "Ẩn listing" : "Unlist"}</option>
-            <option value="set_zero">{L ? "Set tồn = 0" : "Set zero"}</option>
-          </select>
+          <Select
+            value={form.outOfStockBehavior}
+            onValueChange={(value) => set("outOfStockBehavior", value as FormState["outOfStockBehavior"])}
+            options={[
+              { value: "keep_visible", label: L ? "Giữ hiển thị" : "Keep visible" },
+              { value: "unlist", label: L ? "Ẩn listing" : "Unlist" },
+              { value: "set_zero", label: L ? "Set tồn = 0" : "Set zero" },
+            ]}
+            className="w-full"
+          />
         </Field>
       </div>
     </FormSection>
