@@ -12,7 +12,7 @@ export default async function ShopeeInboxPage() {
   const { threads } = await getShopeeInbox();
 
   return (
-    <div className="space-y-5">
+    <div className="p-4 sm:p-6 space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <Link href={Routes.Shopee} className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-primary-600">
