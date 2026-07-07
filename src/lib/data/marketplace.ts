@@ -10,10 +10,12 @@ import {
   marketplaceSyncJobs,
   orders,
   products,
+  warehouses,
 } from "@/db/schema";
 
 const EMPTY_SHOPEE_SUMMARY = {
   shop: null,
+  shops: [],
   metrics: {
     listings: 0,
     publishedListings: 0,
@@ -33,7 +35,7 @@ function isMissingMarketplaceTable(e: unknown) {
 
 export async function getShopeeConnectionSummary() {
   try {
-    const [shop] = await db
+    const shops = await db
       .select({
         id: marketplaceShops.id,
         shopId: marketplaceShops.shopId,
@@ -44,11 +46,12 @@ export async function getShopeeConnectionSummary() {
         tokenExpiresAt: marketplaceShops.tokenExpiresAt,
         lastSyncAt: marketplaceShops.lastSyncAt,
         lastError: marketplaceShops.lastError,
+        metadata: marketplaceShops.metadata,
       })
       .from(marketplaceShops)
       .where(eq(marketplaceShops.provider, "shopee"))
       .orderBy(desc(marketplaceShops.updatedAt))
-      .limit(1);
+      .limit(20);
 
     const [metrics] = await db
       .select({
@@ -59,7 +62,7 @@ export async function getShopeeConnectionSummary() {
       })
       .from(marketplaceProductMappings);
 
-    return { shop: shop ?? null, metrics };
+    return { shop: shops[0] ?? null, shops, metrics };
   } catch (e) {
     if (isMissingMarketplaceTable(e)) return EMPTY_SHOPEE_SUMMARY;
     throw e;
@@ -77,7 +80,7 @@ export async function getProductShopeeMapping(productId: string) {
 
 export async function getShopeeDashboard() {
   try {
-    const [summary, jobs, mappings] = await Promise.all([
+    const [summary, jobs, mappings, warehouseRows] = await Promise.all([
       getShopeeConnectionSummary(),
       db
         .select()
@@ -104,10 +107,15 @@ export async function getShopeeDashboard() {
         .where(eq(marketplaceProductMappings.provider, "shopee"))
         .orderBy(desc(marketplaceProductMappings.updatedAt))
         .limit(50),
+      db
+        .select({ id: warehouses.id, name: warehouses.name, isDefault: warehouses.isDefault })
+        .from(warehouses)
+        .orderBy(desc(warehouses.isDefault), warehouses.name)
+        .limit(80),
     ]);
-    return { ...summary, jobs, mappings };
+    return { ...summary, jobs, mappings, warehouses: warehouseRows };
   } catch (e) {
-    if (isMissingMarketplaceTable(e)) return { ...EMPTY_SHOPEE_SUMMARY, jobs: [], mappings: [] };
+    if (isMissingMarketplaceTable(e)) return { ...EMPTY_SHOPEE_SUMMARY, jobs: [], mappings: [], warehouses: [] };
     throw e;
   }
 }

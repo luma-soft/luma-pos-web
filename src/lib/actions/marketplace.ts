@@ -26,10 +26,12 @@ import { consumeAiUsage, recordAiTokenUsage } from "@/lib/ai/usage";
 import {
   aiListingFillSchema,
   importShopeeOrderSchema,
+  marketplaceShopSyncPolicySchema,
   sendMarketplaceMessageSchema,
   shopeeListingDraftSchema,
   type AiListingFillInput,
   type ImportShopeeOrderInput,
+  type MarketplaceShopSyncPolicyInput,
   type SendMarketplaceMessageInput,
   type ShopeeListingDraftInput,
 } from "@/lib/schemas/marketplace";
@@ -191,6 +193,57 @@ export async function disconnectShopeeShop(shopId: string): Promise<ActionResult
     return { ok: true, data: undefined };
   } catch (e) {
     console.error("disconnectShopeeShop failed:", e);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function updateMarketplaceShopSyncPolicy(input: MarketplaceShopSyncPolicyInput): Promise<ActionResult> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const parsed = marketplaceShopSyncPolicySchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const v = parsed.data;
+  try {
+    const [shop] = await db
+      .select({ id: marketplaceShops.id, provider: marketplaceShops.provider, metadata: marketplaceShops.metadata })
+      .from(marketplaceShops)
+      .where(eq(marketplaceShops.id, v.shopId))
+      .limit(1);
+    if (!shop) return { ok: false, error: "marketplace.errors.shopNotFound" };
+
+    const currentMetadata = shop.metadata && typeof shop.metadata === "object" && !Array.isArray(shop.metadata)
+      ? shop.metadata as Record<string, unknown>
+      : {};
+    const syncPolicy = {
+      warehouseId: v.warehouseId || "",
+      syncStock: v.syncStock,
+      syncPrice: v.syncPrice,
+      importOrders: v.importOrders,
+      syncMessages: v.syncMessages,
+      autoCreateCustomer: v.autoCreateCustomer,
+      stockBuffer: v.stockBuffer,
+      minStockThreshold: v.minStockThreshold,
+      outOfStockBehavior: v.outOfStockBehavior,
+    };
+    await db.update(marketplaceShops).set({
+      metadata: { ...currentMetadata, syncPolicy },
+      updatedAt: sql`now()`,
+    }).where(eq(marketplaceShops.id, v.shopId));
+    await writeAuditLog({
+      actorUserId: gate.userId,
+      source: "manual",
+      action: "update_marketplace_sync_policy",
+      entityType: "marketplace_shop",
+      entityId: v.shopId,
+      status: "succeeded",
+      before: { syncPolicy: currentMetadata.syncPolicy ?? null },
+      after: { syncPolicy },
+      metadata: { provider: shop.provider },
+    });
+    revalidatePath(Routes.OnlineSales);
+    return { ok: true, data: undefined };
+  } catch (e) {
+    console.error("updateMarketplaceShopSyncPolicy failed:", e);
     return { ok: false, error: "errors.serverError" };
   }
 }

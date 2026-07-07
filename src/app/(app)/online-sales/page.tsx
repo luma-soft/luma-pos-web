@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getLocale } from "next-intl/server";
 import { Boxes, ExternalLink, Inbox, Layers3, RefreshCw, Send, ShoppingBag, Store } from "lucide-react";
 import { getShopeeDashboard, getShopeeInbox } from "@/lib/data/marketplace";
-import { sendMarketplaceMessage } from "@/lib/actions/marketplace";
+import { sendMarketplaceMessage, updateMarketplaceShopSyncPolicy } from "@/lib/actions/marketplace";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { disconnectShopeeShop } from "@/lib/actions/marketplace";
@@ -68,6 +68,12 @@ export default async function OnlineSalesPage({ searchParams }: { searchParams: 
         ))}
       </div>
 
+      {params.error && (
+        <div className="rounded-card border border-warn/20 bg-warn-soft px-4 py-3 text-sm font-semibold text-warn">
+          {onlineSalesError(params.error, L)}
+        </div>
+      )}
+
       {(tab === "overview" || tab === "channels") && (
         <>
           <section className="grid grid-cols-1 gap-3 md:grid-cols-4">
@@ -93,6 +99,20 @@ export default async function OnlineSalesPage({ searchParams }: { searchParams: 
               ))}
             </div>
           </section>
+
+          {tab === "channels" && data.shops.length > 0 && (
+            <section className="rounded-card border border-border bg-surface">
+              <div className="border-b border-border-soft px-4 py-3">
+                <h2 className="text-sm font-extrabold">{L ? "Chính sách đồng bộ theo gian hàng" : "Shop sync policies"}</h2>
+                <p className="text-xs text-slate-500">{L ? "Cấu hình kho nguồn, tồn đệm và dữ liệu được đồng bộ cho từng shop." : "Configure source warehouse, stock buffer, and synced data per shop."}</p>
+              </div>
+              <div className="divide-y divide-border-soft">
+                {data.shops.map((shopRow) => (
+                  <ShopPolicyForm key={shopRow.id} shop={shopRow} warehouses={data.warehouses} L={L} />
+                ))}
+              </div>
+            </section>
+          )}
         </>
       )}
 
@@ -102,6 +122,98 @@ export default async function OnlineSalesPage({ searchParams }: { searchParams: 
       {tab === "sync" || tab === "overview" ? <SyncSection jobs={data.jobs} L={L} /> : null}
     </div>
   );
+}
+
+function ShopPolicyForm({
+  shop,
+  warehouses,
+  L,
+}: {
+  shop: NonNullable<Awaited<ReturnType<typeof getShopeeDashboard>>["shops"]>[number];
+  warehouses: Awaited<ReturnType<typeof getShopeeDashboard>>["warehouses"];
+  L: boolean;
+}) {
+  const policy = shopSyncPolicy(shop.metadata);
+  return (
+    <form action={async (formData: FormData) => {
+      "use server";
+      await updateMarketplaceShopSyncPolicy({
+        shopId: shop.id,
+        warehouseId: String(formData.get("warehouseId") ?? ""),
+        syncStock: formData.get("syncStock") === "on",
+        syncPrice: formData.get("syncPrice") === "on",
+        importOrders: formData.get("importOrders") === "on",
+        syncMessages: formData.get("syncMessages") === "on",
+        autoCreateCustomer: formData.get("autoCreateCustomer") === "on",
+        stockBuffer: Number(formData.get("stockBuffer") ?? 0),
+        minStockThreshold: Number(formData.get("minStockThreshold") ?? 0),
+        outOfStockBehavior: String(formData.get("outOfStockBehavior") ?? "keep_visible") as "keep_visible" | "unlist" | "set_zero",
+      });
+    }} className="grid grid-cols-1 gap-3 px-4 py-4 xl:grid-cols-[220px_1fr_auto]">
+      <div className="min-w-0">
+        <div className="font-semibold">{shop.shopName || shop.shopId}</div>
+        <div className="mt-1 text-xs text-slate-500">Shopee · {shop.region} · {shop.status}</div>
+      </div>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{L ? "Kho nguồn" : "Source warehouse"}</span>
+          <select name="warehouseId" defaultValue={policy.warehouseId} className="rounded-lg border border-border bg-canvas px-3 py-2 text-sm">
+            <option value="">{L ? "Kho mặc định" : "Default warehouse"}</option>
+            {warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{L ? "Tồn đệm" : "Stock buffer"}</span>
+          <input name="stockBuffer" type="number" min={0} defaultValue={policy.stockBuffer} className="rounded-lg border border-border bg-canvas px-3 py-2 text-sm" />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{L ? "Ngưỡng tồn thấp" : "Min stock"}</span>
+          <input name="minStockThreshold" type="number" min={0} defaultValue={policy.minStockThreshold} className="rounded-lg border border-border bg-canvas px-3 py-2 text-sm" />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{L ? "Khi hết hàng" : "Out of stock"}</span>
+          <select name="outOfStockBehavior" defaultValue={policy.outOfStockBehavior} className="rounded-lg border border-border bg-canvas px-3 py-2 text-sm">
+            <option value="keep_visible">{L ? "Giữ hiển thị" : "Keep visible"}</option>
+            <option value="unlist">{L ? "Ẩn listing" : "Unlist"}</option>
+            <option value="set_zero">{L ? "Set tồn = 0" : "Set zero"}</option>
+          </select>
+        </label>
+        {[
+          ["syncStock", L ? "Sync tồn" : "Sync stock", policy.syncStock],
+          ["syncPrice", L ? "Sync giá" : "Sync price", policy.syncPrice],
+          ["importOrders", L ? "Import đơn" : "Import orders", policy.importOrders],
+          ["syncMessages", L ? "Sync tin nhắn" : "Sync messages", policy.syncMessages],
+          ["autoCreateCustomer", L ? "Tự tạo khách" : "Auto-create customer", policy.autoCreateCustomer],
+        ].map(([name, label, checked]) => (
+          <label key={String(name)} className="flex items-center justify-between gap-3 rounded-lg border border-border-soft bg-canvas px-3 py-2 text-sm font-semibold">
+            <span>{label}</span>
+            <input name={String(name)} type="checkbox" defaultChecked={Boolean(checked)} className="h-4 w-4" />
+          </label>
+        ))}
+      </div>
+      <div className="flex items-start justify-end">
+        <button className="rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110">{L ? "Lưu" : "Save"}</button>
+      </div>
+    </form>
+  );
+}
+
+function shopSyncPolicy(metadata: unknown) {
+  const meta = metadata && typeof metadata === "object" && !Array.isArray(metadata)
+    ? metadata as { syncPolicy?: Record<string, unknown> }
+    : {};
+  const policy = meta.syncPolicy ?? {};
+  return {
+    warehouseId: typeof policy.warehouseId === "string" ? policy.warehouseId : "",
+    syncStock: typeof policy.syncStock === "boolean" ? policy.syncStock : true,
+    syncPrice: typeof policy.syncPrice === "boolean" ? policy.syncPrice : true,
+    importOrders: typeof policy.importOrders === "boolean" ? policy.importOrders : true,
+    syncMessages: typeof policy.syncMessages === "boolean" ? policy.syncMessages : false,
+    autoCreateCustomer: typeof policy.autoCreateCustomer === "boolean" ? policy.autoCreateCustomer : true,
+    stockBuffer: Number(policy.stockBuffer ?? 0),
+    minStockThreshold: Number(policy.minStockThreshold ?? 0),
+    outOfStockBehavior: ["keep_visible", "unlist", "set_zero"].includes(String(policy.outOfStockBehavior)) ? String(policy.outOfStockBehavior) : "keep_visible",
+  };
 }
 
 function tabHref(tab: OnlineSalesTab) {
@@ -118,6 +230,19 @@ function tabLabel(tab: OnlineSalesTab, L: boolean) {
     sync: ["Sync logs", "Sync logs"],
   };
   return L ? labels[tab][1] : labels[tab][0];
+}
+
+function onlineSalesError(error: string, L: boolean) {
+  if (error === "missing_shopee_partner_credentials") {
+    return L ? "Thiếu Shopee Partner ID/key. Vào Settings > App sàn TMĐT để cấu hình trước khi kết nối." : "Missing Shopee Partner ID/key. Configure Settings > Marketplace Apps before connecting.";
+  }
+  if (error === "invalid_shopee_partner_id") {
+    return L ? "Shopee Partner ID không hợp lệ. Partner ID phải là số, không phải email." : "Invalid Shopee Partner ID. Partner ID must be numeric, not an email.";
+  }
+  if (error === "marketplace_migration_required") {
+    return L ? "Cần chạy migration marketplace trên production DB trước khi lưu shop." : "Marketplace migration must be applied to the production DB before saving shops.";
+  }
+  return L ? "Không thể kết nối kênh online. Kiểm tra cấu hình rồi thử lại." : "Could not connect the online channel. Check configuration and try again.";
 }
 
 function ProviderCard({ provider, shop, L }: { provider: (typeof PROVIDERS)[number]; shop: Awaited<ReturnType<typeof getShopeeDashboard>>["shop"]; L: boolean }) {

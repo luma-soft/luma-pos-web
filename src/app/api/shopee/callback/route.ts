@@ -16,26 +16,33 @@ export async function GET(req: Request) {
     return NextResponse.redirect(target);
   }
 
-  await db.insert(marketplaceShops)
-    .values({
-      provider: "shopee",
-      shopId,
-      shopName: `Shopee ${shopId}`,
-      region: "VN",
-      status: code ? "authorized" : "connected",
-      connectedAt: new Date(),
-      metadata: { authorizationCodeReceived: Boolean(code) },
-    })
-    .onConflictDoUpdate({
-      target: [marketplaceShops.provider, marketplaceShops.shopId],
-      set: {
+  try {
+    await db.insert(marketplaceShops)
+      .values({
+        provider: "shopee",
+        shopId,
+        shopName: `Shopee ${shopId}`,
+        region: "VN",
         status: code ? "authorized" : "connected",
         connectedAt: new Date(),
-        disconnectedAt: null,
-        lastError: null,
-        updatedAt: sql`now()`,
-      },
-    });
+        metadata: { authorizationCodeReceived: Boolean(code) },
+      })
+      .onConflictDoUpdate({
+        target: [marketplaceShops.provider, marketplaceShops.shopId],
+        set: {
+          status: code ? "authorized" : "connected",
+          connectedAt: new Date(),
+          disconnectedAt: null,
+          lastError: null,
+          updatedAt: sql`now()`,
+        },
+      });
+  } catch {
+    const target = new URL(Routes.OnlineSales, url.origin);
+    target.searchParams.set("tab", "channels");
+    target.searchParams.set("error", "marketplace_migration_required");
+    return NextResponse.redirect(target);
+  }
 
   const [shop] = await db.select({ id: marketplaceShops.id }).from(marketplaceShops).where(eq(marketplaceShops.shopId, shopId)).limit(1);
   const target = new URL(Routes.OnlineSales, url.origin);

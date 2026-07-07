@@ -1261,7 +1261,7 @@ function ShopeeSettingsSection({ L, prefs, canEdit }: { L: boolean; prefs: Store
     enabled: prefs.enabled,
     environment: prefs.environment,
     region: prefs.region || "VN",
-    partnerId: prefs.partnerId,
+    partnerId: /^\d+$/.test(prefs.partnerId) ? prefs.partnerId : "",
     partnerKey: "",
     redirectPath: prefs.redirectPath || "/api/shopee/callback",
     defaultShopId: prefs.defaultShopId,

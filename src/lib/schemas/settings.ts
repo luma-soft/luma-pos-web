@@ -228,7 +228,7 @@ export const shopeeSettingsInputSchema = z.object({
   enabled: z.boolean().default(false),
   environment: z.enum(["sandbox", "production"]).default("sandbox"),
   region: z.string().trim().max(10).default("VN"),
-  partnerId: z.string().trim().max(80).default(""),
+  partnerId: z.string().trim().regex(/^\d*$/).max(80).default(""),
   partnerKey: z.string().trim().max(500).optional(),
   clearPartnerKey: z.boolean().default(false),
   redirectPath: z.string().trim().max(200).default("/api/shopee/callback"),

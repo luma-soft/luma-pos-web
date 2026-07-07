@@ -75,3 +75,17 @@ export const sendMarketplaceMessageSchema = z.object({
   body: z.string().trim().min(1).max(2000),
 });
 export type SendMarketplaceMessageInput = z.input<typeof sendMarketplaceMessageSchema>;
+
+export const marketplaceShopSyncPolicySchema = z.object({
+  shopId: z.string().uuid(),
+  warehouseId: z.string().uuid().optional().or(z.literal("")),
+  syncStock: z.boolean().default(true),
+  syncPrice: z.boolean().default(true),
+  importOrders: z.boolean().default(true),
+  syncMessages: z.boolean().default(false),
+  autoCreateCustomer: z.boolean().default(true),
+  stockBuffer: z.number().min(0).max(100000).default(0),
+  minStockThreshold: z.number().min(0).max(100000).default(0),
+  outOfStockBehavior: z.enum(["keep_visible", "unlist", "set_zero"]).default("keep_visible"),
+});
+export type MarketplaceShopSyncPolicyInput = z.input<typeof marketplaceShopSyncPolicySchema>;
