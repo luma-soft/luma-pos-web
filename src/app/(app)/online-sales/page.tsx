@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getLocale } from "next-intl/server";
-import { Boxes, ExternalLink, Inbox, Layers3, RefreshCw, Send, ShoppingBag, Store } from "lucide-react";
+import { ExternalLink, Inbox, Layers3, RefreshCw, Search, Send, ShoppingBag, Store } from "lucide-react";
 import { getShopeeDashboard, getShopeeInbox } from "@/lib/data/marketplace";
 import { sendMarketplaceMessage, updateMarketplaceShopSyncPolicy } from "@/lib/actions/marketplace";
 import { Routes } from "@/lib/routes";
@@ -285,14 +285,21 @@ function ProviderCard({ provider, shop, L }: { provider: (typeof PROVIDERS)[numb
 function ListingsSection({ data, L }: { data: Awaited<ReturnType<typeof getShopeeDashboard>>; L: boolean }) {
   return (
     <section className="rounded-card border border-border bg-surface">
-      <div className="flex items-center justify-between gap-3 border-b border-border-soft px-4 py-3">
+      <div className="flex flex-col gap-3 border-b border-border-soft px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h2 className="text-sm font-extrabold">{L ? "Listing sản phẩm" : "Product listings"}</h2>
           <p className="text-xs text-slate-500">{L ? "Listing đã lưu draft hoặc publish theo từng kênh bán online." : "Drafted or published listings per online sales channel."}</p>
         </div>
-        <Link href={`${Routes.Inventory}?tab=products`} className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs font-bold hover:bg-surface-2">
-          <Boxes className="h-3.5 w-3.5" /> {L ? "Chọn sản phẩm" : "Select product"}
-        </Link>
+        <form action={Routes.Inventory} className="relative w-full lg:w-[360px]">
+          <input type="hidden" name="tab" value="products" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            type="search"
+            name="q"
+            className="h-10 w-full rounded-full border border-border bg-canvas pl-9 pr-4 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
+            placeholder={L ? "Tìm sản phẩm để đăng sàn..." : "Search products to list online..."}
+          />
+        </form>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] text-sm">
