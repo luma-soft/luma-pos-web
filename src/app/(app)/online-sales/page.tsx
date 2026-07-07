@@ -290,15 +290,18 @@ function ListingsSection({ data, L }: { data: Awaited<ReturnType<typeof getShope
           <h2 className="text-sm font-extrabold">{L ? "Listing sản phẩm" : "Product listings"}</h2>
           <p className="text-xs text-slate-500">{L ? "Listing đã lưu draft hoặc publish theo từng kênh bán online." : "Drafted or published listings per online sales channel."}</p>
         </div>
-        <form action={Routes.Inventory} className="relative w-full lg:w-[360px]">
+        <form action={Routes.Inventory} method="get" className="relative flex w-full items-center gap-2 lg:w-[420px]">
           <input type="hidden" name="tab" value="products" />
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             type="search"
             name="q"
-            className="h-10 w-full rounded-full border border-border bg-canvas pl-9 pr-4 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
+            className="h-10 min-w-0 flex-1 rounded-full border border-border bg-canvas pl-9 pr-4 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
             placeholder={L ? "Tìm sản phẩm để đăng sàn..." : "Search products to list online..."}
           />
+          <button type="submit" className="h-10 shrink-0 rounded-full bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110">
+            {L ? "Tìm" : "Search"}
+          </button>
         </form>
       </div>
       <div className="overflow-x-auto">
