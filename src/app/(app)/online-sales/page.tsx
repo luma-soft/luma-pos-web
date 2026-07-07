@@ -6,7 +6,7 @@ import { sendMarketplaceMessage, updateMarketplaceShopSyncPolicy } from "@/lib/a
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { disconnectShopeeShop } from "@/lib/actions/marketplace";
-import { OnlineSalesProductSearch } from "./online-sales-product-search";
+import { OnlineSalesListingButton } from "./online-sales-product-search";
 
 type SP = Record<string, string | undefined>;
 type OnlineSalesTab = "overview" | "channels" | "listings" | "orders" | "inbox" | "sync";
@@ -291,7 +291,7 @@ function ListingsSection({ data, L }: { data: Awaited<ReturnType<typeof getShope
           <h2 className="text-sm font-extrabold">{L ? "Listing sản phẩm" : "Product listings"}</h2>
           <p className="text-xs text-slate-500">{L ? "Listing đã lưu draft hoặc publish theo từng kênh bán online." : "Drafted or published listings per online sales channel."}</p>
         </div>
-        <OnlineSalesProductSearch L={L} />
+        <OnlineSalesListingButton L={L} />
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] text-sm">
