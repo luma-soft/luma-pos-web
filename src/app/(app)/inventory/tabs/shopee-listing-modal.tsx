@@ -10,6 +10,7 @@ import { generateShopeeListingAiFill, publishShopeeListing, saveShopeeListingDra
 import { searchPosProducts } from "@/lib/actions/pos-search";
 import type { ProductDetail } from "@/lib/data/products";
 import type { PosProduct } from "@/lib/data/pos";
+import { Select } from "@/components/ui/select";
 import { categoryEmoji } from "@/lib/category-emoji";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 
@@ -203,11 +204,15 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
               />
               <label className="flex flex-col gap-1">
                 <span className={LABEL}>{L ? "Kênh bán" : "Sales channel"}</span>
-                <select className={FIELD} value={provider} onChange={(event) => setProvider(event.target.value as ProviderId)}>
-                  {PROVIDERS.map((item) => (
-                    <option key={item.id} value={item.id}>{item.name}{item.ready ? "" : ` · ${L ? "sắp hỗ trợ" : "soon"}`}</option>
-                  ))}
-                </select>
+                <Select
+                  value={provider}
+                  onValueChange={(value) => setProvider(value as ProviderId)}
+                  options={PROVIDERS.map((item) => ({
+                    value: item.id,
+                    label: `${item.name}${item.ready ? "" : ` · ${L ? "sắp hỗ trợ" : "soon"}`}`,
+                  }))}
+                  className="w-full"
+                />
               </label>
             </div>
 
