@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "next-intl";
-import { Check, Loader2, Search, Sparkles, Store, UploadCloud, X } from "lucide-react";
+import { Check, Loader2, Search, Sparkles, UploadCloud, X } from "lucide-react";
 import { generateShopeeListingAiFill, publishShopeeListing, saveShopeeListingDraft } from "@/lib/actions/marketplace";
 import { searchPosProducts } from "@/lib/actions/pos-search";
 import type { ProductDetail } from "@/lib/data/products";
@@ -212,60 +212,25 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
               </label>
             </div>
 
-            {provider !== "shopee" ? (
-              <div className="rounded-card border border-dashed border-border bg-canvas px-4 py-8 text-center">
-                <Store className="mx-auto h-8 w-8 text-slate-400" />
-                <h3 className="mt-3 text-sm font-extrabold">{providerName(provider)} {L ? "sắp hỗ trợ" : "coming soon"}</h3>
-                <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-                  {L ? "Form sẽ đổi theo yêu cầu của từng sàn. Hiện tại chỉ Shopee có draft/publish queue." : "The form will adapt per marketplace. Only Shopee draft/publish queue is available right now."}
-                </p>
-              </div>
-            ) : !product ? (
+            {!product ? (
               <div className="rounded-card border border-dashed border-border bg-canvas px-4 py-10 text-center text-sm text-slate-400">
-                {L ? "Chọn sản phẩm ở ô tìm kiếm để mở form Shopee." : "Select a product from search to open the Shopee form."}
+                {L ? "Chọn sản phẩm ở ô tìm kiếm để mở form theo từng sàn." : "Select a product from search to open the marketplace-specific form."}
               </div>
             ) : (
               <>
             <div className="flex flex-wrap items-center gap-2">
-              <button type="button" disabled={aiPending} onClick={autoFill} className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50">
+              <button type="button" disabled={aiPending || provider !== "shopee"} onClick={autoFill} className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50">
                 {aiPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                 {L ? "Auto fill bằng AI" : "Auto fill with AI"}
               </button>
-              <span className="text-xs text-slate-500">{L ? "AI không tự publish; mọi field đều sửa được." : "AI never publishes; every field remains editable."}</span>
+              <span className="text-xs text-slate-500">
+                {provider === "shopee"
+                  ? (L ? "AI không tự publish; mọi field đều sửa được." : "AI never publishes; every field remains editable.")
+                  : (L ? "AI/publish sẽ bật khi adapter sàn này sẵn sàng." : "AI/publish unlocks when this marketplace adapter is ready.")}
+              </span>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <Field label={L ? "Tiêu đề listing" : "Listing title"}><input className={FIELD} value={form.title} maxLength={120} onChange={(e) => set("title", e.target.value)} /></Field>
-              <Field label={L ? "Danh mục theo kênh" : "Channel category"}><input className={FIELD} value={form.categoryPath} onChange={(e) => set("categoryPath", e.target.value)} placeholder={L ? "Ví dụ: Nhà cửa > Vật liệu xây dựng" : "Example: Home > Building materials"} /></Field>
-              <Field label={L ? "Brand" : "Brand"}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
-              <Field label="SKU"><input className={FIELD} value={form.sku} onChange={(e) => set("sku", e.target.value)} /></Field>
-              <Field label={L ? "Giá bán" : "Price"}><input className={FIELD} type="number" min={0} value={form.price} onChange={(e) => set("price", Number(e.target.value))} /></Field>
-              <Field label={L ? "Tồn đăng sàn" : "Channel stock"}><input className={FIELD} type="number" min={0} value={form.stock} onChange={(e) => set("stock", Number(e.target.value))} /></Field>
-              <Field label={L ? "Khối lượng" : "Weight"}><input className={FIELD} type="number" min={0} value={form.weight} onChange={(e) => set("weight", Number(e.target.value))} /></Field>
-              <Field label={L ? "Kích thước" : "Dimensions"}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} /></Field>
-            </div>
-
-            <Field label={L ? "Mô tả ngắn" : "Short description"}><textarea className={cn(FIELD, "min-h-20")} value={form.shortDescription} onChange={(e) => set("shortDescription", e.target.value)} /></Field>
-            <Field label={L ? "Mô tả đầy đủ" : "Full description"}><textarea className={cn(FIELD, "min-h-44")} value={form.description} onChange={(e) => set("description", e.target.value)} /></Field>
-            <Field label={L ? "Ảnh sản phẩm (mỗi dòng một URL)" : "Product images (one URL per line)"}><textarea className={cn(FIELD, "min-h-24 font-mono text-xs")} value={form.imageUrls} onChange={(e) => set("imageUrls", e.target.value)} /></Field>
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <Field label={L ? "Sync mode" : "Sync mode"}>
-                <select className={FIELD} value={form.syncMode} onChange={(e) => set("syncMode", e.target.value as FormState["syncMode"])}>
-                  <option value="luma_to_shopee">{L ? "Luma → Kênh online" : "Luma → Online channel"}</option>
-                  <option value="shopee_to_luma">{L ? "Kênh online → Luma" : "Online channel → Luma"}</option>
-                  <option value="manual">Manual</option>
-                </select>
-              </Field>
-              <Field label={L ? "Ngưỡng tồn thấp" : "Min stock threshold"}><input className={FIELD} type="number" min={0} value={form.minStockThreshold} onChange={(e) => set("minStockThreshold", Number(e.target.value))} /></Field>
-              <Field label={L ? "Khi hết hàng" : "Out of stock"}>
-                <select className={FIELD} value={form.outOfStockBehavior} onChange={(e) => set("outOfStockBehavior", e.target.value as FormState["outOfStockBehavior"])}>
-                  <option value="keep_visible">{L ? "Giữ hiển thị" : "Keep visible"}</option>
-                  <option value="unlist">{L ? "Ẩn listing" : "Unlist"}</option>
-                  <option value="set_zero">{L ? "Set tồn = 0" : "Set zero"}</option>
-                </select>
-              </Field>
-            </div>
+            <ProviderListingFields provider={provider} form={form} set={set} L={L} />
 
             {product.children.length > 0 && (
               <div className="rounded-card border border-border px-4 py-3">
@@ -313,6 +278,165 @@ function Info({ label, value }: { label: string; value: string }) {
   return <div className="flex items-center justify-between gap-3"><span className="text-slate-500">{label}</span><span className="truncate font-semibold">{value}</span></div>;
 }
 
+function ProviderListingFields({
+  provider,
+  form,
+  set,
+  L,
+}: {
+  provider: ProviderId;
+  form: FormState;
+  set: <K extends keyof FormState>(key: K, value: FormState[K]) => void;
+  L: boolean;
+}) {
+  if (provider === "tiktok_shop") return <TikTokListingFields form={form} set={set} L={L} />;
+  if (provider === "lazada") return <LazadaListingFields form={form} set={set} L={L} />;
+  if (provider === "tiki") return <TikiListingFields form={form} set={set} L={L} />;
+  return <ShopeeListingFields form={form} set={set} L={L} />;
+}
+
+function ShopeeListingFields({ form, set, L }: { form: FormState; set: <K extends keyof FormState>(key: K, value: FormState[K]) => void; L: boolean }) {
+  return (
+    <>
+      <FormSection title={L ? "Shopee product" : "Shopee product"} note={L ? "Cần category_id, brand/attributes theo danh mục, ảnh đã upload sang Shopee, logistics và package." : "Requires category_id, category brand/attributes, Shopee-uploaded media, logistics, and package data."}>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <Field label={L ? "Tên sản phẩm Shopee" : "Shopee item name"}><input className={FIELD} value={form.title} maxLength={120} onChange={(e) => set("title", e.target.value)} /></Field>
+          <Field label={L ? "Shopee category_id / path" : "Shopee category_id / path"}><input className={FIELD} value={form.categoryPath} onChange={(e) => set("categoryPath", e.target.value)} placeholder={L ? "ID hoặc path từ Shopee category API" : "ID or path from Shopee category API"} /></Field>
+          <Field label={L ? "Shopee brand_id / brand" : "Shopee brand_id / brand"}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
+          <Field label="Seller SKU"><input className={FIELD} value={form.sku} onChange={(e) => set("sku", e.target.value)} /></Field>
+          <Field label={L ? "Giá bán" : "Price"}><input className={FIELD} type="number" min={0} value={form.price} onChange={(e) => set("price", Number(e.target.value))} /></Field>
+          <Field label={L ? "Normal stock" : "Normal stock"}><input className={FIELD} type="number" min={0} value={form.stock} onChange={(e) => set("stock", Number(e.target.value))} /></Field>
+        </div>
+      </FormSection>
+
+      <FormSection title={L ? "Media, vận chuyển & thuộc tính" : "Media, logistics & attributes"} note={L ? "Ảnh cần chuyển thành image_id_list, logistic_info cần lấy từ shop logistics." : "Images should become image_id_list; logistic_info should come from shop logistics."}>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <Field label={L ? "Ảnh / image_id_list" : "Images / image_id_list"}><textarea className={cn(FIELD, "min-h-24 font-mono text-xs")} value={form.imageUrls} onChange={(e) => set("imageUrls", e.target.value)} /></Field>
+          <Field label={L ? "Mô tả Shopee" : "Shopee description"}><textarea className={cn(FIELD, "min-h-24")} value={form.description} onChange={(e) => set("description", e.target.value)} /></Field>
+          <Field label={L ? "Khối lượng gói hàng (kg)" : "Package weight (kg)"}><input className={FIELD} type="number" min={0} value={form.weight} onChange={(e) => set("weight", Number(e.target.value))} /></Field>
+          <Field label={L ? "Kích thước D x R x C (cm)" : "Dimensions L x W x H (cm)"}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} placeholder="20 x 10 x 8" /></Field>
+          <Field label={L ? "Logistic IDs" : "Logistic IDs"}><input className={FIELD} placeholder={L ? "VD: 5001, 5002" : "Example: 5001, 5002"} /></Field>
+          <Field label={L ? "Attributes theo danh mục" : "Category attributes"}><textarea className={cn(FIELD, "min-h-20 font-mono text-xs")} value={`brand=${form.brand}\ncategoryPath=${form.categoryPath}`} readOnly /></Field>
+        </div>
+      </FormSection>
+      <SyncFields form={form} set={set} L={L} />
+    </>
+  );
+}
+
+function TikTokListingFields({ form, set, L }: { form: FormState; set: <K extends keyof FormState>(key: K, value: FormState[K]) => void; L: boolean }) {
+  return (
+    <>
+      <FormSection title="TikTok Shop" note={L ? "TikTok cần category, attributes, description dạng HTML, media upload, package, SKU/inventory và có thể cần certification." : "TikTok needs category, attributes, HTML description, uploaded media, package data, SKU/inventory, and possibly certifications."}>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <Field label={L ? "Product title" : "Product title"}><input className={FIELD} value={form.title} maxLength={255} onChange={(e) => set("title", e.target.value)} /></Field>
+          <Field label={L ? "TikTok category" : "TikTok category"}><input className={FIELD} value={form.categoryPath} onChange={(e) => set("categoryPath", e.target.value)} /></Field>
+          <Field label={L ? "Brand" : "Brand"}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
+          <Field label="Seller SKU"><input className={FIELD} value={form.sku} onChange={(e) => set("sku", e.target.value)} /></Field>
+          <Field label={L ? "Giá SKU" : "SKU price"}><input className={FIELD} type="number" min={0} value={form.price} onChange={(e) => set("price", Number(e.target.value))} /></Field>
+          <Field label={L ? "Warehouse inventory" : "Warehouse inventory"}><input className={FIELD} type="number" min={0} value={form.stock} onChange={(e) => set("stock", Number(e.target.value))} /></Field>
+          <Field label={L ? "Package weight" : "Package weight"}><input className={FIELD} type="number" min={0} value={form.weight} onChange={(e) => set("weight", Number(e.target.value))} /></Field>
+          <Field label={L ? "Package dimensions" : "Package dimensions"}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} /></Field>
+        </div>
+        <Field label={L ? "Description HTML" : "HTML description"}><textarea className={cn(FIELD, "min-h-32")} value={form.description} onChange={(e) => set("description", e.target.value)} /></Field>
+        <Field label={L ? "Images/video/certification assets" : "Images/video/certification assets"}><textarea className={cn(FIELD, "min-h-24 font-mono text-xs")} value={form.imageUrls} onChange={(e) => set("imageUrls", e.target.value)} /></Field>
+      </FormSection>
+      <AdapterPending provider="TikTok Shop" L={L} />
+    </>
+  );
+}
+
+function LazadaListingFields({ form, set, L }: { form: FormState; set: <K extends keyof FormState>(key: K, value: FormState[K]) => void; L: boolean }) {
+  return (
+    <>
+      <FormSection title="Lazada" note={L ? "Lazada create product dùng primary category, SPU/SKU attributes, SellerSku, package, quantity, price và images." : "Lazada create product uses primary category, SPU/SKU attributes, SellerSku, package, quantity, price, and images."}>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <Field label={L ? "Primary category" : "Primary category"}><input className={FIELD} value={form.categoryPath} onChange={(e) => set("categoryPath", e.target.value)} /></Field>
+          <Field label={L ? "Product name" : "Product name"}><input className={FIELD} value={form.title} onChange={(e) => set("title", e.target.value)} /></Field>
+          <Field label={L ? "Brand" : "Brand"}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
+          <Field label={L ? "Model" : "Model"}><input className={FIELD} placeholder={L ? "Model hoặc dòng sản phẩm" : "Model or product line"} /></Field>
+          <Field label="SellerSku"><input className={FIELD} value={form.sku} onChange={(e) => set("sku", e.target.value)} /></Field>
+          <Field label={L ? "Quantity" : "Quantity"}><input className={FIELD} type="number" min={0} value={form.stock} onChange={(e) => set("stock", Number(e.target.value))} /></Field>
+          <Field label={L ? "Price" : "Price"}><input className={FIELD} type="number" min={0} value={form.price} onChange={(e) => set("price", Number(e.target.value))} /></Field>
+          <Field label={L ? "Special price" : "Special price"}><input className={FIELD} type="number" min={0} value={form.compareAtPrice} onChange={(e) => set("compareAtPrice", Number(e.target.value))} /></Field>
+          <Field label={L ? "Package weight" : "Package weight"}><input className={FIELD} type="number" min={0} value={form.weight} onChange={(e) => set("weight", Number(e.target.value))} /></Field>
+          <Field label={L ? "Package dimensions" : "Package dimensions"}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} /></Field>
+        </div>
+        <Field label={L ? "Description" : "Description"}><textarea className={cn(FIELD, "min-h-32")} value={form.description} onChange={(e) => set("description", e.target.value)} /></Field>
+        <Field label={L ? "Images" : "Images"}><textarea className={cn(FIELD, "min-h-24 font-mono text-xs")} value={form.imageUrls} onChange={(e) => set("imageUrls", e.target.value)} /></Field>
+      </FormSection>
+      <AdapterPending provider="Lazada" L={L} />
+    </>
+  );
+}
+
+function TikiListingFields({ form, set, L }: { form: FormState; set: <K extends keyof FormState>(key: K, value: FormState[K]) => void; L: boolean }) {
+  return (
+    <>
+      <FormSection title="Tiki" note={L ? "Tiki flow cần chọn category, lấy attribute theo category, map attribute, chuẩn bị certificate files nếu category/brand yêu cầu." : "Tiki flow needs category selection, category attributes, attribute mapping, and certificate files when category/brand requires them."}>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <Field label={L ? "Tiki category" : "Tiki category"}><input className={FIELD} value={form.categoryPath} onChange={(e) => set("categoryPath", e.target.value)} /></Field>
+          <Field label={L ? "Tên sản phẩm" : "Product name"}><input className={FIELD} value={form.title} onChange={(e) => set("title", e.target.value)} /></Field>
+          <Field label={L ? "Brand" : "Brand"}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
+          <Field label="Seller SKU"><input className={FIELD} value={form.sku} onChange={(e) => set("sku", e.target.value)} /></Field>
+          <Field label={L ? "Giá" : "Price"}><input className={FIELD} type="number" min={0} value={form.price} onChange={(e) => set("price", Number(e.target.value))} /></Field>
+          <Field label={L ? "Tồn" : "Inventory"}><input className={FIELD} type="number" min={0} value={form.stock} onChange={(e) => set("stock", Number(e.target.value))} /></Field>
+          <Field label={L ? "Khối lượng" : "Weight"}><input className={FIELD} type="number" min={0} value={form.weight} onChange={(e) => set("weight", Number(e.target.value))} /></Field>
+          <Field label={L ? "Kích thước" : "Dimensions"}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} /></Field>
+        </div>
+        <Field label={L ? "Mô tả" : "Description"}><textarea className={cn(FIELD, "min-h-32")} value={form.description} onChange={(e) => set("description", e.target.value)} /></Field>
+        <Field label={L ? "Attribute mapping / certificate files" : "Attribute mapping / certificate files"}><textarea className={cn(FIELD, "min-h-24 font-mono text-xs")} placeholder={L ? "Điền attribute bắt buộc và file chứng nhận nếu Tiki yêu cầu" : "Enter required attributes and certificate files if Tiki requires them"} /></Field>
+        <Field label={L ? "Images" : "Images"}><textarea className={cn(FIELD, "min-h-24 font-mono text-xs")} value={form.imageUrls} onChange={(e) => set("imageUrls", e.target.value)} /></Field>
+      </FormSection>
+      <AdapterPending provider="Tiki" L={L} />
+    </>
+  );
+}
+
+function SyncFields({ form, set, L }: { form: FormState; set: <K extends keyof FormState>(key: K, value: FormState[K]) => void; L: boolean }) {
+  return (
+    <FormSection title={L ? "Chính sách đồng bộ" : "Sync policy"}>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <Field label={L ? "Sync mode" : "Sync mode"}>
+          <select className={FIELD} value={form.syncMode} onChange={(e) => set("syncMode", e.target.value as FormState["syncMode"])}>
+            <option value="luma_to_shopee">{L ? "Luma → Kênh online" : "Luma → Online channel"}</option>
+            <option value="shopee_to_luma">{L ? "Kênh online → Luma" : "Online channel → Luma"}</option>
+            <option value="manual">Manual</option>
+          </select>
+        </Field>
+        <Field label={L ? "Ngưỡng tồn thấp" : "Min stock threshold"}><input className={FIELD} type="number" min={0} value={form.minStockThreshold} onChange={(e) => set("minStockThreshold", Number(e.target.value))} /></Field>
+        <Field label={L ? "Khi hết hàng" : "Out of stock"}>
+          <select className={FIELD} value={form.outOfStockBehavior} onChange={(e) => set("outOfStockBehavior", e.target.value as FormState["outOfStockBehavior"])}>
+            <option value="keep_visible">{L ? "Giữ hiển thị" : "Keep visible"}</option>
+            <option value="unlist">{L ? "Ẩn listing" : "Unlist"}</option>
+            <option value="set_zero">{L ? "Set tồn = 0" : "Set zero"}</option>
+          </select>
+        </Field>
+      </div>
+    </FormSection>
+  );
+}
+
+function FormSection({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-3 rounded-card border border-border-soft bg-surface px-4 py-3">
+      <div>
+        <h3 className="text-sm font-extrabold">{title}</h3>
+        {note && <p className="mt-1 text-xs text-slate-500">{note}</p>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function AdapterPending({ provider, L }: { provider: string; L: boolean }) {
+  return (
+    <div className="rounded-card border border-warn/20 bg-warn-soft px-4 py-3 text-xs font-semibold text-warn">
+      {L ? `${provider} form đã tách theo sàn, nhưng adapter publish/API chưa bật.` : `${provider} form is marketplace-specific, but publish/API adapter is not enabled yet.`}
+    </div>
+  );
+}
+
 function formFromProduct(product: ProductDetail | null): FormState {
   if (!product) {
     return {
@@ -356,10 +480,6 @@ function formFromProduct(product: ProductDetail | null): FormState {
     minStockThreshold: 0,
     outOfStockBehavior: "keep_visible",
   };
-}
-
-function providerName(provider: ProviderId) {
-  return PROVIDERS.find((item) => item.id === provider)?.name ?? provider;
 }
 
 function ProductSearchInListing({
