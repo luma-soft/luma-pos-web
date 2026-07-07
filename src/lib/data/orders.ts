@@ -10,7 +10,7 @@ export const ORDERS_PAGE_SIZE = 20;
 
 export type OrderStatusFilter = "all" | "completed" | "cancelled" | "owing" | "returned";
 export type OrderPaymentFilter = "all" | "paid" | "unpaid" | "partial";
-export type OrderSourceFilter = "all" | "pos" | "shopee";
+export type OrderSourceFilter = "all" | "pos" | "shopee" | "tiktok_shop" | "lazada" | "tiki";
 
 export interface OrderListFilters {
   orderId?: string;
@@ -56,7 +56,7 @@ export async function getOrders(filters: OrderListFilters = {}) {
     const c = or(eq(orders.paymentStatus, "deposit"), eq(orders.paymentStatus, "partial"));
     if (c) conditions.push(c);
   }
-  if (filters.source === "shopee") conditions.push(eq(orders.sourceMode, "shopee"));
+  if (filters.source && !["all", "pos"].includes(filters.source)) conditions.push(eq(orders.sourceMode, filters.source));
   else if (filters.source === "pos") conditions.push(sql`coalesce(${orders.sourceMode}, '') <> 'shopee'`);
   // khoảng ngày
   if (filters.from) {

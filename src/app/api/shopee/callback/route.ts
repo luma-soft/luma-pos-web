@@ -11,7 +11,7 @@ export async function GET(req: Request) {
   const error = url.searchParams.get("error") || "";
 
   if (error || !shopId) {
-    const target = new URL(Routes.Shopee, url.origin);
+    const target = new URL(Routes.OnlineSales, url.origin);
     target.searchParams.set("error", error || "missing_shop_id");
     return NextResponse.redirect(target);
   }
@@ -38,7 +38,7 @@ export async function GET(req: Request) {
     });
 
   const [shop] = await db.select({ id: marketplaceShops.id }).from(marketplaceShops).where(eq(marketplaceShops.shopId, shopId)).limit(1);
-  const target = new URL(Routes.Shopee, url.origin);
+  const target = new URL(Routes.OnlineSales, url.origin);
   if (shop?.id) target.searchParams.set("shop", shop.id);
   return NextResponse.redirect(target);
 }

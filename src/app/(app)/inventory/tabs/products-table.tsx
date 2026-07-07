@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   Ban,
   Barcode,
@@ -644,6 +644,7 @@ function DocumentValue({ movement }: { movement: StockMovementRow }) {
 
 function ProductActionBar({ product }: { product: ProductRow }) {
   const t = useTranslations();
+  const locale = useLocale();
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
@@ -715,6 +716,7 @@ function ProductActionBar({ product }: { product: ProductRow }) {
     sp.delete("productId");
     sp.delete("copyFrom");
     sp.delete("sameTypeAs");
+    sp.delete("onlineProductId");
     sp.delete("shopeeProductId");
     for (const [key, value] of Object.entries(patch)) sp.set(key, value);
     return `${pathname}?${sp.toString()}`;
@@ -752,9 +754,9 @@ function ProductActionBar({ product }: { product: ProductRow }) {
           />
           <ActionLink
             icon={Store}
-            label="Shopee"
+            label={locale === "vi" ? "Đăng sàn" : "List online"}
             href={productModalHref({
-              shopeeProductId: product.id,
+              onlineProductId: product.id,
             })}
           />
           <ActionLink

@@ -38,6 +38,7 @@ export const Routes = {
   Suppliers: "/suppliers",
   Reports: "/reports",
   Notifications: "/notifications",
+  OnlineSales: "/online-sales",
   Shopee: "/shopee",
   ShopeeInbox: "/shopee/inbox",
   Settings: "/settings",

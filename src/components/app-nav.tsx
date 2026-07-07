@@ -29,7 +29,7 @@ const GROUPS: Group[] = [
     items: [
       { href: Routes.Sales, icon: FileText, key: "nav.groups.sales" },
       { href: Routes.Inventory, icon: Warehouse, key: "nav.groups.inventory" },
-      { href: Routes.Shopee, icon: Store, key: "nav.shopee" },
+      { href: Routes.OnlineSales, icon: Store, key: "nav.onlineSales" },
       { href: Routes.Partners, icon: Users, key: "nav.groups.partners" },
       { href: Routes.Finance, icon: Wallet, key: "nav.groups.finance" },
     ],

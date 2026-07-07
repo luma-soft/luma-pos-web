@@ -142,7 +142,7 @@ export function OrdersTable({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                   <div className="font-semibold text-primary-600">{order.code}</div>
-                    <div className="text-xs text-slate-400">{formatDate(order.createdAt)} · {order.customerName ?? t("orders.walkIn")} · {order.sourceMode === "shopee" ? "Shopee" : "POS"}</div>
+                    <div className="text-xs text-slate-400">{formatDate(order.createdAt)} · {order.customerName ?? t("orders.walkIn")} · {channelLabel(order.sourceMode)}</div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     <OrderStatusBadge status={order.status} />
@@ -165,13 +165,21 @@ export function OrdersTable({
 }
 
 function ChannelBadge({ source }: { source?: string | null }) {
-  const shopee = source === "shopee";
+  const online = Boolean(source && source !== "pos");
   return (
     <span className={cn(
       "inline-flex rounded-md px-2 py-1 text-xs font-bold",
-      shopee ? "bg-warn-soft text-warn" : "bg-surface-2 text-slate-600",
+      online ? "bg-warn-soft text-warn" : "bg-surface-2 text-slate-600",
     )}>
-      {shopee ? "Shopee" : "POS"}
+      {channelLabel(source)}
     </span>
   );
+}
+
+function channelLabel(source?: string | null) {
+  if (source === "shopee") return "Shopee";
+  if (source === "tiktok_shop") return "TikTok Shop";
+  if (source === "lazada") return "Lazada";
+  if (source === "tiki") return "Tiki";
+  return "POS";
 }

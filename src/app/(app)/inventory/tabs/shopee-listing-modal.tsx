@@ -33,6 +33,7 @@ type FormState = {
 
 const FIELD = "w-full rounded-lg border border-border bg-canvas px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20";
 const LABEL = "text-[10px] font-bold uppercase tracking-wide text-slate-500";
+const PROVIDERS = ["Shopee", "TikTok Shop", "Lazada", "Tiki"] as const;
 
 export function ShopeeListingModal({ product, closeHref }: { product: ProductDetail; closeHref: string }) {
   const locale = useLocale();
@@ -150,7 +151,7 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
         setError(res.error);
         return;
       }
-      setMessage(action === "publish" ? (L ? "Đã queue publish listing Shopee." : "Shopee publish queued.") : (L ? "Đã lưu draft Shopee." : "Shopee draft saved."));
+      setMessage(action === "publish" ? (L ? "Đã queue publish listing lên kênh online." : "Online listing publish queued.") : (L ? "Đã lưu draft listing online." : "Online listing draft saved."));
       router.refresh();
     });
   }
@@ -160,7 +161,7 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
       <div className="flex h-[min(94dvh,960px)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
           <div className="min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-wide text-primary-600">Shopee Listing</div>
+            <div className="text-[10px] font-bold uppercase tracking-wide text-primary-600">{L ? "Đăng sàn" : "List online"}</div>
             <h2 className="truncate text-lg font-extrabold">{product.name}</h2>
           </div>
           <Link href={closeHref} className="grid h-9 w-9 place-items-center rounded-full border border-border hover:bg-surface-2" aria-label="Close">
@@ -184,6 +185,23 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
 
           <main className="space-y-4 p-4">
             <div className="flex flex-wrap items-center gap-2">
+              <div className="flex w-full flex-wrap gap-2">
+                {PROVIDERS.map((provider) => (
+                  <button
+                    key={provider}
+                    type="button"
+                    disabled={provider !== "Shopee"}
+                    className={cn(
+                      "rounded-full border px-3 py-1.5 text-xs font-bold",
+                      provider === "Shopee"
+                        ? "border-primary-600 bg-primary-50 text-primary-700 dark:bg-primary-950/40"
+                        : "border-border bg-surface-2 text-slate-400",
+                    )}
+                  >
+                    {provider}{provider !== "Shopee" ? ` · ${L ? "sắp hỗ trợ" : "soon"}` : ""}
+                  </button>
+                ))}
+              </div>
               <button type="button" disabled={aiPending} onClick={autoFill} className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50">
                 {aiPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                 {L ? "Auto fill bằng AI" : "Auto fill with AI"}
@@ -192,12 +210,12 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <Field label={L ? "Tiêu đề Shopee" : "Shopee title"}><input className={FIELD} value={form.title} maxLength={120} onChange={(e) => set("title", e.target.value)} /></Field>
-              <Field label={L ? "Danh mục Shopee" : "Shopee category"}><input className={FIELD} value={form.categoryPath} onChange={(e) => set("categoryPath", e.target.value)} placeholder={L ? "Ví dụ: Nhà cửa > Vật liệu xây dựng" : "Example: Home > Building materials"} /></Field>
+              <Field label={L ? "Tiêu đề listing" : "Listing title"}><input className={FIELD} value={form.title} maxLength={120} onChange={(e) => set("title", e.target.value)} /></Field>
+              <Field label={L ? "Danh mục theo kênh" : "Channel category"}><input className={FIELD} value={form.categoryPath} onChange={(e) => set("categoryPath", e.target.value)} placeholder={L ? "Ví dụ: Nhà cửa > Vật liệu xây dựng" : "Example: Home > Building materials"} /></Field>
               <Field label={L ? "Brand" : "Brand"}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
               <Field label="SKU"><input className={FIELD} value={form.sku} onChange={(e) => set("sku", e.target.value)} /></Field>
               <Field label={L ? "Giá bán" : "Price"}><input className={FIELD} type="number" min={0} value={form.price} onChange={(e) => set("price", Number(e.target.value))} /></Field>
-              <Field label={L ? "Tồn Shopee" : "Shopee stock"}><input className={FIELD} type="number" min={0} value={form.stock} onChange={(e) => set("stock", Number(e.target.value))} /></Field>
+              <Field label={L ? "Tồn đăng sàn" : "Channel stock"}><input className={FIELD} type="number" min={0} value={form.stock} onChange={(e) => set("stock", Number(e.target.value))} /></Field>
               <Field label={L ? "Khối lượng" : "Weight"}><input className={FIELD} type="number" min={0} value={form.weight} onChange={(e) => set("weight", Number(e.target.value))} /></Field>
               <Field label={L ? "Kích thước" : "Dimensions"}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} /></Field>
             </div>
@@ -209,8 +227,8 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <Field label={L ? "Sync mode" : "Sync mode"}>
                 <select className={FIELD} value={form.syncMode} onChange={(e) => set("syncMode", e.target.value as FormState["syncMode"])}>
-                  <option value="luma_to_shopee">Luma → Shopee</option>
-                  <option value="shopee_to_luma">Shopee → Luma</option>
+                  <option value="luma_to_shopee">{L ? "Luma → Kênh online" : "Luma → Online channel"}</option>
+                  <option value="shopee_to_luma">{L ? "Kênh online → Luma" : "Online channel → Luma"}</option>
                   <option value="manual">Manual</option>
                 </select>
               </Field>
@@ -226,7 +244,7 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
 
             {product.children.length > 0 && (
               <div className="rounded-card border border-border px-4 py-3">
-                <div className={LABEL}>{L ? "Biến thể sẽ được map sang Shopee model" : "Variants mapped to Shopee models"}</div>
+                <div className={LABEL}>{L ? "Biến thể sẽ được map sang model của kênh" : "Variants mapped to channel models"}</div>
                 <div className="mt-2 grid gap-2">
                   {product.children.map((child) => (
                     <div key={child.id} className="grid grid-cols-[1fr_auto_auto] gap-3 rounded-lg bg-canvas px-3 py-2 text-sm">
@@ -251,7 +269,7 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
               {L ? "Lưu draft" : "Save draft"}
             </button>
             <button type="button" disabled={pending || !canPublish} onClick={() => save("publish")} className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50">
-              {L ? "Publish Shopee" : "Publish Shopee"}
+              {L ? "Publish lên sàn" : "Publish online"}
             </button>
           </div>
         </div>

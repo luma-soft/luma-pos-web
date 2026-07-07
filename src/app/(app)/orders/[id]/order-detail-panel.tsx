@@ -214,7 +214,7 @@ export async function OrderDetailPanel({
 
           <div className="space-y-2 rounded-lg border border-border-soft p-3">
             <div className="font-semibold">{t("orders.detail.info")}</div>
-            {order.sourceMode && <InfoLine label="Channel" value={order.sourceMode === "shopee" ? "Shopee" : order.sourceMode} valueClassName={order.sourceMode === "shopee" ? "font-semibold text-warn" : undefined} />}
+            {order.sourceMode && <InfoLine label="Channel" value={orderChannelLabel(order.sourceMode)} valueClassName={order.sourceMode === "shopee" ? "font-semibold text-warn" : undefined} />}
             {order.sourceSaleTime && <InfoLine label="Source time" value={formatDate(order.sourceSaleTime)} />}
             <InfoLine label={t("pos.subtotal")} value={formatCurrency(Number(order.subtotal))} />
             <InfoLine label={t("pos.discount")} value={formatCurrency(Number(order.discount))} />
@@ -279,6 +279,14 @@ export async function OrderDetailPanel({
       </div>
     </div>
   );
+}
+
+function orderChannelLabel(source: string) {
+  if (source === "shopee") return "Shopee";
+  if (source === "tiktok_shop") return "TikTok Shop";
+  if (source === "lazada") return "Lazada";
+  if (source === "tiki") return "Tiki";
+  return source;
 }
 
 function InfoLine({

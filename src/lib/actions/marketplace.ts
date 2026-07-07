@@ -161,7 +161,7 @@ export async function connectShopeeDemoShop(): Promise<ActionResult<{ shopId: st
       metadata: { provider: "shopee" },
     });
     revalidatePath(Routes.Settings);
-    revalidatePath(Routes.Shopee);
+    revalidatePath(Routes.OnlineSales);
     return { ok: true, data: { shopId: shop.id } };
   } catch (e) {
     console.error("connectShopeeDemoShop failed:", e);
@@ -187,7 +187,7 @@ export async function disconnectShopeeShop(shopId: string): Promise<ActionResult
       status: "succeeded",
     });
     revalidatePath(Routes.Settings);
-    revalidatePath(Routes.Shopee);
+    revalidatePath(Routes.OnlineSales);
     return { ok: true, data: undefined };
   } catch (e) {
     console.error("disconnectShopeeShop failed:", e);
@@ -330,7 +330,7 @@ export async function saveShopeeListingDraft(input: ShopeeListingDraftInput): Pr
       shopId: v.shopId ?? null,
     });
     revalidatePath(Routes.Inventory);
-    revalidatePath(Routes.Shopee);
+    revalidatePath(Routes.OnlineSales);
     return { ok: true, data: { mappingId: row.id } };
   } catch (e) {
     console.error("saveShopeeListingDraft failed:", e);
@@ -374,7 +374,7 @@ export async function publishShopeeListing(input: ShopeeListingDraftInput): Prom
       metadata: { productId: v.productId, externalItemId },
     });
     revalidatePath(Routes.Inventory);
-    revalidatePath(Routes.Shopee);
+    revalidatePath(Routes.OnlineSales);
     return { ok: true, data: { mappingId: saved.data.mappingId, externalItemId } };
   } catch (e) {
     console.error("publishShopeeListing failed:", e);
@@ -394,7 +394,7 @@ export async function unpublishShopeeListing(mappingId: string): Promise<ActionR
       userId: gate.userId,
     });
     revalidatePath(Routes.Inventory);
-    revalidatePath(Routes.Shopee);
+    revalidatePath(Routes.OnlineSales);
     return { ok: true, data: undefined };
   } catch (e) {
     console.error("unpublishShopeeListing failed:", e);
@@ -495,7 +495,7 @@ export async function importShopeeOrder(input: ImportShopeeOrderInput): Promise<
       return order;
     });
     revalidatePath(Routes.Sales);
-    revalidatePath(Routes.Shopee);
+    revalidatePath(Routes.OnlineSales);
     return { ok: true, data: { orderId: result.id, code: result.code, duplicate: false } };
   } catch (e) {
     console.error("importShopeeOrder failed:", e);
@@ -524,7 +524,7 @@ export async function sendMarketplaceMessage(input: SendMarketplaceMessageInput)
       payload: { threadId: v.threadId, body: v.body },
       userId: gate.userId,
     });
-    revalidatePath(Routes.ShopeeInbox);
+    revalidatePath(Routes.OnlineSales);
     return { ok: true, data: undefined };
   } catch (e) {
     console.error("sendMarketplaceMessage failed:", e);

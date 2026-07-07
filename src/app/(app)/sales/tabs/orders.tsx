@@ -19,7 +19,7 @@ type SP = Record<string, string | undefined>;
 
 const STATUS: OrderStatusFilter[] = ["all", "completed", "owing", "returned", "cancelled"];
 const PAYMENTS: OrderPaymentFilter[] = ["all", "paid", "partial", "unpaid"];
-const SOURCES: OrderSourceFilter[] = ["all", "pos", "shopee"];
+const SOURCES: OrderSourceFilter[] = ["all", "pos", "shopee", "tiktok_shop", "lazada", "tiki"];
 
 export async function OrdersTab({ searchParams }: { searchParams: SP }) {
   const t = await getTranslations();
@@ -82,6 +82,9 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
             { value: "all", label: LumaText(t, "orders.sourceFilter.all", "All channels") },
             { value: "pos", label: "POS" },
             { value: "shopee", label: "Shopee" },
+            { value: "tiktok_shop", label: "TikTok Shop" },
+            { value: "lazada", label: "Lazada" },
+            { value: "tiki", label: "Tiki" },
           ]}
           className="min-w-36"
         />
