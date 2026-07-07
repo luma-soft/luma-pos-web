@@ -4,7 +4,7 @@ import { Boxes, ExternalLink, Inbox, RefreshCw, Store, TriangleAlert } from "luc
 import { getShopeeDashboard } from "@/lib/data/marketplace";
 import { Routes } from "@/lib/routes";
 import { formatCurrency, formatDate, formatNumber } from "@/lib/utils";
-import { connectShopeeDemoShop, disconnectShopeeShop } from "@/lib/actions/marketplace";
+import { disconnectShopeeShop } from "@/lib/actions/marketplace";
 
 export default async function ShopeePage() {
   const locale = await getLocale();
@@ -53,14 +53,9 @@ export default async function ShopeePage() {
           </div>
           <div className="flex flex-wrap gap-2">
             {!shop || shop.status !== "connected" ? (
-              <form action={async () => {
-                "use server";
-                await connectShopeeDemoShop();
-              }}>
-                <button className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-xs font-bold text-white hover:brightness-110">
-                  <ExternalLink className="h-3.5 w-3.5" /> {L ? "Kết nối demo" : "Connect demo"}
-                </button>
-              </form>
+              <Link href="/api/shopee/connect" className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-xs font-bold text-white hover:brightness-110">
+                <ExternalLink className="h-3.5 w-3.5" /> {L ? "Kết nối Shopee" : "Connect Shopee"}
+              </Link>
             ) : (
               <form action={async () => {
                 "use server";
