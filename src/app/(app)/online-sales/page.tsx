@@ -121,7 +121,7 @@ export default async function OnlineSalesPage({ searchParams }: { searchParams: 
         </>
       )}
 
-      {tab === "listings" || tab === "overview" ? <ListingsSection data={data} L={L} /> : null}
+      {tab === "listings" || tab === "overview" ? <ListingsSection data={data} L={L} tab={tab} /> : null}
       {tab === "orders" && <OnlineOrdersSection L={L} />}
       {tab === "inbox" && <InboxSection threads={inbox.threads} L={L} />}
       {tab === "sync" || tab === "overview" ? <SyncSection jobs={data.jobs} L={L} /> : null}
@@ -305,7 +305,7 @@ function ProviderCard({ provider, shop, L }: { provider: (typeof PROVIDERS)[numb
   );
 }
 
-function ListingsSection({ data, L }: { data: Awaited<ReturnType<typeof getShopeeDashboard>>; L: boolean }) {
+function ListingsSection({ data, L, tab }: { data: Awaited<ReturnType<typeof getShopeeDashboard>>; L: boolean; tab: OnlineSalesTab }) {
   return (
     <section className="rounded-card border border-border bg-surface">
       <div className="flex flex-col gap-3 border-b border-border-soft px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
@@ -313,7 +313,7 @@ function ListingsSection({ data, L }: { data: Awaited<ReturnType<typeof getShope
           <h2 className="text-sm font-extrabold">{L ? "Listing sản phẩm" : "Product listings"}</h2>
           <p className="text-xs text-slate-500">{L ? "Listing đã lưu draft hoặc publish theo từng kênh bán online." : "Drafted or published listings per online sales channel."}</p>
         </div>
-        <OnlineSalesListingButton L={L} />
+        <OnlineSalesListingButton L={L} tab={tab === "overview" ? "overview" : "listings"} />
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] text-sm">
