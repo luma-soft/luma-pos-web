@@ -180,6 +180,7 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
               {product ? (
                 <>
                   <Info label="SKU" value={product.sku} />
+                  <Info label={L ? "Giá nhập" : "Cost price"} value={formatCurrency(Number(product.costPrice))} />
                   <Info label={L ? "Giá Luma" : "Luma price"} value={formatCurrency(Number(product.retailPrice))} />
                   <Info label={L ? "Tồn" : "Stock"} value={`${formatNumber(Number(product.totalStock))} ${product.baseUnit}`} />
                   <Info label={L ? "Danh mục" : "Category"} value={product.categoryName ?? "—"} />
@@ -235,6 +236,14 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
               </span>
             </div>
 
+            <PricingRecommendation
+              L={L}
+              provider={provider}
+              costPrice={Number(product.costPrice)}
+              currentPrice={form.price}
+              onUse={(price) => set("price", price)}
+            />
+
             <ProviderListingFields provider={provider} form={form} set={set} L={L} />
 
             {product.children.length > 0 && (
@@ -281,6 +290,92 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Info({ label, value }: { label: string; value: string }) {
   return <div className="flex items-center justify-between gap-3"><span className="text-slate-500">{label}</span><span className="truncate font-semibold">{value}</span></div>;
+}
+
+function PricingRecommendation({
+  L,
+  provider,
+  costPrice,
+  currentPrice,
+  onUse,
+}: {
+  L: boolean;
+  provider: ProviderId;
+  costPrice: number;
+  currentPrice: number;
+  onUse: (price: number) => void;
+}) {
+  const assumption = MARKETPLACE_PRICE_ASSUMPTIONS[provider];
+  const targetMarginRate = 0.2;
+  const suggestedPrice = suggestMarketplacePrice(costPrice, assumption.percentFee, assumption.fixedFee, targetMarginRate);
+  const feeAmount = currentPrice > 0 ? Math.round(currentPrice * assumption.percentFee + assumption.fixedFee) : 0;
+  const currentProfit = currentPrice > 0 ? Math.round(currentPrice - feeAmount - costPrice) : 0;
+  const currentMargin = currentPrice > 0 ? currentProfit / currentPrice : 0;
+  const canSuggest = costPrice > 0 && suggestedPrice > 0;
+
+  return (
+    <section className="rounded-card border border-primary-100 bg-primary-50/60 px-4 py-3 dark:border-primary-900 dark:bg-primary-950/20">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div>
+          <div className="text-[10px] font-bold uppercase tracking-wide text-primary-700 dark:text-primary-300">
+            {L ? "Gợi ý giá bán" : "Suggested selling price"}
+          </div>
+          <div className="mt-1 grid grid-cols-2 gap-2 text-xs text-slate-600 dark:text-slate-300 md:grid-cols-4">
+            <PriceMetric label={L ? "Giá nhập" : "Cost"} value={costPrice > 0 ? formatCurrency(costPrice) : "—"} />
+            <PriceMetric label={L ? "Phí tạm tính" : "Fee estimate"} value={`${Math.round(assumption.percentFee * 1000) / 10}%${assumption.fixedFee ? ` + ${formatCurrency(assumption.fixedFee)}` : ""}`} />
+            <PriceMetric label={L ? "Margin mục tiêu" : "Target margin"} value={`${Math.round(targetMarginRate * 100)}%`} />
+            <PriceMetric label={L ? "Lãi giá hiện tại" : "Current profit"} value={currentPrice > 0 ? `${formatCurrency(currentProfit)} (${Math.round(currentMargin * 100)}%)` : "—"} />
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            {L
+              ? `Tạm tính theo biểu phí ${assumption.label}; phí thực tế thay đổi theo ngành hàng, chương trình và loại shop.`
+              : `Estimated using ${assumption.label}; actual fees vary by category, campaign, and shop type.`}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+          <div className="text-right">
+            <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{L ? "Giá đề xuất" : "Suggested price"}</div>
+            <div className="text-lg font-extrabold tabular-nums text-primary-700 dark:text-primary-300">{canSuggest ? formatCurrency(suggestedPrice) : "—"}</div>
+          </div>
+          <button
+            type="button"
+            disabled={!canSuggest}
+            onClick={() => onUse(suggestedPrice)}
+            className="rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50"
+          >
+            {L ? "Dùng giá này" : "Use price"}
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PriceMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="font-bold text-slate-500">{label}</div>
+      <div className="mt-0.5 font-semibold tabular-nums text-slate-900 dark:text-slate-100">{value}</div>
+    </div>
+  );
+}
+
+const MARKETPLACE_PRICE_ASSUMPTIONS: Record<ProviderId, { label: string; percentFee: number; fixedFee: number }> = {
+  shopee: { label: "Shopee: fixed/category fee + transaction fee", percentFee: 0.14, fixedFee: 3000 },
+  tiktok_shop: { label: "TikTok Shop: platform commission + transaction fee", percentFee: 0.185, fixedFee: 0 },
+  lazada: { label: "Lazada: commission + processing fee", percentFee: 0.14, fixedFee: 3000 },
+  tiki: { label: "Tiki: category commission/service estimate", percentFee: 0.12, fixedFee: 0 },
+};
+
+function suggestMarketplacePrice(costPrice: number, percentFee: number, fixedFee: number, targetMarginRate: number) {
+  if (!Number.isFinite(costPrice) || costPrice <= 0) return 0;
+  const denominator = 1 - percentFee - targetMarginRate;
+  if (denominator <= 0) return 0;
+  return roundUpTo(costPrice + fixedFee, denominator, 1000);
+}
+
+function roundUpTo(baseCost: number, denominator: number, step: number) {
+  return Math.ceil((baseCost / denominator) / step) * step;
 }
 
 function ProviderListingFields({
