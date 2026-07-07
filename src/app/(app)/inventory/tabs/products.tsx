@@ -20,7 +20,7 @@ const STATUSES = ["active", "inactive", "all"] as const;
 type Status = (typeof STATUSES)[number];
 const VIEWS = ["grouped", "flat"] as const;
 type View = (typeof VIEWS)[number];
-const PRODUCT_MODAL_KEYS = ["productModal", "productId", "copyFrom", "sameTypeAs", "onlineProductId", "shopeeProductId"] as const;
+const PRODUCT_MODAL_KEYS = ["productModal", "productId", "copyFrom", "sameTypeAs", "onlineListing", "onlineProductId", "shopeeProductId"] as const;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function ProductsTab({ searchParams }: { searchParams: SP }) {
@@ -83,11 +83,12 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
 
 async function ShopeeListingModalShell({ searchParams }: { searchParams: SP }) {
   const productId = searchParams.onlineProductId ?? searchParams.shopeeProductId;
-  if (!productId) return null;
+  if (!productId && searchParams.onlineListing !== "1") return null;
+  if (!productId) return <ShopeeListingModal key="new-online-listing" product={null} closeHref={productModalHref(searchParams, {})} />;
   if (!UUID_RE.test(productId)) notFound();
   const product = await getProduct(productId);
   if (!product) notFound();
-  return <ShopeeListingModal product={product} closeHref={productModalHref(searchParams, {})} />;
+  return <ShopeeListingModal key={product.id} product={product} closeHref={productModalHref(searchParams, {})} />;
 }
 
 async function ProductEditorModal({ searchParams }: { searchParams: SP }) {

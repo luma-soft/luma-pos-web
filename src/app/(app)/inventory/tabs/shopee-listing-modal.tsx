@@ -1,13 +1,16 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "next-intl";
-import { Check, Loader2, Sparkles, UploadCloud, X } from "lucide-react";
+import { Check, Loader2, Search, Sparkles, Store, UploadCloud, X } from "lucide-react";
 import { generateShopeeListingAiFill, publishShopeeListing, saveShopeeListingDraft } from "@/lib/actions/marketplace";
+import { searchPosProducts } from "@/lib/actions/pos-search";
 import type { ProductDetail } from "@/lib/data/products";
+import type { PosProduct } from "@/lib/data/pos";
+import { categoryEmoji } from "@/lib/category-emoji";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 
 type FormState = {
@@ -33,40 +36,31 @@ type FormState = {
 
 const FIELD = "w-full rounded-lg border border-border bg-canvas px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20";
 const LABEL = "text-[10px] font-bold uppercase tracking-wide text-slate-500";
-const PROVIDERS = ["Shopee", "TikTok Shop", "Lazada", "Tiki"] as const;
+const PROVIDERS = [
+  { id: "shopee", name: "Shopee", ready: true },
+  { id: "tiktok_shop", name: "TikTok Shop", ready: false },
+  { id: "lazada", name: "Lazada", ready: false },
+  { id: "tiki", name: "Tiki", ready: false },
+] as const;
+type ProviderId = (typeof PROVIDERS)[number]["id"];
 
-export function ShopeeListingModal({ product, closeHref }: { product: ProductDetail; closeHref: string }) {
+export function ShopeeListingModal({ product, closeHref }: { product: ProductDetail | null; closeHref: string }) {
   const locale = useLocale();
   const L = locale === "vi";
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [pending, start] = useTransition();
   const [aiPending, startAi] = useTransition();
+  const [provider, setProvider] = useState<ProviderId>("shopee");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [aiSuggestionId, setAiSuggestionId] = useState<string | undefined>();
   const [editedFields, setEditedFields] = useState<string[]>([]);
-  const [form, setForm] = useState<FormState>({
-    title: product.name.slice(0, 120),
-    shortDescription: product.description?.slice(0, 300) ?? "",
-    description: product.description || `${product.name}\nSKU: ${product.sku}`,
-    categoryId: "",
-    categoryPath: product.categoryName ?? "",
-    brand: product.brandName ?? "",
-    sku: product.sku,
-    barcode: product.barcode ?? "",
-    price: Number(product.retailPrice),
-    compareAtPrice: 0,
-    stock: Number(product.totalStock),
-    weight: product.weight ? Number(product.weight) : 0,
-    dimensions: product.dimensions ?? "",
-    imageUrls: Array.isArray(product.imageUrls) ? product.imageUrls.join("\n") : "",
-    videoUrl: "",
-    syncMode: "luma_to_shopee",
-    minStockThreshold: 0,
-    outOfStockBehavior: "keep_visible",
-  });
+  const [form, setForm] = useState<FormState>(() => formFromProduct(product));
+
   const images = useMemo(() => form.imageUrls.split(/\n|,/).map((x) => x.trim()).filter(Boolean), [form.imageUrls]);
-  const canPublish = form.title.trim().length > 0 && form.description.trim().length >= 20 && form.price >= 0 && form.stock >= 0;
+  const canPublish = Boolean(product) && provider === "shopee" && form.title.trim().length > 0 && form.description.trim().length >= 20 && form.price >= 0 && form.stock >= 0;
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -76,6 +70,7 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
   }
 
   function payload(action: "draft" | "publish" | "update") {
+    if (!product) throw new Error("Product is required");
     return {
       productId: product.id,
       action,
@@ -115,6 +110,7 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
   }
 
   function autoFill() {
+    if (!product || provider !== "shopee") return;
     setError("");
     setMessage("");
     startAi(async () => {
@@ -141,6 +137,10 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
   }
 
   function save(action: "draft" | "publish") {
+    if (!product || provider !== "shopee") {
+      setError(L ? "Chọn sản phẩm và kênh Shopee trước khi lưu." : "Select a product and Shopee before saving.");
+      return;
+    }
     setError("");
     setMessage("");
     start(async () => {
@@ -162,7 +162,7 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
           <div className="min-w-0">
             <div className="text-[10px] font-bold uppercase tracking-wide text-primary-600">{L ? "Đăng sàn" : "List online"}</div>
-            <h2 className="truncate text-lg font-extrabold">{product.name}</h2>
+            <h2 className="truncate text-lg font-extrabold">{product ? product.name : (L ? "Tạo listing bán online" : "Create online listing")}</h2>
           </div>
           <Link href={closeHref} className="grid h-9 w-9 place-items-center rounded-full border border-border hover:bg-surface-2" aria-label="Close">
             <X className="h-4 w-4" />
@@ -172,36 +172,61 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
         <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[280px_1fr]">
           <aside className="border-b border-border bg-canvas p-4 lg:border-b-0 lg:border-r">
             <div className="relative h-52 overflow-hidden rounded-card border border-border bg-surface">
-              {images[0] ? <Image src={images[0]} alt={product.name} fill className="object-cover" unoptimized /> : <div className="grid h-full place-items-center text-slate-400"><UploadCloud className="h-9 w-9" /></div>}
+              {images[0] && product ? <Image src={images[0]} alt={product.name} fill className="object-cover" unoptimized /> : <div className="grid h-full place-items-center text-slate-400"><UploadCloud className="h-9 w-9" /></div>}
             </div>
             <div className="mt-3 space-y-2 text-sm">
-              <Info label="SKU" value={product.sku} />
-              <Info label={L ? "Giá Luma" : "Luma price"} value={formatCurrency(Number(product.retailPrice))} />
-              <Info label={L ? "Tồn" : "Stock"} value={`${formatNumber(Number(product.totalStock))} ${product.baseUnit}`} />
-              <Info label={L ? "Danh mục" : "Category"} value={product.categoryName ?? "—"} />
-              <Info label={L ? "Biến thể" : "Variants"} value={String(product.children.length)} />
+              {product ? (
+                <>
+                  <Info label="SKU" value={product.sku} />
+                  <Info label={L ? "Giá Luma" : "Luma price"} value={formatCurrency(Number(product.retailPrice))} />
+                  <Info label={L ? "Tồn" : "Stock"} value={`${formatNumber(Number(product.totalStock))} ${product.baseUnit}`} />
+                  <Info label={L ? "Danh mục" : "Category"} value={product.categoryName ?? "—"} />
+                  <Info label={L ? "Biến thể" : "Variants"} value={String(product.children.length)} />
+                </>
+              ) : (
+                <p className="text-sm text-slate-500">{L ? "Tìm và chọn sản phẩm để bắt đầu điền thông tin đăng bán." : "Search and select a product to start filling listing details."}</p>
+              )}
             </div>
           </aside>
 
           <main className="space-y-4 p-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex w-full flex-wrap gap-2">
-                {PROVIDERS.map((provider) => (
-                  <button
-                    key={provider}
-                    type="button"
-                    disabled={provider !== "Shopee"}
-                    className={cn(
-                      "rounded-full border px-3 py-1.5 text-xs font-bold",
-                      provider === "Shopee"
-                        ? "border-primary-600 bg-primary-50 text-primary-700 dark:bg-primary-950/40"
-                        : "border-border bg-surface-2 text-slate-400",
-                    )}
-                  >
-                    {provider}{provider !== "Shopee" ? ` · ${L ? "sắp hỗ trợ" : "soon"}` : ""}
-                  </button>
-                ))}
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1fr_220px]">
+              <ProductSearchInListing
+                L={L}
+                selectedProduct={product}
+                onSelect={(productId) => {
+                  const sp = new URLSearchParams(searchParams.toString());
+                  sp.set("tab", "products");
+                  sp.set("onlineListing", "1");
+                  sp.set("onlineProductId", productId);
+                  router.replace(`${pathname}?${sp.toString()}`, { scroll: false });
+                }}
+              />
+              <label className="flex flex-col gap-1">
+                <span className={LABEL}>{L ? "Kênh bán" : "Sales channel"}</span>
+                <select className={FIELD} value={provider} onChange={(event) => setProvider(event.target.value as ProviderId)}>
+                  {PROVIDERS.map((item) => (
+                    <option key={item.id} value={item.id}>{item.name}{item.ready ? "" : ` · ${L ? "sắp hỗ trợ" : "soon"}`}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            {provider !== "shopee" ? (
+              <div className="rounded-card border border-dashed border-border bg-canvas px-4 py-8 text-center">
+                <Store className="mx-auto h-8 w-8 text-slate-400" />
+                <h3 className="mt-3 text-sm font-extrabold">{providerName(provider)} {L ? "sắp hỗ trợ" : "coming soon"}</h3>
+                <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
+                  {L ? "Form sẽ đổi theo yêu cầu của từng sàn. Hiện tại chỉ Shopee có draft/publish queue." : "The form will adapt per marketplace. Only Shopee draft/publish queue is available right now."}
+                </p>
               </div>
+            ) : !product ? (
+              <div className="rounded-card border border-dashed border-border bg-canvas px-4 py-10 text-center text-sm text-slate-400">
+                {L ? "Chọn sản phẩm ở ô tìm kiếm để mở form Shopee." : "Select a product from search to open the Shopee form."}
+              </div>
+            ) : (
+              <>
+            <div className="flex flex-wrap items-center gap-2">
               <button type="button" disabled={aiPending} onClick={autoFill} className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50">
                 {aiPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                 {L ? "Auto fill bằng AI" : "Auto fill with AI"}
@@ -258,6 +283,8 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
             )}
 
             {(message || error) && <div className={cn("rounded-card px-4 py-3 text-sm font-semibold", error ? "bg-er-soft text-er" : "bg-ok-soft text-ok")}>{error || message}</div>}
+              </>
+            )}
           </main>
         </div>
 
@@ -284,4 +311,147 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Info({ label, value }: { label: string; value: string }) {
   return <div className="flex items-center justify-between gap-3"><span className="text-slate-500">{label}</span><span className="truncate font-semibold">{value}</span></div>;
+}
+
+function formFromProduct(product: ProductDetail | null): FormState {
+  if (!product) {
+    return {
+      title: "",
+      shortDescription: "",
+      description: "",
+      categoryId: "",
+      categoryPath: "",
+      brand: "",
+      sku: "",
+      barcode: "",
+      price: 0,
+      compareAtPrice: 0,
+      stock: 0,
+      weight: 0,
+      dimensions: "",
+      imageUrls: "",
+      videoUrl: "",
+      syncMode: "luma_to_shopee",
+      minStockThreshold: 0,
+      outOfStockBehavior: "keep_visible",
+    };
+  }
+  return {
+    title: product.name.slice(0, 120),
+    shortDescription: product.description?.slice(0, 300) ?? "",
+    description: product.description || `${product.name}\nSKU: ${product.sku}`,
+    categoryId: "",
+    categoryPath: product.categoryName ?? "",
+    brand: product.brandName ?? "",
+    sku: product.sku,
+    barcode: product.barcode ?? "",
+    price: Number(product.retailPrice),
+    compareAtPrice: 0,
+    stock: Number(product.totalStock),
+    weight: product.weight ? Number(product.weight) : 0,
+    dimensions: product.dimensions ?? "",
+    imageUrls: Array.isArray(product.imageUrls) ? product.imageUrls.join("\n") : "",
+    videoUrl: "",
+    syncMode: "luma_to_shopee",
+    minStockThreshold: 0,
+    outOfStockBehavior: "keep_visible",
+  };
+}
+
+function providerName(provider: ProviderId) {
+  return PROVIDERS.find((item) => item.id === provider)?.name ?? provider;
+}
+
+function ProductSearchInListing({
+  L,
+  selectedProduct,
+  onSelect,
+}: {
+  L: boolean;
+  selectedProduct: ProductDetail | null;
+  onSelect: (productId: string) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [results, setResults] = useState<PosProduct[]>([]);
+  const [isPending, startTransition] = useTransition();
+  const query = search.trim();
+
+  useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (cancelled) return;
+      if (!query) {
+        setResults([]);
+        return;
+      }
+      startTransition(async () => {
+        const rows = await searchPosProducts(query);
+        if (!cancelled) setResults(rows);
+      });
+    }, query ? 250 : 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [query]);
+
+  function choose(productId: string, label: string) {
+    setSearch(label);
+    setResults([]);
+    onSelect(productId);
+  }
+
+  return (
+    <div className="relative flex flex-col gap-1">
+      <span className={LABEL}>{L ? "Sản phẩm" : "Product"}</span>
+      <Search className="absolute left-3 top-[34px] z-10 h-4 w-4 text-slate-400" />
+      <input
+        type="text"
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        placeholder={selectedProduct ? selectedProduct.name : (L ? "Tìm theo tên, SKU hoặc barcode..." : "Search by name, SKU, or barcode...")}
+        className="h-10 w-full rounded-lg border border-border bg-canvas pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
+      />
+      {selectedProduct && !query && <div className="text-xs text-slate-500">{selectedProduct.sku} · {selectedProduct.categoryName ?? (L ? "Chưa có danh mục" : "No category")}</div>}
+      {(query || isPending) && (
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-auto rounded-xl border border-border bg-surface shadow-e2">
+          {isPending ? (
+            <div className="px-4 py-6 text-center text-sm text-slate-400">
+              <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />{L ? "Đang tìm..." : "Searching..."}</span>
+            </div>
+          ) : results.length === 0 ? (
+            <div className="px-4 py-6 text-center text-sm text-slate-400">{L ? "Không tìm thấy sản phẩm." : "No products found."}</div>
+          ) : (
+            <div className="divide-y divide-border-soft">
+              {results.map((product) => (
+                <button
+                  key={product.id}
+                  type="button"
+                  onClick={() => choose(product.id, product.name)}
+                  className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-surface-2"
+                >
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-lg">{categoryEmoji(product.categoryName)}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-semibold">{product.name}</div>
+                    <div className={cn("text-xs", Number(product.stock) <= 0 ? "text-er" : "text-slate-400")}>
+                      {product.isVariantParent ? `${product.children.length} SKU con` : `${product.sku} · ${L ? "Tồn" : "Stock"} ${formatNumber(Number(product.stock))} ${product.baseUnit}`}
+                    </div>
+                  </div>
+                  <span className="hidden w-36 shrink-0 truncate text-right text-sm font-semibold tabular-nums text-primary-600 sm:block">
+                    {product.isVariantParent ? variantPriceLabel(product) : `${formatCurrency(Number(product.retailPrice))}/${product.baseUnit}`}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function variantPriceLabel(product: PosProduct) {
+  const min = Number(product.minRetailPrice ?? product.retailPrice);
+  const max = Number(product.maxRetailPrice ?? product.retailPrice);
+  return min !== max ? `${formatCurrency(min)} - ${formatCurrency(max)}` : formatCurrency(max);
 }
