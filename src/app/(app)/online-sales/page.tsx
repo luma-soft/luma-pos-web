@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { getLocale } from "next-intl/server";
-import { ExternalLink, Inbox, Layers3, RefreshCw, Search, Send, ShoppingBag, Store } from "lucide-react";
+import { ExternalLink, Inbox, Layers3, RefreshCw, Send, ShoppingBag, Store } from "lucide-react";
 import { getShopeeDashboard, getShopeeInbox } from "@/lib/data/marketplace";
 import { sendMarketplaceMessage, updateMarketplaceShopSyncPolicy } from "@/lib/actions/marketplace";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { disconnectShopeeShop } from "@/lib/actions/marketplace";
+import { OnlineSalesProductSearch } from "./online-sales-product-search";
 
 type SP = Record<string, string | undefined>;
 type OnlineSalesTab = "overview" | "channels" | "listings" | "orders" | "inbox" | "sync";
@@ -290,19 +291,7 @@ function ListingsSection({ data, L }: { data: Awaited<ReturnType<typeof getShope
           <h2 className="text-sm font-extrabold">{L ? "Listing sản phẩm" : "Product listings"}</h2>
           <p className="text-xs text-slate-500">{L ? "Listing đã lưu draft hoặc publish theo từng kênh bán online." : "Drafted or published listings per online sales channel."}</p>
         </div>
-        <form action={Routes.Inventory} method="get" className="relative flex w-full items-center gap-2 lg:w-[420px]">
-          <input type="hidden" name="tab" value="products" />
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="search"
-            name="q"
-            className="h-10 min-w-0 flex-1 rounded-full border border-border bg-canvas pl-9 pr-4 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
-            placeholder={L ? "Tìm sản phẩm để đăng sàn..." : "Search products to list online..."}
-          />
-          <button type="submit" className="h-10 shrink-0 rounded-full bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110">
-            {L ? "Tìm" : "Search"}
-          </button>
-        </form>
+        <OnlineSalesProductSearch L={L} />
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] text-sm">
