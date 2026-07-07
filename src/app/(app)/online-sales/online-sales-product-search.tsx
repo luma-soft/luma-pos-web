@@ -67,14 +67,14 @@ export function OnlineSalesProductSearch({ L }: { L: boolean }) {
 
   return (
     <div ref={rootRef} className="relative w-full lg:w-[460px]">
-      <Search className="absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      <Search className="absolute left-3 top-1/2 z-30 h-4 w-4 -translate-y-1/2 text-slate-400" />
       <input
         type="text"
         value={search}
         onChange={(event) => setSearch(event.target.value)}
         onFocus={() => setBrowsing(true)}
         placeholder={L ? "Tìm sản phẩm để đăng sàn..." : "Search products to list online..."}
-        className="w-full rounded-xl border border-border bg-surface py-3 pl-10 pr-10 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
+        className="relative z-20 h-11 w-full rounded-xl border border-border bg-surface pl-10 pr-10 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
       />
 
       {showResults && (
@@ -82,14 +82,14 @@ export function OnlineSalesProductSearch({ L }: { L: boolean }) {
           type="button"
           onClick={closeSearch}
           title={L ? "Đóng" : "Close"}
-          className="absolute right-2 top-1/2 z-10 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-slate-400 hover:bg-surface-2 hover:text-slate-600"
+          className="absolute right-2 top-1/2 z-30 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-slate-400 hover:bg-surface-2 hover:text-slate-600"
         >
           <X className="h-4 w-4" />
         </button>
       )}
 
       {showResults && (
-        <div className="absolute left-0 right-0 top-full z-40 mt-1 max-h-[min(64dvh,520px)] overflow-auto rounded-xl border border-border bg-surface shadow-e2">
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 max-h-[min(48dvh,360px)] overflow-auto rounded-xl border border-border bg-surface shadow-e2">
           {isPending ? (
             <div className="px-4 py-6 text-center text-sm text-slate-400">
               <span className="inline-flex items-center gap-2">
@@ -102,15 +102,15 @@ export function OnlineSalesProductSearch({ L }: { L: boolean }) {
               {query ? (L ? "Không tìm thấy sản phẩm." : "No products found.") : (L ? "Nhập tên, SKU hoặc barcode sản phẩm." : "Type a product name, SKU, or barcode.")}
             </div>
           ) : (
-            <div className="py-1">
+            <div className="py-1.5">
               {results.slice(0, 60).map((product) => (
                 <button
                   key={product.id}
                   type="button"
                   onClick={() => openListing(product.id)}
-                  className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-surface-2"
+                  className="flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left hover:bg-surface-2"
                 >
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md bg-surface-2 text-lg">
+                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-lg">
                     {categoryEmoji(product.categoryName)}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -121,8 +121,8 @@ export function OnlineSalesProductSearch({ L }: { L: boolean }) {
                         : `${product.sku} · ${L ? "Tồn" : "Stock"} ${formatNumber(Number(product.stock))} ${product.baseUnit}`}
                     </div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-3">
-                    <span className="hidden text-right text-sm font-semibold tabular-nums text-primary-600 sm:block">
+                  <div className="flex w-36 shrink-0 items-center justify-end gap-3">
+                    <span className="hidden truncate text-right text-sm font-semibold tabular-nums text-primary-600 sm:block">
                       {product.isVariantParent ? variantPriceLabel(product) : `${formatCurrency(Number(product.retailPrice))}/${product.baseUnit}`}
                     </span>
                     <Store className="h-4 w-4 text-slate-400" />
