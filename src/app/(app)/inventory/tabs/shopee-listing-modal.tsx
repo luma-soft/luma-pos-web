@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "next-intl";
-import { Check, Loader2, Search, Sparkles, UploadCloud, X } from "lucide-react";
+import { Check, ChevronRight, Loader2, Search, Sparkles, UploadCloud, X } from "lucide-react";
 import { generateShopeeListingAiFill, publishShopeeListing, saveShopeeListingDraft } from "@/lib/actions/marketplace";
 import { searchPosProducts } from "@/lib/actions/pos-search";
 import type { ProductDetail } from "@/lib/data/products";
@@ -62,7 +62,7 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
   const [form, setForm] = useState<FormState>(() => formFromProduct(product));
 
   const images = useMemo(() => form.imageUrls.split(/\n|,/).map((x) => x.trim()).filter(Boolean), [form.imageUrls]);
-  const canPublish = Boolean(product) && provider === "shopee" && form.title.trim().length > 0 && form.description.trim().length >= 20 && form.price >= 0 && form.stock >= 0;
+  const canPublish = Boolean(product) && provider === "shopee" && form.categoryId.trim().length > 0 && form.title.trim().length > 0 && form.description.trim().length >= 20 && form.price >= 0 && form.stock >= 0;
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -292,6 +292,175 @@ function Info({ label, value }: { label: string; value: string }) {
   return <div className="flex items-center justify-between gap-3"><span className="text-slate-500">{label}</span><span className="truncate font-semibold">{value}</span></div>;
 }
 
+type ShopeeCategoryNode = {
+  id: string;
+  name: string;
+  children?: ShopeeCategoryNode[];
+};
+
+type ShopeeCategoryPick = {
+  id: string;
+  path: string;
+};
+
+function ShopeeCategoryPicker({ L, value, onChange }: { L: boolean; value: string; onChange: (category: ShopeeCategoryPick) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-sm font-semibold">
+        {L ? "Danh mục sản phẩm" : "Product category"} <span className="text-er">*</span>
+      </span>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={cn(
+          "flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-border bg-canvas px-3 text-left text-sm outline-none hover:bg-surface-2 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20",
+          !value && "text-slate-400",
+        )}
+      >
+        <span className="min-w-0 truncate">{value || (L ? "Chọn danh mục sản phẩm" : "Choose product category")}</span>
+        <ChevronRight className="h-4 w-4 rotate-90 text-slate-400" />
+      </button>
+      {open && <ShopeeCategoryDialog L={L} currentPath={value} onClose={() => setOpen(false)} onConfirm={(category) => { onChange(category); setOpen(false); }} />}
+    </div>
+  );
+}
+
+function ShopeeCategoryDialog({
+  L,
+  currentPath,
+  onClose,
+  onConfirm,
+}: {
+  L: boolean;
+  currentPath: string;
+  onClose: () => void;
+  onConfirm: (category: ShopeeCategoryPick) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [level1, setLevel1] = useState<ShopeeCategoryNode | null>(() => SHOPEE_CATEGORY_TREE.find((node) => currentPath.startsWith(node.name)) ?? null);
+  const [level2, setLevel2] = useState<ShopeeCategoryNode | null>(null);
+  const [selected, setSelected] = useState<ShopeeCategoryPick | null>(() => flattenShopeeCategories(SHOPEE_CATEGORY_TREE).find((category) => category.path === currentPath) ?? null);
+  const searchResults = useMemo(() => {
+    const q = normalizeCategorySearch(query);
+    if (!q) return [];
+    return flattenShopeeCategories(SHOPEE_CATEGORY_TREE).filter((category) => normalizeCategorySearch(category.path).includes(q)).slice(0, 30);
+  }, [query]);
+  const children = level1?.children ?? [];
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-3 sm:p-5">
+      <div className="flex h-[min(88dvh,760px)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
+        <div className="flex items-center justify-between gap-3 px-5 py-4">
+          <h3 className="text-xl font-extrabold">{L ? "Chọn danh mục sản phẩm" : "Choose product category"}</h3>
+          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full hover:bg-surface-2" aria-label="Close">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="px-5 pb-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              autoFocus
+              className="h-12 w-full rounded-lg border border-border bg-canvas pl-10 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
+              placeholder={L ? "Tìm kiếm" : "Search"}
+            />
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 overflow-hidden border-t border-border-soft">
+          {query.trim() ? (
+            <div className="h-full overflow-auto p-4">
+              {searchResults.length === 0 ? (
+                <div className="px-4 py-10 text-center text-sm text-slate-400">{L ? "Không tìm thấy danh mục." : "No categories found."}</div>
+              ) : searchResults.map((category) => (
+                <button
+                  key={category.id}
+                  type="button"
+                  onClick={() => setSelected(category)}
+                  className={cn(
+                    "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-2",
+                    selected?.id === category.id && "bg-primary-50 text-primary-700 dark:bg-primary-950/40",
+                  )}
+                >
+                  <span className="min-w-0 truncate">{category.path}</span>
+                  {selected?.id === category.id ? <Check className="h-4 w-4 text-primary-600" /> : null}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="grid h-full min-h-0 grid-cols-1 md:grid-cols-[320px_1fr]">
+              <div className="overflow-auto border-r border-border-soft py-2">
+                {SHOPEE_CATEGORY_TREE.map((node) => (
+                  <CategoryRow key={node.id} active={level1?.id === node.id} label={node.name} hasChildren onClick={() => { setLevel1(node); setLevel2(null); }} />
+                ))}
+              </div>
+              <div className="overflow-auto py-2">
+                {!level1 ? (
+                  <div className="px-5 py-10 text-sm text-slate-400">{L ? "Chọn danh mục cấp 1." : "Choose a top-level category."}</div>
+                ) : children.length === 0 ? (
+                  <CategoryRow active={selected?.id === level1.id} label={level1.name} onClick={() => setSelected(categoryPick(level1, []))} />
+                ) : children.map((child) => (
+                  <CategoryRow
+                    key={child.id}
+                    active={level2?.id === child.id || selected?.id === child.id}
+                    label={child.name}
+                    hasChildren={Boolean(child.children?.length)}
+                    onClick={() => {
+                      if (child.children?.length) setLevel2(child);
+                      else {
+                        setLevel2(child);
+                        setSelected(categoryPick(child, [level1.name]));
+                      }
+                    }}
+                  />
+                ))}
+                {level2?.children?.length ? (
+                  <div className="mt-3 border-t border-border-soft pt-2">
+                    {level2.children.map((child) => (
+                      <CategoryRow
+                        key={child.id}
+                        active={selected?.id === child.id}
+                        label={child.name}
+                        onClick={() => setSelected(categoryPick(child, [level1?.name ?? "", level2.name]))}
+                      />
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t border-border-soft px-5 py-4">
+          <button type="button" onClick={onClose} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2">{L ? "Bỏ qua" : "Skip"}</button>
+          <button
+            type="button"
+            disabled={!selected}
+            onClick={() => selected && onConfirm(selected)}
+            className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50"
+          >
+            {L ? "Xác nhận" : "Confirm"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CategoryRow({ active, label, hasChildren, onClick }: { active?: boolean; label: string; hasChildren?: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn("flex w-full items-center justify-between gap-3 px-5 py-3 text-left text-sm font-semibold hover:bg-surface-2", active && "bg-primary-50 text-primary-700 dark:bg-primary-950/40")}
+    >
+      <span className="min-w-0 truncate">{label}</span>
+      {hasChildren ? <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" /> : active ? <Check className="h-4 w-4 shrink-0 text-primary-600" /> : null}
+    </button>
+  );
+}
+
 function PricingRecommendation({
   L,
   provider,
@@ -378,6 +547,44 @@ function roundUpTo(baseCost: number, denominator: number, step: number) {
   return Math.ceil((baseCost / denominator) / step) * step;
 }
 
+const SHOPEE_CATEGORY_TREE: ShopeeCategoryNode[] = [
+  { id: "100630", name: "Thời Trang Nữ", children: [{ id: "100630-1", name: "Áo" }, { id: "100630-2", name: "Quần" }, { id: "100630-3", name: "Váy" }] },
+  { id: "100011", name: "Thời Trang Nam", children: [{ id: "100011-1", name: "Áo sơ mi" }, { id: "100011-2", name: "Áo thun" }, { id: "100011-3", name: "Quần nam" }] },
+  { id: "100630-beauty", name: "Sắc Đẹp", children: [{ id: "100630-beauty-1", name: "Chăm sóc da" }, { id: "100630-beauty-2", name: "Trang điểm" }, { id: "100630-beauty-3", name: "Nước hoa" }] },
+  { id: "100001", name: "Sức Khỏe", children: [{ id: "100001-1", name: "Thực phẩm chức năng" }, { id: "100001-2", name: "Chăm sóc sức khỏe" }] },
+  { id: "100017", name: "Phụ Kiện Thời Trang", children: [{ id: "100017-1", name: "Kính mắt" }, { id: "100017-2", name: "Đồng hồ" }, { id: "100017-3", name: "Trang sức" }] },
+  { id: "100010", name: "Thiết Bị Điện Gia Dụng", children: [{ id: "100010-1", name: "Đèn" }, { id: "100010-2", name: "Quạt" }, { id: "100010-3", name: "Thiết bị nhà bếp" }] },
+  { id: "100012", name: "Giày Dép Nam", children: [{ id: "100012-1", name: "Giày thể thao" }, { id: "100012-2", name: "Dép nam" }] },
+  { id: "100013", name: "Điện Thoại & Phụ Kiện", children: [{ id: "100013-1", name: "Điện thoại" }, { id: "100013-2", name: "Ốp lưng" }, { id: "100013-3", name: "Sạc & cáp" }] },
+  { id: "100014", name: "Du lịch & Hành lý", children: [{ id: "100014-1", name: "Vali" }, { id: "100014-2", name: "Túi du lịch" }] },
+  { id: "100015", name: "Túi Ví Nữ", children: [{ id: "100015-1", name: "Túi đeo chéo" }, { id: "100015-2", name: "Ví nữ" }] },
+  {
+    id: "100016",
+    name: "Nhà Cửa & Đời Sống",
+    children: [
+      { id: "100016-1", name: "Vật liệu xây dựng", children: [{ id: "100016-1-1", name: "Ống nước" }, { id: "100016-1-2", name: "Phụ kiện điện nước" }] },
+      { id: "100016-2", name: "Thiết bị điện", children: [{ id: "100016-2-1", name: "Át cài / CB điện" }, { id: "100016-2-2", name: "Ổ cắm & công tắc" }, { id: "100016-2-3", name: "Đèn điện" }] },
+    ],
+  },
+];
+
+function categoryPick(node: ShopeeCategoryNode, parents: string[]): ShopeeCategoryPick {
+  const path = [...parents, node.name].filter(Boolean).join("/");
+  return { id: node.id, path };
+}
+
+function flattenShopeeCategories(nodes: ShopeeCategoryNode[], parents: string[] = []): ShopeeCategoryPick[] {
+  return nodes.flatMap((node) => {
+    const current = categoryPick(node, parents);
+    const children = node.children ? flattenShopeeCategories(node.children, [...parents, node.name]) : [];
+    return node.children?.length ? children : [current];
+  });
+}
+
+function normalizeCategorySearch(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
 function ProviderListingFields({
   provider,
   form,
@@ -398,16 +605,35 @@ function ProviderListingFields({
 function ShopeeListingFields({ form, set, L }: { form: FormState; set: <K extends keyof FormState>(key: K, value: FormState[K]) => void; L: boolean }) {
   return (
     <>
-      <FormSection title={L ? "Shopee product" : "Shopee product"} note={L ? "Cần category_id, brand/attributes theo danh mục, ảnh đã upload sang Shopee, logistics và package." : "Requires category_id, category brand/attributes, Shopee-uploaded media, logistics, and package data."}>
+      <section className="space-y-3 rounded-card border border-border-soft bg-surface px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-extrabold">{L ? "Thông tin sàn Shopee" : "Shopee marketplace info"}</h3>
+            <p className="mt-1 text-xs text-slate-500">
+              {L ? "Cần category_id, brand/attributes theo danh mục, ảnh đã upload sang Shopee, logistics và package." : "Requires category_id, category brand/attributes, Shopee-uploaded media, logistics, and package data."}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2 text-[#ee4d2d]">
+            <span className="grid h-8 w-8 place-items-center rounded-md bg-[#ee4d2d] text-base font-extrabold text-white">S</span>
+            <span className="hidden text-lg font-semibold sm:block">Shopee</span>
+          </div>
+        </div>
+        <ShopeeCategoryPicker
+          L={L}
+          value={form.categoryId ? form.categoryPath : ""}
+          onChange={(category) => {
+            set("categoryId", category.id);
+            set("categoryPath", category.path);
+          }}
+        />
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <Field label={L ? "Tên sản phẩm Shopee" : "Shopee item name"}><input className={FIELD} value={form.title} maxLength={120} onChange={(e) => set("title", e.target.value)} /></Field>
-          <Field label={L ? "Shopee category_id / path" : "Shopee category_id / path"}><input className={FIELD} value={form.categoryPath} onChange={(e) => set("categoryPath", e.target.value)} placeholder={L ? "ID hoặc path từ Shopee category API" : "ID or path from Shopee category API"} /></Field>
           <Field label={L ? "Shopee brand_id / brand" : "Shopee brand_id / brand"}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
           <Field label="Seller SKU"><input className={FIELD} value={form.sku} onChange={(e) => set("sku", e.target.value)} /></Field>
           <Field label={L ? "Giá bán" : "Price"}><MoneyInput className={FIELD} value={form.price} min={0} onChange={(value) => set("price", value ?? 0)} /></Field>
           <Field label={L ? "Normal stock" : "Normal stock"}><input className={FIELD} type="number" min={0} value={form.stock} onChange={(e) => set("stock", Number(e.target.value))} /></Field>
         </div>
-      </FormSection>
+      </section>
 
       <FormSection title={L ? "Media, vận chuyển & thuộc tính" : "Media, logistics & attributes"} note={L ? "Ảnh cần chuyển thành image_id_list, logistic_info cần lấy từ shop logistics." : "Images should become image_id_list; logistic_info should come from shop logistics."}>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
