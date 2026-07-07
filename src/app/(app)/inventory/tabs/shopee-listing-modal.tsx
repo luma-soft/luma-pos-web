@@ -6,7 +6,7 @@ import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "next-intl";
 import { Check, ChevronRight, Loader2, Search, Sparkles, UploadCloud, X } from "lucide-react";
-import { generateShopeeListingAiFill, publishShopeeListing, saveShopeeListingDraft } from "@/lib/actions/marketplace";
+import { generateShopeeListingAiFill, loadShopeeCategoryAttributes, loadShopeeCategoryTree, loadShopeeLogisticsChannels, publishShopeeListing, saveShopeeListingDraft } from "@/lib/actions/marketplace";
 import { searchPosProducts } from "@/lib/actions/pos-search";
 import type { ProductDetail } from "@/lib/data/products";
 import type { PosProduct } from "@/lib/data/pos";
@@ -29,8 +29,10 @@ type FormState = {
   stock: number;
   weight: number;
   dimensions: string;
+  logisticId: string;
   imageUrls: string;
   videoUrl: string;
+  attributeValues: Record<string, string>;
   syncMode: "luma_to_shopee" | "shopee_to_luma" | "manual";
   minStockThreshold: number;
   outOfStockBehavior: "keep_visible" | "unlist" | "set_zero";
@@ -92,9 +94,10 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
       stock: Number(form.stock) || 0,
       weight: Number(form.weight) || undefined,
       dimensions: form.dimensions,
+      logisticId: form.logisticId,
       imageUrls: images,
       videoUrl: form.videoUrl,
-      attributes: { brand: form.brand, categoryPath: form.categoryPath },
+      attributes: { brand: form.brand, categoryPath: form.categoryPath, ...form.attributeValues },
       variants: product.children.map((child) => ({
         name: child.variantName || child.name,
         sku: child.sku,
@@ -303,8 +306,41 @@ type ShopeeCategoryPick = {
   path: string;
 };
 
+type ShopeeCategoryAttribute = {
+  id: string;
+  name: string;
+  mandatory: boolean;
+  inputType: string;
+  values: { id: string; name: string }[];
+};
+
+type ShopeeLogisticsChannel = {
+  id: string;
+  name: string;
+  enabled: boolean;
+};
+
 function ShopeeCategoryPicker({ L, value, onChange }: { L: boolean; value: string; onChange: (category: ShopeeCategoryPick) => void }) {
   const [open, setOpen] = useState(false);
+  const [tree, setTree] = useState<ShopeeCategoryNode[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  function openPicker() {
+    setOpen(true);
+    if (tree.length > 0 || loading) return;
+    setLoading(true);
+    setError("");
+    loadShopeeCategoryTree().then((res) => {
+      if (res.ok) {
+        setTree(res.data.tree);
+      } else {
+        setError(res.error);
+      }
+      setLoading(false);
+    });
+  }
+
   return (
     <div className="flex flex-col gap-1">
       <span className="text-sm font-semibold">
@@ -312,7 +348,7 @@ function ShopeeCategoryPicker({ L, value, onChange }: { L: boolean; value: strin
       </span>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={openPicker}
         className={cn(
           "flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-border bg-canvas px-3 text-left text-sm outline-none hover:bg-surface-2 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20",
           !value && "text-slate-400",
@@ -321,7 +357,17 @@ function ShopeeCategoryPicker({ L, value, onChange }: { L: boolean; value: strin
         <span className="min-w-0 truncate">{value || (L ? "Chọn danh mục sản phẩm" : "Choose product category")}</span>
         <ChevronRight className="h-4 w-4 rotate-90 text-slate-400" />
       </button>
-      {open && <ShopeeCategoryDialog L={L} currentPath={value} onClose={() => setOpen(false)} onConfirm={(category) => { onChange(category); setOpen(false); }} />}
+      {open && (
+        <ShopeeCategoryDialog
+          L={L}
+          currentPath={value}
+          tree={tree}
+          loading={loading}
+          error={error}
+          onClose={() => setOpen(false)}
+          onConfirm={(category) => { onChange(category); setOpen(false); }}
+        />
+      )}
     </div>
   );
 }
@@ -329,24 +375,32 @@ function ShopeeCategoryPicker({ L, value, onChange }: { L: boolean; value: strin
 function ShopeeCategoryDialog({
   L,
   currentPath,
+  tree,
+  loading,
+  error,
   onClose,
   onConfirm,
 }: {
   L: boolean;
   currentPath: string;
+  tree: ShopeeCategoryNode[];
+  loading: boolean;
+  error: string;
   onClose: () => void;
   onConfirm: (category: ShopeeCategoryPick) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [level1, setLevel1] = useState<ShopeeCategoryNode | null>(() => SHOPEE_CATEGORY_TREE.find((node) => currentPath.startsWith(node.name)) ?? null);
+  const [level1, setLevel1] = useState<ShopeeCategoryNode | null>(null);
   const [level2, setLevel2] = useState<ShopeeCategoryNode | null>(null);
-  const [selected, setSelected] = useState<ShopeeCategoryPick | null>(() => flattenShopeeCategories(SHOPEE_CATEGORY_TREE).find((category) => category.path === currentPath) ?? null);
+  const [selected, setSelected] = useState<ShopeeCategoryPick | null>(() => flattenShopeeCategories(tree).find((category) => category.path === currentPath) ?? null);
+  const activeLevel1 = level1 ?? tree.find((node) => currentPath.startsWith(node.name)) ?? tree[0] ?? null;
+
   const searchResults = useMemo(() => {
     const q = normalizeCategorySearch(query);
     if (!q) return [];
-    return flattenShopeeCategories(SHOPEE_CATEGORY_TREE).filter((category) => normalizeCategorySearch(category.path).includes(q)).slice(0, 30);
-  }, [query]);
-  const children = level1?.children ?? [];
+    return flattenShopeeCategories(tree).filter((category) => normalizeCategorySearch(category.path).includes(q)).slice(0, 30);
+  }, [query, tree]);
+  const children = activeLevel1?.children ?? [];
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-3 sm:p-5">
@@ -370,7 +424,18 @@ function ShopeeCategoryDialog({
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-hidden border-t border-border-soft">
-          {query.trim() ? (
+          {loading ? (
+            <div className="grid h-full place-items-center text-sm text-slate-500">
+              <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" />{L ? "Đang tải danh mục Shopee..." : "Loading Shopee categories..."}</span>
+            </div>
+          ) : error ? (
+            <div className="grid h-full place-items-center px-6 text-center text-sm text-er">
+              <div>
+                <div className="font-bold">{L ? "Không tải được danh mục Shopee" : "Could not load Shopee categories"}</div>
+                <div className="mt-1 text-xs text-slate-500">{error}</div>
+              </div>
+            </div>
+          ) : query.trim() ? (
             <div className="h-full overflow-auto p-4">
               {searchResults.length === 0 ? (
                 <div className="px-4 py-10 text-center text-sm text-slate-400">{L ? "Không tìm thấy danh mục." : "No categories found."}</div>
@@ -392,15 +457,17 @@ function ShopeeCategoryDialog({
           ) : (
             <div className="grid h-full min-h-0 grid-cols-1 md:grid-cols-[320px_1fr]">
               <div className="overflow-auto border-r border-border-soft py-2">
-                {SHOPEE_CATEGORY_TREE.map((node) => (
-                  <CategoryRow key={node.id} active={level1?.id === node.id} label={node.name} hasChildren onClick={() => { setLevel1(node); setLevel2(null); }} />
+                {tree.length === 0 ? (
+                  <div className="px-5 py-10 text-sm text-slate-400">{L ? "Chưa có danh mục Shopee." : "No Shopee categories."}</div>
+                ) : tree.map((node) => (
+                  <CategoryRow key={node.id} active={activeLevel1?.id === node.id} label={node.name} hasChildren={Boolean(node.children?.length)} onClick={() => { setLevel1(node); setLevel2(null); }} />
                 ))}
               </div>
               <div className="overflow-auto py-2">
-                {!level1 ? (
+                {!activeLevel1 ? (
                   <div className="px-5 py-10 text-sm text-slate-400">{L ? "Chọn danh mục cấp 1." : "Choose a top-level category."}</div>
                 ) : children.length === 0 ? (
-                  <CategoryRow active={selected?.id === level1.id} label={level1.name} onClick={() => setSelected(categoryPick(level1, []))} />
+                  <CategoryRow active={selected?.id === activeLevel1.id} label={activeLevel1.name} onClick={() => setSelected(categoryPick(activeLevel1, []))} />
                 ) : children.map((child) => (
                   <CategoryRow
                     key={child.id}
@@ -411,7 +478,7 @@ function ShopeeCategoryDialog({
                       if (child.children?.length) setLevel2(child);
                       else {
                         setLevel2(child);
-                        setSelected(categoryPick(child, [level1.name]));
+                        setSelected(categoryPick(child, [activeLevel1.name]));
                       }
                     }}
                   />
@@ -423,7 +490,7 @@ function ShopeeCategoryDialog({
                         key={child.id}
                         active={selected?.id === child.id}
                         label={child.name}
-                        onClick={() => setSelected(categoryPick(child, [level1?.name ?? "", level2.name]))}
+                        onClick={() => setSelected(categoryPick(child, [activeLevel1?.name ?? "", level2.name]))}
                       />
                     ))}
                   </div>
@@ -547,27 +614,6 @@ function roundUpTo(baseCost: number, denominator: number, step: number) {
   return Math.ceil((baseCost / denominator) / step) * step;
 }
 
-const SHOPEE_CATEGORY_TREE: ShopeeCategoryNode[] = [
-  { id: "100630", name: "Thời Trang Nữ", children: [{ id: "100630-1", name: "Áo" }, { id: "100630-2", name: "Quần" }, { id: "100630-3", name: "Váy" }] },
-  { id: "100011", name: "Thời Trang Nam", children: [{ id: "100011-1", name: "Áo sơ mi" }, { id: "100011-2", name: "Áo thun" }, { id: "100011-3", name: "Quần nam" }] },
-  { id: "100630-beauty", name: "Sắc Đẹp", children: [{ id: "100630-beauty-1", name: "Chăm sóc da" }, { id: "100630-beauty-2", name: "Trang điểm" }, { id: "100630-beauty-3", name: "Nước hoa" }] },
-  { id: "100001", name: "Sức Khỏe", children: [{ id: "100001-1", name: "Thực phẩm chức năng" }, { id: "100001-2", name: "Chăm sóc sức khỏe" }] },
-  { id: "100017", name: "Phụ Kiện Thời Trang", children: [{ id: "100017-1", name: "Kính mắt" }, { id: "100017-2", name: "Đồng hồ" }, { id: "100017-3", name: "Trang sức" }] },
-  { id: "100010", name: "Thiết Bị Điện Gia Dụng", children: [{ id: "100010-1", name: "Đèn" }, { id: "100010-2", name: "Quạt" }, { id: "100010-3", name: "Thiết bị nhà bếp" }] },
-  { id: "100012", name: "Giày Dép Nam", children: [{ id: "100012-1", name: "Giày thể thao" }, { id: "100012-2", name: "Dép nam" }] },
-  { id: "100013", name: "Điện Thoại & Phụ Kiện", children: [{ id: "100013-1", name: "Điện thoại" }, { id: "100013-2", name: "Ốp lưng" }, { id: "100013-3", name: "Sạc & cáp" }] },
-  { id: "100014", name: "Du lịch & Hành lý", children: [{ id: "100014-1", name: "Vali" }, { id: "100014-2", name: "Túi du lịch" }] },
-  { id: "100015", name: "Túi Ví Nữ", children: [{ id: "100015-1", name: "Túi đeo chéo" }, { id: "100015-2", name: "Ví nữ" }] },
-  {
-    id: "100016",
-    name: "Nhà Cửa & Đời Sống",
-    children: [
-      { id: "100016-1", name: "Vật liệu xây dựng", children: [{ id: "100016-1-1", name: "Ống nước" }, { id: "100016-1-2", name: "Phụ kiện điện nước" }] },
-      { id: "100016-2", name: "Thiết bị điện", children: [{ id: "100016-2-1", name: "Át cài / CB điện" }, { id: "100016-2-2", name: "Ổ cắm & công tắc" }, { id: "100016-2-3", name: "Đèn điện" }] },
-    ],
-  },
-];
-
 function categoryPick(node: ShopeeCategoryNode, parents: string[]): ShopeeCategoryPick {
   const path = [...parents, node.name].filter(Boolean).join("/");
   return { id: node.id, path };
@@ -603,6 +649,55 @@ function ProviderListingFields({
 }
 
 function ShopeeListingFields({ form, set, L }: { form: FormState; set: <K extends keyof FormState>(key: K, value: FormState[K]) => void; L: boolean }) {
+  const [attributes, setAttributes] = useState<ShopeeCategoryAttribute[]>([]);
+  const [attributesLoading, setAttributesLoading] = useState(false);
+  const [attributesError, setAttributesError] = useState("");
+  const [logistics, setLogistics] = useState<ShopeeLogisticsChannel[]>([]);
+  const [logisticsLoading, setLogisticsLoading] = useState(true);
+  const [logisticsError, setLogisticsError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    loadShopeeLogisticsChannels().then((res) => {
+      if (cancelled) return;
+      if (res.ok) {
+        setLogistics(res.data.channels);
+      } else {
+        setLogisticsError(res.error);
+      }
+      setLogisticsLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function loadCategoryAttributes(categoryId: string) {
+    setAttributes([]);
+    setAttributesError("");
+    if (!categoryId) return;
+    setAttributesLoading(true);
+    loadShopeeCategoryAttributes(categoryId).then((res) => {
+      if (res.ok) {
+        setAttributes(res.data.attributes);
+      } else {
+        setAttributesError(res.error);
+      }
+      setAttributesLoading(false);
+    });
+  }
+
+  function setAttribute(attributeId: string, value: string) {
+    set("attributeValues", { ...form.attributeValues, [attributeId]: value });
+  }
+
+  function selectCategory(category: ShopeeCategoryPick) {
+    set("categoryId", category.id);
+    set("categoryPath", category.path);
+    set("attributeValues", {});
+    loadCategoryAttributes(category.id);
+  }
+
   return (
     <>
       <section className="space-y-3 rounded-card border border-border-soft bg-surface px-4 py-3">
@@ -621,10 +716,7 @@ function ShopeeListingFields({ form, set, L }: { form: FormState; set: <K extend
         <ShopeeCategoryPicker
           L={L}
           value={form.categoryId ? form.categoryPath : ""}
-          onChange={(category) => {
-            set("categoryId", category.id);
-            set("categoryPath", category.path);
-          }}
+          onChange={selectCategory}
         />
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <Field label={L ? "Tên sản phẩm Shopee" : "Shopee item name"}><input className={FIELD} value={form.title} maxLength={120} onChange={(e) => set("title", e.target.value)} /></Field>
@@ -632,7 +724,67 @@ function ShopeeListingFields({ form, set, L }: { form: FormState; set: <K extend
           <Field label="Seller SKU"><input className={FIELD} value={form.sku} onChange={(e) => set("sku", e.target.value)} /></Field>
           <Field label={L ? "Giá bán" : "Price"}><MoneyInput className={FIELD} value={form.price} min={0} onChange={(value) => set("price", value ?? 0)} /></Field>
           <Field label={L ? "Normal stock" : "Normal stock"}><input className={FIELD} type="number" min={0} value={form.stock} onChange={(e) => set("stock", Number(e.target.value))} /></Field>
+          <Field label={L ? "Kênh vận chuyển" : "Logistics channel"}>
+            {logistics.length > 0 ? (
+              <Select
+                value={form.logisticId}
+                onValueChange={(value) => set("logisticId", value)}
+                options={[
+                  { value: "", label: L ? "Chọn kênh vận chuyển" : "Choose logistics channel" },
+                  ...logistics.filter((channel) => channel.enabled).map((channel) => ({ value: channel.id, label: channel.name })),
+                ]}
+                className="w-full"
+              />
+            ) : (
+              <div className={cn(FIELD, "flex h-10 items-center text-slate-400")}>
+                {logisticsLoading ? (L ? "Đang tải kênh vận chuyển..." : "Loading logistics...") : logisticsError || (L ? "Chưa có dữ liệu logistics" : "No logistics data")}
+              </div>
+            )}
+          </Field>
         </div>
+        {form.categoryId && (
+          <div className="rounded-card border border-border-soft bg-canvas p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className={LABEL}>{L ? "Attributes theo danh mục Shopee" : "Shopee category attributes"}</div>
+                <p className="mt-1 text-xs text-slate-500">
+                  {L ? "Field bắt buộc sẽ đổi theo category đã chọn." : "Required fields change based on the selected category."}
+                </p>
+              </div>
+              {attributesLoading && <Loader2 className="h-4 w-4 animate-spin text-slate-400" />}
+            </div>
+            {attributesError ? (
+              <div className="mt-3 rounded-lg bg-er-soft px-3 py-2 text-xs font-semibold text-er">{attributesError}</div>
+            ) : attributes.length === 0 && !attributesLoading ? (
+              <div className="mt-3 text-xs text-slate-400">{L ? "Shopee không trả về attribute cho danh mục này." : "Shopee returned no attributes for this category."}</div>
+            ) : (
+              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                {attributes.filter((attribute) => attribute.mandatory).slice(0, 12).map((attribute) => (
+                  <Field key={attribute.id} label={`${attribute.name} *`}>
+                    {attribute.values.length > 0 ? (
+                      <Select
+                        value={form.attributeValues[attribute.id] ?? ""}
+                        onValueChange={(value) => setAttribute(attribute.id, value)}
+                        options={[
+                          { value: "", label: L ? "Chọn giá trị" : "Choose value" },
+                          ...attribute.values.slice(0, 80).map((value) => ({ value: value.id, label: value.name })),
+                        ]}
+                        className="w-full"
+                      />
+                    ) : (
+                      <input
+                        className={FIELD}
+                        value={form.attributeValues[attribute.id] ?? ""}
+                        onChange={(event) => setAttribute(attribute.id, event.target.value)}
+                        placeholder={attribute.inputType || (L ? "Nhập giá trị" : "Enter value")}
+                      />
+                    )}
+                  </Field>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       <FormSection title={L ? "Media, vận chuyển & thuộc tính" : "Media, logistics & attributes"} note={L ? "Ảnh cần chuyển thành image_id_list, logistic_info cần lấy từ shop logistics." : "Images should become image_id_list; logistic_info should come from shop logistics."}>
@@ -641,8 +793,8 @@ function ShopeeListingFields({ form, set, L }: { form: FormState; set: <K extend
           <Field label={L ? "Mô tả Shopee" : "Shopee description"}><textarea className={cn(FIELD, "min-h-24")} value={form.description} onChange={(e) => set("description", e.target.value)} /></Field>
           <Field label={L ? "Khối lượng gói hàng (kg)" : "Package weight (kg)"}><input className={FIELD} type="number" min={0} value={form.weight} onChange={(e) => set("weight", Number(e.target.value))} /></Field>
           <Field label={L ? "Kích thước D x R x C (cm)" : "Dimensions L x W x H (cm)"}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} placeholder="20 x 10 x 8" /></Field>
-          <Field label={L ? "Logistic IDs" : "Logistic IDs"}><input className={FIELD} placeholder={L ? "VD: 5001, 5002" : "Example: 5001, 5002"} /></Field>
-          <Field label={L ? "Attributes theo danh mục" : "Category attributes"}><textarea className={cn(FIELD, "min-h-20 font-mono text-xs")} value={`brand=${form.brand}\ncategoryPath=${form.categoryPath}`} readOnly /></Field>
+          <Field label={L ? "Logistic ID" : "Logistic ID"}><input className={FIELD} value={form.logisticId} onChange={(e) => set("logisticId", e.target.value)} placeholder={L ? "Tự lấy từ kênh vận chuyển phía trên" : "Auto-filled from logistics selector above"} /></Field>
+          <Field label={L ? "Payload attributes" : "Payload attributes"}><textarea className={cn(FIELD, "min-h-20 font-mono text-xs")} value={JSON.stringify({ brand: form.brand, categoryPath: form.categoryPath, ...form.attributeValues }, null, 2)} readOnly /></Field>
         </div>
       </FormSection>
       <SyncFields form={form} set={set} L={L} />
@@ -789,8 +941,10 @@ function formFromProduct(product: ProductDetail | null): FormState {
       stock: 0,
       weight: 0,
       dimensions: "",
+      logisticId: "",
       imageUrls: "",
       videoUrl: "",
+      attributeValues: {},
       syncMode: "luma_to_shopee",
       minStockThreshold: 0,
       outOfStockBehavior: "keep_visible",
@@ -810,8 +964,10 @@ function formFromProduct(product: ProductDetail | null): FormState {
     stock: Number(product.totalStock),
     weight: product.weight ? Number(product.weight) : 0,
     dimensions: product.dimensions ?? "",
+    logisticId: "",
     imageUrls: Array.isArray(product.imageUrls) ? product.imageUrls.join("\n") : "",
     videoUrl: "",
+    attributeValues: {},
     syncMode: "luma_to_shopee",
     minStockThreshold: 0,
     outOfStockBehavior: "keep_visible",

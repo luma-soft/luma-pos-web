@@ -24,6 +24,7 @@ export const shopeeListingDraftSchema = z.object({
   stock: z.number().min(0),
   weight: z.number().min(0).optional(),
   dimensions: z.string().trim().max(120).default(""),
+  logisticId: z.string().trim().max(80).default(""),
   imageUrls: z.array(z.string().trim().max(1000)).max(12).default([]),
   videoUrl: z.string().trim().max(1000).default(""),
   attributes: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(z.string())])).default({}),

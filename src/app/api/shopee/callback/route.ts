@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { marketplaceShops } from "@/db/schema";
+import { marketplaceShops, marketplaceTokens } from "@/db/schema";
 import { Routes } from "@/lib/routes";
+import { exchangeShopeeAuthorizationCode } from "@/lib/shopee/client";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -17,7 +18,7 @@ export async function GET(req: Request) {
   }
 
   try {
-    await db.insert(marketplaceShops)
+    const [shopRow] = await db.insert(marketplaceShops)
       .values({
         provider: "shopee",
         shopId,
@@ -36,7 +37,46 @@ export async function GET(req: Request) {
           lastError: null,
           updatedAt: sql`now()`,
         },
-      });
+      })
+      .returning({ id: marketplaceShops.id });
+
+    if (code && shopRow?.id) {
+      try {
+        const token = await exchangeShopeeAuthorizationCode({ code, shopId });
+        const expiresAt = token.expireIn ? new Date(Date.now() + token.expireIn * 1000) : null;
+        await db.insert(marketplaceTokens)
+          .values({
+            shopId: shopRow.id,
+            accessToken: token.accessToken,
+            refreshToken: token.refreshToken,
+            expiresAt,
+            scopes: ["product", "order", "chat", "logistics"],
+          })
+          .onConflictDoUpdate({
+            target: [marketplaceTokens.shopId],
+            set: {
+              accessToken: token.accessToken,
+              refreshToken: token.refreshToken,
+              expiresAt,
+              scopes: ["product", "order", "chat", "logistics"],
+              updatedAt: sql`now()`,
+            },
+          });
+        await db.update(marketplaceShops).set({
+          status: "connected",
+          tokenExpiresAt: expiresAt,
+          metadata: { authorizationCodeReceived: true, tokenExchange: "ok" },
+          updatedAt: sql`now()`,
+        }).where(eq(marketplaceShops.id, shopRow.id));
+      } catch (tokenError) {
+        await db.update(marketplaceShops).set({
+          status: "authorized",
+          lastError: tokenError instanceof Error ? tokenError.message : "token_exchange_failed",
+          metadata: { authorizationCodeReceived: true, tokenExchange: "failed" },
+          updatedAt: sql`now()`,
+        }).where(eq(marketplaceShops.id, shopRow.id));
+      }
+    }
   } catch {
     const target = new URL(Routes.OnlineSales, url.origin);
     target.searchParams.set("tab", "channels");

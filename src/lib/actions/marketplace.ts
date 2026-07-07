@@ -36,6 +36,7 @@ import {
   type ShopeeListingDraftInput,
 } from "@/lib/schemas/marketplace";
 import { Routes } from "@/lib/routes";
+import { getShopeeAttributes, getShopeeCategories, getShopeeLogisticsChannels, type ShopeeApiCategory } from "@/lib/shopee/client";
 import { generateCode, requireManager, requireOwner, toMoney, toQty, type ActionResult } from "./common";
 
 function numberFrom(value: unknown, fallback = 0) {
@@ -79,6 +80,42 @@ function fallbackListingSuggestion(product: {
     tags: [product.categoryName, product.brandName, product.sku].filter(Boolean),
     shippingNotes: product.weight ? `Weight from LumaPOS: ${product.weight}` : "Check weight before publishing.",
   };
+}
+
+type CategoryTreeNode = {
+  id: string;
+  name: string;
+  children?: CategoryTreeNode[];
+};
+
+function buildCategoryTree(categories: ShopeeApiCategory[]): CategoryTreeNode[] {
+  const nodes = new Map<string, CategoryTreeNode>();
+  const parentIds = new Map<string, string>();
+  for (const category of categories) {
+    nodes.set(category.id, { id: category.id, name: category.name });
+    parentIds.set(category.id, category.parentId);
+  }
+  const roots: CategoryTreeNode[] = [];
+  for (const category of categories) {
+    const node = nodes.get(category.id);
+    if (!node) continue;
+    const parentId = parentIds.get(category.id) || "0";
+    const parent = parentId !== "0" ? nodes.get(parentId) : null;
+    if (parent) {
+      parent.children = parent.children ?? [];
+      parent.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  }
+  const sortTree = (items: CategoryTreeNode[]) => {
+    items.sort((a, b) => a.name.localeCompare(b.name, "vi"));
+    for (const item of items) {
+      if (item.children) sortTree(item.children);
+    }
+  };
+  sortTree(roots);
+  return roots;
 }
 
 async function getProductForListing(productId: string) {
@@ -245,6 +282,44 @@ export async function updateMarketplaceShopSyncPolicy(input: MarketplaceShopSync
   } catch (e) {
     console.error("updateMarketplaceShopSyncPolicy failed:", e);
     return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function loadShopeeCategoryTree(): Promise<ActionResult<{ tree: CategoryTreeNode[] }>> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  try {
+    const categories = await getShopeeCategories();
+    return { ok: true, data: { tree: buildCategoryTree(categories) } };
+  } catch (e) {
+    console.error("loadShopeeCategoryTree failed:", e);
+    return { ok: false, error: e instanceof Error ? e.message : "marketplace.errors.categoryLoadFailed" };
+  }
+}
+
+export async function loadShopeeCategoryAttributes(categoryId: string): Promise<ActionResult<{ attributes: Awaited<ReturnType<typeof getShopeeAttributes>> }>> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const id = categoryId.trim();
+  if (!id) return { ok: false, error: "errors.invalidData" };
+  try {
+    const attributes = await getShopeeAttributes(id);
+    return { ok: true, data: { attributes } };
+  } catch (e) {
+    console.error("loadShopeeCategoryAttributes failed:", e);
+    return { ok: false, error: e instanceof Error ? e.message : "marketplace.errors.attributeLoadFailed" };
+  }
+}
+
+export async function loadShopeeLogisticsChannels(): Promise<ActionResult<{ channels: Awaited<ReturnType<typeof getShopeeLogisticsChannels>> }>> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  try {
+    const channels = await getShopeeLogisticsChannels();
+    return { ok: true, data: { channels } };
+  } catch (e) {
+    console.error("loadShopeeLogisticsChannels failed:", e);
+    return { ok: false, error: e instanceof Error ? e.message : "marketplace.errors.logisticsLoadFailed" };
   }
 }
 
