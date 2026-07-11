@@ -8,6 +8,9 @@ import { db } from "./index";
 import {
   brands, categories, customers, orders, orderItems, payments, products,
   projects, stockLevels, warehouses, cashTransactions,
+  marketplaceShops, marketplaceTokens, marketplaceProductMappings,
+  marketplaceOrderMappings, marketplaceMessageThreads, marketplaceMessages,
+  marketplaceSyncJobs,
 } from "./schema";
 
 const money = (n: number) => n.toFixed(2);
@@ -22,7 +25,8 @@ async function findOrCreate<T extends { id: string }>(
 async function seedDemo() {
   const [{ c: orderCount }] = await db.select({ c: sql<number>`count(*)::int` }).from(orders);
   if (orderCount > 0) {
-    console.log("⚠️  DB đã có đơn hàng — bỏ qua seed demo (xóa orders trước nếu muốn chạy lại).");
+    console.log("⚠️  DB đã có đơn hàng — chỉ bổ sung demo Bán online/Shopee nếu thiếu.");
+    await seedMarketplaceDemo();
     process.exit(0);
   }
 
@@ -181,8 +185,251 @@ async function seedDemo() {
   }
 
   console.log(`✅ Demo: ${ORDERS.length} đơn / 7 ngày, công nợ Tuấn ${(debtAcc["KH-TUAN"] / 1e6).toFixed(2)}tr · Minh Phát ${(debtAcc["KH-MPHAT"] / 1e6).toFixed(2)}tr · Bảy ${(debtAcc["KH-BAY"] / 1e6).toFixed(2)}tr`);
+  await seedMarketplaceDemo();
   console.log("   Dashboard giờ sẽ hiển thị giống design mockup.");
   process.exit(0);
+}
+
+async function seedMarketplaceDemo() {
+  const productRows = await db
+    .select({
+      id: products.id,
+      sku: products.sku,
+      name: products.name,
+      retailPrice: products.retailPrice,
+      totalStock: products.totalStock,
+      categoryName: sql<string | null>`(select name from categories where id = ${products.categoryId} limit 1)`,
+    })
+    .from(products)
+    .orderBy(products.createdAt)
+    .limit(3);
+  if (productRows.length === 0) {
+    console.log("   ⚠️  Chưa có sản phẩm nên bỏ qua demo Shopee.");
+    return;
+  }
+
+  const [shop] = await db.insert(marketplaceShops)
+    .values({
+      provider: "shopee",
+      shopId: "demo-review-shop",
+      shopName: "Shopee Demo Review Shop",
+      region: "VN",
+      status: "connected",
+      connectedAt: new Date(),
+      tokenExpiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+      metadata: {
+        mode: "demo",
+        reviewAccount: true,
+        note: "Demo shop for Shopee Open Platform reviewer trial account.",
+      },
+    })
+    .onConflictDoUpdate({
+      target: [marketplaceShops.provider, marketplaceShops.shopId],
+      set: {
+        shopName: "Shopee Demo Review Shop",
+        status: "connected",
+        disconnectedAt: null,
+        lastError: null,
+        metadata: {
+          mode: "demo",
+          reviewAccount: true,
+          note: "Demo shop for Shopee Open Platform reviewer trial account.",
+        },
+        updatedAt: sql`now()`,
+      },
+    })
+    .returning({ id: marketplaceShops.id });
+
+  await db.insert(marketplaceTokens).values({
+    shopId: shop.id,
+    accessToken: "demo-access-token",
+    refreshToken: "demo-refresh-token",
+    expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+    scopes: ["product", "order", "chat", "logistics"],
+  }).onConflictDoUpdate({
+    target: [marketplaceTokens.shopId],
+    set: {
+      accessToken: "demo-access-token",
+      refreshToken: "demo-refresh-token",
+      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+      scopes: ["product", "order", "chat", "logistics"],
+      updatedAt: sql`now()`,
+    },
+  });
+
+  for (const [index, product] of productRows.entries()) {
+    const categoryId = index === 0 ? "1000160101" : index === 1 ? "1000160102" : "1000100101";
+    const categoryPath = index === 0
+      ? "Nhà Cửa & Đời Sống/Vật liệu xây dựng/Gạch ốp lát"
+      : index === 1
+        ? "Nhà Cửa & Đời Sống/Vật liệu xây dựng/Ống nước & phụ kiện"
+        : "Thiết Bị Điện Gia Dụng/Thiết bị điện/Át cài / CB điện";
+    const status = index === 0 ? "published" : index === 1 ? "draft" : "ready";
+    const externalItemId = status === "published" ? `demo-item-${product.sku}` : null;
+    const payload = {
+      provider: "shopee",
+      demo: true,
+      productId: product.id,
+      shopId: shop.id,
+      title: product.name,
+      sku: product.sku,
+      categoryId,
+      categoryPath,
+      price: Number(product.retailPrice),
+      stock: Number(product.totalStock),
+      logisticId: "5001",
+      attributes: {
+        brand: "Demo Brand",
+        categoryPath,
+        material: product.categoryName ?? "VLXD",
+      },
+    };
+    const [mapping] = await db.insert(marketplaceProductMappings)
+      .values({
+        provider: "shopee",
+        shopId: shop.id,
+        productId: product.id,
+        externalItemId,
+        externalSku: product.sku,
+        status,
+        title: product.name,
+        categoryId,
+        categoryPath,
+        price: money(Number(product.retailPrice)),
+        stock: qty(Number(product.totalStock)),
+        syncMode: "luma_to_shopee",
+        draftPayload: payload,
+        lastPayload: status === "published" ? payload : null,
+        lastResponse: status === "published" ? { status: "demo_synced", externalItemId, message: "Demo listing visible for Shopee review." } : null,
+        lastSyncAt: status === "published" ? new Date() : null,
+      })
+      .onConflictDoUpdate({
+        target: [marketplaceProductMappings.provider, marketplaceProductMappings.productId],
+        set: {
+          shopId: shop.id,
+          externalItemId,
+          externalSku: product.sku,
+          status,
+          title: product.name,
+          categoryId,
+          categoryPath,
+          price: money(Number(product.retailPrice)),
+          stock: qty(Number(product.totalStock)),
+          draftPayload: payload,
+          lastPayload: status === "published" ? payload : null,
+          lastResponse: status === "published" ? { status: "demo_synced", externalItemId, message: "Demo listing visible for Shopee review." } : null,
+          lastSyncAt: status === "published" ? new Date() : null,
+          lastError: null,
+          updatedAt: sql`now()`,
+        },
+      })
+      .returning({ id: marketplaceProductMappings.id });
+
+    await db.insert(marketplaceSyncJobs).values({
+      provider: "shopee",
+      shopId: shop.id,
+      jobType: status === "published" ? "listing_publish" : "listing_validate",
+      status: status === "published" ? "completed" : "pending",
+      idempotencyKey: `demo:shopee:${product.sku}:${status}`,
+      payload: { ...payload, mappingId: mapping.id },
+      lastResponse: status === "published" ? { status: "ok", message: "Demo sync completed." } : null,
+    }).onConflictDoUpdate({
+      target: [marketplaceSyncJobs.provider, marketplaceSyncJobs.idempotencyKey],
+      set: {
+        shopId: shop.id,
+        status: status === "published" ? "completed" : "pending",
+        payload: { ...payload, mappingId: mapping.id },
+        lastResponse: status === "published" ? { status: "ok", message: "Demo sync completed." } : null,
+        updatedAt: sql`now()`,
+      },
+    });
+  }
+
+  const [order] = await db.select({ id: orders.id, code: orders.code }).from(orders).orderBy(sql`${orders.createdAt} desc`).limit(1);
+  if (order) {
+    await db.insert(marketplaceOrderMappings).values({
+      provider: "shopee",
+      shopId: shop.id,
+      orderId: order.id,
+      externalOrderSn: "SHP-DEMO-ORDER-001",
+      externalStatus: "READY_TO_SHIP",
+      rawPayload: {
+        demo: true,
+        order_sn: "SHP-DEMO-ORDER-001",
+        status: "READY_TO_SHIP",
+        lumaOrderCode: order.code,
+      },
+    }).onConflictDoUpdate({
+      target: [marketplaceOrderMappings.provider, marketplaceOrderMappings.externalOrderSn],
+      set: {
+        shopId: shop.id,
+        orderId: order.id,
+        externalStatus: "READY_TO_SHIP",
+        updatedAt: sql`now()`,
+      },
+    });
+
+    await db.insert(marketplaceSyncJobs).values({
+      provider: "shopee",
+      shopId: shop.id,
+      jobType: "order_import",
+      status: "completed",
+      idempotencyKey: "demo:shopee:order:SHP-DEMO-ORDER-001",
+      payload: { demo: true, orderSn: "SHP-DEMO-ORDER-001", lumaOrderId: order.id },
+      lastResponse: { status: "ok", message: "Demo Shopee order imported into LumaPOS." },
+    }).onConflictDoUpdate({
+      target: [marketplaceSyncJobs.provider, marketplaceSyncJobs.idempotencyKey],
+      set: {
+        shopId: shop.id,
+        status: "completed",
+        payload: { demo: true, orderSn: "SHP-DEMO-ORDER-001", lumaOrderId: order.id },
+        lastResponse: { status: "ok", message: "Demo Shopee order imported into LumaPOS." },
+        updatedAt: sql`now()`,
+      },
+    });
+
+    const [thread] = await db.insert(marketplaceMessageThreads).values({
+      provider: "shopee",
+      shopId: shop.id,
+      externalThreadId: "SHP-DEMO-THREAD-001",
+      externalBuyerId: "demo-buyer-001",
+      buyerName: "Shopee demo buyer",
+      orderId: order.id,
+      status: "open",
+      lastMessageAt: new Date(),
+      metadata: { demo: true, reviewAccount: true },
+    }).onConflictDoUpdate({
+      target: [marketplaceMessageThreads.provider, marketplaceMessageThreads.externalThreadId],
+      set: {
+        shopId: shop.id,
+        orderId: order.id,
+        status: "open",
+        lastMessageAt: new Date(),
+        updatedAt: sql`now()`,
+      },
+    }).returning({ id: marketplaceMessageThreads.id });
+
+    await db.insert(marketplaceMessages).values([
+      {
+        threadId: thread.id,
+        externalMessageId: "SHP-DEMO-MSG-001",
+        direction: "in",
+        body: "Shop ơi đơn này khi nào giao?",
+        rawPayload: { demo: true },
+        sentAt: new Date(Date.now() - 1000 * 60 * 12),
+      },
+      {
+        threadId: thread.id,
+        externalMessageId: "SHP-DEMO-MSG-002",
+        direction: "out",
+        body: "LumaPOS đã nhận đơn Shopee, kho đang chuẩn bị hàng và sẽ cập nhật vận chuyển trong hôm nay.",
+        rawPayload: { demo: true, queuedToShopee: true },
+        sentAt: new Date(Date.now() - 1000 * 60 * 5),
+      },
+    ]).onConflictDoNothing();
+  }
+
+  console.log("   ✅ Demo Shopee: shop, listings, sync logs, order mapping và inbox đã sẵn sàng.");
 }
 
 function hash(s: string): number {

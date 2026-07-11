@@ -31,7 +31,7 @@ export default async function OnlineSalesPage({ searchParams }: { searchParams: 
   const [data, inbox] = await Promise.all([getShopeeDashboard(), getShopeeInbox()]);
   const shop = data.shop;
   const connectedChannels = shop && ["connected", "authorized"].includes(shop.status) ? 1 : 0;
-  const onlineOrderCount = data.jobs.filter((job) => job.jobType.includes("order")).length;
+  const onlineOrderCount = data.orderMappings.length;
   const listingProduct = params.onlineProductId && UUID_RE.test(params.onlineProductId) ? await getProduct(params.onlineProductId) : null;
 
   return (
@@ -123,7 +123,7 @@ export default async function OnlineSalesPage({ searchParams }: { searchParams: 
       )}
 
       {tab === "listings" || tab === "overview" ? <ListingsSection data={data} L={L} tab={tab} /> : null}
-      {tab === "orders" && <OnlineOrdersSection L={L} />}
+      {tab === "orders" && <OnlineOrdersSection rows={data.orderMappings} L={L} />}
       {tab === "inbox" && <InboxSection threads={inbox.threads} L={L} />}
       {tab === "sync" || tab === "overview" ? <SyncSection jobs={data.jobs} L={L} /> : null}
       {params.onlineListing === "1" && (
@@ -360,17 +360,50 @@ function ListingsSection({ data, L, tab }: { data: Awaited<ReturnType<typeof get
   );
 }
 
-function OnlineOrdersSection({ L }: { L: boolean }) {
+function OnlineOrdersSection({ rows, L }: { rows: Awaited<ReturnType<typeof getShopeeDashboard>>["orderMappings"]; L: boolean }) {
   return (
-    <section className="rounded-card border border-border bg-surface px-4 py-10 text-center">
-      <ShoppingBag className="mx-auto h-8 w-8 text-primary-500" />
-      <h2 className="mt-3 text-sm font-extrabold">{L ? "Đơn online tập trung" : "Centralized online orders"}</h2>
-      <p className="mx-auto mt-1 max-w-xl text-sm text-slate-500">
-        {L ? "Đơn từ Shopee, TikTok Shop, Lazada và Tiki sẽ về một luồng xử lý. Hiện đơn Shopee cũng xuất hiện trong Đơn hàng với badge kênh." : "Orders from Shopee, TikTok Shop, Lazada, and Tiki will share one handling flow. Shopee orders also appear in Orders with a channel badge."}
-      </p>
-      <Link href={`${Routes.Sales}?tab=orders&source=shopee`} className="mt-4 inline-flex rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2">
-        {L ? "Xem đơn Shopee" : "View Shopee orders"}
-      </Link>
+    <section className="rounded-card border border-border bg-surface">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-soft px-4 py-3">
+        <div>
+          <h2 className="text-sm font-extrabold">{L ? "Đơn online tập trung" : "Centralized online orders"}</h2>
+          <p className="text-xs text-slate-500">
+            {L ? "Đơn Shopee được map về đơn LumaPOS để xử lý chung với POS." : "Shopee orders map into LumaPOS orders for a shared handling flow."}
+          </p>
+        </div>
+        <Link href={`${Routes.Sales}?tab=orders&source=shopee`} className="inline-flex rounded-full border border-border px-3 py-1.5 text-xs font-bold hover:bg-surface-2">
+          {L ? "Xem trong Đơn hàng" : "View in Orders"}
+        </Link>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[760px] text-sm">
+          <thead className="bg-canvas text-left text-xs uppercase tracking-wide text-slate-500">
+            <tr>
+              <th className="px-4 py-3">{L ? "Mã đơn sàn" : "Marketplace order"}</th>
+              <th className="px-4 py-3">{L ? "Đơn Luma" : "Luma order"}</th>
+              <th className="px-4 py-3">{L ? "Khách hàng" : "Customer"}</th>
+              <th className="px-4 py-3">{L ? "Trạng thái" : "Status"}</th>
+              <th className="px-4 py-3 text-right">{L ? "Tổng tiền" : "Total"}</th>
+              <th className="px-4 py-3">{L ? "Import lúc" : "Imported"}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border-soft">
+            {rows.length === 0 ? (
+              <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-400">{L ? "Chưa có đơn online." : "No online orders yet."}</td></tr>
+            ) : rows.map((row) => (
+              <tr key={row.id}>
+                <td className="px-4 py-3 font-mono text-xs">{row.externalOrderSn}</td>
+                <td className="px-4 py-3">
+                  {row.orderId && row.orderCode ? <Link href={Routes.order(row.orderId)} className="font-semibold text-primary-600 hover:underline">{row.orderCode}</Link> : "—"}
+                </td>
+                <td className="px-4 py-3">{row.customerName ?? "—"}</td>
+                <td className="px-4 py-3"><Badge value={row.externalStatus} /></td>
+                <td className="px-4 py-3 text-right tabular-nums">{row.total ? formatCurrency(Number(row.total)) : "—"}</td>
+                <td className="px-4 py-3 text-slate-500">{formatDate(row.importedAt)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }

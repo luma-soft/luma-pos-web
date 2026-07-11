@@ -45,6 +45,7 @@ type AuthorizedShop = {
   accessToken: string;
   refreshToken: string | null;
   expiresAt: Date | null;
+  metadata: Record<string, unknown> | null;
 };
 
 function shopeeBaseUrl(environment: ShopeeSettings["environment"]) {
@@ -113,6 +114,7 @@ async function getAuthorizedShop(shopUuid?: string): Promise<AuthorizedShop | nu
       accessToken: marketplaceTokens.accessToken,
       refreshToken: marketplaceTokens.refreshToken,
       expiresAt: marketplaceTokens.expiresAt,
+      metadata: marketplaceShops.metadata,
     })
     .from(marketplaceShops)
     .leftJoin(marketplaceTokens, eq(marketplaceTokens.shopId, marketplaceShops.id))
@@ -128,7 +130,12 @@ async function getAuthorizedShop(shopUuid?: string): Promise<AuthorizedShop | nu
     accessToken: row.accessToken,
     refreshToken: row.refreshToken,
     expiresAt: row.expiresAt,
+    metadata: row.metadata,
   };
+}
+
+function isDemoShop(shop: AuthorizedShop) {
+  return shop.accessToken.startsWith("demo-") || shop.metadata?.mode === "demo";
 }
 
 export async function exchangeShopeeAuthorizationCode(input: { code: string; shopId: string }): Promise<ShopeeTokenResponse> {
@@ -176,6 +183,8 @@ async function getShopApi(path: string, requestParams: Record<string, string>, s
 }
 
 export async function getShopeeCategories(shopUuid?: string): Promise<ShopeeApiCategory[]> {
+  const context = await getShopeeShopContext(shopUuid);
+  if (isDemoShop(context.shop)) return DEMO_SHOPEE_CATEGORIES;
   const data = await getShopApi("/api/v2/product/get_category", { language: "vi" }, shopUuid);
   const response = data.response && typeof data.response === "object" ? data.response as Record<string, unknown> : data;
   const list = Array.isArray(response.category_list) ? response.category_list : [];
@@ -192,6 +201,8 @@ export async function getShopeeCategories(shopUuid?: string): Promise<ShopeeApiC
 }
 
 export async function getShopeeAttributes(categoryId: string, shopUuid?: string): Promise<ShopeeApiAttribute[]> {
+  const context = await getShopeeShopContext(shopUuid);
+  if (isDemoShop(context.shop)) return DEMO_SHOPEE_ATTRIBUTES[categoryId] ?? DEMO_SHOPEE_ATTRIBUTES.default;
   const data = await getShopApi("/api/v2/product/get_attribute_tree", { category_id: categoryId, language: "vi" }, shopUuid);
   const response = data.response && typeof data.response === "object" ? data.response as Record<string, unknown> : data;
   const list = Array.isArray(response.attribute_list) ? response.attribute_list : [];
@@ -214,6 +225,8 @@ export async function getShopeeAttributes(categoryId: string, shopUuid?: string)
 }
 
 export async function getShopeeLogisticsChannels(shopUuid?: string): Promise<ShopeeApiLogisticsChannel[]> {
+  const context = await getShopeeShopContext(shopUuid);
+  if (isDemoShop(context.shop)) return DEMO_SHOPEE_LOGISTICS;
   const data = await getShopApi("/api/v2/logistics/get_channel_list", {}, shopUuid);
   const response = data.response && typeof data.response === "object" ? data.response as Record<string, unknown> : data;
   const list = Array.isArray(response.logistics_channel_list) ? response.logistics_channel_list : [];
@@ -226,3 +239,36 @@ export async function getShopeeLogisticsChannels(shopUuid?: string): Promise<Sho
     };
   }).filter((channel) => channel.id && channel.name);
 }
+
+const DEMO_SHOPEE_CATEGORIES: ShopeeApiCategory[] = [
+  { id: "100016", parentId: "0", name: "Nhà Cửa & Đời Sống", hasChildren: true },
+  { id: "10001601", parentId: "100016", name: "Vật liệu xây dựng", hasChildren: true },
+  { id: "1000160101", parentId: "10001601", name: "Gạch ốp lát", hasChildren: false },
+  { id: "1000160102", parentId: "10001601", name: "Ống nước & phụ kiện", hasChildren: false },
+  { id: "100010", parentId: "0", name: "Thiết Bị Điện Gia Dụng", hasChildren: true },
+  { id: "10001001", parentId: "100010", name: "Thiết bị điện", hasChildren: true },
+  { id: "1000100101", parentId: "10001001", name: "Át cài / CB điện", hasChildren: false },
+  { id: "1000100102", parentId: "10001001", name: "Ổ cắm & công tắc", hasChildren: false },
+  { id: "100636", parentId: "0", name: "Thiết Bị Vệ Sinh", hasChildren: true },
+  { id: "10063601", parentId: "100636", name: "Vòi sen & phụ kiện", hasChildren: false },
+  { id: "10063602", parentId: "100636", name: "Bồn cầu", hasChildren: false },
+];
+
+const DEMO_SHOPEE_ATTRIBUTES: Record<string, ShopeeApiAttribute[]> = {
+  default: [
+    { id: "brand", name: "Thương hiệu", mandatory: true, inputType: "TEXT_FILED", values: [] },
+    { id: "material", name: "Chất liệu", mandatory: true, inputType: "COMBO_BOX", values: [{ id: "ceramic", name: "Ceramic" }, { id: "pvc", name: "PVC" }, { id: "steel", name: "Thép" }] },
+    { id: "warranty", name: "Bảo hành", mandatory: true, inputType: "COMBO_BOX", values: [{ id: "none", name: "Không bảo hành" }, { id: "12m", name: "12 tháng" }, { id: "24m", name: "24 tháng" }] },
+  ],
+  "1000100101": [
+    { id: "brand", name: "Thương hiệu", mandatory: true, inputType: "TEXT_FILED", values: [] },
+    { id: "rated_current", name: "Dòng điện định mức", mandatory: true, inputType: "COMBO_BOX", values: [{ id: "20a", name: "20A" }, { id: "32a", name: "32A" }, { id: "63a", name: "63A" }] },
+    { id: "poles", name: "Số pha / số cực", mandatory: true, inputType: "COMBO_BOX", values: [{ id: "1p", name: "1P" }, { id: "2p", name: "2P" }, { id: "3p", name: "3P" }] },
+  ],
+};
+
+const DEMO_SHOPEE_LOGISTICS: ShopeeApiLogisticsChannel[] = [
+  { id: "5001", name: "Shopee Xpress", enabled: true },
+  { id: "5002", name: "Giao Hàng Nhanh", enabled: true },
+  { id: "5003", name: "Viettel Post", enabled: true },
+];

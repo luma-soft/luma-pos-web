@@ -5,6 +5,7 @@ import {
   customers,
   marketplaceMessageThreads,
   marketplaceMessages,
+  marketplaceOrderMappings,
   marketplaceProductMappings,
   marketplaceShops,
   marketplaceSyncJobs,
@@ -80,7 +81,7 @@ export async function getProductShopeeMapping(productId: string) {
 
 export async function getShopeeDashboard() {
   try {
-    const [summary, jobs, mappings, warehouseRows] = await Promise.all([
+    const [summary, jobs, mappings, orderMappings, warehouseRows] = await Promise.all([
       getShopeeConnectionSummary(),
       db
         .select()
@@ -108,14 +109,31 @@ export async function getShopeeDashboard() {
         .orderBy(desc(marketplaceProductMappings.updatedAt))
         .limit(50),
       db
+        .select({
+          id: marketplaceOrderMappings.id,
+          externalOrderSn: marketplaceOrderMappings.externalOrderSn,
+          externalStatus: marketplaceOrderMappings.externalStatus,
+          importedAt: marketplaceOrderMappings.importedAt,
+          orderId: marketplaceOrderMappings.orderId,
+          orderCode: orders.code,
+          total: orders.total,
+          customerName: customers.name,
+        })
+        .from(marketplaceOrderMappings)
+        .leftJoin(orders, eq(orders.id, marketplaceOrderMappings.orderId))
+        .leftJoin(customers, eq(customers.id, orders.customerId))
+        .where(eq(marketplaceOrderMappings.provider, "shopee"))
+        .orderBy(desc(marketplaceOrderMappings.importedAt))
+        .limit(30),
+      db
         .select({ id: warehouses.id, name: warehouses.name, isDefault: warehouses.isDefault })
         .from(warehouses)
         .orderBy(desc(warehouses.isDefault), warehouses.name)
         .limit(80),
     ]);
-    return { ...summary, jobs, mappings, warehouses: warehouseRows };
+    return { ...summary, jobs, mappings, orderMappings, warehouses: warehouseRows };
   } catch (e) {
-    if (isMissingMarketplaceTable(e)) return { ...EMPTY_SHOPEE_SUMMARY, jobs: [], mappings: [], warehouses: [] };
+    if (isMissingMarketplaceTable(e)) return { ...EMPTY_SHOPEE_SUMMARY, jobs: [], mappings: [], orderMappings: [], warehouses: [] };
     throw e;
   }
 }
