@@ -39,6 +39,7 @@ export const Routes = {
   Reports: "/reports",
   Notifications: "/notifications",
   OnlineSales: "/online-sales",
+  Tools: "/tools",
   Shopee: "/shopee",
   ShopeeInbox: "/shopee/inbox",
   Settings: "/settings",
