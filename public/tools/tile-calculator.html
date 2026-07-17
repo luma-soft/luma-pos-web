@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Công cụ tính gạch ốp lát</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e4ecf7 100%);
+    min-height: 100vh;
+    padding: 20px;
+    color: #1f2937;
+  }
+  .container {
+    max-width: 1000px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+    overflow: hidden;
+  }
+  header {
+    background: linear-gradient(135deg, #0ea5e9, #0284c7);
+    color: white;
+    padding: 24px 28px;
+  }
+  header h1 { font-size: 22px; font-weight: 700; }
+  header p { font-size: 14px; opacity: 0.9; margin-top: 4px; }
+
+  .content { padding: 24px 28px; }
+
+  /* Room card */
+  .room {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    margin-bottom: 16px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+  }
+  .room-head {
+    background: #f1f5f9;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .room-head input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1f2937;
+    padding: 4px 6px;
+    border-radius: 5px;
+  }
+  .room-head input:focus { outline: none; background: white; box-shadow: 0 0 0 2px #0ea5e9; }
+  .room-body { padding: 16px; }
+
+  .dims {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .hidden { display: none !important; }
+  .tile-sizes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 10px;
+    background: #fafafa;
+    border: 1px dashed #e5e7eb;
+    border-radius: 8px;
+  }
+  .prices {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .price-block {
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid;
+  }
+  .price-block.floor { background: #f0f9ff; border-color: #bae6fd; }
+  .price-block.wall  { background: #ecfdf5; border-color: #a7f3d0; }
+  .price-block.skirt { background: #fffbeb; border-color: #fde68a; }
+  .price-block .pb-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 8px;
+  }
+  .price-block.floor .pb-title { color: #0284c7; }
+  .price-block.wall  .pb-title { color: #059669; }
+  .price-block.skirt .pb-title { color: #d97706; }
+  .price-block .pb-row {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 6px;
+  }
+  .price-block.skirt .pb-row {
+    grid-template-columns: 0.9fr 1.4fr 0.9fr;
+  }
+  .price-block .pb-row input {
+    padding: 7px 9px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 13px;
+    width: 100%;
+    background: white;
+  }
+  .price-block .pb-row input:focus {
+    outline: none;
+    border-color: #0ea5e9;
+    box-shadow: 0 0 0 2px rgba(14,165,233,0.15);
+  }
+  .price-block .pb-lbl {
+    font-size: 10px;
+    color: #6b7280;
+    margin-bottom: 3px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .price-block .pb-lbl select {
+    padding: 2px 4px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 10px;
+    background: white;
+    color: #374151;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .field label {
+    display: block;
+    font-size: 12px;
+    color: #4b5563;
+    margin-bottom: 5px;
+    font-weight: 500;
+  }
+  .field input, .field select {
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid #d1d5db;
+    border-radius: 7px;
+    font-size: 14px;
+  }
+  .field input:focus, .field select:focus {
+    outline: none;
+    border-color: #0ea5e9;
+    box-shadow: 0 0 0 3px rgba(14,165,233,0.15);
+  }
+
+  .doors-title {
+    font-size: 12px;
+    color: #6b7280;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 8px;
+  }
+  .options-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #4b5563;
+    cursor: pointer;
+    user-select: none;
+    padding: 6px 10px;
+    background: #f3f4f6;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+  }
+  .toggle input { width: 16px; height: 16px; cursor: pointer; }
+  .toggle:has(input:checked) { background: #dbeafe; border-color: #93c5fd; color: #1e40af; }
+
+  .multi-wall {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .multi-wall-grid { display: flex; flex-direction: column; gap: 8px; }
+  .multi-wall-row {
+    display: grid;
+    grid-template-columns: 140px 100px 1fr 30px;
+    gap: 8px;
+    align-items: center;
+    font-size: 13px;
+    background: white;
+    padding: 8px;
+    border-radius: 7px;
+    border: 1px solid #e5e7eb;
+    border-left: 4px solid var(--tc, #059669);
+  }
+  .multi-wall-row input[type="text"],
+  .multi-wall-row input[type="number"] {
+    padding: 7px 9px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 13px;
+    width: 100%;
+  }
+  .multi-wall-row input:focus {
+    outline: none;
+    border-color: #10b981;
+    box-shadow: 0 0 0 2px rgba(16,185,129,0.15);
+  }
+  .multi-wall-row .name-input {
+    font-weight: 600;
+  }
+  .multi-wall-row .calc-out {
+    font-size: 12px;
+    color: #374151;
+    line-height: 1.4;
+  }
+  .multi-wall-row .calc-out b { color: #059669; }
+
+  @media (max-width: 720px) {
+    .multi-wall-row { grid-template-columns: 1fr 1fr 30px; }
+    .multi-wall-row .calc-out { grid-column: 1 / -1; }
+  }
+  .doors-list { display: flex; flex-direction: column; gap: 6px; }
+  .door {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr auto;
+    gap: 8px;
+    align-items: center;
+    background: #f9fafb;
+    padding: 8px 10px;
+    border-radius: 7px;
+    border: 1px solid #e5e7eb;
+  }
+  .door input {
+    padding: 7px 9px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 13px;
+    width: 100%;
+  }
+  .door input:focus {
+    outline: none;
+    border-color: #0ea5e9;
+    box-shadow: 0 0 0 2px rgba(14,165,233,0.15);
+  }
+
+  .btn-mini {
+    background: #fee2e2;
+    color: #dc2626;
+    border: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  .btn-mini:hover { background: #fecaca; }
+
+  .btn-add-door {
+    margin-top: 6px;
+    background: #f0f9ff;
+    color: #0284c7;
+    border: 1px dashed #7dd3fc;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    width: 100%;
+  }
+  .btn-add-door:hover { background: #e0f2fe; }
+
+
+
+  .room-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 10px;
+  }
+  .btn-remove-room {
+    background: #fee2e2;
+    color: #dc2626;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .btn-remove-room:hover { background: #fecaca; }
+
+  .btn-add-room {
+    background: #ecfeff;
+    color: #0284c7;
+    border: 2px dashed #67e8f9;
+    padding: 12px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    width: 100%;
+    margin-bottom: 22px;
+  }
+  .btn-add-room:hover { background: #cffafe; }
+
+  /* Settings */
+  .settings {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 18px;
+    margin-bottom: 18px;
+  }
+  .settings h2 {
+    font-size: 14px;
+    color: #0284c7;
+    margin-bottom: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .settings-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+  }
+  .settings-block {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .settings-block h3 {
+    font-size: 13px;
+    margin-bottom: 10px;
+    font-weight: 600;
+  }
+  .settings-block.floor h3 { color: #0284c7; }
+  .settings-block.wall  h3 { color: #059669; }
+  .settings-block.skirt h3 { color: #d97706; }
+  .settings-block .field { margin-bottom: 10px; }
+  .settings-block .field:last-child { margin-bottom: 0; }
+
+  @media (max-width: 720px) {
+    .dims, .tile-sizes, .prices, .settings-grid, .room-summary { grid-template-columns: 1fr; }
+    .door { grid-template-columns: 1fr 1fr 1fr auto; }
+  }
+
+  /* Per-room summary cards */
+  .room-summary {
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+  }
+  .summary-card.hidden { display: none !important; }
+  .summary-card {
+    padding: 12px;
+    border-radius: 10px;
+  }
+  .summary-card.floor  { background: #e0f2fe; color: #0c4a6e; border: 1px solid #bae6fd; }
+  .summary-card.wall   { background: #d1fae5; color: #064e3b; border: 1px solid #a7f3d0; }
+  .summary-card.skirt  { background: #fef3c7; color: #78350f; border: 1px solid #fde68a; }
+  .summary-card .title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(0,0,0,0.1);
+  }
+  .summary-card .line {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    padding: 3px 0;
+    line-height: 1.4;
+  }
+  .summary-card .line .k { opacity: 0.85; }
+  .summary-card .line .v { font-weight: 600; }
+  .summary-card .line.big .v { font-size: 15px; font-weight: 700; }
+
+  /* Totals */
+  .totals {
+    margin-top: 6px;
+    padding: 18px;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+  }
+  .totals-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    gap: 10px;
+  }
+  .totals h2 {
+    font-size: 14px;
+    color: #0284c7;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .btn-copy {
+    background: #0ea5e9;
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .btn-copy:hover { background: #0284c7; }
+  .btn-copy:active { transform: scale(0.97); }
+  .btn-copy.copied { background: #16a34a; }
+  .btn-copy.copied:hover { background: #15803d; }
+  .btn-copy .copy-icon { font-size: 14px; }
+  .totals-table-wrap { overflow-x: auto; }
+  .totals-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .totals-table th, .totals-table td {
+    padding: 9px 12px;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .totals-table thead th {
+    background: #f1f5f9;
+    color: #334155;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    font-weight: 700;
+    text-align: center;
+    border-right: 1px solid #e2e8f0;
+  }
+  .totals-table thead th.group {
+    text-align: center;
+    font-size: 12px;
+    border-bottom: 2px solid #cbd5e1;
+  }
+  .totals-table thead th.group.floor { background: #e0f2fe; color: #075985; }
+  .totals-table thead th.group.wall  { background: #d1fae5; color: #065f46; }
+  .totals-table thead th.group.skirt { background: #fef3c7; color: #92400e; }
+  .totals-table th.num, .totals-table td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .totals-table tbody tr:hover { background: #f9fafb; }
+  .totals-table tbody td { color: #1f2937; }
+  .totals-table tbody td.room-name { font-weight: 600; }
+  .totals-table tfoot th {
+    background: #0ea5e9;
+    color: white;
+    font-size: 13px;
+    border-bottom: none;
+  }
+  .totals-table .muted { color: #9ca3af; }
+  .totals-table .sub {
+    font-size: 11px;
+    color: #64748b;
+    font-weight: 500;
+    margin-top: 2px;
+    line-height: 1.3;
+  }
+  .totals-table tfoot .sub {
+    color: rgba(255,255,255,0.88);
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🧱 Công cụ tính gạch ốp lát</h1>
+      <p>Nhập chiều dài, rộng, cao phòng & kích thước cửa → Tự động tính diện tích sàn, tường và chân tường</p>
+    </header>
+
+    <div class="content">
+
+      <div id="roomsList"></div>
+
+      <button class="btn-add-room" onclick="addRoom()">+ Thêm phòng</button>
+
+      <div class="totals" id="totalsSection">
+        <div class="totals-head">
+          <h2>📊 Tổng hợp theo phòng</h2>
+          <button class="btn-copy" id="btnCopy" onclick="copySummary()">
+            <span class="copy-icon">📋</span>
+            <span class="copy-text">Sao chép</span>
+          </button>
+        </div>
+        <div class="totals-table-wrap">
+          <table class="totals-table" id="totalsTable">
+            <thead>
+              <tr>
+                <th rowspan="2">Phòng</th>
+                <th colspan="2" class="group floor">🟦 Sàn</th>
+                <th colspan="2" class="group wall">🧱 Tường</th>
+                <th colspan="2" class="group skirt">📏 Chân tường</th>
+              </tr>
+              <tr>
+                <th class="num">Diện tích (m²)</th>
+                <th>Kích thước gạch</th>
+                <th class="num">Diện tích (m²)</th>
+                <th>Kích thước gạch</th>
+                <th class="num">Chiều dài (m)</th>
+                <th>Gạch nguồn</th>
+              </tr>
+            </thead>
+            <tbody id="totalsBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+
+    </div>
+  </div>
+
+<script>
+  const DEFAULT_WASTE = 5;
+  const DEFAULT_SKIRT_HEIGHT = 12; // cm
+
+  let rooms = [
+    {
+      name: "Phòng khách",
+      length: 5, width: 4, height: 0,
+      skirtEnabled: true,
+      wallMultiType: false,
+      floorTileSize: "0.6x0.6",
+      wallTileSize: "0.3x0.6",
+      skirtSourceTile: "0.6x0.6",
+      floorPrice: 0, floorWaste: DEFAULT_WASTE,
+      wallPrice: 0,  wallWaste:  DEFAULT_WASTE,
+      skirtPrice: 0, skirtWaste: DEFAULT_WASTE, skirtPriceMode: "m",
+      skirtHeight: DEFAULT_SKIRT_HEIGHT,
+      doors: [ { name: "Cửa chính", width: 0.9, height: 2.1 } ],
+      wallTypes: defaultWallTypes()
+    },
+    {
+      name: "Nhà tắm",
+      length: 2.5, width: 2, height: 2.4,
+      skirtEnabled: false,
+      wallMultiType: true,
+      floorTileSize: "0.3x0.3",
+      wallTileSize: "0.3x0.6",
+      skirtSourceTile: "0.6x0.6",
+      floorPrice: 0, floorWaste: DEFAULT_WASTE,
+      wallPrice: 0,  wallWaste:  DEFAULT_WASTE,
+      skirtPrice: 0, skirtWaste: DEFAULT_WASTE, skirtPriceMode: "m",
+      skirtHeight: DEFAULT_SKIRT_HEIGHT,
+      doors: [ { name: "Cửa", width: 0.7, height: 2.0 } ],
+      wallTypes: [
+        { name: "Đậm",  rows: 2, color: "#1e293b" },
+        { name: "Điểm", rows: 1, color: "#d97706" },
+        { name: "Nhạt", rows: 5, color: "#94a3b8" }
+      ]
+    }
+  ];
+
+  const PALETTE = ["#1e293b", "#d97706", "#94a3b8", "#059669", "#0ea5e9", "#8b5cf6", "#ec4899", "#ef4444"];
+
+  const FLOOR_SIZES = ["0.3x0.3","0.4x0.4","0.42x0.6","0.5x0.5","0.6x0.6","0.8x0.8","0.6x1.2","0.8x1.6"];
+  const WALL_SIZES  = ["0.2x0.25","0.25x0.4","0.3x0.45","0.3x0.6","0.4x0.8","0.6x0.6","0.6x1.2"];
+  const SKIRT_SIZES = ["0.3x0.3","0.4x0.4","0.5x0.5","0.6x0.6","0.8x0.8","0.6x1.2","0.8x1.6"];
+
+  function tileOpts(sizes, selected) {
+    return sizes.map(s => {
+      const [a, b] = s.split("x").map(parseFloat);
+      const label = `${Math.round(a*100)} × ${Math.round(b*100)} cm`;
+      return `<option value="${s}" ${s === selected ? 'selected' : ''}>${label}</option>`;
+    }).join("");
+  }
+
+  function defaultWallTypes() {
+    return [
+      { name: "Đậm",  rows: 0, color: "#1e293b" },
+      { name: "Điểm", rows: 0, color: "#d97706" },
+      { name: "Nhạt", rows: 0, color: "#94a3b8" }
+    ];
+  }
+
+  function multiWallRowHTML(i, k, t) {
+    return `
+      <div class="multi-wall-row" style="--tc:${t.color}">
+        <input type="text" class="name-input" value="${t.name}" placeholder="Tên loại"
+               oninput="updateWallType(${i}, ${k}, 'name', this.value)">
+        <input type="number" min="0" step="1" value="${t.rows || 0}" placeholder="số hàng"
+               oninput="updateWallType(${i}, ${k}, 'rows', this.value)">
+        <div class="calc-out" data-k="calc-${k}">—</div>
+        <button class="btn-mini" onclick="removeWallType(${i}, ${k})">×</button>
+      </div>
+    `;
+  }
+
+  function addWallType(i) {
+    if (!rooms[i].wallTypes) rooms[i].wallTypes = [];
+    const n = rooms[i].wallTypes.length;
+    rooms[i].wallTypes.push({
+      name: "Loại " + (n + 1),
+      rows: 0,
+      color: PALETTE[n % PALETTE.length]
+    });
+    renderRooms();
+  }
+
+  function removeWallType(i, k) {
+    rooms[i].wallTypes.splice(k, 1);
+    renderRooms();
+  }
+
+  function updateWallType(i, k, field, v) {
+    if (!rooms[i].wallTypes[k]) return;
+    rooms[i].wallTypes[k][field] = (field === "name") ? v : (parseFloat(v) || 0);
+    calc();
+  }
+
+  /* ---------- Geometry per room ---------- */
+  function roomGeo(r) {
+    const L = +r.length || 0;
+    const W = +r.width || 0;
+    const H = +r.height || 0;
+    const perim = 2 * (L + W);
+
+    // Floor area
+    const floorArea = L * W;
+
+    // Sum of door areas and widths
+    let doorArea = 0, doorWidth = 0;
+    (r.doors || []).forEach(d => {
+      const dw = +d.width || 0;
+      const dh = +d.height || 0;
+      doorArea += dw * dh;
+      doorWidth += dw;
+    });
+
+    // Wall: either by dimensions (H × perimeter − doors) OR by dynamic wallTypes (per-room)
+    const multiType = !!r.wallMultiType;
+    let wallEnabled, wallArea;
+    // Per-type breakdown (for multi-type mode)
+    const typeResults = [];
+    if (multiType) {
+      const [ta, tb] = (r.wallTileSize || "0.3x0.6").split("x").map(parseFloat);
+      // Hướng đặt gạch: "ngang" (cạnh dài nằm ngang) | "dung" (cạnh ngắn nằm ngang)
+      const orient = r.wallTileOrientation || "ngang";
+      const tileWidth = (orient === "ngang") ? Math.max(ta, tb) : Math.min(ta, tb);
+      const tileLong  = (orient === "ngang") ? Math.min(ta, tb) : Math.max(ta, tb);
+      const tileArea = ta * tb;
+      const tilesPerRow = tileWidth > 0 ? Math.ceil(perim / tileWidth) : 0;
+      let totalCount = 0, totalRows = 0;
+      (r.wallTypes || []).forEach(t => {
+        const rows = +t.rows || 0;
+        const count = tilesPerRow * rows;
+        const area  = count * tileArea;   // m² gạch (procurement) cho loại này
+        totalCount += count;
+        totalRows  += rows;
+        typeResults.push({
+          name: t.name, color: t.color,
+          rows, tilesPerRow, count, area
+        });
+      });
+      wallEnabled = totalCount > 0;
+      // Diện tích tường thực tế:
+      //   - Có nhập chiều cao phòng H → dùng H (số hàng chỉ để phân bổ màu gạch & đếm số viên)
+      //   - Không nhập H → suy ra từ tổng số hàng × chiều cao 1 viên (kiểu wainscoting tự do)
+      const wallHeight = H > 0 ? H : (totalRows * tileLong);
+      wallArea = Math.max(0, perim * wallHeight - doorArea);
+    } else {
+      wallEnabled = H > 0;
+      wallArea = wallEnabled ? Math.max(0, perim * H - doorArea) : 0;
+    }
+
+    // Skirt: only if user enables it
+    const skirtEnabled = r.skirtEnabled !== false;
+    const skirtLen = skirtEnabled ? Math.max(0, perim - doorWidth) : 0;
+
+    return { floorArea, wallArea, skirtLen, perim, doorArea, doorWidth, wallEnabled, skirtEnabled,
+             multiType, typeResults };
+  }
+
+  /* ---------- Render ---------- */
+  function renderRooms() {
+    const list = document.getElementById("roomsList");
+    list.innerHTML = "";
+    rooms.forEach((r, i) => {
+      const g = roomGeo(r);
+      const wallOn  = (+r.height || 0) > 0 || !!r.wallMultiType;
+      const skirtOn = r.skirtEnabled !== false;
+      const card = document.createElement("div");
+      card.className = "room";
+      card.innerHTML = `
+        <div class="room-head">
+          <span style="font-size:18px">🏠</span>
+          <input type="text" value="${r.name}" placeholder="Tên phòng"
+                 oninput="updateRoom(${i}, 'name', this.value)">
+        </div>
+        <div class="room-body">
+          <div class="dims">
+            <div class="field">
+              <label>Chiều dài (m)</label>
+              <input type="number" value="${r.length}" step="any" min="0"
+                     oninput="updateRoom(${i}, 'length', this.value)">
+            </div>
+            <div class="field">
+              <label>Chiều rộng (m)</label>
+              <input type="number" value="${r.width}" step="any" min="0"
+                     oninput="updateRoom(${i}, 'width', this.value)">
+            </div>
+            <div class="field">
+              <label>Chiều cao (m) <span style="color:#9ca3af; font-weight:400">— tùy chọn</span></label>
+              <input type="number" value="${r.height || ''}" step="any" min="0" placeholder="Bỏ trống nếu không ốp tường"
+                     oninput="updateRoom(${i}, 'height', this.value)">
+            </div>
+          </div>
+
+          <div class="tile-sizes">
+            <div class="field">
+              <label>🟦 Gạch sàn</label>
+              <select onchange="updateRoom(${i}, 'floorTileSize', this.value)">
+                ${tileOpts(FLOOR_SIZES, r.floorTileSize || "0.6x0.6")}
+              </select>
+            </div>
+            <div class="field ${wallOn ? '' : 'hidden'}" data-wall-ui="1">
+              <label>🧱 Gạch tường <span style="color:#9ca3af; font-weight:400; font-size:11px">— hướng đặt</span></label>
+              <div style="display:grid; grid-template-columns: 1.5fr 1fr; gap:6px;">
+                <select onchange="updateRoom(${i}, 'wallTileSize', this.value)">
+                  ${tileOpts(WALL_SIZES, r.wallTileSize || "0.3x0.6")}
+                </select>
+                <select onchange="updateRoom(${i}, 'wallTileOrientation', this.value)" title="Hướng đặt gạch">
+                  <option value="ngang" ${(r.wallTileOrientation || "ngang") === "ngang" ? "selected" : ""}>↔ Nằm ngang</option>
+                  <option value="dung"  ${(r.wallTileOrientation || "ngang") === "dung"  ? "selected" : ""}>↕ Đứng</option>
+                </select>
+              </div>
+            </div>
+            <div class="field ${skirtOn ? '' : 'hidden'}">
+              <label>📏 Gạch nguồn chân tường</label>
+              <select onchange="updateRoom(${i}, 'skirtSourceTile', this.value)">
+                ${tileOpts(SKIRT_SIZES, r.skirtSourceTile || "0.6x0.6")}
+              </select>
+            </div>
+          </div>
+
+          <div class="prices">
+            <div class="price-block floor">
+              <div class="pb-title">🟦 Gạch sàn</div>
+              <div class="pb-lbl">Giá / m² (₫) · Hao hụt (%)</div>
+              <div class="pb-row">
+                <input type="number" min="0" step="1000" value="${r.floorPrice || 0}" placeholder="₫/m²"
+                       oninput="updateRoom(${i}, 'floorPrice', this.value)">
+                <input type="number" min="0" step="any" value="${r.floorWaste ?? DEFAULT_WASTE}" placeholder="% hao"
+                       oninput="updateRoom(${i}, 'floorWaste', this.value)">
+              </div>
+            </div>
+            <div class="price-block wall ${wallOn ? '' : 'hidden'}" data-wall-ui="1">
+              <div class="pb-title">🧱 Gạch tường</div>
+              <div class="pb-lbl">Giá / m² (₫) · Hao hụt (%)</div>
+              <div class="pb-row">
+                <input type="number" min="0" step="1000" value="${r.wallPrice || 0}" placeholder="₫/m²"
+                       oninput="updateRoom(${i}, 'wallPrice', this.value)">
+                <input type="number" min="0" step="any" value="${r.wallWaste ?? DEFAULT_WASTE}" placeholder="% hao"
+                       oninput="updateRoom(${i}, 'wallWaste', this.value)">
+              </div>
+            </div>
+            <div class="price-block skirt ${skirtOn ? '' : 'hidden'}">
+              <div class="pb-title">📏 Chân tường</div>
+              <div class="pb-lbl">
+                Cao (cm) · Giá
+                <select onchange="updateRoom(${i}, 'skirtPriceMode', this.value)">
+                  <option value="m"  ${(r.skirtPriceMode || "m") === "m"  ? "selected" : ""}>/ m dài</option>
+                  <option value="m2" ${(r.skirtPriceMode || "m") === "m2" ? "selected" : ""}>/ m²</option>
+                </select>
+                · Hao hụt (%)
+              </div>
+              <div class="pb-row">
+                <input type="number" min="0" step="any" value="${r.skirtHeight ?? DEFAULT_SKIRT_HEIGHT}" placeholder="cm"
+                       oninput="updateRoom(${i}, 'skirtHeight', this.value)">
+                <input type="number" min="0" step="1000" value="${r.skirtPrice || 0}"
+                       placeholder="${(r.skirtPriceMode || 'm') === 'm2' ? '₫/m²' : '₫/m'}"
+                       oninput="updateRoom(${i}, 'skirtPrice', this.value)">
+                <input type="number" min="0" step="any" value="${r.skirtWaste ?? DEFAULT_WASTE}" placeholder="% hao"
+                       oninput="updateRoom(${i}, 'skirtWaste', this.value)">
+              </div>
+            </div>
+          </div>
+
+          <div class="options-row">
+            <label class="toggle">
+              <input type="checkbox" ${r.skirtEnabled !== false ? 'checked' : ''}
+                     onchange="updateRoom(${i}, 'skirtEnabled', this.checked)">
+              📏 Tính gạch chân tường
+            </label>
+            <label class="toggle">
+              <input type="checkbox" ${r.wallMultiType ? 'checked' : ''}
+                     onchange="updateRoom(${i}, 'wallMultiType', this.checked)">
+              🎨 Ốp tường 3 loại (đậm/điểm/nhạt)
+            </label>
+          </div>
+
+          <div class="multi-wall" data-room-multi="${i}" style="display:${r.wallMultiType ? 'block' : 'none'}">
+            <div class="doors-title">🎨 Các loại gạch ốp tường</div>
+            <div class="hint">
+              Nhập <b>số hàng</b> muốn ốp cho mỗi loại — hệ thống tự tính số viên dựa trên chu vi phòng và kích thước gạch.
+            </div>
+            <div class="multi-wall-grid" id="wallTypes-${i}">
+              ${(r.wallTypes || []).map((t, k) => multiWallRowHTML(i, k, t)).join("")}
+            </div>
+            <button class="btn-add-door" onclick="addWallType(${i})">+ Thêm loại gạch</button>
+          </div>
+
+          <div class="doors-title">🚪 Cửa & cửa sổ</div>
+          <div class="doors-list" id="doorsList-${i}">
+            ${(r.doors || []).map((d, j) => `
+              <div class="door">
+                <input type="text" value="${d.name}" placeholder="Tên cửa"
+                       oninput="updateDoor(${i}, ${j}, 'name', this.value)">
+                <input type="number" value="${d.width}" step="any" min="0" placeholder="Rộng (m)"
+                       oninput="updateDoor(${i}, ${j}, 'width', this.value)">
+                <input type="number" value="${d.height}" step="any" min="0" placeholder="Cao (m)"
+                       oninput="updateDoor(${i}, ${j}, 'height', this.value)">
+                <button class="btn-mini" onclick="removeDoor(${i}, ${j})">×</button>
+              </div>
+            `).join("")}
+          </div>
+          <button class="btn-add-door" onclick="addDoor(${i})">+ Thêm cửa / cửa sổ</button>
+
+          <div class="room-summary" data-room="${i}">
+            <div class="summary-card floor">
+              <div class="title">🟦 Gạch sàn</div>
+              <div class="line big"><span class="k">Diện tích</span><span class="v" data-k="floorArea">${g.floorArea.toFixed(2)} m²</span></div>
+              <div class="line"><span class="k">Sau hao hụt</span><span class="v" data-k="floorWaste">—</span></div>
+              <div class="line"><span class="k">Số viên</span><span class="v" data-k="floorTiles">—</span></div>
+              <div class="line big"><span class="k">Chi phí</span><span class="v" data-k="floorCost">—</span></div>
+            </div>
+            <div class="summary-card wall">
+              <div class="title">🧱 Gạch tường</div>
+              <div class="line big"><span class="k">Diện tích</span><span class="v" data-k="wallArea">${g.wallArea.toFixed(2)} m²</span></div>
+              <div class="line"><span class="k">Sau hao hụt</span><span class="v" data-k="wallWaste">—</span></div>
+              <div class="line"><span class="k">Số viên</span><span class="v" data-k="wallTiles">—</span></div>
+              <div class="line big"><span class="k">Chi phí</span><span class="v" data-k="wallCost">—</span></div>
+            </div>
+            <div class="summary-card skirt">
+              <div class="title">📏 Chân tường</div>
+              <div class="line big"><span class="k">Chiều dài</span><span class="v" data-k="skirtLen">${g.skirtLen.toFixed(2)} m</span></div>
+              <div class="line"><span class="k">Sau hao hụt</span><span class="v" data-k="skirtWaste">—</span></div>
+              <div class="line"><span class="k">Gạch nguồn</span><span class="v" data-k="skirtSrc">—</span></div>
+              <div class="line big"><span class="k">Chi phí</span><span class="v" data-k="skirtCost">—</span></div>
+            </div>
+          </div>
+
+          <div class="room-actions">
+            <button class="btn-remove-room" onclick="removeRoom(${i})">🗑 Xóa phòng</button>
+          </div>
+        </div>
+      `;
+      list.appendChild(card);
+    });
+    calc();
+  }
+
+  /* ---------- Updates ---------- */
+  function updateRoom(i, k, v) {
+    if (k === "name" || k === "floorTileSize" || k === "wallTileSize" || k === "skirtSourceTile" || k === "skirtPriceMode" || k === "wallTileOrientation") {
+      rooms[i][k] = v;
+      // Re-render so the price input's placeholder ("₫/m" vs "₫/m²") updates
+      if (k === "skirtPriceMode") { renderRooms(); return; }
+    } else if (k === "skirtEnabled" || k === "wallMultiType") {
+      rooms[i][k] = !!v;
+      // Re-render to refresh hidden/shown inputs for wall + skirt
+      renderRooms();
+      return;
+    } else if (k === "height") {
+      const prev = +rooms[i].height || 0;
+      const next = parseFloat(v) || 0;
+      rooms[i][k] = next;
+      // Crossing 0 toggles wall-UI visibility — but only when not using multi-type mode.
+      // Use in-place class toggle (avoid re-render so input focus isn't lost while typing).
+      if (!rooms[i].wallMultiType && ((prev > 0) !== (next > 0))) {
+        const wallOn = next > 0;
+        const roomCard = document.querySelectorAll(".room")[i];
+        if (roomCard) {
+          roomCard.querySelectorAll('[data-wall-ui="1"]').forEach(el => {
+            el.classList.toggle("hidden", !wallOn);
+          });
+        }
+      }
+    } else {
+      rooms[i][k] = parseFloat(v) || 0;
+    }
+    calc(); // calc updates all per-room details
+  }
+
+  function updateDoor(i, j, k, v) {
+    rooms[i].doors[j][k] = k === "name" ? v : parseFloat(v) || 0;
+    calc(); // calc updates all per-room details
+  }
+
+
+
+  function addDoor(i) {
+    if (!rooms[i].doors) rooms[i].doors = [];
+    rooms[i].doors.push({ name: "Cửa " + (rooms[i].doors.length + 1), width: 0.9, height: 2.1 });
+    renderRooms();
+  }
+
+  function removeDoor(i, j) {
+    rooms[i].doors.splice(j, 1);
+    renderRooms();
+  }
+
+  function addRoom() {
+    rooms.push({
+      name: "Phòng " + (rooms.length + 1),
+      length: 0, width: 0, height: 0,
+      skirtEnabled: true,
+      wallMultiType: false,
+      floorTileSize: "0.6x0.6",
+      wallTileSize: "0.3x0.6",
+      skirtSourceTile: "0.6x0.6",
+      floorPrice: 0, floorWaste: DEFAULT_WASTE,
+      wallPrice: 0,  wallWaste:  DEFAULT_WASTE,
+      skirtPrice: 0, skirtWaste: DEFAULT_WASTE, skirtPriceMode: "m",
+      skirtHeight: DEFAULT_SKIRT_HEIGHT,
+      doors: [],
+      wallTypes: defaultWallTypes()
+    });
+    renderRooms();
+  }
+
+  function removeRoom(i) {
+    rooms.splice(i, 1);
+    if (!rooms.length) {
+      rooms.push({
+        name: "Phòng 1", length: 0, width: 0, height: 0,
+        skirtEnabled: true, wallMultiType: false,
+        floorTileSize: "0.6x0.6",
+        wallTileSize: "0.3x0.6",
+        skirtSourceTile: "0.6x0.6",
+        floorPrice: 0, floorWaste: DEFAULT_WASTE,
+        wallPrice: 0,  wallWaste:  DEFAULT_WASTE,
+        skirtPrice: 0, skirtWaste: DEFAULT_WASTE, skirtPriceMode: "m",
+      skirtHeight: DEFAULT_SKIRT_HEIGHT,
+        doors: [],
+        wallTypes: defaultWallTypes()
+      });
+    }
+    renderRooms();
+  }
+
+  /* ---------- Totals ---------- */
+  function parseTile(s) {
+    const [a, b] = String(s || "").split("x").map(parseFloat);
+    return { a: a || 0, b: b || 0, area: (a || 0) * (b || 0) };
+  }
+  function fmt(n) { return new Intl.NumberFormat("vi-VN").format(Math.round(n)); }
+  function tileLbl(s) {
+    const p = parseTile(s);
+    if (!p.a || !p.b) return "—";
+    return Math.round(p.a * 100) + "×" + Math.round(p.b * 100) + " cm";
+  }
+
+  function calc() {
+    // Per-room DOM updates + bottom totals table
+    const tbody = document.getElementById("totalsBody");
+    if (tbody) tbody.innerHTML = "";
+    const num = n => n.toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    rooms.forEach((r, i) => {
+      const g = roomGeo(r);
+
+      // Per-room settings (waste %, price)
+      const fw = +r.floorWaste || 0;
+      const fp = +r.floorPrice || 0;
+      const ww = +r.wallWaste  || 0;
+      const wp = +r.wallPrice  || 0;
+      const sw = +r.skirtWaste || 0;
+      const sp = +r.skirtPrice || 0;
+      const sH = (+r.skirtHeight || 0) / 100; // m
+
+      // Per-room tile sizes
+      const fTile = parseTile(r.floorTileSize || "0.6x0.6").area;
+      const wTileInfo = parseTile(r.wallTileSize || "0.3x0.6");
+      const wTile = wTileInfo.area;
+      const sTileInfo = parseTile(r.skirtSourceTile || "0.6x0.6");
+      const ta = sTileInfo.a, tb = sTileInfo.b;
+      const tileLong = Math.max(ta, tb);
+      const tileShort = Math.min(ta, tb);
+      const stripsPerTile = sH > 0 ? Math.floor(tileShort / sH) : 0;
+      const stripLen = tileLong;
+      if (g.skirtEnabled) displayStripsPerTile = stripsPerTile;
+
+      // Floor per room
+      const rFWaste = g.floorArea * (1 + fw / 100);
+      const rFCount = fTile > 0 ? Math.ceil(rFWaste / fTile) : 0;
+      const rFCost = rFWaste * fp;
+
+      // Wall per room — cost = diện tích × (1 + hao hụt) × giá ₫/m² (cùng công thức cho cả 2 chế độ)
+      const rWWaste = g.wallArea * (1 + ww / 100);
+      const rWCount = wTile > 0 ? Math.ceil(rWWaste / wTile) : 0;
+      const rWCost = rWWaste * wp;
+
+      // Skirt per room
+      const rSWaste = g.skirtLen * (1 + sw / 100);
+      const rSSrc = (stripsPerTile > 0 && stripLen > 0)
+        ? Math.ceil(rSWaste / (stripsPerTile * stripLen))
+        : 0;
+      const rSSrcArea = rSSrc * ta * tb;
+      // Price mode: "m" = ₫/m dài (theo chiều dài có hao hụt); "m2" = ₫/m² (theo m² gạch nguồn đã dùng)
+      const rSCost = ((r.skirtPriceMode || "m") === "m2")
+        ? rSSrcArea * sp
+        : rSWaste * sp;
+
+      // Update per-room DOM cards
+      const card = document.querySelector(`.room-summary[data-room="${i}"]`);
+      if (card) {
+        const set = (k, v) => {
+          const el = card.querySelector(`[data-k="${k}"]`);
+          if (el) el.textContent = v;
+        };
+        set("floorArea", g.floorArea.toFixed(2) + " m²");
+        set("floorWaste", rFWaste.toFixed(2) + " m²");
+        set("floorTiles", fmt(rFCount) + " viên");
+        set("floorCost", fmt(rFCost) + " ₫");
+
+        // Wall card - hide if disabled
+        const wallCard = card.querySelector(".summary-card.wall");
+        if (g.wallEnabled) {
+          wallCard.classList.remove("hidden");
+          set("wallArea", g.wallArea.toFixed(2) + " m²");
+          set("wallWaste", rWWaste.toFixed(2) + " m²");
+          if (g.multiType) {
+            const parts = (g.typeResults || [])
+              .filter(t => t.count > 0)
+              .map(t => `${t.name}: ${fmt(t.count)}`);
+            set("wallTiles", parts.join(" · ") || "—");
+          } else {
+            set("wallTiles", fmt(rWCount) + " viên");
+          }
+          set("wallCost", fmt(rWCost) + " ₫");
+        } else {
+          wallCard.classList.add("hidden");
+        }
+
+        // Per-type inline calc display — inside the multi-wall block (sibling of .room-summary)
+        if (g.multiType) {
+          const multiBlock = document.querySelector(`[data-room-multi="${i}"]`);
+          if (multiBlock) {
+            (g.typeResults || []).forEach((t, k) => {
+              const el = multiBlock.querySelector(`[data-k="calc-${k}"]`);
+              if (el) {
+                if (t.rows > 0) {
+                  el.innerHTML = `${t.tilesPerRow} × ${t.rows} = <b>${fmt(t.count)} viên</b> · ${t.area.toFixed(2)} m²`;
+                } else {
+                  el.innerHTML = `<span style="opacity:0.5">nhập số hàng →</span>`;
+                }
+              }
+            });
+          }
+        }
+
+        // Skirt card - hide if disabled
+        const skirtCard = card.querySelector(".summary-card.skirt");
+        if (g.skirtEnabled) {
+          skirtCard.classList.remove("hidden");
+          set("skirtLen", g.skirtLen.toFixed(2) + " m");
+          set("skirtWaste", rSWaste.toFixed(2) + " m");
+          set("skirtSrc", fmt(rSSrc) + " viên (" + rSSrcArea.toFixed(2) + " m²)");
+          set("skirtCost", fmt(rSCost) + " ₫");
+        } else {
+          skirtCard.classList.add("hidden");
+        }
+      }
+
+      // Append to bottom totals table
+      if (tbody) {
+        const tr = document.createElement("tr");
+        const muted = '<span class="muted">—</span>';
+        const wallAreaCell  = g.wallEnabled  ? num(g.wallArea) + " m²" : muted;
+        const wallTileCell  = g.wallEnabled  ? tileLbl(r.wallTileSize)  : muted;
+        const skirtLenCell  = g.skirtEnabled
+          ? num(g.skirtLen) + ' m<div class="sub">≈ ' + num(rSSrcArea) + ' m² gạch nguồn</div>'
+          : muted;
+        const skirtTileCell = g.skirtEnabled
+          ? tileLbl(r.skirtSourceTile) + '<div class="sub">' + fmt(rSSrc) + ' viên</div>'
+          : muted;
+        tr.innerHTML =
+          '<td class="room-name">' + (r.name || "Phòng " + (i + 1)) + '</td>' +
+          '<td class="num">' + num(g.floorArea) + ' m²</td>' +
+          '<td>' + tileLbl(r.floorTileSize) + '</td>' +
+          '<td class="num">' + wallAreaCell + '</td>' +
+          '<td>' + wallTileCell + '</td>' +
+          '<td class="num">' + skirtLenCell + '</td>' +
+          '<td>' + skirtTileCell + '</td>';
+        tbody.appendChild(tr);
+      }
+    });
+  }
+
+  /* ---------- Copy summary ---------- */
+  function buildSummaryText() {
+    const lines = [];
+    const fmt2 = n => (Math.round(n * 100) / 100).toLocaleString("vi-VN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    lines.push("📊 TỔNG HỢP GẠCH ỐP LÁT");
+    lines.push("═".repeat(42));
+    rooms.forEach((r, i) => {
+      const g = roomGeo(r);
+      lines.push("");
+      lines.push("🏠 " + (r.name || "Phòng " + (i + 1)));
+      if (g.floorArea > 0) {
+        lines.push("  🟦 Sàn:       " + fmt2(g.floorArea) + " m²  (gạch " + tileLbl(r.floorTileSize) + ")");
+      }
+      if (g.wallEnabled && g.wallArea > 0) {
+        lines.push("  🧱 Tường:     " + fmt2(g.wallArea) + " m²  (gạch " + tileLbl(r.wallTileSize) + ")");
+      }
+      if (g.skirtEnabled && g.skirtLen > 0) {
+        const sInfo = parseTile(r.skirtSourceTile || "0.6x0.6");
+        const ta = sInfo.a, tb = sInfo.b;
+        const tileLong = Math.max(ta, tb), tileShort = Math.min(ta, tb);
+        const sH = (+r.skirtHeight || 0) / 100;
+        const sw = +r.skirtWaste || 0;
+        const stripsPerTile = sH > 0 ? Math.floor(tileShort / sH) : 0;
+        const rSWaste = g.skirtLen * (1 + sw / 100);
+        const rSSrc = (stripsPerTile > 0 && tileLong > 0)
+          ? Math.ceil(rSWaste / (stripsPerTile * tileLong)) : 0;
+        const rSSrcArea = rSSrc * ta * tb;
+        lines.push("  📏 Chân tường: " + fmt2(g.skirtLen) + " m  ≈ " + fmt2(rSSrcArea) + " m² gạch nguồn (" + tileLbl(r.skirtSourceTile) + ", " + rSSrc + " viên)");
+      }
+    });
+    return lines.join("\n");
+  }
+
+  function copySummary() {
+    const text = buildSummaryText();
+    const btn = document.getElementById("btnCopy");
+    const done = () => {
+      if (!btn) return;
+      btn.classList.add("copied");
+      const t = btn.querySelector(".copy-text");
+      const orig = t ? t.textContent : "";
+      if (t) t.textContent = "Đã sao chép!";
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        if (t) t.textContent = orig || "Sao chép";
+      }, 1800);
+    };
+    const fallback = () => {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); done(); }
+      catch (e) { alert("Không thể sao chép tự động. Nội dung:\n\n" + text); }
+      document.body.removeChild(ta);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done).catch(fallback);
+    } else {
+      fallback();
+    }
+  }
+
+  renderRooms();
+</script>
+</body>
+</html>
