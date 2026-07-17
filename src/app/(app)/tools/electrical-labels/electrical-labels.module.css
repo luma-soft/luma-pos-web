@@ -1,0 +1,110 @@
+.a4Page {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 12mm 10mm;
+  overflow: hidden;
+  box-sizing: border-box;
+  color: #101828;
+  background: #fff;
+  font-family: Arial, "Helvetica Neue", sans-serif;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
+}
+
+.previewPage {
+  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.1);
+}
+
+.sheetInner {
+  width: 190mm;
+  height: 273mm;
+}
+
+.labelRow {
+  display: flex;
+  gap: 2mm;
+  align-items: flex-start;
+}
+
+.printLabel {
+  position: relative;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  padding: 1mm 1.1mm 1mm 2.4mm;
+  overflow: hidden;
+  border: 0.25mm solid #334155;
+  border-radius: 1.1mm;
+  color: #101828;
+  background: #fff;
+  font-size: var(--label-font-size);
+  font-weight: 800;
+  line-height: 1.02;
+  text-align: center;
+  letter-spacing: -0.025em;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.printLabel::before {
+  content: "";
+  position: absolute;
+  top: 1mm;
+  bottom: 1mm;
+  left: 0.8mm;
+  width: 1mm;
+  border-radius: 0.5mm;
+  background: var(--label-accent);
+}
+
+.printLabel span {
+  position: relative;
+  z-index: 1;
+}
+
+.border {
+  padding-left: 1.1mm;
+  border-width: 0.45mm;
+  border-color: var(--label-accent);
+}
+
+.border::before,
+.fill::before {
+  display: none;
+}
+
+.fill {
+  padding-left: 1.1mm;
+  border-color: var(--label-accent);
+  background: color-mix(in srgb, var(--label-accent) 13%, white);
+}
+
+.mono {
+  border-color: #252f3f;
+  filter: grayscale(1);
+}
+
+.mono::before {
+  background: #1f2937;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  .a4Page {
+    width: 210mm;
+    height: 297mm;
+    min-height: 297mm;
+    margin: 0;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .a4Page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+}

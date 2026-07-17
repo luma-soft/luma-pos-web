@@ -216,9 +216,18 @@ textarea.ai-composer-scrollbar-hidden::-webkit-scrollbar-corner {
 
 /* In phiếu tạm từ POS: ẩn toàn app, chỉ hiện phiếu (portal .pos-print-root ở body) */
 .pos-print-root { display: none; }
+.electrical-labels-print-root { display: none; }
 @media print {
   body.pos-printing > *:not(.pos-print-root) { display: none !important; }
   body.pos-printing .pos-print-root { display: flex !important; justify-content: center; }
+  body.electrical-labels-printing {
+    width: 210mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  body.electrical-labels-printing > *:not(.electrical-labels-print-root) { display: none !important; }
+  body.electrical-labels-printing .electrical-labels-print-root { display: block !important; }
 }
 
 /* Chevron gọn + cách lề phải cho <select> native (tránh icon sát mép).

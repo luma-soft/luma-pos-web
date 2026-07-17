@@ -40,6 +40,7 @@ export const Routes = {
   Notifications: "/notifications",
   OnlineSales: "/online-sales",
   Tools: "/tools",
+  ElectricalLabels: "/tools/electrical-labels",
   Shopee: "/shopee",
   ShopeeInbox: "/shopee/inbox",
   Settings: "/settings",
