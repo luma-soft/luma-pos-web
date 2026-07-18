@@ -63,18 +63,23 @@
 }
 
 .border {
-  padding-left: 1.1mm;
   border-width: 0.45mm;
   border-color: var(--label-accent);
 }
 
+.none::before,
 .border::before,
 .fill::before {
   display: none;
 }
 
+.none,
+.border,
 .fill {
   padding-left: 1.1mm;
+}
+
+.fill {
   border-color: var(--label-accent);
   background: color-mix(in srgb, var(--label-accent) 13%, white);
 }

@@ -85,6 +85,23 @@
     "more": "Thêm",
     "returns": "Trả hàng"
   },
+  "toolsCenter": {
+    "title": "Công cụ",
+    "subtitle": "Tiện ích hỗ trợ cửa hàng",
+    "selectTool": "Chọn công cụ",
+    "groups": {
+      "calculation": "Tính toán",
+      "printing": "In ấn"
+    },
+    "items": {
+      "tileCalculator": "Tính gạch ốp lát",
+      "electricalLabels": "Nhãn tủ điện"
+    },
+    "breadcrumbs": {
+      "calculation": "Công cụ · Tính toán",
+      "printing": "Công cụ · In ấn"
+    }
+  },
   "tileCalculator": {
     "title": "Tính gạch ốp lát",
     "eyebrow": "Dự toán vật tư",
@@ -169,6 +186,7 @@
   },
   "electricalLabels": {
     "title": "Nhãn tủ điện",
+    "description": "Thiết kế, xem trước và in nhãn mạch theo đúng kích thước module aptomat.",
     "badge": "A4 · Module DIN",
     "tileCalculator": "Tính gạch",
     "deviceTitle": "Hãng và dòng aptomat",
@@ -179,24 +197,27 @@
     "customWidth": "Chiều rộng một module",
     "moduleHint": "Rộng nhãn = số module × {width} mm − mép chừa. Với RCBO, hãy chọn theo số module chiếm chỗ thay vì chỉ dựa vào số cực.",
     "circuitsTitle": "Danh sách mạch",
-    "circuitsDescription": "Đặt tên, số module, số lượng và màu nhận diện cho từng mạch.",
+    "circuitsDescription": "Đặt tên, số module, số lượng và màu nhận diện tùy chọn cho từng mạch.",
     "reset": "Đặt lại",
     "circuitName": "Tên mạch",
     "modules": "Số module",
     "quantity": "Số lượng",
     "moduleOption": "{count} module · {width} mm",
     "colorFor": "Màu của mạch {name}",
+    "clearColor": "Bỏ màu của mạch {name}",
     "removeCircuit": "Xóa mạch {name}",
     "addCircuit": "Thêm mạch",
     "appearanceTitle": "Kích thước và màu",
-    "appearanceDescription": "Điều chỉnh cách cắt và kiểu màu trước khi in.",
+    "appearanceDescription": "Điều chỉnh cách cắt và tùy chọn màu trước khi in.",
     "labelHeight": "Chiều cao nhãn",
     "clearance": "Mép chừa khi cắt",
     "colorStyle": "Kiểu màu khi in",
     "quickPalette": "Bảng màu nhanh",
+    "noColor": "Không dùng màu nhãn",
     "uppercase": "Chữ in hoa",
     "uppercaseHint": "Dễ đọc hơn khi nhãn nhỏ.",
     "styles": {
+      "none": "Không màu",
       "stripe": "Thanh màu",
       "border": "Viền màu",
       "fill": "Nền nhạt",

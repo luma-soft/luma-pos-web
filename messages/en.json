@@ -85,6 +85,23 @@
     "more": "More",
     "returns": "Returns"
   },
+  "toolsCenter": {
+    "title": "Tools",
+    "subtitle": "Utilities for daily store work",
+    "selectTool": "Select a tool",
+    "groups": {
+      "calculation": "Calculation",
+      "printing": "Printing"
+    },
+    "items": {
+      "tileCalculator": "Tile calculator",
+      "electricalLabels": "Electrical labels"
+    },
+    "breadcrumbs": {
+      "calculation": "Tools · Calculation",
+      "printing": "Tools · Printing"
+    }
+  },
   "tileCalculator": {
     "title": "Tile calculator",
     "eyebrow": "Material estimate",
@@ -169,6 +186,7 @@
   },
   "electricalLabels": {
     "title": "Electrical cabinet labels",
+    "description": "Design, preview, and print circuit labels using the breaker module's actual dimensions.",
     "badge": "A4 · DIN module",
     "tileCalculator": "Tile calculator",
     "deviceTitle": "Breaker brand and range",
@@ -179,24 +197,27 @@
     "customWidth": "Single-module width",
     "moduleHint": "Label width = module count × {width} mm − cutting clearance. For an RCBO, use the occupied module count rather than pole count alone.",
     "circuitsTitle": "Circuit list",
-    "circuitsDescription": "Set the name, module count, quantity, and identification color for each circuit.",
+    "circuitsDescription": "Set the name, module count, quantity, and an optional identification color for each circuit.",
     "reset": "Reset",
     "circuitName": "Circuit name",
     "modules": "Modules",
     "quantity": "Quantity",
     "moduleOption": "{count} module(s) · {width} mm",
     "colorFor": "Color for circuit {name}",
+    "clearColor": "Remove color from circuit {name}",
     "removeCircuit": "Remove circuit {name}",
     "addCircuit": "Add circuit",
     "appearanceTitle": "Size and color",
-    "appearanceDescription": "Adjust the cut size and color treatment before printing.",
+    "appearanceDescription": "Adjust the cut size and optional color treatment before printing.",
     "labelHeight": "Label height",
     "clearance": "Cutting clearance",
     "colorStyle": "Print color style",
     "quickPalette": "Quick palette",
+    "noColor": "Do not use label colors",
     "uppercase": "Uppercase text",
     "uppercaseHint": "Improves legibility on small labels.",
     "styles": {
+      "none": "No color",
       "stripe": "Color stripe",
       "border": "Color border",
       "fill": "Pale fill",

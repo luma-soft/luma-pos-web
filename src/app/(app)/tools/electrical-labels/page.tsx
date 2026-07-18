@@ -1,33 +1,20 @@
-import Link from "next/link";
-import { Calculator, Tags } from "lucide-react";
 import { getTranslations } from "next-intl/server";
-import { PageHeader } from "@/components/page-header";
-import { buttonVariants } from "@/components/ui/button-variants";
-import { Routes } from "@/lib/routes";
 import { ElectricalLabelsClient } from "./electrical-labels-client";
+import { ToolPageHeader } from "../tool-page-header";
 
 export default async function ElectricalLabelsPage() {
-  const t = await getTranslations("electricalLabels");
+  const [t, toolsT] = await Promise.all([
+    getTranslations("electricalLabels"),
+    getTranslations("toolsCenter"),
+  ]);
 
   return (
-    <div className="min-h-dvh bg-canvas">
-      <PageHeader
+    <div className="min-h-full bg-canvas">
+      <ToolPageHeader
+        eyebrow={toolsT("breadcrumbs.printing")}
         title={t("title")}
-        badge={(
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-950/50 dark:text-primary-300">
-            <Tags className="size-3.5" />
-            {t("badge")}
-          </span>
-        )}
-      >
-        <Link
-          href={Routes.Tools}
-          className={buttonVariants({ variant: "outline", size: "sm" })}
-        >
-          <Calculator />
-          {t("tileCalculator")}
-        </Link>
-      </PageHeader>
+        description={t("description")}
+      />
       <ElectricalLabelsClient />
     </div>
   );

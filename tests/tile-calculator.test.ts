@@ -1,3 +1,4 @@
+// @ts-expect-error bun:test types are provided by the Bun test runtime, not this Next.js app.
 import { describe, expect, test } from "bun:test";
 import {
   calculateRoom,

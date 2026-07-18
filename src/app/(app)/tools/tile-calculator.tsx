@@ -1,10 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
-  Calculator,
   Check,
   CircleAlert,
   Copy,
@@ -14,17 +12,13 @@ import {
   Plus,
   ReceiptText,
   Ruler,
-  Tags,
   Trash2,
 } from "lucide-react";
-import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
-import { buttonVariants } from "@/components/ui/button-variants";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { cn } from "@/lib/utils";
-import { Routes } from "@/lib/routes";
 import {
   DEFAULT_SKIRT_HEIGHT,
   DEFAULT_WASTE,
@@ -39,12 +33,14 @@ import {
   type TileRoom,
   type WallType,
 } from "./tile-calculator-model";
+import { ToolPageHeader } from "./tool-page-header";
 
 type CopyState = "idle" | "copied" | "error";
 type Translator = ReturnType<typeof useTranslations>;
 
 export function TileCalculator() {
   const t = useTranslations("tileCalculator");
+  const toolsT = useTranslations("toolsCenter");
   const locale = useLocale();
   const [rooms, setRooms] = useState<TileRoom[]>(() => createInitialRooms(t));
   const [copyState, setCopyState] = useState<CopyState>("idle");
@@ -144,34 +140,23 @@ export function TileCalculator() {
   }
 
   return (
-    <div className="min-h-dvh bg-canvas">
-      <PageHeader title={t("title")}>
-        <Link
-          href={Routes.ElectricalLabels}
-          className={buttonVariants({ variant: "outline", size: "sm" })}
-        >
-          <Tags />
-          {t("electricalLabels")}
-        </Link>
-        <Button type="button" variant="outline" size="sm" onClick={copySummary}>
-          {copyState === "copied" ? <Check /> : copyState === "error" ? <CircleAlert /> : <Copy />}
-          {copyState === "copied" ? t("copied") : t("copySummary")}
-        </Button>
-      </PageHeader>
+    <div className="min-h-full bg-canvas">
+      <ToolPageHeader
+        eyebrow={toolsT("breadcrumbs.calculation")}
+        title={t("title")}
+        description={t("description")}
+        actions={(
+          <Button type="button" variant="outline" size="sm" onClick={copySummary}>
+            {copyState === "copied" ? <Check /> : copyState === "error" ? <CircleAlert /> : <Copy />}
+            {copyState === "copied" ? t("copied") : t("copySummary")}
+          </Button>
+        )}
+      />
 
       <main className="mx-auto w-full max-w-[94rem] px-4 py-5 sm:px-6 sm:py-7">
-        <div className="mb-6 max-w-3xl">
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold tracking-[0.14em] text-primary-700 uppercase dark:text-primary-300">
-            <Calculator className="size-4" />
-            {t("eyebrow")}
-          </div>
-          <p className="text-sm leading-6 text-slate-500 dark:text-slate-400 sm:text-base">
-            {t("description")}
-          </p>
-          {copyState === "error" && (
-            <p role="alert" className="mt-2 text-sm font-medium text-er">{t("copyFailed")}</p>
-          )}
-        </div>
+        {copyState === "error" && (
+          <p role="alert" className="mb-4 text-sm font-medium text-er">{t("copyFailed")}</p>
+        )}
 
         <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]">
           <section aria-label={t("rooms")} className="min-w-0 space-y-4">

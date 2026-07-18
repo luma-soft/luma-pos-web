@@ -3,6 +3,7 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import {
+  Ban,
   CirclePlus,
   Info,
   Printer,
@@ -24,14 +25,14 @@ import {
 import styles from "./electrical-labels.module.css";
 
 type ModuleCount = 1 | 2 | 3 | 4;
-type ColorStyle = "stripe" | "border" | "fill" | "mono";
+type ColorStyle = "none" | "stripe" | "border" | "fill" | "mono";
 
 type Circuit = {
   id: string;
   name: string;
   modules: ModuleCount;
   quantity: number;
-  color: string;
+  color: string | null;
 };
 
 type LabelSettings = {
@@ -73,7 +74,7 @@ const DEFAULT_SETTINGS: LabelSettings = {
   labelHeight: 12,
   clearance: 1,
   uppercase: true,
-  colorStyle: "stripe",
+  colorStyle: "none",
   profileId: "panasonic-bbd",
   customModuleWidth: 18,
 };
@@ -115,10 +116,10 @@ function fontSizeFor(name: string, modules: ModuleCount) {
 export function ElectricalLabelsClient() {
   const t = useTranslations("electricalLabels");
   const makeDefaults = React.useCallback((): Circuit[] => [
-    { id: "main", name: t("defaults.main"), modules: 2, quantity: 2, color: "#dc2626" },
-    { id: "induction", name: t("defaults.induction"), modules: 1, quantity: 4, color: "#f59e0b" },
-    { id: "lighting", name: t("defaults.lighting"), modules: 1, quantity: 6, color: "#2563eb" },
-    { id: "water-heater", name: t("defaults.waterHeater"), modules: 1, quantity: 4, color: "#059669" },
+    { id: "main", name: t("defaults.main"), modules: 2, quantity: 2, color: null },
+    { id: "induction", name: t("defaults.induction"), modules: 1, quantity: 4, color: null },
+    { id: "lighting", name: t("defaults.lighting"), modules: 1, quantity: 6, color: null },
+    { id: "water-heater", name: t("defaults.waterHeater"), modules: 1, quantity: 4, color: null },
   ], [t]);
   const [circuits, setCircuits] = React.useState<Circuit[]>(makeDefaults);
   const [settings, setSettings] = React.useState<LabelSettings>(DEFAULT_SETTINGS);
@@ -203,7 +204,7 @@ export function ElectricalLabelsClient() {
   const addCircuit = () => {
     setCircuits((current) => [
       ...current,
-      { id: makeId(), name: t("defaults.socket"), modules: 1, quantity: 2, color: "#7c3aed" },
+      { id: makeId(), name: t("defaults.socket"), modules: 1, quantity: 2, color: null },
     ]);
   };
 
@@ -217,6 +218,15 @@ export function ElectricalLabelsClient() {
       ...item,
       color: colors[index % colors.length],
     })));
+    setSettings((current) => ({
+      ...current,
+      colorStyle: current.colorStyle === "none" ? "stripe" : current.colorStyle,
+    }));
+  };
+
+  const clearColors = () => {
+    setCircuits((current) => current.map((item) => ({ ...item, color: null })));
+    setSettings((current) => ({ ...current, colorStyle: "none" }));
   };
 
   const print = () => {
@@ -243,7 +253,7 @@ export function ElectricalLabelsClient() {
 
   return (
     <>
-      <div className="mx-auto grid w-full max-w-[1600px] gap-4 p-4 sm:p-6 xl:grid-cols-[minmax(390px,0.82fr)_minmax(620px,1.18fr)]">
+      <div className="mx-auto grid w-full max-w-[1600px] gap-4 p-4 sm:p-6 2xl:grid-cols-[minmax(520px,0.82fr)_minmax(620px,1.18fr)]">
         <div className="min-w-0 space-y-4">
           <Section
             collapsible={false}
@@ -302,27 +312,34 @@ export function ElectricalLabelsClient() {
             <div className="space-y-3">
               {circuits.map((circuit, index) => (
                 <div
-                  className="grid gap-3 rounded-xl border border-border bg-surface-2 p-3 sm:grid-cols-[32px_minmax(130px,1fr)_minmax(130px,0.9fr)_92px_32px] sm:items-end"
+                  className="grid gap-3 rounded-xl border border-border bg-surface-2 p-3 sm:grid-cols-[44px_minmax(0,1.35fr)_minmax(0,1fr)_84px_32px] sm:items-end"
                   key={circuit.id}
                 >
                   <div className="flex items-center gap-2 sm:block sm:self-center">
                     <span className="font-mono text-[10px] font-semibold text-slate-400">{String(index + 1).padStart(2, "0")}</span>
-                    <input
-                      type="color"
-                      value={circuit.color}
-                      onChange={(event) => updateCircuit(circuit.id, { color: event.target.value })}
-                      aria-label={t("colorFor", { name: circuit.name })}
-                      className="h-8 w-8 cursor-pointer rounded-lg border-0 bg-transparent p-0"
+                    <CircuitColorPicker
+                      color={circuit.color}
+                      chooseLabel={t("colorFor", { name: circuit.name })}
+                      clearLabel={t("clearColor", { name: circuit.name })}
+                      onChange={(color) => {
+                        updateCircuit(circuit.id, { color });
+                        if (color) {
+                          setSettings((current) => ({
+                            ...current,
+                            colorStyle: current.colorStyle === "none" ? "stripe" : current.colorStyle,
+                          }));
+                        }
+                      }}
                     />
                   </div>
-                  <Field label={t("circuitName")}>
+                  <Field label={t("circuitName")} className="min-w-0">
                     <Input
                       value={circuit.name}
                       maxLength={32}
                       onChange={(event) => updateCircuit(circuit.id, { name: event.target.value })}
                     />
                   </Field>
-                  <Field label={t("modules")}>
+                  <Field label={t("modules")} className="min-w-0">
                     <Select
                       className="w-full"
                       value={String(circuit.modules)}
@@ -330,8 +347,9 @@ export function ElectricalLabelsClient() {
                       onValueChange={(value) => updateCircuit(circuit.id, { modules: Number(value) as ModuleCount })}
                     />
                   </Field>
-                  <Field label={t("quantity")}>
+                  <Field label={t("quantity")} className="min-w-0">
                     <NumberInput
+                      className="min-w-0 px-2"
                       value={circuit.quantity}
                       min={1}
                       max={99}
@@ -388,6 +406,7 @@ export function ElectricalLabelsClient() {
                   value={settings.colorStyle}
                   onChange={(colorStyle) => setSettings((current) => ({ ...current, colorStyle }))}
                   items={([
+                    ["none", t("styles.none")],
                     ["stripe", t("styles.stripe")],
                     ["border", t("styles.border")],
                     ["fill", t("styles.fill")],
@@ -396,6 +415,16 @@ export function ElectricalLabelsClient() {
                 />
               </Field>
               <Field label={t("quickPalette")}>
+                <div className="mb-2 grid grid-cols-1">
+                  <button
+                    type="button"
+                    onClick={clearColors}
+                    className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface p-2.5 text-xs font-semibold text-slate-600 transition-colors hover:border-primary-300 hover:text-primary-700 dark:text-slate-300"
+                  >
+                    <Ban className="size-4" />
+                    {t("noColor")}
+                  </button>
+                </div>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {COLOR_PALETTES.map((palette) => (
                     <button
@@ -431,7 +460,7 @@ export function ElectricalLabelsClient() {
         </div>
 
         <div className="min-w-0">
-          <div className="overflow-hidden rounded-card border border-border bg-surface shadow-e1 xl:sticky xl:top-[74px]">
+          <div className="overflow-hidden rounded-card border border-border bg-surface shadow-e1 2xl:sticky 2xl:top-[74px]">
             <div className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3 sm:px-5">
               <div>
                 <Text as="h2" weight="bold">{t("preview")}</Text>
@@ -478,6 +507,51 @@ export function ElectricalLabelsClient() {
   );
 }
 
+function CircuitColorPicker({
+  color,
+  chooseLabel,
+  clearLabel,
+  onChange,
+}: {
+  color: string | null;
+  chooseLabel: string;
+  clearLabel: string;
+  onChange: (color: string | null) => void;
+}) {
+  return (
+    <div className="relative mt-1 w-fit">
+      <label
+        className="relative grid size-9 cursor-pointer place-items-center overflow-hidden rounded-lg border border-border bg-surface shadow-sm transition-colors hover:border-primary-400 focus-within:ring-2 focus-within:ring-primary-500/30"
+        title={chooseLabel}
+      >
+        {color ? (
+          <span className="absolute inset-1 rounded-md" style={{ backgroundColor: color }} aria-hidden="true" />
+        ) : (
+          <Ban className="size-4 text-slate-400" aria-hidden="true" />
+        )}
+        <input
+          type="color"
+          value={color ?? "#0f766e"}
+          onChange={(event) => onChange(event.target.value)}
+          aria-label={chooseLabel}
+          className="absolute inset-0 cursor-pointer opacity-0"
+        />
+      </label>
+      {color && (
+        <button
+          type="button"
+          aria-label={clearLabel}
+          title={clearLabel}
+          onClick={() => onChange(null)}
+          className="absolute -right-1.5 -top-1.5 z-10 grid size-4 place-items-center rounded-full border border-border bg-surface text-[10px] font-bold leading-none text-slate-500 shadow-sm hover:border-red-300 hover:text-red-600"
+        >
+          ×
+        </button>
+      )}
+    </div>
+  );
+}
+
 function PrintPage({
   page,
   settings,
@@ -505,13 +579,14 @@ function PrintPage({
           >
             {row.map((label, labelIndex) => {
               const width = moduleWidth * label.modules - settings.clearance;
+              const colorStyle = label.color ? settings.colorStyle : "none";
               return (
                 <div
-                  className={`${styles.printLabel} ${styles[settings.colorStyle] ?? ""}`}
+                  className={`${styles.printLabel} ${styles[colorStyle] ?? ""}`}
                   style={{
                     width: `${width}mm`,
                     height: `${settings.labelHeight}mm`,
-                    "--label-accent": label.color,
+                    "--label-accent": label.color ?? "transparent",
                     "--label-font-size": `${fontSizeFor(label.name, label.modules)}pt`,
                   } as React.CSSProperties}
                   key={`${label.id}-${labelIndex}`}
