@@ -42,7 +42,13 @@ export async function updateSession(request: NextRequest) {
 
   if (user && isAuthPath) {
     const url = request.nextUrl.clone();
-    url.pathname = Routes.Dashboard;
+    if (user.email?.toLowerCase() === "review@lumapos.shop") {
+      url.pathname = Routes.OnlineSales;
+      url.searchParams.set("tab", "overview");
+      url.searchParams.set("channel", "shopee");
+    } else {
+      url.pathname = Routes.Dashboard;
+    }
     return NextResponse.redirect(url);
   }
 

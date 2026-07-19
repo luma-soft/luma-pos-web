@@ -38,7 +38,10 @@ export default function LoginPage() {
       setServerErr(error.message);
       return;
     }
-    router.push(Routes.Dashboard);
+    const nextRoute = values.email.trim().toLowerCase() === "review@lumapos.shop"
+      ? `${Routes.OnlineSales}?tab=overview&channel=shopee`
+      : Routes.Dashboard;
+    router.push(nextRoute);
     router.refresh();
   }
 
