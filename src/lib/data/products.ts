@@ -25,6 +25,7 @@ import {
 } from "@/db/schema";
 import { accentInsensitiveLike } from "@/lib/search";
 import { coercePageSize, DEFAULT_PAGE_SIZE } from "@/lib/pagination";
+import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
 
 export const PRODUCTS_PAGE_SIZE = 20;
 
@@ -44,11 +45,25 @@ export interface ProductListFilters {
 
 export const PRODUCT_ORDER_NOTE_SPEC_KEY = "__orderNote";
 
+function productComplianceFields(hasColumns: boolean) {
+  return {
+    vatRate: hasColumns ? products.vatRate : sql<string | null>`null`,
+    priceByWeight: hasColumns ? products.priceByWeight : sql<boolean>`false`,
+    trackBatches: hasColumns ? products.trackBatches : sql<boolean>`false`,
+    shelfLifeDays: hasColumns ? products.shelfLifeDays : sql<number | null>`null`,
+    lifecycleStatus: hasColumns
+      ? products.lifecycleStatus
+      : sql<string>`case when ${products.isActive} then 'active' else 'archived' end`,
+  };
+}
+
 export async function getProducts(filters: ProductListFilters = {}) {
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize, DEFAULT_PAGE_SIZE);
   const status: ProductStatusFilter = filters.status ?? "active";
   const view: ProductListView = filters.view ?? "grouped";
+  const hasComplianceColumns = await hasProductComplianceColumns();
+  const complianceFields = productComplianceFields(hasComplianceColumns);
   const conditions: SQL[] = [];
 
   if (filters.q?.trim()) {
@@ -108,7 +123,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
         )`,
         )!,
       );
-    } else if (status === "draft" || status === "archived") {
+    } else if (hasComplianceColumns && (status === "draft" || status === "archived")) {
       conditions.push(
         or(
           eq(products.lifecycleStatus, status),
@@ -125,7 +140,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
     if (status === "active") conditions.push(eq(products.isActive, true));
     else if (status === "inactive")
       conditions.push(eq(products.isActive, false));
-    else if (status === "draft" || status === "archived")
+    else if (hasComplianceColumns && (status === "draft" || status === "archived"))
       conditions.push(eq(products.lifecycleStatus, status));
   }
 
@@ -149,11 +164,11 @@ export async function getProducts(filters: ProductListFilters = {}) {
         wholesalePrice: products.wholesalePrice,
         contractorPrice: products.contractorPrice,
         agentPrice: products.agentPrice,
-        vatRate: products.vatRate,
-        priceByWeight: products.priceByWeight,
-        trackBatches: products.trackBatches,
-        shelfLifeDays: products.shelfLifeDays,
-        lifecycleStatus: products.lifecycleStatus,
+        vatRate: complianceFields.vatRate,
+        priceByWeight: complianceFields.priceByWeight,
+        trackBatches: complianceFields.trackBatches,
+        shelfLifeDays: complianceFields.shelfLifeDays,
+        lifecycleStatus: complianceFields.lifecycleStatus,
         parentProductId: products.parentProductId,
         variantName: products.variantName,
         isVariantParent: products.isVariantParent,
@@ -239,11 +254,11 @@ export async function getProducts(filters: ProductListFilters = {}) {
             wholesalePrice: products.wholesalePrice,
             contractorPrice: products.contractorPrice,
             agentPrice: products.agentPrice,
-            vatRate: products.vatRate,
-            priceByWeight: products.priceByWeight,
-            trackBatches: products.trackBatches,
-            shelfLifeDays: products.shelfLifeDays,
-            lifecycleStatus: products.lifecycleStatus,
+            vatRate: complianceFields.vatRate,
+            priceByWeight: complianceFields.priceByWeight,
+            trackBatches: complianceFields.trackBatches,
+            shelfLifeDays: complianceFields.shelfLifeDays,
+            lifecycleStatus: complianceFields.lifecycleStatus,
             parentProductId: products.parentProductId,
             variantName: products.variantName,
             isVariantParent: products.isVariantParent,
@@ -516,6 +531,9 @@ export async function getMobileProducts(filters: ProductListFilters = {}) {
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize, 15);
   const status: ProductStatusFilter = filters.status ?? "active";
+  const complianceFields = productComplianceFields(
+    await hasProductComplianceColumns(),
+  );
   const conditions: SQL[] = [sql`${products.parentProductId} is null`];
 
   if (filters.q?.trim()) {
@@ -561,11 +579,11 @@ export async function getMobileProducts(filters: ProductListFilters = {}) {
         wholesalePrice: products.wholesalePrice,
         contractorPrice: products.contractorPrice,
         agentPrice: products.agentPrice,
-        vatRate: products.vatRate,
-        priceByWeight: products.priceByWeight,
-        trackBatches: products.trackBatches,
-        shelfLifeDays: products.shelfLifeDays,
-        lifecycleStatus: products.lifecycleStatus,
+        vatRate: complianceFields.vatRate,
+        priceByWeight: complianceFields.priceByWeight,
+        trackBatches: complianceFields.trackBatches,
+        shelfLifeDays: complianceFields.shelfLifeDays,
+        lifecycleStatus: complianceFields.lifecycleStatus,
         parentProductId: products.parentProductId,
         variantName: products.variantName,
         isVariantParent: products.isVariantParent,
@@ -632,6 +650,9 @@ export async function getMobileProductOptions() {
 
 /** Chi tiết 1 SP cho trang xem/sửa (gồm đơn vị quy đổi + tồn kho). */
 export async function getProduct(id: string) {
+  const complianceFields = productComplianceFields(
+    await hasProductComplianceColumns(),
+  );
   const [p] = await db
     .select({
       id: products.id,
@@ -654,11 +675,11 @@ export async function getProduct(id: string) {
       wholesalePrice: products.wholesalePrice,
       contractorPrice: products.contractorPrice,
       agentPrice: products.agentPrice,
-      vatRate: products.vatRate,
-      priceByWeight: products.priceByWeight,
-      trackBatches: products.trackBatches,
-      shelfLifeDays: products.shelfLifeDays,
-      lifecycleStatus: products.lifecycleStatus,
+      vatRate: complianceFields.vatRate,
+      priceByWeight: complianceFields.priceByWeight,
+      trackBatches: complianceFields.trackBatches,
+      shelfLifeDays: complianceFields.shelfLifeDays,
+      lifecycleStatus: complianceFields.lifecycleStatus,
       location: products.location,
       weight: products.weight,
       dimensions: products.dimensions,

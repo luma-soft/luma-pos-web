@@ -6,6 +6,7 @@ import {
 import { unstable_cache } from "next/cache";
 import { accentInsensitiveLike } from "@/lib/search";
 import { coercePageSize } from "@/lib/pagination";
+import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
 
 export const INVENTORY_PAGE_SIZE = 30;
 
@@ -34,6 +35,7 @@ const getInventoryStats = unstable_cache(
 export async function getInventory(filters: { q?: string; low?: boolean; stock?: StockFilter; categoryId?: string; page?: number; pageSize?: number } = {}) {
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize, INVENTORY_PAGE_SIZE);
+  const hasComplianceColumns = await hasProductComplianceColumns();
   const conditions: SQL[] = [eq(products.isActive, true)];
   if (filters.q?.trim()) {
     const q = filters.q.trim();
@@ -57,8 +59,8 @@ export async function getInventory(filters: { q?: string; low?: boolean; stock?:
         name: products.name,
         baseUnit: products.baseUnit,
         costPrice: products.costPrice,
-        trackBatches: products.trackBatches,
-        shelfLifeDays: products.shelfLifeDays,
+        trackBatches: hasComplianceColumns ? products.trackBatches : sql<boolean>`false`,
+        shelfLifeDays: hasComplianceColumns ? products.shelfLifeDays : sql<number | null>`null`,
         totalStock: products.totalStock,
         minLevel: products.minStock,
         stockValue: sql<string>`${products.totalStock} * ${products.costPrice}`,
