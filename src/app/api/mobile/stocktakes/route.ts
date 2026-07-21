@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { profiles, stocktakeItems, stocktakes, warehouses } from "@/db/schema";
 import { createStocktake } from "@/lib/actions/stocktakes";
 import { requireMobileStockAccess } from "@/lib/mobile/auth";
-import { mobileAction, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
+import { mobileAction, mobileError, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
 
 export async function GET() {
   const gate = await requireMobileStockAccess();
@@ -39,8 +39,18 @@ export async function POST(request: Request) {
 
   const body = await readJson(request);
   if (!body) return mobileAction({ ok: false, error: "errors.invalidData" });
+  if (
+    typeof body === "object" &&
+    "balanceNow" in body &&
+    body.balanceNow === true
+  ) {
+    return mobileError("stocktakes.errors.createDraftFirst", 409);
+  }
 
   return mobileAction(
-    await createStocktake(body as Parameters<typeof createStocktake>[0])
+    await createStocktake({
+      ...(body as Parameters<typeof createStocktake>[0]),
+      balanceNow: false,
+    })
   );
 }

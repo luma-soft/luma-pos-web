@@ -4,9 +4,21 @@ import { revalidatePath } from "next/cache";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { diningTables, warehouses, kitchenTickets, kitchenTicketItems } from "@/db/schema";
+import {
+  diningTables,
+  warehouses,
+  kitchenTickets,
+  kitchenTicketItems,
+  modifierGroups,
+  products,
+} from "@/db/schema";
 import { tableCartSchema, type TableCartItem } from "@/lib/schemas/table";
 import { createOrderForUser } from "@/lib/orders/create";
+import {
+  mergeLockedTableCart,
+  resolveAuthoritativeTableCart,
+  tableCheckoutClientId,
+} from "@/lib/tables/authoritative-cart";
 import { type ActionResult, requireUser, requireManager, getProfileId, toQty } from "./common";
 
 type Method = "cash" | "bank_transfer" | "credit";
@@ -14,6 +26,59 @@ type Method = "cash" | "bank_transfer" | "credit";
 function readCart(raw: unknown): TableCartItem[] {
   const parsed = tableCartSchema.safeParse(raw);
   return parsed.success ? parsed.data : [];
+}
+
+const tableCartDataErrors = new Set([
+  "PRODUCT_NOT_SELLABLE",
+  "INVALID_PRODUCT_PRICE",
+  "INVALID_MODIFIER_PRICE",
+  "DUPLICATE_LINE_ID",
+]);
+
+function isTableCartDataError(error: unknown) {
+  return error instanceof Error && tableCartDataErrors.has(error.message);
+}
+
+async function authoritativeTableCart(
+  items: TableCartItem[],
+  lockedSentLineIds: ReadonlySet<string>,
+) {
+  const productIds = [...new Set(items.map((item) => item.productId))];
+  const [productRows, modifierRows] = await Promise.all([
+    productIds.length
+      ? db
+          .select({
+            id: products.id,
+            name: products.name,
+            baseUnit: products.baseUnit,
+            retailPrice: products.retailPrice,
+            isActive: products.isActive,
+            lifecycleStatus: products.lifecycleStatus,
+            categoryId: products.categoryId,
+          })
+          .from(products)
+          .where(inArray(products.id, productIds))
+      : Promise.resolve([]),
+    db
+      .select({
+        options: modifierGroups.options,
+        categoryIds: modifierGroups.categoryIds,
+      })
+      .from(modifierGroups)
+      .where(eq(modifierGroups.isActive, true)),
+  ]);
+  return resolveAuthoritativeTableCart({
+    items,
+    products: productRows,
+    modifierOptions: modifierRows.flatMap((group) =>
+      (group.options ?? []).map((option) => ({
+        label: option.label,
+        priceDelta: option.priceDelta,
+        categoryIds: group.categoryIds ?? [],
+      })),
+    ),
+    lockedSentLineIds,
+  });
 }
 
 /** Đóng các phiếu bếp đang mở của 1 bàn (khi thanh toán xong / đóng bàn). */
@@ -58,12 +123,33 @@ export async function openTable(id: string): Promise<ActionResult> {
 
 export async function setTableCart(id: string, items: unknown): Promise<ActionResult> {
   try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  return setTableCartForUser(id, items);
+}
+
+export async function setTableCartForUser(id: string, items: unknown): Promise<ActionResult> {
   const parsed = tableCartSchema.safeParse(items);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   try {
-    await db.update(diningTables).set({ currentCart: parsed.data, status: "occupied" }).where(eq(diningTables.id, id));
+    const [table] = await db
+      .select({ currentCart: diningTables.currentCart })
+      .from(diningTables)
+      .where(eq(diningTables.id, id))
+      .limit(1);
+    if (!table) return { ok: false, error: "errors.invalidData" };
+    const merged = mergeLockedTableCart({
+      existing: readCart(table.currentCart),
+      requested: parsed.data,
+    });
+    const cart = await authoritativeTableCart(
+      merged.items,
+      merged.lockedSentLineIds,
+    );
+    await db.update(diningTables).set({ currentCart: cart, status: "occupied" }).where(eq(diningTables.id, id));
     revalidatePath("/tables"); return { ok: true, data: undefined };
-  } catch (e) { console.error("setTableCart failed:", e); return { ok: false, error: "errors.serverError" }; }
+  } catch (e) {
+    if (isTableCartDataError(e)) return { ok: false, error: "errors.invalidData" };
+    console.error("setTableCart failed:", e); return { ok: false, error: "errors.serverError" };
+  }
 }
 
 export async function closeTable(id: string): Promise<ActionResult> {
@@ -79,6 +165,10 @@ export async function closeTable(id: string): Promise<ActionResult> {
 export async function sendToKitchen(id: string): Promise<ActionResult<{ ticketId: string }>> {
   let userId: string;
   try { userId = (await requireUser()).id; } catch { return { ok: false, error: "errors.unauthorized" }; }
+  return sendToKitchenForUser(userId, id);
+}
+
+export async function sendToKitchenForUser(userId: string, id: string): Promise<ActionResult<{ ticketId: string }>> {
   try {
     const [t] = await db.select().from(diningTables).where(eq(diningTables.id, id)).limit(1);
     if (!t) return { ok: false, error: "errors.invalidData" };
@@ -98,6 +188,8 @@ export async function sendToKitchen(id: string): Promise<ActionResult<{ ticketId
       await tx.insert(kitchenTicketItems).values(fresh.map((i) => ({
         ticketId: ticket.id, productId: i.productId, productName: i.productName,
         quantity: toQty(i.quantity), modifiers: i.modifiers, note: i.note ?? null,
+        course: i.course,
+        fireAt: new Date(Date.now() + i.courseDelayMinutes * 60_000),
       })));
       return ticket.id;
     });
@@ -115,6 +207,10 @@ const lineIdsSchema = z.array(z.string()).optional();
 export async function checkoutTable(id: string, method: Method, lineIds?: unknown): Promise<ActionResult<{ code: string }>> {
   let userId: string;
   try { userId = (await requireUser()).id; } catch { return { ok: false, error: "errors.unauthorized" }; }
+  return checkoutTableForUser(userId, id, method, lineIds);
+}
+
+export async function checkoutTableForUser(userId: string, id: string, method: Method, lineIds?: unknown): Promise<ActionResult<{ code: string }>> {
   const ids = lineIdsSchema.safeParse(lineIds);
   if (!ids.success) return { ok: false, error: "errors.invalidData" };
   try {
@@ -123,8 +219,12 @@ export async function checkoutTable(id: string, method: Method, lineIds?: unknow
     const cart = readCart(t.currentCart);
     if (cart.length === 0) return { ok: false, error: "pos.errors.emptyCart" };
 
-    const selected = ids.data && ids.data.length > 0 ? cart.filter((i) => ids.data!.includes(i.lineId)) : cart;
-    if (selected.length === 0) return { ok: false, error: "pos.errors.emptyCart" };
+    const selectedRaw = ids.data && ids.data.length > 0 ? cart.filter((i) => ids.data!.includes(i.lineId)) : cart;
+    if (selectedRaw.length === 0) return { ok: false, error: "pos.errors.emptyCart" };
+    const selected = await authoritativeTableCart(
+      selectedRaw,
+      new Set(selectedRaw.filter((item) => item.sent).map((item) => item.lineId)),
+    );
 
     const [wh] = await db.select({ id: warehouses.id }).from(warehouses).orderBy(desc(warehouses.isDefault)).limit(1);
     if (!wh) return { ok: false, error: "errors.invalidData" };
@@ -132,6 +232,10 @@ export async function checkoutTable(id: string, method: Method, lineIds?: unknow
 
     const res = await createOrderForUser(userId, {
       mode: "sale",
+      clientId: tableCheckoutClientId({
+        tableId: id,
+        lineIds: selected.map((item) => item.lineId),
+      }),
       warehouseId: wh.id,
       items: selected.map((i) => ({
         productId: i.productId,
@@ -157,29 +261,90 @@ export async function checkoutTable(id: string, method: Method, lineIds?: unknow
     }
     revalidatePath("/tables");
     return { ok: true, data: { code: res.data.code } };
-  } catch (e) { console.error("checkoutTable failed:", e); return { ok: false, error: "errors.serverError" }; }
+  } catch (e) {
+    if (isTableCartDataError(e)) return { ok: false, error: "errors.invalidData" };
+    console.error("checkoutTable failed:", e); return { ok: false, error: "errors.serverError" };
+  }
 }
 
 /** Gộp bàn: dồn giỏ + phiếu bếp của các bàn nguồn về bàn đích, giải phóng bàn nguồn. */
 export async function mergeTables(targetId: string, sourceIds: unknown): Promise<ActionResult> {
   try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  return mergeTablesForUser(targetId, sourceIds);
+}
+
+export async function mergeTablesForUser(targetId: string, sourceIds: unknown): Promise<ActionResult> {
   const parsed = z.array(z.uuid()).min(1).safeParse(sourceIds);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const sources = parsed.data.filter((s) => s !== targetId);
   if (sources.length === 0) return { ok: false, error: "errors.invalidData" };
   try {
-    const rows = await db.select().from(diningTables).where(inArray(diningTables.id, [targetId, ...sources]));
-    const target = rows.find((r) => r.id === targetId);
-    if (!target) return { ok: false, error: "errors.invalidData" };
-    const merged = [...readCart(target.currentCart)];
-    for (const s of sources) merged.push(...readCart(rows.find((r) => r.id === s)?.currentCart));
-
-    await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx): Promise<ActionResult> => {
+      const rows = await tx.select().from(diningTables)
+        .where(inArray(diningTables.id, [targetId, ...sources]))
+        .for("update");
+      const target = rows.find((r) => r.id === targetId);
+      if (!target || rows.length !== sources.length + 1) {
+        return { ok: false, error: "errors.invalidData" };
+      }
+      const merged = [...readCart(target.currentCart)];
+      for (const sourceId of sources) {
+        merged.push(...readCart(rows.find((row) => row.id === sourceId)?.currentCart));
+      }
       await tx.update(diningTables).set({ currentCart: merged, status: "occupied", openedAt: target.openedAt ?? new Date() }).where(eq(diningTables.id, targetId));
       await tx.update(kitchenTickets).set({ tableId: targetId, tableName: target.name }).where(and(inArray(kitchenTickets.tableId, sources), eq(kitchenTickets.status, "active")));
       await tx.update(diningTables).set({ status: "free", currentCart: [], openedAt: null }).where(inArray(diningTables.id, sources));
+      return { ok: true, data: undefined };
     });
+    if (!result.ok) return result;
     revalidatePath("/tables"); revalidatePath("/kds");
-    return { ok: true, data: undefined };
+    return result;
   } catch (e) { console.error("mergeTables failed:", e); return { ok: false, error: "errors.serverError" }; }
+}
+
+/** Chuyển toàn bộ giỏ + phiếu bếp sang một bàn trống trong cùng transaction. */
+export async function moveTableForUser(sourceId: string, targetId: string): Promise<ActionResult> {
+  if (!sourceId || !targetId || sourceId === targetId) {
+    return { ok: false, error: "errors.invalidData" };
+  }
+  try {
+    const result = await db.transaction(async (tx): Promise<ActionResult> => {
+      const rows = await tx
+        .select()
+        .from(diningTables)
+        .where(inArray(diningTables.id, [sourceId, targetId]))
+        .for("update");
+      const source = rows.find((row) => row.id === sourceId);
+      const target = rows.find((row) => row.id === targetId);
+      if (!source || !target) return { ok: false, error: "errors.invalidData" };
+      const sourceCart = readCart(source.currentCart);
+      const targetCart = readCart(target.currentCart);
+      if (sourceCart.length === 0) return { ok: false, error: "pos.errors.emptyCart" };
+      if (target.status === "occupied" || targetCart.length > 0) {
+        return { ok: false, error: "tables.errors.targetOccupied" };
+      }
+      await tx.update(diningTables).set({
+        currentCart: sourceCart,
+        status: "occupied",
+        openedAt: source.openedAt ?? new Date(),
+      }).where(eq(diningTables.id, targetId));
+      await tx.update(kitchenTickets).set({
+        tableId: targetId,
+        tableName: target.name,
+      }).where(and(eq(kitchenTickets.tableId, sourceId), eq(kitchenTickets.status, "active")));
+      await tx.update(diningTables).set({
+        status: "free",
+        currentCart: [],
+        openedAt: null,
+      }).where(eq(diningTables.id, sourceId));
+      return { ok: true, data: undefined };
+    });
+    if (!result.ok) return result;
+    revalidatePath("/tables");
+    revalidatePath("/kds");
+    return result;
+  } catch (e) {
+    console.error("moveTable failed:", e);
+    return { ok: false, error: "errors.serverError" };
+  }
 }

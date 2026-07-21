@@ -1,9 +1,9 @@
 import { getOrder, getOrders } from "@/lib/data/orders";
-import { requireMobileManager } from "@/lib/mobile/auth";
+import { requireMobileSalesAccess } from "@/lib/mobile/auth";
 import { mobileGate, mobileOk, searchParam } from "@/lib/mobile/response";
 
 export async function GET(request: Request) {
-  const gate = await requireMobileManager();
+  const gate = await requireMobileSalesAccess();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
 

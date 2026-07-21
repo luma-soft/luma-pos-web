@@ -1,4 +1,4 @@
-import { serveTicket, setTicketItemStatus } from "@/lib/actions/kitchen";
+import { serveTicketForUser, setTicketItemStatusForUser } from "@/lib/actions/kitchen";
 import { requireMobileSalesAccess } from "@/lib/mobile/auth";
 import { mobileAction, mobileGate, readJson } from "@/lib/mobile/response";
 
@@ -22,7 +22,7 @@ export async function PATCH(
     status?: unknown;
   };
   if (payload.scope === "ticket" || payload.status === "servedAll") {
-    return mobileAction(await serveTicket(ticketId));
+    return mobileAction(await serveTicketForUser(ticketId));
   }
 
   const status =
@@ -36,5 +36,5 @@ export async function PATCH(
   const itemId =
     typeof payload.itemId === "string" ? payload.itemId : ticketId;
 
-  return mobileAction(await setTicketItemStatus(itemId, status));
+  return mobileAction(await setTicketItemStatusForUser(itemId, status));
 }

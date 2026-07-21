@@ -1,4 +1,4 @@
-import { setTableCart } from "@/lib/actions/tables";
+import { setTableCartForUser } from "@/lib/actions/tables";
 import { requireMobileSalesAccess } from "@/lib/mobile/auth";
 import { mobileAction, mobileGate, readJson } from "@/lib/mobile/response";
 
@@ -7,8 +7,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const gate = await requireMobileSalesAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const { id } = await params;
   const body = await readJson(request);
@@ -17,5 +16,5 @@ export async function POST(
       ? (body as { items?: unknown }).items
       : body;
 
-  return mobileAction(await setTableCart(id, items));
+  return mobileAction(await setTableCartForUser(id, items));
 }

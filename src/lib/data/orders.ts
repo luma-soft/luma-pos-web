@@ -1,7 +1,7 @@
 import { and, count, desc, eq, gte, inArray, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  customers, orderItems, orders, payments, profiles, returnItems, returns, warehouses,
+  customers, einvoices, orderItems, orders, payments, profiles, returnItems, returns, warehouses,
 } from "@/db/schema";
 import { accentInsensitiveLike } from "@/lib/search";
 import { coercePageSize } from "@/lib/pagination";
@@ -82,9 +82,20 @@ export async function getOrders(filters: OrderListFilters = {}) {
       createdAt: orders.createdAt,
       customerName: customers.name,
       customerType: customers.type,
+      eInvoice: {
+        id: einvoices.id,
+        status: einvoices.status,
+        number: einvoices.number,
+        provider: einvoices.provider,
+        attemptCount: einvoices.attemptCount,
+        nextAttemptAt: einvoices.nextAttemptAt,
+        lastError: einvoices.lastError,
+        issuedAt: einvoices.issuedAt,
+      },
     })
     .from(orders)
-    .leftJoin(customers, eq(orders.customerId, customers.id));
+    .leftJoin(customers, eq(orders.customerId, customers.id))
+    .leftJoin(einvoices, eq(orders.id, einvoices.orderId));
 
   const countQ = db
     .select({ total: count() })

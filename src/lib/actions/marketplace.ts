@@ -23,6 +23,7 @@ import {
 import { writeAuditLog } from "@/lib/audit";
 import { completeAiText, loadAiProviderConfig, parseJsonText } from "@/lib/ai/provider-adapter";
 import { consumeAiUsage, recordAiTokenUsage } from "@/lib/ai/usage";
+import { consumeTrackedStockLots } from "@/lib/inventory/stock-lot-service";
 import {
   aiListingFillSchema,
   importShopeeOrderSchema,
@@ -567,9 +568,10 @@ export async function importShopeeOrder(input: ImportShopeeOrderInput): Promise<
         }).returning({ id: customers.id });
         customerId = customer.id;
       }
+      const isCancelled = v.status.toLowerCase().includes("cancel");
       const [order] = await tx.insert(orders).values({
         code: generateCode("SHP"),
-        status: v.status.toLowerCase().includes("cancel") ? "cancelled" : "completed",
+        status: isCancelled ? "cancelled" : "completed",
         paymentStatus: "paid",
         customerId,
         warehouseId: warehouse.id,
@@ -592,7 +594,15 @@ export async function importShopeeOrder(input: ImportShopeeOrderInput): Promise<
         unitPrice: toMoney(item.unitPrice),
         total: toMoney(item.quantity * item.unitPrice),
       })));
-      for (const item of v.items) {
+      for (const item of isCancelled ? [] : v.items) {
+        await consumeTrackedStockLots(tx, {
+          productId: item.productId,
+          warehouseId: warehouse.id,
+          quantity: item.quantity,
+          refType: "order",
+          refId: order.id,
+          createdBy: gate.userId,
+        });
         await tx.insert(stockLevels).values({
           productId: item.productId,
           warehouseId: warehouse.id,
@@ -626,6 +636,9 @@ export async function importShopeeOrder(input: ImportShopeeOrderInput): Promise<
     revalidatePath(Routes.OnlineSales);
     return { ok: true, data: { orderId: result.id, code: result.code, duplicate: false } };
   } catch (e) {
+    if (e instanceof Error && e.message === "INSUFFICIENT_BATCH_STOCK") {
+      return { ok: false, error: "orders.errors.insufficientStock" };
+    }
     console.error("importShopeeOrder failed:", e);
     return { ok: false, error: "errors.serverError" };
   }

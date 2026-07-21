@@ -9,6 +9,8 @@ import {
 import { createInternalUseSchema, type CreateInternalUseInput } from "@/lib/schemas/internal-use";
 import { type ActionResult, requireUser, getProfileId, getRole, generateCode, toMoney, toQty } from "./common";
 import { Routes } from "@/lib/routes";
+import { consumeTrackedStockLots } from "@/lib/inventory/stock-lot-service";
+import { canCreateInternalUse } from "@/lib/inventory/internal-use-policy";
 
 /** Ngưỡng phải duyệt (giá vốn). >500k & không phải owner/manager → chờ duyệt. */
 const APPROVAL_THRESHOLD = 500_000;
@@ -31,6 +33,14 @@ async function postStock(
   if (!issue.warehouseId) return;
   for (const it of items) {
     const baseQty = Number(it.quantity) * Number(it.unitMultiplier);
+    await consumeTrackedStockLots(tx, {
+      productId: it.productId,
+      warehouseId: issue.warehouseId,
+      quantity: baseQty,
+      refType: "internal_use",
+      refId: issue.id,
+      createdBy: profileId,
+    });
     await tx.insert(stockLevels)
       .values({ productId: it.productId, warehouseId: issue.warehouseId, quantity: toQty(-baseQty) })
       .onConflictDoUpdate({
@@ -64,6 +74,9 @@ export async function createInternalUse(
   try {
     const profileId = await getProfileId(userId);
     const role = await getRole(userId);
+    if (!canCreateInternalUse(role)) {
+      return { ok: false, error: "errors.forbidden" };
+    }
     const warehouseId = v.warehouseId ?? (await defaultWarehouseId());
     if (!warehouseId) return { ok: false, error: "errors.invalidData" };
 
@@ -111,6 +124,9 @@ export async function createInternalUse(
     revalidatePath(Routes.Inventory);
     return { ok: true, data: result };
   } catch (e) {
+    if (e instanceof Error && e.message === "INSUFFICIENT_BATCH_STOCK") {
+      return { ok: false, error: "inventory.errors.insufficientBatchStock" };
+    }
     console.error("createInternalUse failed:", e);
     return { ok: false, error: "errors.serverError" };
   }
@@ -134,6 +150,9 @@ export async function approveInternalUse(id: string): Promise<ActionResult> {
     revalidatePath(Routes.Inventory);
     return { ok: true, data: undefined };
   } catch (e) {
+    if (e instanceof Error && e.message === "INSUFFICIENT_BATCH_STOCK") {
+      return { ok: false, error: "inventory.errors.insufficientBatchStock" };
+    }
     console.error("approveInternalUse failed:", e);
     return { ok: false, error: "errors.serverError" };
   }

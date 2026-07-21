@@ -1,5 +1,9 @@
 import { getAuditLogs, type AuditSource, type AuditStatus } from "@/lib/audit";
-import { requireMobileUser } from "@/lib/mobile/auth";
+import {
+  MOBILE_AUDIT_ROLES,
+  toMobileAuditLog,
+} from "@/lib/audit/mobile-audit";
+import { requireMobileRole } from "@/lib/mobile/auth";
 import { mobileGate, mobileOk, numberParam, searchParam } from "@/lib/mobile/response";
 
 const SOURCES = new Set(["manual", "ai", "mobile", "pos", "system"]);
@@ -13,7 +17,7 @@ function dateParam(request: Request, key: string) {
 }
 
 export async function GET(request: Request) {
-  const gate = await requireMobileUser();
+  const gate = await requireMobileRole(MOBILE_AUDIT_ROLES);
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
 
@@ -31,9 +35,6 @@ export async function GET(request: Request) {
   });
 
   return mobileOk({
-    rows: rows.map((row) => ({
-      ...row,
-      createdAt: row.createdAt.toISOString(),
-    })),
+    rows: rows.map(toMobileAuditLog),
   });
 }

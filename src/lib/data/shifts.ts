@@ -28,6 +28,7 @@ export async function getShiftSummary(shift: Shift | null) {
       expectedCash: null,
       tenderTotals: { cash: 0, bank_transfer: 0, card: 0 },
       orderCount: 0,
+      revenue: 0,
       refundTotal: 0,
       cashIn: 0,
       cashOut: 0,
@@ -48,6 +49,7 @@ export async function getShiftSummary(shift: Shift | null) {
     db
       .select({
         orderCount: sql<string>`count(distinct ${orders.id})`,
+        revenue: sql<string>`coalesce(sum(${orders.total}), 0)`,
       })
       .from(orders)
       .where(eq(orders.shiftId, shift.id)),
@@ -72,6 +74,7 @@ export async function getShiftSummary(shift: Shift | null) {
     expectedCash,
     tenderTotals,
     orderCount: Number(orderRows[0]?.orderCount ?? 0),
+    revenue: Number(orderRows[0]?.revenue ?? 0),
     refundTotal: Number(cashRows[0]?.refundTotal ?? 0),
     cashIn: Number(cashRows[0]?.cashIn ?? 0),
     cashOut: Number(cashRows[0]?.cashOut ?? 0),
@@ -94,3 +97,18 @@ export async function getShifts(limit = 50) {
     .orderBy(desc(shifts.openedAt)).limit(limit);
 }
 export type ShiftRow = Awaited<ReturnType<typeof getShifts>>[number];
+
+export async function getShiftHistoryWithSummaries(limit = 30) {
+  const rows = await getShifts(limit);
+  return Promise.all(
+    rows.map(async (row) => {
+      const [shift] = await db
+        .select()
+        .from(shifts)
+        .where(eq(shifts.id, row.id))
+        .limit(1);
+      const summary = await getShiftSummary(shift ?? null);
+      return { ...row, summary };
+    }),
+  );
+}

@@ -22,7 +22,10 @@ export type CreateCashTxInput = z.input<typeof schema>;
 export async function createCashTx(input: CreateCashTxInput): Promise<ActionResult> {
   const gate = await requireManager();
   if (!gate.ok) return gate;
-  const userId = gate.userId;
+  return createCashTxForUser(gate.userId, input);
+}
+
+export async function createCashTxForUser(userId: string, input: CreateCashTxInput): Promise<ActionResult> {
   const parsed = schema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;

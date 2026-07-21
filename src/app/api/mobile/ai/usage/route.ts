@@ -1,10 +1,11 @@
 import { getAiUsageStatus } from "@/lib/ai/usage";
 import { requireAiProviderConfigured } from "@/lib/ai/config";
-import { requireMobileUser } from "@/lib/mobile/auth";
+import { requireMobileRole } from "@/lib/mobile/auth";
 import { mobileGate, mobileOk } from "@/lib/mobile/response";
+import { MOBILE_AI_ADMIN_ROLES } from "@/lib/settings/mobile-settings-access";
 
 export async function GET() {
-  const gate = await requireMobileUser();
+  const gate = await requireMobileRole(MOBILE_AI_ADMIN_ROLES);
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   const aiBlocked = await requireAiProviderConfigured();

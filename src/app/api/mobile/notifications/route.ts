@@ -1,26 +1,49 @@
 import { getProfileId } from "@/lib/actions/common";
 import { db } from "@/db";
-import { mobileNotificationStates } from "@/db/schema";
+import { einvoices, mobileNotificationStates, orders } from "@/db/schema";
 import { getRestockSuggestions } from "@/lib/data/ai-restock";
 import { getCurrentShift } from "@/lib/data/shifts";
 import { getStoreSettings } from "@/lib/data/settings";
 import { requireMobileUser } from "@/lib/mobile/auth";
 import { mobileGate, mobileOk } from "@/lib/mobile/response";
-import { and, eq, inArray } from "drizzle-orm";
+import { mobileNotificationSettingsForRole } from "@/lib/settings/mobile-settings-access";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 export async function GET() {
   const gate = await requireMobileUser();
   if (!gate.ok) return mobileGate(gate)!;
 
   const profileId = await getProfileId(gate.userId);
-  const [store, restock, shift] = await Promise.all([
+  const [store, restock, shift, failedEinvoices] = await Promise.all([
     getStoreSettings(),
     getRestockSuggestions(30),
     getCurrentShift(profileId ?? gate.userId),
+    db.select({
+      id: einvoices.id,
+      orderCode: orders.code,
+      attemptCount: einvoices.attemptCount,
+    })
+      .from(einvoices)
+      .innerJoin(orders, eq(orders.id, einvoices.orderId))
+      .where(eq(einvoices.status, "error"))
+      .orderBy(desc(einvoices.createdAt))
+      .limit(10),
   ]);
+  const prefs = store.prefs.notifications;
+  const routed = (category: keyof typeof prefs.roleRouting) =>
+    prefs.roleRouting[category].includes(gate.role);
+  const restockRows = prefs.lowStock && routed("lowStock")
+    ? restock.filter((row) =>
+        row.priority === "high"
+        || (row.daysOfStock != null && row.daysOfStock <= prefs.thresholds.lowStockDays)
+      ).slice(0, 10)
+    : [];
+  const routedEinvoices = failedEinvoices.filter(
+    (row) => row.attemptCount >= prefs.thresholds.einvoiceFailureAttempts,
+  );
   const stateUserId = profileId ?? gate.userId;
   const rows = [
-    ...restock.slice(0, 10).map((row) => ({
+    ...restockRows.map((row) => ({
       id: `restock-${row.id}`,
       category: "lowStock",
       title: row.name,
@@ -29,7 +52,18 @@ export async function GET() {
       priority: row.priority,
       action: { type: "open", target: "aiRestocking", id: row.id },
     })),
-    {
+    ...(prefs.einvoiceError && routed("einvoiceError")
+      ? routedEinvoices.map((row) => ({
+          id: `einvoice-error-${row.id}`,
+          category: "einvoiceError",
+          title: `Hóa đơn điện tử ${row.orderCode} phát hành lỗi`,
+          body: "Mở hóa đơn để kiểm tra trạng thái và thử lại.",
+          unread: true,
+          priority: "high" as const,
+          action: { type: "open", target: "invoices", id: row.id },
+        }))
+      : []),
+    ...(prefs.shiftClose && routed("shiftClose") ? [{
       id: shift ? `shift-${shift.id}` : "shift-open",
       category: "shiftClose",
       title: shift ? "Ca đang mở" : "Chưa mở ca",
@@ -39,7 +73,7 @@ export async function GET() {
       unread: !shift,
       priority: shift ? "low" : "medium",
       action: { type: "open", target: "shift" },
-    },
+    }] : []),
   ];
   const ids = rows.map((row) => row.id);
   const states = ids.length
@@ -64,15 +98,17 @@ export async function GET() {
       ...row,
       unread: row.unread && stateById.get(row.id)?.read !== true,
     }));
+  const visibleSettings = mobileNotificationSettingsForRole(prefs, gate.role);
 
   return mobileOk({
     rows: visibleRows,
     counts: {
       all: visibleRows.length,
       unread: visibleRows.filter((row) => row.unread).length,
-      lowStock: restock.length,
-      shiftClose: 1,
+      lowStock: restockRows.length,
+      einvoiceError: routedEinvoices.length,
+      shiftClose: prefs.shiftClose && routed("shiftClose") ? 1 : 0,
     },
-    settings: store.prefs.notifications,
+    ...(visibleSettings ? { settings: visibleSettings } : {}),
   });
 }

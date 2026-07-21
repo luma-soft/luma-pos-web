@@ -4,13 +4,15 @@ import { revalidatePath } from "next/cache";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  products, productSuppliers, purchaseOrders, purchaseOrderItems, stockLevels, stockMovements, suppliers,
+  products, productSuppliers, purchaseOrders, purchaseOrderItems, stockLevels, stockLots, stockMovements, suppliers,
 } from "@/db/schema";
 import { createPurchaseSchema, type CreatePurchaseOutput, updatePurchaseSchema, type UpdatePurchaseOutput } from "@/lib/schemas/order";
 import { type ActionResult, requireStockAccess, requireManager, getProfileId, generateCode, toMoney, toQty } from "./common";
 import { recordCashTx } from "@/lib/cash";
 import { Routes } from "@/lib/routes";
 import { getCurrentShift } from "@/lib/data/shifts";
+import { validateReceiptBatchLines } from "@/lib/inventory/batch-policy";
+import { recordStockLotReceipt } from "@/lib/inventory/stock-lot-service";
 
 type PurchaseCalcInput = Pick<CreatePurchaseOutput, "items" | "discount" | "vatRate" | "amountPaid">;
 
@@ -55,8 +57,14 @@ export async function createPurchase(
     const result = await db.transaction(async (tx) => {
       // validate product ids tồn tại
       const ids = v.items.map((i) => i.productId);
-      const found = await tx.select({ id: products.id }).from(products).where(inArray(products.id, ids));
+      const found = await tx.select({
+        id: products.id,
+        trackBatches: products.trackBatches,
+        shelfLifeDays: products.shelfLifeDays,
+      }).from(products).where(inArray(products.id, ids));
       if (found.length !== new Set(ids).size) throw new Error("PRODUCT_NOT_FOUND");
+      const batchValidation = validateReceiptBatchLines({ products: found, items: v.items });
+      if (!batchValidation.ok) throw new Error(batchValidation.error);
 
       const [po] = await tx.insert(purchaseOrders).values({
         code: generateCode("PN"),
@@ -74,18 +82,22 @@ export async function createPurchase(
         createdBy: profileId,
       }).returning({ id: purchaseOrders.id, code: purchaseOrders.code });
 
-      await tx.insert(purchaseOrderItems).values(
-        v.items.map((i) => ({
+      const receiptItems: { id: string }[] = [];
+      for (const i of v.items) {
+        const [receiptItem] = await tx.insert(purchaseOrderItems).values({
           purchaseOrderId: po.id,
           productId: i.productId,
           quantity: toQty(i.quantity),
           unitCost: toMoney(i.unitCost),
           discount: toMoney(i.discount),
           total: toMoney(purchaseLineTotal(i)),
-        }))
-      );
+          batchNumber: i.batchNumber ?? null,
+          expiryDate: i.expiryDate ?? null,
+        }).returning({ id: purchaseOrderItems.id });
+        receiptItems.push(receiptItem);
+      }
 
-      for (const i of v.items) {
+      for (const [index, i] of v.items.entries()) {
         await tx
           .insert(stockLevels)
           .values({
@@ -112,6 +124,28 @@ export async function createPurchase(
           note: po.code,
           createdBy: profileId,
         });
+
+        const productPolicy = found.find((product) => product.id === i.productId);
+        if (productPolicy?.trackBatches) {
+          const [lot] = await tx.insert(stockLots).values({
+            productId: i.productId,
+            warehouseId: v.warehouseId,
+            purchaseOrderItemId: receiptItems[index].id,
+            batchNumber: i.batchNumber!.trim(),
+            expiryDate: i.expiryDate ?? null,
+            receivedQuantity: toQty(i.quantity),
+            availableQuantity: toQty(i.quantity),
+            unitCost: toMoney(i.unitCost),
+            createdBy: profileId,
+          }).returning({ id: stockLots.id });
+          await recordStockLotReceipt(tx, {
+            stockLotId: lot.id,
+            quantity: i.quantity,
+            refType: "purchase",
+            refId: po.id,
+            createdBy: profileId,
+          });
+        }
 
         // giá vốn = giá nhập sau chiết khấu dòng; giá nhập cuối = giá trên phiếu (chưa chiết khấu)
         const netUnit = i.quantity > 0 ? purchaseLineTotal(i) / i.quantity : i.unitCost;
@@ -154,6 +188,7 @@ export async function createPurchase(
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
     if (msg === "PRODUCT_NOT_FOUND") return { ok: false, error: "errors.invalidData" };
+    if (msg.startsWith("purchases.errors.")) return { ok: false, error: msg };
     console.error("createPurchase failed:", e);
     return { ok: false, error: "errors.serverError" };
   }
@@ -180,10 +215,22 @@ export async function updatePurchase(input: UpdatePurchaseOutput): Promise<Actio
       if (po.status !== "received" && po.status !== "draft") throw new Error("NOT_EDITABLE");
 
       const ids = v.items.map((i) => i.productId);
-      const found = await tx.select({ id: products.id }).from(products).where(inArray(products.id, ids));
+      const found = await tx.select({
+        id: products.id,
+        trackBatches: products.trackBatches,
+        shelfLifeDays: products.shelfLifeDays,
+      }).from(products).where(inArray(products.id, ids));
       if (found.length !== new Set(ids).size) throw new Error("PRODUCT_NOT_FOUND");
+      const batchValidation = validateReceiptBatchLines({ products: found, items: v.items });
+      if (!batchValidation.ok) throw new Error(batchValidation.error);
 
       const oldItems = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, po.id));
+      const oldLots = oldItems.length > 0
+        ? await tx.select().from(stockLots).where(inArray(stockLots.purchaseOrderItemId, oldItems.map((item) => item.id)))
+        : [];
+      if (oldLots.some((lot) => Number(lot.availableQuantity) < Number(lot.receivedQuantity))) {
+        throw new Error("BATCH_ALREADY_CONSUMED");
+      }
       const oldPaid = po.status === "received" ? Number(po.amountPaid) : 0;
       const oldOwed = po.status === "received" ? Math.max(0, Number(po.total) - oldPaid) : 0;
 
@@ -209,19 +256,26 @@ export async function updatePurchase(input: UpdatePurchaseOutput): Promise<Actio
         }
       }
 
+      if (oldLots.length > 0) {
+        await tx.delete(stockLots).where(inArray(stockLots.id, oldLots.map((lot) => lot.id)));
+      }
       await tx.delete(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, po.id));
-      await tx.insert(purchaseOrderItems).values(
-        v.items.map((i) => ({
+      const receiptItems: { id: string }[] = [];
+      for (const i of v.items) {
+        const [receiptItem] = await tx.insert(purchaseOrderItems).values({
           purchaseOrderId: po.id,
           productId: i.productId,
           quantity: toQty(i.quantity),
           unitCost: toMoney(i.unitCost),
           discount: toMoney(i.discount),
           total: toMoney(purchaseLineTotal(i)),
-        }))
-      );
+          batchNumber: i.batchNumber ?? null,
+          expiryDate: i.expiryDate ?? null,
+        }).returning({ id: purchaseOrderItems.id });
+        receiptItems.push(receiptItem);
+      }
 
-      for (const i of v.items) {
+      for (const [index, i] of v.items.entries()) {
         await tx
           .insert(stockLevels)
           .values({
@@ -248,6 +302,28 @@ export async function updatePurchase(input: UpdatePurchaseOutput): Promise<Actio
           note: `Sửa phiếu nhập ${po.code}`,
           createdBy: profileId,
         });
+
+        const productPolicy = found.find((product) => product.id === i.productId);
+        if (productPolicy?.trackBatches) {
+          const [lot] = await tx.insert(stockLots).values({
+            productId: i.productId,
+            warehouseId: v.warehouseId,
+            purchaseOrderItemId: receiptItems[index].id,
+            batchNumber: i.batchNumber!.trim(),
+            expiryDate: i.expiryDate ?? null,
+            receivedQuantity: toQty(i.quantity),
+            availableQuantity: toQty(i.quantity),
+            unitCost: toMoney(i.unitCost),
+            createdBy: profileId,
+          }).returning({ id: stockLots.id });
+          await recordStockLotReceipt(tx, {
+            stockLotId: lot.id,
+            quantity: i.quantity,
+            refType: "purchase_edit",
+            refId: po.id,
+            createdBy: profileId,
+          });
+        }
 
         const netUnit = i.quantity > 0 ? purchaseLineTotal(i) / i.quantity : i.unitCost;
         await tx.update(products).set({
@@ -323,6 +399,10 @@ export async function updatePurchase(input: UpdatePurchaseOutput): Promise<Actio
       PURCHASE_NOT_FOUND: "purchases.errors.notFound",
       NOT_EDITABLE: "purchases.errors.notEditable",
       PRODUCT_NOT_FOUND: "errors.invalidData",
+      BATCH_ALREADY_CONSUMED: "purchases.errors.batchAlreadyConsumed",
+      "purchases.errors.batchRequired": "purchases.errors.batchRequired",
+      "purchases.errors.expiryRequired": "purchases.errors.expiryRequired",
+      "purchases.errors.expiredBatch": "purchases.errors.expiredBatch",
     };
     if (known[msg]) return { ok: false, error: known[msg] };
     console.error("updatePurchase failed:", e);
@@ -348,6 +428,15 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
 
       if (po.status === "received") {
         const items = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, po.id));
+        const receiptLots = items.length > 0
+          ? await tx.select().from(stockLots).where(inArray(stockLots.purchaseOrderItemId, items.map((item) => item.id)))
+          : [];
+        if (receiptLots.some((lot) => Number(lot.availableQuantity) < Number(lot.receivedQuantity))) {
+          throw new Error("BATCH_ALREADY_CONSUMED");
+        }
+        if (receiptLots.length > 0) {
+          await tx.delete(stockLots).where(inArray(stockLots.id, receiptLots.map((lot) => lot.id)));
+        }
         for (const i of items) {
           const qty = Number(i.quantity);
           await tx.update(stockLevels).set({
@@ -395,6 +484,7 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
       PURCHASE_NOT_FOUND: "purchases.errors.notFound",
       ALREADY_CANCELLED: "purchases.errors.alreadyCancelled",
       NOT_EDITABLE: "purchases.errors.notEditable",
+      BATCH_ALREADY_CONSUMED: "purchases.errors.batchAlreadyConsumed",
     };
     if (known[msg]) return { ok: false, error: known[msg] };
     console.error("cancelPurchase failed:", e);

@@ -86,7 +86,7 @@ export async function getStoreSettings(): Promise<StoreSettings> {
 /** Danh sách nhân viên (profiles). */
 export async function getStaff() {
   return db
-    .select({ id: profiles.id, fullName: profiles.fullName, phone: profiles.phone, role: profiles.role, isActive: profiles.isActive, createdAt: profiles.createdAt })
+    .select({ id: profiles.id, fullName: profiles.fullName, phone: profiles.phone, role: profiles.role, isActive: profiles.isActive, cashierPinUpdatedAt: profiles.cashierPinUpdatedAt, createdAt: profiles.createdAt })
     .from(profiles)
     .orderBy(asc(profiles.fullName));
 }

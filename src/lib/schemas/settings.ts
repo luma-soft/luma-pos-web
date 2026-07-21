@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { defaultNotificationChannelPreferences } from "@/lib/notifications/channel-registry";
 
 export const storeSettingsSchema = z.object({
   name: z.string().max(200).default(""),
@@ -16,9 +17,8 @@ export type StaffRole = (typeof STAFF_ROLES)[number];
 
 /* ── Operational prefs (Tax / Payments / Notifications / Hardware) — lưu jsonb store_settings.prefs ── */
 
-export const PAYMENT_METHODS = ["cash", "qr", "momo", "zalopay", "vnpay", "card"] as const;
+export const PAYMENT_METHODS = ["cash", "qr", "momo", "zalopay", "vnpay", "card", "credit"] as const;
 export const NOTIF_TYPES = ["lowStock", "stagnant", "shiftClose", "einvoiceError", "syncDone"] as const;
-export const NOTIF_CHANNELS = ["zalo", "email", "inApp", "sms"] as const;
 export const PAPER_SIZES = ["K80", "K57", "A5", "A4"] as const;
 export const AI_PROVIDERS = ["openai", "deepseek", "gemini"] as const;
 export const AI_TEXT_MODELS = [
@@ -48,6 +48,7 @@ const paymentPrefs = z.object({
   zalopay: z.boolean().default(false),
   vnpay: z.boolean().default(false),
   card: z.boolean().default(false),
+  credit: z.boolean().default(true),
 });
 
 const notificationPrefs = z.object({
@@ -56,12 +57,42 @@ const notificationPrefs = z.object({
   shiftClose: z.boolean().default(true),
   einvoiceError: z.boolean().default(true),
   syncDone: z.boolean().default(false),
-  channels: z.object({
-    zalo: z.boolean().default(true),
-    email: z.boolean().default(true),
-    inApp: z.boolean().default(true),
-    sms: z.boolean().default(false),
-  }).default({ zalo: true, email: true, inApp: true, sms: false }),
+  channels: z.record(z.string().trim().min(1).max(40), z.boolean())
+    .transform((channels) => ({
+      ...defaultNotificationChannelPreferences(),
+      ...channels,
+    }))
+    .default(defaultNotificationChannelPreferences()),
+  quietHours: z.object({
+    enabled: z.boolean().default(false),
+    start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default("22:00"),
+    end: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).default("07:00"),
+    timezone: z.string().trim().min(1).max(80).default("Asia/Ho_Chi_Minh"),
+  }).default({
+    enabled: false,
+    start: "22:00",
+    end: "07:00",
+    timezone: "Asia/Ho_Chi_Minh",
+  }),
+  thresholds: z.object({
+    lowStockDays: z.number().int().min(1).max(90).default(7),
+    einvoiceFailureAttempts: z.number().int().min(1).max(20).default(1),
+  }).default({ lowStockDays: 7, einvoiceFailureAttempts: 1 }),
+  roleRouting: z.object({
+    lowStock: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
+      .min(1).default(["owner", "manager", "warehouse"]),
+    einvoiceError: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
+      .min(1).default(["owner", "manager"]),
+    shiftClose: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
+      .min(1).default(["owner", "manager", "cashier"]),
+    syncDone: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
+      .min(1).default(["owner", "manager"]),
+  }).default({
+    lowStock: ["owner", "manager", "warehouse"],
+    einvoiceError: ["owner", "manager"],
+    shiftClose: ["owner", "manager", "cashier"],
+    syncDone: ["owner", "manager"],
+  }),
 });
 
 const hardwarePrefs = z.object({
@@ -78,6 +109,11 @@ const appPrefs = z.object({
 
 const posPrefs = z.object({
   showProjectFields: z.boolean().default(false),
+});
+
+const securityPrefs = z.object({
+  maxDiscountPercent: z.number().min(0).max(100).default(10),
+  sessionTimeoutMinutes: z.number().int().min(1).max(480).default(2),
 });
 
 const aiPrefs = z.object({
@@ -130,11 +166,30 @@ const shopeePrefs = z.object({
 
 export const storePrefsSchema = z.object({
   tax: taxPrefs.default({ defaultRate: 8, priceIncludesTax: false, einvoiceEnabled: false, einvoiceProvider: "VNPT", einvoiceTaxId: "" }),
-  payments: paymentPrefs.default({ cash: true, qr: true, momo: false, zalopay: false, vnpay: false, card: false }),
-  notifications: notificationPrefs.default({ lowStock: true, stagnant: true, shiftClose: true, einvoiceError: true, syncDone: false, channels: { zalo: true, email: true, inApp: true, sms: false } }),
+  payments: paymentPrefs.default({ cash: true, qr: true, momo: false, zalopay: false, vnpay: false, card: false, credit: true }),
+  notifications: notificationPrefs.default({
+    lowStock: true,
+    stagnant: true,
+    shiftClose: true,
+    einvoiceError: true,
+    syncDone: false,
+    channels: defaultNotificationChannelPreferences(),
+    quietHours: { enabled: false, start: "22:00", end: "07:00", timezone: "Asia/Ho_Chi_Minh" },
+    thresholds: { lowStockDays: 7, einvoiceFailureAttempts: 1 },
+    roleRouting: {
+      lowStock: ["owner", "manager", "warehouse"],
+      einvoiceError: ["owner", "manager"],
+      shiftClose: ["owner", "manager", "cashier"],
+      syncDone: ["owner", "manager"],
+    },
+  }),
   hardware: hardwarePrefs.default({ paperSize: "K80", autoPrint: false, openDrawer: true, printEinvoiceQr: true }),
   app: appPrefs.default({ biometricAuth: true, offlineMode: true }),
   pos: posPrefs.default({ showProjectFields: false }),
+  security: securityPrefs.default({
+    maxDiscountPercent: 10,
+    sessionTimeoutMinutes: 2,
+  }),
   ai: aiPrefs.default({
     provider: "gemini",
     textModel: "gemini-2.5-flash",

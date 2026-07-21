@@ -1,16 +1,15 @@
-import {
-  setStaffActive,
-  updateStaffRole,
-} from "@/lib/actions/settings";
+import { authorizeMobileSensitiveAction } from "@/lib/auth/mobile-approval";
 import { getStaff } from "@/lib/data/settings";
 import { requireMobileManager } from "@/lib/mobile/auth";
 import {
   mobileAction,
+  mobileError,
   mobileGate,
   mobileOk,
   readJson,
 } from "@/lib/mobile/response";
-import type { StaffRole } from "@/lib/schemas/settings";
+import { applyStaffSettingsMutation } from "@/lib/settings/staff-settings-service";
+import { parseStaffSettingsMutation } from "@/lib/settings/staff-settings-mutation";
 
 export async function GET() {
   const gate = await requireMobileManager();
@@ -22,28 +21,27 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   const gate = await requireMobileManager();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const body = await readJson(request);
-  if (!body || typeof body !== "object") {
+  const mutation = parseStaffSettingsMutation(body);
+  if (!mutation) {
     return mobileAction({ ok: false, error: "errors.invalidData" });
   }
 
-  const payload = body as { id?: unknown; role?: unknown; active?: unknown };
-  if (typeof payload.id !== "string") {
-    return mobileAction({ ok: false, error: "errors.invalidData" });
-  }
+  const authorization = await authorizeMobileSensitiveAction({
+    request,
+    requesterId: gate.userId,
+    requesterRole: gate.role,
+    permission: "settings.sensitive",
+    scope: mutation.scope,
+  });
+  if (!authorization.ok) return mobileError(authorization.error, 403);
 
-  if (typeof payload.role === "string") {
-    const result = await updateStaffRole(payload.id, payload.role as StaffRole);
-    if (!result.ok) return mobileAction(result);
-  }
-
-  if (typeof payload.active === "boolean") {
-    const result = await setStaffActive(payload.id, payload.active);
-    if (!result.ok) return mobileAction(result);
-  }
-
-  return mobileOk({ id: payload.id });
+  return mobileAction(await applyStaffSettingsMutation({
+    actorId: gate.userId,
+    actorRole: gate.role,
+    mutation,
+    source: "mobile",
+  }));
 }

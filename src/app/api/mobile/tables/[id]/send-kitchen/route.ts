@@ -1,4 +1,4 @@
-import { sendToKitchen } from "@/lib/actions/tables";
+import { sendToKitchenForUser } from "@/lib/actions/tables";
 import { requireMobileSalesAccess } from "@/lib/mobile/auth";
 import { mobileAction, mobileGate } from "@/lib/mobile/response";
 
@@ -7,9 +7,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const gate = await requireMobileSalesAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const { id } = await params;
-  return mobileAction(await sendToKitchen(id));
+  return mobileAction(await sendToKitchenForUser(gate.userId, id));
 }

@@ -1,5 +1,5 @@
-import { getMobileProducts } from "@/lib/data/products";
-import { getPurchaseFormOptions, getPurchases, getRecentMovements } from "@/lib/data/inventory";
+import { getInventory, getInternalUseCostSummary, getPurchaseFormOptions, getPurchases, getRecentMovements } from "@/lib/data/inventory";
+import { getExpiryStockAlerts } from "@/lib/data/inventory-lots";
 import { requireMobileStockAccess } from "@/lib/mobile/auth";
 import { mobileGate, mobileOk, numberParam, searchParam } from "@/lib/mobile/response";
 
@@ -15,28 +15,27 @@ export async function GET(request: Request) {
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
 
-  const products = await getMobileProducts({
+  const products = await getInventory({
       q: searchParam(request, "q"),
       categoryId: searchParam(request, "categoryId"),
       page: numberParam(request, "page", 1),
       pageSize: numberParam(request, "pageSize", 15),
     });
 
-  const [movements, purchases, purchaseOptions] = await Promise.all([
+  const [movements, purchases, purchaseOptions, expiry, internalUse] = await Promise.all([
     withFallback(getRecentMovements(15), []),
     withFallback(getPurchases({ pageSize: 5 }), { rows: [], total: 0, page: 1, pageSize: 5, pageCount: 1 }),
     withFallback(getPurchaseFormOptions(), { suppliers: [], warehouses: [] }),
+    getExpiryStockAlerts(30, 50),
+    getInternalUseCostSummary(),
   ]);
 
-  const inventory = {
-    ...products,
-    rows: products.rows.map((row) => ({
-      ...row,
-      stockValue: `${Number(row.totalStock ?? 0) * Number(row.costPrice ?? 0)}`,
-    })),
-    totalValue: 0,
-    lowCount: 0,
-  };
-
-  return mobileOk({ inventory, movements, purchases, purchaseOptions });
+  return mobileOk({
+    inventory: products,
+    movements,
+    purchases,
+    purchaseOptions,
+    expiry,
+    internalUse,
+  });
 }

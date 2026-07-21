@@ -4,7 +4,8 @@ import { paymentBankAccounts } from "@/db/schema";
 import { getProfileId } from "@/lib/actions/common";
 import { requireMobileSalesAccess } from "@/lib/mobile/auth";
 import { mobileAction, mobileError, mobileGate, readJson } from "@/lib/mobile/response";
-import { createPendingSepayPayment } from "@/lib/payments/service";
+import { cancelDraftOrder, createPendingSepayPayment } from "@/lib/payments/service";
+import { SEPAY_PAYMENT_TIMEOUT_MS } from "@/lib/payments/service-core";
 import { buildSepayVietQrImageUrl } from "@/lib/payments/sepay";
 
 export async function POST(request: Request) {
@@ -36,7 +37,10 @@ export async function POST(request: Request) {
       .orderBy(sql`${paymentBankAccounts.isDefault} desc`, paymentBankAccounts.createdAt)
       .limit(1);
 
-  if (!account) return mobileError("payments.errors.bankAccountNotFound");
+  if (!account) {
+    await cancelDraftOrder(orderId);
+    return mobileError("payments.errors.bankAccountNotFound");
+  }
 
   const profileId = await getProfileId(gate.userId);
   const result = await createPendingSepayPayment({
@@ -70,6 +74,7 @@ export async function POST(request: Request) {
         accountName: account.accountName,
       },
       status: "pending",
+      expiresAt: new Date(Date.now() + SEPAY_PAYMENT_TIMEOUT_MS).toISOString(),
     },
   });
 }

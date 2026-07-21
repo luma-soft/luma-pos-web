@@ -1,11 +1,10 @@
-import { closeShift } from "@/lib/actions/shifts";
+import { closeShiftForUser } from "@/lib/actions/shifts";
 import { requireMobileUser } from "@/lib/mobile/auth";
 import { mobileAction, mobileGate, readJson } from "@/lib/mobile/response";
 
 export async function POST(request: Request) {
   const gate = await requireMobileUser();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const body = await readJson(request);
   const countedCash =
@@ -17,5 +16,5 @@ export async function POST(request: Request) {
       ? String((body as { note?: unknown }).note ?? "")
       : undefined;
 
-  return mobileAction(await closeShift(countedCash, note));
+  return mobileAction(await closeShiftForUser(gate.userId, countedCash, note));
 }

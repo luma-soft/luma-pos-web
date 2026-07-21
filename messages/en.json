@@ -1492,6 +1492,7 @@
     },
     "errors": {
       "nothingToPay": "Nothing left to collect.",
+      "amountExceedsRemaining": "The amount exceeds the order balance. Reload the order.",
       "alreadyCancelled": "Order already cancelled.",
       "sourceNotFound": "Original invoice not found.",
       "sourceNotCopyable": "This invoice cannot be copied.",
@@ -1836,6 +1837,7 @@
     "title": "Reports",
     "lastNDays": "{n} days",
     "revenue": "Revenue",
+    "returnsDeducted": "Returns deducted: {amount}",
     "collected": "Collected",
     "uncollected": "Uncollected",
     "orders": "Orders",
@@ -2045,7 +2047,8 @@
   "payments": {
     "errors": {
       "bankAccountNotFound": "No enabled SePay bank account is configured.",
-      "notConfirmable": "This payment cannot be confirmed."
+      "notConfirmable": "This payment cannot be confirmed.",
+      "referenceConflict": "This payment request was already used with different details. Reload the order."
     }
   },
   "settings": {
@@ -2299,7 +2302,7 @@
     "title": "E-invoice",
     "issue": "Issue e-invoice",
     "issued": "Issued",
-    "stubNote": "Using internal stub issuer — sequential numbers. Swap issueWithProvider() for real Viettel/VNPT/MISA integration.",
+    "queueNote": "Provider and server issuance queue own the status; LumaPOS never generates invoice numbers locally.",
     "empty": "No e-invoices yet",
     "emptyHint": "Issue from the order detail page.",
     "cols": {
@@ -2307,7 +2310,15 @@
       "issuedAt": "Issued at",
       "order": "Source order",
       "buyer": "Buyer",
-      "beforeVat": "Before VAT"
+      "beforeVat": "Before VAT",
+      "status": "Status"
+    },
+    "status": {
+      "draft": "Draft",
+      "queued": "Queued",
+      "processing": "Processing",
+      "issued": "Issued",
+      "error": "Error"
     },
     "errors": {
       "onlyCompleted": "Only completed orders.",

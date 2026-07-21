@@ -37,6 +37,7 @@ for (const f of files) {
 ok("migration adds orders.shiftId", "shiftId" in orders);
 ok("migration adds payments.shiftId", "shiftId" in payments);
 ok("migration adds cashTransactions.shiftId", "shiftId" in cashTransactions);
+ok("migration adds shift handover links", "handoverToUserId" in shifts && "handoverFromShiftId" in shifts);
 
 console.log("1) Shift-scoped cash and tender totals");
 const [cashier] = await db.insert(profiles).values({
@@ -142,10 +143,14 @@ ok("bank transfer tender = 300k", tender.bank_transfer === 300_000, `got ${tende
 ok("pending SePay payment is excluded from tender totals", tender.bank_transfer !== 1_299_999, `got ${tender.bank_transfer}`);
 
 const [orderAgg] = await db
-  .select({ count: dsql`count(*)::int` })
+  .select({
+    count: dsql`count(*)::int`,
+    revenue: dsql`coalesce(sum(${orders.total}), 0)`,
+  })
   .from(orders)
   .where(eq(orders.shiftId, shift.id));
 ok("order count includes credit/no-payment order", Number(orderAgg.count) === 2, `got ${orderAgg.count}`);
+ok("shift revenue comes from server orders", Number(orderAgg.revenue) === 1_200_000, `got ${orderAgg.revenue}`);
 ok("payment reference is stored", (await db.select().from(payments).where(eq(payments.reference, "BANK-001"))).length === 1);
 ok("credit order has no payment row but remains in shift", !!creditOrder.id);
 

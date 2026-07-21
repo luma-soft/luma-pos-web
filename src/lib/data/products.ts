@@ -29,7 +29,7 @@ import { coercePageSize, DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 export const PRODUCTS_PAGE_SIZE = 20;
 
 /** active = chỉ đang bán (mặc định), inactive = ngừng bán, all = tất cả. */
-export type ProductStatusFilter = "active" | "inactive" | "all";
+export type ProductStatusFilter = "active" | "inactive" | "draft" | "archived" | "all";
 export type ProductListView = "grouped" | "flat";
 
 export interface ProductListFilters {
@@ -108,12 +108,25 @@ export async function getProducts(filters: ProductListFilters = {}) {
         )`,
         )!,
       );
+    } else if (status === "draft" || status === "archived") {
+      conditions.push(
+        or(
+          eq(products.lifecycleStatus, status),
+          sql`exists (
+            select 1 from products child
+            where child.parent_product_id = ${products.id}
+              and child.lifecycle_status = ${status}
+          )`,
+        )!,
+      );
     }
   } else {
     conditions.push(eq(products.isVariantParent, false));
     if (status === "active") conditions.push(eq(products.isActive, true));
     else if (status === "inactive")
       conditions.push(eq(products.isActive, false));
+    else if (status === "draft" || status === "archived")
+      conditions.push(eq(products.lifecycleStatus, status));
   }
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
@@ -136,6 +149,11 @@ export async function getProducts(filters: ProductListFilters = {}) {
         wholesalePrice: products.wholesalePrice,
         contractorPrice: products.contractorPrice,
         agentPrice: products.agentPrice,
+        vatRate: products.vatRate,
+        priceByWeight: products.priceByWeight,
+        trackBatches: products.trackBatches,
+        shelfLifeDays: products.shelfLifeDays,
+        lifecycleStatus: products.lifecycleStatus,
         parentProductId: products.parentProductId,
         variantName: products.variantName,
         isVariantParent: products.isVariantParent,
@@ -221,6 +239,11 @@ export async function getProducts(filters: ProductListFilters = {}) {
             wholesalePrice: products.wholesalePrice,
             contractorPrice: products.contractorPrice,
             agentPrice: products.agentPrice,
+            vatRate: products.vatRate,
+            priceByWeight: products.priceByWeight,
+            trackBatches: products.trackBatches,
+            shelfLifeDays: products.shelfLifeDays,
+            lifecycleStatus: products.lifecycleStatus,
             parentProductId: products.parentProductId,
             variantName: products.variantName,
             isVariantParent: products.isVariantParent,
@@ -538,6 +561,11 @@ export async function getMobileProducts(filters: ProductListFilters = {}) {
         wholesalePrice: products.wholesalePrice,
         contractorPrice: products.contractorPrice,
         agentPrice: products.agentPrice,
+        vatRate: products.vatRate,
+        priceByWeight: products.priceByWeight,
+        trackBatches: products.trackBatches,
+        shelfLifeDays: products.shelfLifeDays,
+        lifecycleStatus: products.lifecycleStatus,
         parentProductId: products.parentProductId,
         variantName: products.variantName,
         isVariantParent: products.isVariantParent,
@@ -626,6 +654,11 @@ export async function getProduct(id: string) {
       wholesalePrice: products.wholesalePrice,
       contractorPrice: products.contractorPrice,
       agentPrice: products.agentPrice,
+      vatRate: products.vatRate,
+      priceByWeight: products.priceByWeight,
+      trackBatches: products.trackBatches,
+      shelfLifeDays: products.shelfLifeDays,
+      lifecycleStatus: products.lifecycleStatus,
       location: products.location,
       weight: products.weight,
       dimensions: products.dimensions,

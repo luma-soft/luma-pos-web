@@ -14,10 +14,17 @@ export async function POST(
   if (!body || typeof body !== "object") {
     return mobileAction({ ok: false, error: "errors.invalidData" });
   }
+  const payload = body as Record<string, unknown>;
+  if (
+    typeof payload.clientRequestId !== "string" ||
+    payload.clientRequestId.trim().length < 8
+  ) {
+    return mobileAction({ ok: false, error: "errors.invalidData" });
+  }
 
   return mobileAction(
     await addPaymentForUser(gate.userId, {
-      ...(body as Record<string, unknown>),
+      ...payload,
       orderId: id,
     } as Parameters<typeof addPaymentForUser>[1])
   );

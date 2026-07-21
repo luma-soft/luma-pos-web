@@ -1,4 +1,4 @@
-import { checkoutTable } from "@/lib/actions/tables";
+import { checkoutTableForUser } from "@/lib/actions/tables";
 import { requireMobileSalesAccess } from "@/lib/mobile/auth";
 import { mobileAction, mobileGate, readJson } from "@/lib/mobile/response";
 
@@ -7,8 +7,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const gate = await requireMobileSalesAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const { id } = await params;
   const body = await readJson(request);
@@ -23,5 +22,7 @@ export async function POST(
       ? "bank_transfer"
       : "cash";
 
-  return mobileAction(await checkoutTable(id, method, payload.lineIds));
+  return mobileAction(
+    await checkoutTableForUser(gate.userId, id, method, payload.lineIds),
+  );
 }

@@ -20,8 +20,20 @@ async function closeTicketIfDone(ticketId: string) {
 
 export async function setTicketItemStatus(itemId: string, status: ItemStatus): Promise<ActionResult> {
   try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  return setTicketItemStatusForUser(itemId, status);
+}
+
+export async function setTicketItemStatusForUser(itemId: string, status: ItemStatus): Promise<ActionResult> {
   if (!STATUSES.includes(status)) return { ok: false, error: "errors.invalidData" };
   try {
+    const [scheduled] = await db.select({ fireAt: kitchenTicketItems.fireAt })
+      .from(kitchenTicketItems)
+      .where(eq(kitchenTicketItems.id, itemId))
+      .limit(1);
+    if (!scheduled) return { ok: false, error: "errors.invalidData" };
+    if (status !== "pending" && scheduled.fireAt && scheduled.fireAt.getTime() > Date.now()) {
+      return { ok: false, error: "tables.errors.courseNotFired" };
+    }
     const [it] = await db.update(kitchenTicketItems).set({ status, updatedAt: new Date() })
       .where(eq(kitchenTicketItems.id, itemId)).returning({ ticketId: kitchenTicketItems.ticketId });
     if (it && status === "served") await closeTicketIfDone(it.ticketId);
@@ -32,6 +44,10 @@ export async function setTicketItemStatus(itemId: string, status: ItemStatus): P
 /** Phục vụ cả phiếu (mọi món → served, phiếu → done). */
 export async function serveTicket(ticketId: string): Promise<ActionResult> {
   try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  return serveTicketForUser(ticketId);
+}
+
+export async function serveTicketForUser(ticketId: string): Promise<ActionResult> {
   try {
     await db.update(kitchenTicketItems).set({ status: "served", updatedAt: new Date() }).where(eq(kitchenTicketItems.ticketId, ticketId));
     await db.update(kitchenTickets).set({ status: "done" }).where(eq(kitchenTickets.id, ticketId));

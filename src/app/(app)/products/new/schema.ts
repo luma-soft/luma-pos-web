@@ -63,6 +63,11 @@ export const createProductSchema = z.object({
   wholesalePrice: z.number().nullable().optional(),
   contractorPrice: z.number().nullable().optional(),
   agentPrice: z.number().nullable().optional(),
+  vatRate: z.number().min(0).max(100).nullable().optional(),
+  priceByWeight: z.boolean().default(false),
+  trackBatches: z.boolean().default(false),
+  shelfLifeDays: z.number().int().positive().nullable().optional(),
+  lifecycleStatus: z.enum(["draft", "active", "archived"]).default("active"),
   priceBookPrices: z.record(z.string(), z.number().min(0).nullable()).default({}),
 
   // Stock

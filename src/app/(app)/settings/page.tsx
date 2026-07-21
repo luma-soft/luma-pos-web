@@ -2,6 +2,7 @@ import { SettingsClient } from "./settings-client";
 import { PromotionsTab } from "../sales/tabs/promotions";
 import { getStoreSettings } from "@/lib/data/settings";
 import { requireUser, getRole } from "@/lib/actions/common";
+import { resolveNotificationChannels } from "@/lib/notifications/channels";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       store={store}
       canManage={canManage}
       canEditAi={canEditAi}
+      notificationChannels={resolveNotificationChannels()}
       initialTab={params.tab}
       promotionsContent={<PromotionsTab />}
     />

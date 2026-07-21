@@ -1,6 +1,16 @@
 import { and, desc, eq, gte, ilike, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { categories, customers, orderItems, orders, products, profiles } from "@/db/schema";
+import {
+  categories,
+  customers,
+  orderItems,
+  orders,
+  products,
+  profiles,
+  returnItems,
+  returns,
+} from "@/db/schema";
+import { calculateDashboardFinancials } from "@/lib/dashboard/financials";
 
 function daysAgo(n: number) {
   const d = new Date();
@@ -16,6 +26,14 @@ export type ReportFilters = {
 };
 
 export async function getReports(rangeDays = 30, filters: ReportFilters = {}) {
+  return getReportsForDatabase(db, rangeDays, filters);
+}
+
+export async function getReportsForDatabase(
+  database: typeof db,
+  rangeDays = 30,
+  filters: ReportFilters = {},
+) {
   const since = daysAgo(rangeDays - 1);
   // chỉ đơn bán thật: loại quote/merged/cancelled/draft
   const notCancelled = inArray(orders.status, ["completed", "returned"]);
@@ -28,15 +46,60 @@ export async function getReports(rangeDays = 30, filters: ReportFilters = {}) {
   const where = customerFilter
     ? and(notCancelled, gte(orders.createdAt, since), customerFilter)
     : and(notCancelled, gte(orders.createdAt, since));
+  const returnCustomerFilter = filters.customerId
+    ? eq(returns.customerId, filters.customerId)
+    : customerTerm
+      ? or(ilike(customers.name, `%${customerTerm}%`), ilike(customers.phone, `%${customerTerm}%`), ilike(customers.code, `%${customerTerm}%`))
+      : undefined;
+  const returnWhere = returnCustomerFilter
+    ? and(gte(returns.createdAt, since), returnCustomerFilter)
+    : gte(returns.createdAt, since);
 
-  const [summaryRows, byDay, topProducts, byCategory, byCustomer, byEmployee] = await Promise.all([
-    db.select({
+  const [
+    summaryRows,
+    profitRows,
+    refundRows,
+    returnedProfitRows,
+    grossByDay,
+    refundsByDay,
+    topProducts,
+    byCategory,
+    byCustomer,
+    byEmployee,
+  ] = await Promise.all([
+    database.select({
       revenue: sql<string>`coalesce(sum(${orders.total}), 0)`,
       collected: sql<string>`coalesce(sum(${orders.amountPaid}), 0)`,
       orderCount: sql<number>`count(*)::int`,
+      customerCount: sql<number>`count(distinct ${orders.customerId})::int`,
     }).from(orders).leftJoin(customers, eq(orders.customerId, customers.id)).where(where),
 
-    db.select({
+    database.select({
+      grossProfit: sql<string>`coalesce(sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})), 0)`,
+    })
+      .from(orderItems)
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .innerJoin(products, eq(orderItems.productId, products.id))
+      .leftJoin(customers, eq(orders.customerId, customers.id))
+      .where(where),
+
+    database.select({
+      refundTotal: sql<string>`coalesce(sum(${returns.totalRefund}), 0)`,
+    })
+      .from(returns)
+      .leftJoin(customers, eq(returns.customerId, customers.id))
+      .where(returnWhere),
+
+    database.select({
+      returnedProfit: sql<string>`coalesce(sum(${returnItems.total} - (${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice})), 0)`,
+    })
+      .from(returnItems)
+      .innerJoin(returns, eq(returnItems.returnId, returns.id))
+      .innerJoin(products, eq(returnItems.productId, products.id))
+      .leftJoin(customers, eq(returns.customerId, customers.id))
+      .where(returnWhere),
+
+    database.select({
       day: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD')`,
       revenue: sql<string>`coalesce(sum(${orders.total}), 0)`,
       orderCount: sql<number>`count(*)::int`,
@@ -47,7 +110,17 @@ export async function getReports(rangeDays = 30, filters: ReportFilters = {}) {
       .groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`)
       .orderBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`),
 
-    db.select({
+    database.select({
+      day: sql<string>`to_char(${returns.createdAt}, 'YYYY-MM-DD')`,
+      refund: sql<string>`coalesce(sum(${returns.totalRefund}), 0)`,
+    })
+      .from(returns)
+      .leftJoin(customers, eq(returns.customerId, customers.id))
+      .where(returnWhere)
+      .groupBy(sql`to_char(${returns.createdAt}, 'YYYY-MM-DD')`)
+      .orderBy(sql`to_char(${returns.createdAt}, 'YYYY-MM-DD')`),
+
+    database.select({
       productId: orderItems.productId,
       productName: sql<string>`max(${orderItems.productName})`,
       qtySold: sql<string>`sum(${orderItems.quantity} * ${orderItems.unitMultiplier})`,
@@ -64,7 +137,7 @@ export async function getReports(rangeDays = 30, filters: ReportFilters = {}) {
       .orderBy(desc(sql`sum(${orderItems.total})`))
       .limit(10),
 
-    db.select({
+    database.select({
       categoryName: sql<string>`coalesce(${categories.name}, 'Khác')`,
       revenue: sql<string>`sum(${orderItems.total})`,
     })
@@ -78,7 +151,7 @@ export async function getReports(rangeDays = 30, filters: ReportFilters = {}) {
       .orderBy(desc(sql`sum(${orderItems.total})`)),
 
     // top khách hàng theo doanh thu
-    db.select({
+    database.select({
       customerId: orders.customerId,
       customerName: sql<string>`coalesce(max(${customers.name}), 'Khách lẻ')`,
       customerType: sql<string | null>`max(${customers.type})`,
@@ -94,7 +167,7 @@ export async function getReports(rangeDays = 30, filters: ReportFilters = {}) {
       .limit(10),
 
     // theo nhân viên (createdBy)
-    db.select({
+    database.select({
       sellerId: orders.createdBy,
       sellerName: sql<string>`coalesce(max(${profiles.fullName}), '—')`,
       orderCount: sql<number>`count(*)::int`,
@@ -110,14 +183,46 @@ export async function getReports(rangeDays = 30, filters: ReportFilters = {}) {
   ]);
 
   const summary = summaryRows[0];
+  const grossRevenue = Number(summary.revenue);
+  const refundTotal = Number(refundRows[0]?.refundTotal ?? 0);
+  const financials = calculateDashboardFinancials({
+    grossRevenue,
+    grossProfit: Number(profitRows[0]?.grossProfit ?? 0),
+    refundTotal,
+    returnedProfit: Number(returnedProfitRows[0]?.returnedProfit ?? 0),
+    orderCount: summary.orderCount,
+  });
+  const days = new Map<string, { day: string; revenue: number; orderCount: number }>();
+  for (const row of grossByDay) {
+    days.set(row.day, {
+      day: row.day,
+      revenue: Number(row.revenue),
+      orderCount: row.orderCount,
+    });
+  }
+  for (const row of refundsByDay) {
+    const current = days.get(row.day);
+    days.set(row.day, {
+      day: row.day,
+      revenue: (current?.revenue ?? 0) - Number(row.refund),
+      orderCount: current?.orderCount ?? 0,
+    });
+  }
+  const byDay = [...days.values()].sort((left, right) => left.day.localeCompare(right.day));
+
   return {
     rangeDays,
     filters,
     summary: {
-      revenue: Number(summary.revenue),
+      revenue: financials.revenue,
+      grossRevenue,
+      refundTotal,
       collected: Number(summary.collected),
       orderCount: summary.orderCount,
+      customerCount: summary.customerCount,
+      grossProfit: financials.grossProfit,
     },
+    generatedAt: new Date().toISOString(),
     byDay,
     topProducts,
     byCategory,

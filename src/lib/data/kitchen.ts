@@ -10,6 +10,8 @@ export type KdsItem = {
   quantity: number;
   modifiers: { label: string; priceDelta: number }[];
   note: string | null;
+  course: string;
+  fireAt: Date | null;
   status: KdsItemStatus;
 };
 
@@ -46,6 +48,8 @@ export async function getActiveTickets(): Promise<KdsTicket[]> {
       quantity: Number(it.quantity),
       modifiers: it.modifiers ?? [],
       note: it.note,
+      course: it.course,
+      fireAt: it.fireAt,
       status: it.status as KdsItemStatus,
     });
     byTicket.set(it.ticketId, list);

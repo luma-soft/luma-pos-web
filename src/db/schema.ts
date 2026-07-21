@@ -1,5 +1,5 @@
 import {
-  pgTable, uuid, text, varchar, integer, decimal, timestamp,
+  pgTable, uuid, text, varchar, integer, decimal, timestamp, date,
   boolean, jsonb, primaryKey, index, uniqueIndex, pgEnum,
 } from "drizzle-orm/pg-core";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
@@ -16,7 +16,7 @@ export const paymentStatusEnum = pgEnum("payment_status", [
   "unpaid", "deposit", "partial", "paid", "refunded",
 ]);
 export const paymentMethodEnum = pgEnum("payment_method", [
-  "cash", "bank_transfer", "card", "vnpay", "momo", "credit",
+  "cash", "bank_transfer", "card", "vnpay", "momo", "zalopay", "credit", "exchange_credit",
 ]);
 export const stockMovementTypeEnum = pgEnum("stock_movement_type", [
   "purchase", "sale", "return_in", "return_out", "transfer", "adjust", "init", "internal_use",
@@ -43,8 +43,29 @@ export const profiles = pgTable("profiles", {
   phone: varchar("phone", { length: 20 }),
   role: userRoleEnum("role").notNull().default("cashier"),
   isActive: boolean("is_active").notNull().default(true),
+  cashierPinHash: text("cashier_pin_hash"),
+  cashierPinFailedAttempts: integer("cashier_pin_failed_attempts").notNull().default(0),
+  cashierPinLockedUntil: timestamp("cashier_pin_locked_until", { withTimezone: true }),
+  cashierPinUpdatedAt: timestamp("cashier_pin_updated_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const mobileApprovals = pgTable("mobile_approvals", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+  requesterId: uuid("requester_id").notNull().references(() => profiles.id),
+  approverId: uuid("approver_id").notNull().references(() => profiles.id),
+  permission: text("permission").notNull(),
+  scope: text("scope"),
+  mode: text("mode").notNull(),
+  reason: text("reason"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("mobile_approvals_requester_idx").on(t.requesterId, t.createdAt),
+  index("mobile_approvals_expiry_idx").on(t.expiresAt),
+]);
 
 // ============= General Audit Log =============
 
@@ -181,6 +202,11 @@ export const products = pgTable("products", {
   wholesalePrice: decimal("wholesale_price", { precision: 14, scale: 2 }),
   contractorPrice: decimal("contractor_price", { precision: 14, scale: 2 }),
   agentPrice: decimal("agent_price", { precision: 14, scale: 2 }),
+  vatRate: decimal("vat_rate", { precision: 5, scale: 2 }),
+  priceByWeight: boolean("price_by_weight").notNull().default(false),
+  trackBatches: boolean("track_batches").notNull().default(false),
+  shelfLifeDays: integer("shelf_life_days"),
+  lifecycleStatus: varchar("lifecycle_status", { length: 20 }).notNull().default("active"),
 
   // Đặc thù VLXD
   // gạch: m² mỗi viên, viên mỗi hộp -> tự tính khi user nhập kích thước phòng
@@ -211,6 +237,7 @@ export const products = pgTable("products", {
   index("products_category_idx").on(t.categoryId),
   index("products_parent_idx").on(t.parentProductId),
   index("products_variant_parent_idx").on(t.isVariantParent, t.parentProductId),
+  index("products_lifecycle_status_idx").on(t.lifecycleStatus),
   // danh sách SP lọc đang bán + sắp theo ngày tạo (trang Sản phẩm/Thiết lập giá)
   index("products_active_created_idx").on(t.isActive, t.createdAt),
   index("products_total_stock_idx").on(t.totalStock), // lọc/sắp theo tồn (trang Tồn kho)
@@ -337,6 +364,60 @@ export const mobileNotificationStates = pgTable("mobile_notification_states", {
   uniqueIndex("mobile_notification_states_user_notification_idx").on(t.userId, t.notificationId),
 ]);
 
+export const mobilePushDevices = pgTable("mobile_push_devices", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  effectiveUserId: uuid("effective_user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  deviceId: varchar("device_id", { length: 120 }).notNull(),
+  platform: varchar("platform", { length: 20 }).notNull(),
+  token: text("token").notNull().unique(),
+  permission: varchar("permission", { length: 20 }).notNull().default("authorized"),
+  enabled: boolean("enabled").notNull().default(true),
+  locale: varchar("locale", { length: 20 }),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("mobile_push_devices_user_device_idx").on(t.userId, t.deviceId),
+  index("mobile_push_devices_user_enabled_idx").on(t.userId, t.enabled),
+  index("mobile_push_devices_effective_user_enabled_idx").on(t.effectiveUserId, t.enabled),
+]);
+
+export const mobilePushDeliveries = pgTable("mobile_push_deliveries", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  deviceId: uuid("device_id").notNull().references(() => mobilePushDevices.id, { onDelete: "cascade" }),
+  notificationKey: varchar("notification_key", { length: 180 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull(),
+  attempts: integer("attempts").notNull().default(1),
+  errorCode: varchar("error_code", { length: 80 }),
+  attemptedAt: timestamp("attempted_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("mobile_push_deliveries_device_notification_idx")
+    .on(t.deviceId, t.notificationKey),
+  index("mobile_push_deliveries_status_idx").on(t.status, t.attemptedAt),
+]);
+
+export const mobileTelemetryEvents = pgTable("mobile_telemetry_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  eventType: varchar("event_type", { length: 32 }).notNull(),
+  platform: varchar("platform", { length: 16 }).notNull(),
+  appVersion: varchar("app_version", { length: 32 }).notNull(),
+  metric: varchar("metric", { length: 32 }),
+  screen: varchar("screen", { length: 32 }),
+  durationMs: integer("duration_ms"),
+  success: boolean("success"),
+  errorType: varchar("error_type", { length: 80 }),
+  fingerprint: varchar("fingerprint", { length: 16 }),
+  attemptedCount: integer("attempted_count"),
+  succeededCount: integer("succeeded_count"),
+  failedCount: integer("failed_count"),
+  conflictCount: integer("conflict_count"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("mobile_telemetry_events_type_created_idx").on(t.eventType, t.createdAt),
+]);
+
 // ============= Suppliers =============
 
 export const suppliers = pgTable("suppliers", {
@@ -449,10 +530,19 @@ export const payments = pgTable("payments", {
   provider: text("provider"),
   bankAccountId: uuid("bank_account_id").references(() => paymentBankAccounts.id, { onDelete: "set null" }),
   providerTransactionId: text("provider_transaction_id"),
+  clientRequestId: varchar("client_request_id", { length: 80 }),
   gateway: text("gateway"),
   accountNumber: text("account_number"),
   confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
   rawMatchedEventId: uuid("raw_matched_event_id"),
+  checkoutUrl: text("checkout_url"),
+  deepLink: text("deep_link"),
+  qrPayload: text("qr_payload"),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  lastProviderStatus: text("last_provider_status"),
+  lastProviderError: text("last_provider_error"),
+  lastProviderCheckedAt: timestamp("last_provider_checked_at", { withTimezone: true }),
+  providerQueryAttempts: integer("provider_query_attempts").notNull().default(0),
   amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
   method: paymentMethodEnum("method").notNull(),
   reference: text("reference"), // mã GD ngân hàng
@@ -466,6 +556,12 @@ export const payments = pgTable("payments", {
   index("payments_provider_reference_idx").on(t.provider, t.reference),
   index("payments_bank_account_idx").on(t.bankAccountId),
   uniqueIndex("payments_provider_transaction_idx").on(t.provider, t.providerTransactionId),
+  uniqueIndex("payments_provider_client_request_idx").on(t.provider, t.clientRequestId),
+  uniqueIndex("payments_manual_client_request_idx")
+    .on(t.clientRequestId)
+    .where(sql`${t.provider} is null and ${t.clientRequestId} is not null`),
+  index("payments_provider_expiry_idx").on(t.provider, t.status, t.expiresAt),
+  index("payments_provider_query_idx").on(t.provider, t.status, t.lastProviderCheckedAt),
 ]);
 
 export const paymentWebhookEvents = pgTable("payment_webhook_events", {
@@ -523,7 +619,42 @@ export const purchaseOrderItems = pgTable("purchase_order_items", {
   unitCost: decimal("unit_cost", { precision: 14, scale: 2 }).notNull(),
   discount: decimal("discount", { precision: 14, scale: 2 }).notNull().default("0"), // giảm giá dòng
   total: decimal("total", { precision: 14, scale: 2 }).notNull(),
+  batchNumber: varchar("batch_number", { length: 80 }),
+  expiryDate: date("expiry_date"),
 });
+
+// ============= Stock lots (batch / expiry ledger) =============
+
+export const stockLots = pgTable("stock_lots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "restrict" }),
+  warehouseId: uuid("warehouse_id").notNull().references(() => warehouses.id, { onDelete: "restrict" }),
+  purchaseOrderItemId: uuid("purchase_order_item_id").references(() => purchaseOrderItems.id, { onDelete: "set null" }),
+  batchNumber: varchar("batch_number", { length: 80 }).notNull(),
+  expiryDate: date("expiry_date"),
+  receivedQuantity: decimal("received_quantity", { precision: 14, scale: 4 }).notNull(),
+  availableQuantity: decimal("available_quantity", { precision: 14, scale: 4 }).notNull(),
+  unitCost: decimal("unit_cost", { precision: 14, scale: 2 }),
+  receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
+  createdBy: uuid("created_by").references(() => profiles.id),
+}, (t) => [
+  index("stock_lots_product_warehouse_idx").on(t.productId, t.warehouseId),
+  index("stock_lots_expiry_idx").on(t.expiryDate),
+  index("stock_lots_purchase_item_idx").on(t.purchaseOrderItemId),
+]);
+
+export const stockLotMovements = pgTable("stock_lot_movements", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  stockLotId: uuid("stock_lot_id").notNull().references(() => stockLots.id, { onDelete: "cascade" }),
+  quantity: decimal("quantity", { precision: 14, scale: 4 }).notNull(),
+  refType: text("ref_type").notNull(),
+  refId: uuid("ref_id").notNull(),
+  createdBy: uuid("created_by").references(() => profiles.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("stock_lot_movements_lot_idx").on(t.stockLotId, t.createdAt),
+  index("stock_lot_movements_ref_idx").on(t.refType, t.refId),
+]);
 
 // ============= Purchase Returns (trả hàng nhập/NCC) =============
 
@@ -571,11 +702,14 @@ export const purchaseReturnItems = pgTable("purchase_return_items", {
 
 // ============= Returns (trả hàng theo hóa đơn) =============
 
-export const refundMethodEnum = pgEnum("refund_method", ["cash", "bank_transfer", "debt_deduct"]);
+export const refundMethodEnum = pgEnum("refund_method", [
+  "cash", "bank_transfer", "debt_deduct", "momo", "zalopay", "vnpay",
+]);
 
 export const returns = pgTable("returns", {
   id: uuid("id").primaryKey().defaultRandom(),
   code: varchar("code", { length: 30 }).notNull().unique(), // TH-...
+  clientId: varchar("client_id", { length: 80 }),
   // nullable: trả hàng nhanh không gắn hóa đơn (vd lịch sử KiotViet)
   orderId: uuid("order_id").references(() => orders.id),
   customerId: uuid("customer_id").references(() => customers.id),
@@ -583,10 +717,17 @@ export const returns = pgTable("returns", {
   reason: text("reason"),
   refundMethod: refundMethodEnum("refund_method").notNull().default("cash"),
   totalRefund: decimal("total_refund", { precision: 14, scale: 2 }).notNull().default("0"),
+  exchangeOrderId: uuid("exchange_order_id").references(() => orders.id),
+  exchangeDifference: decimal("exchange_difference", { precision: 14, scale: 2 }),
+  exchangeSettlementMethod: text("exchange_settlement_method"),
   note: text("note"),
   createdBy: uuid("created_by").references(() => profiles.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => [index("returns_order_idx").on(t.orderId)]);
+}, (t) => [
+  index("returns_order_idx").on(t.orderId),
+  index("returns_exchange_order_idx").on(t.exchangeOrderId),
+  uniqueIndex("returns_client_id_idx").on(t.clientId),
+]);
 
 export const returnItems = pgTable("return_items", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -601,6 +742,35 @@ export const returnItems = pgTable("return_items", {
   total: decimal("total", { precision: 14, scale: 2 }).notNull(),
   restock: boolean("restock").notNull().default(true), // false = hàng hỏng, không nhập lại kho bán
 }, (t) => [index("return_items_return_idx").on(t.returnId)]);
+
+export const paymentRefunds = pgTable("payment_refunds", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  returnId: uuid("return_id").notNull().references(() => returns.id, { onDelete: "restrict" }),
+  paymentId: uuid("payment_id").notNull().references(() => payments.id, { onDelete: "restrict" }),
+  status: text("status").notNull().default("pending"),
+  provider: text("provider").notNull(),
+  reference: varchar("reference", { length: 100 }).notNull(),
+  clientRequestId: varchar("client_request_id", { length: 80 }).notNull(),
+  amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
+  providerRefundTransactionId: text("provider_refund_transaction_id"),
+  providerStatus: text("provider_status"),
+  providerError: text("provider_error"),
+  rawPayload: jsonb("raw_payload").$type<Record<string, unknown>>().notNull().default({}),
+  submittedAt: timestamp("submitted_at", { withTimezone: true }),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  lastProviderCheckedAt: timestamp("last_provider_checked_at", { withTimezone: true }),
+  providerQueryAttempts: integer("provider_query_attempts").notNull().default(0),
+  createdBy: uuid("created_by").references(() => profiles.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("payment_refunds_return_idx").on(t.returnId),
+  uniqueIndex("payment_refunds_client_request_idx").on(t.clientRequestId),
+  uniqueIndex("payment_refunds_provider_reference_idx").on(t.provider, t.reference),
+  uniqueIndex("payment_refunds_provider_transaction_idx").on(t.provider, t.providerRefundTransactionId),
+  index("payment_refunds_payment_idx").on(t.paymentId),
+  index("payment_refunds_status_query_idx").on(t.status, t.lastProviderCheckedAt),
+]);
 
 // ============= Sổ quỹ thu chi =============
 
@@ -678,25 +848,47 @@ export const tripStops = pgTable("trip_stops", {
   note: text("note"),
 }, (t) => [index("trip_stops_trip_idx").on(t.tripId)]);
 
-// ============= Hóa đơn điện tử (stub provider) =============
+// ============= Hóa đơn điện tử =============
 
-export const einvoiceStatusEnum = pgEnum("einvoice_status", ["draft", "issued", "error"]);
+export const einvoiceStatusEnum = pgEnum("einvoice_status", [
+  "draft",
+  "queued",
+  "processing",
+  "issued",
+  "error",
+]);
 
 export const einvoices = pgTable("einvoices", {
   id: uuid("id").primaryKey().defaultRandom(),
   orderId: uuid("order_id").notNull().references(() => orders.id).unique(),
   status: einvoiceStatusEnum("status").notNull().default("draft"),
-  serial: varchar("serial", { length: 20 }).notNull().default("1C26TTP"),
+  serial: varchar("serial", { length: 20 }),
   number: varchar("number", { length: 20 }),
   buyerName: text("buyer_name").notNull(),
   buyerTaxCode: varchar("buyer_tax_code", { length: 30 }),
+  buyerAddress: text("buyer_address"),
+  buyerEmail: text("buyer_email"),
+  provider: varchar("provider", { length: 40 }),
+  requestId: varchar("request_id", { length: 80 }).unique(),
+  providerReference: text("provider_reference"),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
+  queuedAt: timestamp("queued_at", { withTimezone: true }),
+  lockedAt: timestamp("locked_at", { withTimezone: true }),
+  lockToken: varchar("lock_token", { length: 80 }),
+  lastError: text("last_error"),
   vatRate: decimal("vat_rate", { precision: 5, scale: 2 }).notNull().default("10"),
   totalBeforeVat: decimal("total_before_vat", { precision: 14, scale: 2 }).notNull().default("0"),
   vatAmount: decimal("vat_amount", { precision: 14, scale: 2 }).notNull().default("0"),
   issuedAt: timestamp("issued_at", { withTimezone: true }),
   note: text("note"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("einvoices_retry_idx").on(t.status, t.nextAttemptAt),
+  index("einvoices_lock_idx").on(t.lockedAt),
+]);
 
 // ============= Kiểm kho (stocktake) =============
 
@@ -792,10 +984,14 @@ export const shifts = pgTable("shifts", {
   variance: decimal("variance", { precision: 14, scale: 2 }),
   status: text("status").notNull().default("open"),
   note: text("note"),
+  handoverToUserId: uuid("handover_to_user_id").references(() => profiles.id),
+  handoverFromShiftId: uuid("handover_from_shift_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("shifts_status_idx").on(t.status),
   index("shifts_user_idx").on(t.userId),
+  index("shifts_handover_to_user_idx").on(t.handoverToUserId),
+  index("shifts_handover_from_shift_idx").on(t.handoverFromShiftId),
   uniqueIndex("shifts_open_user_unique_idx").on(t.userId).where(sql`${t.status} = 'open'`),
 ]);
 
@@ -844,10 +1040,15 @@ export const kitchenTicketItems = pgTable("kitchen_ticket_items", {
   quantity: decimal("quantity", { precision: 14, scale: 3 }).notNull().default("1"),
   modifiers: jsonb("modifiers").$type<{ label: string; priceDelta: number }[]>().notNull().default([]),
   note: text("note"),
+  course: text("course").notNull().default("asap"),
+  fireAt: timestamp("fire_at", { withTimezone: true }),
   status: text("status").notNull().default("pending"), // pending | preparing | ready | served
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => [index("kitchen_ticket_items_ticket_idx").on(t.ticketId)]);
+}, (t) => [
+  index("kitchen_ticket_items_ticket_idx").on(t.ticketId),
+  index("kitchen_ticket_items_fire_at_idx").on(t.fireAt, t.status),
+]);
 
 // ============= Store settings (singleton) =============
 

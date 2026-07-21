@@ -20,7 +20,13 @@ export function EInvoiceForm({ orderId, defaultBuyer }: { orderId: string; defau
     if (!buyerName.trim() || busy) return;
     setBusy(true);
     setError("");
-    const res = await issueEInvoice({ orderId, buyerName, buyerTaxCode: buyerTaxCode || undefined, vatRate });
+    const res = await issueEInvoice({
+      orderId,
+      buyerName,
+      buyerTaxCode: buyerTaxCode || undefined,
+      vatRate,
+      requestId: `web-einvoice-${orderId}`,
+    });
     setBusy(false);
     if (res.ok) router.refresh();
     else setError(t(res.error as never));

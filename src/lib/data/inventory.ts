@@ -1,7 +1,7 @@
-import { and, asc, count, desc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  products, profiles, purchaseOrderItems, purchaseOrders, stockMovements, suppliers, warehouses,
+  internalUseIssues, products, profiles, purchaseOrderItems, purchaseOrders, stockMovements, suppliers, warehouses,
 } from "@/db/schema";
 import { unstable_cache } from "next/cache";
 import { accentInsensitiveLike } from "@/lib/search";
@@ -57,6 +57,8 @@ export async function getInventory(filters: { q?: string; low?: boolean; stock?:
         name: products.name,
         baseUnit: products.baseUnit,
         costPrice: products.costPrice,
+        trackBatches: products.trackBatches,
+        shelfLifeDays: products.shelfLifeDays,
         totalStock: products.totalStock,
         minLevel: products.minStock,
         stockValue: sql<string>`${products.totalStock} * ${products.costPrice}`,
@@ -107,6 +109,24 @@ export const getRecentMovements = unstable_cache(
   ["recent-movements"],
   { revalidate: 30 }
 );
+
+export async function getInternalUseCostSummary() {
+  const periodStart = new Date();
+  periodStart.setHours(0, 0, 0, 0);
+  periodStart.setDate(1);
+  const [summary] = await db
+    .select({
+      total: sql<string>`coalesce(sum(${internalUseIssues.totalCost}), 0)`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(internalUseIssues)
+    .where(gte(internalUseIssues.createdAt, periodStart));
+  return {
+    total: Number(summary.total),
+    count: summary.count,
+    periodStart: periodStart.toISOString(),
+  };
+}
 
 export async function getPurchases(filters: { q?: string; status?: string; page?: number; pageSize?: number } = {}) {
   const page = Math.max(1, filters.page ?? 1);

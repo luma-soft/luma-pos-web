@@ -1,13 +1,17 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { orderItems, orders, products } from "@/db/schema";
+import {
+  calculateRestock,
+  type RestockPriority,
+} from "@/lib/ai/restock-policy";
 
-const COVER_DAYS = 14;
+export type { RestockPriority } from "@/lib/ai/restock-policy";
 
-export type RestockPriority = "high" | "medium" | "low";
 export type RestockRow = {
   id: string; name: string; sku: string; baseUnit: string;
   stock: number; velocity: number; daysOfStock: number | null; suggestedQty: number; priority: RestockPriority;
+  unitCost: number;
 };
 
 /** Gợi ý nhập hàng (deterministic) từ tốc độ bán {days} ngày gần nhất. */
@@ -27,7 +31,7 @@ export async function getRestockSuggestions(days = 30): Promise<RestockRow[]> {
   const soldMap = new Map(sold.map((r) => [r.productId, Number(r.base)]));
 
   const prods = await db
-    .select({ id: products.id, name: products.name, sku: products.sku, baseUnit: products.baseUnit, totalStock: products.totalStock, minStock: products.minStock })
+    .select({ id: products.id, name: products.name, sku: products.sku, baseUnit: products.baseUnit, totalStock: products.totalStock, minStock: products.minStock, costPrice: products.costPrice, lastPurchasePrice: products.lastPurchasePrice })
     .from(products)
     .where(eq(products.isActive, true));
 
@@ -35,18 +39,27 @@ export async function getRestockSuggestions(days = 30): Promise<RestockRow[]> {
   for (const p of prods) {
     const stock = Number(p.totalStock);
     const min = Number(p.minStock);
-    const velocity = (soldMap.get(p.id) ?? 0) / days;
-    const lowStock = min > 0 && stock <= min;
+    const calculation = calculateRestock({
+      stock,
+      minStock: min,
+      soldQuantity: soldMap.get(p.id) ?? 0,
+      lookbackDays: days,
+    });
+    const { velocity, lowStock, daysOfStock, suggestedQty, priority } = calculation;
     if (velocity <= 0 && !lowStock) continue; // bỏ SP không bán & đủ tồn
 
-    const daysOfStock = velocity > 0 ? stock / velocity : null;
-    const suggestedQty = Math.max(0, Math.ceil(velocity * COVER_DAYS) - stock);
-    const priority: RestockPriority =
-      daysOfStock != null && daysOfStock < 7 ? "high"
-      : daysOfStock != null && daysOfStock < 14 ? "medium"
-      : lowStock ? "high" : "low";
-
-    rows.push({ id: p.id, name: p.name, sku: p.sku, baseUnit: p.baseUnit, stock, velocity, daysOfStock, suggestedQty, priority });
+    rows.push({
+      id: p.id,
+      name: p.name,
+      sku: p.sku,
+      baseUnit: p.baseUnit,
+      stock,
+      velocity,
+      daysOfStock,
+      suggestedQty,
+      priority,
+      unitCost: Number(p.lastPurchasePrice ?? p.costPrice ?? 0),
+    });
   }
 
   const order: Record<RestockPriority, number> = { high: 0, medium: 1, low: 2 };

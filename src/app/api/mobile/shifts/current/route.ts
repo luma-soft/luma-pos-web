@@ -16,6 +16,7 @@ export async function GET() {
     expectedCash: summary.expectedCash,
     tenderTotals: summary.tenderTotals,
     orderCount: summary.orderCount,
+    revenue: summary.revenue,
     refundTotal: summary.refundTotal,
     cashIn: summary.cashIn,
     cashOut: summary.cashOut,

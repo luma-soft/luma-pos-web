@@ -1492,6 +1492,7 @@
     },
     "errors": {
       "nothingToPay": "Đơn này không còn gì để thu.",
+      "amountExceedsRemaining": "Số tiền vượt quá phần còn phải thu. Hãy tải lại đơn.",
       "alreadyCancelled": "Đơn đã hủy trước đó.",
       "sourceNotFound": "Không tìm thấy hóa đơn gốc.",
       "sourceNotCopyable": "Hóa đơn này không thể sao chép.",
@@ -1836,6 +1837,7 @@
     "title": "Báo cáo",
     "lastNDays": "{n} ngày",
     "revenue": "Doanh thu",
+    "returnsDeducted": "Đã trừ hoàn trả {amount}",
     "collected": "Đã thu",
     "uncollected": "Chưa thu",
     "orders": "Số đơn",
@@ -2045,7 +2047,8 @@
   "payments": {
     "errors": {
       "bankAccountNotFound": "Chưa cấu hình tài khoản ngân hàng SePay đang bật.",
-      "notConfirmable": "Thanh toán này không thể xác nhận."
+      "notConfirmable": "Thanh toán này không thể xác nhận.",
+      "referenceConflict": "Yêu cầu thanh toán đã được dùng với nội dung khác. Hãy tải lại đơn."
     }
   },
   "settings": {
@@ -2299,7 +2302,7 @@
     "title": "Hóa đơn điện tử",
     "issue": "Phát hành HĐĐT",
     "issued": "Đã phát hành",
-    "stubNote": "Đang dùng bộ phát hành nội bộ (stub) — số HĐ cấp tuần tự. Khi tích hợp Viettel S-Invoice/VNPT/MISA chỉ thay 1 hàm issueWithProvider().",
+    "queueNote": "Trạng thái do provider và hàng đợi phát hành trên server quản lý; hệ thống không tự sinh số hóa đơn.",
     "empty": "Chưa phát hành HĐĐT nào",
     "emptyHint": "Phát hành từ trang chi tiết đơn hàng.",
     "cols": {
@@ -2307,7 +2310,15 @@
       "issuedAt": "Ngày phát hành",
       "order": "Đơn nguồn",
       "buyer": "Người mua",
-      "beforeVat": "Trước VAT"
+      "beforeVat": "Trước VAT",
+      "status": "Trạng thái"
+    },
+    "status": {
+      "draft": "Nháp",
+      "queued": "Đang chờ",
+      "processing": "Đang xử lý",
+      "issued": "Đã phát hành",
+      "error": "Lỗi"
     },
     "errors": {
       "onlyCompleted": "Chỉ phát hành cho đơn hoàn tất.",

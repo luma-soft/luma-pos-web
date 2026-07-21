@@ -1,9 +1,9 @@
 import { createInternalUse } from "@/lib/actions/internal-use";
-import { requireMobileUser } from "@/lib/mobile/auth";
+import { requireMobileStockAccess } from "@/lib/mobile/auth";
 import { mobileAction, mobileGate, readJson } from "@/lib/mobile/response";
 
 export async function POST(request: Request) {
-  const gate = await requireMobileUser();
+  const gate = await requireMobileStockAccess();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
 

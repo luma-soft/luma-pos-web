@@ -61,7 +61,7 @@ export function TableOrder({ id, name, initialCart, modifierGroups }: { id: stri
       const ex = cart.findIndex((c) => c.productId === p.id && !c.sent && c.modifiers.length === 0 && !c.note);
       if (ex >= 0) { const c = [...cart]; c[ex] = { ...c[ex], quantity: c[ex].quantity + 1 }; persist(c); return; }
     }
-    persist([...cart, { lineId: uid(), productId: p.id, productName: p.name, unitName: p.baseUnit, unitMultiplier: 1, quantity: 1, basePrice: base, unitPrice, modifiers, note: note || undefined, sent: false }]);
+    persist([...cart, { lineId: uid(), productId: p.id, productName: p.name, unitName: p.baseUnit, unitMultiplier: 1, quantity: 1, basePrice: base, unitPrice, modifiers, note: note || undefined, course: "asap", courseDelayMinutes: 0, sent: false }]);
   }
 
   const setQty = (lineId: string, d: number) => {

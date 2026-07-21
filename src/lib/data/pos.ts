@@ -27,6 +27,7 @@ function posProductSelect(warehouseId: string | null) {
     wholesalePrice: products.wholesalePrice,
     contractorPrice: products.contractorPrice,
     agentPrice: products.agentPrice,
+    priceByWeight: products.priceByWeight,
     m2PerUnit: products.m2PerUnit,
     categoryId: products.categoryId,
     categoryName: categories.name,

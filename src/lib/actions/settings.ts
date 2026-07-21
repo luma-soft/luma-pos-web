@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { paymentBankAccounts, profiles, storeSettings } from "@/db/schema";
+import { paymentBankAccounts, storeSettings } from "@/db/schema";
 import { getPaymentBankAccounts, getStaff } from "@/lib/data/settings";
 import { getAiUsageStatus } from "@/lib/ai/usage";
 import {
@@ -14,7 +14,6 @@ import {
   storePrefsPatchSchema,
   zaloSettingsInputSchema,
   parseStorePrefs,
-  STAFF_ROLES,
   type AiSettingsInput,
   type PaymentBankAccountInput,
   type ShopeeSettingsInput,
@@ -27,6 +26,8 @@ import { writeAuditLog } from "@/lib/audit";
 import { buildAiProviderConfig, completeAiText, completeAiVision } from "@/lib/ai/provider-adapter";
 import { type ActionResult, requireManager, requireOwner, requireUser } from "./common";
 import { Routes } from "@/lib/routes";
+import { applyStaffSettingsMutation } from "@/lib/settings/staff-settings-service";
+import { parseStaffSettingsMutation } from "@/lib/settings/staff-settings-mutation";
 
 type AiProviderTestKind = "text" | "vision";
 
@@ -117,6 +118,13 @@ export async function updateStoreSettings(input: StoreSettingsInput): Promise<Ac
 export async function updateStorePrefs(patch: StorePrefsPatch): Promise<ActionResult> {
   const gate = await requireManager();
   if (!gate.ok) return gate;
+  return updateStorePrefsForUser(gate.userId, patch);
+}
+
+export async function updateStorePrefsForUser(
+  _userId: string,
+  patch: StorePrefsPatch,
+): Promise<ActionResult> {
   const parsed = storePrefsPatchSchema.safeParse(patch);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   try {
@@ -459,28 +467,33 @@ export async function testAiProvider(input: AiSettingsInput, kind: AiProviderTes
 export async function updateStaffRole(id: string, role: StaffRole): Promise<ActionResult> {
   const gate = await requireManager();
   if (!gate.ok) return gate;
-  if (!STAFF_ROLES.includes(role)) return { ok: false, error: "errors.invalidData" };
-  try {
-    await db.update(profiles).set({ role }).where(eq(profiles.id, id));
-    revalidatePath(Routes.Settings);
-    return { ok: true, data: undefined };
-  } catch (e) {
-    console.error("updateStaffRole failed:", e);
-    return { ok: false, error: "errors.serverError" };
-  }
+  const mutation = parseStaffSettingsMutation({ id, role });
+  if (!mutation) return { ok: false, error: "errors.invalidData" };
+  const result = await applyStaffSettingsMutation({
+    actorId: gate.userId,
+    actorRole: gate.role,
+    mutation,
+    source: "manual",
+  });
+  if (!result.ok) return result;
+  revalidatePath(Routes.Settings);
+  return { ok: true, data: undefined };
 }
 
 export async function setStaffActive(id: string, active: boolean): Promise<ActionResult> {
   const gate = await requireManager();
   if (!gate.ok) return gate;
-  try {
-    await db.update(profiles).set({ isActive: active }).where(eq(profiles.id, id));
-    revalidatePath(Routes.Settings);
-    return { ok: true, data: undefined };
-  } catch (e) {
-    console.error("setStaffActive failed:", e);
-    return { ok: false, error: "errors.serverError" };
-  }
+  const mutation = parseStaffSettingsMutation({ id, active });
+  if (!mutation) return { ok: false, error: "errors.invalidData" };
+  const result = await applyStaffSettingsMutation({
+    actorId: gate.userId,
+    actorRole: gate.role,
+    mutation,
+    source: "manual",
+  });
+  if (!result.ok) return result;
+  revalidatePath(Routes.Settings);
+  return { ok: true, data: undefined };
 }
 
 export async function savePaymentBankAccount(input: PaymentBankAccountInput): Promise<ActionResult> {

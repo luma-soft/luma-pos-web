@@ -66,7 +66,7 @@ export type AiAssistantResponse = {
   prompt: string;
   actionPreview?: AiActionPreview;
   actions: Array<{ type: string; target: string; label: string }>;
-  chart?: { type: string; rows: unknown[] };
+  chart?: { type: string; rows: unknown[]; sourceId?: string };
   toolTrace?: AiToolTrace[];
 };
 
@@ -2639,7 +2639,9 @@ export async function buildAiAssistantResponse(input: {
       actions: [
         { type: "open", target: actionPreview.action.target, label: "Open related screen" },
       ],
-      chart: { type: "revenueByDay", rows: input.chartRows },
+      chart: asksReportSummary
+        ? { type: "revenueByDay", rows: input.chartRows }
+        : undefined,
       toolTrace,
     };
   }

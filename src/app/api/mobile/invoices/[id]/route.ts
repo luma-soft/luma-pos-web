@@ -22,6 +22,14 @@ export async function GET(
       id: einvoices.id,
       status: einvoices.status,
       number: einvoices.number,
+      serial: einvoices.serial,
+      provider: einvoices.provider,
+      providerReference: einvoices.providerReference,
+      requestId: einvoices.requestId,
+      attemptCount: einvoices.attemptCount,
+      lastAttemptAt: einvoices.lastAttemptAt,
+      nextAttemptAt: einvoices.nextAttemptAt,
+      lastError: einvoices.lastError,
       issuedAt: einvoices.issuedAt,
     })
     .from(einvoices)
@@ -32,12 +40,12 @@ export async function GET(
     eInvoice: eInvoice ?? null,
     lifecycle: {
       hasReturns: order.returns.length > 0,
-      hasEInvoice: Boolean(eInvoice),
+      hasEInvoice: eInvoice?.status === "issued",
       canEdit:
         (order.status === "completed" || order.status === "quote") &&
         order.returns.length === 0 &&
-        !eInvoice,
-      canCancel: order.status !== "cancelled" && order.status !== "merged" && !eInvoice,
+        eInvoice?.status !== "issued",
+      canCancel: order.status !== "cancelled" && order.status !== "merged" && eInvoice?.status !== "issued",
       canAddPayment:
         (order.status === "completed" || order.status === "returned") &&
         Number(order.amountPaid) < Number(order.total),

@@ -31,6 +31,9 @@ export const createOrderSchema = z.object({
   discount: z.number().min(0).default(0),
   taxRate: z.number().min(0).max(100).default(0),
   shippingFee: z.number().min(0).default(0),
+  // Provider-first checkout creates a draft that must not reserve/consume
+  // stock until the server confirms the external payment.
+  paymentPending: z.boolean().optional().default(false),
   items: z.array(orderItemSchema).min(1, { error: "pos.errors.emptyCart" }),
   payment: z.object({
     method: z.enum(["cash", "bank_transfer", "card", "credit"]),
@@ -64,6 +67,7 @@ export const addPaymentSchema = z.object({
   orderId: z.uuid(),
   amount: z.number().positive(),
   method: z.enum(["cash", "bank_transfer", "card"]),
+  clientRequestId: z.string().trim().min(8).max(80).optional(),
   reference: z.string().trim().optional(),
   note: z.string().optional(),
 });
@@ -113,6 +117,8 @@ export const purchaseItemSchema = z.object({
   quantity: z.number().positive(), // theo đơn vị gốc
   unitCost: z.number().min(0),
   discount: z.number().min(0).default(0), // giảm giá dòng (VND)
+  batchNumber: z.string().trim().min(1).max(80).optional(),
+  expiryDate: z.iso.date().optional(),
 });
 
 export const createPurchaseSchema = z.object({

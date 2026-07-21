@@ -1,4 +1,4 @@
-import { createCashTx } from "@/lib/actions/cashbook";
+import { createCashTxForUser } from "@/lib/actions/cashbook";
 import { getCashbook } from "@/lib/data/cashbook";
 import { requireMobileManager } from "@/lib/mobile/auth";
 import {
@@ -26,8 +26,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const gate = await requireMobileManager();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const body = await readJson(request);
   if (!body || typeof body !== "object") {
@@ -35,6 +34,9 @@ export async function POST(request: Request) {
   }
 
   return mobileAction(
-    await createCashTx(body as Parameters<typeof createCashTx>[0]),
+    await createCashTxForUser(
+      gate.userId,
+      body as Parameters<typeof createCashTxForUser>[1],
+    ),
   );
 }

@@ -1,4 +1,4 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   customers, einvoices, orderItems, orders, payments, returnItems, returns, stockLevels, stockMovements,
@@ -27,7 +27,7 @@ export async function updateOrderForUser(userId: string, input: UpdateOrderInput
       if (order.status !== "completed" && order.status !== "quote") throw new Error("NOT_EDITABLE");
       const [hasReturn] = await tx.select({ id: returns.id }).from(returns).where(eq(returns.orderId, v.orderId)).limit(1);
       if (hasReturn) throw new Error("HAS_RETURNS");
-      const [hasEInvoice] = await tx.select({ id: einvoices.id }).from(einvoices).where(eq(einvoices.orderId, v.orderId)).limit(1);
+      const [hasEInvoice] = await tx.select({ id: einvoices.id }).from(einvoices).where(and(eq(einvoices.orderId, v.orderId), eq(einvoices.status, "issued"))).limit(1);
       if (hasEInvoice) throw new Error("HAS_EINVOICE");
 
       const isQuote = order.status === "quote";
@@ -147,7 +147,7 @@ export async function mergeOrdersForUser(userId: string, orderIds: string[]): Pr
       if (customerIds.size !== 1 || !sources[0].customerId) throw new Error("SAME_CUSTOMER");
       const [hasReturn] = await tx.select({ id: returns.id }).from(returns).where(inArray(returns.orderId, orderIds)).limit(1);
       if (hasReturn) throw new Error("HAS_RETURNS");
-      const [hasEInvoice] = await tx.select({ id: einvoices.id }).from(einvoices).where(inArray(einvoices.orderId, orderIds)).limit(1);
+      const [hasEInvoice] = await tx.select({ id: einvoices.id }).from(einvoices).where(and(inArray(einvoices.orderId, orderIds), eq(einvoices.status, "issued"))).limit(1);
       if (hasEInvoice) throw new Error("HAS_EINVOICE");
 
       const subtotal = sources.reduce((s, o) => s + Number(o.subtotal), 0);

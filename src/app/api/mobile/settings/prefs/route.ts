@@ -1,15 +1,18 @@
-import { updateStorePrefs } from "@/lib/actions/settings";
+import { updateStorePrefsForUser } from "@/lib/actions/settings";
+import { authorizeMobileSensitiveAction } from "@/lib/auth/mobile-approval";
 import { getStoreSettings } from "@/lib/data/settings";
-import { requireMobileManager, requireMobileUser } from "@/lib/mobile/auth";
+import { requireMobileManager, requireMobileRole } from "@/lib/mobile/auth";
+import { MOBILE_SETTINGS_ADMIN_ROLES } from "@/lib/settings/mobile-settings-access";
 import {
   mobileAction,
+  mobileError,
   mobileGate,
   mobileOk,
   readJson,
 } from "@/lib/mobile/response";
 
 export async function GET() {
-  const gate = await requireMobileUser();
+  const gate = await requireMobileRole(MOBILE_SETTINGS_ADMIN_ROLES);
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
 
@@ -19,11 +22,19 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   const gate = await requireMobileManager();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const body = await readJson(request);
   if (!body) return mobileAction({ ok: false, error: "errors.invalidData" });
 
-  return mobileAction(await updateStorePrefs(body));
+  const authorization = await authorizeMobileSensitiveAction({
+    request,
+    requesterId: gate.userId,
+    requesterRole: gate.role,
+    permission: "settings.sensitive",
+    scope: "settings:prefs",
+  });
+  if (!authorization.ok) return mobileError(authorization.error, 403);
+
+  return mobileAction(await updateStorePrefsForUser(gate.userId, body));
 }

@@ -11,6 +11,9 @@ function normalizeCart(raw: unknown): TableCartItem[] {
   return arr.map((r) => {
     const i = r as Record<string, unknown>;
     const unitPrice = Number(i.unitPrice) || 0;
+    const course = ["asap", "starter", "main", "dessert", "drink"].includes(String(i.course))
+      ? i.course as TableCartItem["course"]
+      : "asap";
     return {
       lineId: typeof i.lineId === "string" ? i.lineId : `${i.productId}-${Math.random().toString(36).slice(2, 8)}`,
       productId: String(i.productId),
@@ -22,6 +25,8 @@ function normalizeCart(raw: unknown): TableCartItem[] {
       unitPrice,
       modifiers: Array.isArray(i.modifiers) ? (i.modifiers as TableCartItem["modifiers"]) : [],
       note: typeof i.note === "string" ? i.note : undefined,
+      course,
+      courseDelayMinutes: Math.max(0, Math.min(240, Math.trunc(Number(i.courseDelayMinutes) || 0))),
       sent: i.sent === true,
     };
   });

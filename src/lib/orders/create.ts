@@ -1,8 +1,8 @@
 import { revalidatePath } from "next/cache";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  orders, orderItems, payments, customers, stockLevels, stockMovements, einvoices, returns,
+  orders, orderItems, payments, customers, products, stockLevels, stockMovements, einvoices, returns,
 } from "@/db/schema";
 import { createOrderSchema, type CreateOrderInput } from "@/lib/schemas/order";
 import {
@@ -12,6 +12,8 @@ import { recordCashTx, fundForMethod } from "@/lib/cash";
 import { Routes } from "@/lib/routes";
 import { normalizeOrderItems } from "@/lib/orders/normalize";
 import { getCurrentShift } from "@/lib/data/shifts";
+import { calculateProductTax } from "@/lib/orders/product-tax";
+import { consumeTrackedStockLots, restoreTrackedStockLots } from "@/lib/inventory/stock-lot-service";
 
 function revalidateOrderPaths(sourceOrderId?: string) {
   try {
@@ -40,6 +42,17 @@ export async function createOrderForUser(
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
 
+  const paymentPending = v.paymentPending === true;
+  if (
+    paymentPending &&
+    (v.mode !== "sale" ||
+      v.payment.method !== "credit" ||
+      v.payment.amount !== 0 ||
+      !v.clientId)
+  ) {
+    return { ok: false, error: "errors.invalidData" };
+  }
+
   // Khử trùng: nếu đơn với clientId này đã tạo (đồng bộ lại) → trả về đơn cũ, không tạo trùng.
   if (v.clientId) {
     const [existing] = await db.select({ id: orders.id, code: orders.code }).from(orders).where(eq(orders.clientId, v.clientId)).limit(1);
@@ -61,11 +74,34 @@ export async function createOrderForUser(
   }
   const subtotal = trustedItems.reduce((s, i) => s + i.total, 0);
   const afterDiscount = Math.max(0, subtotal - v.discount);
-  const tax = Math.round((afterDiscount * v.taxRate) / 100);
+  const productTaxRows = await db
+    .select({ id: products.id, vatRate: products.vatRate })
+    .from(products)
+    .where(inArray(products.id, [...new Set(trustedItems.map((item) => item.productId))]));
+  const vatRateByProduct = new Map(
+    productTaxRows.map((product) => [
+      product.id,
+      product.vatRate == null ? null : Number(product.vatRate),
+    ]),
+  );
+  const tax = calculateProductTax({
+    lines: trustedItems.map((item) => ({
+      total: item.total,
+      vatRate: vatRateByProduct.get(item.productId) ?? null,
+    })),
+    discount: v.discount,
+    fallbackVatRate: v.taxRate,
+  });
   const total = Math.max(0, afterDiscount + tax + v.shippingFee);
   const paid = isQuote || isBooking || v.payment.method === "credit" ? 0 : Math.min(v.payment.amount, total);
   const remaining = total - paid;
-  const paymentStatus = paid >= total ? "paid" : paid > 0 ? "deposit" : "unpaid";
+  const paymentStatus = paymentPending
+    ? "unpaid"
+    : paid >= total
+      ? "paid"
+      : paid > 0
+        ? "deposit"
+        : "unpaid";
 
   try {
     const profileId = await getProfileId(userId);
@@ -97,6 +133,15 @@ export async function createOrderForUser(
         if (sourceIsSale && sourceOrder.warehouseId) {
           for (const i of sourceItems) {
             const baseQty = Number(i.quantity) * Number(i.unitMultiplier);
+            await restoreTrackedStockLots(tx, {
+              productId: i.productId,
+              quantity: baseQty,
+              sourceRefType: "order",
+              sourceRefId: sourceOrder.id,
+              refType: "order_edit_cancel",
+              refId: sourceOrder.id,
+              createdBy: profileId,
+            });
             await tx.update(stockLevels).set({
               quantity: sql`${stockLevels.quantity} + ${toQty(baseQty)}`,
               updatedAt: sql`now()`,
@@ -144,7 +189,13 @@ export async function createOrderForUser(
       const orderInsert: typeof orders.$inferInsert = {
         code: generateCode(isQuote ? "BG" : "DH"),
         clientId: v.clientId ?? null,
-        status: isQuote ? "quote" : isBooking ? "confirmed" : "completed",
+        status: isQuote
+          ? "quote"
+          : isBooking
+            ? "confirmed"
+            : paymentPending
+              ? "draft"
+              : "completed",
         paymentStatus,
         shiftId: currentShift?.id ?? null,
         customerId: v.customerId ?? null,
@@ -208,11 +259,19 @@ export async function createOrderForUser(
       }
 
       // Báo giá / đặt hàng: không trừ kho, không ghi công nợ doanh thu.
-      if (isQuote || isBooking) return order;
+      if (isQuote || isBooking || paymentPending) return order;
 
       // Trừ kho theo base unit + ghi movement
       for (const i of trustedItems) {
         const baseQty = i.quantity * i.unitMultiplier;
+        await consumeTrackedStockLots(tx, {
+          productId: i.productId,
+          warehouseId: v.warehouseId,
+          quantity: baseQty,
+          refType: "order",
+          refId: order.id,
+          createdBy: profileId,
+        });
         await tx
           .insert(stockLevels)
           .values({
@@ -265,6 +324,7 @@ export async function createOrderForUser(
       SOURCE_ALREADY_REPLACED: "orderEdit.errors.notEditable",
       SOURCE_HAS_RETURNS: "orderEdit.errors.hasReturns",
       SOURCE_HAS_EINVOICE: "orderEdit.errors.hasEInvoice",
+      INSUFFICIENT_BATCH_STOCK: "pos.errors.insufficientStock",
     };
     const msg = e instanceof Error ? e.message : "";
     if (known[msg]) return { ok: false, error: known[msg] };

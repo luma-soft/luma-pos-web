@@ -1,4 +1,6 @@
-import { updateCustomer } from "@/lib/actions/partners";
+import { authorizeMobileSensitiveAction } from "@/lib/auth/mobile-approval";
+import { eraseCustomerPersonalData } from "@/lib/customers/privacy";
+import { updateCustomerCore } from "@/lib/customers/write";
 import { getCustomer } from "@/lib/data/partners";
 import { requireMobileSalesAccess } from "@/lib/mobile/auth";
 import {
@@ -28,8 +30,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const gate = await requireMobileSalesAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const { id } = await params;
   const body = await readJson(request);
@@ -38,9 +39,27 @@ export async function PATCH(
   }
 
   return mobileAction(
-    await updateCustomer({
+    await updateCustomerCore({
       ...(body as Record<string, unknown>),
       id,
-    } as Parameters<typeof updateCustomer>[0])
+    } as Parameters<typeof updateCustomerCore>[0])
   );
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const gate = await requireMobileSalesAccess();
+  if (!gate.ok) return mobileGate(gate)!;
+  const { id } = await params;
+  const authorization = await authorizeMobileSensitiveAction({
+    request,
+    requesterId: gate.userId,
+    requesterRole: gate.role,
+    permission: "customer.erase",
+    scope: `customer:${id}:erase`,
+  });
+  if (!authorization.ok) return mobileError(authorization.error, 403);
+  return mobileAction(await eraseCustomerPersonalData(id));
 }

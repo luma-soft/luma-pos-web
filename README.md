@@ -84,6 +84,31 @@ bun dev
 - `product_units` → 1 SP nhiều đơn vị (viên/hộp/m²/pallet)
 - `customers.type` → retail/wholesale/contractor/agent (4 bảng giá)
 - `orders` có `project_name` + đặt cọc qua `payments`
+- MoMo/ZaloPay/VNPay gateway intents are enabled only with complete server-side
+  credentials and `PAYMENT_CALLBACK_BASE_URL` (public HTTPS). Provider redirects
+  are informational; only verified IPN/callbacks with exact provider/reference/
+  amount settle orders. Pending status polling is also recovered through the
+  providers' signed/merchant-bound transaction inquiry APIs, throttled per
+  payment; inquiry evidence must match the server-owned reference and amount
+  before settlement. Returns to an original gateway use a separate durable
+  refund ledger and provider refund/query APIs; return acceptance never posts a
+  bank cash-out until exact refund evidence is confirmed. See `.env.example`
+  for the sandbox configuration keys.
+- Manual cash/card follow-up payments use a stable client request ID plus an
+  order row lock. Replaying a request after a lost mobile response returns the
+  existing payment and cannot duplicate payment, cashbook, debt, or
+  `amount_paid` mutations. F&B cart writes and checkout also rebuild product
+  identity/prices and configured modifier deltas from active server records;
+  kitchen-sent lines are immutable to client cart updates.
+- E-invoice requests use a durable `queued → processing → issued|error` worker
+  with bounded retry and stale-lock recovery. The production adapter calls a
+  merchant-owned HTTPS bridge using a stable request ID and HMAC-signed exact
+  request/response bodies; forged, stale, pending, or malformed evidence never
+  becomes an issued invoice. Configure the selected provider bridge only with
+  the server-side `EINVOICE_BRIDGE_*` variables in `.env.example`. Mobile
+  settings receives only a secret-free readiness projection, and an explicit
+  manual retry reuses the invoice request identity while resetting the bounded
+  automatic retry budget.
 - `customers.current_debt` → công nợ tự động cập nhật
 - `stock_movements` → log mọi thay đổi tồn kho
 
@@ -96,11 +121,12 @@ Web hoàn chỉnh — đã deploy được lên Vercel (xem `DEPLOY.md`):
 - [x] POS: giá theo nhóm khách, KM bậc thang, tính m² gạch, lưu tạm nhiều giỏ, báo giá
 - [x] Đơn hàng: chi tiết, thu nợ, hủy, sửa đơn, gộp đơn, trả hàng (hoàn kho/trừ nợ)
 - [x] Kho: tồn + cảnh báo min, kiểm kho cân bằng, nhập hàng + nợ NCC
-- [x] Tài chính: sổ quỹ tự ghi, công nợ KH/NCC, HĐĐT (stub provider)
+- [x] Tài chính: sổ quỹ tự ghi, công nợ KH/NCC, hàng đợi HĐĐT + signed bridge
 - [x] In ấn: A4/A5/K80, editor mẫu in, in hàng loạt
 - [x] Khác: công trình, portal đặt hàng theo token, dashboard + báo cáo (DT/lãi gộp/KH/NV)
 - [x] UI khớp design mockups (`design/index.html`) — 4 theme, demo data: `bun db:seed-demo`
-- [ ] Tích hợp HĐĐT thật (Viettel/VNPT/MISA — thay `issueWithProvider()`)
+- [ ] HĐĐT production: deploy bridge mapping cho vendor đã chọn, cấu hình
+  credential/callback và hoàn tất sandbox acceptance certification
 - [ ] Điều xe giao hàng (đã code, đang tắt — xem `src/app/(app)/delivery/page.tsx`)
 - [ ] Import KiotViet
 - [ ] Mobile app (Flutter)
@@ -109,7 +135,11 @@ Web hoàn chỉnh — đã deploy được lên Vercel (xem `DEPLOY.md`):
 
 ```bash
 bun add -d @electric-sql/pglite   # 1 lần
-for f in tests/*.test.mjs; do node --experimental-strip-types "$f"; done
+bun test tests/*.test.ts
+for f in tests/*.test.mjs; do bun "$f"; done
 ```
 
-5 suite / ~85 checks chạy trên PGlite với đúng migrations thật.
+Các test TypeScript chạy bằng Bun; các suite `.test.mjs` chạy riêng trên PGlite
+với đúng migration thật. Mobile production-readiness verification hiện bao gồm
+102 TypeScript tests và 20 database-backed suites; xem
+`../luma-pos-mobile/docs/mobile_production_readiness.md` để biết gate mới nhất.

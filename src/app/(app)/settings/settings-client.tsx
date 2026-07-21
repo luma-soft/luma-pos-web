@@ -71,6 +71,7 @@ const PAYMENTS = [
   { ico: "🔵", name: "ZaloPay", vi: "Ví ZaloPay", id: "zalopay", enabled: false, color: "#006AFF", note: "Not yet configured — tap to set up" },
   { ico: "🔴", name: "VNPay", vi: "VNPay", id: "vnpay", enabled: false, color: "#CC0000", note: "Not yet configured — tap to set up" },
   { ico: "💳", name: "Card / SoftPOS", vi: "Thẻ / mPOS", id: "card", enabled: false, color: "#374151", note: "Connect card reader in Hardware first" },
+  { ico: "🧾", name: "Customer credit", vi: "Công nợ", id: "credit", enabled: true, color: "#B45309", note: "Saved customer required · server-owned debt" },
 ];
 const VIETQR_BANKS = [
   { code: "ICB", bin: "970415", shortName: "VietinBank", name: "Ngân hàng TMCP Công thương Việt Nam", logo: "https://api.vietqr.io/img/ICB.png", aliases: [] },
@@ -284,12 +285,14 @@ export function SettingsClient({
   store,
   canManage,
   canEditAi,
+  notificationChannels,
   initialTab,
   promotionsContent,
 }: {
   store: StoreSettings;
   canManage: boolean;
   canEditAi: boolean;
+  notificationChannels: { id: string; configured: boolean }[];
   initialTab?: string;
   promotionsContent: React.ReactNode;
 }) {
@@ -400,7 +403,7 @@ export function SettingsClient({
         {active === "print" && <PrintSection L={L} />}
         {active === "promotions" && promotionsContent}
         {active === "tax" && <TaxSection L={L} prefs={store.prefs.tax} canManage={canManage} />}
-        {active === "notifications" && <NotificationsSection L={L} prefs={store.prefs.notifications} canManage={canManage} />}
+        {active === "notifications" && <NotificationsSection L={L} prefs={store.prefs.notifications} canManage={canManage} availableChannels={notificationChannels} />}
         {active === "zalo" && <ZaloSection L={L} prefs={store.prefs.zalo} canEdit={canEditAi} />}
         {active === "shopee" && <ShopeeSettingsSection L={L} prefs={store.prefs.shopee} canEdit={canEditAi} />}
         {active === "ai" && (aiUsage ? <AiSection L={L} prefs={store.prefs.ai} canEdit={canEditAi} usage={aiUsage} /> : <LazySectionState L={L} loading={Boolean(lazyLoading.ai)} error={lazyError.ai} />)}
@@ -1166,16 +1169,25 @@ function TaxSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["ta
   );
 }
 
-function NotificationsSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["notifications"]; canManage: boolean }) {
+function NotificationsSection({
+  L,
+  prefs,
+  canManage,
+  availableChannels,
+}: {
+  L: boolean;
+  prefs: StorePrefs["notifications"];
+  canManage: boolean;
+  availableChannels: { id: string; configured: boolean }[];
+}) {
   const [form, setForm] = useState(prefs);
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
   const [pending, start] = useTransition();
   const mark = () => { setDirty(true); setSaved(false); };
   type TK = "lowStock" | "stagnant" | "shiftClose" | "einvoiceError" | "syncDone";
-  type CK = "zalo" | "email" | "inApp" | "sms";
   const setType = (k: TK, v: boolean) => { setForm((p) => ({ ...p, [k]: v })); mark(); };
-  const setChannel = (k: CK, v: boolean) => { setForm((p) => ({ ...p, channels: { ...p.channels, [k]: v } })); mark(); };
+  const setChannel = (k: string, v: boolean) => { setForm((p) => ({ ...p, channels: { ...p.channels, [k]: v } })); mark(); };
   function save() { start(async () => { const r = await updateStorePrefs({ notifications: form }); if (r.ok) { setDirty(false); setSaved(true); } }); }
 
   const types: { k: TK; title: string; desc: string }[] = [
@@ -1185,10 +1197,11 @@ function NotificationsSection({ L, prefs, canManage }: { L: boolean; prefs: Stor
     { k: "einvoiceError", title: L ? "Lỗi hóa đơn điện tử" : "E-invoice error", desc: L ? "Khi HĐĐT gửi thất bại" : "When e-invoice fails" },
     { k: "syncDone", title: L ? "Đồng bộ hoàn tất" : "Sync completed", desc: L ? "Khi dữ liệu offline đồng bộ xong" : "When offline data syncs" },
   ];
-  const channels: { k: CK; ico: string; name: string }[] = [
-    { k: "zalo", ico: "📱", name: "Zalo OA" }, { k: "email", ico: "📧", name: "Email" },
-    { k: "inApp", ico: "🔔", name: L ? "Thông báo trong ứng dụng" : "In-app push" }, { k: "sms", ico: "💬", name: "SMS" },
-  ];
+  const channelView = (id: string) => id === "push"
+    ? { ico: "📲", name: "Push" }
+    : id === "inApp"
+      ? { ico: "🔔", name: L ? "Thông báo trong ứng dụng" : "In-app" }
+      : { ico: "🔌", name: id };
   return (
     <>
       <Card title={L ? "Loại thông báo" : "Notification Types"} vi={L ? "Ngưỡng & sự kiện" : "Thresholds & events"}>
@@ -1198,13 +1211,21 @@ function NotificationsSection({ L, prefs, canManage }: { L: boolean; prefs: Stor
       </Card>
       <Card title={L ? "Kênh thông báo" : "Notification Channels"} vi={L ? "Nơi gửi thông báo" : "Where alerts are sent"}>
         <div className="p-3.5 flex flex-col gap-1.5">
-          {channels.map((c) => (
-            <div key={c.k} className={ROW}>
-              <span className="text-lg">{c.ico}</span>
-              <div className="flex-1 text-xs font-bold">{c.name}</div>
-              <Toggle checked={form.channels[c.k]} onChange={canManage ? (v) => setChannel(c.k, v) : () => {}} aria-label={c.name} />
-            </div>
-          ))}
+          {availableChannels.map((channel) => {
+            const view = channelView(channel.id);
+            return (
+              <div key={channel.id} className={ROW}>
+                <span className="text-lg">{view.ico}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold">{view.name}</div>
+                  <div className="text-[9px] text-slate-500">
+                    {channel.configured ? (L ? "Sẵn sàng" : "Available") : (L ? "Chưa cấu hình phía server" : "Not configured on server")}
+                  </div>
+                </div>
+                <Toggle checked={form.channels[channel.id] === true} disabled={!canManage || !channel.configured} onChange={(v) => setChannel(channel.id, v)} aria-label={view.name} />
+              </div>
+            );
+          })}
         </div>
       </Card>
       <SaveBar L={L} dirty={dirty} saved={saved} pending={pending} canManage={canManage} onSave={save} />

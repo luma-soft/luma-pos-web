@@ -19,7 +19,7 @@ type EInvoiceSummary = {
   id: string;
   status: string;
   number: string | null;
-  serial: string;
+  serial: string | null;
   buyerName: string;
   vatRate: string | number;
   vatAmount: string | number;
@@ -229,7 +229,7 @@ export async function OrderDetailPanel({
               <div className="font-semibold">{t("einvoice.title")}</div>
               {einvoice ? (
                 <>
-                  <InfoLine label={t("einvoice.cols.number")} value={`${einvoice.serial} · ${einvoice.number ?? "—"}`} strong />
+                  <InfoLine label={t("einvoice.cols.number")} value={einvoice.number ? `${einvoice.serial ? `${einvoice.serial} · ` : ""}${einvoice.number}` : "—"} strong />
                   <InfoLine label={t("einvoice.cols.buyer")} value={einvoice.buyerName} />
                   <InfoLine label={`VAT ${Number(einvoice.vatRate)}%`} value={formatCurrency(Number(einvoice.vatAmount))} />
                 </>

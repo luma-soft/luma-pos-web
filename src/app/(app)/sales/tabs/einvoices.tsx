@@ -12,13 +12,14 @@ export async function EInvoicesTab() {
       id: einvoices.id, number: einvoices.number, serial: einvoices.serial, status: einvoices.status,
       buyerName: einvoices.buyerName, buyerTaxCode: einvoices.buyerTaxCode, vatRate: einvoices.vatRate,
       totalBeforeVat: einvoices.totalBeforeVat, vatAmount: einvoices.vatAmount, issuedAt: einvoices.issuedAt,
+      attemptCount: einvoices.attemptCount, nextAttemptAt: einvoices.nextAttemptAt, lastError: einvoices.lastError,
       orderId: einvoices.orderId, orderCode: orders.code, orderTotal: orders.total,
     })
     .from(einvoices).innerJoin(orders, eq(einvoices.orderId, orders.id)).orderBy(desc(einvoices.createdAt)).limit(50);
 
   return (
     <>
-      <p className="text-xs text-warn mb-5">! {t("einvoice.stubNote")}</p>
+      <p className="text-xs text-slate-500 mb-5">{t("einvoice.queueNote")}</p>
 
       {rows.length === 0 ? (
         <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">

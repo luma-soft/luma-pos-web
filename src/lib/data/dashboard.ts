@@ -1,6 +1,20 @@
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { categories, customers, orderItems, orders, products, stockLevels } from "@/db/schema";
+import {
+  categories,
+  customers,
+  einvoices,
+  orderItems,
+  orders,
+  products,
+  returnItems,
+  returns,
+  stockLevels,
+} from "@/db/schema";
+import {
+  calculateDashboardFinancials,
+  mergeNetRevenueByDay,
+} from "@/lib/dashboard/financials";
 
 export type DashboardRange = "today" | "7d" | "30d" | "month";
 
@@ -19,7 +33,21 @@ export async function getDashboard(range: DashboardRange = "7d") {
   const realSale = inArray(orders.status, ["completed", "returned"]);
   const inRange = and(realSale, gte(orders.createdAt, since));
 
-  const [[agg], [profitAgg], [debtAgg], lowStock, recentOrders, topDebtors, revenueByDay] = await Promise.all([
+  const [
+    [agg],
+    [profitAgg],
+    [refundAgg],
+    [returnedProfitAgg],
+    [debtAgg],
+    [openOrderAgg],
+    lowStockCountRows,
+    [eInvoiceAttentionAgg],
+    lowStock,
+    recentOrders,
+    topDebtors,
+    grossRevenueByDay,
+    refundsByDay,
+  ] = await Promise.all([
     db.select({
       revenue: sql<string>`coalesce(sum(${orders.total}), 0)`,
       orderCount: sql<number>`count(*)::int`,
@@ -35,9 +63,36 @@ export async function getDashboard(range: DashboardRange = "7d") {
       .where(inRange),
 
     db.select({
+      refundTotal: sql<string>`coalesce(sum(${returns.totalRefund}), 0)`,
+    }).from(returns).where(gte(returns.createdAt, since)),
+
+    db.select({
+      returnedProfit: sql<string>`coalesce(sum(${returnItems.total} - (${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice})), 0)`,
+    })
+      .from(returnItems)
+      .innerJoin(returns, eq(returnItems.returnId, returns.id))
+      .innerJoin(products, eq(returnItems.productId, products.id))
+      .where(gte(returns.createdAt, since)),
+
+    db.select({
       totalDebt: sql<string>`coalesce(sum(${customers.currentDebt}), 0)`,
       debtors: sql<number>`count(*) filter (where ${customers.currentDebt} > 0)::int`,
     }).from(customers).where(eq(customers.isActive, true)),
+
+    db.select({
+      count: sql<number>`count(*)::int`,
+    }).from(orders).where(inArray(orders.status, ["draft", "quote", "confirmed", "delivering"])),
+
+    db.select({ id: products.id })
+      .from(products)
+      .leftJoin(stockLevels, eq(stockLevels.productId, products.id))
+      .where(eq(products.isActive, true))
+      .groupBy(products.id)
+      .having(sql`coalesce(sum(${stockLevels.quantity}), 0) <= coalesce(max(${stockLevels.minLevel}), 0) and coalesce(max(${stockLevels.minLevel}), 0) > 0`),
+
+    db.select({
+      count: sql<number>`count(*)::int`,
+    }).from(einvoices).where(inArray(einvoices.status, ["draft", "error"])),
 
     db.select({
       id: products.id,
@@ -94,23 +149,41 @@ export async function getDashboard(range: DashboardRange = "7d") {
       .where(inRange)
       .groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`, sql`extract(isodow from ${orders.createdAt})`)
       .orderBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`),
+
+    db.select({
+      day: sql<string>`to_char(${returns.createdAt}, 'YYYY-MM-DD')`,
+      dow: sql<number>`extract(isodow from ${returns.createdAt})::int`,
+      refund: sql<string>`coalesce(sum(${returns.totalRefund}), 0)`,
+    })
+      .from(returns)
+      .where(gte(returns.createdAt, since))
+      .groupBy(sql`to_char(${returns.createdAt}, 'YYYY-MM-DD')`, sql`extract(isodow from ${returns.createdAt})`)
+      .orderBy(sql`to_char(${returns.createdAt}, 'YYYY-MM-DD')`),
   ]);
 
-  const revenue = Number(agg.revenue);
-  const profit = Number(profitAgg.profit);
+  const financials = calculateDashboardFinancials({
+    grossRevenue: Number(agg.revenue),
+    grossProfit: Number(profitAgg.profit),
+    refundTotal: Number(refundAgg.refundTotal),
+    returnedProfit: Number(returnedProfitAgg.returnedProfit),
+    orderCount: agg.orderCount,
+  });
 
   return {
     range,
-    revenue,
+    revenue: financials.revenue,
     orderCount: agg.orderCount,
-    avgOrder: agg.orderCount > 0 ? revenue / agg.orderCount : 0,
-    grossProfit: profit,
-    marginPct: revenue > 0 ? (profit / revenue) * 100 : 0,
+    avgOrder: financials.avgOrder,
+    grossProfit: financials.grossProfit,
+    marginPct: financials.marginPct,
     debt: { total: Number(debtAgg.totalDebt), debtors: debtAgg.debtors },
+    openOrderCount: openOrderAgg.count,
+    lowStockCount: lowStockCountRows.length,
+    eInvoiceAttentionCount: eInvoiceAttentionAgg.count,
     lowStock,
     recentOrders,
     topDebtors,
-    revenueByDay,
+    revenueByDay: mergeNetRevenueByDay(grossRevenueByDay, refundsByDay),
   };
 }
 

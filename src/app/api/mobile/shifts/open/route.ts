@@ -1,11 +1,10 @@
-import { openShift } from "@/lib/actions/shifts";
+import { openShiftForUser } from "@/lib/actions/shifts";
 import { requireMobileUser } from "@/lib/mobile/auth";
 import { mobileAction, mobileGate, readJson } from "@/lib/mobile/response";
 
 export async function POST(request: Request) {
   const gate = await requireMobileUser();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const body = await readJson(request);
   const openingFloat =
@@ -18,5 +17,5 @@ export async function POST(request: Request) {
         )
       : 0;
 
-  return mobileAction(await openShift(openingFloat));
+  return mobileAction(await openShiftForUser(gate.userId, openingFloat));
 }

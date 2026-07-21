@@ -350,6 +350,11 @@ const updateProductSchema = z.object({
   wholesalePrice: z.number().min(0).nullable(),
   contractorPrice: z.number().min(0).nullable(),
   agentPrice: z.number().min(0).nullable(),
+  vatRate: z.number().min(0).max(100).nullable().optional(),
+  priceByWeight: z.boolean().optional(),
+  trackBatches: z.boolean().optional(),
+  shelfLifeDays: z.number().int().positive().nullable().optional(),
+  lifecycleStatus: z.enum(["draft", "active", "archived"]).optional(),
   priceBookPrices: z
     .record(z.string(), z.number().min(0).nullable())
     .default({}),
@@ -438,6 +443,7 @@ export async function setProductActive(
       .update(products)
       .set({
         isActive: v.isActive,
+        lifecycleStatus: v.isActive ? "active" : "archived",
         updatedAt: sql`now()`,
       })
       .where(
@@ -504,11 +510,22 @@ export async function updateProduct(
           contractorPrice:
             v.contractorPrice != null ? String(v.contractorPrice) : null,
           agentPrice: v.agentPrice != null ? String(v.agentPrice) : null,
+          ...(v.vatRate !== undefined
+            ? { vatRate: v.vatRate == null ? null : String(v.vatRate) }
+            : {}),
+          ...(v.priceByWeight != null ? { priceByWeight: v.priceByWeight } : {}),
+          ...(v.trackBatches != null ? { trackBatches: v.trackBatches } : {}),
+          ...(v.shelfLifeDays !== undefined ? { shelfLifeDays: v.shelfLifeDays } : {}),
+          ...(v.lifecycleStatus != null
+            ? {
+                lifecycleStatus: v.lifecycleStatus,
+                isActive: v.lifecycleStatus === "active" && v.isActive,
+              }
+            : { isActive: v.isActive }),
           location: v.location || null,
           description: v.description || null,
           ...(v.imageUrls ? { imageUrls: v.imageUrls } : {}),
           specs: v.specs && Object.keys(v.specs).length > 0 ? v.specs : null,
-          isActive: v.isActive,
           updatedAt: sql`now()`,
         })
         .where(eq(products.id, v.id));
@@ -792,13 +809,18 @@ export async function createProduct(
             contractorPrice:
               v.contractorPrice != null ? String(v.contractorPrice) : null,
             agentPrice: v.agentPrice != null ? String(v.agentPrice) : null,
+            vatRate: v.vatRate == null ? null : String(v.vatRate),
+            priceByWeight: v.priceByWeight,
+            trackBatches: v.trackBatches,
+            shelfLifeDays: v.shelfLifeDays ?? null,
+            lifecycleStatus: v.lifecycleStatus,
             m2PerUnit: computeM2PerUnit(v),
             location: v.location?.trim() || null,
             weight: weightKg != null ? String(weightKg) : null,
             dimensions: buildDimensions(v),
             specs: singleProductSpecs,
             imageUrls: v.imageUrls,
-            isActive: v.directSale,
+            isActive: v.lifecycleStatus === "active" && v.directSale,
           })
           .returning({ id: products.id });
 
@@ -831,6 +853,11 @@ export async function createProduct(
           contractorPrice:
             v.contractorPrice != null ? String(v.contractorPrice) : null,
           agentPrice: v.agentPrice != null ? String(v.agentPrice) : null,
+          vatRate: v.vatRate == null ? null : String(v.vatRate),
+          priceByWeight: v.priceByWeight,
+          trackBatches: v.trackBatches,
+          shelfLifeDays: v.shelfLifeDays ?? null,
+          lifecycleStatus: v.lifecycleStatus,
           m2PerUnit: computeM2PerUnit(v),
           location: v.location?.trim() || null,
           weight: weightKg != null ? String(weightKg) : null,
@@ -876,6 +903,11 @@ export async function createProduct(
             contractorPrice:
               childContractor != null ? String(childContractor) : null,
             agentPrice: childAgent != null ? String(childAgent) : null,
+            vatRate: v.vatRate == null ? null : String(v.vatRate),
+            priceByWeight: v.priceByWeight,
+            trackBatches: v.trackBatches,
+            shelfLifeDays: v.shelfLifeDays ?? null,
+            lifecycleStatus: v.lifecycleStatus,
             m2PerUnit: computeM2PerUnit(v),
             location: v.location?.trim() || null,
             weight: weightKg != null ? String(weightKg) : null,
@@ -883,7 +915,7 @@ export async function createProduct(
             specs: mergeSpecs(descriptiveSpecs, child.specs),
             imageUrls:
               child.imageUrls.length > 0 ? child.imageUrls : v.imageUrls,
-            isActive: child.directSale,
+            isActive: v.lifecycleStatus === "active" && child.directSale,
           })
           .returning({ id: products.id });
 

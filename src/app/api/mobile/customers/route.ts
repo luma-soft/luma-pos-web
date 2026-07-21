@@ -1,4 +1,4 @@
-import { createCustomer } from "@/lib/actions/partners";
+import { createCustomerCore } from "@/lib/customers/write";
 import { getCustomers } from "@/lib/data/partners";
 import { requireMobileSalesAccess } from "@/lib/mobile/auth";
 import {
@@ -35,6 +35,6 @@ export async function POST(request: Request) {
   if (!body) return mobileAction({ ok: false, error: "errors.invalidData" });
 
   return mobileAction(
-    await createCustomer(body as Parameters<typeof createCustomer>[0])
+    await createCustomerCore(body as Parameters<typeof createCustomerCore>[0])
   );
 }

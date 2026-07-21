@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   customers,
@@ -62,7 +62,7 @@ export async function cancelOrderForUser(
       const [hasEInvoice] = await tx
         .select({ id: einvoices.id })
         .from(einvoices)
-        .where(eq(einvoices.orderId, orderId))
+        .where(and(eq(einvoices.orderId, orderId), eq(einvoices.status, "issued")))
         .limit(1);
       if (hasEInvoice) throw new Error("HAS_EINVOICE");
 

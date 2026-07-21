@@ -1,7 +1,9 @@
 import { and, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { cashTransactions, orders, purchaseOrders } from "@/db/schema";
+import { cashTransactions, purchaseOrders } from "@/db/schema";
 import { getReports } from "@/lib/data/reports";
+import { buildMobileFinanceSummary } from "@/lib/finance/mobile-summary";
+import { getReceivablesSnapshot } from "@/lib/finance/receivables";
 import { requireMobileManager } from "@/lib/mobile/auth";
 import { mobileGate, mobileOk, searchParam } from "@/lib/mobile/response";
 
@@ -20,20 +22,11 @@ export async function GET(request: Request) {
 
   const range = searchParam(request, "range", "month");
   const since = sinceForRange(range);
-  const saleStatus = inArray(orders.status, ["completed", "returned"]);
   const payableStatus = inArray(purchaseOrders.status, ["received", "returned"]);
 
-  const [reports, receivableRows, payableRows, cashRows] = await Promise.all([
+  const [reports, receivables, payableRows, cashRows] = await Promise.all([
     getReports(range === "today" ? 1 : range === "week" ? 7 : 30),
-    db
-      .select({
-        total: sql<string>`coalesce(sum(${orders.total}), 0)`,
-        paid: sql<string>`coalesce(sum(${orders.amountPaid}), 0)`,
-        unpaid: sql<string>`coalesce(sum(greatest(${orders.total} - ${orders.amountPaid}, 0)), 0)`,
-        count: sql<number>`count(*)::int`,
-      })
-      .from(orders)
-      .where(and(saleStatus, gte(orders.createdAt, since))),
+    getReceivablesSnapshot(),
     db
       .select({
         total: sql<string>`coalesce(sum(${purchaseOrders.total}), 0)`,
@@ -54,33 +47,21 @@ export async function GET(request: Request) {
       .groupBy(cashTransactions.fund),
   ]);
 
-  const receivables = receivableRows[0];
   const payables = payableRows[0];
   const cashByFund = Object.fromEntries(cashRows.map((row) => [row.fund, row]));
 
   return mobileOk({
     range,
-    summary: {
+    summary: buildMobileFinanceSummary({
       revenue: reports.summary.revenue,
       collected: reports.summary.collected,
-      estimatedProfit: reports.topProducts.reduce(
-        (sum, product) => sum + Number(product.profit ?? 0),
-        0,
-      ),
-      cost: Math.max(
-        0,
-        reports.summary.revenue -
-          reports.topProducts.reduce(
-            (sum, product) => sum + Number(product.profit ?? 0),
-            0,
-          ),
-      ),
-      debt: Number(receivables.unpaid),
-    },
+      grossProfit: reports.summary.grossProfit,
+      debt: receivables.unpaid,
+    }),
     receivables: {
-      total: Number(receivables.total),
-      paid: Number(receivables.paid),
-      unpaid: Number(receivables.unpaid),
+      total: receivables.total,
+      paid: receivables.paid,
+      unpaid: receivables.unpaid,
       count: receivables.count,
     },
     payables: {

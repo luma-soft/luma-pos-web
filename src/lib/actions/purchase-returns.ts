@@ -17,6 +17,7 @@ import { recordCashTx } from "@/lib/cash";
 import { Routes } from "@/lib/routes";
 import { type ActionResult, generateCode, getProfileId, requireStockAccess, toMoney, toQty } from "./common";
 import { getCurrentShift } from "@/lib/data/shifts";
+import { consumeTrackedStockLots } from "@/lib/inventory/stock-lot-service";
 
 export async function searchPurchaseReturnProducts(q: string, warehouseId: string): Promise<PurchaseReturnProductRow[]> {
   const gate = await requireStockAccess();
@@ -128,6 +129,14 @@ export async function createPurchaseReturn(
       }));
 
       for (const item of v.items) {
+        await consumeTrackedStockLots(tx, {
+          productId: item.productId,
+          warehouseId: v.warehouseId,
+          quantity: item.quantity,
+          refType: "purchase_return",
+          refId: ret.id,
+          createdBy: profileId,
+        });
         await tx.update(stockLevels).set({
           quantity: sql`${stockLevels.quantity} - ${toQty(item.quantity)}`,
           updatedAt: sql`now()`,
@@ -176,6 +185,7 @@ export async function createPurchaseReturn(
     const known: Record<string, string> = {
       PRODUCT_NOT_FOUND: "errors.invalidData",
       INSUFFICIENT_STOCK: "purchaseReturns.errors.insufficientStock",
+      INSUFFICIENT_BATCH_STOCK: "purchaseReturns.errors.insufficientStock",
     };
     if (known[msg]) return { ok: false, error: known[msg] };
     console.error("createPurchaseReturn failed:", e);

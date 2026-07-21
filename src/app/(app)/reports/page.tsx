@@ -30,7 +30,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   const filterQuery = filterParams.toString();
   const filterLabel = filters.customer || filters.q || (filters.customerId ? `ID ${filters.customerId.slice(0, 8)}` : "");
 
-  const maxDay = Math.max(1, ...data.byDay.map((d) => Number(d.revenue)));
+  const maxDay = Math.max(1, ...data.byDay.map((d) => Math.abs(Number(d.revenue))));
   const totalCatRevenue = Math.max(1, data.byCategory.reduce((s, c) => s + Number(c.revenue), 0));
   const uncollected = data.summary.revenue - data.summary.collected;
 
@@ -64,6 +64,11 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         <div className="bg-surface rounded-card border border-border p-5">
           <div className="text-sm text-slate-500">{t("reports.revenue")}</div>
           <div className="text-2xl font-bold tabular-nums mt-1">{formatCurrency(data.summary.revenue)}</div>
+          {data.summary.refundTotal > 0 && (
+            <div className="mt-1 text-xs font-medium text-er">
+              {t("reports.returnsDeducted", { amount: formatCurrency(data.summary.refundTotal) })}
+            </div>
+          )}
         </div>
         <div className="bg-surface rounded-card border border-border p-5">
           <div className="text-sm text-slate-500">{t("reports.collected")}</div>
@@ -92,7 +97,10 @@ export default async function ReportsPage({ searchParams }: PageProps) {
               const v = Number(d.revenue);
               return (
                 <div key={d.day} className="flex-1 min-w-6 flex flex-col items-center justify-end h-full gap-1" title={`${d.day}: ${formatCurrency(v)}`}>
-                  <div className="w-full rounded-t bg-primary-600/85" style={{ height: `${Math.max(2, (v / maxDay) * 100)}%` }} />
+                  <div
+                    className={cn("w-full rounded-t", v < 0 ? "bg-er/85" : "bg-primary-600/85")}
+                    style={{ height: `${Math.max(2, (Math.abs(v) / maxDay) * 100)}%` }}
+                  />
                   <Text as="span" variant="muted" className="text-[9px] whitespace-nowrap" text={`${d.day.slice(8)}/${d.day.slice(5, 7)}`} />
                 </div>
               );

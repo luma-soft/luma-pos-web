@@ -1,7 +1,12 @@
-import { issueEInvoice } from "@/lib/actions/einvoice";
+import { issueEInvoiceForUser } from "@/lib/actions/einvoice";
 import { requireMobileManager } from "@/lib/mobile/auth";
 import {
+  OFFLINE_ACTOR_HEADER,
+  validateOfflineReplayActor,
+} from "@/lib/mobile/offline-actor";
+import {
   mobileAction,
+  mobileError,
   mobileGate,
   readJson,
 } from "@/lib/mobile/response";
@@ -11,8 +16,16 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const gate = await requireMobileManager();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
+  if (
+    !validateOfflineReplayActor({
+      header: request.headers.get(OFFLINE_ACTOR_HEADER),
+      principalId: gate.principalId ?? gate.userId,
+      actorId: gate.userId,
+    })
+  ) {
+    return mobileError("offline.actorMismatch", 403);
+  }
 
   const { id } = await params;
   const body = await readJson(request);
@@ -21,9 +34,9 @@ export async function PATCH(
   }
 
   return mobileAction(
-    await issueEInvoice({
+    await issueEInvoiceForUser({
       ...(body as Record<string, unknown>),
       orderId: id,
-    } as Parameters<typeof issueEInvoice>[0])
+    } as Parameters<typeof issueEInvoiceForUser>[0])
   );
 }

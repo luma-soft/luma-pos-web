@@ -19,6 +19,8 @@ export const tableCartItemSchema = z.object({
   unitPrice: z.number().min(0), // basePrice + Σ modifier.priceDelta
   modifiers: z.array(cartModifierSchema).default([]),
   note: z.string().optional(),
+  course: z.enum(["asap", "starter", "main", "dessert", "drink"]).default("asap"),
+  courseDelayMinutes: z.number().int().min(0).max(240).default(0),
   sent: z.boolean().default(false), // đã gửi bếp?
 });
 export type TableCartItemInput = z.input<typeof tableCartItemSchema>;

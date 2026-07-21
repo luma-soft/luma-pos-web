@@ -7,6 +7,10 @@ import { db } from "@/db";
 import { stockLevels, stockMovements, stocktakeItems, stocktakes } from "@/db/schema";
 import { type ActionResult, requireManager, requireStockAccess, getProfileId, generateCode, toQty } from "./common";
 import { Routes } from "@/lib/routes";
+import {
+  consumeTrackedStockLots,
+  receiveUnspecifiedTrackedStockLot,
+} from "@/lib/inventory/stock-lot-service";
 
 const createSchema = z.object({
   warehouseId: z.uuid(),
@@ -107,6 +111,27 @@ export async function balanceStocktake(id: string): Promise<ActionResult> {
         const actual = Number(i.actualQty);
         const diff = actual - current;
 
+        if (diff < -1e-9) {
+          await consumeTrackedStockLots(tx, {
+            productId: i.productId,
+            warehouseId: st.warehouseId,
+            quantity: Math.abs(diff),
+            refType: "stocktake",
+            refId: st.id,
+            createdBy: profileId,
+          });
+        } else if (diff > 1e-9) {
+          await receiveUnspecifiedTrackedStockLot(tx, {
+            productId: i.productId,
+            warehouseId: st.warehouseId,
+            quantity: diff,
+            batchNumber: `ADJUST-${st.code}`,
+            refType: "stocktake",
+            refId: st.id,
+            createdBy: profileId,
+          });
+        }
+
         // set tồn = thực tế
         await tx
           .insert(stockLevels)
@@ -142,6 +167,9 @@ export async function balanceStocktake(id: string): Promise<ActionResult> {
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
     if (msg === "NOT_DRAFT") return { ok: false, error: "stocktakes.errors.notDraft" };
+    if (msg === "INSUFFICIENT_BATCH_STOCK") {
+      return { ok: false, error: "stocktakes.errors.insufficientBatchStock" };
+    }
     console.error("balanceStocktake failed:", e);
     return { ok: false, error: "errors.serverError" };
   }

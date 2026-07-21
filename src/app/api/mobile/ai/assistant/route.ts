@@ -4,6 +4,7 @@ import { requireAiProviderConfigured } from "@/lib/ai/config";
 import { buildAttachmentNextActionResponse, shouldAskAttachmentNextAction } from "@/lib/ai/attachment-intent";
 import { attachmentPromptBlock, parseAiAttachment, type AiAttachmentMetadata, type ParsedAiAttachment } from "@/lib/ai/attachments";
 import { buildAiAssistantResponse, withAiPreviewReviewAction, type AiAssistantResponse } from "@/lib/ai/actions";
+import { buildAssistantProvenance } from "@/lib/ai/provenance";
 import { loadAiProviderConfig } from "@/lib/ai/provider-adapter";
 import { runAiToolLoop } from "@/lib/ai/tool-loop";
 import { consumeAiUsage, recordAiTokenUsage, recordAiUsageEvent } from "@/lib/ai/usage";
@@ -194,7 +195,15 @@ export async function POST(request: Request) {
       },
       metadata: { surface, rawContentLogged: false, usageUnits: usage.charged },
     });
-    return mobileOk({ ...response, aiUsage: usage.usage });
+    return mobileOk({
+      ...response,
+      aiUsage: usage.usage,
+      cloudProcessing: {
+        enabled: true,
+        provider: providerConfig?.provider ?? "configured_provider",
+        attachmentCount: parsedAttachments.length,
+      },
+    });
   }
   const basePrompt = shouldBuildPosImageCart
     ? `Tạo giỏ POS từ ảnh. ${prompt || "Đọc sản phẩm và số lượng từ file đính kèm."}`
@@ -239,13 +248,14 @@ export async function POST(request: Request) {
   }
   let response: AiAssistantResponse;
   if (toolLoop.ok && toolLoop.preview) {
+    const isReportPreview = toolLoop.preview.intent === "report_summary" || toolLoop.preview.intent === "customer_report";
     response = {
       text: toolLoop.preview.description,
       state: toolLoop.preview.state,
       prompt: enrichedPrompt,
       actionPreview: toolLoop.preview,
       actions: [{ type: "open", target: toolLoop.preview.action.target, label: "Open related screen" }],
-      chart: { type: "revenueByDay", rows: reports.byDay },
+      chart: isReportPreview ? { type: "revenueByDay", rows: reports.byDay } : undefined,
       toolTrace: toolLoop.trace,
     };
   } else {
@@ -306,5 +316,33 @@ export async function POST(request: Request) {
     metadata: { surface, usageUnits: usage.charged, toolTrace: response.toolTrace ?? [] },
   });
 
-  return mobileOk({ ...response, aiUsage: usage.usage });
+  const provenance = buildAssistantProvenance({
+    revenue: reports.summary.revenue,
+    collected: reports.summary.collected,
+    restockCount: restock.length,
+    rangeDays: 30,
+    generatedAt: new Date(reports.generatedAt),
+  });
+  const isRestockPreview = response.actionPreview?.intent === "create_draft_purchase_order_from_restocking";
+  const sourceBackedResponse = Boolean(response.chart) || isRestockPreview;
+  const selectedFacts = sourceBackedResponse
+    ? provenance.facts.filter((fact) => !isRestockPreview || fact.sourceId === "inventory-restock-30d")
+    : [];
+  const selectedSourceIds = new Set(selectedFacts.map((fact) => fact.sourceId));
+  const selectedSources = provenance.sources.filter((source) => selectedSourceIds.has(source.id));
+  if (response.chart) {
+    response.chart = { ...response.chart, sourceId: "reports-30d" };
+  }
+
+  return mobileOk({
+    ...response,
+    aiUsage: usage.usage,
+    cloudProcessing: {
+      enabled: true,
+      provider: providerConfig?.provider ?? "configured_provider",
+      attachmentCount: parsedAttachments.length,
+    },
+    sources: selectedSources,
+    facts: selectedFacts,
+  });
 }

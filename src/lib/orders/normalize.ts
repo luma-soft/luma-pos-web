@@ -12,6 +12,8 @@ export type NormalizedOrderItem = {
   unitName: string;
   unitMultiplier: number;
   quantity: number;
+  preDiscountUnitPrice: number;
+  lineDiscount: number;
   unitPrice: number;
   total: number;
 };
@@ -111,13 +113,14 @@ export async function normalizeOrderItems(
 
     const multiplier = unit ? Number(unit.multiplier) : 1;
     const listedPrice = listedUnitPrice(product, unit, priceByProduct.get(product.id));
-    const manualUnitPrice = item.manualUnitPrice ?? item.unitPrice;
+    const manualUnitPrice = item.manualUnitPrice;
     const lineDiscount = Math.max(0, item.lineDiscount ?? 0);
     const baseQty = item.quantity * multiplier;
     const promoPrice = manualUnitPrice == null
       ? applyPromo(listedPrice, promoByProduct.get(product.id), baseQty).price
       : listedPrice;
-    const unitPrice = Math.max(0, (manualUnitPrice ?? promoPrice) - lineDiscount);
+    const preDiscountUnitPrice = manualUnitPrice ?? promoPrice;
+    const unitPrice = Math.max(0, preDiscountUnitPrice - lineDiscount);
 
     return {
       productId: product.id,
@@ -125,6 +128,8 @@ export async function normalizeOrderItems(
       unitName: unit?.unitName ?? product.baseUnit,
       unitMultiplier: multiplier,
       quantity: item.quantity,
+      preDiscountUnitPrice,
+      lineDiscount,
       unitPrice,
       total: item.quantity * unitPrice,
     };
