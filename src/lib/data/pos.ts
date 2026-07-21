@@ -4,6 +4,7 @@ import { categories, customers, paymentBankAccounts, products, productPrices, pr
 import { isPromoActive, type PromoTier } from "@/lib/promo";
 import { getPriceBooks } from "@/lib/data/price-books";
 import { getMobileProducts } from "@/lib/data/products";
+import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
 import { accentInsensitiveLike } from "@/lib/search";
 
 export interface PosUnit {
@@ -13,7 +14,7 @@ export interface PosUnit {
 }
 
 /** Select dùng chung cho lưới POS + tìm kiếm (cùng shape PosProduct). */
-function posProductSelect(warehouseId: string | null) {
+function posProductSelect(warehouseId: string | null, hasComplianceColumns: boolean) {
   return {
     id: products.id,
     sku: products.sku,
@@ -27,7 +28,7 @@ function posProductSelect(warehouseId: string | null) {
     wholesalePrice: products.wholesalePrice,
     contractorPrice: products.contractorPrice,
     agentPrice: products.agentPrice,
-    priceByWeight: products.priceByWeight,
+    priceByWeight: hasComplianceColumns ? products.priceByWeight : sql<boolean>`false`,
     m2PerUnit: products.m2PerUnit,
     categoryId: products.categoryId,
     categoryName: categories.name,
@@ -100,6 +101,7 @@ function activeRootCondition() {
 
 /** Toàn bộ data POS cần khi mở trang: SP active + đơn vị + tồn kho mặc định, KH, kho. */
 export async function getPosData(options?: { includeProductIds?: string[] }) {
+  const hasComplianceColumns = await hasProductComplianceColumns();
   const [defaultWh] = await db
     .select({ id: warehouses.id, name: warehouses.name })
     .from(warehouses)
@@ -109,7 +111,7 @@ export async function getPosData(options?: { includeProductIds?: string[] }) {
   const includeProductIds = [...new Set(options?.includeProductIds ?? [])];
   const [rootRows, sourceProductRows, customerRows] = await Promise.all([
     db
-      .select(posProductSelect(defaultWh?.id ?? null))
+      .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(activeRootCondition())
@@ -117,7 +119,7 @@ export async function getPosData(options?: { includeProductIds?: string[] }) {
       .limit(200),
     includeProductIds.length
       ? db
-          .select(posProductSelect(defaultWh?.id ?? null))
+          .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
           .from(products)
           .leftJoin(categories, eq(products.categoryId, categories.id))
           .where(and(eq(products.isActive, true), inArray(products.id, includeProductIds)))
@@ -140,7 +142,7 @@ export async function getPosData(options?: { includeProductIds?: string[] }) {
   const parentIds = rootRows.filter((p) => p.isVariantParent).map((p) => p.id);
   const childRows = parentIds.length > 0
     ? await db
-        .select(posProductSelect(defaultWh?.id ?? null))
+        .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
         .from(products)
         .leftJoin(categories, eq(products.categoryId, categories.id))
         .where(and(eq(products.isActive, true), inArray(products.parentProductId, parentIds)))
@@ -277,6 +279,7 @@ export async function getMobilePosData() {
  * 200 SP của lưới mặc định.
  */
 export async function searchPosProductRows(q: string): Promise<PosProduct[]> {
+  const hasComplianceColumns = await hasProductComplianceColumns();
   const [defaultWh] = await db
     .select({ id: warehouses.id })
     .from(warehouses)
@@ -291,14 +294,14 @@ export async function searchPosProductRows(q: string): Promise<PosProduct[]> {
 
   const [childRows, rootRows] = await Promise.all([
     db
-      .select(posProductSelect(defaultWh?.id ?? null))
+      .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(and(eq(products.isActive, true), eq(products.isVariantParent, false), match))
       .orderBy(asc(products.name))
       .limit(40),
     db
-      .select(posProductSelect(defaultWh?.id ?? null))
+      .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(and(activeRootCondition(), match))
@@ -309,7 +312,7 @@ export async function searchPosProductRows(q: string): Promise<PosProduct[]> {
   const parentIds = rootRows.filter((p) => p.isVariantParent).map((p) => p.id);
   const pickerChildren = parentIds.length > 0
     ? await db
-        .select(posProductSelect(defaultWh?.id ?? null))
+        .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
         .from(products)
         .leftJoin(categories, eq(products.categoryId, categories.id))
         .where(and(eq(products.isActive, true), inArray(products.parentProductId, parentIds)))
