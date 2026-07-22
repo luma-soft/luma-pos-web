@@ -2451,6 +2451,22 @@
       "deleteConfirm": "Xóa hồ sơ này?",
       "empty": "Chưa có hồ sơ nghiệm thu nào."
     },
+    "maintenance": {
+      "title": "Bảo trì định kỳ",
+      "summary": "{count} lịch bảo trì",
+      "create": "Thêm lịch bảo trì",
+      "edit": "Sửa lịch bảo trì",
+      "titleField": "Nội dung bảo trì",
+      "interval": "Chu kỳ",
+      "days": "ngày",
+      "nextDueOn": "Ngày đến hạn",
+      "active": "Đang theo dõi",
+      "paused": "Tạm dừng",
+      "complete": "Đã bảo trì",
+      "delete": "Xóa lịch bảo trì",
+      "deleteConfirm": "Xóa lịch bảo trì này?",
+      "empty": "Chưa có lịch bảo trì định kỳ."
+    },
     "checklist": {
       "site-survey": "Khảo sát vị trí và góc quan sát",
       "cabling": "Kéo dây mạng, nguồn và kiểm tra tuyến",

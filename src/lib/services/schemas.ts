@@ -131,6 +131,20 @@ export const serviceHandoverDocumentSchema = z.object({
 
 export type ServiceHandoverDocumentInput = z.input<typeof serviceHandoverDocumentSchema>;
 
+export const serviceMaintenancePlanSchema = z.object({
+  id: z.uuid().nullable().optional(),
+  projectId: z.uuid(),
+  assetId: z.uuid().nullable().optional(),
+  title: z.string().trim().min(1),
+  intervalDays: z.coerce.number().int().positive(),
+  nextDueOn: z.iso.date(),
+  assignedTo: z.uuid().nullable().optional(),
+  isActive: z.boolean().default(true),
+  note: z.string().trim().optional(),
+});
+
+export type ServiceMaintenancePlanInput = z.input<typeof serviceMaintenancePlanSchema>;
+
 export const installedAssetCreateSchema = z.object({
   projectId: z.uuid(),
   jobId: z.uuid().nullable().optional(),

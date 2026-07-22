@@ -935,6 +935,26 @@ export const serviceHandoverDocuments = pgTable("service_handover_documents", {
   index("service_handover_documents_project_idx").on(t.projectId, t.createdAt),
 ]);
 
+export const serviceMaintenancePlans = pgTable("service_maintenance_plans", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  assetId: uuid("asset_id").references(() => installedAssets.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  intervalDays: integer("interval_days").notNull(),
+  nextDueOn: date("next_due_on").notNull(),
+  lastCompletedOn: date("last_completed_on"),
+  assignedTo: uuid("assigned_to").references(() => profiles.id, { onDelete: "set null" }),
+  isActive: boolean("is_active").notNull().default(true),
+  note: text("note"),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("service_maintenance_plans_interval_check", sql`${t.intervalDays} > 0`),
+  index("service_maintenance_plans_due_idx").on(t.isActive, t.nextDueOn),
+  index("service_maintenance_plans_project_idx").on(t.projectId, t.isActive),
+]);
+
 export const installedAssets = pgTable("installed_assets", {
   id: uuid("id").primaryKey().defaultRandom(),
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),

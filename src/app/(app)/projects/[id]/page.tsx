@@ -20,6 +20,7 @@ import {
   ServiceMaterialReservation,
   ServiceCostEditor,
   ServiceHandoverEditor,
+  ServiceMaintenanceEditor,
   WarrantyClaimQuickCreate,
   WarrantyClaimStatusAction,
 } from "../../services/service-widgets";
@@ -30,7 +31,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const t = await getTranslations();
   const detail = await getProjectDetail(id);
   if (!detail) notFound();
-  const { project, orders, jobs, assets, claims, materials, statusLogs, costEntries, profitability, plannedMaterialCost, handoverDocuments } = detail;
+  const { project, orders, jobs, assets, claims, materials, statusLogs, costEntries, profitability, plannedMaterialCost, handoverDocuments, maintenancePlans } = detail;
   const serviceOptions = project.serviceType ? await getServiceFormOptions() : null;
 
   return (
@@ -90,6 +91,28 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                       {document.photoUrls.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{document.photoUrls.map((url) => <a key={url} href={url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary-600 hover:underline">{t("services.documents.photoLink")}</a>)}</div>}
                     </div>
                     <ServiceHandoverEditor projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} initial={document} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+
+          <Section
+            title={t("services.maintenance.title")}
+            description={t("services.maintenance.summary", { count: maintenancePlans.filter((plan) => plan.isActive).length })}
+            action={<ServiceMaintenanceEditor projectId={project.id} assets={assets.map((asset) => ({ id: asset.id, name: asset.name, serialNumber: asset.serialNumber }))} staff={serviceOptions.assigneeOptions} />}
+          >
+            {maintenancePlans.length === 0 ? (
+              <Text variant="muted" size="sm" text={t("services.maintenance.empty")} />
+            ) : (
+              <div className="space-y-2">
+                {maintenancePlans.map((plan) => (
+                  <div key={plan.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-border-soft pb-2 last:border-b-0">
+                    <div>
+                      <Text size="sm" weight="medium" text={plan.title} />
+                      <Text size="xs" variant="muted" text={`${plan.assetName ?? t("services.assets.noProduct")} · ${t("services.maintenance.nextDueOn")}: ${plan.nextDueOn}${plan.assignedToName ? ` · ${plan.assignedToName}` : ""}`} />
+                    </div>
+                    <ServiceMaintenanceEditor projectId={project.id} assets={assets.map((asset) => ({ id: asset.id, name: asset.name, serialNumber: asset.serialNumber }))} staff={serviceOptions.assigneeOptions} initial={plan} />
                   </div>
                 ))}
               </div>

@@ -12,6 +12,7 @@ import {
   serviceHandoverDocuments,
   serviceJobMaterials,
   serviceJobs,
+  serviceMaintenancePlans,
   serviceMaterialAllocations,
   serviceStatusLogs,
   stockMovements,
@@ -67,7 +68,7 @@ export async function getProjectDetail(id: string) {
   }).from(projects).leftJoin(customers, eq(projects.customerId, customers.id)).where(eq(projects.id, id)).limit(1);
   if (!project) return null;
 
-  const [relatedOrders, jobs, assets, claims, materials, statusLogs, costEntries, costSummary, plannedMaterialSummary, handoverDocuments] = await Promise.all([
+  const [relatedOrders, jobs, assets, claims, materials, statusLogs, costEntries, costSummary, plannedMaterialSummary, handoverDocuments, maintenancePlans] = await Promise.all([
     db.select({
       id: orders.id,
       code: orders.code,
@@ -224,6 +225,23 @@ export async function getProjectDetail(id: string) {
     }).from(serviceHandoverDocuments)
       .where(eq(serviceHandoverDocuments.projectId, id))
       .orderBy(desc(serviceHandoverDocuments.createdAt)),
+    db.select({
+      id: serviceMaintenancePlans.id,
+      assetId: serviceMaintenancePlans.assetId,
+      assetName: installedAssets.name,
+      title: serviceMaintenancePlans.title,
+      intervalDays: serviceMaintenancePlans.intervalDays,
+      nextDueOn: serviceMaintenancePlans.nextDueOn,
+      lastCompletedOn: serviceMaintenancePlans.lastCompletedOn,
+      assignedTo: serviceMaintenancePlans.assignedTo,
+      assignedToName: profiles.fullName,
+      isActive: serviceMaintenancePlans.isActive,
+      note: serviceMaintenancePlans.note,
+    }).from(serviceMaintenancePlans)
+      .leftJoin(installedAssets, eq(serviceMaintenancePlans.assetId, installedAssets.id))
+      .leftJoin(profiles, eq(serviceMaintenancePlans.assignedTo, profiles.id))
+      .where(eq(serviceMaintenancePlans.projectId, id))
+      .orderBy(serviceMaintenancePlans.nextDueOn),
   ]);
 
   const [actualMaterialSummary] = await db.select({
@@ -249,6 +267,7 @@ export async function getProjectDetail(id: string) {
     profitability,
     plannedMaterialCost: Number(plannedMaterialSummary[0]?.plannedCost ?? 0),
     handoverDocuments,
+    maintenancePlans,
   };
 }
 

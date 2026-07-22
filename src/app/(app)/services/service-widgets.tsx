@@ -19,11 +19,14 @@ import {
   createWarrantyClaim,
   deleteServiceCostEntry,
   deleteServiceHandoverDocument,
+  completeServiceMaintenancePlan,
+  deleteServiceMaintenancePlan,
   releaseServiceJobMaterialReservations,
   reserveServiceJobMaterial,
   saveServiceJobMaterial,
   saveServiceCostEntry,
   saveServiceHandoverDocument,
+  saveServiceMaintenancePlan,
   syncServiceJobMaterialStock,
   transitionServiceJob,
   transitionWarrantyClaim,
@@ -57,6 +60,8 @@ type WarehouseOption = { id: string; name: string; isDefault: boolean };
 type ServiceCostJobOption = { id: string; code: string; title: string };
 type ServiceCostStaffOption = { id: string; name: string };
 type HandoverJobOption = { id: string; code: string; title: string };
+type MaintenanceStaffOption = { id: string; name: string };
+type MaintenanceAssetOption = { id: string; name: string; serialNumber: string | null };
 
 export function ServiceDashboardFilters({
   tab,
@@ -1163,6 +1168,88 @@ export function ServiceHandoverEditor({
           <Input value={signedBy} onChange={(event) => setSignedBy(event.target.value)} placeholder={t("services.documents.signedBy")} />
           <Input type="date" value={signedAt} onChange={(event) => setSignedAt(event.target.value)} aria-label={t("services.documents.signedAt")} />
           <Select value={status} onChange={(event) => setStatus(event.target.value)} options={["draft", "signed"].map((value) => ({ value, label: t(`services.documents.status.${value}` as never) }))} />
+        </div>
+      </RowPreviewModal>
+    </>
+  );
+}
+
+export function ServiceMaintenanceEditor({
+  projectId,
+  assets,
+  staff,
+  initial,
+}: {
+  projectId: string;
+  assets: MaintenanceAssetOption[];
+  staff: MaintenanceStaffOption[];
+  initial?: {
+    id: string;
+    assetId: string | null;
+    title: string;
+    intervalDays: number;
+    nextDueOn: string;
+    assignedTo: string | null;
+    isActive: boolean;
+    note: string | null;
+  };
+}) {
+  const t = useTranslations();
+  const router = useRouter();
+  const dialog = useConfirmDialog();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [assetId, setAssetId] = useState(initial?.assetId ?? "");
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [intervalDays, setIntervalDays] = useState<number | null>(initial?.intervalDays ?? 90);
+  const [nextDueOn, setNextDueOn] = useState(initial?.nextDueOn ?? new Date().toISOString().slice(0, 10));
+  const [assignedTo, setAssignedTo] = useState(initial?.assignedTo ?? "");
+  const [isActive, setIsActive] = useState(initial?.isActive ?? true);
+  const [note, setNote] = useState(initial?.note ?? "");
+
+  async function submit() {
+    if (!title.trim() || !intervalDays || busy) return;
+    setBusy(true);
+    const result = await saveServiceMaintenancePlan({ id: initial?.id ?? null, projectId, assetId: assetId || null, title, intervalDays, nextDueOn, assignedTo: assignedTo || null, isActive, note });
+    setBusy(false);
+    if (result.ok) { setOpen(false); router.refresh(); }
+  }
+  async function complete() {
+    if (!initial || busy) return;
+    setBusy(true);
+    const result = await completeServiceMaintenancePlan(initial.id);
+    setBusy(false);
+    if (result.ok) router.refresh();
+  }
+  async function remove() {
+    if (!initial || busy) return;
+    const confirmed = await dialog.confirm({ title: t("services.maintenance.delete"), description: t("services.maintenance.deleteConfirm"), confirmLabel: t("common.delete"), variant: "destructive" });
+    if (!confirmed) return;
+    setBusy(true);
+    const result = await deleteServiceMaintenancePlan(initial.id);
+    setBusy(false);
+    if (result.ok) { setOpen(false); router.refresh(); }
+  }
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        {initial && <Button type="button" variant="outline" size="sm" onClick={complete} disabled={busy || !initial.isActive} loading={busy} tx="services.maintenance.complete" />}
+        <Button type="button" variant={initial ? "ghost" : "default"} size="sm" onClick={() => setOpen(true)} tx={initial ? "common.edit" : "services.maintenance.create"} />
+      </div>
+      <RowPreviewModal open={open} onClose={() => !busy && setOpen(false)} title={t(initial ? "services.maintenance.edit" : "services.maintenance.create")} closeLabel={t("common.close")} size="md" footer={(
+        <div className="flex items-center justify-between gap-2">
+          {initial ? <Button type="button" variant="ghost" onClick={remove} disabled={busy} tx="services.maintenance.delete" /> : <span />}
+          <div className="flex gap-2"><Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy} tx="common.cancel" /><Button type="button" onClick={submit} disabled={busy || !title.trim() || !intervalDays} loading={busy} tx="common.save" /></div>
+        </div>
+      )}>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Select value={assetId} onChange={(event) => setAssetId(event.target.value)} options={[{ value: "", label: t("services.assets.noProduct") }, ...assets.map((asset) => ({ value: asset.id, label: `${asset.name}${asset.serialNumber ? ` · ${asset.serialNumber}` : ""}` }))]} />
+          <Select value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...staff.map((person) => ({ value: person.id, label: person.name }))]} />
+          <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={`${t("services.maintenance.titleField")} *`} className="sm:col-span-2" />
+          <NumberInput value={intervalDays} onChange={setIntervalDays} min={1} decimals={0} suffix={t("services.maintenance.days")} placeholder={t("services.maintenance.interval")} />
+          <Input type="date" value={nextDueOn} onChange={(event) => setNextDueOn(event.target.value)} aria-label={t("services.maintenance.nextDueOn")} />
+          <Select value={isActive ? "active" : "paused"} onChange={(event) => setIsActive(event.target.value === "active")} options={[{ value: "active", label: t("services.maintenance.active") }, { value: "paused", label: t("services.maintenance.paused") }]} />
+          <Textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder={t("customers.fields.note")} className="sm:col-span-2" />
         </div>
       </RowPreviewModal>
     </>

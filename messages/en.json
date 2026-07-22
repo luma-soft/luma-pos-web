@@ -2451,6 +2451,22 @@
       "deleteConfirm": "Delete this document?",
       "empty": "No acceptance documents yet."
     },
+    "maintenance": {
+      "title": "Scheduled maintenance",
+      "summary": "{count} maintenance plans",
+      "create": "Add maintenance plan",
+      "edit": "Edit maintenance plan",
+      "titleField": "Maintenance task",
+      "interval": "Interval",
+      "days": "days",
+      "nextDueOn": "Next due date",
+      "active": "Active",
+      "paused": "Paused",
+      "complete": "Mark maintained",
+      "delete": "Delete maintenance plan",
+      "deleteConfirm": "Delete this maintenance plan?",
+      "empty": "No scheduled maintenance yet."
+    },
     "checklist": {
       "site-survey": "Survey positions and viewing angles",
       "cabling": "Run network and power cabling",

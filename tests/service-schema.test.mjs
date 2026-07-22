@@ -4,7 +4,7 @@ import { drizzle } from "drizzle-orm/pglite";
 
 const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const schema = await import(`${projectRoot}/src/db/schema.ts`);
-const { projects, serviceJobs, serviceCostEntries, serviceHandoverDocuments } = schema;
+const { projects, serviceJobs, serviceCostEntries, serviceHandoverDocuments, serviceMaintenancePlans } = schema;
 const { createDefaultChecklist } = await import(
   `${projectRoot}/src/lib/services/domain.ts`
 );
@@ -69,4 +69,15 @@ if (document.status !== "signed" || document.photoUrls.length !== 1) {
   throw new Error("service handover document was not persisted");
 }
 
-console.log("service schema: project, camera job, cost, and handover persisted");
+const [plan] = await db.insert(serviceMaintenancePlans).values({
+  projectId: project.id,
+  assetId: null,
+  title: "Vệ sinh đầu ghi",
+  intervalDays: 90,
+  nextDueOn: "2026-10-20",
+}).returning();
+if (plan.intervalDays !== 90 || plan.isActive !== true) {
+  throw new Error("service maintenance plan was not persisted");
+}
+
+console.log("service schema: project, camera job, cost, handover, and maintenance persisted");
