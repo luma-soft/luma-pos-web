@@ -25,6 +25,7 @@ export function ProjectQuickCreate({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
+  const [nameSuggested, setNameSuggested] = useState(false);
   const [customerId, setCustomerId] = useState("");
   const [createdCustomers, setCreatedCustomers] = useState<{ id: string; name: string }[]>([]);
   const [customerCreateOpen, setCustomerCreateOpen] = useState(false);
@@ -40,9 +41,34 @@ export function ProjectQuickCreate({
     ...createdCustomers.filter((created) => !customers.some((customer) => customer.id === created.id)),
   ];
 
+  function suggestProjectName(customerName: string, type = serviceType) {
+    return `${customerName} - ${t(`services.types.${type}` as never)}`;
+  }
+
+  function chooseCustomer(nextCustomerId: string) {
+    const customer = customerOptions.find((item) => item.id === nextCustomerId);
+    setCustomerId(nextCustomerId);
+    if (serviceMode && (!name.trim() || nameSuggested)) {
+      setName(customer ? suggestProjectName(customer.name) : "");
+      setNameSuggested(Boolean(customer));
+    }
+  }
+
+  function chooseServiceType(nextServiceType: string) {
+    setServiceType(nextServiceType);
+    const customer = customerOptions.find((item) => item.id === customerId);
+    if (serviceMode && nameSuggested && customer) {
+      setName(suggestProjectName(customer.name, nextServiceType));
+    }
+  }
+
   function applyCreatedCustomer(customer: CustomerCreateResult) {
     setCreatedCustomers((current) => [...current.filter((item) => item.id !== customer.id), { id: customer.id, name: customer.name }]);
     setCustomerId(customer.id);
+    if (serviceMode && (!name.trim() || nameSuggested)) {
+      setName(suggestProjectName(customer.name));
+      setNameSuggested(true);
+    }
     setCustomerCreateOpen(false);
     router.refresh();
   }
@@ -65,6 +91,7 @@ export function ProjectQuickCreate({
     setBusy(false);
     if (res.ok) {
       setOpen(false); setName(""); setAddress(""); setTargetEndsOn("");
+      setNameSuggested(false); setCustomerId("");
       setSiteContactName(""); setSiteContactPhone("");
       router.refresh();
     } else setError(t(res.error as never));
@@ -91,11 +118,14 @@ export function ProjectQuickCreate({
         )}
       >
         <div className="grid gap-3 sm:grid-cols-2">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={`${t("projects.cols.name")} *`} />
+          <Input value={name} onChange={(e) => {
+            setName(e.target.value);
+            setNameSuggested(false);
+          }} placeholder={`${t("projects.cols.name")} *`} />
           <div className="flex min-w-0 gap-2">
             <Select
               value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
+              onChange={(e) => chooseCustomer(e.target.value)}
               options={[
                 { value: "", label: t("projects.noCustomer") },
                 ...customerOptions.map((c) => ({ value: c.id, label: c.name })),
@@ -118,7 +148,7 @@ export function ProjectQuickCreate({
             <>
               <Select
                 value={serviceType}
-                onChange={(e) => setServiceType(e.target.value)}
+                onChange={(e) => chooseServiceType(e.target.value)}
                 options={[
                   { value: "camera", label: t("services.types.camera") },
                   { value: "electrical", label: t("services.types.electrical") },
