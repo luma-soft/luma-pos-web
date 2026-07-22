@@ -38,7 +38,6 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
       <div className="flex items-center gap-3 flex-wrap mb-4">
         {cameraMaterials && <div><h2 className="text-lg font-bold">Vật tư lắp camera</h2><p className="text-sm text-slate-500">Thêm, sửa, xóa các vật tư dùng trong báo giá lắp đặt camera.</p></div>}
         {!cameraMaterials && <>
-          <Link href={productModalHref(params, { productModal: "create" })} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98]"><Plus className="w-4 h-4" />{t("products.createNew")}</Link>
           <form className="flex min-w-0 flex-1 flex-wrap items-center gap-3" action={Routes.Inventory}>
             <input type="hidden" name="tab" value="products" />
             <div className="relative min-w-[240px] flex-1">
@@ -50,6 +49,7 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
             <Select name="view" defaultValue={view} options={[{ value: "grouped", label: t("products.list.viewGrouped") }, { value: "flat", label: t("products.list.viewFlat") }]} />
             <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full border border-border bg-surface hover:bg-surface-2">{t("common.search")}</button>
           </form>
+          <Link href={productModalHref(params, { productModal: "create" })} className="inline-flex shrink-0 items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98]"><Plus className="w-4 h-4" />{t("products.createNew")}</Link>
         </>}
       </div>
 
