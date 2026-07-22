@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Check, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Select } from "@/components/ui/select";
+import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { cn } from "@/lib/utils";
 import { createCategoryNode, updateCategory, deleteCategory } from "@/lib/actions/products";
 
@@ -57,36 +58,45 @@ export function CategoriesManager({ categories: initial }: { categories: Cat[] }
     } else setError(t(res.error as never));
   }
 
-  function Row({ c, child = false }: { c: Cat; child?: boolean }) {
+  const rows = roots.flatMap((root) => [root, ...childrenOf(root.id)]);
+
+  function CategoryName({ c }: { c: Cat }) {
     const isEditing = editing?.id === c.id;
     return (
-      <div className={cn("group flex items-center gap-2 px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/50", child && "pl-9")}>
-        {isEditing ? (
-          <input
-            autoFocus
-            value={editing.name}
-            onChange={(e) => setEditing({ id: c.id, name: e.target.value })}
-            onBlur={() => rename(c.id, editing.name)}
-            onKeyDown={(e) => { if (e.key === "Enter") rename(c.id, editing.name); if (e.key === "Escape") setEditing(null); }}
-            className="flex-1 px-2 py-1 text-sm rounded border border-primary-400 bg-white dark:bg-slate-900"
-          />
-        ) : (
-          <>
-            <span className="flex-1 text-sm">
-              {c.name}
-              <span className="text-xs text-slate-400 ml-1.5">({c.productCount})</span>
-            </span>
-            <button onClick={() => setEditing({ id: c.id, name: c.name })} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-primary-600" title={t("common.edit")}>
-              <Pencil className="w-4 h-4" />
-            </button>
-            <button onClick={() => remove(c.id)} disabled={busy === c.id} className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 disabled:opacity-50" title={t("common.delete")}>
-              {busy === c.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-            </button>
-          </>
-        )}
+      isEditing ? (
+        <input
+          autoFocus
+          value={editing.name}
+          onChange={(e) => setEditing({ id: c.id, name: e.target.value })}
+          onBlur={() => rename(c.id, editing.name)}
+          onKeyDown={(e) => { if (e.key === "Enter") rename(c.id, editing.name); if (e.key === "Escape") setEditing(null); }}
+          className="w-full max-w-sm rounded border border-primary-400 bg-white px-2 py-1 text-sm dark:bg-slate-900"
+        />
+      ) : (
+        <span className={cn("font-medium", c.parentId && "pl-6")}>{c.name}</span>
+      )
+    );
+  }
+
+  function Actions({ c }: { c: Cat }) {
+    return (
+      <div className="flex items-center justify-end gap-1">
+        <button onClick={() => setEditing({ id: c.id, name: c.name })} className="rounded-md p-1.5 text-slate-400 hover:bg-surface-2 hover:text-primary-600" title={t("common.edit")}>
+          <Pencil className="h-4 w-4" />
+        </button>
+        <button onClick={() => remove(c.id)} disabled={busy === c.id} className="rounded-md p-1.5 text-slate-400 hover:bg-surface-2 hover:text-red-500 disabled:opacity-50" title={t("common.delete")}>
+          {busy === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+        </button>
       </div>
     );
   }
+
+  const columns: DataTableColumn<Cat>[] = [
+    { key: "name", label: t("categories.name"), required: true, render: (c) => <CategoryName c={c} /> },
+    { key: "parent", label: t("categories.parent"), defaultVisible: true, render: (c) => <span className="text-slate-500">{c.parentId ? cats.find((parent) => parent.id === c.parentId)?.name ?? "—" : "—"}</span> },
+    { key: "productCount", label: t("categories.productCount"), defaultVisible: true, align: "right", render: (c) => <span className="tabular-nums text-slate-600">{c.productCount}</span> },
+    { key: "actions", label: t("common.actions"), required: true, align: "right", render: (c) => <Actions c={c} /> },
+  ];
 
   return (
     <div>
@@ -99,15 +109,25 @@ export function CategoriesManager({ categories: initial }: { categories: Cat[] }
 
       {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
 
-      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl divide-y divide-slate-100 dark:divide-slate-800 overflow-hidden">
-        {cats.length === 0 && <p className="p-8 text-center text-sm text-slate-400">{t("categories.empty")}</p>}
-        {roots.map((r) => (
-          <div key={r.id}>
-            <Row c={r} />
-            {childrenOf(r.id).map((ch) => <Row key={ch.id} c={ch} child />)}
+      <DataTableShell
+        tableId="products.categories"
+        rows={rows}
+        columns={columns}
+        getRowId={(row) => row.id}
+        minWidth="720px"
+        empty={<p className="rounded-card border border-border-soft bg-surface p-8 text-center text-sm text-slate-400">{t("categories.empty")}</p>}
+        renderMobileRow={({ row }) => (
+          <div className="flex items-center justify-between gap-3 p-3">
+            <div className="min-w-0 space-y-1">
+              <CategoryName c={row} />
+              <div className="text-xs text-slate-500">
+                {row.parentId ? cats.find((parent) => parent.id === row.parentId)?.name : t("categories.noParent")} · {row.productCount} {t("categories.productCount")}
+              </div>
+            </div>
+            <Actions c={row} />
           </div>
-        ))}
-      </div>
+        )}
+      />
 
       {/* modal tạo nhóm hàng */}
       {open && (
