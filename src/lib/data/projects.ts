@@ -131,7 +131,11 @@ export async function getProjectDetail(id: string) {
       resolvedAt: warrantyClaims.resolvedAt,
       diagnosis: warrantyClaims.diagnosis,
       resolution: warrantyClaims.resolution,
+      laborCharge: warrantyClaims.laborCharge,
+      materialCharge: warrantyClaims.materialCharge,
+      assetName: installedAssets.name,
     }).from(warrantyClaims)
+      .leftJoin(installedAssets, eq(warrantyClaims.assetId, installedAssets.id))
       .where(eq(warrantyClaims.projectId, id))
       .orderBy(desc(warrantyClaims.reportedAt)),
     db.select({

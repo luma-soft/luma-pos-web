@@ -93,7 +93,7 @@ export type ServiceJobRow = ServiceDashboard["jobs"][number];
 export type WarrantyClaimRow = ServiceDashboard["claims"][number];
 
 export async function getServiceFormOptions() {
-  const [customerOptions, projectOptions, assigneeOptions, productOptions] = await Promise.all([
+  const [customerOptions, projectOptions, assigneeOptions, productOptions, jobOptions, assetOptions] = await Promise.all([
     db.select({ id: customers.id, name: customers.name })
       .from(customers)
       .where(eq(customers.isActive, true))
@@ -117,7 +117,25 @@ export async function getServiceFormOptions() {
       .where(eq(products.isActive, true))
       .orderBy(asc(products.name))
       .limit(500),
+    db.select({
+      id: serviceJobs.id,
+      projectId: serviceJobs.projectId,
+      code: serviceJobs.code,
+      title: serviceJobs.title,
+    }).from(serviceJobs)
+      .orderBy(desc(serviceJobs.createdAt))
+      .limit(500),
+    db.select({
+      id: installedAssets.id,
+      projectId: installedAssets.projectId,
+      jobId: installedAssets.jobId,
+      name: installedAssets.name,
+      serialNumber: installedAssets.serialNumber,
+    }).from(installedAssets)
+      .where(ne(installedAssets.status, "removed"))
+      .orderBy(asc(installedAssets.name))
+      .limit(500),
   ]);
 
-  return { customerOptions, projectOptions, assigneeOptions, productOptions };
+  return { customerOptions, projectOptions, assigneeOptions, productOptions, jobOptions, assetOptions };
 }

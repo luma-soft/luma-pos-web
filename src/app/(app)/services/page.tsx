@@ -69,7 +69,7 @@ export default async function ServicesPage({
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Text variant="muted" size="sm" text={t("services.summary.openClaims", { count: dashboard.metrics.openClaims })} />
-            <WarrantyClaimQuickCreate projects={options.projectOptions} />
+            <WarrantyClaimQuickCreate projects={options.projectOptions} jobs={options.jobOptions} assets={options.assetOptions} />
           </div>
           {dashboard.claims.length > 0
             ? <WarrantyClaimsTable rows={dashboard.claims} />

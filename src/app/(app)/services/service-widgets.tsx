@@ -22,6 +22,7 @@ import {
   updateInstalledAsset,
   updateServiceJob,
   updateServiceChecklist,
+  updateWarrantyClaim,
 } from "@/lib/actions/services";
 import type {
   ServiceJobRow,
@@ -36,6 +37,8 @@ import { ProjectEdit } from "../projects/project-widgets";
 type ProjectOption = { id: string; name: string; serviceType: string | null };
 type AssigneeOption = { id: string; name: string };
 type ProductOption = { id: string; name: string; sku: string; baseUnit: string };
+type WarrantyJobOption = { id: string; projectId: string; code: string; title: string };
+type WarrantyAssetOption = { id: string; projectId: string; jobId: string | null; name: string; serialNumber: string | null };
 
 export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProjectRow[]; customers: { id: string; name: string }[] }) {
   const t = useTranslations();
@@ -214,13 +217,39 @@ export function ServiceJobQuickCreate({
   );
 }
 
-export function WarrantyClaimQuickCreate({ projects }: { projects: ProjectOption[] }) {
+export function WarrantyClaimQuickCreate({
+  projects,
+  jobs,
+  assets,
+  initial,
+}: {
+  projects: ProjectOption[];
+  jobs: WarrantyJobOption[];
+  assets: WarrantyAssetOption[];
+  initial?: {
+    id: string;
+    jobId: string | null;
+    assetId: string | null;
+    title: string;
+    description: string | null;
+    priority: string;
+    scheduledAt: Date | string | null;
+    laborCharge: string;
+    materialCharge: string;
+  };
+}) {
   const t = useTranslations();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
-  const [title, setTitle] = useState("");
-  const [priority, setPriority] = useState("normal");
+  const [jobId, setJobId] = useState(initial?.jobId ?? "");
+  const [assetId, setAssetId] = useState(initial?.assetId ?? "");
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [priority, setPriority] = useState(initial?.priority ?? "normal");
+  const [scheduledAt, setScheduledAt] = useState(initial ? toDateTimeLocal(initial.scheduledAt) : "");
+  const [laborCharge, setLaborCharge] = useState<number | null>(initial ? Number(initial.laborCharge) : 0);
+  const [materialCharge, setMaterialCharge] = useState<number | null>(initial ? Number(initial.materialCharge) : 0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -228,30 +257,47 @@ export function WarrantyClaimQuickCreate({ projects }: { projects: ProjectOption
     if (!projectId || !title.trim() || busy) return;
     setBusy(true);
     setError("");
-    const result = await createWarrantyClaim({
-      projectId,
+    const payload = {
+      jobId: jobId || null,
+      assetId: assetId || null,
       title,
+      description: description || undefined,
       priority: priority as "low" | "normal" | "high" | "urgent",
-    });
+      scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+    };
+    const result = initial
+      ? await updateWarrantyClaim({
+          ...payload,
+          claimId: initial.id,
+          laborCharge: laborCharge ?? 0,
+          materialCharge: materialCharge ?? 0,
+        })
+      : await createWarrantyClaim({ ...payload, projectId });
     setBusy(false);
     if (result.ok) {
       setOpen(false);
-      setTitle("");
+      if (!initial) {
+        setTitle("");
+        setDescription("");
+        setScheduledAt("");
+      }
       router.refresh();
     } else setError(t(result.error as never));
   }
 
   return (
     <>
-      <Button type="button" onClick={() => setOpen(true)}><Plus className="h-4 w-4" />{t("services.warranty.create")}</Button>
+      <Button type="button" variant={initial ? "link" : "default"} size={initial ? "sm" : "default"} className={initial ? "h-auto px-0 text-xs" : undefined} onClick={() => setOpen(true)}>
+        {initial ? t("common.edit") : <><Plus className="h-4 w-4" />{t("services.warranty.create")}</>}
+      </Button>
       <RowPreviewModal
         open={open}
         onClose={() => {
           if (!busy) setOpen(false);
         }}
-        title={t("services.warranty.create")}
+        title={t(initial ? "services.warranty.edit" : "services.warranty.create")}
         closeLabel={t("common.close")}
-        size="md"
+        size="lg"
         footer={(
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy} tx="common.cancel" />
@@ -259,11 +305,30 @@ export function WarrantyClaimQuickCreate({ projects }: { projects: ProjectOption
           </div>
         )}
       >
-        <div className="grid gap-3">
-          <Select value={projectId} onChange={(event) => setProjectId(event.target.value)} options={projects.map((project) => ({ value: project.id, label: project.name }))} />
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={`${t("services.fields.issue")} *`} />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Select value={projectId} onChange={(event) => {
+            setProjectId(event.target.value);
+            setJobId("");
+            setAssetId("");
+          }} options={projects.map((project) => ({ value: project.id, label: project.name }))} disabled={Boolean(initial)} />
           <Select value={priority} onChange={(event) => setPriority(event.target.value)} options={priorityOptions(t)} />
-          {error && <Text as="p" variant="destructive" size="xs" text={error} />}
+          <Select value={jobId} onChange={(event) => setJobId(event.target.value)} options={[{ value: "", label: t("services.warranty.noJob") }, ...jobs.filter((job) => job.projectId === projectId).map((job) => ({ value: job.id, label: `${job.code} · ${job.title}` }))]} />
+          <Select value={assetId} onChange={(event) => {
+            const nextId = event.target.value;
+            setAssetId(nextId);
+            const asset = assets.find((item) => item.id === nextId);
+            if (asset?.jobId) setJobId(asset.jobId);
+          }} options={[{ value: "", label: t("services.warranty.noAsset") }, ...assets.filter((asset) => asset.projectId === projectId).map((asset) => ({ value: asset.id, label: `${asset.name}${asset.serialNumber ? ` · ${asset.serialNumber}` : ""}` }))]} />
+          <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={`${t("services.fields.issue")} *`} className="sm:col-span-2" />
+          <Input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} aria-label={t("services.fields.schedule")} className="sm:col-span-2" />
+          <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder={t("services.fields.description")} className="sm:col-span-2" />
+          {initial && (
+            <>
+              <NumberInput value={laborCharge} onChange={setLaborCharge} min={0} suffix="đ" placeholder={t("services.fields.laborCharge")} />
+              <NumberInput value={materialCharge} onChange={setMaterialCharge} min={0} suffix="đ" placeholder={t("services.fields.materialCharge")} />
+            </>
+          )}
+          {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
         </div>
       </RowPreviewModal>
     </>
@@ -688,25 +753,72 @@ export function ServiceJobStatusAction({ jobId, status }: { jobId: string; statu
   );
 }
 
-function WarrantyClaimStatusAction({ claimId, status }: { claimId: string; status: WarrantyClaimStatus }) {
+export function WarrantyClaimStatusAction({
+  claimId,
+  status,
+  diagnosis: initialDiagnosis = "",
+  resolution: initialResolution = "",
+}: {
+  claimId: string;
+  status: WarrantyClaimStatus;
+  diagnosis?: string | null;
+  resolution?: string | null;
+}) {
   const t = useTranslations();
   const router = useRouter();
   const [value, setValue] = useState<WarrantyClaimStatus>(status);
+  const [open, setOpen] = useState(false);
+  const [diagnosis, setDiagnosis] = useState(initialDiagnosis ?? "");
+  const [resolution, setResolution] = useState(initialResolution ?? "");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   async function save() {
     if (value === status) return;
     setBusy(true);
-    const result = await transitionWarrantyClaim({ claimId, status: value });
+    setError("");
+    const result = await transitionWarrantyClaim({
+      claimId,
+      status: value,
+      diagnosis: diagnosis || undefined,
+      resolution: resolution || undefined,
+    });
     setBusy(false);
-    if (result.ok) router.refresh();
-    else setValue(status);
+    if (result.ok) {
+      setOpen(false);
+      router.refresh();
+    } else {
+      setError(t(result.error as never));
+      setValue(status);
+    }
   }
 
   return (
     <span onClick={stopRowToggle} className="inline-flex items-center gap-1.5">
       <Select size="sm" value={value} onChange={(event) => setValue(event.target.value as WarrantyClaimStatus)} options={claimStatusOptions(t)} />
-      {value !== status && <Button type="button" size="sm" onClick={save} loading={busy} tx="common.save" />}
+      {value !== status && <Button type="button" size="sm" onClick={() => setOpen(true)} tx="common.save" />}
+      <RowPreviewModal
+        open={open}
+        onClose={() => {
+          if (!busy) setOpen(false);
+        }}
+        title={t("services.warranty.updateStatus")}
+        subtitle={`${t(`services.claimStatuses.${status}` as never)} → ${t(`services.claimStatuses.${value}` as never)}`}
+        closeLabel={t("common.close")}
+        size="lg"
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy} tx="common.cancel" />
+            <Button type="button" onClick={save} loading={busy} disabled={busy} tx="common.save" />
+          </div>
+        )}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Textarea value={diagnosis} onChange={(event) => setDiagnosis(event.target.value)} placeholder={t("services.fields.diagnosis")} />
+          <Textarea value={resolution} onChange={(event) => setResolution(event.target.value)} placeholder={t("services.fields.resolution")} />
+          {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
+        </div>
+      </RowPreviewModal>
     </span>
   );
 }

@@ -2337,7 +2337,12 @@
       "ipAddress": "IP address",
       "installedAt": "Installed at",
       "customerWarranty": "Customer warranty end date",
-      "supplierWarranty": "Supplier warranty end date"
+      "supplierWarranty": "Supplier warranty end date",
+      "diagnosis": "Diagnosis",
+      "resolution": "Resolution",
+      "laborCharge": "Labor charge",
+      "materialCharge": "Material charge",
+      "cost": "Total cost"
     },
     "summary": {
       "activeProjects": "{count} active projects",
@@ -2357,6 +2362,10 @@
     },
     "warranty": {
       "create": "New warranty case",
+      "edit": "Update warranty case",
+      "updateStatus": "Update warranty status",
+      "noJob": "— No linked work order —",
+      "noAsset": "— No linked asset —",
       "empty": "No warranty cases yet."
     },
     "assets": {

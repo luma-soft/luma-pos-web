@@ -12,6 +12,7 @@ import {
   serviceJobUpdateSchema,
   serviceProjectCreateSchema,
   warrantyClaimCreateSchema,
+  warrantyClaimUpdateSchema,
 } from "@/lib/services/schemas";
 
 describe("service project checklists", () => {
@@ -136,6 +137,19 @@ describe("installed assets and warranty", () => {
       title: "Camera mất tín hiệu",
     }).success).toBe(true);
     expect(warrantyClaimCreateSchema.safeParse({ title: "Camera mất tín hiệu" }).success).toBe(false);
+  });
+
+  it("validates warranty scheduling and service charges", () => {
+    expect(warrantyClaimUpdateSchema.safeParse({
+      claimId: "d5a84a82-d4c0-4b8f-b20d-87501d14a727",
+      jobId: null,
+      assetId: null,
+      title: "Camera mất tín hiệu",
+      priority: "urgent",
+      scheduledAt: "2026-07-22T02:30:00.000Z",
+      laborCharge: 250000,
+      materialCharge: 150000,
+    }).success).toBe(true);
   });
 
   it("allows a resolved warranty case to close but not a new case", () => {

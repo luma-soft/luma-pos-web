@@ -16,6 +16,7 @@ import {
   generateCode,
   isUniqueViolation,
   requireManager,
+  toMoney,
   toQty,
 } from "@/lib/actions/common";
 import {
@@ -44,6 +45,8 @@ import {
   type WarrantyClaimCreateInput,
   warrantyClaimTransitionSchema,
   type WarrantyClaimTransitionInput,
+  warrantyClaimUpdateSchema,
+  type WarrantyClaimUpdateInput,
 } from "@/lib/services/schemas";
 import { Routes } from "@/lib/routes";
 
@@ -394,6 +397,41 @@ export async function createWarrantyClaim(
   } catch (error) {
     console.error("createWarrantyClaim failed:", error);
     return { ok: false, error: isUniqueViolation(error) ? "services.errors.duplicateCode" : "errors.serverError" };
+  }
+}
+
+export async function updateWarrantyClaim(
+  input: WarrantyClaimUpdateInput,
+): Promise<ActionResult> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const parsed = warrantyClaimUpdateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const value = parsed.data;
+
+  try {
+    const [current] = await db.select({ projectId: warrantyClaims.projectId })
+      .from(warrantyClaims)
+      .where(eq(warrantyClaims.id, value.claimId))
+      .limit(1);
+    if (!current) return { ok: false, error: "errors.notFound" };
+
+    await db.update(warrantyClaims).set({
+      jobId: value.jobId ?? null,
+      assetId: value.assetId ?? null,
+      title: value.title,
+      description: value.description || null,
+      priority: value.priority,
+      scheduledAt: value.scheduledAt ? new Date(value.scheduledAt) : null,
+      laborCharge: toMoney(value.laborCharge),
+      materialCharge: toMoney(value.materialCharge),
+      updatedAt: new Date(),
+    }).where(eq(warrantyClaims.id, value.claimId));
+    revalidateServiceProject(current.projectId);
+    return { ok: true, data: undefined };
+  } catch (error) {
+    console.error("updateWarrantyClaim failed:", error);
+    return { ok: false, error: "errors.serverError" };
   }
 }
 

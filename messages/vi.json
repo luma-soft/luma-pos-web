@@ -2337,7 +2337,12 @@
       "ipAddress": "Địa chỉ IP",
       "installedAt": "Ngày lắp đặt",
       "customerWarranty": "Bảo hành cho khách đến ngày",
-      "supplierWarranty": "Bảo hành nhà cung cấp đến ngày"
+      "supplierWarranty": "Bảo hành nhà cung cấp đến ngày",
+      "diagnosis": "Chẩn đoán nguyên nhân",
+      "resolution": "Phương án xử lý",
+      "laborCharge": "Chi phí nhân công",
+      "materialCharge": "Chi phí vật tư",
+      "cost": "Tổng chi phí"
     },
     "summary": {
       "activeProjects": "{count} công trình đang theo dõi",
@@ -2357,6 +2362,10 @@
     },
     "warranty": {
       "create": "Tiếp nhận bảo hành",
+      "edit": "Cập nhật phiếu bảo hành",
+      "updateStatus": "Cập nhật trạng thái bảo hành",
+      "noJob": "— Không liên kết lệnh việc —",
+      "noAsset": "— Không liên kết thiết bị —",
       "empty": "Chưa có phiếu bảo hành nào."
     },
     "assets": {

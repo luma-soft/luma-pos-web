@@ -17,6 +17,7 @@ import {
   ServiceJobStatusAction,
   ServiceMaterialEditor,
   WarrantyClaimQuickCreate,
+  WarrantyClaimStatusAction,
 } from "../../services/service-widgets";
 import { ProjectEdit } from "../project-widgets";
 
@@ -126,16 +127,35 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <Section
             title={t("services.tabs.warranty")}
             description={t("services.summary.openClaims", { count: claims.filter((claim) => claim.status !== "closed" && claim.status !== "void").length })}
-            action={<WarrantyClaimQuickCreate projects={[{ id: project.id, name: project.name, serviceType: project.serviceType }]} />}
+            action={<WarrantyClaimQuickCreate
+              projects={[{ id: project.id, name: project.name, serviceType: project.serviceType }]}
+              jobs={jobs.map((job) => ({ id: job.id, projectId: project.id, code: job.code, title: job.title }))}
+              assets={assets.map((asset) => ({ id: asset.id, projectId: project.id, jobId: asset.jobId, name: asset.name, serialNumber: asset.serialNumber }))}
+            />}
           >
             {claims.length === 0 ? (
               <Text variant="muted" size="sm" text={t("services.warranty.empty")} />
             ) : (
               <div className="space-y-2">
                 {claims.map((claim) => (
-                  <div key={claim.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-border-soft pb-2 last:border-b-0">
-                    <div><Text as="div" weight="semibold" size="sm" text={`${claim.code} · ${claim.title}`} /><Text as="div" variant="muted" size="xs" text={formatDate(claim.reportedAt)} /></div>
-                    <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-medium">{t(`services.claimStatuses.${claim.status}` as never)}</span>
+                  <div key={claim.id} className="flex flex-wrap items-start justify-between gap-3 border-b border-border-soft pb-3 last:border-b-0">
+                    <div className="min-w-0 flex-1">
+                      <Text as="div" weight="semibold" size="sm" text={`${claim.code} · ${claim.title}`} />
+                      <Text as="div" variant="muted" size="xs" text={`${formatDate(claim.reportedAt)}${claim.assetName ? ` · ${claim.assetName}` : ""}`} />
+                      {claim.description && <Text as="p" size="xs" variant="muted" className="mt-1" text={claim.description} />}
+                      {(Number(claim.laborCharge) > 0 || Number(claim.materialCharge) > 0) && (
+                        <Text as="div" size="xs" className="mt-1" text={`${t("services.fields.cost")}: ${formatCurrency(Number(claim.laborCharge) + Number(claim.materialCharge))}`} />
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <WarrantyClaimQuickCreate
+                        projects={[{ id: project.id, name: project.name, serviceType: project.serviceType }]}
+                        jobs={jobs.map((job) => ({ id: job.id, projectId: project.id, code: job.code, title: job.title }))}
+                        assets={assets.map((asset) => ({ id: asset.id, projectId: project.id, jobId: asset.jobId, name: asset.name, serialNumber: asset.serialNumber }))}
+                        initial={claim}
+                      />
+                      <WarrantyClaimStatusAction claimId={claim.id} status={claim.status} diagnosis={claim.diagnosis} resolution={claim.resolution} />
+                    </div>
                   </div>
                 ))}
               </div>

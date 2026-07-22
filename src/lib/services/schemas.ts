@@ -129,6 +129,16 @@ export const warrantyClaimCreateSchema = z.object({
 
 export type WarrantyClaimCreateInput = z.input<typeof warrantyClaimCreateSchema>;
 
+export const warrantyClaimUpdateSchema = warrantyClaimCreateSchema.omit({
+  projectId: true,
+}).extend({
+  claimId: z.uuid(),
+  laborCharge: z.coerce.number().min(0).default(0),
+  materialCharge: z.coerce.number().min(0).default(0),
+});
+
+export type WarrantyClaimUpdateInput = z.input<typeof warrantyClaimUpdateSchema>;
+
 export const warrantyClaimTransitionSchema = z.object({
   claimId: z.uuid(),
   status: z.enum([
