@@ -1635,7 +1635,7 @@ export function PosClient({
       )}
 
       {/* left: catalog */}
-      <div className={cn("flex-1 flex flex-col p-3 sm:p-4 min-w-0", mobileView === "cart" && "hidden lg:flex")}>
+      <div className={cn("flex-1 flex flex-col p-3 sm:p-4 min-w-0 min-h-0 overflow-y-auto", mobileView === "cart" && "hidden lg:flex")}>
         {/* nút sang trang thanh toán — chỉ mobile */}
         {cart.length > 0 && (
           <button onClick={() => setMobileView("cart")}
