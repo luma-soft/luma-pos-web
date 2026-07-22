@@ -1819,7 +1819,7 @@ export function PosClient({
           </div>}
         </div>
 
-        {orderLinesPanel}
+        {!isCameraQuoteDraft && orderLinesPanel}
       </div>
 
       {/* right: cart — rộng hơn để thao tác đơn thoải mái, nhận thả SP từ danh sách */}
