@@ -17,6 +17,7 @@ import { ShopeeListingModal } from "./shopee-listing-modal";
 import { CAMERA_QUOTE_DETAIL_MATERIAL_SKUS, CAMERA_QUOTE_MATERIAL_SKUS } from "@/lib/data/camera-quote-constants";
 import { CameraMaterialSearch } from "./camera-material-search";
 import { InstantProductSearch } from "./instant-product-search";
+import { InstantProductFilters } from "./instant-product-filters";
 
 type SP = Record<string, string | undefined>;
 const STATUSES = ["active", "inactive", "all"] as const;
@@ -73,13 +74,7 @@ async function ProductsToolbar({
   return (
     <div className="mb-4 flex flex-wrap items-center gap-3">
       <InstantProductSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />
-      <form className="flex flex-wrap items-center gap-3" action={Routes.Inventory}>
-        <input type="hidden" name="tab" value="products" />
-        <input type="hidden" name="q" value={params.q ?? ""} readOnly />
-        <Select name="category" defaultValue={params.category ?? ""} options={[{ value: "", label: t("products.list.allCategories") }, ...categories.map((c) => ({ value: c.id, label: c.name }))]} className="min-w-44" />
-        <Select name="status" defaultValue={status} options={[{ value: "active", label: t("products.list.statusActive") }, { value: "inactive", label: t("products.list.statusInactive") }, { value: "all", label: t("products.list.statusAll") }]} />
-        <Select name="view" defaultValue={view} options={[{ value: "grouped", label: t("products.list.viewGrouped") }, { value: "flat", label: t("products.list.viewFlat") }]} />
-      </form>
+      <InstantProductFilters category={params.category ?? ""} status={status} view={view} categories={categories} labels={{ allCategories: t("products.list.allCategories"), active: t("products.list.statusActive"), inactive: t("products.list.statusInactive"), all: t("products.list.statusAll"), grouped: t("products.list.viewGrouped"), flat: t("products.list.viewFlat") }} />
       <Link href={productModalHref(params, { productModal: "create" })} className="inline-flex shrink-0 items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98]"><Plus className="w-4 h-4" />{t("products.createNew")}</Link>
     </div>
   );
