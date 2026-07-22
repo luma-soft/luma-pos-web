@@ -14,13 +14,14 @@ import { Text } from "@/components/ui/text";
  * URL-based: cập nhật query `page` / `size`, giữ nguyên các query khác.
  */
 export function Pagination({
-  page, pageCount, total, pageSize, unitLabel,
+  page, pageCount, total, pageSize, unitLabel, showRange = true,
 }: {
   page: number;
   pageCount: number;
   total: number;
   pageSize: number;
   unitLabel?: string;
+  showRange?: boolean;
 }) {
   const t = useTranslations();
   const router = useRouter();
@@ -70,12 +71,7 @@ export function Pagination({
         <Button variant="outline" size="iconSm" disabled={page >= pageCount} onClick={() => go({ page: String(pageCount) })} title={t("pagination.last")}><ChevronsRight className="w-4 h-4" /></Button>
       </div>
 
-      <Text
-        as="div"
-        variant="muted"
-        className="ml-auto sm:ml-0 tabular-nums"
-        text={`${t("pagination.range", { start, end, total })}${unitLabel ? ` ${unitLabel}` : ""}`}
-      />
+      {showRange && <Text as="div" variant="muted" className="ml-auto sm:ml-0 tabular-nums" text={`${t("pagination.range", { start, end, total })}${unitLabel ? ` ${unitLabel}` : ""}`} />}
     </div>
   );
 }

@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { Plus, Search, PackageOpen } from "lucide-react";
+import { Plus, PackageOpen } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { getProduct, getProducts, getProductFormOptions } from "@/lib/data/products";
 import { getPriceBooks, getPriceOverridesForProducts } from "@/lib/data/price-books";
@@ -16,6 +16,7 @@ import { productToFormInitialValues } from "../../products/product-form-values";
 import { ShopeeListingModal } from "./shopee-listing-modal";
 import { CAMERA_QUOTE_DETAIL_MATERIAL_SKUS, CAMERA_QUOTE_MATERIAL_SKUS } from "@/lib/data/camera-quote-constants";
 import { CameraMaterialSearch } from "./camera-material-search";
+import { InstantProductSearch } from "./instant-product-search";
 
 type SP = Record<string, string | undefined>;
 const STATUSES = ["active", "inactive", "all"] as const;
@@ -28,35 +29,17 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 export async function ProductsTab({ searchParams }: { searchParams: SP }) {
   const t = await getTranslations();
   const params = searchParams;
-  const status: Status = STATUSES.includes(params.status as Status) ? (params.status as Status) : "active";
-  const view: View = VIEWS.includes(params.view as View) ? (params.view as View) : "grouped";
   const cameraMaterials = params.cameraMaterials === "1";
   const { categories } = await getProductFormOptions();
 
   return (
     <>
-      <div className="flex items-center gap-3 flex-wrap mb-4">
-        {cameraMaterials && <div><h2 className="text-lg font-bold">Vật tư lắp camera</h2><p className="text-sm text-slate-500">Thêm, sửa, xóa các vật tư dùng trong báo giá lắp đặt camera.</p></div>}
-        {!cameraMaterials && <>
-          <form className="flex min-w-0 flex-1 flex-wrap items-center gap-3" action={Routes.Inventory}>
-            <input type="hidden" name="tab" value="products" />
-            <div className="relative min-w-[240px] flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface" />
-            </div>
-            <Select name="category" defaultValue={params.category ?? ""} options={[{ value: "", label: t("products.list.allCategories") }, ...categories.map((c) => ({ value: c.id, label: c.name }))]} className="min-w-44" />
-            <Select name="status" defaultValue={status} options={[{ value: "active", label: t("products.list.statusActive") }, { value: "inactive", label: t("products.list.statusInactive") }, { value: "all", label: t("products.list.statusAll") }]} />
-            <Select name="view" defaultValue={view} options={[{ value: "grouped", label: t("products.list.viewGrouped") }, { value: "flat", label: t("products.list.viewFlat") }]} />
-            <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full border border-border bg-surface hover:bg-surface-2">{t("common.search")}</button>
-          </form>
-          <Link href={productModalHref(params, { productModal: "create" })} className="inline-flex shrink-0 items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98]"><Plus className="w-4 h-4" />{t("products.createNew")}</Link>
-        </>}
-      </div>
+      {cameraMaterials && <div className="mb-4"><h2 className="text-lg font-bold">Vật tư lắp camera</h2><p className="text-sm text-slate-500">Thêm, sửa, xóa các vật tư dùng trong báo giá lắp đặt camera.</p></div>}
 
       {cameraMaterials && <CameraMaterialSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />}
 
       <Suspense fallback={<TableSkeleton cols={8} rows={10} />}>
-      <ProductsContent searchParams={searchParams} cameraMaterials={cameraMaterials} />
+        <ProductsContent searchParams={searchParams} cameraMaterials={cameraMaterials} categories={categories} />
       </Suspense>
 
       <ProductEditorModal searchParams={params} />
@@ -73,6 +56,36 @@ async function ShopeeListingModalShell({ searchParams }: { searchParams: SP }) {
   const product = await getProduct(productId);
   if (!product) notFound();
   return <ShopeeListingModal key={product.id} product={product} closeHref={productModalHref(searchParams, {})} />;
+}
+
+async function ProductsToolbar({
+  params,
+  categories,
+  status,
+  view,
+  totalLabel,
+}: {
+  params: SP;
+  categories: Awaited<ReturnType<typeof getProductFormOptions>>["categories"];
+  status: Status;
+  view: View;
+  totalLabel: string | null;
+}) {
+  const t = await getTranslations();
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-3">
+      <InstantProductSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />
+      <form className="flex flex-wrap items-center gap-3" action={Routes.Inventory}>
+        <input type="hidden" name="tab" value="products" />
+        <input type="hidden" name="q" value={params.q ?? ""} readOnly />
+        <Select name="category" defaultValue={params.category ?? ""} options={[{ value: "", label: t("products.list.allCategories") }, ...categories.map((c) => ({ value: c.id, label: c.name }))]} className="min-w-44" />
+        <Select name="status" defaultValue={status} options={[{ value: "active", label: t("products.list.statusActive") }, { value: "inactive", label: t("products.list.statusInactive") }, { value: "all", label: t("products.list.statusAll") }]} />
+        <Select name="view" defaultValue={view} options={[{ value: "grouped", label: t("products.list.viewGrouped") }, { value: "flat", label: t("products.list.viewFlat") }]} />
+      </form>
+      {totalLabel && <span className="shrink-0 text-sm text-slate-500">{totalLabel}</span>}
+      <Link href={productModalHref(params, { productModal: "create" })} className="inline-flex shrink-0 items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98]"><Plus className="w-4 h-4" />{t("products.createNew")}</Link>
+    </div>
+  );
 }
 
 async function ProductEditorModal({ searchParams }: { searchParams: SP }) {
@@ -135,7 +148,7 @@ function productModalHref(params: SP, patch: Record<string, string>) {
   return `${Routes.Inventory}?${sp.toString()}`;
 }
 
-async function ProductsContent({ searchParams, cameraMaterials = false }: { searchParams: SP; cameraMaterials?: boolean }) {
+async function ProductsContent({ searchParams, cameraMaterials = false, categories = [] }: { searchParams: SP; cameraMaterials?: boolean; categories?: Awaited<ReturnType<typeof getProductFormOptions>>["categories"] }) {
   const t = await getTranslations();
   const params = searchParams;
   const page = Number(params.page) || 1;
@@ -156,6 +169,7 @@ async function ProductsContent({ searchParams, cameraMaterials = false }: { sear
 
   return (
     <>
+      {!cameraMaterials && <ProductsToolbar params={params} categories={categories} status={status} view={view} totalLabel={t("products.list.total", { total })} />}
       {rows.length === 0 ? (
         <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">
           <PackageOpen className="w-10 h-10 mx-auto mb-3 opacity-60" />
@@ -169,7 +183,7 @@ async function ProductsContent({ searchParams, cameraMaterials = false }: { sear
       )}
 
       <div className="shrink-0 pt-3">
-        <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("products.unitLabel")} />
+        <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("products.unitLabel")} showRange={false} />
       </div>
     </>
   );
