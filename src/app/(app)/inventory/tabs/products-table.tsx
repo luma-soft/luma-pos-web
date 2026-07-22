@@ -10,6 +10,7 @@ import {
   Barcode,
   Copy,
   ImageIcon,
+  MoreHorizontal,
   PackagePlus,
   Pencil,
   Plus,
@@ -719,6 +720,7 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
   const dialog = useConfirmDialog();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
+  const [moreOpen, setMoreOpen] = useState(false);
   const effectiveActive = product.isVariantParent
     ? product.children.some((child) => child.isActive)
     : product.isActive;
@@ -841,26 +843,32 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
             })}
             tone="primary"
           />
-          <ActionLink
-            icon={Store}
-            label={locale === "vi" ? "Đăng sàn" : "List online"}
-            href={productModalHref({
-              onlineProductId: product.id,
-            })}
-          />
-          <ActionLink
-            icon={Barcode}
-            label={t("products.actions.printLabels")}
-            href={Routes.productLabels(product.id)}
-          />
-          <ActionLink
-            icon={Plus}
-            label={t("products.actions.addSameType")}
-            href={productModalHref({
-              productModal: "sameType",
-              sameTypeAs: sameTypeSourceId,
-            })}
-          />
+          <div className="relative">
+            <button
+              type="button"
+              aria-label={locale === "vi" ? "Thao tác khác" : "More actions"}
+              aria-expanded={moreOpen}
+              onClick={() => setMoreOpen((value) => !value)}
+              className={cn(actionClassName, "border-border bg-surface text-slate-700 hover:bg-surface-2 dark:text-slate-200")}
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+            {moreOpen && (
+              <div className="absolute right-0 top-11 z-30 min-w-52 rounded-lg border border-border bg-surface p-1 shadow-xl">
+                <MenuActionLink
+                  icon={Store}
+                  label={locale === "vi" ? "Đăng sàn" : "List online"}
+                  href={productModalHref({ onlineProductId: product.id })}
+                />
+                <MenuActionLink icon={Barcode} label={t("products.actions.printLabels")} href={Routes.productLabels(product.id)} />
+                <MenuActionLink
+                  icon={Plus}
+                  label={t("products.actions.addSameType")}
+                  href={productModalHref({ productModal: "sameType", sameTypeAs: sameTypeSourceId })}
+                />
+              </div>
+            )}
+          </div>
           <ActionLink
             icon={PackagePlus}
             label={t("products.actions.purchase")}
@@ -904,6 +912,23 @@ function ActionLink({
           : "border-border bg-surface text-slate-700 hover:bg-surface-2 dark:text-slate-200",
       )}
     >
+      <Icon className="h-4 w-4" />
+      {label}
+    </Link>
+  );
+}
+
+function MenuActionLink({
+  href,
+  icon: Icon,
+  label,
+}: {
+  href: string;
+  icon: LucideIcon;
+  label: string;
+}) {
+  return (
+    <Link href={href} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-surface-2 dark:text-slate-200">
       <Icon className="h-4 w-4" />
       {label}
     </Link>
