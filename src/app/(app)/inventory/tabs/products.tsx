@@ -35,45 +35,25 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
 
   return (
     <>
-      <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+      <div className="flex items-center gap-3 flex-wrap mb-4">
         {cameraMaterials && <div><h2 className="text-lg font-bold">Vật tư lắp camera</h2><p className="text-sm text-slate-500">Thêm, sửa, xóa các vật tư dùng trong báo giá lắp đặt camera.</p></div>}
-        {!cameraMaterials && <div className="flex items-center gap-2">
+        {!cameraMaterials && <>
           <Link href={productModalHref(params, { productModal: "create" })} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98]"><Plus className="w-4 h-4" />{t("products.createNew")}</Link>
-        </div>}
+          <form className="flex min-w-0 flex-1 flex-wrap items-center gap-3" action={Routes.Inventory}>
+            <input type="hidden" name="tab" value="products" />
+            <div className="relative min-w-[240px] flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface" />
+            </div>
+            <Select name="category" defaultValue={params.category ?? ""} options={[{ value: "", label: t("products.list.allCategories") }, ...categories.map((c) => ({ value: c.id, label: c.name }))]} className="min-w-44" />
+            <Select name="status" defaultValue={status} options={[{ value: "active", label: t("products.list.statusActive") }, { value: "inactive", label: t("products.list.statusInactive") }, { value: "all", label: t("products.list.statusAll") }]} />
+            <Select name="view" defaultValue={view} options={[{ value: "grouped", label: t("products.list.viewGrouped") }, { value: "flat", label: t("products.list.viewFlat") }]} />
+            <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full border border-border bg-surface hover:bg-surface-2">{t("common.search")}</button>
+          </form>
+        </>}
       </div>
 
-      {cameraMaterials ? <CameraMaterialSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} /> : <form className="flex flex-wrap items-center gap-3 mb-4" action={Routes.Inventory}>
-        <input type="hidden" name="tab" value={cameraMaterials ? "camera-materials" : "products"} />
-        {cameraMaterials && <input type="hidden" name="cameraMaterials" value="1" />}
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface" />
-        </div>
-        <Select
-          name="category"
-          defaultValue={params.category ?? ""}
-          options={[{ value: "", label: t("products.list.allCategories") }, ...categories.map((c) => ({ value: c.id, label: c.name }))]}
-          className="min-w-44"
-        />
-        <Select
-          name="status"
-          defaultValue={status}
-          options={[
-            { value: "active", label: t("products.list.statusActive") },
-            { value: "inactive", label: t("products.list.statusInactive") },
-            { value: "all", label: t("products.list.statusAll") },
-          ]}
-        />
-        <Select
-          name="view"
-          defaultValue={view}
-          options={[
-            { value: "grouped", label: t("products.list.viewGrouped") },
-            { value: "flat", label: t("products.list.viewFlat") },
-          ]}
-        />
-        <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full border border-border bg-surface hover:bg-surface-2">{t("common.search")}</button>
-      </form>}
+      {cameraMaterials && <CameraMaterialSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />}
 
       <Suspense fallback={<TableSkeleton cols={8} rows={10} />}>
       <ProductsContent searchParams={searchParams} cameraMaterials={cameraMaterials} />
