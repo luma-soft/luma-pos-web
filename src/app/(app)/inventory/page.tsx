@@ -26,7 +26,7 @@ const TABS = [
 export default async function InventoryPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const t = await getTranslations();
   const params = await searchParams;
-  const tab = params.tab ?? "stock";
+  const tab = params.tab ?? "products";
 
   return (
     <div className="p-4 sm:p-6">
