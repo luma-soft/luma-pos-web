@@ -376,6 +376,7 @@
       "title": "Camera installation quote",
       "description": "Choose each camera package, memory card, installation and materials by location.",
       "addCamera": "Add camera to quote",
+      "manageMaterials": "Material settings",
       "pickerTitle": "Choose a camera",
       "pickerDescription": "Choose a camera to add a new package to the quote.",
       "pickerSearch": "Search camera name or SKU",
@@ -401,7 +402,8 @@
       "removeMaterial": "Remove material",
       "cameraQuantity": "Camera quantity",
       "packageTotal": "Package total",
-      "packageNote": "Camera package {n}"
+      "packageNote": "Camera package {n}",
+      "lineItems": "Quote details"
     },
     "invoice": {
       "tab": "Order {n}",

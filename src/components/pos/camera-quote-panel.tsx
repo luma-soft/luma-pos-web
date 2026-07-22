@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -110,6 +111,18 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
     const installation = installations.find((item) => item.sku === "SVC-CAM-INSTALL-200") ?? installations[0];
     const material = defaultMaterial();
     if (!card || !installation || !material) return;
+    const existing = packages.find((pkg) =>
+      pkg.cameraId === cameraId &&
+      pkg.cardId === card.id &&
+      pkg.installationId === installation.id &&
+      pkg.materialLines.length === 1 &&
+      pkg.materialLines[0]?.productId === material.productId &&
+      pkg.materialLines[0]?.quantity === material.quantity,
+    );
+    if (existing) {
+      updatePackage(existing.key, { quantity: Math.min(99, existing.quantity + 1) });
+      return;
+    }
     onChange([
       ...packages,
       {
@@ -150,7 +163,10 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
           <h2 className="text-base font-bold">{t("pos.cameraQuote.title")}</h2>
           <p className="mt-0.5 text-xs text-slate-500">{t("pos.cameraQuote.description")}</p>
         </div>
-        <Button type="button" size="sm" onClick={() => setPickerOpen(true)}><Plus className="h-4 w-4" />{t("pos.cameraQuote.addCamera")}</Button>
+        <div className="flex items-center gap-2">
+          <Link href="/products" target="_blank" className="text-xs font-semibold text-slate-500 hover:text-primary-600">{t("pos.cameraQuote.manageMaterials")}</Link>
+          <Button type="button" size="sm" onClick={() => setPickerOpen(true)}><Plus className="h-4 w-4" />{t("pos.cameraQuote.addCamera")}</Button>
+        </div>
       </div>
 
       {packages.length === 0 ? (
@@ -222,7 +238,7 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
                             min={0.01}
                             decimals={2}
                             thousandSeparator={false}
-                            suffix={unitLabel(product)}
+                            suffix={unitLabel(product) ? ` ${unitLabel(product)}` : ""}
                             onChange={(quantity) => updatePackage(pkg.key, {
                               materialLines: pkg.materialLines.map((item, itemIndex) => itemIndex === materialIndex ? { ...item, quantity: Math.max(0.01, quantity ?? 1) } : item),
                             })}
