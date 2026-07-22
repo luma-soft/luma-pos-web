@@ -65,6 +65,7 @@ import {
   type WarrantyClaimUpdateInput,
 } from "@/lib/services/schemas";
 import { Routes } from "@/lib/routes";
+import { writeAuditLog } from "@/lib/audit";
 import { releaseServiceJobMaterialReservationsCore, reserveServiceJobMaterialStockCore, syncServiceJobMaterialStockCore } from "@/lib/services/material-stock";
 
 function revalidateServiceProject(projectId?: string) {
@@ -72,6 +73,10 @@ function revalidateServiceProject(projectId?: string) {
   revalidatePath(Routes.Partners);
   revalidatePath(Routes.Projects);
   if (projectId) revalidatePath(Routes.project(projectId));
+}
+
+async function auditServiceMutation(actorUserId: string, action: string, entityType: string, entityId: string | null, metadata?: Record<string, unknown>) {
+  await writeAuditLog({ actorUserId, source: "manual", action, entityType, entityId, metadata });
 }
 
 async function loadJobProject(jobId?: string | null) {
@@ -412,6 +417,7 @@ export async function reserveServiceJobMaterial(
     const result = await db.transaction((tx) => reserveServiceJobMaterialStockCore(tx, { ...parsed.data, createdBy: gate.userId }));
     revalidateServiceProject(result.projectId);
     revalidatePath(Routes.Inventory);
+    await auditServiceMutation(gate.userId, "reserve_material", "service_material", parsed.data.materialId, { warehouseId: parsed.data.warehouseId, quantity: parsed.data.quantity });
     return { ok: true, data: { quantityBase: result.quantityBase } };
   } catch (error) {
     const code = error instanceof Error ? error.message : "";
@@ -431,6 +437,7 @@ export async function releaseServiceJobMaterialReservations(materialId: string):
     const result = await db.transaction((tx) => releaseServiceJobMaterialReservationsCore(tx, { materialId }));
     revalidateServiceProject(result.projectId);
     revalidatePath(Routes.Inventory);
+    await auditServiceMutation(gate.userId, "release_material_reservation", "service_material", materialId);
     return { ok: true, data: undefined };
   } catch (error) {
     if (error instanceof Error && error.message === "SERVICE_MATERIAL_NOT_FOUND") return { ok: false, error: "errors.notFound" };
@@ -469,11 +476,13 @@ export async function saveServiceHandoverDocument(
         .where(eq(serviceHandoverDocuments.id, value.id)).returning({ id: serviceHandoverDocuments.id });
       if (!document) return { ok: false, error: "errors.notFound" };
       revalidateServiceProject(value.projectId);
+      await auditServiceMutation(gate.userId, "update_service_handover", "service_handover_document", value.id);
       return { ok: true, data: document };
     }
     const [document] = await db.insert(serviceHandoverDocuments).values({ ...values, createdBy: gate.userId })
       .returning({ id: serviceHandoverDocuments.id });
     revalidateServiceProject(value.projectId);
+    await auditServiceMutation(gate.userId, "create_service_handover", "service_handover_document", document.id);
     return { ok: true, data: document };
   } catch (error) {
     console.error("saveServiceHandoverDocument failed:", error);
@@ -522,10 +531,12 @@ export async function saveServiceMaintenancePlan(
       const [plan] = await db.update(serviceMaintenancePlans).set(values).where(eq(serviceMaintenancePlans.id, value.id)).returning({ id: serviceMaintenancePlans.id });
       if (!plan) return { ok: false, error: "errors.notFound" };
       revalidateServiceProject(value.projectId);
+      await auditServiceMutation(gate.userId, "update_service_maintenance", "service_maintenance_plan", value.id);
       return { ok: true, data: plan };
     }
     const [plan] = await db.insert(serviceMaintenancePlans).values({ ...values, createdBy: gate.userId }).returning({ id: serviceMaintenancePlans.id });
     revalidateServiceProject(value.projectId);
+    await auditServiceMutation(gate.userId, "create_service_maintenance", "service_maintenance_plan", plan.id);
     return { ok: true, data: plan };
   } catch (error) {
     console.error("saveServiceMaintenancePlan failed:", error);
@@ -545,6 +556,7 @@ export async function completeServiceMaintenancePlan(id: string): Promise<Action
     nextDueOn.setDate(nextDueOn.getDate() + current.intervalDays);
     await db.update(serviceMaintenancePlans).set({ lastCompletedOn: completedOn.toISOString().slice(0, 10), nextDueOn: nextDueOn.toISOString().slice(0, 10), updatedAt: completedOn }).where(eq(serviceMaintenancePlans.id, id));
     revalidateServiceProject(current.projectId);
+    await auditServiceMutation(gate.userId, "complete_service_maintenance", "service_maintenance_plan", id);
     return { ok: true, data: undefined };
   } catch (error) {
     console.error("completeServiceMaintenancePlan failed:", error);
@@ -600,6 +612,7 @@ export async function saveServiceCostEntry(
       }).where(eq(serviceCostEntries.id, value.id)).returning({ id: serviceCostEntries.id });
       if (!entry) return { ok: false, error: "errors.notFound" };
       revalidateServiceProject(value.projectId);
+      await auditServiceMutation(gate.userId, "update_service_cost", "service_cost_entry", value.id);
       return { ok: true, data: entry };
     }
     const [entry] = await db.insert(serviceCostEntries).values({
@@ -616,6 +629,7 @@ export async function saveServiceCostEntry(
       createdBy: gate.userId,
     }).returning({ id: serviceCostEntries.id });
     revalidateServiceProject(value.projectId);
+    await auditServiceMutation(gate.userId, "create_service_cost", "service_cost_entry", entry.id, { type: value.type, amount });
     return { ok: true, data: entry };
   } catch (error) {
     console.error("saveServiceCostEntry failed:", error);
