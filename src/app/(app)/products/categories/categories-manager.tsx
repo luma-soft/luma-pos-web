@@ -8,11 +8,13 @@ import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { cn } from "@/lib/utils";
 import { createCategoryNode, updateCategory, deleteCategory } from "@/lib/actions/products";
 
-interface Cat { id: string; name: string; parentId: string | null; productCount: number; }
+interface Cat { id: string; name: string; parentId: string | null; parentName: string | null; productCount: number; }
+interface ParentOption { id: string; name: string; }
 
-export function CategoriesManager({ categories: initial }: { categories: Cat[] }) {
+export function CategoriesManager({ categories: initial, parentOptions: initialParentOptions, total }: { categories: Cat[]; parentOptions: ParentOption[]; total: number }) {
   const t = useTranslations();
   const [cats, setCats] = useState(initial);
+  const [parentOptions, setParentOptions] = useState(initialParentOptions);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -23,16 +25,16 @@ export function CategoriesManager({ categories: initial }: { categories: Cat[] }
   const [newParent, setNewParent] = useState("");
   const [creating, setCreating] = useState(false);
 
-  const roots = cats.filter((c) => !c.parentId);
-  const childrenOf = (id: string) => cats.filter((c) => c.parentId === id);
+  const roots = parentOptions;
 
   async function rename(id: string, name: string) {
     setEditing(null);
     const n = name.trim();
     if (!n) return;
-    setCats((cs) => cs.map((c) => (c.id === id ? { ...c, name: n } : c)));
+    setCats((cs) => cs.map((c) => c.id === id ? { ...c, name: n } : c.parentId === id ? { ...c, parentName: n } : c));
     const res = await updateCategory(id, { name: n });
     if (!res.ok) setError(t(res.error as never));
+    else setParentOptions((options) => options.map((option) => option.id === id ? { ...option, name: n } : option));
   }
 
   async function remove(id: string) {
@@ -41,7 +43,8 @@ export function CategoriesManager({ categories: initial }: { categories: Cat[] }
     const res = await deleteCategory(id);
     setBusy(null);
     if (res.ok) {
-      setCats((cs) => cs.filter((c) => c.id !== id).map((c) => (c.parentId === id ? { ...c, parentId: null } : c)));
+      setCats((cs) => cs.filter((c) => c.id !== id).map((c) => (c.parentId === id ? { ...c, parentId: null, parentName: null } : c)));
+      setParentOptions((options) => options.filter((option) => option.id !== id));
     } else setError(t(res.error as never));
   }
 
@@ -53,12 +56,14 @@ export function CategoriesManager({ categories: initial }: { categories: Cat[] }
     const res = await createCategoryNode({ name: n, parentId: newParent || null });
     setCreating(false);
     if (res.ok) {
-      setCats((cs) => [...cs, { id: res.data.id, name: n, parentId: newParent || null, productCount: 0 }]);
+      const parentName = roots.find((root) => root.id === newParent)?.name ?? null;
+      setCats((cs) => [...cs, { id: res.data.id, name: n, parentId: newParent || null, parentName, productCount: 0 }]);
+      if (!newParent) setParentOptions((options) => [...options, { id: res.data.id, name: n }]);
       setNewName(""); setNewParent(""); setOpen(false);
     } else setError(t(res.error as never));
   }
 
-  const rows = roots.flatMap((root) => [root, ...childrenOf(root.id)]);
+  const rows = cats;
 
   function CategoryName({ c }: { c: Cat }) {
     const isEditing = editing?.id === c.id;
@@ -93,7 +98,7 @@ export function CategoriesManager({ categories: initial }: { categories: Cat[] }
 
   const columns: DataTableColumn<Cat>[] = [
     { key: "name", label: t("categories.name"), required: true, render: (c) => <CategoryName c={c} /> },
-    { key: "parent", label: t("categories.parent"), defaultVisible: true, render: (c) => <span className="text-slate-500">{c.parentId ? cats.find((parent) => parent.id === c.parentId)?.name ?? "—" : "—"}</span> },
+    { key: "parent", label: t("categories.parent"), defaultVisible: true, render: (c) => <span className="text-slate-500">{c.parentName ?? "—"}</span> },
     { key: "productCount", label: t("categories.productCount"), defaultVisible: true, align: "right", render: (c) => <span className="tabular-nums text-slate-600">{c.productCount}</span> },
     { key: "actions", label: t("common.actions"), required: true, align: "right", render: (c) => <Actions c={c} /> },
   ];
@@ -101,7 +106,7 @@ export function CategoriesManager({ categories: initial }: { categories: Cat[] }
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <span className="text-sm text-slate-500">{t("categories.count", { n: cats.length })}</span>
+        <span className="text-sm text-slate-500">{t("categories.count", { n: total })}</span>
         <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700">
           <Plus className="w-4 h-4" /> {t("categories.create")}
         </button>
@@ -121,7 +126,7 @@ export function CategoriesManager({ categories: initial }: { categories: Cat[] }
             <div className="min-w-0 space-y-1">
               <CategoryName c={row} />
               <div className="text-xs text-slate-500">
-                {row.parentId ? cats.find((parent) => parent.id === row.parentId)?.name : t("categories.noParent")} · {row.productCount} {t("categories.productCount")}
+                {row.parentName ?? t("categories.noParent")} · {row.productCount} {t("categories.productCount")}
               </div>
             </div>
             <Actions c={row} />

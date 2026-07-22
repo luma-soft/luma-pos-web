@@ -2745,6 +2745,7 @@
   "categories": {
     "title": "Nhóm hàng",
     "count": "{n} nhóm",
+    "unitLabel": "nhóm",
     "create": "Tạo nhóm hàng",
     "empty": "Chưa có nhóm hàng",
     "name": "Tên nhóm",
