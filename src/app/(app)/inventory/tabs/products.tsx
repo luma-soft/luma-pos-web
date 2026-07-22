@@ -8,7 +8,6 @@ import { getProduct, getProducts, getProductFormOptions } from "@/lib/data/produ
 import { getPriceBooks, getPriceOverridesForProducts } from "@/lib/data/price-books";
 import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
-import { Select } from "@/components/ui/select";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { ProductsTable } from "./products-table";
 import { NewProductForm } from "../../products/new/product-form";
