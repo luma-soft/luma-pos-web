@@ -147,6 +147,8 @@ export type PosInitialContext = {
   customerId?: string;
   projectId: string;
   projectName: string;
+  cameraQuote?: boolean;
+  cameraId?: string;
 };
 
 /**
@@ -160,6 +162,7 @@ interface PosDraft {
   id: string;
   kind: PosDraftKind;
   cameraQuote?: boolean;
+  cameraInitialId?: string;
   cameraPackages?: CameraQuotePackage[];
   source?: PosSourceInvoice;
   cart: CartLine[];
@@ -207,6 +210,8 @@ function makeInvoice(id?: string): PosDraft {
 function makeDraftFromContext(context: PosInitialContext, id = SOURCE_INV_ID): PosDraft {
   return {
     ...makeDraft(id, context.kind),
+    cameraQuote: context.cameraQuote,
+    cameraInitialId: context.cameraId,
     customerId: context.customerId ?? "",
     projectId: context.projectId,
     projectName: context.projectName,
@@ -670,7 +675,7 @@ export function PosClient({
   const productById = useMemo(() => new Map(searchableProducts.map((product) => [product.id, product])), [searchableProducts]);
   const cameraPackages = active.cameraPackages ?? [];
 
-  function cameraPackagesToCart(packages: CameraQuotePackage[]) {
+  const cameraPackagesToCart = useCallback((packages: CameraQuotePackage[]) => {
     return packages.flatMap((pkg, packageIndex) => {
       const packageItems = [
         { productId: pkg.cameraId, quantity: pkg.quantity },
@@ -692,11 +697,33 @@ export function PosClient({
         }];
       });
     });
-  }
+  }, [productById, priceBook, t]);
 
   function setCameraPackages(packages: CameraQuotePackage[]) {
     patchActive({ cameraPackages: packages, cart: cameraPackagesToCart(packages) });
   }
+
+  useEffect(() => {
+    if (!initialContext?.cameraQuote || !active.cameraQuote || active.cameraPackages?.length || !active.cameraInitialId) return;
+    const camera = productById.get(active.cameraInitialId);
+    const card = searchableProducts.find((product) => product.sku === "MEM-IMOU-64GB");
+    const installation = searchableProducts.find((product) => product.sku === "SVC-CAM-INSTALL-200");
+    const material = searchableProducts.find((product) => product.sku === "MAT-CAM-BASIC-50");
+    if (!camera || !card || !installation || !material) return;
+    const packages: CameraQuotePackage[] = [{
+      key: `camera-package-${Date.now()}`,
+      cameraId: camera.id,
+      cardId: card.id,
+      installationId: installation.id,
+      materialLines: [{ productId: material.id, quantity: 1 }],
+      quantity: 1,
+    }];
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) patchActive({ cameraPackages: packages, cart: cameraPackagesToCart(packages), cameraInitialId: undefined });
+    });
+    return () => { cancelled = true; };
+  }, [active.cameraInitialId, active.cameraPackages?.length, active.cameraQuote, initialContext?.cameraQuote, productById, searchableProducts, patchActive, cameraPackagesToCart]);
 
   // Khi gõ tìm kiếm: hỏi server (quét toàn bộ SP, bỏ dấu) — khớp trang Sản phẩm.
   const [serverResults, setServerResults] = useState<PosProduct[]>([]);

@@ -2,10 +2,12 @@
 
 import { Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
 import { Select } from "@/components/ui/select";
+import { CameraPickerModal, type CameraPickerProduct } from "@/components/pos/camera-picker-modal";
 import {
   CAMERA_QUOTE_CARD_SKUS,
   CAMERA_QUOTE_DETAIL_MATERIAL_SKUS,
@@ -51,9 +53,17 @@ function keyFor(prefix: string) {
 
 export function CameraQuotePanel({ products, packages, priceBook, onChange }: Props) {
   const t = useTranslations();
+  const [pickerOpen, setPickerOpen] = useState(false);
   const bySku = new Map(products.flatMap((product) => [[product.sku ?? "", product]]));
   const byId = new Map(products.map((product) => [product.id, product]));
   const cameras = products.filter(isCamera).sort((a, b) => a.name.localeCompare(b.name, "vi"));
+  const pickerCameras: CameraPickerProduct[] = cameras.map((product) => ({
+    id: product.id,
+    sku: product.sku ?? "",
+    name: product.name,
+    retailPrice: Number(product.retailPrice),
+    imageUrl: Array.isArray(product.imageUrls) && typeof product.imageUrls[0] === "string" ? product.imageUrls[0] : null,
+  }));
   const cards = CAMERA_QUOTE_CARD_SKUS.flatMap((sku) => {
     const product = bySku.get(sku);
     return product ? [product] : [];
@@ -127,15 +137,7 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
           <h2 className="text-base font-bold">{t("pos.cameraQuote.title")}</h2>
           <p className="mt-0.5 text-xs text-slate-500">{t("pos.cameraQuote.description")}</p>
         </div>
-        <div className="min-w-0 sm:w-[360px]">
-          <Select
-            size="sm"
-            value=""
-            placeholder={t("pos.cameraQuote.addCamera")}
-            options={cameras.map((product) => ({ value: product.id, label: label(product) }))}
-            onValueChange={addCamera}
-          />
-        </div>
+        <Button type="button" size="sm" onClick={() => setPickerOpen(true)}><Plus className="h-4 w-4" />{t("pos.cameraQuote.addCamera")}</Button>
       </div>
 
       {packages.length === 0 ? (
@@ -264,6 +266,12 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
           })}
         </div>
       )}
+      <CameraPickerModal
+        open={pickerOpen}
+        cameras={pickerCameras}
+        onClose={() => setPickerOpen(false)}
+        onSelect={(camera) => addCamera(camera.id)}
+      />
     </section>
   );
 }
