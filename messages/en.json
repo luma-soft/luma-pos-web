@@ -1835,6 +1835,10 @@
     }
   },
   "reports": {
+    "serviceProfitability": "Service project profitability",
+    "serviceProject": "Project",
+    "serviceCost": "Total cost",
+    "margin": "Margin",
     "title": "Reports",
     "lastNDays": "{n} days",
     "revenue": "Revenue",

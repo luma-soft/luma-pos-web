@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
-import { getReports } from "@/lib/data/reports";
+import { getReports, getServiceProfitabilityReport } from "@/lib/data/reports";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Text } from "@/components/ui/text";
 
@@ -21,7 +21,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
     customer: typeof params.customer === "string" ? params.customer : undefined,
     q: typeof params.q === "string" ? params.q : undefined,
   };
-  const data = await getReports(range, filters);
+  const [data, serviceProfitability] = await Promise.all([getReports(range, filters), getServiceProfitabilityReport()]);
   const filterParams = new URLSearchParams();
   if (filters.customerId) filterParams.set("customerId", filters.customerId);
   if (filters.customer) filterParams.set("customer", filters.customer);
@@ -86,6 +86,18 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           </div>
         </div>
       </div>
+
+      {serviceProfitability.length > 0 && (
+        <div className="bg-surface rounded-card border border-border overflow-hidden">
+          <div className="px-4 py-3 border-b border-border font-semibold text-sm">{t("reports.serviceProfitability")}</div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead><tr className="bg-canvas text-left text-xs uppercase text-slate-500"><th className="px-4 py-2.5">{t("reports.serviceProject")}</th><th className="px-4 py-2.5 text-right">{t("reports.revenue")}</th><th className="px-4 py-2.5 text-right">{t("reports.serviceCost")}</th><th className="px-4 py-2.5 text-right">{t("reports.grossProfit")}</th><th className="px-4 py-2.5 text-right">{t("reports.margin")}</th></tr></thead>
+              <tbody className="divide-y divide-border-soft">{serviceProfitability.map((row) => <tr key={row.id}><td className="px-4 py-2.5 font-medium">{row.name}</td><td className="px-4 py-2.5 text-right tabular-nums">{formatCurrency(row.revenue)}</td><td className="px-4 py-2.5 text-right tabular-nums">{formatCurrency(row.totalCost)}</td><td className={cn("px-4 py-2.5 text-right tabular-nums", row.grossProfit >= 0 ? "text-ok" : "text-er")}>{formatCurrency(row.grossProfit)}</td><td className="px-4 py-2.5 text-right tabular-nums">{row.marginPercent.toFixed(1)}%</td></tr>)}</tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <div className="bg-surface rounded-card border border-border p-5">
         <Text as="h2" weight="semibold" className="mb-4" text={t("dashboard.revenueByDay")} />

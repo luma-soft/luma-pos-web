@@ -1835,6 +1835,10 @@
     }
   },
   "reports": {
+    "serviceProfitability": "Hiệu quả công trình dịch vụ",
+    "serviceProject": "Công trình",
+    "serviceCost": "Tổng chi phí",
+    "margin": "Biên lợi nhuận",
     "title": "Báo cáo",
     "lastNDays": "{n} ngày",
     "revenue": "Doanh thu",

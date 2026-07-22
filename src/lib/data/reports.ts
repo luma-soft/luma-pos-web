@@ -11,6 +11,25 @@ import {
   returns,
 } from "@/db/schema";
 import { calculateDashboardFinancials } from "@/lib/dashboard/financials";
+import { getProjectDetail, getProjectRows } from "@/lib/data/projects";
+
+export async function getServiceProfitabilityReport() {
+  const projects = (await getProjectRows()).filter((project) => project.serviceType);
+  const rows = (await Promise.all(projects.map(async (project) => {
+    const detail = await getProjectDetail(project.id);
+    if (!detail?.profitability) return null;
+    return {
+      id: project.id,
+      name: project.name,
+      serviceType: project.serviceType,
+      revenue: detail.profitability.revenue,
+      totalCost: detail.profitability.totalCost,
+      grossProfit: detail.profitability.grossProfit,
+      marginPercent: detail.profitability.marginPercent,
+    };
+  }))).filter((row): row is NonNullable<typeof row> => Boolean(row));
+  return rows.sort((left, right) => right.grossProfit - left.grossProfit);
+}
 
 function daysAgo(n: number) {
   const d = new Date();
