@@ -218,7 +218,7 @@ export function DataTableShell<T>({
                       {column.label}
                     </th>
                   ))}
-                  <th className="px-2 py-2 text-right">{columnVisibilityMenu}</th>
+                  <th className="sticky right-0 z-20 bg-canvas px-2 py-2 text-right shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.35)]">{columnVisibilityMenu}</th>
                 </tr>
               </thead>
               <tbody>
@@ -228,7 +228,7 @@ export function DataTableShell<T>({
                       const cell = summaryCells.find((item) => item.key === column.key);
                       return <td key={column.key} className={cn("px-3 py-3", cell?.className)}>{cell?.content}</td>;
                     })}
-                    <td className="px-3 py-3" />
+                    <td className="sticky right-0 z-10 bg-surface px-3 py-3" />
                   </tr>
                 )}
                 {rows.map((row) => {
@@ -262,7 +262,7 @@ export function DataTableShell<T>({
                             </td>
                           );
                         })}
-                        <td className="px-3 py-3 text-right">
+                        <td className="sticky right-0 z-10 bg-surface px-3 py-3 text-right shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.25)]">
                           {expandable && (
                             <ChevronDown className={cn("ml-auto h-4 w-4 text-slate-400 transition-transform", expanded && "rotate-180")} />
                           )}
