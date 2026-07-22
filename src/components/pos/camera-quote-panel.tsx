@@ -1,11 +1,10 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { Minus, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
 import { Select } from "@/components/ui/select";
 import { CameraPickerModal, type CameraPickerProduct } from "@/components/pos/camera-picker-modal";
@@ -184,13 +183,20 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
                     <div className="text-[11px] font-bold uppercase tracking-wide text-primary-600">
                       {t("pos.cameraQuote.package", { n: String(index + 1).padStart(2, "0") })}
                     </div>
-                    <Select
-                      size="sm"
-                      className="mt-1 w-full"
-                      value={pkg.cameraId}
-                      options={cameras.map((product) => ({ value: product.id, label: label(product) }))}
-                      onValueChange={(cameraId) => updatePackage(pkg.key, { cameraId })}
-                    />
+                    <div className="mt-1 flex items-center gap-2">
+                      <Select
+                        size="sm"
+                        className="min-w-0 flex-1"
+                        value={pkg.cameraId}
+                        options={cameras.map((product) => ({ value: product.id, label: label(product) }))}
+                        onValueChange={(cameraId) => updatePackage(pkg.key, { cameraId })}
+                      />
+                      <div className="grid h-9 shrink-0 grid-cols-[32px_42px_32px] overflow-hidden rounded-md border border-border bg-surface">
+                        <button type="button" disabled={pkg.quantity <= 1} onClick={() => updatePackage(pkg.key, { quantity: Math.max(1, pkg.quantity - 1) })} className="grid place-items-center text-slate-500 hover:bg-surface-2 hover:text-er disabled:opacity-40"><Minus className="h-3.5 w-3.5" /></button>
+                        <span className="grid place-items-center border-x border-border text-sm font-semibold tabular-nums">{pkg.quantity}</span>
+                        <button type="button" disabled={pkg.quantity >= 99} onClick={() => updatePackage(pkg.key, { quantity: Math.min(99, pkg.quantity + 1) })} className="grid place-items-center text-slate-500 hover:bg-surface-2 hover:text-primary-600 disabled:opacity-40"><Plus className="h-3.5 w-3.5" /></button>
+                      </div>
+                    </div>
                     <div className="mt-1 text-[11px] text-slate-400">{camera?.sku}</div>
                   </div>
                   <Button
@@ -272,19 +278,7 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
                   </Button>
                 </div>
 
-                <div className="mt-3 flex items-center justify-between gap-3 border-t border-border-soft pt-3">
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <span>{t("pos.cameraQuote.cameraQuantity")}</span>
-                    <Input
-                      size="sm"
-                      type="number"
-                      min={1}
-                      max={99}
-                      value={pkg.quantity}
-                      onChange={(event) => updatePackage(pkg.key, { quantity: Math.min(99, Math.max(1, Number(event.target.value) || 1)) })}
-                      className="w-16 text-center tabular-nums"
-                    />
-                  </div>
+                <div className="mt-3 flex items-center justify-end gap-3 border-t border-border-soft pt-3">
                   <div className="text-right">
                     <div className="text-[11px] text-slate-400">{t("pos.cameraQuote.packageTotal")}</div>
                     <div className="font-black tabular-nums text-primary-700">{formatCurrency(packageTotal(pkg))}</div>
