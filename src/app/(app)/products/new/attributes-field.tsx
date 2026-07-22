@@ -4,7 +4,8 @@ import { useFieldArray, useFormContext, Controller } from "react-hook-form";
 import { useTranslations } from "next-intl";
 import { Plus, Trash2 } from "lucide-react";
 import { Button, Select, TagInput } from "@/components/ui";
-import { PRESET_ATTRIBUTES, type CreateProductInput } from "./schema";
+import type { CreateProductInput } from "./schema";
+import { buildAttributeNameOptions } from "./attribute-name-options";
 
 export function AttributesField() {
   const t = useTranslations();
@@ -13,10 +14,6 @@ export function AttributesField() {
     control,
     name: "attributes",
   });
-
-  const options = [
-    ...PRESET_ATTRIBUTES.map((name) => ({ value: name, label: name })),
-  ];
 
   return (
     <div className="space-y-3">
@@ -40,7 +37,7 @@ export function AttributesField() {
                 onChange={f.onChange}
                 onBlur={f.onBlur}
                 placeholderTx="products.attributes.namePlaceholder"
-                options={options}
+                options={buildAttributeNameOptions(f.value)}
               />
             )}
           />
