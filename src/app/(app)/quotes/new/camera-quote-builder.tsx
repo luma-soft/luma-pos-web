@@ -19,6 +19,7 @@ import type {
   CameraQuoteProductOption,
 } from "@/lib/data/camera-quotes";
 import { Routes } from "@/lib/routes";
+import { Select } from "@/components/ui/select";
 
 type PackageRow = {
   key: string;
@@ -187,21 +188,23 @@ export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOption
       <section className="min-w-0 space-y-4">
         <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm sm:p-5">
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-1.5 text-sm font-medium">
+            <div className="space-y-1.5 text-sm font-medium">
               <span>Khách hàng</span>
-              <select
-                value={customerId}
-                onChange={(event) => setCustomerId(event.target.value)}
-                className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm"
-              >
-                <option value="">Khách lẻ / chưa chọn</option>
-                {options.customers.map((customer) => (
-                  <option key={customer.id} value={customer.id}>
-                    {customer.name}{customer.phone ? ` - ${customer.phone}` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
+              <div className="[&>div]:block [&>div]:w-full">
+                <Select
+                  className="w-full"
+                  options={[
+                    { value: "", label: "Khách lẻ / chưa chọn" },
+                    ...options.customers.map((customer) => ({
+                      value: customer.id,
+                      label: `${customer.name}${customer.phone ? ` - ${customer.phone}` : ""}`,
+                    })),
+                  ]}
+                  value={customerId}
+                  onValueChange={setCustomerId}
+                />
+              </div>
+            </div>
             <label className="space-y-1.5 text-sm font-medium">
               <span>Tên công trình / nội dung</span>
               <input
@@ -438,20 +441,21 @@ function QuoteSelect({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="grid grid-cols-[70px_1fr] items-center gap-2 text-xs">
+    <div className="grid grid-cols-[70px_minmax(0,1fr)] items-center gap-2 text-xs">
       <span className="font-semibold text-slate-500">{label}</span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-9 min-w-0 rounded-lg border border-border bg-surface px-2 text-xs"
-      >
-        {options.map((option) => (
-          <option key={option.id} value={option.id}>
-            {option.name} · {money.format(option.retailPrice)}
-          </option>
-        ))}
-      </select>
-    </label>
+      <div className="min-w-0 [&>div]:block [&>div]:w-full">
+        <Select
+          size="sm"
+          className="h-9 w-full text-xs"
+          options={options.map((option) => ({
+            value: option.id,
+            label: `${option.name} · ${money.format(option.retailPrice)}`,
+          }))}
+          value={value}
+          onValueChange={onChange}
+        />
+      </div>
+    </div>
   );
 }
 
