@@ -48,6 +48,7 @@ export function DataTableShell<T>({
   empty,
   rowClassName,
   toolbar,
+  maxHeight,
 }: {
   tableId: string;
   rows: T[];
@@ -62,6 +63,7 @@ export function DataTableShell<T>({
   empty?: ReactNode;
   rowClassName?: (row: T, expanded: boolean) => string | undefined;
   toolbar?: ReactNode;
+  maxHeight?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -148,7 +150,7 @@ export function DataTableShell<T>({
   );
 
   return (
-    <div className="min-w-0">
+    <div className="w-full min-w-0">
       {toolbar && <div className="mb-2 flex flex-wrap items-center justify-end gap-2">{toolbar}</div>}
 
       {rows.length === 0 && empty ? (
@@ -184,7 +186,10 @@ export function DataTableShell<T>({
             })}
           </div>
 
-          <div className="hidden overflow-x-auto rounded-card border border-border-soft bg-surface lg:block">
+          <div
+            className={cn("hidden rounded-card border border-border-soft bg-surface lg:block", maxHeight ? "overflow-auto" : "overflow-x-auto")}
+            style={maxHeight ? { maxHeight } : undefined}
+          >
             <table className="w-full table-fixed text-sm" style={{ minWidth }}>
               <colgroup>
                 {visibleColumns.map((column) => (
@@ -199,6 +204,7 @@ export function DataTableShell<T>({
                       key={column.key}
                       className={cn(
                         "px-3 py-3",
+                        maxHeight && "sticky top-0 z-10 bg-canvas",
                         column.align === "right" && "text-right",
                         column.align === "center" && "text-center",
                         column.headerClassName,

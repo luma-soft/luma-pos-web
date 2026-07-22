@@ -104,7 +104,7 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
   ];
 
   return (
-    <div>
+    <div className="w-full min-w-0">
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm text-slate-500">{t("categories.count", { n: total })}</span>
         <button onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700">
@@ -120,6 +120,7 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
         columns={columns}
         getRowId={(row) => row.id}
         minWidth="720px"
+        maxHeight="calc(100dvh - 250px)"
         empty={<p className="rounded-card border border-border-soft bg-surface p-8 text-center text-sm text-slate-400">{t("categories.empty")}</p>}
         renderMobileRow={({ row }) => (
           <div className="flex items-center justify-between gap-3 p-3">
