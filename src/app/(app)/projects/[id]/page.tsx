@@ -90,7 +90,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                       {document.content && <Text as="p" size="sm" variant="muted" className="mt-1 whitespace-pre-wrap" text={document.content} />}
                       {document.photoUrls.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{document.photoUrls.map((url) => <a key={url} href={url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary-600 hover:underline">{t("services.documents.photoLink")}</a>)}</div>}
                     </div>
-                    <ServiceHandoverEditor projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} initial={document} />
+                    <div className="flex items-center gap-2">
+                      <Link href={`/projects/${project.id}/documents/${document.id}/print`} className="text-xs font-semibold text-primary-600 hover:underline">{t("services.documents.print")}</Link>
+                      <ServiceHandoverEditor projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} initial={document} />
+                    </div>
                   </div>
                 ))}
               </div>
