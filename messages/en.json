@@ -375,8 +375,7 @@
     "cameraQuote": {
       "title": "Camera installation quote",
       "description": "Choose each camera package, memory card, installation and materials by location.",
-      "addCamera": "Add camera to quote",
-      "manageMaterials": "Material settings",
+      "addCamera": "Add camera",
       "pickerTitle": "Choose a camera",
       "pickerDescription": "Choose a camera to add a new package to the quote.",
       "pickerSearch": "Search camera name or SKU",

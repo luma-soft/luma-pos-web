@@ -375,8 +375,7 @@
     "cameraQuote": {
       "title": "Báo giá lắp đặt camera",
       "description": "Chọn từng gói camera, thẻ nhớ, công lắp và vật tư theo vị trí.",
-      "addCamera": "Thêm camera vào báo giá",
-      "manageMaterials": "Cài đặt vật tư",
+      "addCamera": "Thêm camera",
       "pickerTitle": "Chọn camera",
       "pickerDescription": "Chọn camera để thêm một gói mới vào báo giá.",
       "pickerSearch": "Tìm tên hoặc mã camera",
