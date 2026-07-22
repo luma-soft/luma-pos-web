@@ -897,6 +897,24 @@ function ImageUploadGrid() {
   const urls: string[] = watch("imageUrls") ?? [];
   const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState("");
+  const [urlInput, setUrlInput] = useState("");
+
+  function addImageUrl() {
+    const value = urlInput.trim();
+    setErr("");
+    try {
+      const parsed = new URL(value);
+      if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error();
+      if (urls.includes(value)) {
+        setUrlInput("");
+        return;
+      }
+      setValue("imageUrls", [...urls, value], { shouldDirty: true });
+      setUrlInput("");
+    } catch {
+      setErr(t("products.fields.imageUrlInvalid"));
+    }
+  }
 
   async function upload(files: FileList | null) {
     if (!files?.length) return;
@@ -933,6 +951,31 @@ function ImageUploadGrid() {
 
   return (
     <div>
+      {urls.length < MAX_IMAGES && (
+        <div className="mb-3 flex gap-2">
+          <Input
+            type="url"
+            value={urlInput}
+            onChange={(event) => setUrlInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                addImageUrl();
+              }
+            }}
+            placeholder={t("products.fields.imageUrlPlaceholder")}
+            aria-label={t("products.fields.imageUrl")}
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={addImageUrl}
+            disabled={!urlInput.trim()}
+          >
+            {t("products.fields.addImageUrl")}
+          </Button>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-2">
         {urls.map((u, i) => (
           <div

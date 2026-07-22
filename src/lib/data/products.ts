@@ -225,7 +225,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
       .leftJoin(stockLevels, eq(stockLevels.productId, products.id))
       .where(where)
       .groupBy(products.id, categories.name, brands.name)
-      .orderBy(desc(products.createdAt))
+      .orderBy(desc(products.createdAt), desc(products.id))
       .limit(size)
       .offset((page - 1) * size),
     db.select({ total: count() }).from(products).where(where),

@@ -17,6 +17,7 @@ export const Routes = {
   Finance: "/finance",
   Orders: "/orders",
   Quotes: "/quotes",
+  QuoteNew: "/quotes/new",
   Cashbook: "/cashbook",
   Delivery: "/delivery",
   Projects: "/projects",

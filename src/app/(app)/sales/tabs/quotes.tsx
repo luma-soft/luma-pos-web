@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { and, count, desc, eq, or } from "drizzle-orm";
-import { FileSpreadsheet, ShoppingCart, Search } from "lucide-react";
+import { Camera, FileSpreadsheet, Search } from "lucide-react";
 import { db } from "@/db";
 import { customers, orders } from "@/db/schema";
 import { Routes } from "@/lib/routes";
@@ -27,9 +27,9 @@ export async function QuotesTab({ searchParams }: { searchParams: SP }) {
           <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("orders.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         </div>
         <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full bg-primary-600 hover:brightness-110 text-white transition active:scale-[0.98]">{t("common.search")}</button>
-        <Link href={Routes.POS} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98] ml-auto shrink-0">
-          <ShoppingCart className="w-4 h-4" />
-          {t("quotes.createViaPos")}
+        <Link href={Routes.QuoteNew} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98] ml-auto shrink-0">
+          <Camera className="w-4 h-4" />
+          {t("quotes.createCamera")}
         </Link>
       </form>
 

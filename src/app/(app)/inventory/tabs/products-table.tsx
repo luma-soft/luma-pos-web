@@ -66,10 +66,13 @@ export function ProductsTable({
       label: t("products.list.colProduct"),
       required: true,
       render: (product) => (
-        <span>
-          <span className="font-medium text-slate-900 dark:text-slate-100">{product.name}</span>
-          <span className="ml-2 text-xs text-slate-400">{product.sku}{product.barcode ? ` · ${product.barcode}` : ""}</span>
-        </span>
+        <div className="flex items-center gap-3">
+          <ProductThumbnail product={product} />
+          <div className="min-w-0">
+            <div className="truncate font-medium text-slate-900 dark:text-slate-100">{product.name}</div>
+            <div className="truncate text-xs text-slate-400">{product.sku}{product.barcode ? ` · ${product.barcode}` : ""}</div>
+          </div>
+        </div>
       ),
     },
     { key: "category", label: t("products.list.colCategory"), defaultVisible: true, render: (product) => <span className="text-slate-500">{product.categoryName ?? "—"}</span> },
@@ -104,9 +107,12 @@ export function ProductsTable({
       renderMobileRow={({ row: product, toggle }) => (
         <button type="button" onClick={toggle} className="w-full p-3 text-left">
           <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <div className="truncate font-medium">{product.name}</div>
-              <div className="text-xs text-slate-400">{product.sku}{product.categoryName ? ` · ${product.categoryName}` : ""}</div>
+            <div className="flex min-w-0 items-center gap-3">
+              <ProductThumbnail product={product} />
+              <div className="min-w-0">
+                <div className="truncate font-medium">{product.name}</div>
+                <div className="truncate text-xs text-slate-400">{product.sku}{product.categoryName ? ` · ${product.categoryName}` : ""}</div>
+              </div>
             </div>
             <StatusBadge product={product} />
           </div>
@@ -118,6 +124,30 @@ export function ProductsTable({
         </button>
       )}
     />
+  );
+}
+
+function ProductThumbnail({ product }: { product: ProductRow }) {
+  const image = Array.isArray(product.imageUrls) && typeof product.imageUrls[0] === "string"
+    ? product.imageUrls[0]
+    : null;
+  return (
+    <div className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-border-soft bg-white dark:bg-slate-900">
+      {image ? (
+        <Image
+          src={image}
+          alt={product.name}
+          fill
+          sizes="44px"
+          className="object-contain p-1"
+          unoptimized
+        />
+      ) : (
+        <div className="grid h-full place-items-center text-slate-300 dark:text-slate-600">
+          <ImageIcon className="h-5 w-5" />
+        </div>
+      )}
+    </div>
   );
 }
 
