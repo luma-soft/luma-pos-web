@@ -41,9 +41,9 @@ function isCamera(product: PosProduct) {
   const sku = (product.sku ?? "").trim().toUpperCase();
   const category = (product.categoryName ?? "").trim().toLocaleLowerCase("vi");
   const name = product.name.toLocaleLowerCase("vi");
-  return category.includes("camera") ||
+  return category === "camera giám sát" ||
     cameraPrefixes.some((prefix) => sku.startsWith(prefix)) ||
-    name.includes("camera") || name.includes("ezviz") || name.includes("imou");
+    name.startsWith("ezviz ") || name.startsWith("imou ");
 }
 
 function label(product: PosProduct) {
