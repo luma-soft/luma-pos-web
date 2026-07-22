@@ -2430,6 +2430,27 @@
       "delete": "Xóa chi phí",
       "deleteConfirm": "Xóa khoản chi phí này?"
     },
+    "documents": {
+      "title": "Nghiệm thu & hồ sơ",
+      "summary": "{count} hồ sơ công trình",
+      "create": "Thêm hồ sơ",
+      "edit": "Sửa hồ sơ",
+      "survey": "Khảo sát",
+      "acceptance": "Nghiệm thu",
+      "handover": "Bàn giao",
+      "titleField": "Tên hồ sơ",
+      "content": "Nội dung / ghi chú nghiệm thu",
+      "photoUrls": "URL ảnh (mỗi dòng một URL)",
+      "photoLink": "Mở ảnh",
+      "signedBy": "Người ký",
+      "signedAt": "Ngày ký",
+      "draft": "Bản nháp",
+      "signed": "Đã ký",
+      "status": { "draft": "Bản nháp", "signed": "Đã ký" },
+      "delete": "Xóa hồ sơ",
+      "deleteConfirm": "Xóa hồ sơ này?",
+      "empty": "Chưa có hồ sơ nghiệm thu nào."
+    },
     "checklist": {
       "site-survey": "Khảo sát vị trí và góc quan sát",
       "cabling": "Kéo dây mạng, nguồn và kiểm tra tuyến",

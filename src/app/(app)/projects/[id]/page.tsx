@@ -19,6 +19,7 @@ import {
   ServiceMaterialStockSync,
   ServiceMaterialReservation,
   ServiceCostEditor,
+  ServiceHandoverEditor,
   WarrantyClaimQuickCreate,
   WarrantyClaimStatusAction,
 } from "../../services/service-widgets";
@@ -29,7 +30,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const t = await getTranslations();
   const detail = await getProjectDetail(id);
   if (!detail) notFound();
-  const { project, orders, jobs, assets, claims, materials, statusLogs, costEntries, profitability, plannedMaterialCost } = detail;
+  const { project, orders, jobs, assets, claims, materials, statusLogs, costEntries, profitability, plannedMaterialCost, handoverDocuments } = detail;
   const serviceOptions = project.serviceType ? await getServiceFormOptions() : null;
 
   return (
@@ -71,6 +72,30 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
       {project.serviceType && serviceOptions && (
         <div className="mb-5 space-y-4">
+          <Section
+            title={t("services.documents.title")}
+            description={t("services.documents.summary", { count: handoverDocuments.length })}
+            action={<ServiceHandoverEditor projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} />}
+          >
+            {handoverDocuments.length === 0 ? (
+              <Text variant="muted" size="sm" text={t("services.documents.empty")} />
+            ) : (
+              <div className="space-y-3">
+                {handoverDocuments.map((document) => (
+                  <div key={document.id} className="flex flex-wrap items-start justify-between gap-3 border-b border-border-soft pb-3 last:border-b-0">
+                    <div className="min-w-0 flex-1">
+                      <Text as="div" weight="semibold" size="sm" text={`${t(`services.documents.${document.type}` as never)} · ${document.title}`} />
+                      <Text as="div" variant="muted" size="xs" text={`${t(`services.documents.status.${document.status}` as never)}${document.signedBy ? ` · ${document.signedBy}` : ""}${document.signedAt ? ` · ${document.signedAt}` : ""}`} />
+                      {document.content && <Text as="p" size="sm" variant="muted" className="mt-1 whitespace-pre-wrap" text={document.content} />}
+                      {document.photoUrls.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{document.photoUrls.map((url) => <a key={url} href={url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary-600 hover:underline">{t("services.documents.photoLink")}</a>)}</div>}
+                    </div>
+                    <ServiceHandoverEditor projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} initial={document} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+
           <Section
             title={t("services.costs.title")}
             description={t("services.costs.summary", { count: costEntries.length })}

@@ -2430,6 +2430,27 @@
       "delete": "Delete cost",
       "deleteConfirm": "Delete this cost entry?"
     },
+    "documents": {
+      "title": "Acceptance & documents",
+      "summary": "{count} project documents",
+      "create": "Add document",
+      "edit": "Edit document",
+      "survey": "Survey",
+      "acceptance": "Acceptance",
+      "handover": "Handover",
+      "titleField": "Document title",
+      "content": "Acceptance notes / content",
+      "photoUrls": "Photo URLs (one per line)",
+      "photoLink": "Open photo",
+      "signedBy": "Signed by",
+      "signedAt": "Signed on",
+      "draft": "Draft",
+      "signed": "Signed",
+      "status": { "draft": "Draft", "signed": "Signed" },
+      "delete": "Delete document",
+      "deleteConfirm": "Delete this document?",
+      "empty": "No acceptance documents yet."
+    },
     "checklist": {
       "site-survey": "Survey positions and viewing angles",
       "cabling": "Run network and power cabling",

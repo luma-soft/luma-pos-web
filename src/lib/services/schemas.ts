@@ -116,6 +116,21 @@ export const serviceMaterialReservationSchema = z.object({
 
 export type ServiceMaterialReservationInput = z.input<typeof serviceMaterialReservationSchema>;
 
+export const serviceHandoverDocumentSchema = z.object({
+  id: z.uuid().nullable().optional(),
+  projectId: z.uuid(),
+  jobId: z.uuid().nullable().optional(),
+  type: z.enum(["survey", "acceptance", "handover"]),
+  title: z.string().trim().min(1),
+  content: z.string().trim().optional(),
+  photoUrls: z.array(z.string().trim().url()).max(30).default([]),
+  signedBy: z.string().trim().optional(),
+  signedAt: z.iso.date().nullable().optional(),
+  status: z.enum(["draft", "signed"]).default("draft"),
+});
+
+export type ServiceHandoverDocumentInput = z.input<typeof serviceHandoverDocumentSchema>;
+
 export const installedAssetCreateSchema = z.object({
   projectId: z.uuid(),
   jobId: z.uuid().nullable().optional(),

@@ -8,6 +8,7 @@ import {
   orders,
   projects,
   serviceCostEntries,
+  serviceHandoverDocuments,
   serviceJobMaterials,
   serviceJobs,
   serviceStatusLogs,
@@ -45,6 +46,8 @@ import {
   type ServiceMaterialStockSyncInput,
   serviceMaterialReservationSchema,
   type ServiceMaterialReservationInput,
+  serviceHandoverDocumentSchema,
+  type ServiceHandoverDocumentInput,
   serviceJobUpdateSchema,
   type ServiceJobUpdateInput,
   serviceJobTransitionSchema,
@@ -429,6 +432,63 @@ export async function releaseServiceJobMaterialReservations(materialId: string):
   } catch (error) {
     if (error instanceof Error && error.message === "SERVICE_MATERIAL_NOT_FOUND") return { ok: false, error: "errors.notFound" };
     console.error("releaseServiceJobMaterialReservations failed:", error);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function saveServiceHandoverDocument(
+  input: ServiceHandoverDocumentInput,
+): Promise<ActionResult<{ id: string }>> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const parsed = serviceHandoverDocumentSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const value = parsed.data;
+  try {
+    if (!await isServiceProject(value.projectId)) return { ok: false, error: "services.errors.projectRequired" };
+    if (value.jobId && !await serviceLinksAreValid(value.projectId, { jobId: value.jobId })) {
+      return { ok: false, error: "services.errors.relationMismatch" };
+    }
+    const values = {
+      projectId: value.projectId,
+      jobId: value.jobId ?? null,
+      type: value.type,
+      title: value.title,
+      content: value.content || null,
+      photoUrls: value.photoUrls,
+      signedBy: value.signedBy || null,
+      signedAt: value.signedAt ?? null,
+      status: value.status,
+      updatedAt: new Date(),
+    };
+    if (value.id) {
+      const [document] = await db.update(serviceHandoverDocuments).set(values)
+        .where(eq(serviceHandoverDocuments.id, value.id)).returning({ id: serviceHandoverDocuments.id });
+      if (!document) return { ok: false, error: "errors.notFound" };
+      revalidateServiceProject(value.projectId);
+      return { ok: true, data: document };
+    }
+    const [document] = await db.insert(serviceHandoverDocuments).values({ ...values, createdBy: gate.userId })
+      .returning({ id: serviceHandoverDocuments.id });
+    revalidateServiceProject(value.projectId);
+    return { ok: true, data: document };
+  } catch (error) {
+    console.error("saveServiceHandoverDocument failed:", error);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function deleteServiceHandoverDocument(id: string): Promise<ActionResult> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  try {
+    const [document] = await db.delete(serviceHandoverDocuments).where(eq(serviceHandoverDocuments.id, id))
+      .returning({ projectId: serviceHandoverDocuments.projectId });
+    if (!document) return { ok: false, error: "errors.notFound" };
+    revalidateServiceProject(document.projectId);
+    return { ok: true, data: undefined };
+  } catch (error) {
+    console.error("deleteServiceHandoverDocument failed:", error);
     return { ok: false, error: "errors.serverError" };
   }
 }

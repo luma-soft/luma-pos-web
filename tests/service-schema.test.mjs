@@ -4,7 +4,7 @@ import { drizzle } from "drizzle-orm/pglite";
 
 const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const schema = await import(`${projectRoot}/src/db/schema.ts`);
-const { projects, serviceJobs, serviceCostEntries } = schema;
+const { projects, serviceJobs, serviceCostEntries, serviceHandoverDocuments } = schema;
 const { createDefaultChecklist } = await import(
   `${projectRoot}/src/lib/services/domain.ts`
 );
@@ -54,4 +54,19 @@ if (cost.type !== "labor" || Number(cost.amount) !== 1200000) {
   throw new Error("service cost entry was not persisted");
 }
 
-console.log("service schema: project, camera job, and cost entry persisted");
+const [document] = await db.insert(serviceHandoverDocuments).values({
+  projectId: project.id,
+  jobId: job.id,
+  type: "acceptance",
+  title: "Nghiệm thu camera",
+  content: "Đã kiểm tra hình ảnh và ghi hình.",
+  photoUrls: ["https://example.com/acceptance.jpg"],
+  status: "signed",
+  signedBy: "Chị Hà",
+  signedAt: "2026-07-22",
+}).returning();
+if (document.status !== "signed" || document.photoUrls.length !== 1) {
+  throw new Error("service handover document was not persisted");
+}
+
+console.log("service schema: project, camera job, cost, and handover persisted");

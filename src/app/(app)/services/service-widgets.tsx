@@ -18,10 +18,12 @@ import {
   createServiceJob,
   createWarrantyClaim,
   deleteServiceCostEntry,
+  deleteServiceHandoverDocument,
   releaseServiceJobMaterialReservations,
   reserveServiceJobMaterial,
   saveServiceJobMaterial,
   saveServiceCostEntry,
+  saveServiceHandoverDocument,
   syncServiceJobMaterialStock,
   transitionServiceJob,
   transitionWarrantyClaim,
@@ -54,6 +56,7 @@ type WarrantyAssetOption = { id: string; projectId: string; jobId: string | null
 type WarehouseOption = { id: string; name: string; isDefault: boolean };
 type ServiceCostJobOption = { id: string; code: string; title: string };
 type ServiceCostStaffOption = { id: string; name: string };
+type HandoverJobOption = { id: string; code: string; title: string };
 
 export function ServiceDashboardFilters({
   tab,
@@ -1067,6 +1070,99 @@ export function ServiceCostEditor({
           <Select value={staffId} onChange={(event) => setStaffId(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...staff.map((person) => ({ value: person.id, label: person.name }))]} />
           <Input type="date" value={incurredOn} onChange={(event) => setIncurredOn(event.target.value)} aria-label={t("services.costs.incurredOn")} />
           <Textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder={t("customers.fields.note")} className="sm:col-span-2" />
+        </div>
+      </RowPreviewModal>
+    </>
+  );
+}
+
+export function ServiceHandoverEditor({
+  projectId,
+  jobs,
+  initial,
+}: {
+  projectId: string;
+  jobs: HandoverJobOption[];
+  initial?: {
+    id: string;
+    jobId: string | null;
+    type: string;
+    title: string;
+    content: string | null;
+    photoUrls: string[];
+    signedBy: string | null;
+    signedAt: string | null;
+    status: string;
+  };
+}) {
+  const t = useTranslations();
+  const router = useRouter();
+  const dialog = useConfirmDialog();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [type, setType] = useState(initial?.type ?? "acceptance");
+  const [jobId, setJobId] = useState(initial?.jobId ?? "");
+  const [title, setTitle] = useState(initial?.title ?? "");
+  const [content, setContent] = useState(initial?.content ?? "");
+  const [photoUrls, setPhotoUrls] = useState(initial?.photoUrls.join("\n") ?? "");
+  const [signedBy, setSignedBy] = useState(initial?.signedBy ?? "");
+  const [signedAt, setSignedAt] = useState(initial?.signedAt ?? "");
+  const [status, setStatus] = useState(initial?.status ?? "draft");
+
+  async function submit() {
+    if (!title.trim() || busy) return;
+    setBusy(true);
+    const result = await saveServiceHandoverDocument({
+      id: initial?.id ?? null,
+      projectId,
+      jobId: jobId || null,
+      type: type as "survey" | "acceptance" | "handover",
+      title,
+      content,
+      photoUrls: photoUrls.split(/\n|,/).map((url) => url.trim()).filter(Boolean),
+      signedBy,
+      signedAt: signedAt || null,
+      status: status as "draft" | "signed",
+    });
+    setBusy(false);
+    if (result.ok) { setOpen(false); router.refresh(); }
+  }
+
+  async function remove() {
+    if (!initial || busy) return;
+    const confirmed = await dialog.confirm({ title: t("services.documents.delete"), description: t("services.documents.deleteConfirm"), confirmLabel: t("common.delete"), variant: "destructive" });
+    if (!confirmed) return;
+    setBusy(true);
+    const result = await deleteServiceHandoverDocument(initial.id);
+    setBusy(false);
+    if (result.ok) { setOpen(false); router.refresh(); }
+  }
+
+  return (
+    <>
+      <Button type="button" variant={initial ? "ghost" : "default"} size="sm" onClick={() => setOpen(true)} tx={initial ? "common.edit" : "services.documents.create"} />
+      <RowPreviewModal
+        open={open}
+        onClose={() => !busy && setOpen(false)}
+        title={t(initial ? "services.documents.edit" : "services.documents.create")}
+        closeLabel={t("common.close")}
+        size="lg"
+        footer={(
+          <div className="flex items-center justify-between gap-2">
+            {initial ? <Button type="button" variant="ghost" onClick={remove} disabled={busy} tx="services.documents.delete" /> : <span />}
+            <div className="flex gap-2"><Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy} tx="common.cancel" /><Button type="button" onClick={submit} disabled={busy || !title.trim()} loading={busy} tx="common.save" /></div>
+          </div>
+        )}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Select value={type} onChange={(event) => setType(event.target.value)} options={["survey", "acceptance", "handover"].map((value) => ({ value, label: t(`services.documents.${value}` as never) }))} />
+          <Select value={jobId} onChange={(event) => setJobId(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...jobs.map((job) => ({ value: job.id, label: `${job.code} · ${job.title}` }))]} />
+          <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={`${t("services.documents.titleField")} *`} className="sm:col-span-2" />
+          <Textarea value={content} onChange={(event) => setContent(event.target.value)} placeholder={t("services.documents.content")} className="min-h-28 sm:col-span-2" />
+          <Textarea value={photoUrls} onChange={(event) => setPhotoUrls(event.target.value)} placeholder={t("services.documents.photoUrls")} className="min-h-20 sm:col-span-2" />
+          <Input value={signedBy} onChange={(event) => setSignedBy(event.target.value)} placeholder={t("services.documents.signedBy")} />
+          <Input type="date" value={signedAt} onChange={(event) => setSignedAt(event.target.value)} aria-label={t("services.documents.signedAt")} />
+          <Select value={status} onChange={(event) => setStatus(event.target.value)} options={["draft", "signed"].map((value) => ({ value, label: t(`services.documents.status.${value}` as never) }))} />
         </div>
       </RowPreviewModal>
     </>

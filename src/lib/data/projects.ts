@@ -9,6 +9,7 @@ import {
   profiles,
   projects,
   serviceCostEntries,
+  serviceHandoverDocuments,
   serviceJobMaterials,
   serviceJobs,
   serviceMaterialAllocations,
@@ -66,7 +67,7 @@ export async function getProjectDetail(id: string) {
   }).from(projects).leftJoin(customers, eq(projects.customerId, customers.id)).where(eq(projects.id, id)).limit(1);
   if (!project) return null;
 
-  const [relatedOrders, jobs, assets, claims, materials, statusLogs, costEntries, costSummary, plannedMaterialSummary] = await Promise.all([
+  const [relatedOrders, jobs, assets, claims, materials, statusLogs, costEntries, costSummary, plannedMaterialSummary, handoverDocuments] = await Promise.all([
     db.select({
       id: orders.id,
       code: orders.code,
@@ -209,6 +210,20 @@ export async function getProjectDetail(id: string) {
       .innerJoin(serviceJobs, eq(serviceJobMaterials.jobId, serviceJobs.id))
       .innerJoin(products, eq(serviceJobMaterials.productId, products.id))
       .where(eq(serviceJobs.projectId, id)),
+    db.select({
+      id: serviceHandoverDocuments.id,
+      jobId: serviceHandoverDocuments.jobId,
+      type: serviceHandoverDocuments.type,
+      title: serviceHandoverDocuments.title,
+      content: serviceHandoverDocuments.content,
+      photoUrls: serviceHandoverDocuments.photoUrls,
+      signedBy: serviceHandoverDocuments.signedBy,
+      signedAt: serviceHandoverDocuments.signedAt,
+      status: serviceHandoverDocuments.status,
+      createdAt: serviceHandoverDocuments.createdAt,
+    }).from(serviceHandoverDocuments)
+      .where(eq(serviceHandoverDocuments.projectId, id))
+      .orderBy(desc(serviceHandoverDocuments.createdAt)),
   ]);
 
   const [actualMaterialSummary] = await db.select({
@@ -233,6 +248,7 @@ export async function getProjectDetail(id: string) {
     costEntries,
     profitability,
     plannedMaterialCost: Number(plannedMaterialSummary[0]?.plannedCost ?? 0),
+    handoverDocuments,
   };
 }
 

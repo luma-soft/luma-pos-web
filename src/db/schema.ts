@@ -915,6 +915,26 @@ export const serviceMaterialAllocations = pgTable("service_material_allocations"
   index("service_material_allocations_warehouse_idx").on(t.warehouseId, t.status),
 ]);
 
+export const serviceHandoverDocuments = pgTable("service_handover_documents", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  jobId: uuid("job_id").references(() => serviceJobs.id, { onDelete: "set null" }),
+  type: text("type").notNull(), // survey | acceptance | handover
+  title: text("title").notNull(),
+  content: text("content"),
+  photoUrls: jsonb("photo_urls").$type<string[]>().notNull().default([]),
+  signedBy: text("signed_by"),
+  signedAt: date("signed_at"),
+  status: text("status").notNull().default("draft"), // draft | signed
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("service_handover_documents_type_check", sql`${t.type} in ('survey', 'acceptance', 'handover')`),
+  check("service_handover_documents_status_check", sql`${t.status} in ('draft', 'signed')`),
+  index("service_handover_documents_project_idx").on(t.projectId, t.createdAt),
+]);
+
 export const installedAssets = pgTable("installed_assets", {
   id: uuid("id").primaryKey().defaultRandom(),
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
