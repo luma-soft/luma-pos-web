@@ -15,6 +15,7 @@ import {
   ServiceJobEdit,
   ServiceJobQuickCreate,
   ServiceJobStatusAction,
+  ServiceMaterialEditor,
   WarrantyClaimQuickCreate,
 } from "../../services/service-widgets";
 import { ProjectEdit } from "../project-widgets";
@@ -141,18 +142,34 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             )}
           </Section>
 
-          {materials.length > 0 && (
-            <Section title={t("inventory.title")} description={t("services.tabs.jobs")}>
+          <Section
+            title={t("services.materials.title")}
+            description={t("services.materials.summary", { count: materials.length })}
+            action={<ServiceMaterialEditor jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} products={serviceOptions.productOptions} />}
+          >
+            {materials.length === 0 ? (
+              <Text variant="muted" size="sm" text={t("services.materials.empty")} />
+            ) : (
               <div className="space-y-2">
                 {materials.map((material) => (
-                  <div key={material.id} className="flex items-center justify-between gap-3 border-b border-border-soft pb-2 last:border-b-0">
-                    <Text size="sm" weight="medium" text={`${material.sku} · ${material.productName}`} />
-                    <Text size="sm" text={`${Number(material.usedQuantity)}/${Number(material.plannedQuantity)} ${material.unitName}`} />
+                  <div key={material.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-border-soft pb-2 last:border-b-0">
+                    <div>
+                      <Text size="sm" weight="medium" text={`${material.sku} · ${material.productName}`} />
+                      <Text size="xs" variant="muted" text={`${material.jobCode} · ${material.jobTitle}`} />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Text size="sm" text={`${t("services.materials.used")}: ${Number(material.usedQuantity)} / ${Number(material.plannedQuantity)} ${material.unitName}`} />
+                      <ServiceMaterialEditor
+                        jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))}
+                        products={serviceOptions.productOptions}
+                        initial={material}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
-            </Section>
-          )}
+            )}
+          </Section>
         </div>
       )}
 

@@ -2352,6 +2352,16 @@
       "create": "Record installed asset",
       "empty": "No installed assets recorded."
     },
+    "materials": {
+      "title": "Job materials",
+      "create": "Add material",
+      "edit": "Update material",
+      "planned": "Planned quantity",
+      "used": "Used quantity",
+      "unit": "Unit",
+      "summary": "{count} material lines by work order",
+      "empty": "No planned materials for this project yet."
+    },
     "checklist": {
       "site-survey": "Survey positions and viewing angles",
       "cabling": "Run network and power cabling",

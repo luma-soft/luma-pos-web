@@ -135,6 +135,8 @@ export async function getProjectDetail(id: string) {
     db.select({
       id: serviceJobMaterials.id,
       jobId: serviceJobMaterials.jobId,
+      jobCode: serviceJobs.code,
+      jobTitle: serviceJobs.title,
       productId: serviceJobMaterials.productId,
       productName: products.name,
       sku: products.sku,

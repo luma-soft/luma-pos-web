@@ -8,6 +8,7 @@ import { Plus } from "lucide-react";
 import { DataTableShell, RowPreviewModal, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
+import { NumberInput } from "@/components/ui/number-input";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
 import { Toggle } from "@/components/ui/toggle";
@@ -15,6 +16,7 @@ import {
   createInstalledAsset,
   createServiceJob,
   createWarrantyClaim,
+  saveServiceJobMaterial,
   transitionServiceJob,
   transitionWarrantyClaim,
   updateServiceJob,
@@ -32,6 +34,7 @@ import { ProjectEdit } from "../projects/project-widgets";
 
 type ProjectOption = { id: string; name: string; serviceType: string | null };
 type AssigneeOption = { id: string; name: string };
+type ProductOption = { id: string; name: string; sku: string; baseUnit: string };
 
 export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProjectRow[]; customers: { id: string; name: string }[] }) {
   const t = useTranslations();
@@ -465,6 +468,111 @@ export function ServiceJobEdit({
           <Select value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...assignees.map((item) => ({ value: item.id, label: item.name }))]} />
           <Input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} aria-label={t("services.fields.schedule")} />
           <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder={t("services.fields.description")} className="sm:col-span-2" />
+          {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
+        </div>
+      </RowPreviewModal>
+    </>
+  );
+}
+
+export function ServiceMaterialEditor({
+  jobs,
+  products,
+  initial,
+}: {
+  jobs: { id: string; code: string; title: string }[];
+  products: ProductOption[];
+  initial?: {
+    jobId: string;
+    productId: string;
+    unitName: string;
+    plannedQuantity: string;
+    usedQuantity: string;
+    note: string | null;
+  };
+}) {
+  const t = useTranslations();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [jobId, setJobId] = useState(initial?.jobId ?? jobs[0]?.id ?? "");
+  const [productId, setProductId] = useState(initial?.productId ?? products[0]?.id ?? "");
+  const [unitName, setUnitName] = useState(initial?.unitName ?? products[0]?.baseUnit ?? "");
+  const [plannedQuantity, setPlannedQuantity] = useState<number | null>(initial ? Number(initial.plannedQuantity) : 0);
+  const [usedQuantity, setUsedQuantity] = useState<number | null>(initial ? Number(initial.usedQuantity) : 0);
+  const [note, setNote] = useState(initial?.note ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit() {
+    if (!jobId || !productId || !unitName.trim() || busy) return;
+    setBusy(true);
+    setError("");
+    const result = await saveServiceJobMaterial({
+      jobId,
+      productId,
+      unitName,
+      plannedQuantity: plannedQuantity ?? 0,
+      usedQuantity: usedQuantity ?? 0,
+      note: note || undefined,
+    });
+    setBusy(false);
+    if (result.ok) {
+      setOpen(false);
+      router.refresh();
+    } else setError(t(result.error as never));
+  }
+
+  const disabled = jobs.length === 0 || products.length === 0;
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant={initial ? "link" : "outline"}
+        size="sm"
+        className={initial ? "h-auto px-0 text-xs" : undefined}
+        onClick={() => setOpen(true)}
+        disabled={disabled}
+      >
+        {initial ? t("common.edit") : <><Plus className="h-4 w-4" />{t("services.materials.create")}</>}
+      </Button>
+      <RowPreviewModal
+        open={open}
+        onClose={() => {
+          if (!busy) setOpen(false);
+        }}
+        title={t(initial ? "services.materials.edit" : "services.materials.create")}
+        closeLabel={t("common.close")}
+        size="lg"
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy} tx="common.cancel" />
+            <Button type="button" onClick={submit} disabled={busy || disabled || !unitName.trim()} loading={busy} tx="common.save" />
+          </div>
+        )}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Select
+            value={jobId}
+            onChange={(event) => setJobId(event.target.value)}
+            options={jobs.map((job) => ({ value: job.id, label: `${job.code} · ${job.title}` }))}
+            disabled={Boolean(initial)}
+          />
+          <Select
+            value={productId}
+            onChange={(event) => {
+              const nextId = event.target.value;
+              setProductId(nextId);
+              setUnitName(products.find((product) => product.id === nextId)?.baseUnit ?? "");
+            }}
+            options={products.map((product) => ({ value: product.id, label: `${product.sku} · ${product.name}` }))}
+            disabled={Boolean(initial)}
+          />
+          <Input value={unitName} onChange={(event) => setUnitName(event.target.value)} placeholder={t("services.materials.unit")} disabled={Boolean(initial)} />
+          <div />
+          <NumberInput value={plannedQuantity} onChange={setPlannedQuantity} min={0} decimals={4} suffix={unitName} placeholder={t("services.materials.planned")} />
+          <NumberInput value={usedQuantity} onChange={setUsedQuantity} min={0} decimals={4} suffix={unitName} placeholder={t("services.materials.used")} />
+          <Textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder={t("customers.fields.note")} className="sm:col-span-2" />
           {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
         </div>
       </RowPreviewModal>

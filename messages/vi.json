@@ -2352,6 +2352,16 @@
       "create": "Ghi nhận thiết bị",
       "empty": "Chưa ghi nhận thiết bị đã lắp."
     },
+    "materials": {
+      "title": "Vật tư thi công",
+      "create": "Thêm vật tư",
+      "edit": "Cập nhật vật tư",
+      "planned": "Số lượng dự kiến",
+      "used": "Đã sử dụng",
+      "unit": "Đơn vị tính",
+      "summary": "{count} dòng vật tư theo lệnh việc",
+      "empty": "Chưa lập vật tư dự kiến cho công trình."
+    },
     "checklist": {
       "site-survey": "Khảo sát vị trí và góc quan sát",
       "cabling": "Kéo dây mạng, nguồn và kiểm tra tuyến",
