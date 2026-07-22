@@ -36,8 +36,8 @@ async function sourceInvoiceFromParams(params: PosSearchParams): Promise<PosSour
   if (!order) return null;
   const sourceKind = mode === "return"
     ? "return_invoice"
-    : kind === "quote" || kind === "booking"
-      ? kind
+      : kind === "quote" || kind === "booking" || kind === "invoice"
+        ? kind
       : order.status === "quote"
         ? "quote"
         : order.status === "confirmed"

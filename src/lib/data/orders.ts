@@ -129,6 +129,12 @@ export async function getOrder(id: string) {
       sourceOrderId: orders.sourceOrderId,
       sourceMode: orders.sourceMode,
       sourceSaleTime: orders.sourceSaleTime,
+      hasCreatedOrder: sql<boolean>`exists (
+        select 1 from orders converted
+        where converted.source_order_id = ${orders.id}
+          and converted.source_mode = 'copy'
+          and converted.status not in ('quote', 'confirmed', 'cancelled')
+      )`,
       replacedByOrderId: orders.replacedByOrderId,
       note: orders.note,
       createdAt: orders.createdAt,

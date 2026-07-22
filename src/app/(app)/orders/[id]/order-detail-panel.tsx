@@ -13,7 +13,7 @@ import { OrderActions, PaymentForm, SendOrderZaloButton } from "./order-actions"
 import { EInvoiceForm } from "./einvoice-form";
 import { SharePrintDocButton } from "./share-print-doc-button";
 import { buttonVariants } from "@/components/ui/button-variants";
-import { BookingCreateOrderButton, QuoteCreateOrderButton, QuoteDeleteButton } from "../../quotes/quote-actions";
+import { BookingCreateOrderButton, QuoteDeleteButton } from "../../quotes/quote-actions";
 
 type EInvoiceSummary = {
   id: string;
@@ -58,10 +58,10 @@ export async function OrderDetailPanel({
   const shareHref = shareTemplate
     ? `${Routes.order(order.id)}/print?${new URLSearchParams({ templateId: shareTemplate.id, size: shareTemplate.paperDefault }).toString()}`
     : null;
-  const posSourceHref = (mode: "edit" | "copy" | "return") => {
+  const posSourceHref = (mode: "edit" | "copy" | "return", sourceKindOverride?: string) => {
     const sp = new URLSearchParams({
       sourceMode: mode,
-      sourceKind,
+      sourceKind: sourceKindOverride ?? sourceKind,
       sourceOrderId: order.id,
       sourceCode: order.code,
       sourceSaleTime: formatDate(order.createdAt),
@@ -249,7 +249,11 @@ export async function OrderDetailPanel({
           {!isQuote && canSendZalo && <SendOrderZaloButton orderId={order.id} />}
         </div>
         <div className="flex flex-wrap gap-2 xl:justify-end">
-          {isQuote && <QuoteCreateOrderButton quoteId={order.id} />}
+          {isQuote && !order.hasCreatedOrder && (
+            <Link href={posSourceHref("copy", "invoice")} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-9")}>
+              {t("quotes.convert")}
+            </Link>
+          )}
           {isBooking && !cancelled && <BookingCreateOrderButton bookingId={order.id} />}
           {shareDocType && shareHref && <SharePrintDocButton href={shareHref} code={order.code} docType={shareDocType} />}
           <Link href={`${Routes.order(order.id)}/print`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9")}>
