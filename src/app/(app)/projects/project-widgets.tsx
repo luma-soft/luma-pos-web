@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Plus } from "lucide-react";
 import { RowPreviewModal } from "@/components/data-table";
+import { CustomerCreateDialog, type CustomerCreateResult } from "@/components/partners/customer-create-dialog";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -25,6 +26,8 @@ export function ProjectQuickCreate({
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [customerId, setCustomerId] = useState("");
+  const [createdCustomers, setCreatedCustomers] = useState<{ id: string; name: string }[]>([]);
+  const [customerCreateOpen, setCustomerCreateOpen] = useState(false);
   const [address, setAddress] = useState("");
   const [serviceType, setServiceType] = useState("camera");
   const [targetEndsOn, setTargetEndsOn] = useState("");
@@ -32,6 +35,17 @@ export function ProjectQuickCreate({
   const [siteContactPhone, setSiteContactPhone] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const customerOptions = [
+    ...customers,
+    ...createdCustomers.filter((created) => !customers.some((customer) => customer.id === created.id)),
+  ];
+
+  function applyCreatedCustomer(customer: CustomerCreateResult) {
+    setCreatedCustomers((current) => [...current.filter((item) => item.id !== customer.id), { id: customer.id, name: customer.name }]);
+    setCustomerId(customer.id);
+    setCustomerCreateOpen(false);
+    router.refresh();
+  }
 
   async function submit() {
     if (!name.trim() || busy) return;
@@ -62,7 +76,7 @@ export function ProjectQuickCreate({
         <Plus className="w-4 h-4" />
       </Button>
       <RowPreviewModal
-        open={open}
+        open={open && !customerCreateOpen}
         onClose={() => {
           if (!busy) setOpen(false);
         }}
@@ -78,14 +92,27 @@ export function ProjectQuickCreate({
       >
         <div className="grid gap-3 sm:grid-cols-2">
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={`${t("projects.cols.name")} *`} />
-          <Select
-            value={customerId}
-            onChange={(e) => setCustomerId(e.target.value)}
-            options={[
-              { value: "", label: t("projects.noCustomer") },
-              ...customers.map((c) => ({ value: c.id, label: c.name })),
-            ]}
-          />
+          <div className="flex min-w-0 gap-2">
+            <Select
+              value={customerId}
+              onChange={(e) => setCustomerId(e.target.value)}
+              options={[
+                { value: "", label: t("projects.noCustomer") },
+                ...customerOptions.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+              className="min-w-0 flex-1"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => setCustomerCreateOpen(true)}
+              title={t("customers.createNew")}
+              aria-label={t("customers.createNew")}
+            >
+              <Plus />
+            </Button>
+          </div>
           <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder={t("customers.fields.address")} className="sm:col-span-2" />
           {serviceMode && (
             <>
@@ -107,6 +134,11 @@ export function ProjectQuickCreate({
           {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
         </div>
       </RowPreviewModal>
+      <CustomerCreateDialog
+        open={customerCreateOpen}
+        onOpenChange={setCustomerCreateOpen}
+        onCreated={applyCreatedCustomer}
+      />
     </>
   );
 }
@@ -149,6 +181,8 @@ export function ProjectEdit({ project, customers }: { project: EditableProject; 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(project.name);
   const [customerId, setCustomerId] = useState(project.customerId ?? "");
+  const [createdCustomers, setCreatedCustomers] = useState<{ id: string; name: string }[]>([]);
+  const [customerCreateOpen, setCustomerCreateOpen] = useState(false);
   const [address, setAddress] = useState(project.address ?? "");
   const [note, setNote] = useState(project.note ?? "");
   const [status, setStatus] = useState(project.status);
@@ -161,6 +195,17 @@ export function ProjectEdit({ project, customers }: { project: EditableProject; 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const isServiceProject = Boolean(project.serviceType);
+  const customerOptions = [
+    ...customers,
+    ...createdCustomers.filter((created) => !customers.some((customer) => customer.id === created.id)),
+  ];
+
+  function applyCreatedCustomer(customer: CustomerCreateResult) {
+    setCreatedCustomers((current) => [...current.filter((item) => item.id !== customer.id), { id: customer.id, name: customer.name }]);
+    setCustomerId(customer.id);
+    setCustomerCreateOpen(false);
+    router.refresh();
+  }
 
   async function submit() {
     if (!name.trim() || busy) return;
@@ -195,7 +240,7 @@ export function ProjectEdit({ project, customers }: { project: EditableProject; 
     <>
       <Button type="button" variant="link" size="sm" onClick={() => setOpen(true)} className="h-auto px-0 text-xs" tx="common.edit" />
       <RowPreviewModal
-        open={open}
+        open={open && !customerCreateOpen}
         onClose={() => {
           if (!busy) setOpen(false);
         }}
@@ -211,14 +256,27 @@ export function ProjectEdit({ project, customers }: { project: EditableProject; 
       >
         <div className="grid gap-3 sm:grid-cols-2">
           <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={`${t("projects.cols.name")} *`} />
-          <Select
-            value={customerId}
-            onChange={(e) => setCustomerId(e.target.value)}
-            options={[
-              { value: "", label: t("projects.noCustomer") },
-              ...customers.map((c) => ({ value: c.id, label: c.name })),
-            ]}
-          />
+          <div className="flex min-w-0 gap-2">
+            <Select
+              value={customerId}
+              onChange={(e) => setCustomerId(e.target.value)}
+              options={[
+                { value: "", label: t("projects.noCustomer") },
+                ...customerOptions.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+              className="min-w-0 flex-1"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => setCustomerCreateOpen(true)}
+              title={t("customers.createNew")}
+              aria-label={t("customers.createNew")}
+            >
+              <Plus />
+            </Button>
+          </div>
           <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder={t("customers.fields.address")} className="sm:col-span-2" />
           {isServiceProject ? (
             <>
@@ -259,6 +317,11 @@ export function ProjectEdit({ project, customers }: { project: EditableProject; 
           {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
         </div>
       </RowPreviewModal>
+      <CustomerCreateDialog
+        open={customerCreateOpen}
+        onOpenChange={setCustomerCreateOpen}
+        onCreated={applyCreatedCustomer}
+      />
     </>
   );
 }
