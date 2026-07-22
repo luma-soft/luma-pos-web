@@ -18,12 +18,20 @@ export const CAMERA_QUOTE_MATERIAL_SKUS = [
   "MAT-CAM-OUT-80",
   "MAT-CAM-PTZ-100",
 ] as const;
+export const CAMERA_QUOTE_DETAIL_MATERIAL_SKUS = [
+  "SP003033",
+  "MAT-CAM-BRACKET-IP",
+  "MAT-CAM-JBOX-STD",
+  "SP001208",
+  "SP000891",
+] as const;
 
 const requiredSkus = [
   ...CAMERA_QUOTE_CARD_SKUS,
   ...CAMERA_QUOTE_INSTALL_SKUS,
   ...CAMERA_QUOTE_MATERIAL_SKUS,
 ];
+const optionalMaterialSkus = CAMERA_QUOTE_DETAIL_MATERIAL_SKUS;
 
 function firstImage(value: unknown) {
   return Array.isArray(value) && typeof value[0] === "string" ? value[0] : null;
@@ -79,7 +87,7 @@ export async function getCameraQuoteFormOptions() {
         specs: products.specs,
       })
       .from(products)
-      .where(inArray(products.sku, requiredSkus)),
+      .where(inArray(products.sku, [...requiredSkus, ...optionalMaterialSkus])),
     db
       .select({
         id: customers.id,
@@ -118,7 +126,13 @@ export async function getCameraQuoteFormOptions() {
     cameras: cameraRows.map(mapProduct),
     cards: CAMERA_QUOTE_CARD_SKUS.map((sku) => mapProduct(utilityBySku.get(sku)!)),
     installations: CAMERA_QUOTE_INSTALL_SKUS.map((sku) => mapProduct(utilityBySku.get(sku)!)),
-    materials: CAMERA_QUOTE_MATERIAL_SKUS.map((sku) => mapProduct(utilityBySku.get(sku)!)),
+    materials: [
+      ...CAMERA_QUOTE_MATERIAL_SKUS.map((sku) => mapProduct(utilityBySku.get(sku)!)),
+      ...optionalMaterialSkus.flatMap((sku) => {
+        const row = utilityBySku.get(sku);
+        return row ? [mapProduct(row)] : [];
+      }),
+    ],
     customers: customerRows,
     warehouses: warehouseRows,
     defaultWarehouseId: warehouseRows.find((row) => row.isDefault)?.id ?? warehouseRows[0]?.id ?? null,

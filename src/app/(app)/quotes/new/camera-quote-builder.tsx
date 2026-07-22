@@ -27,7 +27,7 @@ type PackageRow = {
   cameraId: string;
   cardId: string;
   installationId: string;
-  materialId: string;
+  materialLines: Array<{ productId: string; quantity: number }>;
   quantity: number;
 };
 
@@ -53,7 +53,7 @@ function utilityDefaults(cameraSku: string, options: CameraQuoteFormOptions) {
   const index = indoor ? 0 : fixedOutdoor ? 1 : 2;
   return {
     installationId: options.installations[index].id,
-    materialId: options.materials[index].id,
+    materialLines: [{ productId: options.materials[index].id, quantity: 1 }],
   };
 }
 
@@ -106,7 +106,7 @@ export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOption
         cameraId: camera.id,
         cardId: options.cards[1]?.id ?? options.cards[0].id,
         installationId: defaults.installationId,
-        materialId: defaults.materialId,
+        materialLines: defaults.materialLines,
         quantity: 1,
       },
     ]);
@@ -140,9 +140,7 @@ export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOption
           productById.get(row.cameraId),
           productById.get(row.cardId),
           productById.get(row.installationId),
-          productById.get(row.materialId),
-        ];
-        return selected.flatMap((product) =>
+        ].flatMap((product) =>
           product
             ? [
                 {
@@ -154,6 +152,20 @@ export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOption
               ]
             : [],
         );
+        return [
+          ...selected,
+          ...row.materialLines.flatMap((line) => {
+            const product = productById.get(line.productId);
+            return product
+              ? [{
+                  productId: product.id,
+                  productName: product.name,
+                  unitName: product.baseUnit,
+                  quantity: row.quantity * line.quantity,
+                }]
+              : [];
+          }),
+        ];
       });
 
       const result = await createOrder({
@@ -401,7 +413,35 @@ function PackageEditor({
       <div className="mt-3 grid gap-2">
         <QuoteSelect label={t("memoryLabel")} value={row.cardId} options={options.cards} onChange={(cardId) => onChange({ cardId })} />
         <QuoteSelect label={t("installationLabel")} value={row.installationId} options={options.installations} onChange={(installationId) => onChange({ installationId })} />
-        <QuoteSelect label={t("materialLabel")} value={row.materialId} options={options.materials} onChange={(materialId) => onChange({ materialId })} />
+        {row.materialLines.map((line, materialIndex) => (
+          <div key={`${row.key}-material-${materialIndex}`} className="grid grid-cols-[minmax(0,1fr)_56px_32px] items-center gap-2">
+            <QuoteSelect label={materialIndex === 0 ? t("materialLabel") : ""} value={line.productId} options={options.materials} onChange={(productId) => onChange({ materialLines: row.materialLines.map((item, index) => index === materialIndex ? { ...item, productId } : item) })} />
+            <input
+              type="number"
+              min={0.01}
+              step="any"
+              value={line.quantity}
+              onChange={(event) => onChange({ materialLines: row.materialLines.map((item, index) => index === materialIndex ? { ...item, quantity: Math.max(0.01, Number(event.target.value) || 0.01) } : item) })}
+              className="h-9 w-full rounded-lg border border-border bg-surface px-2 text-center text-xs"
+              aria-label={t("materialQuantity")}
+            />
+            <button
+              type="button"
+              onClick={() => onChange({ materialLines: row.materialLines.filter((_, index) => index !== materialIndex) })}
+              className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"
+              aria-label={t("removeMaterial")}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={() => onChange({ materialLines: [...row.materialLines, { productId: options.materials[0]?.id ?? "", quantity: 1 }] })}
+          className="justify-self-start text-xs font-semibold text-primary-600 hover:text-primary-700"
+        >
+          + {t("addMaterial")}
+        </button>
       </div>
 
       <details className="mt-3 rounded-lg border border-border-soft bg-surface px-3 py-2 text-xs">
@@ -465,6 +505,11 @@ function packageTotal(
   row: PackageRow,
   productById: Map<string, CameraQuoteProductOption>,
 ) {
-  return [row.cameraId, row.cardId, row.installationId, row.materialId]
-    .reduce((sum, id) => sum + (productById.get(id)?.retailPrice ?? 0), 0) * row.quantity;
+  const baseTotal = [row.cameraId, row.cardId, row.installationId]
+    .reduce((sum, id) => sum + (productById.get(id)?.retailPrice ?? 0), 0);
+  const materialTotal = row.materialLines.reduce(
+    (sum, line) => sum + (productById.get(line.productId)?.retailPrice ?? 0) * line.quantity,
+    0,
+  );
+  return (baseTotal + materialTotal) * row.quantity;
 }
