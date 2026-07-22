@@ -50,6 +50,12 @@ function label(product: PosProduct) {
   return `${product.name} · ${formatCurrency(Number(product.retailPrice))}`;
 }
 
+function unitLabel(product?: PosProduct) {
+  const unit = product?.baseUnit?.trim();
+  if (!unit) return "";
+  return unit.toLocaleLowerCase("vi") === "cái" ? "cái" : unit.toLocaleLowerCase("vi") === "cuộn" ? "cuộn" : unit;
+}
+
 function keyFor(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -87,7 +93,7 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
     sku: product.sku ?? "",
     name: product.name,
     retailPrice: Number(product.retailPrice),
-    unitName: product.baseUnit,
+    unitName: unitLabel(product),
   }));
   const pickerMemoryCards = pickerOptions(cards);
   const pickerInstallations = pickerOptions(installations);
@@ -209,7 +215,7 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
                     {pkg.materialLines.map((line, materialIndex) => {
                       const product = byId.get(line.productId);
                       return (
-                        <div key={`${pkg.key}-${line.productId}-${materialIndex}`} className="grid grid-cols-[minmax(0,1fr)_96px_32px] items-center gap-2">
+                        <div key={`${pkg.key}-${line.productId}-${materialIndex}`} className="grid grid-cols-[minmax(0,1fr)_120px_32px] items-center gap-2">
                           <Select
                             size="sm"
                             value={line.productId}
@@ -222,7 +228,7 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
                             min={0.01}
                             decimals={2}
                             thousandSeparator={false}
-                            suffix={product?.baseUnit ?? ""}
+                            suffix={unitLabel(product)}
                             onChange={(quantity) => updatePackage(pkg.key, {
                               materialLines: pkg.materialLines.map((item, itemIndex) => itemIndex === materialIndex ? { ...item, quantity: Math.max(0.01, quantity ?? 1) } : item),
                             })}

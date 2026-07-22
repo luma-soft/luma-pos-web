@@ -18,6 +18,14 @@ export type CameraPickerProduct = {
   unitName?: string | null;
 };
 
+function formatUnit(unit?: string | null) {
+  const value = unit?.trim();
+  if (!value) return "—";
+  if (value.toLocaleLowerCase("vi") === "cái") return "cái";
+  if (value.toLocaleLowerCase("vi") === "cuộn") return "cuộn";
+  return value;
+}
+
 type Props = {
   open: boolean;
   cameras: CameraPickerProduct[];
@@ -100,7 +108,7 @@ export function CameraPickerModal({ open, cameras, memoryCards, installations, m
               ) : (
                 <div key={product.id} className="rounded-xl border border-border-soft bg-canvas/50 p-4">
                   <div className="flex items-start gap-3"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary-50 text-primary-600">{activeTab === "memory" ? <HardDrive className="h-5 w-5" /> : activeTab === "installation" ? <Wrench className="h-5 w-5" /> : <Package className="h-5 w-5" />}</div><div className="min-w-0"><div className="line-clamp-2 text-sm font-bold text-slate-900 dark:text-slate-100">{product.name}</div><div className="mt-1 text-xs text-slate-400">{product.sku}</div></div></div>
-                  <div className="mt-4 flex items-end justify-between gap-2"><span className="text-xs text-slate-500">{t("pos.cameraQuote.unitLabel")}: {product.unitName ?? "—"}</span><span className="font-black tabular-nums text-primary-700">{formatCurrency(product.retailPrice)}</span></div>
+                  <div className="mt-4 flex items-end justify-between gap-2"><span className="text-xs text-slate-500">{t("pos.cameraQuote.unitLabel")}: {formatUnit(product.unitName)}</span><span className="font-black tabular-nums text-primary-700">{formatCurrency(product.retailPrice)}</span></div>
                   <div className="mt-2 text-xs text-slate-500">{t("pos.cameraQuote.referenceOnly")}</div>
                 </div>
               ))}
