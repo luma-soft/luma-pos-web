@@ -18,6 +18,7 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Cat | null>(null);
 
   // modal tạo mới
   const [open, setOpen] = useState(false);
@@ -35,6 +36,14 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
     const res = await updateCategory(id, { name: n });
     if (!res.ok) setError(t(res.error as never));
     else setParentOptions((options) => options.map((option) => option.id === id ? { ...option, name: n } : option));
+  }
+
+  function requestRemove(category: Cat) {
+    if (category.productCount > 0) {
+      setPendingDelete(category);
+      return;
+    }
+    void remove(category.id);
   }
 
   async function remove(id: string) {
@@ -90,7 +99,7 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
         <button onClick={() => setEditing({ id: c.id, name: c.name })} className="rounded-md p-1.5 text-slate-400 hover:bg-surface-2 hover:text-primary-600" title={t("common.edit")}>
           <Pencil className="h-4 w-4" />
         </button>
-        <button onClick={() => remove(c.id)} disabled={busy === c.id} className="rounded-md p-1.5 text-slate-400 hover:bg-surface-2 hover:text-red-500 disabled:opacity-50" title={t("common.delete")}>
+        <button onClick={() => requestRemove(c)} disabled={busy === c.id} className="rounded-md p-1.5 text-slate-400 hover:bg-surface-2 hover:text-red-500 disabled:opacity-50" title={t("common.delete")}>
           {busy === c.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
         </button>
       </div>
@@ -184,6 +193,23 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
               <button onClick={create} disabled={creating || !newName.trim()} className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg bg-primary-600 text-white font-medium disabled:opacity-50">
                 {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} {t("common.save")}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {pendingDelete && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-4" onClick={() => setPendingDelete(null)}>
+          <div className="w-full max-w-md rounded-2xl bg-surface shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="border-b border-border-soft px-5 py-4">
+              <h3 className="font-bold text-slate-900 dark:text-slate-100">{t("categories.deleteWarningTitle")}</h3>
+            </div>
+            <div className="px-5 py-4 text-sm text-slate-600 dark:text-slate-300">
+              {t("categories.deleteWarning", { name: pendingDelete.name, count: pendingDelete.productCount })}
+            </div>
+            <div className="flex justify-end gap-2 border-t border-border-soft px-5 py-3">
+              <button type="button" onClick={() => setPendingDelete(null)} className="rounded-lg border border-border px-4 py-2 text-sm font-medium hover:bg-surface-2">{t("common.cancel")}</button>
+              <button type="button" onClick={() => { const id = pendingDelete.id; setPendingDelete(null); void remove(id); }} className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">{t("categories.deleteAnyway")}</button>
             </div>
           </div>
         </div>
