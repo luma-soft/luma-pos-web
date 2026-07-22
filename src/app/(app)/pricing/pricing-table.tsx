@@ -248,6 +248,8 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
         columns={columns}
         getRowId={(row) => row.id}
         minWidth={`${Math.max(780, 610 + books.length * 170)}px`}
+        maxHeight="calc(100dvh - 430px)"
+        fillHeight
       />
       {formulaRow && formulaBook && (
         <div
