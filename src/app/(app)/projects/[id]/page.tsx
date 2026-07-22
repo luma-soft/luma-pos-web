@@ -12,7 +12,9 @@ import { OrderStatusBadge, PaymentStatusBadge } from "../../orders/status-badges
 import {
   InstalledAssetQuickCreate,
   ServiceChecklistEditor,
+  ServiceJobEdit,
   ServiceJobQuickCreate,
+  ServiceJobStatusAction,
   WarrantyClaimQuickCreate,
 } from "../../services/service-widgets";
 import { ProjectEdit } from "../project-widgets";
@@ -22,7 +24,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const t = await getTranslations();
   const detail = await getProjectDetail(id);
   if (!detail) notFound();
-  const { project, orders, jobs, assets, claims, materials } = detail;
+  const { project, orders, jobs, assets, claims, materials, statusLogs } = detail;
   const serviceOptions = project.serviceType ? await getServiceFormOptions() : null;
 
   return (
@@ -74,9 +76,27 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                         <Text as="div" weight="semibold" text={`${job.code} · ${job.title}`} />
                         <Text as="div" variant="muted" size="xs" className="mt-0.5" text={`${t(`services.types.${job.serviceType}` as never)} · ${job.assignedToName ?? t("services.fields.unassigned")}`} />
                       </div>
-                      <span className="rounded-full bg-primary-50 px-2.5 py-0.5 text-xs font-medium text-primary-700">{t(`services.jobStatuses.${job.status}` as never)}</span>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <ServiceJobEdit job={job} projectType={project.serviceType ?? job.serviceType} assignees={serviceOptions.assigneeOptions} />
+                        <ServiceJobStatusAction jobId={job.id} status={job.status} />
+                      </div>
                     </div>
+                    {job.description && <Text as="p" size="sm" variant="muted" className="mb-3" text={job.description} />}
                     <ServiceChecklistEditor jobId={job.id} checklist={job.checklist} />
+                    {statusLogs.some((log) => log.jobId === job.id) && (
+                      <div className="mt-3 border-t border-border-soft pt-3">
+                        <Text as="div" weight="semibold" size="xs" className="mb-2" tx="services.fields.history" />
+                        <div className="space-y-2">
+                          {statusLogs.filter((log) => log.jobId === job.id).slice(0, 5).map((log) => (
+                            <div key={log.id} className="text-xs text-slate-500">
+                              <span className="font-medium text-slate-700 dark:text-slate-200">{t(`services.jobStatuses.${log.toStatus}` as never)}</span>
+                              {` · ${formatDate(log.createdAt)}${log.createdByName ? ` · ${log.createdByName}` : ""}`}
+                              {log.note && <div className="mt-0.5">{log.note}</div>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

@@ -32,6 +32,8 @@ import {
   type ServiceJobCreateInput,
   serviceJobMaterialSchema,
   type ServiceJobMaterialInput,
+  serviceJobUpdateSchema,
+  type ServiceJobUpdateInput,
   serviceJobTransitionSchema,
   type ServiceJobTransitionInput,
   serviceProjectCreateSchema,
@@ -121,6 +123,45 @@ export async function createServiceJob(
   } catch (error) {
     console.error("createServiceJob failed:", error);
     return { ok: false, error: isUniqueViolation(error) ? "services.errors.duplicateCode" : "errors.serverError" };
+  }
+}
+
+export async function updateServiceJob(
+  input: ServiceJobUpdateInput,
+): Promise<ActionResult> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const parsed = serviceJobUpdateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const value = parsed.data;
+
+  try {
+    const [current] = await db.select({
+      projectId: serviceJobs.projectId,
+      projectType: projects.serviceType,
+    }).from(serviceJobs)
+      .innerJoin(projects, eq(serviceJobs.projectId, projects.id))
+      .where(eq(serviceJobs.id, value.jobId))
+      .limit(1);
+    if (!current?.projectType) return { ok: false, error: "errors.notFound" };
+    if (!isServiceTypeAllowedForProject(current.projectType, value.serviceType)) {
+      return { ok: false, error: "services.errors.tradeMismatch" };
+    }
+
+    await db.update(serviceJobs).set({
+      serviceType: value.serviceType,
+      title: value.title,
+      priority: value.priority,
+      assignedTo: value.assignedTo ?? null,
+      scheduledAt: value.scheduledAt ? new Date(value.scheduledAt) : null,
+      description: value.description || null,
+      updatedAt: new Date(),
+    }).where(eq(serviceJobs.id, value.jobId));
+    revalidateServiceProject(current.projectId);
+    return { ok: true, data: undefined };
+  } catch (error) {
+    console.error("updateServiceJob failed:", error);
+    return { ok: false, error: "errors.serverError" };
   }
 }
 

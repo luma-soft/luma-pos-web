@@ -8,6 +8,7 @@ import {
 import {
   installedAssetCreateSchema,
   serviceJobCreateSchema,
+  serviceJobUpdateSchema,
   serviceProjectCreateSchema,
   warrantyClaimCreateSchema,
 } from "@/lib/services/schemas";
@@ -63,6 +64,18 @@ describe("service job input", () => {
 
     expect(serviceJobCreateSchema.safeParse({ ...base, serviceType: "camera" }).success).toBe(true);
     expect(serviceJobCreateSchema.safeParse({ ...base, serviceType: "mixed" }).success).toBe(false);
+  });
+
+  it("validates editable scheduling and assignment fields", () => {
+    expect(serviceJobUpdateSchema.safeParse({
+      jobId: "b3a15e84-7e3f-4e7f-b516-f5b72ca4b72c",
+      serviceType: "electrical",
+      title: "Kiểm tra tủ điện",
+      priority: "high",
+      assignedTo: null,
+      scheduledAt: "2026-07-22T02:30:00.000Z",
+      description: "Đo tải và kiểm tra tiếp địa",
+    }).success).toBe(true);
   });
 });
 

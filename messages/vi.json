@@ -2311,6 +2311,9 @@
       "unassigned": "— Chưa phân công —",
       "schedule": "Lịch thực hiện",
       "checklist": "Checklist",
+      "description": "Mô tả công việc",
+      "statusNote": "Ghi chú chuyển trạng thái",
+      "history": "Lịch sử xử lý",
       "issue": "Sự cố / yêu cầu",
       "asset": "Thiết bị",
       "reportedAt": "Ngày tiếp nhận",
@@ -2337,6 +2340,8 @@
     },
     "jobs": {
       "create": "Thêm lệnh việc",
+      "edit": "Sửa lệnh việc",
+      "updateStatus": "Cập nhật trạng thái lệnh việc",
       "empty": "Chưa có lệnh công việc nào."
     },
     "warranty": {

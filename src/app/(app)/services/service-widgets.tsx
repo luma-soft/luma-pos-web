@@ -7,7 +7,7 @@ import { useTranslations } from "next-intl";
 import { Plus } from "lucide-react";
 import { DataTableShell, RowPreviewModal, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Input, Textarea } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
 import { Toggle } from "@/components/ui/toggle";
@@ -17,6 +17,7 @@ import {
   createWarrantyClaim,
   transitionServiceJob,
   transitionWarrantyClaim,
+  updateServiceJob,
   updateServiceChecklist,
 } from "@/lib/actions/services";
 import type {
@@ -144,6 +145,7 @@ export function ServiceJobQuickCreate({
   const [priority, setPriority] = useState("normal");
   const [assignedTo, setAssignedTo] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
+  const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -158,12 +160,14 @@ export function ServiceJobQuickCreate({
       priority: priority as "low" | "normal" | "high" | "urgent",
       assignedTo: assignedTo || null,
       scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+      description: description || undefined,
     });
     setBusy(false);
     if (result.ok) {
       setOpen(false);
       setTitle("");
       setScheduledAt("");
+      setDescription("");
       router.refresh();
     } else setError(t(result.error as never));
   }
@@ -198,6 +202,7 @@ export function ServiceJobQuickCreate({
           <Select value={priority} onChange={(event) => setPriority(event.target.value)} options={priorityOptions(t)} />
           <Select value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...assignees.map((item) => ({ value: item.id, label: item.name }))]} />
           <Input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} aria-label={t("services.fields.schedule")} className="sm:col-span-2" />
+          <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder={t("services.fields.description")} className="sm:col-span-2" />
           {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
         </div>
       </RowPreviewModal>
@@ -380,25 +385,141 @@ export function ServiceChecklistEditor({
   );
 }
 
-function ServiceJobStatusAction({ jobId, status }: { jobId: string; status: ServiceJobStatus }) {
+export function ServiceJobEdit({
+  job,
+  projectType,
+  assignees,
+}: {
+  job: {
+    id: string;
+    serviceType: string;
+    title: string;
+    priority: string;
+    assignedToName: string | null;
+    assignedTo?: string | null;
+    scheduledAt: Date | string | null;
+    description: string | null;
+  };
+  projectType: string;
+  assignees: AssigneeOption[];
+}) {
+  const t = useTranslations();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [serviceType, setServiceType] = useState(job.serviceType);
+  const [title, setTitle] = useState(job.title);
+  const [priority, setPriority] = useState(job.priority);
+  const initialAssignee = assignees.find((item) => item.name === job.assignedToName)?.id ?? job.assignedTo ?? "";
+  const [assignedTo, setAssignedTo] = useState(initialAssignee);
+  const [scheduledAt, setScheduledAt] = useState(toDateTimeLocal(job.scheduledAt));
+  const [description, setDescription] = useState(job.description ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit() {
+    if (!title.trim() || busy) return;
+    setBusy(true);
+    setError("");
+    const result = await updateServiceJob({
+      jobId: job.id,
+      serviceType: serviceType as "camera" | "electrical" | "plumbing",
+      title,
+      priority: priority as "low" | "normal" | "high" | "urgent",
+      assignedTo: assignedTo || null,
+      scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+      description: description || undefined,
+    });
+    setBusy(false);
+    if (result.ok) {
+      setOpen(false);
+      router.refresh();
+    } else setError(t(result.error as never));
+  }
+
+  return (
+    <>
+      <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" onClick={() => setOpen(true)} tx="common.edit" />
+      <RowPreviewModal
+        open={open}
+        onClose={() => {
+          if (!busy) setOpen(false);
+        }}
+        title={t("services.jobs.edit")}
+        closeLabel={t("common.close")}
+        size="lg"
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy} tx="common.cancel" />
+            <Button type="button" onClick={submit} disabled={busy || !title.trim()} loading={busy} tx="common.save" />
+          </div>
+        )}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Select
+            value={serviceType}
+            onChange={(event) => setServiceType(event.target.value)}
+            options={projectType === "mixed" ? concreteTypeOptions(t) : concreteTypeOptions(t).filter((item) => item.value === projectType)}
+          />
+          <Select value={priority} onChange={(event) => setPriority(event.target.value)} options={priorityOptions(t)} />
+          <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={`${t("services.fields.job")} *`} className="sm:col-span-2" />
+          <Select value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...assignees.map((item) => ({ value: item.id, label: item.name }))]} />
+          <Input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} aria-label={t("services.fields.schedule")} />
+          <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder={t("services.fields.description")} className="sm:col-span-2" />
+          {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
+        </div>
+      </RowPreviewModal>
+    </>
+  );
+}
+
+export function ServiceJobStatusAction({ jobId, status }: { jobId: string; status: ServiceJobStatus }) {
   const t = useTranslations();
   const router = useRouter();
   const [value, setValue] = useState<ServiceJobStatus>(status);
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   async function save() {
     if (value === status) return;
     setBusy(true);
-    const result = await transitionServiceJob({ jobId, status: value });
+    setError("");
+    const result = await transitionServiceJob({ jobId, status: value, note: note || undefined });
     setBusy(false);
-    if (result.ok) router.refresh();
-    else setValue(status);
+    if (result.ok) {
+      setOpen(false);
+      setNote("");
+      router.refresh();
+    } else {
+      setError(t(result.error as never));
+      setValue(status);
+    }
   }
 
   return (
     <span onClick={stopRowToggle} className="inline-flex items-center gap-1.5">
       <Select size="sm" value={value} onChange={(event) => setValue(event.target.value as ServiceJobStatus)} options={jobStatusOptions(t)} />
-      {value !== status && <Button type="button" size="sm" onClick={save} loading={busy} tx="common.save" />}
+      {value !== status && <Button type="button" size="sm" onClick={() => setOpen(true)} tx="common.save" />}
+      <RowPreviewModal
+        open={open}
+        onClose={() => {
+          if (!busy) setOpen(false);
+        }}
+        title={t("services.jobs.updateStatus")}
+        subtitle={`${t(`services.jobStatuses.${status}` as never)} → ${t(`services.jobStatuses.${value}` as never)}`}
+        closeLabel={t("common.close")}
+        size="md"
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy} tx="common.cancel" />
+            <Button type="button" onClick={save} loading={busy} disabled={busy} tx="common.save" />
+          </div>
+        )}
+      >
+        <Textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder={t("services.fields.statusNote")} />
+        {error && <Text as="p" variant="destructive" size="xs" className="mt-3" text={error} />}
+      </RowPreviewModal>
     </span>
   );
 }
@@ -448,4 +569,11 @@ function jobStatusOptions(t: ReturnType<typeof useTranslations>) {
 
 function claimStatusOptions(t: ReturnType<typeof useTranslations>) {
   return ["new", "scheduled", "in_progress", "waiting_materials", "waiting_supplier", "resolved", "closed", "void"].map((value) => ({ value, label: t(`services.claimStatuses.${value}` as never) }));
+}
+
+function toDateTimeLocal(value: Date | string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
+  return date.toISOString().slice(0, 16);
 }

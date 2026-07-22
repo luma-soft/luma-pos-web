@@ -9,6 +9,7 @@ import {
   projects,
   serviceJobMaterials,
   serviceJobs,
+  serviceStatusLogs,
   warrantyClaims,
 } from "@/db/schema";
 
@@ -60,7 +61,7 @@ export async function getProjectDetail(id: string) {
   }).from(projects).leftJoin(customers, eq(projects.customerId, customers.id)).where(eq(projects.id, id)).limit(1);
   if (!project) return null;
 
-  const [relatedOrders, jobs, assets, claims, materials] = await Promise.all([
+  const [relatedOrders, jobs, assets, claims, materials, statusLogs] = await Promise.all([
     db.select({
       id: orders.id,
       code: orders.code,
@@ -84,6 +85,7 @@ export async function getProjectDetail(id: string) {
       title: serviceJobs.title,
       status: serviceJobs.status,
       priority: serviceJobs.priority,
+      assignedTo: serviceJobs.assignedTo,
       assignedToName: profiles.fullName,
       scheduledAt: serviceJobs.scheduledAt,
       completedAt: serviceJobs.completedAt,
@@ -145,9 +147,22 @@ export async function getProjectDetail(id: string) {
       .innerJoin(products, eq(serviceJobMaterials.productId, products.id))
       .where(eq(serviceJobs.projectId, id))
       .orderBy(desc(serviceJobMaterials.createdAt)),
+    db.select({
+      id: serviceStatusLogs.id,
+      jobId: serviceStatusLogs.jobId,
+      fromStatus: serviceStatusLogs.fromStatus,
+      toStatus: serviceStatusLogs.toStatus,
+      note: serviceStatusLogs.note,
+      createdByName: profiles.fullName,
+      createdAt: serviceStatusLogs.createdAt,
+    }).from(serviceStatusLogs)
+      .innerJoin(serviceJobs, eq(serviceStatusLogs.jobId, serviceJobs.id))
+      .leftJoin(profiles, eq(serviceStatusLogs.createdBy, profiles.id))
+      .where(eq(serviceJobs.projectId, id))
+      .orderBy(desc(serviceStatusLogs.createdAt)),
   ]);
 
-  return { project, orders: relatedOrders, jobs, assets, claims, materials };
+  return { project, orders: relatedOrders, jobs, assets, claims, materials, statusLogs };
 }
 
 export type ProjectDetail = NonNullable<Awaited<ReturnType<typeof getProjectDetail>>>;

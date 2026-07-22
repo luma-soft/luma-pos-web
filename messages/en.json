@@ -2311,6 +2311,9 @@
       "unassigned": "— Unassigned —",
       "schedule": "Schedule",
       "checklist": "Checklist",
+      "description": "Work description",
+      "statusNote": "Status change note",
+      "history": "Activity history",
       "issue": "Issue / request",
       "asset": "Asset",
       "reportedAt": "Reported",
@@ -2337,6 +2340,8 @@
     },
     "jobs": {
       "create": "New work order",
+      "edit": "Edit work order",
+      "updateStatus": "Update work order status",
       "empty": "No work orders yet."
     },
     "warranty": {

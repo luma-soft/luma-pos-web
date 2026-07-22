@@ -50,6 +50,16 @@ export const serviceJobCreateSchema = z.object({
 
 export type ServiceJobCreateInput = z.input<typeof serviceJobCreateSchema>;
 
+export const serviceJobUpdateSchema = serviceJobCreateSchema.omit({
+  projectId: true,
+  quoteOrderId: true,
+  materialOrderId: true,
+}).extend({
+  jobId: z.uuid(),
+});
+
+export type ServiceJobUpdateInput = z.input<typeof serviceJobUpdateSchema>;
+
 export const serviceJobTransitionSchema = z.object({
   jobId: z.uuid(),
   status: z.enum([
