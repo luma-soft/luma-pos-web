@@ -143,7 +143,7 @@ export type PosSourceInvoice = {
 };
 
 export type PosInitialContext = {
-  kind: "quote";
+  kind: "quote" | "return_quick";
   customerId?: string;
   projectId: string;
   projectName: string;

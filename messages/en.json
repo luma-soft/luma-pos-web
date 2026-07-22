@@ -1923,6 +1923,7 @@
       "debtTooSmall": "Current debt is less than the refund — use cash/bank instead."
     },
     "title": "Returns",
+    "create": "Create return",
     "total": "{total} returns",
     "searchPlaceholder": "Search return code, order code, customer…",
     "empty": "No returns yet",

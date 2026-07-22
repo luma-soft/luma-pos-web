@@ -69,6 +69,9 @@ async function sourceInvoiceFromParams(params: PosSearchParams): Promise<PosSour
 }
 
 function initialContextFromParams(params: PosSearchParams): PosInitialContext | null {
+  if (one(params.draft) === "return_quick") {
+    return { kind: "return_quick", projectId: "", projectName: "" };
+  }
   const cameraQuote = one(params.cameraQuote) === "1";
   const cameraId = one(params.cameraId);
   if (cameraQuote) {

@@ -1923,6 +1923,7 @@
       "debtTooSmall": "Công nợ hiện tại nhỏ hơn số tiền hoàn — chọn hoàn tiền mặt/CK."
     },
     "title": "Trả hàng",
+    "create": "Tạo phiếu trả hàng",
     "total": "{total} phiếu trả hàng",
     "searchPlaceholder": "Tìm mã phiếu, mã đơn, khách hàng…",
     "empty": "Chưa có phiếu trả hàng nào",
