@@ -1,6 +1,7 @@
 import { eq, inArray } from "drizzle-orm";
 import { db } from "../db";
 import { brands, categories, products } from "../db/schema";
+import { buildCameraProductDescription } from "./camera-product-description";
 
 type CatalogProduct = {
   sku: string;
@@ -37,7 +38,16 @@ const camera = (
   costPrice,
   retailPrice,
   image,
-  description: features,
+  description: buildCameraProductDescription({
+    name,
+    fullCode,
+    resolution,
+    lens,
+    connection,
+    nightAndProtection,
+    powerAndStorage,
+    features,
+  }),
   specs: {
     "Mã đầy đủ": [fullCode],
     "Độ phân giải": [resolution],

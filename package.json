@@ -16,6 +16,7 @@
     "db:seed-demo": "bun run src/db/seed-demo.ts",
     "db:seed-price-books": "bun run src/scripts/seed-price-books.ts",
     "db:seed-camera-products": "bun run src/scripts/seed-camera-products.ts",
+    "db:sync-camera-descriptions": "bun run src/scripts/sync-camera-product-descriptions.ts",
     "import:kiotviet-history": "bun run src/scripts/import-kiotviet-history.ts",
     "ai:eval": "bun run src/scripts/run-ai-evals.ts"
   },
