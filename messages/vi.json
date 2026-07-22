@@ -2295,6 +2295,12 @@
       "closed": "Đã đóng",
       "void": "Đã hủy"
     },
+    "assetStatuses": {
+      "installed": "Đang sử dụng",
+      "repair": "Đang sửa chữa",
+      "replaced": "Đã thay thế",
+      "removed": "Đã tháo gỡ"
+    },
     "priorities": {
       "low": "Thấp",
       "normal": "Bình thường",
@@ -2324,9 +2330,14 @@
       "siteContactPhone": "SĐT liên hệ",
       "serialNumber": "Serial",
       "assetKind": "Loại thiết bị",
+      "brand": "Hãng",
+      "model": "Model",
       "location": "Vị trí lắp",
       "macAddress": "Địa chỉ MAC",
-      "ipAddress": "Địa chỉ IP"
+      "ipAddress": "Địa chỉ IP",
+      "installedAt": "Ngày lắp đặt",
+      "customerWarranty": "Bảo hành cho khách đến ngày",
+      "supplierWarranty": "Bảo hành nhà cung cấp đến ngày"
     },
     "summary": {
       "activeProjects": "{count} công trình đang theo dõi",
@@ -2350,6 +2361,8 @@
     },
     "assets": {
       "create": "Ghi nhận thiết bị",
+      "edit": "Cập nhật thiết bị",
+      "noProduct": "— Không liên kết hàng hóa —",
       "empty": "Chưa ghi nhận thiết bị đã lắp."
     },
     "materials": {

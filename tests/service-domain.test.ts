@@ -7,6 +7,7 @@ import {
 } from "@/lib/services/domain";
 import {
   installedAssetCreateSchema,
+  installedAssetUpdateSchema,
   serviceJobCreateSchema,
   serviceJobUpdateSchema,
   serviceProjectCreateSchema,
@@ -112,6 +113,20 @@ describe("installed assets and warranty", () => {
       projectId,
       assetKind: "valve",
       name: "Van tổng tầng 1",
+    }).success).toBe(true);
+  });
+
+  it("tracks installed asset lifecycle and warranty dates", () => {
+    expect(installedAssetUpdateSchema.safeParse({
+      assetId: "5cc4c05b-2e33-4719-81cf-748d4c97813e",
+      jobId: null,
+      productId: null,
+      assetKind: "breaker",
+      name: "CB tổng",
+      status: "repair",
+      installedAt: "2026-07-22T02:30:00.000Z",
+      customerWarrantyEndsOn: "2027-07-22",
+      supplierWarrantyEndsOn: "2028-07-22",
     }).success).toBe(true);
   });
 

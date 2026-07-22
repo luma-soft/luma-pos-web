@@ -28,6 +28,8 @@ import {
 import {
   installedAssetCreateSchema,
   type InstalledAssetCreateInput,
+  installedAssetUpdateSchema,
+  type InstalledAssetUpdateInput,
   serviceJobCreateSchema,
   type ServiceJobCreateInput,
   serviceJobMaterialSchema,
@@ -319,6 +321,48 @@ export async function createInstalledAsset(
     return { ok: true, data: asset };
   } catch (error) {
     console.error("createInstalledAsset failed:", error);
+    return { ok: false, error: isUniqueViolation(error) ? "services.errors.duplicateSerial" : "errors.serverError" };
+  }
+}
+
+export async function updateInstalledAsset(
+  input: InstalledAssetUpdateInput,
+): Promise<ActionResult> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const parsed = installedAssetUpdateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const value = parsed.data;
+
+  try {
+    const [current] = await db.select({ projectId: installedAssets.projectId })
+      .from(installedAssets)
+      .where(eq(installedAssets.id, value.assetId))
+      .limit(1);
+    if (!current) return { ok: false, error: "errors.notFound" };
+
+    await db.update(installedAssets).set({
+      jobId: value.jobId ?? null,
+      productId: value.productId ?? null,
+      assetKind: value.assetKind,
+      name: value.name,
+      brand: value.brand || null,
+      model: value.model || null,
+      serialNumber: value.serialNumber || null,
+      macAddress: value.macAddress || null,
+      ipAddress: value.ipAddress || null,
+      locationLabel: value.locationLabel || null,
+      installedAt: value.installedAt ? new Date(value.installedAt) : null,
+      customerWarrantyEndsOn: value.customerWarrantyEndsOn ?? null,
+      supplierWarrantyEndsOn: value.supplierWarrantyEndsOn ?? null,
+      status: value.status,
+      note: value.note || null,
+      updatedAt: new Date(),
+    }).where(eq(installedAssets.id, value.assetId));
+    revalidateServiceProject(current.projectId);
+    return { ok: true, data: undefined };
+  } catch (error) {
+    console.error("updateInstalledAsset failed:", error);
     return { ok: false, error: isUniqueViolation(error) ? "services.errors.duplicateSerial" : "errors.serverError" };
   }
 }

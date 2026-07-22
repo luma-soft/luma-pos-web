@@ -100,6 +100,7 @@ export async function getProjectDetail(id: string) {
     db.select({
       id: installedAssets.id,
       jobId: installedAssets.jobId,
+      productId: installedAssets.productId,
       assetKind: installedAssets.assetKind,
       name: installedAssets.name,
       brand: installedAssets.brand,
@@ -112,6 +113,7 @@ export async function getProjectDetail(id: string) {
       customerWarrantyEndsOn: installedAssets.customerWarrantyEndsOn,
       supplierWarrantyEndsOn: installedAssets.supplierWarrantyEndsOn,
       status: installedAssets.status,
+      note: installedAssets.note,
     }).from(installedAssets)
       .where(eq(installedAssets.projectId, id))
       .orderBy(desc(installedAssets.createdAt)),

@@ -108,6 +108,15 @@ export const installedAssetCreateSchema = z.object({
 
 export type InstalledAssetCreateInput = z.input<typeof installedAssetCreateSchema>;
 
+export const installedAssetUpdateSchema = installedAssetCreateSchema.omit({
+  projectId: true,
+}).extend({
+  assetId: z.uuid(),
+  status: z.enum(["installed", "repair", "replaced", "removed"]),
+});
+
+export type InstalledAssetUpdateInput = z.input<typeof installedAssetUpdateSchema>;
+
 export const warrantyClaimCreateSchema = z.object({
   projectId: z.uuid(),
   jobId: z.uuid().nullable().optional(),

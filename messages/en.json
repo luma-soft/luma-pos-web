@@ -2295,6 +2295,12 @@
       "closed": "Closed",
       "void": "Void"
     },
+    "assetStatuses": {
+      "installed": "In service",
+      "repair": "Under repair",
+      "replaced": "Replaced",
+      "removed": "Removed"
+    },
     "priorities": {
       "low": "Low",
       "normal": "Normal",
@@ -2324,9 +2330,14 @@
       "siteContactPhone": "Contact phone",
       "serialNumber": "Serial",
       "assetKind": "Asset type",
+      "brand": "Brand",
+      "model": "Model",
       "location": "Install location",
       "macAddress": "MAC address",
-      "ipAddress": "IP address"
+      "ipAddress": "IP address",
+      "installedAt": "Installed at",
+      "customerWarranty": "Customer warranty end date",
+      "supplierWarranty": "Supplier warranty end date"
     },
     "summary": {
       "activeProjects": "{count} active projects",
@@ -2350,6 +2361,8 @@
     },
     "assets": {
       "create": "Record installed asset",
+      "edit": "Update installed asset",
+      "noProduct": "— No linked product —",
       "empty": "No installed assets recorded."
     },
     "materials": {

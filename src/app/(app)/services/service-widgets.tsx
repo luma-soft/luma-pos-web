@@ -19,6 +19,7 @@ import {
   saveServiceJobMaterial,
   transitionServiceJob,
   transitionWarrantyClaim,
+  updateInstalledAsset,
   updateServiceJob,
   updateServiceChecklist,
 } from "@/lib/actions/services";
@@ -272,21 +273,49 @@ export function WarrantyClaimQuickCreate({ projects }: { projects: ProjectOption
 export function InstalledAssetQuickCreate({
   projectId,
   jobs,
+  products,
+  initial,
 }: {
   projectId: string;
   jobs: { id: string; code: string; title: string }[];
+  products: ProductOption[];
+  initial?: {
+    id: string;
+    jobId: string | null;
+    productId: string | null;
+    assetKind: string;
+    name: string;
+    brand: string | null;
+    model: string | null;
+    serialNumber: string | null;
+    macAddress: string | null;
+    ipAddress: string | null;
+    locationLabel: string | null;
+    installedAt: Date | string | null;
+    customerWarrantyEndsOn: string | null;
+    supplierWarrantyEndsOn: string | null;
+    status: "installed" | "repair" | "replaced" | "removed";
+    note: string | null;
+  };
 }) {
   const t = useTranslations();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [jobId, setJobId] = useState("");
-  const [assetKind, setAssetKind] = useState("camera");
-  const [name, setName] = useState("");
-  const [serialNumber, setSerialNumber] = useState("");
-  const [locationLabel, setLocationLabel] = useState("");
-  const [macAddress, setMacAddress] = useState("");
-  const [ipAddress, setIpAddress] = useState("");
-  const [customerWarrantyEndsOn, setCustomerWarrantyEndsOn] = useState("");
+  const [jobId, setJobId] = useState(initial?.jobId ?? "");
+  const [productId, setProductId] = useState(initial?.productId ?? "");
+  const [assetKind, setAssetKind] = useState(initial?.assetKind ?? "camera");
+  const [name, setName] = useState(initial?.name ?? "");
+  const [brand, setBrand] = useState(initial?.brand ?? "");
+  const [model, setModel] = useState(initial?.model ?? "");
+  const [serialNumber, setSerialNumber] = useState(initial?.serialNumber ?? "");
+  const [locationLabel, setLocationLabel] = useState(initial?.locationLabel ?? "");
+  const [macAddress, setMacAddress] = useState(initial?.macAddress ?? "");
+  const [ipAddress, setIpAddress] = useState(initial?.ipAddress ?? "");
+  const [installedAt, setInstalledAt] = useState(initial ? toDateTimeLocal(initial.installedAt) : toDateTimeLocal(new Date()));
+  const [customerWarrantyEndsOn, setCustomerWarrantyEndsOn] = useState(initial?.customerWarrantyEndsOn ?? "");
+  const [supplierWarrantyEndsOn, setSupplierWarrantyEndsOn] = useState(initial?.supplierWarrantyEndsOn ?? "");
+  const [status, setStatus] = useState(initial?.status ?? "installed");
+  const [note, setNote] = useState(initial?.note ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -294,40 +323,55 @@ export function InstalledAssetQuickCreate({
     if (!name.trim() || !assetKind.trim() || busy) return;
     setBusy(true);
     setError("");
-    const result = await createInstalledAsset({
-      projectId,
+    const payload = {
       jobId: jobId || null,
+      productId: productId || null,
       assetKind,
       name,
+      brand: brand || undefined,
+      model: model || undefined,
       serialNumber: serialNumber || undefined,
       locationLabel: locationLabel || undefined,
       macAddress: macAddress || undefined,
       ipAddress: ipAddress || undefined,
+      installedAt: installedAt ? new Date(installedAt).toISOString() : null,
       customerWarrantyEndsOn: customerWarrantyEndsOn || null,
-      installedAt: new Date().toISOString(),
-    });
+      supplierWarrantyEndsOn: supplierWarrantyEndsOn || null,
+      note: note || undefined,
+    };
+    const result = initial
+      ? await updateInstalledAsset({ ...payload, assetId: initial.id, status })
+      : await createInstalledAsset({ ...payload, projectId });
     setBusy(false);
     if (result.ok) {
       setOpen(false);
-      setName("");
-      setSerialNumber("");
-      setLocationLabel("");
-      setMacAddress("");
-      setIpAddress("");
-      setCustomerWarrantyEndsOn("");
+      if (!initial) {
+        setName("");
+        setBrand("");
+        setModel("");
+        setSerialNumber("");
+        setLocationLabel("");
+        setMacAddress("");
+        setIpAddress("");
+        setCustomerWarrantyEndsOn("");
+        setSupplierWarrantyEndsOn("");
+        setNote("");
+      }
       router.refresh();
     } else setError(t(result.error as never));
   }
 
   return (
     <>
-      <Button type="button" size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4" />{t("services.assets.create")}</Button>
+      <Button type="button" variant={initial ? "link" : "default"} size="sm" className={initial ? "h-auto px-0 text-xs" : undefined} onClick={() => setOpen(true)}>
+        {initial ? t("common.edit") : <><Plus className="h-4 w-4" />{t("services.assets.create")}</>}
+      </Button>
       <RowPreviewModal
         open={open}
         onClose={() => {
           if (!busy) setOpen(false);
         }}
-        title={t("services.assets.create")}
+        title={t(initial ? "services.assets.edit" : "services.assets.create")}
         closeLabel={t("common.close")}
         size="xl"
         footer={(
@@ -339,13 +383,25 @@ export function InstalledAssetQuickCreate({
       >
         <div className="grid gap-3 sm:grid-cols-2">
           <Select value={jobId} onChange={(event) => setJobId(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...jobs.map((job) => ({ value: job.id, label: `${job.code} · ${job.title}` }))]} />
+          <Select value={productId} onChange={(event) => {
+            const nextId = event.target.value;
+            setProductId(nextId);
+            const product = products.find((item) => item.id === nextId);
+            if (product && !name.trim()) setName(product.name);
+          }} options={[{ value: "", label: t("services.assets.noProduct") }, ...products.map((product) => ({ value: product.id, label: `${product.sku} · ${product.name}` }))]} />
           <Input value={assetKind} onChange={(event) => setAssetKind(event.target.value)} placeholder={`${t("services.fields.assetKind")} *`} />
           <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={`${t("services.fields.asset")} *`} />
+          <Input value={brand} onChange={(event) => setBrand(event.target.value)} placeholder={t("services.fields.brand")} />
+          <Input value={model} onChange={(event) => setModel(event.target.value)} placeholder={t("services.fields.model")} />
           <Input value={serialNumber} onChange={(event) => setSerialNumber(event.target.value)} placeholder={t("services.fields.serialNumber")} />
           <Input value={locationLabel} onChange={(event) => setLocationLabel(event.target.value)} placeholder={t("services.fields.location")} />
           <Input value={macAddress} onChange={(event) => setMacAddress(event.target.value)} placeholder={t("services.fields.macAddress")} />
           <Input value={ipAddress} onChange={(event) => setIpAddress(event.target.value)} placeholder={t("services.fields.ipAddress")} />
-          <Input type="date" value={customerWarrantyEndsOn} onChange={(event) => setCustomerWarrantyEndsOn(event.target.value)} aria-label={t("services.tabs.warranty")} />
+          <Input type="datetime-local" value={installedAt} onChange={(event) => setInstalledAt(event.target.value)} aria-label={t("services.fields.installedAt")} />
+          <Select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} options={["installed", "repair", "replaced", "removed"].map((value) => ({ value, label: t(`services.assetStatuses.${value}` as never) }))} disabled={!initial} />
+          <Input type="date" value={customerWarrantyEndsOn} onChange={(event) => setCustomerWarrantyEndsOn(event.target.value)} aria-label={t("services.fields.customerWarranty")} />
+          <Input type="date" value={supplierWarrantyEndsOn} onChange={(event) => setSupplierWarrantyEndsOn(event.target.value)} aria-label={t("services.fields.supplierWarranty")} />
+          <Textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder={t("customers.fields.note")} className="sm:col-span-2" />
           {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
         </div>
       </RowPreviewModal>
