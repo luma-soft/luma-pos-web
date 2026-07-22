@@ -843,12 +843,17 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
             })}
             tone="primary"
           />
-          <div className="relative">
+          <div
+            className="relative"
+            onMouseEnter={() => setMoreOpen(true)}
+            onMouseLeave={() => setMoreOpen(false)}
+          >
             <button
               type="button"
               aria-label={locale === "vi" ? "Thao tác khác" : "More actions"}
               aria-expanded={moreOpen}
               onClick={() => setMoreOpen((value) => !value)}
+              onFocus={() => setMoreOpen(true)}
               className={cn(actionClassName, "border-border bg-surface text-slate-700 hover:bg-surface-2 dark:text-slate-200")}
             >
               <MoreHorizontal className="h-4 w-4" />
