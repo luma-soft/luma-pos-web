@@ -23,6 +23,7 @@ export const CAMERA_QUOTE_DETAIL_MATERIAL_SKUS = [
   "MAT-CAM-JBOX-STD",
   "SP001645",
   "SP001481",
+  "SP001216",
   "SP000891",
 ] as const;
 
