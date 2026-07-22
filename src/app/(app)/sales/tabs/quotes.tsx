@@ -1,9 +1,9 @@
 import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
-import { and, asc, count, desc, eq, or } from "drizzle-orm";
+import { and, count, desc, eq, or } from "drizzle-orm";
 import { FileSpreadsheet, Search } from "lucide-react";
 import { db } from "@/db";
-import { categories, customers, orders, products } from "@/db/schema";
+import { customers, orders } from "@/db/schema";
 import { Routes } from "@/lib/routes";
 import { accentInsensitiveLike } from "@/lib/search";
 import { TableSkeleton } from "@/components/table-skeleton";
@@ -17,18 +17,6 @@ type SP = Record<string, string | undefined>;
 export async function QuotesTab({ searchParams }: { searchParams: SP }) {
   const t = await getTranslations();
   const params = searchParams;
-  const cameraRows = await db.select({
-    id: products.id,
-    sku: products.sku,
-    name: products.name,
-    retailPrice: products.retailPrice,
-    imageUrls: products.imageUrls,
-    description: products.description,
-  })
-    .from(products)
-    .innerJoin(categories, eq(products.categoryId, categories.id))
-    .where(eq(categories.name, "Camera giám sát"))
-    .orderBy(asc(products.name));
 
   return (
     <>
@@ -39,17 +27,7 @@ export async function QuotesTab({ searchParams }: { searchParams: SP }) {
           <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("orders.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         </div>
         <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full bg-primary-600 hover:brightness-110 text-white transition active:scale-[0.98]">{t("common.search")}</button>
-        <CameraQuoteCreateButton
-          className="ml-auto shrink-0"
-          cameras={cameraRows.map((camera) => ({
-            id: camera.id,
-            sku: camera.sku ?? "",
-            name: camera.name,
-            retailPrice: Number(camera.retailPrice),
-            imageUrl: Array.isArray(camera.imageUrls) && typeof camera.imageUrls[0] === "string" ? camera.imageUrls[0] : null,
-            description: camera.description,
-          }))}
-        />
+        <CameraQuoteCreateButton className="ml-auto shrink-0" />
       </form>
 
       <Suspense fallback={<TableSkeleton cols={6} rows={10} />}>
