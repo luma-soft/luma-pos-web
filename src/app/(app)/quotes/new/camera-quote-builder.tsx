@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
   Camera,
   CheckCircle2,
@@ -63,13 +64,12 @@ function newKey() {
 }
 
 export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOptions }) {
+  const t = useTranslations("quotes");
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [customerId, setCustomerId] = useState("");
-  const [projectName, setProjectName] = useState("Báo giá lắp đặt camera");
-  const [note, setNote] = useState(
-    "Thẻ nhớ chính hãng chuyên dụng, bảo hành 24 tháng. Giá đã gồm công lắp đặt, cấu hình ứng dụng và vật tư cơ bản theo từng gói. Chi phí phát sinh chỉ thực hiện sau khi khách hàng đồng ý.",
-  );
+  const [projectName, setProjectName] = useState(() => t("projectPlaceholder"));
+  const [note, setNote] = useState(() => t("defaultNote"));
   const [packages, setPackages] = useState<PackageRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -125,11 +125,11 @@ export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOption
 
   function save(openPrint: boolean) {
     if (packages.length === 0) {
-      setError("Hãy thêm ít nhất một camera vào báo giá.");
+      setError(t("builderErrors.addCamera"));
       return;
     }
     if (!options.defaultWarehouseId) {
-      setError("Chưa có kho mặc định để lưu báo giá.");
+      setError(t("builderErrors.noWarehouse"));
       return;
     }
 
@@ -161,7 +161,7 @@ export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOption
         clientId: crypto.randomUUID(),
         customerId: customerId || null,
         warehouseId: options.defaultWarehouseId!,
-        projectName: projectName.trim() || "Báo giá lắp đặt camera",
+        projectName: projectName.trim() || t("projectPlaceholder"),
         note: note.trim(),
         discount: 0,
         taxRate: 0,
@@ -171,7 +171,7 @@ export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOption
       });
 
       if (!result.ok) {
-        setError("Không thể lưu báo giá. Vui lòng kiểm tra quyền bán hàng và dữ liệu sản phẩm.");
+        setError(t("builderErrors.saveFailed"));
         return;
       }
 
@@ -189,12 +189,12 @@ export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOption
         <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm sm:p-5">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1.5 text-sm font-medium">
-              <span>Khách hàng</span>
+              <span>{t("customerLabel")}</span>
               <div className="[&>div]:block [&>div]:w-full">
                 <Select
                   className="w-full"
                   options={[
-                    { value: "", label: "Khách lẻ / chưa chọn" },
+                    { value: "", label: t("customerPlaceholder") },
                     ...options.customers.map((customer) => ({
                       value: customer.id,
                       label: `${customer.name}${customer.phone ? ` - ${customer.phone}` : ""}`,
@@ -206,7 +206,7 @@ export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOption
               </div>
             </div>
             <label className="space-y-1.5 text-sm font-medium">
-              <span>Tên công trình / nội dung</span>
+              <span>{t("projectLabel")}</span>
               <input
                 value={projectName}
                 onChange={(event) => setProjectName(event.target.value)}
@@ -215,7 +215,7 @@ export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOption
             </label>
           </div>
           <label className="mt-4 block space-y-1.5 text-sm font-medium">
-            <span>Ghi chú báo giá</span>
+            <span>{t("noteLabel")}</span>
             <textarea
               value={note}
               onChange={(event) => setNote(event.target.value)}
@@ -228,15 +228,15 @@ export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOption
         <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm sm:p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">Chọn camera</h2>
-              <p className="mt-1 text-sm text-slate-500">Giá dưới đây là giá riêng của camera, chưa gồm thẻ, công và vật tư.</p>
+              <h2 className="text-base font-bold text-slate-900 dark:text-slate-100">{t("cameraPickerTitle")}</h2>
+              <p className="mt-1 text-sm text-slate-500">{t("cameraPickerHint")}</p>
             </div>
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Tìm tên hoặc mã camera"
+                placeholder={t("cameraSearchPlaceholder")}
                 className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm"
               />
             </div>
@@ -255,8 +255,8 @@ export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOption
           <div className="rounded-2xl border border-border bg-surface shadow-sm">
             <div className="flex items-center justify-between border-b border-border-soft px-4 py-4">
               <div>
-                <h2 className="font-bold text-slate-900 dark:text-slate-100">Các gói trong báo giá</h2>
-                <p className="mt-0.5 text-xs text-slate-500">{cameraCount} camera · {packages.length} cấu hình</p>
+                <h2 className="font-bold text-slate-900 dark:text-slate-100">{t("packagesTitle")}</h2>
+                <p className="mt-0.5 text-xs text-slate-500">{t("packageCount", { cameraCount, packageCount: packages.length })}</p>
               </div>
               <FileText className="h-5 w-5 text-primary-600" />
             </div>
@@ -264,8 +264,8 @@ export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOption
             {packages.length === 0 ? (
               <div className="px-6 py-14 text-center text-slate-400">
                 <Camera className="mx-auto mb-3 h-10 w-10 opacity-50" />
-                <p className="font-medium">Chưa chọn camera</p>
-                <p className="mt-1 text-sm">Bấm “Thêm vào báo giá” ở danh sách bên trái.</p>
+                <p className="font-medium">{t("emptyPackagesTitle")}</p>
+                <p className="mt-1 text-sm">{t("emptyPackagesHint")}</p>
               </div>
             ) : (
               <div className="max-h-[calc(100vh-360px)] space-y-3 overflow-y-auto p-3">
@@ -286,10 +286,10 @@ export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOption
             <div className="border-t border-border-soft p-4">
               <div className="flex items-end justify-between gap-4">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tổng báo giá</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{t("totalLabel")}</div>
                   <div className="mt-1 text-2xl font-black tabular-nums text-primary-700">{money.format(quoteTotal)}</div>
                 </div>
-                <div className="text-right text-xs text-slate-500">Chưa gồm chi phí<br />phát sinh thực tế</div>
+                <div className="text-right text-xs whitespace-pre-line text-slate-500">{t("unexpectedCosts")}</div>
               </div>
 
               {error && (
@@ -306,7 +306,7 @@ export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOption
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 text-sm font-bold text-primary-700 hover:bg-primary-100 disabled:opacity-50"
                 >
                   <CheckCircle2 className="h-4 w-4" />
-                  {isPending ? "Đang lưu…" : "Lưu báo giá"}
+                  {isPending ? t("saving") : t("saveQuote")}
                 </button>
                 <button
                   type="button"
@@ -315,7 +315,7 @@ export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOption
                   className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary-600 px-3 text-sm font-bold text-white hover:bg-primary-700 disabled:opacity-50"
                 >
                   <Printer className="h-4 w-4" />
-                  Lưu & in
+                  {t("saveAndPrint")}
                 </button>
               </div>
             </div>
@@ -333,6 +333,7 @@ function CameraOptionCard({
   camera: CameraQuoteProductOption;
   onAdd: () => void;
 }) {
+  const t = useTranslations("quotes");
   const resolution = camera.specs["Độ phân giải"]?.[0];
   const connection = camera.specs["Kết nối"]?.[0];
   return (
@@ -360,7 +361,7 @@ function CameraOptionCard({
         onClick={onAdd}
         className="mt-auto inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-primary-600 px-3 text-sm font-semibold text-white hover:bg-primary-700"
       >
-        <Plus className="h-4 w-4" /> Thêm vào báo giá
+        <Plus className="h-4 w-4" /> {t("addToQuote")}
       </button>
     </article>
   );
@@ -381,29 +382,30 @@ function PackageEditor({
   onChange: (patch: Partial<PackageRow>) => void;
   onRemove: () => void;
 }) {
+  const t = useTranslations("quotes");
   const camera = productById.get(row.cameraId)!;
   const total = packageTotal(row, productById);
   return (
     <div className="rounded-xl border border-border-soft bg-canvas/50 p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-xs font-bold uppercase tracking-wide text-primary-600">Gói {String(index + 1).padStart(2, "0")}</div>
+          <div className="text-xs font-bold uppercase tracking-wide text-primary-600">{t("packageLabel", { number: String(index + 1).padStart(2, "0") })}</div>
           <div className="mt-0.5 line-clamp-2 text-sm font-bold">{camera.name}</div>
           <div className="mt-1 text-xs text-slate-400">{camera.sku}</div>
         </div>
-        <button type="button" onClick={onRemove} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label="Xóa gói">
+        <button type="button" onClick={onRemove} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label={t("removePackage")}>
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
 
       <div className="mt-3 grid gap-2">
-        <QuoteSelect label="Thẻ nhớ" value={row.cardId} options={options.cards} onChange={(cardId) => onChange({ cardId })} />
-        <QuoteSelect label="Công lắp" value={row.installationId} options={options.installations} onChange={(installationId) => onChange({ installationId })} />
-        <QuoteSelect label="Vật tư" value={row.materialId} options={options.materials} onChange={(materialId) => onChange({ materialId })} />
+        <QuoteSelect label={t("memoryLabel")} value={row.cardId} options={options.cards} onChange={(cardId) => onChange({ cardId })} />
+        <QuoteSelect label={t("installationLabel")} value={row.installationId} options={options.installations} onChange={(installationId) => onChange({ installationId })} />
+        <QuoteSelect label={t("materialLabel")} value={row.materialId} options={options.materials} onChange={(materialId) => onChange({ materialId })} />
       </div>
 
       <details className="mt-3 rounded-lg border border-border-soft bg-surface px-3 py-2 text-xs">
-        <summary className="cursor-pointer font-semibold text-slate-600">Xem bảng thông số camera</summary>
+        <summary className="cursor-pointer font-semibold text-slate-600">{t("cameraSpecs")}</summary>
         <dl className="mt-2 divide-y divide-border-soft">
           {Object.entries(camera.specs).map(([label, values]) => (
             <div key={label} className="grid grid-cols-[110px_1fr] gap-2 py-1.5">
@@ -416,12 +418,12 @@ function PackageEditor({
 
       <div className="mt-3 flex items-center justify-between border-t border-border-soft pt-3">
         <div className="inline-flex items-center rounded-lg border border-border bg-surface">
-          <button type="button" onClick={() => onChange({ quantity: Math.max(1, row.quantity - 1) })} className="p-2 text-slate-500 hover:text-primary-700" aria-label="Giảm số lượng"><Minus className="h-3.5 w-3.5" /></button>
+          <button type="button" onClick={() => onChange({ quantity: Math.max(1, row.quantity - 1) })} className="p-2 text-slate-500 hover:text-primary-700" aria-label={t("decreaseQuantity")}><Minus className="h-3.5 w-3.5" /></button>
           <span className="min-w-8 text-center text-sm font-bold tabular-nums">{row.quantity}</span>
-          <button type="button" onClick={() => onChange({ quantity: Math.min(99, row.quantity + 1) })} className="p-2 text-slate-500 hover:text-primary-700" aria-label="Tăng số lượng"><Plus className="h-3.5 w-3.5" /></button>
+          <button type="button" onClick={() => onChange({ quantity: Math.min(99, row.quantity + 1) })} className="p-2 text-slate-500 hover:text-primary-700" aria-label={t("increaseQuantity")}><Plus className="h-3.5 w-3.5" /></button>
         </div>
         <div className="text-right">
-          <div className="text-[11px] text-slate-400">Trọn gói</div>
+          <div className="text-[11px] text-slate-400">{t("packageTotal")}</div>
           <div className="font-black tabular-nums text-primary-700">{money.format(total)}</div>
         </div>
       </div>
