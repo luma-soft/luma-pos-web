@@ -52,7 +52,7 @@ function label(product: PosProduct) {
 
 function unitLabel(product?: PosProduct) {
   const unit = product?.baseUnit?.trim();
-  if (!unit) return "";
+  if (!unit || unit.toLocaleLowerCase("vi") === "điểm") return "";
   return unit.toLocaleLowerCase("vi") === "cái" ? "cái" : unit.toLocaleLowerCase("vi") === "cuộn" ? "cuộn" : unit;
 }
 
