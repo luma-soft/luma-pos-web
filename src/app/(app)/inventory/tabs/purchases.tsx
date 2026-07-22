@@ -44,7 +44,6 @@ async function PurchasesContent({ searchParams }: { searchParams: SP }) {
           <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full bg-primary-600 hover:brightness-110 text-white">{t("common.search")}</button>
           <Link href={Routes.PurchaseNew} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98] ml-auto shrink-0"><Plus className="w-4 h-4" />{t("purchases.createNew")}</Link>
         </form>
-        <span className="shrink-0 text-sm text-slate-500">{t("purchases.total", { total })}</span>
       </div>
 
       {rows.length === 0 ? (

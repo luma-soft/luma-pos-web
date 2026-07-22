@@ -75,7 +75,6 @@ async function PricingContent({
           />
           <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full border border-border bg-surface hover:bg-surface-2">{t("common.search")}</button>
         </form>
-        <span className="shrink-0 text-sm text-slate-500">{t("products.list.total", { total })}</span>
       </div>
       <PricingTable books={books} rows={tableRows} total={total} />
       <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("products.unitLabel")} />

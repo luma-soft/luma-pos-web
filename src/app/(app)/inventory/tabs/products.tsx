@@ -63,13 +63,11 @@ async function ProductsToolbar({
   categories,
   status,
   view,
-  totalLabel,
 }: {
   params: SP;
   categories: Awaited<ReturnType<typeof getProductFormOptions>>["categories"];
   status: Status;
   view: View;
-  totalLabel: string | null;
 }) {
   const t = await getTranslations();
   return (
@@ -82,7 +80,6 @@ async function ProductsToolbar({
         <Select name="status" defaultValue={status} options={[{ value: "active", label: t("products.list.statusActive") }, { value: "inactive", label: t("products.list.statusInactive") }, { value: "all", label: t("products.list.statusAll") }]} />
         <Select name="view" defaultValue={view} options={[{ value: "grouped", label: t("products.list.viewGrouped") }, { value: "flat", label: t("products.list.viewFlat") }]} />
       </form>
-      {totalLabel && <span className="shrink-0 text-sm text-slate-500">{totalLabel}</span>}
       <Link href={productModalHref(params, { productModal: "create" })} className="inline-flex shrink-0 items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98]"><Plus className="w-4 h-4" />{t("products.createNew")}</Link>
     </div>
   );
@@ -169,7 +166,7 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
 
   return (
     <>
-      {!cameraMaterials && <ProductsToolbar params={params} categories={categories} status={status} view={view} totalLabel={t("products.list.total", { total })} />}
+      {!cameraMaterials && <ProductsToolbar params={params} categories={categories} status={status} view={view} />}
       {rows.length === 0 ? (
         <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">
           <PackageOpen className="w-10 h-10 mx-auto mb-3 opacity-60" />

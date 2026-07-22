@@ -42,7 +42,6 @@ async function PurchaseReturnsContent({ searchParams }: { searchParams: SP }) {
             {t("purchaseReturns.createNew")}
           </Link>
         </form>
-        <span className="shrink-0 text-sm text-slate-500">{t("purchaseReturns.total", { total })}</span>
       </div>
       {rows.length === 0 ? (
         <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">
