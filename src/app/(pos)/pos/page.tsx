@@ -86,11 +86,10 @@ function initialContextFromParams(params: PosSearchParams): PosInitialContext | 
   if (one(params.draft) !== "quote") return null;
   const projectId = one(params.projectId);
   const customerId = one(params.customerId);
-  const projectName = one(params.projectName)?.trim();
-  if (!projectId || !UUID_RE.test(projectId) || !projectName) return null;
+  const projectName = one(params.projectName)?.trim() || "Báo giá";
   return {
     kind: "quote",
-    projectId,
+    projectId: projectId && UUID_RE.test(projectId) ? projectId : "",
     projectName,
     customerId: customerId && UUID_RE.test(customerId) ? customerId : "",
   };
