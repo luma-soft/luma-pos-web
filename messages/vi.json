@@ -2315,6 +2315,7 @@
       "asset": "Thiết bị",
       "reportedAt": "Ngày tiếp nhận",
       "priority": "Ưu tiên",
+      "startsOn": "Ngày bắt đầu",
       "targetEndsOn": "Dự kiến hoàn thành",
       "siteContactName": "Liên hệ tại công trình",
       "siteContactPhone": "SĐT liên hệ",

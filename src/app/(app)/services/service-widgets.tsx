@@ -27,11 +27,12 @@ import type {
 import { Routes } from "@/lib/routes";
 import { cn, formatDate } from "@/lib/utils";
 import type { ServiceChecklistItem, ServiceJobStatus, WarrantyClaimStatus } from "@/lib/services/domain";
+import { ProjectEdit } from "../projects/project-widgets";
 
 type ProjectOption = { id: string; name: string; serviceType: string | null };
 type AssigneeOption = { id: string; name: string };
 
-export function ServiceProjectsTable({ rows }: { rows: ServiceProjectRow[] }) {
+export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProjectRow[]; customers: { id: string; name: string }[] }) {
   const t = useTranslations();
   const columns: DataTableColumn<ServiceProjectRow>[] = [
     {
@@ -57,6 +58,14 @@ export function ServiceProjectsTable({ rows }: { rows: ServiceProjectRow[] }) {
       label: t("services.fields.stage"),
       required: true,
       render: (row) => <ServiceBadge label={row.serviceStage ? t(`services.stages.${row.serviceStage}` as never) : "—"} tone={row.serviceStage === "completed" ? "success" : "default"} />,
+    },
+    {
+      key: "actions",
+      label: "",
+      required: true,
+      width: "64px",
+      align: "right",
+      render: (row) => <span onClick={stopRowToggle}><ProjectEdit project={row} customers={customers} /></span>,
     },
   ];
 

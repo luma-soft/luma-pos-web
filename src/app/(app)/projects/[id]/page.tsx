@@ -15,6 +15,7 @@ import {
   ServiceJobQuickCreate,
   WarrantyClaimQuickCreate,
 } from "../../services/service-widgets";
+import { ProjectEdit } from "../project-widgets";
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -34,6 +35,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <h1 className="truncate text-[17px] font-bold">{project.name}</h1>
           <p className="text-xs text-slate-500">{project.customerName ?? t("projects.noCustomer")}</p>
         </div>
+        {serviceOptions && <div className="ml-auto"><ProjectEdit project={project} customers={serviceOptions.customerOptions} /></div>}
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4 mb-5">

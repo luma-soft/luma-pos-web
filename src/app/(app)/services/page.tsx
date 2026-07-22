@@ -82,7 +82,7 @@ export default async function ServicesPage({
             <ProjectQuickCreate customers={options.customerOptions} serviceMode />
           </div>
           {dashboard.projects.length > 0
-            ? <ServiceProjectsTable rows={dashboard.projects} />
+            ? <ServiceProjectsTable rows={dashboard.projects} customers={options.customerOptions} />
             : <Section collapsible={false}><Text variant="muted" size="sm" text={t("services.projects.empty")} /></Section>}
         </div>
       )}

@@ -2315,6 +2315,7 @@
       "asset": "Asset",
       "reportedAt": "Reported",
       "priority": "Priority",
+      "startsOn": "Start date",
       "targetEndsOn": "Target completion",
       "siteContactName": "Site contact",
       "siteContactPhone": "Contact phone",

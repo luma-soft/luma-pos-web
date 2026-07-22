@@ -21,6 +21,12 @@ export type CreateProjectInput = z.input<typeof projectSchema>;
 const projectUpdateSchema = projectSchema.extend({
   id: z.uuid(),
   status: z.enum(["active", "done"]).default("active"),
+  serviceType: z.enum(["camera", "electrical", "plumbing", "mixed"]).optional(),
+  serviceStage: z.enum(["planning", "quoted", "active", "paused", "completed", "warranty", "cancelled"]).optional(),
+  startsOn: z.iso.date().nullable().optional(),
+  targetEndsOn: z.iso.date().nullable().optional(),
+  siteContactName: z.string().trim().optional(),
+  siteContactPhone: z.string().trim().max(20).optional(),
 });
 export type UpdateProjectInput = z.input<typeof projectUpdateSchema>;
 
@@ -151,24 +157,27 @@ export async function updateProject(input: UpdateProjectInput): Promise<ActionRe
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
   try {
+    const isServiceProject = Boolean(v.serviceType);
+    const serviceStage = v.status === "done" ? "completed" : v.serviceStage;
     await db.update(projects).set({
       name: v.name.trim(),
       customerId: v.customerId ?? null,
       address: v.address?.trim() || null,
       note: v.note?.trim() || null,
       status: v.status,
-      serviceStage: sql`case
-        when ${projects.serviceType} is null then ${projects.serviceStage}
-        when ${v.status} = 'done' then 'completed'::service_project_stage
-        else coalesce(${projects.serviceStage}, 'active'::service_project_stage)
-      end`,
-      progressPercent: sql`case
-        when ${projects.serviceType} is not null and ${v.status} = 'done' then 100
-        else ${projects.progressPercent}
-      end`,
+      ...(isServiceProject ? {
+        serviceType: v.serviceType,
+        serviceStage,
+        startsOn: v.startsOn ?? null,
+        targetEndsOn: v.targetEndsOn ?? null,
+        siteContactName: v.siteContactName || null,
+        siteContactPhone: v.siteContactPhone || null,
+        ...(v.status === "done" ? { progressPercent: 100 } : {}),
+      } : {}),
     }).where(eq(projects.id, v.id));
     revalidatePath(Routes.Partners);
     revalidatePath(Routes.Projects);
+    revalidatePath(Routes.Services);
     revalidatePath(Routes.project(v.id));
     return { ok: true, data: undefined };
   } catch (e) {

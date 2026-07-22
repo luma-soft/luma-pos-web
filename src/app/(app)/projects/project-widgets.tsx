@@ -3,10 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Plus, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
 import { RowPreviewModal } from "@/components/data-table";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Input, Textarea } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
 import type { ProjectRow } from "@/lib/data/projects";
@@ -128,7 +128,22 @@ export function ProjectToggle({ id, status }: { id: string; status: string }) {
   );
 }
 
-export function ProjectEdit({ project, customers }: { project: ProjectRow; customers: { id: string; name: string }[] }) {
+type EditableProject = Pick<ProjectRow,
+  | "id"
+  | "name"
+  | "customerId"
+  | "address"
+  | "note"
+  | "status"
+  | "serviceType"
+  | "serviceStage"
+  | "startsOn"
+  | "targetEndsOn"
+  | "siteContactName"
+  | "siteContactPhone"
+>;
+
+export function ProjectEdit({ project, customers }: { project: EditableProject; customers: { id: string; name: string }[] }) {
   const t = useTranslations();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -137,8 +152,15 @@ export function ProjectEdit({ project, customers }: { project: ProjectRow; custo
   const [address, setAddress] = useState(project.address ?? "");
   const [note, setNote] = useState(project.note ?? "");
   const [status, setStatus] = useState(project.status);
+  const [serviceType, setServiceType] = useState<string>(project.serviceType ?? "camera");
+  const [serviceStage, setServiceStage] = useState<string>(project.serviceStage ?? "planning");
+  const [startsOn, setStartsOn] = useState(project.startsOn ?? "");
+  const [targetEndsOn, setTargetEndsOn] = useState(project.targetEndsOn ?? "");
+  const [siteContactName, setSiteContactName] = useState(project.siteContactName ?? "");
+  const [siteContactPhone, setSiteContactPhone] = useState(project.siteContactPhone ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const isServiceProject = Boolean(project.serviceType);
 
   async function submit() {
     if (!name.trim() || busy) return;
@@ -150,7 +172,15 @@ export function ProjectEdit({ project, customers }: { project: ProjectRow; custo
       customerId: customerId || null,
       address: address || undefined,
       note: note || undefined,
-      status: status === "done" ? "done" : "active",
+      status: isServiceProject
+        ? serviceStage === "completed" || serviceStage === "cancelled" ? "done" : "active"
+        : status === "done" ? "done" : "active",
+      serviceType: isServiceProject ? serviceType as "camera" | "electrical" | "plumbing" | "mixed" : undefined,
+      serviceStage: isServiceProject ? serviceStage as "planning" | "quoted" | "active" | "paused" | "completed" | "warranty" | "cancelled" : undefined,
+      startsOn: isServiceProject ? startsOn || null : undefined,
+      targetEndsOn: isServiceProject ? targetEndsOn || null : undefined,
+      siteContactName: isServiceProject ? siteContactName || undefined : undefined,
+      siteContactPhone: isServiceProject ? siteContactPhone || undefined : undefined,
     });
     setBusy(false);
     if (res.ok) {
@@ -164,42 +194,71 @@ export function ProjectEdit({ project, customers }: { project: ProjectRow; custo
   return (
     <>
       <Button type="button" variant="link" size="sm" onClick={() => setOpen(true)} className="h-auto px-0 text-xs" tx="common.edit" />
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setOpen(false)}>
-          <div className="w-full max-w-xl rounded-card border border-border bg-surface p-4 shadow-e2" onClick={(event) => event.stopPropagation()}>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <Text as="h2" weight="bold" className="text-sm" tx="projects.editTitle" />
-              <Button type="button" variant="ghost" size="iconSm" onClick={() => setOpen(false)}><X className="w-4 h-4" /></Button>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={`${t("projects.cols.name")} *`} />
-              <Select
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-                options={[
-                  { value: "", label: t("projects.noCustomer") },
-                  ...customers.map((c) => ({ value: c.id, label: c.name })),
-                ]}
-              />
-              <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder={t("customers.fields.address")} />
-              <Select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                options={[
-                  { value: "active", label: t("projects.status.active") },
-                  { value: "done", label: t("projects.status.done") },
-                ]}
-              />
-              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("customers.fields.note")} className="sm:col-span-2" />
-            </div>
-            {error && <Text as="p" variant="destructive" size="xs" className="mt-3" text={error} />}
-            <div className="mt-4 flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setOpen(false)} tx="common.cancel" />
-              <Button type="button" onClick={submit} disabled={busy || !name.trim()} loading={busy} tx="common.save" />
-            </div>
+      <RowPreviewModal
+        open={open}
+        onClose={() => {
+          if (!busy) setOpen(false);
+        }}
+        title={t("projects.editTitle")}
+        closeLabel={t("common.close")}
+        size={isServiceProject ? "lg" : "md"}
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy} tx="common.cancel" />
+            <Button type="button" onClick={submit} disabled={busy || !name.trim()} loading={busy} tx="common.save" />
           </div>
+        )}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={`${t("projects.cols.name")} *`} />
+          <Select
+            value={customerId}
+            onChange={(e) => setCustomerId(e.target.value)}
+            options={[
+              { value: "", label: t("projects.noCustomer") },
+              ...customers.map((c) => ({ value: c.id, label: c.name })),
+            ]}
+          />
+          <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder={t("customers.fields.address")} className="sm:col-span-2" />
+          {isServiceProject ? (
+            <>
+              <Select
+                value={serviceType}
+                onChange={(e) => setServiceType(e.target.value)}
+                options={[
+                  { value: "camera", label: t("services.types.camera") },
+                  { value: "electrical", label: t("services.types.electrical") },
+                  { value: "plumbing", label: t("services.types.plumbing") },
+                  { value: "mixed", label: t("services.types.mixed") },
+                ]}
+              />
+              <Select
+                value={serviceStage}
+                onChange={(e) => setServiceStage(e.target.value)}
+                options={["planning", "quoted", "active", "paused", "completed", "warranty", "cancelled"].map((value) => ({
+                  value,
+                  label: t(`services.stages.${value}` as never),
+                }))}
+              />
+              <Input type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} aria-label={t("services.fields.startsOn")} />
+              <Input type="date" value={targetEndsOn} onChange={(e) => setTargetEndsOn(e.target.value)} aria-label={t("services.fields.targetEndsOn")} />
+              <Input value={siteContactName} onChange={(e) => setSiteContactName(e.target.value)} placeholder={t("services.fields.siteContactName")} />
+              <Input value={siteContactPhone} onChange={(e) => setSiteContactPhone(e.target.value)} placeholder={t("services.fields.siteContactPhone")} />
+            </>
+          ) : (
+            <Select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              options={[
+                { value: "active", label: t("projects.status.active") },
+                { value: "done", label: t("projects.status.done") },
+              ]}
+            />
+          )}
+          <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("customers.fields.note")} className="sm:col-span-2" />
+          {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
         </div>
-      )}
+      </RowPreviewModal>
     </>
   );
 }
