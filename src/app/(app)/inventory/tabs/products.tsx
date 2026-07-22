@@ -168,9 +168,6 @@ async function ProductsContent({ searchParams, cameraMaterials = false }: { sear
         </>
       )}
 
-      <div className="pt-3">
-        <span className="text-sm text-slate-500">{t("products.list.total", { total })}</span>
-      </div>
       <div className="shrink-0 pt-3">
         <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("products.unitLabel")} />
       </div>
