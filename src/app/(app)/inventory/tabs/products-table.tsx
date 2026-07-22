@@ -73,6 +73,7 @@ export function ProductsTable({
       key: "product",
       label: t("products.list.colProduct"),
       required: true,
+      width: "30%",
       render: (product) => (
         <div className="flex items-center gap-3">
           <ProductThumbnail product={product} />
