@@ -2413,6 +2413,7 @@
     "errors": {
       "projectRequired": "Cần chọn công trình dịch vụ hợp lệ.",
       "tradeMismatch": "Nghiệp vụ của lệnh việc không phù hợp với công trình.",
+      "relationMismatch": "Dữ liệu được chọn không thuộc công trình này hoặc không đúng loại chứng từ.",
       "invalidTransition": "Không thể chuyển sang trạng thái này.",
       "duplicateCode": "Mã chứng từ đã tồn tại, vui lòng thử lại.",
       "duplicateSerial": "Serial thiết bị đã tồn tại."

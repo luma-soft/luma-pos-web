@@ -113,3 +113,30 @@ export function canTransitionWarrantyClaim(
 ): boolean {
   return current === next || allowedWarrantyTransitions[current].includes(next);
 }
+
+type ProjectLink = { projectId: string | null } | null;
+type OrderProjectLink = { projectId: string | null; status: string } | null;
+
+export function validateServiceLinks({
+  projectId,
+  job,
+  asset,
+  quoteOrder,
+  materialOrder,
+}: {
+  projectId: string;
+  job?: ProjectLink;
+  asset?: ProjectLink;
+  quoteOrder?: OrderProjectLink;
+  materialOrder?: OrderProjectLink;
+}): boolean {
+  if (job !== undefined && job?.projectId !== projectId) return false;
+  if (asset !== undefined && asset?.projectId !== projectId) return false;
+  if (quoteOrder !== undefined && (quoteOrder?.projectId !== projectId || quoteOrder.status !== "quote")) return false;
+  if (materialOrder !== undefined && (
+    materialOrder?.projectId !== projectId
+    || materialOrder.status === "quote"
+    || materialOrder.status === "cancelled"
+  )) return false;
+  return true;
+}

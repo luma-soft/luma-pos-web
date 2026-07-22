@@ -2413,6 +2413,7 @@
     "errors": {
       "projectRequired": "Select a valid service project.",
       "tradeMismatch": "The work order trade does not match this project.",
+      "relationMismatch": "The selected record does not belong to this project or has the wrong document type.",
       "invalidTransition": "This status transition is not allowed.",
       "duplicateCode": "The document code already exists. Try again.",
       "duplicateSerial": "This asset serial already exists."

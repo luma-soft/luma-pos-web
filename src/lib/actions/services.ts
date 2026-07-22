@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   installedAssets,
+  orders,
   projects,
   serviceJobMaterials,
   serviceJobs,
@@ -24,6 +25,7 @@ import {
   canTransitionServiceJob,
   createDefaultChecklist,
   isServiceTypeAllowedForProject,
+  validateServiceLinks,
   type ServiceChecklistItem,
 } from "@/lib/services/domain";
 import {
@@ -55,6 +57,56 @@ function revalidateServiceProject(projectId?: string) {
   revalidatePath(Routes.Partners);
   revalidatePath(Routes.Projects);
   if (projectId) revalidatePath(Routes.project(projectId));
+}
+
+async function loadJobProject(jobId?: string | null) {
+  if (!jobId) return undefined;
+  const [job] = await db.select({ projectId: serviceJobs.projectId })
+    .from(serviceJobs)
+    .where(eq(serviceJobs.id, jobId))
+    .limit(1);
+  return job ?? null;
+}
+
+async function loadAssetProject(assetId?: string | null) {
+  if (!assetId) return undefined;
+  const [asset] = await db.select({ projectId: installedAssets.projectId })
+    .from(installedAssets)
+    .where(eq(installedAssets.id, assetId))
+    .limit(1);
+  return asset ?? null;
+}
+
+async function loadOrderProject(orderId?: string | null) {
+  if (!orderId) return undefined;
+  const [order] = await db.select({ projectId: orders.projectId, status: orders.status })
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .limit(1);
+  return order ?? null;
+}
+
+async function serviceLinksAreValid(projectId: string, links: {
+  jobId?: string | null;
+  assetId?: string | null;
+  quoteOrderId?: string | null;
+  materialOrderId?: string | null;
+}) {
+  const [job, asset, quoteOrder, materialOrder] = await Promise.all([
+    loadJobProject(links.jobId),
+    loadAssetProject(links.assetId),
+    loadOrderProject(links.quoteOrderId),
+    loadOrderProject(links.materialOrderId),
+  ]);
+  return validateServiceLinks({ projectId, job, asset, quoteOrder, materialOrder });
+}
+
+async function isServiceProject(projectId: string) {
+  const [project] = await db.select({ serviceType: projects.serviceType })
+    .from(projects)
+    .where(eq(projects.id, projectId))
+    .limit(1);
+  return Boolean(project?.serviceType);
 }
 
 export async function createServiceProject(
@@ -105,6 +157,10 @@ export async function createServiceJob(
     if (!isServiceTypeAllowedForProject(project.serviceType, value.serviceType)) {
       return { ok: false, error: "services.errors.tradeMismatch" };
     }
+    if (!await serviceLinksAreValid(value.projectId, {
+      quoteOrderId: value.quoteOrderId,
+      materialOrderId: value.materialOrderId,
+    })) return { ok: false, error: "services.errors.relationMismatch" };
 
     const code = generateCode("DV");
     const [job] = await db.insert(serviceJobs).values({
@@ -152,6 +208,10 @@ export async function updateServiceJob(
     if (!isServiceTypeAllowedForProject(current.projectType, value.serviceType)) {
       return { ok: false, error: "services.errors.tradeMismatch" };
     }
+    if (!await serviceLinksAreValid(current.projectId, {
+      quoteOrderId: value.quoteOrderId,
+      materialOrderId: value.materialOrderId,
+    })) return { ok: false, error: "services.errors.relationMismatch" };
 
     await db.update(serviceJobs).set({
       serviceType: value.serviceType,
@@ -304,6 +364,12 @@ export async function createInstalledAsset(
   const value = parsed.data;
 
   try {
+    if (!await isServiceProject(value.projectId)) {
+      return { ok: false, error: "services.errors.projectRequired" };
+    }
+    if (!await serviceLinksAreValid(value.projectId, { jobId: value.jobId })) {
+      return { ok: false, error: "services.errors.relationMismatch" };
+    }
     const [asset] = await db.insert(installedAssets).values({
       projectId: value.projectId,
       jobId: value.jobId ?? null,
@@ -345,6 +411,9 @@ export async function updateInstalledAsset(
       .where(eq(installedAssets.id, value.assetId))
       .limit(1);
     if (!current) return { ok: false, error: "errors.notFound" };
+    if (!await serviceLinksAreValid(current.projectId, { jobId: value.jobId })) {
+      return { ok: false, error: "services.errors.relationMismatch" };
+    }
 
     await db.update(installedAssets).set({
       jobId: value.jobId ?? null,
@@ -382,6 +451,12 @@ export async function createWarrantyClaim(
   const value = parsed.data;
 
   try {
+    if (!await isServiceProject(value.projectId)) {
+      return { ok: false, error: "services.errors.projectRequired" };
+    }
+    if (!await serviceLinksAreValid(value.projectId, { jobId: value.jobId, assetId: value.assetId })) {
+      return { ok: false, error: "services.errors.relationMismatch" };
+    }
     const code = generateCode("BH");
     const [claim] = await db.insert(warrantyClaims).values({
       projectId: value.projectId,
@@ -417,6 +492,9 @@ export async function updateWarrantyClaim(
       .where(eq(warrantyClaims.id, value.claimId))
       .limit(1);
     if (!current) return { ok: false, error: "errors.notFound" };
+    if (!await serviceLinksAreValid(current.projectId, { jobId: value.jobId, assetId: value.assetId })) {
+      return { ok: false, error: "services.errors.relationMismatch" };
+    }
 
     await db.update(warrantyClaims).set({
       jobId: value.jobId ?? null,

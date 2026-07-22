@@ -4,6 +4,7 @@ import {
   canTransitionServiceJob,
   createDefaultChecklist,
   isServiceTypeAllowedForProject,
+  validateServiceLinks,
 } from "@/lib/services/domain";
 import {
   installedAssetCreateSchema,
@@ -171,5 +172,22 @@ describe("service quote links", () => {
     expect(href).toContain("/pos?draft=quote");
     expect(href).toContain("projectName=Camera+kho+B%C3%ACnh+T%C3%A2n");
     expect(href).toContain("customerId=cf3dbf89-6b79-441c-b4cd-934ce25fdf80");
+  });
+
+  it("rejects orders and field records linked to a different project", () => {
+    const projectId = "d5a84a82-d4c0-4b8f-b20d-87501d14a727";
+    const otherProjectId = "cf3dbf89-6b79-441c-b4cd-934ce25fdf80";
+
+    expect(validateServiceLinks({
+      projectId,
+      job: { projectId },
+      asset: { projectId },
+      quoteOrder: { projectId, status: "quote" },
+      materialOrder: { projectId, status: "confirmed" },
+    })).toBe(true);
+    expect(validateServiceLinks({ projectId, job: { projectId: otherProjectId } })).toBe(false);
+    expect(validateServiceLinks({ projectId, asset: null })).toBe(false);
+    expect(validateServiceLinks({ projectId, quoteOrder: { projectId, status: "confirmed" } })).toBe(false);
+    expect(validateServiceLinks({ projectId, materialOrder: { projectId, status: "cancelled" } })).toBe(false);
   });
 });

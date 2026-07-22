@@ -31,7 +31,13 @@ import type {
 } from "@/lib/data/services";
 import { Routes } from "@/lib/routes";
 import { cn, formatDate } from "@/lib/utils";
-import type { ServiceChecklistItem, ServiceJobStatus, WarrantyClaimStatus } from "@/lib/services/domain";
+import {
+  canTransitionServiceJob,
+  canTransitionWarrantyClaim,
+  type ServiceChecklistItem,
+  type ServiceJobStatus,
+  type WarrantyClaimStatus,
+} from "@/lib/services/domain";
 import { ProjectEdit } from "../projects/project-widgets";
 
 type ProjectOption = { id: string; name: string; serviceType: string | null };
@@ -801,7 +807,12 @@ export function ServiceJobStatusAction({ jobId, status }: { jobId: string; statu
 
   return (
     <span onClick={stopRowToggle} className="inline-flex items-center gap-1.5">
-      <Select size="sm" value={value} onChange={(event) => setValue(event.target.value as ServiceJobStatus)} options={jobStatusOptions(t)} />
+      <Select
+        size="sm"
+        value={value}
+        onChange={(event) => setValue(event.target.value as ServiceJobStatus)}
+        options={jobStatusOptions(t).filter((option) => canTransitionServiceJob(status, option.value as ServiceJobStatus))}
+      />
       {value !== status && <Button type="button" size="sm" onClick={() => setOpen(true)} tx="common.save" />}
       <RowPreviewModal
         open={open}
@@ -868,7 +879,12 @@ export function WarrantyClaimStatusAction({
 
   return (
     <span onClick={stopRowToggle} className="inline-flex items-center gap-1.5">
-      <Select size="sm" value={value} onChange={(event) => setValue(event.target.value as WarrantyClaimStatus)} options={claimStatusOptions(t)} />
+      <Select
+        size="sm"
+        value={value}
+        onChange={(event) => setValue(event.target.value as WarrantyClaimStatus)}
+        options={claimStatusOptions(t).filter((option) => canTransitionWarrantyClaim(status, option.value as WarrantyClaimStatus))}
+      />
       {value !== status && <Button type="button" size="sm" onClick={() => setOpen(true)} tx="common.save" />}
       <RowPreviewModal
         open={open}
