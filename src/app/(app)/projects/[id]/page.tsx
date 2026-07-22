@@ -17,6 +17,7 @@ import {
   ServiceJobStatusAction,
   ServiceMaterialEditor,
   ServiceMaterialStockSync,
+  ServiceMaterialReservation,
   ServiceCostEditor,
   WarrantyClaimQuickCreate,
   WarrantyClaimStatusAction,
@@ -228,6 +229,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                     </div>
                     <div className="flex items-center gap-3">
                       <Text size="sm" text={`${t("services.materials.used")}: ${Number(material.usedQuantity)} / ${Number(material.plannedQuantity)} ${material.unitName}`} />
+                      <ServiceMaterialReservation material={material} warehouses={serviceOptions.warehouseOptions} />
                       <ServiceMaterialStockSync material={material} warehouses={serviceOptions.warehouseOptions} />
                       <ServiceMaterialEditor
                         jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))}

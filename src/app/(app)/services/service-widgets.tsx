@@ -18,6 +18,8 @@ import {
   createServiceJob,
   createWarrantyClaim,
   deleteServiceCostEntry,
+  releaseServiceJobMaterialReservations,
+  reserveServiceJobMaterial,
   saveServiceJobMaterial,
   saveServiceCostEntry,
   syncServiceJobMaterialStock,
@@ -795,9 +797,12 @@ export function ServiceMaterialStockSync({
     id: string;
     unitName: string;
     usedQuantity: string;
+    plannedQuantity: string;
     unitMultiplier: string;
     issuedBaseQuantity: string;
     stockWarehouseId: string | null;
+    reservedBaseQuantity: string;
+    reservedWarehouseId: string | null;
   };
   warehouses: WarehouseOption[];
 }) {
@@ -877,6 +882,82 @@ export function ServiceMaterialStockSync({
             unit: material.unitName,
           })} />
           {error && <Text as="p" variant="destructive" size="xs" text={error} />}
+        </div>
+      </RowPreviewModal>
+    </>
+  );
+}
+
+export function ServiceMaterialReservation({
+  material,
+  warehouses,
+}: {
+  material: {
+    id: string;
+    unitName: string;
+    plannedQuantity: string;
+    usedQuantity: string;
+    unitMultiplier: string;
+    reservedBaseQuantity: string;
+    reservedWarehouseId: string | null;
+  };
+  warehouses: WarehouseOption[];
+}) {
+  const t = useTranslations();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [warehouseId, setWarehouseId] = useState(material.reservedWarehouseId ?? warehouses.find((warehouse) => warehouse.isDefault)?.id ?? warehouses[0]?.id ?? "");
+  const [quantity, setQuantity] = useState<number | null>(Math.max(0, Number(material.plannedQuantity) - Number(material.usedQuantity)));
+  const multiplier = Number(material.unitMultiplier);
+  const reservedQuantity = multiplier > 0 ? Number(material.reservedBaseQuantity) / multiplier : 0;
+  const remainingQuantity = Math.max(0, Number(material.plannedQuantity) - Number(material.usedQuantity) - reservedQuantity);
+
+  async function reserve() {
+    if (!warehouseId || !quantity || busy) return;
+    setBusy(true);
+    const result = await reserveServiceJobMaterial({ materialId: material.id, warehouseId, quantity });
+    setBusy(false);
+    if (result.ok) { setOpen(false); router.refresh(); }
+  }
+
+  async function release() {
+    if (busy) return;
+    setBusy(true);
+    const result = await releaseServiceJobMaterialReservations(material.id);
+    setBusy(false);
+    if (result.ok) router.refresh();
+  }
+
+  if (reservedQuantity > 0) {
+    return (
+      <div className="flex items-center gap-2">
+        <Text size="xs" variant="muted" text={t("services.materials.reserved", { quantity: Number(reservedQuantity.toFixed(4)), unit: material.unitName })} />
+        <Button type="button" variant="ghost" size="sm" onClick={release} disabled={busy} loading={busy} tx="services.materials.releaseReservation" />
+      </div>
+    );
+  }
+  if (remainingQuantity <= 0 || warehouses.length === 0 || multiplier <= 0) return null;
+  return (
+    <>
+      <Button type="button" variant="outline" size="sm" onClick={() => setOpen(true)} tx="services.materials.reserveStock" />
+      <RowPreviewModal
+        open={open}
+        onClose={() => !busy && setOpen(false)}
+        title={t("services.materials.reserveStockTitle")}
+        closeLabel={t("common.close")}
+        size="md"
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy} tx="common.cancel" />
+            <Button type="button" onClick={reserve} disabled={busy || !warehouseId || !quantity} loading={busy} tx="services.materials.reserveStock" />
+          </div>
+        )}
+      >
+        <div className="space-y-3">
+          <Select value={warehouseId} onChange={(event) => setWarehouseId(event.target.value)} options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))} />
+          <NumberInput value={quantity} onChange={setQuantity} min={0} max={remainingQuantity} decimals={4} suffix={material.unitName} placeholder={t("services.materials.reserveQuantity")} />
+          <Text as="p" size="sm" text={t("services.materials.reserveHint", { quantity: Number(remainingQuantity.toFixed(4)), unit: material.unitName })} />
         </div>
       </RowPreviewModal>
     </>

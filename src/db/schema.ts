@@ -898,6 +898,23 @@ export const serviceCostEntries = pgTable("service_cost_entries", {
   index("service_cost_entries_job_idx").on(t.jobId),
 ]);
 
+export const serviceMaterialAllocations = pgTable("service_material_allocations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  materialId: uuid("material_id").notNull().references(() => serviceJobMaterials.id, { onDelete: "cascade" }),
+  warehouseId: uuid("warehouse_id").notNull().references(() => warehouses.id, { onDelete: "restrict" }),
+  quantity: decimal("quantity", { precision: 14, scale: 4 }).notNull(),
+  remainingQuantity: decimal("remaining_quantity", { precision: 14, scale: 4 }).notNull(),
+  status: text("status").notNull().default("reserved"), // reserved | consumed | released
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  releasedAt: timestamp("released_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("service_material_allocations_status_check", sql`${t.status} in ('reserved', 'consumed', 'released')`),
+  check("service_material_allocations_quantity_check", sql`${t.quantity} > 0 and ${t.remainingQuantity} >= 0 and ${t.remainingQuantity} <= ${t.quantity}`),
+  index("service_material_allocations_material_idx").on(t.materialId, t.status),
+  index("service_material_allocations_warehouse_idx").on(t.warehouseId, t.status),
+]);
+
 export const installedAssets = pgTable("installed_assets", {
   id: uuid("id").primaryKey().defaultRandom(),
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),

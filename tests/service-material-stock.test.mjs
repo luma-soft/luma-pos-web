@@ -15,7 +15,7 @@ const {
   stockMovements,
   warehouses,
 } = schema;
-const { syncServiceJobMaterialStockCore } = await import(
+const { releaseServiceJobMaterialReservationsCore, reserveServiceJobMaterialStockCore, syncServiceJobMaterialStockCore } = await import(
   `${projectRoot}/src/lib/services/material-stock.ts`
 );
 
@@ -96,5 +96,38 @@ if (insufficientStockError !== "INSUFFICIENT_SERVICE_MATERIAL_STOCK") {
 }
 [level] = await db.select().from(stockLevels).where(eq(stockLevels.productId, product.id));
 if (Number(level.quantity) !== 16) throw new Error(`failed sync changed stock to ${level.quantity}`);
+
+const [reservationJob] = await db.insert(serviceJobs).values({
+  projectId: project.id,
+  code: "DV-STOCK-2",
+  serviceType: "camera",
+  title: "Dự phòng vật tư",
+}).returning();
+const [reservedMaterial] = await db.insert(serviceJobMaterials).values({
+  jobId: reservationJob.id,
+  productId: product.id,
+  unitName: "cuộn",
+  plannedQuantity: "3",
+  usedQuantity: "0",
+}).returning();
+await db.transaction((tx) => reserveServiceJobMaterialStockCore(tx, {
+  materialId: reservedMaterial.id,
+  warehouseId: warehouse.id,
+  quantity: 2,
+  createdBy: null,
+}));
+[level] = await db.select().from(stockLevels).where(eq(stockLevels.productId, product.id));
+if (Number(level.quantity) !== 16 || Number(level.reserved) !== 8) throw new Error("reservation did not hold stock");
+await db.update(serviceJobMaterials).set({ usedQuantity: "1" }).where(eq(serviceJobMaterials.id, reservedMaterial.id));
+await db.transaction((tx) => syncServiceJobMaterialStockCore(tx, {
+  materialId: reservedMaterial.id,
+  warehouseId: warehouse.id,
+  createdBy: null,
+}));
+[level] = await db.select().from(stockLevels).where(eq(stockLevels.productId, product.id));
+if (Number(level.quantity) !== 12 || Number(level.reserved) !== 4) throw new Error("issued stock did not consume its reservation");
+await db.transaction((tx) => releaseServiceJobMaterialReservationsCore(tx, { materialId: reservedMaterial.id }));
+[level] = await db.select().from(stockLevels).where(eq(stockLevels.productId, product.id));
+if (Number(level.reserved) !== 0) throw new Error("released reservation still held stock");
 
 console.log("service material stock: issue, return, idempotent sync, and rollback passed");

@@ -108,6 +108,14 @@ export const serviceCostEntrySchema = z.object({
 
 export type ServiceCostEntryInput = z.input<typeof serviceCostEntrySchema>;
 
+export const serviceMaterialReservationSchema = z.object({
+  materialId: z.uuid(),
+  warehouseId: z.uuid(),
+  quantity: z.coerce.number().positive(),
+});
+
+export type ServiceMaterialReservationInput = z.input<typeof serviceMaterialReservationSchema>;
+
 export const installedAssetCreateSchema = z.object({
   projectId: z.uuid(),
   jobId: z.uuid().nullable().optional(),

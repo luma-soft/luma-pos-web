@@ -2394,6 +2394,12 @@
       "syncStock": "Đồng bộ kho",
       "syncStockTitle": "Đồng bộ vật tư với tồn kho",
       "syncStockHint": "Đã dùng {used} {unit}, đã xuất kho {issued} {unit}. Hệ thống chỉ xuất hoặc hoàn phần chênh lệch.",
+      "reserveStock": "Giữ hàng",
+      "releaseReservation": "Bỏ giữ",
+      "reserveStockTitle": "Giữ vật tư cho công trình",
+      "reserveQuantity": "Số lượng cần giữ",
+      "reserveHint": "Còn {quantity} {unit} chưa giữ theo kế hoạch.",
+      "reserved": "Đã giữ: {quantity} {unit}",
       "summary": "{count} dòng vật tư theo lệnh việc",
       "empty": "Chưa lập vật tư dự kiến cho công trình."
     },
@@ -2448,6 +2454,7 @@
       "invalidMaterialUnit": "Đơn vị vật tư không khớp với đơn vị của sản phẩm.",
       "materialWarehouseMismatch": "Vật tư này đã được xuất từ kho khác.",
       "insufficientMaterialStock": "Kho không đủ tồn khả dụng để xuất vật tư.",
+      "reservationExceedsPlan": "Số lượng giữ vượt quá vật tư còn lại theo kế hoạch.",
       "invalidTransition": "Không thể chuyển sang trạng thái này.",
       "duplicateCode": "Mã chứng từ đã tồn tại, vui lòng thử lại.",
       "duplicateSerial": "Serial thiết bị đã tồn tại."

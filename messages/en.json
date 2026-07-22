@@ -2394,6 +2394,12 @@
       "syncStock": "Sync inventory",
       "syncStockTitle": "Sync materials with inventory",
       "syncStockHint": "Used {used} {unit}, issued {issued} {unit}. Only the difference will be issued or returned.",
+      "reserveStock": "Reserve stock",
+      "releaseReservation": "Release",
+      "reserveStockTitle": "Reserve materials for project",
+      "reserveQuantity": "Quantity to reserve",
+      "reserveHint": "{quantity} {unit} remain unreserved in the plan.",
+      "reserved": "Reserved: {quantity} {unit}",
       "summary": "{count} material lines by work order",
       "empty": "No planned materials for this project yet."
     },
@@ -2448,6 +2454,7 @@
       "invalidMaterialUnit": "The material unit does not match the product units.",
       "materialWarehouseMismatch": "This material was already issued from another warehouse.",
       "insufficientMaterialStock": "The warehouse does not have enough available stock for this material.",
+      "reservationExceedsPlan": "The reserved quantity exceeds the remaining planned material.",
       "invalidTransition": "This status transition is not allowed.",
       "duplicateCode": "The document code already exists. Try again.",
       "duplicateSerial": "This asset serial already exists."

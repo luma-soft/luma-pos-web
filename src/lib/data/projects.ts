@@ -11,6 +11,7 @@ import {
   serviceCostEntries,
   serviceJobMaterials,
   serviceJobs,
+  serviceMaterialAllocations,
   serviceStatusLogs,
   stockMovements,
   warrantyClaims,
@@ -160,6 +161,8 @@ export async function getProjectDetail(id: string) {
       usedQuantity: serviceJobMaterials.usedQuantity,
       issuedBaseQuantity: sql<string>`coalesce(-(select sum(${stockMovements.quantity}) from ${stockMovements} where ${stockMovements.refType} = 'service_material' and ${stockMovements.refId} = ${serviceJobMaterials.id}), 0)`,
       stockWarehouseId: sql<string | null>`(select ${stockMovements.warehouseId} from ${stockMovements} where ${stockMovements.refType} = 'service_material' and ${stockMovements.refId} = ${serviceJobMaterials.id} order by ${stockMovements.createdAt} asc limit 1)`,
+      reservedBaseQuantity: sql<string>`coalesce((select sum(${serviceMaterialAllocations.remainingQuantity}) from ${serviceMaterialAllocations} where ${serviceMaterialAllocations.materialId} = ${serviceJobMaterials.id} and ${serviceMaterialAllocations.status} = 'reserved'), 0)`,
+      reservedWarehouseId: sql<string | null>`(select ${serviceMaterialAllocations.warehouseId} from ${serviceMaterialAllocations} where ${serviceMaterialAllocations.materialId} = ${serviceJobMaterials.id} and ${serviceMaterialAllocations.status} = 'reserved' order by ${serviceMaterialAllocations.createdAt} asc limit 1)`,
       note: serviceJobMaterials.note,
     }).from(serviceJobMaterials)
       .innerJoin(serviceJobs, eq(serviceJobMaterials.jobId, serviceJobs.id))

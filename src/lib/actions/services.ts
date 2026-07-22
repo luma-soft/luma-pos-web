@@ -43,6 +43,8 @@ import {
   type ServiceCostEntryInput,
   serviceMaterialStockSyncSchema,
   type ServiceMaterialStockSyncInput,
+  serviceMaterialReservationSchema,
+  type ServiceMaterialReservationInput,
   serviceJobUpdateSchema,
   type ServiceJobUpdateInput,
   serviceJobTransitionSchema,
@@ -57,7 +59,7 @@ import {
   type WarrantyClaimUpdateInput,
 } from "@/lib/services/schemas";
 import { Routes } from "@/lib/routes";
-import { syncServiceJobMaterialStockCore } from "@/lib/services/material-stock";
+import { releaseServiceJobMaterialReservationsCore, reserveServiceJobMaterialStockCore, syncServiceJobMaterialStockCore } from "@/lib/services/material-stock";
 
 function revalidateServiceProject(projectId?: string) {
   revalidatePath(Routes.Services);
@@ -389,6 +391,44 @@ export async function syncServiceJobMaterialStock(
       return { ok: false, error: "services.errors.insufficientMaterialStock" };
     }
     console.error("syncServiceJobMaterialStock failed:", error);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function reserveServiceJobMaterial(
+  input: ServiceMaterialReservationInput,
+): Promise<ActionResult<{ quantityBase: number }>> {
+  const gate = await requireStockAccess();
+  if (!gate.ok) return gate;
+  const parsed = serviceMaterialReservationSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  try {
+    const result = await db.transaction((tx) => reserveServiceJobMaterialStockCore(tx, { ...parsed.data, createdBy: gate.userId }));
+    revalidateServiceProject(result.projectId);
+    revalidatePath(Routes.Inventory);
+    return { ok: true, data: { quantityBase: result.quantityBase } };
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "";
+    if (code === "SERVICE_MATERIAL_NOT_FOUND") return { ok: false, error: "errors.notFound" };
+    if (code === "INVALID_SERVICE_MATERIAL_UNIT") return { ok: false, error: "services.errors.invalidMaterialUnit" };
+    if (code === "SERVICE_MATERIAL_RESERVATION_EXCEEDS_PLAN") return { ok: false, error: "services.errors.reservationExceedsPlan" };
+    if (code === "INSUFFICIENT_SERVICE_MATERIAL_STOCK") return { ok: false, error: "services.errors.insufficientMaterialStock" };
+    console.error("reserveServiceJobMaterial failed:", error);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function releaseServiceJobMaterialReservations(materialId: string): Promise<ActionResult> {
+  const gate = await requireStockAccess();
+  if (!gate.ok) return gate;
+  try {
+    const result = await db.transaction((tx) => releaseServiceJobMaterialReservationsCore(tx, { materialId }));
+    revalidateServiceProject(result.projectId);
+    revalidatePath(Routes.Inventory);
+    return { ok: true, data: undefined };
+  } catch (error) {
+    if (error instanceof Error && error.message === "SERVICE_MATERIAL_NOT_FOUND") return { ok: false, error: "errors.notFound" };
+    console.error("releaseServiceJobMaterialReservations failed:", error);
     return { ok: false, error: "errors.serverError" };
   }
 }
