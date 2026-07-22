@@ -156,10 +156,6 @@ async function ProductsContent({ searchParams, cameraMaterials = false }: { sear
 
   return (
     <>
-      <div className="mb-2">
-        <span className="text-sm text-slate-500">{t("products.list.total", { total })}</span>
-      </div>
-
       {rows.length === 0 ? (
         <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">
           <PackageOpen className="w-10 h-10 mx-auto mb-3 opacity-60" />
@@ -172,6 +168,9 @@ async function ProductsContent({ searchParams, cameraMaterials = false }: { sear
         </>
       )}
 
+      <div className="pt-3">
+        <span className="text-sm text-slate-500">{t("products.list.total", { total })}</span>
+      </div>
       <div className="shrink-0 pt-3">
         <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("products.unitLabel")} />
       </div>
