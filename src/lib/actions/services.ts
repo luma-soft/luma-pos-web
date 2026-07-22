@@ -7,6 +7,7 @@ import {
   installedAssets,
   orders,
   projects,
+  serviceCostEntries,
   serviceJobMaterials,
   serviceJobs,
   serviceStatusLogs,
@@ -38,6 +39,8 @@ import {
   type ServiceJobCreateInput,
   serviceJobMaterialSchema,
   type ServiceJobMaterialInput,
+  serviceCostEntrySchema,
+  type ServiceCostEntryInput,
   serviceMaterialStockSyncSchema,
   type ServiceMaterialStockSyncInput,
   serviceJobUpdateSchema,
@@ -386,6 +389,78 @@ export async function syncServiceJobMaterialStock(
       return { ok: false, error: "services.errors.insufficientMaterialStock" };
     }
     console.error("syncServiceJobMaterialStock failed:", error);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function saveServiceCostEntry(
+  input: ServiceCostEntryInput,
+): Promise<ActionResult<{ id: string }>> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const parsed = serviceCostEntrySchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const value = parsed.data;
+  const amount = value.quantity * value.unitCost;
+
+  try {
+    const [project] = await db.select({ id: projects.id }).from(projects)
+      .where(eq(projects.id, value.projectId)).limit(1);
+    if (!project) return { ok: false, error: "errors.notFound" };
+    if (value.jobId) {
+      const [job] = await db.select({ projectId: serviceJobs.projectId }).from(serviceJobs)
+        .where(eq(serviceJobs.id, value.jobId)).limit(1);
+      if (!job || job.projectId !== value.projectId) return { ok: false, error: "services.errors.relationMismatch" };
+    }
+    if (value.id) {
+      const [entry] = await db.update(serviceCostEntries).set({
+        jobId: value.jobId ?? null,
+        type: value.type,
+        description: value.description,
+        quantity: toQty(value.quantity),
+        unitCost: toMoney(value.unitCost),
+        amount: toMoney(amount),
+        staffId: value.staffId ?? null,
+        incurredOn: value.incurredOn,
+        note: value.note || null,
+        updatedAt: new Date(),
+      }).where(eq(serviceCostEntries.id, value.id)).returning({ id: serviceCostEntries.id });
+      if (!entry) return { ok: false, error: "errors.notFound" };
+      revalidateServiceProject(value.projectId);
+      return { ok: true, data: entry };
+    }
+    const [entry] = await db.insert(serviceCostEntries).values({
+      projectId: value.projectId,
+      jobId: value.jobId ?? null,
+      type: value.type,
+      description: value.description,
+      quantity: toQty(value.quantity),
+      unitCost: toMoney(value.unitCost),
+      amount: toMoney(amount),
+      staffId: value.staffId ?? null,
+      incurredOn: value.incurredOn,
+      note: value.note || null,
+      createdBy: gate.userId,
+    }).returning({ id: serviceCostEntries.id });
+    revalidateServiceProject(value.projectId);
+    return { ok: true, data: entry };
+  } catch (error) {
+    console.error("saveServiceCostEntry failed:", error);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function deleteServiceCostEntry(id: string): Promise<ActionResult> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  try {
+    const [entry] = await db.delete(serviceCostEntries).where(eq(serviceCostEntries.id, id))
+      .returning({ projectId: serviceCostEntries.projectId });
+    if (!entry) return { ok: false, error: "errors.notFound" };
+    revalidateServiceProject(entry.projectId);
+    return { ok: true, data: undefined };
+  } catch (error) {
+    console.error("deleteServiceCostEntry failed:", error);
     return { ok: false, error: "errors.serverError" };
   }
 }

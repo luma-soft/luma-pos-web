@@ -4,7 +4,7 @@ import { drizzle } from "drizzle-orm/pglite";
 
 const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const schema = await import(`${projectRoot}/src/db/schema.ts`);
-const { projects, serviceJobs } = schema;
+const { projects, serviceJobs, serviceCostEntries } = schema;
 const { createDefaultChecklist } = await import(
   `${projectRoot}/src/lib/services/domain.ts`
 );
@@ -41,4 +41,17 @@ if (job.status !== "new" || job.checklist.length !== 6) {
   throw new Error("service job defaults or checklist were not persisted");
 }
 
-console.log("service schema: project and camera job persisted");
+const [cost] = await db.insert(serviceCostEntries).values({
+  projectId: project.id,
+  jobId: job.id,
+  type: "labor",
+  description: "Thi công kéo dây",
+  quantity: "8",
+  unitCost: "150000",
+  amount: "1200000",
+}).returning();
+if (cost.type !== "labor" || Number(cost.amount) !== 1200000) {
+  throw new Error("service cost entry was not persisted");
+}
+
+console.log("service schema: project, camera job, and cost entry persisted");

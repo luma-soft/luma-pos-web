@@ -158,3 +158,26 @@ export function calculateServiceMaterialStockSync(
   const deltaBaseQuantity = Math.round((targetBaseQuantity - issuedBaseQuantity) * 10_000) / 10_000;
   return { targetBaseQuantity, deltaBaseQuantity };
 }
+
+export type ServiceProjectProfitabilityInput = {
+  revenue: number;
+  materialCost: number;
+  laborCost: number;
+  otherCost: number;
+};
+
+export function calculateServiceProjectProfitability(input: ServiceProjectProfitabilityInput) {
+  const values = [input.revenue, input.materialCost, input.laborCost, input.otherCost];
+  if (values.some((value) => !Number.isFinite(value) || value < 0)) return null;
+  const totalCost = input.materialCost + input.laborCost + input.otherCost;
+  const grossProfit = input.revenue - totalCost;
+  return {
+    revenue: input.revenue,
+    materialCost: input.materialCost,
+    laborCost: input.laborCost,
+    otherCost: input.otherCost,
+    totalCost,
+    grossProfit,
+    marginPercent: input.revenue > 0 ? (grossProfit / input.revenue) * 100 : 0,
+  };
+}

@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   customers,
@@ -8,12 +8,14 @@ import {
   products,
   profiles,
   projects,
+  serviceCostEntries,
   serviceJobMaterials,
   serviceJobs,
   serviceStatusLogs,
   stockMovements,
   warrantyClaims,
 } from "@/db/schema";
+import { calculateServiceProjectProfitability } from "@/lib/services/domain";
 
 export async function getProjectRows() {
   return db.select({
@@ -63,7 +65,7 @@ export async function getProjectDetail(id: string) {
   }).from(projects).leftJoin(customers, eq(projects.customerId, customers.id)).where(eq(projects.id, id)).limit(1);
   if (!project) return null;
 
-  const [relatedOrders, jobs, assets, claims, materials, statusLogs] = await Promise.all([
+  const [relatedOrders, jobs, assets, claims, materials, statusLogs, costEntries, costSummary, plannedMaterialSummary] = await Promise.all([
     db.select({
       id: orders.id,
       code: orders.code,
@@ -177,9 +179,58 @@ export async function getProjectDetail(id: string) {
       .leftJoin(profiles, eq(serviceStatusLogs.createdBy, profiles.id))
       .where(eq(serviceJobs.projectId, id))
       .orderBy(desc(serviceStatusLogs.createdAt)),
+    db.select({
+      id: serviceCostEntries.id,
+      jobId: serviceCostEntries.jobId,
+      type: serviceCostEntries.type,
+      description: serviceCostEntries.description,
+      quantity: serviceCostEntries.quantity,
+      unitCost: serviceCostEntries.unitCost,
+      amount: serviceCostEntries.amount,
+      staffId: serviceCostEntries.staffId,
+      staffName: profiles.fullName,
+      incurredOn: serviceCostEntries.incurredOn,
+      note: serviceCostEntries.note,
+      createdAt: serviceCostEntries.createdAt,
+    }).from(serviceCostEntries)
+      .leftJoin(profiles, eq(serviceCostEntries.staffId, profiles.id))
+      .where(eq(serviceCostEntries.projectId, id))
+      .orderBy(desc(serviceCostEntries.incurredOn), desc(serviceCostEntries.createdAt)),
+    db.select({
+      laborCost: sql<string>`coalesce(sum(case when ${serviceCostEntries.type} = 'labor' then ${serviceCostEntries.amount} else 0 end), 0)`,
+      otherCost: sql<string>`coalesce(sum(case when ${serviceCostEntries.type} <> 'labor' then ${serviceCostEntries.amount} else 0 end), 0)`,
+    }).from(serviceCostEntries).where(eq(serviceCostEntries.projectId, id)),
+    db.select({
+      plannedCost: sql<string>`coalesce(sum(${serviceJobMaterials.plannedQuantity} * case when ${serviceJobMaterials.unitName} = ${products.baseUnit} then 1 else coalesce((select ${productUnits.multiplier} from ${productUnits} where ${productUnits.productId} = ${serviceJobMaterials.productId} and ${productUnits.unitName} = ${serviceJobMaterials.unitName} limit 1), 0) end * ${products.costPrice}), 0)`,
+    }).from(serviceJobMaterials)
+      .innerJoin(serviceJobs, eq(serviceJobMaterials.jobId, serviceJobs.id))
+      .innerJoin(products, eq(serviceJobMaterials.productId, products.id))
+      .where(eq(serviceJobs.projectId, id)),
   ]);
 
-  return { project, orders: relatedOrders, jobs, assets, claims, materials, statusLogs };
+  const [actualMaterialSummary] = await db.select({
+    materialCost: sql<string>`coalesce(sum(abs(${stockMovements.quantity}) * coalesce(${stockMovements.unitCost}, 0)), 0)`,
+  }).from(stockMovements)
+    .innerJoin(serviceJobMaterials, and(eq(stockMovements.refType, "service_material"), eq(stockMovements.refId, serviceJobMaterials.id)))
+    .innerJoin(serviceJobs, eq(serviceJobMaterials.jobId, serviceJobs.id))
+    .where(and(eq(serviceJobs.projectId, id), sql`${stockMovements.quantity} < 0`));
+  const revenue = Number(project.totalValue);
+  const materialCost = Number(actualMaterialSummary?.materialCost ?? 0);
+  const laborCost = Number(costSummary[0]?.laborCost ?? 0);
+  const otherCost = Number(costSummary[0]?.otherCost ?? 0);
+  const profitability = calculateServiceProjectProfitability({ revenue, materialCost, laborCost, otherCost });
+  return {
+    project,
+    orders: relatedOrders,
+    jobs,
+    assets,
+    claims,
+    materials,
+    statusLogs,
+    costEntries,
+    profitability,
+    plannedMaterialCost: Number(plannedMaterialSummary[0]?.plannedCost ?? 0),
+  };
 }
 
 export type ProjectDetail = NonNullable<Awaited<ReturnType<typeof getProjectDetail>>>;

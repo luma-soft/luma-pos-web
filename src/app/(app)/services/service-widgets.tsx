@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Plus } from "lucide-react";
 import { DataTableShell, RowPreviewModal, stopRowToggle, type DataTableColumn } from "@/components/data-table";
+import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
@@ -16,7 +17,9 @@ import {
   createInstalledAsset,
   createServiceJob,
   createWarrantyClaim,
+  deleteServiceCostEntry,
   saveServiceJobMaterial,
+  saveServiceCostEntry,
   syncServiceJobMaterialStock,
   transitionServiceJob,
   transitionWarrantyClaim,
@@ -47,6 +50,8 @@ type ProductOption = { id: string; name: string; sku: string; baseUnit: string }
 type WarrantyJobOption = { id: string; projectId: string; code: string; title: string };
 type WarrantyAssetOption = { id: string; projectId: string; jobId: string | null; name: string; serialNumber: string | null };
 type WarehouseOption = { id: string; name: string; isDefault: boolean };
+type ServiceCostJobOption = { id: string; code: string; title: string };
+type ServiceCostStaffOption = { id: string; name: string };
 
 export function ServiceDashboardFilters({
   tab,
@@ -872,6 +877,115 @@ export function ServiceMaterialStockSync({
             unit: material.unitName,
           })} />
           {error && <Text as="p" variant="destructive" size="xs" text={error} />}
+        </div>
+      </RowPreviewModal>
+    </>
+  );
+}
+
+export function ServiceCostEditor({
+  projectId,
+  jobs,
+  staff,
+  initial,
+}: {
+  projectId: string;
+  jobs: ServiceCostJobOption[];
+  staff: ServiceCostStaffOption[];
+  initial?: {
+    id: string;
+    jobId: string | null;
+    type: string;
+    description: string;
+    quantity: string;
+    unitCost: string;
+    staffId: string | null;
+    incurredOn: string;
+    note: string | null;
+  };
+}) {
+  const t = useTranslations();
+  const router = useRouter();
+  const dialog = useConfirmDialog();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [type, setType] = useState(initial?.type ?? "labor");
+  const [jobId, setJobId] = useState(initial?.jobId ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [quantity, setQuantity] = useState<number | null>(initial ? Number(initial.quantity) : 1);
+  const [unitCost, setUnitCost] = useState<number | null>(initial ? Number(initial.unitCost) : 0);
+  const [staffId, setStaffId] = useState(initial?.staffId ?? "");
+  const [incurredOn, setIncurredOn] = useState(initial?.incurredOn ?? new Date().toISOString().slice(0, 10));
+  const [note, setNote] = useState(initial?.note ?? "");
+
+  async function submit() {
+    if (!description.trim() || quantity == null || unitCost == null || busy) return;
+    setBusy(true);
+    const result = await saveServiceCostEntry({
+      id: initial?.id ?? null,
+      projectId,
+      jobId: jobId || null,
+      type: type as "labor" | "subcontractor" | "transport" | "other",
+      description,
+      quantity,
+      unitCost,
+      staffId: staffId || null,
+      incurredOn,
+      note,
+    });
+    setBusy(false);
+    if (result.ok) {
+      setOpen(false);
+      router.refresh();
+    }
+  }
+
+  async function remove() {
+    if (!initial || busy) return;
+    const confirmed = await dialog.confirm({
+      title: t("services.costs.delete"),
+      description: t("services.costs.deleteConfirm"),
+      confirmLabel: t("common.delete"),
+      variant: "destructive",
+    });
+    if (!confirmed) return;
+    setBusy(true);
+    const result = await deleteServiceCostEntry(initial.id);
+    setBusy(false);
+    if (result.ok) {
+      setOpen(false);
+      router.refresh();
+    }
+  }
+
+  return (
+    <>
+      <Button type="button" variant={initial ? "ghost" : "default"} size="sm" onClick={() => setOpen(true)} tx={initial ? "common.edit" : "services.costs.create"} />
+      <RowPreviewModal
+        open={open}
+        onClose={() => !busy && setOpen(false)}
+        title={t(initial ? "services.costs.edit" : "services.costs.create")}
+        closeLabel={t("common.close")}
+        size="md"
+        footer={(
+          <div className="flex items-center justify-between gap-2">
+            {initial ? <Button type="button" variant="ghost" onClick={remove} disabled={busy} tx="services.costs.delete" /> : <span />}
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy} tx="common.cancel" />
+              <Button type="button" onClick={submit} disabled={busy || !description.trim() || quantity == null || unitCost == null} loading={busy} tx="common.save" />
+            </div>
+          </div>
+        )}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Select value={type} onChange={(event) => setType(event.target.value)} options={["labor", "subcontractor", "transport", "other"].map((value) => ({ value, label: t(`services.costs.${value}` as never) }))} />
+          <Select value={jobId} onChange={(event) => setJobId(event.target.value)} options={[{ value: "", label: t("services.jobs.noQuote") }, ...jobs.map((job) => ({ value: job.id, label: `${job.code} · ${job.title}` }))]} />
+          <Input value={description} onChange={(event) => setDescription(event.target.value)} placeholder={`${t("services.costs.description")} *`} className="sm:col-span-2" />
+          <NumberInput value={quantity} onChange={setQuantity} min={0} decimals={4} placeholder={t("services.costs.quantity")} />
+          <NumberInput value={unitCost} onChange={setUnitCost} min={0} suffix="đ" placeholder={t("services.costs.unitCost")} />
+          <Select value={staffId} onChange={(event) => setStaffId(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...staff.map((person) => ({ value: person.id, label: person.name }))]} />
+          <Input type="date" value={incurredOn} onChange={(event) => setIncurredOn(event.target.value)} aria-label={t("services.costs.incurredOn")} />
+          <Textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder={t("customers.fields.note")} className="sm:col-span-2" />
         </div>
       </RowPreviewModal>
     </>

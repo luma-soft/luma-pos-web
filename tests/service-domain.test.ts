@@ -3,6 +3,7 @@ import {
   canTransitionWarrantyClaim,
   canTransitionServiceJob,
   calculateServiceMaterialStockSync,
+  calculateServiceProjectProfitability,
   createDefaultChecklist,
   isServiceTypeAllowedForProject,
   validateServiceLinks,
@@ -83,6 +84,31 @@ describe("service job input", () => {
       quoteOrderId: "cf3dbf89-6b79-441c-b4cd-934ce25fdf80",
       materialOrderId: null,
     }).success).toBe(true);
+  });
+});
+
+describe("service project profitability", () => {
+  it("calculates total cost, gross profit, and margin", () => {
+    const result = calculateServiceProjectProfitability({
+      revenue: 10000000,
+      materialCost: 4000000,
+      laborCost: 2000000,
+      otherCost: 500000,
+    });
+    expect(result).toEqual({
+      revenue: 10000000,
+      materialCost: 4000000,
+      laborCost: 2000000,
+      otherCost: 500000,
+      totalCost: 6500000,
+      grossProfit: 3500000,
+      marginPercent: 35,
+    });
+  });
+
+  it("rejects negative or non-finite cost inputs", () => {
+    expect(calculateServiceProjectProfitability({ revenue: 10, materialCost: -1, laborCost: 0, otherCost: 0 })).toBeNull();
+    expect(calculateServiceProjectProfitability({ revenue: Number.NaN, materialCost: 0, laborCost: 0, otherCost: 0 })).toBeNull();
   });
 });
 

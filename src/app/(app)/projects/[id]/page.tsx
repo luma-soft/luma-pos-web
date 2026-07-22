@@ -17,6 +17,7 @@ import {
   ServiceJobStatusAction,
   ServiceMaterialEditor,
   ServiceMaterialStockSync,
+  ServiceCostEditor,
   WarrantyClaimQuickCreate,
   WarrantyClaimStatusAction,
 } from "../../services/service-widgets";
@@ -27,7 +28,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const t = await getTranslations();
   const detail = await getProjectDetail(id);
   if (!detail) notFound();
-  const { project, orders, jobs, assets, claims, materials, statusLogs } = detail;
+  const { project, orders, jobs, assets, claims, materials, statusLogs, costEntries, profitability, plannedMaterialCost } = detail;
   const serviceOptions = project.serviceType ? await getServiceFormOptions() : null;
 
   return (
@@ -69,6 +70,41 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
       {project.serviceType && serviceOptions && (
         <div className="mb-5 space-y-4">
+          <Section
+            title={t("services.costs.title")}
+            description={t("services.costs.summary", { count: costEntries.length })}
+            action={<ServiceCostEditor projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} staff={serviceOptions.assigneeOptions} />}
+          >
+            {profitability && (
+              <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-6">
+                <CostMetric label={t("services.costs.revenue")} value={profitability.revenue} />
+                <CostMetric label={t("services.costs.plannedMaterialCost")} value={plannedMaterialCost} />
+                <CostMetric label={t("services.costs.materialCost")} value={profitability.materialCost} />
+                <CostMetric label={t("services.costs.laborCost")} value={profitability.laborCost} />
+                <CostMetric label={t("services.costs.otherCost")} value={profitability.otherCost} />
+                <CostMetric label={t("services.costs.grossProfit")} value={profitability.grossProfit} tone={profitability.grossProfit >= 0 ? "text-ok" : "text-er"} />
+              </div>
+            )}
+            {costEntries.length === 0 ? (
+              <Text variant="muted" size="sm" text={t("services.costs.empty")} />
+            ) : (
+              <div className="space-y-2">
+                {costEntries.map((entry) => (
+                  <div key={entry.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-border-soft pb-2 last:border-b-0">
+                    <div className="min-w-0">
+                      <Text size="sm" weight="medium" text={`${t(`services.costs.${entry.type}` as never)} · ${entry.description}`} />
+                      <Text size="xs" variant="muted" text={`${entry.incurredOn}${entry.staffName ? ` · ${entry.staffName}` : ""}${entry.note ? ` · ${entry.note}` : ""}`} />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Text size="sm" weight="semibold" text={formatCurrency(Number(entry.amount))} />
+                      <ServiceCostEditor projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} staff={serviceOptions.assigneeOptions} initial={entry} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+
           <Section
             title={t("services.tabs.jobs")}
             description={t("services.summary.openJobs", { count: jobs.filter((job) => job.status !== "completed" && job.status !== "cancelled").length })}
@@ -273,6 +309,15 @@ function Info({ label, value }: { label: string; value: string }) {
     <div className="flex justify-between gap-3 border-b border-border-soft pb-2 last:border-b-0">
       <span className="text-slate-500">{label}</span>
       <span className="text-right font-medium">{value}</span>
+    </div>
+  );
+}
+
+function CostMetric({ label, value, tone = "" }: { label: string; value: number; tone?: string }) {
+  return (
+    <div className="rounded-lg bg-surface-2 px-3 py-2">
+      <div className="text-[11px] text-slate-500">{label}</div>
+      <div className={`mt-1 text-sm font-semibold tabular-nums ${tone}`}>{formatCurrency(value)}</div>
     </div>
   );
 }

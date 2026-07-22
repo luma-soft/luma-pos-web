@@ -93,6 +93,21 @@ export const serviceMaterialStockSyncSchema = z.object({
 
 export type ServiceMaterialStockSyncInput = z.input<typeof serviceMaterialStockSyncSchema>;
 
+export const serviceCostEntrySchema = z.object({
+  id: z.uuid().nullable().optional(),
+  projectId: z.uuid(),
+  jobId: z.uuid().nullable().optional(),
+  type: z.enum(["labor", "subcontractor", "transport", "other"]),
+  description: z.string().trim().min(1),
+  quantity: z.coerce.number().min(0),
+  unitCost: z.coerce.number().min(0),
+  staffId: z.uuid().nullable().optional(),
+  incurredOn: z.iso.date(),
+  note: z.string().trim().optional(),
+});
+
+export type ServiceCostEntryInput = z.input<typeof serviceCostEntrySchema>;
+
 export const installedAssetCreateSchema = z.object({
   projectId: z.uuid(),
   jobId: z.uuid().nullable().optional(),

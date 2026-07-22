@@ -1,6 +1,6 @@
 import {
   pgTable, uuid, text, varchar, integer, decimal, timestamp, date,
-  boolean, jsonb, primaryKey, index, uniqueIndex, pgEnum,
+  boolean, jsonb, primaryKey, index, uniqueIndex, pgEnum, check,
 } from "drizzle-orm/pg-core";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
@@ -874,6 +874,28 @@ export const serviceJobMaterials = pgTable("service_job_materials", {
 }, (t) => [
   uniqueIndex("service_job_materials_job_product_unit_idx").on(t.jobId, t.productId, t.unitName),
   index("service_job_materials_product_idx").on(t.productId),
+]);
+
+export const serviceCostEntries = pgTable("service_cost_entries", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  jobId: uuid("job_id").references(() => serviceJobs.id, { onDelete: "set null" }),
+  type: text("type").notNull(), // labor | subcontractor | transport | other
+  description: text("description").notNull(),
+  quantity: decimal("quantity", { precision: 14, scale: 4 }).notNull().default("1"),
+  unitCost: decimal("unit_cost", { precision: 14, scale: 2 }).notNull().default("0"),
+  amount: decimal("amount", { precision: 14, scale: 2 }).notNull().default("0"),
+  staffId: uuid("staff_id").references(() => profiles.id, { onDelete: "set null" }),
+  incurredOn: date("incurred_on").notNull().defaultNow(),
+  note: text("note"),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("service_cost_entries_type_check", sql`${t.type} in ('labor', 'subcontractor', 'transport', 'other')`),
+  check("service_cost_entries_amount_check", sql`${t.quantity} >= 0 and ${t.unitCost} >= 0 and ${t.amount} >= 0`),
+  index("service_cost_entries_project_idx").on(t.projectId, t.incurredOn),
+  index("service_cost_entries_job_idx").on(t.jobId),
 ]);
 
 export const installedAssets = pgTable("installed_assets", {
