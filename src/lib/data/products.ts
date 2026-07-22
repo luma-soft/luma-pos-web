@@ -41,6 +41,7 @@ export interface ProductListFilters {
   updatedSince?: string;
   page?: number;
   pageSize?: number;
+  productSkus?: readonly string[];
 }
 
 export const PRODUCT_ORDER_NOTE_SPEC_KEY = "__orderNote";
@@ -98,6 +99,9 @@ export async function getProducts(filters: ProductListFilters = {}) {
           )!
         : eq(products.categoryId, filters.categoryId),
     );
+  }
+  if (filters.productSkus?.length) {
+    conditions.push(inArray(products.sku, filters.productSkus));
   }
   if (view === "grouped") {
     conditions.push(sql`${products.parentProductId} is null`);

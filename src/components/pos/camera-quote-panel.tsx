@@ -164,7 +164,7 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
           <p className="mt-0.5 text-xs text-slate-500">{t("pos.cameraQuote.description")}</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/products" target="_blank" className="text-xs font-semibold text-slate-500 hover:text-primary-600">{t("pos.cameraQuote.manageMaterials")}</Link>
+          <Link href="/inventory?tab=camera-materials" target="_blank" className="text-xs font-semibold text-slate-500 hover:text-primary-600">{t("pos.cameraQuote.manageMaterials")}</Link>
           <Button type="button" size="sm" onClick={() => setPickerOpen(true)}><Plus className="h-4 w-4" />{t("pos.cameraQuote.addCamera")}</Button>
         </div>
       </div>

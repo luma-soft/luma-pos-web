@@ -1826,6 +1826,7 @@
   },
   "inventory": {
     "title": "Tồn kho",
+    "cameraMaterials": "Vật tư lắp camera",
     "totalValue": "Giá trị tồn kho",
     "byCost": "Theo giá vốn",
     "lowStock": "Sắp hết hàng",

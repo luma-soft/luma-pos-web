@@ -14,6 +14,7 @@ import { ProductsTable } from "./products-table";
 import { NewProductForm } from "../../products/new/product-form";
 import { productToFormInitialValues } from "../../products/product-form-values";
 import { ShopeeListingModal } from "./shopee-listing-modal";
+import { CAMERA_QUOTE_DETAIL_MATERIAL_SKUS, CAMERA_QUOTE_MATERIAL_SKUS } from "@/lib/data/camera-quote-constants";
 
 type SP = Record<string, string | undefined>;
 const STATUSES = ["active", "inactive", "all"] as const;
@@ -28,11 +29,13 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
   const params = searchParams;
   const status: Status = STATUSES.includes(params.status as Status) ? (params.status as Status) : "active";
   const view: View = VIEWS.includes(params.view as View) ? (params.view as View) : "grouped";
+  const cameraMaterials = params.cameraMaterials === "1";
   const { categories } = await getProductFormOptions();
 
   return (
     <>
       <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+        {cameraMaterials && <div><h2 className="text-lg font-bold">Vật tư lắp camera</h2><p className="text-sm text-slate-500">Thêm, sửa, xóa các vật tư dùng trong báo giá lắp đặt camera.</p></div>}
         <div className="flex items-center gap-2">
           <Link href={Routes.Categories} className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-border text-sm font-medium hover:bg-surface-2">{t("categories.title")}</Link>
           <Link href={productModalHref(params, { productModal: "create" })} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98]"><Plus className="w-4 h-4" />{t("products.createNew")}</Link>
@@ -72,7 +75,7 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
       </form>
 
       <Suspense fallback={<TableSkeleton cols={8} rows={10} />}>
-        <ProductsContent searchParams={searchParams} />
+        <ProductsContent searchParams={searchParams} cameraMaterials={cameraMaterials} />
       </Suspense>
 
       <ProductEditorModal searchParams={params} />
@@ -151,7 +154,7 @@ function productModalHref(params: SP, patch: Record<string, string>) {
   return `${Routes.Inventory}?${sp.toString()}`;
 }
 
-async function ProductsContent({ searchParams }: { searchParams: SP }) {
+async function ProductsContent({ searchParams, cameraMaterials = false }: { searchParams: SP; cameraMaterials?: boolean }) {
   const t = await getTranslations();
   const params = searchParams;
   const page = Number(params.page) || 1;
@@ -159,7 +162,15 @@ async function ProductsContent({ searchParams }: { searchParams: SP }) {
   const status: Status = STATUSES.includes(params.status as Status) ? (params.status as Status) : "active";
   const view: View = VIEWS.includes(params.view as View) ? (params.view as View) : "grouped";
 
-  const { rows, total, pageCount } = await getProducts({ q: params.q, categoryId: params.category, status, view, page, pageSize });
+  const { rows, total, pageCount } = await getProducts({
+    q: params.q,
+    categoryId: params.category,
+    status,
+    view,
+    page,
+    pageSize,
+    productSkus: cameraMaterials ? [...CAMERA_QUOTE_MATERIAL_SKUS, ...CAMERA_QUOTE_DETAIL_MATERIAL_SKUS] : undefined,
+  });
 
   return (
     <>

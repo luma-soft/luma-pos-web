@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 
 const TABS = [
   { tab: "products", labelKey: "nav.products" },
+  { tab: "camera-materials", labelKey: "inventory.cameraMaterials" },
   { tab: "stock", labelKey: "inventory.title" },
   { tab: "pricing", labelKey: "nav.pricing" },
   { tab: "purchases", labelKey: "nav.purchases" },
@@ -36,7 +37,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         <div className="px-4 sm:px-6 pb-1.5"><GroupTabs base={Routes.Inventory} items={TABS} /></div>
       </div>
 
-      {tab === "products" ? <ProductsTab searchParams={params} />
+      {tab === "products" || tab === "camera-materials" ? <ProductsTab searchParams={tab === "camera-materials" ? { ...params, cameraMaterials: "1" } : params} />
         : tab === "pricing" ? <PricingTab searchParams={params} />
         : tab === "purchases" ? <PurchasesTab searchParams={params} />
         : tab === "purchase-returns" ? <PurchaseReturnsTab searchParams={params} />
