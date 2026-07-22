@@ -13,6 +13,7 @@ import {
   WarrantyClaimQuickCreate,
   WarrantyClaimsTable,
 } from "./service-widgets";
+import { ProductsTab } from "../inventory/tabs/products";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ const TABS = [
   { tab: "projects", labelKey: "services.tabs.projects" },
   { tab: "jobs", labelKey: "services.tabs.jobs" },
   { tab: "warranty", labelKey: "services.tabs.warranty" },
+  { tab: "camera-materials", labelKey: "inventory.cameraMaterials" },
 ];
 
 export default async function ServicesPage({
@@ -61,13 +63,17 @@ export default async function ServicesPage({
                 ? dashboard.projects.length
                 : item.tab === "jobs"
                   ? dashboard.metrics.openJobs
-                  : dashboard.metrics.openClaims,
+                  : item.tab === "warranty"
+                    ? dashboard.metrics.openClaims
+                    : undefined,
             }))}
           />
         </div>
       </div>
 
-      {tab === "jobs" ? (
+      {tab === "camera-materials" ? (
+        <ProductsTab searchParams={{ ...params, cameraMaterials: "1" }} />
+      ) : tab === "jobs" ? (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>

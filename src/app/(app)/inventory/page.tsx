@@ -24,7 +24,6 @@ const TABS = [
   { tab: "purchase-returns", labelKey: "purchaseReturns.title" },
   { tab: "internal", labelKey: "nav.internalUse" },
   { tab: "stocktakes", labelKey: "nav.stocktakes" },
-  { tab: "camera-materials", labelKey: "inventory.cameraMaterials" },
   { tab: "categories", labelKey: "categories.title" },
 ];
 
