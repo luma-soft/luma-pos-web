@@ -101,7 +101,7 @@ function activeRootCondition() {
 }
 
 /** Toàn bộ data POS cần khi mở trang: SP active + đơn vị + tồn kho mặc định, KH, kho. */
-export async function getPosData(options?: { includeProductIds?: readonly string[]; includeProductSkus?: readonly string[] }) {
+export async function getPosData(options?: { includeProductIds?: readonly string[]; includeProductSkus?: readonly string[]; includeProductCategories?: readonly string[] }) {
   const hasComplianceColumns = await hasProductComplianceColumns();
   const [defaultWh] = await db
     .select({ id: warehouses.id, name: warehouses.name })
@@ -111,6 +111,7 @@ export async function getPosData(options?: { includeProductIds?: readonly string
 
   const includeProductIds = [...new Set(options?.includeProductIds ?? [])];
   const includeProductSkus = [...new Set(options?.includeProductSkus ?? [])];
+  const includeProductCategories = [...new Set(options?.includeProductCategories ?? [])];
   const [rootRows, sourceProductRows, customerRows] = await Promise.all([
     db
       .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
@@ -119,7 +120,7 @@ export async function getPosData(options?: { includeProductIds?: readonly string
       .where(activeRootCondition())
       .orderBy(asc(products.name))
       .limit(200),
-    includeProductIds.length || includeProductSkus.length
+    includeProductIds.length || includeProductSkus.length || includeProductCategories.length
       ? db
           .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
           .from(products)
@@ -129,6 +130,7 @@ export async function getPosData(options?: { includeProductIds?: readonly string
             or(
               includeProductIds.length ? inArray(products.id, includeProductIds) : undefined,
               includeProductSkus.length ? inArray(products.sku, includeProductSkus) : undefined,
+              includeProductCategories.length ? inArray(categories.name, includeProductCategories) : undefined,
             ),
           ))
       : Promise.resolve([]),

@@ -105,7 +105,7 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
     ...aiProductIds,
   ];
   const [data, settings, t, orderPrintTemplate, quotePrintTemplate, bookingPrintTemplate, returnPrintTemplate] = await Promise.all([
-    getPosData({ includeProductIds, includeProductSkus: CAMERA_QUOTE_UTILITY_SKUS }),
+    getPosData({ includeProductIds, includeProductSkus: CAMERA_QUOTE_UTILITY_SKUS, includeProductCategories: ["Camera giám sát"] }),
     getStoreSettings(),
     getTranslations(),
     getPrintTemplate("order"),
