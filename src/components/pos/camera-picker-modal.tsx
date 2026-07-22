@@ -50,7 +50,7 @@ export function CameraPickerModal({ open, cameras, memoryCards, installations, m
 
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/40 p-4" role="presentation" onMouseDown={close}>
-      <div className="flex max-h-[min(760px,calc(100dvh-2rem))] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl" role="dialog" aria-modal="true" aria-label={t("pos.cameraQuote.pickerTitle")} onMouseDown={(event) => event.stopPropagation()}>
+      <div className="flex max-h-[min(900px,calc(100dvh-2rem))] w-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl" role="dialog" aria-modal="true" aria-label={t("pos.cameraQuote.pickerTitle")} onMouseDown={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-5">
           <div>
             <h2 className="text-base font-bold sm:text-lg">{t("pos.cameraQuote.pickerTitle")}</h2>
@@ -77,7 +77,7 @@ export function CameraPickerModal({ open, cameras, memoryCards, installations, m
           {filtered.length === 0 ? (
             <div className="grid min-h-40 place-items-center text-sm text-slate-500">{t("pos.cameraQuote.pickerEmpty")}</div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filtered.map((product) => activeTab === "camera" ? (
                 <button key={product.id} type="button" onClick={() => { onSelect(product); close(); }} className="group overflow-hidden rounded-xl border border-border-soft bg-canvas/50 text-left transition hover:border-primary-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
                   <div className="flex h-36 items-center justify-center bg-white p-3 dark:bg-slate-950">

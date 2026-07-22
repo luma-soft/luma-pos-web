@@ -37,10 +37,13 @@ type Props = {
 const cameraPrefixes = ["EZ-", "IM-"];
 
 function isCamera(product: PosProduct) {
-  return !product.isVariantParent && (
-    product.categoryName === "Camera giám sát" ||
-    cameraPrefixes.some((prefix) => product.sku?.startsWith(prefix))
-  );
+  if (product.isVariantParent) return false;
+  const sku = (product.sku ?? "").trim().toUpperCase();
+  const category = (product.categoryName ?? "").trim().toLocaleLowerCase("vi");
+  const name = product.name.toLocaleLowerCase("vi");
+  return category.includes("camera") ||
+    cameraPrefixes.some((prefix) => sku.startsWith(prefix)) ||
+    name.includes("camera") || name.includes("ezviz") || name.includes("imou");
 }
 
 function label(product: PosProduct) {
