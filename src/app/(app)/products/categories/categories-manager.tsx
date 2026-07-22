@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Check, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Select } from "@/components/ui/select";
-import { DataTableShell, type DataTableColumn } from "@/components/data-table";
+import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { cn } from "@/lib/utils";
 import { createCategoryNode, updateCategory, deleteCategory } from "@/lib/actions/products";
 
@@ -63,7 +63,8 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
     } else setError(t(res.error as never));
   }
 
-  const rows = cats;
+  const rows = cats.filter((c) => !c.parentId);
+  const childrenOf = (id: string) => cats.filter((c) => c.parentId === id);
 
   function CategoryName({ c }: { c: Cat }) {
     const isEditing = editing?.id === c.id;
@@ -85,7 +86,7 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
 
   function Actions({ c }: { c: Cat }) {
     return (
-      <div className="flex items-center justify-end gap-1">
+      <div className="flex items-center justify-end gap-1" onClick={stopRowToggle}>
         <button onClick={() => setEditing({ id: c.id, name: c.name })} className="rounded-md p-1.5 text-slate-400 hover:bg-surface-2 hover:text-primary-600" title={t("common.edit")}>
           <Pencil className="h-4 w-4" />
         </button>
@@ -122,17 +123,34 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
         minWidth="720px"
         maxHeight="calc(100dvh - 250px)"
         empty={<p className="rounded-card border border-border-soft bg-surface p-8 text-center text-sm text-slate-400">{t("categories.empty")}</p>}
-        renderMobileRow={({ row }) => (
+        renderMobileRow={({ row, toggle, expanded }) => (
           <div className="flex items-center justify-between gap-3 p-3">
-            <div className="min-w-0 space-y-1">
+            <div role="button" tabIndex={0} onClick={toggle} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") toggle(); }} className="min-w-0 flex-1 space-y-1 text-left">
               <CategoryName c={row} />
               <div className="text-xs text-slate-500">
                 {row.parentName ?? t("categories.noParent")} · {row.productCount} {t("categories.productCount")}
               </div>
             </div>
+            <ChevronDown className={cn("h-4 w-4 shrink-0 text-slate-400 transition-transform", expanded && "rotate-180")} />
             <Actions c={row} />
           </div>
         )}
+        renderExpanded={(row) => {
+          const children = childrenOf(row.id);
+          if (children.length === 0) return null;
+          return (
+            <div className="divide-y divide-border-soft bg-surface-2/45">
+              {children.map((child) => (
+                <div key={child.id} className="grid grid-cols-[minmax(0,1fr)_minmax(10rem,1fr)_8rem_5rem] items-center gap-3 px-3 py-3 text-sm">
+                  <CategoryName c={child} />
+                  <span className="text-slate-500">{child.parentName ?? "—"}</span>
+                  <span className="text-right tabular-nums text-slate-600">{child.productCount}</span>
+                  <Actions c={child} />
+                </div>
+              ))}
+            </div>
+          );
+        }}
       />
 
       {/* modal tạo nhóm hàng */}
