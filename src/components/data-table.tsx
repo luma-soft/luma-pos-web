@@ -218,7 +218,7 @@ export function DataTableShell<T>({
                       {column.label}
                     </th>
                   ))}
-                  <th className="sticky right-0 z-20 bg-canvas px-2 py-2 text-right shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.35)]">{columnVisibilityMenu}</th>
+                  <th className="sticky right-0 top-0 z-20 bg-canvas px-2 py-2 text-right shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.35)]">{columnVisibilityMenu}</th>
                 </tr>
               </thead>
               <tbody>
