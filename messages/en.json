@@ -384,6 +384,7 @@
       "pickerSearchInstallation": "Search installation service",
       "pickerSearchMaterial": "Search material name or SKU",
       "pickerEmpty": "No camera found",
+      "cameraCount": "{count} cameras",
       "chooseCamera": "Choose this camera",
       "selectedCount": "{count} camera selected",
       "cameraTab": "Cameras",

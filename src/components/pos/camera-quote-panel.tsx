@@ -88,16 +88,6 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
     const product = bySku.get(sku);
     return product ? [product] : [];
   });
-  const pickerOptions = (items: PosProduct[]): CameraPickerProduct[] => items.map((product) => ({
-    id: product.id,
-    sku: product.sku ?? "",
-    name: product.name,
-    retailPrice: Number(product.retailPrice),
-    unitName: unitLabel(product),
-  }));
-  const pickerMemoryCards = pickerOptions(cards);
-  const pickerInstallations = pickerOptions(installations);
-  const pickerMaterials = pickerOptions(materials);
   const selectedCameras = packages.reduce<Record<string, number>>((counts, pkg) => {
     counts[pkg.cameraId] = (counts[pkg.cameraId] ?? 0) + pkg.quantity;
     return counts;
@@ -292,9 +282,6 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
       <CameraPickerModal
         open={pickerOpen}
         cameras={pickerCameras}
-        memoryCards={pickerMemoryCards}
-        installations={pickerInstallations}
-        materials={pickerMaterials}
         selectedCameras={selectedCameras}
         onClose={() => setPickerOpen(false)}
         onSelect={(camera) => addCamera(camera.id)}

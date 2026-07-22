@@ -384,6 +384,7 @@
       "pickerSearchInstallation": "Tìm loại công lắp đặt",
       "pickerSearchMaterial": "Tìm tên hoặc mã vật tư",
       "pickerEmpty": "Không tìm thấy camera",
+      "cameraCount": "{count} camera",
       "chooseCamera": "Chọn camera này",
       "selectedCount": "Đã chọn {count} camera",
       "cameraTab": "Camera",
