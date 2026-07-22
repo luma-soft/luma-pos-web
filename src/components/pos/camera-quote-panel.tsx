@@ -79,6 +79,16 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
     const product = bySku.get(sku);
     return product ? [product] : [];
   });
+  const pickerOptions = (items: PosProduct[]): CameraPickerProduct[] => items.map((product) => ({
+    id: product.id,
+    sku: product.sku ?? "",
+    name: product.name,
+    retailPrice: Number(product.retailPrice),
+    unitName: product.baseUnit,
+  }));
+  const pickerMemoryCards = pickerOptions(cards);
+  const pickerInstallations = pickerOptions(installations);
+  const pickerMaterials = pickerOptions(materials);
   const genericMaterialIds = new Set(
     CAMERA_QUOTE_MATERIAL_SKUS.flatMap((sku) => {
       const product = bySku.get(sku);
@@ -269,6 +279,9 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
       <CameraPickerModal
         open={pickerOpen}
         cameras={pickerCameras}
+        memoryCards={pickerMemoryCards}
+        installations={pickerInstallations}
+        materials={pickerMaterials}
         onClose={() => setPickerOpen(false)}
         onSelect={(camera) => addCamera(camera.id)}
       />
