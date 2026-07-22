@@ -565,7 +565,8 @@
     "stock": {
       "current": "On hand",
       "min": "Min level",
-      "max": "Max level"
+      "max": "Max level",
+      "notTracked": "Stock not tracked"
     },
     "physical": {
       "location": "Location",

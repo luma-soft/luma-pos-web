@@ -23,6 +23,10 @@ import { Routes } from "@/lib/routes";
 import { deleteProduct, setProductActive } from "@/lib/actions/products";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import type { ProductListResult } from "@/lib/data/products";
+import {
+  isProductStockManaged,
+  productStockDisplay,
+} from "./product-stock-display";
 
 type ProductRow = ProductListResult["rows"][number];
 type StockMovementRow = ProductRow["stockMovements"][number];
@@ -85,11 +89,14 @@ export function ProductsTable({
       defaultVisible: true,
       align: "right",
       cellClassName: (product) => {
+        if (!isProductStockManaged(product.categoryName)) {
+          return "font-medium text-slate-400";
+        }
         const stock = Number(product.totalStock);
         const min = Number(product.minLevel);
         return min > 0 && stock <= min ? "font-semibold text-er" : "font-semibold text-slate-700 dark:text-slate-300";
       },
-      render: (product) => `${formatNumber(Number(product.totalStock))} ${product.baseUnit}`,
+      render: (product) => productStockDisplay(product, t("products.stock.notTracked")),
     },
     { key: "status", label: t("products.list.colStatus"), defaultVisible: true, render: (product) => <StatusBadge product={product} /> },
   ];
@@ -119,7 +126,7 @@ export function ProductsTable({
           <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
             <Metric label={t("products.list.colCost")} value={priceRange(product.minCostPrice, product.maxCostPrice, product.costPrice)} />
             <Metric label={t("products.list.colSalePrice")} value={priceRange(product.minRetailPrice, product.maxRetailPrice, product.retailPrice)} />
-            <Metric label={t("products.list.colStock")} value={`${formatNumber(Number(product.totalStock))} ${product.baseUnit}`} />
+            <Metric label={t("products.list.colStock")} value={productStockDisplay(product, t("products.stock.notTracked"))} />
           </div>
         </button>
       )}
@@ -287,12 +294,12 @@ function ProductInfoPanel({
           />
           <InfoItem
             label={t("products.stock.current")}
-            value={`${formatNumber(Number(product.totalStock))} ${product.baseUnit}`}
+            value={productStockDisplay(product, t("products.stock.notTracked"))}
           />
           <InfoItem
             label={t("products.stock.min")}
             value={
-              Number(product.minLevel) > 0
+              isProductStockManaged(product.categoryName) && Number(product.minLevel) > 0
                 ? formatNumber(Number(product.minLevel))
                 : undefined
             }
@@ -347,7 +354,10 @@ function ProductInfoPanel({
                     {formatCurrency(Number(child.retailPrice))}
                   </span>
                   <span className="tabular-nums text-slate-500">
-                    {formatNumber(Number(child.totalStock))} {child.baseUnit}
+                    {productStockDisplay(
+                      { ...child, categoryName: product.categoryName },
+                      t("products.stock.notTracked"),
+                    )}
                   </span>
                 </Link>
               ))}
@@ -414,6 +424,9 @@ function TextPanel({
 function ProductStockCardPanel({ product }: { product: ProductRow }) {
   const t = useTranslations();
   const movements = product.stockMovements;
+
+  if (!isProductStockManaged(product.categoryName))
+    return <EmptyPanel message={t("products.stock.notTracked")} />;
 
   if (movements.length === 0)
     return <EmptyPanel message={t("products.expand.stockCardEmpty")} />;
@@ -497,6 +510,10 @@ function ProductStockPanel({
   effectiveActive: boolean;
 }) {
   const t = useTranslations();
+
+  if (!isProductStockManaged(product.categoryName))
+    return <EmptyPanel message={t("products.stock.notTracked")} />;
+
   const rows =
     product.stockLocations.length > 0
       ? product.stockLocations
@@ -635,10 +652,15 @@ function RelatedProductsPanel({ product }: { product: ProductRow }) {
                 {formatCurrency(Number(item.costPrice))}
               </td>
               <td className="px-3 py-3 text-right tabular-nums">
-                {formatNumber(Number(item.totalStock))} {item.baseUnit}
+                {productStockDisplay(
+                  { ...item, categoryName: product.categoryName },
+                  t("products.stock.notTracked"),
+                )}
               </td>
               <td className="px-3 py-3 text-right tabular-nums">
-                {formatNumber(Number(item.reservedStock))}
+                {isProductStockManaged(product.categoryName)
+                  ? formatNumber(Number(item.reservedStock))
+                  : "—"}
               </td>
             </tr>
           ))}

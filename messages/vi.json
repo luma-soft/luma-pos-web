@@ -565,7 +565,8 @@
     "stock": {
       "current": "Tồn kho",
       "min": "Định mức tồn thấp nhất",
-      "max": "Định mức tồn cao nhất"
+      "max": "Định mức tồn cao nhất",
+      "notTracked": "Không quản lý tồn"
     },
     "physical": {
       "location": "Vị trí",
