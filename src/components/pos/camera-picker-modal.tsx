@@ -68,7 +68,7 @@ export function CameraPickerModal({ open, cameras, selectedCameras = {}, onClose
                     {product.imageUrl ? <Image src={product.imageUrl} alt={product.name} width={220} height={140} unoptimized className="h-full w-full object-contain" /> : <Camera className="h-12 w-12 text-slate-300" />}
                   </div>
                   <div className="p-3">
-                    <div className="line-clamp-2 text-sm font-bold text-slate-900 dark:text-slate-100">{product.name}</div>
+                    <div className="whitespace-normal break-words text-sm font-bold text-slate-900 dark:text-slate-100">{product.name}</div>
                     <div className="mt-1 text-xs text-slate-400">{product.sku}</div>
                     <div className="mt-2 font-black tabular-nums text-primary-700">{formatCurrency(product.retailPrice)}</div>
                     {selectedCameras[product.id] ? <div className="mt-2 text-xs font-semibold text-primary-600">{t("pos.cameraQuote.selectedCount", { count: selectedCameras[product.id] })}</div> : null}

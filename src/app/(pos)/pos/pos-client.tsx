@@ -1500,7 +1500,7 @@ export function PosClient({
                   >
                     <GripVertical className="w-3.5 h-3.5" />
                   </button>
-                  <span className={cn("font-medium text-sm line-clamp-2 break-words", outOfStock && "text-er")}>{l.product.name}</span>
+                  <span className={cn("font-medium text-sm whitespace-normal break-words", outOfStock && "text-er")}>{l.product.name}</span>
                   {eff.pct > 0 && (
                     <span className={cn(
                       "shrink-0 text-xs font-bold rounded px-1",
@@ -1767,7 +1767,7 @@ export function PosClient({
                         >
                           <div className="w-9 h-9 rounded-md bg-surface-2 grid place-items-center text-lg shrink-0">{categoryEmoji(p.categoryName)}</div>
                           <div className="min-w-0 flex-1">
-                            <div className="text-sm font-medium truncate">{p.name}</div>
+                            <div className="text-sm font-medium whitespace-normal break-words">{p.name}</div>
                             <div className={cn("text-xs", stock <= 0 ? "text-er" : "text-slate-400")}>
                               {p.isVariantParent ? `${children.length} SKU con` : `${t("pos.stockLabel")} ${formatNumber(stock)} ${p.baseUnit}`}
                             </div>
@@ -2345,7 +2345,7 @@ function VariantPickerModal({
       <div className="fixed z-60 left-1/2 top-1/2 w-[560px] max-w-[calc(100vw-32px)] max-h-[min(80dvh,640px)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-border bg-surface shadow-e2">
         <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
           <div className="min-w-0">
-            <div className="font-semibold truncate">{parent.name}</div>
+            <div className="font-semibold whitespace-normal break-words">{parent.name}</div>
             <div className="mt-0.5 text-xs text-slate-500">{children.length} SKU con · {priceLabelFor(parent, priceBook)}</div>
           </div>
           <button type="button" onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-600">
@@ -2367,7 +2367,7 @@ function VariantPickerModal({
                     className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 text-left hover:border-primary-300 hover:bg-primary-50/50 dark:hover:bg-primary-950/20"
                   >
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold">{child.variantName ?? child.name}</span>
+                      <span className="block whitespace-normal break-words text-sm font-semibold">{child.variantName ?? child.name}</span>
                       <span className="block text-xs text-slate-500">{child.sku}{child.barcode ? ` · ${child.barcode}` : ""}</span>
                     </span>
                     <span className="shrink-0 text-right">
@@ -2468,7 +2468,7 @@ function PrintSizePicker({
           "transition hover:bg-surface-2 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
         )}
       >
-        <span className="truncate">{selected?.label}</span>
+        <span className="whitespace-normal break-words">{selected?.label}</span>
         <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform", open && "rotate-180")} />
       </button>
       {open && (

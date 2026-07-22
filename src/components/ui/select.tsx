@@ -28,6 +28,8 @@ export interface SelectProps
   placeholder?: string;
   placeholderTx?: string;
   placeholderTxOptions?: TxValues;
+  /** Keep long labels readable instead of truncating them. */
+  wrapLabel?: boolean;
 }
 
 export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
@@ -45,6 +47,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
       placeholder,
       placeholderTx,
       placeholderTxOptions,
+      wrapLabel = false,
       disabled,
       ...props
     },
@@ -147,12 +150,13 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
             "relative w-full rounded-lg border bg-surface text-left transition-[border-color,box-shadow,background-color] duration-150 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50",
             sizeCls,
             variantCls,
+            wrapLabel && "h-auto min-h-10 py-2",
             !selected && "text-slate-400",
             className
           )}
           {...props}
         >
-          <span className="block truncate">{selectedLabel ?? "—"}</span>
+          <span className={cn("block", wrapLabel ? "whitespace-normal break-words pr-1" : "truncate")}>{selectedLabel ?? "—"}</span>
           <ChevronDown className={cn("absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none transition-transform", open && "rotate-180")} />
         </button>
         {open && !disabled && menuStyle && typeof document !== "undefined" && createPortal(
@@ -176,7 +180,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                     active && "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-200"
                   )}
                 >
-                  <span className="min-w-0 truncate">{optionLabel(option, t)}</span>
+                  <span className={cn("min-w-0", wrapLabel ? "whitespace-normal break-words" : "truncate")}>{optionLabel(option, t)}</span>
                   {active && <Check className="h-4 w-4 shrink-0 text-primary-600" />}
                 </button>
               );

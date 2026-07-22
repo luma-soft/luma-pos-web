@@ -185,6 +185,7 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
                     <div className="mt-1 flex items-center gap-2">
                       <Select
                         size="sm"
+                        wrapLabel
                         className="min-w-0 flex-1"
                         value={pkg.cameraId}
                         options={cameras.map((product) => ({ value: product.id, label: label(product) }))}
@@ -212,12 +213,14 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
                 <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <Select
                     size="sm"
+                    wrapLabel
                     value={pkg.cardId}
                     options={cards.map((product) => ({ value: product.id, label: label(product) }))}
                     onValueChange={(cardId) => updatePackage(pkg.key, { cardId })}
                   />
                   <Select
                     size="sm"
+                    wrapLabel
                     value={pkg.installationId}
                     options={installations.map((product) => ({ value: product.id, label: label(product) }))}
                     onValueChange={(installationId) => updatePackage(pkg.key, { installationId })}
@@ -232,7 +235,8 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
                       return (
                         <div key={`${pkg.key}-${line.productId}-${materialIndex}`} className="grid grid-cols-[minmax(0,1fr)_120px_32px] items-center gap-2">
                           <Select
-                            size="sm"
+                        size="sm"
+                        wrapLabel
                             value={line.productId}
                             options={materials.map((item) => ({ value: item.id, label: label(item) }))}
                             onValueChange={(productId) => updateMaterial(pkg, materialIndex, productId)}
