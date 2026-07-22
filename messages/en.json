@@ -372,6 +372,20 @@
     "unit": "Unit",
     "lineNotePlaceholder": "Product note…",
     "orderNotePlaceholder": "Order note…",
+    "cameraQuote": {
+      "title": "Camera installation quote",
+      "description": "Choose each camera package, memory card, installation and materials by location.",
+      "addCamera": "Add camera to quote",
+      "empty": "No camera package yet. Choose a camera to start.",
+      "package": "Package {n}",
+      "removePackage": "Remove camera package",
+      "materials": "Materials",
+      "addMaterial": "Add material",
+      "removeMaterial": "Remove material",
+      "cameraQuantity": "Camera quantity",
+      "packageTotal": "Package total",
+      "packageNote": "Camera package {n}"
+    },
     "invoice": {
       "tab": "Order {n}",
       "add": "Add invoice",
@@ -382,11 +396,13 @@
     "draftTabs": {
       "invoice": "Invoice {n}",
       "quote": "Quote {n}",
+      "cameraQuote": "Camera quote {n}",
       "booking": "Booking {n}",
       "addLabel": "Add POS tab",
       "add": {
         "invoice": "Add invoice",
         "quote": "Add quote",
+        "cameraQuote": "Add camera quote",
         "booking": "Add booking",
         "return_quick": "Add quick return"
       },

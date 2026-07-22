@@ -372,6 +372,20 @@
     "unit": "ĐVT",
     "lineNotePlaceholder": "Ghi chú sản phẩm…",
     "orderNotePlaceholder": "Ghi chú đơn hàng…",
+    "cameraQuote": {
+      "title": "Báo giá lắp đặt camera",
+      "description": "Chọn từng gói camera, thẻ nhớ, công lắp và vật tư theo vị trí.",
+      "addCamera": "Thêm camera vào báo giá",
+      "empty": "Chưa có gói camera. Chọn camera để bắt đầu.",
+      "package": "Gói {n}",
+      "removePackage": "Xóa gói camera",
+      "materials": "Vật tư",
+      "addMaterial": "Thêm vật tư",
+      "removeMaterial": "Xóa vật tư",
+      "cameraQuantity": "Số camera",
+      "packageTotal": "Tổng gói",
+      "packageNote": "Gói camera {n}"
+    },
     "invoice": {
       "tab": "Đơn {n}",
       "add": "Thêm hóa đơn",
@@ -382,11 +396,13 @@
     "draftTabs": {
       "invoice": "Hóa đơn {n}",
       "quote": "Báo giá {n}",
+      "cameraQuote": "Báo giá camera {n}",
       "booking": "Đặt hàng {n}",
       "addLabel": "Thêm tab POS",
       "add": {
         "invoice": "Thêm hóa đơn",
         "quote": "Thêm báo giá",
+        "cameraQuote": "Thêm báo giá camera",
         "booking": "Thêm đặt hàng",
         "return_quick": "Thêm trả hàng nhanh"
       },

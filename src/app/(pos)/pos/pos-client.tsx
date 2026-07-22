@@ -17,6 +17,7 @@ import { PrintDoc } from "@/components/print/print-doc";
 import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
 import { CustomerCreateDialog, type CustomerCreateResult } from "@/components/partners/customer-create-dialog";
+import { CameraQuotePanel, type CameraQuotePackage } from "@/components/pos/camera-quote-panel";
 import type { PaperSize, PrintTemplate } from "@/lib/print/template-shared";
 import type { StorePrefs } from "@/lib/schemas/settings";
 import type { AiActionPreview } from "@/lib/ai/actions";
@@ -158,6 +159,8 @@ export type PriceBook = string;
 interface PosDraft {
   id: string;
   kind: PosDraftKind;
+  cameraQuote?: boolean;
+  cameraPackages?: CameraQuotePackage[];
   source?: PosSourceInvoice;
   cart: CartLine[];
   customerId: string;
@@ -589,6 +592,7 @@ export function PosClient({
   const activeKind = active.kind ?? "invoice";
   const isInvoiceDraft = activeKind === "invoice";
   const isQuoteDraft = activeKind === "quote";
+  const isCameraQuoteDraft = isQuoteDraft && active.cameraQuote === true;
   const isBookingDraft = activeKind === "booking";
   const isReturnDraft = isReturnKind(activeKind);
   const isReturnInvoiceDraft = activeKind === "return_invoice";
@@ -624,8 +628,8 @@ export function PosClient({
   });
 
   /** Thêm tab POS mới và chuyển sang nó. */
-  function addDraft(kind: PosDraftKind) {
-    const inv = makeDraft(undefined, kind);
+  function addDraft(kind: PosDraftKind, cameraQuote = false) {
+    const inv = { ...makeDraft(undefined, kind), cameraQuote };
     setInvoices((list) => [...list, inv]);
     setActiveId(inv.id);
     setAddMenuOpen(false);
@@ -663,6 +667,36 @@ export function PosClient({
     [customerId, customerOptions]
   );
   const searchableProducts = useMemo(() => flattenProducts(data.products), [data.products]);
+  const productById = useMemo(() => new Map(searchableProducts.map((product) => [product.id, product])), [searchableProducts]);
+  const cameraPackages = active.cameraPackages ?? [];
+
+  function cameraPackagesToCart(packages: CameraQuotePackage[]) {
+    return packages.flatMap((pkg, packageIndex) => {
+      const packageItems = [
+        { productId: pkg.cameraId, quantity: pkg.quantity },
+        { productId: pkg.cardId, quantity: pkg.quantity },
+        { productId: pkg.installationId, quantity: pkg.quantity },
+        ...pkg.materialLines.map((line) => ({ productId: line.productId, quantity: pkg.quantity * line.quantity })),
+      ];
+      return packageItems.flatMap((item, itemIndex) => {
+        const product = productById.get(item.productId);
+        if (!product) return [];
+        return [{
+          key: `camera-${pkg.key}-${itemIndex}`,
+          product,
+          unitName: product.baseUnit,
+          unitMultiplier: 1,
+          unitPrice: unitPriceFor(product, null, priceBook),
+          quantity: item.quantity,
+          note: t("pos.cameraQuote.packageNote", { n: String(packageIndex + 1).padStart(2, "0") }),
+        }];
+      });
+    });
+  }
+
+  function setCameraPackages(packages: CameraQuotePackage[]) {
+    patchActive({ cameraPackages: packages, cart: cameraPackagesToCart(packages) });
+  }
 
   // Khi gõ tìm kiếm: hỏi server (quét toàn bộ SP, bỏ dấu) — khớp trang Sản phẩm.
   const [serverResults, setServerResults] = useState<PosProduct[]>([]);
@@ -681,7 +715,12 @@ export function PosClient({
 
   /** Khi chỉ có một tab, nút X sẽ làm trống hóa đơn thay vì đóng tab. */
   function clearInvoice(id: string) {
-    setInvoices((list) => list.map((inv) => (inv.id === id ? makeDraft(id, inv.kind ?? "invoice") : inv)));
+    setInvoices((list) => list.map((inv) => {
+      if (inv.id !== id) return inv;
+      const next = makeDraft(id, inv.kind ?? "invoice");
+      next.cameraQuote = inv.cameraQuote;
+      return next;
+    }));
     setActiveId(id);
     setError("");
     setAiUnresolvedItems([]);
@@ -1335,7 +1374,7 @@ export function PosClient({
             )}
           >
             <TabIcon className={cn("w-4 h-4 shrink-0", isActive ? "text-primary-600" : "text-slate-400")} />
-            <span>{t(`pos.draftTabs.${kind}`, { n: ordinal })}</span>
+            <span>{inv.cameraQuote ? t("pos.draftTabs.cameraQuote", { n: ordinal }) : t(`pos.draftTabs.${kind}`, { n: ordinal })}</span>
             {count > 0 && (
               <span className={cn(
                 "min-w-[20px] text-center rounded-full px-1.5 text-xs font-bold",
@@ -1415,7 +1454,7 @@ export function PosClient({
             >
               <div className="flex items-center gap-2 px-3 py-3">
                 <span className="w-5 text-center text-xs text-slate-400 shrink-0 tabular-nums">{idx + 1}</span>
-                <button onClick={() => setCart((c) => c.filter((x) => x.key !== l.key))} className="text-slate-400 hover:text-er shrink-0">
+                <button disabled={isCameraQuoteDraft} onClick={() => setCart((c) => c.filter((x) => x.key !== l.key))} className="text-slate-400 hover:text-er shrink-0 disabled:cursor-not-allowed disabled:opacity-40">
                   <Trash2 className="w-4 h-4" />
                 </button>
                 <span className="w-24 text-sm text-slate-400 shrink-0 truncate">{l.product.sku ?? ""}</span>
@@ -1446,6 +1485,7 @@ export function PosClient({
                 <Select
                   value={l.unitName}
                   onChange={(e) => changeUnit(l.key, e.target.value)}
+                  disabled={isCameraQuoteDraft}
                   size="sm"
                   options={[
                     { value: l.product.baseUnit, label: l.product.baseUnit },
@@ -1461,6 +1501,7 @@ export function PosClient({
                     )}
                   >
                     <button
+                      disabled={isCameraQuoteDraft}
                       onClick={() => updateQty(l.key, -1)}
                       className={cn(
                         "grid h-full place-items-center text-slate-500 hover:text-er hover:bg-surface-2",
@@ -1472,6 +1513,7 @@ export function PosClient({
                     <input
                       type="number"
                       value={l.quantity}
+                      readOnly={isCameraQuoteDraft}
                       onChange={(e) => setQty(l.key, Number(e.target.value))}
                       className={cn(
                         "no-spinner h-full w-full border-x border-border bg-surface text-center text-sm outline-none",
@@ -1479,6 +1521,7 @@ export function PosClient({
                       )}
                     />
                     <button
+                      disabled={isCameraQuoteDraft}
                       onClick={() => updateQty(l.key, 1)}
                       className={cn(
                         "grid h-full place-items-center text-slate-500 hover:text-primary-600 hover:bg-surface-2",
@@ -1496,6 +1539,7 @@ export function PosClient({
                   <StockQuantityTooltip stock={Number(l.product.stock)} ordered={l.quantity * l.unitMultiplier} unit={l.product.baseUnit} />
                 </div>
                 <button
+                  disabled={isCameraQuoteDraft}
                   onClick={() => setEditKey(editKey === l.key ? null : l.key)}
                   title={t("pos.priceEditor.editHint")}
                   className="w-28 text-right text-base tabular-nums text-slate-500 hover:text-primary-600 shrink-0"
@@ -1503,7 +1547,7 @@ export function PosClient({
                   {formatCurrency(eff.price)}
                 </button>
                 <span className="w-28 text-right text-base font-bold tabular-nums shrink-0">{formatCurrency(eff.price * l.quantity)}</span>
-                <button onClick={() => setEditKey(editKey === l.key ? null : l.key)} className="w-7 h-7 rounded-md hover:bg-surface-2 grid place-items-center shrink-0 text-slate-400">
+                <button disabled={isCameraQuoteDraft} onClick={() => setEditKey(editKey === l.key ? null : l.key)} className="w-7 h-7 rounded-md hover:bg-surface-2 grid place-items-center shrink-0 text-slate-400 disabled:cursor-not-allowed disabled:opacity-40">
                   <MoreVertical className="w-4 h-4" />
                 </button>
               </div>
@@ -1634,7 +1678,15 @@ export function PosClient({
               </div>
             </div>
           )}
-          <div ref={searchRef} className="relative flex gap-2">
+          {isCameraQuoteDraft && (
+            <CameraQuotePanel
+              products={searchableProducts}
+              packages={cameraPackages}
+              priceBook={priceBook}
+              onChange={setCameraPackages}
+            />
+          )}
+          {!isCameraQuoteDraft && <div ref={searchRef} className="relative flex gap-2">
             <div className="relative min-w-0 flex-1">
               <Search className="absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
@@ -1737,7 +1789,7 @@ export function PosClient({
                 )}
               </div>
             )}
-          </div>
+          </div>}
         </div>
 
         {orderLinesPanel}
@@ -2137,6 +2189,14 @@ export function PosClient({
                 </button>
               );
             })}
+            <button
+              type="button"
+              onClick={() => addDraft("quote", true)}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2"
+            >
+              <FileText className="h-4 w-4 text-primary-500" />
+              {t("pos.draftTabs.add.cameraQuote")}
+            </button>
           </div>
         </>,
         document.body

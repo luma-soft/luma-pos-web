@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { LayoutDashboard } from "lucide-react";
 import { getPosData } from "@/lib/data/pos";
+import { CAMERA_QUOTE_UTILITY_SKUS } from "@/lib/data/camera-quote-constants";
 import { getStoreSettings } from "@/lib/data/settings";
 import { getOrder } from "@/lib/data/orders";
 import { getPrintTemplate } from "@/lib/print/template";
@@ -91,7 +92,7 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
     ...aiProductIds,
   ];
   const [data, settings, t, orderPrintTemplate, quotePrintTemplate, bookingPrintTemplate, returnPrintTemplate] = await Promise.all([
-    getPosData({ includeProductIds }),
+    getPosData({ includeProductIds, includeProductSkus: CAMERA_QUOTE_UTILITY_SKUS }),
     getStoreSettings(),
     getTranslations(),
     getPrintTemplate("order"),

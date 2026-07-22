@@ -100,7 +100,7 @@ function activeRootCondition() {
 }
 
 /** Toàn bộ data POS cần khi mở trang: SP active + đơn vị + tồn kho mặc định, KH, kho. */
-export async function getPosData(options?: { includeProductIds?: string[] }) {
+export async function getPosData(options?: { includeProductIds?: readonly string[]; includeProductSkus?: readonly string[] }) {
   const hasComplianceColumns = await hasProductComplianceColumns();
   const [defaultWh] = await db
     .select({ id: warehouses.id, name: warehouses.name })
@@ -109,6 +109,7 @@ export async function getPosData(options?: { includeProductIds?: string[] }) {
     .limit(1);
 
   const includeProductIds = [...new Set(options?.includeProductIds ?? [])];
+  const includeProductSkus = [...new Set(options?.includeProductSkus ?? [])];
   const [rootRows, sourceProductRows, customerRows] = await Promise.all([
     db
       .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
@@ -117,12 +118,18 @@ export async function getPosData(options?: { includeProductIds?: string[] }) {
       .where(activeRootCondition())
       .orderBy(asc(products.name))
       .limit(200),
-    includeProductIds.length
+    includeProductIds.length || includeProductSkus.length
       ? db
           .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
           .from(products)
           .leftJoin(categories, eq(products.categoryId, categories.id))
-          .where(and(eq(products.isActive, true), inArray(products.id, includeProductIds)))
+          .where(and(
+            eq(products.isActive, true),
+            or(
+              includeProductIds.length ? inArray(products.id, includeProductIds) : undefined,
+              includeProductSkus.length ? inArray(products.sku, includeProductSkus) : undefined,
+            ),
+          ))
       : Promise.resolve([]),
     db
       .select({
