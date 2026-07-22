@@ -385,6 +385,7 @@
       "pickerSearchMaterial": "Search material name or SKU",
       "pickerEmpty": "No camera found",
       "chooseCamera": "Choose this camera",
+      "selectedCount": "{count} camera selected",
       "cameraTab": "Cameras",
       "memoryTab": "Memory cards",
       "installationTab": "Installation",

@@ -385,6 +385,7 @@
       "pickerSearchMaterial": "Tìm tên hoặc mã vật tư",
       "pickerEmpty": "Không tìm thấy camera",
       "chooseCamera": "Chọn camera này",
+      "selectedCount": "Đã chọn {count} camera",
       "cameraTab": "Camera",
       "memoryTab": "Thẻ nhớ",
       "installationTab": "Công lắp đặt",

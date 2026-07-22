@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Camera, HardDrive, Package, Search, Wrench, X } from "lucide-react";
+import { Camera, Check, HardDrive, Package, Search, Wrench, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
@@ -32,11 +32,12 @@ type Props = {
   memoryCards: CameraPickerProduct[];
   installations: CameraPickerProduct[];
   materials: CameraPickerProduct[];
+  selectedCameras?: Record<string, number>;
   onClose: () => void;
   onSelect: (camera: CameraPickerProduct) => void;
 };
 
-export function CameraPickerModal({ open, cameras, memoryCards, installations, materials, onClose, onSelect }: Props) {
+export function CameraPickerModal({ open, cameras, memoryCards, installations, materials, selectedCameras = {}, onClose, onSelect }: Props) {
   const t = useTranslations();
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState<"camera" | "memory" | "installation" | "material">("camera");
@@ -94,7 +95,8 @@ export function CameraPickerModal({ open, cameras, memoryCards, installations, m
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filtered.map((product) => activeTab === "camera" ? (
-                <button key={product.id} type="button" onClick={() => { onSelect(product); close(); }} className="group overflow-hidden rounded-xl border border-border-soft bg-canvas/50 text-left transition hover:border-primary-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+                <button key={product.id} type="button" onClick={() => { onSelect(product); close(); }} className={`group relative overflow-hidden rounded-xl border bg-canvas/50 text-left transition hover:border-primary-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${selectedCameras[product.id] ? "border-primary-500 ring-2 ring-primary-100 dark:ring-primary-900/40" : "border-border-soft"}`}>
+                  {selectedCameras[product.id] ? <span className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-primary-600 px-2 py-1 text-[11px] font-bold text-white"><Check className="h-3 w-3" /> {selectedCameras[product.id]}</span> : null}
                   <div className="flex h-36 items-center justify-center bg-white p-3 dark:bg-slate-950">
                     {product.imageUrl ? <Image src={product.imageUrl} alt={product.name} width={220} height={140} unoptimized className="h-full w-full object-contain" /> : <Camera className="h-12 w-12 text-slate-300" />}
                   </div>
@@ -102,7 +104,7 @@ export function CameraPickerModal({ open, cameras, memoryCards, installations, m
                     <div className="line-clamp-2 text-sm font-bold text-slate-900 dark:text-slate-100">{product.name}</div>
                     <div className="mt-1 text-xs text-slate-400">{product.sku}</div>
                     <div className="mt-2 font-black tabular-nums text-primary-700">{formatCurrency(product.retailPrice)}</div>
-                    <div className="mt-2 text-xs font-semibold text-primary-600 group-hover:underline">{t("pos.cameraQuote.chooseCamera")}</div>
+                    {selectedCameras[product.id] ? <div className="mt-2 text-xs font-semibold text-primary-600">{t("pos.cameraQuote.selectedCount", { count: selectedCameras[product.id] })}</div> : null}
                   </div>
                 </button>
               ) : (

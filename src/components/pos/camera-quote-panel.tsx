@@ -98,6 +98,10 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
   const pickerMemoryCards = pickerOptions(cards);
   const pickerInstallations = pickerOptions(installations);
   const pickerMaterials = pickerOptions(materials);
+  const selectedCameras = packages.reduce<Record<string, number>>((counts, pkg) => {
+    counts[pkg.cameraId] = (counts[pkg.cameraId] ?? 0) + pkg.quantity;
+    return counts;
+  }, {});
   const genericMaterialIds = new Set(
     CAMERA_QUOTE_MATERIAL_SKUS.flatMap((sku) => {
       const product = bySku.get(sku);
@@ -291,6 +295,7 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
         memoryCards={pickerMemoryCards}
         installations={pickerInstallations}
         materials={pickerMaterials}
+        selectedCameras={selectedCameras}
         onClose={() => setPickerOpen(false)}
         onSelect={(camera) => addCamera(camera.id)}
       />
