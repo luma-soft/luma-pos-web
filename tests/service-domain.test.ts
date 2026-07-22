@@ -14,6 +14,7 @@ import {
   warrantyClaimCreateSchema,
   warrantyClaimUpdateSchema,
 } from "@/lib/services/schemas";
+import { Routes } from "@/lib/routes";
 
 describe("service project checklists", () => {
   it("creates a camera checklist that covers survey through handover", () => {
@@ -77,6 +78,8 @@ describe("service job input", () => {
       assignedTo: null,
       scheduledAt: "2026-07-22T02:30:00.000Z",
       description: "Đo tải và kiểm tra tiếp địa",
+      quoteOrderId: "cf3dbf89-6b79-441c-b4cd-934ce25fdf80",
+      materialOrderId: null,
     }).success).toBe(true);
   });
 });
@@ -155,5 +158,18 @@ describe("installed assets and warranty", () => {
   it("allows a resolved warranty case to close but not a new case", () => {
     expect(canTransitionWarrantyClaim("resolved", "closed")).toBe(true);
     expect(canTransitionWarrantyClaim("new", "closed")).toBe(false);
+  });
+});
+
+describe("service quote links", () => {
+  it("prefills the existing POS quote flow with project and customer context", () => {
+    const href = Routes.projectQuote({
+      projectId: "d5a84a82-d4c0-4b8f-b20d-87501d14a727",
+      projectName: "Camera kho Bình Tân",
+      customerId: "cf3dbf89-6b79-441c-b4cd-934ce25fdf80",
+    });
+    expect(href).toContain("/pos?draft=quote");
+    expect(href).toContain("projectName=Camera+kho+B%C3%ACnh+T%C3%A2n");
+    expect(href).toContain("customerId=cf3dbf89-6b79-441c-b4cd-934ce25fdf80");
   });
 });

@@ -8,6 +8,7 @@ import { getPrintTemplate } from "@/lib/print/template";
 import { Routes } from "@/lib/routes";
 import { formatDate } from "@/lib/utils";
 import { PosClient, type PosSourceInvoice } from "./pos-client";
+import type { PosInitialContext } from "./pos-client";
 
 export const dynamic = "force-dynamic";
 
@@ -66,9 +67,24 @@ async function sourceInvoiceFromParams(params: PosSearchParams): Promise<PosSour
   };
 }
 
+function initialContextFromParams(params: PosSearchParams): PosInitialContext | null {
+  if (one(params.draft) !== "quote") return null;
+  const projectId = one(params.projectId);
+  const customerId = one(params.customerId);
+  const projectName = one(params.projectName)?.trim();
+  if (!projectId || !UUID_RE.test(projectId) || !projectName) return null;
+  return {
+    kind: "quote",
+    projectId,
+    projectName,
+    customerId: customerId && UUID_RE.test(customerId) ? customerId : "",
+  };
+}
+
 export default async function POSPage({ searchParams }: { searchParams: Promise<PosSearchParams> }) {
   const params = await searchParams;
   const sourceInvoice = await sourceInvoiceFromParams(params);
+  const initialContext = initialContextFromParams(params);
   const aiProductIds = csvUuids(params.aiProducts);
   const includeProductIds = [
     ...(sourceInvoice?.items?.map((item) => item.productId) ?? []),
@@ -112,6 +128,7 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
           bookingPrintTemplate={bookingPrintTemplate}
           returnPrintTemplate={returnPrintTemplate}
           initialSourceInvoice={sourceInvoice}
+          initialContext={initialContext}
           posPrefs={settings.prefs.pos}
         />
       </div>

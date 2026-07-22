@@ -513,6 +513,7 @@ export function ServiceJobEdit({
   job,
   projectType,
   assignees,
+  orders,
 }: {
   job: {
     id: string;
@@ -523,9 +524,12 @@ export function ServiceJobEdit({
     assignedTo?: string | null;
     scheduledAt: Date | string | null;
     description: string | null;
+    quoteOrderId: string | null;
+    materialOrderId: string | null;
   };
   projectType: string;
   assignees: AssigneeOption[];
+  orders: { id: string; code: string; status: string }[];
 }) {
   const t = useTranslations();
   const router = useRouter();
@@ -537,6 +541,8 @@ export function ServiceJobEdit({
   const [assignedTo, setAssignedTo] = useState(initialAssignee);
   const [scheduledAt, setScheduledAt] = useState(toDateTimeLocal(job.scheduledAt));
   const [description, setDescription] = useState(job.description ?? "");
+  const [quoteOrderId, setQuoteOrderId] = useState(job.quoteOrderId ?? "");
+  const [materialOrderId, setMaterialOrderId] = useState(job.materialOrderId ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -552,6 +558,8 @@ export function ServiceJobEdit({
       assignedTo: assignedTo || null,
       scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
       description: description || undefined,
+      quoteOrderId: quoteOrderId || null,
+      materialOrderId: materialOrderId || null,
     });
     setBusy(false);
     if (result.ok) {
@@ -589,6 +597,22 @@ export function ServiceJobEdit({
           <Select value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...assignees.map((item) => ({ value: item.id, label: item.name }))]} />
           <Input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} aria-label={t("services.fields.schedule")} />
           <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder={t("services.fields.description")} className="sm:col-span-2" />
+          <Select
+            value={quoteOrderId}
+            onChange={(event) => setQuoteOrderId(event.target.value)}
+            options={[
+              { value: "", label: t("services.jobs.noQuote") },
+              ...orders.filter((order) => order.status === "quote").map((order) => ({ value: order.id, label: order.code })),
+            ]}
+          />
+          <Select
+            value={materialOrderId}
+            onChange={(event) => setMaterialOrderId(event.target.value)}
+            options={[
+              { value: "", label: t("services.jobs.noMaterialOrder") },
+              ...orders.filter((order) => order.status !== "quote" && order.status !== "cancelled").map((order) => ({ value: order.id, label: order.code })),
+            ]}
+          />
           {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
         </div>
       </RowPreviewModal>

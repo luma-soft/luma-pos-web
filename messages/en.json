@@ -2342,7 +2342,9 @@
       "resolution": "Resolution",
       "laborCharge": "Labor charge",
       "materialCharge": "Material charge",
-      "cost": "Total cost"
+      "cost": "Total cost",
+      "quote": "Linked quote",
+      "materialOrder": "Linked material order"
     },
     "summary": {
       "activeProjects": "{count} active projects",
@@ -2352,12 +2354,15 @@
     },
     "projects": {
       "create": "New service project",
+      "createQuote": "Create quote",
       "empty": "No Camera, Electrical, or Plumbing projects yet."
     },
     "jobs": {
       "create": "New work order",
       "edit": "Edit work order",
       "updateStatus": "Update work order status",
+      "noQuote": "— No linked quote —",
+      "noMaterialOrder": "— No linked material order —",
       "empty": "No work orders yet."
     },
     "warranty": {

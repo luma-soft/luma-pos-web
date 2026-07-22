@@ -2342,7 +2342,9 @@
       "resolution": "Phương án xử lý",
       "laborCharge": "Chi phí nhân công",
       "materialCharge": "Chi phí vật tư",
-      "cost": "Tổng chi phí"
+      "cost": "Tổng chi phí",
+      "quote": "Báo giá liên quan",
+      "materialOrder": "Đơn vật tư liên quan"
     },
     "summary": {
       "activeProjects": "{count} công trình đang theo dõi",
@@ -2352,12 +2354,15 @@
     },
     "projects": {
       "create": "Thêm công trình dịch vụ",
+      "createQuote": "Tạo báo giá",
       "empty": "Chưa có công trình Camera, Điện hoặc Nước."
     },
     "jobs": {
       "create": "Thêm lệnh việc",
       "edit": "Sửa lệnh việc",
       "updateStatus": "Cập nhật trạng thái lệnh việc",
+      "noQuote": "— Chưa liên kết báo giá —",
+      "noMaterialOrder": "— Chưa liên kết đơn vật tư —",
       "empty": "Chưa có lệnh công việc nào."
     },
     "warranty": {

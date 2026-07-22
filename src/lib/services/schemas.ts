@@ -52,8 +52,6 @@ export type ServiceJobCreateInput = z.input<typeof serviceJobCreateSchema>;
 
 export const serviceJobUpdateSchema = serviceJobCreateSchema.omit({
   projectId: true,
-  quoteOrderId: true,
-  materialOrderId: true,
 }).extend({
   jobId: z.uuid(),
 });

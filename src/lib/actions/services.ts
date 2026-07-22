@@ -160,6 +160,8 @@ export async function updateServiceJob(
       assignedTo: value.assignedTo ?? null,
       scheduledAt: value.scheduledAt ? new Date(value.scheduledAt) : null,
       description: value.description || null,
+      quoteOrderId: value.quoteOrderId ?? null,
+      materialOrderId: value.materialOrderId ?? null,
       updatedAt: new Date(),
     }).where(eq(serviceJobs.id, value.jobId));
     revalidateServiceProject(current.projectId);

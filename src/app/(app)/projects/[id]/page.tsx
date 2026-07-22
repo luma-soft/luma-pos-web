@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FilePlus2 } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { getProjectDetail } from "@/lib/data/projects";
@@ -40,6 +40,12 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <p className="text-xs text-slate-500">{project.customerName ?? t("projects.noCustomer")}</p>
         </div>
         {serviceOptions && <div className="ml-auto"><ProjectEdit project={project} customers={serviceOptions.customerOptions} /></div>}
+        {project.serviceType && (
+          <Link href={Routes.projectQuote({ projectId: project.id, projectName: project.name, customerId: project.customerId })} className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary-600 px-3 text-sm font-semibold text-white hover:brightness-110">
+            <FilePlus2 className="h-4 w-4" />
+            {t("services.projects.createQuote")}
+          </Link>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4 mb-5">
@@ -79,11 +85,17 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                         <Text as="div" variant="muted" size="xs" className="mt-0.5" text={`${t(`services.types.${job.serviceType}` as never)} · ${job.assignedToName ?? t("services.fields.unassigned")}`} />
                       </div>
                       <div className="flex flex-wrap items-center justify-end gap-2">
-                        <ServiceJobEdit job={job} projectType={project.serviceType ?? job.serviceType} assignees={serviceOptions.assigneeOptions} />
+                        <ServiceJobEdit job={job} projectType={project.serviceType ?? job.serviceType} assignees={serviceOptions.assigneeOptions} orders={orders.map((order) => ({ id: order.id, code: order.code, status: order.status }))} />
                         <ServiceJobStatusAction jobId={job.id} status={job.status} />
                       </div>
                     </div>
                     {job.description && <Text as="p" size="sm" variant="muted" className="mb-3" text={job.description} />}
+                    {(job.quoteOrderId || job.materialOrderId) && (
+                      <div className="mb-3 flex flex-wrap gap-3 text-xs">
+                        {job.quoteOrderId && <Link href={Routes.salesOrder(job.quoteOrderId, "quote")} className="font-semibold text-primary-600 hover:underline">{t("services.fields.quote")}</Link>}
+                        {job.materialOrderId && <Link href={Routes.salesOrder(job.materialOrderId, "completed")} className="font-semibold text-primary-600 hover:underline">{t("services.fields.materialOrder")}</Link>}
+                      </div>
+                    )}
                     <ServiceChecklistEditor jobId={job.id} checklist={job.checklist} />
                     {statusLogs.some((log) => log.jobId === job.id) && (
                       <div className="mt-3 border-t border-border-soft pt-3">

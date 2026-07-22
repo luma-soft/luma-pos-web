@@ -68,6 +68,15 @@ export const Routes = {
   customer: (id: string) => `/customers/${id}` as const,
   supplier: (id: string) => `/suppliers/${id}` as const,
   project: (id: string) => `/projects/${id}` as const,
+  projectQuote: (input: { projectId: string; projectName: string; customerId?: string | null }) => {
+    const params = new URLSearchParams({
+      draft: "quote",
+      projectId: input.projectId,
+      projectName: input.projectName,
+    });
+    if (input.customerId) params.set("customerId", input.customerId);
+    return `/pos?${params.toString()}` as const;
+  },
 } as const;
 
 export type Route = typeof Routes[keyof typeof Routes];

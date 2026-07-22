@@ -141,6 +141,13 @@ export type PosSourceInvoice = {
   }>;
 };
 
+export type PosInitialContext = {
+  kind: "quote";
+  customerId?: string;
+  projectId: string;
+  projectName: string;
+};
+
 /**
  * Một hóa đơn đang soạn (tab). Cho phép mở nhiều đơn cùng lúc — bán cho nhiều
  * khách song song mà không mất giỏ (giống KiotViet/Sapo). Lưu localStorage.
@@ -192,6 +199,15 @@ function makeDraft(id?: string, kind: PosDraftKind = "invoice"): PosDraft {
 
 function makeInvoice(id?: string): PosDraft {
   return makeDraft(id, "invoice");
+}
+
+function makeDraftFromContext(context: PosInitialContext, id = SOURCE_INV_ID): PosDraft {
+  return {
+    ...makeDraft(id, context.kind),
+    customerId: context.customerId ?? "",
+    projectId: context.projectId,
+    projectName: context.projectName,
+  };
 }
 
 function makeDraftFromSource(source: PosSourceInvoice, products: PosProduct[], id = FIRST_INV_ID): PosDraft {
@@ -412,6 +428,7 @@ export function PosClient({
   bookingPrintTemplate,
   returnPrintTemplate,
   initialSourceInvoice,
+  initialContext,
   posPrefs,
 }: {
   data: PosData;
@@ -420,6 +437,7 @@ export function PosClient({
   bookingPrintTemplate: PrintTemplate;
   returnPrintTemplate: PrintTemplate;
   initialSourceInvoice?: PosSourceInvoice | null;
+  initialContext?: PosInitialContext | null;
   posPrefs: StorePrefs["pos"];
 }) {
   const t = useTranslations();
@@ -481,13 +499,17 @@ export function PosClient({
   // nhiều hóa đơn cùng lúc (tab). id đầu cố định để khớp SSR.
   const [invoices, setInvoices] = useState<PosDraft[]>(() => [
     makeInvoice(FIRST_INV_ID),
-    ...(initialSourceInvoice ? [makeDraftFromSource(initialSourceInvoice, data.products, SOURCE_INV_ID)] : []),
+    ...(initialSourceInvoice
+      ? [makeDraftFromSource(initialSourceInvoice, data.products, SOURCE_INV_ID)]
+      : initialContext
+        ? [makeDraftFromContext(initialContext)]
+        : []),
   ]);
-  const [activeId, setActiveId] = useState(initialSourceInvoice ? SOURCE_INV_ID : FIRST_INV_ID);
+  const [activeId, setActiveId] = useState(initialSourceInvoice || initialContext ? SOURCE_INV_ID : FIRST_INV_ID);
 
   // load đơn đang soạn sau khi mount (tránh lệch SSR; defer cho react-compiler)
   useEffect(() => {
-    if (initialSourceInvoice) return;
+    if (initialSourceInvoice || initialContext) return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("aiDraft") === "1") return;
     let cancelled = false;
@@ -501,22 +523,22 @@ export function PosClient({
       }
     });
     return () => { cancelled = true; };
-  }, [initialSourceInvoice]);
+  }, [initialContext, initialSourceInvoice]);
 
   // ghi localStorage mỗi khi đơn đổi (bỏ qua lần đầu để không ghi đè bản đã lưu)
   const hydratedRef = useRef(false);
   useEffect(() => {
-    if (initialSourceInvoice) return;
+    if (initialSourceInvoice || initialContext) return;
     if (!hydratedRef.current) { hydratedRef.current = true; return; }
     saveInvoices(invoices);
-  }, [invoices, initialSourceInvoice]);
+  }, [initialContext, invoices, initialSourceInvoice]);
 
   // nhớ tab đang mở (giữ khi chuyển trang rồi quay lại)
   useEffect(() => {
-    if (!initialSourceInvoice && hydratedRef.current) {
+    if (!initialSourceInvoice && !initialContext && hydratedRef.current) {
       try { localStorage.setItem(ACT_KEY, activeId); } catch { /* bỏ qua */ }
     }
-  }, [activeId, initialSourceInvoice]);
+  }, [activeId, initialContext, initialSourceInvoice]);
 
   useEffect(() => {
     if (!sepayCheckout || sepayCheckout.status !== "pending") return;
