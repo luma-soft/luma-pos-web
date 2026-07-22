@@ -48,8 +48,8 @@ export function DataTableShell<T>({
   empty,
   rowClassName,
   toolbar,
-  maxHeight,
-  fillHeight = false,
+  maxHeight = "calc(100dvh - 280px)",
+  fillHeight = true,
   canExpand,
 }: {
   tableId: string;
