@@ -1,0 +1,115 @@
+export const serviceTypes = ["camera", "electrical", "plumbing", "mixed"] as const;
+
+export type ServiceType = (typeof serviceTypes)[number];
+export type ConcreteServiceType = Exclude<ServiceType, "mixed">;
+
+export type ServiceChecklistItem = {
+  code: string;
+  labelKey: string;
+  completed: boolean;
+};
+
+export const serviceJobStatuses = [
+  "new",
+  "scheduled",
+  "in_progress",
+  "waiting_materials",
+  "waiting_customer",
+  "completed",
+  "warranty",
+  "cancelled",
+] as const;
+
+export type ServiceJobStatus = (typeof serviceJobStatuses)[number];
+
+export const warrantyClaimStatuses = [
+  "new",
+  "scheduled",
+  "in_progress",
+  "waiting_materials",
+  "waiting_supplier",
+  "resolved",
+  "closed",
+  "void",
+] as const;
+
+export type WarrantyClaimStatus = (typeof warrantyClaimStatuses)[number];
+
+const allowedStatusTransitions: Record<ServiceJobStatus, readonly ServiceJobStatus[]> = {
+  new: ["scheduled", "in_progress", "cancelled"],
+  scheduled: ["in_progress", "waiting_materials", "waiting_customer", "cancelled"],
+  in_progress: ["waiting_materials", "waiting_customer", "completed", "cancelled"],
+  waiting_materials: ["scheduled", "in_progress", "cancelled"],
+  waiting_customer: ["scheduled", "in_progress", "cancelled"],
+  completed: ["warranty"],
+  warranty: ["in_progress", "completed"],
+  cancelled: [],
+};
+
+const allowedWarrantyTransitions: Record<WarrantyClaimStatus, readonly WarrantyClaimStatus[]> = {
+  new: ["scheduled", "in_progress", "void"],
+  scheduled: ["in_progress", "waiting_materials", "waiting_supplier", "void"],
+  in_progress: ["waiting_materials", "waiting_supplier", "resolved", "void"],
+  waiting_materials: ["in_progress", "resolved", "void"],
+  waiting_supplier: ["in_progress", "resolved", "void"],
+  resolved: ["closed", "in_progress"],
+  closed: [],
+  void: [],
+};
+
+const defaultChecklistCodes: Record<ServiceType, readonly string[]> = {
+  camera: [
+    "site-survey",
+    "cabling",
+    "device-installation",
+    "configuration",
+    "commissioning",
+    "handover",
+  ],
+  electrical: [
+    "electrical-survey",
+    "isolation",
+    "cabling-and-panel",
+    "fixture-installation",
+    "electrical-testing",
+    "handover",
+  ],
+  plumbing: [
+    "plumbing-survey",
+    "water-isolation",
+    "pipework",
+    "fixture-installation",
+    "pressure-and-leak-test",
+    "handover",
+  ],
+  mixed: [],
+};
+
+export function createDefaultChecklist(type: ServiceType): ServiceChecklistItem[] {
+  return defaultChecklistCodes[type].map((code) => ({
+    code,
+    labelKey: `services.checklist.${code}`,
+    completed: false,
+  }));
+}
+
+export function isServiceTypeAllowedForProject(
+  projectType: ServiceType,
+  jobType: ConcreteServiceType,
+): boolean {
+  return projectType === "mixed" || projectType === jobType;
+}
+
+export function canTransitionServiceJob(
+  current: ServiceJobStatus,
+  next: ServiceJobStatus,
+): boolean {
+  return current === next || allowedStatusTransitions[current].includes(next);
+}
+
+export function canTransitionWarrantyClaim(
+  current: WarrantyClaimStatus,
+  next: WarrantyClaimStatus,
+): boolean {
+  return current === next || allowedWarrantyTransitions[current].includes(next);
+}

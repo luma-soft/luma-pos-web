@@ -57,6 +57,7 @@
     "cashbook": "Cash book",
     "delivery": "Delivery",
     "projects": "Projects",
+    "services": "Projects & Services",
     "promotions": "Promotions",
     "einvoices": "E-invoices",
     "groups": {
@@ -2251,6 +2252,124 @@
     "noCustomer": "— No customer —",
     "markDone": "Mark done",
     "reopen": "Reopen"
+  },
+  "services": {
+    "title": "Projects & Services",
+    "tabs": {
+      "projects": "Projects",
+      "jobs": "Work orders",
+      "warranty": "Warranty"
+    },
+    "types": {
+      "camera": "Camera",
+      "electrical": "Electrical",
+      "plumbing": "Plumbing",
+      "mixed": "Mixed"
+    },
+    "stages": {
+      "planning": "Survey",
+      "quoted": "Quoted",
+      "active": "In progress",
+      "paused": "Paused",
+      "completed": "Completed",
+      "warranty": "Warranty",
+      "cancelled": "Cancelled"
+    },
+    "jobStatuses": {
+      "new": "New",
+      "scheduled": "Scheduled",
+      "in_progress": "In progress",
+      "waiting_materials": "Waiting for materials",
+      "waiting_customer": "Waiting for customer",
+      "completed": "Completed",
+      "warranty": "Warranty",
+      "cancelled": "Cancelled"
+    },
+    "claimStatuses": {
+      "new": "New",
+      "scheduled": "Scheduled",
+      "in_progress": "In progress",
+      "waiting_materials": "Waiting for materials",
+      "waiting_supplier": "Waiting for supplier",
+      "resolved": "Resolved",
+      "closed": "Closed",
+      "void": "Void"
+    },
+    "priorities": {
+      "low": "Low",
+      "normal": "Normal",
+      "high": "High",
+      "urgent": "Urgent"
+    },
+    "fields": {
+      "type": "Trade",
+      "stage": "Stage",
+      "progress": "Progress",
+      "assets": "Installed assets",
+      "job": "Work order",
+      "assignee": "Assignee",
+      "unassigned": "— Unassigned —",
+      "schedule": "Schedule",
+      "checklist": "Checklist",
+      "issue": "Issue / request",
+      "asset": "Asset",
+      "reportedAt": "Reported",
+      "priority": "Priority",
+      "targetEndsOn": "Target completion",
+      "siteContactName": "Site contact",
+      "siteContactPhone": "Contact phone",
+      "serialNumber": "Serial",
+      "assetKind": "Asset type",
+      "location": "Install location",
+      "macAddress": "MAC address",
+      "ipAddress": "IP address"
+    },
+    "summary": {
+      "activeProjects": "{count} active projects",
+      "openJobs": "{count} open work orders",
+      "assets": "{count} installed assets",
+      "openClaims": "{count} open warranty cases"
+    },
+    "projects": {
+      "create": "New service project",
+      "empty": "No Camera, Electrical, or Plumbing projects yet."
+    },
+    "jobs": {
+      "create": "New work order",
+      "empty": "No work orders yet."
+    },
+    "warranty": {
+      "create": "New warranty case",
+      "empty": "No warranty cases yet."
+    },
+    "assets": {
+      "create": "Record installed asset",
+      "empty": "No installed assets recorded."
+    },
+    "checklist": {
+      "site-survey": "Survey positions and viewing angles",
+      "cabling": "Run network and power cabling",
+      "device-installation": "Install cameras, recorder, and network equipment",
+      "configuration": "Configure recording and remote viewing",
+      "commissioning": "Test day, night, and retention",
+      "handover": "Acceptance and handover",
+      "electrical-survey": "Survey loads and electrical condition",
+      "isolation": "Isolate power and verify safety",
+      "cabling-and-panel": "Install cabling and electrical panel",
+      "fixture-installation": "Install devices and fixtures",
+      "electrical-testing": "Test voltage, insulation, and grounding",
+      "plumbing-survey": "Survey water supply and drainage",
+      "water-isolation": "Isolate supply and release pressure",
+      "pipework": "Install pipes and fittings",
+      "pressure-and-leak-test": "Pressure and leak test"
+    },
+    "errors": {
+      "projectRequired": "Select a valid service project.",
+      "tradeMismatch": "The work order trade does not match this project.",
+      "invalidTransition": "This status transition is not allowed.",
+      "duplicateCode": "The document code already exists. Try again.",
+      "duplicateSerial": "This asset serial already exists."
+    }
   },
   "promos": {
     "title": "Promotions",

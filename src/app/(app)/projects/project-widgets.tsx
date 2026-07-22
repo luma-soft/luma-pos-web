@@ -10,14 +10,25 @@ import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
 import type { ProjectRow } from "@/lib/data/projects";
 import { createProject, toggleProjectStatus, updateProject } from "@/lib/actions/extras";
+import { createServiceProject } from "@/lib/actions/services";
 
-export function ProjectQuickCreate({ customers }: { customers: { id: string; name: string }[] }) {
+export function ProjectQuickCreate({
+  customers,
+  serviceMode = false,
+}: {
+  customers: { id: string; name: string }[];
+  serviceMode?: boolean;
+}) {
   const t = useTranslations();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [customerId, setCustomerId] = useState("");
   const [address, setAddress] = useState("");
+  const [serviceType, setServiceType] = useState("camera");
+  const [targetEndsOn, setTargetEndsOn] = useState("");
+  const [siteContactName, setSiteContactName] = useState("");
+  const [siteContactPhone, setSiteContactPhone] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -25,24 +36,35 @@ export function ProjectQuickCreate({ customers }: { customers: { id: string; nam
     if (!name.trim() || busy) return;
     setBusy(true);
     setError("");
-    const res = await createProject({ name, customerId: customerId || null, address: address || undefined });
+    const res = serviceMode
+      ? await createServiceProject({
+          name,
+          customerId: customerId || null,
+          address: address || undefined,
+          serviceType: serviceType as "camera" | "electrical" | "plumbing" | "mixed",
+          targetEndsOn: targetEndsOn || null,
+          siteContactName: siteContactName || undefined,
+          siteContactPhone: siteContactPhone || undefined,
+        })
+      : await createProject({ name, customerId: customerId || null, address: address || undefined });
     setBusy(false);
     if (res.ok) {
-      setOpen(false); setName(""); setAddress("");
+      setOpen(false); setName(""); setAddress(""); setTargetEndsOn("");
+      setSiteContactName(""); setSiteContactPhone("");
       router.refresh();
     } else setError(t(res.error as never));
   }
 
   if (!open) {
     return (
-      <Button type="button" onClick={() => setOpen(true)} tx="projects.createNew">
+      <Button type="button" onClick={() => setOpen(true)} tx={serviceMode ? "services.projects.create" : "projects.createNew"}>
         <Plus className="w-4 h-4" />
       </Button>
     );
   }
 
   return (
-    <div className="flex items-end gap-2 bg-surface border border-border rounded-card p-3 flex-wrap">
+    <div className="grid gap-2 bg-surface border border-border rounded-card p-3 sm:grid-cols-2 lg:grid-cols-4">
       <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={`${t("projects.cols.name")} *`} className="w-52" />
       <Select
         value={customerId}
@@ -53,8 +75,27 @@ export function ProjectQuickCreate({ customers }: { customers: { id: string; nam
         ]}
       />
       <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder={t("customers.fields.address")} className="w-52" />
-      <Button type="button" onClick={submit} disabled={busy || !name.trim()} loading={busy} tx="common.save" />
-      <Button type="button" variant="ghost" size="iconSm" onClick={() => setOpen(false)}><X className="w-4 h-4" /></Button>
+      {serviceMode && (
+        <>
+          <Select
+            value={serviceType}
+            onChange={(e) => setServiceType(e.target.value)}
+            options={[
+              { value: "camera", label: t("services.types.camera") },
+              { value: "electrical", label: t("services.types.electrical") },
+              { value: "plumbing", label: t("services.types.plumbing") },
+              { value: "mixed", label: t("services.types.mixed") },
+            ]}
+          />
+          <Input type="date" value={targetEndsOn} onChange={(e) => setTargetEndsOn(e.target.value)} aria-label={t("services.fields.targetEndsOn")} />
+          <Input value={siteContactName} onChange={(e) => setSiteContactName(e.target.value)} placeholder={t("services.fields.siteContactName")} />
+          <Input value={siteContactPhone} onChange={(e) => setSiteContactPhone(e.target.value)} placeholder={t("services.fields.siteContactPhone")} />
+        </>
+      )}
+      <div className="flex items-center justify-end gap-2 sm:col-span-2 lg:col-span-4">
+        <Button type="button" onClick={submit} disabled={busy || !name.trim()} loading={busy} tx="common.save" />
+        <Button type="button" variant="ghost" size="iconSm" onClick={() => setOpen(false)}><X className="w-4 h-4" /></Button>
+      </div>
       {error && <Text as="p" variant="destructive" size="xs" className="w-full" text={error} />}
     </div>
   );

@@ -5,14 +5,24 @@ import { ArrowLeft } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { getProjectDetail } from "@/lib/data/projects";
+import { getServiceFormOptions } from "@/lib/data/services";
+import { Section } from "@/components/ui/section";
+import { Text } from "@/components/ui/text";
 import { OrderStatusBadge, PaymentStatusBadge } from "../../orders/status-badges";
+import {
+  InstalledAssetQuickCreate,
+  ServiceChecklistEditor,
+  ServiceJobQuickCreate,
+  WarrantyClaimQuickCreate,
+} from "../../services/service-widgets";
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const t = await getTranslations();
   const detail = await getProjectDetail(id);
   if (!detail) notFound();
-  const { project, orders } = detail;
+  const { project, orders, jobs, assets, claims, materials } = detail;
+  const serviceOptions = project.serviceType ? await getServiceFormOptions() : null;
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl">
@@ -27,17 +37,112 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4 mb-5">
-        <Metric label={t("projects.cols.orders")} value={String(project.orderCount)} />
-        <Metric label={t("projects.cols.value")} value={formatCurrency(Number(project.totalValue))} />
-        <Metric label={t("orders.cols.remaining")} value={formatCurrency(Number(project.remaining))} danger={Number(project.remaining) > 0} />
-        <Metric label={t("orders.cols.status")} value={t(`projects.status.${project.status}` as never)} />
+        {project.serviceType ? (
+          <>
+            <Metric label={t("services.tabs.jobs")} value={String(jobs.length)} />
+            <Metric label={t("services.fields.progress")} value={`${project.progressPercent}%`} />
+            <Metric label={t("services.fields.assets")} value={String(assets.length)} />
+            <Metric label={t("services.tabs.warranty")} value={String(claims.filter((claim) => claim.status !== "closed" && claim.status !== "void").length)} danger={claims.some((claim) => claim.priority === "urgent" && claim.status !== "closed")} />
+          </>
+        ) : (
+          <>
+            <Metric label={t("projects.cols.orders")} value={String(project.orderCount)} />
+            <Metric label={t("projects.cols.value")} value={formatCurrency(Number(project.totalValue))} />
+            <Metric label={t("orders.cols.remaining")} value={formatCurrency(Number(project.remaining))} danger={Number(project.remaining) > 0} />
+            <Metric label={t("orders.cols.status")} value={t(`projects.status.${project.status}` as never)} />
+          </>
+        )}
       </div>
+
+      {project.serviceType && serviceOptions && (
+        <div className="mb-5 space-y-4">
+          <Section
+            title={t("services.tabs.jobs")}
+            description={t("services.summary.openJobs", { count: jobs.filter((job) => job.status !== "completed" && job.status !== "cancelled").length })}
+            action={<ServiceJobQuickCreate projects={[{ id: project.id, name: project.name, serviceType: project.serviceType }]} assignees={serviceOptions.assigneeOptions} />}
+          >
+            {jobs.length === 0 ? (
+              <Text variant="muted" size="sm" text={t("services.jobs.empty")} />
+            ) : (
+              <div className="grid gap-3 lg:grid-cols-2">
+                {jobs.map((job) => (
+                  <div key={job.id} className="rounded-card border border-border-soft bg-surface-2 p-3">
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div>
+                        <Text as="div" weight="semibold" text={`${job.code} · ${job.title}`} />
+                        <Text as="div" variant="muted" size="xs" className="mt-0.5" text={`${t(`services.types.${job.serviceType}` as never)} · ${job.assignedToName ?? t("services.fields.unassigned")}`} />
+                      </div>
+                      <span className="rounded-full bg-primary-50 px-2.5 py-0.5 text-xs font-medium text-primary-700">{t(`services.jobStatuses.${job.status}` as never)}</span>
+                    </div>
+                    <ServiceChecklistEditor jobId={job.id} checklist={job.checklist} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+
+          <Section
+            title={t("services.fields.assets")}
+            description={t("services.summary.assets", { count: assets.length })}
+            action={<InstalledAssetQuickCreate projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} />}
+          >
+            {assets.length === 0 ? (
+              <Text variant="muted" size="sm" text={t("services.assets.empty")} />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-sm">
+                  <thead><tr className="text-left text-xs uppercase text-slate-500"><th className="py-2 pr-3">{t("services.fields.asset")}</th><th className="px-3 py-2">{t("services.fields.serialNumber")}</th><th className="px-3 py-2">{t("services.fields.location")}</th><th className="px-3 py-2">{t("services.fields.macAddress")}</th><th className="py-2 pl-3">{t("services.tabs.warranty")}</th></tr></thead>
+                  <tbody className="divide-y divide-border-soft">
+                    {assets.map((asset) => <tr key={asset.id}><td className="py-2 pr-3 font-medium">{asset.name}</td><td className="px-3 py-2 font-mono text-xs">{asset.serialNumber ?? "—"}</td><td className="px-3 py-2">{asset.locationLabel ?? "—"}</td><td className="px-3 py-2 font-mono text-xs">{asset.macAddress ?? "—"}</td><td className="py-2 pl-3">{asset.customerWarrantyEndsOn ? formatDate(asset.customerWarrantyEndsOn) : "—"}</td></tr>)}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Section>
+
+          <Section
+            title={t("services.tabs.warranty")}
+            description={t("services.summary.openClaims", { count: claims.filter((claim) => claim.status !== "closed" && claim.status !== "void").length })}
+            action={<WarrantyClaimQuickCreate projects={[{ id: project.id, name: project.name, serviceType: project.serviceType }]} />}
+          >
+            {claims.length === 0 ? (
+              <Text variant="muted" size="sm" text={t("services.warranty.empty")} />
+            ) : (
+              <div className="space-y-2">
+                {claims.map((claim) => (
+                  <div key={claim.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-border-soft pb-2 last:border-b-0">
+                    <div><Text as="div" weight="semibold" size="sm" text={`${claim.code} · ${claim.title}`} /><Text as="div" variant="muted" size="xs" text={formatDate(claim.reportedAt)} /></div>
+                    <span className="rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-medium">{t(`services.claimStatuses.${claim.status}` as never)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
+
+          {materials.length > 0 && (
+            <Section title={t("inventory.title")} description={t("services.tabs.jobs")}>
+              <div className="space-y-2">
+                {materials.map((material) => (
+                  <div key={material.id} className="flex items-center justify-between gap-3 border-b border-border-soft pb-2 last:border-b-0">
+                    <Text size="sm" weight="medium" text={`${material.sku} · ${material.productName}`} />
+                    <Text size="sm" text={`${Number(material.usedQuantity)}/${Number(material.plannedQuantity)} ${material.unitName}`} />
+                  </div>
+                ))}
+              </div>
+            </Section>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
         <div className="bg-surface border border-border rounded-card p-4 text-sm space-y-3">
           <Info label={t("projects.cols.name")} value={project.name} />
           <Info label={t("orders.cols.customer")} value={project.customerName ?? "—"} />
+          {project.serviceType && <Info label={t("services.fields.type")} value={t(`services.types.${project.serviceType}` as never)} />}
+          {project.serviceStage && <Info label={t("services.fields.stage")} value={t(`services.stages.${project.serviceStage}` as never)} />}
           <Info label={t("customers.fields.address")} value={project.address ?? "—"} />
+          {project.siteContactName && <Info label={t("services.fields.siteContactName")} value={`${project.siteContactName}${project.siteContactPhone ? ` · ${project.siteContactPhone}` : ""}`} />}
+          {project.targetEndsOn && <Info label={t("services.fields.targetEndsOn")} value={formatDate(project.targetEndsOn)} />}
           <Info label={t("customers.fields.note")} value={project.note ?? "—"} />
           <Info label={t("orders.cols.date")} value={formatDate(project.createdAt)} />
         </div>

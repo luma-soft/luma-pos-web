@@ -1,0 +1,350 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import {
+  installedAssets,
+  projects,
+  serviceJobMaterials,
+  serviceJobs,
+  serviceStatusLogs,
+  warrantyClaims,
+} from "@/db/schema";
+import {
+  type ActionResult,
+  generateCode,
+  isUniqueViolation,
+  requireManager,
+  toQty,
+} from "@/lib/actions/common";
+import {
+  canTransitionWarrantyClaim,
+  canTransitionServiceJob,
+  createDefaultChecklist,
+  isServiceTypeAllowedForProject,
+  type ServiceChecklistItem,
+} from "@/lib/services/domain";
+import {
+  installedAssetCreateSchema,
+  type InstalledAssetCreateInput,
+  serviceJobCreateSchema,
+  type ServiceJobCreateInput,
+  serviceJobMaterialSchema,
+  type ServiceJobMaterialInput,
+  serviceJobTransitionSchema,
+  type ServiceJobTransitionInput,
+  serviceProjectCreateSchema,
+  type ServiceProjectCreateInput,
+  warrantyClaimCreateSchema,
+  type WarrantyClaimCreateInput,
+  warrantyClaimTransitionSchema,
+  type WarrantyClaimTransitionInput,
+} from "@/lib/services/schemas";
+import { Routes } from "@/lib/routes";
+
+function revalidateServiceProject(projectId?: string) {
+  revalidatePath(Routes.Services);
+  revalidatePath(Routes.Partners);
+  revalidatePath(Routes.Projects);
+  if (projectId) revalidatePath(Routes.project(projectId));
+}
+
+export async function createServiceProject(
+  input: ServiceProjectCreateInput,
+): Promise<ActionResult<{ id: string }>> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const parsed = serviceProjectCreateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const value = parsed.data;
+
+  try {
+    const [project] = await db.insert(projects).values({
+      name: value.name,
+      customerId: value.customerId ?? null,
+      address: value.address || null,
+      serviceType: value.serviceType,
+      serviceStage: value.serviceStage,
+      startsOn: value.startsOn ?? null,
+      targetEndsOn: value.targetEndsOn ?? null,
+      siteContactName: value.siteContactName || null,
+      siteContactPhone: value.siteContactPhone || null,
+      note: value.note || null,
+    }).returning({ id: projects.id });
+    revalidateServiceProject(project.id);
+    return { ok: true, data: project };
+  } catch (error) {
+    console.error("createServiceProject failed:", error);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function createServiceJob(
+  input: ServiceJobCreateInput,
+): Promise<ActionResult<{ id: string; code: string }>> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const parsed = serviceJobCreateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const value = parsed.data;
+
+  try {
+    const [project] = await db.select({ id: projects.id, serviceType: projects.serviceType })
+      .from(projects)
+      .where(eq(projects.id, value.projectId))
+      .limit(1);
+    if (!project?.serviceType) return { ok: false, error: "services.errors.projectRequired" };
+    if (!isServiceTypeAllowedForProject(project.serviceType, value.serviceType)) {
+      return { ok: false, error: "services.errors.tradeMismatch" };
+    }
+
+    const code = generateCode("DV");
+    const [job] = await db.insert(serviceJobs).values({
+      projectId: value.projectId,
+      code,
+      serviceType: value.serviceType,
+      title: value.title,
+      priority: value.priority,
+      assignedTo: value.assignedTo ?? null,
+      scheduledAt: value.scheduledAt ? new Date(value.scheduledAt) : null,
+      description: value.description || null,
+      checklist: createDefaultChecklist(value.serviceType),
+      quoteOrderId: value.quoteOrderId ?? null,
+      materialOrderId: value.materialOrderId ?? null,
+      createdBy: gate.userId,
+    }).returning({ id: serviceJobs.id, code: serviceJobs.code });
+
+    await db.update(projects).set({ serviceStage: "active" }).where(eq(projects.id, value.projectId));
+    revalidateServiceProject(value.projectId);
+    return { ok: true, data: job };
+  } catch (error) {
+    console.error("createServiceJob failed:", error);
+    return { ok: false, error: isUniqueViolation(error) ? "services.errors.duplicateCode" : "errors.serverError" };
+  }
+}
+
+export async function transitionServiceJob(
+  input: ServiceJobTransitionInput,
+): Promise<ActionResult> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const parsed = serviceJobTransitionSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const value = parsed.data;
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [current] = await tx.select({
+        projectId: serviceJobs.projectId,
+        status: serviceJobs.status,
+      }).from(serviceJobs).where(eq(serviceJobs.id, value.jobId)).limit(1);
+      if (!current) return { ok: false as const, error: "errors.notFound" };
+      if (!canTransitionServiceJob(current.status, value.status)) {
+        return { ok: false as const, error: "services.errors.invalidTransition" };
+      }
+      if (current.status === value.status) {
+        return { ok: true as const, projectId: current.projectId };
+      }
+
+      await tx.update(serviceJobs).set({
+        status: value.status,
+        completedAt: value.status === "completed" ? new Date() : null,
+        updatedAt: new Date(),
+      }).where(eq(serviceJobs.id, value.jobId));
+      await tx.insert(serviceStatusLogs).values({
+        jobId: value.jobId,
+        fromStatus: current.status,
+        toStatus: value.status,
+        note: value.note || null,
+        createdBy: gate.userId,
+      });
+
+      const rows = await tx.select({ status: serviceJobs.status })
+        .from(serviceJobs)
+        .where(eq(serviceJobs.projectId, current.projectId));
+      const countable = rows.filter((row) => row.status !== "cancelled");
+      const completed = countable.filter((row) => row.status === "completed").length;
+      const progressPercent = countable.length === 0
+        ? 0
+        : Math.round((completed / countable.length) * 100);
+      const serviceStage = value.status === "warranty"
+        ? "warranty" as const
+        : progressPercent === 100
+          ? "completed" as const
+          : "active" as const;
+      await tx.update(projects).set({ progressPercent, serviceStage })
+        .where(eq(projects.id, current.projectId));
+      return { ok: true as const, projectId: current.projectId };
+    });
+
+    if (!result.ok) return result;
+    revalidateServiceProject(result.projectId);
+    return { ok: true, data: undefined };
+  } catch (error) {
+    console.error("transitionServiceJob failed:", error);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function updateServiceChecklist(
+  jobId: string,
+  checklist: ServiceChecklistItem[],
+): Promise<ActionResult> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  if (!Array.isArray(checklist) || checklist.some((item) =>
+    !item || typeof item.code !== "string" || typeof item.labelKey !== "string" || typeof item.completed !== "boolean"
+  )) return { ok: false, error: "errors.invalidData" };
+
+  try {
+    const [job] = await db.update(serviceJobs).set({ checklist, updatedAt: new Date() })
+      .where(eq(serviceJobs.id, jobId))
+      .returning({ projectId: serviceJobs.projectId });
+    if (!job) return { ok: false, error: "errors.notFound" };
+    revalidateServiceProject(job.projectId);
+    return { ok: true, data: undefined };
+  } catch (error) {
+    console.error("updateServiceChecklist failed:", error);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function saveServiceJobMaterial(
+  input: ServiceJobMaterialInput,
+): Promise<ActionResult> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const parsed = serviceJobMaterialSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const value = parsed.data;
+
+  try {
+    await db.insert(serviceJobMaterials).values({
+      jobId: value.jobId,
+      productId: value.productId,
+      unitName: value.unitName,
+      plannedQuantity: toQty(value.plannedQuantity),
+      usedQuantity: toQty(value.usedQuantity),
+      note: value.note || null,
+    }).onConflictDoUpdate({
+      target: [serviceJobMaterials.jobId, serviceJobMaterials.productId, serviceJobMaterials.unitName],
+      set: {
+        plannedQuantity: toQty(value.plannedQuantity),
+        usedQuantity: toQty(value.usedQuantity),
+        note: value.note || null,
+        updatedAt: new Date(),
+      },
+    });
+    const [job] = await db.select({ projectId: serviceJobs.projectId })
+      .from(serviceJobs).where(eq(serviceJobs.id, value.jobId)).limit(1);
+    revalidateServiceProject(job?.projectId);
+    return { ok: true, data: undefined };
+  } catch (error) {
+    console.error("saveServiceJobMaterial failed:", error);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function createInstalledAsset(
+  input: InstalledAssetCreateInput,
+): Promise<ActionResult<{ id: string }>> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const parsed = installedAssetCreateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const value = parsed.data;
+
+  try {
+    const [asset] = await db.insert(installedAssets).values({
+      projectId: value.projectId,
+      jobId: value.jobId ?? null,
+      productId: value.productId ?? null,
+      assetKind: value.assetKind,
+      name: value.name,
+      brand: value.brand || null,
+      model: value.model || null,
+      serialNumber: value.serialNumber || null,
+      macAddress: value.macAddress || null,
+      ipAddress: value.ipAddress || null,
+      locationLabel: value.locationLabel || null,
+      installedAt: value.installedAt ? new Date(value.installedAt) : null,
+      customerWarrantyEndsOn: value.customerWarrantyEndsOn ?? null,
+      supplierWarrantyEndsOn: value.supplierWarrantyEndsOn ?? null,
+      note: value.note || null,
+      createdBy: gate.userId,
+    }).returning({ id: installedAssets.id });
+    revalidateServiceProject(value.projectId);
+    return { ok: true, data: asset };
+  } catch (error) {
+    console.error("createInstalledAsset failed:", error);
+    return { ok: false, error: isUniqueViolation(error) ? "services.errors.duplicateSerial" : "errors.serverError" };
+  }
+}
+
+export async function createWarrantyClaim(
+  input: WarrantyClaimCreateInput,
+): Promise<ActionResult<{ id: string; code: string }>> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const parsed = warrantyClaimCreateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const value = parsed.data;
+
+  try {
+    const code = generateCode("BH");
+    const [claim] = await db.insert(warrantyClaims).values({
+      projectId: value.projectId,
+      jobId: value.jobId ?? null,
+      assetId: value.assetId ?? null,
+      code,
+      title: value.title,
+      description: value.description || null,
+      priority: value.priority,
+      scheduledAt: value.scheduledAt ? new Date(value.scheduledAt) : null,
+      createdBy: gate.userId,
+    }).returning({ id: warrantyClaims.id, code: warrantyClaims.code });
+    revalidateServiceProject(value.projectId);
+    return { ok: true, data: claim };
+  } catch (error) {
+    console.error("createWarrantyClaim failed:", error);
+    return { ok: false, error: isUniqueViolation(error) ? "services.errors.duplicateCode" : "errors.serverError" };
+  }
+}
+
+export async function transitionWarrantyClaim(
+  input: WarrantyClaimTransitionInput,
+): Promise<ActionResult> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const parsed = warrantyClaimTransitionSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const value = parsed.data;
+
+  try {
+    const [current] = await db.select({
+      projectId: warrantyClaims.projectId,
+      status: warrantyClaims.status,
+    }).from(warrantyClaims).where(eq(warrantyClaims.id, value.claimId)).limit(1);
+    if (!current) return { ok: false, error: "errors.notFound" };
+    if (!canTransitionWarrantyClaim(current.status, value.status)) {
+      return { ok: false, error: "services.errors.invalidTransition" };
+    }
+    await db.update(warrantyClaims).set({
+      status: value.status,
+      diagnosis: value.diagnosis || undefined,
+      resolution: value.resolution || undefined,
+      resolvedAt: value.status === "resolved" || value.status === "closed" ? new Date() : null,
+      updatedAt: new Date(),
+    }).where(eq(warrantyClaims.id, value.claimId));
+    if (value.status !== current.status) {
+      await db.update(projects).set({ serviceStage: "warranty" })
+        .where(eq(projects.id, current.projectId));
+    }
+    revalidateServiceProject(current.projectId);
+    return { ok: true, data: undefined };
+  } catch (error) {
+    console.error("transitionWarrantyClaim failed:", error);
+    return { ok: false, error: "errors.serverError" };
+  }
+}

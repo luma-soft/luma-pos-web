@@ -20,6 +20,7 @@ export const Routes = {
   Cashbook: "/cashbook",
   Delivery: "/delivery",
   Projects: "/projects",
+  Services: "/services",
   Promotions: "/promotions",
   EInvoices: "/einvoices",
   Products: "/products",

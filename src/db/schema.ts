@@ -5,6 +5,7 @@ import {
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import type { StorePrefs } from "@/lib/schemas/settings";
+import type { ServiceChecklistItem } from "@/lib/services/domain";
 
 // ============= Enums =============
 
@@ -26,6 +27,24 @@ export const customerTypeEnum = pgEnum("customer_type", [
 ]);
 export const customerConsentStatusEnum = pgEnum("customer_consent_status", [
   "pending", "granted", "withdrawn",
+]);
+export const serviceTypeEnum = pgEnum("service_type", [
+  "camera", "electrical", "plumbing", "mixed",
+]);
+export const serviceProjectStageEnum = pgEnum("service_project_stage", [
+  "planning", "quoted", "active", "paused", "completed", "warranty", "cancelled",
+]);
+export const serviceJobStatusEnum = pgEnum("service_job_status", [
+  "new", "scheduled", "in_progress", "waiting_materials", "waiting_customer", "completed", "warranty", "cancelled",
+]);
+export const serviceJobPriorityEnum = pgEnum("service_job_priority", [
+  "low", "normal", "high", "urgent",
+]);
+export const serviceAssetStatusEnum = pgEnum("service_asset_status", [
+  "installed", "repair", "replaced", "removed",
+]);
+export const warrantyClaimStatusEnum = pgEnum("warranty_claim_status", [
+  "new", "scheduled", "in_progress", "waiting_materials", "waiting_supplier", "resolved", "closed", "void",
 ]);
 
 export const auditLogSourceEnum = pgEnum("audit_log_source", [
@@ -804,9 +823,121 @@ export const projects = pgTable("projects", {
   customerId: uuid("customer_id").references(() => customers.id),
   address: text("address"),
   status: text("status").notNull().default("active"), // active | done
+  serviceType: serviceTypeEnum("service_type"),
+  serviceStage: serviceProjectStageEnum("service_stage"),
+  progressPercent: integer("progress_percent").notNull().default(0),
+  startsOn: date("starts_on"),
+  targetEndsOn: date("target_ends_on"),
+  siteContactName: text("site_contact_name"),
+  siteContactPhone: varchar("site_contact_phone", { length: 20 }),
   note: text("note"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [index("projects_customer_idx").on(t.customerId)]);
+
+// ============= Thi công & dịch vụ =============
+
+export const serviceJobs = pgTable("service_jobs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  code: varchar("code", { length: 30 }).notNull().unique(),
+  serviceType: serviceTypeEnum("service_type").notNull(),
+  title: text("title").notNull(),
+  status: serviceJobStatusEnum("status").notNull().default("new"),
+  priority: serviceJobPriorityEnum("priority").notNull().default("normal"),
+  assignedTo: uuid("assigned_to").references(() => profiles.id, { onDelete: "set null" }),
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  description: text("description"),
+  checklist: jsonb("checklist").$type<ServiceChecklistItem[]>().notNull().default([]),
+  quoteOrderId: uuid("quote_order_id").references(() => orders.id, { onDelete: "set null" }),
+  materialOrderId: uuid("material_order_id").references(() => orders.id, { onDelete: "set null" }),
+  completionNote: text("completion_note"),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("service_jobs_project_idx").on(t.projectId, t.createdAt),
+  index("service_jobs_status_schedule_idx").on(t.status, t.scheduledAt),
+  index("service_jobs_assignee_idx").on(t.assignedTo, t.status),
+]);
+
+export const serviceJobMaterials = pgTable("service_job_materials", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  jobId: uuid("job_id").notNull().references(() => serviceJobs.id, { onDelete: "cascade" }),
+  productId: uuid("product_id").notNull().references(() => products.id),
+  unitName: varchar("unit_name", { length: 30 }).notNull(),
+  plannedQuantity: decimal("planned_quantity", { precision: 14, scale: 4 }).notNull().default("0"),
+  usedQuantity: decimal("used_quantity", { precision: 14, scale: 4 }).notNull().default("0"),
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("service_job_materials_job_product_unit_idx").on(t.jobId, t.productId, t.unitName),
+  index("service_job_materials_product_idx").on(t.productId),
+]);
+
+export const installedAssets = pgTable("installed_assets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  jobId: uuid("job_id").references(() => serviceJobs.id, { onDelete: "set null" }),
+  productId: uuid("product_id").references(() => products.id, { onDelete: "set null" }),
+  assetKind: text("asset_kind").notNull(),
+  name: text("name").notNull(),
+  brand: text("brand"),
+  model: text("model"),
+  serialNumber: text("serial_number"),
+  macAddress: text("mac_address"),
+  ipAddress: text("ip_address"),
+  locationLabel: text("location_label"),
+  installedAt: timestamp("installed_at", { withTimezone: true }),
+  customerWarrantyEndsOn: date("customer_warranty_ends_on"),
+  supplierWarrantyEndsOn: date("supplier_warranty_ends_on"),
+  status: serviceAssetStatusEnum("status").notNull().default("installed"),
+  note: text("note"),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("installed_assets_project_idx").on(t.projectId, t.status),
+  index("installed_assets_job_idx").on(t.jobId),
+  uniqueIndex("installed_assets_serial_idx").on(t.serialNumber),
+]);
+
+export const warrantyClaims = pgTable("warranty_claims", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  jobId: uuid("job_id").references(() => serviceJobs.id, { onDelete: "set null" }),
+  assetId: uuid("asset_id").references(() => installedAssets.id, { onDelete: "set null" }),
+  code: varchar("code", { length: 30 }).notNull().unique(),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: warrantyClaimStatusEnum("status").notNull().default("new"),
+  priority: serviceJobPriorityEnum("priority").notNull().default("normal"),
+  reportedAt: timestamp("reported_at", { withTimezone: true }).defaultNow().notNull(),
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  diagnosis: text("diagnosis"),
+  resolution: text("resolution"),
+  laborCharge: decimal("labor_charge", { precision: 14, scale: 2 }).notNull().default("0"),
+  materialCharge: decimal("material_charge", { precision: 14, scale: 2 }).notNull().default("0"),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("warranty_claims_project_idx").on(t.projectId, t.status),
+  index("warranty_claims_asset_idx").on(t.assetId),
+  index("warranty_claims_schedule_idx").on(t.status, t.scheduledAt),
+]);
+
+export const serviceStatusLogs = pgTable("service_status_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  jobId: uuid("job_id").notNull().references(() => serviceJobs.id, { onDelete: "cascade" }),
+  fromStatus: serviceJobStatusEnum("from_status"),
+  toStatus: serviceJobStatusEnum("to_status").notNull(),
+  note: text("note"),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [index("service_status_logs_job_idx").on(t.jobId, t.createdAt)]);
 
 // ============= Khuyến mãi (bậc thang theo SL) =============
 

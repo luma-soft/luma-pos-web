@@ -57,6 +57,7 @@
     "cashbook": "Sổ quỹ",
     "delivery": "Giao hàng",
     "projects": "Công trình",
+    "services": "Thi công & Dịch vụ",
     "promotions": "Khuyến mãi",
     "einvoices": "HĐ điện tử",
     "groups": {
@@ -2251,6 +2252,124 @@
     "noCustomer": "— Không gắn khách —",
     "markDone": "Hoàn tất",
     "reopen": "Mở lại"
+  },
+  "services": {
+    "title": "Thi công & Dịch vụ",
+    "tabs": {
+      "projects": "Công trình",
+      "jobs": "Lệnh việc",
+      "warranty": "Bảo hành"
+    },
+    "types": {
+      "camera": "Camera",
+      "electrical": "Điện",
+      "plumbing": "Nước",
+      "mixed": "Hỗn hợp"
+    },
+    "stages": {
+      "planning": "Khảo sát",
+      "quoted": "Đã báo giá",
+      "active": "Đang thi công",
+      "paused": "Tạm dừng",
+      "completed": "Hoàn tất",
+      "warranty": "Bảo hành",
+      "cancelled": "Đã hủy"
+    },
+    "jobStatuses": {
+      "new": "Mới",
+      "scheduled": "Đã lên lịch",
+      "in_progress": "Đang làm",
+      "waiting_materials": "Chờ vật tư",
+      "waiting_customer": "Chờ khách",
+      "completed": "Hoàn tất",
+      "warranty": "Bảo hành",
+      "cancelled": "Đã hủy"
+    },
+    "claimStatuses": {
+      "new": "Mới",
+      "scheduled": "Đã lên lịch",
+      "in_progress": "Đang xử lý",
+      "waiting_materials": "Chờ vật tư",
+      "waiting_supplier": "Chờ nhà cung cấp",
+      "resolved": "Đã xử lý",
+      "closed": "Đã đóng",
+      "void": "Đã hủy"
+    },
+    "priorities": {
+      "low": "Thấp",
+      "normal": "Bình thường",
+      "high": "Cao",
+      "urgent": "Khẩn"
+    },
+    "fields": {
+      "type": "Nghiệp vụ",
+      "stage": "Giai đoạn",
+      "progress": "Tiến độ",
+      "assets": "Thiết bị đã lắp",
+      "job": "Công việc",
+      "assignee": "Người phụ trách",
+      "unassigned": "— Chưa phân công —",
+      "schedule": "Lịch thực hiện",
+      "checklist": "Checklist",
+      "issue": "Sự cố / yêu cầu",
+      "asset": "Thiết bị",
+      "reportedAt": "Ngày tiếp nhận",
+      "priority": "Ưu tiên",
+      "targetEndsOn": "Dự kiến hoàn thành",
+      "siteContactName": "Liên hệ tại công trình",
+      "siteContactPhone": "SĐT liên hệ",
+      "serialNumber": "Serial",
+      "assetKind": "Loại thiết bị",
+      "location": "Vị trí lắp",
+      "macAddress": "Địa chỉ MAC",
+      "ipAddress": "Địa chỉ IP"
+    },
+    "summary": {
+      "activeProjects": "{count} công trình đang theo dõi",
+      "openJobs": "{count} lệnh việc chưa hoàn tất",
+      "assets": "{count} thiết bị đang lắp đặt",
+      "openClaims": "{count} phiếu bảo hành đang mở"
+    },
+    "projects": {
+      "create": "Thêm công trình dịch vụ",
+      "empty": "Chưa có công trình Camera, Điện hoặc Nước."
+    },
+    "jobs": {
+      "create": "Thêm lệnh việc",
+      "empty": "Chưa có lệnh công việc nào."
+    },
+    "warranty": {
+      "create": "Tiếp nhận bảo hành",
+      "empty": "Chưa có phiếu bảo hành nào."
+    },
+    "assets": {
+      "create": "Ghi nhận thiết bị",
+      "empty": "Chưa ghi nhận thiết bị đã lắp."
+    },
+    "checklist": {
+      "site-survey": "Khảo sát vị trí và góc quan sát",
+      "cabling": "Kéo dây mạng, nguồn và kiểm tra tuyến",
+      "device-installation": "Lắp camera, đầu ghi và thiết bị mạng",
+      "configuration": "Cấu hình ghi hình và xem từ xa",
+      "commissioning": "Kiểm tra ngày, đêm và lưu trữ",
+      "handover": "Nghiệm thu và bàn giao",
+      "electrical-survey": "Khảo sát tải và hiện trạng điện",
+      "isolation": "Cô lập nguồn và kiểm tra an toàn",
+      "cabling-and-panel": "Thi công dây và tủ điện",
+      "fixture-installation": "Lắp thiết bị và phụ kiện",
+      "electrical-testing": "Đo kiểm điện áp, cách điện và tiếp địa",
+      "plumbing-survey": "Khảo sát cấp thoát nước",
+      "water-isolation": "Khóa nguồn và xả áp",
+      "pipework": "Thi công đường ống và phụ kiện",
+      "pressure-and-leak-test": "Thử áp và kiểm tra rò rỉ"
+    },
+    "errors": {
+      "projectRequired": "Cần chọn công trình dịch vụ hợp lệ.",
+      "tradeMismatch": "Nghiệp vụ của lệnh việc không phù hợp với công trình.",
+      "invalidTransition": "Không thể chuyển sang trạng thái này.",
+      "duplicateCode": "Mã chứng từ đã tồn tại, vui lòng thử lại.",
+      "duplicateSerial": "Serial thiết bị đã tồn tại."
+    }
   },
   "promos": {
     "title": "Khuyến mãi",

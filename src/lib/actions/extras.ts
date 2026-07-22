@@ -58,6 +58,16 @@ export async function toggleProjectStatus(id: string): Promise<ActionResult> {
   try {
     await db.update(projects).set({
       status: sql`case when ${projects.status} = 'active' then 'done' else 'active' end`,
+      serviceStage: sql`case
+        when ${projects.serviceType} is null then ${projects.serviceStage}
+        when ${projects.status} = 'active' then 'completed'::service_project_stage
+        else 'active'::service_project_stage
+      end`,
+      progressPercent: sql`case
+        when ${projects.serviceType} is null then ${projects.progressPercent}
+        when ${projects.status} = 'active' then 100
+        else ${projects.progressPercent}
+      end`,
     }).where(eq(projects.id, id));
     revalidatePath(Routes.Partners);
     revalidatePath(Routes.Projects);
@@ -147,6 +157,15 @@ export async function updateProject(input: UpdateProjectInput): Promise<ActionRe
       address: v.address?.trim() || null,
       note: v.note?.trim() || null,
       status: v.status,
+      serviceStage: sql`case
+        when ${projects.serviceType} is null then ${projects.serviceStage}
+        when ${v.status} = 'done' then 'completed'::service_project_stage
+        else coalesce(${projects.serviceStage}, 'active'::service_project_stage)
+      end`,
+      progressPercent: sql`case
+        when ${projects.serviceType} is not null and ${v.status} = 'done' then 100
+        else ${projects.progressPercent}
+      end`,
     }).where(eq(projects.id, v.id));
     revalidatePath(Routes.Partners);
     revalidatePath(Routes.Projects);
