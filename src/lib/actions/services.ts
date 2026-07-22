@@ -17,6 +17,7 @@ import {
   generateCode,
   isUniqueViolation,
   requireManager,
+  requireStockAccess,
   toMoney,
   toQty,
 } from "@/lib/actions/common";
@@ -37,6 +38,8 @@ import {
   type ServiceJobCreateInput,
   serviceJobMaterialSchema,
   type ServiceJobMaterialInput,
+  serviceMaterialStockSyncSchema,
+  type ServiceMaterialStockSyncInput,
   serviceJobUpdateSchema,
   type ServiceJobUpdateInput,
   serviceJobTransitionSchema,
@@ -51,6 +54,7 @@ import {
   type WarrantyClaimUpdateInput,
 } from "@/lib/services/schemas";
 import { Routes } from "@/lib/routes";
+import { syncServiceJobMaterialStockCore } from "@/lib/services/material-stock";
 
 function revalidateServiceProject(projectId?: string) {
   revalidatePath(Routes.Services);
@@ -350,6 +354,38 @@ export async function saveServiceJobMaterial(
     return { ok: true, data: undefined };
   } catch (error) {
     console.error("saveServiceJobMaterial failed:", error);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function syncServiceJobMaterialStock(
+  input: ServiceMaterialStockSyncInput,
+): Promise<ActionResult<{ issuedBaseQuantity: number }>> {
+  const gate = await requireStockAccess();
+  if (!gate.ok) return gate;
+  const parsed = serviceMaterialStockSyncSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const value = parsed.data;
+
+  try {
+    const result = await db.transaction((tx) => syncServiceJobMaterialStockCore(tx, {
+      materialId: value.materialId,
+      warehouseId: value.warehouseId,
+      createdBy: gate.userId,
+    }));
+
+    revalidateServiceProject(result.projectId);
+    revalidatePath(Routes.Inventory);
+    return { ok: true, data: { issuedBaseQuantity: result.issuedBaseQuantity } };
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "";
+    if (code === "SERVICE_MATERIAL_NOT_FOUND") return { ok: false, error: "errors.notFound" };
+    if (code === "INVALID_SERVICE_MATERIAL_UNIT") return { ok: false, error: "services.errors.invalidMaterialUnit" };
+    if (code === "SERVICE_MATERIAL_WAREHOUSE_MISMATCH") return { ok: false, error: "services.errors.materialWarehouseMismatch" };
+    if (code === "INSUFFICIENT_SERVICE_MATERIAL_STOCK" || code === "INSUFFICIENT_BATCH_STOCK") {
+      return { ok: false, error: "services.errors.insufficientMaterialStock" };
+    }
+    console.error("syncServiceJobMaterialStock failed:", error);
     return { ok: false, error: "errors.serverError" };
   }
 }

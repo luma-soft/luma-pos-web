@@ -17,6 +17,7 @@ import {
   createServiceJob,
   createWarrantyClaim,
   saveServiceJobMaterial,
+  syncServiceJobMaterialStock,
   transitionServiceJob,
   transitionWarrantyClaim,
   updateInstalledAsset,
@@ -45,6 +46,7 @@ type AssigneeOption = { id: string; name: string };
 type ProductOption = { id: string; name: string; sku: string; baseUnit: string };
 type WarrantyJobOption = { id: string; projectId: string; code: string; title: string };
 type WarrantyAssetOption = { id: string; projectId: string; jobId: string | null; name: string; serialNumber: string | null };
+type WarehouseOption = { id: string; name: string; isDefault: boolean };
 
 export function ServiceDashboardFilters({
   tab,
@@ -774,6 +776,102 @@ export function ServiceMaterialEditor({
           <NumberInput value={usedQuantity} onChange={setUsedQuantity} min={0} decimals={4} suffix={unitName} placeholder={t("services.materials.used")} />
           <Textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder={t("customers.fields.note")} className="sm:col-span-2" />
           {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
+        </div>
+      </RowPreviewModal>
+    </>
+  );
+}
+
+export function ServiceMaterialStockSync({
+  material,
+  warehouses,
+}: {
+  material: {
+    id: string;
+    unitName: string;
+    usedQuantity: string;
+    unitMultiplier: string;
+    issuedBaseQuantity: string;
+    stockWarehouseId: string | null;
+  };
+  warehouses: WarehouseOption[];
+}) {
+  const t = useTranslations();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [warehouseId, setWarehouseId] = useState(
+    material.stockWarehouseId ?? warehouses.find((warehouse) => warehouse.isDefault)?.id ?? warehouses[0]?.id ?? "",
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const multiplier = Number(material.unitMultiplier);
+  const issuedQuantity = multiplier > 0 ? Number(material.issuedBaseQuantity) / multiplier : 0;
+  const isSynced = multiplier > 0
+    && Math.abs(Number(material.usedQuantity) * multiplier - Number(material.issuedBaseQuantity)) < 0.0001;
+
+  async function submit() {
+    if (!warehouseId || busy) return;
+    setBusy(true);
+    setError("");
+    const result = await syncServiceJobMaterialStock({ materialId: material.id, warehouseId });
+    setBusy(false);
+    if (result.ok) {
+      setOpen(false);
+      router.refresh();
+    } else setError(t(result.error as never));
+  }
+
+  return (
+    <>
+      <div className="flex items-center gap-2">
+        <Text
+          size="xs"
+          variant={isSynced ? "muted" : "destructive"}
+          text={t("services.materials.issued", { quantity: Number(issuedQuantity.toFixed(4)), unit: material.unitName })}
+        />
+        {!isSynced && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setOpen(true)}
+            disabled={warehouses.length === 0 || multiplier <= 0}
+            tx="services.materials.syncStock"
+          />
+        )}
+      </div>
+      <RowPreviewModal
+        open={open}
+        onClose={() => {
+          if (!busy) setOpen(false);
+        }}
+        title={t("services.materials.syncStockTitle")}
+        closeLabel={t("common.close")}
+        size="md"
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy} tx="common.cancel" />
+            <Button type="button" onClick={submit} disabled={busy || !warehouseId} loading={busy} tx="services.materials.syncStock" />
+          </div>
+        )}
+      >
+        <div className="space-y-3">
+          <div>
+            <Select
+              value={warehouseId}
+              onChange={(event) => setWarehouseId(event.target.value)}
+              options={warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))}
+              disabled={Boolean(material.stockWarehouseId)}
+              aria-label={t("purchases.cols.warehouse")}
+              className="w-full"
+            />
+          </div>
+          <Text as="p" size="sm" text={t("services.materials.syncStockHint", {
+            used: Number(material.usedQuantity),
+            issued: Number(issuedQuantity.toFixed(4)),
+            unit: material.unitName,
+          })} />
+          {error && <Text as="p" variant="destructive" size="xs" text={error} />}
         </div>
       </RowPreviewModal>
     </>

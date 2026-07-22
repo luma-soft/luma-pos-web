@@ -2389,7 +2389,11 @@
       "edit": "Cập nhật vật tư",
       "planned": "Số lượng dự kiến",
       "used": "Đã sử dụng",
+      "issued": "Đã xuất: {quantity} {unit}",
       "unit": "Đơn vị tính",
+      "syncStock": "Đồng bộ kho",
+      "syncStockTitle": "Đồng bộ vật tư với tồn kho",
+      "syncStockHint": "Đã dùng {used} {unit}, đã xuất kho {issued} {unit}. Hệ thống chỉ xuất hoặc hoàn phần chênh lệch.",
       "summary": "{count} dòng vật tư theo lệnh việc",
       "empty": "Chưa lập vật tư dự kiến cho công trình."
     },
@@ -2414,6 +2418,9 @@
       "projectRequired": "Cần chọn công trình dịch vụ hợp lệ.",
       "tradeMismatch": "Nghiệp vụ của lệnh việc không phù hợp với công trình.",
       "relationMismatch": "Dữ liệu được chọn không thuộc công trình này hoặc không đúng loại chứng từ.",
+      "invalidMaterialUnit": "Đơn vị vật tư không khớp với đơn vị của sản phẩm.",
+      "materialWarehouseMismatch": "Vật tư này đã được xuất từ kho khác.",
+      "insufficientMaterialStock": "Kho không đủ tồn khả dụng để xuất vật tư.",
       "invalidTransition": "Không thể chuyển sang trạng thái này.",
       "duplicateCode": "Mã chứng từ đã tồn tại, vui lòng thử lại.",
       "duplicateSerial": "Serial thiết bị đã tồn tại."

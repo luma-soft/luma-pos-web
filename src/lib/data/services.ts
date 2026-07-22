@@ -7,6 +7,7 @@ import {
   profiles,
   projects,
   serviceJobs,
+  warehouses,
   warrantyClaims,
 } from "@/db/schema";
 
@@ -94,7 +95,7 @@ export type ServiceJobRow = ServiceDashboard["jobs"][number];
 export type WarrantyClaimRow = ServiceDashboard["claims"][number];
 
 export async function getServiceFormOptions() {
-  const [customerOptions, projectOptions, assigneeOptions, productOptions, jobOptions, assetOptions] = await Promise.all([
+  const [customerOptions, projectOptions, assigneeOptions, productOptions, jobOptions, assetOptions, warehouseOptions] = await Promise.all([
     db.select({ id: customers.id, name: customers.name })
       .from(customers)
       .where(eq(customers.isActive, true))
@@ -136,7 +137,10 @@ export async function getServiceFormOptions() {
       .where(ne(installedAssets.status, "removed"))
       .orderBy(asc(installedAssets.name))
       .limit(500),
+    db.select({ id: warehouses.id, name: warehouses.name, isDefault: warehouses.isDefault })
+      .from(warehouses)
+      .orderBy(desc(warehouses.isDefault), asc(warehouses.name)),
   ]);
 
-  return { customerOptions, projectOptions, assigneeOptions, productOptions, jobOptions, assetOptions };
+  return { customerOptions, projectOptions, assigneeOptions, productOptions, jobOptions, assetOptions, warehouseOptions };
 }

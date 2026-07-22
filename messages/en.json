@@ -2389,7 +2389,11 @@
       "edit": "Update material",
       "planned": "Planned quantity",
       "used": "Used quantity",
+      "issued": "Issued: {quantity} {unit}",
       "unit": "Unit",
+      "syncStock": "Sync inventory",
+      "syncStockTitle": "Sync materials with inventory",
+      "syncStockHint": "Used {used} {unit}, issued {issued} {unit}. Only the difference will be issued or returned.",
       "summary": "{count} material lines by work order",
       "empty": "No planned materials for this project yet."
     },
@@ -2414,6 +2418,9 @@
       "projectRequired": "Select a valid service project.",
       "tradeMismatch": "The work order trade does not match this project.",
       "relationMismatch": "The selected record does not belong to this project or has the wrong document type.",
+      "invalidMaterialUnit": "The material unit does not match the product units.",
+      "materialWarehouseMismatch": "This material was already issued from another warehouse.",
+      "insufficientMaterialStock": "The warehouse does not have enough available stock for this material.",
       "invalidTransition": "This status transition is not allowed.",
       "duplicateCode": "The document code already exists. Try again.",
       "duplicateSerial": "This asset serial already exists."

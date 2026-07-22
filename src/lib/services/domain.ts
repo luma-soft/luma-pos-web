@@ -140,3 +140,21 @@ export function validateServiceLinks({
   )) return false;
   return true;
 }
+
+export function calculateServiceMaterialStockSync(
+  usedQuantity: number,
+  unitMultiplier: number,
+  issuedBaseQuantity: number,
+) {
+  if (
+    !Number.isFinite(usedQuantity)
+    || !Number.isFinite(unitMultiplier)
+    || !Number.isFinite(issuedBaseQuantity)
+    || usedQuantity < 0
+    || unitMultiplier <= 0
+    || issuedBaseQuantity < 0
+  ) return null;
+  const targetBaseQuantity = Math.round(usedQuantity * unitMultiplier * 10_000) / 10_000;
+  const deltaBaseQuantity = Math.round((targetBaseQuantity - issuedBaseQuantity) * 10_000) / 10_000;
+  return { targetBaseQuantity, deltaBaseQuantity };
+}

@@ -86,6 +86,13 @@ export const serviceJobMaterialSchema = z.object({
 
 export type ServiceJobMaterialInput = z.input<typeof serviceJobMaterialSchema>;
 
+export const serviceMaterialStockSyncSchema = z.object({
+  materialId: z.uuid(),
+  warehouseId: z.uuid(),
+});
+
+export type ServiceMaterialStockSyncInput = z.input<typeof serviceMaterialStockSyncSchema>;
+
 export const installedAssetCreateSchema = z.object({
   projectId: z.uuid(),
   jobId: z.uuid().nullable().optional(),

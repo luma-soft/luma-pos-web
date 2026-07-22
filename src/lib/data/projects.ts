@@ -4,12 +4,14 @@ import {
   customers,
   installedAssets,
   orders,
+  productUnits,
   products,
   profiles,
   projects,
   serviceJobMaterials,
   serviceJobs,
   serviceStatusLogs,
+  stockMovements,
   warrantyClaims,
 } from "@/db/schema";
 
@@ -146,9 +148,16 @@ export async function getProjectDetail(id: string) {
       productId: serviceJobMaterials.productId,
       productName: products.name,
       sku: products.sku,
+      baseUnit: products.baseUnit,
       unitName: serviceJobMaterials.unitName,
+      unitMultiplier: sql<string>`case
+        when ${serviceJobMaterials.unitName} = ${products.baseUnit} then 1
+        else coalesce((select ${productUnits.multiplier} from ${productUnits} where ${productUnits.productId} = ${serviceJobMaterials.productId} and ${productUnits.unitName} = ${serviceJobMaterials.unitName} limit 1), 0)
+      end`,
       plannedQuantity: serviceJobMaterials.plannedQuantity,
       usedQuantity: serviceJobMaterials.usedQuantity,
+      issuedBaseQuantity: sql<string>`coalesce(-(select sum(${stockMovements.quantity}) from ${stockMovements} where ${stockMovements.refType} = 'service_material' and ${stockMovements.refId} = ${serviceJobMaterials.id}), 0)`,
+      stockWarehouseId: sql<string | null>`(select ${stockMovements.warehouseId} from ${stockMovements} where ${stockMovements.refType} = 'service_material' and ${stockMovements.refId} = ${serviceJobMaterials.id} order by ${stockMovements.createdAt} asc limit 1)`,
       note: serviceJobMaterials.note,
     }).from(serviceJobMaterials)
       .innerJoin(serviceJobs, eq(serviceJobMaterials.jobId, serviceJobs.id))

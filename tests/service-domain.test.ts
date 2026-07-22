@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canTransitionWarrantyClaim,
   canTransitionServiceJob,
+  calculateServiceMaterialStockSync,
   createDefaultChecklist,
   isServiceTypeAllowedForProject,
   validateServiceLinks,
@@ -189,5 +190,23 @@ describe("service quote links", () => {
     expect(validateServiceLinks({ projectId, asset: null })).toBe(false);
     expect(validateServiceLinks({ projectId, quoteOrder: { projectId, status: "confirmed" } })).toBe(false);
     expect(validateServiceLinks({ projectId, materialOrder: { projectId, status: "cancelled" } })).toBe(false);
+  });
+});
+
+describe("service material stock sync", () => {
+  it("calculates base-unit issues and returns from the posted difference", () => {
+    expect(calculateServiceMaterialStockSync(3, 4, 8)).toEqual({
+      targetBaseQuantity: 12,
+      deltaBaseQuantity: 4,
+    });
+    expect(calculateServiceMaterialStockSync(1, 4, 12)).toEqual({
+      targetBaseQuantity: 4,
+      deltaBaseQuantity: -8,
+    });
+  });
+
+  it("rejects invalid usage and unit multipliers", () => {
+    expect(calculateServiceMaterialStockSync(-1, 1, 0)).toBeNull();
+    expect(calculateServiceMaterialStockSync(1, 0, 0)).toBeNull();
   });
 });
