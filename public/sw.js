@@ -1,8 +1,7 @@
-/* Service Worker — cache app shell để mở app/POS được khi mất mạng.
-   Chiến lược: tĩnh Next (hashed) = cache-first; điều hướng = network-first
-   + fallback cache (hoặc /pos khi offline); GET khác = network-first + cache. */
-const CACHE = "sales-pos-v2";
-const APP_SHELL = ["/pos", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/icon-180.png"];
+/* Service Worker — cache tài nguyên tĩnh và trang POS để hỗ trợ offline.
+   Không chặn RSC/API hoặc các trang nghiệp vụ có dữ liệu đăng nhập. */
+const CACHE = "sales-pos-v3";
+const APP_SHELL = ["/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/icon-180.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -30,32 +29,29 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icon")) {
     event.respondWith(
       caches.match(req).then((hit) => hit || fetch(req).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(req, copy));
+        if (res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy));
+        }
         return res;
       }))
     );
     return;
   }
 
-  // Điều hướng trang → network-first, offline thì lấy cache (cuối cùng /pos)
-  if (req.mode === "navigate") {
-    event.respondWith(
-      fetch(req).then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(req, copy));
-        return res;
-      }).catch(() => caches.match(req).then((hit) => hit || caches.match("/pos")))
-    );
-    return;
-  }
-
-  // GET khác (gồm payload RSC) → network-first, fallback cache
+  // Chỉ POS được cache theo navigation. RSC/API và các trang khác đi thẳng mạng.
+  if (req.mode !== "navigate" || url.pathname !== "/pos") return;
   event.respondWith(
     fetch(req).then((res) => {
-      const copy = res.clone();
-      caches.open(CACHE).then((c) => c.put(req, copy));
+      if (res.ok && !res.redirected) {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(req, copy));
+      }
       return res;
-    }).catch(() => caches.match(req))
+    }).catch(async (error) => {
+      const cached = await caches.match(req);
+      if (cached) return cached;
+      throw error;
+    })
   );
 });

@@ -14,6 +14,18 @@ const nextConfig: NextConfig = {
     // giữa Sản phẩm/Thiết lập giá/Tồn kho trong 30s không query lại DB.
     staleTimes: { dynamic: 30, static: 180 },
   },
+  async headers() {
+    return [
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'" },
+        ],
+      },
+    ];
+  },
 };
 
 export default withNextIntl(nextConfig);
