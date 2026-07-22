@@ -466,6 +466,35 @@ export async function setProductActive(
   }
 }
 
+/** Gắn hoặc bỏ sản phẩm khỏi danh sách vật tư dùng trong báo giá camera. */
+export async function setCameraMaterial(input: {
+  productId: string;
+  enabled: boolean;
+}): Promise<ActionResult> {
+  const gate = await requireStockAccess();
+  if (!gate.ok) return gate;
+  try {
+    const [current] = await db
+      .select({ specs: products.specs })
+      .from(products)
+      .where(eq(products.id, input.productId))
+      .limit(1);
+    if (!current) return { ok: false, error: "errors.invalidData" };
+    const specs = current.specs && typeof current.specs === "object" && !Array.isArray(current.specs)
+      ? { ...(current.specs as Record<string, unknown>) }
+      : {};
+    if (input.enabled) specs.__cameraQuoteMaterial = true;
+    else delete specs.__cameraQuoteMaterial;
+    await db.update(products).set({ specs: Object.keys(specs).length > 0 ? specs : null }).where(eq(products.id, input.productId));
+    revalidatePath(Routes.Inventory);
+    revalidatePath(Routes.POS);
+    return { ok: true, data: undefined };
+  } catch (e) {
+    console.error("setCameraMaterial failed:", e);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
 /** Cập nhật thông tin SP (không đụng tồn kho — tồn quản lý ở Kho/Kiểm kho). */
 export async function updateProduct(
   input: UpdateProductInput,

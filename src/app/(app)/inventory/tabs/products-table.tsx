@@ -21,6 +21,7 @@ import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { Routes } from "@/lib/routes";
 import { deleteProduct, setProductActive } from "@/lib/actions/products";
+import { setCameraMaterial } from "@/lib/actions/products";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import type { ProductListResult } from "@/lib/data/products";
 import {
@@ -59,9 +60,11 @@ const MOVEMENT_TYPE_KEYS: Record<string, string> = {
 export function ProductsTable({
   rows,
   initialExpandedId,
+  cameraMaterials = false,
 }: {
   rows: ProductListResult["rows"];
   initialExpandedId?: string;
+  cameraMaterials?: boolean;
 }) {
   const t = useTranslations();
   const columns: DataTableColumn<ProductRow>[] = [
@@ -110,7 +113,7 @@ export function ProductsTable({
       expandedParam="expanded"
       initialExpandedId={initialExpandedId}
       minWidth="1120px"
-      renderExpanded={(product) => <ExpandedProduct product={product} />}
+      renderExpanded={(product) => <ExpandedProduct product={product} cameraMaterials={cameraMaterials} />}
       renderMobileRow={({ row: product, toggle }) => (
         <button type="button" onClick={toggle} className="w-full p-3 text-left">
           <div className="flex items-start justify-between gap-2">
@@ -158,7 +161,7 @@ function ProductThumbnail({ product }: { product: ProductRow }) {
   );
 }
 
-function ExpandedProduct({ product }: { product: ProductRow }) {
+function ExpandedProduct({ product, cameraMaterials = false }: { product: ProductRow; cameraMaterials?: boolean }) {
   const t = useTranslations();
   const [tab, setTab] = useState<ProductExpandTab>("info");
   const specs = specEntries(product.specs);
@@ -169,6 +172,19 @@ function ExpandedProduct({ product }: { product: ProductRow }) {
   const effectiveActive = product.isVariantParent
     ? product.children.some((child) => child.isActive)
     : product.isActive;
+
+  if (cameraMaterials) {
+    return (
+      <div className="border-t border-border-soft bg-surface px-4 py-4">
+        <div className="grid gap-4 sm:grid-cols-3">
+          <InfoItem label={t("products.fields.sku")} value={product.sku} />
+          <InfoItem label={t("products.pricing.retailPrice")} value={formatCurrency(Number(product.retailPrice))} />
+          <InfoItem label={t("products.list.colUnits")} value={product.baseUnit} />
+        </div>
+        <ProductActionBar product={product} cameraMaterials />
+      </div>
+    );
+  }
 
   return (
     <div className="border-t border-border-soft bg-surface px-4 py-4">
@@ -694,7 +710,7 @@ function DocumentValue({ movement }: { movement: StockMovementRow }) {
   return <span className="text-primary-600">{label}</span>;
 }
 
-function ProductActionBar({ product }: { product: ProductRow }) {
+function ProductActionBar({ product, cameraMaterials = false }: { product: ProductRow; cameraMaterials?: boolean }) {
   const t = useTranslations();
   const locale = useLocale();
   const router = useRouter();
@@ -708,6 +724,16 @@ function ProductActionBar({ product }: { product: ProductRow }) {
     : product.isActive;
   const nextActive = !effectiveActive;
   const sameTypeSourceId = product.parentProductId ?? product.id;
+
+  function toggleCameraMaterial() {
+    if (pending) return;
+    setError("");
+    startTransition(async () => {
+      const res = await setCameraMaterial({ productId: product.id, enabled: !cameraMaterials });
+      if (res.ok) clearExpandedAndRefresh();
+      else setError(t(res.error as never));
+    });
+  }
 
   function clearExpandedAndRefresh() {
     const sp = new URLSearchParams(params.toString());
@@ -779,22 +805,33 @@ function ProductActionBar({ product }: { product: ProductRow }) {
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-wrap gap-2">
           <ActionButton
-            icon={Trash2}
-            label={t("products.actions.delete")}
-            onClick={removeProduct}
+            icon={cameraMaterials ? Trash2 : PackagePlus}
+            label={cameraMaterials
+              ? (locale === "vi" ? "Xóa khỏi vật tư lắp camera" : "Remove from camera materials")
+              : (locale === "vi" ? "Thêm vào vật tư lắp camera" : "Add to camera materials")}
+            onClick={toggleCameraMaterial}
             disabled={pending}
-            tone="danger"
+            tone={cameraMaterials ? "danger" : "neutral"}
           />
-          <ActionLink
-            icon={Copy}
-            label={t("products.actions.copy")}
-            href={productModalHref({
-              productModal: "copy",
-              copyFrom: product.id,
-            })}
-          />
+          {!cameraMaterials && <>
+            <ActionButton
+              icon={Trash2}
+              label={t("products.actions.delete")}
+              onClick={removeProduct}
+              disabled={pending}
+              tone="danger"
+            />
+            <ActionLink
+              icon={Copy}
+              label={t("products.actions.copy")}
+              href={productModalHref({
+                productModal: "copy",
+                copyFrom: product.id,
+              })}
+            />
+          </>}
         </div>
-        <div className="flex flex-wrap gap-2 xl:justify-end">
+        {!cameraMaterials && <div className="flex flex-wrap gap-2 xl:justify-end">
           <ActionLink
             icon={Pencil}
             label={t("products.actions.edit")}
@@ -839,7 +876,7 @@ function ProductActionBar({ product }: { product: ProductRow }) {
             onClick={toggleActive}
             disabled={pending}
           />
-        </div>
+        </div>}
       </div>
       {error && <p className="mt-2 text-sm font-medium text-er">{error}</p>}
     </div>

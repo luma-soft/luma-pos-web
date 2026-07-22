@@ -21,6 +21,7 @@ function posProductSelect(warehouseId: string | null, hasComplianceColumns: bool
     barcode: products.barcode,
     name: products.name,
     imageUrls: products.imageUrls,
+    specs: products.specs,
     parentProductId: products.parentProductId,
     variantName: products.variantName,
     isVariantParent: products.isVariantParent,

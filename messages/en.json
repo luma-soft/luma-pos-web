@@ -21,7 +21,8 @@
     "noResults": "No results",
     "clear": "Clear",
     "active": "On",
-    "inactive": "Off"
+    "inactive": "Off",
+    "actions": "Actions"
   },
   "auth": {
     "login": "Sign in",
@@ -2748,6 +2749,7 @@
     "empty": "No categories yet",
     "name": "Name",
     "parent": "Parent group",
+    "productCount": "Products",
     "noParent": "— No parent —"
   },
   "pagination": {

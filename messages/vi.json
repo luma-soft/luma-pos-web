@@ -21,7 +21,8 @@
     "noResults": "Không tìm thấy",
     "clear": "Xóa chọn",
     "active": "Bật",
-    "inactive": "Tắt"
+    "inactive": "Tắt",
+    "actions": "Thao tác"
   },
   "auth": {
     "login": "Đăng nhập",
@@ -2748,6 +2749,7 @@
     "empty": "Chưa có nhóm hàng",
     "name": "Tên nhóm",
     "parent": "Nhóm cha",
+    "productCount": "Số sản phẩm",
     "noParent": "— Không có nhóm cha —"
   },
   "pagination": {

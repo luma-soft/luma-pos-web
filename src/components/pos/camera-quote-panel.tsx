@@ -80,13 +80,14 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
     const product = bySku.get(sku);
     return product ? [product] : [];
   });
-  const materials = [
+  const materialSkus = new Set<string>([
     ...CAMERA_QUOTE_MATERIAL_SKUS,
     ...CAMERA_QUOTE_DETAIL_MATERIAL_SKUS,
-  ].flatMap((sku) => {
-    const product = bySku.get(sku);
-    return product ? [product] : [];
-  });
+  ]);
+  const materials = products.filter((product) =>
+    materialSkus.has(product.sku ?? "") ||
+    Boolean(product.specs && typeof product.specs === "object" && !Array.isArray(product.specs) && (product.specs as Record<string, unknown>).__cameraQuoteMaterial === true),
+  );
   const selectedCameras = packages.reduce<Record<string, number>>((counts, pkg) => {
     counts[pkg.cameraId] = (counts[pkg.cameraId] ?? 0) + pkg.quantity;
     return counts;

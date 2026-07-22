@@ -43,7 +43,8 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
       </div>
 
       <form className="flex flex-wrap items-center gap-3 mb-4" action={Routes.Inventory}>
-        <input type="hidden" name="tab" value="products" />
+        <input type="hidden" name="tab" value={cameraMaterials ? "camera-materials" : "products"} />
+        {cameraMaterials && <input type="hidden" name="cameraMaterials" value="1" />}
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface" />
@@ -170,6 +171,7 @@ async function ProductsContent({ searchParams, cameraMaterials = false }: { sear
     page,
     pageSize,
     productSkus: cameraMaterials ? [...CAMERA_QUOTE_MATERIAL_SKUS, ...CAMERA_QUOTE_DETAIL_MATERIAL_SKUS] : undefined,
+    cameraMaterial: cameraMaterials,
   });
 
   return (
@@ -186,7 +188,7 @@ async function ProductsContent({ searchParams, cameraMaterials = false }: { sear
         </div>
       ) : (
         <>
-          <ProductsTable rows={rows} initialExpandedId={params.expanded} />
+          <ProductsTable rows={rows} initialExpandedId={params.expanded} cameraMaterials={cameraMaterials} />
         </>
       )}
 
