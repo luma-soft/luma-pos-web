@@ -76,7 +76,7 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
       </form>}
 
       <Suspense fallback={<TableSkeleton cols={8} rows={10} />}>
-        <ProductsContent searchParams={searchParams} cameraMaterials={cameraMaterials} />
+      <ProductsContent searchParams={searchParams} cameraMaterials={cameraMaterials} />
       </Suspense>
 
       <ProductEditorModal searchParams={params} />
@@ -192,7 +192,9 @@ async function ProductsContent({ searchParams, cameraMaterials = false }: { sear
         </>
       )}
 
-      <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("products.unitLabel")} />
+      <div className="shrink-0 pt-3">
+        <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("products.unitLabel")} />
+      </div>
     </>
   );
 }
