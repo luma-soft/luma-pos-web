@@ -34,6 +34,13 @@ export function CameraPickerModal({ open, cameras, memoryCards, installations, m
   const [activeTab, setActiveTab] = useState<"camera" | "memory" | "installation" | "material">("camera");
   const lists = { camera: cameras, memory: memoryCards, installation: installations, material: materials };
   const activeProducts = lists[activeTab];
+  const searchPlaceholder = activeTab === "camera"
+    ? t("pos.cameraQuote.pickerSearchCamera")
+    : activeTab === "memory"
+      ? t("pos.cameraQuote.pickerSearchMemory")
+      : activeTab === "installation"
+        ? t("pos.cameraQuote.pickerSearchInstallation")
+        : t("pos.cameraQuote.pickerSearchMaterial");
   const filtered = useMemo(() => {
     const query = search.trim().toLocaleLowerCase("vi");
     if (!query) return activeProducts;
@@ -50,7 +57,7 @@ export function CameraPickerModal({ open, cameras, memoryCards, installations, m
 
   return (
     <div className="fixed inset-0 z-[80] grid place-items-center bg-slate-950/40 p-4" role="presentation" onMouseDown={close}>
-      <div className="flex max-h-[min(900px,calc(100dvh-2rem))] w-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl" role="dialog" aria-modal="true" aria-label={t("pos.cameraQuote.pickerTitle")} onMouseDown={(event) => event.stopPropagation()}>
+      <div className="flex h-[min(860px,calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] w-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl" role="dialog" aria-modal="true" aria-label={t("pos.cameraQuote.pickerTitle")} onMouseDown={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-5">
           <div>
             <h2 className="text-base font-bold sm:text-lg">{t("pos.cameraQuote.pickerTitle")}</h2>
@@ -59,7 +66,7 @@ export function CameraPickerModal({ open, cameras, memoryCards, installations, m
           <Button type="button" variant="ghost" size="iconSm" aria-label={t("common.close")} onClick={close}><X className="h-5 w-5" /></Button>
         </div>
         <div className="border-b border-border p-4 sm:px-5">
-          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("pos.cameraQuote.pickerSearch")} leftIcon={<Search />} />
+          <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={searchPlaceholder} leftIcon={<Search />} />
           <div className="mt-3 flex gap-1 overflow-x-auto rounded-lg bg-surface-2 p-1" role="tablist">
             {([
               ["camera", t("pos.cameraQuote.cameraTab"), cameras.length],
