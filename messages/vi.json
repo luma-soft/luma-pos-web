@@ -2352,6 +2352,10 @@
       "assets": "{count} thiết bị đang lắp đặt",
       "openClaims": "{count} phiếu bảo hành đang mở"
     },
+    "filters": {
+      "allTypes": "Tất cả nghiệp vụ",
+      "allStatuses": "Tất cả trạng thái"
+    },
     "projects": {
       "create": "Thêm công trình dịch vụ",
       "createQuote": "Tạo báo giá",

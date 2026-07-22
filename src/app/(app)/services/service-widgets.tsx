@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Plus } from "lucide-react";
 import { DataTableShell, RowPreviewModal, stopRowToggle, type DataTableColumn } from "@/components/data-table";
@@ -39,6 +39,55 @@ type AssigneeOption = { id: string; name: string };
 type ProductOption = { id: string; name: string; sku: string; baseUnit: string };
 type WarrantyJobOption = { id: string; projectId: string; code: string; title: string };
 type WarrantyAssetOption = { id: string; projectId: string; jobId: string | null; name: string; serialNumber: string | null };
+
+export function ServiceDashboardFilters({
+  tab,
+  serviceType,
+  status,
+}: {
+  tab: string;
+  serviceType: string;
+  status: string;
+}) {
+  const t = useTranslations();
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+  const statuses = tab === "jobs"
+    ? jobStatusOptions(t)
+    : tab === "warranty"
+      ? claimStatusOptions(t)
+      : ["planning", "quoted", "active", "paused", "completed", "warranty", "cancelled"].map((value) => ({ value, label: t(`services.stages.${value}` as never) }));
+
+  function update(key: "type" | "status", value: string) {
+    const next = new URLSearchParams(params.toString());
+    if (value) next.set(key, value);
+    else next.delete(key);
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  }
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-2">
+      <Select
+        size="sm"
+        value={serviceType}
+        onChange={(event) => update("type", event.target.value)}
+        options={[
+          { value: "", label: t("services.filters.allTypes") },
+          ...["camera", "electrical", "plumbing", "mixed"].map((value) => ({ value, label: t(`services.types.${value}` as never) })),
+        ]}
+        className="min-w-36"
+      />
+      <Select
+        size="sm"
+        value={status}
+        onChange={(event) => update("status", event.target.value)}
+        options={[{ value: "", label: t("services.filters.allStatuses") }, ...statuses]}
+        className="min-w-44"
+      />
+    </div>
+  );
+}
 
 export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProjectRow[]; customers: { id: string; name: string }[] }) {
   const t = useTranslations();

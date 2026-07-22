@@ -2352,6 +2352,10 @@
       "assets": "{count} installed assets",
       "openClaims": "{count} open warranty cases"
     },
+    "filters": {
+      "allTypes": "All trades",
+      "allStatuses": "All statuses"
+    },
     "projects": {
       "create": "New service project",
       "createQuote": "Create quote",

@@ -9,6 +9,7 @@ import {
   ServiceJobQuickCreate,
   ServiceJobsTable,
   ServiceProjectsTable,
+  ServiceDashboardFilters,
   WarrantyClaimQuickCreate,
   WarrantyClaimsTable,
 } from "./service-widgets";
@@ -33,6 +34,17 @@ export default async function ServicesPage({
     getServiceFormOptions(),
   ]);
   const tab = params.tab ?? "projects";
+  const serviceType = params.type ?? "";
+  const status = params.status ?? "";
+  const projectRows = dashboard.projects.filter((project) =>
+    (!serviceType || project.serviceType === serviceType) && (!status || project.serviceStage === status)
+  );
+  const jobRows = dashboard.jobs.filter((job) =>
+    (!serviceType || job.serviceType === serviceType) && (!status || job.status === status)
+  );
+  const claimRows = dashboard.claims.filter((claim) =>
+    (!serviceType || claim.serviceType === serviceType) && (!status || claim.status === status)
+  );
 
   return (
     <div className="p-4 sm:p-6">
@@ -58,31 +70,40 @@ export default async function ServicesPage({
       {tab === "jobs" ? (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Text variant="muted" size="sm" text={t("services.summary.openJobs", { count: dashboard.metrics.openJobs })} />
+            <div>
+              <Text variant="muted" size="sm" text={t("services.summary.openJobs", { count: jobRows.filter((job) => job.status !== "completed" && job.status !== "cancelled").length })} />
+              <ServiceDashboardFilters tab={tab} serviceType={serviceType} status={status} />
+            </div>
             <ServiceJobQuickCreate projects={options.projectOptions} assignees={options.assigneeOptions} />
           </div>
-          {dashboard.jobs.length > 0
-            ? <ServiceJobsTable rows={dashboard.jobs} />
+          {jobRows.length > 0
+            ? <ServiceJobsTable rows={jobRows} />
             : <Section collapsible={false}><Text variant="muted" size="sm" text={t("services.jobs.empty")} /></Section>}
         </div>
       ) : tab === "warranty" ? (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Text variant="muted" size="sm" text={t("services.summary.openClaims", { count: dashboard.metrics.openClaims })} />
+            <div>
+              <Text variant="muted" size="sm" text={t("services.summary.openClaims", { count: claimRows.filter((claim) => claim.status !== "closed" && claim.status !== "void").length })} />
+              <ServiceDashboardFilters tab={tab} serviceType={serviceType} status={status} />
+            </div>
             <WarrantyClaimQuickCreate projects={options.projectOptions} jobs={options.jobOptions} assets={options.assetOptions} />
           </div>
-          {dashboard.claims.length > 0
-            ? <WarrantyClaimsTable rows={dashboard.claims} />
+          {claimRows.length > 0
+            ? <WarrantyClaimsTable rows={claimRows} />
             : <Section collapsible={false}><Text variant="muted" size="sm" text={t("services.warranty.empty")} /></Section>}
         </div>
       ) : (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Text variant="muted" size="sm" text={t("services.summary.activeProjects", { count: dashboard.metrics.activeProjects })} />
+            <div>
+              <Text variant="muted" size="sm" text={t("services.summary.activeProjects", { count: projectRows.filter((project) => project.serviceStage !== "completed" && project.serviceStage !== "cancelled").length })} />
+              <ServiceDashboardFilters tab={tab} serviceType={serviceType} status={status} />
+            </div>
             <ProjectQuickCreate customers={options.customerOptions} serviceMode />
           </div>
-          {dashboard.projects.length > 0
-            ? <ServiceProjectsTable rows={dashboard.projects} customers={options.customerOptions} />
+          {projectRows.length > 0
+            ? <ServiceProjectsTable rows={projectRows} customers={options.customerOptions} />
             : <Section collapsible={false}><Text variant="muted" size="sm" text={t("services.projects.empty")} /></Section>}
         </div>
       )}

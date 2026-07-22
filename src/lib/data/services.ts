@@ -59,6 +59,7 @@ export async function getServiceDashboard() {
       code: warrantyClaims.code,
       projectId: warrantyClaims.projectId,
       projectName: projects.name,
+      serviceType: projects.serviceType,
       assetName: installedAssets.name,
       title: warrantyClaims.title,
       status: warrantyClaims.status,
