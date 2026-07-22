@@ -1,6 +1,7 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import type { Session } from "@supabase/supabase-js";
 import { eq } from "drizzle-orm";
+import { activeProfile } from "@/lib/auth/profile-access";
 
 export function createMobileAuthClient() {
   return createSupabaseClient(
@@ -44,7 +45,8 @@ export async function mobileAuthPayload(session: Session) {
     return { ok: false as const, error: "errors.serverError" };
   }
 
-  if (profile && !profile.isActive) {
+  const active = activeProfile(profile);
+  if (!active) {
     return { ok: false as const, error: "errors.unauthorized" };
   }
 
@@ -59,8 +61,8 @@ export async function mobileAuthPayload(session: Session) {
       user: {
         id: session.user.id,
         email: session.user.email ?? "",
-        role: profile?.role ?? "cashier",
-        fullName: profile?.fullName ?? session.user.email ?? "",
+        role: active.role,
+        fullName: active.fullName ?? session.user.email ?? "",
       },
     },
   };

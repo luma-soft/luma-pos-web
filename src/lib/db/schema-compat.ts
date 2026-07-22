@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { unstable_cache } from "next/cache";
 import { db } from "@/db";
 
 async function hasProductComplianceColumnsQuery() {
@@ -18,18 +19,11 @@ async function hasProductComplianceColumnsQuery() {
   return Number(rows[0]?.count ?? 0) === 5;
 }
 
-const cachedHasProductComplianceColumns = (() => {
-  try {
-    const { unstable_cache } = require("next/cache") as typeof import("next/cache");
-    return unstable_cache(
-      hasProductComplianceColumnsQuery,
-      ["schema-compat-products-compliance-columns"],
-      { revalidate: 30 },
-    );
-  } catch {
-    return hasProductComplianceColumnsQuery;
-  }
-})();
+const cachedHasProductComplianceColumns = unstable_cache(
+  hasProductComplianceColumnsQuery,
+  ["schema-compat-products-compliance-columns"],
+  { revalidate: 30 },
+);
 
 export async function hasProductComplianceColumns() {
   try {

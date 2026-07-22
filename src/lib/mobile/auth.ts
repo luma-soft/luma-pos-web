@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import { requireRole, type Gate, type Role } from "@/lib/actions/common";
+import { activeProfile } from "@/lib/auth/profile-access";
 import {
   cashierContextSecret,
   verifyCashierContextToken,
@@ -44,12 +45,13 @@ export async function requireMobileRole(roles: readonly Role[]): Promise<MobileG
     .where(eq(profiles.id, user.id))
     .limit(1);
 
-  if (principalProfile && !principalProfile.isActive) {
+  const activePrincipal = activeProfile(principalProfile);
+  if (!activePrincipal) {
     return { ok: false, error: "errors.unauthorized" };
   }
 
   let userId = user.id;
-  let role = principalProfile?.role ?? "cashier";
+  let role = activePrincipal.role;
   const cashierContext = headerStore.get("x-luma-cashier-context")?.trim();
   if (cashierContext) {
     let claims;

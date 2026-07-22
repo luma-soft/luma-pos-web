@@ -5,6 +5,7 @@ import type { User } from "@supabase/supabase-js";
 import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import { createClient as createCookieClient } from "@/lib/supabase/server";
+import { activeProfile } from "@/lib/auth/profile-access";
 
 export type ActionResult<T = undefined> =
   | { ok: true; data: T }
@@ -45,7 +46,7 @@ export async function requireUser() {
     .from(profiles)
     .where(eq(profiles.id, user.id))
     .limit(1);
-  if (p && !p.isActive) throw new UnauthorizedError();
+  if (!p?.isActive) throw new UnauthorizedError();
   return user;
 }
 
@@ -55,11 +56,12 @@ export async function getProfileId(userId: string): Promise<string | null> {
   return p?.id ?? null;
 }
 
-/** Vai trò của user (profiles.role) — mặc định 'cashier' nếu chưa có profile. */
+/** Vai trò của user (profiles.role). User không có profile active bị từ chối. */
 export async function getRole(userId: string): Promise<string> {
   const [p] = await db.select({ role: profiles.role, isActive: profiles.isActive }).from(profiles).where(eq(profiles.id, userId)).limit(1);
-  if (p && !p.isActive) throw new UnauthorizedError();
-  return p?.role ?? "cashier";
+  const profile = activeProfile(p);
+  if (!profile) throw new UnauthorizedError();
+  return profile.role;
 }
 
 export type Role = "owner" | "manager" | "cashier" | "warehouse";
@@ -69,7 +71,8 @@ export type Gate = { ok: true; userId: string; role: Role } | { ok: false; error
 export async function requireRole(roles: Role[]): Promise<Gate> {
   let userId: string;
   try { userId = (await requireUser()).id; } catch { return { ok: false, error: "errors.unauthorized" }; }
-  const role = (await getRole(userId)) as Role;
+  let role: Role;
+  try { role = (await getRole(userId)) as Role; } catch { return { ok: false, error: "errors.unauthorized" }; }
   if (!roles.includes(role)) return { ok: false, error: "errors.forbidden" };
   return { ok: true, userId, role };
 }
