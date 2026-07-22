@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { RowPreviewModal } from "@/components/data-table";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
@@ -55,49 +56,58 @@ export function ProjectQuickCreate({
     } else setError(t(res.error as never));
   }
 
-  if (!open) {
-    return (
+  return (
+    <>
       <Button type="button" onClick={() => setOpen(true)} tx={serviceMode ? "services.projects.create" : "projects.createNew"}>
         <Plus className="w-4 h-4" />
       </Button>
-    );
-  }
-
-  return (
-    <div className="grid gap-2 bg-surface border border-border rounded-card p-3 sm:grid-cols-2 lg:grid-cols-4">
-      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={`${t("projects.cols.name")} *`} className="w-52" />
-      <Select
-        value={customerId}
-        onChange={(e) => setCustomerId(e.target.value)}
-        options={[
-          { value: "", label: t("projects.noCustomer") },
-          ...customers.map((c) => ({ value: c.id, label: c.name })),
-        ]}
-      />
-      <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder={t("customers.fields.address")} className="w-52" />
-      {serviceMode && (
-        <>
+      <RowPreviewModal
+        open={open}
+        onClose={() => {
+          if (!busy) setOpen(false);
+        }}
+        title={t(serviceMode ? "services.projects.create" : "projects.createNew")}
+        closeLabel={t("common.close")}
+        size="lg"
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy} tx="common.cancel" />
+            <Button type="button" onClick={submit} disabled={busy || !name.trim()} loading={busy} tx="common.save" />
+          </div>
+        )}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={`${t("projects.cols.name")} *`} />
           <Select
-            value={serviceType}
-            onChange={(e) => setServiceType(e.target.value)}
+            value={customerId}
+            onChange={(e) => setCustomerId(e.target.value)}
             options={[
-              { value: "camera", label: t("services.types.camera") },
-              { value: "electrical", label: t("services.types.electrical") },
-              { value: "plumbing", label: t("services.types.plumbing") },
-              { value: "mixed", label: t("services.types.mixed") },
+              { value: "", label: t("projects.noCustomer") },
+              ...customers.map((c) => ({ value: c.id, label: c.name })),
             ]}
           />
-          <Input type="date" value={targetEndsOn} onChange={(e) => setTargetEndsOn(e.target.value)} aria-label={t("services.fields.targetEndsOn")} />
-          <Input value={siteContactName} onChange={(e) => setSiteContactName(e.target.value)} placeholder={t("services.fields.siteContactName")} />
-          <Input value={siteContactPhone} onChange={(e) => setSiteContactPhone(e.target.value)} placeholder={t("services.fields.siteContactPhone")} />
-        </>
-      )}
-      <div className="flex items-center justify-end gap-2 sm:col-span-2 lg:col-span-4">
-        <Button type="button" onClick={submit} disabled={busy || !name.trim()} loading={busy} tx="common.save" />
-        <Button type="button" variant="ghost" size="iconSm" onClick={() => setOpen(false)}><X className="w-4 h-4" /></Button>
-      </div>
-      {error && <Text as="p" variant="destructive" size="xs" className="w-full" text={error} />}
-    </div>
+          <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder={t("customers.fields.address")} className="sm:col-span-2" />
+          {serviceMode && (
+            <>
+              <Select
+                value={serviceType}
+                onChange={(e) => setServiceType(e.target.value)}
+                options={[
+                  { value: "camera", label: t("services.types.camera") },
+                  { value: "electrical", label: t("services.types.electrical") },
+                  { value: "plumbing", label: t("services.types.plumbing") },
+                  { value: "mixed", label: t("services.types.mixed") },
+                ]}
+              />
+              <Input type="date" value={targetEndsOn} onChange={(e) => setTargetEndsOn(e.target.value)} aria-label={t("services.fields.targetEndsOn")} />
+              <Input value={siteContactName} onChange={(e) => setSiteContactName(e.target.value)} placeholder={t("services.fields.siteContactName")} />
+              <Input value={siteContactPhone} onChange={(e) => setSiteContactPhone(e.target.value)} placeholder={t("services.fields.siteContactPhone")} />
+            </>
+          )}
+          {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
+        </div>
+      </RowPreviewModal>
+    </>
   );
 }
 

@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Plus, X } from "lucide-react";
-import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
+import { Plus } from "lucide-react";
+import { DataTableShell, RowPreviewModal, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -159,27 +159,40 @@ export function ServiceJobQuickCreate({
     } else setError(t(result.error as never));
   }
 
-  if (!open) return <Button type="button" onClick={() => setOpen(true)}><Plus className="h-4 w-4" />{t("services.jobs.create")}</Button>;
-
   return (
-    <div className="grid gap-2 rounded-card border border-border bg-surface p-3 sm:grid-cols-2 lg:grid-cols-3">
-      <Select value={projectId} onChange={(event) => {
-        const nextProjectId = event.target.value;
-        setProjectId(nextProjectId);
-        const projectType = projects.find((project) => project.id === nextProjectId)?.serviceType;
-        if (projectType && projectType !== "mixed") setServiceType(projectType);
-      }} options={projects.map((project) => ({ value: project.id, label: project.name }))} placeholder={t("projects.cols.name")} />
-      <Select value={serviceType} onChange={(event) => setServiceType(event.target.value)} options={concreteTypeOptions(t)} />
-      <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={`${t("services.fields.job")} *`} />
-      <Select value={priority} onChange={(event) => setPriority(event.target.value)} options={priorityOptions(t)} />
-      <Select value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...assignees.map((item) => ({ value: item.id, label: item.name }))]} />
-      <Input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} aria-label={t("services.fields.schedule")} />
-      {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2 lg:col-span-3" text={error} />}
-      <div className="flex justify-end gap-2 sm:col-span-2 lg:col-span-3">
-        <Button type="button" onClick={submit} disabled={!projectId || !title.trim()} loading={busy} tx="common.save" />
-        <Button type="button" variant="ghost" size="iconSm" onClick={() => setOpen(false)}><X className="h-4 w-4" /></Button>
-      </div>
-    </div>
+    <>
+      <Button type="button" onClick={() => setOpen(true)}><Plus className="h-4 w-4" />{t("services.jobs.create")}</Button>
+      <RowPreviewModal
+        open={open}
+        onClose={() => {
+          if (!busy) setOpen(false);
+        }}
+        title={t("services.jobs.create")}
+        closeLabel={t("common.close")}
+        size="lg"
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy} tx="common.cancel" />
+            <Button type="button" onClick={submit} disabled={busy || !projectId || !title.trim()} loading={busy} tx="common.save" />
+          </div>
+        )}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Select value={projectId} onChange={(event) => {
+            const nextProjectId = event.target.value;
+            setProjectId(nextProjectId);
+            const projectType = projects.find((project) => project.id === nextProjectId)?.serviceType;
+            if (projectType && projectType !== "mixed") setServiceType(projectType);
+          }} options={projects.map((project) => ({ value: project.id, label: project.name }))} placeholder={t("projects.cols.name")} />
+          <Select value={serviceType} onChange={(event) => setServiceType(event.target.value)} options={concreteTypeOptions(t)} />
+          <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={`${t("services.fields.job")} *`} className="sm:col-span-2" />
+          <Select value={priority} onChange={(event) => setPriority(event.target.value)} options={priorityOptions(t)} />
+          <Select value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...assignees.map((item) => ({ value: item.id, label: item.name }))]} />
+          <Input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} aria-label={t("services.fields.schedule")} className="sm:col-span-2" />
+          {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
+        </div>
+      </RowPreviewModal>
+    </>
   );
 }
 
@@ -210,19 +223,32 @@ export function WarrantyClaimQuickCreate({ projects }: { projects: ProjectOption
     } else setError(t(result.error as never));
   }
 
-  if (!open) return <Button type="button" onClick={() => setOpen(true)}><Plus className="h-4 w-4" />{t("services.warranty.create")}</Button>;
-
   return (
-    <div className="grid gap-2 rounded-card border border-border bg-surface p-3 sm:grid-cols-3">
-      <Select value={projectId} onChange={(event) => setProjectId(event.target.value)} options={projects.map((project) => ({ value: project.id, label: project.name }))} />
-      <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={`${t("services.fields.issue")} *`} />
-      <Select value={priority} onChange={(event) => setPriority(event.target.value)} options={priorityOptions(t)} />
-      {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-3" text={error} />}
-      <div className="flex justify-end gap-2 sm:col-span-3">
-        <Button type="button" onClick={submit} disabled={!projectId || !title.trim()} loading={busy} tx="common.save" />
-        <Button type="button" variant="ghost" size="iconSm" onClick={() => setOpen(false)}><X className="h-4 w-4" /></Button>
-      </div>
-    </div>
+    <>
+      <Button type="button" onClick={() => setOpen(true)}><Plus className="h-4 w-4" />{t("services.warranty.create")}</Button>
+      <RowPreviewModal
+        open={open}
+        onClose={() => {
+          if (!busy) setOpen(false);
+        }}
+        title={t("services.warranty.create")}
+        closeLabel={t("common.close")}
+        size="md"
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy} tx="common.cancel" />
+            <Button type="button" onClick={submit} disabled={busy || !projectId || !title.trim()} loading={busy} tx="common.save" />
+          </div>
+        )}
+      >
+        <div className="grid gap-3">
+          <Select value={projectId} onChange={(event) => setProjectId(event.target.value)} options={projects.map((project) => ({ value: project.id, label: project.name }))} />
+          <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={`${t("services.fields.issue")} *`} />
+          <Select value={priority} onChange={(event) => setPriority(event.target.value)} options={priorityOptions(t)} />
+          {error && <Text as="p" variant="destructive" size="xs" text={error} />}
+        </div>
+      </RowPreviewModal>
+    </>
   );
 }
 
@@ -276,24 +302,37 @@ export function InstalledAssetQuickCreate({
     } else setError(t(result.error as never));
   }
 
-  if (!open) return <Button type="button" size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4" />{t("services.assets.create")}</Button>;
-
   return (
-    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-      <Select value={jobId} onChange={(event) => setJobId(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...jobs.map((job) => ({ value: job.id, label: `${job.code} · ${job.title}` }))]} />
-      <Input value={assetKind} onChange={(event) => setAssetKind(event.target.value)} placeholder={`${t("services.fields.assetKind")} *`} />
-      <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={`${t("services.fields.asset")} *`} />
-      <Input value={serialNumber} onChange={(event) => setSerialNumber(event.target.value)} placeholder={t("services.fields.serialNumber")} />
-      <Input value={locationLabel} onChange={(event) => setLocationLabel(event.target.value)} placeholder={t("services.fields.location")} />
-      <Input value={macAddress} onChange={(event) => setMacAddress(event.target.value)} placeholder={t("services.fields.macAddress")} />
-      <Input value={ipAddress} onChange={(event) => setIpAddress(event.target.value)} placeholder={t("services.fields.ipAddress")} />
-      <Input type="date" value={customerWarrantyEndsOn} onChange={(event) => setCustomerWarrantyEndsOn(event.target.value)} aria-label={t("services.tabs.warranty")} />
-      {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2 lg:col-span-4" text={error} />}
-      <div className="flex justify-end gap-2 sm:col-span-2 lg:col-span-4">
-        <Button type="button" onClick={submit} disabled={!name.trim() || !assetKind.trim()} loading={busy} tx="common.save" />
-        <Button type="button" variant="ghost" size="iconSm" onClick={() => setOpen(false)}><X className="h-4 w-4" /></Button>
-      </div>
-    </div>
+    <>
+      <Button type="button" size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4" />{t("services.assets.create")}</Button>
+      <RowPreviewModal
+        open={open}
+        onClose={() => {
+          if (!busy) setOpen(false);
+        }}
+        title={t("services.assets.create")}
+        closeLabel={t("common.close")}
+        size="xl"
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy} tx="common.cancel" />
+            <Button type="button" onClick={submit} disabled={busy || !name.trim() || !assetKind.trim()} loading={busy} tx="common.save" />
+          </div>
+        )}
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Select value={jobId} onChange={(event) => setJobId(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...jobs.map((job) => ({ value: job.id, label: `${job.code} · ${job.title}` }))]} />
+          <Input value={assetKind} onChange={(event) => setAssetKind(event.target.value)} placeholder={`${t("services.fields.assetKind")} *`} />
+          <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={`${t("services.fields.asset")} *`} />
+          <Input value={serialNumber} onChange={(event) => setSerialNumber(event.target.value)} placeholder={t("services.fields.serialNumber")} />
+          <Input value={locationLabel} onChange={(event) => setLocationLabel(event.target.value)} placeholder={t("services.fields.location")} />
+          <Input value={macAddress} onChange={(event) => setMacAddress(event.target.value)} placeholder={t("services.fields.macAddress")} />
+          <Input value={ipAddress} onChange={(event) => setIpAddress(event.target.value)} placeholder={t("services.fields.ipAddress")} />
+          <Input type="date" value={customerWarrantyEndsOn} onChange={(event) => setCustomerWarrantyEndsOn(event.target.value)} aria-label={t("services.tabs.warranty")} />
+          {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
+        </div>
+      </RowPreviewModal>
+    </>
   );
 }
 

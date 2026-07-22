@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, type ReactNode, type SyntheticEvent, useEffect, useMemo, useState } from "react";
+import { Fragment, type ReactNode, type SyntheticEvent, useEffect, useId, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, Columns3, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -356,6 +356,8 @@ export function RowPreviewModal({
   onClose,
   children,
   footer,
+  size = "full",
+  closeLabel = "Đóng",
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
@@ -363,20 +365,44 @@ export function RowPreviewModal({
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  size?: "md" | "lg" | "xl" | "full";
+  closeLabel?: string;
 }) {
+  const titleId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose, open]);
+
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[90] bg-slate-950/45 p-3 sm:p-6" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-6" onMouseDown={onClose}>
       <div
-        className="mx-auto flex h-full max-h-[900px] w-full max-w-6xl flex-col overflow-hidden rounded-card bg-surface shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className={cn(
+          "flex w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-surface shadow-2xl sm:rounded-card",
+          size === "md" && "max-h-[92dvh] sm:max-w-lg",
+          size === "lg" && "max-h-[92dvh] sm:max-w-2xl",
+          size === "xl" && "max-h-[92dvh] sm:max-w-4xl",
+          size === "full" && "h-full max-h-[900px] sm:max-w-6xl",
+        )}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-5">
           <div className="min-w-0">
-            <div className="truncate text-lg font-bold">{title}</div>
+            <div id={titleId} className="truncate text-lg font-bold">{title}</div>
             {subtitle && <div className="mt-0.5 truncate text-sm text-slate-500">{subtitle}</div>}
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-surface-2 hover:text-slate-700" aria-label="Đóng">
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-surface-2 hover:text-slate-700" aria-label={closeLabel}>
             <X className="h-5 w-5" />
           </button>
         </div>
