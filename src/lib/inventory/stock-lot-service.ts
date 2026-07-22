@@ -1,12 +1,12 @@
 import { and, asc, eq, gt, sql } from "drizzle-orm";
-import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type * as schema from "@/db/schema";
 import { products, stockLotMovements, stockLots } from "@/db/schema";
 import { planLotConsumption } from "@/lib/inventory/stock-lot-allocation";
 
 const toQty = (quantity: number) => quantity.toFixed(4);
 
-export type InventoryTransaction = Parameters<Parameters<PostgresJsDatabase<typeof schema>["transaction"]>[0]>[0];
+export type InventoryTransaction = Parameters<Parameters<NodePgDatabase<typeof schema>["transaction"]>[0]>[0];
 
 export async function consumeTrackedStockLots(
   tx: InventoryTransaction,

@@ -16,7 +16,7 @@ async function hasProductComplianceColumnsQuery() {
         'lifecycle_status'
       )
   `);
-  return Number(rows[0]?.count ?? 0) === 5;
+  return Number(rows.rows[0]?.count ?? 0) === 5;
 }
 
 const cachedHasProductComplianceColumns = unstable_cache(
