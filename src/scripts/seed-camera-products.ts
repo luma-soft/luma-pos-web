@@ -5,12 +5,13 @@ import { brands, categories, products } from "../db/schema";
 type CatalogProduct = {
   sku: string;
   name: string;
-  brand?: "EZVIZ" | "IMOU" | "Hikvision";
+  brand?: "EZVIZ" | "IMOU" | "Hikvision" | "Kioxia" | "Lexar";
   category: "Camera giám sát" | "Thẻ nhớ" | "Dịch Vụ";
   costPrice: number;
   retailPrice: number;
   description: string;
   image?: string;
+  warrantyMonths?: number;
   specs: Record<string, string[]>;
 };
 
@@ -239,6 +240,38 @@ const catalog: CatalogProduct[] = [
     },
   },
   {
+    sku: "MEM-KIOXIA-128GB",
+    name: "Thẻ nhớ Kioxia 128GB MicroSD",
+    brand: "Kioxia",
+    category: "Thẻ nhớ",
+    costPrice: 0,
+    retailPrice: 445_000,
+    description: "Thẻ nhớ MicroSD Kioxia dung lượng 128GB.",
+    warrantyMonths: 0,
+    specs: {
+      "Dung lượng": ["128GB"],
+      "Chuẩn thẻ": ["MicroSD"],
+      "Thương hiệu": ["Kioxia"],
+    },
+  },
+  {
+    sku: "MEM-LEXAR-512GB-LSDMI512BB633A",
+    name: "Thẻ nhớ Lexar 512GB MicroSD - Thẻ xanh",
+    brand: "Lexar",
+    category: "Thẻ nhớ",
+    costPrice: 0,
+    retailPrice: 1_100_000,
+    description: "Thẻ nhớ MicroSD Lexar dung lượng 512GB, phiên bản thẻ xanh.",
+    warrantyMonths: 0,
+    specs: {
+      "Mã sản phẩm": ["LSDMI512BB633A"],
+      "Dung lượng": ["512GB"],
+      "Chuẩn thẻ": ["MicroSD"],
+      "Phiên bản": ["Thẻ xanh"],
+      "Thương hiệu": ["Lexar"],
+    },
+  },
+  {
     sku: "SVC-CAM-INSTALL-200",
     name: "Công lắp đặt camera - cơ bản",
     category: "Dịch Vụ",
@@ -325,13 +358,13 @@ async function main() {
 
   await db
     .insert(brands)
-    .values(["EZVIZ", "IMOU", "Hikvision"].map((name) => ({ name })))
+    .values(["EZVIZ", "IMOU", "Hikvision", "Kioxia", "Lexar"].map((name) => ({ name })))
     .onConflictDoNothing({ target: brands.name });
 
   const brandRows = await db
     .select({ id: brands.id, name: brands.name })
     .from(brands)
-    .where(inArray(brands.name, ["EZVIZ", "IMOU", "Hikvision"]));
+    .where(inArray(brands.name, ["EZVIZ", "IMOU", "Hikvision", "Kioxia", "Lexar"]));
   const brandIds = new Map(brandRows.map((row) => [row.name, row.id]));
 
   await db.transaction(async (tx) => {
@@ -348,7 +381,7 @@ async function main() {
         lastPurchasePrice: String(item.costPrice),
         retailPrice: String(item.retailPrice),
         specs: item.specs,
-        warrantyMonths: 24,
+        warrantyMonths: item.warrantyMonths ?? 24,
         imageUrls: item.image ? [productImageUrl(item.image)] : [],
         lifecycleStatus: "active",
         isActive: true,

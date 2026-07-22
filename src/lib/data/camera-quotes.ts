@@ -2,7 +2,12 @@ import { asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { categories, customers, products, warehouses } from "@/db/schema";
 
-export const CAMERA_QUOTE_CARD_SKUS = ["MEM-HIK-32GB", "MEM-IMOU-64GB"] as const;
+export const CAMERA_QUOTE_CARD_SKUS = [
+  "MEM-HIK-32GB",
+  "MEM-IMOU-64GB",
+  "MEM-KIOXIA-128GB",
+  "MEM-LEXAR-512GB-LSDMI512BB633A",
+] as const;
 export const CAMERA_QUOTE_INSTALL_SKUS = [
   "SVC-CAM-INSTALL-200",
   "SVC-CAM-INSTALL-250",
