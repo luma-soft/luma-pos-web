@@ -38,7 +38,6 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
       <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
         {cameraMaterials && <div><h2 className="text-lg font-bold">Vật tư lắp camera</h2><p className="text-sm text-slate-500">Thêm, sửa, xóa các vật tư dùng trong báo giá lắp đặt camera.</p></div>}
         {!cameraMaterials && <div className="flex items-center gap-2">
-          <Link href={Routes.Categories} className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-border text-sm font-medium hover:bg-surface-2">{t("categories.title")}</Link>
           <Link href={productModalHref(params, { productModal: "create" })} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98]"><Plus className="w-4 h-4" />{t("products.createNew")}</Link>
         </div>}
       </div>

@@ -9,6 +9,10 @@ import { PurchasesTab } from "./tabs/purchases";
 import { PurchaseReturnsTab } from "./tabs/purchase-returns";
 import { StocktakesTab } from "./tabs/stocktakes";
 import { InternalUseTab } from "./tabs/internal-use";
+import { getCategoriesWithCounts } from "@/lib/data/categories";
+import { Pagination } from "@/components/pagination";
+import { parsePageSize } from "@/lib/pagination";
+import { CategoriesManager } from "../products/categories/categories-manager";
 
 export const dynamic = "force-dynamic";
 
@@ -21,12 +25,17 @@ const TABS = [
   { tab: "internal", labelKey: "nav.internalUse" },
   { tab: "stocktakes", labelKey: "nav.stocktakes" },
   { tab: "camera-materials", labelKey: "inventory.cameraMaterials" },
+  { tab: "categories", labelKey: "categories.title" },
 ];
 
 export default async function InventoryPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const t = await getTranslations();
   const params = await searchParams;
   const tab = params.tab ?? "products";
+
+  const page = Number(params.page) || 1;
+  const pageSize = parsePageSize(params.size);
+  const categoryData = tab === "categories" ? await getCategoriesWithCounts({ page, pageSize }) : null;
 
   return (
     <div className="p-4 sm:p-6">
@@ -37,7 +46,11 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         <div className="px-4 sm:px-6 pb-1.5"><GroupTabs base={Routes.Inventory} items={TABS} /></div>
       </div>
 
-      {tab === "products" || tab === "camera-materials" ? <ProductsTab searchParams={tab === "camera-materials" ? { ...params, cameraMaterials: "1" } : params} />
+      {tab === "categories" && categoryData ? <>
+        <CategoriesManager categories={categoryData.rows} parentOptions={categoryData.roots} total={categoryData.total} />
+        <Pagination page={page} pageCount={categoryData.pageCount} total={categoryData.total} pageSize={pageSize} unitLabel={t("categories.unitLabel")} />
+      </>
+        : tab === "products" || tab === "camera-materials" ? <ProductsTab searchParams={tab === "camera-materials" ? { ...params, cameraMaterials: "1" } : params} />
         : tab === "pricing" ? <PricingTab searchParams={params} />
         : tab === "purchases" ? <PurchasesTab searchParams={params} />
         : tab === "purchase-returns" ? <PurchaseReturnsTab searchParams={params} />
