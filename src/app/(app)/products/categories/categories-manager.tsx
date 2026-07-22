@@ -131,6 +131,8 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
         getRowId={(row) => row.id}
         minWidth="720px"
         maxHeight="calc(100dvh - 250px)"
+        fillHeight
+        canExpand={(row) => childrenOf(row.id).length > 0}
         empty={<p className="rounded-card border border-border-soft bg-surface p-8 text-center text-sm text-slate-400">{t("categories.empty")}</p>}
         renderMobileRow={({ row, toggle, expanded }) => (
           <div className="flex items-center justify-between gap-3 p-3">

@@ -49,6 +49,8 @@ export function DataTableShell<T>({
   rowClassName,
   toolbar,
   maxHeight,
+  fillHeight = false,
+  canExpand,
 }: {
   tableId: string;
   rows: T[];
@@ -64,6 +66,8 @@ export function DataTableShell<T>({
   rowClassName?: (row: T, expanded: boolean) => string | undefined;
   toolbar?: ReactNode;
   maxHeight?: string;
+  fillHeight?: boolean;
+  canExpand?: (row: T) => boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -160,8 +164,9 @@ export function DataTableShell<T>({
           <div className="space-y-2 lg:hidden">
             {rows.map((row) => {
               const id = getRowId(row);
-              const expanded = expandedId === id;
-              const toggle = () => setExpanded(expanded ? null : id);
+              const expandable = Boolean(renderExpanded && (canExpand ? canExpand(row) : true));
+              const expanded = expandable && expandedId === id;
+              const toggle = () => { if (expandable) setExpanded(expanded ? null : id); };
               return (
                 <div key={id} className={cn("overflow-hidden rounded-card border bg-surface", expanded ? "border-primary-200 shadow-e1" : "border-border-soft")}>
                   {renderMobileRow ? (
@@ -176,7 +181,7 @@ export function DataTableShell<T>({
                             </div>
                           ))}
                         </div>
-                        {renderExpanded && <ChevronDown className={cn("h-4 w-4 shrink-0 text-slate-400 transition-transform", expanded && "rotate-180")} />}
+                        {expandable && <ChevronDown className={cn("h-4 w-4 shrink-0 text-slate-400 transition-transform", expanded && "rotate-180")} />}
                       </div>
                     </button>
                   )}
@@ -187,8 +192,8 @@ export function DataTableShell<T>({
           </div>
 
           <div
-            className={cn("hidden rounded-card border border-border-soft bg-surface lg:block", maxHeight ? "overflow-auto" : "overflow-x-auto")}
-            style={maxHeight ? { maxHeight } : undefined}
+            className={cn("hidden rounded-card border border-border-soft bg-surface lg:block", maxHeight ? "overflow-auto" : "overflow-x-auto", fillHeight && "h-full")}
+            style={maxHeight ? { maxHeight, ...(fillHeight ? { height: maxHeight } : {}) } : undefined}
           >
             <table className="w-full table-fixed text-sm" style={{ minWidth }}>
               <colgroup>
@@ -228,17 +233,18 @@ export function DataTableShell<T>({
                 )}
                 {rows.map((row) => {
                   const id = getRowId(row);
-                  const expanded = expandedId === id;
+                  const expandable = Boolean(renderExpanded && (canExpand ? canExpand(row) : true));
+                  const expanded = expandable && expandedId === id;
                   return (
                     <Fragment key={id}>
                       <tr
                         className={cn(
                           "border-t border-border-soft transition-colors",
-                          renderExpanded && "cursor-pointer",
+                          expandable && "cursor-pointer",
                           expanded ? "bg-primary-50/45 dark:bg-primary-950/15" : "hover:bg-surface-2",
                           rowClassName?.(row, expanded),
                         )}
-                        onClick={() => setExpanded(expanded ? null : id)}
+                        onClick={() => { if (expandable) setExpanded(expanded ? null : id); }}
                       >
                         {visibleColumns.map((column) => {
                           const cellClassName = typeof column.cellClassName === "function" ? column.cellClassName(row) : column.cellClassName;
@@ -257,7 +263,7 @@ export function DataTableShell<T>({
                           );
                         })}
                         <td className="px-3 py-3 text-right">
-                          {renderExpanded && (
+                          {expandable && (
                             <ChevronDown className={cn("ml-auto h-4 w-4 text-slate-400 transition-transform", expanded && "rotate-180")} />
                           )}
                         </td>
