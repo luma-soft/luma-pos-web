@@ -115,8 +115,8 @@ export function ProductsTable({
       expandedParam="expanded"
       initialExpandedId={initialExpandedId}
       minWidth="1120px"
-      maxHeight="calc(100dvh - 360px)"
-      fillHeight
+      maxHeight={undefined}
+      fillHeight={false}
       renderExpanded={(product) => <ExpandedProduct product={product} cameraMaterials={cameraMaterials} />}
       renderMobileRow={({ row: product, toggle }) => (
         <button type="button" onClick={toggle} className="w-full p-3 text-left">
