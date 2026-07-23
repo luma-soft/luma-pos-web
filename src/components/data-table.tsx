@@ -48,7 +48,7 @@ export function DataTableShell<T>({
   empty,
   rowClassName,
   toolbar,
-  maxHeight = "calc(100dvh - 360px)",
+  maxHeight = "calc(100dvh - 250px)",
   fillHeight = true,
   canExpand,
 }: {

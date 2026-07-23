@@ -115,7 +115,7 @@ export function ProductsTable({
       expandedParam="expanded"
       initialExpandedId={initialExpandedId}
       minWidth="1120px"
-      maxHeight="calc(100dvh - 360px)"
+        maxHeight="calc(100dvh - 250px)"
       fillHeight
       renderExpanded={(product) => <ExpandedProduct product={product} cameraMaterials={cameraMaterials} />}
       renderMobileRow={({ row: product, toggle }) => (

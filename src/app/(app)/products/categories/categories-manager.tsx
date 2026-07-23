@@ -130,7 +130,7 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
         columns={columns}
         getRowId={(row) => row.id}
         minWidth="720px"
-        maxHeight="calc(100dvh - 360px)"
+        maxHeight="calc(100dvh - 250px)"
         fillHeight
         canExpand={(row) => childrenOf(row.id).length > 0}
         empty={<p className="rounded-card border border-border-soft bg-surface p-8 text-center text-sm text-slate-400">{t("categories.empty")}</p>}
