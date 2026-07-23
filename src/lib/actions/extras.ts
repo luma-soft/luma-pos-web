@@ -47,6 +47,7 @@ export async function createProject(input: CreateProjectInput): Promise<ActionRe
       note: v.note || null,
     }).returning({ id: projects.id });
     revalidatePath(Routes.Partners);
+    revalidatePath(Routes.Services);
     revalidatePath(Routes.Projects);
     return { ok: true, data: { id: row.id } };
   } catch (e) {
@@ -76,6 +77,7 @@ export async function toggleProjectStatus(id: string): Promise<ActionResult> {
       end`,
     }).where(eq(projects.id, id));
     revalidatePath(Routes.Partners);
+    revalidatePath(Routes.Services);
     revalidatePath(Routes.Projects);
     revalidatePath(Routes.project(id));
     return { ok: true, data: undefined };

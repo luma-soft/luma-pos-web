@@ -2326,6 +2326,7 @@
   "projects": {
     "title": "Công trình",
     "total": "{total} công trình",
+    "unitLabel": "công trình",
     "createNew": "Thêm công trình",
     "empty": "Chưa có công trình nào",
     "emptyHint": "Tạo công trình để gắn vào đơn khi bán ở POS.",

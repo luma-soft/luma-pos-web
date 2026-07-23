@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, count, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   customers,
@@ -19,28 +19,47 @@ import {
   warrantyClaims,
 } from "@/db/schema";
 import { calculateServiceProjectProfitability } from "@/lib/services/domain";
+import { coercePageSize } from "@/lib/pagination";
+
+const projectRowSelection = {
+  id: projects.id,
+  name: projects.name,
+  customerId: projects.customerId,
+  address: projects.address,
+  note: projects.note,
+  status: projects.status,
+  serviceType: projects.serviceType,
+  serviceStage: projects.serviceStage,
+  progressPercent: projects.progressPercent,
+  startsOn: projects.startsOn,
+  targetEndsOn: projects.targetEndsOn,
+  siteContactName: projects.siteContactName,
+  siteContactPhone: projects.siteContactPhone,
+  customerName: customers.name,
+  orderCount: sql<number>`(select count(*) from ${orders} where ${orders.projectId} = ${projects.id} and ${orders.status} != 'cancelled')::int`,
+  totalValue: sql<string>`coalesce((select sum(${orders.total}) from ${orders} where ${orders.projectId} = ${projects.id} and ${orders.status} not in ('cancelled','quote','merged')), 0)`,
+  remaining: sql<string>`coalesce((select sum(${orders.total} - ${orders.amountPaid}) from ${orders} where ${orders.projectId} = ${projects.id} and ${orders.status} = 'completed'), 0)`,
+  createdAt: projects.createdAt,
+};
 
 export async function getProjectRows() {
-  return db.select({
-    id: projects.id,
-    name: projects.name,
-    customerId: projects.customerId,
-    address: projects.address,
-    note: projects.note,
-    status: projects.status,
-    serviceType: projects.serviceType,
-    serviceStage: projects.serviceStage,
-    progressPercent: projects.progressPercent,
-    startsOn: projects.startsOn,
-    targetEndsOn: projects.targetEndsOn,
-    siteContactName: projects.siteContactName,
-    siteContactPhone: projects.siteContactPhone,
-    customerName: customers.name,
-    orderCount: sql<number>`(select count(*) from ${orders} where ${orders.projectId} = ${projects.id} and ${orders.status} != 'cancelled')::int`,
-    totalValue: sql<string>`coalesce((select sum(${orders.total}) from ${orders} where ${orders.projectId} = ${projects.id} and ${orders.status} not in ('cancelled','quote','merged')), 0)`,
-    remaining: sql<string>`coalesce((select sum(${orders.total} - ${orders.amountPaid}) from ${orders} where ${orders.projectId} = ${projects.id} and ${orders.status} = 'completed'), 0)`,
-    createdAt: projects.createdAt,
-  }).from(projects).leftJoin(customers, eq(projects.customerId, customers.id)).orderBy(desc(projects.createdAt));
+  return db.select(projectRowSelection).from(projects).leftJoin(customers, eq(projects.customerId, customers.id)).orderBy(desc(projects.createdAt));
+}
+
+export async function getProjectPage(page = 1, pageSize?: number) {
+  const safePage = Math.max(1, page);
+  const size = coercePageSize(pageSize);
+  const [rows, countRows] = await Promise.all([
+    db.select(projectRowSelection)
+      .from(projects)
+      .leftJoin(customers, eq(projects.customerId, customers.id))
+      .orderBy(desc(projects.createdAt))
+      .limit(size)
+      .offset((safePage - 1) * size),
+    db.select({ total: count() }).from(projects),
+  ]);
+  const total = countRows[0]?.total ?? 0;
+  return { rows, total, page: safePage, pageSize: size, pageCount: Math.max(1, Math.ceil(total / size)) };
 }
 
 export type ProjectRow = Awaited<ReturnType<typeof getProjectRows>>[number];

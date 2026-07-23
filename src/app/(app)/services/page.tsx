@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { GroupTabs } from "@/components/group-tabs";
+import { Pagination } from "@/components/pagination";
 import { Section } from "@/components/ui/section";
 import { Text } from "@/components/ui/text";
 import { getServiceDashboard, getServiceFormOptions } from "@/lib/data/services";
@@ -14,6 +15,7 @@ import {
   WarrantyClaimsTable,
 } from "./service-widgets";
 import { ProductsTab } from "../inventory/tabs/products";
+import { parsePageSize } from "@/lib/pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -38,9 +40,13 @@ export default async function ServicesPage({
   const tab = params.tab ?? "projects";
   const serviceType = params.type ?? "";
   const status = params.status ?? "";
+  const page = Math.max(1, Number(params.page) || 1);
+  const pageSize = parsePageSize(params.size);
   const projectRows = dashboard.projects.filter((project) =>
     (!serviceType || project.serviceType === serviceType) && (!status || project.serviceStage === status)
   );
+  const pagedProjectRows = projectRows.slice((page - 1) * pageSize, page * pageSize);
+  const projectPageCount = Math.max(1, Math.ceil(projectRows.length / pageSize));
   const jobRows = dashboard.jobs.filter((job) =>
     (!serviceType || job.serviceType === serviceType) && (!status || job.status === status)
   );
@@ -109,8 +115,9 @@ export default async function ServicesPage({
             <ProjectQuickCreate customers={options.customerOptions} serviceMode />
           </div>
           {projectRows.length > 0
-            ? <ServiceProjectsTable rows={projectRows} customers={options.customerOptions} />
+            ? <ServiceProjectsTable rows={pagedProjectRows} customers={options.customerOptions} />
             : <Section collapsible={false}><Text variant="muted" size="sm" text={t("services.projects.empty")} /></Section>}
+          <Pagination page={page} pageCount={projectPageCount} total={projectRows.length} pageSize={pageSize} unitLabel={t("projects.unitLabel")} />
         </div>
       )}
     </div>
