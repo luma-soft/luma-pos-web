@@ -112,28 +112,52 @@ async function StockContent({ searchParams }: { searchParams: SP }) {
           <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("products.unitLabel")} />
         </div>
 
-        <div className="min-w-0 self-start overflow-hidden rounded-card border border-border bg-surface shadow-e1">
-          <div className="px-4 py-3 border-b border-border font-bold text-sm">{t("inventory.movementsTitle")}</div>
-          {movements.length === 0 ? (
-            <p className="px-4 py-8 text-sm text-slate-400 text-center">{t("inventory.noMovements")}</p>
-          ) : (
-            <div className="divide-y divide-border-soft">
-              {movements.map((m) => {
-                const qty = Number(m.quantity);
-                return (
-                  <div key={m.id} className="flex min-w-0 items-center gap-3 px-4 py-2.5 text-sm">
-                    <span className={cn("w-12 shrink-0 font-mono font-bold tabular-nums", MOVE_STYLES[m.type] ?? "")}>{qty > 0 ? "+" : ""}{formatNumber(qty)}</span>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-medium">{m.productName}</div>
-                      <div className="truncate text-xs text-slate-400">{t(`inventory.moveTypes.${m.type}` as never)} · {m.warehouseName} · {formatDate(m.createdAt)}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        <RecentMovementsTable movements={movements} />
       </div>
     </>
+  );
+}
+
+function RecentMovementsTable({ movements }: { movements: Awaited<ReturnType<typeof getRecentMovements>> }) {
+  const t = useTranslations();
+  return (
+    <section className="min-w-0 overflow-hidden rounded-card border border-border bg-surface shadow-e1">
+      <div className="border-b border-border px-4 py-3 text-sm font-bold">{t("inventory.movementsTitle")}</div>
+      {movements.length === 0 ? (
+        <p className="px-4 py-8 text-center text-sm text-slate-400">{t("inventory.noMovements")}</p>
+      ) : (
+        <div className="max-h-[min(520px,calc(100dvh-360px))] overflow-auto">
+          <table className="w-full min-w-[520px] text-sm">
+            <thead className="sticky top-0 z-10 bg-canvas text-left text-xs font-semibold text-slate-500">
+              <tr>
+                <th className="whitespace-nowrap px-3 py-3 text-right">SL</th>
+                <th className="px-3 py-3">Sản phẩm</th>
+                <th className="px-3 py-3">Loại</th>
+                <th className="px-3 py-3">Kho</th>
+                <th className="whitespace-nowrap px-3 py-3">Thời gian</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border-soft">
+              {movements.map((movement) => {
+                const quantity = Number(movement.quantity);
+                return (
+                  <tr key={movement.id} className="align-middle hover:bg-surface-2">
+                    <td className={cn("whitespace-nowrap px-3 py-3 text-right font-mono font-bold tabular-nums", MOVE_STYLES[movement.type] ?? "")}>
+                      {quantity > 0 ? "+" : ""}{formatNumber(quantity)} {movement.baseUnit}
+                    </td>
+                    <td className="max-w-[220px] px-3 py-3">
+                      <div className="truncate font-medium" title={movement.productName}>{movement.productName}</div>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-3 text-slate-500">{t(`inventory.moveTypes.${movement.type}` as never)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-slate-500">{movement.warehouseName}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-xs text-slate-400">{formatDate(movement.createdAt)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
