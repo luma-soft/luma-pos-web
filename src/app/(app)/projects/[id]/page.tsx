@@ -26,6 +26,7 @@ import {
 } from "../../services/service-widgets";
 import { ProjectEdit } from "../project-widgets";
 import { CameraQuoteCreateButton } from "../../sales/tabs/camera-quote-create-button";
+import { ProjectServiceTab, ProjectServiceTabs } from "./project-service-tabs";
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -81,6 +82,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
       {project.serviceType && serviceOptions && (
         <div className="mb-5 space-y-4">
+          <ProjectServiceTabs initialActive="overview">
+          <ProjectServiceTab id="overview" label={t("nav.groups.overview")}>
           <section className="rounded-card border border-primary-200 bg-primary-50/60 p-4 dark:border-primary-900 dark:bg-primary-950/20">
             <div className="mb-3">
               <Text as="h2" weight="semibold" text={t("services.workflow.title")} />
@@ -113,6 +116,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               </div>
             )}
           </Section>
+          </ProjectServiceTab>
+          <ProjectServiceTab id="documents" label={t("services.documents.title")} count={handoverDocuments.length}>
           <Section
             title={t("services.documents.title")}
             description={t("services.documents.summary", { count: handoverDocuments.length })}
@@ -139,7 +144,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               </div>
             )}
           </Section>
+          </ProjectServiceTab>
 
+          <ProjectServiceTab id="maintenance" label={t("services.maintenance.title")} count={maintenancePlans.filter((plan) => plan.isActive).length}>
           <Section
             id="maintenance"
             title={t("services.maintenance.title")}
@@ -162,7 +169,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               </div>
             )}
           </Section>
+          </ProjectServiceTab>
 
+          <ProjectServiceTab id="costs" label={t("services.costs.title")} count={costEntries.length}>
           <Section
             title={t("services.costs.title")}
             description={t("services.costs.summary", { count: costEntries.length })}
@@ -197,7 +206,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               </div>
             )}
           </Section>
+          </ProjectServiceTab>
 
+          <ProjectServiceTab id="jobs" label={t("services.tabs.jobs")} count={jobs.length}>
           <Section
             title={t("services.tabs.jobs")}
             description={t("services.summary.openJobs", { count: jobs.filter((job) => job.status !== "completed" && job.status !== "cancelled").length })}
@@ -246,7 +257,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               </div>
             )}
           </Section>
+          </ProjectServiceTab>
 
+          <ProjectServiceTab id="assets" label={t("services.fields.assets")} count={assets.length}>
           <Section
             id="assets"
             title={t("services.fields.assets")}
@@ -266,7 +279,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               </div>
             )}
           </Section>
+          </ProjectServiceTab>
 
+          <ProjectServiceTab id="warranty" label={t("services.tabs.warranty")} count={claims.filter((claim) => claim.status !== "closed" && claim.status !== "void").length}>
           <Section
             id="warranty"
             title={t("services.tabs.warranty")}
@@ -305,7 +320,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               </div>
             )}
           </Section>
+          </ProjectServiceTab>
 
+          <ProjectServiceTab id="materials" label={t("services.materials.title")} count={materials.length}>
           <Section
             title={t("services.materials.title")}
             description={t("services.materials.summary", { count: materials.length })}
@@ -336,6 +353,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               </div>
             )}
           </Section>
+          </ProjectServiceTab>
+          </ProjectServiceTabs>
         </div>
       )}
 
