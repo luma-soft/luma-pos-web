@@ -169,7 +169,7 @@ export function DataTableShell<T>({
   );
 
   return (
-    <div className="w-full min-w-0">
+    <div className="flex min-h-0 w-full min-w-0 flex-col">
       {toolbar && <div className="mb-2 flex flex-wrap items-center justify-end gap-2">{toolbar}</div>}
 
       {rows.length === 0 && empty ? (
@@ -208,7 +208,7 @@ export function DataTableShell<T>({
 
           <div
             ref={desktopTableRef}
-            className={cn("hidden rounded-card border border-border-soft bg-surface lg:block", maxHeight ? "overflow-auto" : "overflow-x-auto", fillHeight && "h-full")}
+            className={cn("hidden min-h-0 rounded-card border border-border-soft bg-surface lg:block", maxHeight ? "overflow-auto" : "overflow-x-auto", fillHeight && "h-full")}
             style={maxHeight ? { maxHeight: availableHeight ? `${availableHeight}px` : maxHeight, ...(fillHeight ? { height: availableHeight ? `${availableHeight}px` : maxHeight } : {}) } : undefined}
           >
             <table className="w-full table-fixed text-sm" style={{ minWidth }}>
