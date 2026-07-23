@@ -122,6 +122,9 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
           currentTarget: { value: nextValue, name },
         } as React.ChangeEvent<HTMLSelectElement>);
       }
+      if (typeof window !== "undefined") {
+        queueMicrotask(() => window.dispatchEvent(new CustomEvent("luma:select-change", { detail: { name, value: nextValue } })));
+      }
       setOpen(false);
     }
 

@@ -14,6 +14,7 @@ import { parsePageSize } from "@/lib/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { OrderDetailPanel } from "../../orders/[id]/order-detail-panel";
 import { OrdersTable } from "./orders-table";
+import { InstantFilterForm } from "@/components/instant-filter-form";
 
 type SP = Record<string, string | undefined>;
 
@@ -60,7 +61,7 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
         </Link>
       </div>
 
-      <form className="flex flex-wrap items-center gap-2 mb-4" action={Routes.Sales}>
+      <InstantFilterForm className="flex flex-wrap items-center gap-2 mb-4" action={Routes.Sales}>
         <input type="hidden" name="tab" value="orders" />
         {status !== "all" && <input type="hidden" name="status" value={status} />}
         <div className="relative w-56">
@@ -90,13 +91,12 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
         />
         <input type="date" name="from" defaultValue={from} aria-label={t("orders.filter.from")} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         <input type="date" name="to" defaultValue={to} aria-label={t("orders.filter.to")} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface" />
-        <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full bg-primary-600 hover:brightness-110 text-white transition active:scale-[0.98]">{t("common.search")}</button>
         {(params.q || payment !== "all" || source !== "all" || from || to || params.orderId) && (
           <Link href={href({ q: undefined, payment: undefined, source: undefined, from: undefined, to: undefined, orderId: undefined, expandedOrder: undefined })} className="px-3 py-2 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">
             {t("orders.filter.clear")}
           </Link>
         )}
-      </form>
+      </InstantFilterForm>
 
       <Suspense fallback={<TableSkeleton cols={10} rows={10} />}>
         <OrdersContent searchParams={searchParams} />

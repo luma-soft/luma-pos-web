@@ -11,6 +11,7 @@ import { getProductFormOptions } from "@/lib/data/products";
 import { Select } from "@/components/ui/select";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { StockTable } from "./stock-table";
+import { InstantFilterForm } from "@/components/instant-filter-form";
 
 type SP = Record<string, string | undefined>;
 const STOCKS: StockFilter[] = ["all", "instock", "low", "out"];
@@ -29,7 +30,7 @@ export async function StockTab({ searchParams }: { searchParams: SP }) {
 
   return (
     <>
-      <form className="flex flex-wrap items-center gap-3 mb-3" action={Routes.Inventory}>
+      <InstantFilterForm className="flex flex-wrap items-center gap-3 mb-3" action={Routes.Inventory}>
         <input type="hidden" name="tab" value="stock" />
         <div className="relative w-full max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -46,11 +47,10 @@ export async function StockTab({ searchParams }: { searchParams: SP }) {
           options={[{ value: "", label: t("products.list.allCategories") }, ...categories.map((c) => ({ value: c.id, label: c.name }))]}
           className="min-w-44"
         />
-        <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full bg-primary-600 hover:brightness-110 text-white transition active:scale-[0.98]">{t("common.search")}</button>
         <Link href={Routes.PurchaseNew} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98] ml-auto shrink-0">
           <Truck className="w-4 h-4" />{t("purchases.createNew")}
         </Link>
-      </form>
+      </InstantFilterForm>
 
       <Suspense fallback={<TableSkeleton cols={6} rows={10} />}>
         <StockContent searchParams={searchParams} />

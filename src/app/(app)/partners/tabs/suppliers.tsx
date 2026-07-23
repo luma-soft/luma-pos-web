@@ -7,6 +7,7 @@ import { parsePageSize } from "@/lib/pagination";
 import { Select } from "@/components/ui/select";
 import { SupplierQuickCreate } from "../../suppliers/supplier-form";
 import { SuppliersTable } from "./suppliers-table";
+import { InstantFilterForm } from "@/components/instant-filter-form";
 
 type SP = Record<string, string | undefined>;
 const OWING = ["", "owing", "clear"] as const;
@@ -27,7 +28,7 @@ export async function SuppliersTab({ searchParams }: { searchParams: SP }) {
         <SupplierQuickCreate />
       </div>
 
-      <form className="flex items-center gap-3 mb-4" action={Routes.Partners}>
+      <InstantFilterForm className="flex items-center gap-3 mb-4" action={Routes.Partners}>
         <input type="hidden" name="tab" value="suppliers" />
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -42,8 +43,7 @@ export async function SuppliersTab({ searchParams }: { searchParams: SP }) {
             { value: "clear", label: t("suppliers.filter.clear") },
           ]}
         />
-        <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full border border-border bg-surface hover:bg-surface-2">{t("common.search")}</button>
-      </form>
+      </InstantFilterForm>
 
       {rows.length === 0 ? (
         <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">

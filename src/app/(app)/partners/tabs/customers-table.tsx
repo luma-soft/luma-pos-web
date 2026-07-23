@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { Pagination } from "@/components/pagination";
 import { DataTableShell, RowPreviewModal, stopRowToggle, type DataTableColumn } from "@/components/data-table";
+import { InstantFilterForm } from "@/components/instant-filter-form";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { CustomerCreateDialog } from "@/components/partners/customer-create-dialog";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -135,7 +136,7 @@ function CustomerSearch({
   const t = useTranslations();
 
   return (
-    <form action={Routes.Partners} className="flex min-w-0 flex-1 items-center gap-2">
+    <InstantFilterForm action={Routes.Partners} className="flex min-w-0 flex-1 items-center gap-2">
       <input type="hidden" name="tab" value="customers" />
       <input type="hidden" name="size" value={pageSize} />
       <HiddenFilterInputs filters={filters} includeQ={false} />
@@ -163,10 +164,7 @@ function CustomerSearch({
           )}
         </button>
       </div>
-      <button type="submit" className="hidden h-10 rounded-lg border border-border bg-surface px-4 text-sm font-semibold hover:bg-surface-2 sm:inline-flex sm:items-center">
-        {t("common.search")}
-      </button>
-    </form>
+    </InstantFilterForm>
   );
 }
 
@@ -661,7 +659,7 @@ function CustomerFilterForm({ filters, pageSize }: { filters: CustomerFilters; p
   const clearHref = `${Routes.Partners}?tab=customers${filters.q ? `&q=${encodeURIComponent(filters.q)}` : ""}&size=${pageSize}`;
 
   return (
-    <form action={Routes.Partners} className="space-y-5">
+    <InstantFilterForm action={Routes.Partners} className="space-y-5">
       <input type="hidden" name="tab" value="customers" />
       <input type="hidden" name="size" value={pageSize} />
       {filters.q && <input type="hidden" name="q" value={filters.q} />}
@@ -706,10 +704,9 @@ function CustomerFilterForm({ filters, pageSize }: { filters: CustomerFilters; p
       <MoneyRangeFilter title={t("customers.filters.currentDebt")} fromName="debtFrom" toName="debtTo" fromValue={filters.debtFrom} toValue={filters.debtTo} />
 
       <div className="flex gap-2 border-t border-border-soft pt-4">
-        <button type="submit" className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-10 flex-1 rounded-lg")}>{t("customers.filters.apply")}</button>
         <Link href={clearHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-10 rounded-lg")}>{t("customers.filters.clear")}</Link>
       </div>
-    </form>
+    </InstantFilterForm>
   );
 }
 

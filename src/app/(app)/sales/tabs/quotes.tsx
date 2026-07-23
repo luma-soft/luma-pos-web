@@ -11,6 +11,7 @@ import { getOrder } from "@/lib/data/orders";
 import { OrderDetailPanel } from "../../orders/[id]/order-detail-panel";
 import { QuotesTable } from "./quotes-table";
 import { CameraQuoteCreateButton } from "./camera-quote-create-button";
+import { InstantFilterForm } from "@/components/instant-filter-form";
 
 type SP = Record<string, string | undefined>;
 
@@ -20,15 +21,14 @@ export async function QuotesTab({ searchParams }: { searchParams: SP }) {
 
   return (
     <>
-      <form className="flex items-center gap-3 mb-4" action={Routes.Sales}>
+      <InstantFilterForm className="flex items-center gap-3 mb-4" action={Routes.Sales}>
         <input type="hidden" name="tab" value="quotes" />
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("orders.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         </div>
-        <button type="submit" className="px-4 py-2 text-sm font-medium rounded-full bg-primary-600 hover:brightness-110 text-white transition active:scale-[0.98]">{t("common.search")}</button>
         <CameraQuoteCreateButton className="ml-auto shrink-0" />
-      </form>
+      </InstantFilterForm>
 
       <Suspense fallback={<TableSkeleton cols={6} rows={10} />}>
         <QuotesContent searchParams={searchParams} />
