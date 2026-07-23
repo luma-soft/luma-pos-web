@@ -47,6 +47,7 @@ export function DataTableShell<T>({
   initialExpandedId,
   empty,
   rowClassName,
+  onRowClick,
   toolbar,
   maxHeight = "calc(100dvh - 250px)",
   fillHeight = true,
@@ -64,6 +65,7 @@ export function DataTableShell<T>({
   initialExpandedId?: string | null;
   empty?: ReactNode;
   rowClassName?: (row: T, expanded: boolean) => string | undefined;
+  onRowClick?: (row: T) => void;
   toolbar?: ReactNode;
   maxHeight?: string;
   fillHeight?: boolean;
@@ -180,7 +182,7 @@ export function DataTableShell<T>({
           <div className="space-y-2 lg:hidden">
             {rows.map((row) => {
               const id = getRowId(row);
-              const expandable = Boolean(renderExpanded && (canExpand ? canExpand(row) : true));
+              const expandable = Boolean(!onRowClick && renderExpanded && (canExpand ? canExpand(row) : true));
               const expanded = expandable && expandedId === id;
               const toggle = () => { if (expandable) setExpanded(expanded ? null : id); };
               return (
@@ -188,7 +190,7 @@ export function DataTableShell<T>({
                   {renderMobileRow ? (
                     renderMobileRow({ row, expanded, toggle })
                   ) : (
-                    <button type="button" onClick={toggle} className="w-full p-3 text-left">
+                    <button type="button" onClick={() => onRowClick ? onRowClick(row) : toggle()} className="w-full p-3 text-left">
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0 space-y-1">
                           {visibleColumns.slice(0, 3).map((column) => (
@@ -250,7 +252,7 @@ export function DataTableShell<T>({
                 )}
                 {rows.map((row) => {
                   const id = getRowId(row);
-                  const expandable = Boolean(renderExpanded && (canExpand ? canExpand(row) : true));
+                  const expandable = Boolean(!onRowClick && renderExpanded && (canExpand ? canExpand(row) : true));
                   const expanded = expandable && expandedId === id;
                   return (
                     <Fragment key={id}>
@@ -261,7 +263,7 @@ export function DataTableShell<T>({
                           expanded ? "bg-primary-50/45 dark:bg-primary-950/15" : "hover:bg-surface-2",
                           rowClassName?.(row, expanded),
                         )}
-                        onClick={() => { if (expandable) setExpanded(expanded ? null : id); }}
+                        onClick={() => onRowClick ? onRowClick(row) : (expandable && setExpanded(expanded ? null : id))}
                       >
                         {visibleColumns.map((column) => {
                           const cellClassName = typeof column.cellClassName === "function" ? column.cellClassName(row) : column.cellClassName;
