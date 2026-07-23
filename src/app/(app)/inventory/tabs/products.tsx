@@ -174,7 +174,7 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
       )}
 
       <div className="shrink-0 pt-3">
-        <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("products.unitLabel")} showRange={false} />
+        <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("products.unitLabel")} />
       </div>
     </>
   );
