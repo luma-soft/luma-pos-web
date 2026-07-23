@@ -2445,6 +2445,16 @@
       "assets": "{count} installed assets",
       "openClaims": "{count} open warranty cases"
     },
+    "workflow": {
+      "title": "After-installation tracking",
+      "hint": "After installing a camera, record the asset so its history, maintenance schedule, and future warranty cases stay connected.",
+      "asset": "Record installed asset",
+      "assetHint": "Serial, MAC, location, install date, warranty",
+      "maintenance": "Schedule maintenance",
+      "maintenanceHint": "Set recurring inspection reminders",
+      "warranty": "Track warranty",
+      "warrantyHint": "Create a case when the customer reports an issue"
+    },
     "filters": {
       "allTypes": "All trades",
       "allStatuses": "All statuses"
@@ -2473,6 +2483,7 @@
     "assets": {
       "create": "Record installed asset",
       "edit": "Update installed asset",
+      "afterInstallHint": "Record each installed camera here so its history and warranty stay tied to the correct asset.",
       "noJob": "— No linked work order —",
       "noProduct": "— No linked product —",
       "empty": "No installed assets recorded."

@@ -2445,6 +2445,16 @@
       "assets": "{count} thiết bị đang lắp đặt",
       "openClaims": "{count} phiếu bảo hành đang mở"
     },
+    "workflow": {
+      "title": "Theo dõi sau lắp đặt",
+      "hint": "Lắp xong camera? Ghi nhận thiết bị để lưu lịch sử, lịch bảo trì và tiếp nhận bảo hành về sau.",
+      "asset": "Ghi nhận thiết bị",
+      "assetHint": "Serial, MAC, vị trí, ngày lắp, hạn bảo hành",
+      "maintenance": "Lập lịch bảo trì",
+      "maintenanceHint": "Nhắc lịch kiểm tra định kỳ",
+      "warranty": "Theo dõi bảo hành",
+      "warrantyHint": "Tạo phiếu khi khách báo lỗi"
+    },
     "filters": {
       "allTypes": "Tất cả nghiệp vụ",
       "allStatuses": "Tất cả trạng thái"
@@ -2473,6 +2483,7 @@
     "assets": {
       "create": "Ghi nhận thiết bị",
       "edit": "Cập nhật thiết bị",
+      "afterInstallHint": "Mỗi camera lắp xong nên ghi nhận tại đây để tra cứu lịch sử và bảo hành theo đúng thiết bị.",
       "noJob": "— Không gắn công việc —",
       "noProduct": "— Không liên kết hàng hóa —",
       "empty": "Chưa ghi nhận thiết bị đã lắp."

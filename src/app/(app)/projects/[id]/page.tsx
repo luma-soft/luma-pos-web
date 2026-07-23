@@ -74,6 +74,17 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
       {project.serviceType && serviceOptions && (
         <div className="mb-5 space-y-4">
+          <section className="rounded-card border border-primary-200 bg-primary-50/60 p-4 dark:border-primary-900 dark:bg-primary-950/20">
+            <div className="mb-3">
+              <Text as="h2" weight="semibold" text={t("services.workflow.title")} />
+              <Text as="p" variant="muted" size="sm" className="mt-1 max-w-3xl" text={t("services.workflow.hint")} />
+            </div>
+            <div className="grid gap-2 md:grid-cols-3">
+              <WorkflowStep href="#assets" number="1" title={t("services.workflow.asset")} hint={t("services.workflow.assetHint")} count={assets.length} />
+              <WorkflowStep href="#maintenance" number="2" title={t("services.workflow.maintenance")} hint={t("services.workflow.maintenanceHint")} count={maintenancePlans.filter((plan) => plan.isActive).length} />
+              <WorkflowStep href="#warranty" number="3" title={t("services.workflow.warranty")} hint={t("services.workflow.warrantyHint")} count={claims.filter((claim) => claim.status !== "closed" && claim.status !== "void").length} />
+            </div>
+          </section>
           <Section
             title={t("services.documents.title")}
             description={t("services.documents.summary", { count: handoverDocuments.length })}
@@ -102,6 +113,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </Section>
 
           <Section
+            id="maintenance"
             title={t("services.maintenance.title")}
             description={t("services.maintenance.summary", { count: maintenancePlans.filter((plan) => plan.isActive).length })}
             action={<ServiceMaintenanceEditor projectId={project.id} assets={assets.map((asset) => ({ id: asset.id, name: asset.name, serialNumber: asset.serialNumber }))} staff={serviceOptions.assigneeOptions} />}
@@ -208,8 +220,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </Section>
 
           <Section
+            id="assets"
             title={t("services.fields.assets")}
-            description={t("services.summary.assets", { count: assets.length })}
+            description={`${t("services.summary.assets", { count: assets.length })} · ${t("services.assets.afterInstallHint")}`}
             action={<InstalledAssetQuickCreate projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} products={serviceOptions.productOptions} />}
           >
             {assets.length === 0 ? (
@@ -227,6 +240,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </Section>
 
           <Section
+            id="warranty"
             title={t("services.tabs.warranty")}
             description={t("services.summary.openClaims", { count: claims.filter((claim) => claim.status !== "closed" && claim.status !== "void").length })}
             action={<WarrantyClaimQuickCreate
@@ -373,5 +387,22 @@ function CostMetric({ label, value, tone = "" }: { label: string; value: number;
       <div className="text-[11px] text-slate-500">{label}</div>
       <div className={`mt-1 text-sm font-semibold tabular-nums ${tone}`}>{formatCurrency(value)}</div>
     </div>
+  );
+}
+
+function WorkflowStep({ href, number, title, hint, count }: { href: string; number: string; title: string; hint: string; count: number }) {
+  return (
+    <a href={href} className="group rounded-xl border border-primary-100 bg-surface px-3 py-3 transition-colors hover:border-primary-300 hover:bg-white dark:border-primary-900/70 dark:hover:bg-slate-900">
+      <div className="flex items-start gap-3">
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary-600 text-xs font-bold text-white">{number}</span>
+        <span className="min-w-0">
+          <span className="flex items-center justify-between gap-2 text-sm font-semibold text-primary-800 dark:text-primary-200">
+            <span>{title}</span>
+            <span className="font-mono text-xs text-slate-500">{count}</span>
+          </span>
+          <span className="mt-1 block text-xs text-slate-500">{hint}</span>
+        </span>
+      </div>
+    </a>
   );
 }

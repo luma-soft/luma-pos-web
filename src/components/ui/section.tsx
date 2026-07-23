@@ -8,6 +8,7 @@ import type { TxValues } from "./_tx";
 import { Text } from "./text";
 
 export interface SectionProps {
+  id?: string;
   title?: React.ReactNode;
   titleTx?: string;
   titleTxOptions?: TxValues;
@@ -22,6 +23,7 @@ export interface SectionProps {
 }
 
 export function Section({
+  id,
   title, titleTx, titleTxOptions,
   description, descriptionTx, descriptionTxOptions,
   collapsible = true, defaultOpen = true, action, className, children,
@@ -33,7 +35,7 @@ export function Section({
   const descContent = descriptionTx ? t(descriptionTx, descriptionTxOptions) : description;
 
   return (
-    <div className={cn(
+    <div id={id} className={cn(
       "bg-surface border border-border-soft rounded-card shadow-e1",
       className
     )}>
