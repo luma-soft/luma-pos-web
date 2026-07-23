@@ -105,7 +105,7 @@ export function DataTableShell<T>({
       // Reserve only the pagination row and a small bottom inset. The app shell
       // constrains the viewport, so a large safety gap would leave visible
       // whitespace below every table.
-      setAvailableHeight(Math.max(280, Math.floor(window.innerHeight - top - 72)));
+      setAvailableHeight(Math.max(280, Math.floor(window.innerHeight - top - 96)));
     };
     updateHeight();
     window.addEventListener("resize", updateHeight);
