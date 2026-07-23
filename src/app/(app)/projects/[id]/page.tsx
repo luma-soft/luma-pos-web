@@ -42,9 +42,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     ...maintenancePlans.map((plan) => ({ id: `maintenance-${plan.id}`, at: plan.createdAt, label: t("services.timeline.maintenanceCreated", { name: plan.title }), detail: plan.nextDueOn })),
     ...claims.map((claim) => ({ id: `claim-${claim.id}`, at: claim.reportedAt ?? claim.createdAt, label: t("services.timeline.warrantyReported", { name: claim.title }), detail: claim.code })),
   ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  const projectOverviewDetails = project.serviceType ? <ProjectOverviewDetails project={project} orders={orders} t={t} /> : null;
 
   return (
-    <div className="p-4 sm:p-6 max-w-6xl">
+    <div className="w-full p-4 sm:p-6">
       <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-5 min-h-[58px] px-4 sm:px-6 py-2.5 bg-surface border-b border-border flex items-center gap-3">
         <Link href={`${Routes.Services}?tab=projects`} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
           <ArrowLeft className="w-4 h-4" />
@@ -116,6 +117,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               </div>
             )}
           </Section>
+          {projectOverviewDetails}
           </ProjectServiceTab>
           <ProjectServiceTab id="documents" label={t("services.documents.title")} count={handoverDocuments.length}>
           <Section
@@ -358,6 +360,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         </div>
       )}
 
+      {!project.serviceType && (
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
         <div className="bg-surface border border-border rounded-card p-4 text-sm space-y-3">
           <Info label={t("projects.cols.name")} value={project.name} />
@@ -405,6 +408,47 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             </table>
           )}
         </div>
+      </div>
+      )}
+    </div>
+  );
+}
+
+type ProjectOverviewDetailsProps = {
+  project: NonNullable<Awaited<ReturnType<typeof getProjectDetail>>>["project"];
+  orders: NonNullable<Awaited<ReturnType<typeof getProjectDetail>>>["orders"];
+  t: Awaited<ReturnType<typeof getTranslations>>;
+};
+
+function ProjectOverviewDetails({ project, orders, t }: ProjectOverviewDetailsProps) {
+  return (
+    <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="bg-surface border border-border rounded-card p-4 text-sm space-y-3">
+        <Info label={t("projects.cols.name")} value={project.name} />
+        <Info label={t("orders.cols.customer")} value={project.customerName ?? "—"} />
+        {project.serviceType && <Info label={t("services.fields.type")} value={t(`services.types.${project.serviceType}` as never)} />}
+        {project.serviceStage && <Info label={t("services.fields.stage")} value={t(`services.stages.${project.serviceStage}` as never)} />}
+        <Info label={t("customers.fields.address")} value={project.address ?? "—"} />
+        {project.siteContactName && <Info label={t("services.fields.siteContactName")} value={`${project.siteContactName}${project.siteContactPhone ? ` · ${project.siteContactPhone}` : ""}`} />}
+        {project.targetEndsOn && <Info label={t("services.fields.targetEndsOn")} value={formatDate(project.targetEndsOn)} />}
+        <Info label={t("customers.fields.note")} value={project.note ?? "—"} />
+        <Info label={t("orders.cols.date")} value={formatDate(project.createdAt)} />
+      </div>
+      <div className="min-w-0 bg-surface border border-border rounded-card overflow-x-auto">
+        <div className="px-4 py-3 border-b border-border font-semibold text-sm">{t("projects.relatedOrders")}</div>
+        {orders.length === 0 ? (
+          <p className="px-4 py-8 text-sm text-slate-400 text-center">{t("orders.empty")}</p>
+        ) : (
+          <table className="w-full min-w-[720px] text-sm">
+            <thead><tr className="bg-canvas text-left text-xs uppercase text-slate-500"><th className="px-4 py-2.5 font-semibold">{t("orders.cols.code")}</th><th className="px-4 py-2.5 font-semibold">{t("orders.cols.date")}</th><th className="px-4 py-2.5 font-semibold">{t("orders.cols.customer")}</th><th className="px-4 py-2.5 font-semibold">{t("orders.cols.status")}</th><th className="px-4 py-2.5 font-semibold text-right">{t("orders.cols.total")}</th><th className="px-4 py-2.5 font-semibold text-right">{t("orders.cols.remaining")}</th></tr></thead>
+            <tbody className="divide-y divide-border-soft">
+              {orders.map((order) => {
+                const remaining = Number(order.total) - Number(order.amountPaid);
+                return <tr key={order.id}><td className="px-4 py-3"><Link href={Routes.salesOrder(order.id, order.status)} className="font-semibold text-primary-600 hover:underline">{order.code}</Link></td><td className="px-4 py-3 text-slate-500">{formatDate(order.createdAt)}</td><td className="px-4 py-3">{order.customerName ?? t("orders.walkIn")}</td><td className="px-4 py-3"><div className="flex flex-wrap gap-1.5"><OrderStatusBadge status={order.status} /><PaymentStatusBadge status={order.paymentStatus} /></div></td><td className="px-4 py-3 text-right tabular-nums font-semibold">{formatCurrency(Number(order.total))}</td><td className="px-4 py-3 text-right tabular-nums font-semibold text-er">{remaining > 0 ? formatCurrency(remaining) : "—"}</td></tr>;
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

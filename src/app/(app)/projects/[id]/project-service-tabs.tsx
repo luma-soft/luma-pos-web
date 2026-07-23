@@ -29,7 +29,6 @@ export function ProjectServiceTabs({ children, initialActive }: { children: Reac
                 )}
               >
                 {item.props.label}
-                {item.props.count != null && <span className="rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px]">{item.props.count}</span>}
               </button>
             );
           })}
