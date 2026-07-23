@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { ArrowLeft, FilePlus2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { getProjectDetail } from "@/lib/data/projects";
@@ -25,6 +25,7 @@ import {
   WarrantyClaimStatusAction,
 } from "../../services/service-widgets";
 import { ProjectEdit } from "../project-widgets";
+import { CameraQuoteCreateButton } from "../../sales/tabs/camera-quote-create-button";
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -46,10 +47,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         </div>
         {serviceOptions && <div className="ml-auto"><ProjectEdit project={project} customers={serviceOptions.customerOptions} /></div>}
         {project.serviceType && (
-          <Link href={Routes.projectQuote({ projectId: project.id, projectName: project.name, customerId: project.customerId })} className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary-600 px-3 text-sm font-semibold text-white hover:brightness-110">
-            <FilePlus2 className="h-4 w-4" />
-            {t("services.projects.createQuote")}
-          </Link>
+          <CameraQuoteCreateButton
+            className="ml-auto"
+            project={{ id: project.id, name: project.name, customerId: project.customerId }}
+          />
         )}
       </div>
 

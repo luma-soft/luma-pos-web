@@ -2472,6 +2472,7 @@
     "assets": {
       "create": "Ghi nhận thiết bị",
       "edit": "Cập nhật thiết bị",
+      "noJob": "— Không gắn công việc —",
       "noProduct": "— Không liên kết hàng hóa —",
       "empty": "Chưa ghi nhận thiết bị đã lắp."
     },

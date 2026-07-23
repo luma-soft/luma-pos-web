@@ -2472,6 +2472,7 @@
     "assets": {
       "create": "Record installed asset",
       "edit": "Update installed asset",
+      "noJob": "— No linked work order —",
       "noProduct": "— No linked product —",
       "empty": "No installed assets recorded."
     },

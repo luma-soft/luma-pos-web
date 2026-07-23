@@ -75,12 +75,16 @@ function initialContextFromParams(params: PosSearchParams): PosInitialContext | 
   const cameraQuote = one(params.cameraQuote) === "1";
   const cameraId = one(params.cameraId);
   if (cameraQuote) {
+    const projectId = one(params.projectId);
+    const customerId = one(params.customerId);
+    const projectName = one(params.projectName)?.trim() || "Báo giá lắp đặt camera";
     return {
       kind: "quote",
       cameraQuote: true,
       cameraId: cameraId && UUID_RE.test(cameraId) ? cameraId : undefined,
-      projectId: "",
-      projectName: "Báo giá lắp đặt camera",
+      projectId: projectId && UUID_RE.test(projectId) ? projectId : "",
+      projectName,
+      customerId: customerId && UUID_RE.test(customerId) ? customerId : "",
     };
   }
   if (one(params.draft) !== "quote") return null;
