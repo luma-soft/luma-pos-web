@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { Plus } from "lucide-react";
 import { DataTableShell, RowPreviewModal, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
+import { SearchableSelect } from "@/components/combobox";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
@@ -519,13 +520,12 @@ export function InstalledAssetQuickCreate({
         )}
       >
         <div className="grid gap-3 sm:grid-cols-2">
-          <Select value={jobId} onChange={(event) => setJobId(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...jobs.map((job) => ({ value: job.id, label: `${job.code} · ${job.title}` }))]} />
-          <Select value={productId} onChange={(event) => {
-            const nextId = event.target.value;
+          <SearchableSelect value={jobId} showSearch onChange={setJobId} allowClear={false} placeholder={t("services.assets.noJob")} options={[{ value: "", label: t("services.assets.noJob") }, ...jobs.map((job) => ({ value: job.id, label: `${job.code} · ${job.title}` }))]} />
+          <SearchableSelect value={productId} showSearch onChange={(nextId) => {
             setProductId(nextId);
             const product = products.find((item) => item.id === nextId);
             if (product && !name.trim()) setName(product.name);
-          }} options={[{ value: "", label: t("services.assets.noProduct") }, ...products.map((product) => ({ value: product.id, label: `${product.sku} · ${product.name}` }))]} />
+          }} allowClear={false} placeholder={t("services.assets.noProduct")} options={[{ value: "", label: t("services.assets.noProduct") }, ...products.map((product) => ({ value: product.id, label: `${product.sku} · ${product.name}` }))]} />
           <Input value={assetKind} onChange={(event) => setAssetKind(event.target.value)} placeholder={`${t("services.fields.assetKind")} *`} />
           <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={`${t("services.fields.asset")} *`} />
           <Input value={brand} onChange={(event) => setBrand(event.target.value)} placeholder={t("services.fields.brand")} />
@@ -535,7 +535,7 @@ export function InstalledAssetQuickCreate({
           <Input value={macAddress} onChange={(event) => setMacAddress(event.target.value)} placeholder={t("services.fields.macAddress")} />
           <Input value={ipAddress} onChange={(event) => setIpAddress(event.target.value)} placeholder={t("services.fields.ipAddress")} />
           <Input type="datetime-local" value={installedAt} onChange={(event) => setInstalledAt(event.target.value)} aria-label={t("services.fields.installedAt")} />
-          <Select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} options={["installed", "repair", "replaced", "removed"].map((value) => ({ value, label: t(`services.assetStatuses.${value}` as never) }))} disabled={!initial} />
+          <SearchableSelect value={status} showSearch onChange={(value) => setStatus(value as typeof status)} allowClear={false} placeholder={t("services.assetStatuses.installed")} options={["installed", "repair", "replaced", "removed"].map((value) => ({ value, label: t(`services.assetStatuses.${value}` as never) }))} disabled={!initial} />
           <Input type="date" value={customerWarrantyEndsOn} onChange={(event) => setCustomerWarrantyEndsOn(event.target.value)} aria-label={t("services.fields.customerWarranty")} />
           <Input type="date" value={supplierWarrantyEndsOn} onChange={(event) => setSupplierWarrantyEndsOn(event.target.value)} aria-label={t("services.fields.supplierWarranty")} />
           <Textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder={t("customers.fields.note")} className="sm:col-span-2" />

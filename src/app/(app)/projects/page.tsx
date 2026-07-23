@@ -5,5 +5,5 @@ export default async function ProjectsRedirect({ searchParams }: { searchParams:
   const usp = new URLSearchParams();
   for (const [k, v] of Object.entries(sp)) if (typeof v === "string") usp.set(k, v);
   usp.set("tab", "projects");
-  redirect(`/partners?${usp.toString()}`);
+  redirect(`/services?${usp.toString()}`);
 }

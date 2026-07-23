@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { ArrowLeft, FilePlus2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { getProjectDetail } from "@/lib/data/projects";
@@ -25,6 +25,7 @@ import {
   WarrantyClaimStatusAction,
 } from "../../services/service-widgets";
 import { ProjectEdit } from "../project-widgets";
+import { CameraQuoteCreateButton } from "../../sales/tabs/camera-quote-create-button";
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -37,7 +38,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   return (
     <div className="p-4 sm:p-6 max-w-6xl">
       <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-5 min-h-[58px] px-4 sm:px-6 py-2.5 bg-surface border-b border-border flex items-center gap-3">
-        <Link href={`${Routes.Partners}?tab=projects`} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+        <Link href={`${Routes.Services}?tab=projects`} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div className="min-w-0">
@@ -46,10 +47,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         </div>
         {serviceOptions && <div className="ml-auto"><ProjectEdit project={project} customers={serviceOptions.customerOptions} /></div>}
         {project.serviceType && (
-          <Link href={Routes.projectQuote({ projectId: project.id, projectName: project.name, customerId: project.customerId })} className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary-600 px-3 text-sm font-semibold text-white hover:brightness-110">
-            <FilePlus2 className="h-4 w-4" />
-            {t("services.projects.createQuote")}
-          </Link>
+          <CameraQuoteCreateButton
+            className="ml-auto"
+            project={{ id: project.id, name: project.name, customerId: project.customerId }}
+          />
         )}
       </div>
 

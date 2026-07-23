@@ -2326,6 +2326,7 @@
   "projects": {
     "title": "Projects",
     "total": "{total} projects",
+    "unitLabel": "projects",
     "createNew": "New project",
     "empty": "No projects yet",
     "emptyHint": "Create projects to attach to POS sales.",
@@ -2472,6 +2473,7 @@
     "assets": {
       "create": "Record installed asset",
       "edit": "Update installed asset",
+      "noJob": "— No linked work order —",
       "noProduct": "— No linked product —",
       "empty": "No installed assets recorded."
     },

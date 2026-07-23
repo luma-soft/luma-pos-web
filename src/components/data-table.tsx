@@ -102,8 +102,9 @@ export function DataTableShell<T>({
     if (!fillHeight || !maxHeight) return;
     const updateHeight = () => {
       const top = desktopTableRef.current?.getBoundingClientRect().top ?? 0;
-      // Keep a compact footer-sized gap so pagination stays visible below the table.
-      setAvailableHeight(Math.max(280, Math.floor(window.innerHeight - top - 72)));
+      // Reserve space for the pagination/footer and the page's bottom padding so
+      // only the table itself scrolls, never the surrounding screen.
+      setAvailableHeight(Math.max(280, Math.floor(window.innerHeight - top - 120)));
     };
     updateHeight();
     window.addEventListener("resize", updateHeight);
@@ -168,7 +169,7 @@ export function DataTableShell<T>({
   );
 
   return (
-    <div className="w-full min-w-0">
+    <div className="flex min-h-0 w-full min-w-0 flex-col">
       {toolbar && <div className="mb-2 flex flex-wrap items-center justify-end gap-2">{toolbar}</div>}
 
       {rows.length === 0 && empty ? (
@@ -207,7 +208,7 @@ export function DataTableShell<T>({
 
           <div
             ref={desktopTableRef}
-            className={cn("hidden rounded-card border border-border-soft bg-surface lg:block", maxHeight ? "overflow-auto" : "overflow-x-auto", fillHeight && "h-full")}
+            className={cn("hidden min-h-0 rounded-card border border-border-soft bg-surface lg:block", maxHeight ? "overflow-auto" : "overflow-x-auto", fillHeight && "h-full")}
             style={maxHeight ? { maxHeight: availableHeight ? `${availableHeight}px` : maxHeight, ...(fillHeight ? { height: availableHeight ? `${availableHeight}px` : maxHeight } : {}) } : undefined}
           >
             <table className="w-full table-fixed text-sm" style={{ minWidth }}>

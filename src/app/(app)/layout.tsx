@@ -36,7 +36,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const mode = await getMode();
 
   return (
-    <div className="min-h-dvh flex bg-canvas">
+    <div className="h-dvh min-h-0 flex bg-canvas">
       <MobileNavBackdrop />
 
       <aside className="app-sidebar w-60 shrink-0 bg-surface border-r border-border flex flex-col sticky top-0 h-dvh overflow-hidden">
@@ -62,7 +62,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
 
-      <main className="flex-1 min-w-0 overflow-auto overflow-x-hidden">
+      <main className="flex-1 min-h-0 min-w-0 overflow-auto overflow-x-hidden">
         <div className="pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">{children}</div>
         <MobileTabBar />
         {store.prefs.ai.openaiApiKeySet && store.prefs.ai.showFloatingLauncher && <AiAssistantLauncher />}
