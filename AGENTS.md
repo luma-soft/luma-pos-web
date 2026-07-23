@@ -13,4 +13,5 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ## Git workflow preference
 
 - Mặc định làm việc trực tiếp trên branch `main`; không tự tạo branch hoặc mở PR.
-- Khi người dùng yêu cầu push, commit các thay đổi thuộc task hiện tại và push trực tiếp lên `origin/main`.
+- Sau khi hoàn tất một task thay đổi code, mặc định commit các thay đổi thuộc task và push trực tiếp lên `origin/main`, trừ khi người dùng nói rõ không push.
+- Không chờ người dùng nhắc lại việc commit/push; luôn kiểm tra `git status`, không đưa file tạm hoặc thay đổi ngoài phạm vi task vào commit.
