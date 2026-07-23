@@ -2455,6 +2455,16 @@
       "warranty": "Track warranty",
       "warrantyHint": "Create a case when the customer reports an issue"
     },
+    "timeline": {
+      "title": "Project history",
+      "summary": "Installation, work orders, maintenance, and warranty in one timeline",
+      "projectCreated": "Project profile created",
+      "jobCreated": "Work order created: {name}",
+      "assetInstalled": "Asset recorded: {name}",
+      "warrantyReported": "Warranty case received: {name}",
+      "maintenanceCreated": "Maintenance scheduled: {name}",
+      "empty": "No activity beyond the project profile yet."
+    },
     "filters": {
       "allTypes": "All trades",
       "allStatuses": "All statuses"

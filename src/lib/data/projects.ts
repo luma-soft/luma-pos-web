@@ -119,6 +119,7 @@ export async function getProjectDetail(id: string) {
       checklist: serviceJobs.checklist,
       quoteOrderId: serviceJobs.quoteOrderId,
       materialOrderId: serviceJobs.materialOrderId,
+      createdAt: serviceJobs.createdAt,
     }).from(serviceJobs)
       .leftJoin(profiles, eq(serviceJobs.assignedTo, profiles.id))
       .where(eq(serviceJobs.projectId, id))
@@ -136,6 +137,7 @@ export async function getProjectDetail(id: string) {
       ipAddress: installedAssets.ipAddress,
       locationLabel: installedAssets.locationLabel,
       installedAt: installedAssets.installedAt,
+      createdAt: installedAssets.createdAt,
       customerWarrantyEndsOn: installedAssets.customerWarrantyEndsOn,
       supplierWarrantyEndsOn: installedAssets.supplierWarrantyEndsOn,
       status: installedAssets.status,
@@ -160,6 +162,7 @@ export async function getProjectDetail(id: string) {
       laborCharge: warrantyClaims.laborCharge,
       materialCharge: warrantyClaims.materialCharge,
       assetName: installedAssets.name,
+      createdAt: warrantyClaims.createdAt,
     }).from(warrantyClaims)
       .leftJoin(installedAssets, eq(warrantyClaims.assetId, installedAssets.id))
       .where(eq(warrantyClaims.projectId, id))
@@ -256,6 +259,7 @@ export async function getProjectDetail(id: string) {
       assignedToName: profiles.fullName,
       isActive: serviceMaintenancePlans.isActive,
       note: serviceMaintenancePlans.note,
+      createdAt: serviceMaintenancePlans.createdAt,
     }).from(serviceMaintenancePlans)
       .leftJoin(installedAssets, eq(serviceMaintenancePlans.assetId, installedAssets.id))
       .leftJoin(profiles, eq(serviceMaintenancePlans.assignedTo, profiles.id))

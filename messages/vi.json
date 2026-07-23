@@ -2455,6 +2455,16 @@
       "warranty": "Theo dõi bảo hành",
       "warrantyHint": "Tạo phiếu khi khách báo lỗi"
     },
+    "timeline": {
+      "title": "Lịch sử công trình",
+      "summary": "Tập trung các mốc lắp đặt, công việc và bảo hành",
+      "projectCreated": "Tạo hồ sơ công trình",
+      "jobCreated": "Tạo lệnh việc: {name}",
+      "assetInstalled": "Ghi nhận thiết bị: {name}",
+      "warrantyReported": "Tiếp nhận bảo hành: {name}",
+      "maintenanceCreated": "Lập lịch bảo trì: {name}",
+      "empty": "Chưa có hoạt động nào ngoài hồ sơ công trình."
+    },
     "filters": {
       "allTypes": "Tất cả nghiệp vụ",
       "allStatuses": "Tất cả trạng thái"

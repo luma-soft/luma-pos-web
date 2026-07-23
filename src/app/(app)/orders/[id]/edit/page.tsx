@@ -1,8 +1,6 @@
 import { notFound } from "next/navigation";
-import { asc, eq } from "drizzle-orm";
-import { db } from "@/db";
-import { products } from "@/db/schema";
 import { getOrder } from "@/lib/data/orders";
+import { getProductCatalog } from "@/lib/data/product-catalog";
 import { OrderEditForm } from "./order-edit-form";
 
 export default async function OrderEditPage({ params }: { params: Promise<{ id: string }> }) {
@@ -10,12 +8,7 @@ export default async function OrderEditPage({ params }: { params: Promise<{ id: 
   const order = await getOrder(id).catch(() => null);
   if (!order || (order.status !== "completed" && order.status !== "quote") || order.returns.length > 0) notFound();
 
-  const productOptions = await db
-    .select({ id: products.id, name: products.name, sku: products.sku, baseUnit: products.baseUnit, retailPrice: products.retailPrice })
-    .from(products)
-    .where(eq(products.isActive, true))
-    .orderBy(asc(products.name))
-    .limit(500);
+  const productOptions = await getProductCatalog();
 
   return (
     <OrderEditForm

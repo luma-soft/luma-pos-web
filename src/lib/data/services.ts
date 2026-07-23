@@ -3,13 +3,13 @@ import { db } from "@/db";
 import {
   customers,
   installedAssets,
-  products,
   profiles,
   projects,
   serviceJobs,
   warehouses,
   warrantyClaims,
 } from "@/db/schema";
+import { getProductCatalog } from "@/lib/data/product-catalog";
 
 export async function getServiceDashboard() {
   const [projectRows, jobRows, claimRows] = await Promise.all([
@@ -110,15 +110,7 @@ export async function getServiceFormOptions() {
       .from(profiles)
       .where(eq(profiles.isActive, true))
       .orderBy(asc(profiles.fullName)),
-    db.select({
-      id: products.id,
-      name: products.name,
-      sku: products.sku,
-      baseUnit: products.baseUnit,
-    }).from(products)
-      .where(eq(products.isActive, true))
-      .orderBy(asc(products.name))
-      .limit(500),
+    getProductCatalog(),
     db.select({
       id: serviceJobs.id,
       projectId: serviceJobs.projectId,

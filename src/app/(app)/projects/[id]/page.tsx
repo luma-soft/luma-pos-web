@@ -34,6 +34,13 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   if (!detail) notFound();
   const { project, orders, jobs, assets, claims, materials, statusLogs, costEntries, profitability, plannedMaterialCost, handoverDocuments, maintenancePlans } = detail;
   const serviceOptions = project.serviceType ? await getServiceFormOptions() : null;
+  const timeline = [
+    { id: `project-${project.id}`, at: project.createdAt, label: t("services.timeline.projectCreated"), detail: project.name },
+    ...jobs.map((job) => ({ id: `job-${job.id}`, at: job.createdAt, label: t("services.timeline.jobCreated", { name: job.title }), detail: job.code })),
+    ...assets.map((asset) => ({ id: `asset-${asset.id}`, at: asset.installedAt ?? asset.createdAt, label: t("services.timeline.assetInstalled", { name: asset.name }), detail: [asset.serialNumber, asset.locationLabel].filter(Boolean).join(" · ") })),
+    ...maintenancePlans.map((plan) => ({ id: `maintenance-${plan.id}`, at: plan.createdAt, label: t("services.timeline.maintenanceCreated", { name: plan.title }), detail: plan.nextDueOn })),
+    ...claims.map((claim) => ({ id: `claim-${claim.id}`, at: claim.reportedAt ?? claim.createdAt, label: t("services.timeline.warrantyReported", { name: claim.title }), detail: claim.code })),
+  ].sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl">
@@ -85,6 +92,27 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               <WorkflowStep href="#warranty" number="3" title={t("services.workflow.warranty")} hint={t("services.workflow.warrantyHint")} count={claims.filter((claim) => claim.status !== "closed" && claim.status !== "void").length} />
             </div>
           </section>
+          <Section
+            title={t("services.timeline.title")}
+            description={t("services.timeline.summary")}
+            collapsible={false}
+          >
+            {timeline.length <= 1 ? (
+              <Text variant="muted" size="sm" text={t("services.timeline.empty")} />
+            ) : (
+              <div className="space-y-3">
+                {timeline.slice(0, 12).map((event) => (
+                  <div key={event.id} className="flex items-start gap-3 border-b border-border-soft pb-3 last:border-b-0 last:pb-0">
+                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary-600" />
+                    <div className="min-w-0 flex-1">
+                      <Text as="div" size="sm" weight="medium" text={event.label} />
+                      <Text as="div" size="xs" variant="muted" text={`${formatDate(event.at)}${event.detail ? ` · ${event.detail}` : ""}`} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Section>
           <Section
             title={t("services.documents.title")}
             description={t("services.documents.summary", { count: handoverDocuments.length })}

@@ -54,7 +54,7 @@ import { ProjectEdit } from "../projects/project-widgets";
 
 type ProjectOption = { id: string; name: string; serviceType: string | null };
 type AssigneeOption = { id: string; name: string };
-type ProductOption = { id: string; name: string; sku: string; baseUnit: string };
+type ProductOption = { id: string; name: string; sku: string; brandName: string | null; categoryName: string | null; baseUnit: string };
 type WarrantyJobOption = { id: string; projectId: string; code: string; title: string };
 type WarrantyAssetOption = { id: string; projectId: string; jobId: string | null; name: string; serialNumber: string | null };
 type WarehouseOption = { id: string; name: string; isDefault: boolean };
@@ -525,7 +525,7 @@ export function InstalledAssetQuickCreate({
             setProductId(nextId);
             const product = products.find((item) => item.id === nextId);
             if (product && !name.trim()) setName(product.name);
-          }} allowClear={false} placeholder={t("services.assets.noProduct")} options={[{ value: "", label: t("services.assets.noProduct") }, ...products.map((product) => ({ value: product.id, label: `${product.sku} · ${product.name}` }))]} />
+          }} allowClear={false} placeholder={t("services.assets.noProduct")} options={[{ value: "", label: t("services.assets.noProduct") }, ...products.map((product) => ({ value: product.id, label: `${product.brandName ? `${product.brandName} · ` : ""}${product.sku} · ${product.name}`, hint: product.categoryName ?? undefined }))]} />
           <Input value={assetKind} onChange={(event) => setAssetKind(event.target.value)} placeholder={`${t("services.fields.assetKind")} *`} />
           <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={`${t("services.fields.asset")} *`} />
           <Input value={brand} onChange={(event) => setBrand(event.target.value)} placeholder={t("services.fields.brand")} />
@@ -775,15 +775,17 @@ export function ServiceMaterialEditor({
             options={jobs.map((job) => ({ value: job.id, label: `${job.code} · ${job.title}` }))}
             disabled={Boolean(initial)}
           />
-          <Select
+          <SearchableSelect
             value={productId}
-            onChange={(event) => {
-              const nextId = event.target.value;
+            showSearch
+            allowClear={false}
+            onChange={(nextId) => {
               setProductId(nextId);
               setUnitName(products.find((product) => product.id === nextId)?.baseUnit ?? "");
             }}
-            options={products.map((product) => ({ value: product.id, label: `${product.sku} · ${product.name}` }))}
+            options={products.map((product) => ({ value: product.id, label: `${product.brandName ? `${product.brandName} · ` : ""}${product.sku} · ${product.name}`, hint: product.categoryName ?? undefined }))}
             disabled={Boolean(initial)}
+            placeholder={t("services.materials.product")}
           />
           <Input value={unitName} onChange={(event) => setUnitName(event.target.value)} placeholder={t("services.materials.unit")} disabled={Boolean(initial)} />
           <div />
