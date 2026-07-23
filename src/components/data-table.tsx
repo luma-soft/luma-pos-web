@@ -102,9 +102,10 @@ export function DataTableShell<T>({
     if (!fillHeight || !maxHeight) return;
     const updateHeight = () => {
       const top = desktopTableRef.current?.getBoundingClientRect().top ?? 0;
-      // Reserve space for the pagination/footer and the page's bottom padding so
-      // only the table itself scrolls, never the surrounding screen.
-      setAvailableHeight(Math.max(280, Math.floor(window.innerHeight - top - 120)));
+      // Reserve only the pagination row and a small bottom inset. The app shell
+      // constrains the viewport, so a large safety gap would leave visible
+      // whitespace below every table.
+      setAvailableHeight(Math.max(280, Math.floor(window.innerHeight - top - 72)));
     };
     updateHeight();
     window.addEventListener("resize", updateHeight);
