@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Routes } from "@/lib/routes";
-import { cn, formatCurrency, formatNumber } from "@/lib/utils";
-import { getReports, getServiceProfitabilityReport } from "@/lib/data/reports";
+import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
+import { getReports } from "@/lib/data/reports";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { GroupTabs } from "@/components/group-tabs";
 import { Text } from "@/components/ui/text";
@@ -30,7 +30,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
     customer: typeof params.customer === "string" ? params.customer : undefined,
     q: typeof params.q === "string" ? params.q : undefined,
   };
-  const [data, serviceProfitability] = await Promise.all([getReports(range, filters), getServiceProfitabilityReport()]);
+  const data = await getReports(range, filters);
   const filterParams = new URLSearchParams();
   if (filters.customerId) filterParams.set("customerId", filters.customerId);
   if (filters.customer) filterParams.set("customer", filters.customer);
@@ -104,17 +104,48 @@ export default async function ReportsPage({ searchParams }: PageProps) {
             </div>
           </div>
 
-          {serviceProfitability.length > 0 && (
-            <div className="bg-surface rounded-card border border-border overflow-hidden">
-              <div className="px-4 py-3 border-b border-border font-semibold text-sm">{t("reports.serviceProfitability")}</div>
+          <div className="overflow-hidden rounded-card border border-border bg-surface">
+            <div className="border-b border-border px-4 py-3 text-sm font-semibold">{t("reports.invoiceList")}</div>
+            {data.invoices.length === 0 ? (
+              <Text as="p" variant="muted" className="py-8 text-center" text={t("dashboard.noData")} />
+            ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] text-sm">
-                  <thead><tr className="bg-canvas text-left text-xs uppercase text-slate-500"><th className="px-4 py-2.5">{t("reports.serviceProject")}</th><th className="px-4 py-2.5 text-right">{t("reports.revenue")}</th><th className="px-4 py-2.5 text-right">{t("reports.serviceCost")}</th><th className="px-4 py-2.5 text-right">{t("reports.grossProfit")}</th><th className="px-4 py-2.5 text-right">{t("reports.margin")}</th></tr></thead>
-                  <tbody className="divide-y divide-border-soft">{serviceProfitability.map((row) => <tr key={row.id}><td className="px-4 py-2.5 font-medium">{row.name}</td><td className="px-4 py-2.5 text-right tabular-nums">{formatCurrency(row.revenue)}</td><td className="px-4 py-2.5 text-right tabular-nums">{formatCurrency(row.totalCost)}</td><td className={cn("px-4 py-2.5 text-right tabular-nums", row.grossProfit >= 0 ? "text-ok" : "text-er")}>{formatCurrency(row.grossProfit)}</td><td className="px-4 py-2.5 text-right tabular-nums">{row.marginPercent.toFixed(1)}%</td></tr>)}</tbody>
+                <table className="w-full min-w-[860px] text-sm">
+                  <thead>
+                    <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
+                      <th className="px-4 py-2.5 font-semibold">{t("orders.cols.code")}</th>
+                      <th className="px-4 py-2.5 font-semibold">{t("orders.cols.date")}</th>
+                      <th className="px-4 py-2.5 font-semibold">{t("orders.cols.customer")}</th>
+                      <th className="px-4 py-2.5 text-right font-semibold">{t("orders.cols.total")}</th>
+                      <th className="px-4 py-2.5 text-right font-semibold">{t("reports.collected")}</th>
+                      <th className="px-4 py-2.5 text-right font-semibold">{t("reports.profit")}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-soft">
+                    {data.invoices.map((invoice) => {
+                      const profit = Number(invoice.profit);
+                      return (
+                        <tr key={invoice.id}>
+                          <td className="px-4 py-2.5">
+                            <Link href={Routes.salesOrder(invoice.id, invoice.status)} className="font-semibold text-primary-600 hover:underline">
+                              {invoice.code}
+                            </Link>
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-2.5 text-slate-500">{formatDate(invoice.createdAt)}</td>
+                          <td className="px-4 py-2.5 font-medium">{invoice.customerName}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatCurrency(Number(invoice.total))}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-ok">{formatCurrency(Number(invoice.amountPaid))}</td>
+                          <td className={cn("px-4 py-2.5 text-right tabular-nums font-semibold", profit >= 0 ? "text-ok" : "text-er")}>
+                            {formatCurrency(profit)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
                 </table>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           <div className="bg-surface rounded-card border border-border p-5">
             <Text as="h2" weight="semibold" className="mb-4" text={t("dashboard.revenueByDay")} />

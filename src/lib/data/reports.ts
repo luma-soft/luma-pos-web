@@ -11,25 +11,6 @@ import {
   returns,
 } from "@/db/schema";
 import { calculateDashboardFinancials } from "@/lib/dashboard/financials";
-import { getProjectDetail, getProjectRows } from "@/lib/data/projects";
-
-export async function getServiceProfitabilityReport() {
-  const projects = (await getProjectRows()).filter((project) => project.serviceType);
-  const rows = (await Promise.all(projects.map(async (project) => {
-    const detail = await getProjectDetail(project.id);
-    if (!detail?.profitability) return null;
-    return {
-      id: project.id,
-      name: project.name,
-      serviceType: project.serviceType,
-      revenue: detail.profitability.revenue,
-      totalCost: detail.profitability.totalCost,
-      grossProfit: detail.profitability.grossProfit,
-      marginPercent: detail.profitability.marginPercent,
-    };
-  }))).filter((row): row is NonNullable<typeof row> => Boolean(row));
-  return rows.sort((left, right) => right.grossProfit - left.grossProfit);
-}
 
 function daysAgo(n: number) {
   const d = new Date();
@@ -81,6 +62,7 @@ export async function getReportsForDatabase(
     returnedProfitRows,
     grossByDay,
     refundsByDay,
+    invoices,
     topProducts,
     byCategory,
     byCustomer,
@@ -138,6 +120,25 @@ export async function getReportsForDatabase(
       .where(returnWhere)
       .groupBy(sql`to_char(${returns.createdAt}, 'YYYY-MM-DD')`)
       .orderBy(sql`to_char(${returns.createdAt}, 'YYYY-MM-DD')`),
+
+    database.select({
+      id: orders.id,
+      code: orders.code,
+      status: orders.status,
+      createdAt: orders.createdAt,
+      customerName: sql<string>`coalesce(${customers.name}, 'Khách lẻ')`,
+      total: orders.total,
+      amountPaid: orders.amountPaid,
+      profit: sql<string>`coalesce(sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})), 0)`,
+    })
+      .from(orders)
+      .leftJoin(orderItems, eq(orderItems.orderId, orders.id))
+      .leftJoin(products, eq(orderItems.productId, products.id))
+      .leftJoin(customers, eq(orders.customerId, customers.id))
+      .where(where)
+      .groupBy(orders.id, customers.name)
+      .orderBy(desc(orders.createdAt))
+      .limit(100),
 
     database.select({
       productId: orderItems.productId,
@@ -243,6 +244,7 @@ export async function getReportsForDatabase(
     },
     generatedAt: new Date().toISOString(),
     byDay,
+    invoices,
     topProducts,
     byCategory,
     byCustomer,
