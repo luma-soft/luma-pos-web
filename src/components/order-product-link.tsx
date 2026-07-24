@@ -11,6 +11,8 @@ export function OrderProductLink({
   return (
     <Link
       href={Routes.product(productId)}
+      target="_blank"
+      rel="noopener noreferrer"
       className="font-medium text-primary-600 hover:underline"
     >
       {productName}
