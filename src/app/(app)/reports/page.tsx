@@ -5,6 +5,7 @@ import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import { getReports, getServiceProfitabilityReport } from "@/lib/data/reports";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Text } from "@/components/ui/text";
+import { ReportBreakdownTabs } from "./report-breakdown-tabs";
 
 interface PageProps {
   searchParams: Promise<{ range?: string; customerId?: string; customer?: string; q?: string; source?: string }>;
@@ -33,6 +34,12 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   const maxDay = Math.max(1, ...data.byDay.map((d) => Math.abs(Number(d.revenue))));
   const totalCatRevenue = Math.max(1, data.byCategory.reduce((s, c) => s + Number(c.revenue), 0));
   const uncollected = data.summary.revenue - data.summary.collected;
+  const breakdownTabs = [
+    { id: "products", label: t("reports.topProducts") },
+    { id: "categories", label: t("reports.byCategory") },
+    { id: "customers", label: t("reports.topCustomers") },
+    { id: "employees", label: t("reports.byEmployee") },
+  ] as const;
 
   return (
     <div className="p-4 sm:p-6 space-y-5">
@@ -121,9 +128,8 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         )}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div className="bg-surface rounded-card border border-border overflow-hidden">
-          <div className="px-4 py-3 border-b border-border font-semibold text-sm">{t("reports.topProducts")}</div>
+      <ReportBreakdownTabs tabs={breakdownTabs} ariaLabel={t("reports.title")}>
+        <div>
           {data.topProducts.length === 0 ? (
             <Text as="p" variant="muted" className="py-8 text-center" text={t("dashboard.noData")} />
           ) : (
@@ -157,8 +163,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           )}
         </div>
 
-        <div className="bg-surface rounded-card border border-border p-5 self-start">
-          <Text as="h2" weight="semibold" className="mb-4" text={t("reports.byCategory")} />
+        <div className="p-5">
           {data.byCategory.length === 0 ? (
             <Text as="p" variant="muted" className="py-8 text-center" text={t("dashboard.noData")} />
           ) : (
@@ -181,12 +186,8 @@ export default async function ReportsPage({ searchParams }: PageProps) {
             </div>
           )}
         </div>
-      </div>
 
-      {/* theo khách hàng + theo nhân viên — theo design */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div className="bg-surface rounded-card border border-border overflow-hidden">
-          <div className="px-4 py-3 border-b border-border font-semibold text-sm">{t("reports.topCustomers")}</div>
+        <div>
           {data.byCustomer.length === 0 ? (
             <Text as="p" variant="muted" className="py-8 text-center" text={t("dashboard.noData")} />
           ) : (
@@ -225,8 +226,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           )}
         </div>
 
-        <div className="bg-surface rounded-card border border-border overflow-hidden self-start">
-          <div className="px-4 py-3 border-b border-border font-semibold text-sm">{t("reports.byEmployee")}</div>
+        <div>
           {data.byEmployee.length === 0 ? (
             <Text as="p" variant="muted" className="py-8 text-center" text={t("dashboard.noData")} />
           ) : (
@@ -254,7 +254,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
             </div>
           )}
         </div>
-      </div>
+      </ReportBreakdownTabs>
     </div>
   );
 }
