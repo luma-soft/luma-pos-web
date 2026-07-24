@@ -8,8 +8,6 @@ import { customers, orders } from "@/db/schema";
 import { Routes } from "@/lib/routes";
 import { accentInsensitiveLike } from "@/lib/search";
 import { TableSkeleton } from "@/components/table-skeleton";
-import { getOrder } from "@/lib/data/orders";
-import { OrderDetailPanel } from "../../orders/[id]/order-detail-panel";
 import { BookingsTable } from "./bookings-table";
 import { InstantFilterForm } from "@/components/instant-filter-form";
 
@@ -67,9 +65,6 @@ async function BookingsContent({ searchParams }: { searchParams: SP }) {
       .offset((page - 1) * 20),
     db.select({ total: count() }).from(orders).leftJoin(customers, eq(orders.customerId, customers.id)).where(where),
   ]);
-  const expandedId = params.expandedBooking ?? null;
-  const expandedBooking = expandedId ? await getOrder(expandedId).catch(() => null) : null;
-
   return (
     <>
       <div className="mb-2">
@@ -83,7 +78,7 @@ async function BookingsContent({ searchParams }: { searchParams: SP }) {
           <p className="mt-1 text-sm">{t("bookings.emptyHint")}</p>
         </div>
       ) : (
-        <BookingsTable rows={rows} expandedId={expandedBooking?.id ?? expandedId} expandedContent={expandedBooking ? <OrderDetailPanel order={expandedBooking} compact /> : null} />
+        <BookingsTable rows={rows} />
       )}
     </>
   );

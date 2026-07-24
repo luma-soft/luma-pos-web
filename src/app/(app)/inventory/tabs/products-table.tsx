@@ -712,7 +712,7 @@ function DocumentValue({ movement }: { movement: StockMovementRow }) {
   if (movement.refType === "order" && movement.refId) {
     return (
       <Link
-        href={`${Routes.Sales}?tab=orders&orderId=${encodeURIComponent(movement.refId)}&expandedOrder=${encodeURIComponent(movement.refId)}`}
+        href={Routes.order(movement.refId)}
         className="text-primary-600 hover:underline"
       >
         {label}

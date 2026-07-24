@@ -20,9 +20,11 @@ export const dynamic = "force-dynamic";
 export default async function AppLayout({
   children,
   productModal,
+  orderModal,
 }: {
   children: React.ReactNode;
   productModal: React.ReactNode;
+  orderModal: React.ReactNode;
 }) {
   let user: Awaited<ReturnType<typeof requireUser>>;
   try {
@@ -73,6 +75,7 @@ export default async function AppLayout({
         <MobileTabBar />
         {store.prefs.ai.openaiApiKeySet && store.prefs.ai.showFloatingLauncher && <AiAssistantLauncher />}
       </main>
+      {orderModal}
       {productModal}
     </div>
   );

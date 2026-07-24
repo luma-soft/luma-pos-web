@@ -1,23 +1,20 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ChevronDown } from "lucide-react";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { Routes } from "@/lib/routes";
 import type { OrderListRow } from "@/lib/data/orders";
 import { OrderStatusBadge, PaymentStatusBadge } from "../../orders/status-badges";
 
 export function OrdersTable({
   rows,
-  expandedId,
-  expandedContent,
 }: {
   rows: OrderListRow[];
-  expandedId?: string | null;
-  expandedContent?: ReactNode;
 }) {
   const t = useTranslations();
+  const router = useRouter();
   const columns: DataTableColumn<OrderListRow>[] = [
     {
       key: "select",
@@ -117,11 +114,9 @@ export function OrdersTable({
         rows={rows}
         columns={columns}
         getRowId={(order) => order.id}
-        expandedParam="expandedOrder"
-        initialExpandedId={expandedId}
         minWidth="1120px"
+        onRowClick={(order) => router.push(Routes.order(order.id), { scroll: false })}
         rowClassName={(order) => cn(order.status === "cancelled" && "opacity-60")}
-        renderExpanded={(order) => (expandedId === order.id ? expandedContent : null)}
         toolbar={(
           <div className="flex flex-1 items-center gap-3 text-sm">
             <span className="hidden text-xs text-slate-500 sm:inline">{t("orders.batchHint")}</span>
@@ -134,20 +129,17 @@ export function OrdersTable({
             </button>
           </div>
         )}
-        renderMobileRow={({ row: order, expanded, toggle }) => {
+        renderMobileRow={({ row: order }) => {
           const remaining = Number(order.total) - Number(order.amountPaid);
           return (
             <>
-              <button type="button" onClick={toggle} className="w-full p-3 text-left">
+              <button type="button" onClick={() => router.push(Routes.order(order.id), { scroll: false })} className="w-full p-3 text-left">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                   <div className="font-semibold text-primary-600">{order.code}</div>
                     <div className="text-xs text-slate-400">{formatDate(order.createdAt)} · {order.customerName ?? t("orders.walkIn")} · {channelLabel(order.sourceMode)}</div>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <OrderStatusBadge status={order.status} />
-                    <ChevronDown className={cn("h-4 w-4 text-slate-400 transition-transform", expanded && "rotate-180")} />
-                  </div>
+                  <OrderStatusBadge status={order.status} />
                 </div>
                 <div className="mt-2 flex items-center justify-between text-sm">
                   <span className="font-semibold tabular-nums">{formatCurrency(Number(order.total))}</span>

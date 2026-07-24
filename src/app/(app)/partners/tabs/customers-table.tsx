@@ -523,7 +523,7 @@ function OrderPreviewDialog({
 }) {
   const t = useTranslations();
   const order = preview?.order;
-  const openHref = order ? `${Routes.Sales}?tab=orders&orderId=${encodeURIComponent(order.id)}&expandedOrder=${encodeURIComponent(order.id)}` : "#";
+  const openHref = order ? Routes.order(order.id) : "#";
   const total = order ? Number(order.total) : 0;
   const paid = order ? Number(order.amountPaid) : 0;
 

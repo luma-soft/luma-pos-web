@@ -1,9 +1,10 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { Routes } from "@/lib/routes";
 
 type BookingRow = {
   id: string;
@@ -17,14 +18,11 @@ type BookingRow = {
 
 export function BookingsTable({
   rows,
-  expandedId,
-  expandedContent,
 }: {
   rows: BookingRow[];
-  expandedId?: string | null;
-  expandedContent?: ReactNode;
 }) {
   const t = useTranslations();
+  const router = useRouter();
   const columns: DataTableColumn<BookingRow>[] = [
     { key: "code", label: t("bookings.cols.code"), required: true, width: "170px", render: (row) => <span className="font-semibold text-primary-600">{row.code}</span> },
     { key: "date", label: t("orders.cols.date"), defaultVisible: true, width: "160px", render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
@@ -39,10 +37,8 @@ export function BookingsTable({
       rows={rows}
       columns={columns}
       getRowId={(row) => row.id}
-      expandedParam="expandedBooking"
-      initialExpandedId={expandedId}
       minWidth="960px"
-      renderExpanded={(row) => (expandedId === row.id ? expandedContent : null)}
+      onRowClick={(row) => router.push(Routes.order(row.id), { scroll: false })}
     />
   );
 }

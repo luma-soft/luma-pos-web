@@ -1,9 +1,10 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { Routes } from "@/lib/routes";
 
 type QuoteRow = {
   id: string;
@@ -16,14 +17,11 @@ type QuoteRow = {
 
 export function QuotesTable({
   rows,
-  expandedId,
-  expandedContent,
 }: {
   rows: QuoteRow[];
-  expandedId?: string | null;
-  expandedContent?: ReactNode;
 }) {
   const t = useTranslations();
+  const router = useRouter();
   const columns: DataTableColumn<QuoteRow>[] = [
     { key: "code", label: t("quotes.cols.code"), required: true, width: "170px", render: (row) => <span className="font-semibold text-primary-600">{row.code}</span> },
     { key: "date", label: t("orders.cols.date"), defaultVisible: true, width: "170px", render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
@@ -37,10 +35,8 @@ export function QuotesTable({
       rows={rows}
       columns={columns}
       getRowId={(row) => row.id}
-      expandedParam="expandedQuote"
-      initialExpandedId={expandedId}
       minWidth="880px"
-      renderExpanded={(row) => (expandedId === row.id ? expandedContent : null)}
+      onRowClick={(row) => router.push(Routes.order(row.id), { scroll: false })}
     />
   );
 }

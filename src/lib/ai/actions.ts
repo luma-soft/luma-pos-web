@@ -6,6 +6,7 @@ import type { RestockRow } from "@/lib/data/ai-restock";
 import type { ParsedAiAttachment } from "@/lib/ai/attachments";
 import { planAiAssistantIntent, type AiPlannerIntent, type AiPlannerResult } from "@/lib/ai/planner";
 import { recordAiTokenUsage } from "@/lib/ai/usage";
+import { Routes } from "@/lib/routes";
 
 export type AiAssistantState =
   | "idle"
@@ -151,13 +152,13 @@ function buildAiReviewAction(preview: AiActionPreview): AiActionPreview["reviewA
     return { type: "open", href: "/pos?aiDraft=1", label: "Mở POS kiểm tra giỏ nháp", target: "pos" };
   }
   if (preview.intent === "convert_quote_to_order") {
-    return { type: "open", href: orderId ? `/sales?tab=quotes&orderId=${orderId}&expandedQuote=${orderId}` : "/sales?tab=quotes", label: "Mở báo giá liên quan", target: "quotes" };
+    return { type: "open", href: orderId ? Routes.order(orderId) : "/sales?tab=quotes", label: "Mở báo giá liên quan", target: "quotes" };
   }
   if (preview.intent === "find_invoice" || preview.intent === "edit_invoice" || preview.intent === "record_invoice_payment" || preview.intent === "cancel_invoice" || preview.intent === "create_return_refund" || preview.intent === "send_einvoice") {
     return {
       type: "open",
       href: orderId
-        ? `/sales?tab=orders&orderId=${orderId}&expandedOrder=${orderId}`
+        ? Routes.order(orderId)
         : hrefWithParams("/sales", { tab: "orders", q: orderCode || reportQuery || undefined, source: "ai-preview" }),
       label: "Mở hóa đơn liên quan",
       target: "orders",

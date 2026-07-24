@@ -7,8 +7,6 @@ import { customers, orders } from "@/db/schema";
 import { Routes } from "@/lib/routes";
 import { accentInsensitiveLike } from "@/lib/search";
 import { TableSkeleton } from "@/components/table-skeleton";
-import { getOrder } from "@/lib/data/orders";
-import { OrderDetailPanel } from "../../orders/[id]/order-detail-panel";
 import { QuotesTable } from "./quotes-table";
 import { CameraQuoteCreateButton } from "./camera-quote-create-button";
 import { InstantFilterForm } from "@/components/instant-filter-form";
@@ -55,9 +53,6 @@ async function QuotesContent({ searchParams }: { searchParams: SP }) {
       .where(where).orderBy(desc(orders.createdAt)).limit(20).offset((page - 1) * 20),
     db.select({ total: count() }).from(orders).leftJoin(customers, eq(orders.customerId, customers.id)).where(where),
   ]);
-  const expandedId = params.expandedQuote ?? null;
-  const expandedQuote = expandedId ? await getOrder(expandedId).catch(() => null) : null;
-
   return (
     <>
       <div className="mb-2">
@@ -71,7 +66,7 @@ async function QuotesContent({ searchParams }: { searchParams: SP }) {
           <p className="text-sm mt-1">{t("quotes.emptyHint")}</p>
         </div>
       ) : (
-        <QuotesTable rows={rows} expandedId={expandedQuote?.id ?? expandedId} expandedContent={expandedQuote ? <OrderDetailPanel order={expandedQuote} compact /> : null} />
+        <QuotesTable rows={rows} />
       )}
     </>
   );

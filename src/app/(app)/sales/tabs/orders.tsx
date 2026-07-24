@@ -2,17 +2,13 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Search, ShoppingCart, FileX2 } from "lucide-react";
-import { eq } from "drizzle-orm";
-import { db } from "@/db";
-import { einvoices } from "@/db/schema";
 import { Routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
-import { getOrder, getOrders, type OrderStatusFilter, type OrderPaymentFilter, type OrderSourceFilter } from "@/lib/data/orders";
+import { getOrders, type OrderStatusFilter, type OrderPaymentFilter, type OrderSourceFilter } from "@/lib/data/orders";
 import { Pagination } from "@/components/pagination";
 import { Select } from "@/components/ui/select";
 import { parsePageSize } from "@/lib/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
-import { OrderDetailPanel } from "../../orders/[id]/order-detail-panel";
 import { OrdersTable } from "./orders-table";
 import { InstantFilterForm } from "@/components/instant-filter-form";
 
@@ -33,7 +29,7 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
 
   const href = (overrides: Record<string, string | undefined>) => {
     const sp = new URLSearchParams();
-    const merged = { tab: "orders", q: params.q, status, payment, source, from, to, orderId: params.orderId, expandedOrder: params.expandedOrder, page: undefined as string | undefined, ...overrides };
+    const merged = { tab: "orders", q: params.q, status, payment, source, from, to, orderId: params.orderId, page: undefined as string | undefined, ...overrides };
     for (const [k, v] of Object.entries(merged)) if (v && v !== "all") sp.set(k, v);
     return `${Routes.Sales}?${sp.toString()}`;
   };
@@ -92,7 +88,7 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
         <input type="date" name="from" defaultValue={from} aria-label={t("orders.filter.from")} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         <input type="date" name="to" defaultValue={to} aria-label={t("orders.filter.to")} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         {(params.q || payment !== "all" || source !== "all" || from || to || params.orderId) && (
-          <Link href={href({ q: undefined, payment: undefined, source: undefined, from: undefined, to: undefined, orderId: undefined, expandedOrder: undefined })} className="px-3 py-2 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">
+          <Link href={href({ q: undefined, payment: undefined, source: undefined, from: undefined, to: undefined, orderId: undefined })} className="px-3 py-2 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">
             {t("orders.filter.clear")}
           </Link>
         )}
@@ -116,12 +112,7 @@ async function OrdersContent({ searchParams }: { searchParams: SP }) {
   const page = Number(params.page) || 1;
   const pageSize = parsePageSize(params.size);
 
-  const expandedId = params.expandedOrder ?? params.orderId ?? null;
   const { rows, total, pageCount } = await getOrders({ orderId: params.orderId, q: params.q, status, payment, source, from, to, page, pageSize });
-  const expandedOrder = expandedId ? await getOrder(expandedId).catch(() => null) : null;
-  const [expandedEinvoice] = expandedOrder
-    ? await db.select().from(einvoices).where(eq(einvoices.orderId, expandedOrder.id)).limit(1)
-    : [null];
 
   return (
     <>
@@ -136,11 +127,7 @@ async function OrdersContent({ searchParams }: { searchParams: SP }) {
         </div>
       ) : (
         <>
-          <OrdersTable
-            rows={rows}
-            expandedId={expandedOrder?.id ?? expandedId}
-            expandedContent={expandedOrder ? <OrderDetailPanel order={expandedOrder} einvoice={expandedEinvoice ?? null} compact /> : null}
-          />
+          <OrdersTable rows={rows} />
         </>
       )}
 

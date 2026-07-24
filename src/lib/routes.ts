@@ -51,10 +51,8 @@ export const Routes = {
   // Param routes
   order: (id: string) => `/orders/${id}` as const,
   salesOrder: (id: string, status?: string | null) => {
-    const tab = status === "quote" ? "quotes" : status === "confirmed" ? "bookings" : "orders";
-    const expandedParam = tab === "quotes" ? "expandedQuote" : tab === "bookings" ? "expandedBooking" : "expandedOrder";
-    const encodedId = encodeURIComponent(id);
-    return `/sales?tab=${tab}&orderId=${encodedId}&${expandedParam}=${encodedId}` as const;
+    void status; // Kept for compatibility with callers that already know the order type.
+    return `/orders/${encodeURIComponent(id)}` as const;
   },
   product: (id: string) => `/products/${encodeURIComponent(id)}` as const,
   productDetail: (id: string) => `/products/${encodeURIComponent(id)}` as const,
