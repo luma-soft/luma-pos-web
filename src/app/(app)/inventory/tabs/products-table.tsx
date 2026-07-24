@@ -60,14 +60,16 @@ const MOVEMENT_TYPE_KEYS: Record<string, string> = {
 
 export function ProductsTable({
   rows,
-  initialExpandedId,
-  cameraMaterials = false,
 }: {
   rows: ProductListResult["rows"];
-  initialExpandedId?: string;
-  cameraMaterials?: boolean;
 }) {
   const t = useTranslations();
+  const router = useRouter();
+
+  function openProduct(product: ProductRow) {
+    router.push(Routes.productDetail(product.id), { scroll: false });
+  }
+
   const columns: DataTableColumn<ProductRow>[] = [
     {
       key: "product",
@@ -112,14 +114,12 @@ export function ProductsTable({
       rows={rows}
       columns={columns}
       getRowId={(product) => product.id}
-      expandedParam="expanded"
-      initialExpandedId={initialExpandedId}
       minWidth="1120px"
-        maxHeight="calc(100dvh - 250px)"
+      maxHeight="calc(100dvh - 250px)"
       fillHeight
-      renderExpanded={(product) => <ExpandedProduct product={product} cameraMaterials={cameraMaterials} />}
-      renderMobileRow={({ row: product, toggle }) => (
-        <button type="button" onClick={toggle} className="w-full p-3 text-left">
+      onRowClick={openProduct}
+      renderMobileRow={({ row: product }) => (
+        <button type="button" onClick={() => openProduct(product)} className="w-full p-3 text-left">
           <div className="flex items-start justify-between gap-2">
             <div className="flex min-w-0 items-center gap-3">
               <ProductThumbnail product={product} />
@@ -165,7 +165,15 @@ function ProductThumbnail({ product }: { product: ProductRow }) {
   );
 }
 
-function ExpandedProduct({ product, cameraMaterials = false }: { product: ProductRow; cameraMaterials?: boolean }) {
+export function ProductDetailView({
+  product,
+  cameraMaterials = false,
+  surface = "modal",
+}: {
+  product: ProductRow;
+  cameraMaterials?: boolean;
+  surface?: "modal" | "page";
+}) {
   const t = useTranslations();
   const [tab, setTab] = useState<ProductExpandTab>("info");
   const specs = specEntries(product.specs);
@@ -179,7 +187,7 @@ function ExpandedProduct({ product, cameraMaterials = false }: { product: Produc
 
   if (cameraMaterials) {
     return (
-      <div className="border-t border-border-soft bg-surface px-4 py-4">
+      <div className={cn("bg-surface px-4 py-4", surface === "page" && "rounded-card border border-border-soft")}>
         <div className="grid gap-4 sm:grid-cols-3">
           <InfoItem label={t("products.fields.sku")} value={product.sku} />
           <InfoItem label={t("products.pricing.retailPrice")} value={formatCurrency(Number(product.retailPrice))} />
@@ -191,7 +199,7 @@ function ExpandedProduct({ product, cameraMaterials = false }: { product: Produc
   }
 
   return (
-    <div className="border-t border-border-soft bg-surface px-4 py-4">
+    <div className={cn("bg-surface px-4 py-4", surface === "page" && "rounded-card border border-border-soft")}>
       <div className="flex items-center gap-6 overflow-x-auto border-b border-border-soft text-sm font-semibold text-slate-500">
         {PRODUCT_EXPAND_TABS.map((key) => (
           <button
@@ -359,7 +367,7 @@ function ProductInfoPanel({
               {product.children.map((child) => (
                 <Link
                   key={child.id}
-                  href={Routes.product(child.id)}
+                  href={Routes.productDetail(child.id)}
                   className="grid grid-cols-[1fr_auto_auto] gap-3 px-3 py-2 text-sm hover:bg-surface-2"
                 >
                   <span className="min-w-0">
@@ -653,7 +661,7 @@ function RelatedProductsPanel({ product }: { product: ProductRow }) {
             <tr key={item.id} className="align-top">
               <td className="px-3 py-3">
                 <Link
-                  href={Routes.product(item.id)}
+                  href={Routes.productDetail(item.id)}
                   className="font-semibold text-primary-600 hover:underline"
                 >
                   {item.sku}
@@ -743,6 +751,11 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
   function clearExpandedAndRefresh() {
     const sp = new URLSearchParams(params.toString());
     sp.delete("expanded");
+    sp.delete("detailProductId");
+    if (pathname.startsWith("/products/")) {
+      router.replace(`${Routes.Inventory}?tab=products`);
+      return;
+    }
     const query = sp.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, {
       scroll: false,
@@ -801,8 +814,9 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
     sp.delete("sameTypeAs");
     sp.delete("onlineProductId");
     sp.delete("shopeeProductId");
+    sp.delete("detailProductId");
     for (const [key, value] of Object.entries(patch)) sp.set(key, value);
-    return `${pathname}?${sp.toString()}`;
+    return `${Routes.Inventory}?${sp.toString()}`;
   }
 
   return (

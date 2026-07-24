@@ -17,7 +17,13 @@ import { getAttentionNotificationCount } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
-export default async function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({
+  children,
+  productModal,
+}: {
+  children: React.ReactNode;
+  productModal: React.ReactNode;
+}) {
   let user: Awaited<ReturnType<typeof requireUser>>;
   try {
     user = await requireUser();
@@ -67,6 +73,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <MobileTabBar />
         {store.prefs.ai.openaiApiKeySet && store.prefs.ai.showFloatingLauncher && <AiAssistantLauncher />}
       </main>
+      {productModal}
     </div>
   );
 }

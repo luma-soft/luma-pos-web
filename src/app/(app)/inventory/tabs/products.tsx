@@ -169,7 +169,7 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
         </div>
       ) : (
         <>
-          <ProductsTable rows={rows} initialExpandedId={params.expanded} cameraMaterials={cameraMaterials} />
+          <ProductsTable rows={rows} />
         </>
       )}
 

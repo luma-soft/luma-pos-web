@@ -103,7 +103,7 @@ function recordHref(record: Record<string, unknown>) {
   const id = textValue(record.id);
   const type = textValue(record.type);
   if (!id || id === "draft") return null;
-  if (type === "product") return `/inventory?tab=products&expanded=${id}`;
+  if (type === "product") return Routes.product(id);
   if (type === "customer") return `/partners?tab=customers&expandedCustomer=${id}`;
   if (type === "quote") return Routes.salesOrder(id, "quote");
   if (type === "order" || type === "invoice") return Routes.salesOrder(id, "completed");

@@ -56,7 +56,8 @@ export const Routes = {
     const encodedId = encodeURIComponent(id);
     return `/sales?tab=${tab}&orderId=${encodedId}&${expandedParam}=${encodedId}` as const;
   },
-  product: (id: string) => `/inventory?tab=products&expanded=${id}` as const,
+  product: (id: string) => `/products/${encodeURIComponent(id)}` as const,
+  productDetail: (id: string) => `/products/${encodeURIComponent(id)}` as const,
   productEdit: (id: string) => `/products/${id}/edit` as const,
   productCopy: (id: string) => `/products/new?copyFrom=${id}` as const,
   productSameType: (id: string) => `/products/new?sameTypeAs=${id}` as const,

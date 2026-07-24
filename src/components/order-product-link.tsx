@@ -10,9 +10,7 @@ export function OrderProductLink({
 }) {
   return (
     <Link
-      href={Routes.product(productId)}
-      target="_blank"
-      rel="noopener noreferrer"
+      href={Routes.productDetail(productId)}
       className="font-medium text-primary-600 hover:underline"
     >
       {productName}

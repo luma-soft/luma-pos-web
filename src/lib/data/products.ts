@@ -34,6 +34,7 @@ export type ProductStatusFilter = "active" | "inactive" | "draft" | "archived" |
 export type ProductListView = "grouped" | "flat";
 
 export interface ProductListFilters {
+  exactProductId?: string;
   q?: string;
   categoryId?: string;
   status?: ProductStatusFilter;
@@ -67,8 +68,11 @@ export async function getProducts(filters: ProductListFilters = {}) {
   const hasComplianceColumns = await hasProductComplianceColumns();
   const complianceFields = productComplianceFields(hasComplianceColumns);
   const conditions: SQL[] = [];
+  const exactProductId = filters.exactProductId;
 
-  if (filters.q?.trim()) {
+  if (exactProductId) {
+    conditions.push(eq(products.id, exactProductId));
+  } else if (filters.q?.trim()) {
     const q = filters.q.trim();
     const childSearch = sql`exists (
       select 1 from products child
@@ -87,7 +91,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
     );
     if (search) conditions.push(search);
   }
-  if (filters.categoryId) {
+  if (!exactProductId && filters.categoryId) {
     conditions.push(
       view === "grouped"
         ? or(
@@ -101,10 +105,10 @@ export async function getProducts(filters: ProductListFilters = {}) {
         : eq(products.categoryId, filters.categoryId),
     );
   }
-  if (filters.productSkus?.length && !filters.cameraMaterial) {
+  if (!exactProductId && filters.productSkus?.length && !filters.cameraMaterial) {
     conditions.push(inArray(products.sku, filters.productSkus));
   }
-  if (filters.cameraMaterial) {
+  if (!exactProductId && filters.cameraMaterial) {
     conditions.push(
       or(
         filters.productSkus?.length ? inArray(products.sku, filters.productSkus) : undefined,
@@ -112,7 +116,10 @@ export async function getProducts(filters: ProductListFilters = {}) {
       )!,
     );
   }
-  if (view === "grouped") {
+  if (exactProductId) {
+    // An exact lookup must find both variant parents and children regardless of
+    // the list's current status/view filters.
+  } else if (view === "grouped") {
     conditions.push(sql`${products.parentProductId} is null`);
     if (status === "active") {
       conditions.push(
@@ -245,7 +252,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
   ]);
 
   const parentIds =
-    view === "grouped"
+    (view === "grouped" || Boolean(exactProductId))
       ? rows.filter((row) => row.isVariantParent).map((row) => row.id)
       : [];
   const children =
@@ -538,6 +545,17 @@ export async function getProducts(filters: ProductListFilters = {}) {
     pageSize: size,
     pageCount: Math.max(1, Math.ceil(total / size)),
   };
+}
+
+export async function getProductListItem(id: string) {
+  const result = await getProducts({
+    exactProductId: id,
+    status: "all",
+    view: "flat",
+    page: 1,
+    pageSize: 1,
+  });
+  return result.rows[0] ?? null;
 }
 
 export async function getMobileProducts(filters: ProductListFilters = {}) {

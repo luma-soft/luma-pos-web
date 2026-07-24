@@ -259,7 +259,7 @@ export function DataTableShell<T>({
                       <tr
                         className={cn(
                           "border-t border-border-soft transition-colors",
-                          expandable && "cursor-pointer",
+                          (expandable || onRowClick) && "cursor-pointer",
                           expanded ? "bg-primary-50/45 dark:bg-primary-950/15" : "hover:bg-surface-2",
                           rowClassName?.(row, expanded),
                         )}
