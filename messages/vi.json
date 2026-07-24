@@ -1878,6 +1878,21 @@
   "reports": {
     "invoiceList": "Danh sách hóa đơn",
     "profit": "Lãi",
+    "period": {
+      "label": "Khoảng thời gian",
+      "from": "Từ",
+      "to": "Đến",
+      "apply": "Xem báo cáo",
+      "options": {
+        "7d": "7 ngày gần nhất",
+        "30d": "30 ngày gần nhất",
+        "90d": "90 ngày gần nhất",
+        "this_month": "Tháng này",
+        "last_month": "Tháng trước",
+        "this_year": "Năm nay",
+        "custom": "Chọn ngày"
+      }
+    },
     "title": "Báo cáo",
     "lastNDays": "{n} ngày",
     "revenue": "Doanh thu",

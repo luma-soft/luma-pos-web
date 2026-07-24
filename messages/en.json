@@ -1878,6 +1878,21 @@
   "reports": {
     "invoiceList": "Invoice list",
     "profit": "Profit",
+    "period": {
+      "label": "Date range",
+      "from": "From",
+      "to": "To",
+      "apply": "View report",
+      "options": {
+        "7d": "Last 7 days",
+        "30d": "Last 30 days",
+        "90d": "Last 90 days",
+        "this_month": "This month",
+        "last_month": "Last month",
+        "this_year": "This year",
+        "custom": "Choose dates"
+      }
+    },
     "title": "Reports",
     "lastNDays": "{n} days",
     "revenue": "Revenue",

@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, lt, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   categories,
@@ -23,6 +23,8 @@ export type ReportFilters = {
   customerId?: string;
   customer?: string;
   q?: string;
+  from?: Date;
+  to?: Date;
 };
 
 export async function getReports(rangeDays = 30, filters: ReportFilters = {}) {
@@ -34,7 +36,13 @@ export async function getReportsForDatabase(
   rangeDays = 30,
   filters: ReportFilters = {},
 ) {
-  const since = daysAgo(rangeDays - 1);
+  const since = filters.from ?? daysAgo(rangeDays - 1);
+  const orderDateFilter = filters.to
+    ? and(gte(orders.createdAt, since), lt(orders.createdAt, filters.to))
+    : gte(orders.createdAt, since);
+  const returnDateFilter = filters.to
+    ? and(gte(returns.createdAt, since), lt(returns.createdAt, filters.to))
+    : gte(returns.createdAt, since);
   // chỉ đơn bán thật: loại quote/merged/cancelled/draft
   const notCancelled = inArray(orders.status, ["completed", "returned"]);
   const customerTerm = filters.customer?.trim() || filters.q?.trim() || "";
@@ -44,16 +52,16 @@ export async function getReportsForDatabase(
       ? or(ilike(customers.name, `%${customerTerm}%`), ilike(customers.phone, `%${customerTerm}%`), ilike(customers.code, `%${customerTerm}%`))
       : undefined;
   const where = customerFilter
-    ? and(notCancelled, gte(orders.createdAt, since), customerFilter)
-    : and(notCancelled, gte(orders.createdAt, since));
+    ? and(notCancelled, orderDateFilter, customerFilter)
+    : and(notCancelled, orderDateFilter);
   const returnCustomerFilter = filters.customerId
     ? eq(returns.customerId, filters.customerId)
     : customerTerm
       ? or(ilike(customers.name, `%${customerTerm}%`), ilike(customers.phone, `%${customerTerm}%`), ilike(customers.code, `%${customerTerm}%`))
       : undefined;
   const returnWhere = returnCustomerFilter
-    ? and(gte(returns.createdAt, since), returnCustomerFilter)
-    : gte(returns.createdAt, since);
+    ? and(returnDateFilter, returnCustomerFilter)
+    : returnDateFilter;
 
   const [
     summaryRows,

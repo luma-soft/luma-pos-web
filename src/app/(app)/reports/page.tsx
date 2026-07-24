@@ -3,41 +3,49 @@ import { getTranslations } from "next-intl/server";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { getReports } from "@/lib/data/reports";
-import { buttonVariants } from "@/components/ui/button-variants";
 import { GroupTabs } from "@/components/group-tabs";
 import { Text } from "@/components/ui/text";
+import { ReportPeriodFilter, type ReportPeriod } from "./report-period-filter";
 
 interface PageProps {
-  searchParams: Promise<{ tab?: string; range?: string; customerId?: string; customer?: string; q?: string; source?: string }>;
+  searchParams: Promise<{
+    tab?: string;
+    period?: string;
+    range?: string;
+    from?: string;
+    to?: string;
+    customerId?: string;
+    customer?: string;
+    q?: string;
+    source?: string;
+  }>;
 }
 
-const RANGES = [7, 30, 90] as const;
+const REPORT_PERIODS: readonly ReportPeriod[] = ["7d", "30d", "90d", "this_month", "last_month", "this_year", "custom"];
 const REPORT_TABS = [
   { tab: "overview", labelKey: "reports.overview" },
   { tab: "products", labelKey: "reports.products" },
   { tab: "customers", labelKey: "reports.customers" },
   { tab: "employees", labelKey: "reports.employees" },
 ];
-const REPORT_FILTER_PARAMS = ["range", "customerId", "customer", "q", "source"] as const;
+const REPORT_FILTER_PARAMS = ["period", "range", "from", "to", "customerId", "customer", "q", "source"] as const;
 
 export default async function ReportsPage({ searchParams }: PageProps) {
   const t = await getTranslations();
   const params = await searchParams;
   const activeTab = REPORT_TABS.find((item) => item.tab === params.tab)?.tab ?? "overview";
-  const range = RANGES.includes(Number(params.range) as 7) ? Number(params.range) : 30;
+  const legacyPeriod = ["7", "30", "90"].includes(params.range ?? "") ? `${params.range}d` : undefined;
+  const requestedPeriod = params.period ?? legacyPeriod;
+  const period = REPORT_PERIODS.includes(requestedPeriod as ReportPeriod) ? requestedPeriod as ReportPeriod : "30d";
+  const dateRange = resolveDateRange(period, params.from, params.to);
   const filters = {
     customerId: typeof params.customerId === "string" ? params.customerId : undefined,
     customer: typeof params.customer === "string" ? params.customer : undefined,
     q: typeof params.q === "string" ? params.q : undefined,
+    from: dateRange.from,
+    to: dateRange.toExclusive,
   };
-  const data = await getReports(range, filters);
-  const filterParams = new URLSearchParams();
-  if (filters.customerId) filterParams.set("customerId", filters.customerId);
-  if (filters.customer) filterParams.set("customer", filters.customer);
-  if (filters.q) filterParams.set("q", filters.q);
-  if (params.source) filterParams.set("source", params.source);
-  if (activeTab !== "overview") filterParams.set("tab", activeTab);
-  const filterQuery = filterParams.toString();
+  const data = await getReports(dateRange.rangeDays, filters);
   const filterLabel = filters.customer || filters.q || (filters.customerId ? `ID ${filters.customerId.slice(0, 8)}` : "");
 
   const maxDay = Math.max(1, ...data.byDay.map((d) => Math.abs(Number(d.revenue))));
@@ -45,27 +53,13 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   return (
     <div className="p-4 sm:p-6">
       <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-5 bg-surface border-b border-border">
-        <div className="min-h-[52px] px-4 sm:px-6 pt-2.5 flex items-center">
+        <div className="flex min-h-[52px] flex-wrap items-center justify-between gap-3 px-4 pt-2.5 sm:px-6">
           <Text as="h1" weight="bold" className="text-[17px]" text={t("reports.title")} />
+          <ReportPeriodFilter period={period} from={dateRange.fromValue} to={dateRange.toValue} />
         </div>
         <div className="px-4 sm:px-6 pb-1.5">
           <GroupTabs base={Routes.Reports} items={REPORT_TABS} preserveParams={REPORT_FILTER_PARAMS} />
         </div>
-      </div>
-
-      <div className="mb-5 flex w-full justify-end gap-1.5 overflow-x-auto">
-        {RANGES.map((r) => (
-          <Link
-            key={r}
-            href={`${Routes.Reports}?range=${r}${filterQuery ? `&${filterQuery}` : ""}`}
-            className={cn(
-              buttonVariants({ variant: range === r ? "default" : "outline", size: "sm" }),
-              "h-9 flex-1 whitespace-nowrap sm:flex-none"
-            )}
-          >
-            {t("reports.lastNDays", { n: r })}
-          </Link>
-        ))}
       </div>
 
       {filterLabel && (
@@ -279,4 +273,64 @@ export default async function ReportsPage({ searchParams }: PageProps) {
       )}
     </div>
   );
+}
+
+function resolveDateRange(period: ReportPeriod, fromParam?: string, toParam?: string) {
+  const today = startOfDay(new Date());
+  const tomorrow = addDays(today, 1);
+  let from = addDays(today, -29);
+  let toExclusive = tomorrow;
+
+  if (period === "7d") from = addDays(today, -6);
+  else if (period === "90d") from = addDays(today, -89);
+  else if (period === "this_month") from = new Date(today.getFullYear(), today.getMonth(), 1);
+  else if (period === "last_month") {
+    from = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    toExclusive = new Date(today.getFullYear(), today.getMonth(), 1);
+  } else if (period === "this_year") {
+    from = new Date(today.getFullYear(), 0, 1);
+  } else if (period === "custom") {
+    const customFrom = parseDate(fromParam);
+    const customTo = parseDate(toParam);
+    if (customFrom && customTo && customFrom <= customTo) {
+      from = customFrom;
+      toExclusive = addDays(customTo, 1);
+    } else {
+      from = new Date(today.getFullYear(), today.getMonth(), 1);
+    }
+  }
+
+  const toInclusive = addDays(toExclusive, -1);
+  return {
+    from,
+    toExclusive,
+    fromValue: dateInputValue(from),
+    toValue: dateInputValue(toInclusive),
+    rangeDays: Math.max(1, Math.round((toExclusive.getTime() - from.getTime()) / 86_400_000)),
+  };
+}
+
+function parseDate(value?: string) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function startOfDay(value: Date) {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
+function addDays(value: Date, days: number) {
+  const date = new Date(value);
+  date.setDate(date.getDate() + days);
+  return date;
+}
+
+function dateInputValue(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
