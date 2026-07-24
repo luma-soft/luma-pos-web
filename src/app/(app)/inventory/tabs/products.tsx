@@ -79,7 +79,13 @@ async function ProductsToolbar({
   );
 }
 
-async function ProductEditorModal({ searchParams }: { searchParams: SP }) {
+export async function ProductEditorModal({
+  searchParams,
+  closeHrefOverride,
+}: {
+  searchParams: SP;
+  closeHrefOverride?: string;
+}) {
   const modal = searchParams.productModal;
   if (!modal) return null;
   if (!["create", "edit", "copy", "sameType"].includes(modal)) return null;
@@ -101,14 +107,14 @@ async function ProductEditorModal({ searchParams }: { searchParams: SP }) {
   const priceBookPrices = seedProduct
     ? Object.fromEntries(Object.entries(priceOverridesByBook).map(([bookId, prices]) => [bookId, prices[seedProduct.id]]))
     : {};
-  const closeHref = productModalHref(searchParams, {});
+  const closeHref = closeHrefOverride ?? productModalHref(searchParams, {});
   const mode = modal === "edit" ? "edit" : "create";
   const initialValues = seedProduct
     ? productToFormInitialValues(seedProduct, modal === "copy" ? "copy" : modal === "sameType" ? "sameType" : "edit", priceBookPrices)
     : undefined;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-2 sm:p-5">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-2 sm:p-5">
       <div className="h-[min(92dvh,920px)] w-full max-w-7xl overflow-hidden rounded-2xl bg-surface shadow-2xl">
         <NewProductForm
           mode={mode}

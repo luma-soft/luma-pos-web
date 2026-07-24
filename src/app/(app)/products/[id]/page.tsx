@@ -4,13 +4,16 @@ import { ArrowLeft } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { getProductListItem } from "@/lib/data/products";
 import { ProductDetailView } from "../../inventory/tabs/products-table";
+import { ProductEditorModal } from "../../inventory/tabs/products";
 
 interface Props {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | undefined>>;
 }
 
-export default async function ProductDetailPage({ params }: Props) {
+export default async function ProductDetailPage({ params, searchParams }: Props) {
   const { id } = await params;
+  const query = await searchParams;
   const product = await getProductListItem(id);
   if (!product) notFound();
 
@@ -30,6 +33,12 @@ export default async function ProductDetailPage({ params }: Props) {
         </div>
       </div>
       <ProductDetailView product={product} surface="page" />
+      {query.edit === "1" && (
+        <ProductEditorModal
+          searchParams={{ productModal: "edit", productId: id }}
+          closeHrefOverride={Routes.productDetail(id)}
+        />
+      )}
     </div>
   );
 }

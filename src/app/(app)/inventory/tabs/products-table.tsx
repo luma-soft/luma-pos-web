@@ -187,8 +187,8 @@ export function ProductDetailView({
 
   if (cameraMaterials) {
     return (
-      <div className={cn("bg-surface px-4 py-4", surface === "page" && "rounded-card border border-border-soft")}>
-        <div className="grid gap-4 sm:grid-cols-3">
+      <div className={cn("bg-surface px-4 py-4", surface === "modal" && "flex h-full min-h-0 flex-col", surface === "page" && "rounded-card border border-border-soft")}>
+        <div className={cn("grid gap-4 sm:grid-cols-3", surface === "modal" && "min-h-0 flex-1 overflow-y-auto")}>
           <InfoItem label={t("products.fields.sku")} value={product.sku} />
           <InfoItem label={t("products.pricing.retailPrice")} value={formatCurrency(Number(product.retailPrice))} />
           <InfoItem label={t("products.list.colUnits")} value={product.baseUnit} />
@@ -199,8 +199,8 @@ export function ProductDetailView({
   }
 
   return (
-    <div className={cn("bg-surface px-4 py-4", surface === "page" && "rounded-card border border-border-soft")}>
-      <div className="flex items-center gap-6 overflow-x-auto border-b border-border-soft text-sm font-semibold text-slate-500">
+    <div className={cn("bg-surface px-4 py-4", surface === "modal" && "flex h-full min-h-0 flex-col", surface === "page" && "rounded-card border border-border-soft")}>
+      <div className="flex shrink-0 items-center gap-6 overflow-x-auto border-b border-border-soft text-sm font-semibold text-slate-500">
         {PRODUCT_EXPAND_TABS.map((key) => (
           <button
             key={key}
@@ -218,7 +218,7 @@ export function ProductDetailView({
         ))}
       </div>
 
-      <div className="pt-4">
+      <div className={cn("pt-4", surface === "modal" && "min-h-0 flex-1 overflow-y-auto")}>
         {tab === "info" && (
           <ProductInfoPanel
             product={product}
@@ -854,10 +854,14 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
           <ActionLink
             icon={Pencil}
             label={t("products.actions.edit")}
-            href={productModalHref({
-              productModal: "edit",
-              productId: product.id,
-            })}
+            href={
+              pathname.startsWith("/products/")
+                ? `${Routes.productDetail(product.id)}?edit=1`
+                : productModalHref({
+                    productModal: "edit",
+                    productId: product.id,
+                  })
+            }
             tone="primary"
           />
           <div

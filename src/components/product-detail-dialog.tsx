@@ -35,7 +35,7 @@ export function ProductDetailDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="product-detail-title"
-        className="flex max-h-[94dvh] w-full max-w-7xl flex-col overflow-hidden rounded-t-2xl bg-surface shadow-2xl sm:rounded-2xl"
+        className="flex h-[94dvh] w-full max-w-7xl flex-col overflow-hidden rounded-t-2xl bg-surface shadow-2xl sm:h-[min(92dvh,920px)] sm:rounded-2xl"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-6">
@@ -54,7 +54,7 @@ export function ProductDetailDialog({
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="min-h-0 overflow-y-auto">{children}</div>
+        <div className="min-h-0 flex-1">{children}</div>
       </div>
     </div>
   );
