@@ -1908,6 +1908,11 @@
     "products": "Sản phẩm",
     "customers": "Khách hàng",
     "employees": "Nhân viên",
+    "unitLabels": {
+      "products": "sản phẩm",
+      "customers": "khách hàng",
+      "employees": "nhân viên"
+    },
     "topProducts": "Top sản phẩm theo doanh thu",
     "qtySold": "SL bán",
     "grossProfit": "Lãi gộp",

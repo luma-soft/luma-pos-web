@@ -1,11 +1,19 @@
+import type { ReactNode } from "react";
 import { getTranslations } from "next-intl/server";
 import { Routes } from "@/lib/routes";
-import { cn, formatCurrency, formatNumber } from "@/lib/utils";
-import { getReportInvoices, getReports } from "@/lib/data/reports";
+import { cn, formatCurrency } from "@/lib/utils";
+import {
+  getReportCustomers,
+  getReportEmployees,
+  getReportInvoices,
+  getReportProducts,
+  getReports,
+} from "@/lib/data/reports";
 import { parsePageSize } from "@/lib/pagination";
 import { Pagination } from "@/components/pagination";
 import { GroupTabs } from "@/components/group-tabs";
 import { Text } from "@/components/ui/text";
+import { ReportCustomersTable, ReportEmployeesTable, ReportProductsTable } from "./report-detail-tables";
 import { ReportInvoicesTable } from "./report-invoices-table";
 import { ReportPeriodFilter, type ReportPeriod } from "./report-period-filter";
 
@@ -52,10 +60,19 @@ export default async function ReportsPage({ searchParams }: PageProps) {
     from: dateRange.from,
     to: dateRange.toExclusive,
   };
-  const [data, invoiceResult] = await Promise.all([
+  const [data, invoiceResult, productResult, customerResult, employeeResult] = await Promise.all([
     getReports(dateRange.rangeDays, filters),
     activeTab === "invoices"
       ? getReportInvoices(dateRange.rangeDays, filters, page, pageSize)
+      : Promise.resolve(null),
+    activeTab === "products"
+      ? getReportProducts(dateRange.rangeDays, filters, page, pageSize)
+      : Promise.resolve(null),
+    activeTab === "customers"
+      ? getReportCustomers(dateRange.rangeDays, filters, page, pageSize)
+      : Promise.resolve(null),
+    activeTab === "employees"
+      ? getReportEmployees(dateRange.rangeDays, filters, page, pageSize)
       : Promise.resolve(null),
   ]);
   const filterLabel = filters.customer || filters.q || (filters.customerId ? `ID ${filters.customerId.slice(0, 8)}` : "");
@@ -146,114 +163,53 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         </>
       )}
 
-      {activeTab === "products" && (
-        <div className="overflow-hidden rounded-card border border-border bg-surface">
-          {data.topProducts.length === 0 ? (
-            <Text as="p" variant="muted" className="py-8 text-center" text={t("dashboard.noData")} />
-          ) : (
-            <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
-              <thead>
-                <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
-                  <th className="px-4 py-2.5 font-semibold">{t("orders.cols.product")}</th>
-                  <th className="px-4 py-2.5 font-semibold text-right">{t("reports.qtySold")}</th>
-                  <th className="px-4 py-2.5 font-semibold text-right">{t("reports.revenue")}</th>
-                  <th className="px-4 py-2.5 font-semibold text-right">{t("reports.grossProfit")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-soft">
-                {data.topProducts.map((p) => {
-                  const profit = Number(p.profit);
-                  return (
-                    <tr key={p.productId}>
-                      <td className="px-4 py-2.5 font-medium">{p.productName}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">{formatNumber(Number(p.qtySold))} {p.baseUnit}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatCurrency(Number(p.revenue))}</td>
-                      <td className={cn("px-4 py-2.5 text-right tabular-nums", profit >= 0 ? "text-ok" : "text-er")}>
-                        {formatCurrency(profit)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            </div>
-          )}
-        </div>
+      {activeTab === "products" && productResult && (
+        <ReportTabTable
+          table={<ReportProductsTable rows={productResult.rows} />}
+          result={productResult}
+          unitLabel={t("reports.unitLabels.products")}
+        />
       )}
 
-      {activeTab === "customers" && (
-        <div className="overflow-hidden rounded-card border border-border bg-surface">
-          {data.byCustomer.length === 0 ? (
-            <Text as="p" variant="muted" className="py-8 text-center" text={t("dashboard.noData")} />
-          ) : (
-            <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] text-sm">
-              <thead>
-                <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
-                  <th className="px-4 py-2.5 font-semibold">{t("orders.cols.customer")}</th>
-                  <th className="px-4 py-2.5 font-semibold text-right">{t("reports.orders")}</th>
-                  <th className="px-4 py-2.5 font-semibold text-right">{t("reports.revenue")}</th>
-                  <th className="px-4 py-2.5 font-semibold text-right">{t("reports.uncollected")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-soft">
-                {data.byCustomer.map((c) => {
-                  const remaining = Number(c.remaining);
-                  return (
-                    <tr key={c.customerId ?? "walkin"}>
-                      <td className="px-4 py-2.5 font-medium">
-                        {c.customerName}
-                        {c.customerType && c.customerType !== "retail" && (
-                          <Text as="span" variant="muted" size="xs" text={` (${t(`customers.types.${c.customerType}` as never)})`} />
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{c.orderCount}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatCurrency(Number(c.revenue))}</td>
-                      <td className={cn("px-4 py-2.5 text-right tabular-nums", remaining > 0 ? "text-er font-semibold" : "text-slate-400")}>
-                        {remaining > 0 ? formatCurrency(remaining) : "—"}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            </div>
-          )}
-        </div>
+      {activeTab === "customers" && customerResult && (
+        <ReportTabTable
+          table={<ReportCustomersTable rows={customerResult.rows} />}
+          result={customerResult}
+          unitLabel={t("reports.unitLabels.customers")}
+        />
       )}
 
-      {activeTab === "employees" && (
-        <div className="overflow-hidden rounded-card border border-border bg-surface">
-          {data.byEmployee.length === 0 ? (
-            <Text as="p" variant="muted" className="py-8 text-center" text={t("dashboard.noData")} />
-          ) : (
-            <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm">
-              <thead>
-                <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
-                  <th className="px-4 py-2.5 font-semibold">{t("reports.employee")}</th>
-                  <th className="px-4 py-2.5 font-semibold text-right">{t("reports.orders")}</th>
-                  <th className="px-4 py-2.5 font-semibold text-right">{t("reports.revenue")}</th>
-                  <th className="px-4 py-2.5 font-semibold text-right">{t("reports.collected")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-soft">
-                {data.byEmployee.map((e) => (
-                  <tr key={e.sellerId ?? "system"}>
-                    <td className="px-4 py-2.5 font-medium">{e.sellerName}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{e.orderCount}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatCurrency(Number(e.revenue))}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-ok">{formatCurrency(Number(e.collected))}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            </div>
-          )}
-        </div>
+      {activeTab === "employees" && employeeResult && (
+        <ReportTabTable
+          table={<ReportEmployeesTable rows={employeeResult.rows} />}
+          result={employeeResult}
+          unitLabel={t("reports.unitLabels.employees")}
+        />
       )}
     </div>
+  );
+}
+
+function ReportTabTable({
+  table,
+  result,
+  unitLabel,
+}: {
+  table: ReactNode;
+  result: { page: number; pageCount: number; total: number; pageSize: number };
+  unitLabel: string;
+}) {
+  return (
+    <>
+      {table}
+      <Pagination
+        page={result.page}
+        pageCount={result.pageCount}
+        total={result.total}
+        pageSize={result.pageSize}
+        unitLabel={unitLabel}
+      />
+    </>
   );
 }
 

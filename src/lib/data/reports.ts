@@ -107,6 +107,122 @@ export async function getReportInvoices(
 
 export type ReportInvoiceRow = Awaited<ReturnType<typeof getReportInvoices>>["rows"][number];
 
+export async function getReportProducts(
+  rangeDays = 30,
+  filters: ReportFilters = {},
+  page = 1,
+  pageSize = 15,
+) {
+  const safePage = Math.max(1, Math.floor(page));
+  const safePageSize = Math.max(1, Math.floor(pageSize));
+  const { where } = reportConditions(rangeDays, filters);
+  const [rows, [countRow]] = await Promise.all([
+    db.select({
+      productId: orderItems.productId,
+      productName: sql<string>`max(${orderItems.productName})`,
+      qtySold: sql<string>`sum(${orderItems.quantity} * ${orderItems.unitMultiplier})`,
+      baseUnit: sql<string>`max(${products.baseUnit})`,
+      revenue: sql<string>`sum(${orderItems.total})`,
+      profit: sql<string>`sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice}))`,
+    })
+      .from(orderItems)
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .innerJoin(products, eq(orderItems.productId, products.id))
+      .leftJoin(customers, eq(orders.customerId, customers.id))
+      .where(where)
+      .groupBy(orderItems.productId)
+      .orderBy(desc(sql`sum(${orderItems.total})`))
+      .limit(safePageSize)
+      .offset((safePage - 1) * safePageSize),
+    db.select({ total: sql<number>`count(distinct ${orderItems.productId})::int` })
+      .from(orderItems)
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .leftJoin(customers, eq(orders.customerId, customers.id))
+      .where(where),
+  ]);
+  return paginated(rows, countRow?.total ?? 0, safePage, safePageSize);
+}
+
+export async function getReportCustomers(
+  rangeDays = 30,
+  filters: ReportFilters = {},
+  page = 1,
+  pageSize = 15,
+) {
+  const safePage = Math.max(1, Math.floor(page));
+  const safePageSize = Math.max(1, Math.floor(pageSize));
+  const { where } = reportConditions(rangeDays, filters);
+  const [rows, [countRow]] = await Promise.all([
+    db.select({
+      customerId: orders.customerId,
+      customerName: sql<string>`coalesce(max(${customers.name}), 'Khách lẻ')`,
+      customerType: sql<string | null>`max(${customers.type})`,
+      orderCount: sql<number>`count(*)::int`,
+      revenue: sql<string>`sum(${orders.total})`,
+      remaining: sql<string>`sum(${orders.total} - ${orders.amountPaid})`,
+    })
+      .from(orders)
+      .leftJoin(customers, eq(orders.customerId, customers.id))
+      .where(where)
+      .groupBy(orders.customerId)
+      .orderBy(desc(sql`sum(${orders.total})`))
+      .limit(safePageSize)
+      .offset((safePage - 1) * safePageSize),
+    db.select({ total: sql<number>`count(distinct coalesce(${orders.customerId}::text, '__walkin__'))::int` })
+      .from(orders)
+      .leftJoin(customers, eq(orders.customerId, customers.id))
+      .where(where),
+  ]);
+  return paginated(rows, countRow?.total ?? 0, safePage, safePageSize);
+}
+
+export async function getReportEmployees(
+  rangeDays = 30,
+  filters: ReportFilters = {},
+  page = 1,
+  pageSize = 15,
+) {
+  const safePage = Math.max(1, Math.floor(page));
+  const safePageSize = Math.max(1, Math.floor(pageSize));
+  const { where } = reportConditions(rangeDays, filters);
+  const [rows, [countRow]] = await Promise.all([
+    db.select({
+      sellerId: orders.createdBy,
+      sellerName: sql<string>`coalesce(max(${profiles.fullName}), '—')`,
+      orderCount: sql<number>`count(*)::int`,
+      revenue: sql<string>`sum(${orders.total})`,
+      collected: sql<string>`sum(${orders.amountPaid})`,
+    })
+      .from(orders)
+      .leftJoin(profiles, eq(orders.createdBy, profiles.id))
+      .leftJoin(customers, eq(orders.customerId, customers.id))
+      .where(where)
+      .groupBy(orders.createdBy)
+      .orderBy(desc(sql`sum(${orders.total})`))
+      .limit(safePageSize)
+      .offset((safePage - 1) * safePageSize),
+    db.select({ total: sql<number>`count(distinct coalesce(${orders.createdBy}::text, '__system__'))::int` })
+      .from(orders)
+      .leftJoin(customers, eq(orders.customerId, customers.id))
+      .where(where),
+  ]);
+  return paginated(rows, countRow?.total ?? 0, safePage, safePageSize);
+}
+
+function paginated<T>(rows: T[], total: number, page: number, pageSize: number) {
+  return {
+    rows,
+    total,
+    page,
+    pageSize,
+    pageCount: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}
+
+export type ReportProductRow = Awaited<ReturnType<typeof getReportProducts>>["rows"][number];
+export type ReportCustomerRow = Awaited<ReturnType<typeof getReportCustomers>>["rows"][number];
+export type ReportEmployeeRow = Awaited<ReturnType<typeof getReportEmployees>>["rows"][number];
+
 export async function getReportsForDatabase(
   database: typeof db,
   rangeDays = 30,

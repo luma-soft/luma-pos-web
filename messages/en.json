@@ -1908,6 +1908,11 @@
     "products": "Products",
     "customers": "Customers",
     "employees": "Employees",
+    "unitLabels": {
+      "products": "products",
+      "customers": "customers",
+      "employees": "employees"
+    },
     "topProducts": "Top products by revenue",
     "qtySold": "Qty sold",
     "grossProfit": "Gross profit",
