@@ -862,6 +862,7 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
                     productId: product.id,
                   })
             }
+            replace={pathname.startsWith("/products/")}
             tone="primary"
           />
           <div
@@ -922,15 +923,18 @@ function ActionLink({
   icon: Icon,
   label,
   tone = "neutral",
+  replace = false,
 }: {
   href: string;
   icon: LucideIcon;
   label: string;
   tone?: "neutral" | "primary";
+  replace?: boolean;
 }) {
   return (
     <Link
       href={href}
+      replace={replace}
       className={cn(
         actionClassName,
         tone === "primary"
