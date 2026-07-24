@@ -13,6 +13,7 @@ import { OrderActions, PaymentForm, SendOrderZaloButton } from "./order-actions"
 import { EInvoiceForm } from "./einvoice-form";
 import { SharePrintDocButton } from "./share-print-doc-button";
 import { buttonVariants } from "@/components/ui/button-variants";
+import { OrderProductLink } from "@/components/order-product-link";
 import { BookingCreateOrderButton, QuoteDeleteButton } from "../../quotes/quote-actions";
 
 type EInvoiceSummary = {
@@ -126,7 +127,7 @@ export async function OrderDetailPanel({
                   {order.items.map((item) => (
                     <tr key={item.id}>
                       <td className="px-3 py-3 font-medium">
-                        {item.productName}
+                        <OrderProductLink productId={item.productId} productName={item.productName} />
                         {(order.returnedByItem[item.id] ?? 0) > 0 && (
                           <span className="ml-2 text-xs font-normal text-warn">
                             {t("returns.returnedQty", { qty: formatNumber(order.returnedByItem[item.id]), unit: item.unitName })}
