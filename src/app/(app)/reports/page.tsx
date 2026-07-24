@@ -41,7 +41,6 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   const filterLabel = filters.customer || filters.q || (filters.customerId ? `ID ${filters.customerId.slice(0, 8)}` : "");
 
   const maxDay = Math.max(1, ...data.byDay.map((d) => Math.abs(Number(d.revenue))));
-  const totalCatRevenue = Math.max(1, data.byCategory.reduce((s, c) => s + Number(c.revenue), 0));
   const uncollected = data.summary.revenue - data.summary.collected;
   return (
     <div className="p-4 sm:p-6">
@@ -172,8 +171,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
       )}
 
       {activeTab === "products" && (
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-          <div className="overflow-hidden rounded-card border border-border bg-surface">
+        <div className="overflow-hidden rounded-card border border-border bg-surface">
           {data.topProducts.length === 0 ? (
             <Text as="p" variant="muted" className="py-8 text-center" text={t("dashboard.noData")} />
           ) : (
@@ -205,32 +203,6 @@ export default async function ReportsPage({ searchParams }: PageProps) {
             </table>
             </div>
           )}
-          </div>
-
-          <div className="self-start rounded-card border border-border bg-surface p-5">
-            <Text as="h2" weight="semibold" className="mb-4" text={t("reports.byCategory")} />
-          {data.byCategory.length === 0 ? (
-            <Text as="p" variant="muted" className="py-8 text-center" text={t("dashboard.noData")} />
-          ) : (
-            <div className="space-y-3">
-              {data.byCategory.map((c) => {
-                const v = Number(c.revenue);
-                const pct = Math.round((v / totalCatRevenue) * 100);
-                return (
-                  <div key={c.categoryName}>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="font-medium">{c.categoryName}</span>
-                      <Text as="span" variant="muted" className="tabular-nums" text={`${formatCurrency(v)} · ${pct}%`} />
-                    </div>
-                    <div className="h-2 rounded-full bg-surface-2 overflow-hidden">
-                      <div className="h-full rounded-full bg-primary-600/85" style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          </div>
         </div>
       )}
 
