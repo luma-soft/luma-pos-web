@@ -16,10 +16,12 @@ import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-acti
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
 import type { AiQuickActionApplyMode } from "@/components/ai-quick-actions/types";
 import { createPurchase, updatePurchase } from "@/lib/actions/purchases";
-import { resolvePurchaseDraftProducts, searchPurchaseProducts } from "@/lib/actions/purchase-search";
+import { resolvePurchaseDraftProducts } from "@/lib/actions/purchase-search";
 import type { PurchaseFormOptions, PurchaseProductRow } from "@/lib/data/inventory";
 import type { AiActionPreview } from "@/lib/ai/actions";
 import { AI_WORKFLOW_DRAFT_STORAGE_KEY } from "@/components/ai-assistant/utils";
+import { useProductCatalog } from "@/components/product-catalog-provider";
+import { catalogItemToPurchaseProduct } from "@/lib/inventory/product-catalog-adapter";
 
 type PUnit = { unitName: string; multiplier: number };
 type Line = {
@@ -185,6 +187,7 @@ export function PurchaseForm({
   purchaseCode?: string;
   aiPreview?: boolean;
 }) {
+  const catalog = useProductCatalog();
   const t = useTranslations();
   const router = useRouter();
 
@@ -317,7 +320,7 @@ export function PurchaseForm({
     if (typeof payload.note === "string" && (applyMode === "replace" || !note)) setNote(payload.note);
   }
 
-  // tìm SP query thẳng DB (bỏ dấu, quét toàn bộ) — giống POS/Sản phẩm
+  // Tìm trong Product Catalog chung; online/offline dùng cùng một interface.
   const [results, setResults] = useState<PurchaseProductRow[]>([]);
   useEffect(() => {
     const q = search.trim();
@@ -325,12 +328,15 @@ export function PurchaseForm({
     const h = setTimeout(() => {
       if (cancelled) return;
       if (!q) { setResults([]); return; }
-      searchPurchaseProducts(q).then((rows) => {
-        if (!cancelled) setResults(rows.filter((p) => !lines.some((l) => l.productId === p.id)));
-      }).catch(() => { if (!cancelled) setResults([]); });
+      const rows = catalog.search(q, {
+        stockManagedOnly: true,
+        excludeIds: new Set(lines.map((line) => line.productId)),
+        limit: 30,
+      }).map(catalogItemToPurchaseProduct);
+      if (!cancelled) setResults(rows);
     }, q ? 250 : 0);
     return () => { cancelled = true; clearTimeout(h); };
-  }, [search, lines]);
+  }, [catalog, search, lines]);
 
   const lineDiscountVnd = (l: Line) =>
     l.discMode === "pct" ? Math.round((l.quantity * l.unitCost * l.discInput) / 100) : l.discInput;
@@ -380,14 +386,20 @@ export function PurchaseForm({
     if (mode === "edit" && purchaseId) {
       const res = await updatePurchase({ id: purchaseId, ...payload });
       setBusy(false);
-      if (res.ok) router.push(Routes.purchase(purchaseId));
+      if (res.ok) {
+        void catalog.refresh();
+        router.push(Routes.purchase(purchaseId));
+      }
       else setError(t(res.error as never));
       return;
     }
 
     const res = await createPurchase(payload);
     setBusy(false);
-    if (res.ok) router.push(Routes.purchase(res.data.id));
+    if (res.ok) {
+      void catalog.refresh();
+      router.push(Routes.purchase(res.data.id));
+    }
     else setError(t(res.error as never));
   }
 

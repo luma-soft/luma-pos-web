@@ -1,11 +1,10 @@
 /**
- * Lưu trữ offline cho POS (IndexedDB, không phụ thuộc thư viện).
- * - catalog: snapshot dữ liệu POS để tìm/duyệt khi mất mạng.
- * - outbox: hàng đợi đơn bán tạo khi offline, đồng bộ lại khi có mạng.
+ * Hàng đợi đơn bán offline của POS (IndexedDB, không phụ thuộc thư viện).
+ * Product Catalog đã chuyển sang module offline dùng chung toàn app.
  * Mọi hàm an toàn ở client; trả về giá trị mặc định nếu IndexedDB không khả dụng.
  */
 const DB_NAME = "sales-pos-offline";
-const DB_VER = 1;
+const DB_VER = 2;
 
 function openDB(): Promise<IDBDatabase | null> {
   return new Promise((resolve) => {
@@ -13,7 +12,9 @@ function openDB(): Promise<IDBDatabase | null> {
     const req = indexedDB.open(DB_NAME, DB_VER);
     req.onupgradeneeded = () => {
       const db = req.result;
-      if (!db.objectStoreNames.contains("catalog")) db.createObjectStore("catalog");
+      // Catalog v1 không tách user và chỉ chứa một phần danh mục; xóa khi
+      // chuyển sang Product Catalog dùng chung đã được scope theo user/role.
+      if (db.objectStoreNames.contains("catalog")) db.deleteObjectStore("catalog");
       if (!db.objectStoreNames.contains("outbox")) db.createObjectStore("outbox", { keyPath: "localId" });
     };
     req.onsuccess = () => resolve(req.result);
@@ -31,14 +32,6 @@ function run<T>(storeName: string, mode: IDBTransactionMode, fn: (store: IDBObje
       req.onerror = () => resolve(null);
     });
   });
-}
-
-// ---- catalog ----
-export async function saveCatalog(data: unknown): Promise<void> {
-  await run("catalog", "readwrite", (s) => s.put(data, "snapshot"));
-}
-export async function loadCatalog<T = unknown>(): Promise<T | null> {
-  return run<T>("catalog", "readonly", (s) => s.get("snapshot"));
 }
 
 // ---- outbox ----

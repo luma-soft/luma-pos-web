@@ -24,13 +24,15 @@ import type { AiActionPreview } from "@/lib/ai/actions";
 import { createOrder } from "@/lib/actions/orders";
 import { createPosReturn, searchReturnableOrders, type ReturnableOrderOption } from "@/lib/actions/returns";
 import { searchPosProducts } from "@/lib/actions/pos-search";
-import { saveCatalog, enqueueOrder, getOutbox, removeOutbox, markFailed } from "@/lib/offline/pos-store";
+import { enqueueOrder, getOutbox, removeOutbox, markFailed } from "@/lib/offline/pos-store";
 import { applyPromo } from "@/lib/promo";
 import { categoryEmoji } from "@/lib/category-emoji";
 import { Routes } from "@/lib/routes";
 import type { PosData, PosProduct, PosUnit } from "@/lib/data/pos";
 import { isProductStockManaged } from "@/lib/product-stock";
 import { rehydrateCartProducts } from "@/lib/pos/rehydrate-cart-products";
+import { useProductCatalog } from "@/components/product-catalog-provider";
+import { catalogItemToPosProduct } from "@/lib/pos/product-catalog-adapter";
 
 type CartLine = {
   key: string;
@@ -451,6 +453,7 @@ export function PosClient({
   posPrefs: StorePrefs["pos"];
 }) {
   const t = useTranslations();
+  const productCatalog = useProductCatalog();
 
   const [search, setSearch] = useState("");
   const [submittingMode, setSubmittingMode] = useState<"sale" | "quote" | "booking" | "return" | null>(null);
@@ -767,24 +770,25 @@ export function PosClient({
     const h = setTimeout(() => {
       if (cancelled) return;
       if (!q) { setServerResults([]); setSearching(false); return; }
-      // offline → lọc cục bộ trên SP đã tải; online → hỏi server
+      const cachedResults = () => productCatalog.search(q, { limit: 40 }).map((product) =>
+        catalogItemToPosProduct(product, productCatalog.products, data.warehouse?.id ?? null)
+      );
+      // offline → tìm trong Product Catalog dùng chung; online → hỏi server
       if (typeof navigator !== "undefined" && !navigator.onLine) {
-        const nq = normalizeSearch(q);
-        setServerResults(searchableProducts.filter((p) => normalizeSearch(`${p.name} ${p.sku} ${p.barcode ?? ""}`).includes(nq)));
+        setServerResults(cachedResults());
         setSearching(false);
         return;
       }
       setSearching(true);
       searchPosProducts(q)
         .then((res) => { if (!cancelled) { setServerResults(res); setSearching(false); } })
-        .catch(() => { if (!cancelled) { // mất mạng giữa chừng → lọc cục bộ
-          const nq = normalizeSearch(q);
-          setServerResults(searchableProducts.filter((p) => normalizeSearch(`${p.name} ${p.sku} ${p.barcode ?? ""}`).includes(nq)));
+        .catch(() => { if (!cancelled) { // mất mạng giữa chừng → dùng catalog chung
+          setServerResults(cachedResults());
           setSearching(false);
         } });
     }, q ? 250 : 0);
     return () => { cancelled = true; clearTimeout(h); };
-  }, [search, searchableProducts]);
+  }, [data.warehouse?.id, productCatalog, search]);
 
   useEffect(() => {
     if (!isReturnInvoiceDraft) return;
@@ -828,7 +832,10 @@ export function PosClient({
       if (!navigator.onLine) break;
       try {
         const res = await createOrder(it.payload as Parameters<typeof createOrder>[0]);
-        if (res.ok) await removeOutbox(it.localId);
+        if (res.ok) {
+          await removeOutbox(it.localId);
+          void productCatalog.refresh();
+        }
         else await markFailed(it.localId, res.error); // lỗi nghiệp vụ → giữ lại, không lặp vô hạn
       } catch { break; } // vẫn mất mạng → thử lại sau
     }
@@ -837,13 +844,12 @@ export function PosClient({
     setSyncing(false); syncingRef.current = false;
   }
 
-  // cache catalog + theo dõi online/offline + đếm đơn chờ (defer setState cho react-compiler)
+  // Product Catalog được provider toàn app đồng bộ; POS chỉ theo dõi online + outbox.
   useEffect(() => {
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
       setOnline(navigator.onLine);
-      saveCatalog({ products: data.products, customers: customerOptions, savedAt: Date.now() });
       getOutbox().then((o) => { if (!cancelled) setPending(o.filter((x) => !x.failed).length); });
       flushOutbox();
     });
@@ -852,12 +858,9 @@ export function PosClient({
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
     return () => { cancelled = true; window.removeEventListener("online", on); window.removeEventListener("offline", off); };
+    // Chỉ đăng ký listener một lần; flushOutbox dùng state khởi tạo và tự chống chạy trùng.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    void saveCatalog({ products: data.products, customers: customerOptions, savedAt: Date.now() });
-  }, [customerOptions, data.products]);
 
   const filtered = useMemo(() => {
     // có từ khoá → dùng kết quả server; không → lưới SP mặc định
@@ -1202,6 +1205,7 @@ export function PosClient({
     try {
       const res = await createOrder(payload);
       if (res.ok) {
+        void productCatalog.refresh();
         if (submitMode === "sale" && payMethod === "bank_transfer") {
           const paymentRes = await fetch("/api/payments/sepay", {
             method: "POST",
@@ -1305,6 +1309,7 @@ export function PosClient({
         })),
       });
       if (res.ok) {
+        void productCatalog.refresh();
         const printJob = buildPrintJob({
           template: returnPrintTemplate,
           title: t("print.titles.return"),

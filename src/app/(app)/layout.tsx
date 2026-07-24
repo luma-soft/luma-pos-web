@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { requireUser } from "@/lib/actions/common";
+import { getRole, requireUser } from "@/lib/actions/common";
 import { LogoutButton } from "@/components/logout-button";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { ThemeSwitcher } from "@/components/theme-switcher";
@@ -14,6 +14,7 @@ import { Routes } from "@/lib/routes";
 import { getTheme, getMode } from "@/lib/theme/cookie";
 import { getStoreSettings } from "@/lib/data/settings";
 import { getAttentionNotificationCount } from "@/lib/audit";
+import { ProductCatalogProvider } from "@/components/product-catalog-provider";
 
 export const dynamic = "force-dynamic";
 
@@ -42,8 +43,11 @@ export default async function AppLayout({
   const t = await getTranslations();
   const theme = await getTheme();
   const mode = await getMode();
+  const role = await getRole(user.id);
+  const catalogScopeId = `${user.id}:${role}`;
 
   return (
+    <ProductCatalogProvider userId={user.id} scopeId={catalogScopeId}>
     <div className="h-dvh min-h-0 flex bg-canvas">
       <MobileNavBackdrop />
 
@@ -66,7 +70,7 @@ export default async function AppLayout({
           <ModeSwitcher current={mode} />
           <ThemeSwitcher current={theme} />
           <LanguageSwitcher />
-          <LogoutButton />
+          <LogoutButton userId={user.id} />
         </div>
       </aside>
 
@@ -78,5 +82,6 @@ export default async function AppLayout({
       {orderModal}
       {productModal}
     </div>
+    </ProductCatalogProvider>
   );
 }

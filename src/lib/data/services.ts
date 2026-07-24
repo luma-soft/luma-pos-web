@@ -9,7 +9,6 @@ import {
   warehouses,
   warrantyClaims,
 } from "@/db/schema";
-import { getProductCatalog } from "@/lib/data/product-catalog";
 
 export async function getServiceDashboard() {
   const [projectRows, jobRows, claimRows] = await Promise.all([
@@ -95,7 +94,7 @@ export type ServiceJobRow = ServiceDashboard["jobs"][number];
 export type WarrantyClaimRow = ServiceDashboard["claims"][number];
 
 export async function getServiceFormOptions() {
-  const [customerOptions, projectOptions, assigneeOptions, productOptions, jobOptions, assetOptions, warehouseOptions] = await Promise.all([
+  const [customerOptions, projectOptions, assigneeOptions, jobOptions, assetOptions, warehouseOptions] = await Promise.all([
     db.select({ id: customers.id, name: customers.name })
       .from(customers)
       .where(eq(customers.isActive, true))
@@ -110,7 +109,6 @@ export async function getServiceFormOptions() {
       .from(profiles)
       .where(eq(profiles.isActive, true))
       .orderBy(asc(profiles.fullName)),
-    getProductCatalog(),
     db.select({
       id: serviceJobs.id,
       projectId: serviceJobs.projectId,
@@ -134,5 +132,5 @@ export async function getServiceFormOptions() {
       .orderBy(desc(warehouses.isDefault), asc(warehouses.name)),
   ]);
 
-  return { customerOptions, projectOptions, assigneeOptions, productOptions, jobOptions, assetOptions, warehouseOptions };
+  return { customerOptions, projectOptions, assigneeOptions, jobOptions, assetOptions, warehouseOptions };
 }

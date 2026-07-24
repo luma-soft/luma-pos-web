@@ -7,7 +7,6 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useLocale } from "next-intl";
 import { Check, ChevronRight, Loader2, Search, Sparkles, UploadCloud, X } from "lucide-react";
 import { generateShopeeListingAiFill, loadShopeeCategoryAttributes, loadShopeeCategoryTree, loadShopeeLogisticsChannels, publishShopeeListing, saveShopeeListingDraft } from "@/lib/actions/marketplace";
-import { searchPosProducts } from "@/lib/actions/pos-search";
 import type { ProductDetail } from "@/lib/data/products";
 import type { PosProduct } from "@/lib/data/pos";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -15,6 +14,8 @@ import { Select } from "@/components/ui/select";
 import { categoryEmoji } from "@/lib/category-emoji";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import { isProductStockManaged } from "@/lib/product-stock";
+import { useProductCatalog } from "@/components/product-catalog-provider";
+import { catalogItemToPosProduct } from "@/lib/pos/product-catalog-adapter";
 
 type FormState = {
   title: string;
@@ -988,6 +989,7 @@ function ProductSearchInListing({
   selectedProduct: ProductDetail | null;
   onSelect: (productId: string) => void;
 }) {
+  const catalog = useProductCatalog();
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<PosProduct[]>([]);
   const [isPending, startTransition] = useTransition();
@@ -1001,8 +1003,11 @@ function ProductSearchInListing({
         setResults([]);
         return;
       }
-      startTransition(async () => {
-        const rows = await searchPosProducts(query);
+      startTransition(() => {
+        const defaultWarehouseId = catalog.snapshot?.warehouses.find((warehouse) => warehouse.isDefault)?.id ?? null;
+        const rows = catalog.search(query, { limit: 30 }).map((product) =>
+          catalogItemToPosProduct(product, catalog.products, defaultWarehouseId)
+        );
         if (!cancelled) setResults(rows);
       });
     }, query ? 250 : 0);
@@ -1010,7 +1015,7 @@ function ProductSearchInListing({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [query]);
+  }, [catalog, query]);
 
   function choose(productId: string, label: string) {
     setSearch(label);

@@ -1,5 +1,5 @@
 import { getTranslations } from "next-intl/server";
-import { asc, desc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { Percent } from "lucide-react";
 import { db } from "@/db";
 import { products, promotions } from "@/db/schema";
@@ -9,20 +9,16 @@ import { PromotionsTable } from "./promotions-table";
 export async function PromotionsTab() {
   const t = await getTranslations();
 
-  const [rows, productOptions] = await Promise.all([
-    db.select({
-      id: promotions.id, name: promotions.name, tiers: promotions.tiers, isActive: promotions.isActive,
-      startsAt: promotions.startsAt, endsAt: promotions.endsAt, productName: products.name, baseUnit: products.baseUnit,
-    }).from(promotions).innerJoin(products, eq(promotions.productId, products.id)).orderBy(desc(promotions.createdAt)),
-    db.select({ id: products.id, name: products.name, sku: products.sku, baseUnit: products.baseUnit })
-      .from(products).where(eq(products.isActive, true)).orderBy(asc(products.name)).limit(500),
-  ]);
+  const rows = await db.select({
+    id: promotions.id, name: promotions.name, tiers: promotions.tiers, isActive: promotions.isActive,
+    startsAt: promotions.startsAt, endsAt: promotions.endsAt, productName: products.name, baseUnit: products.baseUnit,
+  }).from(promotions).innerJoin(products, eq(promotions.productId, products.id)).orderBy(desc(promotions.createdAt));
 
   return (
     <>
       <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
         <span className="text-sm text-slate-500">{t("promos.total", { total: rows.length })}</span>
-        <PromoQuickCreate products={productOptions} />
+        <PromoQuickCreate />
       </div>
 
       {rows.length === 0 ? (

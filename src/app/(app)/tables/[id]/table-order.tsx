@@ -5,19 +5,22 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ArrowLeft, Search, Plus, Minus, Trash2, Loader2, Check, ChefHat, Split, X } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
-import { searchPosProducts } from "@/lib/actions/pos-search";
 import { setTableCart, checkoutTable, closeTable, sendToKitchen } from "@/lib/actions/tables";
 import type { TableCartItem, CartModifier } from "@/lib/schemas/table";
 import type { ModifierGroup } from "@/lib/data/modifiers";
+import type { PosProduct } from "@/lib/data/pos";
+import { useProductCatalog } from "@/components/product-catalog-provider";
+import { catalogItemToPosProduct } from "@/lib/pos/product-catalog-adapter";
 
 type Method = "cash" | "bank_transfer" | "credit";
 const METHODS: Method[] = ["cash", "bank_transfer", "credit"];
 const uid = () => Math.random().toString(36).slice(2, 9);
-type PosResult = Awaited<ReturnType<typeof searchPosProducts>>[number];
+type PosResult = PosProduct;
 
 export function TableOrder({ id, name, initialCart, modifierGroups }: { id: string; name: string; initialCart: TableCartItem[]; modifierGroups: ModifierGroup[] }) {
   const t = useTranslations();
   const router = useRouter();
+  const catalog = useProductCatalog();
   const [cart, setCart] = useState<TableCartItem[]>(initialCart);
   const [q, setQ] = useState("");
   const [results, setResults] = useState<PosResult[]>([]);
@@ -40,7 +43,12 @@ export function TableOrder({ id, name, initialCart, modifierGroups }: { id: stri
     setQ(v); if (sref.current) clearTimeout(sref.current);
     if (!v.trim()) { setResults([]); return; }
     setSearching(true);
-    sref.current = setTimeout(async () => { setResults(await searchPosProducts(v)); setSearching(false); }, 250);
+    sref.current = setTimeout(() => {
+      setResults(catalog.search(v, { limit: 30 }).map((product) =>
+        catalogItemToPosProduct(product, catalog.products, catalog.snapshot?.warehouses.find((warehouse) => warehouse.isDefault)?.id ?? null)
+      ));
+      setSearching(false);
+    }, 250);
   }
 
   function groupsFor(categoryId: string | null) {
@@ -91,7 +99,10 @@ export function TableOrder({ id, name, initialCart, modifierGroups }: { id: stri
     const lineIds = split && selected.length ? selected : undefined;
     start(async () => {
       const res = await checkoutTable(id, method, lineIds);
-      if (res.ok) router.push("/tables");
+      if (res.ok) {
+        void catalog.refresh();
+        router.push("/tables");
+      }
       else setErr(t(res.error as never));
     });
   }

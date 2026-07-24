@@ -9,13 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
 import { createPromotion, togglePromotion } from "@/lib/actions/extras";
+import { useProductCatalog } from "@/components/product-catalog-provider";
 
-interface ProductOption { id: string; name: string; sku: string; baseUnit: string }
 type Tier = { minQty: number; discountPct: number };
 
-export function PromoQuickCreate({ products }: { products: ProductOption[] }) {
+export function PromoQuickCreate() {
   const t = useTranslations();
   const router = useRouter();
+  const { products } = useProductCatalog();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [productId, setProductId] = useState("");

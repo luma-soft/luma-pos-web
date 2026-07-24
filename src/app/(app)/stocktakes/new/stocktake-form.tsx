@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ArrowLeft, Check, ClipboardCheck, PackageSearch, Save, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, ClipboardCheck, Loader2, PackageSearch, Save, Search, Trash2 } from "lucide-react";
 import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
 import type { AiQuickActionApplyMode } from "@/components/ai-quick-actions/types";
@@ -14,22 +14,42 @@ import { Select } from "@/components/ui/select";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import { createStocktake } from "@/lib/actions/stocktakes";
-import { searchStocktakeProducts } from "@/lib/actions/stocktake-product-search";
-import type { StocktakeProductOption } from "@/lib/data/stocktake-products";
-import { getStocktakeSuggestions } from "@/lib/stocktake-product-search";
+import { useProductCatalog } from "@/components/product-catalog-provider";
+import { getCatalogWarehouseStock, type ProductCatalogItem } from "@/lib/product-catalog";
 import type { AiActionPreview } from "@/lib/ai/actions";
 
-type ProductOption = StocktakeProductOption;
+interface ProductOption {
+  id: string;
+  sku: string;
+  barcode: string | null;
+  name: string;
+  baseUnit: string;
+  costPrice: number;
+  stock: number;
+}
 
 interface Line {
   product: ProductOption;
   actualQty: number;
 }
 
-export function StocktakeForm({ activeWarehouseId, warehouses, products }: { activeWarehouseId: string; warehouses: { id: string; name: string }[]; products: ProductOption[] }) {
+function toProductOption(product: ProductCatalogItem, warehouseId: string): ProductOption {
+  return {
+    id: product.id,
+    sku: product.sku,
+    barcode: product.barcode,
+    name: product.name,
+    baseUnit: product.baseUnit,
+    costPrice: Number(product.costPrice ?? 0),
+    stock: getCatalogWarehouseStock(product, warehouseId),
+  };
+}
+
+export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehouseId: string; warehouses: { id: string; name: string }[] }) {
   const t = useTranslations();
   const router = useRouter();
   const dialog = useConfirmDialog();
+  const catalog = useProductCatalog();
 
   // tồn hệ thống hiển thị được load theo kho này — đổi kho sẽ reload trang
   const warehouseId = activeWarehouseId;
@@ -39,43 +59,22 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
   const [busy, setBusy] = useState<"draft" | "balance" | null>(null);
   const [error, setError] = useState("");
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
-  const [serverSearch, setServerSearch] = useState<{ query: string; products: ProductOption[] }>({
-    query: "",
-    products: [],
-  });
 
   const added = useMemo(() => new Set(lines.map((l) => l.product.id)), [lines]);
-
-  useEffect(() => {
-    const query = search.trim();
-    let cancelled = false;
-
-    const timer = setTimeout(() => {
-      if (!query) return;
-
-      searchStocktakeProducts(query, warehouseId)
-        .then((results) => {
-          if (!cancelled) setServerSearch({ query, products: results });
-        })
-        .catch(() => {
-          if (!cancelled) setServerSearch({ query, products: [] });
-        });
-    }, query ? 250 : 0);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [search, warehouseId]);
+  const products = useMemo(
+    () => catalog.products
+      .filter((product) => product.isStockManaged)
+      .map((product) => toProductOption(product, warehouseId)),
+    [catalog.products, warehouseId],
+  );
 
   const suggestions = useMemo(() => {
-    return getStocktakeSuggestions({
-      search,
-      localProducts: products,
-      serverResults: serverSearch.query === search.trim() ? serverSearch.products : [],
-      addedProductIds: added,
-    });
-  }, [search, products, serverSearch, added]);
+    return catalog.search(search, {
+      stockManagedOnly: true,
+      excludeIds: added,
+      limit: 8,
+    }).map((product) => toProductOption(product, warehouseId));
+  }, [added, catalog, search, warehouseId]);
 
   function addLine(p: ProductOption) {
     setLines((ls) => [...ls, { product: p, actualQty: p.stock }]);
@@ -156,7 +155,10 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
       items: lines.map((l) => ({ productId: l.product.id, actualQty: l.actualQty })),
     });
     setBusy(null);
-    if (res.ok) router.push(Routes.Stocktakes);
+    if (res.ok) {
+      void catalog.refresh();
+      router.push(Routes.Stocktakes);
+    }
     else setError(t(res.error as never));
   }
 
@@ -201,7 +203,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
                 </div>
                 <AiQuickActionButton onClick={() => setAiQuickOpen(true)} label={t("aiQuick.stock.create_stocktake.label")} className="h-12 w-14" />
               </div>
-              {suggestions.length > 0 && (
+              {search.trim() && (
                 <div className="absolute left-0 right-16 z-20 mt-2 overflow-hidden rounded-card border border-border-soft bg-surface shadow-e2">
                   {suggestions.map((p) => (
                     <button
@@ -212,6 +214,12 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
                       <span className="shrink-0 text-slate-500 tabular-nums">{t("pos.stockLabel")}: {formatNumber(p.stock)} {p.baseUnit}</span>
                     </button>
                   ))}
+                  {suggestions.length === 0 && (
+                    <div className="flex items-center gap-2 px-4 py-3 text-sm text-slate-500">
+                      {catalog.status === "loading" && <Loader2 className="h-4 w-4 animate-spin" />}
+                      {t(catalog.status === "loading" ? "common.loading" : "common.noResults")}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

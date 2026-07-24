@@ -9,6 +9,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 import { MoneyInput } from "@/components/ui/money-input";
 import { Select } from "@/components/ui/select";
 import { updateOrder } from "@/lib/actions/order-edit";
+import { useProductCatalog } from "@/components/product-catalog-provider";
 
 interface Line {
   productId: string;
@@ -19,10 +20,6 @@ interface Line {
   unitPrice: number;
 }
 
-interface ProductOption {
-  id: string; name: string; sku: string; baseUnit: string; retailPrice: string;
-}
-
 interface Props {
   orderId: string;
   orderCode: string;
@@ -30,12 +27,12 @@ interface Props {
     projectName: string; note: string; discount: number; shippingFee: number; amountPaid: number;
     items: Line[];
   };
-  productOptions: ProductOption[];
 }
 
-export function OrderEditForm({ orderId, orderCode, initial, productOptions }: Props) {
+export function OrderEditForm({ orderId, orderCode, initial }: Props) {
   const t = useTranslations();
   const router = useRouter();
+  const { products: productOptions } = useProductCatalog();
 
   const [items, setItems] = useState<Line[]>(initial.items);
   const [discount, setDiscount] = useState(initial.discount);

@@ -13,12 +13,14 @@ import { Input, Textarea } from "@/components/ui/input";
 import { MoneyInput } from "@/components/ui/money-input";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
-import { createPurchaseReturn, searchPurchaseReturnProducts } from "@/lib/actions/purchase-returns";
+import { createPurchaseReturn } from "@/lib/actions/purchase-returns";
 import type { AiActionPreview } from "@/lib/ai/actions";
 import type { PurchaseFormOptions } from "@/lib/data/inventory";
 import type { PurchaseReturnProductRow } from "@/lib/data/purchase-returns";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
+import { useProductCatalog } from "@/components/product-catalog-provider";
+import { catalogItemToPurchaseReturnProduct } from "@/lib/inventory/product-catalog-adapter";
 
 type Line = {
   productId: string;
@@ -48,6 +50,7 @@ function productToLine(product: PurchaseReturnProductRow): Line {
 export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }) {
   const t = useTranslations();
   const router = useRouter();
+  const catalog = useProductCatalog();
   const [supplierId, setSupplierId] = useState(options.suppliers[0]?.id ?? "");
   const [warehouseId, setWarehouseId] = useState(options.warehouses[0]?.id ?? "");
   const [search, setSearch] = useState("");
@@ -71,19 +74,18 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
         setResults([]);
         return;
       }
-      searchPurchaseReturnProducts(q, warehouseId)
-        .then((rows) => {
-          if (!cancelled) setResults(rows.filter((row) => !lines.some((line) => line.productId === row.id)));
-        })
-        .catch(() => {
-          if (!cancelled) setResults([]);
-        });
+      const rows = catalog.search(q, {
+        stockManagedOnly: true,
+        excludeIds: new Set(lines.map((line) => line.productId)),
+        limit: 30,
+      }).map((product) => catalogItemToPurchaseReturnProduct(product, warehouseId));
+      if (!cancelled) setResults(rows);
     }, q ? 250 : 0);
     return () => {
       cancelled = true;
       clearTimeout(h);
     };
-  }, [search, warehouseId, lines]);
+  }, [catalog, search, warehouseId, lines]);
 
   const subtotal = lines.reduce((sum, line) => sum + line.quantity * line.returnUnitCost, 0);
   const afterDiscount = Math.max(0, subtotal - discount);
@@ -115,7 +117,8 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
     for (const item of lookups) {
       const query = [item.sku, item.productName, item.text].find((value) => typeof value === "string" && value.trim()) as string | undefined;
       if (!query) continue;
-      const matches = await searchPurchaseReturnProducts(query, warehouseId);
+      const matches = catalog.search(query, { stockManagedOnly: true, limit: 30 })
+        .map((product) => catalogItemToPurchaseReturnProduct(product, warehouseId));
       const product = matches.find((row) => row.sku.toLowerCase() === query.toLowerCase()) ?? matches[0];
       if (!product || seen.has(product.id)) continue;
       seen.add(product.id);
@@ -161,7 +164,10 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
       })),
     });
     setBusy(false);
-    if (res.ok) router.push(`${Routes.Inventory}?tab=purchase-returns&expanded=${res.data.id}`);
+    if (res.ok) {
+      void catalog.refresh();
+      router.push(`${Routes.Inventory}?tab=purchase-returns&expanded=${res.data.id}`);
+    }
     else setError(t(res.error as never));
   }
 

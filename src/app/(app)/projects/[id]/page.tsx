@@ -266,7 +266,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             id="assets"
             title={t("services.fields.assets")}
             description={`${t("services.summary.assets", { count: assets.length })} · ${t("services.assets.afterInstallHint")}`}
-            action={<InstalledAssetQuickCreate projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} products={serviceOptions.productOptions} />}
+            action={<InstalledAssetQuickCreate projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} />}
           >
             {assets.length === 0 ? (
               <Text variant="muted" size="sm" text={t("services.assets.empty")} />
@@ -275,7 +275,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                 <table className="w-full min-w-[760px] text-sm">
                   <thead><tr className="text-left text-xs uppercase text-slate-500"><th className="py-2 pr-3">{t("services.fields.asset")}</th><th className="px-3 py-2">{t("services.fields.serialNumber")}</th><th className="px-3 py-2">{t("services.fields.location")}</th><th className="px-3 py-2">{t("services.fields.macAddress")}</th><th className="px-3 py-2">{t("orders.cols.status")}</th><th className="py-2 pl-3">{t("services.tabs.warranty")}</th><th /></tr></thead>
                   <tbody className="divide-y divide-border-soft">
-                    {assets.map((asset) => <tr key={asset.id}><td className="py-2 pr-3 font-medium">{asset.name}<div className="text-xs font-normal text-slate-500">{[asset.brand, asset.model].filter(Boolean).join(" · ")}</div></td><td className="px-3 py-2 font-mono text-xs">{asset.serialNumber ?? "—"}</td><td className="px-3 py-2">{asset.locationLabel ?? "—"}</td><td className="px-3 py-2 font-mono text-xs">{asset.macAddress ?? "—"}</td><td className="px-3 py-2">{t(`services.assetStatuses.${asset.status}` as never)}</td><td className="py-2 pl-3">{asset.customerWarrantyEndsOn ? formatDate(asset.customerWarrantyEndsOn) : "—"}</td><td className="pl-3 text-right"><InstalledAssetQuickCreate projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} products={serviceOptions.productOptions} initial={asset} /></td></tr>)}
+                    {assets.map((asset) => <tr key={asset.id}><td className="py-2 pr-3 font-medium">{asset.name}<div className="text-xs font-normal text-slate-500">{[asset.brand, asset.model].filter(Boolean).join(" · ")}</div></td><td className="px-3 py-2 font-mono text-xs">{asset.serialNumber ?? "—"}</td><td className="px-3 py-2">{asset.locationLabel ?? "—"}</td><td className="px-3 py-2 font-mono text-xs">{asset.macAddress ?? "—"}</td><td className="px-3 py-2">{t(`services.assetStatuses.${asset.status}` as never)}</td><td className="py-2 pl-3">{asset.customerWarrantyEndsOn ? formatDate(asset.customerWarrantyEndsOn) : "—"}</td><td className="pl-3 text-right"><InstalledAssetQuickCreate projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} initial={asset} /></td></tr>)}
                   </tbody>
                 </table>
               </div>
@@ -328,7 +328,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <Section
             title={t("services.materials.title")}
             description={t("services.materials.summary", { count: materials.length })}
-            action={<ServiceMaterialEditor jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} products={serviceOptions.productOptions} />}
+            action={<ServiceMaterialEditor jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} />}
           >
             {materials.length === 0 ? (
               <Text variant="muted" size="sm" text={t("services.materials.empty")} />
@@ -346,7 +346,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                       <ServiceMaterialStockSync material={material} warehouses={serviceOptions.warehouseOptions} />
                       <ServiceMaterialEditor
                         jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))}
-                        products={serviceOptions.productOptions}
                         initial={material}
                       />
                     </div>

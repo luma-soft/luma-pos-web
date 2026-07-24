@@ -1,14 +1,11 @@
 import { notFound } from "next/navigation";
 import { getOrder } from "@/lib/data/orders";
-import { getProductCatalog } from "@/lib/data/product-catalog";
 import { OrderEditForm } from "./order-edit-form";
 
 export default async function OrderEditPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const order = await getOrder(id).catch(() => null);
   if (!order || (order.status !== "completed" && order.status !== "quote") || order.returns.length > 0) notFound();
-
-  const productOptions = await getProductCatalog();
 
   return (
     <OrderEditForm
@@ -29,7 +26,6 @@ export default async function OrderEditPage({ params }: { params: Promise<{ id: 
           unitPrice: Number(i.unitPrice),
         })),
       }}
-      productOptions={productOptions}
     />
   );
 }

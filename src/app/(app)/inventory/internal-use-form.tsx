@@ -10,12 +10,14 @@ import { SearchableSelect } from "@/components/combobox";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { searchPurchaseProducts } from "@/lib/actions/purchase-search";
 import { createInternalUse } from "@/lib/actions/internal-use";
 import { Routes } from "@/lib/routes";
 import { formatCurrency, cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import type { AiActionPreview } from "@/lib/ai/actions";
+import { useProductCatalog } from "@/components/product-catalog-provider";
+import { catalogItemToPurchaseProduct } from "@/lib/inventory/product-catalog-adapter";
+import type { PurchaseProductRow } from "@/lib/data/inventory";
 
 const APPROVAL_THRESHOLD = 500_000;
 
@@ -40,6 +42,7 @@ export function InternalUseForm() {
   const locale = useLocale();
   const L = locale === "vi";
   const router = useRouter();
+  const catalog = useProductCatalog();
   const [pending, start] = useTransition();
 
   const [department, setDepartment] = useState("");
@@ -47,7 +50,7 @@ export function InternalUseForm() {
   const [note, setNote] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   const [q, setQ] = useState("");
-  const [results, setResults] = useState<Awaited<ReturnType<typeof searchPurchaseProducts>>>([]);
+  const [results, setResults] = useState<PurchaseProductRow[]>([]);
   const [searching, setSearching] = useState(false);
   const [toast, setToast] = useState("");
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
@@ -65,13 +68,14 @@ export function InternalUseForm() {
     if (tRef.current) clearTimeout(tRef.current);
     if (!val.trim()) { setResults([]); return; }
     setSearching(true);
-    tRef.current = setTimeout(async () => {
-      const rows = await searchPurchaseProducts(val);
+    tRef.current = setTimeout(() => {
+      const rows = catalog.search(val, { stockManagedOnly: true, limit: 30 })
+        .map(catalogItemToPurchaseProduct);
       setResults(rows); setSearching(false);
     }, 250);
   }
 
-  function addItem(p: Awaited<ReturnType<typeof searchPurchaseProducts>>[number]) {
+  function addItem(p: PurchaseProductRow) {
     const cost = Number(p.costPrice);
     const units = [{ name: p.baseUnit, mult: 1 }, ...p.units.map((u) => ({ name: u.unitName, mult: Number(u.multiplier) }))];
     setLines((ls) => {
@@ -93,11 +97,12 @@ export function InternalUseForm() {
         : null,
       ...itemRows,
     ].filter((item): item is Record<string, unknown> => Boolean(item));
-    const found: Awaited<ReturnType<typeof searchPurchaseProducts>> = [];
+    const found: PurchaseProductRow[] = [];
     for (const item of lookups) {
       const query = [item.sku, item.productName, item.text].find((value) => typeof value === "string" && value.trim()) as string | undefined;
       if (!query) continue;
-      const rows = await searchPurchaseProducts(query);
+      const rows = catalog.search(query, { stockManagedOnly: true, limit: 30 })
+        .map(catalogItemToPurchaseProduct);
       const product = rows.find((row) => row.sku.toLowerCase() === query.toLowerCase()) ?? rows[0];
       if (product && !found.some((row) => row.id === product.id)) found.push(product);
     }
@@ -146,6 +151,7 @@ export function InternalUseForm() {
         items: lines.map((l) => ({ productId: l.productId, productName: l.productName, unitName: l.unitName, unitMultiplier: l.unitMultiplier, quantity: l.quantity, unitCost: l.unitCost })),
       });
       if (res.ok) {
+        void catalog.refresh();
         setToast(res.data.status === "pending" ? t("internalUse.submittedPending") : t("internalUse.submitted"));
         setLines([]); setNote(""); setReason(""); setDepartment("");
         router.push(`${Routes.Inventory}?tab=internal`);

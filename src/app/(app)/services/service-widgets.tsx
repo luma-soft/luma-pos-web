@@ -51,10 +51,10 @@ import {
   type WarrantyClaimStatus,
 } from "@/lib/services/domain";
 import { ProjectEdit } from "../projects/project-widgets";
+import { useProductCatalog } from "@/components/product-catalog-provider";
 
 type ProjectOption = { id: string; name: string; serviceType: string | null };
 type AssigneeOption = { id: string; name: string };
-type ProductOption = { id: string; name: string; sku: string; brandName: string | null; categoryName: string | null; baseUnit: string };
 type WarrantyJobOption = { id: string; projectId: string; code: string; title: string };
 type WarrantyAssetOption = { id: string; projectId: string; jobId: string | null; name: string; serialNumber: string | null };
 type WarehouseOption = { id: string; name: string; isDefault: boolean };
@@ -413,12 +413,10 @@ export function WarrantyClaimQuickCreate({
 export function InstalledAssetQuickCreate({
   projectId,
   jobs,
-  products,
   initial,
 }: {
   projectId: string;
   jobs: { id: string; code: string; title: string }[];
-  products: ProductOption[];
   initial?: {
     id: string;
     jobId: string | null;
@@ -440,6 +438,7 @@ export function InstalledAssetQuickCreate({
 }) {
   const t = useTranslations();
   const router = useRouter();
+  const { products } = useProductCatalog();
   const [open, setOpen] = useState(false);
   const [jobId, setJobId] = useState(initial?.jobId ?? "");
   const [productId, setProductId] = useState(initial?.productId ?? "");
@@ -696,11 +695,9 @@ export function ServiceJobEdit({
 
 export function ServiceMaterialEditor({
   jobs,
-  products,
   initial,
 }: {
   jobs: { id: string; code: string; title: string }[];
-  products: ProductOption[];
   initial?: {
     jobId: string;
     productId: string;
@@ -712,6 +709,7 @@ export function ServiceMaterialEditor({
 }) {
   const t = useTranslations();
   const router = useRouter();
+  const { products } = useProductCatalog();
   const [open, setOpen] = useState(false);
   const [jobId, setJobId] = useState(initial?.jobId ?? jobs[0]?.id ?? "");
   const [productId, setProductId] = useState(initial?.productId ?? products[0]?.id ?? "");
@@ -721,6 +719,14 @@ export function ServiceMaterialEditor({
   const [note, setNote] = useState(initial?.note ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  function openEditor() {
+    if (!initial && !productId && products[0]) {
+      setProductId(products[0].id);
+      setUnitName(products[0].baseUnit);
+    }
+    setOpen(true);
+  }
 
   async function submit() {
     if (!jobId || !productId || !unitName.trim() || busy) return;
@@ -750,7 +756,7 @@ export function ServiceMaterialEditor({
         variant={initial ? "link" : "outline"}
         size="sm"
         className={initial ? "h-auto px-0 text-xs" : undefined}
-        onClick={() => setOpen(true)}
+        onClick={openEditor}
         disabled={disabled}
       >
         {initial ? t("common.edit") : <><Plus className="h-4 w-4" />{t("services.materials.create")}</>}
