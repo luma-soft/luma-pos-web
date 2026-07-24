@@ -1883,6 +1883,8 @@
       "from": "From",
       "to": "To",
       "apply": "View report",
+      "customTitle": "Choose date range",
+      "customDescription": "The report includes all data from the start date through the end date.",
       "options": {
         "7d": "Last 7 days",
         "30d": "Last 30 days",

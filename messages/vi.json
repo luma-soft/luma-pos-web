@@ -1883,6 +1883,8 @@
       "from": "Từ",
       "to": "Đến",
       "apply": "Xem báo cáo",
+      "customTitle": "Chọn khoảng ngày",
+      "customDescription": "Báo cáo sẽ bao gồm toàn bộ dữ liệu từ ngày bắt đầu đến hết ngày kết thúc.",
       "options": {
         "7d": "7 ngày gần nhất",
         "30d": "30 ngày gần nhất",

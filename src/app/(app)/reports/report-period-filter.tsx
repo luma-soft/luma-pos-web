@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { RowPreviewModal } from "@/components/data-table";
+import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
-import { buttonVariants } from "@/components/ui/button-variants";
-import { cn } from "@/lib/utils";
 
 const PERIODS = [
   "7d",
@@ -33,6 +33,7 @@ export function ReportPeriodFilter({
   const searchParams = useSearchParams();
   const [customFrom, setCustomFrom] = useState(from);
   const [customTo, setCustomTo] = useState(to);
+  const [dateModalOpen, setDateModalOpen] = useState(false);
 
   function navigate(nextPeriod: string, nextFrom?: string, nextTo?: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -49,51 +50,81 @@ export function ReportPeriodFilter({
     router.push(`/reports?${params.toString()}`);
   }
 
+  function selectPeriod(value: string) {
+    if (value === "custom") {
+      setCustomFrom(from);
+      setCustomTo(to);
+      setDateModalOpen(true);
+      return;
+    }
+    navigate(value);
+  }
+
+  function applyCustomPeriod() {
+    if (!customFrom || !customTo || customFrom > customTo) return;
+    setDateModalOpen(false);
+    navigate("custom", customFrom, customTo);
+  }
+
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
+    <>
       <Select
         value={period}
         aria-label={t("reports.period.label")}
-        className="min-w-40"
+        className="h-9 min-w-40"
         options={PERIODS.map((value) => ({
           value,
           label: t(`reports.period.options.${value}` as never),
         }))}
-        onValueChange={(value) => navigate(value, customFrom, customTo)}
+        onValueChange={selectPeriod}
       />
 
-      {period === "custom" && (
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
-            <span>{t("reports.period.from")}</span>
+      <RowPreviewModal
+        open={dateModalOpen}
+        onClose={() => setDateModalOpen(false)}
+        title={t("reports.period.customTitle")}
+        subtitle={t("reports.period.customDescription")}
+        size="md"
+        closeLabel={t("common.close")}
+        footer={(
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setDateModalOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={!customFrom || !customTo || customFrom > customTo}
+              onClick={applyCustomPeriod}
+            >
+              {t("reports.period.apply")}
+            </Button>
+          </div>
+        )}
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="space-y-1.5 text-sm font-medium text-slate-600 dark:text-slate-300">
+            <span className="block">{t("reports.period.from")}</span>
             <input
               type="date"
               value={customFrom}
               max={customTo}
               onChange={(event) => setCustomFrom(event.target.value)}
-              className="h-10 rounded-lg border border-border bg-surface px-2.5 text-sm text-slate-900 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:text-slate-100"
+              className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-slate-900 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:text-slate-100"
             />
           </label>
-          <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
-            <span>{t("reports.period.to")}</span>
+          <label className="space-y-1.5 text-sm font-medium text-slate-600 dark:text-slate-300">
+            <span className="block">{t("reports.period.to")}</span>
             <input
               type="date"
               value={customTo}
               min={customFrom}
               onChange={(event) => setCustomTo(event.target.value)}
-              className="h-10 rounded-lg border border-border bg-surface px-2.5 text-sm text-slate-900 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:text-slate-100"
+              className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-slate-900 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:text-slate-100"
             />
           </label>
-          <button
-            type="button"
-            disabled={!customFrom || !customTo || customFrom > customTo}
-            onClick={() => navigate("custom", customFrom, customTo)}
-            className={cn(buttonVariants({ size: "sm" }), "h-10")}
-          >
-            {t("reports.period.apply")}
-          </button>
         </div>
-      )}
-    </div>
+      </RowPreviewModal>
+    </>
   );
 }
