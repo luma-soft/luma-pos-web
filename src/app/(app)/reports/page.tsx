@@ -1,10 +1,12 @@
-import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Routes } from "@/lib/routes";
-import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
-import { getReports } from "@/lib/data/reports";
+import { cn, formatCurrency, formatNumber } from "@/lib/utils";
+import { getReportInvoices, getReports } from "@/lib/data/reports";
+import { parsePageSize } from "@/lib/pagination";
+import { Pagination } from "@/components/pagination";
 import { GroupTabs } from "@/components/group-tabs";
 import { Text } from "@/components/ui/text";
+import { ReportInvoicesTable } from "./report-invoices-table";
 import { ReportPeriodFilter, type ReportPeriod } from "./report-period-filter";
 
 interface PageProps {
@@ -18,12 +20,15 @@ interface PageProps {
     customer?: string;
     q?: string;
     source?: string;
+    page?: string;
+    size?: string;
   }>;
 }
 
 const REPORT_PERIODS: readonly ReportPeriod[] = ["7d", "30d", "90d", "this_month", "last_month", "this_year", "custom"];
 const REPORT_TABS = [
   { tab: "overview", labelKey: "reports.overview" },
+  { tab: "invoices", labelKey: "reports.invoices" },
   { tab: "products", labelKey: "reports.products" },
   { tab: "customers", labelKey: "reports.customers" },
   { tab: "employees", labelKey: "reports.employees" },
@@ -34,6 +39,8 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   const t = await getTranslations();
   const params = await searchParams;
   const activeTab = REPORT_TABS.find((item) => item.tab === params.tab)?.tab ?? "overview";
+  const page = Math.max(1, Number(params.page) || 1);
+  const pageSize = parsePageSize(params.size);
   const legacyPeriod = ["7", "30", "90"].includes(params.range ?? "") ? `${params.range}d` : undefined;
   const requestedPeriod = params.period ?? legacyPeriod;
   const period = REPORT_PERIODS.includes(requestedPeriod as ReportPeriod) ? requestedPeriod as ReportPeriod : "30d";
@@ -45,7 +52,12 @@ export default async function ReportsPage({ searchParams }: PageProps) {
     from: dateRange.from,
     to: dateRange.toExclusive,
   };
-  const data = await getReports(dateRange.rangeDays, filters);
+  const [data, invoiceResult] = await Promise.all([
+    getReports(dateRange.rangeDays, filters),
+    activeTab === "invoices"
+      ? getReportInvoices(dateRange.rangeDays, filters, page, pageSize)
+      : Promise.resolve(null),
+  ]);
   const filterLabel = filters.customer || filters.q || (filters.customerId ? `ID ${filters.customerId.slice(0, 8)}` : "");
 
   const maxDay = Math.max(1, ...data.byDay.map((d) => Math.abs(Number(d.revenue))));
@@ -97,49 +109,6 @@ export default async function ReportsPage({ searchParams }: PageProps) {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-card border border-border bg-surface">
-            <div className="border-b border-border px-4 py-3 text-sm font-semibold">{t("reports.invoiceList")}</div>
-            {data.invoices.length === 0 ? (
-              <Text as="p" variant="muted" className="py-8 text-center" text={t("dashboard.noData")} />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[860px] text-sm">
-                  <thead>
-                    <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
-                      <th className="px-4 py-2.5 font-semibold">{t("orders.cols.code")}</th>
-                      <th className="px-4 py-2.5 font-semibold">{t("orders.cols.date")}</th>
-                      <th className="px-4 py-2.5 font-semibold">{t("orders.cols.customer")}</th>
-                      <th className="px-4 py-2.5 text-right font-semibold">{t("orders.cols.total")}</th>
-                      <th className="px-4 py-2.5 text-right font-semibold">{t("reports.collected")}</th>
-                      <th className="px-4 py-2.5 text-right font-semibold">{t("reports.profit")}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-soft">
-                    {data.invoices.map((invoice) => {
-                      const profit = Number(invoice.profit);
-                      return (
-                        <tr key={invoice.id}>
-                          <td className="px-4 py-2.5">
-                            <Link href={Routes.salesOrder(invoice.id, invoice.status)} className="font-semibold text-primary-600 hover:underline">
-                              {invoice.code}
-                            </Link>
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-2.5 text-slate-500">{formatDate(invoice.createdAt)}</td>
-                          <td className="px-4 py-2.5 font-medium">{invoice.customerName}</td>
-                          <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatCurrency(Number(invoice.total))}</td>
-                          <td className="px-4 py-2.5 text-right tabular-nums text-ok">{formatCurrency(Number(invoice.amountPaid))}</td>
-                          <td className={cn("px-4 py-2.5 text-right tabular-nums font-semibold", profit >= 0 ? "text-ok" : "text-er")}>
-                            {formatCurrency(profit)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
           <div className="bg-surface rounded-card border border-border p-5">
             <Text as="h2" weight="semibold" className="mb-4" text={t("dashboard.revenueByDay")} />
             {data.byDay.length === 0 ? (
@@ -162,6 +131,19 @@ export default async function ReportsPage({ searchParams }: PageProps) {
             )}
           </div>
         </div>
+      )}
+
+      {activeTab === "invoices" && invoiceResult && (
+        <>
+          <ReportInvoicesTable rows={invoiceResult.rows} />
+          <Pagination
+            page={invoiceResult.page}
+            pageCount={invoiceResult.pageCount}
+            total={invoiceResult.total}
+            pageSize={invoiceResult.pageSize}
+            unitLabel={t("orders.unitLabel")}
+          />
+        </>
       )}
 
       {activeTab === "products" && (

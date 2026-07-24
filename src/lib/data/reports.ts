@@ -27,15 +27,7 @@ export type ReportFilters = {
   to?: Date;
 };
 
-export async function getReports(rangeDays = 30, filters: ReportFilters = {}) {
-  return getReportsForDatabase(db, rangeDays, filters);
-}
-
-export async function getReportsForDatabase(
-  database: typeof db,
-  rangeDays = 30,
-  filters: ReportFilters = {},
-) {
+function reportConditions(rangeDays: number, filters: ReportFilters) {
   const since = filters.from ?? daysAgo(rangeDays - 1);
   const orderDateFilter = filters.to
     ? and(gte(orders.createdAt, since), lt(orders.createdAt, filters.to))
@@ -43,7 +35,6 @@ export async function getReportsForDatabase(
   const returnDateFilter = filters.to
     ? and(gte(returns.createdAt, since), lt(returns.createdAt, filters.to))
     : gte(returns.createdAt, since);
-  // chỉ đơn bán thật: loại quote/merged/cancelled/draft
   const notCancelled = inArray(orders.status, ["completed", "returned"]);
   const customerTerm = filters.customer?.trim() || filters.q?.trim() || "";
   const customerFilter = filters.customerId
@@ -63,6 +54,67 @@ export async function getReportsForDatabase(
     ? and(returnDateFilter, returnCustomerFilter)
     : returnDateFilter;
 
+  return { where, returnWhere };
+}
+
+export async function getReports(rangeDays = 30, filters: ReportFilters = {}) {
+  return getReportsForDatabase(db, rangeDays, filters);
+}
+
+export async function getReportInvoices(
+  rangeDays = 30,
+  filters: ReportFilters = {},
+  page = 1,
+  pageSize = 15,
+) {
+  const safePage = Math.max(1, Math.floor(page));
+  const safePageSize = Math.max(1, Math.floor(pageSize));
+  const { where } = reportConditions(rangeDays, filters);
+  const [rows, [countRow]] = await Promise.all([
+    db.select({
+      id: orders.id,
+      code: orders.code,
+      status: orders.status,
+      createdAt: orders.createdAt,
+      customerName: sql<string>`coalesce(${customers.name}, 'Khách lẻ')`,
+      total: orders.total,
+      amountPaid: orders.amountPaid,
+      profit: sql<string>`coalesce(sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})), 0)`,
+    })
+      .from(orders)
+      .leftJoin(orderItems, eq(orderItems.orderId, orders.id))
+      .leftJoin(products, eq(orderItems.productId, products.id))
+      .leftJoin(customers, eq(orders.customerId, customers.id))
+      .where(where)
+      .groupBy(orders.id, customers.name)
+      .orderBy(desc(orders.createdAt))
+      .limit(safePageSize)
+      .offset((safePage - 1) * safePageSize),
+    db.select({ total: sql<number>`count(*)::int` })
+      .from(orders)
+      .leftJoin(customers, eq(orders.customerId, customers.id))
+      .where(where),
+  ]);
+  const total = countRow?.total ?? 0;
+  return {
+    rows,
+    total,
+    page: safePage,
+    pageSize: safePageSize,
+    pageCount: Math.max(1, Math.ceil(total / safePageSize)),
+  };
+}
+
+export type ReportInvoiceRow = Awaited<ReturnType<typeof getReportInvoices>>["rows"][number];
+
+export async function getReportsForDatabase(
+  database: typeof db,
+  rangeDays = 30,
+  filters: ReportFilters = {},
+) {
+  // chỉ đơn bán thật: loại quote/merged/cancelled/draft
+  const { where, returnWhere } = reportConditions(rangeDays, filters);
+
   const [
     summaryRows,
     profitRows,
@@ -70,7 +122,6 @@ export async function getReportsForDatabase(
     returnedProfitRows,
     grossByDay,
     refundsByDay,
-    invoices,
     topProducts,
     byCategory,
     byCustomer,
@@ -128,25 +179,6 @@ export async function getReportsForDatabase(
       .where(returnWhere)
       .groupBy(sql`to_char(${returns.createdAt}, 'YYYY-MM-DD')`)
       .orderBy(sql`to_char(${returns.createdAt}, 'YYYY-MM-DD')`),
-
-    database.select({
-      id: orders.id,
-      code: orders.code,
-      status: orders.status,
-      createdAt: orders.createdAt,
-      customerName: sql<string>`coalesce(${customers.name}, 'Khách lẻ')`,
-      total: orders.total,
-      amountPaid: orders.amountPaid,
-      profit: sql<string>`coalesce(sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})), 0)`,
-    })
-      .from(orders)
-      .leftJoin(orderItems, eq(orderItems.orderId, orders.id))
-      .leftJoin(products, eq(orderItems.productId, products.id))
-      .leftJoin(customers, eq(orders.customerId, customers.id))
-      .where(where)
-      .groupBy(orders.id, customers.name)
-      .orderBy(desc(orders.createdAt))
-      .limit(100),
 
     database.select({
       productId: orderItems.productId,
@@ -252,7 +284,6 @@ export async function getReportsForDatabase(
     },
     generatedAt: new Date().toISOString(),
     byDay,
-    invoices,
     topProducts,
     byCategory,
     byCustomer,

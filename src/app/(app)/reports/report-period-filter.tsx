@@ -37,6 +37,7 @@ export function ReportPeriodFilter({
   function navigate(nextPeriod: string, nextFrom?: string, nextTo?: string) {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("range");
+    params.delete("page");
     params.set("period", nextPeriod);
     if (nextPeriod === "custom" && nextFrom && nextTo) {
       params.set("from", nextFrom);

@@ -1902,6 +1902,7 @@
     "orders": "Orders",
     "avgOrder": "Avg {avg}/order",
     "overview": "Overview",
+    "invoices": "Invoices",
     "products": "Products",
     "customers": "Customers",
     "employees": "Employees",
