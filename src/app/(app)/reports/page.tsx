@@ -4,18 +4,26 @@ import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import { getReports, getServiceProfitabilityReport } from "@/lib/data/reports";
 import { buttonVariants } from "@/components/ui/button-variants";
+import { GroupTabs } from "@/components/group-tabs";
 import { Text } from "@/components/ui/text";
-import { ReportBreakdownTabs } from "./report-breakdown-tabs";
 
 interface PageProps {
-  searchParams: Promise<{ range?: string; customerId?: string; customer?: string; q?: string; source?: string }>;
+  searchParams: Promise<{ tab?: string; range?: string; customerId?: string; customer?: string; q?: string; source?: string }>;
 }
 
 const RANGES = [7, 30, 90] as const;
+const REPORT_TABS = [
+  { tab: "overview", labelKey: "reports.overview" },
+  { tab: "products", labelKey: "reports.products" },
+  { tab: "customers", labelKey: "reports.customers" },
+  { tab: "employees", labelKey: "reports.employees" },
+];
+const REPORT_FILTER_PARAMS = ["range", "customerId", "customer", "q", "source"] as const;
 
 export default async function ReportsPage({ searchParams }: PageProps) {
   const t = await getTranslations();
   const params = await searchParams;
+  const activeTab = REPORT_TABS.find((item) => item.tab === params.tab)?.tab ?? "overview";
   const range = RANGES.includes(Number(params.range) as 7) ? Number(params.range) : 30;
   const filters = {
     customerId: typeof params.customerId === "string" ? params.customerId : undefined,
@@ -28,47 +36,46 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   if (filters.customer) filterParams.set("customer", filters.customer);
   if (filters.q) filterParams.set("q", filters.q);
   if (params.source) filterParams.set("source", params.source);
+  if (activeTab !== "overview") filterParams.set("tab", activeTab);
   const filterQuery = filterParams.toString();
   const filterLabel = filters.customer || filters.q || (filters.customerId ? `ID ${filters.customerId.slice(0, 8)}` : "");
 
   const maxDay = Math.max(1, ...data.byDay.map((d) => Math.abs(Number(d.revenue))));
   const totalCatRevenue = Math.max(1, data.byCategory.reduce((s, c) => s + Number(c.revenue), 0));
   const uncollected = data.summary.revenue - data.summary.collected;
-  const breakdownTabs = [
-    { id: "overview", label: t("reports.overview") },
-    { id: "products", label: t("reports.topProducts") },
-    { id: "categories", label: t("reports.byCategory") },
-    { id: "customers", label: t("reports.topCustomers") },
-    { id: "employees", label: t("reports.byEmployee") },
-  ] as const;
-
   return (
-    <div className="p-4 sm:p-6 space-y-5">
-      <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-5 min-h-[58px] px-4 sm:px-6 py-2.5 bg-surface border-b border-border flex items-center justify-between gap-3 flex-wrap">
-        <Text as="h1" weight="bold" className="text-[17px]" text={t("reports.title")} />
-        <div className="flex w-full sm:w-auto gap-1.5 overflow-x-auto">
-          {RANGES.map((r) => (
-            <Link
-              key={r}
-              href={`${Routes.Reports}?range=${r}${filterQuery ? `&${filterQuery}` : ""}`}
-              className={cn(
-                buttonVariants({ variant: range === r ? "default" : "outline", size: "sm" }),
-                "h-9 flex-1 sm:flex-none whitespace-nowrap"
-              )}
-            >
-              {t("reports.lastNDays", { n: r })}
-            </Link>
-          ))}
+    <div className="p-4 sm:p-6">
+      <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-5 bg-surface border-b border-border">
+        <div className="min-h-[52px] px-4 sm:px-6 pt-2.5 flex items-center">
+          <Text as="h1" weight="bold" className="text-[17px]" text={t("reports.title")} />
+        </div>
+        <div className="px-4 sm:px-6 pb-1.5">
+          <GroupTabs base={Routes.Reports} items={REPORT_TABS} preserveParams={REPORT_FILTER_PARAMS} />
         </div>
       </div>
 
+      <div className="mb-5 flex w-full justify-end gap-1.5 overflow-x-auto">
+        {RANGES.map((r) => (
+          <Link
+            key={r}
+            href={`${Routes.Reports}?range=${r}${filterQuery ? `&${filterQuery}` : ""}`}
+            className={cn(
+              buttonVariants({ variant: range === r ? "default" : "outline", size: "sm" }),
+              "h-9 flex-1 whitespace-nowrap sm:flex-none"
+            )}
+          >
+            {t("reports.lastNDays", { n: r })}
+          </Link>
+        ))}
+      </div>
+
       {filterLabel && (
-        <div className="rounded-card border border-primary-200 bg-primary-50 px-4 py-3 text-sm font-semibold text-primary-700">
+        <div className="mb-5 rounded-card border border-primary-200 bg-primary-50 px-4 py-3 text-sm font-semibold text-primary-700">
           Báo cáo đang lọc theo khách: {filterLabel}
         </div>
       )}
 
-      <ReportBreakdownTabs tabs={breakdownTabs} ariaLabel={t("reports.title")}>
+      {activeTab === "overview" && (
         <div className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-surface rounded-card border border-border p-5">
@@ -131,8 +138,11 @@ export default async function ReportsPage({ searchParams }: PageProps) {
             )}
           </div>
         </div>
+      )}
 
-        <div className="overflow-hidden rounded-card border border-border bg-surface">
+      {activeTab === "products" && (
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+          <div className="overflow-hidden rounded-card border border-border bg-surface">
           {data.topProducts.length === 0 ? (
             <Text as="p" variant="muted" className="py-8 text-center" text={t("dashboard.noData")} />
           ) : (
@@ -164,9 +174,10 @@ export default async function ReportsPage({ searchParams }: PageProps) {
             </table>
             </div>
           )}
-        </div>
+          </div>
 
-        <div className="rounded-card border border-border bg-surface p-5">
+          <div className="self-start rounded-card border border-border bg-surface p-5">
+            <Text as="h2" weight="semibold" className="mb-4" text={t("reports.byCategory")} />
           {data.byCategory.length === 0 ? (
             <Text as="p" variant="muted" className="py-8 text-center" text={t("dashboard.noData")} />
           ) : (
@@ -188,8 +199,11 @@ export default async function ReportsPage({ searchParams }: PageProps) {
               })}
             </div>
           )}
+          </div>
         </div>
+      )}
 
+      {activeTab === "customers" && (
         <div className="overflow-hidden rounded-card border border-border bg-surface">
           {data.byCustomer.length === 0 ? (
             <Text as="p" variant="muted" className="py-8 text-center" text={t("dashboard.noData")} />
@@ -228,7 +242,9 @@ export default async function ReportsPage({ searchParams }: PageProps) {
             </div>
           )}
         </div>
+      )}
 
+      {activeTab === "employees" && (
         <div className="overflow-hidden rounded-card border border-border bg-surface">
           {data.byEmployee.length === 0 ? (
             <Text as="p" variant="muted" className="py-8 text-center" text={t("dashboard.noData")} />
@@ -257,7 +273,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
             </div>
           )}
         </div>
-      </ReportBreakdownTabs>
+      )}
     </div>
   );
 }

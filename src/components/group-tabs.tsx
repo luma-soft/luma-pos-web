@@ -13,10 +13,29 @@ export interface GroupTab {
 }
 
 /** Thanh tab cho trang gộp (Bán hàng/Kho hàng/Đối tác/Tài chính) — đổi tab qua ?tab=. */
-export function GroupTabs({ base, items }: { base: string; items: GroupTab[] }) {
+export function GroupTabs({
+  base,
+  items,
+  preserveParams = [],
+}: {
+  base: string;
+  items: GroupTab[];
+  preserveParams?: readonly string[];
+}) {
   const t = useTranslations();
   const sp = useSearchParams();
-  const active = sp.get("tab") ?? items[0]?.tab;
+  const requestedTab = sp.get("tab");
+  const active = items.some((item) => item.tab === requestedTab) ? requestedTab : items[0]?.tab;
+
+  function tabHref(tab: string) {
+    const nextParams = new URLSearchParams();
+    nextParams.set("tab", tab);
+    for (const key of preserveParams) {
+      const value = sp.get(key);
+      if (value) nextParams.set(key, value);
+    }
+    return `${base}?${nextParams.toString()}`;
+  }
 
   return (
     <div className="flex items-center gap-1 overflow-x-auto -mx-4 px-4 sm:-mx-6 sm:px-6 [&::-webkit-scrollbar]:h-0">
@@ -25,7 +44,7 @@ export function GroupTabs({ base, items }: { base: string; items: GroupTab[] }) 
         return (
           <Link
             key={it.tab}
-            href={`${base}?tab=${it.tab}`}
+            href={tabHref(it.tab)}
             className={cn(
               "shrink-0 inline-flex items-center gap-2 px-3.5 h-9 rounded-[10px] text-xs font-semibold transition-colors",
               on ? "bg-primary-50 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300" : "text-slate-500 hover:bg-surface-2 hover:text-slate-900 dark:hover:text-slate-200"
