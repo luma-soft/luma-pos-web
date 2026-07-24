@@ -1,12 +1,13 @@
 import { and, asc, count, desc, eq, gte, inArray, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  internalUseIssues, products, profiles, purchaseOrderItems, purchaseOrders, stockMovements, suppliers, warehouses,
+  categories, internalUseIssues, products, profiles, purchaseOrderItems, purchaseOrders, stockMovements, suppliers, warehouses,
 } from "@/db/schema";
 import { unstable_cache } from "next/cache";
 import { accentInsensitiveLike } from "@/lib/search";
 import { coercePageSize } from "@/lib/pagination";
 import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
+import { stockManagedCategoryCondition } from "@/lib/data/product-stock";
 
 export const INVENTORY_PAGE_SIZE = 30;
 
@@ -25,7 +26,8 @@ const getInventoryStats = unstable_cache(
         lowCount: sql<number>`count(*) filter (where ${products.totalStock} <= ${products.minStock} and ${products.minStock} > 0)`,
       })
       .from(products)
-      .where(eq(products.isActive, true));
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .where(and(eq(products.isActive, true), stockManagedCategoryCondition()));
     return { totalValue: Number(agg.totalValue), lowCount: Number(agg.lowCount) };
   },
   ["inventory-stats"],
@@ -36,7 +38,10 @@ export async function getInventory(filters: { q?: string; low?: boolean; stock?:
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize, INVENTORY_PAGE_SIZE);
   const hasComplianceColumns = await hasProductComplianceColumns();
-  const conditions: SQL[] = [eq(products.isActive, true)];
+  const conditions: SQL[] = [
+    eq(products.isActive, true),
+    stockManagedCategoryCondition(),
+  ];
   if (filters.q?.trim()) {
     const q = filters.q.trim();
     const c = or(accentInsensitiveLike(products.name, q), accentInsensitiveLike(products.sku, q));
@@ -70,11 +75,16 @@ export async function getInventory(filters: { q?: string; low?: boolean; stock?:
         ), '[]')`,
       })
       .from(products)
+      .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(where)
       .orderBy(asc(products.name))
       .limit(size)
       .offset((page - 1) * size),
-    db.select({ n: count() }).from(products).where(where),
+    db
+      .select({ n: count() })
+      .from(products)
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .where(where),
   ]);
 
   const { totalValue, lowCount } = await getInventoryStats();
@@ -104,8 +114,10 @@ export const getRecentMovements = unstable_cache(
     })
     .from(stockMovements)
     .innerJoin(products, eq(stockMovements.productId, products.id))
+    .leftJoin(categories, eq(products.categoryId, categories.id))
     .innerJoin(warehouses, eq(stockMovements.warehouseId, warehouses.id))
     .leftJoin(profiles, eq(stockMovements.createdBy, profiles.id))
+    .where(stockManagedCategoryCondition())
     .orderBy(desc(stockMovements.createdAt))
     .limit(limit),
   ["recent-movements"],

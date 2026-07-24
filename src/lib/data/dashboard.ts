@@ -15,6 +15,7 @@ import {
   calculateDashboardFinancials,
   mergeNetRevenueByDay,
 } from "@/lib/dashboard/financials";
+import { stockManagedCategoryCondition } from "@/lib/data/product-stock";
 
 export type DashboardRange = "today" | "7d" | "30d" | "month";
 
@@ -86,7 +87,8 @@ export async function getDashboard(range: DashboardRange = "7d") {
     db.select({ id: products.id })
       .from(products)
       .leftJoin(stockLevels, eq(stockLevels.productId, products.id))
-      .where(eq(products.isActive, true))
+      .leftJoin(categories, eq(products.categoryId, categories.id))
+      .where(and(eq(products.isActive, true), stockManagedCategoryCondition()))
       .groupBy(products.id)
       .having(sql`coalesce(sum(${stockLevels.quantity}), 0) <= coalesce(max(${stockLevels.minLevel}), 0) and coalesce(max(${stockLevels.minLevel}), 0) > 0`),
 
@@ -105,7 +107,7 @@ export async function getDashboard(range: DashboardRange = "7d") {
       .from(products)
       .leftJoin(stockLevels, eq(stockLevels.productId, products.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
-      .where(eq(products.isActive, true))
+      .where(and(eq(products.isActive, true), stockManagedCategoryCondition()))
       .groupBy(products.id, categories.name)
       .having(sql`coalesce(sum(${stockLevels.quantity}), 0) <= coalesce(max(${stockLevels.minLevel}), 0) and coalesce(max(${stockLevels.minLevel}), 0) > 0`)
       .orderBy(sql`coalesce(sum(${stockLevels.quantity}), 0) / nullif(coalesce(max(${stockLevels.minLevel}), 0), 0)`)

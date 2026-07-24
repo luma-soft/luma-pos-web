@@ -29,6 +29,7 @@ import { applyPromo } from "@/lib/promo";
 import { categoryEmoji } from "@/lib/category-emoji";
 import { Routes } from "@/lib/routes";
 import type { PosData, PosProduct, PosUnit } from "@/lib/data/pos";
+import { isProductStockManaged } from "@/lib/product-stock";
 
 type CartLine = {
   key: string;
@@ -1453,7 +1454,8 @@ export function PosClient({
         {cart.map((l, idx) => {
           const m2 = l.product.m2PerUnit ? Number(l.product.m2PerUnit) * l.unitMultiplier * l.quantity : 0;
           const eff = effPrice(l);
-          const outOfStock = Number(l.product.stock) <= 0;
+          const stockManaged = isProductStockManaged(l.product.categoryName);
+          const outOfStock = stockManaged && Number(l.product.stock) <= 0;
           return (
             <div
               key={l.key}
@@ -1563,7 +1565,9 @@ export function PosClient({
                       / {formatNumber(l.returnSoldQuantity)}
                     </div>
                   )}
-                  <StockQuantityTooltip stock={Number(l.product.stock)} ordered={l.quantity * l.unitMultiplier} unit={l.product.baseUnit} />
+                  {stockManaged && (
+                    <StockQuantityTooltip stock={Number(l.product.stock)} ordered={l.quantity * l.unitMultiplier} unit={l.product.baseUnit} />
+                  )}
                 </div>
                 <button
                   disabled={isCameraQuoteDraft}
@@ -1754,6 +1758,8 @@ export function PosClient({
                   <div className="py-1">
                     {filtered.slice(0, 60).map((p) => {
                       const stock = Number(p.stock);
+                      const stockManaged = isProductStockManaged(p.categoryName);
+                      const outOfStock = stockManaged && stock <= 0;
                       const line = cart.find((l) => l.product.id === p.id);
                       const children = productChildren(p);
                       return (
@@ -1768,9 +1774,13 @@ export function PosClient({
                           <div className="w-9 h-9 rounded-md bg-surface-2 grid place-items-center text-lg shrink-0">{categoryEmoji(p.categoryName)}</div>
                           <div className="min-w-0 flex-1">
                             <div className="text-sm font-medium whitespace-normal break-words">{p.name}</div>
-                            <div className={cn("text-xs", stock <= 0 ? "text-er" : "text-slate-400")}>
-                              {p.isVariantParent ? `${children.length} SKU con` : `${t("pos.stockLabel")} ${formatNumber(stock)} ${p.baseUnit}`}
-                            </div>
+                            {p.isVariantParent ? (
+                              <div className="text-xs text-slate-400">{children.length} SKU con</div>
+                            ) : stockManaged ? (
+                              <div className={cn("text-xs", outOfStock ? "text-er" : "text-slate-400")}>
+                                {t("pos.stockLabel")} {formatNumber(stock)} {p.baseUnit}
+                              </div>
+                            ) : null}
                           </div>
                           <div className="flex items-center justify-end gap-2 w-auto sm:w-64 shrink-0">
                             {line && (
@@ -1779,7 +1789,7 @@ export function PosClient({
                                   onClick={() => updateQty(line.key, -1)}
                                   className={cn(
                                     "w-8 h-8 rounded border border-border grid place-items-center",
-                                    stock <= 0 && "border-er text-er"
+                                    outOfStock && "border-er text-er"
                                   )}
                                 >
                                   <Minus className="w-3.5 h-3.5" />
@@ -1790,19 +1800,21 @@ export function PosClient({
                                   onChange={(e) => setQty(line.key, Number(e.target.value))}
                                   className={cn(
                                     "no-spinner w-12 px-1 py-1 text-center text-sm rounded border border-border bg-surface",
-                                    stock <= 0 && "border-er text-er"
+                                    outOfStock && "border-er text-er"
                                   )}
                                 />
                                 <button
                                   onClick={() => updateQty(line.key, 1)}
                                   className={cn(
                                     "w-8 h-8 rounded border border-border grid place-items-center",
-                                    stock <= 0 && "border-er text-er"
+                                    outOfStock && "border-er text-er"
                                   )}
                                 >
                                   <Plus className="w-3.5 h-3.5" />
                                 </button>
-                                <StockQuantityTooltip stock={stock} ordered={line.quantity * line.unitMultiplier} unit={p.baseUnit} />
+                                {stockManaged && (
+                                  <StockQuantityTooltip stock={stock} ordered={line.quantity * line.unitMultiplier} unit={p.baseUnit} />
+                                )}
                               </div>
                             )}
                             <div className="text-sm font-semibold text-primary-600 tabular-nums text-right w-24 sm:w-32">
@@ -2359,6 +2371,7 @@ function VariantPickerModal({
             <div className="grid gap-2">
               {children.map((child) => {
                 const stock = Number(child.stock);
+                const stockManaged = isProductStockManaged(child.categoryName);
                 return (
                   <button
                     key={child.id}
@@ -2372,7 +2385,9 @@ function VariantPickerModal({
                     </span>
                     <span className="shrink-0 text-right">
                       <span className="block text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(basePriceFor(child, priceBook))}</span>
-                      <span className={cn("block text-xs", stock <= 0 ? "text-er" : "text-slate-500")}>{formatNumber(stock)} {child.baseUnit}</span>
+                      {stockManaged && (
+                        <span className={cn("block text-xs", stock <= 0 ? "text-er" : "text-slate-500")}>{formatNumber(stock)} {child.baseUnit}</span>
+                      )}
                     </span>
                   </button>
                 );

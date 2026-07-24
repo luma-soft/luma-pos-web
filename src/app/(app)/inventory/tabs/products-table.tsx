@@ -28,7 +28,7 @@ import type { ProductListResult } from "@/lib/data/products";
 import {
   isProductStockManaged,
   productStockDisplay,
-} from "./product-stock-display";
+} from "@/lib/product-stock";
 
 type ProductRow = ProductListResult["rows"][number];
 type StockMovementRow = ProductRow["stockMovements"][number];

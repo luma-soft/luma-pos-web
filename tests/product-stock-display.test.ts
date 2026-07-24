@@ -1,13 +1,27 @@
 import { describe, expect, test } from "bun:test";
-import { productStockDisplay } from "../src/app/(app)/inventory/tabs/product-stock-display";
+import {
+  isProductStockManaged,
+  productStockDisplay,
+  productStockQuantityDisplay,
+} from "../src/lib/product-stock";
 
 describe("product stock display", () => {
+  test("recognizes untracked service categories regardless of casing or whitespace", () => {
+    expect(isProductStockManaged("  DỊCH VỤ ")).toBe(false);
+    expect(isProductStockManaged("Camera giám sát")).toBe(true);
+    expect(isProductStockManaged(null)).toBe(true);
+  });
+
   test("does not present service units as physical inventory", () => {
+    const service = {
+      categoryName: "Dịch Vụ",
+      totalStock: -4,
+      baseUnit: "điểm",
+    };
+
+    expect(productStockQuantityDisplay(service)).toBeNull();
     expect(
-      productStockDisplay(
-        { categoryName: "Dịch Vụ", totalStock: 0, baseUnit: "điểm" },
-        "Không quản lý tồn",
-      ),
+      productStockDisplay(service, "Không quản lý tồn"),
     ).toBe("Không quản lý tồn");
   });
 

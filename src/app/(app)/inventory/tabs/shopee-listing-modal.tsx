@@ -14,6 +14,7 @@ import { MoneyInput } from "@/components/ui/money-input";
 import { Select } from "@/components/ui/select";
 import { categoryEmoji } from "@/lib/category-emoji";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
+import { isProductStockManaged } from "@/lib/product-stock";
 
 type FormState = {
   title: string;
@@ -185,7 +186,9 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
                   <Info label="SKU" value={product.sku} />
                   <Info label={L ? "Giá nhập" : "Cost price"} value={formatCurrency(Number(product.costPrice))} />
                   <Info label={L ? "Giá Luma" : "Luma price"} value={formatCurrency(Number(product.retailPrice))} />
-                  <Info label={L ? "Tồn" : "Stock"} value={`${formatNumber(Number(product.totalStock))} ${product.baseUnit}`} />
+                  {isProductStockManaged(product.categoryName) && (
+                    <Info label={L ? "Tồn" : "Stock"} value={`${formatNumber(Number(product.totalStock))} ${product.baseUnit}`} />
+                  )}
                   <Info label={L ? "Danh mục" : "Category"} value={product.categoryName ?? "—"} />
                   <Info label={L ? "Biến thể" : "Variants"} value={String(product.children.length)} />
                 </>
@@ -257,7 +260,9 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
                     <div key={child.id} className="grid grid-cols-[1fr_auto_auto] gap-3 rounded-lg bg-canvas px-3 py-2 text-sm">
                       <span className="truncate font-medium">{child.variantName || child.name}</span>
                       <span className="tabular-nums">{formatCurrency(Number(child.retailPrice))}</span>
-                      <span className="tabular-nums text-slate-500">{formatNumber(Number(child.totalStock))}</span>
+                      {isProductStockManaged(product.categoryName) && (
+                        <span className="tabular-nums text-slate-500">{formatNumber(Number(child.totalStock))}</span>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1045,8 +1050,12 @@ function ProductSearchInListing({
                   <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-lg">{categoryEmoji(product.categoryName)}</div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold">{product.name}</div>
-                    <div className={cn("text-xs", Number(product.stock) <= 0 ? "text-er" : "text-slate-400")}>
-                      {product.isVariantParent ? `${product.children.length} SKU con` : `${product.sku} · ${L ? "Tồn" : "Stock"} ${formatNumber(Number(product.stock))} ${product.baseUnit}`}
+                    <div className={cn("text-xs", isProductStockManaged(product.categoryName) && Number(product.stock) <= 0 ? "text-er" : "text-slate-400")}>
+                      {product.isVariantParent
+                        ? `${product.children.length} SKU con`
+                        : isProductStockManaged(product.categoryName)
+                          ? `${product.sku} · ${L ? "Tồn" : "Stock"} ${formatNumber(Number(product.stock))} ${product.baseUnit}`
+                          : product.sku}
                     </div>
                   </div>
                   <span className="hidden w-36 shrink-0 truncate text-right text-sm font-semibold tabular-nums text-primary-600 sm:block">

@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, inArray, or, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  categories,
   products,
   profiles,
   purchaseReturnItems,
@@ -11,6 +12,7 @@ import {
 } from "@/db/schema";
 import { accentInsensitiveLike } from "@/lib/search";
 import { coercePageSize } from "@/lib/pagination";
+import { stockManagedCategoryCondition } from "@/lib/data/product-stock";
 
 export async function getPurchaseReturns(filters: { q?: string; status?: string; page?: number; pageSize?: number } = {}) {
   const page = Math.max(1, filters.page ?? 1);
@@ -161,9 +163,11 @@ export async function searchPurchaseReturnProductRows(q: string, warehouseId: st
       totalStock: stockLevels.quantity,
     })
     .from(products)
+    .leftJoin(categories, eq(products.categoryId, categories.id))
     .leftJoin(stockLevels, and(eq(stockLevels.productId, products.id), eq(stockLevels.warehouseId, warehouseId)))
     .where(and(
       eq(products.isActive, true),
+      stockManagedCategoryCondition(),
       or(accentInsensitiveLike(products.name, term), accentInsensitiveLike(products.sku, term), accentInsensitiveLike(products.barcode, term)),
     ))
     .orderBy(asc(products.name))

@@ -1,7 +1,8 @@
-import { asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { products, stockLevels, warehouses } from "@/db/schema";
+import { categories, products, stockLevels, warehouses } from "@/db/schema";
 import { StocktakeForm } from "./stocktake-form";
+import { stockManagedCategoryCondition } from "@/lib/data/product-stock";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,8 @@ export default async function NewStocktakePage({ searchParams }: { searchParams:
       ), 0)`,
     })
     .from(products)
-    .where(eq(products.isActive, true))
+    .leftJoin(categories, eq(products.categoryId, categories.id))
+    .where(and(eq(products.isActive, true), stockManagedCategoryCondition()))
     .orderBy(asc(products.name))
     .limit(500);
 

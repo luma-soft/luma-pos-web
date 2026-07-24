@@ -1,10 +1,11 @@
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { orderItems, orders, products } from "@/db/schema";
+import { categories, orderItems, orders, products } from "@/db/schema";
 import {
   calculateRestock,
   type RestockPriority,
 } from "@/lib/ai/restock-policy";
+import { stockManagedCategoryCondition } from "@/lib/data/product-stock";
 
 export type { RestockPriority } from "@/lib/ai/restock-policy";
 
@@ -33,7 +34,8 @@ export async function getRestockSuggestions(days = 30): Promise<RestockRow[]> {
   const prods = await db
     .select({ id: products.id, name: products.name, sku: products.sku, baseUnit: products.baseUnit, totalStock: products.totalStock, minStock: products.minStock, costPrice: products.costPrice, lastPurchasePrice: products.lastPurchasePrice })
     .from(products)
-    .where(eq(products.isActive, true));
+    .leftJoin(categories, eq(products.categoryId, categories.id))
+    .where(and(eq(products.isActive, true), stockManagedCategoryCondition()));
 
   const rows: RestockRow[] = [];
   for (const p of prods) {
