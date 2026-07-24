@@ -30,6 +30,7 @@ import { categoryEmoji } from "@/lib/category-emoji";
 import { Routes } from "@/lib/routes";
 import type { PosData, PosProduct, PosUnit } from "@/lib/data/pos";
 import { isProductStockManaged } from "@/lib/product-stock";
+import { rehydrateCartProducts } from "@/lib/pos/rehydrate-cart-products";
 
 type CartLine = {
   key: string;
@@ -526,13 +527,18 @@ export function PosClient({
       if (cancelled) return;
       const saved = loadInvoices();
       if (saved) {
-        setInvoices(saved);
+        const currentProducts = flattenProducts(data.products);
+        const refreshed = saved.map((draft) => ({
+          ...draft,
+          cart: rehydrateCartProducts(draft.cart, currentProducts),
+        }));
+        setInvoices(refreshed);
         const savedActive = localStorage.getItem(ACT_KEY);
-        setActiveId(savedActive && saved.some((i) => i.id === savedActive) ? savedActive : saved[0].id);
+        setActiveId(savedActive && refreshed.some((i) => i.id === savedActive) ? savedActive : refreshed[0].id);
       }
     });
     return () => { cancelled = true; };
-  }, [initialContext, initialSourceInvoice]);
+  }, [data.products, initialContext, initialSourceInvoice]);
 
   // ghi localStorage mỗi khi đơn đổi (bỏ qua lần đầu để không ghi đè bản đã lưu)
   const hydratedRef = useRef(false);
