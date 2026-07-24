@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  catalogRevisionChanged,
   getCatalogWarehouseStock,
   searchProductCatalog,
   type ProductCatalogItem,
@@ -41,6 +42,13 @@ function product(overrides: Partial<ProductCatalogItem> = {}): ProductCatalogIte
 }
 
 describe("shared product catalog", () => {
+  test("refreshes only when the database revision changes", () => {
+    expect(catalogRevisionChanged("41", "42")).toBe(true);
+    expect(catalogRevisionChanged("42", "42")).toBe(false);
+    expect(catalogRevisionChanged("42", "41")).toBe(false);
+    expect(catalogRevisionChanged("42", null)).toBe(false);
+  });
+
   test("finds products beyond former screen limits without accents", () => {
     const products = [
       ...Array.from({ length: 500 }, (_, index) => product({

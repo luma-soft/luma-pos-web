@@ -2,6 +2,7 @@ import { asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   brands,
+  catalogSyncState,
   categories,
   productPrices,
   products,
@@ -18,12 +19,30 @@ import {
 } from "@/lib/product-catalog";
 import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
 
+export async function getProductCatalogRevision(): Promise<string> {
+  const [state] = await db
+    .select({ revision: catalogSyncState.revision })
+    .from(catalogSyncState)
+    .where(eq(catalogSyncState.id, 1))
+    .limit(1);
+  return String(state?.revision ?? 0);
+}
+
 /** Projection đầy đủ để mọi màn hình dùng chung khi online và offline. */
 export async function getProductCatalogSnapshot(
   userId: string,
   role: string,
 ): Promise<ProductCatalogSnapshot> {
+  return buildProductCatalogSnapshot(userId, role, 0);
+}
+
+async function buildProductCatalogSnapshot(
+  userId: string,
+  role: string,
+  attempt: number,
+): Promise<ProductCatalogSnapshot> {
   const hasComplianceColumns = await hasProductComplianceColumns();
+  const revisionBefore = await getProductCatalogRevision();
   const [productRows, warehouseRows] = await Promise.all([
     db
       .select({
@@ -92,11 +111,17 @@ export async function getProductCatalogSnapshot(
       .from(warehouses)
       .orderBy(desc(warehouses.isDefault), asc(warehouses.name)),
   ]);
+  const revisionAfter = await getProductCatalogRevision();
+  if (revisionBefore !== revisionAfter) {
+    if (attempt >= 2) throw new Error("PRODUCT_CATALOG_CHANGED_DURING_SNAPSHOT");
+    return buildProductCatalogSnapshot(userId, role, attempt + 1);
+  }
 
   return {
     schemaVersion: PRODUCT_CATALOG_SCHEMA_VERSION,
     userId,
     scopeId: `${userId}:${role}`,
+    revision: revisionAfter,
     savedAt: Date.now(),
     products: productRows.map((product) => ({
       ...product,

@@ -1,6 +1,6 @@
 import { normalizeSearch } from "@/lib/normalize";
 
-export const PRODUCT_CATALOG_SCHEMA_VERSION = 1;
+export const PRODUCT_CATALOG_SCHEMA_VERSION = 2;
 
 export type CatalogUnit = {
   unitName: string;
@@ -54,10 +54,24 @@ export type ProductCatalogSnapshot = {
   schemaVersion: typeof PRODUCT_CATALOG_SCHEMA_VERSION;
   userId: string;
   scopeId: string;
+  revision: string;
   savedAt: number;
   products: ProductCatalogItem[];
   warehouses: ProductCatalogWarehouse[];
 };
+
+export function catalogRevisionChanged(
+  localRevision: string | null | undefined,
+  remoteRevision: string | null | undefined,
+): boolean {
+  if (!remoteRevision) return false;
+  if (!localRevision) return true;
+  try {
+    return BigInt(remoteRevision) > BigInt(localRevision);
+  } catch {
+    return localRevision !== remoteRevision;
+  }
+}
 
 export type ProductCatalogSearchOptions = {
   stockManagedOnly?: boolean;

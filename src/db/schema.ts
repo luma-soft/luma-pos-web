@@ -1,6 +1,6 @@
 import {
   pgTable, uuid, text, varchar, integer, decimal, timestamp, date,
-  boolean, jsonb, primaryKey, index, uniqueIndex, pgEnum, check,
+  boolean, bigint, jsonb, primaryKey, index, uniqueIndex, pgEnum, check,
 } from "drizzle-orm/pg-core";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
@@ -300,6 +300,17 @@ export const stockLevels = pgTable("stock_levels", {
   minLevel: decimal("min_level", { precision: 14, scale: 4 }).default("0"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [primaryKey({ columns: [t.productId, t.warehouseId] })]);
+
+// Singleton revision advanced by DB triggers whenever the offline Product
+// Catalog projection changes. Clients poll this lightweight value before
+// replacing their IndexedDB snapshot.
+export const catalogSyncState = pgTable("catalog_sync_state", {
+  id: integer("id").primaryKey(),
+  revision: bigint("revision", { mode: "number" }).notNull().default(1),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("catalog_sync_state_singleton_check", sql`${t.id} = 1`),
+]);
 
 // ============= Stock Movements (audit) =============
 
