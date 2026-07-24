@@ -25,6 +25,7 @@ export default async function ProductDetailModalPage({ params, searchParams }: P
         <ProductEditorModal
           searchParams={{ productModal: "edit", productId: id }}
           closeHrefOverride={Routes.productDetail(id)}
+          closeNavigation="replace"
         />
       )}
     </>

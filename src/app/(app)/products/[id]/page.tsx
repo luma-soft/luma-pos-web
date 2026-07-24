@@ -37,6 +37,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
         <ProductEditorModal
           searchParams={{ productModal: "edit", productId: id }}
           closeHrefOverride={Routes.productDetail(id)}
+          closeNavigation="replace"
         />
       )}
     </div>

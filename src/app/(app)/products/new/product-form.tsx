@@ -90,6 +90,7 @@ export interface NewProductFormProps {
   initialValues?: Partial<CreateProductInput>;
   layout?: "page" | "modal";
   closeHref?: string;
+  closeNavigation?: "push" | "replace";
   aiPreview?: boolean;
 }
 
@@ -104,6 +105,7 @@ export function NewProductForm({
   initialValues,
   layout = "page",
   closeHref,
+  closeNavigation = "push",
   aiPreview = false,
 }: NewProductFormProps) {
   const t = useTranslations();
@@ -113,6 +115,10 @@ export function NewProductForm({
   const isEdit = mode === "edit";
   const isModal = layout === "modal";
   const doneHref = closeHref ?? Routes.Products;
+  const navigateAfterModal = (href: string) => {
+    if (closeNavigation === "replace") router.replace(href);
+    else router.push(href);
+  };
 
   const form = useForm<CreateProductInput, unknown, CreateProductOutput>({
     resolver: zodResolver(createProductSchema),
@@ -214,13 +220,14 @@ export function NewProductForm({
         })),
       });
       if (res.ok) {
-        router.push(
+        const href =
           submitIntent === "sameType"
             ? sameTypeHref(productId)
             : isModal
               ? doneHref
-              : Routes.product(productId),
-        );
+              : Routes.product(productId);
+        if (isModal) navigateAfterModal(href);
+        else router.push(href);
         router.refresh();
         return;
       }
@@ -229,7 +236,7 @@ export function NewProductForm({
     }
     const res = await createProduct(values);
     if (res.ok) {
-      router.push(
+      navigateAfterModal(
         submitIntent === "sameType" ? sameTypeHref(res.data.id) : doneHref,
       );
       router.refresh();
@@ -248,7 +255,7 @@ export function NewProductForm({
     return `${path || Routes.Inventory}?${sp.toString()}`;
   }
 
-  const close = () => router.push(doneHref);
+  const close = () => navigateAfterModal(doneHref);
 
   return (
     <Form

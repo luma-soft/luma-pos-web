@@ -82,9 +82,11 @@ async function ProductsToolbar({
 export async function ProductEditorModal({
   searchParams,
   closeHrefOverride,
+  closeNavigation,
 }: {
   searchParams: SP;
   closeHrefOverride?: string;
+  closeNavigation?: "push" | "replace";
 }) {
   const modal = searchParams.productModal;
   if (!modal) return null;
@@ -128,6 +130,7 @@ export async function ProductEditorModal({
           priceBooks={priceBooks}
           layout="modal"
           closeHref={closeHref}
+          closeNavigation={closeNavigation}
         />
       </div>
     </div>
