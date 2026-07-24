@@ -17,10 +17,12 @@ export function GroupTabs({
   base,
   items,
   preserveParams = [],
+  edgeToEdge = true,
 }: {
   base: string;
   items: GroupTab[];
   preserveParams?: readonly string[];
+  edgeToEdge?: boolean;
 }) {
   const t = useTranslations();
   const sp = useSearchParams();
@@ -38,7 +40,10 @@ export function GroupTabs({
   }
 
   return (
-    <div className="flex items-center gap-1 overflow-x-auto -mx-4 px-4 sm:-mx-6 sm:px-6 [&::-webkit-scrollbar]:h-0">
+    <div className={cn(
+      "flex items-center gap-1 overflow-x-auto [&::-webkit-scrollbar]:h-0",
+      edgeToEdge && "-mx-4 px-4 sm:-mx-6 sm:px-6",
+    )}>
       {items.map((it) => {
         const on = it.tab === active;
         return (

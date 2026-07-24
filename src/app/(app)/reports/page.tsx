@@ -82,12 +82,21 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   return (
     <div className="p-4 sm:p-6">
       <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-5 bg-surface border-b border-border">
-        <div className="flex min-h-[52px] flex-wrap items-center justify-between gap-3 px-4 pt-2.5 sm:px-6">
+        <div className="flex min-h-[52px] items-center px-4 pt-2.5 sm:px-6">
           <Text as="h1" weight="bold" className="text-[17px]" text={t("reports.title")} />
-          <ReportPeriodFilter period={period} from={dateRange.fromValue} to={dateRange.toValue} />
         </div>
-        <div className="px-4 sm:px-6 pb-1.5">
-          <GroupTabs base={Routes.Reports} items={REPORT_TABS} preserveParams={REPORT_FILTER_PARAMS} />
+        <div className="flex items-center gap-3 px-4 pb-1.5 sm:px-6">
+          <div className="min-w-0 flex-1">
+            <GroupTabs
+              base={Routes.Reports}
+              items={REPORT_TABS}
+              preserveParams={REPORT_FILTER_PARAMS}
+              edgeToEdge={false}
+            />
+          </div>
+          <div className="shrink-0">
+            <ReportPeriodFilter period={period} from={dateRange.fromValue} to={dateRange.toValue} />
+          </div>
         </div>
       </div>
 
