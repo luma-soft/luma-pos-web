@@ -211,7 +211,11 @@ export function DataTableShell<T>({
 
           <div
             ref={desktopTableRef}
-            className={cn("hidden min-h-0 rounded-card border border-border-soft bg-surface lg:block", maxHeight ? "overflow-auto" : "overflow-x-auto", fillHeight && "h-full")}
+            className={cn(
+              "hidden min-h-0 rounded-card border border-border-soft bg-surface lg:block",
+              maxHeight ? "overflow-auto [scrollbar-gutter:stable]" : "overflow-x-auto",
+              fillHeight && "h-full",
+            )}
             style={maxHeight ? { maxHeight: availableHeight ? `${availableHeight}px` : maxHeight, ...(fillHeight ? { height: availableHeight ? `${availableHeight}px` : maxHeight } : {}) } : undefined}
           >
             <table className="w-full table-fixed text-sm" style={{ minWidth }}>
