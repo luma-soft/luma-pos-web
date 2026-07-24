@@ -49,10 +49,11 @@ export const Routes = {
   LabelSettings: "/settings/labels",
 
   // Param routes
-  order: (id: string) => `/orders/${id}` as const,
+  order: (id: string) => `/orders/${encodeURIComponent(id)}` as const,
+  orderDetail: (id: string) => `/sales?tab=orders&detailOrderId=${encodeURIComponent(id)}` as const,
   salesOrder: (id: string, status?: string | null) => {
-    void status; // Kept for compatibility with callers that already know the order type.
-    return `/orders/${encodeURIComponent(id)}` as const;
+    const tab = status === "quote" ? "quotes" : status === "confirmed" ? "bookings" : "orders";
+    return `/sales?tab=${tab}&detailOrderId=${encodeURIComponent(id)}` as const;
   },
   product: (id: string) => `/products/${encodeURIComponent(id)}` as const,
   productDetail: (id: string) => `/products/${encodeURIComponent(id)}` as const,

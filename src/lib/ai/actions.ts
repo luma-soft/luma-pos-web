@@ -152,13 +152,13 @@ function buildAiReviewAction(preview: AiActionPreview): AiActionPreview["reviewA
     return { type: "open", href: "/pos?aiDraft=1", label: "Mở POS kiểm tra giỏ nháp", target: "pos" };
   }
   if (preview.intent === "convert_quote_to_order") {
-    return { type: "open", href: orderId ? Routes.order(orderId) : "/sales?tab=quotes", label: "Mở báo giá liên quan", target: "quotes" };
+    return { type: "open", href: orderId ? Routes.salesOrder(orderId, "quote") : "/sales?tab=quotes", label: "Mở báo giá liên quan", target: "quotes" };
   }
   if (preview.intent === "find_invoice" || preview.intent === "edit_invoice" || preview.intent === "record_invoice_payment" || preview.intent === "cancel_invoice" || preview.intent === "create_return_refund" || preview.intent === "send_einvoice") {
     return {
       type: "open",
       href: orderId
-        ? Routes.order(orderId)
+        ? Routes.orderDetail(orderId)
         : hrefWithParams("/sales", { tab: "orders", q: orderCode || reportQuery || undefined, source: "ai-preview" }),
       label: "Mở hóa đơn liên quan",
       target: "orders",

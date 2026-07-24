@@ -61,7 +61,7 @@ function Category({ row }: { row: CashbookRow }) {
 }
 
 function Note({ row }: { row: CashbookRow }) {
-  if (row.refType === "order" && row.refId) return <Link href={Routes.order(row.refId)} className="text-primary-600 hover:underline">{row.note}</Link>;
+  if (row.refType === "order" && row.refId) return <Link href={Routes.orderDetail(row.refId)} className="text-primary-600 hover:underline">{row.note}</Link>;
   return <span className="text-slate-500">{row.note ?? "—"}</span>;
 }
 

@@ -1,10 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { Routes } from "@/lib/routes";
 
 type QuoteRow = {
   id: string;
@@ -22,6 +21,14 @@ export function QuotesTable({
 }) {
   const t = useTranslations();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  function openOrder(row: QuoteRow) {
+    const next = new URLSearchParams(searchParams.toString());
+    next.set("detailOrderId", row.id);
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  }
   const columns: DataTableColumn<QuoteRow>[] = [
     { key: "code", label: t("quotes.cols.code"), required: true, width: "170px", render: (row) => <span className="font-semibold text-primary-600">{row.code}</span> },
     { key: "date", label: t("orders.cols.date"), defaultVisible: true, width: "170px", render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
@@ -36,7 +43,7 @@ export function QuotesTable({
       columns={columns}
       getRowId={(row) => row.id}
       minWidth="880px"
-      onRowClick={(row) => router.push(Routes.order(row.id), { scroll: false })}
+      onRowClick={openOrder}
     />
   );
 }

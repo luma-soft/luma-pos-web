@@ -393,7 +393,7 @@ function OnlineOrdersSection({ rows, L }: { rows: Awaited<ReturnType<typeof getS
               <tr key={row.id}>
                 <td className="px-4 py-3 font-mono text-xs">{row.externalOrderSn}</td>
                 <td className="px-4 py-3">
-                  {row.orderId && row.orderCode ? <Link href={Routes.order(row.orderId)} className="font-semibold text-primary-600 hover:underline">{row.orderCode}</Link> : "—"}
+                  {row.orderId && row.orderCode ? <Link href={Routes.orderDetail(row.orderId)} className="font-semibold text-primary-600 hover:underline">{row.orderCode}</Link> : "—"}
                 </td>
                 <td className="px-4 py-3">{row.customerName ?? "—"}</td>
                 <td className="px-4 py-3"><Badge value={row.externalStatus} /></td>

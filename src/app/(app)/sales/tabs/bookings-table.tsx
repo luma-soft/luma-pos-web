@@ -1,10 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { Routes } from "@/lib/routes";
 
 type BookingRow = {
   id: string;
@@ -23,6 +22,14 @@ export function BookingsTable({
 }) {
   const t = useTranslations();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  function openOrder(row: BookingRow) {
+    const next = new URLSearchParams(searchParams.toString());
+    next.set("detailOrderId", row.id);
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  }
   const columns: DataTableColumn<BookingRow>[] = [
     { key: "code", label: t("bookings.cols.code"), required: true, width: "170px", render: (row) => <span className="font-semibold text-primary-600">{row.code}</span> },
     { key: "date", label: t("orders.cols.date"), defaultVisible: true, width: "160px", render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
@@ -38,7 +45,7 @@ export function BookingsTable({
       columns={columns}
       getRowId={(row) => row.id}
       minWidth="960px"
-      onRowClick={(row) => router.push(Routes.order(row.id), { scroll: false })}
+      onRowClick={openOrder}
     />
   );
 }

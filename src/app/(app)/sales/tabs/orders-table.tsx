@@ -1,10 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
-import { Routes } from "@/lib/routes";
 import type { OrderListRow } from "@/lib/data/orders";
 import { OrderStatusBadge, PaymentStatusBadge } from "../../orders/status-badges";
 
@@ -15,6 +14,14 @@ export function OrdersTable({
 }) {
   const t = useTranslations();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  function openOrder(order: OrderListRow) {
+    const next = new URLSearchParams(searchParams.toString());
+    next.set("detailOrderId", order.id);
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  }
   const columns: DataTableColumn<OrderListRow>[] = [
     {
       key: "select",
@@ -115,7 +122,7 @@ export function OrdersTable({
         columns={columns}
         getRowId={(order) => order.id}
         minWidth="1120px"
-        onRowClick={(order) => router.push(Routes.order(order.id), { scroll: false })}
+        onRowClick={openOrder}
         rowClassName={(order) => cn(order.status === "cancelled" && "opacity-60")}
         toolbar={(
           <div className="flex flex-1 items-center gap-3 text-sm">
@@ -133,7 +140,7 @@ export function OrdersTable({
           const remaining = Number(order.total) - Number(order.amountPaid);
           return (
             <>
-              <button type="button" onClick={() => router.push(Routes.order(order.id), { scroll: false })} className="w-full p-3 text-left">
+              <button type="button" onClick={() => openOrder(order)} className="w-full p-3 text-left">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                   <div className="font-semibold text-primary-600">{order.code}</div>

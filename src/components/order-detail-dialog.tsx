@@ -1,7 +1,7 @@
 "use client";
 
 import { type ReactNode, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 
 export function OrderDetailDialog({
@@ -14,7 +14,14 @@ export function OrderDetailDialog({
   children: ReactNode;
 }) {
   const router = useRouter();
-  const close = useCallback(() => router.back(), [router]);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const close = useCallback(() => {
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("detailOrderId");
+    const query = next.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [pathname, router, searchParams]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
