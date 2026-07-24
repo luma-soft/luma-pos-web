@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { ArrowLeft, Check, ClipboardCheck, PackageSearch, Save, Search, Trash2 } from "lucide-react";
@@ -14,11 +14,12 @@ import { Select } from "@/components/ui/select";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import { createStocktake } from "@/lib/actions/stocktakes";
+import { searchStocktakeProducts } from "@/lib/actions/stocktake-product-search";
+import type { StocktakeProductOption } from "@/lib/data/stocktake-products";
+import { getStocktakeSuggestions } from "@/lib/stocktake-product-search";
 import type { AiActionPreview } from "@/lib/ai/actions";
 
-interface ProductOption {
-  id: string; sku: string; name: string; baseUnit: string; costPrice: number; stock: number;
-}
+type ProductOption = StocktakeProductOption;
 
 interface Line {
   product: ProductOption;
@@ -38,16 +39,43 @@ export function StocktakeForm({ activeWarehouseId, warehouses, products }: { act
   const [busy, setBusy] = useState<"draft" | "balance" | null>(null);
   const [error, setError] = useState("");
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
+  const [serverSearch, setServerSearch] = useState<{ query: string; products: ProductOption[] }>({
+    query: "",
+    products: [],
+  });
 
   const added = useMemo(() => new Set(lines.map((l) => l.product.id)), [lines]);
 
+  useEffect(() => {
+    const query = search.trim();
+    let cancelled = false;
+
+    const timer = setTimeout(() => {
+      if (!query) return;
+
+      searchStocktakeProducts(query, warehouseId)
+        .then((results) => {
+          if (!cancelled) setServerSearch({ query, products: results });
+        })
+        .catch(() => {
+          if (!cancelled) setServerSearch({ query, products: [] });
+        });
+    }, query ? 250 : 0);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [search, warehouseId]);
+
   const suggestions = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return [];
-    return products
-      .filter((p) => !added.has(p.id) && (p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q)))
-      .slice(0, 8);
-  }, [search, products, added]);
+    return getStocktakeSuggestions({
+      search,
+      localProducts: products,
+      serverResults: serverSearch.query === search.trim() ? serverSearch.products : [],
+      addedProductIds: added,
+    });
+  }, [search, products, serverSearch, added]);
 
   function addLine(p: ProductOption) {
     setLines((ls) => [...ls, { product: p, actualQty: p.stock }]);

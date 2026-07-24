@@ -19,6 +19,7 @@ export default async function NewStocktakePage({ searchParams }: { searchParams:
     .select({
       id: products.id,
       sku: products.sku,
+      barcode: products.barcode,
       name: products.name,
       baseUnit: products.baseUnit,
       costPrice: products.costPrice,
@@ -40,7 +41,7 @@ export default async function NewStocktakePage({ searchParams }: { searchParams:
       activeWarehouseId={defaultWh ?? ""}
       warehouses={warehouseRows}
       products={productRows.map((p) => ({
-        id: p.id, sku: p.sku, name: p.name, baseUnit: p.baseUnit,
+        id: p.id, sku: p.sku, barcode: p.barcode, name: p.name, baseUnit: p.baseUnit,
         costPrice: Number(p.costPrice), stock: Number(p.stock),
       }))}
     />
