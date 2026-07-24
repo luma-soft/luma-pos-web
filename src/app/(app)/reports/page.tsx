@@ -35,6 +35,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   const totalCatRevenue = Math.max(1, data.byCategory.reduce((s, c) => s + Number(c.revenue), 0));
   const uncollected = data.summary.revenue - data.summary.collected;
   const breakdownTabs = [
+    { id: "overview", label: t("reports.overview") },
     { id: "products", label: t("reports.topProducts") },
     { id: "categories", label: t("reports.byCategory") },
     { id: "customers", label: t("reports.topCustomers") },
@@ -67,69 +68,71 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-surface rounded-card border border-border p-5">
-          <div className="text-sm text-slate-500">{t("reports.revenue")}</div>
-          <div className="text-2xl font-bold tabular-nums mt-1">{formatCurrency(data.summary.revenue)}</div>
-          {data.summary.refundTotal > 0 && (
-            <div className="mt-1 text-xs font-medium text-er">
-              {t("reports.returnsDeducted", { amount: formatCurrency(data.summary.refundTotal) })}
+      <ReportBreakdownTabs tabs={breakdownTabs} ariaLabel={t("reports.title")}>
+        <div className="space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-surface rounded-card border border-border p-5">
+              <div className="text-sm text-slate-500">{t("reports.revenue")}</div>
+              <div className="text-2xl font-bold tabular-nums mt-1">{formatCurrency(data.summary.revenue)}</div>
+              {data.summary.refundTotal > 0 && (
+                <div className="mt-1 text-xs font-medium text-er">
+                  {t("reports.returnsDeducted", { amount: formatCurrency(data.summary.refundTotal) })}
+                </div>
+              )}
+            </div>
+            <div className="bg-surface rounded-card border border-border p-5">
+              <div className="text-sm text-slate-500">{t("reports.collected")}</div>
+              <div className="text-2xl font-bold tabular-nums mt-1 text-ok">{formatCurrency(data.summary.collected)}</div>
+            </div>
+            <div className="bg-surface rounded-card border border-border p-5">
+              <div className="text-sm text-slate-500">{t("reports.uncollected")}</div>
+              <div className={cn("text-2xl font-bold tabular-nums mt-1", uncollected > 0 ? "text-er" : "")}>{formatCurrency(uncollected)}</div>
+            </div>
+            <div className="bg-surface rounded-card border border-border p-5">
+              <div className="text-sm text-slate-500">{t("reports.orders")}</div>
+              <div className="text-2xl font-bold tabular-nums mt-1">{data.summary.orderCount}</div>
+              <div className="text-xs text-slate-400 mt-1">
+                {data.summary.orderCount > 0 && t("reports.avgOrder", { avg: formatCurrency(Math.round(data.summary.revenue / data.summary.orderCount)) })}
+              </div>
+            </div>
+          </div>
+
+          {serviceProfitability.length > 0 && (
+            <div className="bg-surface rounded-card border border-border overflow-hidden">
+              <div className="px-4 py-3 border-b border-border font-semibold text-sm">{t("reports.serviceProfitability")}</div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] text-sm">
+                  <thead><tr className="bg-canvas text-left text-xs uppercase text-slate-500"><th className="px-4 py-2.5">{t("reports.serviceProject")}</th><th className="px-4 py-2.5 text-right">{t("reports.revenue")}</th><th className="px-4 py-2.5 text-right">{t("reports.serviceCost")}</th><th className="px-4 py-2.5 text-right">{t("reports.grossProfit")}</th><th className="px-4 py-2.5 text-right">{t("reports.margin")}</th></tr></thead>
+                  <tbody className="divide-y divide-border-soft">{serviceProfitability.map((row) => <tr key={row.id}><td className="px-4 py-2.5 font-medium">{row.name}</td><td className="px-4 py-2.5 text-right tabular-nums">{formatCurrency(row.revenue)}</td><td className="px-4 py-2.5 text-right tabular-nums">{formatCurrency(row.totalCost)}</td><td className={cn("px-4 py-2.5 text-right tabular-nums", row.grossProfit >= 0 ? "text-ok" : "text-er")}>{formatCurrency(row.grossProfit)}</td><td className="px-4 py-2.5 text-right tabular-nums">{row.marginPercent.toFixed(1)}%</td></tr>)}</tbody>
+                </table>
+              </div>
             </div>
           )}
-        </div>
-        <div className="bg-surface rounded-card border border-border p-5">
-          <div className="text-sm text-slate-500">{t("reports.collected")}</div>
-          <div className="text-2xl font-bold tabular-nums mt-1 text-ok">{formatCurrency(data.summary.collected)}</div>
-        </div>
-        <div className="bg-surface rounded-card border border-border p-5">
-          <div className="text-sm text-slate-500">{t("reports.uncollected")}</div>
-          <div className={cn("text-2xl font-bold tabular-nums mt-1", uncollected > 0 ? "text-er" : "")}>{formatCurrency(uncollected)}</div>
-        </div>
-        <div className="bg-surface rounded-card border border-border p-5">
-          <div className="text-sm text-slate-500">{t("reports.orders")}</div>
-          <div className="text-2xl font-bold tabular-nums mt-1">{data.summary.orderCount}</div>
-          <div className="text-xs text-slate-400 mt-1">
-            {data.summary.orderCount > 0 && t("reports.avgOrder", { avg: formatCurrency(Math.round(data.summary.revenue / data.summary.orderCount)) })}
+
+          <div className="bg-surface rounded-card border border-border p-5">
+            <Text as="h2" weight="semibold" className="mb-4" text={t("dashboard.revenueByDay")} />
+            {data.byDay.length === 0 ? (
+              <Text as="p" variant="muted" className="py-8 text-center" text={t("dashboard.noData")} />
+            ) : (
+              <div className="flex items-end gap-1 h-44 overflow-x-auto">
+                {data.byDay.map((d) => {
+                  const v = Number(d.revenue);
+                  return (
+                    <div key={d.day} className="flex-1 min-w-6 flex flex-col items-center justify-end h-full gap-1" title={`${d.day}: ${formatCurrency(v)}`}>
+                      <div
+                        className={cn("w-full rounded-t", v < 0 ? "bg-er/85" : "bg-primary-600/85")}
+                        style={{ height: `${Math.max(2, (Math.abs(v) / maxDay) * 100)}%` }}
+                      />
+                      <Text as="span" variant="muted" className="text-[9px] whitespace-nowrap" text={`${d.day.slice(8)}/${d.day.slice(5, 7)}`} />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
-      </div>
 
-      {serviceProfitability.length > 0 && (
-        <div className="bg-surface rounded-card border border-border overflow-hidden">
-          <div className="px-4 py-3 border-b border-border font-semibold text-sm">{t("reports.serviceProfitability")}</div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-sm">
-              <thead><tr className="bg-canvas text-left text-xs uppercase text-slate-500"><th className="px-4 py-2.5">{t("reports.serviceProject")}</th><th className="px-4 py-2.5 text-right">{t("reports.revenue")}</th><th className="px-4 py-2.5 text-right">{t("reports.serviceCost")}</th><th className="px-4 py-2.5 text-right">{t("reports.grossProfit")}</th><th className="px-4 py-2.5 text-right">{t("reports.margin")}</th></tr></thead>
-              <tbody className="divide-y divide-border-soft">{serviceProfitability.map((row) => <tr key={row.id}><td className="px-4 py-2.5 font-medium">{row.name}</td><td className="px-4 py-2.5 text-right tabular-nums">{formatCurrency(row.revenue)}</td><td className="px-4 py-2.5 text-right tabular-nums">{formatCurrency(row.totalCost)}</td><td className={cn("px-4 py-2.5 text-right tabular-nums", row.grossProfit >= 0 ? "text-ok" : "text-er")}>{formatCurrency(row.grossProfit)}</td><td className="px-4 py-2.5 text-right tabular-nums">{row.marginPercent.toFixed(1)}%</td></tr>)}</tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      <div className="bg-surface rounded-card border border-border p-5">
-        <Text as="h2" weight="semibold" className="mb-4" text={t("dashboard.revenueByDay")} />
-        {data.byDay.length === 0 ? (
-          <Text as="p" variant="muted" className="py-8 text-center" text={t("dashboard.noData")} />
-        ) : (
-          <div className="flex items-end gap-1 h-44 overflow-x-auto">
-            {data.byDay.map((d) => {
-              const v = Number(d.revenue);
-              return (
-                <div key={d.day} className="flex-1 min-w-6 flex flex-col items-center justify-end h-full gap-1" title={`${d.day}: ${formatCurrency(v)}`}>
-                  <div
-                    className={cn("w-full rounded-t", v < 0 ? "bg-er/85" : "bg-primary-600/85")}
-                    style={{ height: `${Math.max(2, (Math.abs(v) / maxDay) * 100)}%` }}
-                  />
-                  <Text as="span" variant="muted" className="text-[9px] whitespace-nowrap" text={`${d.day.slice(8)}/${d.day.slice(5, 7)}`} />
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      <ReportBreakdownTabs tabs={breakdownTabs} ariaLabel={t("reports.title")}>
-        <div>
+        <div className="overflow-hidden rounded-card border border-border bg-surface">
           {data.topProducts.length === 0 ? (
             <Text as="p" variant="muted" className="py-8 text-center" text={t("dashboard.noData")} />
           ) : (
@@ -163,7 +166,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           )}
         </div>
 
-        <div className="p-5">
+        <div className="rounded-card border border-border bg-surface p-5">
           {data.byCategory.length === 0 ? (
             <Text as="p" variant="muted" className="py-8 text-center" text={t("dashboard.noData")} />
           ) : (
@@ -187,7 +190,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           )}
         </div>
 
-        <div>
+        <div className="overflow-hidden rounded-card border border-border bg-surface">
           {data.byCustomer.length === 0 ? (
             <Text as="p" variant="muted" className="py-8 text-center" text={t("dashboard.noData")} />
           ) : (
@@ -226,7 +229,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
           )}
         </div>
 
-        <div>
+        <div className="overflow-hidden rounded-card border border-border bg-surface">
           {data.byEmployee.length === 0 ? (
             <Text as="p" variant="muted" className="py-8 text-center" text={t("dashboard.noData")} />
           ) : (

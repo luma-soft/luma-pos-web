@@ -1888,6 +1888,7 @@
     "uncollected": "Uncollected",
     "orders": "Orders",
     "avgOrder": "Avg {avg}/order",
+    "overview": "Overview",
     "topProducts": "Top products by revenue",
     "qtySold": "Qty sold",
     "grossProfit": "Gross profit",

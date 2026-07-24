@@ -52,11 +52,11 @@ export function ReportBreakdownTabs({
   }
 
   return (
-    <section className="overflow-hidden rounded-card border border-border bg-surface">
+    <section>
       <div
         role="tablist"
         aria-label={ariaLabel}
-        className="flex gap-1 overflow-x-auto border-b border-border px-2 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex gap-1 overflow-x-auto rounded-card border border-border bg-surface px-2 pt-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {tabs.map((tab, index) => {
           const active = index === activeIndex;
@@ -100,7 +100,7 @@ export function ReportBreakdownTabs({
           aria-labelledby={`${instanceId}-tab-${tab.id}`}
           tabIndex={0}
           hidden={index !== activeIndex}
-          className="outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset"
+          className="mt-5 outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset"
         >
           {panels[index]}
         </div>
