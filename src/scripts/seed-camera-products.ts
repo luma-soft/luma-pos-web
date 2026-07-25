@@ -386,10 +386,9 @@ async function main() {
         description: item.description,
         categoryId: categoryIds[item.category],
         brandId: item.brand ? (brandIds.get(item.brand) ?? null) : null,
-        baseUnit: item.sku.startsWith("SVC-CAM-")
-          ? "điểm camera"
-          : item.sku.startsWith("MAT-CAM-")
-            ? "gói"
+        baseUnit:
+          item.sku.startsWith("SVC-CAM-") || item.sku.startsWith("MAT-CAM-")
+            ? ""
             : "cái",
         costPrice: String(item.costPrice),
         lastPurchasePrice: String(item.costPrice),
