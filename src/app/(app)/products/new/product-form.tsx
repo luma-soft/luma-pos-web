@@ -685,6 +685,11 @@ function ComboItemsField({
       value: product.id,
       label: product.name,
       hint: `${product.sku} · ${product.baseUnit}`,
+      description: `${t("products.combo.salePrice")}: ${formatCurrency(Number(product.retailPrice))} · ${t("products.combo.stock")}: ${
+        product.productKind === "service"
+          ? t("products.stock.notTracked")
+          : `${formatNumber(Number(product.totalStock))} ${product.baseUnit}`
+      }`,
     }));
 
   function addItem() {

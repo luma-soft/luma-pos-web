@@ -13,6 +13,7 @@ export interface ComboOption {
   value: string;
   label: string;
   hint?: string;
+  description?: string;
 }
 /** Alias ngữ nghĩa — cùng kiểu với ComboOption. */
 export type SearchableOption = ComboOption;
@@ -61,7 +62,7 @@ export function SearchableSelect({
 
   const nq = normalizeSearch(q);
   const filtered = useMemo(
-    () => (nq ? options.filter((o) => normalizeSearch(`${o.label} ${o.hint ?? ""}`).includes(nq)) : options),
+    () => (nq ? options.filter((o) => normalizeSearch(`${o.label} ${o.hint ?? ""} ${o.description ?? ""}`).includes(nq)) : options),
     [nq, options]
   );
   const exact = options.some((o) => normalizeSearch(o.label) === nq);
@@ -188,9 +189,21 @@ export function SearchableSelect({
                     o.value === value && "bg-primary-50 dark:bg-primary-950/40"
                   )}
                 >
-                  <Text as="span" truncate className="min-w-0 text-current">
-                    {o.label}{o.hint && <Text as="span" variant="muted" size="xs" className="ml-1" text={o.hint} />}
-                  </Text>
+                  <span className="min-w-0 flex-1">
+                    <Text as="span" truncate className="block min-w-0 text-current">
+                      {o.label}{o.hint && <Text as="span" variant="muted" size="xs" className="ml-1" text={o.hint} />}
+                    </Text>
+                    {o.description && (
+                      <Text
+                        as="span"
+                        variant="muted"
+                        size="xs"
+                        truncate
+                        className="mt-0.5 block"
+                        text={o.description}
+                      />
+                    )}
+                  </span>
                   {o.value === value && <Check className="w-4 h-4 text-primary-600 shrink-0" />}
                 </Button>
               ))}
