@@ -17,6 +17,8 @@ import {
   profiles,
   priceBooks,
   productPrices,
+  orderItems,
+  orders,
 } from "@/db/schema";
 import {
   createProductSchema,
@@ -30,6 +32,7 @@ import {
   requireManager,
   toMoney,
 } from "./common";
+import { productKindChangeBlock } from "@/lib/product-kind-change";
 
 /** Tạo nhóm hàng mới từ form (combobox "+ thêm"). Trả id. */
 export async function createCategory(
@@ -378,6 +381,24 @@ const updateProductSchema = z.object({
       priceOverride: z.number().min(0).nullable(),
     }),
   ),
+}).superRefine((value, ctx) => {
+  if (
+    value.productKind === "combo" &&
+    (!value.comboItems || value.comboItems.length === 0)
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["comboItems"],
+      message: "products.combo.itemsRequired",
+    });
+  }
+  if (value.comboItems?.some((item) => item.productId === value.id)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["comboItems"],
+      message: "products.errors.comboCannotContainItself",
+    });
+  }
 });
 export type UpdateProductInput = z.input<typeof updateProductSchema>;
 
@@ -524,10 +545,39 @@ export async function updateProduct(
           parentProductId: products.parentProductId,
           variantName: products.variantName,
           productKind: products.productKind,
+          isVariantParent: products.isVariantParent,
+          totalStock: sql<string>`coalesce((
+            select sum(${stockLevels.quantity})
+            from ${stockLevels}
+            where ${stockLevels.productId} = ${products.id}
+          ), 0)`,
+          openDocumentCount: sql<number>`(
+            select count(*)::int
+            from ${orderItems}
+            inner join ${orders} on ${orders.id} = ${orderItems.orderId}
+            where ${orderItems.productId} = ${products.id}
+              and ${orders.status} in ('draft', 'quote', 'confirmed', 'delivering')
+          )`,
         })
         .from(products)
         .where(eq(products.id, v.id))
         .limit(1);
+
+      if (!current) throw new Error("PRODUCT_NOT_FOUND");
+      const changingKind =
+        v.productKind !== undefined && v.productKind !== current.productKind;
+      if (changingKind) {
+        const block = productKindChangeBlock({
+          currentKind: current.productKind,
+          nextKind: v.productKind!,
+          totalStock: Number(current.totalStock),
+          hasVariants: Boolean(
+            current.parentProductId || current.isVariantParent,
+          ),
+          openDocumentCount: current.openDocumentCount,
+        });
+        if (block) throw new Error(block);
+      }
 
       await tx
         .update(products)
@@ -734,6 +784,15 @@ export async function updateProduct(
     revalidatePath(Routes.POS);
     return { ok: true, data: undefined };
   } catch (e) {
+    const known: Record<string, string> = {
+      PRODUCT_NOT_FOUND: "errors.invalidData",
+      PRODUCT_KIND_HAS_VARIANTS: "products.errors.kindHasVariants",
+      PRODUCT_KIND_HAS_STOCK: "products.errors.kindHasStock",
+      PRODUCT_KIND_HAS_OPEN_DOCUMENTS:
+        "products.errors.kindHasOpenDocuments",
+    };
+    const message = e instanceof Error ? e.message : "";
+    if (known[message]) return { ok: false, error: known[message] };
     const cause = (e as { cause?: { code?: string } }).cause;
     if (cause?.code === "23505")
       return { ok: false, error: "products.errors.skuExists" };

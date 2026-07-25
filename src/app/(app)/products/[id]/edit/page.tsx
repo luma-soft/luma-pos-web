@@ -37,6 +37,7 @@ export default async function EditProductPage({ params, searchParams }: Props) {
       priceBooks={priceBooks}
       aiPreview={sp.source === "ai-preview"}
       creationKind={product.productKind}
+      currentStock={Number(product.totalStock)}
     />
   );
 }

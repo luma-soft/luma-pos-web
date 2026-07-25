@@ -158,6 +158,7 @@ export async function ProductEditorModal({
           closeHref={closeHref}
           closeNavigation={closeNavigation}
           creationKind={seedProduct?.productKind ?? requestedKind}
+          currentStock={Number(seedProduct?.totalStock ?? 0)}
         />
       </div>
     </div>
