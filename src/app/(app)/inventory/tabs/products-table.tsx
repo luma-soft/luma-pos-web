@@ -851,7 +851,7 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
             />
           </>}
         </div>
-        {!cameraMaterials && <div className="flex flex-nowrap gap-2 overflow-x-auto xl:flex-wrap xl:justify-end">
+        {!cameraMaterials && <div className="flex flex-nowrap gap-2 overflow-x-auto xl:flex-wrap xl:justify-end xl:overflow-visible">
           <ActionLink
             icon={Pencil}
             label={t("products.actions.edit")}
@@ -865,6 +865,11 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
             }
             replace={pathname.startsWith("/products/")}
             tone="primary"
+          />
+          <ActionLink
+            icon={PackagePlus}
+            label={t("products.actions.purchase")}
+            href={Routes.purchaseNewForProduct(product.id)}
           />
           <div
             className="relative"
@@ -882,36 +887,34 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
               <MoreHorizontal className="h-4 w-4" />
             </button>
             {moreOpen && (
-              <div className="absolute right-0 bottom-11 z-30 min-w-52 rounded-lg border border-border bg-surface p-1 shadow-xl">
-                <MenuActionLink
-                  icon={Store}
-                  label={locale === "vi" ? "Đăng sàn" : "List online"}
-                  href={productModalHref({ onlineProductId: product.id })}
-                />
-                <MenuActionLink icon={Barcode} label={t("products.actions.printLabels")} href={Routes.productLabels(product.id)} />
-                <MenuActionLink
-                  icon={Plus}
-                  label={t("products.actions.addSameType")}
-                  href={productModalHref({ productModal: "sameType", sameTypeAs: sameTypeSourceId })}
-                />
+              <div className="absolute right-0 bottom-full z-30 min-w-52 pb-1">
+                <div className="rounded-lg border border-border bg-surface p-1 shadow-xl">
+                  <MenuActionLink
+                    icon={Store}
+                    label={locale === "vi" ? "Đăng sàn" : "List online"}
+                    href={productModalHref({ onlineProductId: product.id })}
+                  />
+                  <MenuActionLink icon={Barcode} label={t("products.actions.printLabels")} href={Routes.productLabels(product.id)} />
+                  <MenuActionLink
+                    icon={Plus}
+                    label={t("products.actions.addSameType")}
+                    href={productModalHref({ productModal: "sameType", sameTypeAs: sameTypeSourceId })}
+                  />
+                  <div className="my-1 border-t border-border-soft" />
+                  <MenuActionButton
+                    icon={Ban}
+                    label={t(
+                      (nextActive
+                        ? "products.actions.resumeSelling"
+                        : "products.actions.stopSelling") as never,
+                    )}
+                    onClick={toggleActive}
+                    disabled={pending}
+                  />
+                </div>
               </div>
             )}
           </div>
-          <ActionLink
-            icon={PackagePlus}
-            label={t("products.actions.purchase")}
-            href={Routes.purchaseNewForProduct(product.id)}
-          />
-          <ActionButton
-            icon={Ban}
-            label={t(
-              (nextActive
-                ? "products.actions.resumeSelling"
-                : "products.actions.stopSelling") as never,
-            )}
-            onClick={toggleActive}
-            disabled={pending}
-          />
         </div>}
       </div>
       {error && <p className="mt-2 text-sm font-medium text-er">{error}</p>}
@@ -963,6 +966,30 @@ function MenuActionLink({
       <Icon className="h-4 w-4" />
       {label}
     </Link>
+  );
+}
+
+function MenuActionButton({
+  icon: Icon,
+  label,
+  onClick,
+  disabled,
+}: {
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-50 dark:text-slate-200"
+    >
+      <Icon className="h-4 w-4" />
+      {label}
+    </button>
   );
 }
 
