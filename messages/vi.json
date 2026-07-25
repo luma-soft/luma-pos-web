@@ -573,6 +573,8 @@
       "selectProduct": "Tìm và chọn thành phần",
       "addItem": "Thêm vào combo",
       "quantity": "Số lượng",
+      "salePrice": "Giá bán",
+      "stock": "Tồn kho",
       "empty": "Combo chưa có thành phần nào.",
       "itemsRequired": "Combo phải có ít nhất một thành phần."
     },

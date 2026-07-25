@@ -864,10 +864,16 @@ export const getProductFormOptions = unstable_cache(
           sku: products.sku,
           baseUnit: products.baseUnit,
           productKind: products.productKind,
+          retailPrice: products.retailPrice,
+          totalStock: sql<string>`coalesce((
+            select sum(${stockLevels.quantity})
+            from ${stockLevels}
+            where ${stockLevels.productId} = ${products.id}
+          ), 0)`,
+          isActive: products.isActive,
         })
         .from(products)
         .where(and(
-          eq(products.isActive, true),
           eq(products.isVariantParent, false),
           sql`${products.productKind} <> 'combo'`,
         ))

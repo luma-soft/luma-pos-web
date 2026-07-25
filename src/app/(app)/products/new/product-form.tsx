@@ -37,7 +37,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { Routes } from "@/lib/routes";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import {
   createProductSchema,
   type CreateProductInput,
@@ -680,7 +680,7 @@ function ComboItemsField({
   const [selectedId, setSelectedId] = useState("");
   const selectedIds = new Set(items.map((item) => item.productId));
   const options = candidates
-    .filter((product) => !selectedIds.has(product.id))
+    .filter((product) => product.isActive && !selectedIds.has(product.id))
     .map((product) => ({
       value: product.id,
       label: product.name,
@@ -745,6 +745,40 @@ function ComboItemsField({
                   <div className="text-xs text-slate-500">
                     {product?.sku} · {product?.baseUnit}
                   </div>
+                  {product && (
+                    <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                      <span>
+                        <span className="text-slate-500">
+                          {t("products.combo.salePrice")}:
+                        </span>{" "}
+                        <span className="font-semibold text-slate-700 dark:text-slate-200">
+                          {formatCurrency(Number(product.retailPrice))}
+                        </span>
+                      </span>
+                      <span>
+                        <span className="text-slate-500">
+                          {t("products.combo.stock")}:
+                        </span>{" "}
+                        <span
+                          className={cn(
+                            "font-semibold",
+                            product.productKind === "service"
+                              ? "text-slate-400"
+                              : "text-slate-700 dark:text-slate-200",
+                          )}
+                        >
+                          {product.productKind === "service"
+                            ? t("products.stock.notTracked")
+                            : `${formatNumber(Number(product.totalStock))} ${product.baseUnit}`}
+                        </span>
+                      </span>
+                      {!product.isActive && (
+                        <span className="font-medium text-amber-600">
+                          {t("products.list.inactive")}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <label className="flex items-center gap-2 text-sm">
                   <span className="text-slate-500">

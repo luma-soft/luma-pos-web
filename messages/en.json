@@ -573,6 +573,8 @@
       "selectProduct": "Search and select an item",
       "addItem": "Add to combo",
       "quantity": "Quantity",
+      "salePrice": "Sale price",
+      "stock": "Stock",
       "empty": "This combo has no items yet.",
       "itemsRequired": "A combo must contain at least one item."
     },
