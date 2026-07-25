@@ -1479,23 +1479,19 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] lg:grid-cols-[1fr_1fr_auto] gap-4 items-end">
-        <Field labelTx="products.pricing.costPrice">
-          <div>
-            <NumberInput
-              value={watch("costPrice")}
-              onChange={(v) => setValue("costPrice", v ?? 0)}
-              suffix="đ"
-              min={0}
-              readOnly={isCombo}
-              className={cn(isCombo && "bg-surface-2 text-slate-600")}
-            />
-            {isCombo && (
-              <p className="mt-1.5 text-xs text-slate-500">
-                {t("products.combo.costAutoHint")}
-              </p>
-            )}
-          </div>
+      <div className="grid grid-cols-1 items-start gap-4 md:grid-cols-[1fr_1fr_auto] lg:grid-cols-[1fr_1fr_auto]">
+        <Field
+          labelTx="products.pricing.costPrice"
+          hintTx={isCombo ? "products.combo.costAutoHint" : undefined}
+        >
+          <NumberInput
+            value={watch("costPrice")}
+            onChange={(v) => setValue("costPrice", v ?? 0)}
+            suffix="đ"
+            min={0}
+            readOnly={isCombo}
+            className={cn(isCombo && "bg-surface-2 text-slate-600")}
+          />
         </Field>
         <Field labelTx="products.pricing.retailPrice">
           <NumberInput
@@ -1508,7 +1504,7 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
         <button
           type="button"
           onClick={openPriceBooks}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/30"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold text-primary-600 hover:bg-primary-50 md:mt-[30px] dark:hover:bg-primary-950/30"
         >
           <Tag className="h-4 w-4" />
           {t("products.pricing.setupPriceBooks")}
