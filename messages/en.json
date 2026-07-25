@@ -575,6 +575,7 @@
       "quantity": "Quantity",
       "salePrice": "Sale price",
       "stock": "Stock",
+      "costAutoHint": "Automatically calculated from each item's cost × quantity.",
       "empty": "This combo has no items yet.",
       "itemsRequired": "A combo must contain at least one item."
     },

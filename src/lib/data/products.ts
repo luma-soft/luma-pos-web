@@ -864,6 +864,7 @@ export const getProductFormOptions = unstable_cache(
           sku: products.sku,
           baseUnit: products.baseUnit,
           productKind: products.productKind,
+          costPrice: products.costPrice,
           retailPrice: products.retailPrice,
           totalStock: sql<string>`coalesce((
             select sum(${stockLevels.quantity})

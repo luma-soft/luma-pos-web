@@ -575,6 +575,7 @@
       "quantity": "Số lượng",
       "salePrice": "Giá bán",
       "stock": "Tồn kho",
+      "costAutoHint": "Tự động tính từ giá vốn × số lượng của các thành phần.",
       "empty": "Combo chưa có thành phần nào.",
       "itemsRequired": "Combo phải có ít nhất một thành phần."
     },

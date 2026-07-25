@@ -676,6 +676,17 @@ function ComboItemsField({
   const t = useTranslations();
   const { watch, setValue, formState } = useFormCtx();
   const items = watch("comboItems") ?? [];
+  const currentCostPrice = Number(watch("costPrice") ?? 0);
+  const candidatesById = useMemo(
+    () => new Map(candidates.map((product) => [product.id, product])),
+    [candidates],
+  );
+  const calculatedCostPrice = items.reduce((total, item) => {
+    const product = candidatesById.get(item.productId);
+    return (
+      total + Number(product?.costPrice ?? 0) * Number(item.quantity || 0)
+    );
+  }, 0);
   const selectedIds = new Set(items.map((item) => item.productId));
   const options = candidates
     .filter((product) => product.isActive && !selectedIds.has(product.id))
@@ -689,6 +700,14 @@ function ComboItemsField({
           : `${formatNumber(Number(product.totalStock))} ${product.baseUnit}`
       }`,
     }));
+
+  useEffect(() => {
+    if (Math.abs(currentCostPrice - calculatedCostPrice) < 0.0001) return;
+    setValue("costPrice", calculatedCostPrice, {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  }, [calculatedCostPrice, currentCostPrice, setValue]);
 
   function addItem(productId: string) {
     if (!productId || selectedIds.has(productId)) return;
@@ -1412,6 +1431,7 @@ function ImageUploadGrid() {
 function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
   const t = useTranslations();
   const { setValue, watch } = useFormCtx();
+  const isCombo = watch("productKind") === "combo";
   const retailPrice = Number(watch("retailPrice") ?? 0);
   const priceBookPrices = watch("priceBookPrices") ?? {};
   const [open, setOpen] = useState(false);
@@ -1453,12 +1473,21 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
     <>
       <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] lg:grid-cols-[1fr_1fr_auto] gap-4 items-end">
         <Field labelTx="products.pricing.costPrice">
-          <NumberInput
-            value={watch("costPrice")}
-            onChange={(v) => setValue("costPrice", v ?? 0)}
-            suffix="đ"
-            min={0}
-          />
+          <div>
+            <NumberInput
+              value={watch("costPrice")}
+              onChange={(v) => setValue("costPrice", v ?? 0)}
+              suffix="đ"
+              min={0}
+              readOnly={isCombo}
+              className={cn(isCombo && "bg-surface-2 text-slate-600")}
+            />
+            {isCombo && (
+              <p className="mt-1.5 text-xs text-slate-500">
+                {t("products.combo.costAutoHint")}
+              </p>
+            )}
+          </div>
         </Field>
         <Field labelTx="products.pricing.retailPrice">
           <NumberInput
