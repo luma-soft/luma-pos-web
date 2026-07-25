@@ -445,6 +445,11 @@ const setProductActiveSchema = z.object({
   productId: z.uuid(),
   isActive: z.boolean(),
 });
+const bulkProductIdsSchema = z
+  .array(z.uuid())
+  .min(1)
+  .max(100)
+  .transform((ids) => [...new Set(ids)]);
 
 /** Bật/tắt kinh doanh. Với nhóm biến thể, áp dụng cho cả nhóm con. */
 export async function setProductActive(
@@ -491,6 +496,95 @@ export async function setProductActive(
     console.error("setProductActive failed:", e);
     return { ok: false, error: "errors.serverError" };
   }
+}
+
+/** Ngừng kinh doanh nhiều hàng hóa; nhóm biến thể áp dụng cho cả sản phẩm con. */
+export async function bulkStopSellingProducts(
+  ids: string[],
+): Promise<ActionResult<{ updated: number }>> {
+  const gate = await requireStockAccess();
+  if (!gate.ok) return gate;
+  const parsed = bulkProductIdsSchema.safeParse(ids);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+
+  try {
+    const targets = await db
+      .select({ id: products.id, isVariantParent: products.isVariantParent })
+      .from(products)
+      .where(inArray(products.id, parsed.data));
+    const parentIds = targets
+      .filter((target) => target.isVariantParent)
+      .map((target) => target.id);
+    const conditions = [inArray(products.id, parsed.data)];
+    if (parentIds.length > 0) {
+      conditions.push(inArray(products.parentProductId, parentIds));
+    }
+    const updated = await db
+      .update(products)
+      .set({
+        isActive: false,
+        lifecycleStatus: "archived",
+        updatedAt: sql`now()`,
+      })
+      .where(or(...conditions))
+      .returning({ id: products.id });
+
+    revalidatePath(Routes.Products);
+    revalidatePath(Routes.Inventory);
+    revalidatePath(Routes.POS);
+    return { ok: true, data: { updated: updated.length } };
+  } catch (e) {
+    console.error("bulkStopSellingProducts failed:", e);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+/**
+ * Xóa nhiều hàng hóa theo best-effort. Hàng đã có chứng từ/thẻ kho được giữ lại
+ * và trả về trong failedIds để UI báo chính xác cho người dùng.
+ */
+export async function bulkDeleteProducts(
+  ids: string[],
+): Promise<
+  ActionResult<{ deleted: number; failedIds: string[] }>
+> {
+  const gate = await requireStockAccess();
+  if (!gate.ok) return gate;
+  const parsed = bulkProductIdsSchema.safeParse(ids);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+
+  let deleted = 0;
+  const failedIds: string[] = [];
+  for (const id of parsed.data) {
+    try {
+      const removed = await db.transaction(async (tx) => {
+        const [target] = await tx
+          .select({ id: products.id, isVariantParent: products.isVariantParent })
+          .from(products)
+          .where(eq(products.id, id))
+          .limit(1);
+        if (!target) return false;
+        if (target.isVariantParent) {
+          await tx.delete(products).where(eq(products.parentProductId, id));
+        }
+        await tx.delete(products).where(eq(products.id, id));
+        return true;
+      });
+      if (removed) deleted += 1;
+    } catch (e) {
+      if (pgErrorCode(e) === "23503") {
+        failedIds.push(id);
+        continue;
+      }
+      console.error(`bulkDeleteProducts failed for ${id}:`, e);
+      failedIds.push(id);
+    }
+  }
+
+  revalidatePath(Routes.Products);
+  revalidatePath(Routes.Inventory);
+  revalidatePath(Routes.POS);
+  return { ok: true, data: { deleted, failedIds } };
 }
 
 /** Gắn hoặc bỏ sản phẩm khỏi danh sách vật tư dùng trong báo giá camera. */

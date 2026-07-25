@@ -767,6 +767,19 @@
       "stopSelling": "Stop selling",
       "resumeSelling": "Resume selling"
     },
+    "bulk": {
+      "selectAll": "Select all visible products",
+      "selectProduct": "Select {name}",
+      "selected": "{count} selected",
+      "more": "More",
+      "stopTitle": "Stop selling in bulk",
+      "stopDescription": "Stop selling the {count} selected items? They will no longer be available for sale in POS.",
+      "deleteTitle": "Delete selected products",
+      "deleteDescription": "Delete the {count} selected items? Products with documents or stock movements will be kept.",
+      "deleteResultTitle": "Product deletion result",
+      "deleteSuccess": "Successfully deleted {count} products.",
+      "deletePartial": "Deleted {deleted} products. {failed} products could not be deleted because they have related data."
+    },
     "confirm": {
       "delete": "Delete this product? If it already has documents or stock movements, the system will block deletion.",
       "stopSelling": "Stop selling this product?",
