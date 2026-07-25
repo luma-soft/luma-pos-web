@@ -5,6 +5,7 @@ import { Routes } from "@/lib/routes";
 import { getProductListItem } from "@/lib/data/products";
 import { ProductDetailView } from "../../inventory/tabs/products-table";
 import { ProductEditorModal } from "../../inventory/tabs/products";
+import { productEditorCloseHref } from "@/lib/product-editor-navigation";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -36,7 +37,7 @@ export default async function ProductDetailPage({ params, searchParams }: Props)
       {query.edit === "1" && (
         <ProductEditorModal
           searchParams={{ productModal: "edit", productId: id }}
-          closeHrefOverride={Routes.productDetail(id)}
+          closeHrefOverride={productEditorCloseHref("page", id)}
           closeNavigation="replace"
         />
       )}
