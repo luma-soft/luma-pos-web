@@ -478,15 +478,15 @@ function InfoTab({
         brands={brands}
         suppliers={suppliers}
       />
+      {productKind === "combo" && (
+        <ComboItemsField products={comboProducts ?? []} />
+      )}
       <Section
         titleTx="products.sections.pricing"
         descriptionTx="products.sections.pricingDesc"
       >
         <PricingFields priceBooks={priceBooks ?? []} />
       </Section>
-      {productKind === "combo" && (
-        <ComboItemsField products={comboProducts ?? []} />
-      )}
       {productKind === "product" && (
         <>
           <Section
