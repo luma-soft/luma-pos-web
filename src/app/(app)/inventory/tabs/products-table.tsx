@@ -822,18 +822,17 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
 
   return (
     <div className="border-t border-border-soft pt-4">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex flex-nowrap gap-2 overflow-x-auto xl:flex-wrap">
-          <ActionButton
-            icon={cameraMaterials ? Trash2 : PackagePlus}
-            label={cameraMaterials
-              ? (locale === "vi" ? "Xóa khỏi vật tư lắp camera" : "Remove from camera materials")
-              : (locale === "vi" ? "Thêm vào vật tư lắp camera" : "Add to camera materials")}
-            onClick={toggleCameraMaterial}
-            disabled={pending}
-            tone={cameraMaterials ? "danger" : "neutral"}
-          />
-          {!cameraMaterials && <>
+      <div className="flex flex-nowrap gap-2 overflow-x-auto xl:flex-wrap xl:justify-end xl:overflow-visible">
+        <ActionButton
+          icon={cameraMaterials ? Trash2 : PackagePlus}
+          label={cameraMaterials
+            ? (locale === "vi" ? "Xóa khỏi vật tư lắp camera" : "Remove from camera materials")
+            : (locale === "vi" ? "Thêm vào vật tư lắp camera" : "Add to camera materials")}
+          onClick={toggleCameraMaterial}
+          disabled={pending}
+          tone={cameraMaterials ? "danger" : "neutral"}
+        />
+        {!cameraMaterials && <>
             <ActionButton
               icon={Trash2}
               label={t("products.actions.delete")}
@@ -849,9 +848,6 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
                 copyFrom: product.id,
               })}
             />
-          </>}
-        </div>
-        {!cameraMaterials && <div className="flex flex-nowrap gap-2 overflow-x-auto xl:flex-wrap xl:justify-end xl:overflow-visible">
           <ActionLink
             icon={Pencil}
             label={t("products.actions.edit")}
@@ -915,7 +911,7 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
               </div>
             )}
           </div>
-        </div>}
+        </>}
       </div>
       {error && <p className="mt-2 text-sm font-medium text-er">{error}</p>}
     </div>
