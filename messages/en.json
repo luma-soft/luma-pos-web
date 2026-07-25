@@ -772,6 +772,7 @@
       "selectProduct": "Select {name}",
       "selected": "{count} selected",
       "more": "More",
+      "moreWithCount": "Actions for {count} selected products",
       "stopTitle": "Stop selling in bulk",
       "stopDescription": "Stop selling the {count} selected items? They will no longer be available for sale in POS.",
       "deleteTitle": "Delete selected products",

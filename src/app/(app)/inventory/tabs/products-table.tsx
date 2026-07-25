@@ -2,7 +2,6 @@
 
 import {
   useEffect,
-  useMemo,
   useRef,
   useState,
   useTransition,
@@ -22,8 +21,6 @@ import {
   Plus,
   Store,
   Trash2,
-  ChevronDown,
-  Loader2,
   type LucideIcon,
 } from "lucide-react";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
@@ -34,12 +31,7 @@ import {
 } from "@/components/data-table";
 import { Routes } from "@/lib/routes";
 import { OrderDetailLink } from "@/components/order-detail-link";
-import {
-  bulkDeleteProducts,
-  bulkStopSellingProducts,
-  deleteProduct,
-  setProductActive,
-} from "@/lib/actions/products";
+import { deleteProduct, setProductActive } from "@/lib/actions/products";
 import { setCameraMaterial } from "@/lib/actions/products";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import type { ProductListResult } from "@/lib/data/products";
@@ -47,6 +39,7 @@ import {
   isProductStockManaged,
   productStockDisplay,
 } from "@/lib/product-stock";
+import { useProductSelection } from "./product-selection";
 
 type ProductRow = ProductListResult["rows"][number];
 type StockMovementRow = ProductRow["stockMovements"][number];
@@ -78,50 +71,22 @@ const MOVEMENT_TYPE_KEYS: Record<string, string> = {
 
 export function ProductsTable({
   rows,
+  selectionEnabled = true,
 }: {
   rows: ProductListResult["rows"];
+  selectionEnabled?: boolean;
 }) {
   const t = useTranslations();
   const router = useRouter();
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const visibleIds = useMemo(() => rows.map((row) => row.id), [rows]);
-  const selectedVisibleIds = visibleIds.filter((id) => selectedIds.has(id));
-  const allSelected =
-    visibleIds.length > 0 && selectedVisibleIds.length === visibleIds.length;
-
-  useEffect(() => {
-    const visible = new Set(visibleIds);
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- selection is page-scoped and must drop rows removed by filters/pagination
-    setSelectedIds((current) => {
-      const next = new Set([...current].filter((id) => visible.has(id)));
-      const unchanged =
-        next.size === current.size &&
-        [...next].every((id) => current.has(id));
-      return unchanged ? current : next;
-    });
-  }, [visibleIds]);
-
-  function toggleProduct(id: string) {
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleAll() {
-    setSelectedIds(
-      allSelected ? new Set() : new Set(visibleIds),
-    );
-  }
+  const { selectedIds, selectedVisibleIds, allSelected, toggle, toggleAll } =
+    useProductSelection();
 
   function openProduct(product: ProductRow) {
     router.push(Routes.productDetail(product.id), { scroll: false });
   }
 
   const columns: DataTableColumn<ProductRow>[] = [
-    {
+    ...(selectionEnabled ? [{
       key: "select",
       label: (
         <SelectionCheckbox
@@ -139,13 +104,13 @@ export function ProductsTable({
       render: (product) => (
         <SelectionCheckbox
           checked={selectedIds.has(product.id)}
-          onChange={() => toggleProduct(product.id)}
+          onChange={() => toggle(product.id)}
           label={t("products.bulk.selectProduct", {
             name: product.name,
           })}
         />
       ),
-    },
+    } satisfies DataTableColumn<ProductRow>] : []),
     {
       key: "product",
       label: t("products.list.colProduct"),
@@ -201,25 +166,19 @@ export function ProductsTable({
           ? "bg-primary-50/50 dark:bg-primary-950/20"
           : undefined
       }
-      toolbar={
-        selectedVisibleIds.length > 0 ? (
-          <BulkProductActions
-            ids={selectedVisibleIds}
-            onSelectionChange={setSelectedIds}
-          />
-        ) : undefined
-      }
       renderMobileRow={({ row: product }) => (
         <div className="flex items-start">
-          <div className="shrink-0 p-3 pr-0 pt-4">
-            <SelectionCheckbox
-              checked={selectedIds.has(product.id)}
-              onChange={() => toggleProduct(product.id)}
-              label={t("products.bulk.selectProduct", {
-                name: product.name,
-              })}
-            />
-          </div>
+          {selectionEnabled && (
+            <div className="shrink-0 p-3 pr-0 pt-4">
+              <SelectionCheckbox
+                checked={selectedIds.has(product.id)}
+                onChange={() => toggle(product.id)}
+                label={t("products.bulk.selectProduct", {
+                  name: product.name,
+                })}
+              />
+            </div>
+          )}
           <button type="button" onClick={() => openProduct(product)} className="min-w-0 flex-1 p-3 text-left">
             <div className="flex items-start justify-between gap-2">
               <div className="flex min-w-0 items-center gap-3">
@@ -268,144 +227,6 @@ function SelectionCheckbox({
       aria-label={label}
       className="h-4 w-4 rounded border-slate-300 accent-primary-600"
     />
-  );
-}
-
-function BulkProductActions({
-  ids,
-  onSelectionChange,
-}: {
-  ids: string[];
-  onSelectionChange: (ids: Set<string>) => void;
-}) {
-  const t = useTranslations();
-  const router = useRouter();
-  const dialog = useConfirmDialog();
-  const rootRef = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
-
-  useEffect(() => {
-    if (!open) return;
-    const close = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [open]);
-
-  async function stopSelling() {
-    setOpen(false);
-    const confirmed = await dialog.confirm({
-      title: t("products.bulk.stopTitle"),
-      description: t("products.bulk.stopDescription", {
-        count: ids.length,
-      }),
-      confirmLabel: t("products.actions.stopSelling"),
-      variant: "warning",
-    });
-    if (!confirmed) return;
-    startTransition(async () => {
-      const result = await bulkStopSellingProducts(ids);
-      if (!result.ok) {
-        await dialog.alert({
-          description: t(result.error as never),
-          variant: "destructive",
-        });
-        return;
-      }
-      onSelectionChange(new Set());
-      router.refresh();
-    });
-  }
-
-  async function remove() {
-    setOpen(false);
-    const confirmed = await dialog.confirm({
-      title: t("products.bulk.deleteTitle"),
-      description: t("products.bulk.deleteDescription", {
-        count: ids.length,
-      }),
-      confirmLabel: t("common.delete"),
-      variant: "destructive",
-    });
-    if (!confirmed) return;
-    startTransition(async () => {
-      const result = await bulkDeleteProducts(ids);
-      if (!result.ok) {
-        await dialog.alert({
-          description: t(result.error as never),
-          variant: "destructive",
-        });
-        return;
-      }
-      const failed = new Set(result.data.failedIds);
-      onSelectionChange(failed);
-      router.refresh();
-      await dialog.alert({
-        title: t("products.bulk.deleteResultTitle"),
-        description:
-          failed.size > 0
-            ? t("products.bulk.deletePartial", {
-                deleted: result.data.deleted,
-                failed: failed.size,
-              })
-            : t("products.bulk.deleteSuccess", {
-                count: result.data.deleted,
-              }),
-        variant: failed.size > 0 ? "warning" : "default",
-      });
-    });
-  }
-
-  return (
-    <div className="flex w-full items-center justify-end gap-3">
-      <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
-        {t("products.bulk.selected", { count: ids.length })}
-      </span>
-      <div ref={rootRef} className="relative">
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => setOpen((value) => !value)}
-          aria-expanded={open}
-          className="inline-flex h-10 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-surface-2 disabled:opacity-60 dark:text-slate-200"
-        >
-          {pending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <MoreHorizontal className="h-4 w-4" />
-          )}
-          {t("products.bulk.more")}
-          <ChevronDown
-            className={cn(
-              "h-4 w-4 transition-transform",
-              open && "rotate-180",
-            )}
-          />
-        </button>
-        {open && (
-          <div className="absolute right-0 top-full z-40 mt-2 min-w-56 rounded-xl border border-border bg-surface p-1 shadow-xl">
-            <button
-              type="button"
-              onClick={stopSelling}
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium hover:bg-surface-2"
-            >
-              <Ban className="h-4 w-4 text-amber-600" />
-              {t("products.actions.stopSelling")}
-            </button>
-            <button
-              type="button"
-              onClick={remove}
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-            >
-              <Trash2 className="h-4 w-4" />
-              {t("products.actions.delete")}
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
   );
 }
 

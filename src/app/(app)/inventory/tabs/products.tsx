@@ -17,6 +17,10 @@ import { CameraMaterialSearch } from "./camera-material-search";
 import { InstantProductSearch } from "./instant-product-search";
 import { InstantProductFilters } from "./instant-product-filters";
 import { ProductCreateMenu } from "./product-create-menu";
+import {
+  ProductBulkActions,
+  ProductSelectionProvider,
+} from "./product-selection";
 
 type SP = Record<string, string | undefined>;
 const STATUSES = ["active", "inactive", "all"] as const;
@@ -97,6 +101,7 @@ async function ProductsToolbar({
           },
         ]}
       />
+      <ProductBulkActions />
     </div>
   );
 }
@@ -196,7 +201,7 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
   });
 
   return (
-    <>
+    <ProductSelectionProvider visibleIds={rows.map((row) => row.id)}>
       {!cameraMaterials && <ProductsToolbar params={params} categories={categories} status={status} view={view} />}
       {rows.length === 0 ? (
         <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">
@@ -206,13 +211,13 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
         </div>
       ) : (
         <>
-          <ProductsTable rows={rows} />
+          <ProductsTable rows={rows} selectionEnabled={!cameraMaterials} />
         </>
       )}
 
       <div className="shrink-0 pt-3">
         <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("products.unitLabel")} />
       </div>
-    </>
+    </ProductSelectionProvider>
   );
 }

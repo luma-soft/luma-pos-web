@@ -772,6 +772,7 @@
       "selectProduct": "Chọn {name}",
       "selected": "Đã chọn {count}",
       "more": "Thao tác",
+      "moreWithCount": "Thao tác với {count} hàng hóa đã chọn",
       "stopTitle": "Ngừng kinh doanh hàng loạt",
       "stopDescription": "Ngừng kinh doanh {count} hàng hóa đã chọn? Các hàng hóa này sẽ không còn xuất hiện để bán tại POS.",
       "deleteTitle": "Xóa hàng hóa đã chọn",
