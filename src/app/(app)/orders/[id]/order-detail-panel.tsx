@@ -79,7 +79,8 @@ export async function OrderDetailPanel({
   );
 
   return (
-    <div className={cn("bg-surface", compact ? "px-4 py-4" : "space-y-4")}>
+    <div className={cn("bg-surface", compact && "flex h-full min-h-0 flex-col")}>
+      <div className={cn(compact ? "min-h-0 flex-1 overflow-y-auto p-4 sm:p-5" : "space-y-4")}>
       <div className={cn("mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between", compact && "mb-4")}>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -243,8 +244,14 @@ export async function OrderDetailPanel({
       </div>
 
       {!isQuote && !cancelled && remaining > 0 && <PaymentForm orderId={order.id} remaining={remaining} />}
+      </div>
 
-      <div className="mt-4 flex flex-col gap-3 border-t border-border-soft pt-4 xl:flex-row xl:items-center xl:justify-between">
+      <div
+        className={cn(
+          "flex shrink-0 flex-col gap-3 border-t border-border-soft xl:flex-row xl:items-center xl:justify-between",
+          compact ? "bg-surface px-4 py-4 sm:px-5" : "mt-4 pt-4",
+        )}
+      >
         <div className="flex flex-wrap gap-2">
           {isQuote && !cancelled ? <QuoteDeleteButton quoteId={order.id} /> : !cancelled && <OrderActions orderId={order.id} />}
           {!isQuote && canSendZalo && <SendOrderZaloButton orderId={order.id} />}
