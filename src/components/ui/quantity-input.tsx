@@ -37,6 +37,34 @@ export function normalizeQuantity(
   return Math.round(clamped * factor) / factor;
 }
 
+export function stepQuantity(
+  value: number,
+  direction: -1 | 1,
+  {
+    min = 0,
+    max,
+    step = 1,
+    decimals = 4,
+  }: Pick<
+    QuantityInputProps,
+    "min" | "max" | "step" | "decimals"
+  > = {},
+) {
+  const tolerance = 1e-9;
+  const stepIndex =
+    direction === 1
+      ? Math.floor(value / step + tolerance) + 1
+      : Math.ceil(value / step - tolerance) - 1;
+  const candidate = stepIndex * step;
+  if (candidate < min - tolerance) return value;
+  if (max != null && max >= min && candidate > max + tolerance) return value;
+  return normalizeQuantity(candidate, {
+    min,
+    max,
+    decimals,
+  });
+}
+
 export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputProps>(
   (
     {
@@ -60,6 +88,18 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
     const upperBound = max != null && max >= min ? max : undefined;
     const update = (nextValue: number) =>
       onChange(normalizeQuantity(nextValue, { min, max: upperBound, decimals }));
+    const decreasedValue = stepQuantity(value, -1, {
+      min,
+      max: upperBound,
+      step,
+      decimals,
+    });
+    const increasedValue = stepQuantity(value, 1, {
+      min,
+      max: upperBound,
+      step,
+      decimals,
+    });
 
     return (
       <div
@@ -72,8 +112,8 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
       >
         <button
           type="button"
-          disabled={locked || value <= min}
-          onClick={() => update(value - step)}
+          disabled={locked || decreasedValue === value}
+          onClick={() => onChange(decreasedValue)}
           aria-label={decrementLabel}
           className="grid h-full place-items-center text-slate-500 transition-colors hover:bg-surface-2 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40"
         >
@@ -97,8 +137,8 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
         />
         <button
           type="button"
-          disabled={locked || (upperBound != null && value >= upperBound)}
-          onClick={() => update(value + step)}
+          disabled={locked || increasedValue === value}
+          onClick={() => onChange(increasedValue)}
           aria-label={incrementLabel}
           className="grid h-full place-items-center text-slate-500 transition-colors hover:bg-surface-2 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-40"
         >

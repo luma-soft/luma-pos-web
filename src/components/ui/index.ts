@@ -5,6 +5,7 @@ export { NumberInput, type NumberInputProps } from "./number-input";
 export {
   QuantityInput,
   normalizeQuantity,
+  stepQuantity,
   type QuantityInputProps,
 } from "./quantity-input";
 export { MoneyInput, type MoneyInputProps } from "./money-input";
