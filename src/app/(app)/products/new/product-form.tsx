@@ -148,7 +148,7 @@ export function NewProductForm({
       maxLevel: 999_999_999,
       weightUnit: "kg",
       dimUnit: "mm",
-      baseUnit: "cái",
+      baseUnit: creationKind === "combo" ? "combo" : "cái",
       units: [],
       attributes: [],
       variantChildren: [],
@@ -547,6 +547,12 @@ function ProductKindChangeField({
     }
     if (draftKind !== "combo") {
       setValue("comboItems", [], { shouldDirty: true });
+    }
+    if (!watch("baseUnit")?.trim()) {
+      setValue("baseUnit", draftKind === "combo" ? "combo" : "cái", {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
     }
     setOpen(false);
   }

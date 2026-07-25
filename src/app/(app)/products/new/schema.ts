@@ -93,7 +93,7 @@ export const createProductSchema = z.object({
   dimUnit: z.enum(["mm", "cm", "m"]).default("mm"),
 
   // Units
-  baseUnit: z.string().trim().transform((unit) => unit || "cái").default("cái"),
+  baseUnit: z.string().trim().default("cái"),
   units: z.array(productUnitSchema).default([]),
 
   // Attributes (replaces VLXD section)
@@ -122,7 +122,11 @@ export const createProductSchema = z.object({
       message: "products.errors.kindCannotHaveVariants",
     });
   }
-});
+}).transform((value) => ({
+  ...value,
+  baseUnit:
+    value.baseUnit || (value.productKind === "combo" ? "combo" : "cái"),
+}));
 
 export type CreateProductInput = z.input<typeof createProductSchema>;
 export type CreateProductOutput = z.output<typeof createProductSchema>;
