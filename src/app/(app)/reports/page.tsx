@@ -85,7 +85,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
         <div className="flex min-h-[52px] items-center px-4 pt-2.5 sm:px-6">
           <Text as="h1" weight="bold" className="text-[17px]" text={t("reports.title")} />
         </div>
-        <div className="flex items-center gap-3 px-4 pb-1.5 sm:px-6">
+        <div className="flex flex-col gap-2 px-4 pb-2 sm:flex-row sm:items-center sm:gap-3 sm:px-6">
           <div className="min-w-0 flex-1">
             <GroupTabs
               base={Routes.Reports}
@@ -94,7 +94,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
               edgeToEdge={false}
             />
           </div>
-          <div className="shrink-0">
+          <div className="w-full shrink-0 sm:w-auto">
             <ReportPeriodFilter period={period} from={dateRange.fromValue} to={dateRange.toValue} />
           </div>
         </div>
@@ -108,27 +108,27 @@ export default async function ReportsPage({ searchParams }: PageProps) {
 
       {activeTab === "overview" && (
         <div className="space-y-5">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-surface rounded-card border border-border p-5">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-2 lg:grid-cols-4 lg:gap-4">
+            <div className="bg-surface rounded-card border border-border p-4 sm:p-5">
               <div className="text-sm text-slate-500">{t("reports.revenue")}</div>
-              <div className="text-2xl font-bold tabular-nums mt-1">{formatCurrency(data.summary.revenue)}</div>
+              <div className="mt-1 break-words text-lg font-bold leading-tight tabular-nums sm:text-2xl">{formatCurrency(data.summary.revenue)}</div>
               {data.summary.refundTotal > 0 && (
                 <div className="mt-1 text-xs font-medium text-er">
                   {t("reports.returnsDeducted", { amount: formatCurrency(data.summary.refundTotal) })}
                 </div>
               )}
             </div>
-            <div className="bg-surface rounded-card border border-border p-5">
+            <div className="bg-surface rounded-card border border-border p-4 sm:p-5">
               <div className="text-sm text-slate-500">{t("reports.collected")}</div>
-              <div className="text-2xl font-bold tabular-nums mt-1 text-ok">{formatCurrency(data.summary.collected)}</div>
+              <div className="mt-1 break-words text-lg font-bold leading-tight tabular-nums text-ok sm:text-2xl">{formatCurrency(data.summary.collected)}</div>
             </div>
-            <div className="bg-surface rounded-card border border-border p-5">
+            <div className="bg-surface rounded-card border border-border p-4 sm:p-5">
               <div className="text-sm text-slate-500">{t("reports.uncollected")}</div>
-              <div className={cn("text-2xl font-bold tabular-nums mt-1", uncollected > 0 ? "text-er" : "")}>{formatCurrency(uncollected)}</div>
+              <div className={cn("mt-1 break-words text-lg font-bold leading-tight tabular-nums sm:text-2xl", uncollected > 0 ? "text-er" : "")}>{formatCurrency(uncollected)}</div>
             </div>
-            <div className="bg-surface rounded-card border border-border p-5">
+            <div className="bg-surface rounded-card border border-border p-4 sm:p-5">
               <div className="text-sm text-slate-500">{t("reports.orders")}</div>
-              <div className="text-2xl font-bold tabular-nums mt-1">{data.summary.orderCount}</div>
+              <div className="mt-1 text-lg font-bold leading-tight tabular-nums sm:text-2xl">{data.summary.orderCount}</div>
               <div className="text-xs text-slate-400 mt-1">
                 {data.summary.orderCount > 0 && t("reports.avgOrder", { avg: formatCurrency(Math.round(data.summary.revenue / data.summary.orderCount)) })}
               </div>

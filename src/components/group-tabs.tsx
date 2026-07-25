@@ -41,7 +41,7 @@ export function GroupTabs({
 
   return (
     <div className={cn(
-      "flex items-center gap-1 overflow-x-auto [&::-webkit-scrollbar]:h-0",
+      "flex snap-x snap-mandatory items-center gap-1 overflow-x-auto overscroll-x-contain scroll-px-4 [&::-webkit-scrollbar]:h-0",
       edgeToEdge && "-mx-4 px-4 sm:-mx-6 sm:px-6",
     )}>
       {items.map((it) => {
@@ -51,7 +51,7 @@ export function GroupTabs({
             key={it.tab}
             href={tabHref(it.tab)}
             className={cn(
-              "shrink-0 inline-flex items-center gap-2 px-3.5 h-9 rounded-[10px] text-xs font-semibold transition-colors",
+              "inline-flex h-11 shrink-0 snap-start items-center gap-2 rounded-[10px] px-3.5 text-xs font-semibold transition-colors sm:h-9",
               on ? "bg-primary-50 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300" : "text-slate-500 hover:bg-surface-2 hover:text-slate-900 dark:hover:text-slate-200"
             )}
           >

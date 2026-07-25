@@ -36,14 +36,14 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
 
   return (
     <>
-      <div className="flex items-end justify-between gap-3 border-b border-border mb-4">
-        <div className="flex gap-1">
+      <div className="mb-4 flex flex-col gap-2 border-b border-border sm:flex-row sm:items-end sm:justify-between sm:gap-3">
+        <div className="-mx-4 flex snap-x snap-mandatory gap-1 overflow-x-auto px-4 sm:mx-0 sm:px-0">
           {STATUS.map((tab) => (
             <Link
               key={tab}
               href={href({ status: tab, page: undefined })}
               className={cn(
-                "px-4 py-2 text-sm font-medium border-b-2 -mb-px",
+                "min-h-11 shrink-0 snap-start border-b-2 px-4 py-2 text-sm font-medium sm:min-h-0",
                 status === tab ? "border-primary-600 text-primary-600" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
               )}
             >
@@ -51,16 +51,16 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
             </Link>
           ))}
         </div>
-        <Link href={Routes.POS} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98] mb-1.5 shrink-0">
+        <Link href={Routes.POS} className="mb-2 inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 active:scale-[0.98] sm:mb-1.5 sm:min-h-0 sm:w-auto">
           <ShoppingCart className="w-4 h-4" />
           {t("orders.createViaPos")}
         </Link>
       </div>
 
-      <InstantFilterForm className="flex flex-wrap items-center gap-2 mb-4" action={Routes.Sales}>
+      <InstantFilterForm className="mb-4 grid grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap" action={Routes.Sales}>
         <input type="hidden" name="tab" value="orders" />
         {status !== "all" && <input type="hidden" name="status" value={status} />}
-        <div className="relative w-56">
+        <div className="relative col-span-2 w-full sm:w-56">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("orders.searchPlaceholder")} aria-label={t("common.search")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface" />
         </div>
@@ -69,26 +69,26 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
           defaultValue={payment}
           aria-label={t("orders.cols.payment")}
           options={PAYMENTS.map((p) => ({ value: p, label: t(`orders.paymentFilter.${p}`) }))}
-          className="min-w-32"
+          className="w-full min-w-0 sm:w-auto sm:min-w-32"
         />
         <Select
           name="source"
           defaultValue={source}
-          aria-label={LumaText(t, "orders.cols.channel", "Channel")}
+          aria-label={t("orders.cols.channel")}
           options={[
-            { value: "all", label: LumaText(t, "orders.sourceFilter.all", "All channels") },
+            { value: "all", label: t("orders.sourceFilter.all") },
             { value: "pos", label: "POS" },
             { value: "shopee", label: "Shopee" },
             { value: "tiktok_shop", label: "TikTok Shop" },
             { value: "lazada", label: "Lazada" },
             { value: "tiki", label: "Tiki" },
           ]}
-          className="min-w-36"
+          className="w-full min-w-0 sm:w-auto sm:min-w-36"
         />
-        <input type="date" name="from" defaultValue={from} aria-label={t("orders.filter.from")} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface" />
-        <input type="date" name="to" defaultValue={to} aria-label={t("orders.filter.to")} className="px-3 py-2 text-sm rounded-lg border border-border bg-surface" />
+        <input type="date" name="from" defaultValue={from} aria-label={t("orders.filter.from")} className="min-w-0 rounded-lg border border-border bg-surface px-3 py-2 text-sm" />
+        <input type="date" name="to" defaultValue={to} aria-label={t("orders.filter.to")} className="min-w-0 rounded-lg border border-border bg-surface px-3 py-2 text-sm" />
         {(params.q || payment !== "all" || source !== "all" || from || to || params.orderId) && (
-          <Link href={href({ q: undefined, payment: undefined, source: undefined, from: undefined, to: undefined, orderId: undefined })} className="px-3 py-2 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">
+          <Link href={href({ q: undefined, payment: undefined, source: undefined, from: undefined, to: undefined, orderId: undefined })} className="col-span-2 px-3 py-2 text-center text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 sm:col-span-1">
             {t("orders.filter.clear")}
           </Link>
         )}
@@ -134,12 +134,4 @@ async function OrdersContent({ searchParams }: { searchParams: SP }) {
       <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("orders.unitLabel")} />
     </>
   );
-}
-
-function LumaText(t: Awaited<ReturnType<typeof getTranslations>>, key: string, fallback: string) {
-  try {
-    return t(key as never);
-  } catch {
-    return fallback;
-  }
 }

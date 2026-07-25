@@ -71,7 +71,7 @@ export function ReportPeriodFilter({
       <Select
         value={period}
         aria-label={t("reports.period.label")}
-        className="h-9 min-w-40"
+        className="h-11 w-full min-w-40 sm:h-9 sm:w-auto"
         options={PERIODS.map((value) => ({
           value,
           label: t(`reports.period.options.${value}` as never),

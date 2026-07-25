@@ -112,7 +112,29 @@ export async function OrderDetailPanel({
       <div className={cn("grid grid-cols-1 gap-4", compact ? "xl:grid-cols-[1fr_300px]" : "lg:grid-cols-[1fr_320px]")}>
         <div className="min-w-0 space-y-4">
           <div className="overflow-hidden rounded-lg border border-border">
-            <div className="overflow-x-auto">
+            <div className="divide-y divide-border-soft lg:hidden">
+              {order.items.map((item) => (
+                <div key={item.id} className="p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 font-medium">
+                      <OrderProductLink productId={item.productId} productName={item.productName} />
+                      {(order.returnedByItem[item.id] ?? 0) > 0 && (
+                        <div className="mt-1 text-xs font-normal text-warn">
+                          {t("returns.returnedQty", { qty: formatNumber(order.returnedByItem[item.id]), unit: item.unitName })}
+                        </div>
+                      )}
+                    </div>
+                    <div className="shrink-0 font-semibold tabular-nums">{formatCurrency(Number(item.total))}</div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                    <span>{formatNumber(Number(item.quantity))} {item.unitName}</span>
+                    <span>× {formatCurrency(Number(item.unitPrice))}</span>
+                    {Number(item.discount) > 0 && <span>{t("orders.cols.discount")}: {formatCurrency(Number(item.discount))}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto lg:block">
               <table className="w-full min-w-[760px] text-sm">
                 <thead>
                   <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">
@@ -249,41 +271,41 @@ export async function OrderDetailPanel({
       <div
         className={cn(
           "flex shrink-0 flex-col gap-3 border-t border-border-soft xl:flex-row xl:items-center xl:justify-between",
-          compact ? "bg-surface px-4 py-4 sm:px-5" : "mt-4 pt-4",
+          compact ? "bg-surface px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] sm:px-5 sm:py-4" : "mt-4 pt-4",
         )}
       >
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-nowrap gap-2 overflow-x-auto xl:flex-wrap">
           {isQuote && !cancelled ? <QuoteDeleteButton quoteId={order.id} /> : !cancelled && <OrderActions orderId={order.id} />}
           {!isQuote && canSendZalo && <SendOrderZaloButton orderId={order.id} />}
         </div>
-        <div className="flex flex-wrap gap-2 xl:justify-end">
+        <div className="flex flex-nowrap gap-2 overflow-x-auto xl:flex-wrap xl:justify-end">
           {isQuote && !order.hasCreatedOrder && (
-            <Link href={posSourceHref("copy", "invoice")} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-9")}>
+            <Link href={posSourceHref("copy", "invoice")} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-11 sm:h-9")}>
               {t("quotes.convert")}
             </Link>
           )}
           {isBooking && !cancelled && <BookingCreateOrderButton bookingId={order.id} />}
           {shareDocType && shareHref && <SharePrintDocButton href={shareHref} code={order.code} docType={shareDocType} />}
-          <Link href={`${Routes.order(order.id)}/print`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9")}>
+          <Link href={`${Routes.order(order.id)}/print`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-11 sm:h-9")}>
             {t("print.printBtn")}
           </Link>
           {(order.status === "completed" || order.status === "quote" || order.status === "confirmed") && order.returns.length === 0 && (
-            <Link href={posSourceHref("edit")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 bg-white dark:bg-surface")}>
+            <Link href={posSourceHref("edit")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-11 bg-white dark:bg-surface sm:h-9")}>
               {isQuote ? t("quotes.edit") : isBooking ? t("bookings.edit") : t("orderEdit.action")}
             </Link>
           )}
           {!cancelled && (
-            <Link href={posSourceHref("copy")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9")}>
+            <Link href={posSourceHref("copy")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-11 sm:h-9")}>
               {t("pos.modes.copyShort")}
             </Link>
           )}
           {order.status === "completed" && (
-            <Link href={posSourceHref("return")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9")}>
+            <Link href={posSourceHref("return")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-11 sm:h-9")}>
               {t("returns.action")}
             </Link>
           )}
           {showOpenAction && (
-            <Link href={openInListHref} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-9")}>
+            <Link href={openInListHref} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-11 sm:h-9")}>
               Mở phiếu
             </Link>
           )}

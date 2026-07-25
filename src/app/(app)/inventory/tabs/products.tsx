@@ -71,10 +71,10 @@ async function ProductsToolbar({
 }) {
   const t = await getTranslations();
   return (
-    <div className="mb-4 flex flex-wrap items-center gap-3">
+    <div className="mb-4 flex flex-wrap items-center gap-2 sm:gap-3">
       <InstantProductSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />
       <InstantProductFilters category={params.category ?? ""} status={status} view={view} categories={categories} labels={{ allCategories: t("products.list.allCategories"), active: t("products.list.statusActive"), inactive: t("products.list.statusInactive"), all: t("products.list.statusAll"), grouped: t("products.list.viewGrouped"), flat: t("products.list.viewFlat") }} />
-      <Link href={productModalHref(params, { productModal: "create" })} className="inline-flex shrink-0 items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98]"><Plus className="w-4 h-4" />{t("products.createNew")}</Link>
+      <Link href={productModalHref(params, { productModal: "create" })} className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 active:scale-[0.98] sm:min-h-0 sm:w-auto sm:justify-start"><Plus className="w-4 h-4" />{t("products.createNew")}</Link>
     </div>
   );
 }
@@ -116,8 +116,8 @@ export async function ProductEditorModal({
     : undefined;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-2 sm:p-5">
-      <div className="h-[min(92dvh,920px)] w-full max-w-7xl overflow-hidden rounded-2xl bg-surface shadow-2xl">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-0 sm:p-5">
+      <div className="h-dvh w-full max-w-7xl overflow-hidden bg-surface shadow-2xl sm:h-[min(92dvh,920px)] sm:rounded-2xl">
         <NewProductForm
           mode={mode}
           productId={editId}

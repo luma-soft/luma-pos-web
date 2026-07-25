@@ -24,9 +24,9 @@ export function InstantProductSearch({ value, placeholder }: { value: string; pl
   }, [params, pathname, query, router, value]);
 
   return (
-    <div className="relative min-w-[240px] flex-1 max-w-sm">
+    <div className="relative w-full min-w-0 flex-1 sm:min-w-[240px] sm:max-w-sm">
       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-      <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={placeholder} className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100" autoComplete="off" />
+      <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={placeholder} className="min-h-11 w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 sm:min-h-0" autoComplete="off" />
     </div>
   );
 }

@@ -29,10 +29,10 @@ export function InstantProductFilters({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <Select value={category} onChange={(event) => update("category", event.target.value)} options={[{ value: "", label: labels.allCategories }, ...categories.map((c) => ({ value: c.id, label: c.name }))]} className="min-w-44" />
-      <Select value={status} onChange={(event) => update("status", event.target.value)} options={[{ value: "active", label: labels.active }, { value: "inactive", label: labels.inactive }, { value: "all", label: labels.all }]} />
-      <Select value={view} onChange={(event) => update("view", event.target.value)} options={[{ value: "grouped", label: labels.grouped }, { value: "flat", label: labels.flat }]} />
+    <div className="grid w-full grid-cols-2 items-center gap-2 sm:flex sm:w-auto sm:flex-wrap sm:gap-3">
+      <Select value={category} onChange={(event) => update("category", event.target.value)} options={[{ value: "", label: labels.allCategories }, ...categories.map((c) => ({ value: c.id, label: c.name }))]} className="min-w-0 sm:min-w-44" />
+      <Select value={status} onChange={(event) => update("status", event.target.value)} options={[{ value: "active", label: labels.active }, { value: "inactive", label: labels.inactive }, { value: "all", label: labels.all }]} className="min-w-0" />
+      <Select value={view} onChange={(event) => update("view", event.target.value)} options={[{ value: "grouped", label: labels.grouped }, { value: "flat", label: labels.flat }]} className="col-span-2 min-w-0 sm:col-span-1" />
     </div>
   );
 }

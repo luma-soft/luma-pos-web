@@ -201,14 +201,14 @@ export function ProductDetailView({
 
   return (
     <div className={cn("bg-surface px-4 py-4", surface === "modal" && "flex h-full min-h-0 flex-col", surface === "page" && "rounded-card border border-border-soft")}>
-      <div className="flex shrink-0 items-center gap-6 overflow-x-auto border-b border-border-soft text-sm font-semibold text-slate-500">
+      <div className="-mx-4 flex shrink-0 snap-x snap-mandatory items-center gap-5 overflow-x-auto border-b border-border-soft px-4 text-sm font-semibold text-slate-500 sm:mx-0 sm:gap-6 sm:px-0">
         {PRODUCT_EXPAND_TABS.map((key) => (
           <button
             key={key}
             type="button"
             onClick={() => setTab(key)}
             className={cn(
-              "shrink-0 border-b-2 pb-2 transition-colors",
+              "min-h-11 shrink-0 snap-start border-b-2 pt-2 transition-colors sm:min-h-0 sm:pb-2 sm:pt-0",
               tab === key
                 ? "border-primary-600 text-primary-600"
                 : "border-transparent hover:text-slate-800 dark:hover:text-slate-200",
@@ -268,7 +268,7 @@ function ProductInfoPanel({
             alt={product.name}
             fill
             sizes="144px"
-            className="object-cover"
+            className="object-contain p-2"
             unoptimized
           />
         ) : (
@@ -823,7 +823,7 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
   return (
     <div className="border-t border-border-soft pt-4">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-nowrap gap-2 overflow-x-auto xl:flex-wrap">
           <ActionButton
             icon={cameraMaterials ? Trash2 : PackagePlus}
             label={cameraMaterials
@@ -851,7 +851,7 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
             />
           </>}
         </div>
-        {!cameraMaterials && <div className="flex flex-wrap gap-2 xl:justify-end">
+        {!cameraMaterials && <div className="flex flex-nowrap gap-2 overflow-x-auto xl:flex-wrap xl:justify-end">
           <ActionLink
             icon={Pencil}
             label={t("products.actions.edit")}
@@ -998,7 +998,7 @@ function ActionButton({
 }
 
 const actionClassName =
-  "inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 sm:h-10";
 
 function StatusBadge({ product }: { product: ProductRow }) {
   const t = useTranslations();

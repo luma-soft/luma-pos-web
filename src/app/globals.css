@@ -219,6 +219,20 @@ textarea.ai-composer-scrollbar-hidden::-webkit-scrollbar-corner {
   [data-mobilenav="open"] .mobile-nav-backdrop { display: block; }
 }
 
+/* Mobile ergonomics: avoid iOS zoom, keep form targets comfortably tappable. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]),
+  select {
+    min-height: 44px;
+  }
+}
+
 /* In phiếu tạm từ POS: ẩn toàn app, chỉ hiện phiếu (portal .pos-print-root ở body) */
 .pos-print-root { display: none; }
 .electrical-labels-print-root { display: none; }

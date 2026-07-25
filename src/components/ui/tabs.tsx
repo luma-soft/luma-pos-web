@@ -22,7 +22,7 @@ export function SegmentedTabs<T extends string>({
   return (
     <div
       role="tablist"
-      className={cn("flex items-center gap-1 overflow-x-auto [&::-webkit-scrollbar]:h-0", className)}
+      className={cn("flex snap-x snap-mandatory items-center gap-1 overflow-x-auto overscroll-x-contain [&::-webkit-scrollbar]:h-0", className)}
     >
       {items.map((item) => {
         const active = item.id === value;
@@ -34,7 +34,7 @@ export function SegmentedTabs<T extends string>({
             aria-selected={active}
             onClick={() => onChange(item.id)}
             className={cn(
-              "inline-flex h-9 shrink-0 items-center gap-2 rounded-[10px] px-3.5 text-xs font-semibold transition-colors",
+              "inline-flex h-11 shrink-0 snap-start items-center gap-2 rounded-[10px] px-3.5 text-xs font-semibold transition-colors sm:h-9",
               active
                 ? "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300"
                 : "text-slate-500 hover:bg-surface-2 hover:text-slate-900 dark:hover:text-slate-200",

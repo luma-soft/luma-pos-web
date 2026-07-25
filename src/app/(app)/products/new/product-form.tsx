@@ -362,7 +362,7 @@ export function NewProductForm({
       </div>
 
       {isModal && (
-        <footer className="shrink-0 border-t border-border bg-surface px-4 py-3 sm:px-6">
+        <footer className="shrink-0 border-t border-border bg-surface px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:pb-3">
           <FormActions
             loading={form.formState.isSubmitting}
             registerDirectSale={form.register("directSale")}

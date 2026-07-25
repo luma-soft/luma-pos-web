@@ -1481,6 +1481,7 @@
       "code": "Code",
       "date": "Date",
       "customer": "Customer",
+      "channel": "Channel",
       "project": "Project",
       "total": "Total",
       "remaining": "Owing",
@@ -1492,6 +1493,9 @@
       "unitPrice": "Unit price",
       "lineTotal": "Line total",
       "discount": "Discount"
+    },
+    "sourceFilter": {
+      "all": "All channels"
     },
     "status": {
       "draft": "Draft",

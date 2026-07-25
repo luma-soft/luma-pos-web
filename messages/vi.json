@@ -1481,6 +1481,7 @@
       "code": "Mã đơn",
       "date": "Ngày",
       "customer": "Khách hàng",
+      "channel": "Nguồn",
       "project": "Công trình",
       "total": "Tổng tiền",
       "remaining": "Còn nợ",
@@ -1492,6 +1493,9 @@
       "unitPrice": "Đơn giá",
       "lineTotal": "Thành tiền",
       "discount": "Giảm giá"
+    },
+    "sourceFilter": {
+      "all": "Tất cả nguồn"
     },
     "status": {
       "draft": "Nháp",

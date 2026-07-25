@@ -62,25 +62,25 @@ export default async function DashboardPage({ searchParams }: PageProps) {
       </div>
 
       {/* 4 stat cards — theo design */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-surface rounded-card border border-border p-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-2 lg:grid-cols-4 lg:gap-4">
+        <div className="bg-surface rounded-card border border-border p-4 sm:p-5">
           <div className="text-xs font-semibold text-slate-500">{t(`dashboard.revenueLabel.${range}`)}</div>
-          <div className="text-[22px] font-extrabold tabular-nums mt-1.5">{formatCurrency(data.revenue)}</div>
+          <div className="mt-1.5 break-words text-[18px] font-extrabold leading-tight tabular-nums sm:text-[22px]">{formatCurrency(data.revenue)}</div>
           <div className="text-xs text-ok mt-1">{t("dashboard.ordersCount", { count: data.orderCount })}</div>
         </div>
-        <div className="bg-surface rounded-card border border-border p-5">
+        <div className="bg-surface rounded-card border border-border p-4 sm:p-5">
           <div className="text-xs font-semibold text-slate-500">{t("dashboard.grossProfit")}</div>
-          <div className="text-[22px] font-extrabold tabular-nums mt-1.5">{formatCurrency(data.grossProfit)}</div>
+          <div className="mt-1.5 break-words text-[18px] font-extrabold leading-tight tabular-nums sm:text-[22px]">{formatCurrency(data.grossProfit)}</div>
           <div className="text-xs text-ok mt-1">{t("dashboard.marginPct", { pct: data.marginPct.toFixed(1) })}</div>
         </div>
-        <div className="bg-surface rounded-card border border-border p-5">
+        <div className="bg-surface rounded-card border border-border p-4 sm:p-5">
           <div className="text-xs font-semibold text-slate-500">{t("dashboard.ordersLabel")}</div>
-          <div className="text-[22px] font-extrabold tabular-nums mt-1.5">{data.orderCount}</div>
+          <div className="mt-1.5 text-[18px] font-extrabold leading-tight tabular-nums sm:text-[22px]">{data.orderCount}</div>
           <div className="text-xs text-slate-400 mt-1">{data.orderCount > 0 ? t("dashboard.avgPerOrder", { avg: formatCurrency(Math.round(data.avgOrder)) }) : "—"}</div>
         </div>
-        <div className="bg-surface rounded-card border border-border p-5">
+        <div className="bg-surface rounded-card border border-border p-4 sm:p-5">
           <div className="text-xs font-semibold text-slate-500">{t("dashboard.receivable")}</div>
-          <div className="text-[22px] font-extrabold tabular-nums mt-1.5 text-warn">{formatCurrency(data.debt.total)}</div>
+          <div className="mt-1.5 break-words text-[18px] font-extrabold leading-tight tabular-nums text-warn sm:text-[22px]">{formatCurrency(data.debt.total)}</div>
           <div className={cn("text-xs mt-1", data.debt.debtors > 0 ? "text-er" : "text-slate-400")}>
             {t("dashboard.debtors", { count: data.debt.debtors })}
           </div>
