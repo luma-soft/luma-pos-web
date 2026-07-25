@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, Search, Check, Plus, Loader2, X } from "lucide-react";
+import { ChevronDown, Search, Check, ImageIcon, Plus, Loader2, X } from "lucide-react";
+import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { normalizeSearch } from "@/lib/normalize";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,7 @@ export interface ComboOption {
   label: string;
   hint?: string;
   description?: string;
+  imageUrl?: string | null;
 }
 /** Alias ngữ nghĩa — cùng kiểu với ComboOption. */
 export type SearchableOption = ComboOption;
@@ -184,25 +186,44 @@ export function SearchableSelect({
                   onMouseEnter={() => setActive(i)}
                   onClick={() => pick(o.value)}
                   className={cn(
-                    "justify-between rounded-none px-3 py-3 lg:py-1.5 text-left",
+                    "h-auto justify-between rounded-none px-3 text-left",
+                    o.imageUrl ? "min-h-16 py-2.5" : "min-h-12 py-2",
                     i === active && "bg-surface-2",
                     o.value === value && "bg-primary-50 dark:bg-primary-950/40"
                   )}
                 >
-                  <span className="min-w-0 flex-1">
-                    <Text as="span" truncate className="block min-w-0 text-current">
-                      {o.label}{o.hint && <Text as="span" variant="muted" size="xs" className="ml-1" text={o.hint} />}
-                    </Text>
-                    {o.description && (
-                      <Text
-                        as="span"
-                        variant="muted"
-                        size="xs"
-                        truncate
-                        className="mt-0.5 block"
-                        text={o.description}
-                      />
+                  <span className="flex min-w-0 flex-1 items-center gap-3">
+                    {o.imageUrl !== undefined && (
+                      <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-lg border border-border-soft bg-surface-2">
+                        {o.imageUrl ? (
+                          <Image
+                            src={o.imageUrl}
+                            alt=""
+                            width={44}
+                            height={44}
+                            unoptimized
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <ImageIcon className="h-5 w-5 text-slate-300" />
+                        )}
+                      </span>
                     )}
+                    <span className="min-w-0 flex-1">
+                      <Text as="span" truncate className="block min-w-0 font-medium text-current">
+                        {o.label}{o.hint && <Text as="span" variant="muted" size="xs" className="ml-1 font-normal" text={o.hint} />}
+                      </Text>
+                      {o.description && (
+                        <Text
+                          as="span"
+                          variant="muted"
+                          size="xs"
+                          truncate
+                          className="mt-1 block"
+                          text={o.description}
+                        />
+                      )}
+                    </span>
                   </span>
                   {o.value === value && <Check className="w-4 h-4 text-primary-600 shrink-0" />}
                 </Button>

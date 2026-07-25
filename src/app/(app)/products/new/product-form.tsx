@@ -695,6 +695,7 @@ function ComboItemsField({
       value: product.id,
       label: product.name,
       hint: `${product.sku} · ${product.baseUnit}`,
+      imageUrl: product.imageUrls?.[0] ?? null,
       description: `${t("products.combo.costPrice")}: ${formatCurrency(Number(product.costPrice))} · ${t("products.combo.salePrice")}: ${formatCurrency(Number(product.retailPrice))} · ${t("products.combo.stock")}: ${
         product.productKind === "service"
           ? t("products.stock.notTracked")
