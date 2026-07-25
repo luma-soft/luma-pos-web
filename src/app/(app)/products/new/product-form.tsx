@@ -17,7 +17,6 @@ import {
   Tag,
   Trash2,
   X,
-  PackagePlus,
   Boxes,
   Package,
   Wrench,
@@ -677,7 +676,6 @@ function ComboItemsField({
   const t = useTranslations();
   const { watch, setValue, formState } = useFormCtx();
   const items = watch("comboItems") ?? [];
-  const [selectedId, setSelectedId] = useState("");
   const selectedIds = new Set(items.map((item) => item.productId));
   const options = candidates
     .filter((product) => product.isActive && !selectedIds.has(product.id))
@@ -692,14 +690,13 @@ function ComboItemsField({
       }`,
     }));
 
-  function addItem() {
-    if (!selectedId || selectedIds.has(selectedId)) return;
+  function addItem(productId: string) {
+    if (!productId || selectedIds.has(productId)) return;
     setValue(
       "comboItems",
-      [...items, { productId: selectedId, quantity: 1 }],
+      [...items, { productId, quantity: 1 }],
       { shouldDirty: true, shouldValidate: true },
     );
-    setSelectedId("");
   }
 
   return (
@@ -708,25 +705,14 @@ function ComboItemsField({
       descriptionTx="products.combo.sectionDesc"
       collapsible={false}
     >
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <Combobox
-          value={selectedId}
-          onChange={setSelectedId}
-          options={options}
-          placeholder={t("products.combo.selectProduct")}
-          showSearch
-          className="flex-1"
-        />
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={addItem}
-          disabled={!selectedId}
-        >
-          <PackagePlus className="h-4 w-4" />
-          {t("products.combo.addItem")}
-        </Button>
-      </div>
+      <Combobox
+        value=""
+        onChange={addItem}
+        options={options}
+        placeholder={t("products.combo.selectProduct")}
+        showSearch
+        allowClear={false}
+      />
 
       {items.length === 0 ? (
         <div className="mt-3 rounded-xl border border-dashed border-border bg-surface-2 px-4 py-6 text-center text-sm text-slate-500">
