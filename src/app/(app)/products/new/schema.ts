@@ -93,7 +93,7 @@ export const createProductSchema = z.object({
   dimUnit: z.enum(["mm", "cm", "m"]).default("mm"),
 
   // Units
-  baseUnit: z.string().default("cái"),
+  baseUnit: z.string().trim().transform((unit) => unit || "cái").default("cái"),
   units: z.array(productUnitSchema).default([]),
 
   // Attributes (replaces VLXD section)

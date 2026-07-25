@@ -46,6 +46,17 @@ describe("product depth schema", () => {
     ]);
   });
 
+  it("normalizes an empty legacy service unit when converting to a combo", () => {
+    const parsed = createProductSchema.parse({
+      ...base,
+      productKind: "combo",
+      baseUnit: "",
+      comboItems: [{ productId: "camera-1", quantity: 1 }],
+    });
+
+    expect(parsed.baseUnit).toBe("cái");
+  });
+
   it("keeps services free of physical variants", () => {
     expect(createProductSchema.safeParse({
       ...base,
