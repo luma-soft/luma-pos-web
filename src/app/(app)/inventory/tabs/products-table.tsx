@@ -882,7 +882,7 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
               <MoreHorizontal className="h-4 w-4" />
             </button>
             {moreOpen && (
-              <div className="absolute right-0 top-11 z-30 min-w-52 rounded-lg border border-border bg-surface p-1 shadow-xl">
+              <div className="absolute right-0 bottom-11 z-30 min-w-52 rounded-lg border border-border bg-surface p-1 shadow-xl">
                 <MenuActionLink
                   icon={Store}
                   label={locale === "vi" ? "Đăng sàn" : "List online"}
