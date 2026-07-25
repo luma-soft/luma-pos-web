@@ -10,6 +10,7 @@ import { generateShopeeListingAiFill, loadShopeeCategoryAttributes, loadShopeeCa
 import type { ProductDetail } from "@/lib/data/products";
 import type { PosProduct } from "@/lib/data/pos";
 import { MoneyInput } from "@/components/ui/money-input";
+import { NumberInput } from "@/components/ui/number-input";
 import { Select } from "@/components/ui/select";
 import { categoryEmoji } from "@/lib/category-emoji";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
@@ -729,7 +730,7 @@ function ShopeeListingFields({ form, set, L }: { form: FormState; set: <K extend
           <Field label={L ? "Shopee brand_id / brand" : "Shopee brand_id / brand"}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
           <Field label="Seller SKU"><input className={FIELD} value={form.sku} onChange={(e) => set("sku", e.target.value)} /></Field>
           <Field label={L ? "Giá bán" : "Price"}><MoneyInput className={FIELD} value={form.price} min={0} onChange={(value) => set("price", value ?? 0)} /></Field>
-          <Field label={L ? "Normal stock" : "Normal stock"}><input className={FIELD} type="number" min={0} value={form.stock} onChange={(e) => set("stock", Number(e.target.value))} /></Field>
+          <Field label={L ? "Normal stock" : "Normal stock"}><NumberInput className={FIELD} min={0} value={form.stock} onChange={(value) => set("stock", value ?? 0)} /></Field>
           <Field label={L ? "Kênh vận chuyển" : "Logistics channel"}>
             {logistics.length > 0 ? (
               <Select
@@ -797,7 +798,7 @@ function ShopeeListingFields({ form, set, L }: { form: FormState; set: <K extend
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <Field label={L ? "Ảnh / image_id_list" : "Images / image_id_list"}><textarea className={cn(FIELD, "min-h-24 font-mono text-xs")} value={form.imageUrls} onChange={(e) => set("imageUrls", e.target.value)} /></Field>
           <Field label={L ? "Mô tả Shopee" : "Shopee description"}><textarea className={cn(FIELD, "min-h-24")} value={form.description} onChange={(e) => set("description", e.target.value)} /></Field>
-          <Field label={L ? "Khối lượng gói hàng (kg)" : "Package weight (kg)"}><input className={FIELD} type="number" min={0} value={form.weight} onChange={(e) => set("weight", Number(e.target.value))} /></Field>
+          <Field label={L ? "Khối lượng gói hàng (kg)" : "Package weight (kg)"}><NumberInput className={FIELD} min={0} decimals={4} value={form.weight} onChange={(value) => set("weight", value ?? 0)} /></Field>
           <Field label={L ? "Kích thước D x R x C (cm)" : "Dimensions L x W x H (cm)"}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} placeholder="20 x 10 x 8" /></Field>
           <Field label={L ? "Logistic ID" : "Logistic ID"}><input className={FIELD} value={form.logisticId} onChange={(e) => set("logisticId", e.target.value)} placeholder={L ? "Tự lấy từ kênh vận chuyển phía trên" : "Auto-filled from logistics selector above"} /></Field>
           <Field label={L ? "Payload attributes" : "Payload attributes"}><textarea className={cn(FIELD, "min-h-20 font-mono text-xs")} value={JSON.stringify({ brand: form.brand, categoryPath: form.categoryPath, ...form.attributeValues }, null, 2)} readOnly /></Field>
@@ -818,8 +819,8 @@ function TikTokListingFields({ form, set, L }: { form: FormState; set: <K extend
           <Field label={L ? "Brand" : "Brand"}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
           <Field label="Seller SKU"><input className={FIELD} value={form.sku} onChange={(e) => set("sku", e.target.value)} /></Field>
           <Field label={L ? "Giá SKU" : "SKU price"}><MoneyInput className={FIELD} value={form.price} min={0} onChange={(value) => set("price", value ?? 0)} /></Field>
-          <Field label={L ? "Warehouse inventory" : "Warehouse inventory"}><input className={FIELD} type="number" min={0} value={form.stock} onChange={(e) => set("stock", Number(e.target.value))} /></Field>
-          <Field label={L ? "Package weight" : "Package weight"}><input className={FIELD} type="number" min={0} value={form.weight} onChange={(e) => set("weight", Number(e.target.value))} /></Field>
+          <Field label={L ? "Warehouse inventory" : "Warehouse inventory"}><NumberInput className={FIELD} min={0} value={form.stock} onChange={(value) => set("stock", value ?? 0)} /></Field>
+          <Field label={L ? "Package weight" : "Package weight"}><NumberInput className={FIELD} min={0} decimals={4} value={form.weight} onChange={(value) => set("weight", value ?? 0)} /></Field>
           <Field label={L ? "Package dimensions" : "Package dimensions"}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} /></Field>
         </div>
         <Field label={L ? "Description HTML" : "HTML description"}><textarea className={cn(FIELD, "min-h-32")} value={form.description} onChange={(e) => set("description", e.target.value)} /></Field>
@@ -840,10 +841,10 @@ function LazadaListingFields({ form, set, L }: { form: FormState; set: <K extend
           <Field label={L ? "Brand" : "Brand"}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
           <Field label={L ? "Model" : "Model"}><input className={FIELD} placeholder={L ? "Model hoặc dòng sản phẩm" : "Model or product line"} /></Field>
           <Field label="SellerSku"><input className={FIELD} value={form.sku} onChange={(e) => set("sku", e.target.value)} /></Field>
-          <Field label={L ? "Quantity" : "Quantity"}><input className={FIELD} type="number" min={0} value={form.stock} onChange={(e) => set("stock", Number(e.target.value))} /></Field>
+          <Field label={L ? "Quantity" : "Quantity"}><NumberInput className={FIELD} min={0} value={form.stock} onChange={(value) => set("stock", value ?? 0)} /></Field>
           <Field label={L ? "Price" : "Price"}><MoneyInput className={FIELD} value={form.price} min={0} onChange={(value) => set("price", value ?? 0)} /></Field>
           <Field label={L ? "Special price" : "Special price"}><MoneyInput className={FIELD} value={form.compareAtPrice} min={0} onChange={(value) => set("compareAtPrice", value ?? 0)} /></Field>
-          <Field label={L ? "Package weight" : "Package weight"}><input className={FIELD} type="number" min={0} value={form.weight} onChange={(e) => set("weight", Number(e.target.value))} /></Field>
+          <Field label={L ? "Package weight" : "Package weight"}><NumberInput className={FIELD} min={0} decimals={4} value={form.weight} onChange={(value) => set("weight", value ?? 0)} /></Field>
           <Field label={L ? "Package dimensions" : "Package dimensions"}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} /></Field>
         </div>
         <Field label={L ? "Description" : "Description"}><textarea className={cn(FIELD, "min-h-32")} value={form.description} onChange={(e) => set("description", e.target.value)} /></Field>
@@ -864,8 +865,8 @@ function TikiListingFields({ form, set, L }: { form: FormState; set: <K extends 
           <Field label={L ? "Brand" : "Brand"}><input className={FIELD} value={form.brand} onChange={(e) => set("brand", e.target.value)} /></Field>
           <Field label="Seller SKU"><input className={FIELD} value={form.sku} onChange={(e) => set("sku", e.target.value)} /></Field>
           <Field label={L ? "Giá" : "Price"}><MoneyInput className={FIELD} value={form.price} min={0} onChange={(value) => set("price", value ?? 0)} /></Field>
-          <Field label={L ? "Tồn" : "Inventory"}><input className={FIELD} type="number" min={0} value={form.stock} onChange={(e) => set("stock", Number(e.target.value))} /></Field>
-          <Field label={L ? "Khối lượng" : "Weight"}><input className={FIELD} type="number" min={0} value={form.weight} onChange={(e) => set("weight", Number(e.target.value))} /></Field>
+          <Field label={L ? "Tồn" : "Inventory"}><NumberInput className={FIELD} min={0} value={form.stock} onChange={(value) => set("stock", value ?? 0)} /></Field>
+          <Field label={L ? "Khối lượng" : "Weight"}><NumberInput className={FIELD} min={0} decimals={4} value={form.weight} onChange={(value) => set("weight", value ?? 0)} /></Field>
           <Field label={L ? "Kích thước" : "Dimensions"}><input className={FIELD} value={form.dimensions} onChange={(e) => set("dimensions", e.target.value)} /></Field>
         </div>
         <Field label={L ? "Mô tả" : "Description"}><textarea className={cn(FIELD, "min-h-32")} value={form.description} onChange={(e) => set("description", e.target.value)} /></Field>
@@ -893,7 +894,7 @@ function SyncFields({ form, set, L }: { form: FormState; set: <K extends keyof F
             className="w-full"
           />
         </Field>
-        <Field label={L ? "Ngưỡng tồn thấp" : "Min stock threshold"}><input className={FIELD} type="number" min={0} value={form.minStockThreshold} onChange={(e) => set("minStockThreshold", Number(e.target.value))} /></Field>
+        <Field label={L ? "Ngưỡng tồn thấp" : "Min stock threshold"}><NumberInput className={FIELD} min={0} value={form.minStockThreshold} onChange={(value) => set("minStockThreshold", value ?? 0)} /></Field>
         <Field label={L ? "Khi hết hàng" : "Out of stock"}>
           <Select
             value={form.outOfStockBehavior}

@@ -14,6 +14,7 @@ import {
 import { DEFAULT_LABEL_TEMPLATE, type LabelTemplate } from "@/lib/labels/template-shared";
 import { Routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
+import { NumberInput } from "@/components/ui/number-input";
 
 const TOGGLES = ["showName", "showSku", "showPrice", "showUnit", "showBarcodeText", "showStoreName"] as const;
 
@@ -156,7 +157,7 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
             <Panel>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label={t("labelSettings.templateName")}><input value={selected.name} onChange={(event) => patch({ name: event.target.value })} className={inputCls} /></Field>
-                <Field label={t("labelSettings.sortOrder")}><NumberInput value={selected.sortOrder} min={0} max={9999} onChange={(value) => patch({ sortOrder: value })} className={inputCls} /></Field>
+                <Field label={t("labelSettings.sortOrder")}><NumberInput value={selected.sortOrder} min={0} max={9999} onChange={(value) => patch({ sortOrder: value ?? selected.sortOrder })} className={inputCls} /></Field>
               </div>
               <label className="mt-3 flex items-center gap-2 text-sm font-semibold">
                 <input type="checkbox" checked={selected.isDefault} onChange={(event) => patch({ isDefault: event.target.checked })} />
@@ -178,13 +179,13 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
                 ))}
               </div>
               <div className="grid gap-3 sm:grid-cols-4">
-                <Field label={t("labelSettings.widthMm")}><NumberInput value={selected.widthMm} min={10} max={120} step={1} onChange={(value) => patch({ widthMm: value })} className={inputCls} /></Field>
-                <Field label={t("labelSettings.heightMm")}><NumberInput value={selected.heightMm} min={8} max={80} step={1} onChange={(value) => patch({ heightMm: value })} className={inputCls} /></Field>
-                <Field label={t("labelSettings.columns")}><NumberInput value={selected.columns} min={1} max={6} step={1} onChange={(value) => patch({ columns: Math.round(value) })} className={inputCls} /></Field>
-                <Field label={t("labelSettings.gapMm")}><NumberInput value={selected.gapMm} min={0} max={20} step={0.5} onChange={(value) => patch({ gapMm: value })} className={inputCls} /></Field>
-                <Field label={t("labelSettings.barcodeHeightMm")}><NumberInput value={selected.barcodeHeightMm} min={6} max={40} step={0.5} onChange={(value) => patch({ barcodeHeightMm: value })} className={inputCls} /></Field>
-                <Field label={t("labelSettings.barcodeQuietMm")}><NumberInput value={selected.barcodeQuietMm} min={0} max={10} step={0.5} onChange={(value) => patch({ barcodeQuietMm: value })} className={inputCls} /></Field>
-                <Field label={t("labelSettings.fontScale")}><NumberInput value={selected.fontScale} min={0.75} max={1.5} step={0.05} onChange={(value) => patch({ fontScale: value })} className={inputCls} /></Field>
+                <Field label={t("labelSettings.widthMm")}><NumberInput value={selected.widthMm} min={10} max={120} step={1} onChange={(value) => patch({ widthMm: value ?? selected.widthMm })} className={inputCls} /></Field>
+                <Field label={t("labelSettings.heightMm")}><NumberInput value={selected.heightMm} min={8} max={80} step={1} onChange={(value) => patch({ heightMm: value ?? selected.heightMm })} className={inputCls} /></Field>
+                <Field label={t("labelSettings.columns")}><NumberInput value={selected.columns} min={1} max={6} step={1} onChange={(value) => patch({ columns: Math.round(value ?? selected.columns) })} className={inputCls} /></Field>
+                <Field label={t("labelSettings.gapMm")}><NumberInput value={selected.gapMm} min={0} max={20} step={0.5} decimals={2} onChange={(value) => patch({ gapMm: value ?? selected.gapMm })} className={inputCls} /></Field>
+                <Field label={t("labelSettings.barcodeHeightMm")}><NumberInput value={selected.barcodeHeightMm} min={6} max={40} step={0.5} decimals={2} onChange={(value) => patch({ barcodeHeightMm: value ?? selected.barcodeHeightMm })} className={inputCls} /></Field>
+                <Field label={t("labelSettings.barcodeQuietMm")}><NumberInput value={selected.barcodeQuietMm} min={0} max={10} step={0.5} decimals={2} onChange={(value) => patch({ barcodeQuietMm: value ?? selected.barcodeQuietMm })} className={inputCls} /></Field>
+                <Field label={t("labelSettings.fontScale")}><NumberInput value={selected.fontScale} min={0.75} max={1.5} step={0.05} decimals={2} onChange={(value) => patch({ fontScale: value ?? selected.fontScale })} className={inputCls} /></Field>
               </div>
             </Panel>
 
@@ -272,33 +273,5 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       <span className="mb-1 block text-xs font-semibold text-slate-500">{label}</span>
       {children}
     </label>
-  );
-}
-
-function NumberInput({
-  value,
-  onChange,
-  className,
-  min,
-  max,
-  step = 1,
-}: {
-  value: number;
-  onChange: (value: number) => void;
-  className?: string;
-  min?: number;
-  max?: number;
-  step?: number;
-}) {
-  return (
-    <input
-      type="number"
-      value={value}
-      min={min}
-      max={max}
-      step={step}
-      onChange={(event) => onChange(Number(event.target.value))}
-      className={className}
-    />
   );
 }

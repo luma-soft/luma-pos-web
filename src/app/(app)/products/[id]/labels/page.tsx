@@ -11,6 +11,7 @@ import { Routes } from "@/lib/routes";
 import { formatCurrency } from "@/lib/utils";
 import { LabelPrintButton } from "./label-print-button";
 import { getStoreSettings } from "@/lib/data/settings";
+import { NumberInput } from "@/components/ui/number-input";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -120,7 +121,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
             </select>
           </Field>
           <Field label={t("products.labels.quantity")}>
-            <input name="qty" type="number" min={1} max={500} defaultValue={qty} className="h-10 w-full rounded-lg border border-border bg-canvas px-3 text-sm" />
+            <NumberInput name="qty" min={1} max={500} defaultValue={qty} thousandSeparator={false} className="h-10 bg-canvas" />
           </Field>
           <Field label={t("products.labels.codeSource")}>
             <select name="codeSource" defaultValue={codeSource} className="h-10 w-full rounded-lg border border-border bg-canvas px-3 text-sm">
@@ -129,7 +130,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
             </select>
           </Field>
           <Field label={t("products.labels.price")}>
-            <input name="price" type="number" min={0} step={1000} defaultValue={Number(query.price || product.retailPrice)} className="h-10 w-full rounded-lg border border-border bg-canvas px-3 text-sm" />
+            <NumberInput name="price" min={0} step={1000} defaultValue={Number(query.price || product.retailPrice)} suffix="đ" className="h-10 bg-canvas" />
           </Field>
           <div className="flex items-end">
             <button type="submit" className="h-10 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700">

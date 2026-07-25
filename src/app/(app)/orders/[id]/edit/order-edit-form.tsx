@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2, Save, Trash2 } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency } from "@/lib/utils";
 import { MoneyInput } from "@/components/ui/money-input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { Select } from "@/components/ui/select";
 import { updateOrder } from "@/lib/actions/order-edit";
 import { useProductCatalog } from "@/components/product-catalog-provider";
@@ -114,9 +115,13 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
                 <td className="px-4 py-2.5 font-medium">{l.productName}</td>
                 <td className="px-4 py-2.5 text-slate-500">{l.unitName}</td>
                 <td className="px-4 py-2.5 text-right">
-                  <input type="number" min={0} value={l.quantity}
-                    onChange={(e) => patch(idx, { quantity: Math.max(0, Number(e.target.value)) })}
-                    className={cn(inputCls, "w-24 text-right")} />
+                  <QuantityInput
+                    min={0}
+                    value={l.quantity}
+                    onChange={(quantity) => patch(idx, { quantity })}
+                    size="sm"
+                    className="ml-auto w-28"
+                  />
                 </td>
                 <td className="px-4 py-2.5 text-right">
                   <MoneyInput value={l.unitPrice}

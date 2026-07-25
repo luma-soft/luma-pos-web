@@ -7,6 +7,7 @@ import { Plus, Trash2, Pencil, Loader2, X, Check } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { saveModifierGroup, setModifierGroupActive, deleteModifierGroup } from "@/lib/actions/modifiers";
 import type { ModifierGroup } from "@/lib/data/modifiers";
+import { NumberInput } from "@/components/ui/number-input";
 
 type Cat = { id: string; name: string };
 type OptRow = { id: string; label: string; priceDelta: number };
@@ -109,7 +110,7 @@ export function ModifiersManage({ groups, categories }: { groups: ModifierGroup[
                   {form.options.map((o, i) => (
                     <div key={o.id} className="flex items-center gap-2">
                       <input value={o.label} onChange={(e) => setOpt(i, { label: e.target.value })} placeholder={t("modifiers.optionLabel")} className="flex-1 px-3 py-2 text-sm rounded-[10px] border border-border bg-canvas" />
-                      <input type="number" value={o.priceDelta} onChange={(e) => setOpt(i, { priceDelta: Number(e.target.value) })} placeholder="+0" className="w-28 px-3 py-2 text-sm rounded-[10px] border border-border bg-canvas font-mono" />
+                      <NumberInput value={o.priceDelta} onChange={(priceDelta) => setOpt(i, { priceDelta: priceDelta ?? 0 })} placeholder="+0" className="w-28 rounded-[10px] bg-canvas font-mono" />
                       <button onClick={() => setForm((f) => ({ ...f, options: f.options.filter((_, x) => x !== i) }))} className="p-1.5 text-slate-400 hover:text-er"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   ))}

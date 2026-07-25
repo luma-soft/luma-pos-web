@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { PAGE_SIZES } from "@/lib/pagination";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { NumberInput } from "@/components/ui/number-input";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
 
@@ -57,15 +57,16 @@ export function Pagination({
       <div className="flex items-center gap-1">
         <Button variant="outline" size="iconSm" disabled={page <= 1} onClick={() => go({ page: undefined })} title={t("pagination.first")}><ChevronsLeft className="w-4 h-4" /></Button>
         <Button variant="outline" size="iconSm" disabled={page <= 1} onClick={() => go({ page: page - 1 <= 1 ? undefined : String(page - 1) })} title={t("pagination.prev")}><ChevronLeft className="w-4 h-4" /></Button>
-        <Input
-          type="number" min={1} max={pageCount}
+        <NumberInput
+          min={1} max={pageCount}
           value={page}
-          onChange={(e) => {
-            const p = Math.min(pageCount, Math.max(1, Number(e.target.value) || 1));
+          onChange={(value) => {
+            const p = Math.min(pageCount, Math.max(1, value ?? 1));
             go({ page: p <= 1 ? undefined : String(p) });
           }}
+          thousandSeparator={false}
           size="sm"
-          className="no-spinner w-12 text-center tabular-nums"
+          className="w-12 text-center tabular-nums"
         />
         <Button variant="outline" size="iconSm" disabled={page >= pageCount} onClick={() => go({ page: String(page + 1) })} title={t("pagination.next")}><ChevronRight className="w-4 h-4" /></Button>
         <Button variant="outline" size="iconSm" disabled={page >= pageCount} onClick={() => go({ page: String(pageCount) })} title={t("pagination.last")}><ChevronsRight className="w-4 h-4" /></Button>

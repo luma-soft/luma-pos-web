@@ -8,7 +8,6 @@ import {
   Camera,
   CheckCircle2,
   FileText,
-  Minus,
   Plus,
   Printer,
   Search,
@@ -21,6 +20,7 @@ import type {
 } from "@/lib/data/camera-quotes";
 import { Routes } from "@/lib/routes";
 import { Select } from "@/components/ui/select";
+import { QuantityInput } from "@/components/ui/quantity-input";
 
 type PackageRow = {
   key: string;
@@ -414,16 +414,16 @@ function PackageEditor({
         <QuoteSelect label={t("memoryLabel")} value={row.cardId} options={options.cards} onChange={(cardId) => onChange({ cardId })} />
         <QuoteSelect label={t("installationLabel")} value={row.installationId} options={options.installations} onChange={(installationId) => onChange({ installationId })} />
         {row.materialLines.map((line, materialIndex) => (
-          <div key={`${row.key}-material-${materialIndex}`} className="grid grid-cols-[minmax(0,1fr)_56px_32px] items-center gap-2">
+          <div key={`${row.key}-material-${materialIndex}`} className="grid grid-cols-[minmax(0,1fr)_112px_32px] items-center gap-2">
             <QuoteSelect label={materialIndex === 0 ? t("materialLabel") : ""} value={line.productId} options={options.materials} onChange={(productId) => onChange({ materialLines: row.materialLines.map((item, index) => index === materialIndex ? { ...item, productId } : item) })} />
-            <input
-              type="number"
+            <QuantityInput
               min={0.01}
-              step="any"
+              step={1}
+              decimals={4}
               value={line.quantity}
-              onChange={(event) => onChange({ materialLines: row.materialLines.map((item, index) => index === materialIndex ? { ...item, quantity: Math.max(0.01, Number(event.target.value) || 0.01) } : item) })}
-              className="h-9 w-full rounded-lg border border-border bg-surface px-2 text-center text-xs"
-              aria-label={t("materialQuantity")}
+              onChange={(quantity) => onChange({ materialLines: row.materialLines.map((item, index) => index === materialIndex ? { ...item, quantity } : item) })}
+              size="sm"
+              className="w-full"
             />
             <button
               type="button"
@@ -457,11 +457,16 @@ function PackageEditor({
       </details>
 
       <div className="mt-3 flex items-center justify-between border-t border-border-soft pt-3">
-        <div className="inline-flex items-center rounded-lg border border-border bg-surface">
-          <button type="button" onClick={() => onChange({ quantity: Math.max(1, row.quantity - 1) })} className="p-2 text-slate-500 hover:text-primary-700" aria-label={t("decreaseQuantity")}><Minus className="h-3.5 w-3.5" /></button>
-          <span className="min-w-8 text-center text-sm font-bold tabular-nums">{row.quantity}</span>
-          <button type="button" onClick={() => onChange({ quantity: Math.min(99, row.quantity + 1) })} className="p-2 text-slate-500 hover:text-primary-700" aria-label={t("increaseQuantity")}><Plus className="h-3.5 w-3.5" /></button>
-        </div>
+        <QuantityInput
+          min={1}
+          max={99}
+          value={row.quantity}
+          onChange={(quantity) => onChange({ quantity })}
+          size="sm"
+          className="w-28"
+          decrementLabel={t("decreaseQuantity")}
+          incrementLabel={t("increaseQuantity")}
+        />
         <div className="text-right">
           <div className="text-[11px] text-slate-400">{t("packageTotal")}</div>
           <div className="font-black tabular-nums text-primary-700">{money.format(total)}</div>

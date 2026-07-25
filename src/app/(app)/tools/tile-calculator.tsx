@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumberInput } from "@/components/ui/number-input";
 import { Select } from "@/components/ui/select";
 import { Toggle } from "@/components/ui/toggle";
 import { cn } from "@/lib/utils";
@@ -532,18 +533,17 @@ function NumberField({ id, label, hint, value, suffix, step = "any", disabled, o
         {hint && <span className="font-normal text-slate-400">{hint}</span>}
       </span>
       <span className="relative block">
-        <Input
+        <NumberInput
           id={id}
-          type="number"
-          inputMode="decimal"
           min={0}
           step={step}
+          decimals={4}
           disabled={disabled}
-          value={value === 0 ? "" : value}
-          onChange={(event) => onChange(toNumber(event.target.value))}
-          className={cn("no-spinner tabular-nums", suffix && "pr-11")}
+          value={value}
+          onChange={(nextValue) => onChange(nextValue ?? 0)}
+          className="tabular-nums"
+          suffix={suffix}
         />
-        {suffix && <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs font-medium text-slate-400">{suffix}</span>}
       </span>
     </label>
   );
@@ -734,9 +734,4 @@ async function writeClipboard(text: string) {
 
 function makeId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function toNumber(value: string) {
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
 }

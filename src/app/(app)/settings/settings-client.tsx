@@ -8,6 +8,7 @@ import { SearchableSelect } from "@/components/combobox";
 import { Select } from "@/components/ui/select";
 import { SegmentedTabs } from "@/components/ui/tabs";
 import { Toggle } from "@/components/ui/toggle";
+import { NumberInput } from "@/components/ui/number-input";
 import { Routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { normalizeSearch } from "@/lib/normalize";
@@ -1695,15 +1696,14 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
             </div>
             <div className="flex flex-col gap-1">
               <span className={FL}>{L ? "Giới hạn lượt AI/tháng" : "Monthly AI unit limit"}</span>
-              <input
+              <NumberInput
                 className={cn(FI, "font-mono")}
-                type="number"
                 min={0}
                 max={100000}
                 step={1}
                 value={form.monthlyUsageLimit}
                 disabled={!canEdit}
-                onChange={(e) => set("monthlyUsageLimit", Math.max(0, Math.min(100000, Math.trunc(Number(e.target.value) || 0))))}
+                onChange={(value) => set("monthlyUsageLimit", Math.trunc(value ?? 0))}
               />
             </div>
           </div>

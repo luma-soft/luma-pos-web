@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { Check, Loader2, Play } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { openShift, closeShift } from "@/lib/actions/shifts";
+import { MoneyInput } from "@/components/ui/money-input";
 
 export function ShiftPanel({ open, openingFloat, expected, openedAt }: {
   open: boolean; openingFloat?: number; expected?: number; openedAt?: string;
@@ -41,7 +42,7 @@ export function ShiftPanel({ open, openingFloat, expected, openedAt }: {
         <div className="text-sm font-bold">{t("shifts.openTitle")}</div>
         <div className="text-xs text-slate-500 mt-0.5 mb-3">{t("shifts.openSub")}</div>
         <label className="text-[9px] font-bold uppercase tracking-wide text-slate-500">{t("shifts.openFloat")}</label>
-        <input type="number" min={0} value={floatVal} onChange={(e) => setFloatVal(e.target.value)} placeholder="0" className="no-spinner w-full mt-1 px-3 py-2 text-sm rounded-[10px] border border-border bg-canvas font-mono" />
+        <MoneyInput min={0} value={floatVal === "" ? null : Number(floatVal)} onChange={(value) => setFloatVal(value == null ? "" : String(value))} placeholder="0" className="mt-1 w-full rounded-[10px] bg-canvas font-mono" />
         {err && <p className="text-xs text-er mt-2">{err}</p>}
         <button disabled={pending} onClick={doOpen} className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 text-white text-sm font-semibold disabled:opacity-50">
           {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}{t("shifts.openBtn")}
@@ -68,7 +69,7 @@ export function ShiftPanel({ open, openingFloat, expected, openedAt }: {
         </div>
       </div>
       <label className="block mt-3 text-[9px] font-bold uppercase tracking-wide text-slate-500">{t("shifts.counted")}</label>
-      <input type="number" min={0} value={counted} onChange={(e) => setCounted(e.target.value)} placeholder="0" className="no-spinner w-full mt-1 px-3 py-2 text-sm rounded-[10px] border border-border bg-canvas font-mono" />
+      <MoneyInput min={0} value={counted === "" ? null : Number(counted)} onChange={(value) => setCounted(value == null ? "" : String(value))} placeholder="0" className="mt-1 w-full rounded-[10px] bg-canvas font-mono" />
       {counted !== "" && (
         <div className={cn("mt-2 text-sm font-semibold", variance === 0 ? "text-slate-500" : variance > 0 ? "text-ok" : "text-er")}>
           {t("shifts.variance")}: {variance > 0 ? "+" : ""}{formatCurrency(variance)} {variance === 0 ? `· ${t("shifts.exact")}` : variance > 0 ? `· ${t("shifts.over")}` : `· ${t("shifts.short")}`}

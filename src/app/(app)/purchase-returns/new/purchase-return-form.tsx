@@ -11,6 +11,8 @@ import { Combobox } from "@/components/combobox";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { MoneyInput } from "@/components/ui/money-input";
+import { NumberInput } from "@/components/ui/number-input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
 import { createPurchaseReturn } from "@/lib/actions/purchase-returns";
@@ -242,13 +244,14 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
                       </td>
                       <td className="px-3 py-2 text-slate-500">{line.unitName}</td>
                       <td className="px-3 py-2">
-                        <input
-                          type="number"
+                        <QuantityInput
                           min={0}
                           max={line.stock}
                           value={line.quantity}
-                          onChange={(event) => patch(line.productId, { quantity: Math.max(0, Number(event.target.value)) })}
-                          className={cn(numCls, overStock && "border-er text-er")}
+                          onChange={(quantity) => patch(line.productId, { quantity })}
+                          size="sm"
+                          className={cn("w-28", overStock && "border-er text-er")}
+                          inputClassName={cn(overStock && "border-er text-er")}
                         />
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums text-slate-500">{formatCurrency(line.unitCost)}</td>
@@ -294,7 +297,7 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
             <div className="flex justify-between items-center gap-2">
               <span className="text-slate-500">{t("purchaseReturns.vatRefund")}</span>
               <div className="flex items-center gap-2">
-                <input type="number" min={0} max={100} value={vatRate || ""} placeholder="0" onChange={(event) => setVatRate(Math.min(100, Math.max(0, Number(event.target.value))))} className={cn(numCls, "w-16")} />
+                <NumberInput min={0} max={100} value={vatRate} placeholder="0" suffix="%" thousandSeparator={false} onChange={(value) => setVatRate(value ?? 0)} className={cn(numCls, "w-20")} />
                 <span className="tabular-nums text-slate-500 w-24 text-right">{formatCurrency(tax)}</span>
               </div>
             </div>

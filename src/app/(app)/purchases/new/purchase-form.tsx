@@ -8,6 +8,8 @@ import { Routes } from "@/lib/routes";
 import { cn, formatCurrency } from "@/lib/utils";
 import { Combobox } from "@/components/combobox";
 import { MoneyInput } from "@/components/ui/money-input";
+import { NumberInput } from "@/components/ui/number-input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -517,11 +519,11 @@ export function PurchaseForm({
                           ]}
                         />
                       </td>
-                      <td className="px-2 py-2"><input type="number" min={0} value={l.quantity} onChange={(e) => patch(l.productId, { quantity: Math.max(0, Number(e.target.value)) })} className={numCls} /></td>
+                      <td className="px-2 py-2"><QuantityInput min={0} value={l.quantity} onChange={(quantity) => patch(l.productId, { quantity })} size="sm" className="w-28" /></td>
                       <td className="px-2 py-2"><MoneyInput value={l.unitCost} onChange={(v) => patch(l.productId, { unitCost: v ?? 0 })} className={numCls} /></td>
                       <td className="px-2 py-2">
                         <div className="flex items-center gap-1">
-                          <input type="number" min={0} value={l.discInput || ""} placeholder="0" onChange={(e) => patch(l.productId, { discInput: Math.max(0, Number(e.target.value)) })} className={numCls} />
+                          <NumberInput min={0} value={l.discInput} placeholder="0" onChange={(discInput) => patch(l.productId, { discInput: discInput ?? 0 })} className={numCls} />
                           <div className="flex rounded-md overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0">
                             {(["vnd", "pct"] as const).map((m) => (
                               <Button
@@ -576,7 +578,7 @@ export function PurchaseForm({
             <div className="flex justify-between items-center gap-2">
               <span className="text-slate-500">VAT %</span>
               <div className="flex items-center gap-2">
-                <input type="number" min={0} max={100} value={vatRate || ""} placeholder="0" onChange={(e) => setVatRate(Math.min(100, Math.max(0, Number(e.target.value))))} className={cn(numCls, "w-16")} />
+                <NumberInput min={0} max={100} value={vatRate} placeholder="0" suffix="%" thousandSeparator={false} onChange={(value) => setVatRate(value ?? 0)} className={cn(numCls, "w-20")} />
                 <span className="tabular-nums text-slate-500 w-24 text-right">{formatCurrency(tax)}</span>
               </div>
             </div>

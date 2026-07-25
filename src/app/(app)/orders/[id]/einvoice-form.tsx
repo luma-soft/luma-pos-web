@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Loader2 } from "lucide-react";
 import { issueEInvoice } from "@/lib/actions/einvoice";
+import { NumberInput } from "@/components/ui/number-input";
 
 export function EInvoiceForm({ orderId, defaultBuyer }: { orderId: string; defaultBuyer: string }) {
   const t = useTranslations();
@@ -53,7 +54,7 @@ export function EInvoiceForm({ orderId, defaultBuyer }: { orderId: string; defau
       </div>
       <div>
         <label className="block text-xs font-medium text-slate-500 mb-1">VAT %</label>
-        <input type="number" min={0} max={20} value={vatRate} onChange={(e) => setVatRate(Number(e.target.value))} className={`${cls} w-20 text-right`} />
+        <NumberInput min={0} max={20} value={vatRate} onChange={(value) => setVatRate(value ?? 0)} suffix="%" thousandSeparator={false} className={`${cls} w-20 text-right`} />
       </div>
       <button onClick={submit} disabled={busy || !buyerName.trim()}
         className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium disabled:opacity-50 inline-flex items-center gap-2">

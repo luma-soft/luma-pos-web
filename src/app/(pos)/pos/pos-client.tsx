@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Search, Plus, Minus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, ChevronDown, Printer, MoreVertical, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw } from "lucide-react";
+import { Search, Plus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, ChevronDown, Printer, MoreVertical, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw } from "lucide-react";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
 import { normalizeSearch } from "@/lib/normalize";
 import { createPortal } from "react-dom";
@@ -13,6 +13,8 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { MoneyInput } from "@/components/ui/money-input";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
+import { QuantityInput } from "@/components/ui/quantity-input";
+import { NumberInput } from "@/components/ui/number-input";
 import { PrintDoc } from "@/components/print/print-doc";
 import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
@@ -1130,13 +1132,6 @@ export function PosClient({
     }));
   }
 
-  function updateQty(key: string, delta: number) {
-    setCart((c) =>
-      c.map((l) => (l.key === key ? { ...l, quantity: clampLineQuantity(l, l.quantity + delta) } : l))
-        .filter((l) => isReturnDraft || l.quantity > 0)
-    );
-  }
-
   function setQty(key: string, qty: number) {
     setCart((c) => c.map((l) => (l.key === key ? { ...l, quantity: clampLineQuantity(l, qty) } : l)).filter((l) => isReturnDraft || l.quantity > 0));
   }
@@ -1534,43 +1529,16 @@ export function PosClient({
                   className="min-w-20 shrink-0 font-medium text-slate-700 dark:text-slate-200"
                 />
                 <div className="group relative shrink-0">
-                  <div
-                    className={cn(
-                      "grid h-8 w-28 grid-cols-[32px_1fr_32px] overflow-hidden rounded-md border border-border bg-surface",
-                      outOfStock && "border-er text-er"
-                    )}
-                  >
-                    <button
-                      disabled={isCameraQuoteDraft}
-                      onClick={() => updateQty(l.key, -1)}
-                      className={cn(
-                        "grid h-full place-items-center text-slate-500 hover:text-er hover:bg-surface-2",
-                        outOfStock && "text-er hover:bg-red-50 dark:hover:bg-red-950/20"
-                      )}
-                    >
-                      <Minus className="w-3.5 h-3.5" />
-                    </button>
-                    <input
-                      type="number"
-                      value={l.quantity}
-                      readOnly={isCameraQuoteDraft}
-                      onChange={(e) => setQty(l.key, Number(e.target.value))}
-                      className={cn(
-                        "no-spinner h-full w-full border-x border-border bg-surface text-center text-sm outline-none",
-                        outOfStock && "border-er text-er"
-                      )}
-                    />
-                    <button
-                      disabled={isCameraQuoteDraft}
-                      onClick={() => updateQty(l.key, 1)}
-                      className={cn(
-                        "grid h-full place-items-center text-slate-500 hover:text-primary-600 hover:bg-surface-2",
-                        outOfStock && "text-er hover:text-er hover:bg-red-50 dark:hover:bg-red-950/20"
-                      )}
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+                  <QuantityInput
+                    value={l.quantity}
+                    onChange={(quantity) => setQty(l.key, quantity)}
+                    min={0}
+                    max={l.returnSoldQuantity}
+                    readOnly={isCameraQuoteDraft}
+                    size="sm"
+                    className={cn("w-28", outOfStock && "border-er text-er")}
+                    inputClassName={cn(outOfStock && "border-er text-er")}
+                  />
                   {isReturnDraft && l.returnSoldQuantity != null && (
                     <div className="mt-1 text-center text-xs font-medium tabular-nums text-slate-500">
                       / {formatNumber(l.returnSoldQuantity)}
@@ -1796,33 +1764,15 @@ export function PosClient({
                           <div className="flex items-center justify-end gap-2 w-auto sm:w-64 shrink-0">
                             {line && (
                               <div className="group relative flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                <button
-                                  onClick={() => updateQty(line.key, -1)}
-                                  className={cn(
-                                    "w-8 h-8 rounded border border-border grid place-items-center",
-                                    outOfStock && "border-er text-er"
-                                  )}
-                                >
-                                  <Minus className="w-3.5 h-3.5" />
-                                </button>
-                                <input
-                                  type="number"
+                                <QuantityInput
                                   value={line.quantity}
-                                  onChange={(e) => setQty(line.key, Number(e.target.value))}
-                                  className={cn(
-                                    "no-spinner w-12 px-1 py-1 text-center text-sm rounded border border-border bg-surface",
-                                    outOfStock && "border-er text-er"
-                                  )}
+                                  onChange={(quantity) => setQty(line.key, quantity)}
+                                  min={0}
+                                  max={line.returnSoldQuantity}
+                                  size="sm"
+                                  className={cn("w-28", outOfStock && "border-er text-er")}
+                                  inputClassName={cn(outOfStock && "border-er text-er")}
                                 />
-                                <button
-                                  onClick={() => updateQty(line.key, 1)}
-                                  className={cn(
-                                    "w-8 h-8 rounded border border-border grid place-items-center",
-                                    outOfStock && "border-er text-er"
-                                  )}
-                                >
-                                  <Plus className="w-3.5 h-3.5" />
-                                </button>
                                 {stockManaged && (
                                   <StockQuantityTooltip stock={stock} ordered={line.quantity * line.unitMultiplier} unit={p.baseUnit} />
                                 )}
@@ -2543,25 +2493,24 @@ function AmountModeInput({
   onModeChange?: (mode: "vnd" | "pct") => void;
   className?: string;
 }) {
-  const shown = value || "";
   return (
     <div className={cn(
       "w-full max-w-[184px] h-11 grid grid-cols-[1fr_56px] rounded-lg border border-border bg-surface overflow-hidden",
       className
     )}>
       {mode === "pct" ? (
-        <input
-          type="number"
+        <NumberInput
           min={0}
           max={100}
-          value={shown}
-          onChange={(e) => onValueChange(Math.max(0, Number(e.target.value)))}
+          value={value}
+          onChange={(nextValue) => onValueChange(nextValue ?? 0)}
           placeholder="0"
-          className="no-spinner h-full min-w-0 px-3 text-right text-sm tabular-nums bg-transparent outline-none"
+          thousandSeparator={false}
+          className="h-full min-w-0 rounded-none border-0 bg-transparent px-3 text-right text-sm tabular-nums outline-none focus:ring-0"
         />
       ) : (
         <MoneyInput
-          value={shown}
+          value={value || ""}
           onChange={(v) => onValueChange(v ?? 0)}
           placeholder="0"
           className="no-spinner h-full min-w-0 px-3 text-right text-sm tabular-nums bg-transparent outline-none border-0"

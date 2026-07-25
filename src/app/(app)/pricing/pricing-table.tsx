@@ -7,6 +7,7 @@ import { Check, Loader2, Pencil, Plus, X, Calculator } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { MoneyInput } from "@/components/ui/money-input";
+import { NumberInput } from "@/components/ui/number-input";
 import { Select } from "@/components/ui/select";
 import { createPriceBook, renamePriceBook, deletePriceBook, setProductPrice, applyPriceFormulaAll, type PriceFormulaBase } from "@/lib/actions/price-books";
 
@@ -291,7 +292,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
               />
               <button type="button" onClick={() => setFOp("+")} className={cn("grid h-7 w-7 place-items-center rounded-full border text-sm", fOp === "+" ? "border-primary-600 bg-primary-600 text-white" : "border-border")}>+</button>
               <button type="button" onClick={() => setFOp("-")} className={cn("grid h-7 w-7 place-items-center rounded-full border text-sm", fOp === "-" ? "border-primary-600 bg-primary-600 text-white" : "border-border")}>−</button>
-              <input type="number" min={0} value={fAmount || ""} onChange={(e) => setFAmount(Math.max(0, Number(e.target.value)))} className="no-spinner w-16 rounded-md border border-border bg-surface px-2 py-1.5 text-right text-sm" />
+              <NumberInput min={0} value={fAmount} onChange={(value) => setFAmount(value ?? 0)} thousandSeparator={fUnit === "vnd"} suffix={fUnit === "pct" ? "%" : undefined} className="w-20 rounded-md px-2 py-1.5 text-right text-sm" />
               <div className="inline-flex overflow-hidden rounded-md border border-border text-xs">
                 <button type="button" onClick={() => setFUnit("vnd")} className={cn("px-2 py-1.5", fUnit === "vnd" ? "bg-primary-600 text-white" : "")}>VND</button>
                 <button type="button" onClick={() => setFUnit("pct")} className={cn("px-2 py-1.5", fUnit === "pct" ? "bg-primary-600 text-white" : "")}>%</button>

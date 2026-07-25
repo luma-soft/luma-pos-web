@@ -192,13 +192,16 @@ textarea.ai-composer-scrollbar-hidden::-webkit-scrollbar-corner {
   *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
 }
 
-/* ẩn nút tăng/giảm mặc định của input[type=number] (POS, form số lượng) */
+/* Input số dùng NumberInput/QuantityInput chung; không để spinner native xen vào UI. */
 .no-spinner::-webkit-outer-spin-button,
-.no-spinner::-webkit-inner-spin-button {
+.no-spinner::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
-.no-spinner {
+.no-spinner,
+input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
 }

@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ArrowLeft, Search, Plus, Minus, Trash2, Loader2, Check, ChefHat, Split, X } from "lucide-react";
+import { ArrowLeft, Search, Plus, Trash2, Loader2, Check, ChefHat, Split, X } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { setTableCart, checkoutTable, closeTable, sendToKitchen } from "@/lib/actions/tables";
 import type { TableCartItem, CartModifier } from "@/lib/schemas/table";
@@ -11,6 +11,7 @@ import type { ModifierGroup } from "@/lib/data/modifiers";
 import type { PosProduct } from "@/lib/data/pos";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPosProduct } from "@/lib/pos/product-catalog-adapter";
+import { QuantityInput } from "@/components/ui/quantity-input";
 
 type Method = "cash" | "bank_transfer" | "credit";
 const METHODS: Method[] = ["cash", "bank_transfer", "credit"];
@@ -72,13 +73,12 @@ export function TableOrder({ id, name, initialCart, modifierGroups }: { id: stri
     persist([...cart, { lineId: uid(), productId: p.id, productName: p.name, unitName: p.baseUnit, unitMultiplier: 1, quantity: 1, basePrice: base, unitPrice, modifiers, note: note || undefined, course: "asap", courseDelayMinutes: 0, sent: false }]);
   }
 
-  const setQty = (lineId: string, d: number) => {
+  const setQty = (lineId: string, quantity: number) => {
     const c = cart.map((i) => i).filter(Boolean);
     const idx = c.findIndex((i) => i.lineId === lineId);
     if (idx < 0 || c[idx].sent) return;
-    const nq = c[idx].quantity + d;
-    if (nq <= 0) persist(c.filter((_, x) => x !== idx));
-    else { const n = [...c]; n[idx] = { ...n[idx], quantity: nq }; persist(n); }
+    if (quantity <= 0) persist(c.filter((_, x) => x !== idx));
+    else { const n = [...c]; n[idx] = { ...n[idx], quantity }; persist(n); }
   };
   const removeLine = (lineId: string) => persist(cart.filter((i) => i.lineId !== lineId));
 
@@ -163,9 +163,7 @@ export function TableOrder({ id, name, initialCart, modifierGroups }: { id: stri
                     <span className="w-6 text-center font-mono pt-0.5">{c.quantity}</span>
                   ) : (
                     <>
-                      <button onClick={() => setQty(c.lineId, -1)} className="w-7 h-7 rounded-md border border-border grid place-items-center shrink-0"><Minus className="w-3 h-3" /></button>
-                      <span className="w-6 text-center font-mono pt-1">{c.quantity}</span>
-                      <button onClick={() => setQty(c.lineId, 1)} className="w-7 h-7 rounded-md border border-border grid place-items-center shrink-0"><Plus className="w-3 h-3" /></button>
+                      <QuantityInput min={0} value={c.quantity} onChange={(quantity) => setQty(c.lineId, quantity)} size="sm" className="w-28" />
                       <button onClick={() => removeLine(c.lineId)} className="text-slate-400 hover:text-er pt-1 shrink-0"><Trash2 className="w-4 h-4" /></button>
                     </>
                   )}
@@ -185,7 +183,7 @@ export function TableOrder({ id, name, initialCart, modifierGroups }: { id: stri
                 <div className="flex items-center justify-between gap-2 mb-3 text-sm">
                   <span className="text-slate-500">{t("tables.guests")}</span>
                   <div className="flex items-center gap-2">
-                    <input type="number" min={1} value={guests} onChange={(e) => setGuests(Math.max(1, Number(e.target.value) || 1))} className="w-16 px-2 py-1 text-sm rounded-lg border border-border bg-canvas font-mono text-right" />
+                    <QuantityInput min={1} value={guests} onChange={setGuests} size="sm" className="w-28" />
                     <span className="font-mono font-bold text-primary-600">{formatCurrency(Math.ceil(payable / guests))}/{t("tables.perGuest")}</span>
                   </div>
                 </div>

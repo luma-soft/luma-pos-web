@@ -28,7 +28,9 @@ const formatNumber = (val: number, sep: boolean, decimals = 0): string => {
       maximumFractionDigits: decimals,
     }).format(val);
   }
-  return decimals > 0 ? val.toFixed(decimals) : String(val);
+  if (decimals <= 0) return String(val);
+  const factor = 10 ** decimals;
+  return String(Math.round(val * factor) / factor);
 };
 
 const parseNumber = (str: string): number | null => {
@@ -39,43 +41,67 @@ const parseNumber = (str: string): number | null => {
 };
 
 export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
-  ({ value, defaultValue, onChange, thousandSeparator = true, suffix, prefix, min, max, decimals = 0, className, ...props }, ref) => {
+  ({ value, defaultValue, onChange, thousandSeparator = true, suffix, prefix, min, max, decimals = 0, className, name, ...props }, ref) => {
+    const initialValue = value ?? defaultValue ?? null;
     const [text, setText] = React.useState<string>(
       value != null ? formatNumber(value, thousandSeparator, decimals) :
       defaultValue != null ? formatNumber(defaultValue, thousandSeparator, decimals) : ""
+    );
+    const [numericValue, setNumericValue] = React.useState<number | null>(
+      initialValue,
     );
 
     React.useEffect(() => {
       if (value != null) {
         setText(formatNumber(value, thousandSeparator, decimals));
+        setNumericValue(value);
       } else if (value === null) {
         setText("");
+        setNumericValue(null);
       }
     }, [value, thousandSeparator, decimals]);
 
     function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
       const raw = e.target.value;
-      setText(raw);
       const parsed = parseNumber(raw);
 
       if (parsed !== null) {
-        if (min != null && parsed < min) return onChange?.(min);
-        if (max != null && parsed > max) return onChange?.(max);
+        const clamped = Math.min(
+          max ?? Number.POSITIVE_INFINITY,
+          Math.max(min ?? Number.NEGATIVE_INFINITY, parsed),
+        );
+        setText(
+          clamped === parsed
+            ? raw
+            : formatNumber(clamped, thousandSeparator, decimals),
+        );
+        setNumericValue(clamped);
+        onChange?.(clamped);
+        return;
       }
-      onChange?.(parsed);
+      setText(raw);
+      setNumericValue(null);
+      onChange?.(null);
     }
 
     function handleBlur() {
       const parsed = parseNumber(text);
       if (parsed !== null) {
-        setText(formatNumber(parsed, thousandSeparator, decimals));
+        const clamped = Math.min(
+          max ?? Number.POSITIVE_INFINITY,
+          Math.max(min ?? Number.NEGATIVE_INFINITY, parsed),
+        );
+        setText(formatNumber(clamped, thousandSeparator, decimals));
+        setNumericValue(clamped);
       } else {
         setText("");
+        setNumericValue(null);
       }
     }
 
     return (
       <div className="relative">
+        {name && <input type="hidden" name={name} value={numericValue ?? ""} />}
         {prefix && (
           <Text as="span" variant="muted" className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" text={prefix} />
         )}
@@ -83,6 +109,7 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
           ref={ref}
           type="text"
           inputMode="decimal"
+          name={undefined}
           value={text}
           onChange={handleChange}
           onBlur={handleBlur}

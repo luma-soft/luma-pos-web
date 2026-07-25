@@ -10,6 +10,7 @@ import type { AiQuickActionApplyMode } from "@/components/ai-quick-actions/types
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { Select } from "@/components/ui/select";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
@@ -266,11 +267,12 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums text-slate-500">{formatNumber(l.product.stock)}</td>
                         <td className="px-4 py-3 text-right">
-                          <Input
-                            type="number" min={0} value={l.actualQty}
-                            onChange={(e) => setQty(l.product.id, Number(e.target.value))}
+                          <QuantityInput
+                            min={0}
+                            value={l.actualQty}
+                            onChange={(quantity) => setQty(l.product.id, quantity)}
                             size="sm"
-                            className="ml-auto w-28 text-right tabular-nums"
+                            className="ml-auto w-28"
                           />
                         </td>
                         <td className={cn("px-4 py-3 text-right tabular-nums font-semibold", diff > 0 ? "text-ok" : diff < 0 ? "text-er" : "text-slate-400")}>

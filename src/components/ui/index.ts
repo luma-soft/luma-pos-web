@@ -2,6 +2,11 @@ export { Button, type ButtonProps } from "./button";
 export { buttonVariants, type ButtonVariantProps } from "./button-variants";
 export { Input, Textarea, type InputProps, type TextareaProps } from "./input";
 export { NumberInput, type NumberInputProps } from "./number-input";
+export {
+  QuantityInput,
+  normalizeQuantity,
+  type QuantityInputProps,
+} from "./quantity-input";
 export { MoneyInput, type MoneyInputProps } from "./money-input";
 export { Select, type SelectProps, type SelectOption } from "./select";
 export { Section, type SectionProps } from "./section";

@@ -6,6 +6,8 @@ import { useTranslations } from "next-intl";
 import { Plus, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumberInput } from "@/components/ui/number-input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
 import { createPromotion, togglePromotion } from "@/lib/actions/extras";
@@ -117,12 +119,12 @@ export function PromoQuickCreate() {
             {tiers.map((tier, i) => (
               <div key={i} className="grid grid-cols-[auto_minmax(72px,96px)_1fr_minmax(64px,88px)_auto_auto] items-center gap-2 text-sm">
                 <Text as="span" variant="muted" text="≥" />
-                <Input type="number" min={1} value={tier.minQty}
-                  onChange={(e) => setTiers((ts) => ts.map((x, j) => j === i ? { ...x, minQty: Number(e.target.value) } : x))}
+                <QuantityInput min={1} value={tier.minQty}
+                  onChange={(minQty) => setTiers((ts) => ts.map((x, j) => j === i ? { ...x, minQty } : x))}
                   className="text-right" />
                 <Text as="span" variant="muted" className="truncate" text={`${product?.baseUnit ?? t("purchases.unitLabel")} → ${t("promos.discount")}`} />
-                <Input type="number" min={0} max={100} step={0.5} value={tier.discountPct}
-                  onChange={(e) => setTiers((ts) => ts.map((x, j) => j === i ? { ...x, discountPct: Number(e.target.value) } : x))}
+                <NumberInput min={0} max={100} step={0.5} decimals={2} thousandSeparator={false} value={tier.discountPct}
+                  onChange={(discountPct) => setTiers((ts) => ts.map((x, j) => j === i ? { ...x, discountPct: discountPct ?? 0 } : x))}
                   className="text-right" />
                 <Text as="span" variant="muted" text="%" />
                 {tiers.length > 1 ? (

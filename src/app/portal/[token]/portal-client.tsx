@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Loader2, Minus, Plus, Search, Trash2 } from "lucide-react";
+import { Loader2, Search, Trash2 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { createPortalOrder } from "@/lib/actions/portal";
+import { QuantityInput } from "@/components/ui/quantity-input";
 
 interface PortalProduct {
   id: string; name: string; sku: string; baseUnit: string; price: number;
@@ -114,15 +115,13 @@ export function PortalClient({ token, customerName, customerType, products }: Pr
                     <div className="text-xs text-slate-400">{p.sku} · <b className="text-blue-600">{formatCurrency(p.price)}</b>/{p.baseUnit}</div>
                   </div>
                   {qty > 0 ? (
-                    <div className="flex items-center gap-1.5">
-                      <button onClick={() => setQty(p.id, qty - 1)} className="w-7 h-7 rounded-md border border-slate-200 grid place-items-center"><Minus className="w-3 h-3" /></button>
-                      <input
-                        type="number" min={0} value={qty}
-                        onChange={(e) => setQty(p.id, Number(e.target.value))}
-                        className="w-16 px-1 py-1 text-center text-sm rounded-md border border-slate-200 tabular-nums"
-                      />
-                      <button onClick={() => setQty(p.id, qty + 1)} className="w-7 h-7 rounded-md border border-slate-200 grid place-items-center"><Plus className="w-3 h-3" /></button>
-                    </div>
+                    <QuantityInput
+                      min={0}
+                      value={qty}
+                      onChange={(quantity) => setQty(p.id, quantity)}
+                      size="sm"
+                      className="w-28"
+                    />
                   ) : (
                     <button onClick={() => setQty(p.id, 1)} className="px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-medium">{t("portal.add")}</button>
                   )}

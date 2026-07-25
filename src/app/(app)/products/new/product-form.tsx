@@ -29,6 +29,7 @@ import {
   Section,
   Input,
   NumberInput,
+  QuantityInput,
   Select,
   Button,
   Field,
@@ -798,26 +799,24 @@ function ComboItemsField({
                     </div>
                   )}
                 </div>
-                <label className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-2 text-sm">
                   <span className="text-slate-500">
                     {t("products.combo.quantity")}
                   </span>
-                  <input
-                    type="number"
-                    min="0.0001"
-                    step="any"
+                  <QuantityInput
                     value={item.quantity}
-                    onChange={(event) => {
-                      const quantity = Number(event.target.value);
+                    min={0.0001}
+                    decimals={4}
+                    onChange={(quantity) => {
                       setValue(
                         `comboItems.${index}.quantity`,
-                        Number.isFinite(quantity) ? quantity : 0,
+                        quantity,
                         { shouldDirty: true, shouldValidate: true },
                       );
                     }}
-                    className="h-10 w-24 rounded-lg border border-border bg-surface px-3 text-right"
+                    className="w-32"
                   />
-                </label>
+                </div>
                 <Button
                   type="button"
                   variant="ghost"
@@ -1135,33 +1134,42 @@ function VariantChildrenPreview() {
                   <Input {...register(`variantChildren.${idx}.baseUnit`)} />
                 </td>
                 <td className="px-3 py-2">
-                  <input
-                    type="number"
+                  <NumberInput
                     min={0}
-                    {...register(`variantChildren.${idx}.costPrice`, {
-                      valueAsNumber: true,
-                    })}
+                    value={child.costPrice}
+                    onChange={(costPrice) =>
+                      setValue(`variantChildren.${idx}.costPrice`, costPrice ?? 0, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
+                    }
                     className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-right"
                   />
                 </td>
                 <td className="px-3 py-2">
-                  <input
-                    type="number"
+                  <NumberInput
                     min={0}
-                    {...register(`variantChildren.${idx}.retailPrice`, {
-                      valueAsNumber: true,
-                    })}
+                    value={child.retailPrice}
+                    onChange={(retailPrice) =>
+                      setValue(`variantChildren.${idx}.retailPrice`, retailPrice ?? 0, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
+                    }
                     className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-right"
                   />
                 </td>
                 <td className="px-3 py-2">
-                  <input
-                    type="number"
+                  <QuantityInput
                     min={0}
-                    {...register(`variantChildren.${idx}.initialStock`, {
-                      valueAsNumber: true,
-                    })}
-                    className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-right"
+                    value={Number(child.initialStock ?? 0)}
+                    onChange={(initialStock) =>
+                      setValue(`variantChildren.${idx}.initialStock`, initialStock, {
+                        shouldDirty: true,
+                        shouldValidate: true,
+                      })
+                    }
+                    className="w-32"
                   />
                 </td>
                 <td className="px-3 py-2 text-center">

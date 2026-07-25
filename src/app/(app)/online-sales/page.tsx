@@ -10,6 +10,7 @@ import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { disconnectShopeeShop } from "@/lib/actions/marketplace";
 import { ShopeeListingModal } from "../inventory/tabs/shopee-listing-modal";
 import { Select } from "@/components/ui/select";
+import { NumberInput } from "@/components/ui/number-input";
 import { OnlineSalesListingButton } from "./online-sales-product-search";
 
 type SP = Record<string, string | undefined>;
@@ -180,11 +181,11 @@ function ShopPolicyForm({
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{L ? "Tồn đệm" : "Stock buffer"}</span>
-          <input name="stockBuffer" type="number" min={0} defaultValue={policy.stockBuffer} className="rounded-lg border border-border bg-canvas px-3 py-2 text-sm" />
+          <NumberInput name="stockBuffer" min={0} defaultValue={policy.stockBuffer} className="bg-canvas" />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{L ? "Ngưỡng tồn thấp" : "Min stock"}</span>
-          <input name="minStockThreshold" type="number" min={0} defaultValue={policy.minStockThreshold} className="rounded-lg border border-border bg-canvas px-3 py-2 text-sm" />
+          <NumberInput name="minStockThreshold" min={0} defaultValue={policy.minStockThreshold} className="bg-canvas" />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{L ? "Khi hết hàng" : "Out of stock"}</span>

@@ -9,6 +9,8 @@ import type { AiQuickActionApplyMode } from "@/components/ai-quick-actions/types
 import { SearchableSelect } from "@/components/combobox";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
+import { NumberInput } from "@/components/ui/number-input";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { Select } from "@/components/ui/select";
 import { createInternalUse } from "@/lib/actions/internal-use";
 import { Routes } from "@/lib/routes";
@@ -246,8 +248,8 @@ export function InternalUseForm() {
                           className="bg-canvas"
                         />
                       </td>
-                      <td className="px-3 py-2"><Input type="number" min={1} value={l.quantity} onChange={(e) => upd(l.key, { quantity: Math.max(1, Number(e.target.value) || 1) })} size="sm" className="no-spinner bg-canvas text-right font-mono" /></td>
-                      <td className="px-3 py-2"><Input type="number" min={0} value={l.unitCost} onChange={(e) => upd(l.key, { unitCost: Math.max(0, Number(e.target.value) || 0) })} size="sm" className="no-spinner bg-canvas text-right font-mono" /></td>
+                      <td className="px-3 py-2"><QuantityInput min={1} value={l.quantity} onChange={(quantity) => upd(l.key, { quantity })} size="sm" className="w-28" /></td>
+                      <td className="px-3 py-2"><NumberInput min={0} value={l.unitCost} onChange={(unitCost) => upd(l.key, { unitCost: unitCost ?? 0 })} size="sm" className="bg-canvas text-right font-mono" /></td>
                       <td className="px-3 py-3 text-right font-mono font-bold">{formatCurrency(l.unitCost * l.quantity)}</td>
                       <td className="sticky right-0 bg-surface px-3 py-2 text-right shadow-[-10px_0_18px_rgba(15,23,42,0.04)]">
                         <button type="button" aria-label={t("common.delete")} onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-er-soft hover:text-er active:scale-[0.98]">
