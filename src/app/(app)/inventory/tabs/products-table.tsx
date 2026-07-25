@@ -823,23 +823,16 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
   return (
     <div className="border-t border-border-soft pt-4">
       <div className="flex flex-nowrap gap-2 overflow-x-auto xl:flex-wrap xl:justify-end xl:overflow-visible">
-        <ActionButton
-          icon={cameraMaterials ? Trash2 : PackagePlus}
-          label={cameraMaterials
-            ? (locale === "vi" ? "Xóa khỏi vật tư lắp camera" : "Remove from camera materials")
-            : (locale === "vi" ? "Thêm vào vật tư lắp camera" : "Add to camera materials")}
-          onClick={toggleCameraMaterial}
-          disabled={pending}
-          tone={cameraMaterials ? "danger" : "neutral"}
-        />
-        {!cameraMaterials && <>
-            <ActionButton
-              icon={Trash2}
-              label={t("products.actions.delete")}
-              onClick={removeProduct}
-              disabled={pending}
-              tone="danger"
-            />
+        {cameraMaterials ? (
+          <ActionButton
+            icon={Trash2}
+            label={locale === "vi" ? "Xóa khỏi vật tư lắp camera" : "Remove from camera materials"}
+            onClick={toggleCameraMaterial}
+            disabled={pending}
+            tone="danger"
+          />
+        ) : (
+          <>
             <ActionLink
               icon={Copy}
               label={t("products.actions.copy")}
@@ -896,6 +889,12 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
                     label={t("products.actions.addSameType")}
                     href={productModalHref({ productModal: "sameType", sameTypeAs: sameTypeSourceId })}
                   />
+                  <MenuActionButton
+                    icon={PackagePlus}
+                    label={locale === "vi" ? "Thêm vào vật tư lắp camera" : "Add to camera materials"}
+                    onClick={toggleCameraMaterial}
+                    disabled={pending}
+                  />
                   <div className="my-1 border-t border-border-soft" />
                   <MenuActionButton
                     icon={Ban}
@@ -907,11 +906,19 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
                     onClick={toggleActive}
                     disabled={pending}
                   />
+                  <MenuActionButton
+                    icon={Trash2}
+                    label={t("products.actions.delete")}
+                    onClick={removeProduct}
+                    disabled={pending}
+                    tone="danger"
+                  />
                 </div>
               </div>
             )}
           </div>
-        </>}
+          </>
+        )}
       </div>
       {error && <p className="mt-2 text-sm font-medium text-er">{error}</p>}
     </div>
@@ -970,18 +977,25 @@ function MenuActionButton({
   label,
   onClick,
   disabled,
+  tone = "neutral",
 }: {
   icon: LucideIcon;
   label: string;
   onClick: () => void;
   disabled?: boolean;
+  tone?: "neutral" | "danger";
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-50 dark:text-slate-200"
+      className={cn(
+        "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium disabled:pointer-events-none disabled:opacity-50",
+        tone === "danger"
+          ? "text-er hover:bg-red-50 dark:hover:bg-red-950/30"
+          : "text-slate-700 hover:bg-surface-2 dark:text-slate-200",
+      )}
     >
       <Icon className="h-4 w-4" />
       {label}

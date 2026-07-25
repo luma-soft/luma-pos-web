@@ -714,7 +714,7 @@
       }
     },
     "actions": {
-      "delete": "Xóa",
+      "delete": "Xóa sản phẩm",
       "copy": "Sao chép",
       "edit": "Chỉnh sửa",
       "printLabels": "In tem mã",

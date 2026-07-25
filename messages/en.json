@@ -714,7 +714,7 @@
       }
     },
     "actions": {
-      "delete": "Delete",
+      "delete": "Delete product",
       "copy": "Copy",
       "edit": "Edit",
       "printLabels": "Print labels",
