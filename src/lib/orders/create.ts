@@ -1,5 +1,5 @@
 import { revalidatePath } from "next/cache";
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   orders, orderItems, payments, customers, products, stockLevels, stockMovements, einvoices, returns,
@@ -129,12 +129,22 @@ export async function createOrderForUser(
         const [hasEInvoice] = await tx.select({ id: einvoices.id }).from(einvoices).where(eq(einvoices.orderId, sourceOrder.id)).limit(1);
         if (hasEInvoice) throw new Error("SOURCE_HAS_EINVOICE");
 
-        const sourceItems = await tx.select().from(orderItems).where(eq(orderItems.orderId, sourceOrder.id));
         if (sourceIsSale && sourceOrder.warehouseId) {
-          for (const i of sourceItems) {
-            const baseQty = Number(i.quantity) * Number(i.unitMultiplier);
+          const sourceStockMovements = await tx
+            .select({
+              productId: stockMovements.productId,
+              quantity: stockMovements.quantity,
+            })
+            .from(stockMovements)
+            .where(and(
+              eq(stockMovements.refType, "order"),
+              eq(stockMovements.refId, sourceOrder.id),
+              eq(stockMovements.type, "sale"),
+            ));
+          for (const movement of sourceStockMovements) {
+            const baseQty = Math.abs(Number(movement.quantity));
             await restoreTrackedStockLots(tx, {
-              productId: i.productId,
+              productId: movement.productId,
               quantity: baseQty,
               sourceRefType: "order",
               sourceRefId: sourceOrder.id,
@@ -145,9 +155,9 @@ export async function createOrderForUser(
             await tx.update(stockLevels).set({
               quantity: sql`${stockLevels.quantity} + ${toQty(baseQty)}`,
               updatedAt: sql`now()`,
-            }).where(sql`${stockLevels.productId} = ${i.productId} and ${stockLevels.warehouseId} = ${sourceOrder.warehouseId}`);
+            }).where(sql`${stockLevels.productId} = ${movement.productId} and ${stockLevels.warehouseId} = ${sourceOrder.warehouseId}`);
             await tx.insert(stockMovements).values({
-              productId: i.productId,
+              productId: movement.productId,
               warehouseId: sourceOrder.warehouseId,
               type: "return_in",
               quantity: toQty(baseQty),
@@ -263,39 +273,41 @@ export async function createOrderForUser(
 
       // Trừ kho theo base unit + ghi movement
       for (const i of trustedItems) {
-        const baseQty = i.quantity * i.unitMultiplier;
-        await consumeTrackedStockLots(tx, {
-          productId: i.productId,
-          warehouseId: v.warehouseId,
-          quantity: baseQty,
-          refType: "order",
-          refId: order.id,
-          createdBy: profileId,
-        });
-        await tx
-          .insert(stockLevels)
-          .values({
-            productId: i.productId,
+        for (const stockItem of i.stockItems) {
+          const baseQty = stockItem.quantity;
+          await consumeTrackedStockLots(tx, {
+            productId: stockItem.productId,
             warehouseId: v.warehouseId,
-            quantity: toQty(-baseQty),
-          })
-          .onConflictDoUpdate({
-            target: [stockLevels.productId, stockLevels.warehouseId],
-            set: {
-              quantity: sql`${stockLevels.quantity} - ${toQty(baseQty)}`,
-              updatedAt: sql`now()`,
-            },
+            quantity: baseQty,
+            refType: "order",
+            refId: order.id,
+            createdBy: profileId,
           });
-        await tx.insert(stockMovements).values({
-          productId: i.productId,
-          warehouseId: v.warehouseId,
-          type: "sale",
-          quantity: toQty(-baseQty),
-          refType: "order",
-          refId: order.id,
-          note: `${order.code} · ${i.quantity} ${i.unitName}`,
-          createdBy: profileId,
-        });
+          await tx
+            .insert(stockLevels)
+            .values({
+              productId: stockItem.productId,
+              warehouseId: v.warehouseId,
+              quantity: toQty(-baseQty),
+            })
+            .onConflictDoUpdate({
+              target: [stockLevels.productId, stockLevels.warehouseId],
+              set: {
+                quantity: sql`${stockLevels.quantity} - ${toQty(baseQty)}`,
+                updatedAt: sql`now()`,
+              },
+            });
+          await tx.insert(stockMovements).values({
+            productId: stockItem.productId,
+            warehouseId: v.warehouseId,
+            type: "sale",
+            quantity: toQty(-baseQty),
+            refType: "order",
+            refId: order.id,
+            note: `${order.code} · ${i.productName} · ${i.quantity} ${i.unitName}`,
+            createdBy: profileId,
+          });
+        }
       }
 
       // Công nợ + tổng mua của khách

@@ -14,7 +14,8 @@ describe("product stock display", () => {
 
   test("does not present service units as physical inventory", () => {
     const service = {
-      categoryName: "Dịch Vụ",
+      categoryName: "Công lắp đặt",
+      productKind: "service" as const,
       totalStock: -4,
       baseUnit: "điểm",
     };
@@ -32,5 +33,19 @@ describe("product stock display", () => {
         "Không quản lý tồn",
       ),
     ).toBe("3 cái");
+  });
+
+  test("does not present combo stock as a standalone quantity", () => {
+    expect(
+      productStockDisplay(
+        {
+          categoryName: "Combo camera",
+          productKind: "combo",
+          totalStock: 99,
+          baseUnit: "bộ",
+        },
+        "Không quản lý tồn",
+      ),
+    ).toBe("Không quản lý tồn");
   });
 });

@@ -25,9 +25,16 @@ export const productVariantChildSchema = z.object({
   agentPrice: z.number().min(0).nullable().optional(),
   initialStock: z.number().min(0).default(0),
   minLevel: z.number().min(0).default(0),
-  imageUrls: z.array(z.string()).default([]),
+  imageUrls: z.array(z.string()).max(10).default([]),
   directSale: z.boolean().default(true),
   specs: z.record(z.string(), z.array(z.string())).default({}),
+});
+
+export const productKindSchema = z.enum(["product", "service", "combo"]);
+
+export const productComboItemSchema = z.object({
+  productId: z.string().min(1, { error: "validation.required" }),
+  quantity: z.number().positive(),
 });
 
 export const siblingApplyFieldSchema = z.enum([
@@ -49,13 +56,14 @@ export const siblingApplySchema = z.object({
 
 export const createProductSchema = z.object({
   // Info
+  productKind: productKindSchema.default("product"),
   sku: z.string().optional(),
   barcode: z.string().optional(),
   name: z.string().min(1, { error: "validation.required" }),
   categoryId: z.string().min(1, { error: "validation.required" }), // nhóm hàng bắt buộc
   brandId: z.string().optional(),
   supplierIds: z.array(z.string()).default([]), // nhiều NCC; phần tử đầu = NCC chính
-  imageUrls: z.array(z.string()).default([]),
+  imageUrls: z.array(z.string()).max(10).default([]),
 
   // Pricing
   costPrice: z.number().min(0).default(0),
@@ -91,6 +99,7 @@ export const createProductSchema = z.object({
   // Attributes (replaces VLXD section)
   attributes: z.array(productAttributeSchema).default([]),
   variantChildren: z.array(productVariantChildSchema).default([]),
+  comboItems: z.array(productComboItemSchema).default([]),
   applyToSiblings: siblingApplySchema.default({ enabled: false, fields: [] }),
 
   // Description
@@ -98,6 +107,21 @@ export const createProductSchema = z.object({
   invoiceNote: z.string().optional(),
 
   directSale: z.boolean().default(true),
+}).superRefine((value, ctx) => {
+  if (value.productKind === "combo" && value.comboItems.length === 0) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["comboItems"],
+      message: "products.combo.itemsRequired",
+    });
+  }
+  if (value.productKind !== "product" && value.variantChildren.length > 0) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["variantChildren"],
+      message: "products.errors.kindCannotHaveVariants",
+    });
+  }
 });
 
 export type CreateProductInput = z.input<typeof createProductSchema>;

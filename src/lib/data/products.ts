@@ -16,6 +16,7 @@ import {
   brands,
   categories,
   products,
+  productComboItems,
   productUnits,
   productSuppliers,
   stockLevels,
@@ -171,6 +172,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
       .select({
         id: products.id,
         sku: products.sku,
+        productKind: products.productKind,
         barcode: products.barcode,
         name: products.name,
         description: products.description,
@@ -201,6 +203,26 @@ export async function getProducts(filters: ProductListFilters = {}) {
         dimensions: products.dimensions,
         specs: products.specs,
         imageUrls: products.imageUrls,
+        comboItems: sql<Array<{
+          productId: string;
+          name: string;
+          sku: string;
+          baseUnit: string;
+          quantity: string;
+          productKind: "product" | "service";
+        }>>`coalesce((
+          select json_agg(json_build_object(
+            'productId', pci.component_product_id,
+            'name', component.name,
+            'sku', component.sku,
+            'baseUnit', component.base_unit,
+            'quantity', pci.quantity,
+            'productKind', component.product_kind
+          ) order by pci.sort_order)
+          from product_combo_items pci
+          join products component on component.id = pci.component_product_id
+          where pci.combo_product_id = ${products.id}
+        ), '[]')`,
         childCount: sql<number>`(
           select count(*)::int from products child where child.parent_product_id = ${products.id}
         )`,
@@ -261,6 +283,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
           .select({
             id: products.id,
             sku: products.sku,
+            productKind: products.productKind,
             barcode: products.barcode,
             name: products.name,
             description: products.description,
@@ -291,6 +314,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
             dimensions: products.dimensions,
             specs: products.specs,
             imageUrls: products.imageUrls,
+            comboItems: sql<never[]>`'[]'::json`,
             childCount: sql<number>`0`,
             minCostPrice: products.costPrice,
             maxCostPrice: products.costPrice,
@@ -688,6 +712,7 @@ export async function getProduct(id: string) {
     .select({
       id: products.id,
       sku: products.sku,
+      productKind: products.productKind,
       barcode: products.barcode,
       name: products.name,
       description: products.description,
@@ -746,6 +771,20 @@ export async function getProduct(id: string) {
     .where(eq(productUnits.productId, id))
     .orderBy(asc(productUnits.sortOrder));
 
+  const comboItems = await db
+    .select({
+      productId: productComboItems.componentProductId,
+      quantity: productComboItems.quantity,
+      name: products.name,
+      sku: products.sku,
+      baseUnit: products.baseUnit,
+      productKind: products.productKind,
+    })
+    .from(productComboItems)
+    .innerJoin(products, eq(productComboItems.componentProductId, products.id))
+    .where(eq(productComboItems.comboProductId, id))
+    .orderBy(asc(productComboItems.sortOrder));
+
   // nhiều NCC (chính trước)
   const supplierRows = await db
     .select({
@@ -766,6 +805,7 @@ export async function getProduct(id: string) {
           name: products.name,
           variantName: products.variantName,
           imageUrls: products.imageUrls,
+          productKind: products.productKind,
           isActive: products.isActive,
         })
         .from(products)
@@ -796,7 +836,7 @@ export async function getProduct(id: string) {
         .orderBy(asc(products.name))
     : [];
 
-  return { ...p, units, suppliers: supplierRows, siblings, children };
+  return { ...p, units, comboItems, suppliers: supplierRows, siblings, children };
 }
 export type ProductDetail = NonNullable<Awaited<ReturnType<typeof getProduct>>>;
 
@@ -804,7 +844,7 @@ export type ProductDetail = NonNullable<Awaited<ReturnType<typeof getProduct>>>;
 // nhiều trang (Sản phẩm, Thiết lập giá, Tồn kho) → đỡ query lặp.
 export const getProductFormOptions = unstable_cache(
   async () => {
-    const [cats, brandRows, supplierRows] = await Promise.all([
+    const [cats, brandRows, supplierRows, comboProductRows] = await Promise.all([
       db
         .select({ id: categories.id, name: categories.name })
         .from(categories)
@@ -817,8 +857,28 @@ export const getProductFormOptions = unstable_cache(
         .select({ id: suppliers.id, name: suppliers.name })
         .from(suppliers)
         .orderBy(asc(suppliers.name)),
+      db
+        .select({
+          id: products.id,
+          name: products.name,
+          sku: products.sku,
+          baseUnit: products.baseUnit,
+          productKind: products.productKind,
+        })
+        .from(products)
+        .where(and(
+          eq(products.isActive, true),
+          eq(products.isVariantParent, false),
+          sql`${products.productKind} <> 'combo'`,
+        ))
+        .orderBy(asc(products.name)),
     ]);
-    return { categories: cats, brands: brandRows, suppliers: supplierRows };
+    return {
+      categories: cats,
+      brands: brandRows,
+      suppliers: supplierRows,
+      comboProducts: comboProductRows,
+    };
   },
   ["product-form-options"],
   { revalidate: 60 },

@@ -33,8 +33,10 @@ export default async function EditProductPage({ params, searchParams }: Props) {
       categories={options.categories}
       brands={options.brands}
       suppliers={options.suppliers}
+      comboProducts={options.comboProducts}
       priceBooks={priceBooks}
       aiPreview={sp.source === "ai-preview"}
+      creationKind={product.productKind}
     />
   );
 }

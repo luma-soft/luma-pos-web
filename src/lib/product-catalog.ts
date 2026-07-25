@@ -1,6 +1,6 @@
 import { normalizeSearch } from "@/lib/normalize";
 
-export const PRODUCT_CATALOG_SCHEMA_VERSION = 2;
+export const PRODUCT_CATALOG_SCHEMA_VERSION = 3;
 
 export type CatalogUnit = {
   unitName: string;
@@ -21,6 +21,7 @@ export type ProductCatalogItem = {
   sku: string;
   barcode: string | null;
   name: string;
+  productKind: "product" | "service" | "combo";
   brandName: string | null;
   categoryId: string | null;
   categoryName: string | null;
@@ -38,6 +39,10 @@ export type ProductCatalogItem = {
   m2PerUnit: string | null;
   priceByWeight: boolean;
   isStockManaged: boolean;
+  comboItems: Array<{
+    productId: string;
+    quantity: string;
+  }>;
   units: CatalogUnit[];
   prices: Record<string, string>;
   warehouseStock: CatalogWarehouseStock[];

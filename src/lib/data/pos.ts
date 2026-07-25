@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
-import { categories, customers, paymentBankAccounts, products, productPrices, productUnits, projects, promotions, stockLevels, warehouses } from "@/db/schema";
+import { categories, customers, paymentBankAccounts, products, productComboItems, productPrices, productUnits, projects, promotions, stockLevels, warehouses } from "@/db/schema";
 import { isPromoActive, type PromoTier } from "@/lib/promo";
 import { getPriceBooks } from "@/lib/data/price-books";
 import { getMobileProducts } from "@/lib/data/products";
@@ -20,6 +20,7 @@ function posProductSelect(warehouseId: string | null, hasComplianceColumns: bool
     sku: products.sku,
     barcode: products.barcode,
     name: products.name,
+    productKind: products.productKind,
     imageUrls: products.imageUrls,
     specs: products.specs,
     parentProductId: products.parentProductId,
@@ -34,6 +35,14 @@ function posProductSelect(warehouseId: string | null, hasComplianceColumns: bool
     m2PerUnit: products.m2PerUnit,
     categoryId: products.categoryId,
     categoryName: categories.name,
+    comboItems: sql<Array<{ productId: string; quantity: string }>>`coalesce((
+      select json_agg(json_build_object(
+        'productId', ${productComboItems.componentProductId},
+        'quantity', ${productComboItems.quantity}
+      ) order by ${productComboItems.sortOrder})
+      from ${productComboItems}
+      where ${productComboItems.comboProductId} = ${products.id}
+    ), '[]')`,
     childCount: sql<number>`(
       select count(*)::int from products child where child.parent_product_id = ${products.id}
     )`,

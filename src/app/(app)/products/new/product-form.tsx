@@ -17,6 +17,7 @@ import {
   Tag,
   Trash2,
   X,
+  PackagePlus,
 } from "lucide-react";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
@@ -82,6 +83,7 @@ export interface NewProductFormProps {
   categories: ProductFormOptions["categories"];
   brands: ProductFormOptions["brands"];
   suppliers?: ProductFormOptions["suppliers"]; // NCC tự gắn khi nhập hàng, không sửa ở form
+  comboProducts?: ProductFormOptions["comboProducts"];
   priceBooks?: PriceBookRow[];
   mode?: "create" | "edit";
   productId?: string;
@@ -92,11 +94,13 @@ export interface NewProductFormProps {
   closeHref?: string;
   closeNavigation?: "push" | "replace";
   aiPreview?: boolean;
+  creationKind?: "product" | "service" | "combo";
 }
 
 export function NewProductForm({
   categories,
   brands,
+  comboProducts = [],
   priceBooks = [],
   mode = "create",
   productId,
@@ -107,6 +111,7 @@ export function NewProductForm({
   closeHref,
   closeNavigation = "push",
   aiPreview = false,
+  creationKind = "product",
 }: NewProductFormProps) {
   const t = useTranslations();
   const router = useRouter();
@@ -124,6 +129,7 @@ export function NewProductForm({
     resolver: zodResolver(createProductSchema),
     defaultValues: {
       sku: "",
+      productKind: creationKind,
       barcode: "",
       name: "",
       categoryId: "",
@@ -141,6 +147,7 @@ export function NewProductForm({
       units: [],
       attributes: [],
       variantChildren: [],
+      comboItems: [],
       applyToSiblings: {
         enabled: false,
         fields: ["name", "imageUrls", "description"],
@@ -194,6 +201,7 @@ export function NewProductForm({
           : null;
       const res = await updateProduct({
         id: productId,
+        productKind: values.productKind,
         sku: values.sku?.trim() || "",
         barcode: values.barcode,
         name: values.name,
@@ -209,6 +217,7 @@ export function NewProductForm({
         location: values.location,
         description: values.description,
         imageUrls: values.imageUrls,
+        comboItems: values.comboItems,
         isActive: values.directSale,
         specs: specsWithOrderNote(specs, values.invoiceNote),
         applyToSiblings: values.applyToSiblings,
@@ -257,6 +266,8 @@ export function NewProductForm({
 
   const close = () => navigateAfterModal(doneHref);
 
+  const productKind = form.watch("productKind") ?? "product";
+
   return (
     <Form
       form={form}
@@ -289,7 +300,11 @@ export function NewProductForm({
           <Heading
             as="h1"
             size="lg"
-            tx={isEdit ? "products.editTitle" : "products.create"}
+            text={t(
+              isEdit
+                ? `products.kind.editTitles.${productKind}`
+                : `products.kind.createTitles.${productKind}`,
+            )}
           />
         </div>
         {isModal ? (
@@ -314,7 +329,7 @@ export function NewProductForm({
 
       <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6">
         <div className="flex gap-6 overflow-x-auto">
-          {(["info", "variants", "description"] as Tab[]).map((tk) => (
+          {(["info", ...(productKind === "product" ? ["variants" as const] : []), "description"] as Tab[]).map((tk) => (
             <button
               key={tk}
               type="button"
@@ -349,6 +364,7 @@ export function NewProductForm({
             categories={categories}
             brands={brands}
             priceBooks={priceBooks}
+            comboProducts={comboProducts}
           />
         )}
         {tab === "variants" && (
@@ -434,7 +450,10 @@ function InfoTab({
   brands,
   suppliers,
   priceBooks,
+  comboProducts,
 }: NewProductFormProps) {
+  const { watch } = useFormCtx();
+  const productKind = watch("productKind") ?? "product";
   return (
     <>
       <BasicInfoSection
@@ -448,19 +467,152 @@ function InfoTab({
       >
         <PricingFields priceBooks={priceBooks ?? []} />
       </Section>
-      <Section
-        titleTx="products.sections.stock"
-        descriptionTx="products.sections.stockDesc"
-      >
-        <StockFields />
-      </Section>
-      <Section
-        titleTx="products.sections.physical"
-        descriptionTx="products.sections.physicalDesc"
-      >
-        <PhysicalFields />
-      </Section>
+      {productKind === "combo" && (
+        <ComboItemsField products={comboProducts ?? []} />
+      )}
+      {productKind === "product" && (
+        <>
+          <Section
+            titleTx="products.sections.stock"
+            descriptionTx="products.sections.stockDesc"
+          >
+            <StockFields />
+          </Section>
+          <Section
+            titleTx="products.sections.physical"
+            descriptionTx="products.sections.physicalDesc"
+          >
+            <PhysicalFields />
+          </Section>
+        </>
+      )}
     </>
+  );
+}
+
+function ComboItemsField({
+  products: candidates,
+}: {
+  products: ProductFormOptions["comboProducts"];
+}) {
+  const t = useTranslations();
+  const { watch, setValue, formState } = useFormCtx();
+  const items = watch("comboItems") ?? [];
+  const [selectedId, setSelectedId] = useState("");
+  const selectedIds = new Set(items.map((item) => item.productId));
+  const options = candidates
+    .filter((product) => !selectedIds.has(product.id))
+    .map((product) => ({
+      value: product.id,
+      label: product.name,
+      hint: `${product.sku} · ${product.baseUnit}`,
+    }));
+
+  function addItem() {
+    if (!selectedId || selectedIds.has(selectedId)) return;
+    setValue(
+      "comboItems",
+      [...items, { productId: selectedId, quantity: 1 }],
+      { shouldDirty: true, shouldValidate: true },
+    );
+    setSelectedId("");
+  }
+
+  return (
+    <Section
+      titleTx="products.combo.sectionTitle"
+      descriptionTx="products.combo.sectionDesc"
+      collapsible={false}
+    >
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Combobox
+          value={selectedId}
+          onChange={setSelectedId}
+          options={options}
+          placeholder={t("products.combo.selectProduct")}
+          showSearch
+          className="flex-1"
+        />
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={addItem}
+          disabled={!selectedId}
+        >
+          <PackagePlus className="h-4 w-4" />
+          {t("products.combo.addItem")}
+        </Button>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="mt-3 rounded-xl border border-dashed border-border bg-surface-2 px-4 py-6 text-center text-sm text-slate-500">
+          {t("products.combo.empty")}
+        </div>
+      ) : (
+        <div className="mt-3 divide-y divide-border-soft overflow-hidden rounded-xl border border-border">
+          {items.map((item, index) => {
+            const product = candidates.find(
+              (candidate) => candidate.id === item.productId,
+            );
+            return (
+              <div
+                key={item.productId}
+                className="flex flex-wrap items-center gap-3 bg-surface px-3 py-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold">
+                    {product?.name ?? item.productId}
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    {product?.sku} · {product?.baseUnit}
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 text-sm">
+                  <span className="text-slate-500">
+                    {t("products.combo.quantity")}
+                  </span>
+                  <input
+                    type="number"
+                    min="0.0001"
+                    step="any"
+                    value={item.quantity}
+                    onChange={(event) => {
+                      const quantity = Number(event.target.value);
+                      setValue(
+                        `comboItems.${index}.quantity`,
+                        Number.isFinite(quantity) ? quantity : 0,
+                        { shouldDirty: true, shouldValidate: true },
+                      );
+                    }}
+                    className="h-10 w-24 rounded-lg border border-border bg-surface px-3 text-right"
+                  />
+                </label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="iconSm"
+                  onClick={() =>
+                    setValue(
+                      "comboItems",
+                      items.filter((_, itemIndex) => itemIndex !== index),
+                      { shouldDirty: true, shouldValidate: true },
+                    )
+                  }
+                  aria-label={t("common.delete")}
+                >
+                  <Trash2 className="h-4 w-4 text-red-500" />
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {formState.errors.comboItems?.message && (
+        <p className="mt-2 text-xs text-red-600">
+          {t(formState.errors.comboItems.message)}
+        </p>
+      )}
+    </Section>
   );
 }
 
@@ -890,7 +1042,7 @@ function BasicInfoSection({ categories, brands }: NewProductFormProps) {
   );
 }
 
-const MAX_IMAGES = 5;
+const MAX_IMAGES = 10;
 
 /** Tên file ngẫu nhiên cho ảnh upload (ngoài render scope — tránh lint react-compiler). */
 function randomImagePath(fileName: string): string {

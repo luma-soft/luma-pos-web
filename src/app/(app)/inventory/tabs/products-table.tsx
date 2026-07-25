@@ -81,7 +81,10 @@ export function ProductsTable({
         <div className="flex items-center gap-3">
           <ProductThumbnail product={product} />
           <div className="min-w-0">
-            <div className="whitespace-normal break-words font-medium text-slate-900 dark:text-slate-100">{product.name}</div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <div className="whitespace-normal break-words font-medium text-slate-900 dark:text-slate-100">{product.name}</div>
+              <ProductKindBadge kind={product.productKind} />
+            </div>
             <div className="truncate text-xs text-slate-400">{product.sku}{product.barcode ? ` · ${product.barcode}` : ""}</div>
           </div>
         </div>
@@ -97,7 +100,7 @@ export function ProductsTable({
       defaultVisible: true,
       align: "right",
       cellClassName: (product) => {
-        if (!isProductStockManaged(product.categoryName)) {
+        if (!isProductStockManaged(product.categoryName, product.productKind)) {
           return "font-medium text-slate-400";
         }
         const stock = Number(product.totalStock);
@@ -166,6 +169,24 @@ function ProductThumbnail({ product }: { product: ProductRow }) {
   );
 }
 
+function ProductKindBadge({
+  kind,
+}: {
+  kind: ProductRow["productKind"];
+}) {
+  const t = useTranslations();
+  const styles = {
+    product: "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300",
+    service: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300",
+    combo: "bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300",
+  } as const;
+  return (
+    <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", styles[kind])}>
+      {t(`products.kind.labels.${kind}`)}
+    </span>
+  );
+}
+
 export function ProductDetailView({
   product,
   cameraMaterials = false,
@@ -179,9 +200,6 @@ export function ProductDetailView({
   const [tab, setTab] = useState<ProductExpandTab>("info");
   const specs = specEntries(product.specs);
   const orderNote = orderNoteFromSpecs(product.specs);
-  const image = Array.isArray(product.imageUrls)
-    ? product.imageUrls[0]
-    : undefined;
   const effectiveActive = product.isVariantParent
     ? product.children.some((child) => child.isActive)
     : product.isActive;
@@ -223,7 +241,7 @@ export function ProductDetailView({
         {tab === "info" && (
           <ProductInfoPanel
             product={product}
-            image={image}
+            imageUrls={product.imageUrls ?? []}
             specs={specs}
             effectiveActive={effectiveActive}
           />
@@ -248,32 +266,55 @@ export function ProductDetailView({
 
 function ProductInfoPanel({
   product,
-  image,
+  imageUrls,
   specs,
   effectiveActive,
 }: {
   product: ProductRow;
-  image?: string;
+  imageUrls: string[];
   specs: Array<readonly [string, string]>;
   effectiveActive: boolean;
 }) {
   const t = useTranslations();
+  const [activeImage, setActiveImage] = useState(0);
+  const image = imageUrls[activeImage];
 
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-[160px_1fr]">
-      <div className="relative h-36 w-36 overflow-hidden rounded-card border border-border bg-primary-50/50">
-        {image ? (
-          <Image
-            src={image}
-            alt={product.name}
-            fill
-            sizes="144px"
-            className="object-contain p-2"
-            unoptimized
-          />
-        ) : (
-          <div className="grid h-full place-items-center text-primary-300">
-            <ImageIcon className="h-12 w-12" />
+      <div>
+        <div className="relative h-36 w-36 overflow-hidden rounded-card border border-border bg-primary-50/50">
+          {image ? (
+            <Image
+              src={image}
+              alt={`${product.name} ${activeImage + 1}`}
+              fill
+              sizes="144px"
+              className="object-contain p-2"
+              unoptimized
+            />
+          ) : (
+            <div className="grid h-full place-items-center text-primary-300">
+              <ImageIcon className="h-12 w-12" />
+            </div>
+          )}
+        </div>
+        {imageUrls.length > 1 && (
+          <div className="mt-2 flex w-36 gap-1.5 overflow-x-auto pb-1">
+            {imageUrls.map((url, index) => (
+              <button
+                key={url}
+                type="button"
+                onClick={() => setActiveImage(index)}
+                className={cn(
+                  "relative h-10 w-10 shrink-0 overflow-hidden rounded-md border bg-white",
+                  index === activeImage
+                    ? "border-primary-600 ring-1 ring-primary-600"
+                    : "border-border",
+                )}
+              >
+                <Image src={url} alt="" fill sizes="40px" className="object-contain p-0.5" unoptimized />
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -290,7 +331,9 @@ function ProductInfoPanel({
             <div className="mt-2 flex flex-wrap gap-2">
               <Badge
                 text={
-                  product.isVariantParent
+                  product.productKind !== "product"
+                    ? t(`products.kind.labels.${product.productKind}`)
+                    : product.isVariantParent
                     ? t("products.list.group")
                     : t("products.expand.normalProduct")
                 }
@@ -328,7 +371,7 @@ function ProductInfoPanel({
           <InfoItem
             label={t("products.stock.min")}
             value={
-              isProductStockManaged(product.categoryName) && Number(product.minLevel) > 0
+              isProductStockManaged(product.categoryName, product.productKind) && Number(product.minLevel) > 0
                 ? formatNumber(Number(product.minLevel))
                 : undefined
             }
@@ -350,6 +393,32 @@ function ProductInfoPanel({
             value={product.dimensions}
           />
         </div>
+
+        {product.productKind === "combo" && product.comboItems.length > 0 && (
+          <div className="rounded-xl border border-border bg-surface-2 p-3">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {t("products.combo.sectionTitle")}
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {product.comboItems.map((item) => (
+                <div
+                  key={item.productId}
+                  className="flex items-center justify-between gap-3 rounded-lg bg-surface px-3 py-2 text-sm"
+                >
+                  <span className="min-w-0 truncate">
+                    {item.name}
+                    <span className="ml-1 text-xs text-slate-400">
+                      {item.sku}
+                    </span>
+                  </span>
+                  <span className="shrink-0 font-semibold">
+                    {formatNumber(Number(item.quantity))} {item.baseUnit}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {specs.length > 0 && (
           <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2 xl:grid-cols-4">

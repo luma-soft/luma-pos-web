@@ -1,6 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { products, productPrices, productUnits, promotions } from "@/db/schema";
+import { products, productComboItems, productPrices, productUnits, promotions } from "@/db/schema";
 import { applyPromo, isPromoActive } from "@/lib/promo";
 import type { CreateOrderOutput, UpdateOrderOutput } from "@/lib/schemas/order";
 
@@ -16,6 +16,11 @@ export type NormalizedOrderItem = {
   lineDiscount: number;
   unitPrice: number;
   total: number;
+  productKind: "product" | "service" | "combo";
+  stockItems: Array<{
+    productId: string;
+    quantity: number;
+  }>;
 };
 
 function listedUnitPrice(
@@ -49,7 +54,7 @@ export async function normalizeOrderItems(
   const productIds = [...new Set(rawItems.map((i) => i.productId))];
   if (productIds.length === 0) throw new Error("INVALID_ITEMS");
 
-  const [productRows, unitRows, priceRows, promoRows] = await Promise.all([
+  const [productRows, unitRows, priceRows, promoRows, comboRows] = await Promise.all([
     db
       .select({
         id: products.id,
@@ -57,6 +62,7 @@ export async function normalizeOrderItems(
         baseUnit: products.baseUnit,
         retailPrice: products.retailPrice,
         isActive: products.isActive,
+        productKind: products.productKind,
       })
       .from(products)
       .where(inArray(products.id, productIds)),
@@ -85,6 +91,16 @@ export async function normalizeOrderItems(
       })
       .from(promotions)
       .where(and(eq(promotions.isActive, true), inArray(promotions.productId, productIds))),
+    db
+      .select({
+        comboProductId: productComboItems.comboProductId,
+        componentProductId: productComboItems.componentProductId,
+        quantity: productComboItems.quantity,
+        componentKind: products.productKind,
+      })
+      .from(productComboItems)
+      .innerJoin(products, eq(productComboItems.componentProductId, products.id))
+      .where(inArray(productComboItems.comboProductId, productIds)),
   ]);
 
   const productById = new Map(productRows.map((p) => [p.id, p]));
@@ -99,6 +115,12 @@ export async function normalizeOrderItems(
   const promoByProduct = new Map<string, NonNullable<(typeof promoRows)[number]["tiers"]>>();
   for (const promo of promoRows) {
     if (isPromoActive(promo)) promoByProduct.set(promo.productId, promo.tiers ?? []);
+  }
+  const comboItemsByProduct = new Map<string, typeof comboRows>();
+  for (const comboItem of comboRows) {
+    const list = comboItemsByProduct.get(comboItem.comboProductId) ?? [];
+    list.push(comboItem);
+    comboItemsByProduct.set(comboItem.comboProductId, list);
   }
 
   return rawItems.map((item) => {
@@ -132,6 +154,18 @@ export async function normalizeOrderItems(
       lineDiscount,
       unitPrice,
       total: item.quantity * unitPrice,
+      productKind: product.productKind,
+      stockItems:
+        product.productKind === "service"
+          ? []
+          : product.productKind === "combo"
+            ? (comboItemsByProduct.get(product.id) ?? [])
+                .filter((component) => component.componentKind === "product")
+                .map((component) => ({
+                  productId: component.componentProductId,
+                  quantity: Number(component.quantity) * baseQty,
+                }))
+            : [{ productId: product.id, quantity: baseQty }],
     };
   });
 }

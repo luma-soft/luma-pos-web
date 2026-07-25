@@ -7,6 +7,7 @@ import { db } from "@/db";
 import {
   products,
   productUnits,
+  productComboItems,
   productSuppliers,
   categories,
   brands,
@@ -338,6 +339,7 @@ export async function updateProductPrices(
 
 const updateProductSchema = z.object({
   id: z.uuid(),
+  productKind: z.enum(["product", "service", "combo"]).optional(),
   sku: z.string().trim().min(1),
   barcode: z.string().trim().optional(),
   name: z.string().trim().min(1),
@@ -361,6 +363,10 @@ const updateProductSchema = z.object({
   location: z.string().trim().optional(),
   description: z.string().trim().optional(),
   imageUrls: z.array(z.string()).optional(),
+  comboItems: z.array(z.object({
+    productId: z.uuid(),
+    quantity: z.number().positive(),
+  })).optional(),
   isActive: z.boolean(),
   specs: z.record(z.string(), z.array(z.string())).nullable(),
   applyToSiblings: siblingApplySchema.optional(),
@@ -517,6 +523,7 @@ export async function updateProduct(
         .select({
           parentProductId: products.parentProductId,
           variantName: products.variantName,
+          productKind: products.productKind,
         })
         .from(products)
         .where(eq(products.id, v.id))
@@ -526,6 +533,7 @@ export async function updateProduct(
         .update(products)
         .set({
           sku: v.sku,
+          ...(v.productKind ? { productKind: v.productKind } : {}),
           barcode: v.barcode || null,
           name: v.name,
           categoryId: v.categoryId || null,
@@ -574,6 +582,29 @@ export async function updateProduct(
             sortOrder: i,
           })),
         );
+      }
+
+      if (
+        v.comboItems !== undefined ||
+        (v.productKind !== undefined && v.productKind !== "combo")
+      ) {
+        await tx
+          .delete(productComboItems)
+          .where(eq(productComboItems.comboProductId, v.id));
+        if (
+          (v.productKind ?? current?.productKind) === "combo" &&
+          v.comboItems &&
+          v.comboItems.length > 0
+        ) {
+          await tx.insert(productComboItems).values(
+            v.comboItems.map((item, index) => ({
+              comboProductId: v.id,
+              componentProductId: item.productId,
+              quantity: String(item.quantity),
+              sortOrder: index,
+            })),
+          );
+        }
       }
 
       // NCC do nhập hàng tự gắn — chỉ đồng bộ khi form gửi supplierIds
@@ -824,6 +855,7 @@ export async function createProduct(
           .insert(products)
           .values({
             sku,
+            productKind: v.productKind,
             barcode: v.barcode?.trim() || null,
             name: v.name.trim(),
             description: v.description || null,
@@ -855,12 +887,24 @@ export async function createProduct(
 
         await insertUnits(product.id);
         await insertSuppliers(product.id);
-        await insertInitialStock(
-          product.id,
-          v.initialStock,
-          v.minLevel,
-          v.costPrice,
-        );
+        if (v.productKind === "product") {
+          await insertInitialStock(
+            product.id,
+            v.initialStock,
+            v.minLevel,
+            v.costPrice,
+          );
+        }
+        if (v.productKind === "combo") {
+          await tx.insert(productComboItems).values(
+            v.comboItems.map((item, index) => ({
+              comboProductId: product.id,
+              componentProductId: item.productId,
+              quantity: String(item.quantity),
+              sortOrder: index,
+            })),
+          );
+        }
         return product;
       }
 
@@ -868,6 +912,7 @@ export async function createProduct(
         .insert(products)
         .values({
           sku,
+          productKind: "product",
           barcode: v.barcode?.trim() || null,
           name: v.name.trim(),
           description: v.description || null,
@@ -916,6 +961,7 @@ export async function createProduct(
           .insert(products)
           .values({
             sku: child.sku?.trim() || generateVariantSku(sku, index),
+            productKind: "product",
             barcode: child.barcode?.trim() || null,
             name: childProductName(v.name, child.variantName),
             parentProductId: parent.id,

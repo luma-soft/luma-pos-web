@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { createProductSchema } from "@/app/(app)/products/new/schema";
 
 const base = {
@@ -26,6 +26,37 @@ describe("product depth schema", () => {
       ...base,
       lifecycleStatus: "deleted",
       shelfLifeDays: 0,
+    }).success).toBe(false);
+  });
+
+  it("requires at least one component for a combo", () => {
+    expect(createProductSchema.safeParse({
+      ...base,
+      productKind: "combo",
+      comboItems: [],
+    }).success).toBe(false);
+
+    const parsed = createProductSchema.parse({
+      ...base,
+      productKind: "combo",
+      comboItems: [{ productId: "camera-1", quantity: 2 }],
+    });
+    expect(parsed.comboItems).toEqual([
+      { productId: "camera-1", quantity: 2 },
+    ]);
+  });
+
+  it("keeps services free of physical variants", () => {
+    expect(createProductSchema.safeParse({
+      ...base,
+      productKind: "service",
+      variantChildren: [{
+        variantName: "Ca sáng",
+        initialStock: 0,
+        minLevel: 0,
+        imageUrls: [],
+        specs: {},
+      }],
     }).success).toBe(false);
   });
 });

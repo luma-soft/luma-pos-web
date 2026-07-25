@@ -1,8 +1,7 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { Plus, PackageOpen } from "lucide-react";
+import { PackageOpen } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { getProduct, getProducts, getProductFormOptions } from "@/lib/data/products";
 import { getPriceBooks, getPriceOverridesForProducts } from "@/lib/data/price-books";
@@ -17,13 +16,14 @@ import { CAMERA_QUOTE_DETAIL_MATERIAL_SKUS, CAMERA_QUOTE_MATERIAL_SKUS } from "@
 import { CameraMaterialSearch } from "./camera-material-search";
 import { InstantProductSearch } from "./instant-product-search";
 import { InstantProductFilters } from "./instant-product-filters";
+import { ProductCreateMenu } from "./product-create-menu";
 
 type SP = Record<string, string | undefined>;
 const STATUSES = ["active", "inactive", "all"] as const;
 type Status = (typeof STATUSES)[number];
 const VIEWS = ["grouped", "flat"] as const;
 type View = (typeof VIEWS)[number];
-const PRODUCT_MODAL_KEYS = ["productModal", "productId", "copyFrom", "sameTypeAs", "onlineListing", "onlineProductId", "shopeeProductId"] as const;
+const PRODUCT_MODAL_KEYS = ["productModal", "productId", "copyFrom", "sameTypeAs", "productKind", "onlineListing", "onlineProductId", "shopeeProductId"] as const;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function ProductsTab({ searchParams }: { searchParams: SP }) {
@@ -74,7 +74,29 @@ async function ProductsToolbar({
     <div className="mb-4 flex flex-wrap items-center gap-2 sm:gap-3">
       <InstantProductSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />
       <InstantProductFilters category={params.category ?? ""} status={status} view={view} categories={categories} labels={{ allCategories: t("products.list.allCategories"), active: t("products.list.statusActive"), inactive: t("products.list.statusInactive"), all: t("products.list.statusAll"), grouped: t("products.list.viewGrouped"), flat: t("products.list.viewFlat") }} />
-      <Link href={productModalHref(params, { productModal: "create" })} className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 active:scale-[0.98] sm:min-h-0 sm:w-auto sm:justify-start"><Plus className="w-4 h-4" />{t("products.createNew")}</Link>
+      <ProductCreateMenu
+        label={t("products.createNew")}
+        items={[
+          {
+            kind: "product",
+            label: t("products.kind.labels.product"),
+            hint: t("products.kind.hints.product"),
+            href: productModalHref(params, { productModal: "create", productKind: "product" }),
+          },
+          {
+            kind: "service",
+            label: t("products.kind.labels.service"),
+            hint: t("products.kind.hints.service"),
+            href: productModalHref(params, { productModal: "create", productKind: "service" }),
+          },
+          {
+            kind: "combo",
+            label: t("products.kind.labels.combo"),
+            hint: t("products.kind.hints.combo"),
+            href: productModalHref(params, { productModal: "create", productKind: "combo" }),
+          },
+        ]}
+      />
     </div>
   );
 }
@@ -111,6 +133,9 @@ export async function ProductEditorModal({
     : {};
   const closeHref = closeHrefOverride ?? productModalHref(searchParams, {});
   const mode = modal === "edit" ? "edit" : "create";
+  const requestedKind = ["product", "service", "combo"].includes(searchParams.productKind ?? "")
+    ? searchParams.productKind as "product" | "service" | "combo"
+    : "product";
   const initialValues = seedProduct
     ? productToFormInitialValues(seedProduct, modal === "copy" ? "copy" : modal === "sameType" ? "sameType" : "edit", priceBookPrices)
     : undefined;
@@ -127,10 +152,12 @@ export async function ProductEditorModal({
           categories={options.categories}
           brands={options.brands}
           suppliers={options.suppliers}
+          comboProducts={options.comboProducts}
           priceBooks={priceBooks}
           layout="modal"
           closeHref={closeHref}
           closeNavigation={closeNavigation}
+          creationKind={seedProduct?.productKind ?? requestedKind}
         />
       </div>
     </div>

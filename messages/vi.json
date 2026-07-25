@@ -532,6 +532,37 @@
     "create": "Tạo hàng hóa",
     "edit": "Sửa hàng hóa",
     "createNew": "Thêm mới",
+    "kind": {
+      "labels": {
+        "product": "Sản phẩm",
+        "service": "Dịch vụ",
+        "combo": "Combo"
+      },
+      "hints": {
+        "product": "Hàng hóa vật lý có quản lý tồn kho",
+        "service": "Công lắp đặt, sửa chữa hoặc dịch vụ không quản lý tồn",
+        "combo": "Một gói bán gồm nhiều sản phẩm hoặc dịch vụ"
+      },
+      "createTitles": {
+        "product": "Tạo sản phẩm",
+        "service": "Tạo dịch vụ",
+        "combo": "Tạo combo"
+      },
+      "editTitles": {
+        "product": "Sửa sản phẩm",
+        "service": "Sửa dịch vụ",
+        "combo": "Sửa combo"
+      }
+    },
+    "combo": {
+      "sectionTitle": "Thành phần combo",
+      "sectionDesc": "Chọn các sản phẩm hoặc dịch vụ được bán cùng trong combo",
+      "selectProduct": "Tìm và chọn thành phần",
+      "addItem": "Thêm vào combo",
+      "quantity": "Số lượng",
+      "empty": "Combo chưa có thành phần nào.",
+      "itemsRequired": "Combo phải có ít nhất một thành phần."
+    },
     "saveAndCreate": "Lưu & Tạo thêm",
     "saveAndCreateSameType": "Lưu & Thêm hàng hóa cùng loại",
     "directSale": "Bán trực tiếp",

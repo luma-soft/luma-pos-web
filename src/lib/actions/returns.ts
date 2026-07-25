@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  customers, orderItems, orders, paymentRefunds, payments, returnItems, returns, stockLevels, stockMovements,
+  customers, orderItems, orders, paymentRefunds, payments, productComboItems, products, returnItems, returns, stockLevels, stockMovements,
 } from "@/db/schema";
 import {
   createPosReturnSchema,
@@ -40,6 +40,39 @@ import { gatewayRefundReference } from "@/lib/payments/refund-service";
 const GATEWAY_REFUND_METHODS = new Set<GatewayProvider>(["momo", "zalopay", "vnpay"]);
 const isGatewayRefundMethod = (value: string): value is GatewayProvider =>
   GATEWAY_REFUND_METHODS.has(value as GatewayProvider);
+
+type ReturnTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function stockTargetsForReturnedItem(
+  tx: ReturnTransaction,
+  productId: string,
+  baseQuantity: number,
+) {
+  const [product] = await tx
+    .select({ productKind: products.productKind })
+    .from(products)
+    .where(eq(products.id, productId))
+    .limit(1);
+  if (!product || product.productKind === "service") return [];
+  if (product.productKind === "product") {
+    return [{ productId, quantity: baseQuantity }];
+  }
+  const components = await tx
+    .select({
+      productId: productComboItems.componentProductId,
+      quantity: productComboItems.quantity,
+      productKind: products.productKind,
+    })
+    .from(productComboItems)
+    .innerJoin(products, eq(productComboItems.componentProductId, products.id))
+    .where(eq(productComboItems.comboProductId, productId));
+  return components
+    .filter((component) => component.productKind === "product")
+    .map((component) => ({
+      productId: component.productId,
+      quantity: Number(component.quantity) * baseQuantity,
+    }));
+}
 
 async function selectRefundableGatewayPayment(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
@@ -320,71 +353,78 @@ export async function createExchangeForUser(
         : [];
 
       for (const row of returnedRows.filter((item) => item.restock)) {
-        const quantity = Number(row.quantity) * Number(row.unitMultiplier);
-        await restoreOrReceiveTrackedStockLots(tx, {
-          productId: row.productId,
-          warehouseId: order.warehouseId,
-          quantity,
-          sourceRefType: "order",
-          sourceRefId: order.id,
-          refType: "exchange_return",
-          refId: returned.id,
-          fallbackBatchNumber: `RETURN-${returned.code}`,
-          createdBy: profileId,
-        });
-        await tx.insert(stockLevels).values({
-          productId: row.productId,
-          warehouseId: order.warehouseId,
-          quantity: toQty(quantity),
-        }).onConflictDoUpdate({
-          target: [stockLevels.productId, stockLevels.warehouseId],
-          set: {
-            quantity: sql`${stockLevels.quantity} + ${toQty(quantity)}`,
-            updatedAt: sql`now()`,
-          },
-        });
-        await tx.insert(stockMovements).values({
-          productId: row.productId,
-          warehouseId: order.warehouseId,
-          type: "return_in",
-          quantity: toQty(quantity),
-          refType: "exchange_return",
-          refId: returned.id,
-          note: `${returned.code} ← ${order.code}`,
-          createdBy: profileId,
-        });
+        const targets = await stockTargetsForReturnedItem(
+          tx,
+          row.productId,
+          Number(row.quantity) * Number(row.unitMultiplier),
+        );
+        for (const target of targets) {
+          await restoreOrReceiveTrackedStockLots(tx, {
+            productId: target.productId,
+            warehouseId: order.warehouseId,
+            quantity: target.quantity,
+            sourceRefType: "order",
+            sourceRefId: order.id,
+            refType: "exchange_return",
+            refId: returned.id,
+            fallbackBatchNumber: `RETURN-${returned.code}`,
+            createdBy: profileId,
+          });
+          await tx.insert(stockLevels).values({
+            productId: target.productId,
+            warehouseId: order.warehouseId,
+            quantity: toQty(target.quantity),
+          }).onConflictDoUpdate({
+            target: [stockLevels.productId, stockLevels.warehouseId],
+            set: {
+              quantity: sql`${stockLevels.quantity} + ${toQty(target.quantity)}`,
+              updatedAt: sql`now()`,
+            },
+          });
+          await tx.insert(stockMovements).values({
+            productId: target.productId,
+            warehouseId: order.warehouseId,
+            type: "return_in",
+            quantity: toQty(target.quantity),
+            refType: "exchange_return",
+            refId: returned.id,
+            note: `${returned.code} ← ${order.code}`,
+            createdBy: profileId,
+          });
+        }
       }
       for (const item of replacementItems) {
-        const quantity = item.quantity * item.unitMultiplier;
-        await consumeTrackedStockLots(tx, {
-          productId: item.productId,
-          warehouseId: order.warehouseId,
-          quantity,
-          refType: "exchange_order",
-          refId: exchangeOrder.id,
-          createdBy: profileId,
-        });
-        await tx.insert(stockLevels).values({
-          productId: item.productId,
-          warehouseId: order.warehouseId,
-          quantity: toQty(-quantity),
-        }).onConflictDoUpdate({
-          target: [stockLevels.productId, stockLevels.warehouseId],
-          set: {
-            quantity: sql`${stockLevels.quantity} - ${toQty(quantity)}`,
-            updatedAt: sql`now()`,
-          },
-        });
-        await tx.insert(stockMovements).values({
-          productId: item.productId,
-          warehouseId: order.warehouseId,
-          type: "sale",
-          quantity: toQty(-quantity),
-          refType: "exchange_order",
-          refId: exchangeOrder.id,
-          note: exchangeOrder.code,
-          createdBy: profileId,
-        });
+        for (const target of item.stockItems) {
+          await consumeTrackedStockLots(tx, {
+            productId: target.productId,
+            warehouseId: order.warehouseId,
+            quantity: target.quantity,
+            refType: "exchange_order",
+            refId: exchangeOrder.id,
+            createdBy: profileId,
+          });
+          await tx.insert(stockLevels).values({
+            productId: target.productId,
+            warehouseId: order.warehouseId,
+            quantity: toQty(-target.quantity),
+          }).onConflictDoUpdate({
+            target: [stockLevels.productId, stockLevels.warehouseId],
+            set: {
+              quantity: sql`${stockLevels.quantity} - ${toQty(target.quantity)}`,
+              updatedAt: sql`now()`,
+            },
+          });
+          await tx.insert(stockMovements).values({
+            productId: target.productId,
+            warehouseId: order.warehouseId,
+            type: "sale",
+            quantity: toQty(-target.quantity),
+            refType: "exchange_order",
+            refId: exchangeOrder.id,
+            note: exchangeOrder.code,
+            createdBy: profileId,
+          });
+        }
       }
 
       if (exchangeCredit > 0) {
@@ -634,38 +674,44 @@ export async function createReturnForUser(
       // Hoàn kho cho hàng restock
       if (order.warehouseId) {
         for (const r of rows.filter((x) => x.restock)) {
-          const baseQty = Number(r.quantity) * Number(r.unitMultiplier);
-          await restoreOrReceiveTrackedStockLots(tx, {
-            productId: r.productId,
-            warehouseId: order.warehouseId,
-            quantity: baseQty,
-            sourceRefType: "order",
-            sourceRefId: order.id,
-            refType: "return",
-            refId: ret.id,
-            fallbackBatchNumber: `RETURN-${ret.code}`,
-            createdBy: profileId,
-          });
-          await tx
-            .insert(stockLevels)
-            .values({ productId: r.productId, warehouseId: order.warehouseId, quantity: toQty(baseQty) })
-            .onConflictDoUpdate({
-              target: [stockLevels.productId, stockLevels.warehouseId],
-              set: {
-                quantity: sql`${stockLevels.quantity} + ${toQty(baseQty)}`,
-                updatedAt: sql`now()`,
-              },
+          const targets = await stockTargetsForReturnedItem(
+            tx,
+            r.productId,
+            Number(r.quantity) * Number(r.unitMultiplier),
+          );
+          for (const target of targets) {
+            await restoreOrReceiveTrackedStockLots(tx, {
+              productId: target.productId,
+              warehouseId: order.warehouseId,
+              quantity: target.quantity,
+              sourceRefType: "order",
+              sourceRefId: order.id,
+              refType: "return",
+              refId: ret.id,
+              fallbackBatchNumber: `RETURN-${ret.code}`,
+              createdBy: profileId,
             });
-          await tx.insert(stockMovements).values({
-            productId: r.productId,
-            warehouseId: order.warehouseId,
-            type: "return_in",
-            quantity: toQty(baseQty),
-            refType: "return",
-            refId: ret.id,
-            note: `${ret.code} ← ${order.code}`,
-            createdBy: profileId,
-          });
+            await tx
+              .insert(stockLevels)
+              .values({ productId: target.productId, warehouseId: order.warehouseId, quantity: toQty(target.quantity) })
+              .onConflictDoUpdate({
+                target: [stockLevels.productId, stockLevels.warehouseId],
+                set: {
+                  quantity: sql`${stockLevels.quantity} + ${toQty(target.quantity)}`,
+                  updatedAt: sql`now()`,
+                },
+              });
+            await tx.insert(stockMovements).values({
+              productId: target.productId,
+              warehouseId: order.warehouseId,
+              type: "return_in",
+              quantity: toQty(target.quantity),
+              refType: "return",
+              refId: ret.id,
+              note: `${ret.code} ← ${order.code}`,
+              createdBy: profileId,
+            });
+          }
         }
       }
 
@@ -835,50 +881,56 @@ export async function createPosReturn(
       await tx.insert(returnItems).values(rows.map((r) => ({ ...r, returnId: ret.id })));
 
       for (const r of rows.filter((row) => row.restock)) {
-        const baseQty = Number(r.quantity) * Number(r.unitMultiplier);
-        if (order) {
-          await restoreOrReceiveTrackedStockLots(tx, {
-            productId: r.productId,
+        const targets = await stockTargetsForReturnedItem(
+          tx,
+          r.productId,
+          Number(r.quantity) * Number(r.unitMultiplier),
+        );
+        for (const target of targets) {
+          if (order) {
+            await restoreOrReceiveTrackedStockLots(tx, {
+              productId: target.productId,
+              warehouseId,
+              quantity: target.quantity,
+              sourceRefType: "order",
+              sourceRefId: order.id,
+              refType: "return",
+              refId: ret.id,
+              fallbackBatchNumber: `RETURN-${ret.code}`,
+              createdBy: profileId,
+            });
+          } else {
+            await receiveUnspecifiedTrackedStockLot(tx, {
+              productId: target.productId,
+              warehouseId,
+              quantity: target.quantity,
+              batchNumber: `RETURN-${ret.code}`,
+              refType: "return",
+              refId: ret.id,
+              createdBy: profileId,
+            });
+          }
+          await tx
+            .insert(stockLevels)
+            .values({ productId: target.productId, warehouseId, quantity: toQty(target.quantity) })
+            .onConflictDoUpdate({
+              target: [stockLevels.productId, stockLevels.warehouseId],
+              set: {
+                quantity: sql`${stockLevels.quantity} + ${toQty(target.quantity)}`,
+                updatedAt: sql`now()`,
+              },
+            });
+          await tx.insert(stockMovements).values({
+            productId: target.productId,
             warehouseId,
-            quantity: baseQty,
-            sourceRefType: "order",
-            sourceRefId: order.id,
+            type: "return_in",
+            quantity: toQty(target.quantity),
             refType: "return",
             refId: ret.id,
-            fallbackBatchNumber: `RETURN-${ret.code}`,
-            createdBy: profileId,
-          });
-        } else {
-          await receiveUnspecifiedTrackedStockLot(tx, {
-            productId: r.productId,
-            warehouseId,
-            quantity: baseQty,
-            batchNumber: `RETURN-${ret.code}`,
-            refType: "return",
-            refId: ret.id,
+            note: order ? `${ret.code} ← ${order.code}` : ret.code,
             createdBy: profileId,
           });
         }
-        await tx
-          .insert(stockLevels)
-          .values({ productId: r.productId, warehouseId, quantity: toQty(baseQty) })
-          .onConflictDoUpdate({
-            target: [stockLevels.productId, stockLevels.warehouseId],
-            set: {
-              quantity: sql`${stockLevels.quantity} + ${toQty(baseQty)}`,
-              updatedAt: sql`now()`,
-            },
-          });
-        await tx.insert(stockMovements).values({
-          productId: r.productId,
-          warehouseId,
-          type: "return_in",
-          quantity: toQty(baseQty),
-          refType: "return",
-          refId: ret.id,
-          note: order ? `${ret.code} ← ${order.code}` : ret.code,
-          createdBy: profileId,
-        });
       }
 
       if (v.refundMethod !== "debt_deduct") {

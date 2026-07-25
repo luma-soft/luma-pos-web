@@ -532,6 +532,37 @@
     "create": "Create Product",
     "edit": "Edit Product",
     "createNew": "New",
+    "kind": {
+      "labels": {
+        "product": "Product",
+        "service": "Service",
+        "combo": "Combo"
+      },
+      "hints": {
+        "product": "A physical item with inventory tracking",
+        "service": "Installation, repair, or other non-stock work",
+        "combo": "A sellable package of products or services"
+      },
+      "createTitles": {
+        "product": "Create product",
+        "service": "Create service",
+        "combo": "Create combo"
+      },
+      "editTitles": {
+        "product": "Edit product",
+        "service": "Edit service",
+        "combo": "Edit combo"
+      }
+    },
+    "combo": {
+      "sectionTitle": "Combo items",
+      "sectionDesc": "Choose the products or services included in this combo",
+      "selectProduct": "Search and select an item",
+      "addItem": "Add to combo",
+      "quantity": "Quantity",
+      "empty": "This combo has no items yet.",
+      "itemsRequired": "A combo must contain at least one item."
+    },
     "saveAndCreate": "Save & New",
     "saveAndCreateSameType": "Save & Add Same Type",
     "directSale": "Direct sale",

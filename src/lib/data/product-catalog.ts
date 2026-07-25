@@ -4,6 +4,7 @@ import {
   brands,
   catalogSyncState,
   categories,
+  productComboItems,
   productPrices,
   products,
   productUnits,
@@ -50,6 +51,7 @@ async function buildProductCatalogSnapshot(
         sku: products.sku,
         barcode: products.barcode,
         name: products.name,
+        productKind: products.productKind,
         brandName: brands.name,
         categoryId: products.categoryId,
         categoryName: categories.name,
@@ -67,9 +69,20 @@ async function buildProductCatalogSnapshot(
         m2PerUnit: products.m2PerUnit,
         priceByWeight: hasComplianceColumns ? products.priceByWeight : sql<boolean>`false`,
         isStockManaged: sql<boolean>`(
-          ${categories.name} is null
-          or lower(trim(${categories.name})) <> ${UNMANAGED_STOCK_CATEGORY_NAME}
+          ${products.productKind} = 'product'
+          and (
+            ${categories.name} is null
+            or lower(trim(${categories.name})) <> ${UNMANAGED_STOCK_CATEGORY_NAME}
+          )
         )`,
+        comboItems: sql<Array<{ productId: string; quantity: string }>>`coalesce((
+          select json_agg(json_build_object(
+            'productId', ${productComboItems.componentProductId},
+            'quantity', ${productComboItems.quantity}
+          ) order by ${productComboItems.sortOrder})
+          from ${productComboItems}
+          where ${productComboItems.comboProductId} = ${products.id}
+        ), '[]')`,
         units: sql<CatalogUnit[]>`coalesce((
           select json_agg(json_build_object(
             'unitName', ${productUnits.unitName},

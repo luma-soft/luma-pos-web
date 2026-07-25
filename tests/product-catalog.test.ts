@@ -13,6 +13,7 @@ function product(overrides: Partial<ProductCatalogItem> = {}): ProductCatalogIte
     sku: "MEM-KIOXIA-128GB",
     barcode: "8930000000128",
     name: "Thẻ nhớ Kioxia 128GB MicroSD",
+    productKind: "product",
     brandName: "Kioxia",
     categoryId: "memory",
     categoryName: "Thẻ nhớ",
@@ -30,6 +31,7 @@ function product(overrides: Partial<ProductCatalogItem> = {}): ProductCatalogIte
     m2PerUnit: null,
     priceByWeight: false,
     isStockManaged: true,
+    comboItems: [],
     units: [{ unitName: "hộp", multiplier: "10", barcode: "8930000000999", priceOverride: null }],
     prices: {},
     warehouseStock: [

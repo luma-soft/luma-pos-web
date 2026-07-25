@@ -15,6 +15,10 @@ export default async function NewProductPage({ searchParams }: Props) {
   const copyFrom = typeof sp.copyFrom === "string" ? sp.copyFrom : undefined;
   const sameTypeAs = typeof sp.sameTypeAs === "string" ? sp.sameTypeAs : undefined;
   const aiPreview = sp.source === "ai-preview";
+  const creationKind = typeof sp.productKind === "string" &&
+    ["product", "service", "combo"].includes(sp.productKind)
+    ? sp.productKind as "product" | "service" | "combo"
+    : "product";
   const seedId = copyFrom ?? sameTypeAs;
   if (seedId && !UUID_RE.test(seedId)) notFound();
 
@@ -34,9 +38,11 @@ export default async function NewProductPage({ searchParams }: Props) {
       categories={options.categories}
       brands={options.brands}
       suppliers={options.suppliers}
+      comboProducts={options.comboProducts}
       priceBooks={priceBooks}
       initialValues={seedProduct ? productToFormInitialValues(seedProduct, copyFrom ? "copy" : "sameType", priceBookPrices) : undefined}
       aiPreview={aiPreview}
+      creationKind={seedProduct?.productKind ?? creationKind}
     />
   );
 }

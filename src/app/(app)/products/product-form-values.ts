@@ -15,6 +15,7 @@ export function productToFormInitialValues(
     ([name]) => name !== PRODUCT_ORDER_NOTE_SPEC_KEY,
   );
   const shared: Partial<CreateProductInput> = {
+    productKind: product.productKind,
     categoryId: product.categoryId ?? "",
     brandId: product.brandId ?? "",
     supplierIds: product.suppliers.map((s) => s.id),
@@ -37,6 +38,10 @@ export function productToFormInitialValues(
       multiplier: Number(u.multiplier),
       barcode: mode === "copy" ? "" : (u.barcode ?? ""),
       priceOverride: u.priceOverride != null ? Number(u.priceOverride) : null,
+    })),
+    comboItems: product.comboItems.map((item) => ({
+      productId: item.productId,
+      quantity: Number(item.quantity),
     })),
     attributes: attributeSpecs.map(([name, values]) => ({
       name,

@@ -25,6 +25,9 @@ export const stockMovementTypeEnum = pgEnum("stock_movement_type", [
 export const customerTypeEnum = pgEnum("customer_type", [
   "retail", "wholesale", "contractor", "agent",
 ]);
+export const productKindEnum = pgEnum("product_kind", [
+  "product", "service", "combo",
+]);
 export const customerConsentStatusEnum = pgEnum("customer_consent_status", [
   "pending", "granted", "withdrawn",
 ]);
@@ -202,6 +205,7 @@ export const products = pgTable("products", {
   sku: varchar("sku", { length: 50 }).notNull().unique(),
   barcode: varchar("barcode", { length: 50 }),
   name: text("name").notNull(),
+  productKind: productKindEnum("product_kind").notNull().default("product"),
   fullName: text("full_name"), // "Gạch granite Viglacera 60x60 Đỏ Matte"
   parentProductId: uuid("parent_product_id").references((): AnyPgColumn => products.id, { onDelete: "set null" }),
   variantName: text("variant_name"),
@@ -275,6 +279,22 @@ export const productUnits = pgTable("product_units", {
   priceOverride: decimal("price_override", { precision: 14, scale: 2 }),
   sortOrder: integer("sort_order").default(0),
 }, (t) => [index("product_units_product_idx").on(t.productId)]);
+
+// Thành phần của combo. quantity luôn tính theo đơn vị cơ bản của sản phẩm con.
+export const productComboItems = pgTable("product_combo_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  comboProductId: uuid("combo_product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  componentProductId: uuid("component_product_id").notNull().references(() => products.id, { onDelete: "restrict" }),
+  quantity: decimal("quantity", { precision: 14, scale: 4 }).notNull().default("1"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("product_combo_items_unique").on(t.comboProductId, t.componentProductId),
+  index("product_combo_items_combo_idx").on(t.comboProductId),
+  index("product_combo_items_component_idx").on(t.componentProductId),
+  check("product_combo_items_not_self", sql`${t.comboProductId} <> ${t.componentProductId}`),
+  check("product_combo_items_quantity_positive", sql`${t.quantity} > 0`),
+]);
 
 // 1 sản phẩm mua được từ NHIỀU nhà cung cấp (products.supplierId = NCC chính)
 export const productSuppliers = pgTable("product_suppliers", {
@@ -1533,6 +1553,21 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   brand: one(brands, { fields: [products.brandId], references: [brands.id] }),
   units: many(productUnits),
   stockLevels: many(stockLevels),
+  comboItems: many(productComboItems, { relationName: "comboProduct" }),
+  includedInCombos: many(productComboItems, { relationName: "comboComponent" }),
+}));
+
+export const productComboItemsRelations = relations(productComboItems, ({ one }) => ({
+  combo: one(products, {
+    fields: [productComboItems.comboProductId],
+    references: [products.id],
+    relationName: "comboProduct",
+  }),
+  component: one(products, {
+    fields: [productComboItems.componentProductId],
+    references: [products.id],
+    relationName: "comboComponent",
+  }),
 }));
 
 export const ordersRelations = relations(orders, ({ one, many }) => ({
