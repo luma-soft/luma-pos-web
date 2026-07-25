@@ -21,6 +21,7 @@ import {
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { Routes } from "@/lib/routes";
+import { OrderDetailLink } from "@/components/order-detail-link";
 import { deleteProduct, setProductActive } from "@/lib/actions/products";
 import { setCameraMaterial } from "@/lib/actions/products";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
@@ -711,12 +712,12 @@ function DocumentValue({ movement }: { movement: StockMovementRow }) {
     movement.documentCode || movement.note || movement.refType || "—";
   if (movement.refType === "order" && movement.refId) {
     return (
-      <Link
-        href={Routes.orderDetail(movement.refId)}
+      <OrderDetailLink
+        orderId={movement.refId}
         className="text-primary-600 hover:underline"
       >
         {label}
-      </Link>
+      </OrderDetailLink>
     );
   }
   return <span className="text-primary-600">{label}</span>;

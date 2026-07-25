@@ -1,10 +1,10 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { getTranslations } from "next-intl/server";
-import { Routes } from "@/lib/routes";
 import type { getReturn } from "@/lib/data/returns";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
+import { OrderDetailLink } from "@/components/order-detail-link";
 
 type ReturnDetail = NonNullable<Awaited<ReturnType<typeof getReturn>>>;
 
@@ -19,9 +19,9 @@ export async function ReturnDetailPanel({ ret, compact = false }: { ret: ReturnD
             <h2 className="truncate text-xl font-bold text-slate-900 dark:text-slate-100">{ret.customerName ?? t("orders.walkIn")}</h2>
             <span className="text-sm font-semibold text-slate-500">{ret.code}</span>
             {ret.orderId && ret.orderCode && (
-              <Link href={Routes.salesOrder(ret.orderId, "completed")} className="text-sm font-semibold text-primary-600 hover:underline">
+              <OrderDetailLink orderId={ret.orderId} className="text-sm font-semibold text-primary-600 hover:underline">
                 {ret.orderCode}
-              </Link>
+              </OrderDetailLink>
             )}
           </div>
           <div className="mt-3 grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-3">

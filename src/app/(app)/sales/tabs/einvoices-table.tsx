@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
-import { Routes } from "@/lib/routes";
+import { OrderDetailLink } from "@/components/order-detail-link";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 type EInvoiceRow = {
@@ -31,7 +30,7 @@ export function EInvoicesTable({ rows }: { rows: EInvoiceRow[] }) {
     { key: "number", label: t("einvoice.cols.number"), required: true, render: (row) => <span className="font-medium">{row.number ?? "-"}{row.serial && <span className="ml-1 text-xs text-slate-400">{row.serial}</span>}</span> },
     { key: "status", label: t("einvoice.cols.status"), defaultVisible: true, render: (row) => <span className="text-xs font-semibold">{t(`einvoice.status.${row.status}`)}</span> },
     { key: "issuedAt", label: t("einvoice.cols.issuedAt"), defaultVisible: true, width: "160px", render: (row) => <span className="text-slate-500">{row.issuedAt ? formatDate(row.issuedAt) : "-"}</span> },
-    { key: "order", label: t("einvoice.cols.order"), defaultVisible: true, render: (row) => <Link href={Routes.orderDetail(row.orderId)} className="text-primary-600 hover:underline">{row.orderCode}</Link> },
+    { key: "order", label: t("einvoice.cols.order"), defaultVisible: true, render: (row) => <OrderDetailLink orderId={row.orderId} className="text-primary-600 hover:underline">{row.orderCode}</OrderDetailLink> },
     { key: "buyer", label: t("einvoice.cols.buyer"), defaultVisible: true, render: (row) => <span>{row.buyerName}{row.buyerTaxCode && <span className="ml-1 text-xs text-slate-400">MST: {row.buyerTaxCode}</span>}</span> },
     { key: "beforeVat", label: t("einvoice.cols.beforeVat"), defaultVisible: true, align: "right", render: (row) => formatCurrency(Number(row.totalBeforeVat)) },
     { key: "vat", label: "VAT", defaultVisible: true, align: "right", render: (row) => `${formatCurrency(Number(row.vatAmount))} (${Number(row.vatRate)}%)` },

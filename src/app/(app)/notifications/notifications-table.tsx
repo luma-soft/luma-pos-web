@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { cn, formatDate } from "@/lib/utils";
 import { Routes } from "@/lib/routes";
+import { OrderDetailLink } from "@/components/order-detail-link";
 import type { AuditSource, AuditStatus, getAuditLogs } from "@/lib/audit";
 
 type AuditRow = Awaited<ReturnType<typeof getAuditLogs>>[number];
@@ -168,12 +169,21 @@ function ExpandedAudit({ row }: { row: AuditRow }) {
             {records.slice(0, 10).map((record, index) => {
               const href = recordHref(record);
               const label = recordLabel(record);
+              const recordId = textValue(record.id);
+              const recordType = textValue(record.type);
               const chip = (
                 <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] font-semibold text-slate-600">
                   {label}
                   {href && <ExternalLink className="h-3 w-3" />}
                 </span>
               );
+              if (recordId && ["order", "invoice", "quote"].includes(recordType ?? "")) {
+                return (
+                  <OrderDetailLink key={`${label}-${index}`} orderId={recordId} onClick={stopRowToggle}>
+                    {chip}
+                  </OrderDetailLink>
+                );
+              }
               return href ? <Link key={`${label}-${index}`} href={href} onClick={stopRowToggle}>{chip}</Link> : <span key={`${label}-${index}`}>{chip}</span>;
             })}
           </div>

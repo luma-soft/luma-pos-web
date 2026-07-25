@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
-import { Routes } from "@/lib/routes";
+import { OrderDetailLink } from "@/components/order-detail-link";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { getCashbook } from "@/lib/data/cashbook";
 
@@ -61,7 +60,7 @@ function Category({ row }: { row: CashbookRow }) {
 }
 
 function Note({ row }: { row: CashbookRow }) {
-  if (row.refType === "order" && row.refId) return <Link href={Routes.orderDetail(row.refId)} className="text-primary-600 hover:underline">{row.note}</Link>;
+  if (row.refType === "order" && row.refId) return <OrderDetailLink orderId={row.refId} className="text-primary-600 hover:underline">{row.note}</OrderDetailLink>;
   return <span className="text-slate-500">{row.note ?? "—"}</span>;
 }
 

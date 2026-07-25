@@ -1,10 +1,9 @@
 "use client";
 
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
-import { Routes } from "@/lib/routes";
+import { OrderDetailLink } from "@/components/order-detail-link";
 import type { ReturnListRow } from "@/lib/data/returns";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
@@ -39,7 +38,7 @@ export function ReturnsTable({
       defaultVisible: true,
       width: "160px",
       render: (row) => row.orderId && row.orderCode
-        ? <Link href={Routes.salesOrder(row.orderId, "completed")} onClick={stopRowToggle} className="text-primary-600 hover:underline">{row.orderCode}</Link>
+        ? <OrderDetailLink orderId={row.orderId} onClick={stopRowToggle} className="text-primary-600 hover:underline">{row.orderCode}</OrderDetailLink>
         : <span className="text-slate-400">-</span>,
     },
     {

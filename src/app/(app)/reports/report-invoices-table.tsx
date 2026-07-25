@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
-import { Routes } from "@/lib/routes";
+import { OrderDetailLink } from "@/components/order-detail-link";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { ReportInvoiceRow } from "@/lib/data/reports";
 
@@ -16,9 +15,9 @@ export function ReportInvoicesTable({ rows }: { rows: ReportInvoiceRow[] }) {
       required: true,
       width: "180px",
       render: (invoice) => (
-        <Link href={Routes.salesOrder(invoice.id, invoice.status)} className="font-semibold text-primary-600 hover:underline">
+        <OrderDetailLink orderId={invoice.id} className="font-semibold text-primary-600 hover:underline">
           {invoice.code}
-        </Link>
+        </OrderDetailLink>
       ),
     },
     {
@@ -75,9 +74,9 @@ export function ReportInvoicesTable({ rows }: { rows: ReportInvoiceRow[] }) {
         <div className="p-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <Link href={Routes.salesOrder(invoice.id, invoice.status)} className="font-semibold text-primary-600 hover:underline">
+              <OrderDetailLink orderId={invoice.id} className="font-semibold text-primary-600 hover:underline">
                 {invoice.code}
-              </Link>
+              </OrderDetailLink>
               <div className="mt-0.5 text-xs text-slate-400">{formatDate(invoice.createdAt)} · {invoice.customerName}</div>
             </div>
             <div className={cn("shrink-0 font-semibold tabular-nums", Number(invoice.profit) >= 0 ? "text-ok" : "text-er")}>

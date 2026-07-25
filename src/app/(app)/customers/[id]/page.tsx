@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { ArrowLeft } from "lucide-react";
 import { Routes } from "@/lib/routes";
+import { OrderDetailLink } from "@/components/order-detail-link";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { getCustomer } from "@/lib/data/partners";
 import { getStoreSettings } from "@/lib/data/settings";
@@ -91,7 +92,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           <div className="space-y-1">
             {owingOrders.map((o) => (
               <div key={o.id} className="flex justify-between">
-                <Link href={Routes.salesOrder(o.id, o.status)} className="text-primary-600 hover:underline font-medium">{o.code}</Link>
+                <OrderDetailLink orderId={o.id} className="text-primary-600 hover:underline font-medium">{o.code}</OrderDetailLink>
                 <span className="tabular-nums font-semibold text-er">{formatCurrency(Number(o.total) - Number(o.amountPaid))}</span>
               </div>
             ))}
@@ -124,7 +125,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                 const remaining = Number(o.total) - Number(o.amountPaid);
                 return (
                   <tr key={o.id} className={cn("hover:bg-surface-2", o.status === "cancelled" && "opacity-60")}>
-                    <td className="px-4 py-3"><Link href={Routes.salesOrder(o.id, o.status)} className="font-medium text-primary-600 hover:underline">{o.code}</Link></td>
+                    <td className="px-4 py-3"><OrderDetailLink orderId={o.id} className="font-medium text-primary-600 hover:underline">{o.code}</OrderDetailLink></td>
                     <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{formatDate(o.createdAt)}</td>
                     <td className="px-4 py-3 text-slate-500">{o.projectName ?? "—"}</td>
                     <td className="px-4 py-3 text-right tabular-nums font-medium">{formatCurrency(Number(o.total))}</td>

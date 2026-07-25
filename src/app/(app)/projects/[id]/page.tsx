@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { ArrowLeft } from "lucide-react";
 import { Routes } from "@/lib/routes";
+import { OrderDetailLink } from "@/components/order-detail-link";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { getProjectDetail } from "@/lib/data/projects";
 import { getServiceFormOptions } from "@/lib/data/services";
@@ -235,8 +236,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                     {job.description && <Text as="p" size="sm" variant="muted" className="mb-3" text={job.description} />}
                     {(job.quoteOrderId || job.materialOrderId) && (
                       <div className="mb-3 flex flex-wrap gap-3 text-xs">
-                        {job.quoteOrderId && <Link href={Routes.salesOrder(job.quoteOrderId, "quote")} className="font-semibold text-primary-600 hover:underline">{t("services.fields.quote")}</Link>}
-                        {job.materialOrderId && <Link href={Routes.salesOrder(job.materialOrderId, "completed")} className="font-semibold text-primary-600 hover:underline">{t("services.fields.materialOrder")}</Link>}
+                        {job.quoteOrderId && <OrderDetailLink orderId={job.quoteOrderId} className="font-semibold text-primary-600 hover:underline">{t("services.fields.quote")}</OrderDetailLink>}
+                        {job.materialOrderId && <OrderDetailLink orderId={job.materialOrderId} className="font-semibold text-primary-600 hover:underline">{t("services.fields.materialOrder")}</OrderDetailLink>}
                       </div>
                     )}
                     <ServiceChecklistEditor jobId={job.id} checklist={job.checklist} />
@@ -394,7 +395,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                   const remaining = Number(order.total) - Number(order.amountPaid);
                   return (
                     <tr key={order.id}>
-                      <td className="px-4 py-3"><Link href={Routes.salesOrder(order.id, order.status)} className="font-semibold text-primary-600 hover:underline">{order.code}</Link></td>
+                      <td className="px-4 py-3"><OrderDetailLink orderId={order.id} className="font-semibold text-primary-600 hover:underline">{order.code}</OrderDetailLink></td>
                       <td className="px-4 py-3 text-slate-500">{formatDate(order.createdAt)}</td>
                       <td className="px-4 py-3">{order.customerName ?? t("orders.walkIn")}</td>
                       <td className="px-4 py-3"><div className="flex flex-wrap gap-1.5"><OrderStatusBadge status={order.status} /><PaymentStatusBadge status={order.paymentStatus} /></div></td>
@@ -443,7 +444,7 @@ function ProjectOverviewDetails({ project, orders, t }: ProjectOverviewDetailsPr
             <tbody className="divide-y divide-border-soft">
               {orders.map((order) => {
                 const remaining = Number(order.total) - Number(order.amountPaid);
-                return <tr key={order.id}><td className="px-4 py-3"><Link href={Routes.salesOrder(order.id, order.status)} className="font-semibold text-primary-600 hover:underline">{order.code}</Link></td><td className="px-4 py-3 text-slate-500">{formatDate(order.createdAt)}</td><td className="px-4 py-3">{order.customerName ?? t("orders.walkIn")}</td><td className="px-4 py-3"><div className="flex flex-wrap gap-1.5"><OrderStatusBadge status={order.status} /><PaymentStatusBadge status={order.paymentStatus} /></div></td><td className="px-4 py-3 text-right tabular-nums font-semibold">{formatCurrency(Number(order.total))}</td><td className="px-4 py-3 text-right tabular-nums font-semibold text-er">{remaining > 0 ? formatCurrency(remaining) : "—"}</td></tr>;
+                return <tr key={order.id}><td className="px-4 py-3"><OrderDetailLink orderId={order.id} className="font-semibold text-primary-600 hover:underline">{order.code}</OrderDetailLink></td><td className="px-4 py-3 text-slate-500">{formatDate(order.createdAt)}</td><td className="px-4 py-3">{order.customerName ?? t("orders.walkIn")}</td><td className="px-4 py-3"><div className="flex flex-wrap gap-1.5"><OrderStatusBadge status={order.status} /><PaymentStatusBadge status={order.paymentStatus} /></div></td><td className="px-4 py-3 text-right tabular-nums font-semibold">{formatCurrency(Number(order.total))}</td><td className="px-4 py-3 text-right tabular-nums font-semibold text-er">{remaining > 0 ? formatCurrency(remaining) : "—"}</td></tr>;
               })}
             </tbody>
           </table>

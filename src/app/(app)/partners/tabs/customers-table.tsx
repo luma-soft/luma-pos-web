@@ -36,6 +36,7 @@ import { CustomerCreateDialog } from "@/components/partners/customer-create-dial
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Select } from "@/components/ui/select";
 import { Routes } from "@/lib/routes";
+import { OrderDetailLink } from "@/components/order-detail-link";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { setCustomerActive } from "@/lib/actions/partners";
 import type { CustomerFilters, CustomerListResult } from "@/lib/data/partners";
@@ -523,7 +524,6 @@ function OrderPreviewDialog({
 }) {
   const t = useTranslations();
   const order = preview?.order;
-  const openHref = order ? Routes.orderDetail(order.id) : "#";
   const total = order ? Number(order.total) : 0;
   const paid = order ? Number(order.amountPaid) : 0;
 
@@ -535,10 +535,10 @@ function OrderPreviewDialog({
       subtitle={order ? `${order.customerName ?? t("orders.walkIn")} · ${formatDate(order.createdAt)}` : undefined}
       footer={order && (
         <div className="flex justify-end">
-          <Link href={openHref} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110">
+          <OrderDetailLink orderId={order.id} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110">
             <ExternalLink className="h-4 w-4" />
             Mở phiếu
-          </Link>
+          </OrderDetailLink>
         </div>
       )}
     >

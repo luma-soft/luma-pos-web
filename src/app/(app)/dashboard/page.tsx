@@ -6,6 +6,7 @@ import { getDashboard, categoryEmoji, type DashboardRange } from "@/lib/data/das
 import { OrderStatusBadge, PaymentStatusBadge } from "../orders/status-badges";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Text } from "@/components/ui/text";
+import { OrderDetailLink } from "@/components/order-detail-link";
 
 export const dynamic = "force-dynamic";
 
@@ -192,9 +193,9 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                 {data.recentOrders.map((o) => (
                   <tr key={o.id} className="hover:bg-surface-2">
                     <td className="px-4 py-3">
-                      <Link href={Routes.orderDetail(o.id)} className="font-semibold text-primary-600 hover:underline">
+                      <OrderDetailLink orderId={o.id} className="font-semibold text-primary-600 hover:underline">
                         {o.code}
-                      </Link>
+                      </OrderDetailLink>
                     </td>
                     <td className="px-4 py-3">
                       {o.customerName ?? t("orders.walkIn")}
