@@ -694,7 +694,7 @@ function ComboItemsField({
       value: product.id,
       label: product.name,
       hint: `${product.sku} · ${product.baseUnit}`,
-      description: `${t("products.combo.salePrice")}: ${formatCurrency(Number(product.retailPrice))} · ${t("products.combo.stock")}: ${
+      description: `${t("products.combo.costPrice")}: ${formatCurrency(Number(product.costPrice))} · ${t("products.combo.salePrice")}: ${formatCurrency(Number(product.retailPrice))} · ${t("products.combo.stock")}: ${
         product.productKind === "service"
           ? t("products.stock.notTracked")
           : `${formatNumber(Number(product.totalStock))} ${product.baseUnit}`
@@ -757,6 +757,14 @@ function ComboItemsField({
                   </div>
                   {product && (
                     <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                      <span>
+                        <span className="text-slate-500">
+                          {t("products.combo.costPrice")}:
+                        </span>{" "}
+                        <span className="font-semibold text-slate-700 dark:text-slate-200">
+                          {formatCurrency(Number(product.costPrice))}
+                        </span>
+                      </span>
                       <span>
                         <span className="text-slate-500">
                           {t("products.combo.salePrice")}:

@@ -573,6 +573,7 @@
       "selectProduct": "Search and select an item",
       "addItem": "Add to combo",
       "quantity": "Quantity",
+      "costPrice": "Cost",
       "salePrice": "Sale price",
       "stock": "Stock",
       "costAutoHint": "Automatically calculated from each item's cost × quantity.",

@@ -573,6 +573,7 @@
       "selectProduct": "Tìm và chọn thành phần",
       "addItem": "Thêm vào combo",
       "quantity": "Số lượng",
+      "costPrice": "Giá vốn",
       "salePrice": "Giá bán",
       "stock": "Tồn kho",
       "costAutoHint": "Tự động tính từ giá vốn × số lượng của các thành phần.",
