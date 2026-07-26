@@ -552,19 +552,6 @@
         "product": "Sửa sản phẩm",
         "service": "Sửa dịch vụ",
         "combo": "Sửa combo"
-      },
-      "change": {
-        "current": "Loại hàng hóa hiện tại",
-        "action": "Đổi loại",
-        "title": "Đổi loại hàng hóa",
-        "description": "Chọn loại mới. Hệ thống sẽ kiểm tra tồn kho, biến thể và chứng từ trước khi lưu.",
-        "confirm": "Xác nhận đổi loại",
-        "stockBlocked": "Không thể đổi loại khi sản phẩm còn tồn {stock}. Hãy điều chỉnh tồn về 0 trước.",
-        "impacts": {
-          "product": "Sản phẩm sẽ bắt đầu được quản lý tồn kho từ 0. Cấu hình thành phần combo hiện tại sẽ bị xóa khi lưu.",
-          "service": "Dịch vụ không quản lý tồn kho. Lịch sử nhập, xuất và bán hàng trước đây vẫn được giữ.",
-          "combo": "Combo không có tồn kho riêng. Bạn phải khai báo ít nhất một thành phần; khi bán sẽ trừ tồn từng sản phẩm con."
-        }
       }
     },
     "combo": {
@@ -830,9 +817,7 @@
     "errors": {
       "skuExists": "SKU đã tồn tại — chọn mã khác.",
       "cannotDeleteReferenced": "Không thể xóa hàng hóa đã phát sinh chứng từ hoặc thẻ kho. Hãy ngừng kinh doanh thay thế.",
-      "kindHasStock": "Không thể đổi loại khi sản phẩm vẫn còn tồn kho. Hãy điều chỉnh tồn về 0 trước.",
-      "kindHasVariants": "Không thể đổi loại cho nhóm hoặc sản phẩm biến thể. Hãy xử lý các biến thể trước.",
-      "kindHasOpenDocuments": "Không thể đổi loại vì hàng hóa đang có đơn hàng, báo giá hoặc giao hàng chưa hoàn tất.",
+      "kindImmutable": "Không thể đổi loại hàng hóa sau khi đã tạo.",
       "comboCannotContainItself": "Combo không thể chứa chính nó.",
       "kindCannotHaveVariants": "Dịch vụ và combo không hỗ trợ biến thể."
     },

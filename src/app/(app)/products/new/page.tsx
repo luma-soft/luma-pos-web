@@ -43,7 +43,6 @@ export default async function NewProductPage({ searchParams }: Props) {
       initialValues={seedProduct ? productToFormInitialValues(seedProduct, copyFrom ? "copy" : "sameType", priceBookPrices) : undefined}
       aiPreview={aiPreview}
       creationKind={seedProduct?.productKind ?? creationKind}
-      currentStock={Number(seedProduct?.totalStock ?? 0)}
     />
   );
 }

@@ -552,19 +552,6 @@
         "product": "Edit product",
         "service": "Edit service",
         "combo": "Edit combo"
-      },
-      "change": {
-        "current": "Current item type",
-        "action": "Change type",
-        "title": "Change item type",
-        "description": "Choose a new type. Inventory, variants, and open documents will be checked before saving.",
-        "confirm": "Confirm type change",
-        "stockBlocked": "This product still has {stock} in stock. Adjust inventory to zero before changing its type.",
-        "impacts": {
-          "product": "Inventory tracking will start from zero. Existing combo components will be removed when saved.",
-          "service": "Services are not inventory tracked. Previous purchasing, stock, and sales history is preserved.",
-          "combo": "Combos have no standalone stock. Add at least one component; sales deduct each physical component."
-        }
       }
     },
     "combo": {
@@ -830,9 +817,7 @@
     "errors": {
       "skuExists": "SKU already exists — choose another.",
       "cannotDeleteReferenced": "Cannot delete a product with documents or stock movements. Stop selling it instead.",
-      "kindHasStock": "This product still has inventory. Adjust it to zero before changing its type.",
-      "kindHasVariants": "A variant group or child cannot change type. Resolve its variants first.",
-      "kindHasOpenDocuments": "This item is used by an unfinished order, quote, or delivery and cannot change type.",
+      "kindImmutable": "Item type cannot be changed after creation.",
       "comboCannotContainItself": "A combo cannot contain itself.",
       "kindCannotHaveVariants": "Services and combos cannot have variants."
     },

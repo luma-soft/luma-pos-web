@@ -17,9 +17,6 @@ import {
   Tag,
   Trash2,
   X,
-  Boxes,
-  Package,
-  Wrench,
 } from "lucide-react";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
@@ -98,7 +95,6 @@ export interface NewProductFormProps {
   closeNavigation?: "push" | "replace";
   aiPreview?: boolean;
   creationKind?: "product" | "service" | "combo";
-  currentStock?: number;
 }
 
 export function NewProductForm({
@@ -116,7 +112,6 @@ export function NewProductForm({
   closeNavigation = "push",
   aiPreview = false,
   creationKind = "product",
-  currentStock = 0,
 }: NewProductFormProps) {
   const t = useTranslations();
   const router = useRouter();
@@ -372,7 +367,6 @@ export function NewProductForm({
             comboProducts={comboProducts}
             mode={mode}
             creationKind={creationKind}
-            currentStock={currentStock}
           />
         )}
         {tab === "variants" && (
@@ -459,20 +453,11 @@ function InfoTab({
   suppliers,
   priceBooks,
   comboProducts,
-  mode,
-  creationKind,
-  currentStock,
 }: NewProductFormProps) {
   const { watch } = useFormCtx();
   const productKind = watch("productKind") ?? "product";
   return (
     <>
-      {mode === "edit" && (
-        <ProductKindChangeField
-          originalKind={creationKind ?? "product"}
-          currentStock={currentStock ?? 0}
-        />
-      )}
       <BasicInfoSection
         categories={categories}
         brands={brands}
@@ -502,174 +487,6 @@ function InfoTab({
             <PhysicalFields />
           </Section>
         </>
-      )}
-    </>
-  );
-}
-
-const PRODUCT_KIND_ICONS = {
-  product: Package,
-  service: Wrench,
-  combo: Boxes,
-} as const;
-
-function ProductKindChangeField({
-  originalKind,
-  currentStock,
-}: {
-  originalKind: "product" | "service" | "combo";
-  currentStock: number;
-}) {
-  const t = useTranslations();
-  const { watch, setValue } = useFormCtx();
-  const currentKind = watch("productKind") ?? originalKind;
-  const [open, setOpen] = useState(false);
-  const [draftKind, setDraftKind] = useState(currentKind);
-  const CurrentIcon = PRODUCT_KIND_ICONS[currentKind];
-  const stockBlocksChange =
-    originalKind === "product" &&
-    draftKind !== "product" &&
-    Math.abs(currentStock) > 1e-9;
-
-  function openDialog() {
-    setDraftKind(currentKind);
-    setOpen(true);
-  }
-
-  function confirmChange() {
-    if (draftKind === currentKind || stockBlocksChange) return;
-    setValue("productKind", draftKind, {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
-    if (draftKind !== "product") {
-      setValue("variantChildren", [], { shouldDirty: true });
-    }
-    if (draftKind !== "combo") {
-      setValue("comboItems", [], { shouldDirty: true });
-    }
-    if (!watch("baseUnit")?.trim()) {
-      setValue("baseUnit", draftKind === "combo" ? "combo" : "cái", {
-        shouldDirty: true,
-        shouldValidate: true,
-      });
-    }
-    setOpen(false);
-  }
-
-  return (
-    <>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary-50 text-primary-600 dark:bg-primary-950/40">
-            <CurrentIcon className="h-5 w-5" />
-          </span>
-          <div>
-            <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-              {t("products.kind.change.current")}
-            </div>
-            <div className="text-sm font-semibold">
-              {t(`products.kind.labels.${currentKind}`)}
-            </div>
-          </div>
-        </div>
-        <Button type="button" variant="outline" onClick={openDialog}>
-          {t("products.kind.change.action")}
-        </Button>
-      </div>
-
-      {open && (
-        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/55 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="change-product-kind-title"
-            className="w-full max-w-xl rounded-2xl border border-border bg-surface p-5 shadow-2xl"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2
-                  id="change-product-kind-title"
-                  className="text-lg font-bold"
-                >
-                  {t("products.kind.change.title")}
-                </h2>
-                <p className="mt-1 text-sm text-slate-500">
-                  {t("products.kind.change.description")}
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="ghost"
-                size="iconSm"
-                onClick={() => setOpen(false)}
-                aria-label={t("common.close")}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <div className="mt-4 grid gap-2 sm:grid-cols-3">
-              {(["product", "service", "combo"] as const).map((kind) => {
-                const Icon = PRODUCT_KIND_ICONS[kind];
-                return (
-                  <button
-                    key={kind}
-                    type="button"
-                    onClick={() => setDraftKind(kind)}
-                    className={cn(
-                      "rounded-xl border p-3 text-left transition",
-                      draftKind === kind
-                        ? "border-primary-600 bg-primary-50 ring-1 ring-primary-600 dark:bg-primary-950/30"
-                        : "border-border hover:bg-surface-2",
-                    )}
-                  >
-                    <Icon className="h-5 w-5 text-primary-600" />
-                    <span className="mt-2 block text-sm font-semibold">
-                      {t(`products.kind.labels.${kind}`)}
-                    </span>
-                    <span className="mt-1 block text-xs text-slate-500">
-                      {t(`products.kind.hints.${kind}`)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {draftKind !== currentKind && (
-              <div
-                className={cn(
-                  "mt-4 rounded-xl border px-4 py-3 text-sm",
-                  stockBlocksChange
-                    ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300"
-                    : "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-300",
-                )}
-              >
-                {stockBlocksChange
-                  ? t("products.kind.change.stockBlocked", {
-                      stock: currentStock,
-                    })
-                  : t(`products.kind.change.impacts.${draftKind}`)}
-              </div>
-            )}
-
-            <div className="mt-5 flex justify-end gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOpen(false)}
-                tx="common.cancel"
-              />
-              <Button
-                type="button"
-                onClick={confirmChange}
-                disabled={draftKind === currentKind || stockBlocksChange}
-              >
-                {t("products.kind.change.confirm")}
-              </Button>
-            </div>
-          </div>
-        </div>
       )}
     </>
   );

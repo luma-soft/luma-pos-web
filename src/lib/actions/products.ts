@@ -17,8 +17,6 @@ import {
   profiles,
   priceBooks,
   productPrices,
-  orderItems,
-  orders,
 } from "@/db/schema";
 import {
   createProductSchema,
@@ -32,7 +30,6 @@ import {
   requireManager,
   toMoney,
 } from "./common";
-import { productKindChangeBlock } from "@/lib/product-kind-change";
 
 /** Tạo nhóm hàng mới từ form (combobox "+ thêm"). Trả id. */
 export async function createCategory(
@@ -639,45 +636,23 @@ export async function updateProduct(
           parentProductId: products.parentProductId,
           variantName: products.variantName,
           productKind: products.productKind,
-          isVariantParent: products.isVariantParent,
-          totalStock: sql<string>`coalesce((
-            select sum(${stockLevels.quantity})
-            from ${stockLevels}
-            where ${stockLevels.productId} = ${products.id}
-          ), 0)`,
-          openDocumentCount: sql<number>`(
-            select count(*)::int
-            from ${orderItems}
-            inner join ${orders} on ${orders.id} = ${orderItems.orderId}
-            where ${orderItems.productId} = ${products.id}
-              and ${orders.status} in ('draft', 'quote', 'confirmed', 'delivering')
-          )`,
         })
         .from(products)
         .where(eq(products.id, v.id))
         .limit(1);
 
       if (!current) throw new Error("PRODUCT_NOT_FOUND");
-      const changingKind =
-        v.productKind !== undefined && v.productKind !== current.productKind;
-      if (changingKind) {
-        const block = productKindChangeBlock({
-          currentKind: current.productKind,
-          nextKind: v.productKind!,
-          totalStock: Number(current.totalStock),
-          hasVariants: Boolean(
-            current.parentProductId || current.isVariantParent,
-          ),
-          openDocumentCount: current.openDocumentCount,
-        });
-        if (block) throw new Error(block);
+      if (
+        v.productKind !== undefined &&
+        v.productKind !== current.productKind
+      ) {
+        throw new Error("PRODUCT_KIND_IMMUTABLE");
       }
 
       await tx
         .update(products)
         .set({
           sku: v.sku,
-          ...(v.productKind ? { productKind: v.productKind } : {}),
           barcode: v.barcode || null,
           name: v.name,
           categoryId: v.categoryId || null,
@@ -729,14 +704,13 @@ export async function updateProduct(
       }
 
       if (
-        v.comboItems !== undefined ||
-        (v.productKind !== undefined && v.productKind !== "combo")
+        v.comboItems !== undefined
       ) {
         await tx
           .delete(productComboItems)
           .where(eq(productComboItems.comboProductId, v.id));
         if (
-          (v.productKind ?? current?.productKind) === "combo" &&
+          current.productKind === "combo" &&
           v.comboItems &&
           v.comboItems.length > 0
         ) {
@@ -880,10 +854,7 @@ export async function updateProduct(
   } catch (e) {
     const known: Record<string, string> = {
       PRODUCT_NOT_FOUND: "errors.invalidData",
-      PRODUCT_KIND_HAS_VARIANTS: "products.errors.kindHasVariants",
-      PRODUCT_KIND_HAS_STOCK: "products.errors.kindHasStock",
-      PRODUCT_KIND_HAS_OPEN_DOCUMENTS:
-        "products.errors.kindHasOpenDocuments",
+      PRODUCT_KIND_IMMUTABLE: "products.errors.kindImmutable",
     };
     const message = e instanceof Error ? e.message : "";
     if (known[message]) return { ok: false, error: known[message] };
