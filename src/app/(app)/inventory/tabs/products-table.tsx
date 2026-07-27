@@ -6,6 +6,7 @@ import {
   useState,
   useTransition,
 } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -13,6 +14,8 @@ import { useLocale, useTranslations } from "next-intl";
 import {
   Ban,
   Barcode,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   ImageIcon,
   MoreHorizontal,
@@ -21,6 +24,8 @@ import {
   Plus,
   Store,
   Trash2,
+  X,
+  ZoomIn,
   type LucideIcon,
 } from "lucide-react";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
@@ -362,27 +367,46 @@ function ProductInfoPanel({
 }) {
   const t = useTranslations();
   const [activeImage, setActiveImage] = useState(0);
+  const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
   const image = imageUrls[activeImage];
 
   return (
     <div className="grid grid-cols-1 gap-5 lg:grid-cols-[160px_1fr]">
       <div>
-        <div className="relative h-36 w-36 overflow-hidden rounded-card border border-border bg-primary-50/50">
+        <button
+          type="button"
+          onClick={() => image && setImagePreviewOpen(true)}
+          disabled={!image}
+          aria-label={
+            image
+              ? t("products.expand.imageZoom", { name: product.name })
+              : undefined
+          }
+          className={cn(
+            "group relative h-36 w-36 overflow-hidden rounded-card border border-border bg-primary-50/50",
+            image && "cursor-zoom-in transition hover:border-primary-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2",
+          )}
+        >
           {image ? (
-            <Image
-              src={image}
-              alt={`${product.name} ${activeImage + 1}`}
-              fill
-              sizes="144px"
-              className="object-contain p-2"
-              unoptimized
-            />
+            <>
+              <Image
+                src={image}
+                alt={`${product.name} ${activeImage + 1}`}
+                fill
+                sizes="144px"
+                className="object-contain p-2 transition-transform duration-200 group-hover:scale-105"
+                unoptimized
+              />
+              <span className="absolute bottom-2 right-2 grid h-8 w-8 place-items-center rounded-full bg-slate-950/70 text-white opacity-0 shadow-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                <ZoomIn className="h-4 w-4" />
+              </span>
+            </>
           ) : (
             <div className="grid h-full place-items-center text-primary-300">
               <ImageIcon className="h-12 w-12" />
             </div>
           )}
-        </div>
+        </button>
         {imageUrls.length > 1 && (
           <div className="mt-2 flex w-36 gap-1.5 overflow-x-auto pb-1">
             {imageUrls.map((url, index) => (
@@ -403,6 +427,16 @@ function ProductInfoPanel({
           </div>
         )}
       </div>
+
+      {imagePreviewOpen && image && (
+        <ProductImageLightbox
+          productName={product.name}
+          imageUrls={imageUrls}
+          activeImage={activeImage}
+          onActiveImageChange={setActiveImage}
+          onClose={() => setImagePreviewOpen(false)}
+        />
+      )}
 
       <div className="min-w-0 space-y-4">
         <div className="flex items-start justify-between gap-3">
@@ -549,6 +583,122 @@ function ProductInfoPanel({
         )}
       </div>
     </div>
+  );
+}
+
+function ProductImageLightbox({
+  productName,
+  imageUrls,
+  activeImage,
+  onActiveImageChange,
+  onClose,
+}: {
+  productName: string;
+  imageUrls: string[];
+  activeImage: number;
+  onActiveImageChange: (index: number) => void;
+  onClose: () => void;
+}) {
+  const t = useTranslations();
+  const hasMultipleImages = imageUrls.length > 1;
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        onClose();
+      }
+      if (event.key === "ArrowLeft" && hasMultipleImages) {
+        event.preventDefault();
+        onActiveImageChange(
+          (activeImage - 1 + imageUrls.length) % imageUrls.length,
+        );
+      }
+      if (event.key === "ArrowRight" && hasMultipleImages) {
+        event.preventDefault();
+        onActiveImageChange((activeImage + 1) % imageUrls.length);
+      }
+    }
+
+    document.addEventListener("keydown", onKeyDown, true);
+    return () => document.removeEventListener("keydown", onKeyDown, true);
+  }, [
+    activeImage,
+    hasMultipleImages,
+    imageUrls.length,
+    onActiveImageChange,
+    onClose,
+  ]);
+
+  return createPortal(
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("products.expand.imageDialog", { name: productName })}
+      className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-sm sm:p-8"
+      onClick={onClose}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label={t("products.expand.imageClose")}
+        autoFocus
+        className="absolute right-4 top-4 z-10 grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:right-6 sm:top-6"
+      >
+        <X className="h-6 w-6" />
+      </button>
+
+      {hasMultipleImages && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onActiveImageChange(
+              (activeImage - 1 + imageUrls.length) % imageUrls.length,
+            );
+          }}
+          aria-label={t("products.expand.imagePrevious")}
+          className="absolute left-3 z-10 grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:left-6"
+        >
+          <ChevronLeft className="h-7 w-7" />
+        </button>
+      )}
+
+      <div
+        className="relative h-[min(82dvh,900px)] w-[min(86vw,1200px)]"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <Image
+          src={imageUrls[activeImage]}
+          alt={`${productName} ${activeImage + 1}`}
+          fill
+          sizes="86vw"
+          className="object-contain"
+          unoptimized
+        />
+      </div>
+
+      {hasMultipleImages && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onActiveImageChange((activeImage + 1) % imageUrls.length);
+          }}
+          aria-label={t("products.expand.imageNext")}
+          className="absolute right-3 z-10 grid h-11 w-11 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white sm:right-6"
+        >
+          <ChevronRight className="h-7 w-7" />
+        </button>
+      )}
+
+      <div className="absolute bottom-4 left-1/2 max-w-[80vw] -translate-x-1/2 truncate rounded-full bg-slate-950/60 px-4 py-2 text-center text-sm font-medium text-white sm:bottom-6">
+        {productName}
+        {hasMultipleImages && ` · ${activeImage + 1}/${imageUrls.length}`}
+      </div>
+    </div>,
+    document.body,
   );
 }
 
