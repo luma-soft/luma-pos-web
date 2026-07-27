@@ -43,7 +43,7 @@ export function EInvoicesTable({ rows }: { rows: EInvoiceRow[] }) {
       columns={columns}
       getRowId={(row) => row.id}
       minWidth="1040px"
-      renderExpanded={(row) => (
+      renderDetail={(row) => (
         <div className="grid gap-4 bg-surface px-4 py-4 md:grid-cols-4">
           <Info label={t("einvoice.cols.number")} value={row.number ? `${row.serial ? `${row.serial} · ` : ""}${row.number}` : "-"} />
           <Info label={t("einvoice.cols.buyer")} value={row.buyerName} />

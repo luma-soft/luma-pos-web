@@ -27,7 +27,7 @@ export function ShiftsTable({ rows }: { rows: ShiftRow[] }) {
       columns={columns}
       getRowId={(row) => row.id}
       minWidth="1080px"
-      renderExpanded={(row) => (
+      renderDetail={(row) => (
         <div className="grid gap-4 bg-surface px-4 py-4 md:grid-cols-4">
           <Info label={t("shifts.cols.code")} value={row.code} />
           <Info label={t("shifts.cols.cashier")} value={row.userName ?? "—"} />

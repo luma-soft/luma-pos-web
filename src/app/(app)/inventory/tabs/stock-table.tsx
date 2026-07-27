@@ -51,7 +51,7 @@ export function StockTable({ rows }: { rows: StockRow[]; stock?: StockFilter }) 
       columns={columns}
       getRowId={(row) => row.id}
       minWidth="980px"
-      renderExpanded={(row) => <ExpandedStock row={row} />}
+      renderDetail={(row) => <ExpandedStock row={row} />}
     />
   );
 }

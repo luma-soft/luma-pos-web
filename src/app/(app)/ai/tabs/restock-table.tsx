@@ -44,7 +44,7 @@ export function RestockTable({ rows }: { rows: RestockRow[] }) {
       columns={columns}
       getRowId={(row) => row.id}
       minWidth="1040px"
-      renderExpanded={(row) => (
+      renderDetail={(row) => (
         <div className="grid gap-4 bg-surface px-4 py-4 md:grid-cols-4">
           <Info label={t("orders.cols.product")} value={row.name} />
           <Info label={t("ai.cols.onHand")} value={`${formatNumber(row.stock)} ${row.baseUnit}`} />

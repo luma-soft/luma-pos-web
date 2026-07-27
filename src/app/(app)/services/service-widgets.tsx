@@ -115,13 +115,12 @@ export function ServiceDashboardFilters({
 
 export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProjectRow[]; customers: { id: string; name: string }[] }) {
   const t = useTranslations();
-  const router = useRouter();
   const columns: DataTableColumn<ServiceProjectRow>[] = [
     {
       key: "name",
       label: t("projects.cols.name"),
       required: true,
-      render: (row) => <Link href={Routes.project(row.id)} className="font-semibold text-primary-600 hover:underline">{row.name}</Link>,
+      render: (row) => <span className="font-semibold text-primary-600">{row.name}</span>,
     },
     { key: "type", label: t("services.fields.type"), defaultVisible: true, render: (row) => serviceTypeLabel(t, row.serviceType) },
     { key: "customer", label: t("orders.cols.customer"), defaultVisible: true, render: (row) => row.customerName ?? "—" },
@@ -157,9 +156,8 @@ export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProject
       rows={rows}
       columns={columns}
       getRowId={(row) => row.id}
-      onRowClick={(row) => router.push(Routes.project(row.id))}
       minWidth="980px"
-      renderExpanded={(row) => (
+      renderDetail={(row) => (
         <div className="grid gap-3 bg-surface px-4 py-4 sm:grid-cols-2 lg:grid-cols-4">
           <Text size="sm" text={row.address ?? "—"} />
           <Text size="sm" text={t("services.summary.openJobs", { count: row.openJobCount })} />

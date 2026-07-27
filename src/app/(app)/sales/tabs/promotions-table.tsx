@@ -49,7 +49,7 @@ export function PromotionsTable({ rows }: { rows: PromotionRow[] }) {
       getRowId={(row) => row.id}
       minWidth="980px"
       rowClassName={(row) => cn(!isPromoActive(row) && "opacity-60")}
-      renderExpanded={(row) => (
+      renderDetail={(row) => (
         <div className="space-y-4 bg-surface px-4 py-4">
           <div className="grid gap-4 md:grid-cols-3">
             <Info label={t("promos.cols.name")} value={row.name} />

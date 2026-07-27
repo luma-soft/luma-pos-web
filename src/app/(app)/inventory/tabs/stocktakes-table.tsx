@@ -44,7 +44,7 @@ export function StocktakesTable({ rows }: { rows: StocktakeRow[] }) {
       getRowId={(row) => row.id}
       minWidth="1080px"
       rowClassName={(row) => cn(row.status === "cancelled" && "opacity-60")}
-      renderExpanded={(row) => (
+      renderDetail={(row) => (
         <div className="grid gap-4 bg-surface px-4 py-4 md:grid-cols-4">
           <Info label={t("stocktakes.cols.code")} value={row.code} />
           <Info label={t("purchases.cols.warehouse")} value={row.warehouseName} />

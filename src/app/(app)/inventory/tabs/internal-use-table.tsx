@@ -71,7 +71,6 @@ export function InternalUseTable({ rows }: { rows: InternalUseRow[] }) {
         columns={columns}
         getRowId={(row) => row.id}
         minWidth="1120px"
-        initialExpandedId={rows[0]?.id ?? null}
         empty={(
           <div className="rounded-card border border-dashed border-border bg-surface px-4 py-14 text-center text-slate-400">
             <LayoutList className="mx-auto mb-3 h-10 w-10 opacity-60" />
@@ -79,7 +78,7 @@ export function InternalUseTable({ rows }: { rows: InternalUseRow[] }) {
           </div>
         )}
         rowClassName={(row) => cn(row.status === "pending" && "bg-warn-soft/25")}
-        renderExpanded={(row) => <ExpandedIssue row={row} />}
+        renderDetail={(row) => <ExpandedIssue row={row} />}
       />
     </section>
   );

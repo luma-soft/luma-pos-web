@@ -91,7 +91,7 @@ export function ReturnsTable({
       expandedParam="expandedReturn"
       initialExpandedId={expandedId}
       minWidth="1120px"
-      renderExpanded={(row) => (
+      renderDetail={(row) => (
         expandedId === row.id && expandedContent
           ? expandedContent
           : (

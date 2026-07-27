@@ -157,6 +157,12 @@ export function DataTableShell<T>({
   columns,
   getRowId,
   renderExpanded,
+  renderDetail,
+  detailTitle,
+  detailSubtitle,
+  detailFooter,
+  detailSize = "xl",
+  detailBodyClassName,
   renderMobileRow,
   summaryCells,
   minWidth = "980px",
@@ -174,7 +180,15 @@ export function DataTableShell<T>({
   rows: T[];
   columns: DataTableColumn<T>[];
   getRowId: (row: T) => string;
+  /** Chỉ dùng cho nội dung phân cấp nằm ngay dưới dòng (ví dụ nhóm hàng cha-con). */
   renderExpanded?: (row: T) => ReactNode;
+  /** Nội dung xem chi tiết của dòng; luôn hiển thị trong modal. */
+  renderDetail?: (row: T) => ReactNode;
+  detailTitle?: (row: T) => ReactNode;
+  detailSubtitle?: (row: T) => ReactNode;
+  detailFooter?: (row: T) => ReactNode;
+  detailSize?: "md" | "lg" | "xl" | "full";
+  detailBodyClassName?: string;
   renderMobileRow?: (props: MobileRenderProps<T>) => ReactNode;
   summaryCells?: DataTableSummaryCell[];
   minWidth?: string;
@@ -253,6 +267,9 @@ export function DataTableShell<T>({
       })
       .map(({ row }) => row);
   }, [columns, rows, sort]);
+  const selectedDetailRow = renderDetail
+    ? displayRows.find((row) => getRowId(row) === expandedId) ?? null
+    : null;
 
   function persist(next: Set<string>) {
     const normalized = new Set(next);
@@ -284,7 +301,7 @@ export function DataTableShell<T>({
   }
 
   function setExpanded(nextId: string | null) {
-    if (!renderExpanded) return;
+    if (!renderExpanded && !renderDetail) return;
     const sp = new URLSearchParams(params.toString());
     if (nextId) sp.set(expandedParam, nextId);
     else sp.delete(expandedParam);
@@ -315,8 +332,11 @@ export function DataTableShell<T>({
             {displayRows.map((row) => {
               const id = getRowId(row);
               const expandable = Boolean(!onRowClick && renderExpanded && (canExpand ? canExpand(row) : true));
-              const expanded = expandable && expandedId === id;
-              const toggle = () => { if (expandable) setExpanded(expanded ? null : id); };
+              const detailOpenable = Boolean(!onRowClick && renderDetail && (canExpand ? canExpand(row) : true));
+              const expanded = (expandable || detailOpenable) && expandedId === id;
+              const toggle = () => {
+                if (expandable || detailOpenable) setExpanded(expanded ? null : id);
+              };
               return (
                 <div key={id} className={cn("overflow-hidden rounded-card border bg-surface", expanded ? "border-primary-200 shadow-e1" : "border-border-soft")}>
                   {renderMobileRow ? (
@@ -435,17 +455,21 @@ export function DataTableShell<T>({
                 {displayRows.map((row) => {
                   const id = getRowId(row);
                   const expandable = Boolean(!onRowClick && renderExpanded && (canExpand ? canExpand(row) : true));
-                  const expanded = expandable && expandedId === id;
+                  const detailOpenable = Boolean(!onRowClick && renderDetail && (canExpand ? canExpand(row) : true));
+                  const expanded = (expandable || detailOpenable) && expandedId === id;
                   return (
                     <Fragment key={id}>
                       <tr
                         className={cn(
                           "border-t border-border-soft transition-colors",
-                          (expandable || onRowClick) && "cursor-pointer",
+                          (expandable || detailOpenable || onRowClick) && "cursor-pointer",
                           expanded ? "bg-primary-50/45 dark:bg-primary-950/15" : "hover:bg-surface-2",
                           rowClassName?.(row, expanded),
                         )}
-                        onClick={() => onRowClick ? onRowClick(row) : (expandable && setExpanded(expanded ? null : id))}
+                        onClick={() => {
+                          if (onRowClick) onRowClick(row);
+                          else if (expandable || detailOpenable) setExpanded(expanded ? null : id);
+                        }}
                       >
                         {visibleColumns.map((column) => {
                           const cellClassName = typeof column.cellClassName === "function" ? column.cellClassName(row) : column.cellClassName;
@@ -483,6 +507,19 @@ export function DataTableShell<T>({
             </table>
           </div>
         </>
+      )}
+      {selectedDetailRow && renderDetail && (
+        <RowPreviewModal
+          open
+          onClose={() => setExpanded(null)}
+          title={detailTitle?.(selectedDetailRow) ?? columns[0]?.render(selectedDetailRow) ?? "Chi tiết"}
+          subtitle={detailSubtitle?.(selectedDetailRow)}
+          footer={detailFooter?.(selectedDetailRow)}
+          size={detailSize}
+          bodyClassName={detailBodyClassName}
+        >
+          {renderDetail(selectedDetailRow)}
+        </RowPreviewModal>
       )}
     </div>
   );

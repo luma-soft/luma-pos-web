@@ -134,7 +134,7 @@ export function NotificationsTable({ rows }: { rows: AuditRow[] }) {
       columns={columns}
       getRowId={(row) => row.id}
       minWidth="1080px"
-      renderExpanded={(row) => <ExpandedAudit row={row} />}
+      renderDetail={(row) => <ExpandedAudit row={row} />}
     />
   );
 }

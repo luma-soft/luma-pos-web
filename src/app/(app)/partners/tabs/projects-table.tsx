@@ -11,7 +11,7 @@ import { ProjectEdit, ProjectToggle } from "../../projects/project-widgets";
 export function ProjectsTable({ rows, customers }: { rows: ProjectRow[]; customers: { id: string; name: string }[] }) {
   const t = useTranslations();
   const columns: DataTableColumn<ProjectRow>[] = [
-    { key: "name", label: t("projects.cols.name"), required: true, render: (row) => <Link href={Routes.project(row.id)} className="font-semibold text-primary-600 hover:underline">{row.name}</Link> },
+    { key: "name", label: t("projects.cols.name"), required: true, render: (row) => <span className="font-semibold text-primary-600">{row.name}</span> },
     { key: "customer", label: t("orders.cols.customer"), defaultVisible: true, render: (row) => row.customerName ?? "—" },
     { key: "address", label: t("customers.fields.address"), defaultVisible: false, render: (row) => <span className="text-slate-500">{row.address ?? "—"}</span> },
     { key: "orders", label: t("projects.cols.orders"), defaultVisible: true, align: "right", width: "110px", render: (row) => row.orderCount },
@@ -48,7 +48,7 @@ export function ProjectsTable({ rows, customers }: { rows: ProjectRow[]; custome
       getRowId={(row) => row.id}
       minWidth="980px"
       rowClassName={(row) => cn(row.status === "done" && "opacity-60")}
-      renderExpanded={(row) => (
+      renderDetail={(row) => (
         <div className="space-y-4 bg-surface px-4 py-4">
           <div className="grid gap-4 md:grid-cols-4">
             <Info label={t("projects.cols.name")} value={row.name} />

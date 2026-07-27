@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { ChevronDown } from "lucide-react";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
@@ -41,15 +40,16 @@ export function PurchaseReturnsTable({ rows }: { rows: PurchaseReturnRow[] }) {
       columns={columns}
       getRowId={(row) => row.id}
       minWidth="1180px"
-      renderExpanded={(row) => <ExpandedPurchaseReturn row={row} />}
-      renderMobileRow={({ row, expanded, toggle }) => (
+      renderDetail={(row) => <ExpandedPurchaseReturn row={row} />}
+      detailSize="full"
+      renderMobileRow={({ row, toggle }) => (
         <button type="button" onClick={toggle} className="w-full p-3 text-left">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <div className="font-semibold text-primary-600">{row.code}</div>
               <div className="text-xs text-slate-400">{formatDate(row.createdAt)} · {row.supplierName}</div>
             </div>
-            <ChevronDown className={cn("h-4 w-4 text-slate-400 transition-transform", expanded && "rotate-180")} />
+            <StatusBadge status={row.status} />
           </div>
           <div className="mt-2 flex items-center justify-between text-sm">
             <span className="font-semibold tabular-nums">{formatCurrency(Number(row.totalRefund))}</span>
