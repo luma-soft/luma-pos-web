@@ -19,13 +19,6 @@ const images = [
     contentType: "image/png",
   },
   {
-    sku: "MAT-CAM-BRACKET-IP",
-    path: "catalog-2026-07/camera-ip-bracket-standard-thread.webp",
-    source:
-      "https://img.drz.lazcdn.com/static/lk/p/d717b4909aa069353a8b6f1fdc2cb43a.jpg_720x720q80.jpg_.webp",
-    contentType: "image/webp",
-  },
-  {
     sku: "MAT-CAM-JBOX-STD",
     path: "catalog-2026-07/camera-junction-box-standard.jpg",
     source:
