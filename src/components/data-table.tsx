@@ -405,6 +405,11 @@ export function DataTableShell<T>({
                             <button
                               type="button"
                               onClick={() => {
+                                if (activeSortColumn === column.key) {
+                                  setActiveSortColumn(null);
+                                  setSort(null);
+                                  return;
+                                }
                                 setActiveSortColumn(column.key);
                                 if (sort?.key !== column.key) setSort(null);
                               }}
