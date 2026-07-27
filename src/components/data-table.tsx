@@ -412,28 +412,30 @@ export function DataTableShell<T>({
                             >
                               {column.label}
                             </button>
-                            {controlsVisible && (
-                              <span className="inline-flex shrink-0 flex-col items-center justify-center">
-                                <button
-                                  type="button"
-                                  onClick={() => setSort({ key: column.key, direction: "asc" })}
-                                  className={cn("grid h-3.5 w-4 place-items-center text-slate-300 transition-colors hover:text-slate-600 dark:text-slate-600 dark:hover:text-slate-300", direction === "asc" && "text-primary-600 dark:text-primary-400")}
-                                  aria-label="Sort ascending"
-                                  title="Sort ascending"
-                                >
-                                  <ChevronUp className="h-3.5 w-3.5 stroke-[2.5]" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setSort({ key: column.key, direction: "desc" })}
-                                  className={cn("grid h-3.5 w-4 place-items-center text-slate-300 transition-colors hover:text-slate-600 dark:text-slate-600 dark:hover:text-slate-300", direction === "desc" && "text-primary-600 dark:text-primary-400")}
-                                  aria-label="Sort descending"
-                                  title="Sort descending"
-                                >
-                                  <ChevronDown className="h-3.5 w-3.5 stroke-[2.5]" />
-                                </button>
-                              </span>
-                            )}
+                            <span className="inline-flex h-4 w-4 shrink-0 flex-col items-center justify-center">
+                              {controlsVisible && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSort({ key: column.key, direction: "asc" })}
+                                    className={cn("grid h-2 w-4 place-items-center text-slate-300 transition-colors hover:text-slate-600 dark:text-slate-600 dark:hover:text-slate-300", direction === "asc" && "text-primary-600 dark:text-primary-400")}
+                                    aria-label="Sort ascending"
+                                    title="Sort ascending"
+                                  >
+                                    <ChevronUp className="h-3 w-3 stroke-[2.5]" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSort({ key: column.key, direction: "desc" })}
+                                    className={cn("grid h-2 w-4 place-items-center text-slate-300 transition-colors hover:text-slate-600 dark:text-slate-600 dark:hover:text-slate-300", direction === "desc" && "text-primary-600 dark:text-primary-400")}
+                                    aria-label="Sort descending"
+                                    title="Sort descending"
+                                  >
+                                    <ChevronDown className="h-3 w-3 stroke-[2.5]" />
+                                  </button>
+                                </>
+                              )}
+                            </span>
                           </div>
                         ) : column.label}
                       </th>
