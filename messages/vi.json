@@ -1761,6 +1761,41 @@
     },
     "purchaseHistory": "Lịch sử nhập hàng",
     "noPurchases": "Chưa có phiếu nhập",
+    "details": {
+      "openEdit": "Mở trang chỉnh sửa",
+      "createdAt": "Ngày tạo",
+      "currentDebt": "Nợ phải trả hiện tại",
+      "emptyHistory": "Chưa có lịch sử nhập hoặc trả hàng",
+      "emptyDebt": "Chưa có phát sinh công nợ",
+      "tabs": {
+        "info": "Thông tin",
+        "history": "Lịch sử nhập/trả hàng",
+        "debt": "Công nợ"
+      },
+      "types": {
+        "purchase": "Nhập hàng",
+        "return": "Trả hàng nhập"
+      },
+      "debtTypes": {
+        "purchase": "Ghi nợ nhập hàng",
+        "return": "Giảm nợ do trả hàng"
+      },
+      "historyCols": {
+        "code": "Mã phiếu",
+        "time": "Thời gian",
+        "type": "Loại giao dịch",
+        "items": "Số mặt hàng",
+        "total": "Tổng tiền",
+        "status": "Trạng thái"
+      },
+      "debtCols": {
+        "code": "Mã phiếu",
+        "time": "Thời gian",
+        "type": "Loại giao dịch",
+        "change": "Phát sinh",
+        "balance": "Dư nợ"
+      }
+    },
     "unitLabel": "nhà cung cấp"
   },
   "purchases": {

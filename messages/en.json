@@ -1761,6 +1761,41 @@
     },
     "purchaseHistory": "Purchase history",
     "noPurchases": "No purchases yet",
+    "details": {
+      "openEdit": "Open edit page",
+      "createdAt": "Created at",
+      "currentDebt": "Current payable",
+      "emptyHistory": "No purchase or return history",
+      "emptyDebt": "No payable activity",
+      "tabs": {
+        "info": "Information",
+        "history": "Purchase/return history",
+        "debt": "Payables"
+      },
+      "types": {
+        "purchase": "Purchase",
+        "return": "Purchase return"
+      },
+      "debtTypes": {
+        "purchase": "Purchase payable",
+        "return": "Debt reduced by return"
+      },
+      "historyCols": {
+        "code": "Document code",
+        "time": "Time",
+        "type": "Transaction type",
+        "items": "Items",
+        "total": "Total",
+        "status": "Status"
+      },
+      "debtCols": {
+        "code": "Document code",
+        "time": "Time",
+        "type": "Transaction type",
+        "change": "Change",
+        "balance": "Balance"
+      }
+    },
     "unitLabel": "suppliers"
   },
   "purchases": {

@@ -438,6 +438,36 @@ export async function getSupplierPurchases(id: string) {
     .orderBy(desc(purchaseOrders.createdAt))
     .limit(50);
 }
+
+export async function getSupplierPurchaseReturns(id: string) {
+  const { purchaseReturns } = await import("@/db/schema");
+  return db
+    .select({
+      id: purchaseReturns.id,
+      code: purchaseReturns.code,
+      status: purchaseReturns.status,
+      settlementStatus: purchaseReturns.settlementStatus,
+      totalRefund: purchaseReturns.totalRefund,
+      refundAmount: purchaseReturns.refundAmount,
+      debtAmount: purchaseReturns.debtAmount,
+      createdAt: purchaseReturns.createdAt,
+    })
+    .from(purchaseReturns)
+    .where(eq(purchaseReturns.supplierId, id))
+    .orderBy(desc(purchaseReturns.createdAt))
+    .limit(50);
+}
+
+export async function getSupplierPreview(id: string) {
+  const [supplier, purchases, purchaseReturns] = await Promise.all([
+    getSupplier(id),
+    getSupplierPurchases(id),
+    getSupplierPurchaseReturns(id),
+  ]);
+  if (!supplier) return null;
+  return { supplier, purchases, purchaseReturns };
+}
+
 export type SupplierDetail = NonNullable<Awaited<ReturnType<typeof getSupplier>>>;
 
 export async function getSuppliers(filters: { q?: string; owing?: "owing" | "clear"; page?: number; pageSize?: number } = {}) {

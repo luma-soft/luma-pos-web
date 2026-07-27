@@ -7,7 +7,6 @@ import { useTranslations } from "next-intl";
 import {
   Ban,
   CalendarDays,
-  ChevronDown,
   Download,
   ExternalLink,
   FileDown,
@@ -185,6 +184,8 @@ function CustomerRows({
   const t = useTranslations();
   const router = useRouter();
   const [createOpen, setCreateOpen] = useState(aiPreview);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const selectedCustomer = data.rows.find((customer) => customer.id === selectedCustomerId) ?? null;
   const columns: DataTableColumn<CustomerRow>[] = [
     {
       key: "select",
@@ -209,7 +210,6 @@ function CustomerRows({
         rows={data.rows}
         columns={columns}
         getRowId={(customer) => customer.id}
-        expandedParam="expandedCustomer"
         minWidth="980px"
         empty={(
           <div className="rounded-card border border-dashed border-border bg-surface p-12 text-center text-slate-400">
@@ -240,15 +240,14 @@ function CustomerRows({
             </div>
           </div>
         )}
-        renderExpanded={(customer) => <ExpandedCustomer customer={customer} />}
-        renderMobileRow={({ row: customer, expanded, toggle }) => (
-          <button type="button" onClick={toggle} className="w-full p-3 text-left">
+        onRowClick={(customer) => setSelectedCustomerId(customer.id)}
+        renderMobileRow={({ row: customer }) => (
+          <button type="button" onClick={() => setSelectedCustomerId(customer.id)} className="w-full p-3 text-left">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="truncate font-semibold">{customer.name}</div>
                 <div className="text-xs text-slate-400">{customer.code ?? "—"} · {customer.phone ?? "—"}</div>
               </div>
-              <ChevronDown className={cn("mt-1 h-4 w-4 text-slate-400 transition-transform", expanded && "rotate-180")} />
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
               <Metric label={t("customers.cols.debt")} value={formatCurrency(Number(customer.currentDebt))} tone={Number(customer.currentDebt) > 0 ? "danger" : "muted"} />
@@ -267,16 +266,25 @@ function CustomerRows({
           router.refresh();
         }}
       />
+      <RowPreviewModal
+        open={Boolean(selectedCustomer)}
+        onClose={() => setSelectedCustomerId(null)}
+        title={selectedCustomer?.name ?? t("customers.expand.profile")}
+        subtitle={selectedCustomer ? [selectedCustomer.code, selectedCustomer.phone].filter(Boolean).join(" · ") : undefined}
+        closeLabel={t("common.close")}
+      >
+        {selectedCustomer && <CustomerDetail customer={selectedCustomer} />}
+      </RowPreviewModal>
     </>
   );
 }
 
-function ExpandedCustomer({ customer }: { customer: CustomerRow }) {
+function CustomerDetail({ customer }: { customer: CustomerRow }) {
   const t = useTranslations();
   const [tab, setTab] = useState<CustomerExpandTab>("info");
 
   return (
-    <div className="border-t border-border-soft bg-surface px-4 py-4">
+    <div className="bg-surface">
       <div className="flex items-center gap-6 overflow-x-auto border-b border-border-soft text-sm font-semibold text-slate-500">
         {CUSTOMER_EXPAND_TABS.map((key) => (
           <button
