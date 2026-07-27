@@ -1762,7 +1762,6 @@
     "purchaseHistory": "Purchase history",
     "noPurchases": "No purchases yet",
     "details": {
-      "openEdit": "Open edit page",
       "createdAt": "Created at",
       "currentDebt": "Current payable",
       "emptyHistory": "No purchase or return history",

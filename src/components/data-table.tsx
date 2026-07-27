@@ -2,7 +2,7 @@
 
 import { Fragment, isValidElement, type ReactNode, type SyntheticEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ArrowDown, ArrowUp, ChevronDown, Columns3, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Columns3, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type SortValue = string | number | Date | null | undefined;
@@ -393,24 +393,24 @@ export function DataTableShell<T>({
                               {column.label}
                             </button>
                             {controlsVisible && (
-                              <span className="inline-flex shrink-0 items-center rounded-md border border-border bg-surface p-0.5 shadow-sm">
+                              <span className="inline-flex shrink-0 flex-col items-center justify-center">
                                 <button
                                   type="button"
                                   onClick={() => setSort({ key: column.key, direction: "asc" })}
-                                  className={cn("grid h-5 w-5 place-items-center rounded-sm text-slate-400 hover:bg-surface-2 hover:text-slate-700", direction === "asc" && "bg-primary-100 text-primary-700 dark:bg-primary-950/60 dark:text-primary-300")}
+                                  className={cn("grid h-3.5 w-4 place-items-center text-slate-300 transition-colors hover:text-slate-600 dark:text-slate-600 dark:hover:text-slate-300", direction === "asc" && "text-primary-600 dark:text-primary-400")}
                                   aria-label="Sort ascending"
                                   title="Sort ascending"
                                 >
-                                  <ArrowUp className="h-3 w-3" />
+                                  <ChevronUp className="h-3.5 w-3.5 stroke-[2.5]" />
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => setSort({ key: column.key, direction: "desc" })}
-                                  className={cn("grid h-5 w-5 place-items-center rounded-sm text-slate-400 hover:bg-surface-2 hover:text-slate-700", direction === "desc" && "bg-primary-100 text-primary-700 dark:bg-primary-950/60 dark:text-primary-300")}
+                                  className={cn("grid h-3.5 w-4 place-items-center text-slate-300 transition-colors hover:text-slate-600 dark:text-slate-600 dark:hover:text-slate-300", direction === "desc" && "text-primary-600 dark:text-primary-400")}
                                   aria-label="Sort descending"
                                   title="Sort descending"
                                 >
-                                  <ArrowDown className="h-3 w-3" />
+                                  <ChevronDown className="h-3.5 w-3.5 stroke-[2.5]" />
                                 </button>
                               </span>
                             )}

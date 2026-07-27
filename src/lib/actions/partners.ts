@@ -54,6 +54,7 @@ export async function updateSupplier(input: UpdateSupplierInput): Promise<Action
       note: v.note || null,
     }).where(eq(suppliers.id, v.id));
     revalidatePath(Routes.Suppliers);
+    revalidatePath(Routes.Partners);
     revalidatePath(`/suppliers/${v.id}`);
     return { ok: true, data: undefined };
   } catch (e) {

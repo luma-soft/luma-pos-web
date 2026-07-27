@@ -2,12 +2,14 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { Loader2, Pencil } from "lucide-react";
 import { DataTableShell, RowPreviewModal, type DataTableColumn } from "@/components/data-table";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { getSuppliers } from "@/lib/data/partners";
+import { updateSupplier } from "@/lib/actions/partners";
 
 type SupplierRow = Awaited<ReturnType<typeof getSuppliers>>["rows"][number];
 type SupplierDetailTab = "info" | "history" | "debt";
@@ -54,14 +56,27 @@ type SupplierHistoryRow = {
   itemCount?: number;
   status: string;
 };
+type SupplierDraft = {
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+  taxCode: string;
+  note: string;
+};
 
 const DETAIL_TABS: SupplierDetailTab[] = ["info", "history", "debt"];
 
 export function SuppliersTable({ rows }: { rows: SupplierRow[] }) {
   const t = useTranslations();
+  const router = useRouter();
   const requestId = useRef(0);
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierRow | null>(null);
   const [preview, setPreview] = useState<{ loading: boolean; data?: SupplierPreview; error?: string } | null>(null);
+  const [draft, setDraft] = useState<SupplierDraft | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const columns: DataTableColumn<SupplierRow>[] = [
     { key: "name", label: t("suppliers.cols.name"), required: true, render: (row) => <span className="font-semibold text-primary-600">{row.name}</span> },
     { key: "code", label: t("customers.cols.code"), defaultVisible: true, render: (row) => <span className="text-slate-500">{row.code}</span> },
@@ -81,6 +96,10 @@ export function SuppliersTable({ rows }: { rows: SupplierRow[] }) {
     const currentRequest = ++requestId.current;
     setSelectedSupplier(row);
     setPreview({ loading: true });
+    setEditing(false);
+    setSaving(false);
+    setSaveError("");
+    setDraft(null);
     try {
       const response = await fetch(`/api/suppliers/${encodeURIComponent(row.id)}/preview`, { cache: "no-store" });
       const json = await response.json();
@@ -89,7 +108,9 @@ export function SuppliersTable({ rows }: { rows: SupplierRow[] }) {
         setPreview({ loading: false, error: t("errors.serverError" as never) });
         return;
       }
-      setPreview({ loading: false, data: json.data as SupplierPreview });
+      const data = json.data as SupplierPreview;
+      setPreview({ loading: false, data });
+      setDraft(toSupplierDraft(data.supplier));
     } catch {
       if (currentRequest === requestId.current) {
         setPreview({ loading: false, error: t("errors.serverError" as never) });
@@ -101,6 +122,72 @@ export function SuppliersTable({ rows }: { rows: SupplierRow[] }) {
     requestId.current += 1;
     setSelectedSupplier(null);
     setPreview(null);
+    setDraft(null);
+    setEditing(false);
+    setSaving(false);
+    setSaveError("");
+  }
+
+  function startEditing() {
+    if (!preview?.data) return;
+    setDraft(toSupplierDraft(preview.data.supplier));
+    setSaveError("");
+    setEditing(true);
+  }
+
+  function cancelEditing() {
+    if (preview?.data) setDraft(toSupplierDraft(preview.data.supplier));
+    setSaveError("");
+    setEditing(false);
+  }
+
+  async function saveSupplier() {
+    if (!preview?.data || !draft || saving) return;
+    if (!draft.name.trim()) {
+      setSaveError(t("validation.required"));
+      return;
+    }
+
+    setSaving(true);
+    setSaveError("");
+    const result = await updateSupplier({
+      id: preview.data.supplier.id,
+      name: draft.name.trim(),
+      phone: draft.phone,
+      email: draft.email,
+      address: draft.address,
+      taxCode: draft.taxCode,
+      note: draft.note,
+    });
+    setSaving(false);
+
+    if (!result.ok) {
+      setSaveError(t(result.error as never));
+      return;
+    }
+
+    const updatedSupplier = {
+      ...preview.data.supplier,
+      name: draft.name.trim(),
+      phone: draft.phone.trim() || null,
+      email: draft.email.trim() || null,
+      address: draft.address.trim() || null,
+      taxCode: draft.taxCode.trim() || null,
+      note: draft.note.trim() || null,
+    };
+    setPreview((current) => current?.data ? { loading: false, data: { ...current.data, supplier: updatedSupplier } } : current);
+    setSelectedSupplier((current) => current ? {
+      ...current,
+      name: updatedSupplier.name,
+      phone: updatedSupplier.phone,
+      email: updatedSupplier.email,
+      address: updatedSupplier.address,
+      taxCode: updatedSupplier.taxCode,
+      note: updatedSupplier.note,
+    } : current);
+    setDraft(toSupplierDraft(updatedSupplier));
+    setEditing(false);
+    router.refresh();
   }
 
   return (
@@ -131,15 +218,27 @@ export function SuppliersTable({ rows }: { rows: SupplierRow[] }) {
       <RowPreviewModal
         open={Boolean(selectedSupplier)}
         onClose={closeSupplier}
-        title={selectedSupplier?.name ?? t("suppliers.title")}
-        subtitle={selectedSupplier ? `${selectedSupplier.code ?? "—"} · ${t("suppliers.cols.debt")}: ${formatCurrency(Number(selectedSupplier.currentDebt))}` : undefined}
+        title={preview?.data?.supplier.name ?? selectedSupplier?.name ?? t("suppliers.title")}
+        subtitle={selectedSupplier ? `${preview?.data?.supplier.code ?? selectedSupplier.code ?? "—"} · ${t("suppliers.cols.debt")}: ${formatCurrency(Number(preview?.data?.supplier.currentDebt ?? selectedSupplier.currentDebt))}` : undefined}
         closeLabel={t("common.close")}
-        footer={selectedSupplier && (
-          <div className="flex justify-end">
-            <Link href={Routes.supplier(selectedSupplier.id)} className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold text-primary-600 hover:bg-surface-2">
-              <ExternalLink className="h-4 w-4" />
-              {t("suppliers.details.openEdit")}
-            </Link>
+        footer={preview?.data && (
+          <div className="flex justify-end gap-2">
+            {editing ? (
+              <>
+                <button type="button" onClick={cancelEditing} disabled={saving} className="inline-flex h-10 items-center rounded-lg border border-border px-4 text-sm font-semibold text-slate-600 hover:bg-surface-2 disabled:opacity-50">
+                  {t("common.cancel")}
+                </button>
+                <button type="button" onClick={saveSupplier} disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50">
+                  {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {t("common.save")}
+                </button>
+              </>
+            ) : (
+              <button type="button" onClick={startEditing} className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold text-primary-600 hover:bg-surface-2">
+                <Pencil className="h-4 w-4" />
+                {t("common.edit")}
+              </button>
+            )}
           </div>
         )}
       >
@@ -150,16 +249,35 @@ export function SuppliersTable({ rows }: { rows: SupplierRow[] }) {
         ) : preview?.error ? (
           <div className="rounded-card border border-dashed border-border px-4 py-10 text-center text-sm font-medium text-er">{preview.error}</div>
         ) : preview?.data ? (
-          <SupplierDetailTabs preview={preview.data} />
+          <div className="space-y-3">
+            {saveError && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">{saveError}</div>}
+            <SupplierDetailTabs
+              preview={preview.data}
+              draft={draft ?? toSupplierDraft(preview.data.supplier)}
+              editing={editing}
+              onDraftChange={(field, value) => setDraft((current) => current ? { ...current, [field]: value } : current)}
+            />
+          </div>
         ) : null}
       </RowPreviewModal>
     </>
   );
 }
 
-function SupplierDetailTabs({ preview }: { preview: SupplierPreview }) {
+function SupplierDetailTabs({
+  preview,
+  draft,
+  editing,
+  onDraftChange,
+}: {
+  preview: SupplierPreview;
+  draft: SupplierDraft;
+  editing: boolean;
+  onDraftChange: (field: keyof SupplierDraft, value: string) => void;
+}) {
   const t = useTranslations();
   const [tab, setTab] = useState<SupplierDetailTab>("info");
+  const visibleTab: SupplierDetailTab = editing ? "info" : tab;
 
   const history: SupplierHistoryRow[] = [
     ...preview.purchases.map((purchase) => ({
@@ -200,10 +318,12 @@ function SupplierDetailTabs({ preview }: { preview: SupplierPreview }) {
           <button
             key={key}
             type="button"
-            onClick={() => setTab(key)}
+            onClick={() => { if (!editing || key === "info") setTab(key); }}
+            disabled={editing && key !== "info"}
             className={cn(
               "shrink-0 border-b-2 pb-2 transition-colors",
-              tab === key ? "border-primary-600 text-primary-600" : "border-transparent hover:text-slate-800 dark:hover:text-slate-200",
+              visibleTab === key ? "border-primary-600 text-primary-600" : "border-transparent hover:text-slate-800 dark:hover:text-slate-200",
+              editing && key !== "info" && "cursor-not-allowed opacity-40",
             )}
           >
             {t(`suppliers.details.tabs.${key}`)}
@@ -212,34 +332,89 @@ function SupplierDetailTabs({ preview }: { preview: SupplierPreview }) {
       </div>
 
       <div className="pt-4">
-        {tab === "info" && <SupplierInfoPanel supplier={preview.supplier} />}
-        {tab === "history" && <SupplierHistoryPanel rows={history} />}
-        {tab === "debt" && <SupplierDebtPanel rows={debtRows} currentDebt={Number(preview.supplier.currentDebt)} />}
+        {visibleTab === "info" && <SupplierInfoPanel supplier={preview.supplier} draft={draft} editing={editing} onDraftChange={onDraftChange} />}
+        {visibleTab === "history" && <SupplierHistoryPanel rows={history} />}
+        {visibleTab === "debt" && <SupplierDebtPanel rows={debtRows} currentDebt={Number(preview.supplier.currentDebt)} />}
       </div>
     </div>
   );
 }
 
-function SupplierInfoPanel({ supplier }: { supplier: SupplierPreview["supplier"] }) {
+function SupplierInfoPanel({
+  supplier,
+  draft,
+  editing,
+  onDraftChange,
+}: {
+  supplier: SupplierPreview["supplier"];
+  draft: SupplierDraft;
+  editing: boolean;
+  onDraftChange: (field: keyof SupplierDraft, value: string) => void;
+}) {
   const t = useTranslations();
+  const inputClassName = "h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100";
+  const labelClassName = "mb-1.5 block text-xs font-semibold text-slate-500";
+
   return (
     <div className="space-y-5">
-      <div className="grid gap-x-8 gap-y-4 md:grid-cols-2">
-        <Info label={t("suppliers.cols.name")} value={supplier.name} />
-        <Info label={t("customers.cols.code")} value={supplier.code ?? "—"} />
-        <Info label={t("customers.cols.phone")} value={supplier.phone ?? "—"} />
-        <Info label="Email" value={supplier.email ?? "—"} />
-        <Info label={t("customers.fields.address")} value={supplier.address ?? "—"} />
-        <Info label={t("customers.fields.taxCode")} value={supplier.taxCode ?? "—"} />
-        <Info label={t("customers.fields.note")} value={supplier.note ?? "—"} />
-        <Info label={t("suppliers.details.createdAt")} value={formatDate(supplier.createdAt)} />
-      </div>
+      {editing ? (
+        <div className="grid gap-x-8 gap-y-4 md:grid-cols-2">
+          <label>
+            <span className={labelClassName}>{t("suppliers.cols.name")}</span>
+            <input autoFocus className={inputClassName} value={draft.name} onChange={(event) => onDraftChange("name", event.target.value)} />
+          </label>
+          <Info label={t("customers.cols.code")} value={supplier.code ?? "—"} />
+          <label>
+            <span className={labelClassName}>{t("customers.cols.phone")}</span>
+            <input className={inputClassName} value={draft.phone} onChange={(event) => onDraftChange("phone", event.target.value)} />
+          </label>
+          <label>
+            <span className={labelClassName}>Email</span>
+            <input type="email" className={inputClassName} value={draft.email} onChange={(event) => onDraftChange("email", event.target.value)} />
+          </label>
+          <label>
+            <span className={labelClassName}>{t("customers.fields.address")}</span>
+            <input className={inputClassName} value={draft.address} onChange={(event) => onDraftChange("address", event.target.value)} />
+          </label>
+          <label>
+            <span className={labelClassName}>{t("customers.fields.taxCode")}</span>
+            <input className={inputClassName} value={draft.taxCode} onChange={(event) => onDraftChange("taxCode", event.target.value)} />
+          </label>
+          <label className="md:col-span-2">
+            <span className={labelClassName}>{t("customers.fields.note")}</span>
+            <textarea className={cn(inputClassName, "min-h-24 resize-y py-2")} value={draft.note} onChange={(event) => onDraftChange("note", event.target.value)} />
+          </label>
+          <Info label={t("suppliers.details.createdAt")} value={formatDate(supplier.createdAt)} />
+        </div>
+      ) : (
+        <div className="grid gap-x-8 gap-y-4 md:grid-cols-2">
+          <Info label={t("suppliers.cols.name")} value={supplier.name} />
+          <Info label={t("customers.cols.code")} value={supplier.code ?? "—"} />
+          <Info label={t("customers.cols.phone")} value={supplier.phone ?? "—"} />
+          <Info label="Email" value={supplier.email ?? "—"} />
+          <Info label={t("customers.fields.address")} value={supplier.address ?? "—"} />
+          <Info label={t("customers.fields.taxCode")} value={supplier.taxCode ?? "—"} />
+          <Info label={t("customers.fields.note")} value={supplier.note ?? "—"} />
+          <Info label={t("suppliers.details.createdAt")} value={formatDate(supplier.createdAt)} />
+        </div>
+      )}
       <div className="rounded-card border border-warn/20 bg-warn-soft px-4 py-3">
         <div className="text-xs font-semibold text-warn">{t("suppliers.cols.debt")}</div>
         <div className="mt-1 text-xl font-bold tabular-nums text-warn">{formatCurrency(Number(supplier.currentDebt))}</div>
       </div>
     </div>
   );
+}
+
+function toSupplierDraft(supplier: SupplierPreview["supplier"]): SupplierDraft {
+  return {
+    name: supplier.name,
+    phone: supplier.phone ?? "",
+    email: supplier.email ?? "",
+    address: supplier.address ?? "",
+    taxCode: supplier.taxCode ?? "",
+    note: supplier.note ?? "",
+  };
 }
 
 function SupplierHistoryPanel({ rows }: { rows: SupplierHistoryRow[] }) {
