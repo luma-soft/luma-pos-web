@@ -1,9 +1,12 @@
 "use client";
 
-import { Fragment, type ReactNode, type SyntheticEvent, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Fragment, isValidElement, type ReactNode, type SyntheticEvent, useEffect, useId, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, Columns3, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, Columns3, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+type SortValue = string | number | Date | null | undefined;
+type SortDirection = "asc" | "desc";
 
 export type DataTableColumn<T> = {
   key: string;
@@ -16,6 +19,8 @@ export type DataTableColumn<T> = {
   cellClassName?: string | ((row: T) => string | undefined);
   render: (row: T) => ReactNode;
   mobileRender?: (row: T) => ReactNode;
+  sortable?: boolean;
+  sortValue?: (row: T) => SortValue;
 };
 
 export type DataTableSummaryCell = {
@@ -32,6 +37,118 @@ type MobileRenderProps<T> = {
 
 export function stopRowToggle(event: SyntheticEvent) {
   event.stopPropagation();
+}
+
+const NON_SORTABLE_COLUMN_KEYS = new Set(["select", "action", "actions", "menu"]);
+const SORT_KEY_ALIASES: Record<string, string[]> = {
+  actor: ["actorName", "createdByName"],
+  assets: ["assetCount"],
+  assignee: ["assigneeName", "assignedToName"],
+  beforeVat: ["totalBeforeVat"],
+  buyer: ["buyerName", "customerName"],
+  cashier: ["cashierName", "createdByName"],
+  category: ["categoryName"],
+  claims: ["openClaimCount", "claimCount"],
+  closed: ["closedAt"],
+  collected: ["collectedAmount", "amountPaid"],
+  cost: ["totalCost", "costPrice"],
+  counted: ["countedCash"],
+  createdBy: ["createdByName"],
+  customer: ["customerName"],
+  date: ["createdAt", "date"],
+  daysLeft: ["daysOfStock"],
+  debt: ["currentDebt", "debt", "owed"],
+  delivery: ["deliveryDate"],
+  diff: ["totalDiff"],
+  employee: ["employeeName", "fullName"],
+  expected: ["expectedCash"],
+  items: ["itemCount"],
+  jobs: ["jobCount", "openJobCount"],
+  lastPurchase: ["lastPurchasePrice"],
+  min: ["minLevel"],
+  netSales: ["totalSpent", "netSales"],
+  onHand: ["stock", "totalStock"],
+  opened: ["openedAt"],
+  order: ["orderCode", "code"],
+  orders: ["orderCount"],
+  product: ["productName", "name"],
+  profit: ["grossProfit", "profit"],
+  reported: ["reportedAt"],
+  revenue: ["totalRevenue", "revenue"],
+  salePrice: ["retailPrice"],
+  schedule: ["scheduledAt"],
+  stock: ["totalStock", "stock"],
+  suggested: ["suggestedQty"],
+  supplier: ["supplierName"],
+  tax: ["taxCode", "tax"],
+  time: ["createdAt", "time"],
+  uncollected: ["uncollectedAmount", "remaining"],
+  value: ["totalValue", "stockValue", "total"],
+  variance: ["cashVariance", "variance"],
+  vat: ["vatAmount"],
+  warehouse: ["warehouseName"],
+};
+const sortCollator = new Intl.Collator("vi", { numeric: true, sensitivity: "base" });
+
+function isSortableColumn<T>(column: DataTableColumn<T>) {
+  return column.sortable ?? !NON_SORTABLE_COLUMN_KEYS.has(column.key);
+}
+
+function getColumnSortValue<T>(column: DataTableColumn<T>, row: T): SortValue {
+  if (column.sortValue) return column.sortValue(row);
+
+  const record = row as Record<string, unknown>;
+  const candidateKeys = [column.key, ...(SORT_KEY_ALIASES[column.key] ?? [])];
+  for (const key of candidateKeys) {
+    const candidate = record[key];
+    if (candidate instanceof Date || typeof candidate === "string" || typeof candidate === "number") {
+      return candidate;
+    }
+  }
+
+  return extractNodeText(column.render(row));
+}
+
+function extractNodeText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(extractNodeText).join(" ");
+  if (isValidElement<{ children?: ReactNode }>(node)) return extractNodeText(node.props.children);
+  return "";
+}
+
+function normalizeSortValue(value: SortValue): string | number | null {
+  if (value === null || value === undefined || value === "") return null;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === "number") return Number.isNaN(value) ? null : value;
+
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "—") return null;
+  if (/^-?\d+(?:\.\d+)?$/.test(trimmed)) {
+    const numeric = Number(trimmed);
+    if (Number.isFinite(numeric)) return numeric;
+  }
+  if (/[₫đ]/i.test(trimmed)) {
+    const numeric = Number(trimmed.replace(/[^\d-]/g, ""));
+    if (Number.isFinite(numeric)) return numeric;
+  }
+  if (trimmed.includes("%")) {
+    const numeric = Number(trimmed.replace(/[^\d,.-]/g, "").replace(",", "."));
+    if (Number.isFinite(numeric)) return numeric;
+  }
+  return trimmed;
+}
+
+function compareSortValues(a: SortValue, b: SortValue, direction: SortDirection) {
+  const left = normalizeSortValue(a);
+  const right = normalizeSortValue(b);
+  if (left === null && right === null) return 0;
+  if (left === null) return 1;
+  if (right === null) return -1;
+
+  const compared = typeof left === "number" && typeof right === "number"
+    ? left - right
+    : sortCollator.compare(String(left), String(right));
+  return direction === "asc" ? compared : -compared;
 }
 
 export function DataTableShell<T>({
@@ -81,6 +198,8 @@ export function DataTableShell<T>({
   const queryExpanded = params.get(expandedParam);
   const expandedId = queryExpanded ?? initialExpandedId ?? null;
   const [storedVisible, setStoredVisible] = useState<Set<string> | null>(null);
+  const [activeSortColumn, setActiveSortColumn] = useState<string | null>(null);
+  const [sort, setSort] = useState<{ key: string; direction: SortDirection } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -121,6 +240,19 @@ export function DataTableShell<T>({
 
   const visibleKeys = storedVisible ?? defaultVisible;
   const visibleColumns = columns.filter((column) => column.required || visibleKeys.has(column.key));
+  const displayRows = useMemo(() => {
+    if (!sort) return rows;
+    const column = columns.find((item) => item.key === sort.key);
+    if (!column || !isSortableColumn(column)) return rows;
+
+    return rows
+      .map((row, index) => ({ row, index, value: getColumnSortValue(column, row) }))
+      .sort((a, b) => {
+        const compared = compareSortValues(a.value, b.value, sort.direction);
+        return compared === 0 ? a.index - b.index : compared;
+      })
+      .map(({ row }) => row);
+  }, [columns, rows, sort]);
 
   function persist(next: Set<string>) {
     const normalized = new Set(next);
@@ -180,7 +312,7 @@ export function DataTableShell<T>({
       ) : (
         <>
           <div className="space-y-2 lg:hidden">
-            {rows.map((row) => {
+            {displayRows.map((row) => {
               const id = getRowId(row);
               const expandable = Boolean(!onRowClick && renderExpanded && (canExpand ? canExpand(row) : true));
               const expanded = expandable && expandedId === id;
@@ -227,20 +359,66 @@ export function DataTableShell<T>({
               </colgroup>
               <thead>
                 <tr className="bg-canvas text-left text-xs font-semibold text-slate-500 dark:text-slate-300">
-                  {visibleColumns.map((column) => (
-                    <th
-                      key={column.key}
-                      className={cn(
-                        "px-3 py-3",
-                        maxHeight && "sticky top-0 z-10 bg-canvas",
-                        column.align === "right" && "text-right",
-                        column.align === "center" && "text-center",
-                        column.headerClassName,
-                      )}
-                    >
-                      {column.label}
-                    </th>
-                  ))}
+                  {visibleColumns.map((column) => {
+                    const sortable = isSortableColumn(column);
+                    const controlsVisible = sortable && activeSortColumn === column.key;
+                    const direction = sort?.key === column.key ? sort.direction : null;
+                    return (
+                      <th
+                        key={column.key}
+                        aria-sort={direction === "asc" ? "ascending" : direction === "desc" ? "descending" : "none"}
+                        className={cn(
+                          "px-3 py-3",
+                          maxHeight && "sticky top-0 z-10 bg-canvas",
+                          controlsVisible && "bg-primary-50/70 dark:bg-primary-950/25",
+                          column.align === "right" && "text-right",
+                          column.align === "center" && "text-center",
+                          column.headerClassName,
+                        )}
+                      >
+                        {sortable ? (
+                          <div className={cn(
+                            "flex min-w-0 items-center gap-1.5",
+                            column.align === "right" && "justify-end",
+                            column.align === "center" && "justify-center",
+                          )}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveSortColumn(column.key);
+                                if (sort?.key !== column.key) setSort(null);
+                              }}
+                              className="min-w-0 truncate text-inherit hover:text-slate-900 dark:hover:text-white"
+                            >
+                              {column.label}
+                            </button>
+                            {controlsVisible && (
+                              <span className="inline-flex shrink-0 items-center rounded-md border border-border bg-surface p-0.5 shadow-sm">
+                                <button
+                                  type="button"
+                                  onClick={() => setSort({ key: column.key, direction: "asc" })}
+                                  className={cn("grid h-5 w-5 place-items-center rounded-sm text-slate-400 hover:bg-surface-2 hover:text-slate-700", direction === "asc" && "bg-primary-100 text-primary-700 dark:bg-primary-950/60 dark:text-primary-300")}
+                                  aria-label="Sort ascending"
+                                  title="Sort ascending"
+                                >
+                                  <ArrowUp className="h-3 w-3" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setSort({ key: column.key, direction: "desc" })}
+                                  className={cn("grid h-5 w-5 place-items-center rounded-sm text-slate-400 hover:bg-surface-2 hover:text-slate-700", direction === "desc" && "bg-primary-100 text-primary-700 dark:bg-primary-950/60 dark:text-primary-300")}
+                                  aria-label="Sort descending"
+                                  title="Sort descending"
+                                >
+                                  <ArrowDown className="h-3 w-3" />
+                                </button>
+                              </span>
+                            )}
+                          </div>
+                        ) : column.label}
+                      </th>
+                    );
+                  })}
                   <th className="sticky right-0 top-0 z-20 bg-canvas px-2 py-2 text-right shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.35)]">{columnVisibilityMenu}</th>
                 </tr>
               </thead>
@@ -254,7 +432,7 @@ export function DataTableShell<T>({
                     <td className="sticky right-0 z-10 bg-surface px-3 py-3" />
                   </tr>
                 )}
-                {rows.map((row) => {
+                {displayRows.map((row) => {
                   const id = getRowId(row);
                   const expandable = Boolean(!onRowClick && renderExpanded && (canExpand ? canExpand(row) : true));
                   const expanded = expandable && expandedId === id;
