@@ -185,6 +185,7 @@ function CustomerRows({
   const router = useRouter();
   const [createOpen, setCreateOpen] = useState(aiPreview);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [detailTab, setDetailTab] = useState<CustomerExpandTab>("info");
   const selectedCustomer = data.rows.find((customer) => customer.id === selectedCustomerId) ?? null;
   const columns: DataTableColumn<CustomerRow>[] = [
     {
@@ -240,9 +241,15 @@ function CustomerRows({
             </div>
           </div>
         )}
-        onRowClick={(customer) => setSelectedCustomerId(customer.id)}
+        onRowClick={(customer) => {
+          setSelectedCustomerId(customer.id);
+          setDetailTab("info");
+        }}
         renderMobileRow={({ row: customer }) => (
-          <button type="button" onClick={() => setSelectedCustomerId(customer.id)} className="w-full p-3 text-left">
+          <button type="button" onClick={() => {
+            setSelectedCustomerId(customer.id);
+            setDetailTab("info");
+          }} className="w-full p-3 text-left">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="truncate font-semibold">{customer.name}</div>
@@ -272,25 +279,34 @@ function CustomerRows({
         title={selectedCustomer?.name ?? t("customers.expand.profile")}
         subtitle={selectedCustomer ? [selectedCustomer.code, selectedCustomer.phone].filter(Boolean).join(" · ") : undefined}
         closeLabel={t("common.close")}
+        bodyClassName="flex flex-col !overflow-hidden"
+        footer={selectedCustomer && <CustomerDetailFooter customer={selectedCustomer} tab={detailTab} />}
       >
-        {selectedCustomer && <CustomerDetail customer={selectedCustomer} />}
+        {selectedCustomer && <CustomerDetail customer={selectedCustomer} tab={detailTab} onTabChange={setDetailTab} />}
       </RowPreviewModal>
     </>
   );
 }
 
-function CustomerDetail({ customer }: { customer: CustomerRow }) {
+function CustomerDetail({
+  customer,
+  tab,
+  onTabChange,
+}: {
+  customer: CustomerRow;
+  tab: CustomerExpandTab;
+  onTabChange: (tab: CustomerExpandTab) => void;
+}) {
   const t = useTranslations();
-  const [tab, setTab] = useState<CustomerExpandTab>("info");
 
   return (
-    <div className="bg-surface">
-      <div className="flex items-center gap-6 overflow-x-auto border-b border-border-soft text-sm font-semibold text-slate-500">
+    <div className="flex min-h-0 flex-1 flex-col bg-surface">
+      <div className="flex shrink-0 items-center gap-6 overflow-x-auto border-b border-border-soft text-sm font-semibold text-slate-500">
         {CUSTOMER_EXPAND_TABS.map((key) => (
           <button
             key={key}
             type="button"
-            onClick={() => setTab(key)}
+            onClick={() => onTabChange(key)}
             className={cn(
               "shrink-0 border-b-2 pb-2 transition-colors",
               tab === key ? "border-primary-600 text-primary-600" : "border-transparent hover:text-slate-800 dark:hover:text-slate-200",
@@ -301,7 +317,7 @@ function CustomerDetail({ customer }: { customer: CustomerRow }) {
         ))}
       </div>
 
-      <div className="pt-4">
+      <div className="min-h-0 flex-1 overflow-hidden pt-4">
         {tab === "info" && <CustomerInfoPanel customer={customer} />}
         {tab === "sales" && <CustomerSalesPanel customer={customer} />}
         {tab === "debt" && <CustomerDebtPanel customer={customer} />}
@@ -314,49 +330,50 @@ function CustomerInfoPanel({ customer }: { customer: CustomerRow }) {
   const t = useTranslations();
 
   return (
-    <div className="space-y-5">
-      <div className="grid gap-5 lg:grid-cols-[150px_minmax(0,1fr)]">
-        <div className="grid h-36 w-36 place-items-center rounded-full bg-primary-50 text-primary-300 dark:bg-primary-950/30">
-          <User className="h-20 w-20" />
-        </div>
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="min-h-0 flex-1 space-y-5 overflow-auto pr-1">
+        <div className="grid gap-5 lg:grid-cols-[150px_minmax(0,1fr)]">
+          <div className="grid h-36 w-36 place-items-center rounded-full bg-primary-50 text-primary-300 dark:bg-primary-950/30">
+            <User className="h-20 w-20" />
+          </div>
 
-        <div className="min-w-0">
-          <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
-              <h3 className="truncate text-lg font-bold text-slate-900 dark:text-slate-100">
-                {customer.name} <span className="text-sm font-medium text-slate-500">{customer.code}</span>
-              </h3>
-              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600 dark:text-slate-300">
-                <span>{t("customers.expand.createdBy")}: <b>{customer.createdByName ?? t("customers.emptyValue")}</b></span>
-                <span className="hidden h-4 w-px bg-border-soft sm:inline-block" />
-                <span>{t("customers.expand.createdAt")}: <b>{formatDate(customer.createdAt)}</b></span>
-                <span className="hidden h-4 w-px bg-border-soft sm:inline-block" />
-                <span>{t("customers.expand.group")}: <b>{customer.customerGroupName ?? t(`customers.types.${customer.type}`)}</b></span>
+          <div className="min-w-0">
+            <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <h3 className="truncate text-lg font-bold text-slate-900 dark:text-slate-100">
+                  {customer.name} <span className="text-sm font-medium text-slate-500">{customer.code}</span>
+                </h3>
+                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-600 dark:text-slate-300">
+                  <span>{t("customers.expand.createdBy")}: <b>{customer.createdByName ?? t("customers.emptyValue")}</b></span>
+                  <span className="hidden h-4 w-px bg-border-soft sm:inline-block" />
+                  <span>{t("customers.expand.createdAt")}: <b>{formatDate(customer.createdAt)}</b></span>
+                  <span className="hidden h-4 w-px bg-border-soft sm:inline-block" />
+                  <span>{t("customers.expand.group")}: <b>{customer.customerGroupName ?? t(`customers.types.${customer.type}`)}</b></span>
+                </div>
               </div>
+              <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t("customers.expand.profile")}</div>
             </div>
-            <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t("customers.expand.profile")}</div>
-          </div>
 
-          <div className="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-3">
-            <InfoField label={t("customers.cols.phone")} value={customer.phone} />
-            <InfoField label={t("customers.expand.birthday")} value={customer.birthday ? formatDate(customer.birthday) : null} />
-            <InfoField label={t("customers.expand.gender")} value={customer.gender} />
-            <InfoField label="Email" value={customer.email} />
-            <InfoField label="Facebook" value={customer.facebook} />
-            <InfoField label={t("customers.fields.address")} value={customer.address} />
+            <div className="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-3">
+              <InfoField label={t("customers.cols.phone")} value={customer.phone} />
+              <InfoField label={t("customers.expand.birthday")} value={customer.birthday ? formatDate(customer.birthday) : null} />
+              <InfoField label={t("customers.expand.gender")} value={customer.gender} />
+              <InfoField label="Email" value={customer.email} />
+              <InfoField label="Facebook" value={customer.facebook} />
+              <InfoField label={t("customers.fields.address")} value={customer.address} />
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-border-soft pt-4">
+          <h4 className="mb-3 text-sm font-bold text-primary-600">{t("customers.expand.invoiceInfo")}</h4>
+          <div className="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2">
+            <InfoField label={t("customers.fields.taxCode")} value={customer.taxCode} />
+            <InfoField label={t("customers.fields.note")} value={customer.note} icon={Pencil} />
           </div>
         </div>
       </div>
 
-      <div className="border-t border-border-soft pt-4">
-        <h4 className="mb-3 text-sm font-bold text-primary-600">{t("customers.expand.invoiceInfo")}</h4>
-        <div className="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2">
-          <InfoField label={t("customers.fields.taxCode")} value={customer.taxCode} />
-          <InfoField label={t("customers.fields.note")} value={customer.note} icon={Pencil} />
-        </div>
-      </div>
-
-      <CustomerActionBar customer={customer} />
     </div>
   );
 }
@@ -381,13 +398,13 @@ function CustomerSalesPanel({ customer }: { customer: CustomerRow }) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="flex h-full min-h-0 flex-col gap-4">
       {customer.salesHistory.length === 0 ? (
-        <EmptyPanel message={t("customers.expand.emptySales")} />
+        <div className="min-h-0 flex-1 overflow-auto"><EmptyPanel message={t("customers.expand.emptySales")} /></div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="min-h-0 flex-1 overscroll-contain overflow-auto">
           <table className="w-full min-w-[860px] text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10">
               <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">
                 <th className="px-3 py-3">{t("customers.expand.salesCols.code")}</th>
                 <th className="px-3 py-3">{t("customers.expand.salesCols.time")}</th>
@@ -416,10 +433,6 @@ function CustomerSalesPanel({ customer }: { customer: CustomerRow }) {
           </table>
         </div>
       )}
-
-      <div className="border-t border-border-soft pt-4">
-        <ActionButton icon={Download} label={t("customers.actions.exportFile")} disabled />
-      </div>
 
       <OrderPreviewDialog preview={preview} onClose={() => setPreview(null)} />
     </div>
@@ -451,8 +464,8 @@ function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex justify-end">
+    <div className="flex h-full min-h-0 flex-col gap-4">
+      <div className="flex shrink-0 justify-end">
         <Select
           value={filter}
           onChange={(event) => setFilter(event.target.value as DebtFilter)}
@@ -467,11 +480,11 @@ function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
       </div>
 
       {rows.length === 0 ? (
-        <EmptyPanel message={t("customers.expand.emptyDebt")} />
+        <div className="min-h-0 flex-1 overflow-auto"><EmptyPanel message={t("customers.expand.emptyDebt")} /></div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="min-h-0 flex-1 overscroll-contain overflow-auto">
           <table className="w-full min-w-[900px] text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10">
               <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">
                 <th className="px-3 py-3">{t("customers.expand.debtCols.code")}</th>
                 <th className="px-3 py-3">{t("customers.expand.debtCols.time")}</th>
@@ -504,19 +517,6 @@ function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
           </table>
         </div>
       )}
-
-      <div className="flex flex-col gap-3 border-t border-border-soft pt-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex flex-wrap gap-2">
-          <ActionButton icon={FileDown} label={t("customers.actions.exportDebtFile")} disabled />
-          <ActionButton icon={Download} label={t("customers.actions.exportFile")} disabled />
-        </div>
-        <div className="flex flex-wrap gap-2 xl:justify-end">
-          <ActionButton icon={WalletCards} label={t("customers.actions.payment")} tone="primary" disabled />
-          <ActionButton icon={Pencil} label={t("customers.actions.adjust")} disabled />
-          <ActionButton icon={WalletCards} label={t("customers.actions.paymentDiscount")} disabled />
-          <ActionButton icon={QrCode} label={t("customers.actions.createQr")} disabled />
-        </div>
-      </div>
 
       <OrderPreviewDialog preview={preview} onClose={() => setPreview(null)} />
     </div>
@@ -610,6 +610,34 @@ function PreviewLine({ label, value, strong }: { label: string; value: string; s
   );
 }
 
+function CustomerDetailFooter({ customer, tab }: { customer: CustomerRow; tab: CustomerExpandTab }) {
+  const t = useTranslations();
+
+  if (tab === "info") return <CustomerActionBar customer={customer} />;
+  if (tab === "sales") {
+    return (
+      <div className="flex justify-start">
+        <ActionButton icon={Download} label={t("customers.actions.exportFile")} disabled />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+      <div className="flex flex-wrap gap-2">
+        <ActionButton icon={FileDown} label={t("customers.actions.exportDebtFile")} disabled />
+        <ActionButton icon={Download} label={t("customers.actions.exportFile")} disabled />
+      </div>
+      <div className="flex flex-wrap gap-2 xl:justify-end">
+        <ActionButton icon={WalletCards} label={t("customers.actions.payment")} tone="primary" disabled />
+        <ActionButton icon={Pencil} label={t("customers.actions.adjust")} disabled />
+        <ActionButton icon={WalletCards} label={t("customers.actions.paymentDiscount")} disabled />
+        <ActionButton icon={QrCode} label={t("customers.actions.createQr")} disabled />
+      </div>
+    </div>
+  );
+}
+
 function CustomerActionBar({ customer }: { customer: CustomerRow }) {
   const t = useTranslations();
   const router = useRouter();
@@ -634,7 +662,7 @@ function CustomerActionBar({ customer }: { customer: CustomerRow }) {
   }
 
   return (
-    <div className="border-t border-border-soft pt-4">
+    <div>
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-wrap gap-2">
           <ActionButton icon={Trash2} label={t("common.delete")} tone="danger" disabled title={t("customers.actions.deleteDisabled")} />

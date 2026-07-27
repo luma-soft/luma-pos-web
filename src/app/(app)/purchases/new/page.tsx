@@ -21,7 +21,9 @@ export default async function NewPurchasePage({ searchParams }: Props) {
   const seedProductIds = source?.items.map((i) => i.productId) ?? (productId ? [productId] : []);
   const [options, initialProducts] = await Promise.all([
     getPurchaseFormOptions(),
-    seedProductIds.length > 0 ? getPurchaseProductRowsByIds(seedProductIds) : Promise.resolve([]),
+    seedProductIds.length > 0
+      ? getPurchaseProductRowsByIds(seedProductIds, { includeInactive: Boolean(source) })
+      : Promise.resolve([]),
   ]);
 
   if (source) {

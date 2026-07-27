@@ -221,6 +221,7 @@ export function SuppliersTable({ rows }: { rows: SupplierRow[] }) {
         title={preview?.data?.supplier.name ?? selectedSupplier?.name ?? t("suppliers.title")}
         subtitle={selectedSupplier ? `${preview?.data?.supplier.code ?? selectedSupplier.code ?? "—"} · ${t("suppliers.cols.debt")}: ${formatCurrency(Number(preview?.data?.supplier.currentDebt ?? selectedSupplier.currentDebt))}` : undefined}
         closeLabel={t("common.close")}
+        bodyClassName="flex flex-col !overflow-hidden"
         footer={preview?.data && (
           <div className="flex justify-end gap-2">
             {editing ? (
@@ -249,7 +250,7 @@ export function SuppliersTable({ rows }: { rows: SupplierRow[] }) {
         ) : preview?.error ? (
           <div className="rounded-card border border-dashed border-border px-4 py-10 text-center text-sm font-medium text-er">{preview.error}</div>
         ) : preview?.data ? (
-          <div className="space-y-3">
+          <div className="flex min-h-0 flex-1 flex-col gap-3">
             {saveError && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">{saveError}</div>}
             <SupplierDetailTabs
               preview={preview.data}
@@ -312,8 +313,8 @@ function SupplierDetailTabs({
     ).rows;
 
   return (
-    <div>
-      <div className="flex items-center gap-6 overflow-x-auto border-b border-border-soft text-sm font-semibold text-slate-500">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex shrink-0 items-center gap-6 overflow-x-auto border-b border-border-soft text-sm font-semibold text-slate-500">
         {DETAIL_TABS.map((key) => (
           <button
             key={key}
@@ -331,7 +332,7 @@ function SupplierDetailTabs({
         ))}
       </div>
 
-      <div className="pt-4">
+      <div className="min-h-0 flex-1 overflow-hidden pt-4">
         {visibleTab === "info" && <SupplierInfoPanel supplier={preview.supplier} draft={draft} editing={editing} onDraftChange={onDraftChange} />}
         {visibleTab === "history" && <SupplierHistoryPanel rows={history} />}
         {visibleTab === "debt" && <SupplierDebtPanel rows={debtRows} currentDebt={Number(preview.supplier.currentDebt)} />}
@@ -356,7 +357,7 @@ function SupplierInfoPanel({
   const labelClassName = "mb-1.5 block text-xs font-semibold text-slate-500";
 
   return (
-    <div className="space-y-5">
+    <div className="h-full space-y-5 overflow-auto pr-1">
       {editing ? (
         <div className="grid gap-x-8 gap-y-4 md:grid-cols-2">
           <label>
@@ -419,12 +420,12 @@ function toSupplierDraft(supplier: SupplierPreview["supplier"]): SupplierDraft {
 
 function SupplierHistoryPanel({ rows }: { rows: SupplierHistoryRow[] }) {
   const t = useTranslations();
-  if (rows.length === 0) return <EmptyPanel message={t("suppliers.details.emptyHistory")} />;
+  if (rows.length === 0) return <div className="h-full overflow-auto"><EmptyPanel message={t("suppliers.details.emptyHistory")} /></div>;
 
   return (
-    <div className="overflow-x-auto rounded-card border border-border-soft">
+    <div className="h-full overscroll-contain overflow-auto rounded-card border border-border-soft">
       <table className="w-full min-w-[800px] text-sm">
-        <thead>
+        <thead className="sticky top-0 z-10">
           <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">
             <th className="px-3 py-3">{t("suppliers.details.historyCols.code")}</th>
             <th className="px-3 py-3">{t("suppliers.details.historyCols.time")}</th>
@@ -458,19 +459,19 @@ function SupplierHistoryPanel({ rows }: { rows: SupplierHistoryRow[] }) {
 function SupplierDebtPanel({ rows, currentDebt }: { rows: Array<SupplierHistoryRow & { balanceAfter: number }>; currentDebt: number }) {
   const t = useTranslations();
   return (
-    <div className="space-y-4">
-      <div className="flex justify-end">
+    <div className="flex h-full min-h-0 flex-col gap-4">
+      <div className="flex shrink-0 justify-end">
         <div className="rounded-lg bg-warn-soft px-4 py-2 text-right">
           <div className="text-xs font-semibold text-warn">{t("suppliers.details.currentDebt")}</div>
           <div className="font-bold tabular-nums text-warn">{formatCurrency(currentDebt)}</div>
         </div>
       </div>
       {rows.length === 0 ? (
-        <EmptyPanel message={t("suppliers.details.emptyDebt")} />
+        <div className="min-h-0 flex-1 overflow-auto"><EmptyPanel message={t("suppliers.details.emptyDebt")} /></div>
       ) : (
-        <div className="overflow-x-auto rounded-card border border-border-soft">
+        <div className="min-h-0 flex-1 overscroll-contain overflow-auto rounded-card border border-border-soft">
           <table className="w-full min-w-[760px] text-sm">
-            <thead>
+            <thead className="sticky top-0 z-10">
               <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">
                 <th className="px-3 py-3">{t("suppliers.details.debtCols.code")}</th>
                 <th className="px-3 py-3">{t("suppliers.details.debtCols.time")}</th>

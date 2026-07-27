@@ -11,7 +11,10 @@ export default async function EditPurchasePage({ params }: { params: Promise<{ i
 
   const [options, initialProducts] = await Promise.all([
     getPurchaseFormOptions(),
-    getPurchaseProductRowsByIds(purchase.items.map((i) => i.productId)),
+    getPurchaseProductRowsByIds(
+      purchase.items.map((i) => i.productId),
+      { includeInactive: true },
+    ),
   ]);
 
   return (

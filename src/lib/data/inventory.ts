@@ -298,13 +298,20 @@ const purchaseProductSelection = {
   ), '[]')`,
 };
 
-export async function getPurchaseProductRowsByIds(ids: string[]) {
+export async function getPurchaseProductRowsByIds(
+  ids: string[],
+  { includeInactive = false }: { includeInactive?: boolean } = {},
+) {
   const uniqueIds = [...new Set(ids)].filter(Boolean);
   if (uniqueIds.length === 0) return [];
   return db
     .select(purchaseProductSelection)
     .from(products)
-    .where(and(eq(products.isActive, true), inArray(products.id, uniqueIds)))
+    .where(
+      includeInactive
+        ? inArray(products.id, uniqueIds)
+        : and(eq(products.isActive, true), inArray(products.id, uniqueIds)),
+    )
     .orderBy(asc(products.name));
 }
 
