@@ -114,6 +114,8 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
         backLabel={t("common.back")}
         title={t("labelSettings.title")}
         subtitle={t("labelSettings.settingsDesc")}
+        flush
+        className="-mx-3 -mt-3 mb-5 md:-mx-6 md:-mt-6"
       />
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">

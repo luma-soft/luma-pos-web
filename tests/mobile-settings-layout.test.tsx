@@ -49,4 +49,17 @@ describe("mobile settings template editors", () => {
     expect(source).toMatch(/aria-label=\{t\("(?:print|label)Settings\.setDefault"\)\}[\s\S]*?min-h-11/);
     expect(source).toMatch(/aria-label=\{t\("(?:print|label)Settings\.deactivate"\)\}[\s\S]*?min-h-11/);
   });
+
+  test.each([
+    ["print", printSource],
+    ["label", labelSource],
+  ])("%s header flushes against the same responsive page padding", (_name, source) => {
+    expect(source).toContain(
+      'className="px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+3rem)] md:p-6"',
+    );
+    expect(source).toMatch(
+      /<MobileDetailHeader[\s\S]*?flush[\s\S]*?className="-mx-3 -mt-3 mb-5 md:-mx-6 md:-mt-6"/,
+    );
+    expect(source).not.toMatch(/<MobileDetailHeader[\s\S]*?className="-mx-4/);
+  });
 });

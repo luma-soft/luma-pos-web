@@ -123,6 +123,8 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
         backLabel={t("common.back")}
         title={t("printSettings.title")}
         subtitle={t("printSettings.settingsDesc")}
+        flush
+        className="-mx-3 -mt-3 mb-5 md:-mx-6 md:-mt-6"
       />
 
       <div className="mb-4 flex gap-1 overflow-x-auto border-b border-border">
