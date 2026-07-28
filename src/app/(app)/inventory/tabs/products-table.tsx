@@ -190,7 +190,7 @@ export function ProductsTable({
               />
             </div>
           )}
-          <button type="button" onClick={() => openProduct(product)} className="min-w-0 flex-1 p-3 text-left">
+          <button type="button" onClick={() => openProduct(product)} className="flex-1 p-3 text-left min-h-11 min-w-11">
             <div className="flex min-w-0 items-center gap-3">
               <ProductThumbnail product={product} />
               <div className="min-w-0 flex-1">
@@ -326,7 +326,7 @@ export function ProductDetailView({
             type="button"
             onClick={() => setTab(key)}
             className={cn(
-              "min-h-11 shrink-0 snap-start border-b-2 px-1 pt-2 transition-colors lg:min-h-0 lg:px-0 lg:pb-2 lg:pt-0",
+              "min-h-11 shrink-0 snap-start border-b-2 px-1 pt-2 transition-colors lg:min-h-0 lg:px-0 lg:pb-2 lg:pt-0 min-w-11 lg:min-w-0",
               tab === key
                 ? "border-primary-600 text-primary-600"
                 : "border-transparent hover:text-slate-800 dark:hover:text-slate-200",
@@ -1539,7 +1539,7 @@ function ActionButton({
 }
 
 const actionClassName =
-  "inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 lg:h-10";
+  "inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 lg:h-10 min-w-11 lg:min-w-0";
 
 function StatusBadge({ product }: { product: ProductRow }) {
   const t = useTranslations();

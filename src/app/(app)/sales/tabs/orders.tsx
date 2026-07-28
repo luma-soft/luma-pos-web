@@ -43,7 +43,7 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
               key={tab}
               href={href({ status: tab, page: undefined })}
               className={cn(
-              "inline-flex min-h-11 shrink-0 snap-start items-center justify-center border-b-2 px-4 py-2 text-sm font-medium lg:min-h-0",
+              "inline-flex min-h-11 shrink-0 snap-start items-center justify-center border-b-2 px-4 py-2 text-sm font-medium lg:min-h-0 min-w-11 lg:min-w-0",
                 status === tab ? "border-primary-600 text-primary-600" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
               )}
             >
@@ -65,7 +65,7 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
           <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("orders.searchPlaceholder")} aria-label={t("common.search")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface min-h-11 lg:min-h-0" />
         </div>
         <details className="group col-span-2 lg:contents">
-          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm font-bold text-slate-600 marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:hidden">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm font-bold text-slate-600 marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:hidden min-w-11">
             <SlidersHorizontal className="h-4 w-4" />
             {t("mobile.orders.filters")}
           </summary>
@@ -91,8 +91,8 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
               ]}
               className="w-full min-w-0 sm:w-auto sm:min-w-36"
             />
-            <input type="date" name="from" defaultValue={from} aria-label={t("orders.filter.from")} className="min-w-0 rounded-lg border border-border bg-surface px-3 py-2 text-sm min-h-11 lg:min-h-0" />
-            <input type="date" name="to" defaultValue={to} aria-label={t("orders.filter.to")} className="min-w-0 rounded-lg border border-border bg-surface px-3 py-2 text-sm min-h-11 lg:min-h-0" />
+            <input type="date" name="from" defaultValue={from} aria-label={t("orders.filter.from")} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" />
+            <input type="date" name="to" defaultValue={to} aria-label={t("orders.filter.to")} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" />
             {(params.q || payment !== "all" || source !== "all" || from || to || params.orderId) && (
               <Link href={href({ q: undefined, payment: undefined, source: undefined, from: undefined, to: undefined, orderId: undefined })} className="col-span-2 inline-flex min-h-11 min-w-11 items-center justify-center px-3 py-2 text-center text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 sm:col-span-1 lg:min-h-0 lg:min-w-0">
                 {t("orders.filter.clear")}

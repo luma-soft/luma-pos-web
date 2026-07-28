@@ -122,7 +122,7 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
         <aside className="rounded-card border border-border bg-surface">
           <div className="flex items-center justify-between border-b border-border-soft p-3">
             <div className="text-sm font-bold">{t("labelSettings.templateList")}</div>
-            <button type="button" onClick={addTemplate} aria-label={t("common.add")} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white">
+            <button type="button" onClick={addTemplate} aria-label={t("common.add")} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white min-w-11">
               <Plus className="h-3.5 w-3.5" />
               {t("common.add")}
             </button>
@@ -159,7 +159,7 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
                 <Field label={t("labelSettings.templateName")}><input value={selected.name} onChange={(event) => patch({ name: event.target.value })} className={inputCls} /></Field>
                 <Field label={t("labelSettings.sortOrder")}><NumberInput value={selected.sortOrder} min={0} max={9999} onChange={(value) => patch({ sortOrder: value ?? selected.sortOrder })} className={inputCls} /></Field>
               </div>
-              <label className="mt-3 flex min-h-11 items-center gap-2 text-sm font-semibold lg:min-h-0">
+              <label className="mt-3 flex min-h-11 items-center gap-2 text-sm font-semibold lg:min-h-0 min-w-11 lg:min-w-0">
                 <input type="checkbox" checked={selected.isDefault} onChange={(event) => patch({ isDefault: event.target.checked })} />
                 {t("labelSettings.defaultTemplate")}
               </label>
@@ -172,7 +172,7 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
                     key={preset.key}
                     type="button"
                     onClick={() => patch(preset)}
-                    className="min-h-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2"
+                    className="min-h-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2 min-w-11"
                   >
                     {preset.widthMm}x{preset.heightMm}mm
                   </button>
@@ -192,7 +192,7 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
             <Panel title={t("labelSettings.contentSection")}>
               <div className="grid gap-2 sm:grid-cols-2">
                 {TOGGLES.map((key) => (
-                  <label key={key} className="flex min-h-11 items-center gap-2 text-sm lg:min-h-0">
+                  <label key={key} className="flex min-h-11 items-center gap-2 text-sm lg:min-h-0 min-w-11 lg:min-w-0">
                     <input type="checkbox" checked={Boolean(selected[key])} onChange={(event) => patch({ [key]: event.target.checked })} />
                     {t(`labelSettings.toggles.${key}`)}
                   </label>
@@ -201,19 +201,19 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
             </Panel>
 
             <div className="sticky bottom-0 z-10 -mx-3 flex flex-wrap items-center gap-2 border-t border-border bg-surface/95 px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
-              <button type="button" onClick={save} disabled={pending} aria-label={t("common.save")} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50">
+              <button type="button" onClick={save} disabled={pending} aria-label={t("common.save")} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50 min-w-11">
                 {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 {t("common.save")}
               </button>
-              <button type="button" onClick={() => persisted && runAction(() => duplicateLabelTemplate(selected.id), "labelSettings.duplicated")} disabled={!persisted || pending} aria-label={t("labelSettings.duplicate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50">
+              <button type="button" onClick={() => persisted && runAction(() => duplicateLabelTemplate(selected.id), "labelSettings.duplicated")} disabled={!persisted || pending} aria-label={t("labelSettings.duplicate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50 min-w-11">
                 <Copy className="h-4 w-4" />
                 {t("labelSettings.duplicate")}
               </button>
-              <button type="button" onClick={() => persisted && runAction(() => setDefaultLabelTemplate(selected.id), "labelSettings.defaultSaved")} disabled={!persisted || selected.isDefault || pending} aria-label={t("labelSettings.setDefault")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50">
+              <button type="button" onClick={() => persisted && runAction(() => setDefaultLabelTemplate(selected.id), "labelSettings.defaultSaved")} disabled={!persisted || selected.isDefault || pending} aria-label={t("labelSettings.setDefault")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50 min-w-11">
                 <Star className="h-4 w-4" />
                 {t("labelSettings.setDefault")}
               </button>
-              <button type="button" onClick={() => persisted && runAction(() => deactivateLabelTemplate(selected.id), "labelSettings.deactivated")} disabled={!persisted || selected.isDefault || pending} aria-label={t("labelSettings.deactivate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-er/40 px-4 text-sm font-semibold text-er disabled:opacity-50">
+              <button type="button" onClick={() => persisted && runAction(() => deactivateLabelTemplate(selected.id), "labelSettings.deactivated")} disabled={!persisted || selected.isDefault || pending} aria-label={t("labelSettings.deactivate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-er/40 px-4 text-sm font-semibold text-er disabled:opacity-50 min-w-11">
                 <EyeOff className="h-4 w-4" />
                 {t("labelSettings.deactivate")}
               </button>

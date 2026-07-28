@@ -30,14 +30,14 @@ export function TripCreate({ orders }: { orders: { id: string; label: string }[]
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="inline-flex min-h-11 items-center gap-2 px-4 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium">
+      <button onClick={() => setOpen(true)} className="inline-flex min-h-11 items-center gap-2 px-4 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium min-w-11">
         <Plus className="w-4 h-4" />
         {t("delivery.createTrip")}
       </button>
     );
   }
 
-  const cls = "min-h-11 px-3 py-2 text-sm rounded-lg border border-border bg-surface lg:min-h-0";
+  const cls = "min-h-11 px-3 py-2 text-sm rounded-lg border border-border bg-surface lg:min-h-0 min-w-11 lg:min-w-0";
   return (
     <div className="bg-surface border border-border rounded-card p-4 w-full max-w-xl space-y-3">
       <div className="flex justify-between items-center">
@@ -79,7 +79,7 @@ export function TripStart({ tripId }: { tripId: string }) {
     <button
       onClick={async () => { setBusy(true); const r = await startTrip(tripId); setBusy(false); if (r.ok) router.refresh(); }}
       disabled={busy}
-      className="min-h-11 rounded-lg bg-primary-600 px-3 text-xs font-medium text-white disabled:opacity-50"
+      className="min-h-11 rounded-lg bg-primary-600 px-3 text-xs font-medium text-white disabled:opacity-50 min-w-11"
     >
       {t("delivery.start")}
     </button>
@@ -94,7 +94,7 @@ export function StopActions({ stopId }: { stopId: string }) {
     <button
       onClick={async () => { setBusy(true); const r = await markStopDelivered(stopId); setBusy(false); if (r.ok) router.refresh(); }}
       disabled={busy}
-      className="min-h-11 whitespace-nowrap rounded-lg border border-emerald-300 px-3 text-xs font-medium text-ok disabled:opacity-50 hover:bg-emerald-50 dark:border-emerald-800 dark:hover:bg-emerald-950/40"
+      className="min-h-11 whitespace-nowrap rounded-lg border border-emerald-300 px-3 text-xs font-medium text-ok disabled:opacity-50 hover:bg-emerald-50 dark:border-emerald-800 dark:hover:bg-emerald-950/40 min-w-11"
     >
       ✓ {t("delivery.markDelivered")}
     </button>

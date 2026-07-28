@@ -202,7 +202,7 @@ export function SuppliersTable({ rows }: { rows: SupplierRow[] }) {
         renderMobileRow={({ row }) => {
           const debt = Number(row.currentDebt);
           return (
-            <button type="button" onClick={() => openSupplier(row)} className="w-full p-3 text-left">
+            <button type="button" onClick={() => openSupplier(row)} className="w-full p-3 text-left min-h-11">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="truncate font-semibold">{row.name}</div>

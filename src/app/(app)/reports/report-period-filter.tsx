@@ -183,7 +183,7 @@ export function ReportPeriodDisclosure({
                 aria-pressed={active}
                 onClick={() => onSelect(value)}
                 className={cn(
-                  "min-h-11 rounded-lg px-2 py-2 text-left text-sm font-semibold leading-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+                  "min-h-11 rounded-lg px-2 py-2 text-left text-sm font-semibold leading-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-11",
                   active
                     ? "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-200"
                     : "text-slate-600 hover:bg-surface-2 dark:text-slate-300",

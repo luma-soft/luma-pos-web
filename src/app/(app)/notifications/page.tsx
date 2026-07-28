@@ -65,9 +65,9 @@ export default async function NotificationsPage({
           {SOURCES.map((item) => (
             <Link key={item} className={cn("inline-flex min-h-11 min-w-11 shrink-0 snap-start items-center justify-center rounded-full border px-2.5 py-1 text-xs font-medium", source === item ? "bg-primary-50 border-primary-100 text-primary-700" : "border-border text-slate-500")} href={paramsWith(params, { source: item })}>{t(`notifications.sources.${item}`)}</Link>
           ))}
-          <Link className={cn("inline-flex min-h-11 shrink-0 snap-start items-center rounded-full border px-2.5 py-1 text-xs font-medium", !status ? "bg-surface-2 border-border text-slate-700" : "border-border text-slate-500")} href={paramsWith(params, { status: undefined })}>{t("notifications.allStatuses")}</Link>
+          <Link className={cn("inline-flex min-h-11 shrink-0 snap-start items-center rounded-full border px-2.5 py-1 text-xs font-medium min-w-11", !status ? "bg-surface-2 border-border text-slate-700" : "border-border text-slate-500")} href={paramsWith(params, { status: undefined })}>{t("notifications.allStatuses")}</Link>
           {STATUSES.map((item) => (
-            <Link key={item} className={cn("inline-flex min-h-11 shrink-0 snap-start items-center rounded-full border px-2.5 py-1 text-xs font-medium", status === item ? "bg-surface-2 border-border text-slate-700" : "border-border text-slate-500")} href={paramsWith(params, { status: item })}>{t(`notifications.statuses.${item}`)}</Link>
+            <Link key={item} className={cn("inline-flex min-h-11 shrink-0 snap-start items-center rounded-full border px-2.5 py-1 text-xs font-medium min-w-11", status === item ? "bg-surface-2 border-border text-slate-700" : "border-border text-slate-500")} href={paramsWith(params, { status: item })}>{t(`notifications.statuses.${item}`)}</Link>
           ))}
         </div>
       </div>

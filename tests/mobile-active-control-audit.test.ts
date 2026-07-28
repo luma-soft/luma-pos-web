@@ -9,6 +9,7 @@ const GUARANTEED_SHARED_CONTROLS = new Set([
   "Button",
   "Combobox",
   "Input",
+  "MoneyInput",
   "NumberInput",
   "QuantityInput",
   "SearchableSelect",
@@ -29,7 +30,6 @@ const NATIVE_PRIMITIVE_IMPLEMENTATIONS = new Set([
   "src/components/order-detail-link.tsx",
   "src/components/ui/button.tsx",
   "src/components/ui/input.tsx",
-  "src/components/ui/money-input.tsx",
   "src/components/ui/quantity-input.tsx",
 ]);
 const PRE_LG_BREAKPOINTS = new Set(["sm", "md"]);
@@ -45,7 +45,6 @@ type Candidate = {
 type LengthState = {
   fixed: boolean;
   min: boolean;
-  padding: boolean;
 };
 
 function tsxFiles(dir: string): string[] {
@@ -308,14 +307,11 @@ function applyLengthUtility(
   utility: string,
   axis: "vertical" | "horizontal",
   state: LengthState,
-  allowContextualPadding: boolean,
 ) {
   const fixedPrefix = axis === "vertical" ? /^(?:h|size)-(.+)$/ : /^(?:w|size)-(.+)$/;
   const minPrefix = axis === "vertical" ? /^min-h-(.+)$/ : /^min-w-(.+)$/;
-  const paddingPrefix = axis === "vertical" ? /^(?:p|py)-(.+)$/ : /^(?:p|px)-(.+)$/;
   const fixed = utility.match(fixedPrefix);
   const min = utility.match(minPrefix);
-  const padding = utility.match(paddingPrefix);
 
   if (fixed) state.fixed = axis === "vertical"
     ? numericScaleIsSafe(fixed[1])
@@ -323,31 +319,21 @@ function applyLengthUtility(
   if (min) state.min = axis === "vertical"
     ? numericScaleIsSafe(min[1])
     : widthValueIsSafe(min[1]);
-  if (allowContextualPadding && padding) {
-    const parsed = Number(padding[1]);
-    state.padding = Number.isFinite(parsed) && parsed >= 3;
-  }
 }
 
 function safeAtBaseAndTablet(
   classes: string[],
   axis: "vertical" | "horizontal",
-  allowContextualPadding = false,
 ) {
-  const state: LengthState = { fixed: false, min: false, padding: false };
+  const state: LengthState = { fixed: false, min: false };
   for (const breakpoint of ["base", "sm", "md"]) {
     for (const token of classes) {
       const parsed = responsiveParts(token);
       if (parsed?.breakpoint === breakpoint) {
-        applyLengthUtility(
-          parsed.utility,
-          axis,
-          state,
-          allowContextualPadding,
-        );
+        applyLengthUtility(parsed.utility, axis, state);
       }
     }
-    if (!(state.fixed || state.min || state.padding)) return false;
+    if (!(state.fixed || state.min)) return false;
   }
   return true;
 }
@@ -356,18 +342,6 @@ function hasDisplayBox(classes: string[]) {
   return classes.some((token) =>
     /^(?:block|flex|grid|inline-block|inline-flex)$/.test(token),
   );
-}
-
-function hasVisibleText(node: ts.JsxOpeningLikeElement) {
-  const fullNode = node.parent;
-  if (!ts.isJsxElement(fullNode)) return false;
-  const childHasText = (child: ts.JsxChild): boolean => {
-    if (ts.isJsxText(child)) return child.text.trim().length > 0;
-    if (ts.isJsxExpression(child)) return Boolean(child.expression);
-    if (ts.isJsxElement(child)) return child.children.some(childHasText);
-    return false;
-  };
-  return fullNode.children.some(childHasText);
 }
 
 function sharedControlHasUnsafeOverride(
@@ -409,7 +383,6 @@ function sharedControlHasUnsafeOverride(
 function ownHitArea(
   node: ts.JsxOpeningLikeElement,
   classes: string[],
-  allowContextualTextWidth: boolean,
 ) {
   const tag = jsxTagName(node);
   if (
@@ -422,28 +395,11 @@ function ownHitArea(
     return !sharedControlHasUnsafeOverride(classes);
   }
   if (GUARANTEED_SHARED_CONTROLS.has(tag)) {
-    return (
-      !sharedControlHasUnsafeOverride(classes) ||
-      safeAtBaseAndTablet(
-        classes,
-        "vertical",
-        allowContextualTextWidth,
-      )
-    );
+    return !sharedControlHasUnsafeOverride(classes);
   }
 
-  const vertical = safeAtBaseAndTablet(
-    classes,
-    "vertical",
-    allowContextualTextWidth,
-  );
-  const horizontal =
-    safeAtBaseAndTablet(
-      classes,
-      "horizontal",
-      allowContextualTextWidth,
-    ) ||
-    (allowContextualTextWidth && hasVisibleText(node));
+  const vertical = safeAtBaseAndTablet(classes, "vertical");
+  const horizontal = safeAtBaseAndTablet(classes, "horizontal");
   if (!vertical || !horizontal) return false;
 
   if (tag === "a" || tag === "Link" || PASSTHROUGH_CONTROL_LINKS.has(tag)) {
@@ -455,7 +411,6 @@ function ownHitArea(
 function outerHitArea(
   node: ts.JsxOpeningLikeElement,
   constants: Map<string, string>,
-  allowContextualTextWidth: boolean,
 ) {
   let current = node.parent.parent;
   while (current) {
@@ -466,11 +421,7 @@ function outerHitArea(
         tag === "label" ||
         (tag === "Button" && attribute(opening, "asChild"))
       ) {
-        return ownHitArea(
-          opening,
-          classTokens(opening, constants),
-          allowContextualTextWidth,
-        );
+        return ownHitArea(opening, classTokens(opening, constants));
       }
       if (isInteractive(opening)) return false;
     }
@@ -483,7 +434,6 @@ function auditSource(
   file: string,
   sourceText: string,
   onlySharedControlUsage = false,
-  allowContextualTextWidth = false,
 ): Candidate[] {
   const source = ts.createSourceFile(
     file,
@@ -517,8 +467,8 @@ function auditSource(
       const classes = classTokens(node, constants);
       if (
         !isNestedChoice &&
-        !ownHitArea(node, classes, allowContextualTextWidth) &&
-        !outerHitArea(node, constants, allowContextualTextWidth)
+        !ownHitArea(node, classes) &&
+        !outerHitArea(node, constants)
       ) {
         const { line } = source.getLineAndCharacterOfPosition(node.getStart());
         candidates.push({
@@ -541,7 +491,7 @@ function auditSource(
 function activeControlCandidates() {
   return [
     ...tsxFiles(APP_ROOT).flatMap((file) =>
-      auditSource(relative(".", file), readFileSync(file, "utf8"), false, true),
+      auditSource(relative(".", file), readFileSync(file, "utf8")),
     ),
     ...tsxFiles(COMPONENT_ROOT).flatMap((file) =>
       auditSource(relative(".", file), readFileSync(file, "utf8")),

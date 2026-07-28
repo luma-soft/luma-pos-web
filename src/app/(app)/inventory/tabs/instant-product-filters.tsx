@@ -31,7 +31,7 @@ export function InstantProductFilters({
 
   return (
     <details className="group w-full sm:contents">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center gap-2 rounded-xl border border-border bg-surface text-sm font-bold text-slate-600 marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:hidden">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center gap-2 rounded-xl border border-border bg-surface text-sm font-bold text-slate-600 marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:hidden min-w-11">
         <SlidersHorizontal className="h-4 w-4" />
         {labels.filters}
       </summary>

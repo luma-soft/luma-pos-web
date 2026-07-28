@@ -552,7 +552,7 @@ function RelatedOrders({ orders, t }: Pick<ProjectOverviewDetailsProps, "orders"
             <MobileRecordCard
               key={order.id}
               title={(
-                <OrderDetailLink orderId={order.id} className="inline-flex min-h-11 items-center text-primary-600 hover:underline">
+                <OrderDetailLink orderId={order.id} className="inline-flex min-h-11 items-center text-primary-600 hover:underline min-w-11">
                   {order.code}
                 </OrderDetailLink>
               )}
@@ -631,7 +631,7 @@ function CostMetric({ label, value, tone = "" }: { label: string; value: number;
 
 function WorkflowStep({ href, number, title, hint, count }: { href: string; number: string; title: string; hint: string; count: number }) {
   return (
-    <a href={href} className="group block rounded-xl border border-primary-100 bg-surface px-3 py-3 transition-colors hover:border-primary-300 hover:bg-white dark:border-primary-900/70 dark:hover:bg-slate-900">
+    <a href={href} className="group block rounded-xl border border-primary-100 bg-surface px-3 py-3 transition-colors hover:border-primary-300 hover:bg-white dark:border-primary-900/70 dark:hover:bg-slate-900 min-h-11 min-w-11">
       <div className="flex items-start gap-3">
         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary-600 text-xs font-bold text-white">{number}</span>
         <span className="min-w-0">

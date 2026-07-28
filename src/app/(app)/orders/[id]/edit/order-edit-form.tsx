@@ -10,6 +10,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 import { MoneyInput } from "@/components/ui/money-input";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { Select } from "@/components/ui/select";
+import { OrderEditMobileLine } from "@/components/order-edit-mobile-line";
 import { updateOrder } from "@/lib/actions/order-edit";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 
@@ -98,18 +99,41 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
       </div>
 
       <div className="bg-surface border border-border rounded-card overflow-hidden mb-4">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
-              <th className="px-4 py-3 font-semibold">{t("orders.cols.product")}</th>
-              <th className="px-4 py-3 font-semibold">{t("orders.cols.unit")}</th>
-              <th className="px-4 py-3 font-semibold text-right w-28">{t("orders.cols.qty")}</th>
-              <th className="px-4 py-3 font-semibold text-right w-36">{t("orders.cols.unitPrice")}</th>
-              <th className="px-4 py-3 font-semibold text-right">{t("orders.cols.lineTotal")}</th>
-              <th className="w-10"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border-soft">
+        <div
+          data-testid="order-edit-mobile-lines"
+          className="space-y-3 p-3 lg:hidden"
+        >
+          {items.map((l, idx) => (
+            <OrderEditMobileLine
+              key={`${l.productId}-${idx}`}
+              line={l}
+              labels={{
+                unit: t("orders.cols.unit"),
+                quantity: t("orders.cols.qty"),
+                unitPrice: t("orders.cols.unitPrice"),
+                lineTotal: t("orders.cols.lineTotal"),
+                delete: t("common.delete"),
+              }}
+              inputClassName={inputCls}
+              onQuantityChange={(quantity) => patch(idx, { quantity })}
+              onUnitPriceChange={(unitPrice) => patch(idx, { unitPrice })}
+              onDelete={() => setItems((ls) => ls.filter((_, i) => i !== idx))}
+            />
+          ))}
+        </div>
+        <div className="hidden overflow-x-auto lg:block">
+          <table data-testid="order-edit-desktop-table" className="w-full min-w-[760px] text-sm">
+            <thead>
+              <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
+                <th className="px-4 py-3 font-semibold">{t("orders.cols.product")}</th>
+                <th className="px-4 py-3 font-semibold">{t("orders.cols.unit")}</th>
+                <th className="px-4 py-3 font-semibold text-right w-28">{t("orders.cols.qty")}</th>
+                <th className="px-4 py-3 font-semibold text-right w-36">{t("orders.cols.unitPrice")}</th>
+                <th className="px-4 py-3 font-semibold text-right">{t("orders.cols.lineTotal")}</th>
+                <th className="w-10"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border-soft">
             {items.map((l, idx) => (
               <tr key={`${l.productId}-${idx}`}>
                 <td className="px-4 py-2.5 font-medium">{l.productName}</td>
@@ -136,8 +160,9 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
                 </td>
               </tr>
             ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
         <div className="px-4 py-3 border-t border-border">
           <Select
             value=""

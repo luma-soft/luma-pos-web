@@ -58,7 +58,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                   href={`${Routes.Dashboard}?range=${r}`}
                   aria-current={range === r ? "page" : undefined}
                   className={cn(
-                    "inline-flex min-h-11 shrink-0 snap-start items-center justify-center rounded-full border px-4 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+                    "inline-flex min-h-11 shrink-0 snap-start items-center justify-center rounded-full border px-4 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-11",
                     range === r
                       ? "border-primary-600 bg-primary-600 text-white shadow-sm"
                       : "border-border bg-surface text-slate-600 hover:bg-surface-2 dark:text-slate-300",

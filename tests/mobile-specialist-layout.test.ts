@@ -85,6 +85,26 @@ describe("mobile specialist layouts", () => {
     expect(orderEditor).toContain('className="ml-auto w-[132px] lg:w-28"');
   });
 
+  test("product-create menu keeps its absolute panel anchored at tablet widths", () => {
+    const productCreate = read("src/app/(app)/inventory/tabs/product-create-menu.tsx");
+
+    expect(productCreate).toContain("sm:relative");
+    expect(productCreate).not.toContain("sm:static");
+    expect(productCreate).toContain("absolute bottom-full right-0");
+    expect(productCreate).toContain("sm:top-full");
+  });
+
+  test("print toolbar reflows every action inside a narrow viewport", () => {
+    const toolbar = read("src/components/print/print-toolbar.tsx");
+
+    expect(toolbar).toContain("flex-wrap");
+    expect(toolbar).toContain("lg:flex-nowrap");
+    expect(toolbar).toContain("order-3 w-full");
+    expect(toolbar).toContain("overflow-x-auto");
+    expect(toolbar).toContain("w-full min-w-0");
+    expect(toolbar).toContain("print:hidden");
+  });
+
   test("electrical preview fits mobile while the print portal retains A4 output", () => {
     const electrical = read("src/app/(app)/tools/electrical-labels/electrical-labels-client.tsx");
 

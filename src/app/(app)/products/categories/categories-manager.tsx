@@ -117,7 +117,7 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
     <div className="w-full min-w-0">
       <div className="flex items-center justify-between mb-3">
         <span className="text-sm text-slate-500">{t("categories.count", { n: total })}</span>
-        <button onClick={() => setOpen(true)} className="inline-flex min-h-11 items-center gap-1.5 px-3 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700">
+        <button onClick={() => setOpen(true)} className="inline-flex min-h-11 items-center gap-1.5 px-3 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 min-w-11">
           <Plus className="w-4 h-4" /> {t("categories.create")}
         </button>
       </div>
@@ -191,8 +191,8 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
               </div>
             </div>
             <div className="flex justify-end gap-2 px-4 py-3 border-t border-slate-200 dark:border-slate-800">
-              <button onClick={() => setOpen(false)} className="min-h-11 px-4 text-sm rounded-lg border border-slate-300 dark:border-slate-700">{t("common.cancel")}</button>
-              <button onClick={create} disabled={creating || !newName.trim()} className="inline-flex min-h-11 items-center gap-1.5 px-4 text-sm rounded-lg bg-primary-600 text-white font-medium disabled:opacity-50">
+              <button onClick={() => setOpen(false)} className="min-h-11 px-4 text-sm rounded-lg border border-slate-300 dark:border-slate-700 min-w-11">{t("common.cancel")}</button>
+              <button onClick={create} disabled={creating || !newName.trim()} className="inline-flex min-h-11 items-center gap-1.5 px-4 text-sm rounded-lg bg-primary-600 text-white font-medium disabled:opacity-50 min-w-11">
                 {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />} {t("common.save")}
               </button>
             </div>
@@ -210,8 +210,8 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
               {t("categories.deleteWarning", { name: pendingDelete.name, count: pendingDelete.productCount })}
             </div>
             <div className="flex justify-end gap-2 border-t border-border-soft px-5 py-3">
-              <button type="button" onClick={() => setPendingDelete(null)} className="min-h-11 rounded-lg border border-border px-4 text-sm font-medium hover:bg-surface-2">{t("common.cancel")}</button>
-              <button type="button" onClick={() => { const id = pendingDelete.id; setPendingDelete(null); void remove(id); }} className="min-h-11 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700">{t("categories.deleteAnyway")}</button>
+              <button type="button" onClick={() => setPendingDelete(null)} className="min-h-11 rounded-lg border border-border px-4 text-sm font-medium hover:bg-surface-2 min-w-11">{t("common.cancel")}</button>
+              <button type="button" onClick={() => { const id = pendingDelete.id; setPendingDelete(null); void remove(id); }} className="min-h-11 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 min-w-11">{t("categories.deleteAnyway")}</button>
             </div>
           </div>
         </div>

@@ -249,7 +249,7 @@ function CustomerRows({
           <button type="button" onClick={() => {
             setSelectedCustomerId(customer.id);
             setDetailTab("info");
-          }} className="w-full p-3 text-left">
+          }} className="w-full p-3 text-left min-h-11">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="truncate font-semibold">{customer.name}</div>
@@ -582,7 +582,7 @@ function OrderPreviewDialog({
       subtitle={order ? `${order.customerName ?? t("orders.walkIn")} · ${formatDate(order.createdAt)}` : undefined}
       footer={order && (
         <div className="flex justify-end">
-          <OrderDetailLink orderId={order.id} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110 lg:min-h-10">
+          <OrderDetailLink orderId={order.id} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110 lg:min-h-10 min-w-11 lg:min-w-0">
             <ExternalLink className="h-4 w-4" />
             Mở phiếu
           </OrderDetailLink>
@@ -820,8 +820,8 @@ function DateRangeFilter({
       <div className="grid grid-cols-[auto_1fr] gap-2">
         <CalendarDays className="mt-2.5 h-4 w-4 text-primary-600" />
         <div className="grid gap-2">
-          <input type="date" name={fromName} defaultValue={fromValue ?? ""} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0" aria-label={t("customers.filters.from")} />
-          <input type="date" name={toName} defaultValue={toValue ?? ""} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0" aria-label={t("customers.filters.to")} />
+          <input type="date" name={fromName} defaultValue={fromValue ?? ""} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" aria-label={t("customers.filters.from")} />
+          <input type="date" name={toName} defaultValue={toValue ?? ""} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" aria-label={t("customers.filters.to")} />
         </div>
       </div>
     </div>
@@ -846,8 +846,8 @@ function MoneyRangeFilter({
     <div>
       <h3 className="mb-3 text-sm font-bold">{title}</h3>
       <div className="grid grid-cols-2 gap-2">
-        <input name={fromName} inputMode="numeric" defaultValue={fromValue ?? ""} placeholder={t("customers.filters.fromValue")} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0" />
-        <input name={toName} inputMode="numeric" defaultValue={toValue ?? ""} placeholder={t("customers.filters.toValue")} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0" />
+        <input name={fromName} inputMode="numeric" defaultValue={fromValue ?? ""} placeholder={t("customers.filters.fromValue")} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" />
+        <input name={toName} inputMode="numeric" defaultValue={toValue ?? ""} placeholder={t("customers.filters.toValue")} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" />
       </div>
     </div>
   );

@@ -135,7 +135,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
             onClick={() => selectDocType(item)}
             aria-pressed={docType === item}
             className={cn(
-              "min-h-11 shrink-0 border-b-2 px-4 py-2 text-sm font-semibold",
+              "min-h-11 shrink-0 border-b-2 px-4 py-2 text-sm font-semibold min-w-11",
               docType === item ? "border-primary-600 text-primary-600" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200",
             )}
           >
@@ -148,7 +148,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
         <aside className="rounded-card border border-border bg-surface">
           <div className="flex items-center justify-between border-b border-border-soft p-3">
             <div className="text-sm font-bold">{t("printSettings.templateList")}</div>
-            <button type="button" onClick={addTemplate} aria-label={t("common.add")} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white">
+            <button type="button" onClick={addTemplate} aria-label={t("common.add")} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white min-w-11">
               <Plus className="h-3.5 w-3.5" />
               {t("common.add")}
             </button>
@@ -188,7 +188,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                         type="button"
                         onClick={() => patch({ paperDefault: size })}
                         className={cn(
-                          "min-h-11 rounded-lg border px-3 text-xs font-bold uppercase lg:min-h-10",
+                          "min-h-11 rounded-lg border px-3 text-xs font-bold uppercase lg:min-h-10 min-w-11 lg:min-w-0",
                           selected.paperDefault === size ? "border-primary-600 bg-primary-600 text-white" : "border-border text-slate-600 dark:text-slate-300",
                         )}
                       >
@@ -198,7 +198,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                   </div>
                 </Field>
               </div>
-              <label className="mt-3 flex min-h-11 items-center gap-2 text-sm font-semibold lg:min-h-0">
+              <label className="mt-3 flex min-h-11 items-center gap-2 text-sm font-semibold lg:min-h-0 min-w-11 lg:min-w-0">
                 <input type="checkbox" checked={selected.isDefault} onChange={(event) => patch({ isDefault: event.target.checked })} />
                 {t("printSettings.defaultTemplate")}
               </label>
@@ -216,7 +216,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
             <Panel title={t("printSettings.optionsSection")}>
               <div className="grid gap-2 sm:grid-cols-2">
                 {TOGGLES.map((key) => (
-                  <label key={key} className="flex min-h-11 items-center gap-2 text-sm lg:min-h-0">
+                  <label key={key} className="flex min-h-11 items-center gap-2 text-sm lg:min-h-0 min-w-11 lg:min-w-0">
                     <input type="checkbox" checked={Boolean(selected.options[key])} onChange={(event) => patchOption(key, event.target.checked)} />
                     {t(`printSettings.toggles.${key}`)}
                   </label>
@@ -229,19 +229,19 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
             </Panel>
 
             <div className="sticky bottom-0 z-10 -mx-3 flex flex-wrap items-center gap-2 border-t border-border bg-surface/95 px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
-              <button type="button" onClick={save} disabled={isPending} aria-label={t("common.save")} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50">
+              <button type="button" onClick={save} disabled={isPending} aria-label={t("common.save")} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50 min-w-11">
                 {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 {t("common.save")}
               </button>
-              <button type="button" onClick={() => persisted && runAction(() => duplicatePrintTemplate(selected.id), "printSettings.duplicated")} disabled={!persisted || isPending} aria-label={t("printSettings.duplicate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50">
+              <button type="button" onClick={() => persisted && runAction(() => duplicatePrintTemplate(selected.id), "printSettings.duplicated")} disabled={!persisted || isPending} aria-label={t("printSettings.duplicate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50 min-w-11">
                 <Copy className="h-4 w-4" />
                 {t("printSettings.duplicate")}
               </button>
-              <button type="button" onClick={() => persisted && runAction(() => setDefaultPrintTemplate(selected.id), "printSettings.defaultSaved")} disabled={!persisted || selected.isDefault || isPending} aria-label={t("printSettings.setDefault")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50">
+              <button type="button" onClick={() => persisted && runAction(() => setDefaultPrintTemplate(selected.id), "printSettings.defaultSaved")} disabled={!persisted || selected.isDefault || isPending} aria-label={t("printSettings.setDefault")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50 min-w-11">
                 <Star className="h-4 w-4" />
                 {t("printSettings.setDefault")}
               </button>
-              <button type="button" onClick={() => persisted && runAction(() => deactivatePrintTemplate(selected.id), "printSettings.deactivated")} disabled={!persisted || isPending} aria-label={t("printSettings.deactivate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-er/40 px-4 text-sm font-semibold text-er disabled:opacity-50">
+              <button type="button" onClick={() => persisted && runAction(() => deactivatePrintTemplate(selected.id), "printSettings.deactivated")} disabled={!persisted || isPending} aria-label={t("printSettings.deactivate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-er/40 px-4 text-sm font-semibold text-er disabled:opacity-50 min-w-11">
                 <EyeOff className="h-4 w-4" />
                 {t("printSettings.deactivate")}
               </button>

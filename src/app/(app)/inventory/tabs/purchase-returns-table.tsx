@@ -43,7 +43,7 @@ export function PurchaseReturnsTable({ rows }: { rows: PurchaseReturnRow[] }) {
       renderDetail={(row) => <ExpandedPurchaseReturn row={row} />}
       detailSize="full"
       renderMobileRow={({ row, toggle }) => (
-        <button type="button" onClick={toggle} className="w-full p-3 text-left">
+        <button type="button" onClick={toggle} className="w-full p-3 text-left min-h-11">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <div className="font-semibold text-primary-600">{row.code}</div>
@@ -81,7 +81,7 @@ function ExpandedPurchaseReturn({ row }: { row: PurchaseReturnRow }) {
               <div className="flex items-start justify-between gap-3">
                 <Link
                   href={Routes.product(item.productId)}
-                  className="inline-flex min-h-11 min-w-0 flex-1 items-center break-words font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  className="inline-flex min-h-11 flex-1 items-center break-words font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-11"
                 >
                   {item.productName}
                 </Link>

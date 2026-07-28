@@ -216,7 +216,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                   {suggestions.map((p) => (
                     <button
                       key={p.id} onClick={() => addLine(p)}
-                      className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left text-sm transition hover:bg-surface-2"
+                      className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left text-sm transition hover:bg-surface-2 min-h-11"
                     >
                       <span className="min-w-0"><b className="block truncate">{p.name}</b><span className="font-mono text-xs text-slate-400">{p.sku}</span></span>
                       <span className="shrink-0 text-slate-500 tabular-nums">{t("pos.stockLabel")}: {formatNumber(p.stock)} {p.baseUnit}</span>

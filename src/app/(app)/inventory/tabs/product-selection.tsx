@@ -200,7 +200,7 @@ export function ProductBulkActions() {
           count: ids.length,
         })}
         className={cn(
-          "inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-border bg-surface px-3.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-surface-2 disabled:opacity-60 lg:min-h-0 lg:h-10",
+          "inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-border bg-surface px-3.5 text-sm font-bold text-slate-700 shadow-sm transition hover:bg-surface-2 disabled:opacity-60 lg:min-h-0 lg:h-10 min-w-11 lg:min-w-0",
           open && "border-primary-300 bg-primary-50 text-primary-700",
         )}
       >

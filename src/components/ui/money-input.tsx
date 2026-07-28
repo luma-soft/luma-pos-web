@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { cn } from "@/lib/utils";
 
 const nf = new Intl.NumberFormat("vi-VN");
 
@@ -38,7 +39,7 @@ export interface MoneyInputProps
  * an toàn trong ô bảng và layout inline.
  */
 export const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
-  ({ value, onChange, min = 0, max, onFocus, onBlur, ...props }, ref) => {
+  ({ value, onChange, min = 0, max, onFocus, onBlur, className, ...props }, ref) => {
     const [text, setText] = React.useState<string>(() => format(toNum(value)));
     const editing = React.useRef(false);
 
@@ -52,6 +53,7 @@ export const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
         ref={ref}
         type="text"
         inputMode="numeric"
+        className={cn("min-h-11 min-w-11 lg:min-h-0 lg:min-w-0", className)}
         value={text}
         onFocus={(e) => {
           editing.current = true;

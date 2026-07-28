@@ -47,14 +47,14 @@ export function PortalLink({ customerId, token, zaloConfigured }: { customerId: 
         <>
           <p className="text-xs text-slate-500 break-all bg-slate-50 dark:bg-slate-800 rounded-lg p-2">{url ?? `/portal/${token}`}</p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <button onClick={copy} className="min-h-11 px-3 rounded-lg bg-primary-600 text-white text-xs font-medium">
+            <button onClick={copy} className="min-h-11 px-3 rounded-lg bg-primary-600 text-white text-xs font-medium min-w-11">
               {copied ? t("portal.copied") : t("portal.copy")}
             </button>
-            <button onClick={generate} disabled={busy} className="min-h-11 px-3 rounded-lg border border-border text-xs font-medium disabled:opacity-50">
+            <button onClick={generate} disabled={busy} className="min-h-11 px-3 rounded-lg border border-border text-xs font-medium disabled:opacity-50 min-w-11">
               {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : t("portal.regenerate")}
             </button>
             {zaloConfigured && (
-              <button onClick={sendZalo} disabled={sendingZalo} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-medium disabled:opacity-50">
+              <button onClick={sendZalo} disabled={sendingZalo} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-medium disabled:opacity-50 min-w-11">
                 {sendingZalo ? <Loader2 className="w-3 h-3 animate-spin" /> : <MessageCircle className="w-3 h-3" />}
                 {t("zalo.send")}
               </button>
@@ -66,7 +66,7 @@ export function PortalLink({ customerId, token, zaloConfigured }: { customerId: 
       ) : (
         <>
           <p className="text-xs text-slate-500 mb-2">{t("portal.desc")}</p>
-          <button onClick={generate} disabled={busy} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-3 text-xs font-medium text-white disabled:opacity-50">
+          <button onClick={generate} disabled={busy} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-3 text-xs font-medium text-white disabled:opacity-50 min-w-11">
             {busy && <Loader2 className="w-3 h-3 animate-spin" />}
             {t("portal.generate")}
           </button>

@@ -336,7 +336,7 @@ export function NewProductForm({
               type="button"
               onClick={() => setTab(tk)}
               className={cn(
-                "py-3 text-sm font-medium border-b-2 transition-colors",
+                "py-3 text-sm font-medium border-b-2 transition-colors min-h-11 min-w-11",
                 tab === tk
                   ? "border-primary-600 text-primary-600"
                   : "border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400",
@@ -738,7 +738,7 @@ function SiblingApplySection({ siblingCount }: { siblingCount: number }) {
   return (
     <Section title={t("products.variants.applyTitle")} collapsible={false}>
       <div className="space-y-3">
-        <label className="flex items-start gap-3 rounded-xl border border-border bg-surface px-4 py-3">
+        <label className="flex items-start gap-3 rounded-xl border border-border bg-surface px-4 py-3 min-h-11 min-w-11">
           <input
             type="checkbox"
             {...register("applyToSiblings.enabled")}

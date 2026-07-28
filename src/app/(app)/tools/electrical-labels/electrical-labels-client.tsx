@@ -445,7 +445,7 @@ export function ElectricalLabelsClient() {
                   ))}
                 </div>
               </Field>
-              <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-border bg-surface-2 p-3">
+              <label className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-border bg-surface-2 p-3 min-h-11 min-w-11">
                 <span>
                   <Text as="span" weight="medium">{t("uppercase")}</Text>
                   <Text as="span" variant="muted" size="xs" className="mt-0.5 block">{t("uppercaseHint")}</Text>

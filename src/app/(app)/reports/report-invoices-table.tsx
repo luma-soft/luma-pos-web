@@ -84,7 +84,7 @@ export function ReportInvoiceMobileRow({ row }: { row: ReportInvoiceRow }) {
     <div className="p-3">
       <OrderDetailLink
         orderId={row.id}
-        className="inline-flex min-h-11 max-w-full items-center font-black text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+        className="inline-flex min-h-11 max-w-full items-center font-black text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-11"
       >
         <span className="truncate">{row.code}</span>
       </OrderDetailLink>

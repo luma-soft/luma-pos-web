@@ -44,11 +44,11 @@ export function TablesFloor({ tables, canManage }: { tables: TableRow[]; canMana
   return (
     <>
       <div className="flex items-center justify-end gap-2 mb-4">
-        <button onClick={() => { setMergeMode((m) => !m); setSelected([]); }} className={cn("inline-flex min-h-11 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition", mergeMode ? "bg-primary-600 text-white" : "border border-border hover:bg-surface-2")}>
+        <button onClick={() => { setMergeMode((m) => !m); setSelected([]); }} className={cn("inline-flex min-h-11 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition min-w-11", mergeMode ? "bg-primary-600 text-white" : "border border-border hover:bg-surface-2")}>
           <GitMerge className="w-4 h-4" />{t("tables.merge")}
         </button>
         {canManage && (
-          <button onClick={() => setManage((m) => !m)} className={cn("inline-flex min-h-11 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition", manage ? "bg-primary-600 text-white" : "border border-border hover:bg-surface-2")}>
+          <button onClick={() => setManage((m) => !m)} className={cn("inline-flex min-h-11 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition min-w-11", manage ? "bg-primary-600 text-white" : "border border-border hover:bg-surface-2")}>
             <Settings2 className="w-4 h-4" />{t("tables.manage")}
           </button>
         )}
@@ -60,7 +60,7 @@ export function TablesFloor({ tables, canManage }: { tables: TableRow[]; canMana
         <div className="mb-5 grid gap-3 rounded-card border border-border bg-surface p-4 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-end">
           <div className="flex min-w-0 flex-col gap-1"><span className="text-[9px] font-bold uppercase text-slate-500">{t("tables.tableName")}</span><input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={t("tables.tableName")} className="min-h-11 w-full rounded-[10px] border border-border bg-canvas px-3 py-2 text-sm" /></div>
           <div className="flex min-w-0 flex-col gap-1"><span className="text-[9px] font-bold uppercase text-slate-500">{t("tables.zone")}</span><input value={newZone} onChange={(e) => setNewZone(e.target.value)} placeholder={t("tables.zone")} className="min-h-11 w-full rounded-[10px] border border-border bg-canvas px-3 py-2 text-sm" /></div>
-          <button disabled={pending} onClick={add} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 sm:col-span-2 lg:col-span-1"><Plus className="w-4 h-4" />{t("tables.addTable")}</button>
+          <button disabled={pending} onClick={add} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 sm:col-span-2 lg:col-span-1 min-w-11"><Plus className="w-4 h-4" />{t("tables.addTable")}</button>
         </div>
       )}
 
@@ -102,7 +102,7 @@ export function TablesFloor({ tables, canManage }: { tables: TableRow[]; canMana
         <div className="fixed inset-x-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-50 mx-auto flex max-w-lg flex-wrap items-center gap-2 rounded-2xl border border-border bg-surface px-3 py-2.5 shadow-e2 lg:inset-x-auto lg:bottom-6 lg:left-1/2 lg:w-max lg:-translate-x-1/2 lg:flex-nowrap lg:px-4">
           <span className="min-w-0 flex-1 text-sm lg:flex-none">{t("tables.mergeInto", { count: selected.length, name: targetName ?? "" })}</span>
           <button onClick={() => setSelected([])} aria-label={t("common.close")} className="grid h-11 w-11 place-items-center rounded-xl text-slate-500 hover:bg-surface-2"><X className="h-5 w-5" /></button>
-          <button disabled={pending} onClick={doMerge} className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <GitMerge className="w-4 h-4" />}{t("tables.mergeConfirm")}</button>
+          <button disabled={pending} onClick={doMerge} className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 min-w-11">{pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <GitMerge className="w-4 h-4" />}{t("tables.mergeConfirm")}</button>
         </div>
       )}
 

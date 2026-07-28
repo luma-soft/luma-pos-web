@@ -184,7 +184,7 @@ export function TileCalculator() {
             <button
               type="button"
               onClick={addRoom}
-              className="group flex w-full items-center justify-center gap-2 rounded-card border border-dashed border-primary-300 bg-primary-50/40 px-4 py-4 text-sm font-semibold text-primary-700 transition hover:border-primary-500 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-primary-800 dark:bg-primary-950/20 dark:text-primary-300 dark:hover:bg-primary-950/35"
+              className="group flex w-full items-center justify-center gap-2 rounded-card border border-dashed border-primary-300 bg-primary-50/40 px-4 py-4 text-sm font-semibold text-primary-700 transition hover:border-primary-500 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-primary-800 dark:bg-primary-950/20 dark:text-primary-300 dark:hover:bg-primary-950/35 min-h-11"
             >
               <Plus className="size-4 transition-transform group-hover:rotate-90" />
               {t("addRoom")}

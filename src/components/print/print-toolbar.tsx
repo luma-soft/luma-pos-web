@@ -39,12 +39,19 @@ export function PrintToolbar({
   };
 
   return (
-    <div className="sticky top-0 z-10 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-2.5 flex items-center gap-3 print:hidden">
+    <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-3 py-2.5 dark:border-slate-800 dark:bg-slate-900 print:hidden lg:flex-nowrap lg:gap-3 lg:px-4">
       <Link href={backHref} className="grid min-h-11 min-w-11 place-items-center rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-800 lg:min-h-0 lg:min-w-0">
         <ArrowLeft className="w-4 h-4" />
       </Link>
-      <span className="font-semibold text-sm">{t("print.title")}</span>
-      <div className="flex gap-1 ml-2">
+      <span className="min-w-0 flex-1 text-sm font-semibold lg:flex-none">{t("print.title")}</span>
+      <button
+        onClick={() => window.print()}
+        className="inline-flex min-h-11 min-w-11 items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 lg:order-last lg:min-h-0 lg:min-w-0"
+      >
+        <Printer className="h-4 w-4" />
+        {t("print.printBtn")}
+      </button>
+      <div className="order-3 w-full flex gap-1 overflow-x-auto lg:order-none lg:ml-2 lg:w-auto lg:overflow-visible">
         {SIZES.map((s) => (
           <Link
             key={s.id}
@@ -64,22 +71,15 @@ export function PrintToolbar({
           onChange={(event) => { window.location.href = hrefFor({ size, templateId: event.target.value }); }}
           size="sm"
           options={templates.map((template) => ({ value: template.id, label: template.name }))}
-          className="max-w-[220px] text-xs font-medium"
+          className="order-4 w-full min-w-0 text-xs font-medium lg:order-none lg:max-w-[220px]"
           aria-label={t("printSettings.templateName")}
         />
       )}
-      <Link href="/settings/print" className="inline-flex min-h-11 min-w-11 items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-300 dark:border-slate-700 text-slate-500 lg:min-h-0 lg:min-w-0">
+      <Link href="/settings/print" className="order-5 inline-flex min-h-11 min-w-11 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-500 dark:border-slate-700 lg:order-none lg:w-auto lg:min-h-0 lg:min-w-0">
         <Settings2 className="w-3.5 h-3.5" />
         {t("print.editTemplate")}
       </Link>
-      <div className="flex-1" />
-      <button
-        onClick={() => window.print()}
-        className="inline-flex min-h-11 min-w-11 items-center gap-2 px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium lg:min-h-0 lg:min-w-0"
-      >
-        <Printer className="w-4 h-4" />
-        {t("print.printBtn")}
-      </button>
+      <div className="hidden flex-1 lg:block" />
     </div>
   );
 }

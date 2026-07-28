@@ -52,7 +52,7 @@ export function ModifiersManage({ groups, categories }: { groups: ModifierGroup[
     <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-slate-500">{t("modifiers.sub")}</p>
-        <button onClick={startNew} className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white"><Plus className="w-4 h-4" />{t("modifiers.add")}</button>
+        <button onClick={startNew} className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white min-w-11"><Plus className="w-4 h-4" />{t("modifiers.add")}</button>
       </div>
 
       {groups.length === 0 ? (
@@ -80,7 +80,7 @@ export function ModifiersManage({ groups, categories }: { groups: ModifierGroup[
                     onClick={() => toggle(g.id, !g.isActive)}
                     title={t("modifiers.toggle")}
                     aria-pressed={g.isActive}
-                    className={cn("min-h-11 rounded-full px-3 py-1 text-[10px] font-bold", g.isActive ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-500")}
+                    className={cn("min-h-11 rounded-full px-3 py-1 text-[10px] font-bold min-w-11", g.isActive ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-500")}
                   >
                     {g.isActive ? t("common.active") : t("common.inactive")}
                   </button>
@@ -107,8 +107,8 @@ export function ModifiersManage({ groups, categories }: { groups: ModifierGroup[
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <label className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm hover:bg-surface-2"><input type="checkbox" checked={form.multi} onChange={(e) => setForm((f) => ({ ...f, multi: e.target.checked }))} />{t("modifiers.multiSelect")}</label>
-                <label className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm hover:bg-surface-2"><input type="checkbox" checked={form.required} onChange={(e) => setForm((f) => ({ ...f, required: e.target.checked }))} />{t("modifiers.required")}</label>
+                <label className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm hover:bg-surface-2 min-w-11"><input type="checkbox" checked={form.multi} onChange={(e) => setForm((f) => ({ ...f, multi: e.target.checked }))} />{t("modifiers.multiSelect")}</label>
+                <label className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm hover:bg-surface-2 min-w-11"><input type="checkbox" checked={form.required} onChange={(e) => setForm((f) => ({ ...f, required: e.target.checked }))} />{t("modifiers.required")}</label>
               </div>
 
               <div>
@@ -116,7 +116,7 @@ export function ModifiersManage({ groups, categories }: { groups: ModifierGroup[
                 <div className="mt-1 space-y-2">
                   {form.options.map((o, i) => (
                     <div key={o.id} className="grid grid-cols-[minmax(0,1fr)_6rem_2.75rem] items-center gap-2 sm:grid-cols-[minmax(0,1fr)_7rem_2.75rem]">
-                      <input value={o.label} onChange={(e) => setOpt(i, { label: e.target.value })} placeholder={t("modifiers.optionLabel")} className="min-h-11 min-w-0 rounded-[10px] border border-border bg-canvas px-3 py-2 text-sm" />
+                      <input value={o.label} onChange={(e) => setOpt(i, { label: e.target.value })} placeholder={t("modifiers.optionLabel")} className="min-h-11 rounded-[10px] border border-border bg-canvas px-3 py-2 text-sm min-w-11" />
                       <NumberInput value={o.priceDelta} onChange={(priceDelta) => setOpt(i, { priceDelta: priceDelta ?? 0 })} placeholder="+0" className="min-h-11 min-w-0 rounded-[10px] bg-canvas px-2 font-mono" />
                       <button
                         onClick={() => setForm((f) => ({ ...f, options: f.options.filter((_, x) => x !== i) }))}
@@ -127,7 +127,7 @@ export function ModifiersManage({ groups, categories }: { groups: ModifierGroup[
                       </button>
                     </div>
                   ))}
-                  <button onClick={() => setForm((f) => ({ ...f, options: [...f.options, { id: uid(), label: "", priceDelta: 0 }] }))} className="inline-flex min-h-11 items-center gap-1 rounded-xl px-2 text-xs font-semibold text-primary-600 hover:bg-primary-50"><Plus className="w-3 h-3" />{t("modifiers.addOption")}</button>
+                  <button onClick={() => setForm((f) => ({ ...f, options: [...f.options, { id: uid(), label: "", priceDelta: 0 }] }))} className="inline-flex min-h-11 items-center gap-1 rounded-xl px-2 text-xs font-semibold text-primary-600 hover:bg-primary-50 min-w-11"><Plus className="w-3 h-3" />{t("modifiers.addOption")}</button>
                 </div>
               </div>
 
@@ -149,8 +149,8 @@ export function ModifiersManage({ groups, categories }: { groups: ModifierGroup[
               {err && <p className="text-sm text-er">{err}</p>}
             </div>
             <div className="sticky bottom-0 flex justify-end gap-2 border-t border-border bg-surface px-5 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:py-3">
-              <button onClick={() => setOpen(false)} className="min-h-11 rounded-full border border-border px-4 py-2 text-sm hover:bg-surface-2">{t("common.cancel")}</button>
-              <button onClick={save} disabled={pending} className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}{t("common.save")}</button>
+              <button onClick={() => setOpen(false)} className="min-h-11 rounded-full border border-border px-4 py-2 text-sm hover:bg-surface-2 min-w-11">{t("common.cancel")}</button>
+              <button onClick={save} disabled={pending} className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 min-w-11">{pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}{t("common.save")}</button>
             </div>
           </div>
         </div>

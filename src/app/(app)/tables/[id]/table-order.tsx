@@ -157,7 +157,7 @@ export function TableOrder({
               <MoveRight className="h-4 w-4" />
               {t("tables.move")}
             </button>
-            <button onClick={close} disabled={pending} className="min-h-11 rounded-xl px-3 text-xs font-semibold text-slate-500 hover:bg-er-soft hover:text-er">{t("tables.close")}</button>
+            <button onClick={close} disabled={pending} className="min-h-11 rounded-xl px-3 text-xs font-semibold text-slate-500 hover:bg-er-soft hover:text-er min-w-11">{t("tables.close")}</button>
           </>
         )}
       />
@@ -184,7 +184,7 @@ export function TableOrder({
           <div className="px-4 py-3 border-b border-border flex items-center justify-between">
             <span className="font-bold text-sm">{t("tables.order")}</span>
             {cart.length > 0 && (
-              <button onClick={() => { setSplit((s) => !s); setSelected([]); }} aria-pressed={split} className={cn("inline-flex min-h-11 items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold", split ? "bg-primary-600 text-white" : "text-slate-500 hover:bg-surface-2")}><Split className="w-3.5 h-3.5" />{t("tables.split")}</button>
+              <button onClick={() => { setSplit((s) => !s); setSelected([]); }} aria-pressed={split} className={cn("inline-flex min-h-11 items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold min-w-11", split ? "bg-primary-600 text-white" : "text-slate-500 hover:bg-surface-2")}><Split className="w-3.5 h-3.5" />{t("tables.split")}</button>
             )}
           </div>
 
@@ -262,7 +262,7 @@ export function TableOrder({
             {err && <p className="text-xs text-er mb-2">{err}</p>}
             <div className="grid grid-cols-3 gap-2">
               {METHODS.map((m) => (
-                <button key={m} disabled={pending || cart.length === 0 || (split && selected.length === 0)} onClick={() => pay(m)} className="inline-flex min-h-14 flex-col items-center justify-center gap-1 rounded-[10px] bg-primary-600 px-2 py-2.5 text-xs font-semibold text-white disabled:opacity-50">
+                <button key={m} disabled={pending || cart.length === 0 || (split && selected.length === 0)} onClick={() => pay(m)} className="inline-flex min-h-14 flex-col items-center justify-center gap-1 rounded-[10px] bg-primary-600 px-2 py-2.5 text-xs font-semibold text-white disabled:opacity-50 min-w-11">
                   {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}{t(`pos.payMethods.${m}` as never)}
                 </button>
               ))}
@@ -311,8 +311,8 @@ export function TableOrder({
             </div>
             {err && <p className="px-4 pb-2 text-sm text-er">{err}</p>}
             <div className="sticky bottom-0 flex justify-end gap-2 border-t border-border bg-surface px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:py-3">
-              <button onClick={() => setMoveOpen(false)} className="min-h-11 rounded-full border border-border px-4 text-sm hover:bg-surface-2">{t("common.cancel")}</button>
-              <button onClick={moveOrder} disabled={pending || !moveTargetId} className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50">
+              <button onClick={() => setMoveOpen(false)} className="min-h-11 rounded-full border border-border px-4 text-sm hover:bg-surface-2 min-w-11">{t("common.cancel")}</button>
+              <button onClick={moveOrder} disabled={pending || !moveTargetId} className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50 min-w-11">
                 {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoveRight className="h-4 w-4" />}
                 {t("tables.moveConfirm")}
               </button>
@@ -381,7 +381,7 @@ function ModifierPicker({ product, groups, onCancel, onConfirm }: { product: Pos
         </div>
         <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-border bg-surface px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-5 sm:py-3">
           <span className="font-mono font-bold">{formatCurrency(Number(product.retailPrice) + extra)}</span>
-          <button onClick={confirm} className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-primary-600 px-5 py-2 text-sm font-semibold text-white"><Plus className="w-4 h-4" />{t("tables.addToOrder")}</button>
+          <button onClick={confirm} className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-primary-600 px-5 py-2 text-sm font-semibold text-white min-w-11"><Plus className="w-4 h-4" />{t("tables.addToOrder")}</button>
         </div>
       </div>
     </div>

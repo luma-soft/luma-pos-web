@@ -47,12 +47,12 @@ export function StocktakeRowActions({ id, status }: { id: string; status: string
 
   return (
     <span className="inline-flex items-center gap-2 whitespace-nowrap">
-      <button onClick={cancel} disabled={busy} className="inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-medium text-red-500 hover:bg-er-soft disabled:opacity-50">
+      <button onClick={cancel} disabled={busy} className="inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-medium text-red-500 hover:bg-er-soft disabled:opacity-50 min-w-11">
         {t("common.cancel")}
       </button>
       <button
         onClick={balance} disabled={busy}
-        className="inline-flex min-h-11 items-center gap-1 rounded-lg bg-emerald-600 px-2.5 text-white text-xs font-medium disabled:opacity-50"
+        className="inline-flex min-h-11 items-center gap-1 rounded-lg bg-emerald-600 px-2.5 text-white text-xs font-medium disabled:opacity-50 min-w-11"
       >
         {busy && <Loader2 className="w-3 h-3 animate-spin" />}
         {t("stocktakes.balance")}

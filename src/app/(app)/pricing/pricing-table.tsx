@@ -236,7 +236,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
             className="min-h-11 w-36 rounded-lg border border-primary-400 bg-surface px-2 text-sm"
           />
         ) : (
-          <button onClick={() => setCreating(true)} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-dashed border-border px-2.5 text-sm text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40">
+          <button onClick={() => setCreating(true)} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-dashed border-border px-2.5 text-sm text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40 min-w-11">
             <Plus className="w-3.5 h-3.5" /> {t("pricing.addBook")}
           </button>
         )}
@@ -303,8 +303,8 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
               <span>{t("pricing.formula.applyAll", { n: total })} <b>{formulaBook.name}</b></span>
             </label>
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setFormula(null)} className="min-h-11 rounded-lg border border-border px-3 text-sm">{t("common.cancel")}</button>
-              <button type="button" onClick={() => applyFormula(formulaRow, formulaBook.id)} disabled={applying} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white disabled:opacity-50">
+              <button type="button" onClick={() => setFormula(null)} className="min-h-11 rounded-lg border border-border px-3 text-sm min-w-11">{t("common.cancel")}</button>
+              <button type="button" onClick={() => applyFormula(formulaRow, formulaBook.id)} disabled={applying} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white disabled:opacity-50 min-w-11">
                 {applying && <Loader2 className="h-4 w-4 animate-spin" />} {t("common.done")}
               </button>
             </div>

@@ -336,7 +336,7 @@ function ListingsSection({ data, L, tab }: { data: Awaited<ReturnType<typeof get
               <div className="flex items-start justify-between gap-3">
                 <Link
                   href={Routes.product(row.productId)}
-                  className="inline-flex min-h-11 min-w-0 flex-1 items-center break-words font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  className="inline-flex min-h-11 flex-1 items-center break-words font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-11"
                 >
                   {row.productName}
                 </Link>
@@ -404,7 +404,7 @@ function OnlineOrdersSection({ rows, L }: { rows: Awaited<ReturnType<typeof getS
             {L ? "Đơn Shopee được map về đơn LumaPOS để xử lý chung với POS." : "Shopee orders map into LumaPOS orders for a shared handling flow."}
           </p>
         </div>
-        <Link href={`${Routes.Sales}?tab=orders&source=shopee`} className="inline-flex min-h-11 items-center rounded-full border border-border px-3 text-xs font-bold hover:bg-surface-2">
+        <Link href={`${Routes.Sales}?tab=orders&source=shopee`} className="inline-flex min-h-11 items-center rounded-full border border-border px-3 text-xs font-bold hover:bg-surface-2 min-w-11">
           {L ? "Xem trong Đơn hàng" : "View in Orders"}
         </Link>
       </div>
@@ -506,7 +506,7 @@ function InboxSection({ threads, L }: { threads: Awaited<ReturnType<typeof getSh
             "use server";
             await sendMarketplaceMessage({ threadId: thread.id, body: String(formData.get("body") ?? "") });
           }} className="flex gap-2 border-t border-border-soft px-4 py-3">
-            <input name="body" className="min-w-0 flex-1 rounded-lg border border-border bg-canvas px-3 py-2 text-sm outline-none focus:border-primary-500 min-h-11 lg:min-h-0" placeholder={L ? "Nhập phản hồi..." : "Type a reply..."} />
+            <input name="body" className="flex-1 rounded-lg border border-border bg-canvas px-3 py-2 text-sm outline-none focus:border-primary-500 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" placeholder={L ? "Nhập phản hồi..." : "Type a reply..."} />
             <button className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
               <Send className="h-4 w-4" /> {L ? "Gửi" : "Send"}
             </button>

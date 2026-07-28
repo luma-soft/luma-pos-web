@@ -215,9 +215,9 @@ function SummaryLine({ label, value, strong }: { label: string; value: string; s
 }
 
 function TextAction({ children }: { children: React.ReactNode }) {
-  return <button type="button" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-slate-600 transition hover:text-primary-700 dark:text-slate-300 lg:min-h-0 lg:px-0">{children}</button>;
+  return <button type="button" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-slate-600 transition hover:text-primary-700 dark:text-slate-300 lg:min-h-0 lg:px-0 min-w-11 lg:min-w-0">{children}</button>;
 }
 
 function SmallAction({ children }: { children: React.ReactNode }) {
-  return <button type="button" className="inline-flex min-h-11 items-center gap-1.5 rounded-card border border-border bg-surface px-3 text-sm font-semibold text-slate-600 transition hover:bg-surface-2 dark:text-slate-200 lg:min-h-9">{children}</button>;
+  return <button type="button" className="inline-flex min-h-11 items-center gap-1.5 rounded-card border border-border bg-surface px-3 text-sm font-semibold text-slate-600 transition hover:bg-surface-2 dark:text-slate-200 lg:min-h-9 min-w-11 lg:min-w-0">{children}</button>;
 }

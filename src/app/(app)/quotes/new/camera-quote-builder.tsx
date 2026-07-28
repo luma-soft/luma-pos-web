@@ -315,7 +315,7 @@ export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOption
                   type="button"
                   onClick={() => save(false)}
                   disabled={isPending || packages.length === 0}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 text-sm font-bold text-primary-700 hover:bg-primary-100 disabled:opacity-50"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 text-sm font-bold text-primary-700 hover:bg-primary-100 disabled:opacity-50 min-w-11"
                 >
                   <CheckCircle2 className="h-4 w-4" />
                   {isPending ? t("saving") : t("saveQuote")}
@@ -324,7 +324,7 @@ export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOption
                   type="button"
                   onClick={() => save(true)}
                   disabled={isPending || packages.length === 0}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary-600 px-3 text-sm font-bold text-white hover:bg-primary-700 disabled:opacity-50"
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary-600 px-3 text-sm font-bold text-white hover:bg-primary-700 disabled:opacity-50 min-w-11"
                 >
                   <Printer className="h-4 w-4" />
                   {t("saveAndPrint")}
@@ -445,7 +445,7 @@ function PackageEditor({
       </div>
 
       <details className="mt-3 rounded-lg border border-border-soft bg-surface px-3 py-2 text-xs">
-        <summary className="min-h-11 cursor-pointer py-3 font-semibold text-slate-600 lg:min-h-0 lg:py-0">{t("cameraSpecs")}</summary>
+        <summary className="min-h-11 cursor-pointer py-3 font-semibold text-slate-600 lg:min-h-0 lg:py-0 min-w-11 lg:min-w-0">{t("cameraSpecs")}</summary>
         <dl className="mt-2 divide-y divide-border-soft">
           {Object.entries(camera.specs).map(([label, values]) => (
             <div key={label} className="grid grid-cols-[110px_1fr] gap-2 py-1.5">

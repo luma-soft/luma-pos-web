@@ -89,7 +89,7 @@ export async function OrderDetailPanel({
             <OrderStatusBadge status={order.status} />
             {!isQuote && <PaymentStatusBadge status={order.paymentStatus} />}
             {showOpenAction && (
-              <Link href={openInListHref} className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-primary-600 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:min-h-0 lg:px-0">
+              <Link href={openInListHref} className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-primary-600 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:min-h-0 lg:px-0 min-w-11 lg:min-w-0">
                 <ExternalLink className="h-4 w-4" />
                 Mở phiếu
               </Link>

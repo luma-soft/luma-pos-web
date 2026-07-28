@@ -197,7 +197,7 @@ export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse
                 <div className="absolute left-0 right-14 z-30 mt-2 overflow-hidden rounded-card border border-border-soft bg-surface shadow-e2">
                   {searching ? <div className="px-4 py-4 text-center text-sm text-slate-400"><Loader2 className="w-4 h-4 animate-spin inline" /></div>
                     : results.map((p) => (
-                      <button key={p.id} type="button" onClick={() => addItem(p)} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition hover:bg-surface-2">
+                      <button key={p.id} type="button" onClick={() => addItem(p)} className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition hover:bg-surface-2 min-h-11">
                         <div className="min-w-0 flex-1"><div className="truncate font-semibold">{p.name}</div><div className="font-mono text-xs text-slate-400">{p.sku} · {t("internalUse.cost")} {formatCurrency(Number(p.costPrice))}/{p.baseUnit}</div></div>
                       </button>
                     ))}

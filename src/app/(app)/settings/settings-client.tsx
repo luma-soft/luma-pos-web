@@ -285,7 +285,7 @@ function Card({ title, vi, action, children }: { title: string; vi: string; acti
 }
 const FL = "text-[9px] font-bold uppercase tracking-wide text-slate-500";
 const FI = "min-h-11 w-full px-[11px] py-[9px] bg-canvas border-[1.5px] border-border rounded-[10px] text-[13px] outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 lg:min-h-0";
-const ROW = "flex min-h-11 items-center justify-between gap-3 px-3.5 py-2.5 bg-canvas rounded-[10px] border border-border-soft";
+const ROW = "flex min-h-11 items-center justify-between gap-3 px-3.5 py-2.5 bg-canvas rounded-[10px] border border-border-soft min-w-11";
 const btnS = "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-full border border-border-soft text-xs font-semibold hover:bg-surface-2 transition lg:min-h-0 lg:min-w-0";
 const btnF = "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-600 text-white text-xs font-semibold hover:brightness-110 transition lg:min-h-0 lg:min-w-0";
 const searchableTouch = "[&>button]:h-11 lg:[&>button]:h-10";
@@ -1141,7 +1141,7 @@ function PrintSection({ L }: { L: boolean }) {
               key={item.href}
               href={item.href}
               className={cn(
-                "group block rounded-[10px] border p-4 transition hover:-translate-y-0.5 hover:shadow-e1",
+                "group block rounded-[10px] border p-4 transition hover:-translate-y-0.5 hover:shadow-e1 min-h-11 min-w-11",
                 item.primary
                   ? "border-primary-200 bg-primary-50/70 text-primary-900 dark:border-primary-900 dark:bg-primary-950/30 dark:text-primary-100"
                   : "border-border bg-canvas text-slate-900 hover:bg-surface-2 dark:text-slate-100",
@@ -1308,7 +1308,7 @@ function ZaloSecretInput({
         placeholder={setFlag ? (L ? "Để trống để giữ giá trị hiện tại" : "Leave blank to keep current value") : ""}
         onChange={(e) => onValueChange(id, e.target.value)}
       />
-      <label className="mt-1 flex min-h-11 items-center gap-2 text-[11px] text-slate-500 lg:min-h-0">
+      <label className="mt-1 flex min-h-11 items-center gap-2 text-[11px] text-slate-500 lg:min-h-0 min-w-11 lg:min-w-0">
         <input type="checkbox" checked={clear} disabled={!canEdit} onChange={(e) => onClearChange(id, e.target.checked)} />
         {L ? "Xóa giá trị đang lưu" : "Clear saved value"}
       </label>
@@ -1403,7 +1403,7 @@ function ShopeeSettingsSection({ L, prefs, canEdit }: { L: boolean; prefs: Store
                 placeholder={partnerKeySet ? (L ? "Đã lưu, nhập key mới để thay" : "Saved, enter a new key to replace") : (L ? "Chưa cấu hình" : "Not configured")}
                 onChange={(e) => set("partnerKey", e.target.value)}
               />
-              <label className="mt-1 flex min-h-11 items-center gap-2 text-[11px] text-slate-500 lg:min-h-0">
+              <label className="mt-1 flex min-h-11 items-center gap-2 text-[11px] text-slate-500 lg:min-h-0 min-w-11 lg:min-w-0">
                 <input type="checkbox" checked={clearPartnerKey} disabled={!canEdit} onChange={(e) => { setClearPartnerKey(e.target.checked); mark(); }} />
                 {L ? "Xóa partner key đang lưu" : "Clear saved partner key"}
               </label>
@@ -1689,7 +1689,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
                 onChange={(e) => set("openaiApiKey", e.target.value)}
               />
               <span className="text-[11px] text-slate-500">{providerKeyHelp(form.provider, L)}</span>
-              <label className="mt-1 flex min-h-11 items-center gap-2 text-[11px] text-slate-500 lg:min-h-0">
+              <label className="mt-1 flex min-h-11 items-center gap-2 text-[11px] text-slate-500 lg:min-h-0 min-w-11 lg:min-w-0">
                 <input type="checkbox" checked={clearOpenaiApiKey} disabled={!canEdit} onChange={(e) => toggleClearKey(e.target.checked)} />
                 {L ? "Xóa API key đang lưu" : "Clear saved API key"}
               </label>

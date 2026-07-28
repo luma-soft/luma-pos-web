@@ -527,7 +527,7 @@ function CategoryRow({ active, label, hasChildren, onClick }: { active?: boolean
     <button
       type="button"
       onClick={onClick}
-      className={cn("flex w-full items-center justify-between gap-3 px-5 py-3 text-left text-sm font-semibold hover:bg-surface-2", active && "bg-primary-50 text-primary-700 dark:bg-primary-950/40")}
+      className={cn("flex w-full items-center justify-between gap-3 px-5 py-3 text-left text-sm font-semibold hover:bg-surface-2 min-h-11", active && "bg-primary-50 text-primary-700 dark:bg-primary-950/40")}
     >
       <span className="min-w-0 truncate">{label}</span>
       {hasChildren ? <ChevronRight className="h-4 w-4 shrink-0 text-slate-500" /> : active ? <Check className="h-4 w-4 shrink-0 text-primary-600" /> : null}

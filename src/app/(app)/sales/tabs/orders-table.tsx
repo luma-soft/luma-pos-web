@@ -140,7 +140,7 @@ export function OrdersTable({
           const remaining = Number(order.total) - Number(order.amountPaid);
           return (
             <>
-              <button type="button" onClick={() => openOrder(order)} className="w-full p-3 text-left">
+              <button type="button" onClick={() => openOrder(order)} className="w-full p-3 text-left min-h-11">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                   <div className="font-semibold text-primary-600">{order.code}</div>

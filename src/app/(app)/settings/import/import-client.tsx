@@ -167,7 +167,7 @@ export function ImportClient() {
       {/* Step 1 — upload */}
       <div className="bg-surface border border-border rounded-card p-5 mb-4">
         <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls,text/csv" onChange={onFile} className="hidden" />
-        <Button type="button" variant="outline" onClick={() => fileRef.current?.click()} className="h-auto w-full flex-col border-2 border-dashed rounded-xl py-8 hover:border-primary-400">
+        <Button type="button" variant="outline" onClick={() => fileRef.current?.click()} className="h-auto w-full flex-col border-2 border-dashed rounded-xl py-8 hover:border-primary-400 min-h-11">
           <Upload className="w-7 h-7 text-slate-400" />
           <Text as="span" weight="semibold" className="text-current" text={fileName || t("import.choose")} />
           <Text as="span" variant="muted" className="text-[11px]" text={t("import.csvOnly")} />
@@ -267,7 +267,7 @@ export function ImportClient() {
             </div>
           )}
           {summary.applied && (
-            <Link href="/products" className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-primary-600 px-4 text-sm font-semibold text-white">{t("import.viewProducts")}</Link>
+            <Link href="/products" className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-primary-600 px-4 text-sm font-semibold text-white min-w-11">{t("import.viewProducts")}</Link>
           )}
         </div>
       )}
