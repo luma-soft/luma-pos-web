@@ -1,11 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { desc, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  internalUseIssues, internalUseItems, stockLevels, stockMovements, warehouses,
+  internalUseIssues, internalUseItems, stockLevels, stockMovements,
 } from "@/db/schema";
+import { getAuthoritativeInternalUseWarehouse } from "@/lib/data/internal-use";
 import { createInternalUseSchema, type CreateInternalUseInput } from "@/lib/schemas/internal-use";
 import { type ActionResult, requireUser, getProfileId, getRole, generateCode, toMoney, toQty } from "./common";
 import { Routes } from "@/lib/routes";
@@ -17,11 +18,6 @@ const APPROVAL_THRESHOLD = 500_000;
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type StockItem = { productId: string; unitMultiplier: string; quantity: string; unitCost: string };
-
-async function defaultWarehouseId(): Promise<string | null> {
-  const [w] = await db.select({ id: warehouses.id }).from(warehouses).orderBy(desc(warehouses.isDefault)).limit(1);
-  return w?.id ?? null;
-}
 
 /** Trừ kho + ghi movement 'internal_use' (giá vốn) cho từng dòng. */
 async function postStock(
@@ -77,7 +73,7 @@ export async function createInternalUse(
     if (!canCreateInternalUse(role)) {
       return { ok: false, error: "errors.forbidden" };
     }
-    const warehouseId = v.warehouseId ?? (await defaultWarehouseId());
+    const warehouseId = v.warehouseId ?? (await getAuthoritativeInternalUseWarehouse())?.id ?? null;
     if (!warehouseId) return { ok: false, error: "errors.invalidData" };
 
     const totalCost = v.items.reduce((s, i) => s + i.unitCost * i.quantity, 0);

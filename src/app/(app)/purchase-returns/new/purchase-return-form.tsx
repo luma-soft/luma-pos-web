@@ -234,7 +234,7 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
                             <div className="text-xs font-semibold text-slate-500">{t("purchaseReturns.availableStock", { stock: formatNumber(line.stock), unit: line.unitName })}</div>
                             <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{line.unitName}</div>
                           </div>
-                          <div className="space-y-1 text-xs font-semibold text-slate-500">
+                          <div className="col-span-2 space-y-1 text-xs font-semibold text-slate-500">
                             <span>{t("purchaseReturns.cols.qty")}</span>
                             <QuantityInput
                               min={0}

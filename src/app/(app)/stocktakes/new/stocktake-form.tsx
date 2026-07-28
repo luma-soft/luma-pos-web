@@ -278,7 +278,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                           <div className="text-xs font-semibold text-slate-500">{t("stocktakes.cols.systemQty")}</div>
                           <div className="flex h-11 items-center rounded-md bg-canvas px-3 text-sm font-semibold tabular-nums">{formatNumber(l.product.stock)}</div>
                         </div>
-                        <div className="space-y-1 text-xs font-semibold text-slate-500">
+                        <div className="col-span-2 space-y-1 text-xs font-semibold text-slate-500">
                           <span>{t("stocktakes.cols.actualQty")}</span>
                           <QuantityInput
                             min={0}

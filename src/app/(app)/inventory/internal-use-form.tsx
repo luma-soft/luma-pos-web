@@ -21,6 +21,7 @@ import { useRouter } from "next/navigation";
 import type { AiActionPreview } from "@/lib/ai/actions";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPurchaseProduct } from "@/lib/inventory/product-catalog-adapter";
+import type { InternalUseWarehouse } from "@/lib/inventory/internal-use-warehouse";
 import type { PurchaseProductRow } from "@/lib/data/inventory";
 
 const APPROVAL_THRESHOLD = 500_000;
@@ -41,7 +42,7 @@ type Line = {
   units: { name: string; mult: number }[]; unitName: string; unitMultiplier: number; quantity: number; unitCost: number;
 };
 
-export function InternalUseForm() {
+export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse | null }) {
   const t = useTranslations();
   const locale = useLocale();
   const L = locale === "vi";
@@ -66,17 +67,13 @@ export function InternalUseForm() {
 
   const totalCost = useMemo(() => lines.reduce((s, l) => s + l.unitCost * l.quantity, 0), [lines]);
   const needsApproval = totalCost > APPROVAL_THRESHOLD;
-  const defaultWarehouse = useMemo(
-    () => catalog.snapshot?.warehouses.find((warehouse) => warehouse.isDefault) ?? null,
-    [catalog.snapshot],
-  );
-  const defaultWarehouseStock = useMemo(() => {
-    if (!defaultWarehouse) return new Map<string, number>();
+  const warehouseStock = useMemo(() => {
+    if (!warehouse) return new Map<string, number>();
     return new Map(catalog.products.map((product) => [
       product.id,
-      getCatalogWarehouseStock(product, defaultWarehouse.id),
+      getCatalogWarehouseStock(product, warehouse.id),
     ]));
-  }, [catalog.products, defaultWarehouse]);
+  }, [catalog.products, warehouse]);
 
   function onSearch(val: string) {
     setQ(val);
@@ -160,6 +157,7 @@ export function InternalUseForm() {
     if (lines.length === 0) return;
     start(async () => {
       const res = await createInternalUse({
+        warehouseId: warehouse?.id,
         department: department ? labelOf(deptOpts, department) : undefined,
         reason: reason ? labelOf(reasonOpts, reason) : undefined,
         note: note || undefined,
@@ -224,7 +222,7 @@ export function InternalUseForm() {
           <div className="flex-1 min-h-[320px] overflow-auto bg-surface border border-border rounded-card">
             <div className="space-y-2 p-3 lg:hidden">
               {lines.map((l) => {
-                const warehouseStock = defaultWarehouseStock.get(l.productId);
+                const availableStock = warehouseStock.get(l.productId);
                 return (
                   <MobileFormLineCard
                     key={l.key}
@@ -244,15 +242,15 @@ export function InternalUseForm() {
                     )}
                   >
                     <div className="grid grid-cols-2 gap-3">
-                      {defaultWarehouse && warehouseStock != null && (
+                      {warehouse && availableStock != null && (
                         <div className="space-y-1">
-                          <div className="text-xs font-semibold text-slate-500">{t("internalUse.availableStock", { warehouse: defaultWarehouse.name })}</div>
+                          <div className="text-xs font-semibold text-slate-500">{t("internalUse.availableStock", { warehouse: warehouse.name })}</div>
                           <div className="flex h-11 items-center rounded-md bg-canvas px-3 text-sm font-semibold tabular-nums">
-                            {formatNumber(warehouseStock)} {l.baseUnit}
+                            {formatNumber(availableStock)} {l.baseUnit}
                           </div>
                         </div>
                       )}
-                      <div className="space-y-1 text-xs font-semibold text-slate-500">
+                      <div className="col-span-2 space-y-1 text-xs font-semibold text-slate-500">
                         <span>{t("internalUse.qty")}</span>
                         <QuantityInput
                           min={1}
@@ -343,7 +341,7 @@ export function InternalUseForm() {
 
       <aside className="w-full lg:w-[390px] shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col p-3 sm:p-4 gap-3 overflow-visible lg:overflow-auto">
           <div className="mb-5 flex items-center justify-between gap-3">
-            <SearchableSelect options={[{ value: "main", label: t("internalUse.defaultBranch") }]} value="main" onChange={() => undefined} placeholder={t("internalUse.defaultBranch")} />
+            <SearchableSelect options={[{ value: "main", label: warehouse?.name ?? t("internalUse.defaultBranch") }]} value="main" onChange={() => undefined} placeholder={warehouse?.name ?? t("internalUse.defaultBranch")} />
             <div className="h-10 rounded-lg border border-border-soft bg-canvas px-3 py-2 text-sm font-semibold text-slate-400">{new Date().toLocaleDateString("vi-VN")}</div>
           </div>
 

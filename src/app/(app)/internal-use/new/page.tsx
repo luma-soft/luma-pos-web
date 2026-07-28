@@ -1,12 +1,16 @@
 import { getTranslations } from "next-intl/server";
 import { Routes } from "@/lib/routes";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
+import { getAuthoritativeInternalUseWarehouse } from "@/lib/data/internal-use";
 import { InternalUseForm } from "../../inventory/internal-use-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewInternalUsePage() {
-  const t = await getTranslations();
+  const [t, warehouse] = await Promise.all([
+    getTranslations(),
+    getAuthoritativeInternalUseWarehouse(),
+  ]);
 
   return (
     <div className="h-dvh flex flex-col bg-canvas">
@@ -17,7 +21,7 @@ export default async function NewInternalUsePage() {
         title={t("internalUse.formTitle")}
       />
 
-      <InternalUseForm />
+      <InternalUseForm warehouse={warehouse} />
     </div>
   );
 }

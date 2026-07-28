@@ -528,7 +528,7 @@ export function PurchaseForm({
                             ]}
                           />
                         </div>
-                        <div className="space-y-1 text-xs font-semibold text-slate-500">
+                        <div className="col-span-2 space-y-1 text-xs font-semibold text-slate-500">
                           <span>{t("purchases.cols.qty")}</span>
                           <QuantityInput
                             min={0}

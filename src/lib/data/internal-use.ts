@@ -2,6 +2,17 @@ import { desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { internalUseIssues, internalUseItems, products, profiles, warehouses } from "@/db/schema";
+import {
+  resolveAuthoritativeInternalUseWarehouse,
+  type InternalUseWarehouse,
+} from "@/lib/inventory/internal-use-warehouse";
+
+export async function getAuthoritativeInternalUseWarehouse(): Promise<InternalUseWarehouse | null> {
+  const rows = await db
+    .select({ id: warehouses.id, name: warehouses.name, isDefault: warehouses.isDefault })
+    .from(warehouses);
+  return resolveAuthoritativeInternalUseWarehouse(rows);
+}
 
 /** Lịch sử phiếu xuất nội bộ (audit) — mới nhất trước. */
 export async function getInternalUseIssues({ limit = 50, q }: { limit?: number; q?: string } = {}) {
