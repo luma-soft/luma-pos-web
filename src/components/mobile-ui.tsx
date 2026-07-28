@@ -2,6 +2,78 @@ import Link from "next/link";
 import { ChevronRight, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+type MobileRecordCardProps = {
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
+  status?: React.ReactNode;
+  children: React.ReactNode;
+  actions?: React.ReactNode;
+  className?: string;
+};
+
+type MobileRecordFieldProps = {
+  label: React.ReactNode;
+  value: React.ReactNode;
+  tone?: "neutral" | "success" | "warning" | "danger";
+  className?: string;
+};
+
+type MobileFormLineCardProps = {
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
+  amount?: React.ReactNode;
+  children: React.ReactNode;
+  actions?: React.ReactNode;
+};
+
+export function MobileRecordCard({ title, subtitle, status, children, actions, className }: MobileRecordCardProps) {
+  return (
+    <article className={cn("rounded-2xl border border-border bg-surface p-3 shadow-e1 lg:hidden", className)}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-sm font-black">{title}</h3>
+          {subtitle && <p className="mt-0.5 truncate text-xs font-medium text-slate-400">{subtitle}</p>}
+        </div>
+        {status && <div className="shrink-0">{status}</div>}
+      </div>
+      <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2">{children}</dl>
+      {actions && <div className="mt-3 flex min-h-11 items-center gap-2 border-t border-border-soft pt-2">{actions}</div>}
+    </article>
+  );
+}
+
+export function MobileRecordField({ label, value, tone = "neutral", className }: MobileRecordFieldProps) {
+  const valueTone = {
+    neutral: "",
+    success: "text-ok",
+    warning: "text-warn",
+    danger: "text-er",
+  }[tone];
+
+  return (
+    <div className={cn("min-w-0", className)}>
+      <dt className="text-[10px] font-extrabold uppercase tracking-[0.06em] text-slate-400">{label}</dt>
+      <dd className={cn("mt-0.5 truncate text-sm font-black tabular-nums", valueTone)}>{value}</dd>
+    </div>
+  );
+}
+
+export function MobileFormLineCard({ title, subtitle, amount, children, actions }: MobileFormLineCardProps) {
+  return (
+    <section className="rounded-2xl border border-border bg-surface p-3 shadow-e1 lg:hidden">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-sm font-black">{title}</h3>
+          {subtitle && <p className="mt-0.5 truncate text-xs font-medium text-slate-400">{subtitle}</p>}
+        </div>
+        {amount && <div className="shrink-0 text-right text-sm font-black tabular-nums">{amount}</div>}
+      </div>
+      <div className="mt-3">{children}</div>
+      {actions && <div className="mt-3 flex min-h-11 items-center gap-2 border-t border-border-soft pt-2">{actions}</div>}
+    </section>
+  );
+}
+
 export function MobileTopBar({
   title,
   subtitle,
