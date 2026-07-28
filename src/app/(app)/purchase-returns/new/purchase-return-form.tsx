@@ -241,6 +241,10 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
                               max={line.stock}
                               value={line.quantity}
                               onChange={(quantity) => patch(line.productId, { quantity })}
+                              touchTargets
+                              decrementLabel={t("common.decreaseProductQuantity", { product: line.name })}
+                              inputLabel={t("common.productQuantity", { product: line.name })}
+                              incrementLabel={t("common.increaseProductQuantity", { product: line.name })}
                               className={cn("min-h-11", overStock && "border-er text-er")}
                               inputClassName={cn(overStock && "border-er text-er")}
                             />
@@ -338,7 +342,7 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
           </div>
         </div>
 
-        <aside className="w-full lg:w-[390px] shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col p-3 sm:p-4 gap-3 overflow-auto">
+        <aside className="w-full lg:w-[390px] shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col p-3 sm:p-4 gap-3 overflow-visible lg:overflow-auto">
           <div className="grid grid-cols-2 gap-2">
             <Combobox value={warehouseId} onChange={setWarehouseId} allowClear={false} options={options.warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }))} />
             <Input value={new Date().toLocaleDateString("vi-VN")} readOnly className="text-slate-500" />

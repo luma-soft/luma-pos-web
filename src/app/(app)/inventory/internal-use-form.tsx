@@ -14,6 +14,7 @@ import { NumberInput } from "@/components/ui/number-input";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { Select } from "@/components/ui/select";
 import { createInternalUse } from "@/lib/actions/internal-use";
+import { getCatalogWarehouseStock } from "@/lib/product-catalog";
 import { Routes } from "@/lib/routes";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -36,7 +37,7 @@ const REASONS = [
 ] as const;
 
 type Line = {
-  key: string; productId: string; sku: string; productName: string; baseUnit: string; costPrice: number; stock: number;
+  key: string; productId: string; sku: string; productName: string; baseUnit: string; costPrice: number;
   units: { name: string; mult: number }[]; unitName: string; unitMultiplier: number; quantity: number; unitCost: number;
 };
 
@@ -65,6 +66,17 @@ export function InternalUseForm() {
 
   const totalCost = useMemo(() => lines.reduce((s, l) => s + l.unitCost * l.quantity, 0), [lines]);
   const needsApproval = totalCost > APPROVAL_THRESHOLD;
+  const defaultWarehouse = useMemo(
+    () => catalog.snapshot?.warehouses.find((warehouse) => warehouse.isDefault) ?? null,
+    [catalog.snapshot],
+  );
+  const defaultWarehouseStock = useMemo(() => {
+    if (!defaultWarehouse) return new Map<string, number>();
+    return new Map(catalog.products.map((product) => [
+      product.id,
+      getCatalogWarehouseStock(product, defaultWarehouse.id),
+    ]));
+  }, [catalog.products, defaultWarehouse]);
 
   function onSearch(val: string) {
     setQ(val);
@@ -84,7 +96,7 @@ export function InternalUseForm() {
     setLines((ls) => {
       const ex = ls.findIndex((x) => x.productId === p.id);
       if (ex >= 0) { const c = [...ls]; c[ex] = { ...c[ex], quantity: c[ex].quantity + 1 }; return c; }
-      return [...ls, { key: `${p.id}-${Date.now()}`, productId: p.id, sku: p.sku, productName: p.name, baseUnit: p.baseUnit, costPrice: cost, stock: Number(p.totalStock) || 0, units, unitName: p.baseUnit, unitMultiplier: 1, quantity: 1, unitCost: cost }];
+      return [...ls, { key: `${p.id}-${Date.now()}`, productId: p.id, sku: p.sku, productName: p.name, baseUnit: p.baseUnit, costPrice: cost, units, unitName: p.baseUnit, unitMultiplier: 1, quantity: 1, unitCost: cost }];
     });
     setQ(""); setResults([]);
   }
@@ -128,7 +140,6 @@ export function InternalUseForm() {
           productName: product.name,
           baseUnit: product.baseUnit,
           costPrice: cost,
-          stock: Number(product.totalStock) || 0,
           units,
           unitName: product.baseUnit,
           unitMultiplier: 1,
@@ -212,52 +223,66 @@ export function InternalUseForm() {
 
           <div className="flex-1 min-h-[320px] overflow-auto bg-surface border border-border rounded-card">
             <div className="space-y-2 p-3 lg:hidden">
-              {lines.map((l) => (
-                <MobileFormLineCard
-                  key={l.key}
-                  title={l.productName}
-                  subtitle={l.sku}
-                  amount={formatCurrency(l.unitCost * l.quantity)}
-                  actions={(
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => setLines((current) => current.filter((item) => item.key !== l.key))}
-                      className="min-h-11 text-er"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      {t("common.delete")}
-                    </Button>
-                  )}
-                >
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <div className="text-xs font-semibold text-slate-500">{t("pos.stockLabel")}</div>
-                      <div className="flex h-11 items-center rounded-md bg-canvas px-3 text-sm font-semibold tabular-nums">
-                        {formatNumber(l.stock)} {l.baseUnit}
+              {lines.map((l) => {
+                const warehouseStock = defaultWarehouseStock.get(l.productId);
+                return (
+                  <MobileFormLineCard
+                    key={l.key}
+                    title={l.productName}
+                    subtitle={l.sku}
+                    amount={formatCurrency(l.unitCost * l.quantity)}
+                    actions={(
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setLines((current) => current.filter((item) => item.key !== l.key))}
+                        className="min-h-11 text-er"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        {t("common.delete")}
+                      </Button>
+                    )}
+                  >
+                    <div className="grid grid-cols-2 gap-3">
+                      {defaultWarehouse && warehouseStock != null && (
+                        <div className="space-y-1">
+                          <div className="text-xs font-semibold text-slate-500">{t("internalUse.availableStock", { warehouse: defaultWarehouse.name })}</div>
+                          <div className="flex h-11 items-center rounded-md bg-canvas px-3 text-sm font-semibold tabular-nums">
+                            {formatNumber(warehouseStock)} {l.baseUnit}
+                          </div>
+                        </div>
+                      )}
+                      <div className="space-y-1 text-xs font-semibold text-slate-500">
+                        <span>{t("internalUse.qty")}</span>
+                        <QuantityInput
+                          min={1}
+                          value={l.quantity}
+                          onChange={(quantity) => upd(l.key, { quantity })}
+                          touchTargets
+                          decrementLabel={t("common.decreaseProductQuantity", { product: l.productName })}
+                          inputLabel={t("common.productQuantity", { product: l.productName })}
+                          incrementLabel={t("common.increaseProductQuantity", { product: l.productName })}
+                          className="min-h-11"
+                        />
+                      </div>
+                      <div className="space-y-1 text-xs font-semibold text-slate-500">
+                        <span>{t("internalUse.unit")}</span>
+                        <Select
+                          aria-label={t("internalUse.unit")}
+                          value={l.unitName}
+                          onChange={(event) => changeUnit(l, event.target.value)}
+                          options={l.units.map((unit) => ({ value: unit.name, label: `${unit.name}${unit.mult > 1 ? ` (×${unit.mult})` : ""}` }))}
+                          className="h-11 bg-canvas"
+                        />
+                      </div>
+                      <div className="space-y-1 text-xs font-semibold text-slate-500">
+                        <span>{t("internalUse.unitCost")}</span>
+                        <NumberInput aria-label={t("internalUse.unitCost")} min={0} value={l.unitCost} onChange={(unitCost) => upd(l.key, { unitCost: unitCost ?? 0 })} className="h-11 bg-canvas text-right font-mono" />
                       </div>
                     </div>
-                    <div className="space-y-1 text-xs font-semibold text-slate-500">
-                      <span>{t("internalUse.qty")}</span>
-                      <QuantityInput min={1} value={l.quantity} onChange={(quantity) => upd(l.key, { quantity })} className="min-h-11" />
-                    </div>
-                    <div className="space-y-1 text-xs font-semibold text-slate-500">
-                      <span>{t("internalUse.unit")}</span>
-                      <Select
-                        aria-label={t("internalUse.unit")}
-                        value={l.unitName}
-                        onChange={(event) => changeUnit(l, event.target.value)}
-                        options={l.units.map((unit) => ({ value: unit.name, label: `${unit.name}${unit.mult > 1 ? ` (×${unit.mult})` : ""}` }))}
-                        className="h-11 bg-canvas"
-                      />
-                    </div>
-                    <div className="space-y-1 text-xs font-semibold text-slate-500">
-                      <span>{t("internalUse.unitCost")}</span>
-                      <NumberInput aria-label={t("internalUse.unitCost")} min={0} value={l.unitCost} onChange={(unitCost) => upd(l.key, { unitCost: unitCost ?? 0 })} className="h-11 bg-canvas text-right font-mono" />
-                    </div>
-                  </div>
-                </MobileFormLineCard>
-              ))}
+                  </MobileFormLineCard>
+                );
+              })}
             </div>
             <div className="hidden lg:block">
               <table className="w-full min-w-[760px] table-fixed text-sm">
@@ -316,7 +341,7 @@ export function InternalUseForm() {
           </div>
       </section>
 
-      <aside className="w-full lg:w-[390px] shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col p-3 sm:p-4 gap-3 overflow-auto">
+      <aside className="w-full lg:w-[390px] shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col p-3 sm:p-4 gap-3 overflow-visible lg:overflow-auto">
           <div className="mb-5 flex items-center justify-between gap-3">
             <SearchableSelect options={[{ value: "main", label: t("internalUse.defaultBranch") }]} value="main" onChange={() => undefined} placeholder={t("internalUse.defaultBranch")} />
             <div className="h-10 rounded-lg border border-border-soft bg-canvas px-3 py-2 text-sm font-semibold text-slate-400">{new Date().toLocaleDateString("vi-VN")}</div>

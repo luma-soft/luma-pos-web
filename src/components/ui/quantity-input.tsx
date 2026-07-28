@@ -17,7 +17,9 @@ export interface QuantityInputProps {
   size?: "sm" | "default";
   className?: string;
   inputClassName?: string;
+  touchTargets?: boolean;
   decrementLabel?: string;
+  inputLabel?: string;
   incrementLabel?: string;
 }
 
@@ -79,7 +81,9 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
       size = "default",
       className,
       inputClassName,
+      touchTargets = false,
       decrementLabel = "Decrease quantity",
+      inputLabel = "Quantity",
       incrementLabel = "Increase quantity",
     },
     ref,
@@ -106,6 +110,7 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
         className={cn(
           "grid shrink-0 grid-cols-[32px_minmax(44px,1fr)_32px] overflow-hidden rounded-lg border border-border bg-surface",
           size === "sm" ? "h-8" : "h-10",
+          touchTargets && "min-h-11 grid-cols-[44px_minmax(44px,1fr)_44px]",
           disabled && "cursor-not-allowed opacity-50",
           className,
         )}
@@ -129,7 +134,7 @@ export const QuantityInput = React.forwardRef<HTMLInputElement, QuantityInputPro
           thousandSeparator={false}
           disabled={disabled}
           readOnly={readOnly}
-          aria-label="Quantity"
+          aria-label={inputLabel}
           className={cn(
             "h-full rounded-none border-y-0 px-1 text-center focus:ring-0",
             inputClassName,

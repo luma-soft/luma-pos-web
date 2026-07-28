@@ -24,7 +24,10 @@
     "inactive": "Off",
     "actions": "Actions",
     "selectAll": "Select all",
-    "primaryNavigation": "Primary navigation"
+    "primaryNavigation": "Primary navigation",
+    "decreaseProductQuantity": "Decrease quantity for {product}",
+    "productQuantity": "Quantity for {product}",
+    "increaseProductQuantity": "Increase quantity for {product}"
   },
   "auth": {
     "login": "Sign in",
@@ -1542,6 +1545,7 @@
     "reason": "Reason",
     "note": "Note",
     "notePlaceholder": "Optional note…",
+    "availableStock": "Stock at {warehouse}",
     "searchProduct": "Search to add a product…",
     "cost": "Cost",
     "unit": "Unit",

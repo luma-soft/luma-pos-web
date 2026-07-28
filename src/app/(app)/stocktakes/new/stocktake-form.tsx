@@ -280,7 +280,16 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                         </div>
                         <div className="space-y-1 text-xs font-semibold text-slate-500">
                           <span>{t("stocktakes.cols.actualQty")}</span>
-                          <QuantityInput min={0} value={l.actualQty} onChange={(quantity) => setQty(l.product.id, quantity)} className="min-h-11" />
+                          <QuantityInput
+                            min={0}
+                            value={l.actualQty}
+                            onChange={(quantity) => setQty(l.product.id, quantity)}
+                            touchTargets
+                            decrementLabel={t("common.decreaseProductQuantity", { product: l.product.name })}
+                            inputLabel={t("common.productQuantity", { product: l.product.name })}
+                            incrementLabel={t("common.increaseProductQuantity", { product: l.product.name })}
+                            className="min-h-11"
+                          />
                         </div>
                         <div className="col-span-2 space-y-1">
                           <div className="text-xs font-semibold text-slate-500">{t("stocktakes.cols.diff")}</div>

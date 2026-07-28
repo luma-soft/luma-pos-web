@@ -530,7 +530,16 @@ export function PurchaseForm({
                         </div>
                         <div className="space-y-1 text-xs font-semibold text-slate-500">
                           <span>{t("purchases.cols.qty")}</span>
-                          <QuantityInput min={0} value={l.quantity} onChange={(quantity) => patch(l.productId, { quantity })} className="min-h-11" />
+                          <QuantityInput
+                            min={0}
+                            value={l.quantity}
+                            onChange={(quantity) => patch(l.productId, { quantity })}
+                            touchTargets
+                            decrementLabel={t("common.decreaseProductQuantity", { product: l.name })}
+                            inputLabel={t("common.productQuantity", { product: l.name })}
+                            incrementLabel={t("common.increaseProductQuantity", { product: l.name })}
+                            className="min-h-11"
+                          />
                         </div>
                         <div className="space-y-1 text-xs font-semibold text-slate-500">
                           <span>{t("purchases.cols.unitCost")}</span>
@@ -547,7 +556,8 @@ export function PurchaseForm({
                                   type="button"
                                   onClick={() => patch(l.productId, { discMode: mode })}
                                   variant={l.discMode === mode ? "default" : "ghost"}
-                                  className="h-11 rounded-none px-2 text-[11px] font-semibold"
+                                  aria-pressed={l.discMode === mode}
+                                  className="h-11 min-w-11 rounded-none px-2 text-[11px] font-semibold"
                                 >
                                   {mode === "vnd" ? "đ" : "%"}
                                 </Button>
@@ -625,7 +635,7 @@ export function PurchaseForm({
         </div>
 
         {/* phải: NCC + tổng tiền */}
-        <div className="w-full lg:w-[380px] shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col p-3 sm:p-4 gap-3 overflow-auto">
+        <div className="w-full lg:w-[380px] shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col p-3 sm:p-4 gap-3 overflow-visible lg:overflow-auto">
           <div>
             <Text as="div" variant="muted" size="xs" weight="medium" className="mb-1" text={`${t("purchases.cols.supplier")} *`} />
             <Combobox value={supplierId} onChange={setSupplierId} allowClear={false}

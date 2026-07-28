@@ -24,7 +24,10 @@
     "inactive": "Tắt",
     "actions": "Thao tác",
     "selectAll": "Chọn tất cả",
-    "primaryNavigation": "Điều hướng chính"
+    "primaryNavigation": "Điều hướng chính",
+    "decreaseProductQuantity": "Giảm số lượng {product}",
+    "productQuantity": "Số lượng {product}",
+    "increaseProductQuantity": "Tăng số lượng {product}"
   },
   "auth": {
     "login": "Đăng nhập",
@@ -1542,6 +1545,7 @@
     "reason": "Lý do",
     "note": "Ghi chú",
     "notePlaceholder": "Ghi chú thêm…",
+    "availableStock": "Tồn tại {warehouse}",
     "searchProduct": "Tìm & thêm sản phẩm…",
     "cost": "Giá vốn",
     "unit": "ĐVT",
