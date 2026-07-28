@@ -105,10 +105,10 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
     );
   }
 
-  const inputCls = "h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm";
+  const inputCls = "min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm md:min-h-10";
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+3rem)] md:p-6">
       <MobileDetailHeader
         backHref={Routes.Settings}
         backLabel={t("common.back")}
@@ -116,11 +116,11 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
         subtitle={t("labelSettings.settingsDesc")}
       />
 
-      <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
         <aside className="rounded-card border border-border bg-surface">
           <div className="flex items-center justify-between border-b border-border-soft p-3">
             <div className="text-sm font-bold">{t("labelSettings.templateList")}</div>
-            <button type="button" onClick={addTemplate} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white">
+            <button type="button" onClick={addTemplate} aria-label={t("common.add")} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white">
               <Plus className="h-3.5 w-3.5" />
               {t("common.add")}
             </button>
@@ -131,8 +131,9 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
                 key={item.id}
                 type="button"
                 onClick={() => { setSelectedId(item.id); setMsg(null); }}
+                aria-pressed={selected.id === item.id}
                 className={cn(
-                  "mb-1 w-full rounded-lg border px-3 py-2.5 text-left text-sm transition",
+                  "mb-1 min-h-11 w-full rounded-lg border px-3 py-2.5 text-left text-sm transition",
                   selected.id === item.id ? "border-primary-500 bg-primary-50 text-primary-800 dark:bg-primary-950/40 dark:text-primary-200" : "border-transparent hover:bg-surface-2",
                   !item.isActive && "opacity-60",
                 )}
@@ -149,14 +150,14 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
           </div>
         </aside>
 
-        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="space-y-4">
+        <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="order-1 space-y-4">
             <Panel>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label={t("labelSettings.templateName")}><input value={selected.name} onChange={(event) => patch({ name: event.target.value })} className={inputCls} /></Field>
                 <Field label={t("labelSettings.sortOrder")}><NumberInput value={selected.sortOrder} min={0} max={9999} onChange={(value) => patch({ sortOrder: value ?? selected.sortOrder })} className={inputCls} /></Field>
               </div>
-              <label className="mt-3 flex items-center gap-2 text-sm font-semibold">
+              <label className="mt-3 flex min-h-11 items-center gap-2 text-sm font-semibold md:min-h-0">
                 <input type="checkbox" checked={selected.isDefault} onChange={(event) => patch({ isDefault: event.target.checked })} />
                 {t("labelSettings.defaultTemplate")}
               </label>
@@ -169,7 +170,7 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
                     key={preset.key}
                     type="button"
                     onClick={() => patch(preset)}
-                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2"
+                    className="min-h-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2"
                   >
                     {preset.widthMm}x{preset.heightMm}mm
                   </button>
@@ -189,7 +190,7 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
             <Panel title={t("labelSettings.contentSection")}>
               <div className="grid gap-2 sm:grid-cols-2">
                 {TOGGLES.map((key) => (
-                  <label key={key} className="flex items-center gap-2 text-sm">
+                  <label key={key} className="flex min-h-11 items-center gap-2 text-sm md:min-h-0">
                     <input type="checkbox" checked={Boolean(selected[key])} onChange={(event) => patch({ [key]: event.target.checked })} />
                     {t(`labelSettings.toggles.${key}`)}
                   </label>
@@ -197,20 +198,20 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
               </div>
             </Panel>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={save} disabled={pending} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50">
+            <div className="sticky bottom-0 z-10 -mx-3 flex flex-wrap items-center gap-2 border-t border-border bg-surface/95 px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+              <button type="button" onClick={save} disabled={pending} aria-label={t("common.save")} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50">
                 {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 {t("common.save")}
               </button>
-              <button type="button" onClick={() => persisted && runAction(() => duplicateLabelTemplate(selected.id), "labelSettings.duplicated")} disabled={!persisted || pending} className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50">
+              <button type="button" onClick={() => persisted && runAction(() => duplicateLabelTemplate(selected.id), "labelSettings.duplicated")} disabled={!persisted || pending} aria-label={t("labelSettings.duplicate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50">
                 <Copy className="h-4 w-4" />
                 {t("labelSettings.duplicate")}
               </button>
-              <button type="button" onClick={() => persisted && runAction(() => setDefaultLabelTemplate(selected.id), "labelSettings.defaultSaved")} disabled={!persisted || selected.isDefault || pending} className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50">
+              <button type="button" onClick={() => persisted && runAction(() => setDefaultLabelTemplate(selected.id), "labelSettings.defaultSaved")} disabled={!persisted || selected.isDefault || pending} aria-label={t("labelSettings.setDefault")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50">
                 <Star className="h-4 w-4" />
                 {t("labelSettings.setDefault")}
               </button>
-              <button type="button" onClick={() => persisted && runAction(() => deactivateLabelTemplate(selected.id), "labelSettings.deactivated")} disabled={!persisted || selected.isDefault || pending} className="inline-flex h-10 items-center gap-2 rounded-lg border border-er/40 px-4 text-sm font-semibold text-er disabled:opacity-50">
+              <button type="button" onClick={() => persisted && runAction(() => deactivateLabelTemplate(selected.id), "labelSettings.deactivated")} disabled={!persisted || selected.isDefault || pending} aria-label={t("labelSettings.deactivate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-er/40 px-4 text-sm font-semibold text-er disabled:opacity-50">
                 <EyeOff className="h-4 w-4" />
                 {t("labelSettings.deactivate")}
               </button>
@@ -218,9 +219,9 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
             </div>
           </div>
 
-          <div>
+          <div className="order-2 min-w-0">
             <p className="mb-2 text-xs font-semibold text-slate-500">{t("labelSettings.preview")}</p>
-            <div className="rounded-card border border-border bg-slate-200 p-4 dark:bg-slate-950">
+            <div className="overflow-auto rounded-card border border-border bg-slate-200 p-4 dark:bg-slate-950">
               <div
                 className="overflow-hidden border border-slate-300 bg-white p-[2mm] text-slate-950 shadow-sm"
                 style={{ width: `${selected.widthMm}mm`, height: `${selected.heightMm}mm` }}
@@ -257,7 +258,7 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
 
 function Panel({ title, children }: { title?: string; children: ReactNode }) {
   return (
-    <div className="rounded-card border border-border bg-surface p-5">
+    <div className="rounded-card border border-border bg-surface p-3 md:p-5">
       {title && <h2 className="mb-3 text-sm font-bold">{title}</h2>}
       {children}
     </div>

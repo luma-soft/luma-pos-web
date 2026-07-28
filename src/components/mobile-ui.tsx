@@ -104,6 +104,45 @@ export function MobileTopBar({
   );
 }
 
+export function TouchTargetToggle({
+  checked,
+  onChange,
+  disabled,
+  "aria-label": ariaLabel,
+}: {
+  checked: boolean;
+  onChange?: (checked: boolean) => void;
+  disabled?: boolean;
+  "aria-label": string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={ariaLabel}
+      disabled={disabled}
+      onClick={() => onChange?.(!checked)}
+      className="relative h-11 w-11 shrink-0 rounded-full transition disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:h-[21px] md:w-[38px]"
+    >
+      <span
+        aria-hidden="true"
+        className={cn(
+          "absolute left-1/2 top-1/2 h-[21px] w-[38px] -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors",
+          checked ? "bg-primary-600" : "bg-border",
+        )}
+      >
+        <span
+          className={cn(
+            "absolute top-[3px] h-[15px] w-[15px] rounded-full bg-white shadow-sm transition-[left]",
+            checked ? "left-[20px]" : "left-[3px]",
+          )}
+        />
+      </span>
+    </button>
+  );
+}
+
 export function MobileMetricTile({
   label,
   value,

@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { ArrowRight, Check, ChevronDown, Copy, ExternalLink, KeyRound, Loader2, MessageCircle, Pencil, Plus, Power, Printer, Save, Star, Trash2, X } from "lucide-react";
 import { SearchableSelect } from "@/components/combobox";
+import { MobileTopBar, TouchTargetToggle } from "@/components/mobile-ui";
 import { Select } from "@/components/ui/select";
 import { SegmentedTabs } from "@/components/ui/tabs";
-import { Toggle } from "@/components/ui/toggle";
 import { NumberInput } from "@/components/ui/number-input";
 import { Routes } from "@/lib/routes";
 import { ONLINE_SALES_ENABLED } from "@/lib/features";
@@ -284,10 +284,11 @@ function Card({ title, vi, action, children }: { title: string; vi: string; acti
   );
 }
 const FL = "text-[9px] font-bold uppercase tracking-wide text-slate-500";
-const FI = "w-full px-[11px] py-[9px] bg-canvas border-[1.5px] border-border rounded-[10px] text-[13px] outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30";
-const ROW = "flex items-center justify-between gap-3 px-3.5 py-2.5 bg-canvas rounded-[10px] border border-border-soft";
-const btnS = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border-soft text-xs font-semibold hover:bg-surface-2 transition";
-const btnF = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-600 text-white text-xs font-semibold hover:brightness-110 transition";
+const FI = "min-h-11 w-full px-[11px] py-[9px] bg-canvas border-[1.5px] border-border rounded-[10px] text-[13px] outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 md:min-h-0";
+const ROW = "flex min-h-11 items-center justify-between gap-3 px-3.5 py-2.5 bg-canvas rounded-[10px] border border-border-soft";
+const btnS = "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-full border border-border-soft text-xs font-semibold hover:bg-surface-2 transition md:min-h-0 md:min-w-0";
+const btnF = "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-600 text-white text-xs font-semibold hover:brightness-110 transition md:min-h-0 md:min-w-0";
+const searchableTouch = "[&>button]:h-11 md:[&>button]:h-10";
 
 export function SettingsClient({
   store,
@@ -389,18 +390,23 @@ export function SettingsClient({
       </nav>
 
       {/* content */}
-      <div className="flex-1 overflow-y-auto px-5 md:px-7 py-6 pb-12">
-        {/* mobile section picker */}
-        <div className="md:hidden mb-4">
-          <Select
-            value={active}
-            onChange={(e) => pick(e.target.value as SectionId)}
-            options={NAV.flatMap((g) => g.items).map((it) => ({ value: it.id, label: L ? it.vi : it.en }))}
-            className={FI}
-          />
-        </div>
-
-        <div className="mb-4">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <MobileTopBar
+          className="md:hidden"
+          title={L ? sec.vi : sec.en}
+          subtitle={L ? sec.subVi : sec.subEn}
+          bottom={
+            <Select
+              value={active}
+              onChange={(e) => pick(e.target.value as SectionId)}
+              options={NAV.flatMap((g) => g.items).map((it) => ({ value: it.id, label: L ? it.vi : it.en }))}
+              aria-label={L ? "Chọn mục cài đặt" : "Choose settings section"}
+              className="min-h-11"
+            />
+          }
+        />
+        <div className="flex-1 overflow-y-auto px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+3rem)] md:px-7 md:py-6">
+        <div className="hidden md:block">
           <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.07em] text-primary-600">
             {tSettings("breadcrumb.settings")} · {tSettings(`breadcrumb.${active}`)}
           </div>
@@ -419,6 +425,7 @@ export function SettingsClient({
         {active === "zalo" && <ZaloSection L={L} prefs={store.prefs.zalo} canEdit={canEditAi} />}
         {ONLINE_SALES_ENABLED && active === "shopee" && <ShopeeSettingsSection L={L} prefs={store.prefs.shopee} canEdit={canEditAi} />}
         {active === "ai" && (aiUsage ? <AiSection L={L} prefs={store.prefs.ai} canEdit={canEditAi} usage={aiUsage} /> : <LazySectionState L={L} loading={Boolean(lazyLoading.ai)} error={lazyError.ai} />)}
+        </div>
       </div>
     </div>
   );
@@ -473,18 +480,18 @@ function StoreSection({ L, locale, store, canManage }: { L: boolean; locale: str
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="flex flex-col gap-1"><span className={FL}>{L ? "Mã số thuế" : "Tax ID"}</span><input className={FI} value={form.taxCode} disabled={!canManage} onChange={(e) => set("taxCode", e.target.value)} /></div>
           <div className="flex flex-col gap-1"><span className={FL}>{L ? "Ngành" : "Industry"}</span>
-            <SearchableSelect options={industryOpts} value={form.industry} onChange={(v) => set("industry", v)} allowClear={false} disabled={!canManage} />
+            <SearchableSelect options={industryOpts} value={form.industry} onChange={(v) => set("industry", v)} allowClear={false} disabled={!canManage} className={searchableTouch} />
           </div>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="flex flex-col gap-1"><span className={FL}>{L ? "Tiền tệ" : "Currency"}</span>
-            <SearchableSelect options={currencyOpts} value={form.currency} onChange={(v) => set("currency", v)} allowClear={false} disabled={!canManage} />
+            <SearchableSelect options={currencyOpts} value={form.currency} onChange={(v) => set("currency", v)} allowClear={false} disabled={!canManage} className={searchableTouch} />
           </div>
         </div>
         {canManage && (dirty || saved) && (
           <div className="flex items-center gap-2 pt-1">
             <span className="text-[11px] text-slate-500 flex-1">{dirty ? (L ? "Có thay đổi chưa lưu" : "Unsaved changes") : (L ? "Đã lưu" : "Saved")}</span>
-            <button disabled={!dirty || pending} onClick={save} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-primary-600 text-white text-xs font-semibold disabled:opacity-50">
+            <button disabled={!dirty || pending} onClick={save} className={cn(btnF, "disabled:opacity-50")}>
               {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{L ? "Lưu" : "Save"}
             </button>
           </div>
@@ -513,14 +520,14 @@ function StaffRowItem({ s, i, L, canManage }: { s: StaffRow; i: number; L: boole
             onChange={(e) => { const r = e.target.value as StaffRole; setRole(r); start(() => { updateStaffRole(s.id, r); }); }}
             size="sm"
             options={STAFF_ROLES.map((r) => ({ value: r, label: L ? ROLE_TEXT[r][1] : ROLE_TEXT[r][0] }))}
-            className="text-xs"
+            className="min-h-11 text-xs md:min-h-0"
           />
         ) : <span className={cn("inline-block px-2 py-0.5 rounded-full text-[9px] font-bold", ROLE_PILL[role] ?? "bg-surface-2 text-slate-500")}>{L ? (ROLE_TEXT[role]?.[1] ?? role) : (ROLE_TEXT[role]?.[0] ?? role)}</span>}
       </td>
       <td className="px-3 py-2.5 font-mono text-[11px] text-slate-500">{s.phone ?? "—"}</td>
       <td className="px-3 py-2.5">
         {canManage
-          ? <Toggle checked={active} onChange={(v) => { setActive(v); start(() => { setStaffActive(s.id, v); }); }} aria-label="active" />
+          ? <TouchTargetToggle checked={active} onChange={(v) => { setActive(v); start(() => { setStaffActive(s.id, v); }); }} aria-label="active" />
           : <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold", active ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-400")}>{active ? (L ? "Hoạt động" : "Active") : (L ? "Vô hiệu" : "Inactive")}</span>}
       </td>
     </tr>
@@ -640,7 +647,7 @@ function HardwareSection({ L, prefs, canManage }: { L: boolean; prefs: StorePref
         <div className="p-4.5 flex flex-col gap-3">
           <div className="flex flex-col gap-1 max-w-50">
             <span className={FL}>{L ? "Khổ giấy mặc định" : "Default paper size"}</span>
-            <SearchableSelect options={PAPER_SIZES.map((s) => ({ value: s, label: s }))} value={form.paperSize} onChange={(v) => set("paperSize", v as typeof form.paperSize)} allowClear={false} disabled={!canManage} />
+            <SearchableSelect options={PAPER_SIZES.map((s) => ({ value: s, label: s }))} value={form.paperSize} onChange={(v) => set("paperSize", v as typeof form.paperSize)} allowClear={false} disabled={!canManage} className={searchableTouch} />
           </div>
           <CtrlRow title={L ? "In QR hóa đơn điện tử" : "Print e-invoice QR"} desc={L ? "Mã xác thực theo Nghị định 70" : "Decree 70 verification code"} checked={form.printEinvoiceQr} onChange={canManage ? (v) => set("printEinvoiceQr", v) : undefined} />
           <CtrlRow title={L ? "In tự động sau mỗi đơn" : "Auto-print after each order"} checked={form.autoPrint} onChange={canManage ? (v) => set("autoPrint", v) : undefined} />
@@ -724,7 +731,7 @@ function PaymentsSection({
                 <div key={p.id} className={ROW}>
                   <span className="w-9 h-9 rounded-[10px] grid place-items-center text-lg shrink-0" style={{ background: p.color + "22", border: `1px solid ${p.color}33` }}>{p.ico}</span>
                   <div className="flex-1 min-w-0"><div className="text-xs font-bold">{L ? p.vi : p.name}</div><div className="text-[10px] text-slate-500">{p.note}</div></div>
-                  <Toggle checked={pm[id]} onChange={() => toggle(id)} aria-label={p.name} />
+                  <TouchTargetToggle checked={pm[id]} onChange={() => toggle(id)} aria-label={p.name} />
                 </div>
               );
             })}
@@ -765,7 +772,7 @@ function SePayNotificationsSection({ L }: { L: boolean }) {
             <div className="min-w-0">
               <div className="text-xs font-bold">{t("setupTitle")}</div>
             </div>
-            <a href="https://my.sepay.vn" target="_blank" rel="noreferrer" className={cn(btnS, "h-9 shrink-0 justify-center rounded-lg px-3 whitespace-nowrap")}>
+            <a href="https://my.sepay.vn" target="_blank" rel="noreferrer" className={cn(btnS, "shrink-0 rounded-lg px-3 whitespace-nowrap")}>
               <ExternalLink className="w-3.5 h-3.5" />{t("openSepay")}
             </a>
           </div>
@@ -888,7 +895,7 @@ function SePayAccountsSection({ L, accounts, canManage }: { L: boolean; accounts
             <div className="px-3.5 py-3 rounded-[10px] bg-canvas border border-border text-[12px] text-slate-500">{t("empty")}</div>
           )}
           {accounts.map((account) => (
-            <div key={account.id} className={cn(ROW, "items-start")}>
+            <div key={account.id} className={cn(ROW, "flex-col items-stretch sm:flex-row sm:items-start")}>
               <div className="w-9 h-9 rounded-[10px] bg-primary-50 dark:bg-primary-950/40 grid place-items-center text-primary-700 dark:text-primary-300 shrink-0">
                 <BankLogo bank={VIETQR_BANKS.find((bank) => bank.code === account.bankCode)} fallback={account.bankCode} />
               </div>
@@ -907,7 +914,7 @@ function SePayAccountsSection({ L, accounts, canManage }: { L: boolean; accounts
                 </div>
               </div>
               {canManage && (
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-1 sm:w-auto">
                   <button type="button" onClick={() => edit(account)} className={btnS} aria-label={t("edit")}>
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
@@ -947,7 +954,7 @@ function SePayAccountsSection({ L, accounts, canManage }: { L: boolean; accounts
                 type="button"
                 onClick={closeForm}
                 disabled={pending}
-                className="rounded-lg p-2 text-slate-400 transition hover:bg-surface-2 hover:text-slate-700 disabled:opacity-50"
+                className="grid min-h-11 min-w-11 place-items-center rounded-lg p-2 text-slate-400 transition hover:bg-surface-2 hover:text-slate-700 disabled:opacity-50 md:min-h-0 md:min-w-0"
                 aria-label={t("cancel")}
               >
                 <X className="h-4 w-4" />
@@ -1048,7 +1055,7 @@ function BankSelect({ value, onChange, placeholder }: { value: string; onChange:
           <div className="border-b border-border-soft">
             <input
               autoFocus
-              className="w-full bg-transparent px-3 py-2.5 text-sm outline-none"
+              className="min-h-11 w-full bg-transparent px-3 py-2.5 text-sm outline-none"
               value={q}
               onChange={(event) => setQ(event.target.value)}
               placeholder={t("bankSearch")}
@@ -1063,7 +1070,7 @@ function BankSelect({ value, onChange, placeholder }: { value: string; onChange:
                 type="button"
                 onClick={() => pick(bank)}
                 className={cn(
-                  "flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-surface-2",
+                  "flex min-h-11 w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-surface-2",
                   bank.code === value && "bg-primary-50 dark:bg-primary-950/40"
                 )}
               >
@@ -1163,12 +1170,12 @@ function TaxSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["ta
           <CtrlRow title={L ? "Giá đã bao gồm thuế" : "Prices include tax"} desc={L ? "Giá niêm yết đã gồm GTGT" : "Listed prices are tax-inclusive"} checked={form.priceIncludesTax} onChange={canManage ? (v) => set("priceIncludesTax", v) : undefined} />
         </div>
       </Card>
-      <Card title={L ? "Hóa đơn điện tử (Nghị định 70/2025)" : "E-Invoice — Decree 70/2025"} vi={L ? "Cấu hình nhà cung cấp HĐĐT" : "E-invoice provider config"} action={<Toggle checked={form.einvoiceEnabled} onChange={canManage ? (v) => set("einvoiceEnabled", v) : () => {}} aria-label="einvoice" />}>
+      <Card title={L ? "Hóa đơn điện tử (Nghị định 70/2025)" : "E-Invoice — Decree 70/2025"} vi={L ? "Cấu hình nhà cung cấp HĐĐT" : "E-invoice provider config"} action={<TouchTargetToggle checked={form.einvoiceEnabled} onChange={canManage ? (v) => set("einvoiceEnabled", v) : () => {}} aria-label="einvoice" />}>
         <div className="p-4.5 flex flex-col gap-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1"><span className={FL}>{L ? "Mã số thuế (MST)" : "Tax ID (MST)"}</span><input className={cn(FI, "font-mono")} value={form.einvoiceTaxId} disabled={!canManage} placeholder="0123456789" onChange={(e) => set("einvoiceTaxId", e.target.value)} /></div>
             <div className="flex flex-col gap-1"><span className={FL}>{L ? "Nhà cung cấp HĐĐT" : "E-Invoice Provider"}</span>
-              <SearchableSelect options={providerOpts} value={form.einvoiceProvider} onChange={(v) => set("einvoiceProvider", v)} allowClear={false} disabled={!canManage} />
+              <SearchableSelect options={providerOpts} value={form.einvoiceProvider} onChange={(v) => set("einvoiceProvider", v)} allowClear={false} disabled={!canManage} className={searchableTouch} />
             </div>
           </div>
           <div className="px-3.5 py-2.5 bg-in-soft border border-in/20 rounded-[10px] text-[11px] text-in leading-relaxed">
@@ -1234,7 +1241,7 @@ function NotificationsSection({
                     {channel.configured ? (L ? "Sẵn sàng" : "Available") : (L ? "Chưa cấu hình phía server" : "Not configured on server")}
                   </div>
                 </div>
-                <Toggle checked={form.channels[channel.id] === true} disabled={!canManage || !channel.configured} onChange={(v) => setChannel(channel.id, v)} aria-label={view.name} />
+                <TouchTargetToggle checked={form.channels[channel.id] === true} disabled={!canManage || !channel.configured} onChange={(v) => setChannel(channel.id, v)} aria-label={view.name} />
               </div>
             );
           })}
@@ -1279,7 +1286,7 @@ function ZaloSecretInput({
         placeholder={setFlag ? (L ? "Để trống để giữ giá trị hiện tại" : "Leave blank to keep current value") : ""}
         onChange={(e) => onValueChange(id, e.target.value)}
       />
-      <label className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
+      <label className="mt-1 flex min-h-11 items-center gap-2 text-[11px] text-slate-500 md:min-h-0">
         <input type="checkbox" checked={clear} disabled={!canEdit} onChange={(e) => onClearChange(id, e.target.checked)} />
         {L ? "Xóa giá trị đang lưu" : "Clear saved value"}
       </label>
@@ -1374,7 +1381,7 @@ function ShopeeSettingsSection({ L, prefs, canEdit }: { L: boolean; prefs: Store
                 placeholder={partnerKeySet ? (L ? "Đã lưu, nhập key mới để thay" : "Saved, enter a new key to replace") : (L ? "Chưa cấu hình" : "Not configured")}
                 onChange={(e) => set("partnerKey", e.target.value)}
               />
-              <label className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
+              <label className="mt-1 flex min-h-11 items-center gap-2 text-[11px] text-slate-500 md:min-h-0">
                 <input type="checkbox" checked={clearPartnerKey} disabled={!canEdit} onChange={(e) => { setClearPartnerKey(e.target.checked); mark(); }} />
                 {L ? "Xóa partner key đang lưu" : "Clear saved partner key"}
               </label>
@@ -1392,7 +1399,7 @@ function ShopeeSettingsSection({ L, prefs, canEdit }: { L: boolean; prefs: Store
       {canEdit && (dirty || saved || error) && (
         <div className="flex items-center gap-2 pt-1">
           <span className={cn("text-[11px] flex-1", error ? "text-er" : "text-slate-500")}>{error || (dirty ? (L ? "Có thay đổi chưa lưu" : "Unsaved changes") : (L ? "Đã lưu" : "Saved"))}</span>
-          <button disabled={!dirty || pending} onClick={save} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-primary-600 text-white text-xs font-semibold disabled:opacity-50">
+          <button disabled={!dirty || pending} onClick={save} className={cn(btnF, "disabled:opacity-50")}>
             {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{L ? "Lưu" : "Save"}
           </button>
         </div>
@@ -1469,7 +1476,7 @@ function ZaloSection({ L, prefs, canEdit }: { L: boolean; prefs: StorePrefs["zal
       <Card
         title={L ? "Zalo Official Account" : "Zalo Official Account"}
         vi={L ? "OA token và trạng thái gửi ZNS" : "OA token and ZNS sending status"}
-        action={<Toggle checked={form.enabled} onChange={canEdit ? (v) => set("enabled", v) : () => {}} aria-label="zalo" />}
+        action={<TouchTargetToggle checked={form.enabled} onChange={canEdit ? (v) => set("enabled", v) : () => {}} aria-label="zalo" />}
       >
         <div className="p-4.5 flex flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -1533,7 +1540,7 @@ function ZaloSection({ L, prefs, canEdit }: { L: boolean; prefs: StorePrefs["zal
       {canEdit && (dirty || saved || error) && (
         <div className="flex items-center gap-2 pt-1">
           <span className={cn("text-[11px] flex-1", error ? "text-er" : "text-slate-500")}>{error || (dirty ? (L ? "Có thay đổi chưa lưu" : "Unsaved changes") : (L ? "Đã lưu" : "Saved"))}</span>
-          <button disabled={!dirty || pending} onClick={save} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-primary-600 text-white text-xs font-semibold disabled:opacity-50">
+          <button disabled={!dirty || pending} onClick={save} className={cn(btnF, "disabled:opacity-50")}>
             {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{L ? "Lưu" : "Save"}
           </button>
         </div>
@@ -1646,6 +1653,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
                 allowClear={false}
                 showSearch={false}
                 disabled={!canEdit}
+                className={searchableTouch}
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -1659,7 +1667,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
                 onChange={(e) => set("openaiApiKey", e.target.value)}
               />
               <span className="text-[11px] text-slate-500">{providerKeyHelp(form.provider, L)}</span>
-              <label className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
+              <label className="mt-1 flex min-h-11 items-center gap-2 text-[11px] text-slate-500 md:min-h-0">
                 <input type="checkbox" checked={clearOpenaiApiKey} disabled={!canEdit} onChange={(e) => toggleClearKey(e.target.checked)} />
                 {L ? "Xóa API key đang lưu" : "Clear saved API key"}
               </label>
@@ -1675,6 +1683,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
                 allowClear={false}
                 showSearch={false}
                 disabled={!canEdit}
+                className={searchableTouch}
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -1690,6 +1699,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
                 allowClear={false}
                 showSearch={false}
                 disabled={!canEdit}
+                className={searchableTouch}
               />
             </div>
           </div>
@@ -1703,6 +1713,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
                 allowClear={false}
                 showSearch={false}
                 disabled={!canEdit}
+                className={searchableTouch}
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -1771,7 +1782,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
               type="button"
               disabled={!canEdit || testing !== null}
               onClick={() => void runProviderTest("text")}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-600 text-white text-xs font-semibold disabled:opacity-50"
+              className={cn(btnF, "disabled:opacity-50")}
             >
               {testing === "text" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               {L ? "Test text model" : "Test text model"}
@@ -1780,7 +1791,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
               type="button"
               disabled={!canEdit || testing !== null || form.provider === "deepseek"}
               onClick={() => void runProviderTest("vision")}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border text-xs font-semibold hover:bg-surface-2 disabled:opacity-50"
+              className={cn(btnS, "disabled:opacity-50")}
             >
               {testing === "vision" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               {L ? "Test vision model" : "Test vision model"}
@@ -1808,7 +1819,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
       {canEdit && (dirty || saved || error) && (
         <div className="flex items-center gap-2 pt-1">
           <span className={cn("text-[11px] flex-1", error ? "text-er" : "text-slate-500")}>{error || (dirty ? (L ? "Có thay đổi chưa lưu" : "Unsaved changes") : (L ? "Đã lưu" : "Saved"))}</span>
-          <button disabled={!dirty || pending} onClick={save} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-primary-600 text-white text-xs font-semibold disabled:opacity-50">
+          <button disabled={!dirty || pending} onClick={save} className={cn(btnF, "disabled:opacity-50")}>
             {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{L ? "Lưu" : "Save"}
           </button>
         </div>
@@ -1824,7 +1835,7 @@ function CtrlRow({ title, desc, checked, onChange }: { title: string; desc?: str
         <div className="text-xs font-bold">{title}</div>
         {desc && <div className="text-[10px] italic text-slate-500 mt-px">{desc}</div>}
       </div>
-      <Toggle checked={checked} onChange={onChange ?? (() => {})} aria-label={title} />
+      <TouchTargetToggle checked={checked} onChange={onChange ?? (() => {})} aria-label={title} />
     </div>
   );
 }
@@ -1835,7 +1846,7 @@ function SaveBar({ L, dirty, saved, pending, canManage, onSave }: { L: boolean; 
   return (
     <div className="flex items-center gap-2 pt-1">
       <span className="text-[11px] text-slate-500 flex-1">{dirty ? (L ? "Có thay đổi chưa lưu" : "Unsaved changes") : (L ? "Đã lưu" : "Saved")}</span>
-      <button disabled={!dirty || pending} onClick={onSave} className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-primary-600 text-white text-xs font-semibold disabled:opacity-50">
+      <button disabled={!dirty || pending} onClick={onSave} className={cn(btnF, "disabled:opacity-50")}>
         {pending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}{L ? "Lưu" : "Save"}
       </button>
     </div>

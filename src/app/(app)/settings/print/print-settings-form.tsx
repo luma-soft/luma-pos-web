@@ -114,10 +114,10 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
     );
   }
 
-  const inputCls = "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm";
+  const inputCls = "min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm md:min-h-10";
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+3rem)] md:p-6">
       <MobileDetailHeader
         backHref={Routes.Settings}
         backLabel={t("common.back")}
@@ -131,8 +131,9 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
             key={item}
             type="button"
             onClick={() => selectDocType(item)}
+            aria-pressed={docType === item}
             className={cn(
-              "shrink-0 border-b-2 px-4 py-2 text-sm font-semibold",
+              "min-h-11 shrink-0 border-b-2 px-4 py-2 text-sm font-semibold",
               docType === item ? "border-primary-600 text-primary-600" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200",
             )}
           >
@@ -141,11 +142,11 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
         ))}
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
         <aside className="rounded-card border border-border bg-surface">
           <div className="flex items-center justify-between border-b border-border-soft p-3">
             <div className="text-sm font-bold">{t("printSettings.templateList")}</div>
-            <button type="button" onClick={addTemplate} className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white">
+            <button type="button" onClick={addTemplate} aria-label={t("common.add")} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white">
               <Plus className="h-3.5 w-3.5" />
               {t("common.add")}
             </button>
@@ -156,8 +157,9 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                 key={item.id}
                 type="button"
                 onClick={() => { setSelectedId(item.id); setMsg(null); }}
+                aria-pressed={selected.id === item.id}
                 className={cn(
-                  "mb-1 w-full rounded-lg border px-3 py-2.5 text-left text-sm transition",
+                  "mb-1 min-h-11 w-full rounded-lg border px-3 py-2.5 text-left text-sm transition",
                   selected.id === item.id ? "border-primary-500 bg-primary-50 text-primary-800 dark:bg-primary-950/40 dark:text-primary-200" : "border-transparent hover:bg-surface-2",
                 )}
               >
@@ -171,8 +173,8 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
           </div>
         </aside>
 
-        <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
-          <div className="space-y-4">
+        <section className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="order-1 space-y-4">
             <Panel>
               <div className="grid gap-3 sm:grid-cols-2">
                 <Field label={t("printSettings.templateName")}><input value={selected.name} onChange={(event) => patch({ name: event.target.value })} className={inputCls} /></Field>
@@ -184,7 +186,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                         type="button"
                         onClick={() => patch({ paperDefault: size })}
                         className={cn(
-                          "h-10 rounded-lg border px-3 text-xs font-bold uppercase",
+                          "min-h-11 rounded-lg border px-3 text-xs font-bold uppercase md:min-h-10",
                           selected.paperDefault === size ? "border-primary-600 bg-primary-600 text-white" : "border-border text-slate-600 dark:text-slate-300",
                         )}
                       >
@@ -194,7 +196,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                   </div>
                 </Field>
               </div>
-              <label className="mt-3 flex items-center gap-2 text-sm font-semibold">
+              <label className="mt-3 flex min-h-11 items-center gap-2 text-sm font-semibold md:min-h-0">
                 <input type="checkbox" checked={selected.isDefault} onChange={(event) => patch({ isDefault: event.target.checked })} />
                 {t("printSettings.defaultTemplate")}
               </label>
@@ -212,7 +214,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
             <Panel title={t("printSettings.optionsSection")}>
               <div className="grid gap-2 sm:grid-cols-2">
                 {TOGGLES.map((key) => (
-                  <label key={key} className="flex items-center gap-2 text-sm">
+                  <label key={key} className="flex min-h-11 items-center gap-2 text-sm md:min-h-0">
                     <input type="checkbox" checked={Boolean(selected.options[key])} onChange={(event) => patchOption(key, event.target.checked)} />
                     {t(`printSettings.toggles.${key}`)}
                   </label>
@@ -224,20 +226,20 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
               <Field label={t("printSettings.footerNote")}><textarea rows={3} value={selected.footerNote} onChange={(event) => patch({ footerNote: event.target.value })} className={inputCls} /></Field>
             </Panel>
 
-            <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={save} disabled={isPending} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50">
+            <div className="sticky bottom-0 z-10 -mx-3 flex flex-wrap items-center gap-2 border-t border-border bg-surface/95 px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+              <button type="button" onClick={save} disabled={isPending} aria-label={t("common.save")} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50">
                 {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 {t("common.save")}
               </button>
-              <button type="button" onClick={() => persisted && runAction(() => duplicatePrintTemplate(selected.id), "printSettings.duplicated")} disabled={!persisted || isPending} className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50">
+              <button type="button" onClick={() => persisted && runAction(() => duplicatePrintTemplate(selected.id), "printSettings.duplicated")} disabled={!persisted || isPending} aria-label={t("printSettings.duplicate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50">
                 <Copy className="h-4 w-4" />
                 {t("printSettings.duplicate")}
               </button>
-              <button type="button" onClick={() => persisted && runAction(() => setDefaultPrintTemplate(selected.id), "printSettings.defaultSaved")} disabled={!persisted || selected.isDefault || isPending} className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50">
+              <button type="button" onClick={() => persisted && runAction(() => setDefaultPrintTemplate(selected.id), "printSettings.defaultSaved")} disabled={!persisted || selected.isDefault || isPending} aria-label={t("printSettings.setDefault")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold disabled:opacity-50">
                 <Star className="h-4 w-4" />
                 {t("printSettings.setDefault")}
               </button>
-              <button type="button" onClick={() => persisted && runAction(() => deactivatePrintTemplate(selected.id), "printSettings.deactivated")} disabled={!persisted || isPending} className="inline-flex h-10 items-center gap-2 rounded-lg border border-er/40 px-4 text-sm font-semibold text-er disabled:opacity-50">
+              <button type="button" onClick={() => persisted && runAction(() => deactivatePrintTemplate(selected.id), "printSettings.deactivated")} disabled={!persisted || isPending} aria-label={t("printSettings.deactivate")} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-er/40 px-4 text-sm font-semibold text-er disabled:opacity-50">
                 <EyeOff className="h-4 w-4" />
                 {t("printSettings.deactivate")}
               </button>
@@ -245,7 +247,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
             </div>
           </div>
 
-          <div className="min-w-0">
+          <div className="order-2 min-w-0">
             <p className="mb-2 text-xs font-semibold text-slate-500">{t("printSettings.preview")}</p>
             <div className="max-h-[720px] overflow-auto rounded-card border border-border bg-slate-200 p-4 dark:bg-slate-950">
               <div className="scale-[0.46] origin-top-left">
@@ -300,7 +302,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
 
 function Panel({ title, children }: { title?: string; children: ReactNode }) {
   return (
-    <div className="rounded-card border border-border bg-surface p-5">
+    <div className="rounded-card border border-border bg-surface p-3 md:p-5">
       {title && <h2 className="mb-3 text-sm font-bold">{title}</h2>}
       {children}
     </div>
