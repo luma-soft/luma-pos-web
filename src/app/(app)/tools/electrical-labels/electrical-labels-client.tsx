@@ -270,6 +270,7 @@ export function ElectricalLabelsClient() {
               <Field label={t("profileLabel")}>
                 <Select
                   className="w-full"
+                  optionClassName="min-h-11 md:min-h-0"
                   value={settings.profileId}
                   options={profileOptions}
                   onValueChange={(profileId) => setSettings((current) => ({ ...current, profileId }))}
@@ -342,6 +343,7 @@ export function ElectricalLabelsClient() {
                   <Field label={t("modules")} className="min-w-0">
                     <Select
                       className="w-full"
+                      optionClassName="min-h-11 md:min-h-0"
                       value={String(circuit.modules)}
                       options={moduleOptions}
                       onValueChange={(value) => updateCircuit(circuit.id, { modules: Number(value) as ModuleCount })}
@@ -481,13 +483,18 @@ export function ElectricalLabelsClient() {
               <Ruler className="mt-0.5 size-4 shrink-0" />
               <p>{t("printHint")}</p>
             </div>
-            <div className="max-h-[calc(100dvh-14rem)] overflow-auto bg-surface-2 p-4 sm:p-6">
+            <div className="max-h-[calc(100dvh-14rem)] overflow-y-auto overflow-x-hidden bg-surface-2 p-4 sm:overflow-auto sm:p-6">
               {pages.map((page, pageIndex) => (
-                <div className="mx-auto mb-6 w-max" key={pageIndex}>
+                <div className="mx-auto mb-6 w-full" key={pageIndex}>
                   <div className="mb-1.5 font-mono text-[9px] font-bold uppercase tracking-widest text-slate-400">
                     {t("pageNumber", { page: pageIndex + 1 })}
                   </div>
-                  <PrintPage page={page} settings={settings} moduleWidth={moduleWidth} pageIndex={pageIndex} preview />
+                  <MobilePrintPreviewFrame>
+                    <PrintPage page={page} settings={settings} moduleWidth={moduleWidth} pageIndex={pageIndex} preview />
+                  </MobilePrintPreviewFrame>
+                  <div className="hidden w-max sm:mx-auto sm:block">
+                    <PrintPage page={page} settings={settings} moduleWidth={moduleWidth} pageIndex={pageIndex} preview />
+                  </div>
                 </div>
               ))}
             </div>
@@ -548,6 +555,16 @@ function CircuitColorPicker({
           ×
         </button>
       )}
+    </div>
+  );
+}
+
+export function MobilePrintPreviewFrame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative h-[416px] w-full overflow-hidden min-[400px]:h-[449px] sm:hidden">
+      <div className="absolute left-0 top-0 origin-top-left scale-[0.37] min-[400px]:scale-[0.4]">
+        {children}
+      </div>
     </div>
   );
 }

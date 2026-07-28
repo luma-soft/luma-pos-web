@@ -1455,6 +1455,11 @@
     "mergeHint": "Chạm các bàn đang phục vụ để gộp (bàn ★ đầu tiên là bàn đích).",
     "mergeInto": "Gộp {count} bàn vào {name}",
     "mergeConfirm": "Gộp bàn",
+    "move": "Chuyển bàn",
+    "moveTitle": "Chuyển đơn sang bàn khác",
+    "moveHint": "Chọn một bàn trống để chuyển toàn bộ món và phiếu bếp.",
+    "noMoveTargets": "Hiện không có bàn trống để chuyển.",
+    "moveConfirm": "Xác nhận chuyển",
     "split": "Tách bill",
     "splitHint": "Chọn món để thanh toán riêng; phần còn lại ở lại bàn.",
     "selectedTotal": "Đã chọn",
@@ -1467,7 +1472,8 @@
     "kitchenTicket": "PHIẾU BẾP",
     "errors": {
       "occupied": "Bàn đang phục vụ — không xóa được.",
-      "nothingToSend": "Không có món mới để gửi."
+      "nothingToSend": "Không có món mới để gửi.",
+      "targetOccupied": "Bàn đích không còn trống."
     }
   },
   "modifiers": {

@@ -30,6 +30,8 @@ export interface SelectProps
   placeholderTxOptions?: TxValues;
   /** Keep long labels readable instead of truncating them. */
   wrapLabel?: boolean;
+  /** Applied to each portaled option row (for route-scoped touch sizing). */
+  optionClassName?: string;
 }
 
 export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
@@ -48,6 +50,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
       placeholderTx,
       placeholderTxOptions,
       wrapLabel = false,
+      optionClassName,
       disabled,
       ...props
     },
@@ -172,20 +175,14 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
             {options.map((option) => {
               const active = option.value === currentValue;
               return (
-                <button
+                <SelectOptionRow
                   key={option.value}
-                  type="button"
-                  role="option"
-                  aria-selected={active}
-                  onClick={() => pick(option.value)}
-                  className={cn(
-                    "flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2",
-                    active && "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-200"
-                  )}
-                >
-                  <span className={cn("min-w-0", wrapLabel ? "whitespace-normal break-words" : "truncate")}>{optionLabel(option, t)}</span>
-                  {active && <Check className="h-4 w-4 shrink-0 text-primary-600" />}
-                </button>
+                  active={active}
+                  wrapLabel={wrapLabel}
+                  onSelect={() => pick(option.value)}
+                  className={optionClassName}
+                  label={optionLabel(option, t)}
+                />
               );
             })}
           </div>,
@@ -196,6 +193,37 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
   }
 );
 Select.displayName = "Select";
+
+export function SelectOptionRow({
+  active,
+  wrapLabel,
+  onSelect,
+  className,
+  label,
+}: {
+  active: boolean;
+  wrapLabel: boolean;
+  onSelect: () => void;
+  className?: string;
+  label: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={active}
+      onClick={onSelect}
+      className={cn(
+        "flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2",
+        active && "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-200",
+        className,
+      )}
+    >
+      <span className={cn("min-w-0", wrapLabel ? "whitespace-normal break-words" : "truncate")}>{label}</span>
+      {active && <Check className="h-4 w-4 shrink-0 text-primary-600" />}
+    </button>
+  );
+}
 
 function stringValue(value: SelectProps["value"] | SelectProps["defaultValue"]) {
   if (Array.isArray(value)) return value[0] ?? "";

@@ -3,23 +3,37 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Search, Plus, Trash2, Loader2, Check, ChefHat, Split, X } from "lucide-react";
+import { Search, Plus, Trash2, Loader2, Check, ChefHat, Split, X, MoveRight } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
-import { setTableCart, checkoutTable, closeTable, sendToKitchen } from "@/lib/actions/tables";
+import { setTableCart, checkoutTable, closeTable, sendToKitchen, moveTable } from "@/lib/actions/tables";
+import { moveTableOrder, type TableMoveTarget } from "@/lib/tables/move-table-order";
 import type { TableCartItem, CartModifier } from "@/lib/schemas/table";
 import type { ModifierGroup } from "@/lib/data/modifiers";
 import type { PosProduct } from "@/lib/data/pos";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPosProduct } from "@/lib/pos/product-catalog-adapter";
 import { QuantityInput } from "@/components/ui/quantity-input";
+import { SplitGuestRow } from "./split-guest-row";
 
 type Method = "cash" | "bank_transfer" | "credit";
 const METHODS: Method[] = ["cash", "bank_transfer", "credit"];
 const uid = () => Math.random().toString(36).slice(2, 9);
 type PosResult = PosProduct;
 
-export function TableOrder({ id, name, initialCart, modifierGroups }: { id: string; name: string; initialCart: TableCartItem[]; modifierGroups: ModifierGroup[] }) {
+export function TableOrder({
+  id,
+  name,
+  initialCart,
+  modifierGroups,
+  moveTargets,
+}: {
+  id: string;
+  name: string;
+  initialCart: TableCartItem[];
+  modifierGroups: ModifierGroup[];
+  moveTargets: TableMoveTarget[];
+}) {
   const t = useTranslations();
   const router = useRouter();
   const catalog = useProductCatalog();
@@ -33,6 +47,8 @@ export function TableOrder({ id, name, initialCart, modifierGroups }: { id: stri
   const [split, setSplit] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
   const [guests, setGuests] = useState(2);
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [moveTargetId, setMoveTargetId] = useState("");
   const sref = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const total = cart.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
@@ -108,6 +124,18 @@ export function TableOrder({ id, name, initialCart, modifierGroups }: { id: stri
     });
   }
   function close() { start(async () => { await closeTable(id); router.push("/tables"); }); }
+  function moveOrder() {
+    if (!moveTargetId) return;
+    setErr("");
+    start(async () => {
+      const result = await moveTableOrder(id, moveTargetId, moveTable);
+      if (!result.ok) {
+        setErr(t(result.error as never));
+        return;
+      }
+      router.push(`/tables/${moveTargetId}`);
+    });
+  }
 
   function toggleSelect(lineId: string) { setSelected((s) => (s.includes(lineId) ? s.filter((x) => x !== lineId) : [...s, lineId])); }
 
@@ -117,7 +145,21 @@ export function TableOrder({ id, name, initialCart, modifierGroups }: { id: stri
         backHref="/tables"
         backLabel={t("common.back")}
         title={name}
-        actions={<button onClick={close} disabled={pending} className="min-h-11 rounded-xl px-3 text-xs font-semibold text-slate-500 hover:bg-er-soft hover:text-er">{t("tables.close")}</button>}
+        actions={(
+          <>
+            <button
+              onClick={() => { setErr(""); setMoveTargetId(""); setMoveOpen(true); }}
+              disabled={pending || moveTargets.length === 0}
+              title={moveTargets.length === 0 ? t("tables.noMoveTargets") : t("tables.move")}
+              aria-label={moveTargets.length === 0 ? t("tables.noMoveTargets") : t("tables.move")}
+              className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl px-3 text-xs font-semibold text-slate-500 hover:bg-surface-2 disabled:opacity-50"
+            >
+              <MoveRight className="h-4 w-4" />
+              {t("tables.move")}
+            </button>
+            <button onClick={close} disabled={pending} className="min-h-11 rounded-xl px-3 text-xs font-semibold text-slate-500 hover:bg-er-soft hover:text-er">{t("tables.close")}</button>
+          </>
+        )}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-4">
@@ -195,9 +237,10 @@ export function TableOrder({ id, name, initialCart, modifierGroups }: { id: stri
             {split ? (
               <>
                 <div className="flex items-center justify-between text-sm mb-2"><span className="text-slate-500">{t("tables.selectedTotal")}</span><span className="font-mono font-bold">{formatCurrency(payable)}</span></div>
-                <div className="flex items-center justify-between gap-2 mb-3 text-sm">
-                  <span className="text-slate-500">{t("tables.guests")}</span>
-                  <div className="flex items-center gap-2">
+                <SplitGuestRow
+                  label={t("tables.guests")}
+                  amount={`${formatCurrency(Math.ceil(payable / guests))}/${t("tables.perGuest")}`}
+                  quantityControl={(
                     <QuantityInput
                       min={1}
                       value={guests}
@@ -209,9 +252,8 @@ export function TableOrder({ id, name, initialCart, modifierGroups }: { id: stri
                       incrementLabel={t("common.increaseProductQuantity", { product: t("tables.guests") })}
                       className="w-[132px]"
                     />
-                    <span className="font-mono font-bold text-primary-600">{formatCurrency(Math.ceil(payable / guests))}/{t("tables.perGuest")}</span>
-                  </div>
-                </div>
+                  )}
+                />
               </>
             ) : (
               <div className="flex justify-between font-bold mb-3"><span>{t("pos.total")}</span><span className="font-mono">{formatCurrency(total)}</span></div>
@@ -231,6 +273,53 @@ export function TableOrder({ id, name, initialCart, modifierGroups }: { id: stri
       </div>
 
       {picker && <ModifierPicker product={picker.product} groups={picker.groups} onCancel={() => setPicker(null)} onConfirm={(mods, note) => { addLine(picker.product, mods, note); setPicker(null); }} />}
+      {moveOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-3 sm:p-4" onClick={() => setMoveOpen(false)}>
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="move-table-title"
+            className="max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-auto rounded-card bg-surface shadow-e2"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="sticky top-0 flex items-center justify-between gap-3 border-b border-border bg-surface px-4 py-3">
+              <div className="min-w-0">
+                <h2 id="move-table-title" className="font-bold">{t("tables.moveTitle")}</h2>
+                <p className="mt-0.5 text-xs text-slate-500">{t("tables.moveHint")}</p>
+              </div>
+              <button onClick={() => setMoveOpen(false)} aria-label={t("common.close")} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-slate-500 hover:bg-surface-2"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="grid gap-2 p-4">
+              {moveTargets.map((target) => {
+                const selectedTarget = moveTargetId === target.id;
+                return (
+                  <button
+                    key={target.id}
+                    type="button"
+                    aria-pressed={selectedTarget}
+                    onClick={() => setMoveTargetId(target.id)}
+                    className={cn(
+                      "flex min-h-11 min-w-11 items-center justify-between gap-3 rounded-xl border px-3 py-2 text-left text-sm",
+                      selectedTarget ? "border-primary-600 bg-primary-50 text-primary-700 dark:bg-primary-950/30 dark:text-primary-200" : "border-border hover:bg-surface-2",
+                    )}
+                  >
+                    <span className="font-semibold">{target.name}</span>
+                    {target.zone && <span className="text-xs text-slate-400">{target.zone}</span>}
+                  </button>
+                );
+              })}
+            </div>
+            {err && <p className="px-4 pb-2 text-sm text-er">{err}</p>}
+            <div className="sticky bottom-0 flex justify-end gap-2 border-t border-border bg-surface px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:py-3">
+              <button onClick={() => setMoveOpen(false)} className="min-h-11 rounded-full border border-border px-4 text-sm hover:bg-surface-2">{t("common.cancel")}</button>
+              <button onClick={moveOrder} disabled={pending || !moveTargetId} className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-primary-600 px-4 text-sm font-semibold text-white disabled:opacity-50">
+                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoveRight className="h-4 w-4" />}
+                {t("tables.moveConfirm")}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
@@ -276,7 +365,7 @@ function ModifierPicker({ product, groups, onCancel, onConfirm }: { product: Pos
                 {g.options.map((o) => {
                   const on = (sel[g.id] ?? []).includes(o.id);
                   return (
-                    <button key={o.id} onClick={() => pick(g, o.id)} aria-pressed={on} className={cn("min-h-11 rounded-full border px-3 py-1.5 text-sm transition", on ? "bg-primary-600 text-white border-primary-600" : "border-border hover:bg-surface-2")}>
+                    <button key={o.id} onClick={() => pick(g, o.id)} aria-pressed={on} className={cn("min-h-11 min-w-11 rounded-full border px-3 py-1.5 text-sm transition", on ? "bg-primary-600 text-white border-primary-600" : "border-border hover:bg-surface-2")}>
                       {o.label}{o.priceDelta ? <span className={cn("font-mono ml-1", on ? "text-white/80" : "text-primary-600")}>+{formatCurrency(o.priceDelta)}</span> : null}
                     </button>
                   );

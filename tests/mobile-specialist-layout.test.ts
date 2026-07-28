@@ -1,5 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { SelectOptionRow } from "@/components/ui/select";
+import { MobilePrintPreviewFrame } from "@/app/(app)/tools/electrical-labels/electrical-labels-client";
+import { SplitGuestRow } from "@/app/(app)/tables/[id]/split-guest-row";
+import {
+  eligibleTableMoveTargets,
+  moveTableOrder,
+} from "@/lib/tables/move-table-order";
 
 const read = (path: string) => readFileSync(path, "utf8");
 
@@ -30,10 +39,49 @@ describe("mobile specialist layouts", () => {
     expect(electrical).toContain("electrical-labels-print-root");
   });
 
+  test("tool form controls and portaled option rows stay touch-safe", () => {
+    const tile = read("src/app/(app)/tools/tile-calculator.tsx");
+    const electrical = read("src/app/(app)/tools/electrical-labels/electrical-labels-client.tsx");
+
+    expect(tile).toContain("h-11 md:h-9");
+    expect(tile).toContain('optionClassName="min-h-11 md:min-h-0"');
+    expect(electrical).toContain('optionClassName="min-h-11 md:min-h-0"');
+
+    const optionHtml = renderToStaticMarkup(createElement(SelectOptionRow, {
+      active: true,
+      wrapLabel: false,
+      onSelect: () => undefined,
+      className: "min-h-11 md:min-h-0",
+      label: "60 × 60 cm",
+    }));
+    expect(optionHtml).toContain("min-h-11");
+    expect(optionHtml).toContain('role="option"');
+    expect(optionHtml).toContain('aria-selected="true"');
+  });
+
+  test("electrical preview fits mobile while the print portal retains A4 output", () => {
+    const electrical = read("src/app/(app)/tools/electrical-labels/electrical-labels-client.tsx");
+
+    expect(electrical).toContain("<MobilePrintPreviewFrame");
+    expect(electrical).toContain("overflow-hidden");
+    expect(electrical).toContain("scale-[0.37]");
+    expect(electrical).toContain("electrical-labels-print-root");
+    expect(electrical).toContain("<PrintPage page={page}");
+
+    const frameHtml = renderToStaticMarkup(createElement(
+      MobilePrintPreviewFrame,
+      null,
+      createElement("div", null, "A4"),
+    ));
+    expect(frameHtml).toContain("w-full overflow-hidden");
+    expect(frameHtml).toContain("scale-[0.37]");
+  });
+
   test("F&B floor and dialogs keep controls touch-safe without narrow overflow", () => {
     const floor = read("src/app/(app)/tables/tables-floor.tsx");
     const modifiers = read("src/app/(app)/tables/modifiers-manage.tsx");
     const order = read("src/app/(app)/tables/[id]/table-order.tsx");
+    const guestRow = read("src/app/(app)/tables/[id]/split-guest-row.tsx");
 
     expect(floor).toContain("grid-cols-1 min-[360px]:grid-cols-2");
     expect(floor).toContain("bottom-[calc(4.5rem+env(safe-area-inset-bottom))]");
@@ -41,6 +89,47 @@ describe("mobile specialist layouts", () => {
     expect(modifiers.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(8);
     expect(order).toContain("touchTargets");
     expect(order.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(8);
+    expect(modifiers).toContain("min-h-11 min-w-11");
+    expect(order).toContain("min-h-11 min-w-11");
+    expect(order).toContain("<SplitGuestRow");
+    expect(guestRow).toContain("flex-col");
+    expect(guestRow).toContain("break-words");
+
+    const guestHtml = renderToStaticMarkup(createElement(SplitGuestRow, {
+      label: "Guests",
+      amount: "9,999,999,999 ₫/guest",
+      quantityControl: createElement("button", { type: "button" }, "12"),
+    }));
+    expect(guestHtml).toContain("flex-col");
+    expect(guestHtml).toContain("break-words");
+    expect(guestHtml).toContain("9,999,999,999 ₫/guest");
+  });
+
+  test("table order exposes a touch-safe move workflow using eligible free targets", async () => {
+    const page = read("src/app/(app)/tables/[id]/page.tsx");
+    const order = read("src/app/(app)/tables/[id]/table-order.tsx");
+
+    expect(page).toContain("eligibleTableMoveTargets");
+    expect(page).toContain("moveTargets=");
+    expect(order).toContain("moveTableOrder");
+    expect(order).toContain("moveTableOrder(id, moveTargetId, moveTable)");
+    expect(order).toContain("min-h-11");
+
+    expect(eligibleTableMoveTargets("source", [
+      { id: "source", name: "Source", zone: "A", status: "occupied" },
+      { id: "free", name: "Free", zone: "A", status: "free" },
+      { id: "busy", name: "Busy", zone: "B", status: "occupied" },
+    ])).toEqual([
+      { id: "free", name: "Free", zone: "A", status: "free" },
+    ]);
+
+    let payload: [string, string] | null = null;
+    const result = await moveTableOrder("source", "free", async (sourceId, targetId) => {
+      payload = [sourceId, targetId];
+      return { ok: true, data: undefined };
+    });
+    expect(payload).toEqual(["source", "free"]);
+    expect(result.ok).toBe(true);
   });
 
   test("KDS remains one column on mobile with reachable status actions", () => {

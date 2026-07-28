@@ -138,7 +138,7 @@ export function ModifiersManage({ groups, categories }: { groups: ModifierGroup[
                     {categories.map((c) => {
                       const on = form.categoryIds.includes(c.id);
                       return (
-                        <button key={c.id} onClick={() => setForm((f) => ({ ...f, categoryIds: on ? f.categoryIds.filter((x) => x !== c.id) : [...f.categoryIds, c.id] }))} aria-pressed={on} className={cn("min-h-11 rounded-full border px-3 py-1 text-xs transition", on ? "bg-primary-600 text-white border-primary-600" : "border-border text-slate-500 hover:bg-surface-2")}>{c.name}</button>
+                        <button key={c.id} onClick={() => setForm((f) => ({ ...f, categoryIds: on ? f.categoryIds.filter((x) => x !== c.id) : [...f.categoryIds, c.id] }))} aria-pressed={on} className={cn("min-h-11 min-w-11 rounded-full border px-3 py-1 text-xs transition", on ? "bg-primary-600 text-white border-primary-600" : "border-border text-slate-500 hover:bg-surface-2")}>{c.name}</button>
                       );
                     })}
                   </div>

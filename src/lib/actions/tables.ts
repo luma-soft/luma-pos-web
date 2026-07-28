@@ -303,6 +303,11 @@ export async function mergeTablesForUser(targetId: string, sourceIds: unknown): 
 }
 
 /** Chuyển toàn bộ giỏ + phiếu bếp sang một bàn trống trong cùng transaction. */
+export async function moveTable(sourceId: string, targetId: string): Promise<ActionResult> {
+  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  return moveTableForUser(sourceId, targetId);
+}
+
 export async function moveTableForUser(sourceId: string, targetId: string): Promise<ActionResult> {
   if (!sourceId || !targetId || sourceId === targetId) {
     return { ok: false, error: "errors.invalidData" };

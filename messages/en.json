@@ -1455,6 +1455,11 @@
     "mergeHint": "Tap occupied tables to merge (first ★ is the target).",
     "mergeInto": "Merge {count} tables into {name}",
     "mergeConfirm": "Merge",
+    "move": "Move table",
+    "moveTitle": "Move order to another table",
+    "moveHint": "Choose a free table for the full order and kitchen tickets.",
+    "noMoveTargets": "No free table is currently available.",
+    "moveConfirm": "Confirm move",
     "split": "Split",
     "splitHint": "Pick lines to settle separately; the rest stays on the table.",
     "selectedTotal": "Selected",
@@ -1467,7 +1472,8 @@
     "kitchenTicket": "KITCHEN TICKET",
     "errors": {
       "occupied": "Table is occupied — can't delete.",
-      "nothingToSend": "Nothing new to send."
+      "nothingToSend": "Nothing new to send.",
+      "targetOccupied": "The target table is no longer free."
     }
   },
   "modifiers": {
