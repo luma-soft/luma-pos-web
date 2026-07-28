@@ -141,7 +141,7 @@ export function TileCalculator() {
   }
 
   return (
-    <div className="min-h-full bg-canvas">
+    <div className="min-h-full bg-canvas [&_button]:min-h-11 [&_button]:min-w-11 lg:[&_button]:min-h-0 lg:[&_button]:min-w-0">
       <ToolPageHeader
         eyebrow={toolsT("breadcrumbs.calculation")}
         title={t("title")}

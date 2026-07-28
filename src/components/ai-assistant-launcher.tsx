@@ -22,7 +22,7 @@ export function AssistantWorkspace() {
   const assistant = useAssistantState("web");
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden pb-[env(safe-area-inset-bottom)] lg:pb-0">
       <AssistantChatSurface
         assistant={assistant}
         mode="workspace"
@@ -112,9 +112,13 @@ export function AiAssistantLauncher({ surface = "web" }: { surface?: AssistantSu
         <section
           aria-label={t("ai.launcherTitle")}
           className={cn(
-            "fixed z-[55] bg-surface border border-border shadow-e2 overflow-hidden flex flex-col",
-            "inset-x-2 bottom-2 h-[min(85dvh,680px)] rounded-t-2xl rounded-b-card",
+            "fixed z-[55] bg-surface border border-border shadow-e2 overflow-hidden flex min-h-0 flex-col",
+            "inset-x-2 h-[min(78dvh,680px)] rounded-t-2xl rounded-b-card [&_button]:min-h-11 [&_button]:min-w-11",
+            isPos
+              ? "bottom-2 pb-[env(safe-area-inset-bottom)]"
+              : "bottom-[calc(4.25rem+env(safe-area-inset-bottom))]",
             "lg:inset-auto lg:top-4 lg:right-4 lg:bottom-4 lg:w-[min(640px,calc(100vw-2rem))] lg:rounded-card",
+            "lg:h-auto lg:pb-0 lg:[&_button]:min-h-0 lg:[&_button]:min-w-0",
             isPos && "lg:top-16 lg:bottom-4"
           )}
         >

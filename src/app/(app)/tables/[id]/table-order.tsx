@@ -124,12 +124,12 @@ export function TableOrder({ id, name, initialCart, modifierGroups }: { id: stri
         <div>
           <div className="relative w-full max-w-md mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input value={q} onChange={(e) => onSearch(e.target.value)} placeholder={t("pos.searchPlaceholder")} className="w-full pl-9 pr-3 py-2.5 text-sm rounded-[10px] border border-border bg-surface" />
+            <input value={q} onChange={(e) => onSearch(e.target.value)} placeholder={t("pos.searchPlaceholder")} className="min-h-11 w-full rounded-[10px] border border-border bg-surface py-2.5 pl-9 pr-3 text-sm" />
             {(results.length > 0 || searching) && q.trim() && (
               <div className="absolute z-30 left-0 right-0 mt-1 bg-surface border border-border rounded-xl shadow-e2 overflow-hidden max-h-[min(70dvh,520px)] overflow-y-auto">
                 {searching ? <div className="px-4 py-4 text-center text-sm text-slate-400"><Loader2 className="w-4 h-4 animate-spin inline" /></div>
                   : results.slice(0, 30).map((p) => (
-                    <button key={p.id} onClick={() => choose(p)} className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left text-sm hover:bg-surface-2">
+                    <button key={p.id} onClick={() => choose(p)} className="flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm hover:bg-surface-2">
                       <span className="truncate">{p.name}</span><span className="font-mono text-primary-600 shrink-0">{formatCurrency(Number(p.retailPrice))}</span>
                     </button>
                   ))}
@@ -142,7 +142,7 @@ export function TableOrder({ id, name, initialCart, modifierGroups }: { id: stri
           <div className="px-4 py-3 border-b border-border flex items-center justify-between">
             <span className="font-bold text-sm">{t("tables.order")}</span>
             {cart.length > 0 && (
-              <button onClick={() => { setSplit((s) => !s); setSelected([]); }} className={cn("inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full", split ? "bg-primary-600 text-white" : "text-slate-500 hover:bg-surface-2")}><Split className="w-3.5 h-3.5" />{t("tables.split")}</button>
+              <button onClick={() => { setSplit((s) => !s); setSelected([]); }} aria-pressed={split} className={cn("inline-flex min-h-11 items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold", split ? "bg-primary-600 text-white" : "text-slate-500 hover:bg-surface-2")}><Split className="w-3.5 h-3.5" />{t("tables.split")}</button>
             )}
           </div>
 
@@ -151,23 +151,36 @@ export function TableOrder({ id, name, initialCart, modifierGroups }: { id: stri
           ) : (
             <div className="divide-y divide-border-soft max-h-[46vh] overflow-auto">
               {cart.map((c) => (
-                <div key={c.lineId} className="px-3 py-2.5 flex items-start gap-2 text-sm">
+                <div key={c.lineId} className="flex flex-wrap items-start gap-2 px-3 py-2.5 text-sm">
                   {split && (
-                    <input type="checkbox" checked={selected.includes(c.lineId)} onChange={() => toggleSelect(c.lineId)} className="mt-1 shrink-0" />
+                    <label className="grid h-11 w-11 shrink-0 place-items-center rounded-xl hover:bg-surface-2">
+                      <span className="sr-only">{c.productName}</span>
+                      <input type="checkbox" checked={selected.includes(c.lineId)} onChange={() => toggleSelect(c.lineId)} className="size-5 accent-primary-600" />
+                    </label>
                   )}
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-[8rem] flex-1">
                     <div className="font-medium truncate flex items-center gap-1.5">{c.productName}{c.sent && <ChefHat className="w-3 h-3 text-ok shrink-0" />}</div>
                     {c.modifiers.length > 0 && <div className="text-[11px] text-slate-400 truncate">{c.modifiers.map((m) => m.label).join(", ")}</div>}
                     {c.note && <div className="text-[11px] text-warn truncate">“{c.note}”</div>}
                     <div className="text-xs text-slate-400 font-mono">{formatCurrency(c.unitPrice)}</div>
                   </div>
                   {c.sent ? (
-                    <span className="w-6 text-center font-mono pt-0.5">{c.quantity}</span>
+                    <span className="grid h-11 w-11 place-items-center text-center font-mono">{c.quantity}</span>
                   ) : (
-                    <>
-                      <QuantityInput min={0} value={c.quantity} onChange={(quantity) => setQty(c.lineId, quantity)} size="sm" className="w-28" />
-                      <button onClick={() => removeLine(c.lineId)} className="text-slate-400 hover:text-er pt-1 shrink-0"><Trash2 className="w-4 h-4" /></button>
-                    </>
+                    <div className="ml-auto flex shrink-0 items-center gap-1">
+                      <QuantityInput
+                        min={0}
+                        value={c.quantity}
+                        onChange={(quantity) => setQty(c.lineId, quantity)}
+                        size="sm"
+                        touchTargets
+                        decrementLabel={t("common.decreaseProductQuantity", { product: c.productName })}
+                        inputLabel={t("common.productQuantity", { product: c.productName })}
+                        incrementLabel={t("common.increaseProductQuantity", { product: c.productName })}
+                        className="w-[132px]"
+                      />
+                      <button onClick={() => removeLine(c.lineId)} aria-label={`${t("common.delete")} ${c.productName}`} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-slate-400 hover:bg-er-soft hover:text-er"><Trash2 className="w-4 h-4" /></button>
+                    </div>
                   )}
                 </div>
               ))}
@@ -175,7 +188,7 @@ export function TableOrder({ id, name, initialCart, modifierGroups }: { id: stri
           )}
 
           <div className="px-4 py-3 border-t border-border">
-            <button onClick={send} disabled={pending || !hasUnsent} className="w-full mb-3 inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-[10px] border border-primary-600 text-primary-700 dark:text-primary-300 text-sm font-semibold disabled:opacity-40">
+            <button onClick={send} disabled={pending || !hasUnsent} className="mb-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] border border-primary-600 px-3 py-2.5 text-sm font-semibold text-primary-700 disabled:opacity-40 dark:text-primary-300">
               {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChefHat className="w-4 h-4" />}{t("tables.sendKitchen")}
             </button>
 
@@ -185,7 +198,17 @@ export function TableOrder({ id, name, initialCart, modifierGroups }: { id: stri
                 <div className="flex items-center justify-between gap-2 mb-3 text-sm">
                   <span className="text-slate-500">{t("tables.guests")}</span>
                   <div className="flex items-center gap-2">
-                    <QuantityInput min={1} value={guests} onChange={setGuests} size="sm" className="w-28" />
+                    <QuantityInput
+                      min={1}
+                      value={guests}
+                      onChange={setGuests}
+                      size="sm"
+                      touchTargets
+                      decrementLabel={t("common.decreaseProductQuantity", { product: t("tables.guests") })}
+                      inputLabel={t("tables.guests")}
+                      incrementLabel={t("common.increaseProductQuantity", { product: t("tables.guests") })}
+                      className="w-[132px]"
+                    />
                     <span className="font-mono font-bold text-primary-600">{formatCurrency(Math.ceil(payable / guests))}/{t("tables.perGuest")}</span>
                   </div>
                 </div>
@@ -197,7 +220,7 @@ export function TableOrder({ id, name, initialCart, modifierGroups }: { id: stri
             {err && <p className="text-xs text-er mb-2">{err}</p>}
             <div className="grid grid-cols-3 gap-2">
               {METHODS.map((m) => (
-                <button key={m} disabled={pending || cart.length === 0 || (split && selected.length === 0)} onClick={() => pay(m)} className="inline-flex flex-col items-center gap-1 px-2 py-2.5 rounded-[10px] bg-primary-600 text-white text-xs font-semibold disabled:opacity-50">
+                <button key={m} disabled={pending || cart.length === 0 || (split && selected.length === 0)} onClick={() => pay(m)} className="inline-flex min-h-14 flex-col items-center justify-center gap-1 rounded-[10px] bg-primary-600 px-2 py-2.5 text-xs font-semibold text-white disabled:opacity-50">
                   {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}{t(`pos.payMethods.${m}` as never)}
                 </button>
               ))}
@@ -239,8 +262,8 @@ function ModifierPicker({ product, groups, onCancel, onConfirm }: { product: Pos
   const extra = groups.reduce((s, g) => s + (sel[g.id] ?? []).reduce((a, id) => a + (g.options.find((o) => o.id === id)?.priceDelta ?? 0), 0), 0);
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={onCancel}>
-      <div className="w-full max-w-md bg-surface rounded-card shadow-e2 max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-3 sm:p-4" onClick={onCancel}>
+      <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-auto rounded-card bg-surface shadow-e2 sm:max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-border sticky top-0 bg-surface">
           <h2 className="font-bold truncate">{product.name}</h2>
           <button onClick={onCancel} aria-label={t("common.close")} className="grid h-11 w-11 place-items-center rounded-xl text-slate-500 hover:bg-surface-2"><X className="w-5 h-5" /></button>
@@ -253,7 +276,7 @@ function ModifierPicker({ product, groups, onCancel, onConfirm }: { product: Pos
                 {g.options.map((o) => {
                   const on = (sel[g.id] ?? []).includes(o.id);
                   return (
-                    <button key={o.id} onClick={() => pick(g, o.id)} className={cn("text-sm px-3 py-1.5 rounded-full border transition", on ? "bg-primary-600 text-white border-primary-600" : "border-border hover:bg-surface-2")}>
+                    <button key={o.id} onClick={() => pick(g, o.id)} aria-pressed={on} className={cn("min-h-11 rounded-full border px-3 py-1.5 text-sm transition", on ? "bg-primary-600 text-white border-primary-600" : "border-border hover:bg-surface-2")}>
                       {o.label}{o.priceDelta ? <span className={cn("font-mono ml-1", on ? "text-white/80" : "text-primary-600")}>+{formatCurrency(o.priceDelta)}</span> : null}
                     </button>
                   );
@@ -263,13 +286,13 @@ function ModifierPicker({ product, groups, onCancel, onConfirm }: { product: Pos
           ))}
           <div>
             <div className="text-[11px] font-bold uppercase text-slate-500 mb-1.5">{t("tables.lineNote")}</div>
-            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("tables.lineNotePlaceholder")} className="w-full px-3 py-2 text-sm rounded-[10px] border border-border bg-canvas" />
+            <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("tables.lineNotePlaceholder")} className="min-h-11 w-full rounded-[10px] border border-border bg-canvas px-3 py-2 text-sm" />
           </div>
           {err && <p className="text-sm text-er">{err}</p>}
         </div>
-        <div className="flex items-center justify-between gap-2 px-5 py-3 border-t border-border sticky bottom-0 bg-surface">
+        <div className="sticky bottom-0 flex items-center justify-between gap-2 border-t border-border bg-surface px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-5 sm:py-3">
           <span className="font-mono font-bold">{formatCurrency(Number(product.retailPrice) + extra)}</span>
-          <button onClick={confirm} className="inline-flex items-center gap-1.5 px-5 py-2 text-sm font-semibold rounded-full bg-primary-600 text-white"><Plus className="w-4 h-4" />{t("tables.addToOrder")}</button>
+          <button onClick={confirm} className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-primary-600 px-5 py-2 text-sm font-semibold text-white"><Plus className="w-4 h-4" />{t("tables.addToOrder")}</button>
         </div>
       </div>
     </div>

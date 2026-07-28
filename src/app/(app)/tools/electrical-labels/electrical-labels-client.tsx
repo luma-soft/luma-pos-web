@@ -253,7 +253,7 @@ export function ElectricalLabelsClient() {
 
   return (
     <>
-      <div className="mx-auto grid w-full max-w-[1600px] gap-4 p-4 sm:p-6 2xl:grid-cols-[minmax(520px,0.82fr)_minmax(620px,1.18fr)]">
+      <div className="mx-auto grid w-full max-w-[1600px] gap-4 p-4 [&_button]:min-h-11 [&_button]:min-w-11 sm:p-6 md:[&_button]:min-h-0 md:[&_button]:min-w-0 xl:grid-cols-[minmax(320px,0.82fr)_minmax(0,1.18fr)]">
         <div className="min-w-0 space-y-4">
           <Section
             collapsible={false}
@@ -519,9 +519,9 @@ function CircuitColorPicker({
   onChange: (color: string | null) => void;
 }) {
   return (
-    <div className="relative mt-1 w-fit">
+    <div className="relative mt-1 flex w-fit gap-1 md:block">
       <label
-        className="relative grid size-9 cursor-pointer place-items-center overflow-hidden rounded-lg border border-border bg-surface shadow-sm transition-colors hover:border-primary-400 focus-within:ring-2 focus-within:ring-primary-500/30"
+        className="relative grid size-11 cursor-pointer place-items-center overflow-hidden rounded-lg border border-border bg-surface shadow-sm transition-colors hover:border-primary-400 focus-within:ring-2 focus-within:ring-primary-500/30 md:size-9"
         title={chooseLabel}
       >
         {color ? (
@@ -543,7 +543,7 @@ function CircuitColorPicker({
           aria-label={clearLabel}
           title={clearLabel}
           onClick={() => onChange(null)}
-          className="absolute -right-1.5 -top-1.5 z-10 grid size-4 place-items-center rounded-full border border-border bg-surface text-[10px] font-bold leading-none text-slate-500 shadow-sm hover:border-red-300 hover:text-red-600"
+          className="relative z-10 grid size-11 place-items-center rounded-lg border border-border bg-surface text-base font-bold leading-none text-slate-500 shadow-sm hover:border-red-300 hover:text-red-600 md:absolute md:-right-1.5 md:-top-1.5 md:size-4 md:rounded-full md:text-[10px]"
         >
           ×
         </button>

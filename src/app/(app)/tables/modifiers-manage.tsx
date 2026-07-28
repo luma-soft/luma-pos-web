@@ -52,7 +52,7 @@ export function ModifiersManage({ groups, categories }: { groups: ModifierGroup[
     <div className="max-w-3xl">
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-slate-500">{t("modifiers.sub")}</p>
-        <button onClick={startNew} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary-600 text-white text-sm font-semibold"><Plus className="w-4 h-4" />{t("modifiers.add")}</button>
+        <button onClick={startNew} className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white"><Plus className="w-4 h-4" />{t("modifiers.add")}</button>
       </div>
 
       {groups.length === 0 ? (
@@ -75,10 +75,17 @@ export function ModifiersManage({ groups, categories }: { groups: ModifierGroup[
                   </div>
                   <div className="mt-1.5 text-xs text-slate-400">{g.categoryIds.length ? `${t("modifiers.appliesTo")}: ${g.categoryIds.map(catName).join(", ")}` : t("modifiers.allItems")}</div>
                 </div>
-                <div className="flex items-center gap-1 shrink-0">
-                  <button onClick={() => toggle(g.id, !g.isActive)} title={t("modifiers.toggle")} className={cn("text-[10px] font-bold px-2 py-1 rounded-full", g.isActive ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-500")}>{g.isActive ? t("common.active") : t("common.inactive")}</button>
-                  <button onClick={() => startEdit(g)} className="p-1.5 rounded-lg text-slate-400 hover:bg-surface-2"><Pencil className="w-4 h-4" /></button>
-                  <button onClick={() => remove(g.id)} className="p-1.5 rounded-lg text-slate-400 hover:text-er hover:bg-surface-2"><Trash2 className="w-4 h-4" /></button>
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                  <button
+                    onClick={() => toggle(g.id, !g.isActive)}
+                    title={t("modifiers.toggle")}
+                    aria-pressed={g.isActive}
+                    className={cn("min-h-11 rounded-full px-3 py-1 text-[10px] font-bold", g.isActive ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-500")}
+                  >
+                    {g.isActive ? t("common.active") : t("common.inactive")}
+                  </button>
+                  <button onClick={() => startEdit(g)} aria-label={`${t("common.edit")} ${g.name}`} className="grid h-11 w-11 place-items-center rounded-xl text-slate-400 hover:bg-surface-2"><Pencil className="w-4 h-4" /></button>
+                  <button onClick={() => remove(g.id)} aria-label={`${t("common.delete")} ${g.name}`} className="grid h-11 w-11 place-items-center rounded-xl text-slate-400 hover:bg-surface-2 hover:text-er"><Trash2 className="w-4 h-4" /></button>
                 </div>
               </div>
             </div>
@@ -87,8 +94,8 @@ export function ModifiersManage({ groups, categories }: { groups: ModifierGroup[
       )}
 
       {open && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={() => setOpen(false)}>
-          <div className="w-full max-w-lg bg-surface rounded-card shadow-e2 max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-3 sm:p-4" onClick={() => setOpen(false)}>
+          <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-auto rounded-card bg-surface shadow-e2 sm:max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3 border-b border-border sticky top-0 bg-surface">
               <h2 className="font-bold">{editId ? t("modifiers.editTitle") : t("modifiers.add")}</h2>
               <button onClick={() => setOpen(false)} aria-label={t("common.close")} className="grid h-11 w-11 place-items-center rounded-xl text-slate-500 hover:bg-surface-2"><X className="h-5 w-5" /></button>
@@ -96,25 +103,31 @@ export function ModifiersManage({ groups, categories }: { groups: ModifierGroup[
             <div className="p-5 space-y-4">
               <div>
                 <label className="text-[10px] font-bold uppercase text-slate-500">{t("modifiers.name")}</label>
-                <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder={t("modifiers.namePlaceholder")} className="mt-1 w-full px-3 py-2 text-sm rounded-[10px] border border-border bg-canvas" />
+                <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder={t("modifiers.namePlaceholder")} className="mt-1 min-h-11 w-full rounded-[10px] border border-border bg-canvas px-3 py-2 text-sm" />
               </div>
 
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.multi} onChange={(e) => setForm((f) => ({ ...f, multi: e.target.checked }))} />{t("modifiers.multiSelect")}</label>
-                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.required} onChange={(e) => setForm((f) => ({ ...f, required: e.target.checked }))} />{t("modifiers.required")}</label>
+              <div className="flex flex-wrap gap-2">
+                <label className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm hover:bg-surface-2"><input type="checkbox" checked={form.multi} onChange={(e) => setForm((f) => ({ ...f, multi: e.target.checked }))} />{t("modifiers.multiSelect")}</label>
+                <label className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm hover:bg-surface-2"><input type="checkbox" checked={form.required} onChange={(e) => setForm((f) => ({ ...f, required: e.target.checked }))} />{t("modifiers.required")}</label>
               </div>
 
               <div>
                 <label className="text-[10px] font-bold uppercase text-slate-500">{t("modifiers.options")}</label>
                 <div className="mt-1 space-y-2">
                   {form.options.map((o, i) => (
-                    <div key={o.id} className="flex items-center gap-2">
-                      <input value={o.label} onChange={(e) => setOpt(i, { label: e.target.value })} placeholder={t("modifiers.optionLabel")} className="flex-1 px-3 py-2 text-sm rounded-[10px] border border-border bg-canvas" />
-                      <NumberInput value={o.priceDelta} onChange={(priceDelta) => setOpt(i, { priceDelta: priceDelta ?? 0 })} placeholder="+0" className="w-28 rounded-[10px] bg-canvas font-mono" />
-                      <button onClick={() => setForm((f) => ({ ...f, options: f.options.filter((_, x) => x !== i) }))} className="p-1.5 text-slate-400 hover:text-er"><Trash2 className="w-4 h-4" /></button>
+                    <div key={o.id} className="grid grid-cols-[minmax(0,1fr)_6rem_2.75rem] items-center gap-2 sm:grid-cols-[minmax(0,1fr)_7rem_2.75rem]">
+                      <input value={o.label} onChange={(e) => setOpt(i, { label: e.target.value })} placeholder={t("modifiers.optionLabel")} className="min-h-11 min-w-0 rounded-[10px] border border-border bg-canvas px-3 py-2 text-sm" />
+                      <NumberInput value={o.priceDelta} onChange={(priceDelta) => setOpt(i, { priceDelta: priceDelta ?? 0 })} placeholder="+0" className="min-h-11 min-w-0 rounded-[10px] bg-canvas px-2 font-mono" />
+                      <button
+                        onClick={() => setForm((f) => ({ ...f, options: f.options.filter((_, x) => x !== i) }))}
+                        aria-label={`${t("common.delete")} ${o.label || t("modifiers.optionLabel")}`}
+                        className="grid h-11 w-11 place-items-center rounded-xl text-slate-400 hover:bg-er-soft hover:text-er"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   ))}
-                  <button onClick={() => setForm((f) => ({ ...f, options: [...f.options, { id: uid(), label: "", priceDelta: 0 }] }))} className="text-xs font-semibold text-primary-600 inline-flex items-center gap-1"><Plus className="w-3 h-3" />{t("modifiers.addOption")}</button>
+                  <button onClick={() => setForm((f) => ({ ...f, options: [...f.options, { id: uid(), label: "", priceDelta: 0 }] }))} className="inline-flex min-h-11 items-center gap-1 rounded-xl px-2 text-xs font-semibold text-primary-600 hover:bg-primary-50"><Plus className="w-3 h-3" />{t("modifiers.addOption")}</button>
                 </div>
               </div>
 
@@ -125,7 +138,7 @@ export function ModifiersManage({ groups, categories }: { groups: ModifierGroup[
                     {categories.map((c) => {
                       const on = form.categoryIds.includes(c.id);
                       return (
-                        <button key={c.id} onClick={() => setForm((f) => ({ ...f, categoryIds: on ? f.categoryIds.filter((x) => x !== c.id) : [...f.categoryIds, c.id] }))} className={cn("text-xs px-2.5 py-1 rounded-full border transition", on ? "bg-primary-600 text-white border-primary-600" : "border-border text-slate-500 hover:bg-surface-2")}>{c.name}</button>
+                        <button key={c.id} onClick={() => setForm((f) => ({ ...f, categoryIds: on ? f.categoryIds.filter((x) => x !== c.id) : [...f.categoryIds, c.id] }))} aria-pressed={on} className={cn("min-h-11 rounded-full border px-3 py-1 text-xs transition", on ? "bg-primary-600 text-white border-primary-600" : "border-border text-slate-500 hover:bg-surface-2")}>{c.name}</button>
                       );
                     })}
                   </div>
@@ -135,9 +148,9 @@ export function ModifiersManage({ groups, categories }: { groups: ModifierGroup[
 
               {err && <p className="text-sm text-er">{err}</p>}
             </div>
-            <div className="flex justify-end gap-2 px-5 py-3 border-t border-border sticky bottom-0 bg-surface">
-              <button onClick={() => setOpen(false)} className="px-4 py-2 text-sm rounded-full border border-border hover:bg-surface-2">{t("common.cancel")}</button>
-              <button onClick={save} disabled={pending} className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-full bg-primary-600 text-white disabled:opacity-50">{pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}{t("common.save")}</button>
+            <div className="sticky bottom-0 flex justify-end gap-2 border-t border-border bg-surface px-5 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:py-3">
+              <button onClick={() => setOpen(false)} className="min-h-11 rounded-full border border-border px-4 py-2 text-sm hover:bg-surface-2">{t("common.cancel")}</button>
+              <button onClick={save} disabled={pending} className="inline-flex min-h-11 items-center gap-1.5 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}{t("common.save")}</button>
             </div>
           </div>
         </div>
