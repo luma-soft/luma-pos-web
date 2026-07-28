@@ -1,13 +1,12 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { ArrowLeft } from "lucide-react";
 import bwipjs from "bwip-js/node";
 import type { ReactNode } from "react";
 import { getProduct } from "@/lib/data/products";
 import { getLabelTemplate, getLabelTemplates } from "@/lib/labels/template";
 import type { LabelTemplate } from "@/lib/labels/template-shared";
 import { Routes } from "@/lib/routes";
+import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { formatCurrency } from "@/lib/utils";
 import { LabelPrintButton } from "./label-print-button";
 import { getStoreSettings } from "@/lib/data/settings";
@@ -99,18 +98,14 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
         }
       `}</style>
       <div className="mx-auto max-w-5xl print:max-w-none">
-        <header className="mb-5 flex flex-wrap items-center justify-between gap-3 print:hidden">
-          <div className="flex min-w-0 items-center gap-3">
-            <Link href={Routes.product(product.id)} className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-border bg-surface hover:bg-surface-2" aria-label={t("common.back")}>
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <div className="min-w-0">
-              <h1 className="truncate text-xl font-bold text-slate-900 dark:text-slate-100">{t("products.labels.title")}</h1>
-              <p className="truncate text-sm text-slate-500">{product.name}</p>
-            </div>
-          </div>
-          <LabelPrintButton label={t("products.labels.print")} />
-        </header>
+        <MobileDetailHeader
+          backHref={Routes.product(product.id)}
+          backLabel={t("common.back")}
+          title={t("products.labels.title")}
+          subtitle={product.name}
+          actions={<LabelPrintButton label={t("products.labels.print")} />}
+          className="print:hidden"
+        />
 
         <form className="mb-4 grid gap-3 rounded-card border border-border bg-surface p-4 print:hidden sm:grid-cols-[minmax(0,1fr)_120px_150px_150px_auto]">
           <Field label={t("products.labels.template")}>

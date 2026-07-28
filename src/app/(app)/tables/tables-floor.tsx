@@ -95,7 +95,7 @@ export function TablesFloor({ tables, canManage }: { tables: TableRow[]; canMana
       {mergeMode && selected.length >= 2 && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2.5 rounded-2xl bg-surface border border-border shadow-e2">
           <span className="text-sm">{t("tables.mergeInto", { count: selected.length, name: targetName ?? "" })}</span>
-          <button onClick={() => setSelected([])} className="p-1.5 rounded-lg hover:bg-surface-2 text-slate-500"><X className="w-4 h-4" /></button>
+          <button onClick={() => setSelected([])} aria-label={t("common.close")} className="grid h-11 w-11 place-items-center rounded-xl text-slate-500 hover:bg-surface-2"><X className="h-5 w-5" /></button>
           <button disabled={pending} onClick={doMerge} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary-600 text-white text-sm font-semibold disabled:opacity-50">{pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <GitMerge className="w-4 h-4" />}{t("tables.mergeConfirm")}</button>
         </div>
       )}

@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { ArrowLeft, Copy, FilePenLine, Printer, ReceiptText } from "lucide-react";
+import { Copy, FilePenLine, Printer, ReceiptText } from "lucide-react";
 import { Routes } from "@/lib/routes";
+import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { getPurchase } from "@/lib/data/inventory";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -33,18 +34,14 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl">
-      <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-5 min-h-[58px] px-4 sm:px-6 py-2.5 bg-surface border-b border-border flex items-center gap-3 flex-wrap">
-        <Link href={Routes.Purchases} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800" aria-label={t("common.back")}>
-          <ArrowLeft className="w-4 h-4" />
-        </Link>
-        <div className="min-w-0">
-          <Text as="h1" weight="bold" className="text-[17px]" text={purchase.code} />
-          <Text as="p" variant="muted" size="xs" text={formatDate(purchase.createdAt)} />
-        </div>
-        <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", statusClass(purchase.status))}>
-          {t(`purchases.status.${purchase.status}` as never)}
-        </span>
-        <div className="w-full sm:w-auto sm:ml-auto flex items-center gap-2 overflow-x-auto sm:overflow-visible pb-1 sm:pb-0">
+      <MobileDetailHeader
+        backHref={Routes.Purchases}
+        backLabel={t("common.back")}
+        title={purchase.code}
+        subtitle={formatDate(purchase.createdAt)}
+        badge={<span className={cn("inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium", statusClass(purchase.status))}>{t(`purchases.status.${purchase.status}` as never)}</span>}
+      />
+      <div className="-mt-3 mb-5 flex items-center gap-2 overflow-x-auto pb-1 sm:justify-end sm:overflow-visible">
           <Link href={printHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 shrink-0")}>
             <Printer className="h-4 w-4" />
             {t("print.printBtn")}
@@ -62,7 +59,6 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
               <PurchaseCancelButton purchaseId={purchase.id} />
             </>
           )}
-        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">

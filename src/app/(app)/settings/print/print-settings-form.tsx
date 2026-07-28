@@ -3,9 +3,9 @@
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ArrowLeft, Copy, EyeOff, Loader2, Plus, Save, Star } from "lucide-react";
-import Link from "next/link";
+import { Copy, EyeOff, Loader2, Plus, Save, Star } from "lucide-react";
 import { PrintDoc } from "@/components/print/print-doc";
+import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import {
   deactivatePrintTemplate,
   duplicatePrintTemplate,
@@ -118,15 +118,12 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="mb-5 flex items-center gap-3">
-        <Link href={Routes.Settings} className="grid h-10 w-10 place-items-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800" aria-label={t("common.back")}>
-          <ArrowLeft className="h-4 w-4" />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold">{t("printSettings.title")}</h1>
-          <p className="text-sm text-slate-500">{t("printSettings.settingsDesc")}</p>
-        </div>
-      </div>
+      <MobileDetailHeader
+        backHref={Routes.Settings}
+        backLabel={t("common.back")}
+        title={t("printSettings.title")}
+        subtitle={t("printSettings.settingsDesc")}
+      />
 
       <div className="mb-4 flex gap-1 overflow-x-auto border-b border-border">
         {PRINT_DOC_TYPES.map((item) => (

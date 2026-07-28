@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ArrowLeft, Search, Trash2 } from "lucide-react";
+import { Search, Trash2 } from "lucide-react";
 import { Routes } from "@/lib/routes";
+import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { cn, formatCurrency } from "@/lib/utils";
 import { Combobox } from "@/components/combobox";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -427,12 +428,12 @@ export function PurchaseForm({
 
   return (
     <div className="h-dvh flex flex-col">
-      <header className="shrink-0 h-12 px-4 flex items-center gap-3 bg-surface border-b border-border">
-        <Button type="button" variant="ghost" size="iconSm" onClick={() => router.push(backHref)} aria-label={t("common.back")}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        <Text as="h1" weight="bold" text={title} />
-      </header>
+      <MobileDetailHeader
+        flush
+        backHref={backHref}
+        backLabel={t("common.back")}
+        title={title}
+      />
 
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-auto lg:overflow-hidden">
         {/* trái: tìm + bảng hàng */}

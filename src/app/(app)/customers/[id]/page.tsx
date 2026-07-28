@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { ArrowLeft } from "lucide-react";
 import { Routes } from "@/lib/routes";
+import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { OrderDetailLink } from "@/components/order-detail-link";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { getCustomer } from "@/lib/data/partners";
@@ -29,13 +29,14 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
 
   return (
     <div className="p-4 sm:p-6 max-w-5xl">
-      <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-5 min-h-[58px] px-4 sm:px-6 py-2.5 bg-surface border-b border-border flex items-center gap-3 flex-wrap">
-        <Link href={Routes.Customers} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
-          <ArrowLeft className="w-4 h-4" />
-        </Link>
-        <h1 className="text-[17px] font-bold">{customer.name}</h1>
-        <CustomerTypeBadge type={customer.type} />
-        <div className="ml-auto flex items-center gap-2">
+      <MobileDetailHeader
+        backHref={Routes.Customers}
+        backLabel={t("common.back")}
+        title={customer.name}
+        badge={<CustomerTypeBadge type={customer.type} />}
+        stackActionsOnMobile
+        actions={
+          <>
           <CustomerEdit customer={{
             id: customer.id, name: customer.name, phone: customer.phone, email: customer.email,
             zaloUserId: customer.zaloUserId,
@@ -45,8 +46,9 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           <Link href={Routes.POS} className="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium">
             {t("orders.createViaPos")}
           </Link>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
         <div className="bg-surface border border-border rounded-card p-4">

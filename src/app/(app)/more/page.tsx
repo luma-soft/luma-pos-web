@@ -12,6 +12,14 @@ import {
   Settings,
   Store,
   UserRoundCog,
+  PackageSearch,
+  Tags,
+  ShoppingCart,
+  ClipboardCheck,
+  Camera,
+  Utensils,
+  ReceiptText,
+  Printer,
 } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { getRole, requireUser } from "@/lib/actions/common";
@@ -38,6 +46,7 @@ export default async function MorePage() {
   const manager = role === "owner" || role === "manager";
   const stock = manager || role === "warehouse";
   const sales = manager || role === "cashier";
+  const fnb = store.industry === "restaurant" || store.industry === "cafe";
 
   return (
     <div className="min-h-full bg-canvas lg:p-6">
@@ -67,11 +76,23 @@ export default async function MorePage() {
           {sales && <MobileSettingsRow href={Routes.Projects} icon={BriefcaseBusiness} label={t("nav.projects")} subtitle={t("mobile.more.projectsHint")} />}
         </MoreSection>
 
+        {stock && (
+          <MoreSection title={t("nav.groups.inventory")}>
+            <MobileSettingsRow href={`${Routes.Inventory}?tab=products`} icon={PackageSearch} label={t("nav.products")} subtitle={t("mobile.more.productsHint")} tone="blue" />
+            <MobileSettingsRow href={`${Routes.Inventory}?tab=categories`} icon={Tags} label={t("categories.title")} subtitle={t("mobile.more.categoriesHint")} tone="purple" />
+            <MobileSettingsRow href={`${Routes.Inventory}?tab=purchases`} icon={ShoppingCart} label={t("nav.purchases")} subtitle={t("mobile.more.purchasesHint")} />
+            <MobileSettingsRow href={`${Routes.Inventory}?tab=stocktakes`} icon={ClipboardCheck} label={t("nav.stocktakes")} subtitle={t("mobile.more.stocktakesHint")} tone="orange" />
+          </MoreSection>
+        )}
+
         {(manager || sales) && (
           <MoreSection title={t("nav.groups.manage")}>
+            {sales && <MobileSettingsRow href={Routes.CameraQuote} icon={Camera} label={t("mobile.more.cameraQuote")} subtitle={t("mobile.more.cameraQuoteHint")} tone="blue" />}
+            {sales && fnb && <MobileSettingsRow href={Routes.Tables} icon={Utensils} label={t("nav.tables")} subtitle={t("mobile.more.tablesHint")} tone="orange" />}
             {manager && <MobileSettingsRow href={Routes.Finance} icon={Wallet} label={t("nav.groups.finance")} subtitle={t("mobile.more.financeHint")} />}
             {sales && <MobileSettingsRow href={`${Routes.Sales}?tab=returns`} icon={RotateCcw} label={t("nav.returns")} subtitle={t("mobile.more.returnsHint")} tone="red" />}
-            {sales && <MobileSettingsRow href={Routes.Finance} icon={Clock3} label={t("nav.shifts")} subtitle={t("mobile.more.shiftHint")} tone="orange" />}
+            {sales && <MobileSettingsRow href={`${Routes.Finance}?tab=shifts`} icon={Clock3} label={t("nav.shifts")} subtitle={t("mobile.more.shiftHint")} tone="orange" />}
+            {manager && <MobileSettingsRow href={`${Routes.Sales}?tab=einvoices`} icon={ReceiptText} label={t("nav.einvoices")} subtitle={t("mobile.more.eInvoicesHint")} tone="blue" />}
             {store.prefs.ai.openaiApiKeySet && <MobileSettingsRow href="/ai" icon={Sparkles} label={t("nav.ai")} subtitle={t("mobile.more.aiHint")} tone="purple" />}
           </MoreSection>
         )}
@@ -79,6 +100,7 @@ export default async function MorePage() {
         <MoreSection title={t("nav.groups.system")}>
           <MobileSettingsRow href={Routes.Tools} icon={Wrench} label={t("nav.tools")} subtitle={t("mobile.more.toolsHint")} tone="blue" />
           {manager && <MobileSettingsRow href={Routes.Settings} icon={Settings} label={t("nav.settings")} subtitle={t("mobile.more.settingsHint")} />}
+          {manager && <MobileSettingsRow href={Routes.PrintSettings} icon={Printer} label={t("mobile.more.printTemplates")} subtitle={t("mobile.more.printTemplatesHint")} tone="orange" />}
           {sales && <MobileSettingsRow href={Routes.POS} icon={UserRoundCog} label={t("nav.pos")} subtitle={t("mobile.more.posHint")} />}
         </MoreSection>
 

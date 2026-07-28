@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { ArrowLeft } from "lucide-react";
 import { Routes } from "@/lib/routes";
+import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { OrderDetailLink } from "@/components/order-detail-link";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { getProjectDetail } from "@/lib/data/projects";
@@ -47,22 +47,21 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="w-full p-4 sm:p-6">
-      <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-5 min-h-[58px] px-4 sm:px-6 py-2.5 bg-surface border-b border-border flex items-center gap-3">
-        <Link href={`${Routes.Services}?tab=projects`} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
-          <ArrowLeft className="w-4 h-4" />
-        </Link>
-        <div className="min-w-0">
-          <h1 className="truncate text-[17px] font-bold">{project.name}</h1>
-          <p className="text-xs text-slate-500">{project.customerName ?? t("projects.noCustomer")}</p>
-        </div>
-        {serviceOptions && <div className="ml-auto"><ProjectEdit project={project} customers={serviceOptions.customerOptions} /></div>}
-        {project.serviceType && (
-          <CameraQuoteCreateButton
-            className="ml-auto"
-            project={{ id: project.id, name: project.name, customerId: project.customerId }}
-          />
-        )}
-      </div>
+      <MobileDetailHeader
+        backHref={`${Routes.Services}?tab=projects`}
+        backLabel={t("common.back")}
+        title={project.name}
+        subtitle={project.customerName ?? t("projects.noCustomer")}
+        stackActionsOnMobile
+        actions={
+          <>
+            {serviceOptions && <ProjectEdit project={project} customers={serviceOptions.customerOptions} />}
+            {project.serviceType && (
+              <CameraQuoteCreateButton project={{ id: project.id, name: project.name, customerId: project.customerId }} />
+            )}
+          </>
+        }
+      />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4 mb-5">
         {project.serviceType ? (

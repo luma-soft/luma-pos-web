@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ArrowLeft, Loader2, Check } from "lucide-react";
+import { Loader2, Check } from "lucide-react";
 import { updateSupplier } from "@/lib/actions/partners";
 import { Routes } from "@/lib/routes";
+import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import type { SupplierDetail, getSupplierPurchases } from "@/lib/data/partners";
 
@@ -40,23 +40,21 @@ export function SupplierDetailClient({ supplier, purchases }: { supplier: Suppli
 
   return (
     <div className="min-h-dvh bg-slate-50 dark:bg-slate-950">
-      <header className="sticky top-0 z-10 bg-surface border-b border-border px-4 sm:px-6 py-3 flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3 min-w-0">
-          <Link href={Routes.Suppliers} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500">
-            <ArrowLeft className="w-4 h-4" />
-          </Link>
-          <div className="min-w-0">
-            <h1 className="text-[17px] font-bold truncate">{supplier.name}</h1>
-            <p className="text-xs text-slate-400">{supplier.code}{debt > 0 ? ` · ${t("suppliers.cols.debt")}: ` : ""}<span className="text-warn">{debt > 0 ? formatCurrency(debt) : ""}</span></p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
+      <MobileDetailHeader
+        flush
+        backHref={Routes.Suppliers}
+        backLabel={t("common.back")}
+        title={supplier.name}
+        subtitle={<>{supplier.code}{debt > 0 ? ` · ${t("suppliers.cols.debt")}: ${formatCurrency(debt)}` : ""}</>}
+        actions={
+          <>
           {saved && <span className="text-sm text-ok inline-flex items-center gap-1"><Check className="w-4 h-4" />{t("common.saved")}</span>}
           <button onClick={save} disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium">
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}{t("common.save")}
           </button>
-        </div>
-      </header>
+          </>
+        }
+      />
 
       <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-5">
         {error && <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-lg px-4 py-2 text-sm text-red-700 dark:text-red-400">{error}</div>}

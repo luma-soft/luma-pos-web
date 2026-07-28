@@ -11,6 +11,7 @@ export const Routes = {
   Home: "/",
   Dashboard: "/dashboard",
   POS: "/pos",
+  CameraQuote: "/pos?cameraQuote=1",
   More: "/more",
   // Nhóm trang có tab (gộp)
   Sales: "/sales",
@@ -23,6 +24,8 @@ export const Routes = {
   Delivery: "/delivery",
   Projects: "/projects",
   Services: "/services",
+  Tables: "/tables",
+  KDS: "/kds",
   Promotions: "/promotions",
   EInvoices: "/einvoices",
   Products: "/products",
@@ -47,6 +50,7 @@ export const Routes = {
   Shopee: "/shopee",
   ShopeeInbox: "/shopee/inbox",
   Settings: "/settings",
+  PrintSettings: "/settings/print",
   LabelSettings: "/settings/labels",
 
   // Param routes

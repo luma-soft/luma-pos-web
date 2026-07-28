@@ -3,8 +3,9 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ArrowLeft, Search, Plus, Trash2, Loader2, Check, ChefHat, Split, X } from "lucide-react";
+import { Search, Plus, Trash2, Loader2, Check, ChefHat, Split, X } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
+import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { setTableCart, checkoutTable, closeTable, sendToKitchen } from "@/lib/actions/tables";
 import type { TableCartItem, CartModifier } from "@/lib/schemas/table";
 import type { ModifierGroup } from "@/lib/data/modifiers";
@@ -112,11 +113,12 @@ export function TableOrder({ id, name, initialCart, modifierGroups }: { id: stri
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-5 min-h-13 px-4 sm:px-6 py-2.5 bg-surface border-b border-border flex items-center gap-3">
-        <button onClick={() => router.push("/tables")} className="p-1.5 rounded-lg hover:bg-surface-2 text-slate-500"><ArrowLeft className="w-4 h-4" /></button>
-        <h1 className="text-[17px] font-bold">{name}</h1>
-        <button onClick={close} disabled={pending} className="ml-auto shrink-0 text-xs text-slate-500 hover:text-er">{t("tables.close")}</button>
-      </div>
+      <MobileDetailHeader
+        backHref="/tables"
+        backLabel={t("common.back")}
+        title={name}
+        actions={<button onClick={close} disabled={pending} className="min-h-11 rounded-xl px-3 text-xs font-semibold text-slate-500 hover:bg-er-soft hover:text-er">{t("tables.close")}</button>}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-4">
         <div>
@@ -241,7 +243,7 @@ function ModifierPicker({ product, groups, onCancel, onConfirm }: { product: Pos
       <div className="w-full max-w-md bg-surface rounded-card shadow-e2 max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-border sticky top-0 bg-surface">
           <h2 className="font-bold truncate">{product.name}</h2>
-          <button onClick={onCancel} className="p-1.5 rounded-lg hover:bg-surface-2 text-slate-500"><X className="w-4 h-4" /></button>
+          <button onClick={onCancel} aria-label={t("common.close")} className="grid h-11 w-11 place-items-center rounded-xl text-slate-500 hover:bg-surface-2"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-5 space-y-4">
           {groups.map((g) => (

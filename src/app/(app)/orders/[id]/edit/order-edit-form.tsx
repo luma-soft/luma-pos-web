@@ -3,8 +3,9 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ArrowLeft, Loader2, Save, Trash2 } from "lucide-react";
+import { Loader2, Save, Trash2 } from "lucide-react";
 import { Routes } from "@/lib/routes";
+import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { cn, formatCurrency } from "@/lib/utils";
 import { MoneyInput } from "@/components/ui/money-input";
 import { QuantityInput } from "@/components/ui/quantity-input";
@@ -86,12 +87,11 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl">
-      <div className="flex items-center gap-3 mb-5">
-        <button onClick={() => router.push(Routes.salesOrder(orderId, "completed"))} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
-          <ArrowLeft className="w-4 h-4" />
-        </button>
-        <h1 className="text-2xl font-bold">{t("orderEdit.title", { code: orderCode })}</h1>
-      </div>
+      <MobileDetailHeader
+        backHref={Routes.salesOrder(orderId, "completed")}
+        backLabel={t("common.back")}
+        title={t("orderEdit.title", { code: orderCode })}
+      />
 
       <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-card p-3 mb-4 text-sm text-amber-800 dark:text-amber-300">
         {t("orderEdit.warning")}

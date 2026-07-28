@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ArrowLeft, Search, Trash2 } from "lucide-react";
+import { Search, Trash2 } from "lucide-react";
 import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
 import type { AiQuickActionApplyMode } from "@/components/ai-quick-actions/types";
 import { Combobox } from "@/components/combobox";
+import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -177,12 +178,12 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
 
   return (
     <div className="h-dvh flex flex-col">
-      <header className="shrink-0 min-h-12 px-4 flex items-center gap-3 bg-surface border-b border-border">
-        <Button type="button" variant="ghost" size="iconSm" onClick={() => router.push(`${Routes.Inventory}?tab=purchase-returns`)} aria-label={t("common.back")}>
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        <Text as="h1" weight="bold" className="text-[17px]" text={t("purchaseReturns.createTitle")} />
-      </header>
+      <MobileDetailHeader
+        flush
+        backHref={`${Routes.Inventory}?tab=purchase-returns`}
+        backLabel={t("common.back")}
+        title={t("purchaseReturns.createTitle")}
+      />
 
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-auto lg:overflow-hidden bg-canvas">
         <div className="flex-1 min-w-0 min-h-[420px] lg:min-h-0 flex flex-col p-3 sm:p-4">

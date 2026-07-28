@@ -3,9 +3,10 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ArrowLeft, Check, ClipboardCheck, Loader2, PackageSearch, Save, Search, Trash2 } from "lucide-react";
+import { Check, ClipboardCheck, Loader2, PackageSearch, Save, Search, Trash2 } from "lucide-react";
 import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
+import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import type { AiQuickActionApplyMode } from "@/components/ai-quick-actions/types";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { Button } from "@/components/ui/button";
@@ -165,18 +166,13 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
 
   return (
     <div className="min-h-dvh bg-canvas p-4 sm:p-6">
-      <div className="mb-5 flex flex-wrap items-start gap-4">
-        <Button type="button" variant="ghost" size="iconSm" onClick={() => router.push(Routes.Stocktakes)} className="mt-1 text-slate-500">
-          <ArrowLeft className="w-4 h-4" />
-        </Button>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-[17px] font-bold leading-tight">{t("stocktakes.createNew")}</h1>
-            <span className="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-950 dark:text-primary-200">{t("stocktakes.status.draft")}</span>
-          </div>
-          <p className="mt-1 max-w-3xl text-sm text-slate-500">{t("stocktakes.balanceHint")}</p>
-        </div>
-        <div className="min-w-44">
+      <MobileDetailHeader
+        backHref={Routes.Stocktakes}
+        backLabel={t("common.back")}
+        title={t("stocktakes.createNew")}
+        subtitle={t("stocktakes.balanceHint")}
+        badge={<span className="rounded-full bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-950 dark:text-primary-200">{t("stocktakes.status.draft")}</span>}
+        actions={<div className="hidden min-w-44 sm:block">
           <Select
             value={warehouseId}
             onChange={(e) => router.push(`${Routes.StocktakeNew}?wh=${e.target.value}`)}
@@ -185,7 +181,17 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
             className="font-medium"
             title={lines.length > 0 ? t("stocktakes.warehouseLocked") : undefined}
           />
-        </div>
+        </div>}
+      />
+      <div className="mb-4 sm:hidden">
+        <Select
+          value={warehouseId}
+          onChange={(e) => router.push(`${Routes.StocktakeNew}?wh=${e.target.value}`)}
+          disabled={lines.length > 0}
+          options={warehouses.map((w) => ({ value: w.id, label: w.name }))}
+          className="h-11 font-medium"
+          title={lines.length > 0 ? t("stocktakes.warehouseLocked") : undefined}
+        />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">

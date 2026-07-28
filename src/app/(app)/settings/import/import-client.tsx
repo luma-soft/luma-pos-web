@@ -4,11 +4,12 @@ import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ArrowLeft, Upload, FileText, Loader2, Check, AlertTriangle, Download } from "lucide-react";
+import { Upload, FileText, Loader2, Check, AlertTriangle, Download } from "lucide-react";
 import * as XLSX from "xlsx";
 import { cn } from "@/lib/utils";
 import { importProducts, type ImportRow, type ImportSummary } from "@/lib/actions/import";
 import { Button } from "@/components/ui/button";
+import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
 
@@ -150,13 +151,14 @@ export function ImportClient() {
 
   return (
     <div className="p-4 sm:p-6 min-h-dvh">
-      <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-5 min-h-13 px-4 sm:px-6 py-2.5 bg-surface border-b border-border flex items-center gap-3">
-        <Link href="/settings" className="p-1.5 rounded-lg hover:bg-surface-2 text-slate-500"><ArrowLeft className="w-4 h-4" /></Link>
-        <Text as="h1" weight="bold" className="text-[17px]" text={t("import.title")} />
-        <Button type="button" variant="outline" size="sm" onClick={downloadTemplate} className="ml-auto rounded-full whitespace-nowrap">
+      <MobileDetailHeader
+        backHref="/settings"
+        backLabel={t("common.back")}
+        title={t("import.title")}
+        actions={<Button type="button" variant="outline" size="sm" onClick={downloadTemplate} className="min-h-11 rounded-full whitespace-nowrap">
           <Download className="w-3.5 h-3.5" />{t("import.template")}
-        </Button>
-      </div>
+        </Button>}
+      />
 
       <div className="px-3.5 py-3 bg-in-soft border border-in/20 rounded-card text-[12px] text-in leading-relaxed mb-4">
         {t("import.intro")}

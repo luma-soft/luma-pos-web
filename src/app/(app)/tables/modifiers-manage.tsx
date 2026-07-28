@@ -91,7 +91,7 @@ export function ModifiersManage({ groups, categories }: { groups: ModifierGroup[
           <div className="w-full max-w-lg bg-surface rounded-card shadow-e2 max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3 border-b border-border sticky top-0 bg-surface">
               <h2 className="font-bold">{editId ? t("modifiers.editTitle") : t("modifiers.add")}</h2>
-              <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-surface-2 text-slate-500"><X className="w-4 h-4" /></button>
+              <button onClick={() => setOpen(false)} aria-label={t("common.close")} className="grid h-11 w-11 place-items-center rounded-xl text-slate-500 hover:bg-surface-2"><X className="h-5 w-5" /></button>
             </div>
             <div className="p-5 space-y-4">
               <div>
