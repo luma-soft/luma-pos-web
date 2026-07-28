@@ -1,7 +1,9 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   useTransition,
@@ -40,6 +42,7 @@ import { OrderDetailLink } from "@/components/order-detail-link";
 import { deleteProduct, setProductActive } from "@/lib/actions/products";
 import { setCameraMaterial } from "@/lib/actions/products";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
+import { positionFloatingMenu } from "@/lib/floating-menu-position";
 import type { ProductListResult } from "@/lib/data/products";
 import {
   isProductStockManaged,
@@ -1042,11 +1045,67 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
   const [moreOpen, setMoreOpen] = useState(false);
+  const [morePosition, setMorePosition] = useState<{
+    left: number;
+    top: number;
+    maxHeight: number;
+  } | null>(null);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
   const effectiveActive = product.isVariantParent
     ? product.children.some((child) => child.isActive)
     : product.isActive;
   const nextActive = !effectiveActive;
   const sameTypeSourceId = product.parentProductId ?? product.id;
+
+  const updateMorePosition = useCallback(() => {
+    const trigger = moreButtonRef.current?.getBoundingClientRect();
+    const menu = moreMenuRef.current?.getBoundingClientRect();
+    if (!trigger || !menu) return;
+    setMorePosition(
+      positionFloatingMenu({
+        trigger,
+        menu,
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight,
+        },
+      }),
+    );
+  }, []);
+
+  useLayoutEffect(() => {
+    if (moreOpen) updateMorePosition();
+  }, [moreOpen, updateMorePosition]);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const closeOnOutsidePointer = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        !moreButtonRef.current?.contains(target) &&
+        !moreMenuRef.current?.contains(target)
+      ) {
+        setMoreOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMoreOpen(false);
+        moreButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener("mousedown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("resize", updateMorePosition);
+    window.addEventListener("scroll", updateMorePosition, true);
+    return () => {
+      document.removeEventListener("mousedown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("resize", updateMorePosition);
+      window.removeEventListener("scroll", updateMorePosition, true);
+    };
+  }, [moreOpen, updateMorePosition]);
 
   function toggleCameraMaterial() {
     if (pending) return;
@@ -1169,24 +1228,33 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
             label={t("products.actions.purchase")}
             href={Routes.purchaseNewForProduct(product.id)}
           />
-          <div
-            className="relative"
-            onMouseEnter={() => setMoreOpen(true)}
-            onMouseLeave={() => setMoreOpen(false)}
-          >
+          <div className="relative">
             <button
+              ref={moreButtonRef}
               type="button"
               aria-label={locale === "vi" ? "Thao tác khác" : "More actions"}
+              aria-haspopup="menu"
               aria-expanded={moreOpen}
               onClick={() => setMoreOpen((value) => !value)}
-              onFocus={() => setMoreOpen(true)}
               className={cn(actionClassName, "border-border bg-surface text-slate-700 hover:bg-surface-2 dark:text-slate-200")}
             >
               <MoreHorizontal className="h-4 w-4" />
             </button>
-            {moreOpen && (
-              <div className="absolute right-0 bottom-full z-30 min-w-52 pb-1">
-                <div className="rounded-lg border border-border bg-surface p-1 shadow-xl">
+            {moreOpen && typeof document !== "undefined" && createPortal(
+              <div
+                ref={moreMenuRef}
+                role="menu"
+                style={
+                  morePosition
+                    ? {
+                        left: morePosition.left,
+                        top: morePosition.top,
+                        maxHeight: morePosition.maxHeight,
+                      }
+                    : { left: 0, top: 0, visibility: "hidden" }
+                }
+                className="fixed z-[100] min-w-52 overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-xl"
+              >
                   {ONLINE_SALES_ENABLED && (
                     <MenuActionLink
                       icon={Store}
@@ -1224,8 +1292,8 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
                     disabled={pending}
                     tone="danger"
                   />
-                </div>
-              </div>
+              </div>,
+              document.body,
             )}
           </div>
           </>
