@@ -89,7 +89,7 @@ export async function OrderDetailPanel({
             <OrderStatusBadge status={order.status} />
             {!isQuote && <PaymentStatusBadge status={order.paymentStatus} />}
             {showOpenAction && (
-              <Link href={openInListHref} className="inline-flex items-center gap-1 text-sm font-semibold text-primary-600 hover:underline">
+              <Link href={openInListHref} className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2 text-sm font-semibold text-primary-600 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:min-h-0 lg:px-0">
                 <ExternalLink className="h-4 w-4" />
                 Mở phiếu
               </Link>
@@ -176,7 +176,25 @@ export async function OrderDetailPanel({
           {!isQuote && order.payments.length > 0 && (
             <div className="overflow-hidden rounded-lg border border-border">
               <div className="border-b border-border px-3 py-2 text-sm font-semibold">{t("orders.detail.payments")}</div>
-              <div className="overflow-x-auto">
+              <div className="divide-y divide-border-soft lg:hidden" data-mobile-audit="order-payments">
+                {order.payments.map((payment) => (
+                  <div key={payment.id} className="space-y-2 p-3 text-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-semibold">{t(`pos.payMethods.${payment.method}` as never)}</div>
+                        <div className="mt-0.5 text-xs text-slate-500">{formatDate(payment.createdAt)}</div>
+                      </div>
+                      <div className="shrink-0 font-semibold tabular-nums text-ok">+ {formatCurrency(Number(payment.amount))}</div>
+                    </div>
+                    {(payment.reference || payment.note) && (
+                      <p className="break-words text-xs text-slate-500">
+                        {[payment.reference, payment.note].filter(Boolean).join(" · ")}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="hidden overflow-x-auto lg:block">
                 <table className="w-full min-w-[620px] text-sm">
                   <tbody className="divide-y divide-border-soft">
                     {order.payments.map((payment) => (
@@ -198,7 +216,30 @@ export async function OrderDetailPanel({
           {order.returns.length > 0 && (
             <div className="overflow-hidden rounded-lg border border-border">
               <div className="border-b border-border px-3 py-2 text-sm font-semibold">{t("returns.sectionTitle")} ({order.returns.length})</div>
-              <div className="overflow-x-auto">
+              <div className="divide-y divide-border-soft lg:hidden" data-mobile-audit="order-returns">
+                {order.returns.map((row) => (
+                  <div key={row.id} className="space-y-2 p-3 text-sm">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-semibold">{row.code}</div>
+                        <div className="mt-0.5 text-xs text-slate-500">{formatDate(row.createdAt)}</div>
+                      </div>
+                      <div className="shrink-0 font-semibold tabular-nums text-er">- {formatCurrency(Number(row.totalRefund))}</div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
+                      <span className="break-words">{t(`returns.reasons.${row.reason}` as never)}</span>
+                      <span className="break-words text-right">{t(`returns.refundMethods.${row.refundMethod}` as never)}</span>
+                    </div>
+                    <Link
+                      href={`/returns/${row.id}/print`}
+                      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-xs font-semibold text-primary-600 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                    >
+                      {t("print.printBtn")}
+                    </Link>
+                  </div>
+                ))}
+              </div>
+              <div className="hidden overflow-x-auto lg:block">
                 <table className="w-full min-w-[760px] text-sm">
                   <tbody className="divide-y divide-border-soft">
                     {order.returns.map((row) => (

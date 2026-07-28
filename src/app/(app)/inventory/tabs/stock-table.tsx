@@ -109,7 +109,23 @@ function ExpandedStock({ row }: { row: StockRow }) {
         )}
 
         {tab === "stock" && (
-          <div className="overflow-x-auto">
+          <>
+          <div className="rounded-lg border border-border p-3 lg:hidden" data-mobile-audit="inventory-stock-location">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="font-semibold">{t("products.expand.defaultWarehouse")}</div>
+                <div className={cn("mt-1 text-sm font-semibold tabular-nums", (sev === "crit" || sev === "out") && "text-er")}>
+                  {formatNumber(stock)} {row.baseUnit}
+                </div>
+              </div>
+              <StatusBadge sev={sev} />
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
+              <InfoItem label={t("inventory.cols.min")} value={min > 0 ? formatNumber(min) : "—"} />
+              <div><div className="text-slate-500">{t("inventory.cols.level")}</div><div className="mt-2"><Level row={row} /></div></div>
+            </div>
+          </div>
+          <div className="hidden overflow-x-auto lg:block">
             <table className="w-full min-w-[760px] text-sm">
               <thead>
                 <tr className="bg-canvas text-left text-xs uppercase tracking-wide text-slate-500">
@@ -139,6 +155,7 @@ function ExpandedStock({ row }: { row: StockRow }) {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </div>
 
@@ -147,7 +164,7 @@ function ExpandedStock({ row }: { row: StockRow }) {
           <ActionLink href={Routes.purchaseNewForProduct(row.id)} icon={PackagePlus} label={t("products.actions.purchase")} />
           <Link
             href={Routes.product(row.id)}
-            className="inline-flex h-10 shrink-0 items-center justify-center rounded-lg border border-primary-600 bg-primary-600 px-3 text-sm font-semibold text-white transition-colors hover:border-primary-700 hover:bg-primary-700"
+            className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-primary-600 bg-primary-600 px-3 text-sm font-semibold text-white transition-colors hover:border-primary-700 hover:bg-primary-700 lg:min-h-10"
           >
             {t("inventory.expand.openProduct" as never)}
           </Link>
@@ -216,7 +233,7 @@ function ActionLink({
   return (
     <Link
       href={href}
-      className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-surface-2 dark:text-slate-200"
+      className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-surface-2 dark:text-slate-200 lg:min-h-10"
     >
       <Icon className="h-4 w-4" />
       {label}

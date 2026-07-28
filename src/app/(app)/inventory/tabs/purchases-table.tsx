@@ -108,7 +108,30 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
           </div>
           <ReceiptText className="h-5 w-5 text-slate-400" />
         </div>
-        <div className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-lg border border-border">
+        <div className="min-h-0 flex-1 divide-y divide-border-soft overflow-auto overscroll-contain rounded-lg border border-border lg:hidden" data-mobile-audit="inventory-purchase-items">
+          {purchase.items.map((item) => {
+            const discount = Number(item.discount);
+            return (
+              <article key={item.id} className="space-y-2 p-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <Link
+                    href={Routes.product(item.productId)}
+                    className="inline-flex min-h-11 min-w-0 flex-1 items-center break-words font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                  >
+                    {item.productName}
+                  </Link>
+                  <div className="shrink-0 font-semibold tabular-nums">{formatCurrency(Number(item.total))}</div>
+                </div>
+                <div className="text-xs text-slate-500">{item.sku} · {formatNumber(Number(item.quantity))} {item.baseUnit}</div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <span>{t("purchases.cols.unitCost")}: <b className="tabular-nums">{formatCurrency(Number(item.unitCost))}</b></span>
+                  <span className="text-right">{t("orders.cols.discount")}: <b className="tabular-nums">{discount > 0 ? formatCurrency(discount) : "—"}</b></span>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+        <div className="hidden min-h-0 flex-1 overflow-auto overscroll-contain rounded-lg border border-border lg:block">
           <table className="w-full min-w-[760px] text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
@@ -200,21 +223,21 @@ function PurchaseDetailFooter({ purchase }: { purchase: PurchaseRow }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div className="flex flex-wrap items-center gap-2">
-        {canChange && <PurchaseCancelButton purchaseId={purchase.id} compact />}
+        {canChange && <PurchaseCancelButton purchaseId={purchase.id} compact className="min-h-11 lg:min-h-8" />}
         {canChange && (
-          <Link href={Routes.purchaseCopy(purchase.id)} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold text-slate-600 hover:bg-surface-2">
+          <Link href={Routes.purchaseCopy(purchase.id)} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold text-slate-600 hover:bg-surface-2 lg:min-h-8">
             <Copy className="h-3.5 w-3.5" />
             {t("purchases.copy")}
           </Link>
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Link href={printHref} className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold text-primary-600 hover:bg-surface-2">
+        <Link href={printHref} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold text-primary-600 hover:bg-surface-2 lg:min-h-8">
           <Printer className="h-3.5 w-3.5" />
           {t("print.printBtn")}
         </Link>
         {canChange && (
-          <Link href={Routes.purchaseEdit(purchase.id)} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white hover:brightness-110">
+          <Link href={Routes.purchaseEdit(purchase.id)} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white hover:brightness-110 lg:min-h-8">
             <FilePenLine className="h-3.5 w-3.5" />
             {t("purchases.edit")}
           </Link>

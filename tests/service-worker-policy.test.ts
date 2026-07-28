@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { AsyncLocalStorage } from "node:async_hooks";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
 
@@ -56,14 +55,21 @@ describe("service worker request policy", () => {
   });
 
   test("serves the worker and manifest outside the authentication proxy", async () => {
-    Object.assign(globalThis, { AsyncLocalStorage });
-    const [{ unstable_doesMiddlewareMatch }, { config }] = await Promise.all([
-      import("next/experimental/testing/server"),
-      import("../src/proxy"),
+    const child = Bun.spawn(
+      ["bun", "run", "tests/fixtures/proxy-match-check.ts"],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    const [exitCode, stdout, stderr] = await Promise.all([
+      child.exited,
+      new Response(child.stdout).text(),
+      new Response(child.stderr).text(),
     ]);
 
-    expect(unstable_doesMiddlewareMatch({ config, nextConfig: {}, url: "/sw.js" })).toBe(false);
-    expect(unstable_doesMiddlewareMatch({ config, nextConfig: {}, url: "/manifest.webmanifest" })).toBe(false);
-    expect(unstable_doesMiddlewareMatch({ config, nextConfig: {}, url: "/services" })).toBe(true);
+    expect(exitCode, stderr).toBe(0);
+    expect(JSON.parse(stdout)).toEqual({
+      serviceWorker: false,
+      manifest: false,
+      authenticatedRoute: true,
+    });
   });
 });

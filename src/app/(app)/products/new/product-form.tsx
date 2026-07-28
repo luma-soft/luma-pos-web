@@ -910,9 +910,9 @@ function VariantChildrenPreview() {
           </div>
         </div>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[860px] text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-900/60">
+      <div className="overflow-visible lg:overflow-x-auto" data-mobile-audit="product-variants">
+        <table className="block w-full min-w-0 text-sm lg:table lg:min-w-[860px]">
+          <thead className="hidden bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-900/60 lg:table-header-group">
             <tr>
               <th className="px-3 py-2 font-semibold">
                 {t("products.variants.variant")}
@@ -936,29 +936,34 @@ function VariantChildrenPreview() {
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border-soft">
+          <tbody className="block divide-y divide-border-soft lg:table-row-group">
             {children.map((child, idx) => (
-              <tr key={child.variantName}>
-                <td className="px-3 py-2">
+              <tr key={child.variantName} className="grid grid-cols-2 gap-3 p-3 lg:table-row lg:p-0">
+                <td className="col-span-2 block p-0 lg:table-cell lg:px-3 lg:py-2">
                   <input
                     type="hidden"
                     {...register(`variantChildren.${idx}.variantName`)}
                   />
-                  <div className="font-medium">{child.variantName}</div>
+                  <div className="text-xs font-semibold text-slate-500 lg:hidden">{t("products.variants.variant")}</div>
+                  <div className="mt-1 break-words font-medium lg:mt-0">{child.variantName}</div>
                 </td>
-                <td className="px-3 py-2">
-                  <Input
+                <td className="col-span-2 block p-0 sm:col-span-1 lg:table-cell lg:px-3 lg:py-2">
+                  <div className="mb-1 text-xs font-semibold text-slate-500 lg:hidden">SKU</div>
+                  <Input className="min-h-11 lg:min-h-0"
                     {...register(`variantChildren.${idx}.sku`)}
                     placeholder={t("products.variants.autoSku")}
                   />
                 </td>
-                <td className="px-3 py-2">
-                  <Input {...register(`variantChildren.${idx}.barcode`)} />
+                <td className="col-span-2 block p-0 sm:col-span-1 lg:table-cell lg:px-3 lg:py-2">
+                  <div className="mb-1 text-xs font-semibold text-slate-500 lg:hidden">{t("products.fields.barcode")}</div>
+                  <Input className="min-h-11 lg:min-h-0" {...register(`variantChildren.${idx}.barcode`)} />
                 </td>
-                <td className="px-3 py-2">
-                  <Input {...register(`variantChildren.${idx}.baseUnit`)} />
+                <td className="block p-0 lg:table-cell lg:px-3 lg:py-2">
+                  <div className="mb-1 text-xs font-semibold text-slate-500 lg:hidden">{t("pos.unit")}</div>
+                  <Input className="min-h-11 lg:min-h-0" {...register(`variantChildren.${idx}.baseUnit`)} />
                 </td>
-                <td className="px-3 py-2">
+                <td className="block p-0 lg:table-cell lg:px-3 lg:py-2">
+                  <div className="mb-1 text-xs font-semibold text-slate-500 lg:hidden">{t("products.pricing.costPrice")}</div>
                   <NumberInput
                     min={0}
                     value={child.costPrice}
@@ -968,10 +973,11 @@ function VariantChildrenPreview() {
                         shouldValidate: true,
                       })
                     }
-                    className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-right"
+                    className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-right lg:min-h-0"
                   />
                 </td>
-                <td className="px-3 py-2">
+                <td className="block p-0 lg:table-cell lg:px-3 lg:py-2">
+                  <div className="mb-1 text-xs font-semibold text-slate-500 lg:hidden">{t("products.pricing.retailPrice")}</div>
                   <NumberInput
                     min={0}
                     value={child.retailPrice}
@@ -981,10 +987,11 @@ function VariantChildrenPreview() {
                         shouldValidate: true,
                       })
                     }
-                    className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-right"
+                    className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-right lg:min-h-0"
                   />
                 </td>
-                <td className="px-3 py-2">
+                <td className="block p-0 lg:table-cell lg:px-3 lg:py-2">
+                  <div className="mb-1 text-xs font-semibold text-slate-500 lg:hidden">{t("products.variants.initialStock")}</div>
                   <QuantityInput
                     min={0}
                     value={Number(child.initialStock ?? 0)}
@@ -994,15 +1001,20 @@ function VariantChildrenPreview() {
                         shouldValidate: true,
                       })
                     }
-                    className="w-32"
+                    className="w-full lg:w-32"
+                    touchTargets
+                    inputLabel={`${child.variantName} — ${t("products.variants.initialStock")}`}
                   />
                 </td>
-                <td className="px-3 py-2 text-center">
+                <td className="block p-0 lg:table-cell lg:px-3 lg:py-2 lg:text-center">
+                  <label className="inline-flex min-h-11 min-w-11 items-center gap-2 text-xs font-semibold text-slate-500 lg:min-h-0 lg:min-w-0">
                   <input
                     type="checkbox"
                     {...register(`variantChildren.${idx}.directSale`)}
                     className="rounded text-primary-600 focus:ring-primary-500"
                   />
+                  <span className="lg:hidden">{t("products.variants.sale")}</span>
+                  </label>
                 </td>
               </tr>
             ))}
@@ -1224,7 +1236,7 @@ function ImageUploadGrid() {
             <button
               type="button"
               onClick={() => remove(u)}
-              className="absolute top-1 right-1 grid place-items-center w-6 h-6 rounded-full bg-black/55 text-white opacity-0 group-hover:opacity-100 transition"
+              className="absolute right-1 top-1 grid h-11 w-11 place-items-center rounded-full bg-black/55 text-white opacity-100 transition sm:h-9 sm:w-9 sm:opacity-0 sm:group-hover:opacity-100"
               aria-label={t("common.delete")}
             >
               <X className="w-4 h-4" />
@@ -1361,15 +1373,15 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="grid h-9 w-9 place-items-center rounded-lg text-slate-500 hover:bg-surface-2"
+                className="grid h-11 w-11 place-items-center rounded-lg text-slate-500 hover:bg-surface-2 lg:h-9 lg:w-9"
                 aria-label={t("common.close")}
               >
                 <X className="h-5 w-5" />
               </button>
             </header>
-            <div className="min-h-0 flex-1 overflow-auto px-5 pb-4 sm:px-6">
-              <table className="w-full min-w-[640px] text-sm">
-                <thead>
+            <div className="min-h-0 flex-1 overflow-auto px-5 pb-4 sm:px-6" data-mobile-audit="product-price-books">
+              <table className="block w-full min-w-0 text-sm lg:table lg:min-w-[640px]">
+                <thead className="hidden lg:table-header-group">
                   <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
                     <th className="px-4 py-3 font-semibold">
                       {t("pricing.cols.name")}
@@ -1380,15 +1392,16 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
                     <th className="w-12 px-4 py-3" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border-soft">
+                <tbody className="block divide-y divide-border-soft lg:table-row-group">
                   {activeBooks.map((book) => {
                     const value = book.isDefault
                       ? draftRetail
                       : (draftOverrides[book.id] ?? null);
                     return (
-                      <tr key={book.id}>
-                        <td className="px-4 py-3 font-medium">{book.name}</td>
-                        <td className="px-4 py-3">
+                      <tr key={book.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 py-3 lg:table-row lg:py-0">
+                        <td className="col-span-2 block p-0 break-words font-medium lg:table-cell lg:px-4 lg:py-3">{book.name}</td>
+                        <td className="block p-0 lg:table-cell lg:px-4 lg:py-3">
+                          <div className="mb-1 text-xs font-semibold text-slate-500 lg:hidden">{t("products.pricing.retailPrice")}</div>
                           <NumberInput
                             value={value}
                             onChange={(next) => {
@@ -1401,10 +1414,10 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
                             }}
                             suffix="đ"
                             min={0}
-                            className="ml-auto max-w-[260px]"
+                            className="min-h-11 w-full lg:ml-auto lg:max-w-[260px] lg:min-h-0"
                           />
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="block p-0 text-right lg:table-cell lg:px-4 lg:py-3">
                           {!book.isDefault && (
                             <button
                               type="button"
@@ -1414,7 +1427,7 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
                                   [book.id]: null,
                                 }))
                               }
-                              className="grid h-9 w-9 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-er"
+                              className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-er lg:h-9 lg:w-9"
                               aria-label={t("common.clear")}
                             >
                               <Trash2 className="h-4 w-4" />

@@ -30,7 +30,7 @@ export function TripCreate({ orders }: { orders: { id: string; label: string }[]
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium">
+      <button onClick={() => setOpen(true)} className="inline-flex min-h-11 items-center gap-2 px-4 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium">
         <Plus className="w-4 h-4" />
         {t("delivery.createTrip")}
       </button>
@@ -42,7 +42,7 @@ export function TripCreate({ orders }: { orders: { id: string; label: string }[]
     <div className="bg-surface border border-border rounded-card p-4 w-full max-w-xl space-y-3">
       <div className="flex justify-between items-center">
         <b className="text-sm">{t("delivery.createTrip")}</b>
-        <button onClick={() => setOpen(false)} className="p-1 text-slate-400"><X className="w-4 h-4" /></button>
+        <button onClick={() => setOpen(false)} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400"><X className="w-4 h-4" /></button>
       </div>
       <div className="flex gap-2">
         <input value={vehicle} onChange={(e) => setVehicle(e.target.value)} placeholder={`${t("delivery.vehicle")} *`} className={`${cls} flex-1`} />
@@ -79,7 +79,7 @@ export function TripStart({ tripId }: { tripId: string }) {
     <button
       onClick={async () => { setBusy(true); const r = await startTrip(tripId); setBusy(false); if (r.ok) router.refresh(); }}
       disabled={busy}
-      className="px-3 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-medium disabled:opacity-50"
+      className="min-h-11 rounded-lg bg-primary-600 px-3 text-xs font-medium text-white disabled:opacity-50"
     >
       {t("delivery.start")}
     </button>
@@ -94,7 +94,7 @@ export function StopActions({ stopId }: { stopId: string }) {
     <button
       onClick={async () => { setBusy(true); const r = await markStopDelivered(stopId); setBusy(false); if (r.ok) router.refresh(); }}
       disabled={busy}
-      className="px-3 py-1.5 rounded-lg border border-emerald-300 dark:border-emerald-800 text-ok text-xs font-medium disabled:opacity-50 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 whitespace-nowrap"
+      className="min-h-11 whitespace-nowrap rounded-lg border border-emerald-300 px-3 text-xs font-medium text-ok disabled:opacity-50 hover:bg-emerald-50 dark:border-emerald-800 dark:hover:bg-emerald-950/40"
     >
       ✓ {t("delivery.markDelivered")}
     </button>

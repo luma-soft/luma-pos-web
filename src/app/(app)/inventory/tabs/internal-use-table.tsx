@@ -109,7 +109,25 @@ function ExpandedIssue({ row }: { row: InternalUseRow }) {
       </div>
 
       <div className="overflow-hidden rounded-card border border-border">
-        <table className="w-full min-w-[760px] table-fixed text-sm">
+        <div className="divide-y divide-border-soft lg:hidden" data-mobile-audit="inventory-internal-use-items">
+          {row.items.map((item) => (
+            <article key={item.id} className="space-y-2 p-3 text-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="break-words font-semibold">{item.productName}</div>
+                  <div className="mt-0.5 font-mono text-xs text-primary-600">{item.sku ?? "—"}</div>
+                </div>
+                <div className="shrink-0 font-bold tabular-nums">{formatCurrency(item.total)}</div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
+                <span>{formatNumber(item.quantity)} {item.unitName}</span>
+                <span className="text-right">{formatCurrency(item.unitCost)} / {item.unitName}</span>
+              </div>
+            </article>
+          ))}
+        </div>
+        <div className="hidden overflow-x-auto lg:block">
+          <table className="w-full min-w-[760px] table-fixed text-sm">
           <colgroup>
             <col className="w-34" />
             <col />
@@ -140,7 +158,8 @@ function ExpandedIssue({ row }: { row: InternalUseRow }) {
               </tr>
             ))}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
@@ -196,9 +215,9 @@ function SummaryLine({ label, value, strong }: { label: string; value: string; s
 }
 
 function TextAction({ children }: { children: React.ReactNode }) {
-  return <button type="button" className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 transition hover:text-primary-700 dark:text-slate-300">{children}</button>;
+  return <button type="button" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-slate-600 transition hover:text-primary-700 dark:text-slate-300 lg:min-h-0 lg:px-0">{children}</button>;
 }
 
 function SmallAction({ children }: { children: React.ReactNode }) {
-  return <button type="button" className="inline-flex h-9 items-center gap-1.5 rounded-card border border-border bg-surface px-3 text-sm font-semibold text-slate-600 transition hover:bg-surface-2 dark:text-slate-200">{children}</button>;
+  return <button type="button" className="inline-flex min-h-11 items-center gap-1.5 rounded-card border border-border bg-surface px-3 text-sm font-semibold text-slate-600 transition hover:bg-surface-2 dark:text-slate-200 lg:min-h-9">{children}</button>;
 }

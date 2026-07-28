@@ -329,7 +329,35 @@ function ListingsSection({ data, L, tab }: { data: Awaited<ReturnType<typeof get
         </div>
         <OnlineSalesListingButton L={L} tab={tab === "overview" ? "overview" : "listings"} />
       </div>
-      <div className="overflow-x-auto">
+      {data.mappings.length > 0 && (
+        <div className="divide-y divide-border-soft lg:hidden" data-mobile-audit="online-listings">
+          {data.mappings.map((row) => (
+            <article key={row.id} className="space-y-3 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <Link
+                  href={Routes.product(row.productId)}
+                  className="inline-flex min-h-11 min-w-0 flex-1 items-center break-words font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                >
+                  {row.productName}
+                </Link>
+                <Badge value={row.status} />
+              </div>
+              <div className="text-xs text-slate-500">{row.sku}</div>
+              <dl className="grid grid-cols-2 gap-2 text-xs">
+                <div><dt className="text-slate-500">{L ? "Kênh" : "Channel"}</dt><dd className="mt-0.5"><Badge value="Shopee" /></dd></div>
+                <div><dt className="text-slate-500">{L ? "Giá" : "Price"}</dt><dd className="mt-0.5 text-right font-semibold tabular-nums">{row.price ? formatCurrency(Number(row.price)) : "—"}</dd></div>
+                <div><dt className="text-slate-500">{L ? "Tồn" : "Stock"}</dt><dd className="mt-0.5 tabular-nums">{row.stock ? formatNumber(Number(row.stock)) : "—"}</dd></div>
+                <div><dt className="text-slate-500">{L ? "Mã sàn" : "Marketplace item"}</dt><dd className="mt-0.5 break-all font-mono">{row.externalItemId ?? "—"}</dd></div>
+                <div className="col-span-2"><dt className="text-slate-500">{L ? "Sync cuối" : "Last sync"}</dt><dd className="mt-0.5 break-words">{row.lastSyncAt ? formatDate(row.lastSyncAt) : row.lastError || "—"}</dd></div>
+              </dl>
+            </article>
+          ))}
+        </div>
+      )}
+      {data.mappings.length === 0 && (
+        <p className="px-4 py-10 text-center text-sm text-slate-400 lg:hidden">{L ? "Chưa có listing online." : "No online listings yet."}</p>
+      )}
+      <div className="hidden overflow-x-auto lg:block">
         <table className="w-full min-w-[900px] text-sm">
           <thead className="bg-canvas text-left text-xs uppercase tracking-wide text-slate-500">
             <tr>
@@ -376,11 +404,43 @@ function OnlineOrdersSection({ rows, L }: { rows: Awaited<ReturnType<typeof getS
             {L ? "Đơn Shopee được map về đơn LumaPOS để xử lý chung với POS." : "Shopee orders map into LumaPOS orders for a shared handling flow."}
           </p>
         </div>
-        <Link href={`${Routes.Sales}?tab=orders&source=shopee`} className="inline-flex rounded-full border border-border px-3 py-1.5 text-xs font-bold hover:bg-surface-2">
+        <Link href={`${Routes.Sales}?tab=orders&source=shopee`} className="inline-flex min-h-11 items-center rounded-full border border-border px-3 text-xs font-bold hover:bg-surface-2">
           {L ? "Xem trong Đơn hàng" : "View in Orders"}
         </Link>
       </div>
-      <div className="overflow-x-auto">
+      {rows.length > 0 && (
+        <div className="divide-y divide-border-soft lg:hidden" data-mobile-audit="online-orders">
+          {rows.map((row) => (
+            <article key={row.id} className="space-y-3 p-3 text-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="break-all font-mono text-xs font-semibold">{row.externalOrderSn}</div>
+                  <div className="mt-1 break-words text-slate-600 dark:text-slate-300">{row.customerName ?? "—"}</div>
+                </div>
+                <Badge value={row.externalStatus} />
+              </div>
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <div className="text-xs text-slate-500">{L ? "Đơn Luma" : "Luma order"}</div>
+                  {row.orderId && row.orderCode ? (
+                    <OrderDetailLink orderId={row.orderId} className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+                      {row.orderCode}
+                    </OrderDetailLink>
+                  ) : "—"}
+                </div>
+                <div className="text-right">
+                  <div className="font-semibold tabular-nums">{row.total ? formatCurrency(Number(row.total)) : "—"}</div>
+                  <div className="mt-1 text-xs text-slate-500">{formatDate(row.importedAt)}</div>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+      {rows.length === 0 && (
+        <p className="px-4 py-10 text-center text-sm text-slate-400 lg:hidden">{L ? "Chưa có đơn online." : "No online orders yet."}</p>
+      )}
+      <div className="hidden overflow-x-auto lg:block">
         <table className="w-full min-w-[760px] text-sm">
           <thead className="bg-canvas text-left text-xs uppercase tracking-wide text-slate-500">
             <tr>

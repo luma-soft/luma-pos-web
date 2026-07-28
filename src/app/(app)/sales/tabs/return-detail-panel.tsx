@@ -38,7 +38,23 @@ export async function ReturnDetailPanel({ ret, compact = false }: { ret: ReturnD
       <div className={cn("grid grid-cols-1 gap-4", compact ? "xl:grid-cols-[1fr_300px]" : "lg:grid-cols-[1fr_320px]")}>
         <div className="min-w-0 space-y-4">
           <div className="overflow-hidden rounded-lg border border-border">
-            <div className="overflow-x-auto">
+            <div className="divide-y divide-border-soft lg:hidden" data-mobile-audit="sales-return-items">
+              {ret.items.map((item) => (
+                <div key={item.id} className="space-y-2 p-3 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="break-words font-semibold">{item.productName}</div>
+                      <div className="mt-0.5 text-xs text-slate-500">{formatNumber(Number(item.quantity))} {item.unitName} × {formatCurrency(Number(item.unitPrice))}</div>
+                    </div>
+                    <div className="shrink-0 font-semibold tabular-nums text-er">- {formatCurrency(Number(item.total))}</div>
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    {t("returns.cols.restock")}: {item.restock ? t("returns.restockYes") : t("returns.restockNo")}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto lg:block">
               <table className="w-full min-w-[760px] text-sm">
                 <thead>
                   <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">

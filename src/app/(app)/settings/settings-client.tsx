@@ -508,12 +508,13 @@ function StaffRowItem({ s, i, L, canManage }: { s: StaffRow; i: number; L: boole
   const [, start] = useTransition();
   const initial = ((s.fullName.trim().split(" ").pop() ?? "?")[0] ?? "?").toUpperCase();
   return (
-    <tr className="border-b border-border-soft last:border-0 hover:bg-surface-2">
-      <td className="px-3 py-2.5"><div className="flex items-center gap-2">
+    <tr className="grid grid-cols-2 gap-3 border-b border-border-soft p-3 last:border-0 hover:bg-surface-2 md:table-row md:p-0">
+      <td className="col-span-2 block p-0 md:table-cell md:px-3 md:py-2.5"><div className="flex items-center gap-2">
         <span className="w-7 h-7 rounded-full grid place-items-center text-[11px] font-extrabold text-white shrink-0" style={{ background: AVATAR_COLORS[i % AVATAR_COLORS.length] }}>{initial}</span>
         <span className="font-bold text-xs">{s.fullName}</span>
       </div></td>
-      <td className="px-3 py-2.5">
+      <td className="block p-0 md:table-cell md:px-3 md:py-2.5">
+        <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400 md:hidden">{L ? "Vai trò" : "Role"}</div>
         {canManage ? (
           <Select
             value={role}
@@ -524,8 +525,12 @@ function StaffRowItem({ s, i, L, canManage }: { s: StaffRow; i: number; L: boole
           />
         ) : <span className={cn("inline-block px-2 py-0.5 rounded-full text-[9px] font-bold", ROLE_PILL[role] ?? "bg-surface-2 text-slate-500")}>{L ? (ROLE_TEXT[role]?.[1] ?? role) : (ROLE_TEXT[role]?.[0] ?? role)}</span>}
       </td>
-      <td className="px-3 py-2.5 font-mono text-[11px] text-slate-500">{s.phone ?? "—"}</td>
-      <td className="px-3 py-2.5">
+      <td className="block p-0 font-mono text-[11px] text-slate-500 md:table-cell md:px-3 md:py-2.5">
+        <div className="mb-1 font-sans text-[10px] font-bold uppercase tracking-wide text-slate-400 md:hidden">{L ? "Điện thoại" : "Phone"}</div>
+        {s.phone ?? "—"}
+      </td>
+      <td className="col-span-2 flex min-h-11 items-center justify-between p-0 md:table-cell md:px-3 md:py-2.5">
+        <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 md:hidden">{L ? "Trạng thái" : "Status"}</div>
         {canManage
           ? <TouchTargetToggle checked={active} onChange={(v) => { setActive(v); start(() => { setStaffActive(s.id, v); }); }} aria-label="active" />
           : <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold", active ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-400")}>{active ? (L ? "Hoạt động" : "Active") : (L ? "Vô hiệu" : "Inactive")}</span>}
@@ -591,15 +596,15 @@ function StaffSection({ L, staff, canManage }: { L: boolean; staff: StaffRow[]; 
           {staff.length === 0 ? (
             <p className="px-4 py-8 text-center text-sm text-slate-400">{L ? "Chưa có nhân viên." : "No staff yet."}</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead><tr className="bg-canvas text-left text-[9px] uppercase tracking-wide text-slate-400 border-b border-border">
+            <div className="overflow-visible md:overflow-x-auto" data-mobile-audit="settings-staff">
+              <table className="block w-full text-sm md:table">
+                <thead className="hidden md:table-header-group"><tr className="bg-canvas text-left text-[9px] uppercase tracking-wide text-slate-400 border-b border-border">
                   <th className="px-3 py-2 font-bold">{L ? "Nhân viên" : "Staff"}</th>
                   <th className="px-3 py-2 font-bold">{L ? "Vai trò" : "Role"}</th>
                   <th className="px-3 py-2 font-bold">{L ? "Điện thoại" : "Phone"}</th>
                   <th className="px-3 py-2 font-bold">{L ? "Trạng thái" : "Status"}</th>
                 </tr></thead>
-                <tbody>{staff.map((s, i) => <StaffRowItem key={s.id} s={s} i={i} L={L} canManage={canManage} />)}</tbody>
+                <tbody className="block md:table-row-group">{staff.map((s, i) => <StaffRowItem key={s.id} s={s} i={i} L={L} canManage={canManage} />)}</tbody>
               </table>
             </div>
           )}
@@ -608,7 +613,24 @@ function StaffSection({ L, staff, canManage }: { L: boolean; staff: StaffRow[]; 
       )}
       {tab === "perms" && (
         <Card title={L ? "Ma trận phân quyền" : "Permission Matrix"} vi={L ? "RBAC" : "Phân quyền theo vai trò (RBAC)"}>
-          <div className="overflow-x-auto">
+          <div className="divide-y divide-border-soft md:hidden" data-mobile-audit="settings-permissions">
+            {PERMS.map((p, i) => (
+              <article key={i} className="p-3">
+                <h4 className="text-xs font-semibold text-slate-900 dark:text-slate-100">{L ? p.vi : p.en}</h4>
+                <dl className="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+                  {roles.map((r) => (
+                    <div key={r} className="flex items-center justify-between gap-2 rounded-lg bg-canvas px-2 py-2">
+                      <dt className="text-slate-500">{L ? ROLE_LABELS[r][1] : ROLE_LABELS[r][0]}</dt>
+                      <dd aria-label={p.roles[r] ? (L ? "Cho phép" : "Allowed") : (L ? "Không cho phép" : "Not allowed")}>
+                        {p.roles[r] ? <Check className="h-4 w-4 text-ok" /> : <span className="text-slate-300 dark:text-slate-700">✕</span>}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-[11px]">
               <thead><tr className="bg-canvas border-b border-border text-[9px] uppercase tracking-wide text-slate-400">
                 <th className="px-2 py-2 text-left font-bold min-w-45">{L ? "Hành động" : "Action"}</th>

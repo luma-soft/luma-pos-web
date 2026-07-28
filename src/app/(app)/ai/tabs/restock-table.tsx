@@ -44,6 +44,31 @@ export function RestockTable({ rows }: { rows: RestockRow[] }) {
       columns={columns}
       getRowId={(row) => row.id}
       minWidth="1040px"
+      renderMobileRow={({ row, toggle }) => (
+        <div className="p-3">
+          <button type="button" onClick={toggle} className="w-full text-left">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="break-words font-semibold">{row.name}</div>
+                <div className="mt-0.5 text-xs text-slate-500">{row.sku}</div>
+              </div>
+              <Priority row={row} />
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+              <Info label={t("ai.cols.onHand")} value={`${formatNumber(row.stock)} ${row.baseUnit}`} />
+              <Info label={t("ai.cols.suggested")} value={row.suggestedQty > 0 ? `+${formatNumber(row.suggestedQty)}` : "—"} />
+            </div>
+          </button>
+          {row.suggestedQty > 0 && (
+            <Link
+              href={Routes.PurchaseNew}
+              className="mt-3 inline-flex min-h-11 min-w-11 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-primary-600 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            >
+              <Truck className="h-4 w-4" />{t("ai.createPo")}
+            </Link>
+          )}
+        </div>
+      )}
       renderDetail={(row) => (
         <div className="grid gap-4 bg-surface px-4 py-4 md:grid-cols-4">
           <Info label={t("orders.cols.product")} value={row.name} />

@@ -147,12 +147,12 @@ function CustomerSearch({
           name="q"
           defaultValue={filters.q ?? ""}
           placeholder={t("customers.searchPlaceholder")}
-          className="h-10 w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-12 text-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+          className="h-11 w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-14 text-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
         />
         <button
           type="button"
           onClick={onOpenFilters}
-          className="absolute right-1.5 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-slate-500 hover:bg-surface-2 hover:text-slate-800"
+          className="absolute right-0.5 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-slate-500 hover:bg-surface-2 hover:text-slate-800"
           aria-label={t("customers.filters.title")}
           title={t("customers.filters.title")}
         >
@@ -402,7 +402,24 @@ function CustomerSalesPanel({ customer }: { customer: CustomerRow }) {
       {customer.salesHistory.length === 0 ? (
         <div className="min-h-0 flex-1 overflow-auto"><EmptyPanel message={t("customers.expand.emptySales")} /></div>
       ) : (
-        <div className="min-h-0 flex-1 overscroll-contain overflow-auto">
+        <>
+        <div className="min-h-0 flex-1 divide-y divide-border-soft overflow-auto lg:hidden" data-mobile-audit="customer-sales">
+          {customer.salesHistory.map((row) => (
+            <article key={`${row.kind}-${row.id}`} className="space-y-2 border border-border-soft p-3 first:rounded-t-card last:rounded-b-card">
+              <div className="flex items-start justify-between gap-3">
+                {row.kind === "order" && row.orderId ? (
+                  <button type="button" onClick={() => openOrderPreview(row.orderId!)} className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{row.code}</button>
+                ) : (
+                  <Link href={`/returns/${row.id}/print`} className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{row.code}</Link>
+                )}
+                <OrderStatusBadge status={row.status} />
+              </div>
+              <div className="text-xs text-slate-500">{formatDate(row.createdAt)} · {row.sellerName ?? t("customers.emptyValue")}</div>
+              <div className="text-right text-sm font-semibold tabular-nums">{formatCurrency(Number(row.total))}</div>
+            </article>
+          ))}
+        </div>
+        <div className="hidden min-h-0 flex-1 overscroll-contain overflow-auto lg:block">
           <table className="w-full min-w-[860px] text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">
@@ -432,6 +449,7 @@ function CustomerSalesPanel({ customer }: { customer: CustomerRow }) {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       <OrderPreviewDialog preview={preview} onClose={() => setPreview(null)} />
@@ -482,7 +500,27 @@ function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
       {rows.length === 0 ? (
         <div className="min-h-0 flex-1 overflow-auto"><EmptyPanel message={t("customers.expand.emptyDebt")} /></div>
       ) : (
-        <div className="min-h-0 flex-1 overscroll-contain overflow-auto">
+        <>
+        <div className="min-h-0 flex-1 divide-y divide-border-soft overflow-auto lg:hidden" data-mobile-audit="customer-debt">
+          {rows.map((row) => (
+            <article key={`${row.kind}-${row.id}`} className="space-y-2 border border-border-soft p-3 first:rounded-t-card last:rounded-b-card">
+              <div className="flex items-start justify-between gap-3">
+                {row.orderId ? (
+                  <button type="button" onClick={() => openOrderPreview(row.orderId!)} className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{row.code}</button>
+                ) : (
+                  <span className="font-semibold text-primary-600">{row.code}</span>
+                )}
+                <span className={cn("shrink-0 font-semibold tabular-nums", row.value < 0 ? "text-ok" : "text-slate-900 dark:text-slate-100")}>{formatCurrency(row.value)}</span>
+              </div>
+              <div className="text-xs text-slate-500">{formatDate(row.createdAt)} · {row.typeLabel}</div>
+              <div className="flex items-center justify-between gap-3 border-t border-border-soft pt-2 text-xs">
+                <span className="text-slate-500">{t("customers.expand.debtCols.balance")}</span>
+                <span className={cn("font-semibold tabular-nums", row.balance > 0 ? "text-er" : "text-slate-500")}>{formatCurrency(row.balance)}</span>
+              </div>
+            </article>
+          ))}
+        </div>
+        <div className="hidden min-h-0 flex-1 overscroll-contain overflow-auto lg:block">
           <table className="w-full min-w-[900px] text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">
@@ -516,6 +554,7 @@ function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       <OrderPreviewDialog preview={preview} onClose={() => setPreview(null)} />
@@ -543,7 +582,7 @@ function OrderPreviewDialog({
       subtitle={order ? `${order.customerName ?? t("orders.walkIn")} · ${formatDate(order.createdAt)}` : undefined}
       footer={order && (
         <div className="flex justify-end">
-          <OrderDetailLink orderId={order.id} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110">
+          <OrderDetailLink orderId={order.id} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110 lg:min-h-10">
             <ExternalLink className="h-4 w-4" />
             Mở phiếu
           </OrderDetailLink>
@@ -563,7 +602,21 @@ function OrderPreviewDialog({
             <InfoField label={t("orders.cols.date")} value={formatDate(order.createdAt)} />
             <InfoField label={t("orders.cols.status")} value={order.status} />
           </div>
-          <div className="overflow-x-auto rounded-lg border border-border">
+          <div className="divide-y divide-border-soft overflow-hidden rounded-lg border border-border lg:hidden" data-mobile-audit="customer-order-preview">
+            {order.items.map((item) => (
+              <article key={item.id} className="space-y-2 p-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 break-words font-medium">{item.productName}<div className="mt-0.5 text-xs text-slate-400">{item.unitName}</div></div>
+                  <div className="shrink-0 font-semibold tabular-nums">{formatCurrency(Number(item.total))}</div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
+                  <span>{Number(item.quantity).toLocaleString("vi-VN")} × {formatCurrency(Number(item.unitPrice))}</span>
+                  <span className="text-right">{t("orders.cols.discount")}: {Number(item.discount) > 0 ? formatCurrency(Number(item.discount)) : "—"}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto rounded-lg border border-border lg:block">
             <table className="w-full min-w-[760px] text-sm">
               <thead>
                 <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">

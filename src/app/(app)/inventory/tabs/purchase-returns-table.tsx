@@ -75,7 +75,27 @@ function ExpandedPurchaseReturn({ row }: { row: PurchaseReturnRow }) {
   return (
     <div className="border-t border-border-soft bg-surface px-4 py-4">
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-        <div className="overflow-x-auto rounded-lg border border-border">
+        <div className="divide-y divide-border-soft overflow-hidden rounded-lg border border-border lg:hidden" data-mobile-audit="inventory-purchase-return-items">
+          {row.items.map((item) => (
+            <article key={item.id} className="space-y-2 p-3 text-sm">
+              <div className="flex items-start justify-between gap-3">
+                <Link
+                  href={Routes.product(item.productId)}
+                  className="inline-flex min-h-11 min-w-0 flex-1 items-center break-words font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                >
+                  {item.productName}
+                </Link>
+                <div className="shrink-0 font-semibold tabular-nums">{formatCurrency(Number(item.total))}</div>
+              </div>
+              <div className="text-xs text-slate-500">{item.sku} · {formatNumber(Number(item.quantity))} {item.unitName}</div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <span>{t("purchaseReturns.cols.unitCost")}: <b className="tabular-nums">{formatCurrency(Number(item.unitCost))}</b></span>
+                <span className="text-right">{t("purchaseReturns.cols.returnUnitCost")}: <b className="tabular-nums">{formatCurrency(Number(item.returnUnitCost))}</b></span>
+              </div>
+            </article>
+          ))}
+        </div>
+        <div className="hidden overflow-x-auto rounded-lg border border-border lg:block">
           <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="bg-canvas text-left text-xs uppercase text-slate-500">

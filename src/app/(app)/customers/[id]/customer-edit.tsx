@@ -44,12 +44,12 @@ export function CustomerEdit({ customer }: {
     else setError(t(res.error));
   }
 
-  const input = "w-full px-3 py-2 text-sm rounded-lg border border-border bg-surface";
+  const input = "min-h-11 w-full px-3 py-2 text-sm rounded-lg border border-border bg-surface";
   const lbl = "text-xs font-medium text-slate-500 mb-1 block";
 
   return (
     <>
-      <button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm font-medium hover:bg-surface-2">
+      <button onClick={() => setOpen(true)} className="inline-flex min-h-11 items-center gap-2 px-4 rounded-lg border border-border text-sm font-medium hover:bg-surface-2">
         <Pencil className="w-4 h-4" />{t("common.edit")}
       </button>
 
@@ -58,7 +58,7 @@ export function CustomerEdit({ customer }: {
           <div onClick={(e) => e.stopPropagation()} className="w-full max-w-lg bg-surface rounded-2xl shadow-xl p-5 max-h-[90vh] overflow-auto">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-bold">{t("customers.editTitle")}</h2>
-              <button onClick={() => setOpen(false)} className="p-1 text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
+              <button onClick={() => setOpen(false)} className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
             </div>
             {error && <div className="mb-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-lg px-3 py-2 text-sm text-red-700 dark:text-red-400">{error}</div>}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -80,8 +80,8 @@ export function CustomerEdit({ customer }: {
               <div className="sm:col-span-2"><label className={lbl}>{t("customers.fields.note")}</label><input className={input} value={note} onChange={(e) => setNote(e.target.value)} /></div>
             </div>
             <div className="flex justify-end gap-2 mt-5">
-              <button onClick={() => setOpen(false)} className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-sm">{t("common.cancel")}</button>
-              <button onClick={save} disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium">
+              <button onClick={() => setOpen(false)} className="min-h-11 px-4 rounded-lg border border-slate-200 dark:border-slate-700 text-sm">{t("common.cancel")}</button>
+              <button onClick={save} disabled={saving} className="inline-flex min-h-11 items-center gap-2 px-4 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium">
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}{t("common.save")}
               </button>
             </div>

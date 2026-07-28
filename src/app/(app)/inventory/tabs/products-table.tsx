@@ -423,7 +423,7 @@ function ProductInfoPanel({
                 type="button"
                 onClick={() => setActiveImage(index)}
                 className={cn(
-                  "relative h-10 w-10 shrink-0 overflow-hidden rounded-md border bg-white",
+                  "relative h-11 w-11 shrink-0 overflow-hidden rounded-md border bg-white lg:h-10 lg:w-10",
                   index === activeImage
                     ? "border-primary-600 ring-1 ring-primary-600"
                     : "border-border",
@@ -809,7 +809,27 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
     return <EmptyPanel message={t("products.expand.stockCardEmpty")} />;
 
   return (
-    <div className="overflow-x-auto">
+    <>
+    <div className="divide-y divide-border-soft lg:hidden" data-mobile-audit="product-stock-card">
+      {movements.map((movement) => (
+        <article key={movement.id} className="space-y-3 border border-border-soft p-3 first:rounded-t-card last:rounded-b-card">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 font-semibold"><DocumentValue movement={movement} /></div>
+            <div className={cn("shrink-0 text-sm font-semibold tabular-nums", Number(movement.quantity) < 0 ? "text-er" : "text-ok")}>
+              {formatSignedNumber(movement.quantity)}
+            </div>
+          </div>
+          <div className="text-xs text-slate-500">{formatDate(movement.createdAt)} · {t(movementTypeKey(movement.type) as never)}</div>
+          <dl className="grid grid-cols-2 gap-2 text-xs">
+            <div><dt className="text-slate-500">{t("products.expand.cols.partner")}</dt><dd className="mt-0.5 break-words">{movement.partnerName || "—"}</dd></div>
+            <div><dt className="text-right text-slate-500">{t("products.expand.cols.stockAfter")}</dt><dd className="mt-0.5 text-right font-semibold tabular-nums">{formatNumber(Number(movement.stockAfter))}</dd></div>
+            <div><dt className="text-slate-500">{t("products.expand.cols.transactionPrice")}</dt><dd className="mt-0.5 tabular-nums">{moneyOrDash(movement.transactionPrice)}</dd></div>
+            <div><dt className="text-right text-slate-500">{t("products.expand.cols.costPrice")}</dt><dd className="mt-0.5 text-right tabular-nums">{moneyOrDash(movement.unitCost)}</dd></div>
+          </dl>
+        </article>
+      ))}
+    </div>
+    <div className="hidden overflow-x-auto lg:block">
       <table className="w-full min-w-[980px] text-sm">
         <thead>
           <tr className="bg-canvas text-left text-xs uppercase tracking-wide text-slate-500">
@@ -876,6 +896,7 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
         </tbody>
       </table>
     </div>
+    </>
   );
 }
 
@@ -906,7 +927,28 @@ function ProductStockPanel({
         ];
 
   return (
-    <div className="overflow-x-auto">
+    <>
+    <div className="space-y-2 lg:hidden" data-mobile-audit="product-stock-location">
+      {rows.map((row) => {
+        const low = row.minLevel > 0 && row.quantity <= row.minLevel;
+        return (
+          <article key={row.warehouseId} className="rounded-card border border-border-soft p-3 text-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div className="break-words font-semibold">{row.warehouseName}</div>
+              <span className={cn("shrink-0 rounded-md px-2 py-1 text-xs font-semibold", effectiveActive ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-500")}>
+                {effectiveActive ? t("products.expand.selling") : t("products.expand.stopped")}
+              </span>
+            </div>
+            <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
+              <div><dt className="text-slate-500">{t("products.expand.cols.stock")}</dt><dd className="mt-0.5 font-semibold tabular-nums">{formatNumber(row.quantity)}</dd></div>
+              <div><dt className="text-right text-slate-500">{t("products.expand.cols.reserved")}</dt><dd className="mt-0.5 text-right font-semibold tabular-nums">{formatNumber(row.reserved)}</dd></div>
+              <div className="col-span-2"><dt className="text-slate-500">{t("products.expand.cols.daysToOut")}</dt><dd className={cn("mt-0.5", low ? "font-semibold text-warn" : "text-slate-500")}>{low ? t("products.expand.lowStock") : "—"}</dd></div>
+            </dl>
+          </article>
+        );
+      })}
+    </div>
+    <div className="hidden overflow-x-auto lg:block">
       <table className="w-full min-w-[760px] text-sm">
         <thead>
           <tr className="bg-canvas text-left text-xs uppercase tracking-wide text-slate-500">
@@ -967,6 +1009,7 @@ function ProductStockPanel({
         </tbody>
       </table>
     </div>
+    </>
   );
 }
 
@@ -978,7 +1021,30 @@ function RelatedProductsPanel({ product }: { product: ProductRow }) {
     return <EmptyPanel message={t("products.expand.relatedEmpty")} />;
 
   return (
-    <div className="overflow-x-auto">
+    <>
+    <div className="space-y-2 lg:hidden" data-mobile-audit="product-related">
+      {rows.map((item) => (
+        <article key={item.id} className="rounded-card border border-border-soft p-3 text-sm">
+          <div className="flex items-start justify-between gap-3">
+            <Link
+              href={Routes.productDetail(item.id)}
+              className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            >
+              {item.sku}
+            </Link>
+            <div className="shrink-0 font-semibold tabular-nums">{formatCurrency(Number(item.retailPrice))}</div>
+          </div>
+          <div className="break-words font-medium">{item.name}</div>
+          <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
+            <div><dt className="text-slate-500">{t("products.expand.cols.costPrice")}</dt><dd className="mt-0.5 tabular-nums">{formatCurrency(Number(item.costPrice))}</dd></div>
+            <div><dt className="text-right text-slate-500">{t("products.expand.cols.stock")}</dt><dd className="mt-0.5 text-right tabular-nums">{productStockDisplay({ ...item, categoryName: product.categoryName }, t("products.stock.notTracked"))}</dd></div>
+            <div><dt className="text-slate-500">{t("products.expand.cols.reserved")}</dt><dd className="mt-0.5 tabular-nums">{isProductStockManaged(product.categoryName) ? formatNumber(Number(item.reservedStock)) : "—"}</dd></div>
+            <div><dt className="text-right text-slate-500">{t("products.expand.cols.vat")}</dt><dd className="mt-0.5 text-right">{t("products.expand.notTaxed")}</dd></div>
+          </dl>
+        </article>
+      ))}
+    </div>
+    <div className="hidden overflow-x-auto lg:block">
       <table className="w-full min-w-[980px] text-sm">
         <thead>
           <tr className="bg-canvas text-left text-xs uppercase tracking-wide text-slate-500">
@@ -1044,6 +1110,7 @@ function RelatedProductsPanel({ product }: { product: ProductRow }) {
         </tbody>
       </table>
     </div>
+    </>
   );
 }
 

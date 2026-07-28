@@ -5,7 +5,7 @@ import { NextIntlClientProvider } from "next-intl";
 import {
   PathnameContext,
   SearchParamsContext,
-} from "next/dist/shared/lib/hooks-client-context.shared-runtime";
+} from "next/dist/shared/lib/hooks-client-context.shared-runtime.js";
 import viMessages from "../messages/vi.json";
 import { GroupTabs } from "@/components/group-tabs";
 import {

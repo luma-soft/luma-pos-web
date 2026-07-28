@@ -165,7 +165,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
               type="button"
               onClick={() => openFormula(r.id, b.id)}
               title={t("pricing.formula.title")}
-              className="opacity-0 group-hover/cell:opacity-100 p-1 text-slate-400 hover:text-primary-600"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-400 hover:text-primary-600 lg:min-h-0 lg:min-w-0 lg:p-1 lg:opacity-0 lg:group-hover/cell:opacity-100"
             >
               <Calculator className="w-3.5 h-3.5" />
             </button>
@@ -200,7 +200,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
       <div className="px-4 py-3 border-b border-border flex items-center gap-2 flex-wrap">
         <span className="text-sm font-medium text-slate-500 mr-1">{t("pricing.booksLabel")}</span>
         {books.map((b) => (
-          <span key={b.id} className="group inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-slate-700 pl-2.5 pr-1.5 py-1 text-sm">
+          <span key={b.id} className="group inline-flex min-h-11 items-center gap-1 rounded-lg border border-slate-200 pl-2.5 pr-1.5 text-sm dark:border-slate-700">
             {editing?.id === b.id ? (
               <input
                 autoFocus
@@ -208,16 +208,16 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
                 onChange={(e) => setEditing({ id: b.id, name: e.target.value })}
                 onBlur={() => rename(b.id, editing.name)}
                 onKeyDown={(e) => { if (e.key === "Enter") rename(b.id, editing.name); if (e.key === "Escape") setEditing(null); }}
-                className="w-28 px-1 py-0.5 text-sm rounded border border-primary-400 bg-surface"
+                className="min-h-11 w-28 rounded border border-primary-400 bg-surface px-1 text-sm lg:min-h-0 lg:py-0.5"
               />
             ) : (
               <>
                 <span className={cn(b.isDefault && "font-semibold")}>{b.name}</span>
-                <button onClick={() => setEditing({ id: b.id, name: b.name })} className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-primary-600" title={t("common.edit")}>
+                <button onClick={() => setEditing({ id: b.id, name: b.name })} className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-400 hover:text-primary-600 lg:min-h-0 lg:min-w-0 lg:p-0.5 lg:opacity-0 lg:group-hover:opacity-100" title={t("common.edit")}>
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
                 {!b.isDefault && (
-                  <button onClick={() => removeBook(b.id)} className="opacity-0 group-hover:opacity-100 p-0.5 text-slate-400 hover:text-red-500" title={t("common.delete")}>
+                  <button onClick={() => removeBook(b.id)} className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-400 hover:text-red-500 lg:min-h-0 lg:min-w-0 lg:p-0.5 lg:opacity-0 lg:group-hover:opacity-100" title={t("common.delete")}>
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
@@ -233,10 +233,10 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
             onBlur={addBook}
             onKeyDown={(e) => { if (e.key === "Enter") addBook(); if (e.key === "Escape") { setCreating(false); setNewName(""); } }}
             placeholder={t("pricing.newBookPlaceholder")}
-            className="w-36 px-2 py-1 text-sm rounded-lg border border-primary-400 bg-surface"
+            className="min-h-11 w-36 rounded-lg border border-primary-400 bg-surface px-2 text-sm"
           />
         ) : (
-          <button onClick={() => setCreating(true)} className="inline-flex items-center gap-1 rounded-lg border border-dashed border-border px-2.5 py-1 text-sm text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40">
+          <button onClick={() => setCreating(true)} className="inline-flex min-h-11 items-center gap-1 rounded-lg border border-dashed border-border px-2.5 text-sm text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-950/40">
             <Plus className="w-3.5 h-3.5" /> {t("pricing.addBook")}
           </button>
         )}
@@ -269,7 +269,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
               <button
                 type="button"
                 onClick={() => setFormula(null)}
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-700"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-700 lg:h-8 lg:w-8"
                 aria-label={t("common.close")}
               >
                 <X className="h-4 w-4" />
@@ -290,12 +290,12 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
                   { value: "lastPurchase", label: t("pricing.cols.lastPurchase") },
                 ]}
               />
-              <button type="button" onClick={() => setFOp("+")} className={cn("grid h-7 w-7 place-items-center rounded-full border text-sm", fOp === "+" ? "border-primary-600 bg-primary-600 text-white" : "border-border")}>+</button>
-              <button type="button" onClick={() => setFOp("-")} className={cn("grid h-7 w-7 place-items-center rounded-full border text-sm", fOp === "-" ? "border-primary-600 bg-primary-600 text-white" : "border-border")}>−</button>
-              <NumberInput min={0} value={fAmount} onChange={(value) => setFAmount(value ?? 0)} thousandSeparator={fUnit === "vnd"} suffix={fUnit === "pct" ? "%" : undefined} className="w-20 rounded-md px-2 py-1.5 text-right text-sm" />
+              <button type="button" onClick={() => setFOp("+")} className={cn("grid h-11 w-11 place-items-center rounded-full border text-sm lg:h-7 lg:w-7", fOp === "+" ? "border-primary-600 bg-primary-600 text-white" : "border-border")}>+</button>
+              <button type="button" onClick={() => setFOp("-")} className={cn("grid h-11 w-11 place-items-center rounded-full border text-sm lg:h-7 lg:w-7", fOp === "-" ? "border-primary-600 bg-primary-600 text-white" : "border-border")}>−</button>
+              <NumberInput min={0} value={fAmount} onChange={(value) => setFAmount(value ?? 0)} thousandSeparator={fUnit === "vnd"} suffix={fUnit === "pct" ? "%" : undefined} className="min-h-11 w-20 rounded-md px-2 text-right text-sm" />
               <div className="inline-flex overflow-hidden rounded-md border border-border text-xs">
-                <button type="button" onClick={() => setFUnit("vnd")} className={cn("px-2 py-1.5", fUnit === "vnd" ? "bg-primary-600 text-white" : "")}>VND</button>
-                <button type="button" onClick={() => setFUnit("pct")} className={cn("px-2 py-1.5", fUnit === "pct" ? "bg-primary-600 text-white" : "")}>%</button>
+                <button type="button" onClick={() => setFUnit("vnd")} className={cn("min-h-11 min-w-11 px-2 lg:min-h-0 lg:min-w-0 lg:py-1.5", fUnit === "vnd" ? "bg-primary-600 text-white" : "")}>VND</button>
+                <button type="button" onClick={() => setFUnit("pct")} className={cn("min-h-11 min-w-11 px-2 lg:min-h-0 lg:min-w-0 lg:py-1.5", fUnit === "pct" ? "bg-primary-600 text-white" : "")}>%</button>
               </div>
             </div>
             <label className="mt-4 flex items-start gap-2 text-sm">
@@ -303,8 +303,8 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
               <span>{t("pricing.formula.applyAll", { n: total })} <b>{formulaBook.name}</b></span>
             </label>
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setFormula(null)} className="rounded-lg border border-border px-3 py-1.5 text-sm">{t("common.cancel")}</button>
-              <button type="button" onClick={() => applyFormula(formulaRow, formulaBook.id)} disabled={applying} className="inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-50">
+              <button type="button" onClick={() => setFormula(null)} className="min-h-11 rounded-lg border border-border px-3 text-sm">{t("common.cancel")}</button>
+              <button type="button" onClick={() => applyFormula(formulaRow, formulaBook.id)} disabled={applying} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white disabled:opacity-50">
                 {applying && <Loader2 className="h-4 w-4 animate-spin" />} {t("common.done")}
               </button>
             </div>

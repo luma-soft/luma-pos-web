@@ -127,7 +127,28 @@ function RecentMovementsTable({ movements }: { movements: Awaited<ReturnType<typ
       {movements.length === 0 ? (
         <p className="px-4 py-8 text-center text-sm text-slate-400">{t("inventory.noMovements")}</p>
       ) : (
-        <div className="max-h-[min(520px,calc(100dvh-360px))] overflow-auto">
+        <>
+        <div className="max-h-[min(520px,calc(100dvh-360px))] divide-y divide-border-soft overflow-auto lg:hidden" data-mobile-audit="inventory-recent-movements">
+          {movements.map((movement) => {
+            const quantity = Number(movement.quantity);
+            return (
+              <article key={movement.id} className="space-y-2 p-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 break-words font-semibold">{movement.productName}</div>
+                  <div className={cn("shrink-0 font-mono font-bold tabular-nums", MOVE_STYLES[movement.type] ?? "")}>
+                    {quantity > 0 ? "+" : ""}{formatNumber(quantity)} {movement.baseUnit}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
+                  <span className="break-words">{t(`inventory.moveTypes.${movement.type}` as never)}</span>
+                  <span className="break-words text-right">{movement.warehouseName}</span>
+                </div>
+                <div className="text-xs text-slate-400">{formatDate(movement.createdAt)}</div>
+              </article>
+            );
+          })}
+        </div>
+        <div className="hidden max-h-[min(520px,calc(100dvh-360px))] overflow-auto lg:block">
           <table className="w-full min-w-[520px] text-sm">
             <thead className="sticky top-0 z-10 bg-canvas text-left text-xs font-semibold text-slate-500">
               <tr>
@@ -158,6 +179,7 @@ function RecentMovementsTable({ movements }: { movements: Awaited<ReturnType<typ
             </tbody>
           </table>
         </div>
+        </>
       )}
     </section>
   );

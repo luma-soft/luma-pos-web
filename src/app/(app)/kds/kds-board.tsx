@@ -64,7 +64,7 @@ export function KdsBoard({ tickets }: { tickets: Ticket[] }) {
                       <span className={cn("shrink-0 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full", it.status === "pending" ? "bg-surface-2 text-slate-500" : it.status === "preparing" ? "bg-in-soft text-in" : "bg-ok-soft text-ok")}>{t(`kds.status.${it.status}`)}</span>
                     </div>
                     {next && (
-                      <button onClick={() => advance(it.id, next)} className="mt-1.5 w-full inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-lg bg-primary-600 text-white text-xs font-semibold active:scale-[0.98]">
+                      <button onClick={() => advance(it.id, next)} className="mt-1.5 inline-flex min-h-11 w-full items-center justify-center gap-1.5 rounded-lg bg-primary-600 px-2 text-xs font-semibold text-white active:scale-[0.98]">
                         <Check className="w-3.5 h-3.5" />{t(`kds.action.${it.status}`)}
                       </button>
                     )}
@@ -72,7 +72,7 @@ export function KdsBoard({ tickets }: { tickets: Ticket[] }) {
                 );
               })}
             </div>
-            <button onClick={() => serveAll(tk.id)} className="w-full px-3 py-2 border-t border-border text-xs font-semibold text-slate-500 hover:bg-surface-2 inline-flex items-center justify-center gap-1.5"><CheckCheck className="w-3.5 h-3.5" />{t("kds.serveAll")}</button>
+            <button onClick={() => serveAll(tk.id)} className="inline-flex min-h-11 w-full items-center justify-center gap-1.5 border-t border-border px-3 text-xs font-semibold text-slate-500 hover:bg-surface-2"><CheckCheck className="w-3.5 h-3.5" />{t("kds.serveAll")}</button>
           </div>
         );
       })}

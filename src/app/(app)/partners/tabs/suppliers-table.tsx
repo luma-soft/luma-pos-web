@@ -423,7 +423,28 @@ function SupplierHistoryPanel({ rows }: { rows: SupplierHistoryRow[] }) {
   if (rows.length === 0) return <div className="h-full overflow-auto"><EmptyPanel message={t("suppliers.details.emptyHistory")} /></div>;
 
   return (
-    <div className="h-full overscroll-contain overflow-auto rounded-card border border-border-soft">
+    <>
+    <div className="h-full divide-y divide-border-soft overflow-auto rounded-card border border-border-soft lg:hidden" data-mobile-audit="supplier-history">
+      {rows.map((row) => (
+        <article key={`${row.kind}-${row.id}`} className="space-y-2 p-3 text-sm">
+          <div className="flex items-start justify-between gap-3">
+            <Link
+              href={row.kind === "purchase" ? Routes.purchase(row.id) : `${Routes.PurchaseReturns}?q=${encodeURIComponent(row.code)}`}
+              className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+            >
+              {row.code}
+            </Link>
+            <SupplierHistoryStatus row={row} />
+          </div>
+          <div className="text-xs text-slate-500">{formatDate(row.createdAt)} · {t(`suppliers.details.types.${row.kind}`)}</div>
+          <div className="flex items-end justify-between gap-3">
+            <span className="text-xs text-slate-500">{t("suppliers.details.historyCols.items")}: {row.itemCount ?? "—"}</span>
+            <span className="font-semibold tabular-nums">{formatCurrency(row.total)}</span>
+          </div>
+        </article>
+      ))}
+    </div>
+    <div className="hidden h-full overscroll-contain overflow-auto rounded-card border border-border-soft lg:block">
       <table className="w-full min-w-[800px] text-sm">
         <thead className="sticky top-0 z-10">
           <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">
@@ -453,6 +474,7 @@ function SupplierHistoryPanel({ rows }: { rows: SupplierHistoryRow[] }) {
         </tbody>
       </table>
     </div>
+    </>
   );
 }
 
@@ -469,7 +491,27 @@ function SupplierDebtPanel({ rows, currentDebt }: { rows: Array<SupplierHistoryR
       {rows.length === 0 ? (
         <div className="min-h-0 flex-1 overflow-auto"><EmptyPanel message={t("suppliers.details.emptyDebt")} /></div>
       ) : (
-        <div className="min-h-0 flex-1 overscroll-contain overflow-auto rounded-card border border-border-soft">
+        <>
+        <div className="min-h-0 flex-1 divide-y divide-border-soft overflow-auto rounded-card border border-border-soft lg:hidden" data-mobile-audit="supplier-debt">
+          {rows.map((row) => (
+            <article key={`${row.kind}-${row.id}`} className="space-y-2 p-3 text-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-semibold text-primary-600">{row.code}</div>
+                  <div className="mt-0.5 text-xs text-slate-500">{formatDate(row.createdAt)} · {t(`suppliers.details.debtTypes.${row.kind}`)}</div>
+                </div>
+                <div className={cn("shrink-0 font-semibold tabular-nums", row.debtChange < 0 ? "text-ok" : "text-warn")}>
+                  {row.debtChange > 0 ? "+" : "−"}{formatCurrency(Math.abs(row.debtChange))}
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3 border-t border-border-soft pt-2 text-xs">
+                <span className="text-slate-500">{t("suppliers.details.debtCols.balance")}</span>
+                <span className="font-semibold tabular-nums">{formatCurrency(row.balanceAfter)}</span>
+              </div>
+            </article>
+          ))}
+        </div>
+        <div className="hidden min-h-0 flex-1 overscroll-contain overflow-auto rounded-card border border-border-soft lg:block">
           <table className="w-full min-w-[760px] text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="bg-canvas text-left text-xs font-semibold text-slate-500">
@@ -495,6 +537,7 @@ function SupplierDebtPanel({ rows, currentDebt }: { rows: Array<SupplierHistoryR
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );

@@ -197,16 +197,32 @@ export function ImportClient() {
           </div>
 
           {mappedSample.length > 0 && (
-            <div className="mt-4 overflow-x-auto">
+            <div className="mt-4">
               <div className="text-[10px] font-bold uppercase text-slate-400 mb-1">{t("import.preview")}</div>
-              <table className="text-xs border border-border rounded-lg overflow-hidden">
-                <thead><tr className="bg-canvas">{FIELDS.filter((f) => map[f.key] >= 0).map((f) => <th key={f.key} className="px-2.5 py-1.5 text-left font-bold border-b border-border">{t(`import.fields.${f.key}`)}</th>)}</tr></thead>
-                <tbody>{mappedSample.map((r, ri) => (
-                  <tr key={ri} className="border-b border-border-soft last:border-0">
-                    {FIELDS.filter((f) => map[f.key] >= 0).map((f) => <td key={f.key} className="px-2.5 py-1.5 whitespace-nowrap">{(r[map[f.key]] ?? "").trim() || "—"}</td>)}
-                  </tr>
-                ))}</tbody>
-              </table>
+              <div className="space-y-2 md:hidden" data-mobile-audit="settings-import-preview">
+                {mappedSample.map((r, ri) => (
+                  <article key={ri} className="rounded-lg border border-border p-3 text-xs">
+                    <dl className="grid grid-cols-2 gap-2">
+                      {FIELDS.filter((f) => map[f.key] >= 0).map((f) => (
+                        <div key={f.key} className="min-w-0">
+                          <dt className="font-semibold text-slate-500">{t(`import.fields.${f.key}`)}</dt>
+                          <dd className="mt-0.5 break-words">{(r[map[f.key]] ?? "").trim() || "—"}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </article>
+                ))}
+              </div>
+              <div className="hidden overflow-x-auto md:block">
+                <table className="text-xs border border-border rounded-lg overflow-hidden">
+                  <thead><tr className="bg-canvas">{FIELDS.filter((f) => map[f.key] >= 0).map((f) => <th key={f.key} className="px-2.5 py-1.5 text-left font-bold border-b border-border">{t(`import.fields.${f.key}`)}</th>)}</tr></thead>
+                  <tbody>{mappedSample.map((r, ri) => (
+                    <tr key={ri} className="border-b border-border-soft last:border-0">
+                      {FIELDS.filter((f) => map[f.key] >= 0).map((f) => <td key={f.key} className="px-2.5 py-1.5 whitespace-nowrap">{(r[map[f.key]] ?? "").trim() || "—"}</td>)}
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
             </div>
           )}
 
@@ -251,7 +267,7 @@ export function ImportClient() {
             </div>
           )}
           {summary.applied && (
-            <Link href="/products" className="inline-flex items-center gap-1.5 mt-3 px-4 py-2 rounded-full bg-primary-600 text-white text-sm font-semibold">{t("import.viewProducts")}</Link>
+            <Link href="/products" className="mt-3 inline-flex min-h-11 items-center gap-1.5 rounded-full bg-primary-600 px-4 text-sm font-semibold text-white">{t("import.viewProducts")}</Link>
           )}
         </div>
       )}
