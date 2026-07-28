@@ -62,7 +62,7 @@ export function ReportProductMobileRow({ row }: { row: ReportProductRow }) {
 
   return (
     <div className="p-3">
-      <div className="truncate text-sm font-black">{row.productName}</div>
+      <div className="break-words text-sm font-black leading-snug">{row.productName}</div>
       <dl className="mt-3 grid grid-cols-2 gap-2">
         <MobileRecordField label={t("reports.qtySold")} value={`${formatNumber(Number(row.qtySold))} ${row.baseUnit}`} />
         <MobileRecordField
@@ -139,7 +139,7 @@ export function ReportCustomerMobileRow({ row }: { row: ReportCustomerRow }) {
 
   return (
     <div className="p-3">
-      <div className="truncate text-sm font-black">
+      <div className="break-words text-sm font-black leading-snug">
         {row.customerName}
         {row.customerType && row.customerType !== "retail" ? ` (${t(`customers.types.${row.customerType}` as never)})` : ""}
       </div>
@@ -213,7 +213,7 @@ export function ReportEmployeeMobileRow({ row }: { row: ReportEmployeeRow }) {
 
   return (
     <div className="p-3">
-      <div className="truncate text-sm font-black">{row.sellerName}</div>
+      <div className="break-words text-sm font-black leading-snug">{row.sellerName}</div>
       <dl className="mt-3 grid grid-cols-2 gap-2">
         <MobileRecordField label={t("reports.orders")} value={formatNumber(row.orderCount)} />
         <MobileRecordField

@@ -7,6 +7,7 @@ import {
   SearchParamsContext,
 } from "next/dist/shared/lib/hooks-client-context.shared-runtime";
 import viMessages from "../messages/vi.json";
+import { GroupTabs } from "@/components/group-tabs";
 import {
   ReportCustomerMobileRow,
   ReportEmployeeMobileRow,
@@ -29,11 +30,12 @@ function renderWithMessages(node: React.ReactNode) {
 
 describe("mobile report rows", () => {
   test("product row keeps quantity, revenue, and signed profit readable", () => {
+    const productName = "Camera H6C Pro 2K với tên sản phẩm rất dài cần hiển thị đầy đủ trên nhiều dòng";
     const html = renderWithMessages(
       <ReportProductMobileRow
         row={{
           productId: "product-1",
-          productName: "Camera H6C Pro 2K",
+          productName,
           qtySold: "12",
           baseUnit: "cái",
           revenue: "12500000",
@@ -42,7 +44,7 @@ describe("mobile report rows", () => {
       />,
     );
 
-    expect(html).toContain("Camera H6C Pro 2K");
+    expect(html).toContain(`<div class="break-words text-sm font-black leading-snug">${productName}</div>`);
     expect(html).toContain("12 cái");
     expect(html).toContain("12.500.000");
     expect(html).toContain("350.000");
@@ -52,11 +54,13 @@ describe("mobile report rows", () => {
   });
 
   test("customer and employee rows preserve their report dimensions", () => {
+    const customerName = "Công ty TNHH Thiết bị An ninh Nguyễn An Chi nhánh Trung tâm";
+    const employeeName = "Trần Bình Nhân viên tư vấn dự án khu vực phía Nam";
     const customerHtml = renderWithMessages(
       <ReportCustomerMobileRow
         row={{
           customerId: "customer-1",
-          customerName: "Nguyễn An",
+          customerName,
           customerType: "retail",
           orderCount: 4,
           revenue: "4200000",
@@ -68,7 +72,7 @@ describe("mobile report rows", () => {
       <ReportEmployeeMobileRow
         row={{
           sellerId: "employee-1",
-          sellerName: "Trần Bình",
+          sellerName: employeeName,
           orderCount: 6,
           revenue: "7200000",
           collected: "6800000",
@@ -76,10 +80,10 @@ describe("mobile report rows", () => {
       />,
     );
 
-    expect(customerHtml).toContain("Nguyễn An");
+    expect(customerHtml).toContain(`<div class="break-words text-sm font-black leading-snug">${customerName}</div>`);
     expect(customerHtml).toContain("500.000");
     expect(customerHtml).toContain("text-er");
-    expect(employeeHtml).toContain("Trần Bình");
+    expect(employeeHtml).toContain(`<div class="break-words text-sm font-black leading-snug">${employeeName}</div>`);
     expect(employeeHtml).toContain("6.800.000");
     expect(employeeHtml).toContain("text-ok");
   });
@@ -122,8 +126,23 @@ describe("mobile report controls", () => {
     expect(collapsed).toContain("30 ngày gần nhất");
     expect(collapsed).not.toContain('aria-label="Khoảng thời gian"');
     expect(expanded).toContain('aria-expanded="true"');
-    expect(expanded).toContain('aria-label="Khoảng thời gian"');
-    expect(expanded).toContain("min-h-11");
+    expect(expanded.match(/aria-pressed="(?:true|false)"/g)).toHaveLength(7);
+    expect(expanded.match(/aria-pressed="(?:true|false)"[^>]*class="[^"]*min-h-11[^"]*"/g)).toHaveLength(7);
+  });
+
+  test("report mobile tabs opt into 44px links while retaining desktop density", () => {
+    const html = renderWithMessages(
+      <GroupTabs
+        base="/reports"
+        items={[
+          { tab: "overview", labelKey: "reports.overview" },
+          { tab: "invoices", labelKey: "reports.invoices" },
+        ]}
+        linkClassName="h-11"
+      />,
+    );
+
+    expect(html.match(/<a [^>]*class="(?=[^"]*h-11)(?=[^"]*lg:h-9)[^"]*"/g)).toHaveLength(2);
   });
 
   test("page separates mobile and desktop headers and keeps chart metrics accessible", () => {

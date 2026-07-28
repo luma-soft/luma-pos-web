@@ -168,8 +168,31 @@ export function ReportPeriodDisclosure({
         />
       </button>
       {open && (
-        <div id={controlId} className="border-t border-border-soft p-2 [&>div]:w-full">
-          <ReportPeriodSelect period={period} onSelect={onSelect} className="min-h-11 w-full" />
+        <div
+          id={controlId}
+          role="group"
+          aria-label={t("reports.period.label")}
+          className="grid grid-cols-2 gap-1 border-t border-border-soft p-2"
+        >
+          {PERIODS.map((value) => {
+            const active = value === period;
+            return (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => onSelect(value)}
+                className={cn(
+                  "min-h-11 rounded-lg px-2 py-2 text-left text-sm font-semibold leading-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+                  active
+                    ? "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-200"
+                    : "text-slate-600 hover:bg-surface-2 dark:text-slate-300",
+                )}
+              >
+                {t(`reports.period.options.${value}` as never)}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

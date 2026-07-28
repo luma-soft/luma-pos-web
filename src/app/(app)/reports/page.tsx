@@ -92,6 +92,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
               items={REPORT_TABS}
               preserveParams={REPORT_FILTER_PARAMS}
               edgeToEdge
+              linkClassName="h-11"
             />
           )}
           className="border-b-0 pb-2"
