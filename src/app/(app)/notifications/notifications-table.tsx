@@ -10,8 +10,10 @@ import { cn, formatDate } from "@/lib/utils";
 import { Routes } from "@/lib/routes";
 import { OrderDetailLink } from "@/components/order-detail-link";
 import type { AuditSource, AuditStatus, getAuditLogs } from "@/lib/audit";
+import { useTranslations } from "next-intl";
 
-type AuditRow = Awaited<ReturnType<typeof getAuditLogs>>[number];
+export type AuditRow = Awaited<ReturnType<typeof getAuditLogs>>[number];
+type Translator = ReturnType<typeof useTranslations>;
 
 function iconFor(source: AuditSource, status: AuditStatus) {
   if (status === "failed" || status === "unauthorized") return <ShieldAlert className="h-4 w-4" />;
@@ -86,16 +88,8 @@ function titleFor(row: AuditRow) {
   return `${row.action.replaceAll("_", " ")} · ${row.entityType}`;
 }
 
-function statusText(status: AuditStatus) {
-  switch (status) {
-    case "previewed": return "Đã tạo preview";
-    case "confirmed": return "Đã xác nhận";
-    case "succeeded": return "Thành công";
-    case "failed": return "Thất bại";
-    case "cancelled": return "Đã hủy";
-    case "unauthorized": return "Không đủ quyền";
-    default: return status;
-  }
+function statusText(status: AuditStatus, t: Translator) {
+  return t(`notifications.statuses.${status}`);
 }
 
 function recordHref(record: Record<string, unknown>) {
@@ -115,17 +109,18 @@ function recordHref(record: Record<string, unknown>) {
   return null;
 }
 
-function recordLabel(record: Record<string, unknown>) {
-  return textValue(record.code) ?? textValue(record.name) ?? textValue(record.label) ?? textValue(record.id) ?? textValue(record.type) ?? "Record";
+function recordLabel(record: Record<string, unknown>, fallback: string) {
+  return textValue(record.code) ?? textValue(record.name) ?? textValue(record.label) ?? textValue(record.id) ?? textValue(record.type) ?? fallback;
 }
 
 export function NotificationsTable({ rows }: { rows: AuditRow[] }) {
+  const t = useTranslations();
   const columns: DataTableColumn<AuditRow>[] = [
-    { key: "notification", label: "Thông báo", required: true, render: (row) => <ActivityCell row={row} /> },
-    { key: "source", label: "Nguồn", defaultVisible: true, width: "120px", render: (row) => <span className={cn("inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold capitalize", sourceTone(row.source))}>{row.source}</span> },
-    { key: "status", label: "Trạng thái", defaultVisible: true, width: "130px", render: (row) => <span className={cn("inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold", toneFor(row.status))}>{row.status}</span> },
-    { key: "actor", label: "Người thực hiện", defaultVisible: true, render: (row) => <span className="inline-flex items-center gap-1.5 text-slate-600"><UserRound className="h-3.5 w-3.5" />{row.actorNameSnapshot ?? row.actorId ?? "System"}</span> },
-    { key: "time", label: "Thời gian", defaultVisible: true, width: "160px", render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
+    { key: "notification", label: t("notifications.columns.notification"), required: true, render: (row) => <ActivityCell row={row} t={t} /> },
+    { key: "source", label: t("notifications.columns.source"), defaultVisible: true, width: "120px", render: (row) => <span className={cn("inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold capitalize", sourceTone(row.source))}>{row.source}</span> },
+    { key: "status", label: t("notifications.columns.status"), defaultVisible: true, width: "130px", render: (row) => <span className={cn("inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold", toneFor(row.status))}>{statusText(row.status, t)}</span> },
+    { key: "actor", label: t("notifications.columns.actor"), defaultVisible: true, render: (row) => <span className="inline-flex items-center gap-1.5 text-slate-600"><UserRound className="h-3.5 w-3.5" />{row.actorNameSnapshot ?? row.actorId ?? t("notifications.systemActor")}</span> },
+    { key: "time", label: t("notifications.columns.time"), defaultVisible: true, width: "160px", render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
   ];
   return (
     <DataTableShell
@@ -134,45 +129,68 @@ export function NotificationsTable({ rows }: { rows: AuditRow[] }) {
       columns={columns}
       getRowId={(row) => row.id}
       minWidth="1080px"
+      renderMobileRow={({ row, expanded, toggle }) => <NotificationMobileRow row={row} expanded={expanded} toggle={toggle} />}
       renderDetail={(row) => <ExpandedAudit row={row} />}
     />
   );
 }
 
-function ActivityCell({ row }: { row: AuditRow }) {
+export function NotificationMobileRow({ row, expanded, toggle }: { row: AuditRow; expanded: boolean; toggle: () => void }) {
+  const t = useTranslations();
+  return (
+    <button
+      type="button"
+      aria-expanded={expanded}
+      onClick={toggle}
+      className="min-h-11 w-full p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
+    >
+      <ActivityCell row={row} t={t} />
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <span className={cn("rounded-full px-2 py-1 text-xs font-bold capitalize", sourceTone(row.source))}>{row.source}</span>
+        <span className={cn("rounded-full px-2 py-1 text-xs font-bold", toneFor(row.status))}>{statusText(row.status, t)}</span>
+      </div>
+      <div className="mt-2 text-xs text-slate-400">
+        {row.actorNameSnapshot ?? row.actorId ?? t("notifications.systemActor")} · {formatDate(row.createdAt)}
+      </div>
+    </button>
+  );
+}
+
+function ActivityCell({ row, t }: { row: AuditRow; t: Translator }) {
   return (
     <div className="flex min-w-0 items-start gap-3">
       <div className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl", toneFor(row.status))}>
         {iconFor(row.source, row.status)}
       </div>
       <div className="min-w-0">
-        <div className="truncate font-semibold capitalize">{row.source === "ai" ? statusText(row.status) : titleFor(row)}</div>
+        <div className="truncate font-semibold capitalize">{row.source === "ai" ? statusText(row.status, t) : titleFor(row)}</div>
         <div className="mt-0.5 truncate font-mono text-xs text-slate-400">{row.entityId ?? "—"}</div>
-        {row.prompt && <div className="mt-1 line-clamp-2 text-xs text-slate-500">Prompt: {truncateText(row.prompt)}</div>}
+        {row.prompt && <div className="mt-1 line-clamp-2 text-xs text-slate-500">{t("notifications.prompt")}: {truncateText(row.prompt)}</div>}
       </div>
     </div>
   );
 }
 
 function ExpandedAudit({ row }: { row: AuditRow }) {
+  const t = useTranslations();
   const records = arrayValue(row.affectedRecords).map(objectValue).filter(Boolean) as Record<string, unknown>[];
   return (
     <div className="space-y-3 bg-surface px-4 py-4 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-xs font-bold uppercase tracking-wide text-slate-400">Chi tiết thông báo</div>
+        <div className="text-xs font-bold uppercase tracking-wide text-slate-400">{t("notifications.detailTitle")}</div>
         <AcknowledgeNotificationButton id={row.id} />
       </div>
       {records.length > 0 && (
         <div>
-          <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">Bản ghi liên quan</div>
+          <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">{t("notifications.relatedRecords")}</div>
           <div className="flex flex-wrap gap-1.5">
             {records.slice(0, 10).map((record, index) => {
               const href = recordHref(record);
-              const label = recordLabel(record);
+              const label = recordLabel(record, t("notifications.recordFallback"));
               const recordId = textValue(record.id);
               const recordType = textValue(record.type);
               const chip = (
-                <span className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                <span className="inline-flex min-h-11 items-center gap-1 rounded-full border border-border bg-surface px-2 text-[11px] font-semibold text-slate-600">
                   {label}
                   {href && <ExternalLink className="h-3 w-3" />}
                 </span>
@@ -203,6 +221,7 @@ function ExpandedAudit({ row }: { row: AuditRow }) {
 }
 
 function AcknowledgeNotificationButton({ id }: { id: string }) {
+  const t = useTranslations();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -223,9 +242,9 @@ function AcknowledgeNotificationButton({ id }: { id: string }) {
           router.refresh();
         });
       }}
-      className="h-8 rounded-full text-xs font-bold text-slate-600"
+      className="min-h-11 rounded-full text-xs font-bold text-slate-600"
     >
-      {pending ? "Đang xử lý..." : "Đã xử lý"}
+      {pending ? t("notifications.processing") : t("notifications.processed")}
     </Button>
   );
 }

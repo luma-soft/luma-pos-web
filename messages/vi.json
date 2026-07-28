@@ -95,6 +95,35 @@
     "mobileOrders": "Đơn",
     "returns": "Trả hàng"
   },
+  "notifications": {
+    "title": "Thông báo",
+    "subtitle": "Các preview, cảnh báo và thao tác cần kiểm tra từ mobile, POS và AI",
+    "filters": "Bộ lọc",
+    "allSources": "Tất cả nguồn",
+    "allStatuses": "Tất cả trạng thái",
+    "systemActor": "Hệ thống",
+    "columns": {
+      "notification": "Thông báo",
+      "source": "Nguồn",
+      "status": "Trạng thái",
+      "actor": "Người thực hiện",
+      "time": "Thời gian"
+    },
+    "statuses": {
+      "previewed": "Đã tạo preview",
+      "confirmed": "Đã xác nhận",
+      "succeeded": "Thành công",
+      "failed": "Thất bại",
+      "cancelled": "Đã hủy",
+      "unauthorized": "Không đủ quyền"
+    },
+    "prompt": "Yêu cầu",
+    "detailTitle": "Chi tiết thông báo",
+    "relatedRecords": "Bản ghi liên quan",
+    "recordFallback": "Bản ghi",
+    "processing": "Đang xử lý...",
+    "processed": "Đã xử lý"
+  },
   "mobile": {
     "dashboard": {
       "subtitle": "Nhịp vận hành hôm nay · POS-first",

@@ -95,6 +95,35 @@
     "mobileOrders": "Orders",
     "returns": "Returns"
   },
+  "notifications": {
+    "title": "Notifications",
+    "subtitle": "Previews, alerts, and actions from mobile, POS, and AI that need review",
+    "filters": "Filters",
+    "allSources": "All sources",
+    "allStatuses": "All statuses",
+    "systemActor": "System",
+    "columns": {
+      "notification": "Notification",
+      "source": "Source",
+      "status": "Status",
+      "actor": "Actor",
+      "time": "Time"
+    },
+    "statuses": {
+      "previewed": "Preview created",
+      "confirmed": "Confirmed",
+      "succeeded": "Succeeded",
+      "failed": "Failed",
+      "cancelled": "Cancelled",
+      "unauthorized": "Unauthorized"
+    },
+    "prompt": "Prompt",
+    "detailTitle": "Notification details",
+    "relatedRecords": "Related records",
+    "recordFallback": "Record",
+    "processing": "Processing...",
+    "processed": "Processed"
+  },
   "mobile": {
     "dashboard": {
       "subtitle": "Today's operations · POS-first",

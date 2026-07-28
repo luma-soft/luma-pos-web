@@ -13,7 +13,7 @@ export function ProjectServiceTabs({ children, initialActive }: { children: Reac
   return (
     <TabContext.Provider value={{ active, setActive }}>
       <div className="rounded-card border border-border bg-surface overflow-hidden">
-        <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-border-soft p-2 [&::-webkit-scrollbar]:h-0">
+        <div role="tablist" className="flex snap-x snap-mandatory gap-1 overflow-x-auto border-b border-border-soft p-2 [&::-webkit-scrollbar]:h-0">
           {items.map((item) => {
             const selected = item.props.id === active;
             return (
@@ -22,9 +22,11 @@ export function ProjectServiceTabs({ children, initialActive }: { children: Reac
                 type="button"
                 role="tab"
                 aria-selected={selected}
+                aria-controls={`project-service-panel-${item.props.id}`}
+                id={`project-service-tab-${item.props.id}`}
                 onClick={() => setActive(item.props.id)}
                 className={cn(
-                  "inline-flex h-9 shrink-0 items-center gap-2 rounded-[10px] px-3.5 text-xs font-semibold transition-colors",
+                  "inline-flex min-h-11 shrink-0 snap-start items-center gap-2 rounded-[10px] px-3.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2",
                   selected ? "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300" : "text-slate-500 hover:bg-surface-2 hover:text-slate-900 dark:hover:text-slate-200",
                 )}
               >
@@ -50,7 +52,13 @@ export function ProjectServiceTab({ id, children }: ProjectServiceTabProps) {
   const context = useContext(TabContext);
   const active = context?.active === id;
   return (
-    <div role="tabpanel" hidden={!active} className={cn("p-4", active && "block")}>
+    <div
+      role="tabpanel"
+      id={`project-service-panel-${id}`}
+      aria-labelledby={`project-service-tab-${id}`}
+      hidden={!active}
+      className={cn("p-3 sm:p-4", active && "block")}
+    >
       {children}
     </div>
   );

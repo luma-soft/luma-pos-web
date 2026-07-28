@@ -4,6 +4,7 @@ import { NotificationsTable } from "./notifications-table";
 import { getAuditLogs, type AuditSource, type AuditStatus } from "@/lib/audit";
 import { requireUser } from "@/lib/actions/common";
 import { cn } from "@/lib/utils";
+import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,7 @@ export default async function NotificationsPage({
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
   const user = await requireUser();
+  const t = await getTranslations();
   const params = await searchParams;
   const source = validSource(params.source);
   const status = validStatus(params.status);
@@ -51,21 +53,21 @@ export default async function NotificationsPage({
         <div className="min-h-13 px-4 sm:px-6 pt-2.5 flex items-center gap-2">
           <Bell className="w-4 h-4 text-primary-600" />
           <div>
-            <h1 className="text-[17px] font-bold leading-tight">Thông báo</h1>
-            <p className="text-[11px] text-slate-400">Các preview, cảnh báo và thao tác cần kiểm tra từ mobile, POS và AI</p>
+            <h1 className="text-[17px] font-bold leading-tight">{t("notifications.title")}</h1>
+            <p className="text-[11px] text-slate-400">{t("notifications.subtitle")}</p>
           </div>
         </div>
-        <div className="px-4 sm:px-6 pb-2 flex flex-wrap gap-2">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs text-slate-500">
-            <Filter className="w-3.5 h-3.5" /> Bộ lọc
+        <div className="flex snap-x snap-mandatory gap-2 overflow-x-auto px-4 pb-2 sm:px-6 [&::-webkit-scrollbar]:h-0">
+          <span className="inline-flex min-h-11 shrink-0 snap-start items-center gap-1.5 rounded-full px-2.5 py-1 text-xs text-slate-500">
+            <Filter className="w-3.5 h-3.5" /> {t("notifications.filters")}
           </span>
-          <Link className={cn("px-2.5 py-1 rounded-full border text-xs font-medium", !source ? "bg-primary-50 border-primary-100 text-primary-700" : "border-border text-slate-500")} href={paramsWith(params, { source: undefined })}>Tất cả nguồn</Link>
+          <Link className={cn("inline-flex min-h-11 shrink-0 snap-start items-center rounded-full border px-2.5 py-1 text-xs font-medium", !source ? "bg-primary-50 border-primary-100 text-primary-700" : "border-border text-slate-500")} href={paramsWith(params, { source: undefined })}>{t("notifications.allSources")}</Link>
           {SOURCES.map((item) => (
-            <Link key={item} className={cn("px-2.5 py-1 rounded-full border text-xs font-medium capitalize", source === item ? "bg-primary-50 border-primary-100 text-primary-700" : "border-border text-slate-500")} href={paramsWith(params, { source: item })}>{item}</Link>
+            <Link key={item} className={cn("inline-flex min-h-11 shrink-0 snap-start items-center rounded-full border px-2.5 py-1 text-xs font-medium capitalize", source === item ? "bg-primary-50 border-primary-100 text-primary-700" : "border-border text-slate-500")} href={paramsWith(params, { source: item })}>{item}</Link>
           ))}
-          <Link className={cn("px-2.5 py-1 rounded-full border text-xs font-medium", !status ? "bg-surface-2 border-border text-slate-700" : "border-border text-slate-500")} href={paramsWith(params, { status: undefined })}>Tất cả trạng thái</Link>
+          <Link className={cn("inline-flex min-h-11 shrink-0 snap-start items-center rounded-full border px-2.5 py-1 text-xs font-medium", !status ? "bg-surface-2 border-border text-slate-700" : "border-border text-slate-500")} href={paramsWith(params, { status: undefined })}>{t("notifications.allStatuses")}</Link>
           {STATUSES.map((item) => (
-            <Link key={item} className={cn("px-2.5 py-1 rounded-full border text-xs font-medium", status === item ? "bg-surface-2 border-border text-slate-700" : "border-border text-slate-500")} href={paramsWith(params, { status: item })}>{item}</Link>
+            <Link key={item} className={cn("inline-flex min-h-11 shrink-0 snap-start items-center rounded-full border px-2.5 py-1 text-xs font-medium", status === item ? "bg-surface-2 border-border text-slate-700" : "border-border text-slate-500")} href={paramsWith(params, { status: item })}>{t(`notifications.statuses.${item}`)}</Link>
           ))}
         </div>
       </div>

@@ -28,6 +28,7 @@ import {
 import { ProjectEdit } from "../project-widgets";
 import { CameraQuoteCreateButton } from "../../sales/tabs/camera-quote-create-button";
 import { ProjectServiceTab, ProjectServiceTabs } from "./project-service-tabs";
+import { MobileRecordCard, MobileRecordField } from "@/components/mobile-ui";
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -158,7 +159,29 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             {maintenancePlans.length === 0 ? (
               <Text variant="muted" size="sm" text={t("services.maintenance.empty")} />
             ) : (
-              <div className="space-y-2">
+              <>
+              <div data-mobile-record="maintenance" className="space-y-3 lg:hidden">
+                {maintenancePlans.map((plan) => (
+                  <MobileRecordCard
+                    key={plan.id}
+                    title={plan.title}
+                    subtitle={plan.assetName ?? t("services.assets.noProduct")}
+                    status={(
+                      <span className={`rounded-full px-2 py-1 text-[11px] font-bold ${plan.isActive ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-500"}`}>
+                        {t(plan.isActive ? "services.maintenance.active" : "services.maintenance.paused")}
+                      </span>
+                    )}
+                    className="[&_button]:min-h-11 [&_h3]:break-words [&_h3]:whitespace-normal"
+                    actions={<ServiceMaintenanceEditor projectId={project.id} assets={assets.map((asset) => ({ id: asset.id, name: asset.name, serialNumber: asset.serialNumber }))} staff={serviceOptions.assigneeOptions} initial={plan} />}
+                  >
+                    <MobileRecordField label={t("services.maintenance.nextDueOn")} value={formatDate(plan.nextDueOn)} />
+                    <MobileRecordField label={t("services.fields.assignee")} value={plan.assignedToName ?? t("services.fields.unassigned")} />
+                    <MobileRecordField label={t("services.maintenance.interval")} value={`${plan.intervalDays} ${t("services.maintenance.days")}`} />
+                    <MobileRecordField className="col-span-2 [&_dd]:break-words [&_dd]:whitespace-normal" label={t("customers.fields.note")} value={plan.note ?? "—"} />
+                  </MobileRecordCard>
+                ))}
+              </div>
+              <div className="hidden space-y-2 lg:block">
                 {maintenancePlans.map((plan) => (
                   <div key={plan.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-border-soft pb-2 last:border-b-0">
                     <div>
@@ -169,6 +192,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                   </div>
                 ))}
               </div>
+              </>
             )}
           </Section>
           </ProjectServiceTab>
@@ -192,7 +216,25 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             {costEntries.length === 0 ? (
               <Text variant="muted" size="sm" text={t("services.costs.empty")} />
             ) : (
-              <div className="space-y-2">
+              <>
+              <div data-mobile-record="cost" className="space-y-3 lg:hidden">
+                {costEntries.map((entry) => (
+                  <MobileRecordCard
+                    key={entry.id}
+                    title={entry.description}
+                    subtitle={formatDate(entry.incurredOn)}
+                    status={<span className="rounded-full bg-surface-2 px-2 py-1 text-[11px] font-bold text-slate-600">{t(`services.costs.${entry.type}` as never)}</span>}
+                    className="[&_button]:min-h-11 [&_h3]:break-words [&_h3]:whitespace-normal"
+                    actions={<ServiceCostEditor projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} staff={serviceOptions.assigneeOptions} initial={entry} />}
+                  >
+                    <MobileRecordField label={t("services.costs.staff")} value={entry.staffName ?? t("services.fields.unassigned")} />
+                    <MobileRecordField label={t("services.costs.total")} value={formatCurrency(Number(entry.amount))} />
+                    <MobileRecordField label={t("services.costs.quantity")} value={Number(entry.quantity)} />
+                    <MobileRecordField label={t("services.costs.unitCost")} value={formatCurrency(Number(entry.unitCost))} />
+                  </MobileRecordCard>
+                ))}
+              </div>
+              <div className="hidden space-y-2 lg:block">
                 {costEntries.map((entry) => (
                   <div key={entry.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-border-soft pb-2 last:border-b-0">
                     <div className="min-w-0">
@@ -206,6 +248,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                   </div>
                 ))}
               </div>
+              </>
             )}
           </Section>
           </ProjectServiceTab>
@@ -271,7 +314,25 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             {assets.length === 0 ? (
               <Text variant="muted" size="sm" text={t("services.assets.empty")} />
             ) : (
-              <div className="overflow-x-auto">
+              <>
+              <div data-mobile-record="asset" className="space-y-3 lg:hidden">
+                {assets.map((asset) => (
+                  <MobileRecordCard
+                    key={asset.id}
+                    title={asset.name}
+                    subtitle={[asset.brand, asset.model].filter(Boolean).join(" · ") || t("services.fields.asset")}
+                    status={<span className="rounded-full bg-in-soft px-2 py-1 text-[11px] font-bold text-in">{t(`services.assetStatuses.${asset.status}` as never)}</span>}
+                    className="[&_button]:min-h-11 [&_h3]:break-words [&_h3]:whitespace-normal"
+                    actions={<InstalledAssetQuickCreate projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} initial={asset} />}
+                  >
+                    <MobileRecordField label={t("services.fields.serialNumber")} value={<span className="font-mono">{asset.serialNumber ?? "—"}</span>} />
+                    <MobileRecordField label={t("services.fields.location")} value={asset.locationLabel ?? "—"} />
+                    <MobileRecordField label={t("services.fields.macAddress")} value={<span className="font-mono">{asset.macAddress ?? "—"}</span>} />
+                    <MobileRecordField label={t("services.tabs.warranty")} value={asset.customerWarrantyEndsOn ? formatDate(asset.customerWarrantyEndsOn) : "—"} />
+                  </MobileRecordCard>
+                ))}
+              </div>
+              <div className="hidden overflow-x-auto lg:block">
                 <table className="w-full min-w-[760px] text-sm">
                   <thead><tr className="text-left text-xs uppercase text-slate-500"><th className="py-2 pr-3">{t("services.fields.asset")}</th><th className="px-3 py-2">{t("services.fields.serialNumber")}</th><th className="px-3 py-2">{t("services.fields.location")}</th><th className="px-3 py-2">{t("services.fields.macAddress")}</th><th className="px-3 py-2">{t("orders.cols.status")}</th><th className="py-2 pl-3">{t("services.tabs.warranty")}</th><th /></tr></thead>
                   <tbody className="divide-y divide-border-soft">
@@ -279,6 +340,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                   </tbody>
                 </table>
               </div>
+              </>
             )}
           </Section>
           </ProjectServiceTab>
@@ -297,7 +359,38 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             {claims.length === 0 ? (
               <Text variant="muted" size="sm" text={t("services.warranty.empty")} />
             ) : (
-              <div className="space-y-2">
+              <>
+              <div data-mobile-record="warranty" className="space-y-3 lg:hidden">
+                {claims.map((claim) => (
+                  <MobileRecordCard
+                    key={claim.id}
+                    title={`${claim.code} · ${claim.title}`}
+                    subtitle={`${formatDate(claim.reportedAt)}${claim.assetName ? ` · ${claim.assetName}` : ""}`}
+                    status={<span className="rounded-full bg-warn-soft px-2 py-1 text-[11px] font-bold text-warn">{t(`services.claimStatuses.${claim.status}` as never)}</span>}
+                    className="[&_button]:min-h-11 [&_h3]:break-words [&_h3]:whitespace-normal"
+                    actions={(
+                      <div className="flex w-full flex-wrap items-center gap-2 [&_button]:min-h-11">
+                        <WarrantyClaimQuickCreate
+                          projects={[{ id: project.id, name: project.name, serviceType: project.serviceType }]}
+                          jobs={jobs.map((job) => ({ id: job.id, projectId: project.id, code: job.code, title: job.title }))}
+                          assets={assets.map((asset) => ({ id: asset.id, projectId: project.id, jobId: asset.jobId, name: asset.name, serialNumber: asset.serialNumber }))}
+                          initial={claim}
+                        />
+                        <WarrantyClaimStatusAction claimId={claim.id} status={claim.status} diagnosis={claim.diagnosis} resolution={claim.resolution} />
+                      </div>
+                    )}
+                  >
+                    <MobileRecordField label={t("services.fields.priority")} value={t(`services.priorities.${claim.priority}` as never)} />
+                    <MobileRecordField
+                      label={t("services.fields.cost")}
+                      value={formatCurrency(Number(claim.laborCharge) + Number(claim.materialCharge))}
+                    />
+                    <MobileRecordField className="col-span-2 [&_dd]:break-words [&_dd]:whitespace-normal" label={t("services.fields.diagnosis")} value={claim.diagnosis ?? "—"} />
+                    <MobileRecordField className="col-span-2 [&_dd]:break-words [&_dd]:whitespace-normal" label={t("services.fields.resolution")} value={claim.resolution ?? "—"} />
+                  </MobileRecordCard>
+                ))}
+              </div>
+              <div className="hidden space-y-2 lg:block">
                 {claims.map((claim) => (
                   <div key={claim.id} className="flex flex-wrap items-start justify-between gap-3 border-b border-border-soft pb-3 last:border-b-0">
                     <div className="min-w-0 flex-1">
@@ -320,6 +413,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                   </div>
                 ))}
               </div>
+              </>
             )}
           </Section>
           </ProjectServiceTab>
@@ -333,7 +427,33 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             {materials.length === 0 ? (
               <Text variant="muted" size="sm" text={t("services.materials.empty")} />
             ) : (
-              <div className="space-y-2">
+              <>
+              <div data-mobile-record="material" className="space-y-3 lg:hidden">
+                {materials.map((material) => (
+                  <MobileRecordCard
+                    key={material.id}
+                    title={material.productName}
+                    subtitle={`${material.sku} · ${material.jobCode} · ${material.jobTitle}`}
+                    className="[&_button]:min-h-11 [&_h3]:break-words [&_h3]:whitespace-normal"
+                    actions={(
+                      <div className="flex w-full flex-wrap items-center gap-2 [&_button]:min-h-11">
+                        <ServiceMaterialReservation material={material} warehouses={serviceOptions.warehouseOptions} />
+                        <ServiceMaterialStockSync material={material} warehouses={serviceOptions.warehouseOptions} />
+                        <ServiceMaterialEditor
+                          jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))}
+                          initial={material}
+                        />
+                      </div>
+                    )}
+                  >
+                    <MobileRecordField label={t("services.materials.planned")} value={`${Number(material.plannedQuantity)} ${material.unitName}`} />
+                    <MobileRecordField label={t("services.materials.used")} value={`${Number(material.usedQuantity)} ${material.unitName}`} />
+                    <MobileRecordField label={t("services.materials.unit")} value={material.unitName} />
+                    <MobileRecordField className="col-span-2 [&_dd]:break-words [&_dd]:whitespace-normal" label={t("customers.fields.note")} value={material.note ?? "—"} />
+                  </MobileRecordCard>
+                ))}
+              </div>
+              <div className="hidden space-y-2 lg:block">
                 {materials.map((material) => (
                   <div key={material.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-border-soft pb-2 last:border-b-0">
                     <div>
@@ -352,6 +472,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                   </div>
                 ))}
               </div>
+              </>
             )}
           </Section>
           </ProjectServiceTab>
@@ -373,38 +494,12 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <Info label={t("orders.cols.date")} value={formatDate(project.createdAt)} />
         </div>
 
-        <div className="bg-surface border border-border rounded-card overflow-x-auto">
+        <div className="min-w-0 bg-surface border border-border rounded-card overflow-hidden">
           <div className="px-4 py-3 border-b border-border font-semibold text-sm">{t("projects.relatedOrders")}</div>
           {orders.length === 0 ? (
             <p className="px-4 py-8 text-sm text-slate-400 text-center">{t("orders.empty")}</p>
           ) : (
-            <table className="w-full min-w-[720px] text-sm">
-              <thead>
-                <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
-                  <th className="px-4 py-2.5 font-semibold">{t("orders.cols.code")}</th>
-                  <th className="px-4 py-2.5 font-semibold">{t("orders.cols.date")}</th>
-                  <th className="px-4 py-2.5 font-semibold">{t("orders.cols.customer")}</th>
-                  <th className="px-4 py-2.5 font-semibold">{t("orders.cols.status")}</th>
-                  <th className="px-4 py-2.5 font-semibold text-right">{t("orders.cols.total")}</th>
-                  <th className="px-4 py-2.5 font-semibold text-right">{t("orders.cols.remaining")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-soft">
-                {orders.map((order) => {
-                  const remaining = Number(order.total) - Number(order.amountPaid);
-                  return (
-                    <tr key={order.id}>
-                      <td className="px-4 py-3"><OrderDetailLink orderId={order.id} className="font-semibold text-primary-600 hover:underline">{order.code}</OrderDetailLink></td>
-                      <td className="px-4 py-3 text-slate-500">{formatDate(order.createdAt)}</td>
-                      <td className="px-4 py-3">{order.customerName ?? t("orders.walkIn")}</td>
-                      <td className="px-4 py-3"><div className="flex flex-wrap gap-1.5"><OrderStatusBadge status={order.status} /><PaymentStatusBadge status={order.paymentStatus} /></div></td>
-                      <td className="px-4 py-3 text-right tabular-nums font-semibold">{formatCurrency(Number(order.total))}</td>
-                      <td className="px-4 py-3 text-right tabular-nums font-semibold text-er">{remaining > 0 ? formatCurrency(remaining) : "—"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <RelatedOrders orders={orders} t={t} />
           )}
         </div>
       </div>
@@ -433,23 +528,75 @@ function ProjectOverviewDetails({ project, orders, t }: ProjectOverviewDetailsPr
         <Info label={t("customers.fields.note")} value={project.note ?? "—"} />
         <Info label={t("orders.cols.date")} value={formatDate(project.createdAt)} />
       </div>
-      <div className="min-w-0 bg-surface border border-border rounded-card overflow-x-auto">
+      <div className="min-w-0 bg-surface border border-border rounded-card overflow-hidden">
         <div className="px-4 py-3 border-b border-border font-semibold text-sm">{t("projects.relatedOrders")}</div>
         {orders.length === 0 ? (
           <p className="px-4 py-8 text-sm text-slate-400 text-center">{t("orders.empty")}</p>
         ) : (
-          <table className="w-full min-w-[720px] text-sm">
-            <thead><tr className="bg-canvas text-left text-xs uppercase text-slate-500"><th className="px-4 py-2.5 font-semibold">{t("orders.cols.code")}</th><th className="px-4 py-2.5 font-semibold">{t("orders.cols.date")}</th><th className="px-4 py-2.5 font-semibold">{t("orders.cols.customer")}</th><th className="px-4 py-2.5 font-semibold">{t("orders.cols.status")}</th><th className="px-4 py-2.5 font-semibold text-right">{t("orders.cols.total")}</th><th className="px-4 py-2.5 font-semibold text-right">{t("orders.cols.remaining")}</th></tr></thead>
-            <tbody className="divide-y divide-border-soft">
-              {orders.map((order) => {
-                const remaining = Number(order.total) - Number(order.amountPaid);
-                return <tr key={order.id}><td className="px-4 py-3"><OrderDetailLink orderId={order.id} className="font-semibold text-primary-600 hover:underline">{order.code}</OrderDetailLink></td><td className="px-4 py-3 text-slate-500">{formatDate(order.createdAt)}</td><td className="px-4 py-3">{order.customerName ?? t("orders.walkIn")}</td><td className="px-4 py-3"><div className="flex flex-wrap gap-1.5"><OrderStatusBadge status={order.status} /><PaymentStatusBadge status={order.paymentStatus} /></div></td><td className="px-4 py-3 text-right tabular-nums font-semibold">{formatCurrency(Number(order.total))}</td><td className="px-4 py-3 text-right tabular-nums font-semibold text-er">{remaining > 0 ? formatCurrency(remaining) : "—"}</td></tr>;
-              })}
-            </tbody>
-          </table>
+          <RelatedOrders orders={orders} t={t} />
         )}
       </div>
     </div>
+  );
+}
+
+function RelatedOrders({ orders, t }: Pick<ProjectOverviewDetailsProps, "orders" | "t">) {
+  return (
+    <>
+      <div data-mobile-record="order" className="space-y-3 p-3 lg:hidden">
+        {orders.map((order) => {
+          const remaining = Number(order.total) - Number(order.amountPaid);
+          return (
+            <MobileRecordCard
+              key={order.id}
+              title={(
+                <OrderDetailLink orderId={order.id} className="inline-flex min-h-11 items-center text-primary-600 hover:underline">
+                  {order.code}
+                </OrderDetailLink>
+              )}
+              subtitle={`${formatDate(order.createdAt)} · ${order.customerName ?? t("orders.walkIn")}`}
+              status={<div className="flex flex-wrap justify-end gap-1.5"><OrderStatusBadge status={order.status} /><PaymentStatusBadge status={order.paymentStatus} /></div>}
+            >
+              <MobileRecordField label={t("orders.cols.total")} value={formatCurrency(Number(order.total))} />
+              <MobileRecordField
+                label={t("orders.cols.remaining")}
+                value={remaining > 0 ? formatCurrency(remaining) : "—"}
+                tone={remaining > 0 ? "danger" : "neutral"}
+              />
+            </MobileRecordCard>
+          );
+        })}
+      </div>
+      <div className="hidden overflow-x-auto lg:block">
+        <table className="w-full min-w-[720px] text-sm">
+          <thead>
+            <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
+              <th className="px-4 py-2.5 font-semibold">{t("orders.cols.code")}</th>
+              <th className="px-4 py-2.5 font-semibold">{t("orders.cols.date")}</th>
+              <th className="px-4 py-2.5 font-semibold">{t("orders.cols.customer")}</th>
+              <th className="px-4 py-2.5 font-semibold">{t("orders.cols.status")}</th>
+              <th className="px-4 py-2.5 text-right font-semibold">{t("orders.cols.total")}</th>
+              <th className="px-4 py-2.5 text-right font-semibold">{t("orders.cols.remaining")}</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border-soft">
+            {orders.map((order) => {
+              const remaining = Number(order.total) - Number(order.amountPaid);
+              return (
+                <tr key={order.id}>
+                  <td className="px-4 py-3"><OrderDetailLink orderId={order.id} className="font-semibold text-primary-600 hover:underline">{order.code}</OrderDetailLink></td>
+                  <td className="px-4 py-3 text-slate-500">{formatDate(order.createdAt)}</td>
+                  <td className="px-4 py-3">{order.customerName ?? t("orders.walkIn")}</td>
+                  <td className="px-4 py-3"><div className="flex flex-wrap gap-1.5"><OrderStatusBadge status={order.status} /><PaymentStatusBadge status={order.paymentStatus} /></div></td>
+                  <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatCurrency(Number(order.total))}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-er tabular-nums">{remaining > 0 ? formatCurrency(remaining) : "—"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 
