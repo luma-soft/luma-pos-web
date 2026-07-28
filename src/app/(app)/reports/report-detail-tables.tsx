@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
+import { MobileRecordField } from "@/components/mobile-ui";
 import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import type { ReportCustomerRow, ReportEmployeeRow, ReportProductRow } from "@/lib/data/reports";
 
@@ -44,7 +45,40 @@ export function ReportProductsTable({ rows }: { rows: ReportProductRow[] }) {
       render: (row) => formatCurrency(Number(row.profit)),
     },
   ];
-  return <ReportTable tableId="reports.products" rows={rows} columns={columns} getRowId={(row) => row.productId} />;
+  return (
+    <ReportTable
+      tableId="reports.products"
+      rows={rows}
+      columns={columns}
+      getRowId={(row) => row.productId}
+      renderMobileRow={(row) => <ReportProductMobileRow row={row} />}
+    />
+  );
+}
+
+export function ReportProductMobileRow({ row }: { row: ReportProductRow }) {
+  const t = useTranslations();
+  const profit = Number(row.profit);
+
+  return (
+    <div className="p-3">
+      <div className="truncate text-sm font-black">{row.productName}</div>
+      <dl className="mt-3 grid grid-cols-2 gap-2">
+        <MobileRecordField label={t("reports.qtySold")} value={`${formatNumber(Number(row.qtySold))} ${row.baseUnit}`} />
+        <MobileRecordField
+          label={t("reports.revenue")}
+          value={formatCurrency(Number(row.revenue))}
+          className="[&_dd]:break-words [&_dd]:whitespace-normal"
+        />
+        <MobileRecordField
+          label={t("reports.grossProfit")}
+          value={formatCurrency(profit)}
+          tone={profit >= 0 ? "success" : "danger"}
+          className="col-span-2 [&_dd]:break-words [&_dd]:whitespace-normal"
+        />
+      </dl>
+    </div>
+  );
 }
 
 export function ReportCustomersTable({ rows }: { rows: ReportCustomerRow[] }) {
@@ -88,7 +122,43 @@ export function ReportCustomersTable({ rows }: { rows: ReportCustomerRow[] }) {
       render: (row) => Number(row.remaining) > 0 ? formatCurrency(Number(row.remaining)) : "—",
     },
   ];
-  return <ReportTable tableId="reports.customers" rows={rows} columns={columns} getRowId={(row) => row.customerId ?? "walkin"} />;
+  return (
+    <ReportTable
+      tableId="reports.customers"
+      rows={rows}
+      columns={columns}
+      getRowId={(row) => row.customerId ?? "walkin"}
+      renderMobileRow={(row) => <ReportCustomerMobileRow row={row} />}
+    />
+  );
+}
+
+export function ReportCustomerMobileRow({ row }: { row: ReportCustomerRow }) {
+  const t = useTranslations();
+  const remaining = Number(row.remaining);
+
+  return (
+    <div className="p-3">
+      <div className="truncate text-sm font-black">
+        {row.customerName}
+        {row.customerType && row.customerType !== "retail" ? ` (${t(`customers.types.${row.customerType}` as never)})` : ""}
+      </div>
+      <dl className="mt-3 grid grid-cols-2 gap-2">
+        <MobileRecordField label={t("reports.orders")} value={formatNumber(row.orderCount)} />
+        <MobileRecordField
+          label={t("reports.revenue")}
+          value={formatCurrency(Number(row.revenue))}
+          className="[&_dd]:break-words [&_dd]:whitespace-normal"
+        />
+        <MobileRecordField
+          label={t("reports.uncollected")}
+          value={remaining > 0 ? formatCurrency(remaining) : "—"}
+          tone={remaining > 0 ? "danger" : "neutral"}
+          className="col-span-2 [&_dd]:break-words [&_dd]:whitespace-normal"
+        />
+      </dl>
+    </div>
+  );
 }
 
 export function ReportEmployeesTable({ rows }: { rows: ReportEmployeeRow[] }) {
@@ -127,7 +197,39 @@ export function ReportEmployeesTable({ rows }: { rows: ReportEmployeeRow[] }) {
       render: (row) => formatCurrency(Number(row.collected)),
     },
   ];
-  return <ReportTable tableId="reports.employees" rows={rows} columns={columns} getRowId={(row) => row.sellerId ?? "system"} />;
+  return (
+    <ReportTable
+      tableId="reports.employees"
+      rows={rows}
+      columns={columns}
+      getRowId={(row) => row.sellerId ?? "system"}
+      renderMobileRow={(row) => <ReportEmployeeMobileRow row={row} />}
+    />
+  );
+}
+
+export function ReportEmployeeMobileRow({ row }: { row: ReportEmployeeRow }) {
+  const t = useTranslations();
+
+  return (
+    <div className="p-3">
+      <div className="truncate text-sm font-black">{row.sellerName}</div>
+      <dl className="mt-3 grid grid-cols-2 gap-2">
+        <MobileRecordField label={t("reports.orders")} value={formatNumber(row.orderCount)} />
+        <MobileRecordField
+          label={t("reports.revenue")}
+          value={formatCurrency(Number(row.revenue))}
+          className="[&_dd]:break-words [&_dd]:whitespace-normal"
+        />
+        <MobileRecordField
+          label={t("reports.collected")}
+          value={formatCurrency(Number(row.collected))}
+          tone="success"
+          className="col-span-2 [&_dd]:break-words [&_dd]:whitespace-normal"
+        />
+      </dl>
+    </div>
+  );
 }
 
 function ReportTable<T>({
@@ -135,11 +237,13 @@ function ReportTable<T>({
   rows,
   columns,
   getRowId,
+  renderMobileRow,
 }: {
   tableId: string;
   rows: T[];
   columns: DataTableColumn<T>[];
   getRowId: (row: T) => string;
+  renderMobileRow: (row: T) => React.ReactNode;
 }) {
   const t = useTranslations();
   return (
@@ -148,6 +252,7 @@ function ReportTable<T>({
       rows={rows}
       columns={columns}
       getRowId={getRowId}
+      renderMobileRow={({ row }) => renderMobileRow(row)}
       minWidth="760px"
       empty={<div className={emptyClassName}>{t("dashboard.noData")}</div>}
     />

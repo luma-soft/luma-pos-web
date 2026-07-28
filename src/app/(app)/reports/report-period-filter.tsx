@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { ChevronDown } from "lucide-react";
 import { RowPreviewModal } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 const PERIODS = [
   "7d",
@@ -34,6 +36,7 @@ export function ReportPeriodFilter({
   const [customFrom, setCustomFrom] = useState(from);
   const [customTo, setCustomTo] = useState(to);
   const [dateModalOpen, setDateModalOpen] = useState(false);
+  const [disclosureOpen, setDisclosureOpen] = useState(false);
 
   function navigate(nextPeriod: string, nextFrom?: string, nextTo?: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -51,6 +54,7 @@ export function ReportPeriodFilter({
   }
 
   function selectPeriod(value: string) {
+    setDisclosureOpen(false);
     if (value === "custom") {
       setCustomFrom(from);
       setCustomTo(to);
@@ -68,16 +72,15 @@ export function ReportPeriodFilter({
 
   return (
     <>
-      <Select
-        value={period}
-        aria-label={t("reports.period.label")}
-        className="h-11 w-full min-w-40 sm:h-9 sm:w-auto"
-        options={PERIODS.map((value) => ({
-          value,
-          label: t(`reports.period.options.${value}` as never),
-        }))}
-        onValueChange={selectPeriod}
+      <ReportPeriodDisclosure
+        period={period}
+        open={disclosureOpen}
+        onToggle={() => setDisclosureOpen((open) => !open)}
+        onSelect={selectPeriod}
       />
+      <div className="hidden lg:block">
+        <ReportPeriodSelect period={period} onSelect={selectPeriod} className="h-9 min-w-40" />
+      </div>
 
       <RowPreviewModal
         open={dateModalOpen}
@@ -88,12 +91,11 @@ export function ReportPeriodFilter({
         closeLabel={t("common.close")}
         footer={(
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => setDateModalOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setDateModalOpen(false)}>
               {t("common.cancel")}
             </Button>
             <Button
               type="button"
-              size="sm"
               disabled={!customFrom || !customTo || customFrom > customTo}
               onClick={applyCustomPeriod}
             >
@@ -110,7 +112,7 @@ export function ReportPeriodFilter({
               value={customFrom}
               max={customTo}
               onChange={(event) => setCustomFrom(event.target.value)}
-              className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-slate-900 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:text-slate-100"
+              className="h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-slate-900 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 sm:h-10 dark:text-slate-100"
             />
           </label>
           <label className="space-y-1.5 text-sm font-medium text-slate-600 dark:text-slate-300">
@@ -120,11 +122,80 @@ export function ReportPeriodFilter({
               value={customTo}
               min={customFrom}
               onChange={(event) => setCustomTo(event.target.value)}
-              className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-slate-900 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 dark:text-slate-100"
+              className="h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-slate-900 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 sm:h-10 dark:text-slate-100"
             />
           </label>
         </div>
       </RowPreviewModal>
     </>
+  );
+}
+
+export function ReportPeriodDisclosure({
+  period,
+  open,
+  onToggle,
+  onSelect,
+}: {
+  period: ReportPeriod;
+  open: boolean;
+  onToggle: () => void;
+  onSelect: (value: string) => void;
+}) {
+  const t = useTranslations();
+  const controlId = "report-period-mobile-control";
+
+  return (
+    <div className="rounded-xl border border-border bg-surface lg:hidden">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={controlId}
+        onClick={onToggle}
+        className="flex min-h-11 w-full items-center justify-between gap-3 px-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+      >
+        <span className="min-w-0">
+          <span className="block text-[10px] font-extrabold uppercase tracking-[0.06em] text-slate-400">
+            {t("reports.period.label")}
+          </span>
+          <span className="block truncate text-sm font-bold">
+            {t(`reports.period.options.${period}` as never)}
+          </span>
+        </span>
+        <ChevronDown
+          aria-hidden="true"
+          className={cn("h-4 w-4 shrink-0 text-slate-400 transition-transform", open && "rotate-180")}
+        />
+      </button>
+      {open && (
+        <div id={controlId} className="border-t border-border-soft p-2 [&>div]:w-full">
+          <ReportPeriodSelect period={period} onSelect={onSelect} className="min-h-11 w-full" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReportPeriodSelect({
+  period,
+  onSelect,
+  className,
+}: {
+  period: ReportPeriod;
+  onSelect: (value: string) => void;
+  className?: string;
+}) {
+  const t = useTranslations();
+  return (
+    <Select
+      value={period}
+      aria-label={t("reports.period.label")}
+      className={className}
+      options={PERIODS.map((value) => ({
+        value,
+        label: t(`reports.period.options.${value}` as never),
+      }))}
+      onValueChange={onSelect}
+    />
   );
 }
