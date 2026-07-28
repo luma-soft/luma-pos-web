@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { PackageOpen } from "lucide-react";
 import { Routes } from "@/lib/routes";
+import { ONLINE_SALES_ENABLED } from "@/lib/features";
 import { getProduct, getProducts, getProductFormOptions } from "@/lib/data/products";
 import { getPriceBooks, getPriceOverridesForProducts } from "@/lib/data/price-books";
 import { Pagination } from "@/components/pagination";
@@ -47,7 +48,7 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
       </Suspense>
 
       <ProductEditorModal searchParams={params} />
-      <ShopeeListingModalShell searchParams={params} />
+      {ONLINE_SALES_ENABLED && <ShopeeListingModalShell searchParams={params} />}
     </>
   );
 }

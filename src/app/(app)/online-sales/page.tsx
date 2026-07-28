@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getLocale } from "next-intl/server";
 import { ExternalLink, Inbox, Layers3, RefreshCw, Send, ShoppingBag, Store } from "lucide-react";
 import { getShopeeDashboard, getShopeeInbox } from "@/lib/data/marketplace";
 import { sendMarketplaceMessage, updateMarketplaceShopSyncPolicy } from "@/lib/actions/marketplace";
 import { getProduct } from "@/lib/data/products";
 import { Routes } from "@/lib/routes";
+import { ONLINE_SALES_ENABLED } from "@/lib/features";
 import { OrderDetailLink } from "@/components/order-detail-link";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { disconnectShopeeShop } from "@/lib/actions/marketplace";
@@ -26,6 +28,8 @@ const PROVIDERS = [
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export default async function OnlineSalesPage({ searchParams }: { searchParams: Promise<SP> }) {
+  if (!ONLINE_SALES_ENABLED) redirect(Routes.Dashboard);
+
   const locale = await getLocale();
   const L = locale === "vi";
   const params = await searchParams;

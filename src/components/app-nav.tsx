@@ -10,6 +10,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { Routes } from "@/lib/routes";
+import { ONLINE_SALES_ENABLED } from "@/lib/features";
 import { cn } from "@/lib/utils";
 import { Text } from "@/components/ui/text";
 
@@ -24,7 +25,9 @@ const GROUPS: Group[] = [
       { href: Routes.Notifications, icon: Bell, key: "nav.notifications", badge: "notifications" },
       { href: Routes.Reports, icon: BarChart3, key: "nav.reports" },
       { href: Routes.POS, icon: ShoppingCart, key: "nav.pos" },
-      { href: Routes.OnlineSales, icon: Store, key: "nav.onlineSales" },
+      ...(ONLINE_SALES_ENABLED
+        ? [{ href: Routes.OnlineSales, icon: Store, key: "nav.onlineSales" }]
+        : []),
     ],
   },
   {

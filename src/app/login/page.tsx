@@ -8,6 +8,7 @@ import { z } from "zod";
 import { useTranslations } from "next-intl";
 import { createClient } from "@/lib/supabase/client";
 import { Routes } from "@/lib/routes";
+import { ONLINE_SALES_ENABLED } from "@/lib/features";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import {
   Button, Input, Form, FormField, Heading, Muted, Text,
@@ -38,7 +39,7 @@ export default function LoginPage() {
       setServerErr(error.message);
       return;
     }
-    const nextRoute = values.email.trim().toLowerCase() === "review@lumapos.shop"
+    const nextRoute = ONLINE_SALES_ENABLED && values.email.trim().toLowerCase() === "review@lumapos.shop"
       ? `${Routes.OnlineSales}?tab=overview&channel=shopee`
       : Routes.Dashboard;
     router.push(nextRoute);

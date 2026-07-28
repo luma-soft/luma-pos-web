@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { Routes } from "@/lib/routes";
+import { ONLINE_SALES_ENABLED } from "@/lib/features";
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -42,7 +43,7 @@ export async function updateSession(request: NextRequest) {
 
   if (user && isAuthPath) {
     const url = request.nextUrl.clone();
-    if (user.email?.toLowerCase() === "review@lumapos.shop") {
+    if (ONLINE_SALES_ENABLED && user.email?.toLowerCase() === "review@lumapos.shop") {
       url.pathname = Routes.OnlineSales;
       url.searchParams.set("tab", "overview");
       url.searchParams.set("channel", "shopee");

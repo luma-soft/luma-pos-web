@@ -10,6 +10,7 @@ import { SegmentedTabs } from "@/components/ui/tabs";
 import { Toggle } from "@/components/ui/toggle";
 import { NumberInput } from "@/components/ui/number-input";
 import { Routes } from "@/lib/routes";
+import { ONLINE_SALES_ENABLED } from "@/lib/features";
 import { cn } from "@/lib/utils";
 import { normalizeSearch } from "@/lib/normalize";
 import {
@@ -242,7 +243,9 @@ const NAV: { group: [string, string]; items: { id: SectionId; ico: string; en: s
   { group: ["System", "Hệ thống"], items: [
     { id: "notifications", ico: "🔔", en: "Notifications", vi: "Thông báo" },
     { id: "zalo", ico: "💬", en: "Zalo OA", vi: "Zalo OA" },
-    { id: "shopee", ico: "🧩", en: "Marketplace Apps", vi: "App sàn TMĐT" },
+    ...(ONLINE_SALES_ENABLED
+      ? [{ id: "shopee" as const, ico: "🧩", en: "Marketplace Apps", vi: "App sàn TMĐT" }]
+      : []),
     { id: "ai", ico: "✨", en: "AI", vi: "AI" },
   ] },
 ];
@@ -260,6 +263,10 @@ const SEC_META: Record<SectionId, { en: string; vi: string; subEn: string; subVi
   shopee: { en: "Marketplace Developer Apps", vi: "App developer sàn TMĐT", subEn: "Provider credentials and OAuth callbacks", subVi: "Credential provider và OAuth callback" },
   ai: { en: "AI Settings", vi: "Cấu hình AI", subEn: "Provider key, vision model, and attachment bucket", subVi: "API key, model vision và bucket lưu file AI" },
 };
+
+function isVisibleSection(id: SectionId) {
+  return ONLINE_SALES_ENABLED || id !== "shopee";
+}
 
 /* ── helpers (luma classes mapping prototype) ── */
 function Card({ title, vi, action, children }: { title: string; vi: string; action?: React.ReactNode; children?: React.ReactNode }) {
@@ -300,7 +307,11 @@ export function SettingsClient({
   const locale = useLocale();
   const tSettings = useTranslations("settings");
   const L = locale === "vi";
-  const normalizedInitialTab = initialTab && SEC_META[initialTab as SectionId] ? initialTab as SectionId : null;
+  const normalizedInitialTab = initialTab
+    && SEC_META[initialTab as SectionId]
+    && isVisibleSection(initialTab as SectionId)
+    ? initialTab as SectionId
+    : null;
   const [active, setActive] = useState<SectionId>(normalizedInitialTab ?? "store");
   const [staff, setStaff] = useState<StaffRow[] | null>(null);
   const [bankAccounts, setBankAccounts] = useState<PaymentBankAccountRow[] | null>(null);
@@ -311,7 +322,7 @@ export function SettingsClient({
     if (normalizedInitialTab) return;
     const saved = localStorage.getItem("lp-settings-active") as SectionId | null;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client sync of persisted section (SSR-safe)
-    if (saved && SEC_META[saved]) setActive(saved);
+    if (saved && SEC_META[saved] && isVisibleSection(saved)) setActive(saved);
   }, [normalizedInitialTab]);
   useEffect(() => {
     let cancelled = false;
@@ -406,7 +417,7 @@ export function SettingsClient({
         {active === "tax" && <TaxSection L={L} prefs={store.prefs.tax} canManage={canManage} />}
         {active === "notifications" && <NotificationsSection L={L} prefs={store.prefs.notifications} canManage={canManage} availableChannels={notificationChannels} />}
         {active === "zalo" && <ZaloSection L={L} prefs={store.prefs.zalo} canEdit={canEditAi} />}
-        {active === "shopee" && <ShopeeSettingsSection L={L} prefs={store.prefs.shopee} canEdit={canEditAi} />}
+        {ONLINE_SALES_ENABLED && active === "shopee" && <ShopeeSettingsSection L={L} prefs={store.prefs.shopee} canEdit={canEditAi} />}
         {active === "ai" && (aiUsage ? <AiSection L={L} prefs={store.prefs.ai} canEdit={canEditAi} usage={aiUsage} /> : <LazySectionState L={L} loading={Boolean(lazyLoading.ai)} error={lazyError.ai} />)}
       </div>
     </div>

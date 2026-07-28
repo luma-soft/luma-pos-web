@@ -35,6 +35,7 @@ import {
   type DataTableColumn,
 } from "@/components/data-table";
 import { Routes } from "@/lib/routes";
+import { ONLINE_SALES_ENABLED } from "@/lib/features";
 import { OrderDetailLink } from "@/components/order-detail-link";
 import { deleteProduct, setProductActive } from "@/lib/actions/products";
 import { setCameraMaterial } from "@/lib/actions/products";
@@ -1182,11 +1183,13 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
             {moreOpen && (
               <div className="absolute right-0 bottom-full z-30 min-w-52 pb-1">
                 <div className="rounded-lg border border-border bg-surface p-1 shadow-xl">
-                  <MenuActionLink
-                    icon={Store}
-                    label={locale === "vi" ? "Đăng sàn" : "List online"}
-                    href={productModalHref({ onlineProductId: product.id })}
-                  />
+                  {ONLINE_SALES_ENABLED && (
+                    <MenuActionLink
+                      icon={Store}
+                      label={locale === "vi" ? "Đăng sàn" : "List online"}
+                      href={productModalHref({ onlineProductId: product.id })}
+                    />
+                  )}
                   <MenuActionLink icon={Barcode} label={t("products.actions.printLabels")} href={Routes.productLabels(product.id)} />
                   <MenuActionLink
                     icon={Plus}
