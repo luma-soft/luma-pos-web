@@ -118,7 +118,14 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
                 return (
                   <MobileRecordCard
                     key={order.id}
-                    title={<OrderDetailLink orderId={order.id}>{order.code}</OrderDetailLink>}
+                    title={(
+                      <OrderDetailLink
+                        orderId={order.id}
+                        className="inline-flex min-h-11 min-w-11 max-w-full items-center rounded-md text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
+                      >
+                        <span className="truncate">{order.code}</span>
+                      </OrderDetailLink>
+                    )}
                     subtitle={formatDate(order.createdAt)}
                     status={<OrderStatusBadge status={order.status} />}
                   >

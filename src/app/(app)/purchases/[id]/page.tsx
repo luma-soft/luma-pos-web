@@ -80,8 +80,11 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
                     <MobileRecordCard
                       key={item.id}
                       title={(
-                        <Link href={Routes.product(item.productId)} className="text-primary-600 hover:underline">
-                          {item.productName}
+                        <Link
+                          href={Routes.product(item.productId)}
+                          className="inline-flex min-h-11 min-w-11 max-w-full items-center rounded-md text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500"
+                        >
+                          <span className="truncate">{item.productName}</span>
                         </Link>
                       )}
                       subtitle={item.sku}
