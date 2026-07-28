@@ -53,10 +53,10 @@ export function ProductCreateMenu({
         className="inline-flex h-12 w-12 items-center justify-center gap-2 rounded-2xl bg-primary-600 p-0 text-sm font-medium text-white shadow-e2 transition hover:brightness-110 active:scale-[0.98] lg:h-auto lg:min-h-0 lg:w-auto lg:rounded-full lg:px-4 lg:py-2 lg:shadow-none"
       >
         <PackagePlus className="h-4 w-4" />
-        <span className="hidden sm:inline">{label}</span>
+        <span className="hidden lg:inline">{label}</span>
         <ChevronDown
           className={cn(
-            "hidden h-4 w-4 transition-transform sm:block",
+            "hidden h-4 w-4 transition-transform lg:block",
             open && "rotate-180",
           )}
         />

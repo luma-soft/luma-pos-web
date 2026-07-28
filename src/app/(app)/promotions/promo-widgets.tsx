@@ -117,21 +117,21 @@ export function PromoQuickCreate() {
           />
           <div className="space-y-2">
             {tiers.map((tier, i) => (
-              <div key={i} className="grid grid-cols-[auto_minmax(72px,96px)_1fr_minmax(64px,88px)_auto_auto] items-center gap-2 text-sm">
+              <div key={i} className="grid grid-cols-[auto_minmax(132px,1fr)_44px] items-center gap-2 text-sm sm:grid-cols-[auto_minmax(132px,132px)_minmax(0,1fr)_minmax(64px,88px)_auto_44px] lg:grid-cols-[auto_minmax(72px,96px)_minmax(0,1fr)_minmax(64px,88px)_auto_auto]">
                 <Text as="span" variant="muted" text="≥" />
                 <QuantityInput min={1} value={tier.minQty}
                   onChange={(minQty) => setTiers((ts) => ts.map((x, j) => j === i ? { ...x, minQty } : x))}
-                  className="text-right" />
-                <Text as="span" variant="muted" className="truncate" text={`${product?.baseUnit ?? t("purchases.unitLabel")} → ${t("promos.discount")}`} />
+                  className="w-full text-right" />
+                <Text as="span" variant="muted" className="col-span-3 row-start-2 truncate sm:col-auto sm:row-auto" text={`${product?.baseUnit ?? t("purchases.unitLabel")} → ${t("promos.discount")}`} />
                 <NumberInput min={0} max={100} step={0.5} decimals={2} thousandSeparator={false} value={tier.discountPct}
                   onChange={(discountPct) => setTiers((ts) => ts.map((x, j) => j === i ? { ...x, discountPct: discountPct ?? 0 } : x))}
-                  className="text-right" />
-                <Text as="span" variant="muted" text="%" />
+                  className="col-start-2 row-start-3 text-right sm:col-auto sm:row-auto" />
+                <Text as="span" variant="muted" className="col-start-3 row-start-3 sm:col-auto sm:row-auto" text="%" />
                 {tiers.length > 1 ? (
-                  <Button type="button" variant="ghost" size="iconSm" onClick={() => setTiers((ts) => ts.filter((_, j) => j !== i))} className="text-slate-400 hover:text-red-500" aria-label={t("common.delete")}>
+                  <Button type="button" variant="ghost" size="iconSm" onClick={() => setTiers((ts) => ts.filter((_, j) => j !== i))} className="col-start-3 row-start-1 text-slate-400 hover:text-red-500 sm:col-auto sm:row-auto" aria-label={t("common.delete")}>
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
-                ) : <span className="h-8 w-8" />}
+                ) : <span className="col-start-3 row-start-1 h-11 w-11 sm:col-auto sm:row-auto lg:h-8 lg:w-8" />}
               </div>
             ))}
             <Button

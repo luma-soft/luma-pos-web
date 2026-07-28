@@ -88,7 +88,7 @@ export function AttachmentPill({
           <button
             type="button"
             onClick={openViewer}
-            className="flex min-w-0 flex-1 items-center gap-2 text-left"
+            className="flex min-h-11 min-w-11 flex-1 items-center gap-2 text-left lg:min-h-0"
             title={t("ai.composer.previewAttachment", { name: attachment.name })}
             aria-label={t("ai.composer.previewAttachment", { name: attachment.name })}
           >
@@ -140,7 +140,7 @@ export function AttachmentPill({
                     href={viewerUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs font-semibold text-slate-600 hover:bg-surface-2"
+                    className="inline-flex h-11 min-w-11 items-center gap-1.5 rounded-lg border border-border px-2.5 text-xs font-semibold text-slate-600 hover:bg-surface-2 lg:h-8 lg:min-w-0"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
                     {t("ai.composer.openAttachment")}

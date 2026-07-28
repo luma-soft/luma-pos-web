@@ -11,7 +11,7 @@ export function OrderProductLink({
   return (
     <Link
       href={Routes.productDetail(productId)}
-      className="font-medium text-primary-600 hover:underline"
+      className="inline-flex min-h-11 min-w-11 items-center font-medium text-primary-600 hover:underline lg:min-h-0 lg:min-w-0"
     >
       {productName}
     </Link>

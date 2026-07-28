@@ -191,10 +191,10 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
                         options={cameras.map((product) => ({ value: product.id, label: label(product) }))}
                         onValueChange={(cameraId) => updatePackage(pkg.key, { cameraId })}
                       />
-                      <div className="grid h-9 shrink-0 grid-cols-[32px_42px_32px] overflow-hidden rounded-md border border-border bg-surface">
-                        <button type="button" disabled={pkg.quantity <= 1} onClick={() => updatePackage(pkg.key, { quantity: Math.max(1, pkg.quantity - 1) })} className="grid place-items-center text-slate-500 hover:bg-surface-2 hover:text-er disabled:opacity-40"><Minus className="h-3.5 w-3.5" /></button>
+                      <div className="grid h-11 shrink-0 grid-cols-[44px_44px_44px] overflow-hidden rounded-md border border-border bg-surface lg:h-9 lg:grid-cols-[32px_42px_32px]">
+                        <button type="button" disabled={pkg.quantity <= 1} onClick={() => updatePackage(pkg.key, { quantity: Math.max(1, pkg.quantity - 1) })} className="grid min-h-11 min-w-11 place-items-center text-slate-500 hover:bg-surface-2 hover:text-er disabled:opacity-40 lg:min-h-0 lg:min-w-0"><Minus className="h-3.5 w-3.5" /></button>
                         <span className="grid place-items-center border-x border-border text-sm font-semibold tabular-nums">{pkg.quantity}</span>
-                        <button type="button" disabled={pkg.quantity >= 99} onClick={() => updatePackage(pkg.key, { quantity: Math.min(99, pkg.quantity + 1) })} className="grid place-items-center text-slate-500 hover:bg-surface-2 hover:text-primary-600 disabled:opacity-40"><Plus className="h-3.5 w-3.5" /></button>
+                        <button type="button" disabled={pkg.quantity >= 99} onClick={() => updatePackage(pkg.key, { quantity: Math.min(99, pkg.quantity + 1) })} className="grid min-h-11 min-w-11 place-items-center text-slate-500 hover:bg-surface-2 hover:text-primary-600 disabled:opacity-40 lg:min-h-0 lg:min-w-0"><Plus className="h-3.5 w-3.5" /></button>
                       </div>
                     </div>
                     <div className="mt-1 text-[11px] text-slate-400">{camera?.sku}</div>

@@ -52,7 +52,7 @@ export const TagInput = React.forwardRef<HTMLInputElement, TagInputProps>(
       <div
         onClick={() => inputRef.current?.focus()}
         className={cn(
-          "flex flex-wrap items-center gap-1.5 min-h-10 w-full rounded-lg border border-border bg-surface px-2 py-1.5 cursor-text transition-[border-color,box-shadow,background-color] duration-150 focus-within:ring-2 focus-within:ring-primary-500/30 focus-within:border-primary-500",
+          "flex min-h-11 w-full flex-wrap items-center gap-1.5 rounded-lg border border-border bg-surface px-2 py-1.5 cursor-text transition-[border-color,box-shadow,background-color] duration-150 focus-within:ring-2 focus-within:ring-primary-500/30 focus-within:border-primary-500",
           disabled && "opacity-50 cursor-not-allowed",
           className
         )}
@@ -85,7 +85,7 @@ export const TagInput = React.forwardRef<HTMLInputElement, TagInputProps>(
           onKeyDown={handleKeyDown}
           onBlur={() => draft && add(draft)}
           placeholder={value.length === 0 ? ph : ""}
-          className="flex-1 min-w-[120px] bg-transparent outline-none text-sm"
+          className="min-h-11 min-w-[120px] flex-1 bg-transparent text-sm outline-none lg:min-h-0"
         />
       </div>
     );

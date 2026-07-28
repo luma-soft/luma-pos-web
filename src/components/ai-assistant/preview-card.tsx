@@ -115,7 +115,7 @@ export function PreviewCard({
               storeAiWorkflowDraft(preview);
               if (isPosCartPreview(preview) || preview.intent === "create_order") storePosDraft(preview);
             }}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-xs font-bold text-primary-700 transition hover:bg-primary-100"
+            className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-xs font-bold text-primary-700 transition hover:bg-primary-100 lg:min-h-0"
           >
             <ExternalLink className="h-3.5 w-3.5" />
             {preview.reviewAction.label}
@@ -154,7 +154,7 @@ export function PreviewCard({
         <div className="min-w-0">
           <div className="text-[11px] text-slate-400">{result ?? t("ai.preview.noMutationYet")}</div>
           {record && (
-            <a href={record.href} className="mt-1 block text-xs font-bold text-primary-600 hover:underline">
+            <a href={record.href} className="mt-1 block min-h-11 min-w-11 text-xs font-bold text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">
               {recordLinkText(record, t)}
             </a>
           )}

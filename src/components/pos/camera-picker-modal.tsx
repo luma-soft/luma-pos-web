@@ -62,7 +62,7 @@ export function CameraPickerModal({ open, cameras, selectedCameras = {}, onClose
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filtered.map((product) => (
-                <button key={product.id} type="button" onClick={() => { onSelect(product); close(); }} className={`group relative overflow-hidden rounded-xl border bg-canvas/50 text-left transition hover:border-primary-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${selectedCameras[product.id] ? "border-primary-500 ring-2 ring-primary-100 dark:ring-primary-900/40" : "border-border-soft"}`}>
+                <button key={product.id} type="button" onClick={() => { onSelect(product); close(); }} className={`group relative min-h-11 min-w-11 overflow-hidden rounded-xl border bg-canvas/50 text-left transition hover:border-primary-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 ${selectedCameras[product.id] ? "border-primary-500 ring-2 ring-primary-100 dark:ring-primary-900/40" : "border-border-soft"}`}>
                   {selectedCameras[product.id] ? <span className="absolute right-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-primary-600 px-2 py-1 text-[11px] font-bold text-white"><Check className="h-3 w-3" /> {selectedCameras[product.id]}</span> : null}
                   <div className="flex h-36 items-center justify-center bg-white p-3 dark:bg-slate-950">
                     {product.imageUrl ? <Image src={product.imageUrl} alt={product.name} width={220} height={140} unoptimized className="h-full w-full object-contain" /> : <Camera className="h-12 w-12 text-slate-300" />}

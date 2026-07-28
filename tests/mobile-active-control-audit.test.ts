@@ -25,6 +25,13 @@ const DIRECT_INTERACTIVE_TAGS = new Set([
   "textarea",
 ]);
 const PASSTHROUGH_CONTROL_LINKS = new Set(["OrderDetailLink"]);
+const NATIVE_PRIMITIVE_IMPLEMENTATIONS = new Set([
+  "src/components/order-detail-link.tsx",
+  "src/components/ui/button.tsx",
+  "src/components/ui/input.tsx",
+  "src/components/ui/money-input.tsx",
+  "src/components/ui/quantity-input.tsx",
+]);
 const PRE_LG_BREAKPOINTS = new Set(["sm", "md"]);
 
 type Candidate = {
@@ -100,7 +107,10 @@ function classTokens(
 
   const fragments: string[] = [];
   const visit = (child: ts.Node) => {
-    if (
+    if (ts.isTemplateExpression(child)) {
+      fragments.push(child.head.text);
+      for (const span of child.templateSpans) fragments.push(span.literal.text);
+    } else if (
       ts.isStringLiteral(child) ||
       ts.isNoSubstitutionTemplateLiteral(child)
     ) {
@@ -115,6 +125,20 @@ function classTokens(
   return fragments.flatMap((fragment) =>
     fragment.split(/\s+/).filter(Boolean),
   );
+}
+
+function isInsideNamedFunction(node: ts.Node, name: string) {
+  let current: ts.Node | undefined = node;
+  while (current) {
+    if (
+      ts.isFunctionDeclaration(current) &&
+      current.name?.text === name
+    ) {
+      return true;
+    }
+    current = current.parent;
+  }
+  return false;
 }
 
 function isHiddenInput(
@@ -250,7 +274,10 @@ function insideInteractiveLabel(node: ts.Node) {
 }
 
 function numericScaleIsSafe(value: string) {
-  if (/^\[(?:44(?:\.0+)?px|2\.75rem)\]$/.test(value)) return true;
+  const arbitraryPx = value.match(/^\[(\d+(?:\.\d+)?)px\]$/);
+  if (arbitraryPx) return Number(arbitraryPx[1]) >= 44;
+  const arbitraryRem = value.match(/^\[(\d+(?:\.\d+)?)rem\]$/);
+  if (arbitraryRem) return Number(arbitraryRem[1]) >= 2.75;
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 11;
 }
@@ -260,12 +287,6 @@ function widthValueIsSafe(value: string) {
     numericScaleIsSafe(value) ||
     ["full", "screen", "fit", "max", "min"].includes(value)
   );
-}
-
-function paddingScaleIsSafe(value: string) {
-  if (/^\[(?:1[2-9]|[2-9]\d)(?:\.0+)?px\]$/.test(value)) return true;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 3;
 }
 
 function responsiveParts(token: string) {
@@ -287,6 +308,7 @@ function applyLengthUtility(
   utility: string,
   axis: "vertical" | "horizontal",
   state: LengthState,
+  allowContextualPadding: boolean,
 ) {
   const fixedPrefix = axis === "vertical" ? /^(?:h|size)-(.+)$/ : /^(?:w|size)-(.+)$/;
   const minPrefix = axis === "vertical" ? /^min-h-(.+)$/ : /^min-w-(.+)$/;
@@ -301,24 +323,39 @@ function applyLengthUtility(
   if (min) state.min = axis === "vertical"
     ? numericScaleIsSafe(min[1])
     : widthValueIsSafe(min[1]);
-  if (padding) state.padding = paddingScaleIsSafe(padding[1]);
+  if (allowContextualPadding && padding) {
+    const parsed = Number(padding[1]);
+    state.padding = Number.isFinite(parsed) && parsed >= 3;
+  }
 }
 
 function safeAtBaseAndTablet(
   classes: string[],
   axis: "vertical" | "horizontal",
+  allowContextualPadding = false,
 ) {
   const state: LengthState = { fixed: false, min: false, padding: false };
   for (const breakpoint of ["base", "sm", "md"]) {
     for (const token of classes) {
       const parsed = responsiveParts(token);
       if (parsed?.breakpoint === breakpoint) {
-        applyLengthUtility(parsed.utility, axis, state);
+        applyLengthUtility(
+          parsed.utility,
+          axis,
+          state,
+          allowContextualPadding,
+        );
       }
     }
     if (!(state.fixed || state.min || state.padding)) return false;
   }
   return true;
+}
+
+function hasDisplayBox(classes: string[]) {
+  return classes.some((token) =>
+    /^(?:block|flex|grid|inline-block|inline-flex)$/.test(token),
+  );
 }
 
 function hasVisibleText(node: ts.JsxOpeningLikeElement) {
@@ -331,12 +368,6 @@ function hasVisibleText(node: ts.JsxOpeningLikeElement) {
     return false;
   };
   return fullNode.children.some(childHasText);
-}
-
-function hasDisplayBox(classes: string[]) {
-  return classes.some((token) =>
-    /^(?:block|flex|grid|inline-block|inline-flex)$/.test(token),
-  );
 }
 
 function sharedControlHasUnsafeOverride(
@@ -378,18 +409,41 @@ function sharedControlHasUnsafeOverride(
 function ownHitArea(
   node: ts.JsxOpeningLikeElement,
   classes: string[],
+  allowContextualTextWidth: boolean,
 ) {
   const tag = jsxTagName(node);
+  if (
+    classes.includes("fixed") &&
+    classes.includes("inset-0")
+  ) {
+    return true;
+  }
+  if (node.getText().includes("buttonVariants(")) {
+    return !sharedControlHasUnsafeOverride(classes);
+  }
   if (GUARANTEED_SHARED_CONTROLS.has(tag)) {
     return (
       !sharedControlHasUnsafeOverride(classes) ||
-      safeAtBaseAndTablet(classes, "vertical")
+      safeAtBaseAndTablet(
+        classes,
+        "vertical",
+        allowContextualTextWidth,
+      )
     );
   }
 
-  const vertical = safeAtBaseAndTablet(classes, "vertical");
+  const vertical = safeAtBaseAndTablet(
+    classes,
+    "vertical",
+    allowContextualTextWidth,
+  );
   const horizontal =
-    safeAtBaseAndTablet(classes, "horizontal") || hasVisibleText(node);
+    safeAtBaseAndTablet(
+      classes,
+      "horizontal",
+      allowContextualTextWidth,
+    ) ||
+    (allowContextualTextWidth && hasVisibleText(node));
   if (!vertical || !horizontal) return false;
 
   if (tag === "a" || tag === "Link" || PASSTHROUGH_CONTROL_LINKS.has(tag)) {
@@ -401,6 +455,7 @@ function ownHitArea(
 function outerHitArea(
   node: ts.JsxOpeningLikeElement,
   constants: Map<string, string>,
+  allowContextualTextWidth: boolean,
 ) {
   let current = node.parent.parent;
   while (current) {
@@ -411,7 +466,11 @@ function outerHitArea(
         tag === "label" ||
         (tag === "Button" && attribute(opening, "asChild"))
       ) {
-        return ownHitArea(opening, classTokens(opening, constants));
+        return ownHitArea(
+          opening,
+          classTokens(opening, constants),
+          allowContextualTextWidth,
+        );
       }
       if (isInteractive(opening)) return false;
     }
@@ -424,6 +483,7 @@ function auditSource(
   file: string,
   sourceText: string,
   onlySharedControlUsage = false,
+  allowContextualTextWidth = false,
 ): Candidate[] {
   const source = ts.createSourceFile(
     file,
@@ -442,7 +502,9 @@ function auditSource(
       (!onlySharedControlUsage ||
         GUARANTEED_SHARED_CONTROLS.has(jsxTagName(node))) &&
       !isHiddenInput(node, constants) &&
+      !NATIVE_PRIMITIVE_IMPLEMENTATIONS.has(file) &&
       !isDataTableColumnRenderer(node) &&
+      !isInsideNamedFunction(node, "ColumnVisibilityMenu") &&
       !isDesktopOnly(node, constants) &&
       !isPrintOnly(node, constants)
     ) {
@@ -455,8 +517,8 @@ function auditSource(
       const classes = classTokens(node, constants);
       if (
         !isNestedChoice &&
-        !ownHitArea(node, classes) &&
-        !outerHitArea(node, constants)
+        !ownHitArea(node, classes, allowContextualTextWidth) &&
+        !outerHitArea(node, constants, allowContextualTextWidth)
       ) {
         const { line } = source.getLineAndCharacterOfPosition(node.getStart());
         candidates.push({
@@ -477,9 +539,14 @@ function auditSource(
 }
 
 function activeControlCandidates() {
-  return tsxFiles(APP_ROOT).flatMap((file) =>
-    auditSource(relative(".", file), readFileSync(file, "utf8")),
-  );
+  return [
+    ...tsxFiles(APP_ROOT).flatMap((file) =>
+      auditSource(relative(".", file), readFileSync(file, "utf8"), false, true),
+    ),
+    ...tsxFiles(COMPONENT_ROOT).flatMap((file) =>
+      auditSource(relative(".", file), readFileSync(file, "utf8")),
+    ),
+  ];
 }
 
 function sharedControlOverrideCandidates() {
@@ -531,8 +598,102 @@ function descendantShrinkCandidates() {
   return failures;
 }
 
+function quantityWidthIsSafe(classes: string[]) {
+  return classes.some((token) =>
+    /^(?:w|min-w)-(?:full|\[132px\])$/.test(token),
+  );
+}
+
+function touchTargetQuantityCandidates() {
+  const failures: string[] = [];
+  for (const root of [APP_ROOT, COMPONENT_ROOT]) {
+    for (const file of tsxFiles(root)) {
+      const source = ts.createSourceFile(
+        file,
+        readFileSync(file, "utf8"),
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TSX,
+      );
+      const constants = stringConstants(source);
+      const visit = (node: ts.Node) => {
+        if (
+          (ts.isJsxOpeningElement(node) ||
+            ts.isJsxSelfClosingElement(node)) &&
+          jsxTagName(node) === "QuantityInput" &&
+          attribute(node, "touchTargets")
+        ) {
+          let allocated = quantityWidthIsSafe(classTokens(node, constants));
+          let current: ts.Node | undefined = node.parent;
+          while (!allocated && current) {
+            if (ts.isJsxElement(current)) {
+              const classes = classTokens(current.openingElement, constants);
+              allocated =
+                quantityWidthIsSafe(classes) ||
+                classes.includes("col-span-2");
+            }
+            current = current.parent;
+          }
+          if (!allocated) {
+            const { line } = source.getLineAndCharacterOfPosition(node.getStart());
+            failures.push(`${relative(".", file)}:${line + 1}`);
+          }
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(source);
+    }
+  }
+  return failures;
+}
+
+function narrowQuantityOverrideCandidates() {
+  const failures: string[] = [];
+  for (const root of [APP_ROOT, COMPONENT_ROOT]) {
+    for (const file of tsxFiles(root)) {
+      const source = ts.createSourceFile(
+        file,
+        readFileSync(file, "utf8"),
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TSX,
+      );
+      const constants = stringConstants(source);
+      const visit = (node: ts.Node) => {
+        if (
+          (ts.isJsxOpeningElement(node) ||
+            ts.isJsxSelfClosingElement(node)) &&
+          jsxTagName(node) === "QuantityInput" &&
+          !isDesktopOnly(node, constants)
+        ) {
+          const narrow = classTokens(node, constants).filter((token) => {
+            const parsed = responsiveParts(token);
+            if (!parsed || parsed.breakpoint === "base" && token.startsWith("lg:")) {
+              return false;
+            }
+            const width = parsed.utility.match(/^w-(\d+)$/);
+            const arbitrary = parsed.utility.match(/^w-\[(\d+)px\]$/);
+            if (width) return Number(width[1]) * 4 < 132;
+            if (arbitrary) return Number(arbitrary[1]) < 132;
+            return false;
+          });
+          if (narrow.length > 0) {
+            const { line } = source.getLineAndCharacterOfPosition(node.getStart());
+            failures.push(
+              `${relative(".", file)}:${line + 1} ${narrow.join(" ")}`,
+            );
+          }
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(source);
+    }
+  }
+  return failures;
+}
+
 describe("mobile active-control audit oracle", () => {
-  test("rejects unsized, classless, pb-only, width-only, and pre-lg shrink controls", () => {
+  test("rejects controls whose width or height is only implied", () => {
     const failures = auditSource(
       "fixture.tsx",
       `
@@ -542,6 +703,9 @@ describe("mobile active-control audit oracle", () => {
             <summary>classless</summary>
             <button className="border-b-2 pb-2">tab</button>
             <button className="w-20">width only</button>
+            <button className="h-11">×</button>
+            <button className="p-3"><Icon /></button>
+            <button className="h-11 px-3">{dynamicLabel}</button>
             <button className="h-11 px-3 sm:h-8">shrinks at tablet</button>
             <SearchableSelect className="[&>button]:h-11 md:[&>button]:h-10" />
           </div>;
@@ -551,6 +715,9 @@ describe("mobile active-control audit oracle", () => {
     expect(failures.map(({ tag }) => tag)).toEqual([
       "button",
       "summary",
+      "button",
+      "button",
+      "button",
       "button",
       "button",
       "button",
@@ -573,6 +740,7 @@ describe("mobile active-control audit oracle", () => {
               <div className="hidden lg:block">
                 <button className="h-8 w-8">desktop only</button>
               </div>
+              <button className="fixed inset-0">full-screen dismiss target</button>
             </div>;
           }
         `,
@@ -582,7 +750,7 @@ describe("mobile active-control audit oracle", () => {
 });
 
 describe("mobile active-control audit", () => {
-  test("every enumerated mobile and tablet control has a 44px hit-area contract", () => {
+  test("every app and shared native mobile/tablet control has a 44px hit-area contract", () => {
     const failures = activeControlCandidates().map(
       ({ file, line, tag, classes, reason }) =>
         `${file}:${line} <${tag}> ${reason}: ${classes.join(" ")}`,
@@ -628,5 +796,10 @@ describe("mobile active-control audit", () => {
 
   test("pre-lg descendant selectors cannot silently shrink nested controls", () => {
     expect(descendantShrinkCandidates()).toEqual([]);
+  });
+
+  test("quantity integrations reserve all three touch tracks below lg", () => {
+    expect(touchTargetQuantityCandidates()).toEqual([]);
+    expect(narrowQuantityOverrideCandidates()).toEqual([]);
   });
 });

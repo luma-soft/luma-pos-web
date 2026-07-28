@@ -14,7 +14,7 @@ export function MobileTabBar() {
   const pathname = usePathname();
   const is = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
-  const item = "group min-w-0 flex-1 flex flex-col items-center justify-center gap-[3px] px-0.5 pt-1 text-[9px] font-bold leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 active:scale-[0.98]";
+  const item = "group min-h-11 min-w-11 flex-1 flex flex-col items-center justify-center gap-[3px] px-0.5 pt-1 text-[9px] font-bold leading-none transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 active:scale-[0.98]";
   const on = "text-primary-600";
   const off = "text-slate-400 dark:text-slate-500";
 

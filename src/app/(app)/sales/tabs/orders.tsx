@@ -36,7 +36,7 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
 
   return (
     <>
-      <div className="mb-4 flex flex-col gap-2 border-b border-border sm:flex-row sm:items-end sm:justify-between sm:gap-3">
+      <div className="mb-4 flex flex-col gap-2 border-b border-border lg:flex-row lg:items-end lg:justify-between lg:gap-3">
         <div className="-mx-4 flex snap-x snap-mandatory gap-1 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
           {STATUS.map((tab) => (
             <Link

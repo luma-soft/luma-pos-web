@@ -54,7 +54,7 @@ export function GroupTabs({
             href={tabHref(it.tab)}
             aria-current={on ? "page" : undefined}
             className={cn(
-              "inline-flex h-10 shrink-0 snap-start items-center gap-2 border-b-2 px-0.5 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:h-9 lg:rounded-[10px] lg:border-b-0 lg:px-3.5 lg:font-semibold",
+              "inline-flex h-11 min-w-11 shrink-0 snap-start items-center gap-2 border-b-2 px-0.5 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:h-9 lg:min-w-0 lg:rounded-[10px] lg:border-b-0 lg:px-3.5 lg:font-semibold",
               on
                 ? "border-primary-600 text-primary-700 dark:text-primary-300 lg:bg-primary-50 lg:dark:bg-primary-950/40"
                 : "border-transparent text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 lg:text-slate-500 lg:hover:bg-surface-2",

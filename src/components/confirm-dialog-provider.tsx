@@ -117,7 +117,7 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
               <button
                 type="button"
                 onClick={() => close(false)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-surface-2 hover:text-slate-700 dark:hover:text-slate-200"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-700 dark:hover:text-slate-200 lg:h-8 lg:w-8"
                 aria-label={t("common.close")}
               >
                 <X className="h-4 w-4" />

@@ -414,7 +414,7 @@ function PackageEditor({
         <QuoteSelect label={t("memoryLabel")} value={row.cardId} options={options.cards} onChange={(cardId) => onChange({ cardId })} />
         <QuoteSelect label={t("installationLabel")} value={row.installationId} options={options.installations} onChange={(installationId) => onChange({ installationId })} />
         {row.materialLines.map((line, materialIndex) => (
-          <div key={`${row.key}-material-${materialIndex}`} className="grid grid-cols-[minmax(0,1fr)_112px_32px] items-center gap-2">
+          <div key={`${row.key}-material-${materialIndex}`} className="grid grid-cols-[minmax(0,1fr)_132px_44px] items-center gap-2 lg:grid-cols-[minmax(0,1fr)_112px_32px]">
             <QuoteSelect label={materialIndex === 0 ? t("materialLabel") : ""} value={line.productId} options={options.materials} onChange={(productId) => onChange({ materialLines: row.materialLines.map((item, index) => index === materialIndex ? { ...item, productId } : item) })} />
             <QuantityInput
               min={0.01}
@@ -463,7 +463,7 @@ function PackageEditor({
           value={row.quantity}
           onChange={(quantity) => onChange({ quantity })}
           size="sm"
-          className="w-28"
+          className="w-[132px] lg:w-28"
           decrementLabel={t("decreaseQuantity")}
           incrementLabel={t("increaseQuantity")}
         />

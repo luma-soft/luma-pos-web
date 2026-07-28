@@ -46,6 +46,12 @@ describe("mobile specialist layouts", () => {
     expect(tile).toContain("h-11 lg:h-9");
     expect(tile).toContain('optionClassName="min-h-11 lg:min-h-0"');
     expect(electrical).toContain('optionClassName="min-h-11 lg:min-h-0"');
+    expect(tile).toContain("sm:grid-cols-[minmax(0,1fr)_7rem_minmax(10rem,1fr)_44px]");
+    expect(tile).toContain("lg:grid-cols-[minmax(0,1fr)_7rem_minmax(10rem,1fr)_2rem]");
+    expect(tile).toContain("sm:grid-cols-[minmax(0,1fr)_7rem_7rem_44px]");
+    expect(tile).toContain("lg:grid-cols-[minmax(0,1fr)_7rem_7rem_2rem]");
+    expect(electrical).toContain("sm:grid-cols-[120px_minmax(0,1.35fr)_minmax(0,1fr)_84px_44px]");
+    expect(electrical).toContain("lg:grid-cols-[44px_minmax(0,1.35fr)_minmax(0,1fr)_84px_32px]");
 
     const optionHtml = renderToStaticMarkup(createElement(SelectOptionRow, {
       active: true,
@@ -57,6 +63,26 @@ describe("mobile specialist layouts", () => {
     expect(optionHtml).toContain("min-h-11");
     expect(optionHtml).toContain('role="option"');
     expect(optionHtml).toContain('aria-selected="true"');
+  });
+
+  test("tablet headers and quantity rows reserve their complete touch geometry", () => {
+    const productCreate = read("src/app/(app)/inventory/tabs/product-create-menu.tsx");
+    const orders = read("src/app/(app)/sales/tabs/orders.tsx");
+    const quote = read("src/app/(app)/quotes/new/camera-quote-builder.tsx");
+    const promotions = read("src/app/(app)/promotions/promo-widgets.tsx");
+    const orderEditor = read("src/app/(app)/orders/[id]/edit/order-edit-form.tsx");
+
+    expect(productCreate).toContain('<span className="hidden lg:inline">{label}</span>');
+    expect(productCreate).toContain('"hidden h-4 w-4 transition-transform lg:block"');
+    expect(orders).toContain("lg:flex-row lg:items-end lg:justify-between");
+    expect(orders).not.toContain("sm:flex-row sm:items-end sm:justify-between");
+    expect(quote).toContain("grid-cols-[minmax(0,1fr)_132px_44px]");
+    expect(quote).toContain("lg:grid-cols-[minmax(0,1fr)_112px_32px]");
+    expect(quote).toContain('className="w-[132px] lg:w-28"');
+    expect(promotions).toContain("grid-cols-[auto_minmax(132px,1fr)_44px]");
+    expect(promotions).toContain("sm:grid-cols-[auto_minmax(132px,132px)");
+    expect(promotions).toContain("lg:grid-cols-[auto_minmax(72px,96px)");
+    expect(orderEditor).toContain('className="ml-auto w-[132px] lg:w-28"');
   });
 
   test("electrical preview fits mobile while the print portal retains A4 output", () => {

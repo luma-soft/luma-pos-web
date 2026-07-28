@@ -92,7 +92,7 @@ export function AppNav({
                   href={item.href}
                   onClick={() => { document.documentElement.dataset.mobilenav = ""; }}
                   className={cn(
-                    "flex items-center gap-2.5 px-3 py-2 rounded-lg font-medium transition",
+                    "flex min-h-11 min-w-11 items-center gap-2.5 px-3 py-2 rounded-lg font-medium transition lg:min-h-0 lg:min-w-0",
                     active
                       ? "bg-primary-50 text-primary-700 dark:bg-primary-950/50 dark:text-primary-400"
                       : "text-slate-500 dark:text-slate-400 hover:bg-surface-2 hover:text-slate-900 dark:hover:text-slate-200"

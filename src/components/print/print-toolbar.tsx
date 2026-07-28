@@ -40,7 +40,7 @@ export function PrintToolbar({
 
   return (
     <div className="sticky top-0 z-10 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-2.5 flex items-center gap-3 print:hidden">
-      <Link href={backHref} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+      <Link href={backHref} className="grid min-h-11 min-w-11 place-items-center rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-800 lg:min-h-0 lg:min-w-0">
         <ArrowLeft className="w-4 h-4" />
       </Link>
       <span className="font-semibold text-sm">{t("print.title")}</span>
@@ -50,7 +50,7 @@ export function PrintToolbar({
             key={s.id}
             href={hrefFor({ size: s.id, templateId: selectedTemplateId })}
             className={cn(
-              "px-3 py-1.5 rounded-lg text-xs font-medium border",
+              "inline-flex min-h-11 min-w-11 items-center justify-center px-3 py-1.5 rounded-lg text-xs font-medium border lg:min-h-0 lg:min-w-0",
               size === s.id ? "bg-primary-600 text-white border-primary-600" : "border-slate-300 dark:border-slate-700"
             )}
           >
@@ -68,14 +68,14 @@ export function PrintToolbar({
           aria-label={t("printSettings.templateName")}
         />
       )}
-      <Link href="/settings/print" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-300 dark:border-slate-700 text-slate-500">
+      <Link href="/settings/print" className="inline-flex min-h-11 min-w-11 items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-300 dark:border-slate-700 text-slate-500 lg:min-h-0 lg:min-w-0">
         <Settings2 className="w-3.5 h-3.5" />
         {t("print.editTemplate")}
       </Link>
       <div className="flex-1" />
       <button
         onClick={() => window.print()}
-        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium"
+        className="inline-flex min-h-11 min-w-11 items-center gap-2 px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium lg:min-h-0 lg:min-w-0"
       >
         <Printer className="w-4 h-4" />
         {t("print.printBtn")}

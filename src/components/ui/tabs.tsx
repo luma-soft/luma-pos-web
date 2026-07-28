@@ -34,7 +34,7 @@ export function SegmentedTabs<T extends string>({
             aria-selected={active}
             onClick={() => onChange(item.id)}
             className={cn(
-              "inline-flex h-11 shrink-0 snap-start items-center gap-2 rounded-[10px] px-3.5 text-xs font-semibold transition-colors lg:h-9",
+              "inline-flex h-11 min-w-11 shrink-0 snap-start items-center gap-2 rounded-[10px] px-3.5 text-xs font-semibold transition-colors lg:h-9 lg:min-w-0",
               active
                 ? "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300"
                 : "text-slate-500 hover:bg-surface-2 hover:text-slate-900 dark:hover:text-slate-200",

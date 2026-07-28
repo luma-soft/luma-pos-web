@@ -120,7 +120,7 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
                     value={l.quantity}
                     onChange={(quantity) => patch(idx, { quantity })}
                     size="sm"
-                    className="ml-auto w-28"
+                    className="ml-auto w-[132px] lg:w-28"
                   />
                 </td>
                 <td className="px-4 py-2.5 text-right">

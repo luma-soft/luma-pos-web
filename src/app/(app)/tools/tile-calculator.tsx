@@ -372,7 +372,7 @@ function RoomCard({
               {room.wallTypes.map((type, typeIndex) => {
                 const result = calculation.wall.typeResults[typeIndex];
                 return (
-                  <div key={type.id} className="grid gap-2 rounded-xl border border-border-soft bg-surface p-3 sm:grid-cols-[minmax(0,1fr)_7rem_minmax(10rem,1fr)_2rem] sm:items-end">
+                  <div key={type.id} className="grid gap-2 rounded-xl border border-border-soft bg-surface p-3 sm:grid-cols-[minmax(0,1fr)_7rem_minmax(10rem,1fr)_44px] sm:items-end lg:grid-cols-[minmax(0,1fr)_7rem_minmax(10rem,1fr)_2rem]">
                     <TextField label={t("typeName")} value={type.name} onChange={(name) => onPatchWallType(type.id, { name })} />
                     <NumberField id={`${room.id}-${type.id}-rows`} label={t("rows")} value={type.rows} onChange={(rows) => onPatchWallType(type.id, { rows })} />
                     <p className="self-center text-xs leading-5 text-slate-500 dark:text-slate-400 sm:pb-1">
@@ -397,7 +397,7 @@ function RoomCard({
           {room.openings.length > 0 ? (
             <div className="space-y-2">
               {room.openings.map((opening) => (
-                <div key={opening.id} className="grid gap-2 rounded-xl bg-surface-2 p-3 sm:grid-cols-[minmax(0,1fr)_7rem_7rem_2rem] sm:items-end">
+                <div key={opening.id} className="grid gap-2 rounded-xl bg-surface-2 p-3 sm:grid-cols-[minmax(0,1fr)_7rem_7rem_44px] sm:items-end lg:grid-cols-[minmax(0,1fr)_7rem_7rem_2rem]">
                   <TextField label={t("openingName")} value={opening.name} onChange={(name) => onPatchOpening(opening.id, { name })} />
                   <NumberField id={`${room.id}-${opening.id}-width`} label={t("width")} value={opening.width} suffix="m" onChange={(width) => onPatchOpening(opening.id, { width })} />
                   <NumberField id={`${room.id}-${opening.id}-height`} label={t("height")} value={opening.height} suffix="m" onChange={(height) => onPatchOpening(opening.id, { height })} />

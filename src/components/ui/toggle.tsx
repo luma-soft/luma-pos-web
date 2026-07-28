@@ -19,17 +19,21 @@ export function Toggle({
       aria-label={ariaLabel}
       disabled={disabled}
       onClick={() => onChange?.(!checked)}
-      className={cn(
-        "relative w-[38px] h-[21px] rounded-full shrink-0 transition-colors disabled:opacity-50",
-        checked ? "bg-primary-600" : "bg-border"
-      )}
+      className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full disabled:opacity-50 lg:h-[21px] lg:w-[38px]"
     >
       <span
         className={cn(
-          "absolute top-[3px] w-[15px] h-[15px] rounded-full bg-white transition-[left] shadow-sm",
-          checked ? "left-[20px]" : "left-[3px]"
+          "relative h-[21px] w-[38px] rounded-full transition-colors",
+          checked ? "bg-primary-600" : "bg-border"
         )}
-      />
+      >
+        <span
+          className={cn(
+            "absolute top-[3px] h-[15px] w-[15px] rounded-full bg-white shadow-sm transition-[left]",
+            checked ? "left-[20px]" : "left-[3px]"
+          )}
+        />
+      </span>
     </button>
   );
 }

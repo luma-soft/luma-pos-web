@@ -639,7 +639,7 @@ function ComboItemsField({
                         { shouldDirty: true, shouldValidate: true },
                       );
                     }}
-                    className="w-32"
+                    className="w-[132px] lg:w-32"
                   />
                 </div>
                 <Button

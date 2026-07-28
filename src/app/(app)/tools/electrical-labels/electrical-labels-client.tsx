@@ -313,7 +313,7 @@ export function ElectricalLabelsClient() {
             <div className="space-y-3">
               {circuits.map((circuit, index) => (
                 <div
-                  className="grid gap-3 rounded-xl border border-border bg-surface-2 p-3 sm:grid-cols-[44px_minmax(0,1.35fr)_minmax(0,1fr)_84px_32px] sm:items-end"
+                  className="grid gap-3 rounded-xl border border-border bg-surface-2 p-3 sm:grid-cols-[120px_minmax(0,1.35fr)_minmax(0,1fr)_84px_44px] sm:items-end lg:grid-cols-[44px_minmax(0,1.35fr)_minmax(0,1fr)_84px_32px]"
                   key={circuit.id}
                 >
                   <div className="flex items-center gap-2 sm:block sm:self-center">

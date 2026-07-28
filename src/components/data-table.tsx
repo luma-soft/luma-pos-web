@@ -353,7 +353,7 @@ export function DataTableShell<T>({
                   {renderMobileRow ? (
                     renderMobileRow({ row, expanded, toggle })
                   ) : (
-                    <button type="button" onClick={() => onRowClick ? onRowClick(row) : toggle()} className="w-full p-3 text-left">
+                    <button type="button" onClick={() => onRowClick ? onRowClick(row) : toggle()} className="min-h-11 w-full p-3 text-left">
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0 space-y-1">
                           {visibleColumns.slice(0, 3).map((column) => (
