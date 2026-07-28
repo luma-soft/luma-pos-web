@@ -166,6 +166,8 @@ export function ProductsTable({
       minWidth="1120px"
       maxHeight="calc(100dvh - 250px)"
       fillHeight
+      mobileListClassName="!space-y-0 overflow-hidden rounded-xl border border-border-soft bg-surface"
+      mobileRowClassName="!rounded-none !border-x-0 !border-t-0 last:!border-b-0"
       onRowClick={openProduct}
       rowClassName={(product) =>
         selectedIds.has(product.id)
@@ -173,9 +175,9 @@ export function ProductsTable({
           : undefined
       }
       renderMobileRow={({ row: product }) => (
-        <div className="flex items-start">
+        <div className="flex items-stretch">
           {selectionEnabled && (
-            <div className="shrink-0 p-3 pr-0 pt-4">
+            <div className="hidden shrink-0 p-3 pr-0 pt-4 sm:block">
               <SelectionCheckbox
                 checked={selectedIds.has(product.id)}
                 onChange={() => toggle(product.id)}
@@ -186,20 +188,22 @@ export function ProductsTable({
             </div>
           )}
           <button type="button" onClick={() => openProduct(product)} className="min-w-0 flex-1 p-3 text-left">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-3">
-                <ProductThumbnail product={product} />
-                <div className="min-w-0">
-                  <div className="whitespace-normal break-words font-medium">{product.name}</div>
-                  <div className="truncate text-xs text-slate-400">{product.sku}{product.categoryName ? ` · ${product.categoryName}` : ""}</div>
+            <div className="flex min-w-0 items-center gap-3">
+              <ProductThumbnail product={product} />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{product.name}</div>
+                <div className="mt-0.5 truncate text-xs text-slate-400">
+                  {product.sku}{product.categoryName ? ` · ${product.categoryName}` : ""}
                 </div>
               </div>
-              <StatusBadge product={product} />
-            </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
-              <Metric label={t("products.list.colCost")} value={priceRange(product.minCostPrice, product.maxCostPrice, product.costPrice)} />
-              <Metric label={t("products.list.colSalePrice")} value={priceRange(product.minRetailPrice, product.maxRetailPrice, product.retailPrice)} />
-              <Metric label={t("products.list.colStock")} value={productStockDisplay(product, t("products.stock.notTracked"))} />
+              <div className="shrink-0 text-right">
+                <p className="text-sm font-bold tabular-nums text-primary-700 dark:text-primary-300">
+                  {priceRange(product.minRetailPrice, product.maxRetailPrice, product.retailPrice)}
+                </p>
+                <span className="mt-1.5 inline-flex rounded-md bg-primary-50 px-2 py-1 text-[11px] font-semibold tabular-nums text-primary-700 dark:bg-primary-950/60 dark:text-primary-300">
+                  {productStockDisplay(product, t("products.stock.notTracked"))}
+                </span>
+              </div>
             </div>
           </button>
         </div>
@@ -1362,17 +1366,6 @@ function StatusBadge({ product }: { product: ProductRow }) {
         : product.isActive
           ? t("products.list.active")
           : t("products.list.inactive")}
-    </span>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <span>
-      <span className="block text-slate-400">{label}</span>
-      <span className="mt-0.5 block truncate font-semibold tabular-nums text-slate-900 dark:text-slate-100">
-        {value}
-      </span>
     </span>
   );
 }

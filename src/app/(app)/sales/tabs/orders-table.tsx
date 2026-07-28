@@ -125,7 +125,7 @@ export function OrdersTable({
         onRowClick={openOrder}
         rowClassName={(order) => cn(order.status === "cancelled" && "opacity-60")}
         toolbar={(
-          <div className="flex flex-1 items-center gap-3 text-sm">
+          <div className="hidden flex-1 items-center gap-3 text-sm sm:flex">
             <span className="hidden text-xs text-slate-500 sm:inline">{t("orders.batchHint")}</span>
             <div className="flex-1" />
             <button type="submit" formAction="/orders/merge" className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2">

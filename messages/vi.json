@@ -22,7 +22,9 @@
     "clear": "Xóa chọn",
     "active": "Bật",
     "inactive": "Tắt",
-    "actions": "Thao tác"
+    "actions": "Thao tác",
+    "selectAll": "Chọn tất cả",
+    "primaryNavigation": "Điều hướng chính"
   },
   "auth": {
     "login": "Đăng nhập",
@@ -85,7 +87,55 @@
     "collapseSidebar": "Thu gọn menu",
     "expandSidebar": "Mở menu",
     "more": "Thêm",
+    "mobileSales": "Bán hàng",
+    "mobileInventory": "Kho",
+    "mobileOrders": "Đơn",
     "returns": "Trả hàng"
+  },
+  "mobile": {
+    "dashboard": {
+      "subtitle": "Nhịp vận hành hôm nay · POS-first",
+      "revenue": "Doanh thu",
+      "orders": "Đơn hàng",
+      "lowStock": "Tồn thấp",
+      "receivables": "Công nợ",
+      "today": "hôm nay",
+      "recorded": "đã ghi nhận",
+      "needRestock": "cần nhập",
+      "owingCustomers": "khách đang nợ",
+      "attention": "Việc cần làm",
+      "openPos": "Mở POS và tìm sản phẩm",
+      "openPosHint": "Tìm kiếm nhanh, sẵn sàng nhập mã vạch",
+      "lowStockAction": "{count} SKU dưới định mức",
+      "lowStockHint": "Kiểm tra trước giờ cao điểm",
+      "ordersAction": "Xem {count} đơn hôm nay",
+      "ordersHint": "Kiểm tra thanh toán và trạng thái đơn"
+    },
+    "inventory": {
+      "subtitle": "Sản phẩm, tồn kho và nhập hàng"
+    },
+    "orders": {
+      "subtitle": "Đơn bán, trả hàng, báo giá và hóa đơn",
+      "filters": "Bộ lọc đơn hàng"
+    },
+    "pos": {
+      "subtitle": "Tìm hàng, tạo giỏ và thanh toán"
+    },
+    "more": {
+      "notificationsHint": "Cảnh báo và việc cần chú ý",
+      "reportsHint": "Doanh thu, lợi nhuận và tồn kho",
+      "customersHint": "Hồ sơ, công nợ và lịch sử mua",
+      "suppliersHint": "Nhà cung cấp, công nợ và lịch sử nhập",
+      "projectsHint": "Công trình, báo giá và tiến độ",
+      "financeHint": "Sổ quỹ, công nợ và giao hàng",
+      "returnsHint": "Trả hàng, nhập kho và hoàn tiền",
+      "shiftHint": "Mở ca, đóng ca và chênh lệch tiền",
+      "aiHint": "Phân tích doanh thu, kho và khách hàng",
+      "toolsHint": "Tiện ích hỗ trợ vận hành cửa hàng",
+      "settingsHint": "Cửa hàng, thuế, thanh toán và nhân viên",
+      "posHint": "Mở màn hình bán hàng",
+      "preferences": "Tùy chọn ứng dụng"
+    }
   },
   "toolsCenter": {
     "title": "Công cụ",
@@ -302,13 +352,14 @@
     "totalReceivable": "Tổng phải thu"
   },
   "pos": {
-    "searchPlaceholder": "Tìm sản phẩm theo tên / SKU / barcode... (F2)",
+    "searchPlaceholder": "Tìm sản phẩm theo tên / SKU / mã vạch...",
     "order": "Đơn hàng",
     "calcTiles": "Tính m²",
     "noItems": "Chưa có sản phẩm nào",
+    "emptyHint": "Tìm sản phẩm hoặc quét mã vạch để bắt đầu bán hàng.",
     "subtotal": "Tạm tính",
     "total": "Tổng cộng",
-    "checkout": "Thanh toán (F9)",
+    "checkout": "Thanh toán",
     "tileCalc": {
       "title": "Tính số viên gạch",
       "width": "Rộng (m)",
@@ -670,6 +721,7 @@
     },
     "list": {
       "searchPlaceholder": "Tìm tên, SKU, barcode…",
+      "filters": "Bộ lọc sản phẩm",
       "allCategories": "Danh mục: Tất cả",
       "total": "{total} sản phẩm",
       "empty": "Chưa có sản phẩm nào",

@@ -22,7 +22,9 @@
     "clear": "Clear",
     "active": "On",
     "inactive": "Off",
-    "actions": "Actions"
+    "actions": "Actions",
+    "selectAll": "Select all",
+    "primaryNavigation": "Primary navigation"
   },
   "auth": {
     "login": "Sign in",
@@ -85,7 +87,55 @@
     "collapseSidebar": "Collapse menu",
     "expandSidebar": "Open menu",
     "more": "More",
+    "mobileSales": "Sales",
+    "mobileInventory": "Inventory",
+    "mobileOrders": "Orders",
     "returns": "Returns"
+  },
+  "mobile": {
+    "dashboard": {
+      "subtitle": "Today's operations · POS-first",
+      "revenue": "Revenue",
+      "orders": "Orders",
+      "lowStock": "Low stock",
+      "receivables": "Receivables",
+      "today": "today",
+      "recorded": "recorded",
+      "needRestock": "need restock",
+      "owingCustomers": "owing customers",
+      "attention": "Attention",
+      "openPos": "Open POS and find products",
+      "openPosHint": "Fast search, ready for barcode input",
+      "lowStockAction": "{count} SKUs below minimum",
+      "lowStockHint": "Review before peak hours",
+      "ordersAction": "View {count} orders today",
+      "ordersHint": "Review payment and order status"
+    },
+    "inventory": {
+      "subtitle": "Products, stock, and purchasing"
+    },
+    "orders": {
+      "subtitle": "Sales, returns, quotes, and invoices",
+      "filters": "Order filters"
+    },
+    "pos": {
+      "subtitle": "Find items, build the cart, and checkout"
+    },
+    "more": {
+      "notificationsHint": "Alerts and items needing attention",
+      "reportsHint": "Revenue, profit, and inventory",
+      "customersHint": "Profiles, debt, and purchase history",
+      "suppliersHint": "Suppliers, payables, and purchase history",
+      "projectsHint": "Projects, quotes, and progress",
+      "financeHint": "Cashbook, debt, and delivery",
+      "returnsHint": "Returns, restocking, and refunds",
+      "shiftHint": "Open, close, and reconcile shifts",
+      "aiHint": "Insights for sales, stock, and customers",
+      "toolsHint": "Utilities for daily store operations",
+      "settingsHint": "Store, tax, payments, and staff",
+      "posHint": "Open the sales terminal",
+      "preferences": "App preferences"
+    }
   },
   "toolsCenter": {
     "title": "Tools",
@@ -302,13 +352,14 @@
     "totalReceivable": "Total receivable"
   },
   "pos": {
-    "searchPlaceholder": "Search by name / SKU / barcode... (F2)",
+    "searchPlaceholder": "Search by name / SKU / barcode...",
     "order": "Order",
     "calcTiles": "Calc m²",
     "noItems": "No items yet",
+    "emptyHint": "Find a product or scan a barcode to start a sale.",
     "subtotal": "Subtotal",
     "total": "Total",
-    "checkout": "Checkout (F9)",
+    "checkout": "Checkout",
     "tileCalc": {
       "title": "Tile calculator",
       "width": "Width (m)",
@@ -670,6 +721,7 @@
     },
     "list": {
       "searchPlaceholder": "Search name, SKU, barcode…",
+      "filters": "Product filters",
       "allCategories": "Category: All",
       "total": "{total} products",
       "empty": "No products yet",

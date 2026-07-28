@@ -1,6 +1,6 @@
 /* Service Worker — cache tài nguyên tĩnh và trang POS để hỗ trợ offline.
    Không chặn RSC/API hoặc các trang nghiệp vụ có dữ liệu đăng nhập. */
-const CACHE = "sales-pos-v3";
+const CACHE = "lumapos-v4";
 const APP_SHELL = ["/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/icon-180.png"];
 
 self.addEventListener("install", (event) => {

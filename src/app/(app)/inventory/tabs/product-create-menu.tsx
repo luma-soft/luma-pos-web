@@ -45,24 +45,24 @@ export function ProductCreateMenu({
   }, [open]);
 
   return (
-    <div ref={rootRef} className="relative w-full shrink-0 sm:w-auto">
+    <div ref={rootRef} className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-4 z-30 w-auto shrink-0 sm:static sm:w-auto">
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 active:scale-[0.98] sm:min-h-0 sm:w-auto"
+        className="inline-flex h-12 w-12 items-center justify-center gap-2 rounded-2xl bg-primary-600 p-0 text-sm font-medium text-white shadow-e2 transition hover:brightness-110 active:scale-[0.98] sm:h-auto sm:min-h-0 sm:w-auto sm:rounded-full sm:px-4 sm:py-2 sm:shadow-none"
       >
         <PackagePlus className="h-4 w-4" />
-        {label}
+        <span className="hidden sm:inline">{label}</span>
         <ChevronDown
           className={cn(
-            "h-4 w-4 transition-transform",
+            "hidden h-4 w-4 transition-transform sm:block",
             open && "rotate-180",
           )}
         />
       </button>
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-full min-w-72 overflow-hidden rounded-xl border border-border bg-surface p-1 shadow-e2 sm:w-80">
+        <div className="absolute bottom-full right-0 z-50 mb-2 w-72 overflow-hidden rounded-xl border border-border bg-surface p-1 shadow-e2 sm:bottom-auto sm:top-full sm:mb-0 sm:mt-2 sm:w-80">
           {items.map((item) => {
             const Icon = icons[item.kind];
             return (

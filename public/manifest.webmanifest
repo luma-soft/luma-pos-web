@@ -1,13 +1,13 @@
 {
-  "name": "Sales Mgmt — Quản lý bán hàng",
-  "short_name": "Sales Mgmt",
-  "description": "Quản lý bán hàng — POS, kho, công nợ",
+  "name": "LumaPOS — Quản lý bán hàng",
+  "short_name": "LumaPOS",
+  "description": "Bán hàng, quản lý kho, đơn hàng và công nợ",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#ffffff",
-  "theme_color": "#2563EB",
+  "background_color": "#FAFAF8",
+  "theme_color": "#0C7B6B",
   "lang": "vi",
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

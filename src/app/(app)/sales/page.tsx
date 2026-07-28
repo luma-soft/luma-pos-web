@@ -25,9 +25,12 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-5 bg-surface border-b border-border">
-        <div className="min-h-[52px] px-4 sm:px-6 pt-2.5 flex items-center">
-          <Text as="h1" weight="bold" className="text-[17px]" text={t("nav.groups.sales")} />
+      <div className="sticky top-0 z-20 -mx-4 -mt-4 mb-4 border-b border-border bg-surface sm:-mx-6 sm:-mt-6 lg:mb-5">
+        <div className="flex min-h-[68px] items-center px-4 pt-2 sm:px-6 lg:min-h-[52px] lg:pt-2.5">
+          <div className="min-w-0">
+            <Text as="h1" weight="bold" className="text-xl tracking-[-0.01em] lg:text-[17px]" text={t("nav.groups.sales")} />
+            <Text as="p" variant="muted" className="mt-0.5 text-xs font-semibold lg:hidden" text={t("mobile.orders.subtitle")} />
+          </div>
         </div>
         <div className="px-4 sm:px-6 pb-1.5"><GroupTabs base={Routes.Sales} items={TABS} /></div>
       </div>

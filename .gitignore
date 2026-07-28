@@ -43,6 +43,7 @@ next-env.d.ts
 
 # sandbox build artifacts
 /tmp/
+/.codex/
 
 # Data export KiotViet (du lieu that, khong commit)
 kiotviet_data/

@@ -13,6 +13,8 @@ import { getCategoriesWithCounts } from "@/lib/data/categories";
 import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
 import { CategoriesManager } from "../products/categories/categories-manager";
+import { ArrowDownToLine, ClipboardCheck } from "lucide-react";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -38,9 +40,20 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 -mt-4 sm:-mt-6 mb-5 bg-surface border-b border-border">
-        <div className="min-h-13 px-4 sm:px-6 pt-2.5 flex items-center">
-          <Text as="h1" weight="bold" className="text-[17px]" text={t("nav.groups.inventory")} />
+      <div className="sticky top-0 z-20 -mx-4 -mt-4 mb-4 border-b border-border bg-surface sm:-mx-6 sm:-mt-6 lg:mb-5">
+        <div className="flex min-h-[68px] items-center gap-3 px-4 pt-2 sm:px-6 lg:min-h-13 lg:pt-2.5">
+          <div className="min-w-0 flex-1">
+            <Text as="h1" weight="bold" className="text-xl tracking-[-0.01em] lg:text-[17px]" text={t("nav.groups.inventory")} />
+            <Text as="p" variant="muted" className="mt-0.5 text-xs font-semibold lg:hidden" text={t("mobile.inventory.subtitle")} />
+          </div>
+          <div className="flex items-center gap-1.5 lg:hidden">
+            <Link href={`${Routes.Inventory}?tab=purchases`} aria-label={t("nav.purchases")} className="grid h-11 w-11 place-items-center rounded-xl border border-border bg-surface-2 text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+              <ArrowDownToLine className="h-5 w-5" />
+            </Link>
+            <Link href={`${Routes.Inventory}?tab=stocktakes`} aria-label={t("nav.stocktakes")} className="grid h-11 w-11 place-items-center rounded-xl border border-border bg-surface-2 text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+              <ClipboardCheck className="h-5 w-5" />
+            </Link>
+          </div>
         </div>
         <div className="px-4 sm:px-6 pb-1.5"><GroupTabs base={Routes.Inventory} items={TABS} /></div>
       </div>

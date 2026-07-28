@@ -7,6 +7,8 @@ import { OrderStatusBadge, PaymentStatusBadge } from "../orders/status-badges";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Text } from "@/components/ui/text";
 import { OrderDetailLink } from "@/components/order-detail-link";
+import { Bell, FileText, Package, Search } from "lucide-react";
+import { MobileActionRow, MobileMetricTile, MobileSectionLabel, MobileTopBar } from "@/components/mobile-ui";
 
 export const dynamic = "force-dynamic";
 
@@ -22,11 +24,83 @@ export default async function DashboardPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const range = (RANGES.includes(params.range as DashboardRange) ? params.range : "7d") as DashboardRange;
   const data = await getDashboard(range);
+  const mobileData = range === "today" ? data : await getDashboard("today");
 
   const maxDay = Math.max(1, ...data.revenueByDay.map((d) => Number(d.revenue)));
 
   return (
-    <div className="p-4 sm:p-6 space-y-5">
+    <>
+      <div className="min-h-full bg-canvas lg:hidden">
+        <MobileTopBar
+          title={t("dashboard.title")}
+          subtitle={t("mobile.dashboard.subtitle")}
+          trailing={(
+            <Link
+              href={Routes.Notifications}
+              aria-label={t("nav.notifications")}
+              className="grid h-11 w-11 place-items-center rounded-xl text-primary-700 transition hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 active:scale-[0.98] dark:text-primary-300"
+            >
+              <Bell className="h-6 w-6" />
+            </Link>
+          )}
+        />
+        <div className="space-y-4 px-3 py-3">
+          <section className="grid grid-cols-2 gap-2.5">
+            <MobileMetricTile
+              label={t("mobile.dashboard.revenue")}
+              value={formatCompactCurrency(mobileData.revenue)}
+              subtitle={t("mobile.dashboard.today")}
+              tone="success"
+            />
+            <MobileMetricTile
+              label={t("mobile.dashboard.orders")}
+              value={mobileData.orderCount}
+              subtitle={t("mobile.dashboard.recorded")}
+              tone="info"
+            />
+            <MobileMetricTile
+              label={t("mobile.dashboard.lowStock")}
+              value={mobileData.lowStock.length}
+              subtitle={t("mobile.dashboard.needRestock")}
+              tone="warning"
+            />
+            <MobileMetricTile
+              label={t("mobile.dashboard.receivables")}
+              value={mobileData.debt.debtors}
+              subtitle={t("mobile.dashboard.owingCustomers")}
+              tone="neutral"
+            />
+          </section>
+
+          <section className="space-y-2">
+            <MobileSectionLabel>{t("mobile.dashboard.attention")}</MobileSectionLabel>
+            <MobileActionRow
+              href={Routes.POS}
+              icon={Search}
+              title={t("mobile.dashboard.openPos")}
+              subtitle={t("mobile.dashboard.openPosHint")}
+            />
+            {mobileData.lowStock.length > 0 && (
+              <MobileActionRow
+                href={`${Routes.Inventory}?low=1`}
+                icon={Package}
+                title={t("mobile.dashboard.lowStockAction", { count: mobileData.lowStock.length })}
+                subtitle={t("mobile.dashboard.lowStockHint")}
+                tone="orange"
+              />
+            )}
+            <MobileActionRow
+              href={Routes.Sales}
+              icon={FileText}
+              title={t("mobile.dashboard.ordersAction", { count: mobileData.orderCount })}
+              subtitle={t("mobile.dashboard.ordersHint")}
+              tone="blue"
+            />
+          </section>
+        </div>
+      </div>
+
+      <div className="hidden space-y-5 p-4 sm:p-6 lg:block">
       {/* header — theo design: title + Realtime + range seg + nút bán hàng */}
       <div className="flex items-center gap-3 flex-wrap">
         <Text as="h1" size="2xl" weight="bold" className="min-w-0 flex-1 sm:flex-none" text={t("dashboard.title")} />
@@ -257,6 +331,16 @@ export default async function DashboardPage({ searchParams }: PageProps) {
         </div>
       </div>
       <Text as="span" className="hidden" text={formatDate(new Date())} />
-    </div>
+      </div>
+    </>
   );
+}
+
+function formatCompactCurrency(value: number) {
+  const amount = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  if (amount >= 1_000_000_000) return `${sign}${(amount / 1_000_000_000).toFixed(1).replace(".0", "")}Bđ`;
+  if (amount >= 1_000_000) return `${sign}${(amount / 1_000_000).toFixed(1).replace(".0", "")}Mđ`;
+  if (amount >= 1_000) return `${sign}${Math.round(amount / 1_000)}Kđ`;
+  return `${sign}${Math.round(amount)}đ`;
 }

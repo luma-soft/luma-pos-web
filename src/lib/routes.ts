@@ -11,6 +11,7 @@ export const Routes = {
   Home: "/",
   Dashboard: "/dashboard",
   POS: "/pos",
+  More: "/more",
   // Nhóm trang có tab (gộp)
   Sales: "/sales",
   Partners: "/partners",

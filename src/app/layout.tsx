@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#2563EB",
+  themeColor: "#0C7B6B",
   viewportFit: "cover",
 };
 
@@ -38,6 +38,7 @@ export default async function RootLayout({
       lang={locale}
       data-theme={theme}
       data-mode={mode}
+      data-scroll-behavior="smooth"
       className="h-full antialiased"
       suppressHydrationWarning
     >

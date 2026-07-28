@@ -78,7 +78,7 @@ async function ProductsToolbar({
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2 sm:gap-3">
       <InstantProductSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />
-      <InstantProductFilters category={params.category ?? ""} status={status} view={view} categories={categories} labels={{ allCategories: t("products.list.allCategories"), active: t("products.list.statusActive"), inactive: t("products.list.statusInactive"), all: t("products.list.statusAll"), grouped: t("products.list.viewGrouped"), flat: t("products.list.viewFlat") }} />
+      <InstantProductFilters category={params.category ?? ""} status={status} view={view} categories={categories} labels={{ filters: t("products.list.filters"), allCategories: t("products.list.allCategories"), active: t("products.list.statusActive"), inactive: t("products.list.statusInactive"), all: t("products.list.statusAll"), grouped: t("products.list.viewGrouped"), flat: t("products.list.viewFlat") }} />
       <ProductCreateMenu
         label={t("products.createNew")}
         items={[
@@ -202,6 +202,12 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
 
   return (
     <ProductSelectionProvider visibleIds={rows.map((row) => row.id)}>
+      {!cameraMaterials && (
+        <div className="mb-3 lg:hidden">
+          <h2 className="text-xl font-bold tracking-tight text-slate-950 dark:text-white">{t("products.title")}</h2>
+          <p className="mt-0.5 text-xs font-medium text-slate-500">{total.toLocaleString("vi-VN")} SKU</p>
+        </div>
+      )}
       {!cameraMaterials && <ProductsToolbar params={params} categories={categories} status={status} view={view} />}
       {rows.length === 0 ? (
         <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">

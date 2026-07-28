@@ -1455,7 +1455,15 @@ export function PosClient({
       </div>
       <div className="flex-1 overflow-auto">
         {cart.length === 0 && (
-          <div className="text-center text-sm text-slate-400 py-12">{t("pos.noItems")}</div>
+          <div className="grid min-h-52 place-items-center px-6 py-12 text-center">
+            <div>
+              <span className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-primary-50 text-primary-700 dark:bg-primary-950/50 dark:text-primary-300">
+                <Search className="h-6 w-6" />
+              </span>
+              <div className="mt-3 text-sm font-bold text-slate-600 dark:text-slate-300">{t("pos.noItems")}</div>
+              <div className="mx-auto mt-1 max-w-56 text-xs leading-5 text-slate-400">{t("pos.emptyHint")}</div>
+            </div>
+          </div>
         )}
         {cart.map((l, idx) => {
           const m2 = l.product.m2PerUnit ? Number(l.product.m2PerUnit) * l.unitMultiplier * l.quantity : 0;
@@ -1487,7 +1495,66 @@ export function PosClient({
                 overKey === l.key && dragKey && dragKey !== l.key && "bg-primary-50/40 dark:bg-primary-950/20"
               )}
             >
-              <div className="flex items-center gap-2 px-3 py-3">
+              <div className="p-3 lg:hidden">
+                <div className="flex items-start gap-2">
+                  <span className="mt-0.5 w-5 shrink-0 text-center text-xs tabular-nums text-slate-400">{idx + 1}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className={cn("text-sm font-semibold leading-5", outOfStock && "text-er")}>{l.product.name}</p>
+                    <p className="mt-0.5 truncate text-xs text-slate-400">{l.product.sku ?? ""}</p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isCameraQuoteDraft}
+                    onClick={() => setCart((current) => current.filter((item) => item.key !== l.key))}
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-er disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-slate-800"
+                    aria-label={t("common.delete")}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="mt-3 grid grid-cols-[minmax(0,1fr)_7.5rem] gap-2">
+                  <Select
+                    value={l.unitName}
+                    onChange={(e) => changeUnit(l.key, e.target.value)}
+                    disabled={isCameraQuoteDraft}
+                    size="sm"
+                    options={[
+                      { value: l.product.baseUnit, label: l.product.baseUnit },
+                      ...l.product.units.map((unit) => ({ value: unit.unitName, label: unit.unitName })),
+                    ]}
+                    className="w-full min-w-0 font-medium text-slate-700 dark:text-slate-200"
+                  />
+                  <QuantityInput
+                    value={l.quantity}
+                    onChange={(quantity) => setQty(l.key, quantity)}
+                    min={0}
+                    max={l.returnSoldQuantity}
+                    readOnly={isCameraQuoteDraft}
+                    size="sm"
+                    className={cn("w-full", outOfStock && "border-er text-er")}
+                    inputClassName={cn(outOfStock && "border-er text-er")}
+                  />
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    disabled={isCameraQuoteDraft}
+                    onClick={() => setEditKey(editKey === l.key ? null : l.key)}
+                    className="text-sm tabular-nums text-slate-500 hover:text-primary-600"
+                  >
+                    {formatCurrency(eff.price)} / {l.unitName}
+                  </button>
+                  <span className="text-base font-bold tabular-nums">{formatCurrency(eff.price * l.quantity)}</span>
+                </div>
+                <input
+                  type="text"
+                  value={l.note ?? ""}
+                  onChange={(e) => setLineNote(l.key, e.target.value)}
+                  placeholder={t("pos.lineNotePlaceholder")}
+                  className="mt-2 w-full bg-transparent text-xs text-slate-400 outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                />
+              </div>
+              <div className="hidden items-center gap-2 px-3 py-3 lg:flex">
                 <span className="w-5 text-center text-xs text-slate-400 shrink-0 tabular-nums">{idx + 1}</span>
                 <button disabled={isCameraQuoteDraft} onClick={() => setCart((c) => c.filter((x) => x.key !== l.key))} className="text-slate-400 hover:text-er shrink-0 disabled:cursor-not-allowed disabled:opacity-40">
                   <Trash2 className="w-4 h-4" />
@@ -1561,7 +1628,7 @@ export function PosClient({
                   <MoreVertical className="w-4 h-4" />
                 </button>
               </div>
-              <div className="flex items-center gap-2 px-3 pb-2.5 -mt-1">
+              <div className="-mt-1 hidden items-center gap-2 px-3 pb-2.5 lg:flex">
                 <span className="w-5 shrink-0" />
                 <span className="w-4 shrink-0" />
                 <span className="w-24 shrink-0" />
@@ -1618,14 +1685,17 @@ export function PosClient({
       )}
 
       {/* left: catalog */}
-      <div className={cn("flex-1 flex flex-col p-3 sm:p-4 min-w-0 min-h-0 overflow-y-auto", mobileView === "cart" && "hidden lg:flex")}>
+      <div className={cn("flex-1 flex flex-col p-3 sm:p-4 min-w-0 min-h-0 overflow-y-auto overscroll-contain", mobileView === "cart" && "hidden lg:flex")}>
         {/* nút sang trang thanh toán — chỉ mobile */}
-        {cart.length > 0 && (
-          <button onClick={() => setMobileView("cart")}
-            className="lg:hidden fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 inline-flex max-w-[calc(100vw-2rem)] items-center gap-2 px-5 py-3 rounded-full bg-primary-600 text-white font-semibold shadow-e2">
-            <ShoppingCart className="w-4 h-4" /> {t("pos.checkout")} ({cart.reduce((s, l) => s + l.quantity, 0)}) · {formatCurrency(total)}
-          </button>
-        )}
+        <button
+          type="button"
+          disabled={cart.length === 0}
+          onClick={() => setMobileView("cart")}
+          className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-4 right-4 z-50 flex h-12 items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 font-semibold text-white shadow-e2 disabled:bg-primary-200 disabled:text-primary-700/60 disabled:shadow-none lg:hidden"
+        >
+          <ShoppingCart className="h-4 w-4" />
+          {t("pos.checkout")} ({cart.reduce((sum, line) => sum + line.quantity, 0)}) · {formatCurrency(total)}
+        </button>
         <div className="mb-3 space-y-2">
           {invoiceTabs}
           {showSourceInvoiceBanner && sourceInvoice && (

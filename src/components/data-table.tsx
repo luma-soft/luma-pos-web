@@ -164,6 +164,8 @@ export function DataTableShell<T>({
   detailSize = "xl",
   detailBodyClassName,
   renderMobileRow,
+  mobileListClassName,
+  mobileRowClassName,
   summaryCells,
   minWidth = "980px",
   expandedParam = "expanded",
@@ -190,6 +192,8 @@ export function DataTableShell<T>({
   detailSize?: "md" | "lg" | "xl" | "full";
   detailBodyClassName?: string;
   renderMobileRow?: (props: MobileRenderProps<T>) => ReactNode;
+  mobileListClassName?: string;
+  mobileRowClassName?: string;
   summaryCells?: DataTableSummaryCell[];
   minWidth?: string;
   expandedParam?: string;
@@ -328,7 +332,7 @@ export function DataTableShell<T>({
         empty
       ) : (
         <>
-          <div className="space-y-2 lg:hidden">
+          <div className={cn("space-y-2 lg:hidden", mobileListClassName)}>
             {displayRows.map((row) => {
               const id = getRowId(row);
               const expandable = Boolean(!onRowClick && renderExpanded && (canExpand ? canExpand(row) : true));
@@ -338,7 +342,14 @@ export function DataTableShell<T>({
                 if (expandable || detailOpenable) setExpanded(expanded ? null : id);
               };
               return (
-                <div key={id} className={cn("overflow-hidden rounded-card border bg-surface", expanded ? "border-primary-200 shadow-e1" : "border-border-soft")}>
+                <div
+                  key={id}
+                  className={cn(
+                    "overflow-hidden rounded-card border bg-surface",
+                    expanded ? "border-primary-200 shadow-e1" : "border-border-soft",
+                    mobileRowClassName,
+                  )}
+                >
                   {renderMobileRow ? (
                     renderMobileRow({ row, expanded, toggle })
                   ) : (
