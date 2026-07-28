@@ -32,12 +32,12 @@ export function MobileRecordCard({ title, subtitle, status, children, actions, c
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-sm font-black">{title}</h3>
-          {subtitle && <p className="mt-0.5 truncate text-xs font-medium text-slate-400">{subtitle}</p>}
+          {subtitle != null && <p className="mt-0.5 truncate text-xs font-medium text-slate-400">{subtitle}</p>}
         </div>
-        {status && <div className="shrink-0">{status}</div>}
+        {status != null && <div className="shrink-0">{status}</div>}
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2">{children}</dl>
-      {actions && <div className="mt-3 flex min-h-11 items-center gap-2 border-t border-border-soft pt-2">{actions}</div>}
+      {actions != null && <div className="mt-3 flex min-h-11 items-center gap-2 border-t border-border-soft pt-2">{actions}</div>}
     </article>
   );
 }
@@ -64,12 +64,12 @@ export function MobileFormLineCard({ title, subtitle, amount, children, actions 
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-sm font-black">{title}</h3>
-          {subtitle && <p className="mt-0.5 truncate text-xs font-medium text-slate-400">{subtitle}</p>}
+          {subtitle != null && <p className="mt-0.5 truncate text-xs font-medium text-slate-400">{subtitle}</p>}
         </div>
-        {amount && <div className="shrink-0 text-right text-sm font-black tabular-nums">{amount}</div>}
+        {amount != null && <div className="shrink-0 text-right text-sm font-black tabular-nums">{amount}</div>}
       </div>
       <div className="mt-3">{children}</div>
-      {actions && <div className="mt-3 flex min-h-11 items-center gap-2 border-t border-border-soft pt-2">{actions}</div>}
+      {actions != null && <div className="mt-3 flex min-h-11 items-center gap-2 border-t border-border-soft pt-2">{actions}</div>}
     </section>
   );
 }
