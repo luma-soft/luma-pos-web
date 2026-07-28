@@ -101,6 +101,13 @@
     "filters": "Filters",
     "allSources": "All sources",
     "allStatuses": "All statuses",
+    "sources": {
+      "manual": "Manual",
+      "ai": "AI",
+      "mobile": "Mobile",
+      "pos": "POS",
+      "system": "System"
+    },
     "systemActor": "System",
     "columns": {
       "notification": "Notification",

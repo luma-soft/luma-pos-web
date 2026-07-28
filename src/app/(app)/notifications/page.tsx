@@ -61,9 +61,9 @@ export default async function NotificationsPage({
           <span className="inline-flex min-h-11 shrink-0 snap-start items-center gap-1.5 rounded-full px-2.5 py-1 text-xs text-slate-500">
             <Filter className="w-3.5 h-3.5" /> {t("notifications.filters")}
           </span>
-          <Link className={cn("inline-flex min-h-11 shrink-0 snap-start items-center rounded-full border px-2.5 py-1 text-xs font-medium", !source ? "bg-primary-50 border-primary-100 text-primary-700" : "border-border text-slate-500")} href={paramsWith(params, { source: undefined })}>{t("notifications.allSources")}</Link>
+          <Link className={cn("inline-flex min-h-11 min-w-11 shrink-0 snap-start items-center justify-center rounded-full border px-2.5 py-1 text-xs font-medium", !source ? "bg-primary-50 border-primary-100 text-primary-700" : "border-border text-slate-500")} href={paramsWith(params, { source: undefined })}>{t("notifications.allSources")}</Link>
           {SOURCES.map((item) => (
-            <Link key={item} className={cn("inline-flex min-h-11 shrink-0 snap-start items-center rounded-full border px-2.5 py-1 text-xs font-medium capitalize", source === item ? "bg-primary-50 border-primary-100 text-primary-700" : "border-border text-slate-500")} href={paramsWith(params, { source: item })}>{item}</Link>
+            <Link key={item} className={cn("inline-flex min-h-11 min-w-11 shrink-0 snap-start items-center justify-center rounded-full border px-2.5 py-1 text-xs font-medium", source === item ? "bg-primary-50 border-primary-100 text-primary-700" : "border-border text-slate-500")} href={paramsWith(params, { source: item })}>{t(`notifications.sources.${item}`)}</Link>
           ))}
           <Link className={cn("inline-flex min-h-11 shrink-0 snap-start items-center rounded-full border px-2.5 py-1 text-xs font-medium", !status ? "bg-surface-2 border-border text-slate-700" : "border-border text-slate-500")} href={paramsWith(params, { status: undefined })}>{t("notifications.allStatuses")}</Link>
           {STATUSES.map((item) => (

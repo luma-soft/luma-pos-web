@@ -92,6 +92,10 @@ function statusText(status: AuditStatus, t: Translator) {
   return t(`notifications.statuses.${status}`);
 }
 
+function sourceText(source: AuditSource, t: Translator) {
+  return t(`notifications.sources.${source}`);
+}
+
 function recordHref(record: Record<string, unknown>) {
   const href = textValue(record.href);
   if (href?.startsWith("/")) return href;
@@ -117,7 +121,7 @@ export function NotificationsTable({ rows }: { rows: AuditRow[] }) {
   const t = useTranslations();
   const columns: DataTableColumn<AuditRow>[] = [
     { key: "notification", label: t("notifications.columns.notification"), required: true, render: (row) => <ActivityCell row={row} t={t} /> },
-    { key: "source", label: t("notifications.columns.source"), defaultVisible: true, width: "120px", render: (row) => <span className={cn("inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold capitalize", sourceTone(row.source))}>{row.source}</span> },
+    { key: "source", label: t("notifications.columns.source"), defaultVisible: true, width: "120px", render: (row) => <span className={cn("inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold", sourceTone(row.source))}>{sourceText(row.source, t)}</span> },
     { key: "status", label: t("notifications.columns.status"), defaultVisible: true, width: "130px", render: (row) => <span className={cn("inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold", toneFor(row.status))}>{statusText(row.status, t)}</span> },
     { key: "actor", label: t("notifications.columns.actor"), defaultVisible: true, render: (row) => <span className="inline-flex items-center gap-1.5 text-slate-600"><UserRound className="h-3.5 w-3.5" />{row.actorNameSnapshot ?? row.actorId ?? t("notifications.systemActor")}</span> },
     { key: "time", label: t("notifications.columns.time"), defaultVisible: true, width: "160px", render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
@@ -146,7 +150,7 @@ export function NotificationMobileRow({ row, expanded, toggle }: { row: AuditRow
     >
       <ActivityCell row={row} t={t} />
       <div className="mt-3 flex items-center justify-between gap-2">
-        <span className={cn("rounded-full px-2 py-1 text-xs font-bold capitalize", sourceTone(row.source))}>{row.source}</span>
+        <span className={cn("rounded-full px-2 py-1 text-xs font-bold", sourceTone(row.source))}>{sourceText(row.source, t)}</span>
         <span className={cn("rounded-full px-2 py-1 text-xs font-bold", toneFor(row.status))}>{statusText(row.status, t)}</span>
       </div>
       <div className="mt-2 text-xs text-slate-400">

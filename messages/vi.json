@@ -101,6 +101,13 @@
     "filters": "Bộ lọc",
     "allSources": "Tất cả nguồn",
     "allStatuses": "Tất cả trạng thái",
+    "sources": {
+      "manual": "Thủ công",
+      "ai": "AI",
+      "mobile": "Di động",
+      "pos": "POS",
+      "system": "Hệ thống"
+    },
     "systemActor": "Hệ thống",
     "columns": {
       "notification": "Thông báo",

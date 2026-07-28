@@ -45,6 +45,32 @@ describe("project service mobile records", () => {
     expect(source.match(/data-mobile-record="(?:maintenance|cost|asset|warranty|material|order)"/g)).toHaveLength(6);
     expect(source.match(/className="hidden[^"]*lg:block"/g)?.length).toBeGreaterThanOrEqual(6);
   });
+
+  test("date-only service values stay verbatim and do not pass through timezone conversion", () => {
+    const source = readFileSync("src/app/(app)/projects/[id]/page.tsx", "utf8");
+
+    expect(source).toContain('value={plan.nextDueOn}');
+    expect(source).toContain('subtitle={entry.incurredOn}');
+    expect(source).not.toContain('value={formatDate(plan.nextDueOn)}');
+    expect(source).not.toContain('subtitle={formatDate(entry.incurredOn)}');
+  });
+
+  test("mobile cost and warranty cards retain long desktop-visible notes", () => {
+    const source = readFileSync("src/app/(app)/projects/[id]/page.tsx", "utf8");
+    const costMobile = source.slice(source.indexOf('data-mobile-record="cost"'), source.indexOf('className="hidden space-y-2 lg:block"', source.indexOf('data-mobile-record="cost"')));
+    const warrantyMobile = source.slice(source.indexOf('data-mobile-record="warranty"'), source.indexOf('className="hidden space-y-2 lg:block"', source.indexOf('data-mobile-record="warranty"')));
+
+    expect(costMobile).toContain("entry.note ?? \"—\"");
+    expect(costMobile).toContain("[&_dd]:whitespace-normal");
+    expect(warrantyMobile).toContain("claim.description ?? \"—\"");
+    expect(warrantyMobile).toContain("[&_dd]:whitespace-normal");
+  });
+
+  test("service section create actions are 44px on mobile and retain desktop density", () => {
+    const source = readFileSync("src/app/(app)/projects/[id]/page.tsx", "utf8");
+
+    expect(source.match(/\[&_button\]:min-h-11 lg:\[&_button\]:min-h-0/g)).toHaveLength(4);
+  });
 });
 
 describe("notification mobile records", () => {
@@ -94,6 +120,7 @@ describe("notification mobile records", () => {
     const vi = viMessages.notifications;
     const en = enMessages.notifications;
     const statuses = ["previewed", "confirmed", "succeeded", "failed", "cancelled", "unauthorized"] as const;
+    const sources = ["manual", "ai", "mobile", "pos", "system"] as const;
 
     expect(vi.title).toBe("Thông báo");
     expect(en.title).toBe("Notifications");
@@ -106,5 +133,41 @@ describe("notification mobile records", () => {
       expect(en.statuses[status]).toBeTruthy();
       expect(vi.statuses[status]).not.toBe(en.statuses[status]);
     }
+    for (const source of sources) {
+      expect(vi.sources[source]).toBeTruthy();
+      expect(en.sources[source]).toBeTruthy();
+    }
+    expect(vi.sources.manual).not.toBe(en.sources.manual);
+    expect(vi.sources.mobile).not.toBe(en.sources.mobile);
+    expect(vi.sources.system).not.toBe(en.sources.system);
+  });
+
+  test("source identifiers remain query values while both locales render translated labels", () => {
+    const row = {
+      id: "audit-mobile",
+      actorId: "staff-1",
+      actorNameSnapshot: "Nguyễn An",
+      source: "mobile" as const,
+      action: "update_order",
+      entityType: "order",
+      entityId: "order-1",
+      status: "succeeded" as const,
+      prompt: null,
+      parsedIntent: null,
+      before: null,
+      after: null,
+      affectedRecords: null,
+      metadata: null,
+      createdAt: new Date("2026-07-28T08:00:00+07:00"),
+    };
+    const viHtml = renderWithMessages(<NotificationMobileRow row={row} expanded={false} toggle={() => undefined} />);
+    const enHtml = renderWithMessages(<NotificationMobileRow row={row} expanded={false} toggle={() => undefined} />, "en");
+    const pageSource = readFileSync("src/app/(app)/notifications/page.tsx", "utf8");
+
+    expect(viHtml).toContain(">Di động<");
+    expect(enHtml).toContain(">Mobile<");
+    expect(pageSource).toContain("paramsWith(params, { source: item })");
+    expect(pageSource).toContain("notifications.sources.");
+    expect(pageSource).toContain("min-w-11");
   });
 });

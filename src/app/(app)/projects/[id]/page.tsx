@@ -154,7 +154,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             id="maintenance"
             title={t("services.maintenance.title")}
             description={t("services.maintenance.summary", { count: maintenancePlans.filter((plan) => plan.isActive).length })}
-            action={<ServiceMaintenanceEditor projectId={project.id} assets={assets.map((asset) => ({ id: asset.id, name: asset.name, serialNumber: asset.serialNumber }))} staff={serviceOptions.assigneeOptions} />}
+            action={<div className="[&_button]:min-h-11 lg:[&_button]:min-h-0"><ServiceMaintenanceEditor projectId={project.id} assets={assets.map((asset) => ({ id: asset.id, name: asset.name, serialNumber: asset.serialNumber }))} staff={serviceOptions.assigneeOptions} /></div>}
           >
             {maintenancePlans.length === 0 ? (
               <Text variant="muted" size="sm" text={t("services.maintenance.empty")} />
@@ -174,7 +174,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                     className="[&_button]:min-h-11 [&_h3]:break-words [&_h3]:whitespace-normal"
                     actions={<ServiceMaintenanceEditor projectId={project.id} assets={assets.map((asset) => ({ id: asset.id, name: asset.name, serialNumber: asset.serialNumber }))} staff={serviceOptions.assigneeOptions} initial={plan} />}
                   >
-                    <MobileRecordField label={t("services.maintenance.nextDueOn")} value={formatDate(plan.nextDueOn)} />
+                    <MobileRecordField label={t("services.maintenance.nextDueOn")} value={plan.nextDueOn} />
                     <MobileRecordField label={t("services.fields.assignee")} value={plan.assignedToName ?? t("services.fields.unassigned")} />
                     <MobileRecordField label={t("services.maintenance.interval")} value={`${plan.intervalDays} ${t("services.maintenance.days")}`} />
                     <MobileRecordField className="col-span-2 [&_dd]:break-words [&_dd]:whitespace-normal" label={t("customers.fields.note")} value={plan.note ?? "—"} />
@@ -201,7 +201,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <Section
             title={t("services.costs.title")}
             description={t("services.costs.summary", { count: costEntries.length })}
-            action={<ServiceCostEditor projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} staff={serviceOptions.assigneeOptions} />}
+            action={<div className="[&_button]:min-h-11 lg:[&_button]:min-h-0"><ServiceCostEditor projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} staff={serviceOptions.assigneeOptions} /></div>}
           >
             {profitability && (
               <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-6">
@@ -222,7 +222,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                   <MobileRecordCard
                     key={entry.id}
                     title={entry.description}
-                    subtitle={formatDate(entry.incurredOn)}
+                    subtitle={entry.incurredOn}
                     status={<span className="rounded-full bg-surface-2 px-2 py-1 text-[11px] font-bold text-slate-600">{t(`services.costs.${entry.type}` as never)}</span>}
                     className="[&_button]:min-h-11 [&_h3]:break-words [&_h3]:whitespace-normal"
                     actions={<ServiceCostEditor projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} staff={serviceOptions.assigneeOptions} initial={entry} />}
@@ -231,6 +231,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                     <MobileRecordField label={t("services.costs.total")} value={formatCurrency(Number(entry.amount))} />
                     <MobileRecordField label={t("services.costs.quantity")} value={Number(entry.quantity)} />
                     <MobileRecordField label={t("services.costs.unitCost")} value={formatCurrency(Number(entry.unitCost))} />
+                    <MobileRecordField className="col-span-2 [&_dd]:break-words [&_dd]:whitespace-normal" label={t("customers.fields.note")} value={entry.note ?? "—"} />
                   </MobileRecordCard>
                 ))}
               </div>
@@ -309,7 +310,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             id="assets"
             title={t("services.fields.assets")}
             description={`${t("services.summary.assets", { count: assets.length })} · ${t("services.assets.afterInstallHint")}`}
-            action={<InstalledAssetQuickCreate projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} />}
+            action={<div className="[&_button]:min-h-11 lg:[&_button]:min-h-0"><InstalledAssetQuickCreate projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} /></div>}
           >
             {assets.length === 0 ? (
               <Text variant="muted" size="sm" text={t("services.assets.empty")} />
@@ -385,6 +386,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                       label={t("services.fields.cost")}
                       value={formatCurrency(Number(claim.laborCharge) + Number(claim.materialCharge))}
                     />
+                    <MobileRecordField className="col-span-2 [&_dd]:break-words [&_dd]:whitespace-normal" label={t("services.fields.description")} value={claim.description ?? "—"} />
                     <MobileRecordField className="col-span-2 [&_dd]:break-words [&_dd]:whitespace-normal" label={t("services.fields.diagnosis")} value={claim.diagnosis ?? "—"} />
                     <MobileRecordField className="col-span-2 [&_dd]:break-words [&_dd]:whitespace-normal" label={t("services.fields.resolution")} value={claim.resolution ?? "—"} />
                   </MobileRecordCard>
@@ -422,7 +424,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <Section
             title={t("services.materials.title")}
             description={t("services.materials.summary", { count: materials.length })}
-            action={<ServiceMaterialEditor jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} />}
+            action={<div className="[&_button]:min-h-11 lg:[&_button]:min-h-0"><ServiceMaterialEditor jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} /></div>}
           >
             {materials.length === 0 ? (
               <Text variant="muted" size="sm" text={t("services.materials.empty")} />
