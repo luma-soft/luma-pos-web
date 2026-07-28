@@ -1883,7 +1883,10 @@
       "warehouse": "Warehouse",
       "owed": "Owed",
       "qty": "Qty",
+      "unit": "Unit",
       "unitCost": "Unit cost",
+      "discount": "Discount",
+      "lineTotal": "Line total",
       "itemCount": "Items",
       "total": "Total"
     },

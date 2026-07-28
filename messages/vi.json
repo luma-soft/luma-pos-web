@@ -1883,7 +1883,10 @@
       "warehouse": "Kho nhận",
       "owed": "Nợ NCC",
       "qty": "SL nhập",
+      "unit": "ĐVT",
       "unitCost": "Giá nhập",
+      "discount": "Giảm giá",
+      "lineTotal": "Thành tiền",
       "itemCount": "Số mặt hàng",
       "total": "Tổng tiền"
     },

@@ -7,6 +7,7 @@ import { Loader2, Check } from "lucide-react";
 import { updateSupplier } from "@/lib/actions/partners";
 import { Routes } from "@/lib/routes";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
+import { MobileRecordCard, MobileRecordField } from "@/components/mobile-ui";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import type { SupplierDetail, getSupplierPurchases } from "@/lib/data/partners";
 
@@ -71,47 +72,80 @@ export function SupplierDetailClient({ supplier, purchases }: { supplier: Suppli
           </div>
         </section>
 
-        <section className="bg-surface border border-border rounded-card overflow-x-auto">
+        <section className="bg-surface border border-border rounded-card overflow-hidden">
           <div className="px-5 py-3 border-b border-border font-semibold text-sm">
             {t("suppliers.purchaseHistory")} ({purchases.length})
           </div>
           {purchases.length === 0 ? (
             <p className="p-4 sm:p-6 text-sm text-slate-400 text-center">{t("suppliers.noPurchases")}</p>
           ) : (
-            <table className="w-full min-w-[640px] text-sm">
-              <thead>
-                <tr className="bg-canvas text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="px-5 py-2.5 font-semibold">{t("purchases.cols.code")}</th>
-                  <th className="px-5 py-2.5 font-semibold">{t("orders.cols.date")}</th>
-                  <th className="px-5 py-2.5 font-semibold text-right">{t("purchases.cols.itemCount")}</th>
-                  <th className="px-5 py-2.5 font-semibold text-right">{t("purchases.cols.total")}</th>
-                  <th className="px-5 py-2.5 font-semibold text-right">{t("orders.cols.remaining")}</th>
-                  <th className="px-5 py-2.5 font-semibold">{t("orders.cols.status")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-soft">
-                {purchases.map((p) => {
-                  const owed = Number(p.total) - Number(p.amountPaid);
+            <>
+              <div className="space-y-2 p-3 lg:hidden">
+                {purchases.map((purchase) => {
+                  const owed = Number(purchase.total) - Number(purchase.amountPaid);
+                  const status = (
+                    <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
+                      purchase.status === "returned" ? "bg-warn-soft text-warn"
+                      : purchase.status === "cancelled" ? "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400"
+                      : "bg-ok-soft text-ok")}>
+                      {t(`purchases.status.${purchase.status}` as never)}
+                    </span>
+                  );
                   return (
-                    <tr key={p.id} className="hover:bg-surface-2">
-                      <td className="px-5 py-2.5 font-medium">{p.code}</td>
-                      <td className="px-5 py-2.5 text-slate-500 whitespace-nowrap">{formatDate(p.createdAt)}</td>
-                      <td className="px-5 py-2.5 text-right tabular-nums text-slate-500">{p.itemCount}</td>
-                      <td className="px-5 py-2.5 text-right tabular-nums font-medium">{formatCurrency(Number(p.total))}</td>
-                      <td className={cn("px-5 py-2.5 text-right tabular-nums", owed > 0 ? "text-warn font-semibold" : "text-slate-400")}>{owed > 0 ? formatCurrency(owed) : "—"}</td>
-                      <td className="px-5 py-2.5">
-                        <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
-                          p.status === "returned" ? "bg-warn-soft text-warn"
-                          : p.status === "cancelled" ? "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400"
-                          : "bg-ok-soft text-ok")}>
-                          {t(`purchases.status.${p.status}` as never)}
-                        </span>
-                      </td>
-                    </tr>
+                    <MobileRecordCard
+                      key={purchase.id}
+                      title={purchase.code}
+                      subtitle={formatDate(purchase.createdAt)}
+                      status={status}
+                    >
+                      <MobileRecordField label={t("purchases.cols.itemCount")} value={purchase.itemCount} />
+                      <MobileRecordField label={t("purchases.cols.total")} value={formatCurrency(Number(purchase.total))} />
+                      <MobileRecordField
+                        label={t("orders.cols.remaining")}
+                        value={owed > 0 ? formatCurrency(owed) : "—"}
+                        tone={owed > 0 ? "warning" : "neutral"}
+                      />
+                    </MobileRecordCard>
                   );
                 })}
-              </tbody>
-            </table>
+              </div>
+              <div className="hidden overflow-x-auto lg:block">
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead>
+                    <tr className="bg-canvas text-left text-xs uppercase tracking-wide text-slate-500">
+                      <th className="px-5 py-2.5 font-semibold">{t("purchases.cols.code")}</th>
+                      <th className="px-5 py-2.5 font-semibold">{t("orders.cols.date")}</th>
+                      <th className="px-5 py-2.5 font-semibold text-right">{t("purchases.cols.itemCount")}</th>
+                      <th className="px-5 py-2.5 font-semibold text-right">{t("purchases.cols.total")}</th>
+                      <th className="px-5 py-2.5 font-semibold text-right">{t("orders.cols.remaining")}</th>
+                      <th className="px-5 py-2.5 font-semibold">{t("orders.cols.status")}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-soft">
+                    {purchases.map((p) => {
+                      const owed = Number(p.total) - Number(p.amountPaid);
+                      return (
+                        <tr key={p.id} className="hover:bg-surface-2">
+                          <td className="px-5 py-2.5 font-medium">{p.code}</td>
+                          <td className="px-5 py-2.5 text-slate-500 whitespace-nowrap">{formatDate(p.createdAt)}</td>
+                          <td className="px-5 py-2.5 text-right tabular-nums text-slate-500">{p.itemCount}</td>
+                          <td className="px-5 py-2.5 text-right tabular-nums font-medium">{formatCurrency(Number(p.total))}</td>
+                          <td className={cn("px-5 py-2.5 text-right tabular-nums", owed > 0 ? "text-warn font-semibold" : "text-slate-400")}>{owed > 0 ? formatCurrency(owed) : "—"}</td>
+                          <td className="px-5 py-2.5">
+                            <span className={cn("inline-flex rounded-full px-2 py-0.5 text-xs font-medium",
+                              p.status === "returned" ? "bg-warn-soft text-warn"
+                              : p.status === "cancelled" ? "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400"
+                              : "bg-ok-soft text-ok")}>
+                              {t(`purchases.status.${p.status}` as never)}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </section>
       </div>

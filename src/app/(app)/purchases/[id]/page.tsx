@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { Copy, FilePenLine, Printer, ReceiptText } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
+import { MobileRecordCard, MobileRecordField } from "@/components/mobile-ui";
 import { getPurchase } from "@/lib/data/inventory";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -42,21 +43,21 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
         badge={<span className={cn("inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium", statusClass(purchase.status))}>{t(`purchases.status.${purchase.status}` as never)}</span>}
       />
       <div className="-mt-3 mb-5 flex items-center gap-2 overflow-x-auto pb-1 sm:justify-end sm:overflow-visible">
-          <Link href={printHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 shrink-0")}>
+          <Link href={printHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11 shrink-0")}>
             <Printer className="h-4 w-4" />
             {t("print.printBtn")}
           </Link>
           {canChange && (
             <>
-              <Link href={copyHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 shrink-0")}>
+              <Link href={copyHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11 shrink-0")}>
                 <Copy className="h-4 w-4" />
                 {t("purchases.copy")}
               </Link>
-              <Link href={editHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 shrink-0")}>
+              <Link href={editHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11 shrink-0")}>
                 <FilePenLine className="h-4 w-4" />
                 {t("purchases.edit")}
               </Link>
-              <PurchaseCancelButton purchaseId={purchase.id} />
+              <PurchaseCancelButton purchaseId={purchase.id} className="min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background" />
             </>
           )}
       </div>
@@ -71,7 +72,36 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
               </div>
               <ReceiptText className="h-5 w-5 text-slate-400" />
             </div>
-            <div className="overflow-x-auto">
+            {purchase.items.length > 0 && (
+              <div className="space-y-2 p-3 lg:hidden">
+                {purchase.items.map((item) => {
+                  const discount = Number(item.discount);
+                  return (
+                    <MobileRecordCard
+                      key={item.id}
+                      title={(
+                        <Link href={Routes.product(item.productId)} className="text-primary-600 hover:underline">
+                          {item.productName}
+                        </Link>
+                      )}
+                      subtitle={item.sku}
+                    >
+                      <MobileRecordField
+                        label={`${t("purchases.cols.qty")} / ${t("purchases.cols.unit")}`}
+                        value={`${formatNumber(Number(item.quantity))} ${item.baseUnit}`}
+                      />
+                      <MobileRecordField label={t("purchases.cols.unitCost")} value={formatCurrency(Number(item.unitCost))} />
+                      <MobileRecordField
+                        label={t("purchases.cols.discount")}
+                        value={discount > 0 ? formatCurrency(discount) : "—"}
+                      />
+                      <MobileRecordField label={t("purchases.cols.lineTotal")} value={formatCurrency(Number(item.total))} />
+                    </MobileRecordCard>
+                  );
+                })}
+              </div>
+            )}
+            <div className="hidden overflow-x-auto lg:block">
               <table className="w-full min-w-[760px] text-sm">
                 <thead>
                   <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
@@ -119,16 +149,16 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
 
           {canChange && (
             <div className="bg-surface border border-border rounded-card p-3 flex flex-wrap items-center gap-2">
-              <PurchaseCancelButton purchaseId={purchase.id} />
-              <Link href={copyHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9")}>
+              <PurchaseCancelButton purchaseId={purchase.id} className="min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background" />
+              <Link href={copyHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11")}>
                 <Copy className="h-4 w-4" />
                 {t("purchases.copy")}
               </Link>
-              <Link href={printHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9")}>
+              <Link href={printHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11")}>
                 <Printer className="h-4 w-4" />
                 {t("print.printBtn")}
               </Link>
-              <Link href={editHref} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-9 ml-auto")}>
+              <Link href={editHref} className={cn(buttonVariants({ variant: "default", size: "sm" }), "min-h-11 ml-auto")}>
                 <FilePenLine className="h-4 w-4" />
                 {t("purchases.edit")}
               </Link>

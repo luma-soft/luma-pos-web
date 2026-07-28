@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { Routes } from "@/lib/routes";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
+import { MobileRecordCard, MobileRecordField } from "@/components/mobile-ui";
 import { OrderDetailLink } from "@/components/order-detail-link";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { getCustomer } from "@/lib/data/partners";
@@ -103,44 +104,70 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
         </div>
       )}
 
-      <div className="bg-surface border border-border rounded-card overflow-x-auto">
+      <div className="bg-surface border border-border rounded-card overflow-hidden">
         <div className="px-4 py-3 border-b border-border font-semibold text-sm">
           {t("customers.orderHistory")}
         </div>
         {customer.orders.length === 0 ? (
           <p className="px-4 py-8 text-sm text-slate-400 text-center">{t("orders.empty")}</p>
         ) : (
-          <table className="w-full min-w-[640px] text-sm">
-            <thead>
-              <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
-                <th className="px-4 py-2.5 font-semibold">{t("orders.cols.code")}</th>
-                <th className="px-4 py-2.5 font-semibold">{t("orders.cols.date")}</th>
-                <th className="px-4 py-2.5 font-semibold">{t("orders.cols.project")}</th>
-                <th className="px-4 py-2.5 font-semibold text-right">{t("orders.cols.total")}</th>
-                <th className="px-4 py-2.5 font-semibold text-right">{t("orders.cols.remaining")}</th>
-                <th className="px-4 py-2.5 font-semibold">{t("orders.cols.payment")}</th>
-                <th className="px-4 py-2.5 font-semibold">{t("orders.cols.status")}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-soft">
-              {customer.orders.map((o) => {
-                const remaining = Number(o.total) - Number(o.amountPaid);
+          <>
+            <div className="space-y-2 p-3 lg:hidden">
+              {customer.orders.map((order) => {
+                const remaining = Number(order.total) - Number(order.amountPaid);
                 return (
-                  <tr key={o.id} className={cn("hover:bg-surface-2", o.status === "cancelled" && "opacity-60")}>
-                    <td className="px-4 py-3"><OrderDetailLink orderId={o.id} className="font-medium text-primary-600 hover:underline">{o.code}</OrderDetailLink></td>
-                    <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{formatDate(o.createdAt)}</td>
-                    <td className="px-4 py-3 text-slate-500">{o.projectName ?? "—"}</td>
-                    <td className="px-4 py-3 text-right tabular-nums font-medium">{formatCurrency(Number(o.total))}</td>
-                    <td className={cn("px-4 py-3 text-right tabular-nums", remaining > 0 && o.status !== "cancelled" ? "text-er font-semibold" : "text-slate-400")}>
-                      {remaining > 0 && o.status !== "cancelled" ? formatCurrency(remaining) : "—"}
-                    </td>
-                    <td className="px-4 py-3"><PaymentStatusBadge status={o.paymentStatus} /></td>
-                    <td className="px-4 py-3"><OrderStatusBadge status={o.status} /></td>
-                  </tr>
+                  <MobileRecordCard
+                    key={order.id}
+                    title={<OrderDetailLink orderId={order.id}>{order.code}</OrderDetailLink>}
+                    subtitle={formatDate(order.createdAt)}
+                    status={<OrderStatusBadge status={order.status} />}
+                  >
+                    <MobileRecordField label={t("orders.cols.total")} value={formatCurrency(Number(order.total))} />
+                    <MobileRecordField
+                      label={t("orders.cols.remaining")}
+                      value={remaining > 0 && order.status !== "cancelled" ? formatCurrency(remaining) : "—"}
+                      tone={remaining > 0 && order.status !== "cancelled" ? "danger" : "neutral"}
+                    />
+                    <MobileRecordField label={t("orders.cols.project")} value={order.projectName ?? "—"} />
+                    <MobileRecordField label={t("orders.cols.payment")} value={<PaymentStatusBadge status={order.paymentStatus} />} />
+                  </MobileRecordCard>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+            <div className="hidden overflow-x-auto lg:block">
+              <table className="w-full min-w-[640px] text-sm">
+                <thead>
+                  <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
+                    <th className="px-4 py-2.5 font-semibold">{t("orders.cols.code")}</th>
+                    <th className="px-4 py-2.5 font-semibold">{t("orders.cols.date")}</th>
+                    <th className="px-4 py-2.5 font-semibold">{t("orders.cols.project")}</th>
+                    <th className="px-4 py-2.5 font-semibold text-right">{t("orders.cols.total")}</th>
+                    <th className="px-4 py-2.5 font-semibold text-right">{t("orders.cols.remaining")}</th>
+                    <th className="px-4 py-2.5 font-semibold">{t("orders.cols.payment")}</th>
+                    <th className="px-4 py-2.5 font-semibold">{t("orders.cols.status")}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-soft">
+                  {customer.orders.map((o) => {
+                    const remaining = Number(o.total) - Number(o.amountPaid);
+                    return (
+                      <tr key={o.id} className={cn("hover:bg-surface-2", o.status === "cancelled" && "opacity-60")}>
+                        <td className="px-4 py-3"><OrderDetailLink orderId={o.id} className="font-medium text-primary-600 hover:underline">{o.code}</OrderDetailLink></td>
+                        <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{formatDate(o.createdAt)}</td>
+                        <td className="px-4 py-3 text-slate-500">{o.projectName ?? "—"}</td>
+                        <td className="px-4 py-3 text-right tabular-nums font-medium">{formatCurrency(Number(o.total))}</td>
+                        <td className={cn("px-4 py-3 text-right tabular-nums", remaining > 0 && o.status !== "cancelled" ? "text-er font-semibold" : "text-slate-400")}>
+                          {remaining > 0 && o.status !== "cancelled" ? formatCurrency(remaining) : "—"}
+                        </td>
+                        <td className="px-4 py-3"><PaymentStatusBadge status={o.paymentStatus} /></td>
+                        <td className="px-4 py-3"><OrderStatusBadge status={o.status} /></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>
