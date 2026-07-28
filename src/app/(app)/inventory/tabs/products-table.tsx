@@ -316,15 +316,15 @@ export function ProductDetailView({
   }
 
   return (
-    <div className={cn("bg-surface px-4 py-4", surface === "modal" && "flex h-full min-h-0 flex-col", surface === "page" && "rounded-card border border-border-soft")}>
-      <div className="-mx-4 flex shrink-0 snap-x snap-mandatory items-center gap-5 overflow-x-auto border-b border-border-soft px-4 text-sm font-semibold text-slate-500 sm:mx-0 sm:gap-6 sm:px-0">
+    <div className={cn("bg-canvas px-3 py-3 sm:bg-surface sm:px-4 sm:py-4", surface === "modal" && "flex h-full min-h-0 flex-col", surface === "page" && "sm:rounded-card sm:border sm:border-border-soft")}>
+      <div className="-mx-3 flex shrink-0 snap-x snap-mandatory items-center gap-5 overflow-x-auto border-b border-border-soft bg-surface px-3 text-sm font-semibold text-slate-500 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-4 sm:px-4 lg:mx-0 lg:gap-6 lg:px-0">
         {PRODUCT_EXPAND_TABS.map((key) => (
           <button
             key={key}
             type="button"
             onClick={() => setTab(key)}
             className={cn(
-              "min-h-11 shrink-0 snap-start border-b-2 pt-2 transition-colors sm:min-h-0 sm:pb-2 sm:pt-0",
+              "min-h-11 shrink-0 snap-start border-b-2 px-1 pt-2 transition-colors lg:min-h-0 lg:px-0 lg:pb-2 lg:pt-0",
               tab === key
                 ? "border-primary-600 text-primary-600"
                 : "border-transparent hover:text-slate-800 dark:hover:text-slate-200",
@@ -335,7 +335,7 @@ export function ProductDetailView({
         ))}
       </div>
 
-      <div className={cn("pt-4", surface === "modal" && "min-h-0 flex-1 overflow-y-auto")}>
+      <div className={cn("pt-3 sm:pt-4", surface === "modal" && "min-h-0 flex-1 overflow-y-auto")}>
         {tab === "info" && (
           <ProductInfoPanel
             product={product}
@@ -379,8 +379,8 @@ function ProductInfoPanel({
   const image = imageUrls[activeImage];
 
   return (
-    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[160px_1fr]">
-      <div>
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[160px_1fr] lg:gap-5">
+      <div className="flex flex-col items-center lg:block">
         <button
           type="button"
           onClick={() => image && setImagePreviewOpen(true)}
@@ -391,7 +391,7 @@ function ProductInfoPanel({
               : undefined
           }
           className={cn(
-            "group relative h-36 w-36 overflow-hidden rounded-card border border-border bg-primary-50/50",
+            "group relative h-32 w-32 overflow-hidden rounded-2xl border border-border bg-surface shadow-sm lg:h-36 lg:w-36 lg:rounded-card lg:bg-primary-50/50 lg:shadow-none",
             image && "cursor-zoom-in transition hover:border-primary-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2",
           )}
         >
@@ -416,7 +416,7 @@ function ProductInfoPanel({
           )}
         </button>
         {imageUrls.length > 1 && (
-          <div className="mt-2 flex w-36 gap-1.5 overflow-x-auto pb-1">
+          <div className="mt-2 flex w-32 gap-1.5 overflow-x-auto pb-1 lg:w-36">
             {imageUrls.map((url, index) => (
               <button
                 key={url}
@@ -446,16 +446,16 @@ function ProductInfoPanel({
         />
       )}
 
-      <div className="min-w-0 space-y-4">
+      <div className="min-w-0 space-y-3 lg:space-y-4">
         <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="break-words text-lg font-bold text-slate-900 dark:text-slate-100">
+          <div className="min-w-0 flex-1 text-center lg:text-left">
+            <h3 className="text-balance break-words text-lg font-black leading-snug text-slate-900 lg:font-bold dark:text-slate-100">
               {product.name}
             </h3>
             <div className="mt-1 text-sm text-slate-500">
               {t("products.fields.category")}: {product.categoryName ?? "—"}
             </div>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-2 flex flex-wrap justify-center gap-2 lg:justify-start">
               <Badge
                 text={
                   product.productKind !== "product"
@@ -477,25 +477,61 @@ function ProductInfoPanel({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 lg:hidden">
+          <ProductMetric
+            label={t("products.pricing.retailPrice")}
+            value={formatCurrency(Number(product.retailPrice))}
+            tone="primary"
+          />
+          <ProductMetric
+            label={t("products.pricing.costPrice")}
+            value={formatCurrency(Number(product.costPrice))}
+          />
+          <ProductMetric
+            label={t("products.stock.current")}
+            value={productStockDisplay(product, t("products.stock.notTracked"))}
+            tone={
+              isProductStockManaged(product.categoryName, product.productKind) &&
+              Number(product.minLevel) > 0 &&
+              Number(product.totalStock) <= Number(product.minLevel)
+                ? "warning"
+                : "success"
+            }
+          />
+          <ProductMetric
+            label={t("products.stock.min")}
+            value={
+              isProductStockManaged(product.categoryName, product.productKind) &&
+              Number(product.minLevel) > 0
+                ? formatNumber(Number(product.minLevel))
+                : "—"
+            }
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-x-8 lg:gap-y-3">
           <InfoItem label={t("products.fields.sku")} value={product.sku} />
           <InfoItem
             label={t("products.fields.barcode")}
             value={product.barcode}
           />
           <InfoItem
+            className="hidden lg:block"
             label={t("products.pricing.costPrice")}
             value={formatCurrency(Number(product.costPrice))}
           />
           <InfoItem
+            className="hidden lg:block"
             label={t("products.pricing.retailPrice")}
             value={formatCurrency(Number(product.retailPrice))}
           />
           <InfoItem
+            className="hidden lg:block"
             label={t("products.stock.current")}
             value={productStockDisplay(product, t("products.stock.notTracked"))}
           />
           <InfoItem
+            className="hidden lg:block"
             label={t("products.stock.min")}
             value={
               isProductStockManaged(product.categoryName, product.productKind) && Number(product.minLevel) > 0
@@ -548,7 +584,7 @@ function ProductInfoPanel({
         )}
 
         {specs.length > 0 && (
-          <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 lg:grid-cols-4 lg:gap-x-8 lg:gap-y-3">
             {specs.map(([key, value]) => (
               <InfoItem key={key} label={key} value={value} />
             ))}
@@ -1190,7 +1226,12 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
 
   return (
     <div className="border-t border-border-soft pt-4">
-      <div className="flex flex-nowrap gap-2 overflow-x-auto xl:flex-wrap xl:justify-end xl:overflow-visible">
+      <div className={cn(
+        cameraMaterials
+          ? "flex"
+          : "grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px]",
+        "gap-2 lg:flex lg:flex-wrap lg:justify-end",
+      )}>
         {cameraMaterials ? (
           <ActionButton
             icon={Trash2}
@@ -1204,6 +1245,7 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
             <ActionLink
               icon={Copy}
               label={t("products.actions.copy")}
+              className="hidden lg:inline-flex"
               href={productModalHref({
                 productModal: "copy",
                 copyFrom: product.id,
@@ -1236,7 +1278,7 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
               aria-haspopup="menu"
               aria-expanded={moreOpen}
               onClick={() => setMoreOpen((value) => !value)}
-              className={cn(actionClassName, "border-border bg-surface text-slate-700 hover:bg-surface-2 dark:text-slate-200")}
+              className={cn(actionClassName, "w-11 border-border bg-surface px-0 text-slate-700 hover:bg-surface-2 dark:text-slate-200")}
             >
               <MoreHorizontal className="h-4 w-4" />
             </button>
@@ -1255,6 +1297,15 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
                 }
                 className="fixed z-[100] min-w-52 overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-xl"
               >
+                  <MenuActionLink
+                    icon={Copy}
+                    label={t("products.actions.copy")}
+                    href={productModalHref({
+                      productModal: "copy",
+                      copyFrom: product.id,
+                    })}
+                    className="lg:hidden"
+                  />
                   {ONLINE_SALES_ENABLED && (
                     <MenuActionLink
                       icon={Store}
@@ -1310,12 +1361,14 @@ function ActionLink({
   label,
   tone = "neutral",
   replace = false,
+  className,
 }: {
   href: string;
   icon: LucideIcon;
   label: string;
   tone?: "neutral" | "primary";
   replace?: boolean;
+  className?: string;
 }) {
   return (
     <Link
@@ -1326,6 +1379,7 @@ function ActionLink({
         tone === "primary"
           ? "border-primary-600 bg-primary-600 text-white hover:border-primary-700 hover:bg-primary-700"
           : "border-border bg-surface text-slate-700 hover:bg-surface-2 dark:text-slate-200",
+        className,
       )}
     >
       <Icon className="h-4 w-4" />
@@ -1338,13 +1392,15 @@ function MenuActionLink({
   href,
   icon: Icon,
   label,
+  className,
 }: {
   href: string;
   icon: LucideIcon;
   label: string;
+  className?: string;
 }) {
   return (
-    <Link href={href} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-surface-2 dark:text-slate-200">
+    <Link href={href} className={cn("flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-surface-2 dark:text-slate-200", className)}>
       <Icon className="h-4 w-4" />
       {label}
     </Link>
@@ -1438,11 +1494,47 @@ function StatusBadge({ product }: { product: ProductRow }) {
   );
 }
 
-function InfoItem({ label, value }: { label: string; value?: string | null }) {
+function ProductMetric({
+  label,
+  value,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  tone?: "neutral" | "primary" | "success" | "warning";
+}) {
   return (
-    <div className="border-b border-border-soft pb-2">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className="mt-1 min-h-5 text-sm font-medium text-slate-800 dark:text-slate-100">
+    <div className="min-w-0 rounded-xl border border-border-soft bg-surface px-3 py-3 shadow-sm">
+      <div className="truncate text-[10px] font-semibold text-slate-400">
+        {label}
+      </div>
+      <div
+        className={cn(
+          "mt-1 truncate font-mono text-sm font-black tabular-nums text-slate-800 dark:text-slate-100",
+          tone === "primary" && "text-primary-700 dark:text-primary-300",
+          tone === "success" && "text-ok",
+          tone === "warning" && "text-warn",
+        )}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function InfoItem({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value?: string | null;
+  className?: string;
+}) {
+  return (
+    <div className={cn("min-w-0 rounded-xl bg-surface px-3 py-2.5 shadow-sm lg:rounded-none lg:border-b lg:border-border-soft lg:bg-transparent lg:px-0 lg:pb-2 lg:pt-0 lg:shadow-none", className)}>
+      <div className="truncate text-[10px] font-semibold text-slate-400 lg:text-xs lg:font-normal lg:text-slate-500">{label}</div>
+      <div className="mt-1 min-h-5 break-words text-sm font-semibold text-slate-800 lg:font-medium dark:text-slate-100">
         {value || "—"}
       </div>
     </div>
