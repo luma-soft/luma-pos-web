@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { Search, Trash2 } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
+import { MobileFormLineCard } from "@/components/mobile-ui";
 import { cn, formatCurrency } from "@/lib/utils";
 import { Combobox } from "@/components/combobox";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -493,7 +494,73 @@ export function PurchaseForm({
             {lines.length === 0 ? (
               <Text as="div" variant="muted" className="h-full grid place-items-center" text={t("purchases.pickProduct")} />
             ) : (
-              <table className="w-full min-w-[760px] text-sm">
+              <>
+                <div className="space-y-2 p-3 lg:hidden">
+                  {lines.map((l) => (
+                    <MobileFormLineCard
+                      key={l.productId}
+                      title={l.name}
+                      subtitle={l.sku}
+                      amount={formatCurrency(lineTotal(l))}
+                      actions={(
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => setLines((current) => current.filter((item) => item.productId !== l.productId))}
+                          className="min-h-11 text-er"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          {t("common.delete")}
+                        </Button>
+                      )}
+                    >
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1 text-xs font-semibold text-slate-500">
+                          <span>{t("products.fields.baseUnit")}</span>
+                          <Select
+                            aria-label={t("products.fields.baseUnit")}
+                            value={l.unitName}
+                            onChange={(event) => changeUnit(l.productId, event.target.value)}
+                            className="h-11"
+                            options={[
+                              { value: l.baseUnit, label: l.baseUnit },
+                              ...l.units.map((unit) => ({ value: unit.unitName, label: `${unit.unitName} (×${unit.multiplier})` })),
+                            ]}
+                          />
+                        </div>
+                        <div className="space-y-1 text-xs font-semibold text-slate-500">
+                          <span>{t("purchases.cols.qty")}</span>
+                          <QuantityInput min={0} value={l.quantity} onChange={(quantity) => patch(l.productId, { quantity })} className="min-h-11" />
+                        </div>
+                        <div className="space-y-1 text-xs font-semibold text-slate-500">
+                          <span>{t("purchases.cols.unitCost")}</span>
+                          <MoneyInput aria-label={t("purchases.cols.unitCost")} value={l.unitCost} onChange={(value) => patch(l.productId, { unitCost: value ?? 0 })} className={cn(numCls, "h-11")} />
+                        </div>
+                        <div className="space-y-1 text-xs font-semibold text-slate-500">
+                          <span>{t("orders.cols.discount")}</span>
+                          <div className="flex items-center gap-1">
+                            <NumberInput aria-label={t("orders.cols.discount")} min={0} value={l.discInput} placeholder="0" onChange={(discInput) => patch(l.productId, { discInput: discInput ?? 0 })} className={cn(numCls, "h-11 min-w-0")} />
+                            <div className="flex shrink-0 overflow-hidden rounded-md border border-slate-200 dark:border-slate-700">
+                              {(["vnd", "pct"] as const).map((mode) => (
+                                <Button
+                                  key={mode}
+                                  type="button"
+                                  onClick={() => patch(l.productId, { discMode: mode })}
+                                  variant={l.discMode === mode ? "default" : "ghost"}
+                                  className="h-11 rounded-none px-2 text-[11px] font-semibold"
+                                >
+                                  {mode === "vnd" ? "đ" : "%"}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </MobileFormLineCard>
+                  ))}
+                </div>
+                <div className="hidden lg:block">
+                  <table className="w-full min-w-[760px] text-sm">
                 <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800/80">
                   <tr className="text-left text-xs uppercase text-slate-500">
                     <th className="px-3 py-2.5 font-semibold">{t("orders.cols.product")}</th>
@@ -550,7 +617,9 @@ export function PurchaseForm({
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -596,10 +665,12 @@ export function PurchaseForm({
 
           {error && <Text as="p" variant="destructive" text={error} />}
 
-          <Button type="button" onClick={submit} disabled={lines.length === 0 || !supplierId} loading={busy} block className="mt-auto h-12 rounded-card font-semibold">
-            {mode === "edit" ? t("purchases.saveChanges") : t("purchases.receiveNow")} · {formatCurrency(total)}
-          </Button>
-          <Text as="p" variant="muted" className="text-[11px]" text={t("purchases.receiveHint")} />
+          <div className="sticky bottom-0 z-10 -mx-3 mt-auto bg-surface px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:static lg:mx-0 lg:bg-transparent lg:p-0">
+            <Button type="button" onClick={submit} disabled={lines.length === 0 || !supplierId} loading={busy} block className="h-12 rounded-card font-semibold">
+              {mode === "edit" ? t("purchases.saveChanges") : t("purchases.receiveNow")} · {formatCurrency(total)}
+            </Button>
+            <Text as="p" variant="muted" className="mt-2 text-[11px]" text={t("purchases.receiveHint")} />
+          </div>
         </div>
       </div>
 

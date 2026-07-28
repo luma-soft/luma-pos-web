@@ -7,6 +7,7 @@ import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-acti
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
 import type { AiQuickActionApplyMode } from "@/components/ai-quick-actions/types";
 import { SearchableSelect } from "@/components/combobox";
+import { MobileFormLineCard } from "@/components/mobile-ui";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
@@ -14,7 +15,7 @@ import { QuantityInput } from "@/components/ui/quantity-input";
 import { Select } from "@/components/ui/select";
 import { createInternalUse } from "@/lib/actions/internal-use";
 import { Routes } from "@/lib/routes";
-import { formatCurrency, cn } from "@/lib/utils";
+import { formatCurrency, formatNumber, cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import type { AiActionPreview } from "@/lib/ai/actions";
 import { useProductCatalog } from "@/components/product-catalog-provider";
@@ -35,7 +36,7 @@ const REASONS = [
 ] as const;
 
 type Line = {
-  key: string; productId: string; sku: string; productName: string; baseUnit: string; costPrice: number;
+  key: string; productId: string; sku: string; productName: string; baseUnit: string; costPrice: number; stock: number;
   units: { name: string; mult: number }[]; unitName: string; unitMultiplier: number; quantity: number; unitCost: number;
 };
 
@@ -83,7 +84,7 @@ export function InternalUseForm() {
     setLines((ls) => {
       const ex = ls.findIndex((x) => x.productId === p.id);
       if (ex >= 0) { const c = [...ls]; c[ex] = { ...c[ex], quantity: c[ex].quantity + 1 }; return c; }
-      return [...ls, { key: `${p.id}-${Date.now()}`, productId: p.id, sku: p.sku, productName: p.name, baseUnit: p.baseUnit, costPrice: cost, units, unitName: p.baseUnit, unitMultiplier: 1, quantity: 1, unitCost: cost }];
+      return [...ls, { key: `${p.id}-${Date.now()}`, productId: p.id, sku: p.sku, productName: p.name, baseUnit: p.baseUnit, costPrice: cost, stock: Number(p.totalStock) || 0, units, unitName: p.baseUnit, unitMultiplier: 1, quantity: 1, unitCost: cost }];
     });
     setQ(""); setResults([]);
   }
@@ -127,6 +128,7 @@ export function InternalUseForm() {
           productName: product.name,
           baseUnit: product.baseUnit,
           costPrice: cost,
+          stock: Number(product.totalStock) || 0,
           units,
           unitName: product.baseUnit,
           unitMultiplier: 1,
@@ -209,7 +211,56 @@ export function InternalUseForm() {
           </div>
 
           <div className="flex-1 min-h-[320px] overflow-auto bg-surface border border-border rounded-card">
-            <table className="w-full min-w-[760px] table-fixed text-sm">
+            <div className="space-y-2 p-3 lg:hidden">
+              {lines.map((l) => (
+                <MobileFormLineCard
+                  key={l.key}
+                  title={l.productName}
+                  subtitle={l.sku}
+                  amount={formatCurrency(l.unitCost * l.quantity)}
+                  actions={(
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setLines((current) => current.filter((item) => item.key !== l.key))}
+                      className="min-h-11 text-er"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {t("common.delete")}
+                    </Button>
+                  )}
+                >
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <div className="text-xs font-semibold text-slate-500">{t("pos.stockLabel")}</div>
+                      <div className="flex h-11 items-center rounded-md bg-canvas px-3 text-sm font-semibold tabular-nums">
+                        {formatNumber(l.stock)} {l.baseUnit}
+                      </div>
+                    </div>
+                    <div className="space-y-1 text-xs font-semibold text-slate-500">
+                      <span>{t("internalUse.qty")}</span>
+                      <QuantityInput min={1} value={l.quantity} onChange={(quantity) => upd(l.key, { quantity })} className="min-h-11" />
+                    </div>
+                    <div className="space-y-1 text-xs font-semibold text-slate-500">
+                      <span>{t("internalUse.unit")}</span>
+                      <Select
+                        aria-label={t("internalUse.unit")}
+                        value={l.unitName}
+                        onChange={(event) => changeUnit(l, event.target.value)}
+                        options={l.units.map((unit) => ({ value: unit.name, label: `${unit.name}${unit.mult > 1 ? ` (×${unit.mult})` : ""}` }))}
+                        className="h-11 bg-canvas"
+                      />
+                    </div>
+                    <div className="space-y-1 text-xs font-semibold text-slate-500">
+                      <span>{t("internalUse.unitCost")}</span>
+                      <NumberInput aria-label={t("internalUse.unitCost")} min={0} value={l.unitCost} onChange={(unitCost) => upd(l.key, { unitCost: unitCost ?? 0 })} className="h-11 bg-canvas text-right font-mono" />
+                    </div>
+                  </div>
+                </MobileFormLineCard>
+              ))}
+            </div>
+            <div className="hidden lg:block">
+              <table className="w-full min-w-[760px] table-fixed text-sm">
               <colgroup>
                 <col className="w-14" />
                 <col className="w-28" />
@@ -260,7 +311,8 @@ export function InternalUseForm() {
                   ))}
                 </tbody>
               )}
-            </table>
+              </table>
+            </div>
           </div>
       </section>
 
@@ -285,7 +337,7 @@ export function InternalUseForm() {
             className="mt-6 min-h-28 bg-canvas"
           />
 
-          <div className="mt-auto grid grid-cols-2 gap-3 pt-6">
+          <div className="sticky bottom-0 z-10 -mx-3 mt-auto grid grid-cols-2 gap-3 bg-surface px-3 pt-6 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:static lg:mx-0 lg:bg-transparent lg:px-0 lg:pb-0">
             <Button type="button" variant="outline" size="lg" disabled={pending || lines.length === 0} loading={pending} onClick={submit} block>
               {!pending && <Save className="h-4 w-4" />}
               {t("stocktakes.saveDraft")}

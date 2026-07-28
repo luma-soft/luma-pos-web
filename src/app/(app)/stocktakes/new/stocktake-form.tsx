@@ -7,6 +7,7 @@ import { Check, ClipboardCheck, Loader2, PackageSearch, Save, Search, Trash2 } f
 import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
+import { MobileFormLineCard } from "@/components/mobile-ui";
 import type { AiQuickActionApplyMode } from "@/components/ai-quick-actions/types";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { Button } from "@/components/ui/button";
@@ -250,8 +251,50 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
               </div>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-210 text-sm">
+            <>
+              <div className="space-y-2 p-3 lg:hidden">
+                {lines.map((l) => {
+                  const diff = l.actualQty - l.product.stock;
+                  return (
+                    <MobileFormLineCard
+                      key={l.product.id}
+                      title={l.product.name}
+                      subtitle={`${l.product.sku} · ${l.product.baseUnit}`}
+                      amount={diff !== 0 ? formatCurrency(diff * l.product.costPrice) : "—"}
+                      actions={(
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => setLines((current) => current.filter((item) => item.product.id !== l.product.id))}
+                          className="min-h-11 text-er"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          {t("common.delete")}
+                        </Button>
+                      )}
+                    >
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <div className="text-xs font-semibold text-slate-500">{t("stocktakes.cols.systemQty")}</div>
+                          <div className="flex h-11 items-center rounded-md bg-canvas px-3 text-sm font-semibold tabular-nums">{formatNumber(l.product.stock)}</div>
+                        </div>
+                        <div className="space-y-1 text-xs font-semibold text-slate-500">
+                          <span>{t("stocktakes.cols.actualQty")}</span>
+                          <QuantityInput min={0} value={l.actualQty} onChange={(quantity) => setQty(l.product.id, quantity)} className="min-h-11" />
+                        </div>
+                        <div className="col-span-2 space-y-1">
+                          <div className="text-xs font-semibold text-slate-500">{t("stocktakes.cols.diff")}</div>
+                          <div className={cn("flex h-11 items-center rounded-md bg-canvas px-3 text-sm font-semibold tabular-nums", diff > 0 ? "text-ok" : diff < 0 ? "text-er" : "text-slate-400")}>
+                            {Math.abs(diff) < 1e-9 ? <Check className="h-4 w-4 text-ok" /> : `${diff > 0 ? "+" : ""}${formatNumber(diff)}`}
+                          </div>
+                        </div>
+                      </div>
+                    </MobileFormLineCard>
+                  );
+                })}
+              </div>
+              <div className="hidden overflow-x-auto lg:block">
+                <table className="w-full min-w-210 text-sm">
                 <thead>
                   <tr className="border-b border-border-soft bg-canvas text-left text-[11px] text-slate-500">
                     <th className="px-4 py-3 font-semibold">{t("orders.cols.product")}</th>
@@ -296,8 +339,9 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                     );
                   })}
                 </tbody>
-              </table>
-            </div>
+                </table>
+              </div>
+            </>
           )}
         </section>
 
@@ -340,7 +384,7 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
             {error && <p className="mt-2 text-xs text-er">{error}</p>}
           </div>
 
-          <div className="mt-4 grid gap-2">
+          <div className="sticky bottom-0 z-10 -mx-5 mt-4 grid gap-2 bg-surface px-5 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:static lg:mx-0 lg:bg-transparent lg:p-0">
             <Button
               type="button"
               onClick={() => submit(true)} disabled={!!busy || lines.length === 0}

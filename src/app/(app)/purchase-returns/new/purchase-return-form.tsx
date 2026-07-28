@@ -9,6 +9,7 @@ import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-actio
 import type { AiQuickActionApplyMode } from "@/components/ai-quick-actions/types";
 import { Combobox } from "@/components/combobox";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
+import { MobileFormLineCard } from "@/components/mobile-ui";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -198,7 +199,70 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
           </div>
 
           <div className="flex-1 min-h-[320px] overflow-auto bg-surface border border-border rounded-card">
-            <table className="w-full min-w-[820px] table-fixed text-sm">
+            <div className="lg:hidden">
+              {lines.length === 0 ? (
+                <div className="grid min-h-[320px] place-items-center px-4 text-center text-slate-400">
+                  <div>
+                    <div className="font-semibold text-slate-700 dark:text-slate-200">{t("purchaseReturns.emptyLinesTitle")}</div>
+                    <div className="mt-2 text-sm">{t("purchaseReturns.emptyLinesHint")}</div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2 p-3">
+                  {lines.map((line) => {
+                    const overStock = line.quantity > line.stock + 1e-9;
+                    return (
+                      <MobileFormLineCard
+                        key={line.productId}
+                        title={line.name}
+                        subtitle={line.sku}
+                        amount={formatCurrency(line.quantity * line.returnUnitCost)}
+                        actions={(
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => setLines((current) => current.filter((item) => item.productId !== line.productId))}
+                            className="min-h-11 text-er"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            {t("common.delete")}
+                          </Button>
+                        )}
+                      >
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <div className="text-xs font-semibold text-slate-500">{t("purchaseReturns.availableStock", { stock: formatNumber(line.stock), unit: line.unitName })}</div>
+                            <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">{line.unitName}</div>
+                          </div>
+                          <div className="space-y-1 text-xs font-semibold text-slate-500">
+                            <span>{t("purchaseReturns.cols.qty")}</span>
+                            <QuantityInput
+                              min={0}
+                              max={line.stock}
+                              value={line.quantity}
+                              onChange={(quantity) => patch(line.productId, { quantity })}
+                              className={cn("min-h-11", overStock && "border-er text-er")}
+                              inputClassName={cn(overStock && "border-er text-er")}
+                            />
+                            {overStock && <span className="block text-er">{t("purchaseReturns.errors.insufficientStock")}</span>}
+                          </div>
+                          <div className="space-y-1">
+                            <div className="text-xs font-semibold text-slate-500">{t("purchaseReturns.cols.unitCost")}</div>
+                            <div className="flex h-11 items-center justify-end rounded-md bg-canvas px-3 text-sm tabular-nums text-slate-500">{formatCurrency(line.unitCost)}</div>
+                          </div>
+                          <div className="space-y-1 text-xs font-semibold text-slate-500">
+                            <span>{t("purchaseReturns.cols.returnUnitCost")}</span>
+                            <MoneyInput aria-label={t("purchaseReturns.cols.returnUnitCost")} value={line.returnUnitCost} onChange={(value) => patch(line.productId, { returnUnitCost: value ?? 0 })} className={cn(numCls, "h-11")} />
+                          </div>
+                        </div>
+                      </MobileFormLineCard>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="hidden lg:block">
+              <table className="w-full min-w-[820px] table-fixed text-sm">
               <colgroup>
                 <col className="w-14" />
                 <col className="w-28" />
@@ -269,7 +333,8 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
                   );
                 })}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -330,13 +395,13 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
           <Textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder={t("orders.detail.notePlaceholder")} rows={3} className="resize-none" />
           {error && <Text as="p" variant="destructive" text={error} />}
 
-          <div className="mt-auto grid grid-cols-2 gap-3">
-            <Button type="button" variant="outline" disabled title={t("purchaseReturns.draftTodo")} className="h-12 rounded-card font-semibold">
-              {t("purchaseReturns.saveDraft")}
-            </Button>
-            <Button type="button" onClick={submit} disabled={lines.length === 0 || !supplierId || !warehouseId} loading={busy} className="h-12 rounded-card font-semibold">
-              {t("purchaseReturns.complete")}
-            </Button>
+          <div className="sticky bottom-0 z-10 -mx-3 mt-auto grid grid-cols-2 gap-3 bg-surface px-3 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:static lg:mx-0 lg:bg-transparent lg:p-0">
+              <Button type="button" variant="outline" disabled title={t("purchaseReturns.draftTodo")} className="h-12 rounded-card font-semibold">
+                {t("purchaseReturns.saveDraft")}
+              </Button>
+              <Button type="button" onClick={submit} disabled={lines.length === 0 || !supplierId || !warehouseId} loading={busy} className="h-12 rounded-card font-semibold">
+                {t("purchaseReturns.complete")}
+              </Button>
           </div>
         </aside>
       </div>
