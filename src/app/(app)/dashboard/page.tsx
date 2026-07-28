@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { getDashboard, categoryEmoji, type DashboardRange } from "@/lib/data/dashboard";
@@ -20,11 +20,15 @@ interface PageProps {
 }
 
 export default async function DashboardPage({ searchParams }: PageProps) {
-  const t = await getTranslations();
+  const [t, locale] = await Promise.all([getTranslations(), getLocale()]);
   const params = await searchParams;
   const range = (RANGES.includes(params.range as DashboardRange) ? params.range : "7d") as DashboardRange;
   const data = await getDashboard(range);
   const mobileData = range === "today" ? data : await getDashboard("today");
+  const mobileDayFormatter = new Intl.DateTimeFormat(locale, {
+    day: "2-digit",
+    month: "2-digit",
+  });
 
   const maxDay = Math.max(1, ...data.revenueByDay.map((d) => Number(d.revenue)));
 
@@ -43,33 +47,104 @@ export default async function DashboardPage({ searchParams }: PageProps) {
               <Bell className="h-6 w-6" />
             </Link>
           )}
+          bottom={(
+            <nav
+              aria-label={t("mobile.dashboard.rangeLabel")}
+              className="-mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {RANGES.map((r) => (
+                <Link
+                  key={r}
+                  href={`${Routes.Dashboard}?range=${r}`}
+                  aria-current={range === r ? "page" : undefined}
+                  className={cn(
+                    "inline-flex min-h-11 shrink-0 snap-start items-center justify-center rounded-full border px-4 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+                    range === r
+                      ? "border-primary-600 bg-primary-600 text-white shadow-sm"
+                      : "border-border bg-surface text-slate-600 hover:bg-surface-2 dark:text-slate-300",
+                  )}
+                >
+                  {t(`dashboard.range.${r}`)}
+                </Link>
+              ))}
+            </nav>
+          )}
         />
         <div className="space-y-4 px-3 py-3">
-          <section className="grid grid-cols-2 gap-2.5">
-            <MobileMetricTile
-              label={t("mobile.dashboard.revenue")}
-              value={formatCompactCurrency(mobileData.revenue)}
-              subtitle={t("mobile.dashboard.today")}
-              tone="success"
-            />
-            <MobileMetricTile
-              label={t("mobile.dashboard.orders")}
-              value={mobileData.orderCount}
-              subtitle={t("mobile.dashboard.recorded")}
-              tone="info"
-            />
-            <MobileMetricTile
-              label={t("mobile.dashboard.lowStock")}
-              value={mobileData.lowStock.length}
-              subtitle={t("mobile.dashboard.needRestock")}
-              tone="warning"
-            />
-            <MobileMetricTile
-              label={t("mobile.dashboard.receivables")}
-              value={mobileData.debt.debtors}
-              subtitle={t("mobile.dashboard.owingCustomers")}
-              tone="neutral"
-            />
+          <section className="space-y-2">
+            <MobileSectionLabel>{t("mobile.dashboard.todayOverview")}</MobileSectionLabel>
+            <div className="grid grid-cols-2 gap-2.5">
+              <MobileMetricTile
+                label={t("mobile.dashboard.revenue")}
+                value={formatCompactCurrency(mobileData.revenue)}
+                subtitle={t("mobile.dashboard.today")}
+                tone="success"
+              />
+              <MobileMetricTile
+                label={t("mobile.dashboard.orders")}
+                value={mobileData.orderCount}
+                subtitle={t("mobile.dashboard.recorded")}
+                tone="info"
+              />
+              <MobileMetricTile
+                label={t("mobile.dashboard.lowStock")}
+                value={mobileData.lowStock.length}
+                subtitle={t("mobile.dashboard.needRestock")}
+                tone="warning"
+              />
+              <MobileMetricTile
+                label={t("mobile.dashboard.receivables")}
+                value={mobileData.debt.debtors}
+                subtitle={t("mobile.dashboard.owingCustomers")}
+                tone="neutral"
+              />
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-border bg-surface shadow-e1">
+            <div className="border-b border-border-soft px-3 py-3">
+              <h2 className="text-sm font-black">{t("mobile.dashboard.revenueTrend")}</h2>
+              <p className="mt-0.5 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                {t("mobile.dashboard.selectedRange", { range: t(`dashboard.range.${range}`) })}
+              </p>
+            </div>
+            {data.revenueByDay.length === 0 ? (
+              <p className="px-3 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                {t("dashboard.noData")}
+              </p>
+            ) : (
+              <div className="overflow-x-auto overscroll-x-contain px-3 pb-3 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <div className="flex h-40 min-w-max items-end gap-2">
+                  {data.revenueByDay.map((d) => {
+                    const v = Number(d.revenue);
+                    const date = mobileDayFormatter.format(new Date(`${d.day}T00:00:00`));
+                    const label = t("mobile.dashboard.trendBarLabel", {
+                      date,
+                      revenue: formatCurrency(v),
+                    });
+                    return (
+                      <div key={d.day} className="flex h-full w-7 min-w-7 shrink-0 flex-col items-center gap-1.5">
+                        <div className="flex min-h-0 w-full flex-1 items-end">
+                          <div
+                            role="img"
+                            aria-label={label}
+                            title={label}
+                            className={cn(
+                              "w-7 min-w-7 rounded-t-md",
+                              d.dow === 7 ? "bg-surface-2" : "bg-primary-600/90",
+                            )}
+                            style={{ height: `${Math.max(4, (v / maxDay) * 100)}%` }}
+                          />
+                        </div>
+                        <span aria-hidden="true" className="text-[9px] font-bold tabular-nums text-slate-500 dark:text-slate-400">
+                          {date}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="space-y-2">

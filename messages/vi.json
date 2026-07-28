@@ -98,6 +98,11 @@
   "mobile": {
     "dashboard": {
       "subtitle": "Nhịp vận hành hôm nay · POS-first",
+      "rangeLabel": "Khoảng thời gian tổng quan",
+      "todayOverview": "Tình hình vận hành hôm nay",
+      "revenueTrend": "Xu hướng doanh thu",
+      "selectedRange": "Theo khoảng đã chọn: {range}",
+      "trendBarLabel": "Ngày {date}: doanh thu {revenue}",
       "revenue": "Doanh thu",
       "orders": "Đơn hàng",
       "lowStock": "Tồn thấp",

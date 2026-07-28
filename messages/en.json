@@ -98,6 +98,11 @@
   "mobile": {
     "dashboard": {
       "subtitle": "Today's operations · POS-first",
+      "rangeLabel": "Dashboard date range",
+      "todayOverview": "Today's operating snapshot",
+      "revenueTrend": "Revenue trend",
+      "selectedRange": "Selected range: {range}",
+      "trendBarLabel": "{date}: revenue {revenue}",
       "revenue": "Revenue",
       "orders": "Orders",
       "lowStock": "Low stock",
