@@ -28,7 +28,7 @@ export function MergeConfirm({ ids, disabled }: { ids: string[]; disabled: boole
       {error && <p className="text-sm text-er">{error}</p>}
       <button
         onClick={confirm} disabled={disabled || busy}
-        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium disabled:opacity-50"
+        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
       >
         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <GitMerge className="w-4 h-4" />}
         {t("merge.confirm", { count: ids.length })}

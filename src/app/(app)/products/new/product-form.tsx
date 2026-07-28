@@ -760,7 +760,7 @@ function SiblingApplySection({ siblingCount }: { siblingCount: number }) {
             {APPLY_FIELD_OPTIONS.map((opt) => (
               <label
                 key={opt}
-                className="flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-sm"
+                className="flex min-h-11 min-w-11 items-center gap-2 rounded-lg bg-surface px-3 py-2 text-sm lg:min-h-0 lg:min-w-0"
               >
                 <input
                   type="checkbox"
@@ -990,7 +990,7 @@ function VariantChildrenPreview() {
                     className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-right lg:min-h-0"
                   />
                 </td>
-                <td className="block p-0 lg:table-cell lg:px-3 lg:py-2">
+                <td className="col-span-2 block p-0 lg:table-cell lg:px-3 lg:py-2">
                   <div className="mb-1 text-xs font-semibold text-slate-500 lg:hidden">{t("products.variants.initialStock")}</div>
                   <QuantityInput
                     min={0}
@@ -1001,7 +1001,7 @@ function VariantChildrenPreview() {
                         shouldValidate: true,
                       })
                     }
-                    className="w-full lg:w-32"
+                    className="w-full lg:w-[132px]"
                     touchTargets
                     inputLabel={`${child.variantName} — ${t("products.variants.initialStock")}`}
                   />
@@ -1349,7 +1349,7 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
         <button
           type="button"
           onClick={openPriceBooks}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold text-primary-600 hover:bg-primary-50 md:mt-[30px] dark:hover:bg-primary-950/30"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold text-primary-600 hover:bg-primary-50 md:mt-[30px] dark:hover:bg-primary-950/30 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
         >
           <Tag className="h-4 w-4" />
           {t("products.pricing.setupPriceBooks")}

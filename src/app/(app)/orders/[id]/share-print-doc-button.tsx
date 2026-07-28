@@ -103,7 +103,7 @@ export function SharePrintDocButton({ href, code, docType }: SharePrintDocButton
       type="button"
       onClick={handleShare}
       disabled={busy}
-      className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 bg-white dark:bg-surface")}
+      className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 bg-white dark:bg-surface min-h-11 min-w-11 lg:min-h-0 lg:min-w-0")}
       aria-live="polite"
     >
       {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Share2 className="mr-2 h-4 w-4" />}

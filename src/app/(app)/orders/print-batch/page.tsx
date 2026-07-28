@@ -39,7 +39,7 @@ export default async function PrintBatchPage({ searchParams }: Props) {
       <div className="min-h-screen grid place-items-center text-center p-8">
         <div>
           <p className="text-slate-500 mb-4">{t("orders.batchEmpty")}</p>
-          <Link href={Routes.Orders} className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium">
+          <Link href={Routes.Orders} className="inline-flex min-h-11 min-w-11 items-center justify-center px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium lg:min-h-0 lg:min-w-0">
             ← {t("orders.title")}
           </Link>
         </div>

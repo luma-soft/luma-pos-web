@@ -601,7 +601,7 @@ function ProductInfoPanel({
                 <Link
                   key={child.id}
                   href={Routes.productDetail(child.id)}
-                  className="grid grid-cols-[1fr_auto_auto] gap-3 px-3 py-2 text-sm hover:bg-surface-2"
+                  className="grid grid-cols-[1fr_auto_auto] gap-3 px-3 py-2 text-sm hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
                 >
                   <span className="min-w-0">
                     <span className="block break-words font-medium">
@@ -1467,7 +1467,7 @@ function MenuActionLink({
   className?: string;
 }) {
   return (
-    <Link href={href} className={cn("flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-surface-2 dark:text-slate-200", className)}>
+    <Link href={href} className={cn("flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-surface-2 dark:text-slate-200 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0", className)}>
       <Icon className="h-4 w-4" />
       {label}
     </Link>
@@ -1493,7 +1493,7 @@ function MenuActionButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium disabled:pointer-events-none disabled:opacity-50",
+        "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-medium disabled:pointer-events-none disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0",
         tone === "danger"
           ? "text-er hover:bg-red-50 dark:hover:bg-red-950/30"
           : "text-slate-700 hover:bg-surface-2 dark:text-slate-200",

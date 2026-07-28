@@ -48,11 +48,11 @@ export function CameraQuoteCreateButton({
       </Button>
       {open && (
         <div className="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-border bg-surface p-1 shadow-e2">
-          <button type="button" onClick={() => { setOpen(false); router.push(quoteHref(false)); }} className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-surface-2">
+          <button type="button" onClick={() => { setOpen(false); router.push(quoteHref(false)); }} className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
             <FileText className="mt-0.5 h-4 w-4 text-primary-600" />
             <span><span className="block text-sm font-semibold">{t("quotes.createQuoteNormal")}</span><span className="mt-0.5 block text-xs text-slate-500">{t("quotes.createQuoteNormalHint")}</span></span>
           </button>
-          <button type="button" onClick={() => { setOpen(false); router.push(quoteHref(true)); }} className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-surface-2">
+          <button type="button" onClick={() => { setOpen(false); router.push(quoteHref(true)); }} className="flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
             <Camera className="mt-0.5 h-4 w-4 text-primary-600" />
             <span><span className="block text-sm font-semibold">{t("quotes.createQuoteCamera")}</span><span className="mt-0.5 block text-xs text-slate-500">{t("quotes.createQuoteCameraHint")}</span></span>
           </button>

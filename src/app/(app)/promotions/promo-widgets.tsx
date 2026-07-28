@@ -139,7 +139,7 @@ export function PromoQuickCreate() {
               variant="link"
               size="sm"
               onClick={() => setTiers((ts) => [...ts, { minQty: (ts[ts.length - 1]?.minQty ?? 0) * 2 || 100, discountPct: (ts[ts.length - 1]?.discountPct ?? 0) + 2 }])}
-              className="h-auto px-0 text-xs"
+              className="h-auto px-0 text-xs min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
               text={`+ ${t("promos.addTier")}`}
             />
           </div>
@@ -167,6 +167,6 @@ export function PromoToggle({ id, isActive }: { id: string; isActive: boolean })
   }
 
   return (
-    <Button type="button" variant="link" size="sm" onClick={toggle} disabled={busy} className="h-auto px-0 text-xs" text={isActive ? t("promos.pause") : t("promos.resume")} />
+    <Button type="button" variant="link" size="sm" onClick={toggle} disabled={busy} className="h-auto px-0 text-xs min-h-11 min-w-11 lg:min-h-0 lg:min-w-0" text={isActive ? t("promos.pause") : t("promos.resume")} />
   );
 }

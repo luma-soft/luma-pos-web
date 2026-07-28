@@ -44,7 +44,7 @@ export function ShiftPanel({ open, openingFloat, expected, openedAt }: {
         <label className="text-[9px] font-bold uppercase tracking-wide text-slate-500">{t("shifts.openFloat")}</label>
         <MoneyInput min={0} value={floatVal === "" ? null : Number(floatVal)} onChange={(value) => setFloatVal(value == null ? "" : String(value))} placeholder="0" className="mt-1 w-full rounded-[10px] bg-canvas font-mono" />
         {err && <p className="text-xs text-er mt-2">{err}</p>}
-        <button disabled={pending} onClick={doOpen} className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 text-white text-sm font-semibold disabled:opacity-50">
+        <button disabled={pending} onClick={doOpen} className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 text-white text-sm font-semibold disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
           {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}{t("shifts.openBtn")}
         </button>
       </div>
@@ -76,7 +76,7 @@ export function ShiftPanel({ open, openingFloat, expected, openedAt }: {
         </div>
       )}
       {err && <p className="text-xs text-er mt-2">{err}</p>}
-      <button disabled={pending || counted === ""} onClick={doClose} className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 text-white text-sm font-semibold disabled:opacity-50">
+      <button disabled={pending || counted === ""} onClick={doClose} className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 text-white text-sm font-semibold disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
         {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}{t("shifts.closeBtn")}
       </button>
     </div>

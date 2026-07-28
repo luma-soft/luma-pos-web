@@ -110,7 +110,7 @@ export function CustomersTable({
           >
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-base font-bold">{t("customers.filters.title")}</h2>
-              <button type="button" onClick={() => setFilterOpen(false)} className="rounded-lg p-2 text-slate-400 hover:bg-surface-2 hover:text-slate-700">
+              <button type="button" onClick={() => setFilterOpen(false)} className="rounded-lg p-2 text-slate-400 hover:bg-surface-2 hover:text-slate-700 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -227,11 +227,11 @@ function CustomerRows({
           <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <CustomerSearch filters={filters} pageSize={data.pageSize} onOpenFilters={onOpenFilters} activeFilterCount={activeFilterCount} />
             <div className="flex shrink-0 items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
-              <button type="button" onClick={() => setCreateOpen(true)} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-10 shrink-0 rounded-lg")}>
+              <button type="button" onClick={() => setCreateOpen(true)} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-10 shrink-0 rounded-lg min-h-11 min-w-11 lg:min-h-0 lg:min-w-0")}>
                 <Plus className="h-4 w-4" />
                 {t("customers.createNew")}
               </button>
-              <Link href="/settings/import" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-10 shrink-0 rounded-lg")}>
+              <Link href="/settings/import" className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-10 shrink-0 rounded-lg min-h-11 min-w-11 lg:min-h-0 lg:min-w-0")}>
                 <FileInput className="h-4 w-4" />
                 {t("customers.actions.importFile")}
               </Link>
@@ -793,7 +793,7 @@ function CustomerFilterForm({ filters, pageSize }: { filters: CustomerFilters; p
       <MoneyRangeFilter title={t("customers.filters.currentDebt")} fromName="debtFrom" toName="debtTo" fromValue={filters.debtFrom} toValue={filters.debtTo} />
 
       <div className="flex gap-2 border-t border-border-soft pt-4">
-        <Link href={clearHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-10 rounded-lg")}>{t("customers.filters.clear")}</Link>
+        <Link href={clearHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-10 rounded-lg min-h-11 min-w-11 lg:min-h-0 lg:min-w-0")}>{t("customers.filters.clear")}</Link>
       </div>
     </InstantFilterForm>
   );
@@ -820,8 +820,8 @@ function DateRangeFilter({
       <div className="grid grid-cols-[auto_1fr] gap-2">
         <CalendarDays className="mt-2.5 h-4 w-4 text-primary-600" />
         <div className="grid gap-2">
-          <input type="date" name={fromName} defaultValue={fromValue ?? ""} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm" aria-label={t("customers.filters.from")} />
-          <input type="date" name={toName} defaultValue={toValue ?? ""} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm" aria-label={t("customers.filters.to")} />
+          <input type="date" name={fromName} defaultValue={fromValue ?? ""} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0" aria-label={t("customers.filters.from")} />
+          <input type="date" name={toName} defaultValue={toValue ?? ""} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0" aria-label={t("customers.filters.to")} />
         </div>
       </div>
     </div>
@@ -846,8 +846,8 @@ function MoneyRangeFilter({
     <div>
       <h3 className="mb-3 text-sm font-bold">{title}</h3>
       <div className="grid grid-cols-2 gap-2">
-        <input name={fromName} inputMode="numeric" defaultValue={fromValue ?? ""} placeholder={t("customers.filters.fromValue")} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm" />
-        <input name={toName} inputMode="numeric" defaultValue={toValue ?? ""} placeholder={t("customers.filters.toValue")} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm" />
+        <input name={fromName} inputMode="numeric" defaultValue={fromValue ?? ""} placeholder={t("customers.filters.fromValue")} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0" />
+        <input name={toName} inputMode="numeric" defaultValue={toValue ?? ""} placeholder={t("customers.filters.toValue")} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0" />
       </div>
     </div>
   );
@@ -868,7 +868,7 @@ function DisabledFilter({ title }: { title: string }) {
 
 function RadioPill({ name, value, checked, label }: { name: string; value: string; checked: boolean; label: string }) {
   return (
-    <label className={cn("inline-flex h-9 cursor-pointer items-center rounded-full border px-4 text-sm font-semibold", checked ? "border-primary-600 bg-primary-600 text-white" : "border-border bg-surface text-slate-600 hover:bg-surface-2")}>
+    <label className={cn("inline-flex h-9 min-h-11 min-w-11 cursor-pointer items-center rounded-full border px-4 text-sm font-semibold lg:min-h-0 lg:min-w-0", checked ? "border-primary-600 bg-primary-600 text-white" : "border-border bg-surface text-slate-600 hover:bg-surface-2")}>
       <input type="radio" name={name} value={value} defaultChecked={checked} className="sr-only" />
       {label}
     </label>
@@ -928,7 +928,7 @@ function ToolbarIcon({ icon: Icon, label, onClick }: { icon: LucideIcon; label: 
       onClick={onClick}
       title={label}
       aria-label={label}
-      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-slate-600 hover:bg-surface-2"
+      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-slate-600 hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
     >
       <Icon className="h-4 w-4" />
     </button>
@@ -970,4 +970,4 @@ function ActionButton({
 }
 
 const actionClassName =
-  "inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex h-10 min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 lg:min-h-0 lg:min-w-0";

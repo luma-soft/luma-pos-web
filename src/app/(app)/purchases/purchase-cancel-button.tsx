@@ -43,7 +43,7 @@ export function PurchaseCancelButton({
       onClick={onCancel}
       disabled={busy}
       className={cn(
-        "inline-flex shrink-0 items-center rounded-lg border border-red-200 font-medium text-er hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:hover:bg-red-950/40",
+        "inline-flex shrink-0 items-center rounded-lg border border-red-200 font-medium text-er hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:hover:bg-red-950/40 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0",
         compact ? "h-8 gap-1.5 px-3 text-xs" : "h-9 gap-2 px-3 text-sm",
         className,
       )}

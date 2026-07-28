@@ -41,7 +41,7 @@ export function EInvoiceForm({ orderId, defaultBuyer }: { orderId: string; defau
     );
   }
 
-  const cls = "px-3 py-2 text-sm rounded-lg border border-border bg-surface";
+  const cls = "min-h-11 px-3 py-2 text-sm rounded-lg border border-border bg-surface lg:min-h-0";
   return (
     <div className="flex items-end gap-2 flex-wrap">
       <div>
@@ -57,7 +57,7 @@ export function EInvoiceForm({ orderId, defaultBuyer }: { orderId: string; defau
         <NumberInput min={0} max={20} value={vatRate} onChange={(value) => setVatRate(value ?? 0)} suffix="%" thousandSeparator={false} className={`${cls} w-20 text-right`} />
       </div>
       <button onClick={submit} disabled={busy || !buyerName.trim()}
-        className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium disabled:opacity-50 inline-flex items-center gap-2">
+        className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium disabled:opacity-50 inline-flex items-center gap-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
         {busy && <Loader2 className="w-4 h-4 animate-spin" />}
         {t("einvoice.issue")}
       </button>

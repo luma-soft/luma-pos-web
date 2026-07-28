@@ -178,7 +178,7 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
                 <input
                   autoFocus value={newName} onChange={(e) => setNewName(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") create(); }}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 min-h-11 lg:min-h-0"
                 />
               </div>
               <div>

@@ -36,7 +36,7 @@ export function OrderActions({ orderId }: { orderId: string }) {
     <button
       onClick={onCancel}
       disabled={busy}
-      className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-red-200 dark:border-red-900 text-er hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50"
+      className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-red-200 dark:border-red-900 text-er hover:bg-red-50 dark:hover:bg-red-950/40 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
     >
       {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
       {t("orders.detail.cancel")}
@@ -64,7 +64,7 @@ export function SendOrderZaloButton({ orderId }: { orderId: string }) {
       <button
         onClick={send}
         disabled={busy}
-        className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-border hover:bg-surface-2 disabled:opacity-50"
+        className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-border hover:bg-surface-2 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
       >
         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <MessageCircle className="w-4 h-4" />}
         {t("zalo.send")}
@@ -122,7 +122,7 @@ export function PaymentForm({ orderId, remaining }: { orderId: string; remaining
             <button
               key={m} type="button" onClick={() => setMethod(m)}
               className={cn(
-                "px-3 py-2 rounded-lg text-xs font-medium border",
+                "px-3 py-2 rounded-lg text-xs font-medium border min-h-11 min-w-11 lg:min-h-0 lg:min-w-0",
                 method === m ? "bg-primary-600 text-white border-primary-600" : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
               )}
             >
@@ -133,16 +133,16 @@ export function PaymentForm({ orderId, remaining }: { orderId: string; remaining
         <input
           value={reference} onChange={(e) => setReference(e.target.value)}
           placeholder={t("orders.detail.referencePlaceholder")}
-          className="w-44 px-3 py-2 text-sm rounded-lg border border-border bg-surface"
+          className="w-44 px-3 py-2 text-sm rounded-lg border border-border bg-surface min-h-11 lg:min-h-0"
         />
         <input
           value={note} onChange={(e) => setNote(e.target.value)}
           placeholder={t("orders.detail.notePlaceholder")}
-          className="flex-1 min-w-40 px-3 py-2 text-sm rounded-lg border border-border bg-surface"
+          className="flex-1 min-w-40 px-3 py-2 text-sm rounded-lg border border-border bg-surface min-h-11 lg:min-h-0"
         />
         <button
           onClick={submit} disabled={busy || amount <= 0}
-          className="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium disabled:opacity-50 inline-flex items-center gap-2"
+          className="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium disabled:opacity-50 inline-flex items-center gap-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
         >
           {busy && <Loader2 className="w-4 h-4 animate-spin" />}
           {t("orders.detail.receive")} {formatCurrency(amount)}

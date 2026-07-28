@@ -175,7 +175,7 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
     else setError(t(res.error as never));
   }
 
-  const numCls = "no-spinner w-full px-2 py-1.5 text-right text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-surface tabular-nums";
+  const numCls = "no-spinner min-h-11 w-full px-2 py-1.5 text-right text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-surface tabular-nums lg:min-h-0";
 
   return (
     <div className="h-dvh flex flex-col">
@@ -388,7 +388,7 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
               </div>
               <MoneyInput value={refundAmount || ""} placeholder="0" onChange={(value) => setRefundAmount(value ?? 0)} className={cn(numCls, "w-36")} />
             </div>
-            <label className="flex items-center justify-between gap-3 rounded-lg border border-border-soft px-3 py-2">
+            <label className="flex min-h-11 min-w-11 items-center justify-between gap-3 rounded-lg border border-border-soft px-3 py-2 lg:min-h-0 lg:min-w-0">
               <span className="text-slate-600 dark:text-slate-300">{t("purchaseReturns.applyDebt")}</span>
               <input type="checkbox" checked={applyDebt} onChange={(event) => setApplyDebt(event.target.checked)} className="rounded text-primary-600" />
             </label>
@@ -433,7 +433,7 @@ function ProductResults({ rows, onPick }: { rows: PurchaseReturnProductRow[]; on
   return (
     <div className="absolute z-20 left-0 right-14 mt-1 max-h-80 overflow-auto bg-surface border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
       {rows.map((row) => (
-        <button key={row.id} type="button" onClick={() => onPick(row)} className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-surface-2">
+        <button key={row.id} type="button" onClick={() => onPick(row)} className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium">{row.name}</span>
             <span className="block truncate text-xs text-slate-400">{row.sku}</span>

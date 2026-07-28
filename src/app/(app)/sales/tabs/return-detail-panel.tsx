@@ -104,7 +104,7 @@ export async function ReturnDetailPanel({ ret, compact = false }: { ret: ReturnD
       </div>
 
       <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-border-soft pt-4">
-        <Link href={`/returns/${ret.id}/print`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9")}>
+        <Link href={`/returns/${ret.id}/print`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0")}>
           {t("returns.print")}
         </Link>
       </div>

@@ -222,7 +222,7 @@ export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOption
               <input
                 value={projectName}
                 onChange={(event) => setProjectName(event.target.value)}
-                className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm"
+                className="h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0"
               />
             </label>
           </div>
@@ -232,7 +232,7 @@ export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOption
               value={note}
               onChange={(event) => setNote(event.target.value)}
               rows={3}
-              className="w-full resize-y rounded-lg border border-border bg-surface px-3 py-2 text-sm leading-5"
+              className="w-full resize-y rounded-lg border border-border bg-surface px-3 py-2 text-sm leading-5 min-h-11 lg:min-h-0"
             />
           </label>
         </div>
@@ -249,7 +249,7 @@ export function CameraQuoteBuilder({ options }: { options: CameraQuoteFormOption
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder={t("cameraSearchPlaceholder")}
-                className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm"
+                className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm min-h-11 lg:min-h-0"
               />
             </div>
           </div>
@@ -371,7 +371,7 @@ function CameraOptionCard({
       <button
         type="button"
         onClick={onAdd}
-        className="mt-auto inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-primary-600 px-3 text-sm font-semibold text-white hover:bg-primary-700"
+        className="mt-auto inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-primary-600 px-3 text-sm font-semibold text-white hover:bg-primary-700 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
       >
         <Plus className="h-4 w-4" /> {t("addToQuote")}
       </button>
@@ -405,7 +405,7 @@ function PackageEditor({
           <div className="mt-0.5 line-clamp-2 text-sm font-bold">{camera.name}</div>
           <div className="mt-1 text-xs text-slate-400">{camera.sku}</div>
         </div>
-        <button type="button" onClick={onRemove} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600" aria-label={t("removePackage")}>
+        <button type="button" onClick={onRemove} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0" aria-label={t("removePackage")}>
           <Trash2 className="h-4 w-4" />
         </button>
       </div>
@@ -428,7 +428,7 @@ function PackageEditor({
             <button
               type="button"
               onClick={() => onChange({ materialLines: row.materialLines.filter((_, index) => index !== materialIndex) })}
-              className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600"
+              className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
               aria-label={t("removeMaterial")}
             >
               <Trash2 className="h-3.5 w-3.5" />

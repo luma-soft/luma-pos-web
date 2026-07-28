@@ -46,7 +46,7 @@ export async function CashbookTab({ searchParams }: { searchParams: SP }) {
 
       <div className="flex items-center gap-1.5 mb-4">
         {(["", "in", "out"] as const).map((tp) => (
-          <Link key={tp || "all"} href={href({ type: tp || undefined, page: undefined })} className={cn("px-3 py-1.5 rounded-lg text-sm font-medium border", (params.type ?? "") === tp ? "bg-primary-600 text-white border-primary-600" : "border-border text-slate-600 dark:text-slate-300")}>
+          <Link key={tp || "all"} href={href({ type: tp || undefined, page: undefined })} className={cn("inline-flex min-h-11 min-w-11 items-center justify-center px-3 py-1.5 rounded-lg text-sm font-medium border lg:min-h-0 lg:min-w-0", (params.type ?? "") === tp ? "bg-primary-600 text-white border-primary-600" : "border-border text-slate-600 dark:text-slate-300")}>
             {t(`cashbook.typeTabs.${tp || "all"}`)}
           </Link>
         ))}

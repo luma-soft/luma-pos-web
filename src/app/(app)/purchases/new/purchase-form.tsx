@@ -407,7 +407,7 @@ export function PurchaseForm({
     else setError(t(res.error as never));
   }
 
-  const numCls = "no-spinner w-full px-2 py-1.5 text-right text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-surface tabular-nums";
+  const numCls = "no-spinner min-h-11 w-full px-2 py-1.5 text-right text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-surface tabular-nums lg:min-h-0";
   const title = mode === "edit"
     ? t("purchases.editTitle", { code: purchaseCode ?? "" })
     : mode === "copy"
@@ -455,7 +455,7 @@ export function PurchaseForm({
             {results.length > 0 && (
               <div className="absolute z-20 left-0 right-14 mt-1 max-h-80 overflow-auto bg-surface border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg">
                 {results.map((p) => (
-                  <Button key={p.id} type="button" variant="ghost" block onClick={() => addProduct(p)} className="h-auto justify-between rounded-none px-3 py-2 text-left">
+                  <Button key={p.id} type="button" variant="ghost" block onClick={() => addProduct(p)} className="h-auto justify-between rounded-none px-3 py-2 text-left min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
                     <Text as="span" className="min-w-0 text-current">
                       <Text as="span" weight="medium" text={p.name} />
                       <Text as="span" variant="muted" size="xs" className="ml-1" text={p.sku} />
@@ -478,7 +478,7 @@ export function PurchaseForm({
                     key={line.key}
                     type="button"
                     onClick={() => setSearch(line.sku ?? line.label)}
-                    className="max-w-full rounded-full border border-warn/30 bg-surface px-3 py-1.5 text-left text-xs font-semibold text-warn hover:bg-warn-soft"
+                    className="max-w-full rounded-full border border-warn/30 bg-surface px-3 py-1.5 text-left text-xs font-semibold text-warn hover:bg-warn-soft min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
                     title={line.meta ?? line.label}
                   >
                     <span className="block max-w-[360px] truncate">

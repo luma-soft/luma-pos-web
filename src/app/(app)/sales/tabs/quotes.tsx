@@ -23,7 +23,7 @@ export async function QuotesTab({ searchParams }: { searchParams: SP }) {
         <input type="hidden" name="tab" value="quotes" />
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("orders.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface" />
+          <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("orders.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface min-h-11 lg:min-h-0" />
         </div>
         <CameraQuoteCreateButton className="ml-auto shrink-0" />
       </InstantFilterForm>

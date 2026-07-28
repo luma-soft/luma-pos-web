@@ -83,7 +83,7 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
     else setError(t(res.error as never));
   }
 
-  const inputCls = "px-2 py-1.5 text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-surface tabular-nums";
+  const inputCls = "min-h-11 px-2 py-1.5 text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-surface tabular-nums lg:min-h-0";
 
   return (
     <div className="p-4 sm:p-6 max-w-4xl">
@@ -182,7 +182,7 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
           <div className="flex flex-col items-end gap-2">
             {error && <p className="text-sm text-er">{error}</p>}
             <button onClick={save} disabled={busy || items.length === 0}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium disabled:opacity-50">
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
               {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {t("orderEdit.save")}
             </button>

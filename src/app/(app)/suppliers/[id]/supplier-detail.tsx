@@ -35,7 +35,7 @@ export function SupplierDetailClient({ supplier, purchases }: { supplier: Suppli
     else setError(t(res.error));
   }
 
-  const input = "w-full px-3 py-2 text-sm rounded-lg border border-border bg-surface";
+  const input = "min-h-11 w-full px-3 py-2 text-sm rounded-lg border border-border bg-surface lg:min-h-0";
   const lbl = "text-xs font-medium text-slate-500 mb-1 block";
   const debt = Number(supplier.currentDebt);
 
@@ -50,7 +50,7 @@ export function SupplierDetailClient({ supplier, purchases }: { supplier: Suppli
         actions={
           <>
           {saved && <span className="text-sm text-ok inline-flex items-center gap-1"><Check className="w-4 h-4" />{t("common.saved")}</span>}
-          <button onClick={save} disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium">
+          <button onClick={save} disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white text-sm font-medium min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}{t("common.save")}
           </button>
           </>

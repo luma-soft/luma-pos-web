@@ -23,9 +23,9 @@ export async function BookingsTab({ searchParams }: { searchParams: SP }) {
         <input type="hidden" name="tab" value="bookings" />
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("orders.searchPlaceholder")} className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm" />
+          <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("orders.searchPlaceholder")} className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm min-h-11 lg:min-h-0" />
         </div>
-        <Link href={Routes.POS} className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 active:scale-[0.98]">
+        <Link href={Routes.POS} className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 active:scale-[0.98] min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
           <ClipboardList className="h-4 w-4" />
           {t("bookings.createViaPos")}
         </Link>

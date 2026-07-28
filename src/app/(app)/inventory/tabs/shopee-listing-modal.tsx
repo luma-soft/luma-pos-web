@@ -41,7 +41,7 @@ type FormState = {
   outOfStockBehavior: "keep_visible" | "unlist" | "set_zero";
 };
 
-const FIELD = "w-full rounded-lg border border-border bg-canvas px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20";
+const FIELD = "min-h-11 w-full rounded-lg border border-border bg-canvas px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 lg:min-h-0";
 const LABEL = "text-[10px] font-bold uppercase tracking-wide text-slate-500";
 const PROVIDERS = [
   { id: "shopee", name: "Shopee", ready: true },
@@ -172,7 +172,7 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
             <div className="text-[10px] font-bold uppercase tracking-wide text-primary-600">{L ? "Đăng sàn" : "List online"}</div>
             <h2 className="truncate text-lg font-extrabold">{product ? product.name : (L ? "Tạo listing bán online" : "Create online listing")}</h2>
           </div>
-          <Link href={closeHref} className="grid h-9 w-9 place-items-center rounded-full border border-border hover:bg-surface-2" aria-label="Close">
+          <Link href={closeHref} className="grid h-9 w-9 place-items-center rounded-full border border-border hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0" aria-label="Close">
             <X className="h-4 w-4" />
           </Link>
         </div>
@@ -233,7 +233,7 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
             ) : (
               <>
             <div className="flex flex-wrap items-center gap-2">
-              <button type="button" disabled={aiPending || provider !== "shopee"} onClick={autoFill} className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50">
+              <button type="button" disabled={aiPending || provider !== "shopee"} onClick={autoFill} className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
                 {aiPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
                 {L ? "Auto fill bằng AI" : "Auto fill with AI"}
               </button>
@@ -280,11 +280,11 @@ export function ShopeeListingModal({ product, closeHref }: { product: ProductDet
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
           <span className="text-xs text-slate-500">{L ? "Publish sẽ tạo sync job và lưu payload/response để retry." : "Publish creates a sync job and stores payload/response for retry."}</span>
           <div className="flex gap-2">
-            <button type="button" disabled={pending} onClick={() => save("draft")} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2 disabled:opacity-50">
+            <button type="button" disabled={pending} onClick={() => save("draft")} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
               {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
               {L ? "Lưu draft" : "Save draft"}
             </button>
-            <button type="button" disabled={pending || !canPublish} onClick={() => save("publish")} className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50">
+            <button type="button" disabled={pending || !canPublish} onClick={() => save("publish")} className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
               {L ? "Publish lên sàn" : "Publish online"}
             </button>
           </div>
@@ -414,7 +414,7 @@ function ShopeeCategoryDialog({
       <div className="flex h-[min(88dvh,760px)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
         <div className="flex items-center justify-between gap-3 px-5 py-4">
           <h3 className="text-xl font-extrabold">{L ? "Chọn danh mục sản phẩm" : "Choose product category"}</h3>
-          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full hover:bg-surface-2" aria-label="Close">
+          <button type="button" onClick={onClose} className="grid h-9 w-9 place-items-center rounded-full hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0" aria-label="Close">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -452,7 +452,7 @@ function ShopeeCategoryDialog({
                   type="button"
                   onClick={() => setSelected(category)}
                   className={cn(
-                    "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-2",
+                    "flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0",
                     selected?.id === category.id && "bg-primary-50 text-primary-700 dark:bg-primary-950/40",
                   )}
                 >
@@ -507,12 +507,12 @@ function ShopeeCategoryDialog({
           )}
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-border-soft px-5 py-4">
-          <button type="button" onClick={onClose} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2">{L ? "Bỏ qua" : "Skip"}</button>
+          <button type="button" onClick={onClose} className="rounded-lg border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">{L ? "Bỏ qua" : "Skip"}</button>
           <button
             type="button"
             disabled={!selected}
             onClick={() => selected && onConfirm(selected)}
-            className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50"
+            className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
           >
             {L ? "Xác nhận" : "Confirm"}
           </button>
@@ -584,7 +584,7 @@ function PricingRecommendation({
             type="button"
             disabled={!canSuggest}
             onClick={() => onUse(suggestedPrice)}
-            className="rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50"
+            className="rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
           >
             {L ? "Dùng giá này" : "Use price"}
           </button>
@@ -1033,7 +1033,7 @@ function ProductSearchInListing({
         value={search}
         onChange={(event) => setSearch(event.target.value)}
         placeholder={selectedProduct ? selectedProduct.name : (L ? "Tìm theo tên, SKU hoặc barcode..." : "Search by name, SKU, or barcode...")}
-        className="h-10 w-full rounded-lg border border-border bg-canvas pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
+        className="h-10 w-full rounded-lg border border-border bg-canvas pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 min-h-11 lg:min-h-0"
       />
       {selectedProduct && !query && <div className="text-xs text-slate-500">{selectedProduct.sku} · {selectedProduct.categoryName ?? (L ? "Chưa có danh mục" : "No category")}</div>}
       {(query || isPending) && (
@@ -1051,7 +1051,7 @@ function ProductSearchInListing({
                   key={product.id}
                   type="button"
                   onClick={() => choose(product.id, product.name)}
-                  className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-surface-2"
+                  className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
                 >
                   <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-lg">{categoryEmoji(product.categoryName)}</div>
                   <div className="min-w-0 flex-1">

@@ -59,7 +59,7 @@ export function ProjectsTable({ rows, customers }: { rows: ProjectRow[]; custome
           {row.address && <Info label={t("customers.fields.address")} value={row.address} />}
           {row.note && <Info label={t("customers.fields.note")} value={row.note} />}
           <div className="flex justify-end">
-            <Link href={Routes.project(row.id)} className="inline-flex h-9 items-center rounded-lg border border-border px-3 text-sm font-semibold text-primary-600 hover:bg-surface-2">
+            <Link href={Routes.project(row.id)} className="inline-flex h-9 items-center rounded-lg border border-border px-3 text-sm font-semibold text-primary-600 hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
               {t("projects.viewDetail")}
             </Link>
           </div>

@@ -226,16 +226,16 @@ export function SuppliersTable({ rows }: { rows: SupplierRow[] }) {
           <div className="flex justify-end gap-2">
             {editing ? (
               <>
-                <button type="button" onClick={cancelEditing} disabled={saving} className="inline-flex h-10 items-center rounded-lg border border-border px-4 text-sm font-semibold text-slate-600 hover:bg-surface-2 disabled:opacity-50">
+                <button type="button" onClick={cancelEditing} disabled={saving} className="inline-flex h-10 items-center rounded-lg border border-border px-4 text-sm font-semibold text-slate-600 hover:bg-surface-2 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
                   {t("common.cancel")}
                 </button>
-                <button type="button" onClick={saveSupplier} disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50">
+                <button type="button" onClick={saveSupplier} disabled={saving} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
                   {saving && <Loader2 className="h-4 w-4 animate-spin" />}
                   {t("common.save")}
                 </button>
               </>
             ) : (
-              <button type="button" onClick={startEditing} className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold text-primary-600 hover:bg-surface-2">
+              <button type="button" onClick={startEditing} className="inline-flex h-10 items-center gap-2 rounded-lg border border-border px-4 text-sm font-semibold text-primary-600 hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
                 <Pencil className="h-4 w-4" />
                 {t("common.edit")}
               </button>
@@ -353,7 +353,7 @@ function SupplierInfoPanel({
   onDraftChange: (field: keyof SupplierDraft, value: string) => void;
 }) {
   const t = useTranslations();
-  const inputClassName = "h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100";
+  const inputClassName = "h-10 min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 lg:min-h-0";
   const labelClassName = "mb-1.5 block text-xs font-semibold text-slate-500";
 
   return (

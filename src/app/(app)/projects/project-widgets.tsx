@@ -186,7 +186,7 @@ export function ProjectToggle({ id, status }: { id: string; status: string }) {
   }
 
   return (
-    <Button type="button" variant="link" size="sm" onClick={toggle} disabled={busy} className="h-auto px-0 text-xs" text={status === "active" ? t("projects.markDone") : t("projects.reopen")} />
+    <Button type="button" variant="link" size="sm" onClick={toggle} disabled={busy} className="h-auto px-0 text-xs min-h-11 min-w-11 lg:min-h-0 lg:min-w-0" text={status === "active" ? t("projects.markDone") : t("projects.reopen")} />
   );
 }
 
@@ -268,7 +268,7 @@ export function ProjectEdit({ project, customers }: { project: EditableProject; 
 
   return (
     <>
-      <Button type="button" variant="link" size="sm" onClick={() => setOpen(true)} className="h-auto px-0 text-xs" tx="common.edit" />
+      <Button type="button" variant="link" size="sm" onClick={() => setOpen(true)} className="h-auto px-0 text-xs min-h-11 min-w-11 lg:min-h-0 lg:min-w-0" tx="common.edit" />
       <RowPreviewModal
         open={open && !customerCreateOpen}
         onClose={() => {

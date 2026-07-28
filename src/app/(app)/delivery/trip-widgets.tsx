@@ -37,7 +37,7 @@ export function TripCreate({ orders }: { orders: { id: string; label: string }[]
     );
   }
 
-  const cls = "px-3 py-2 text-sm rounded-lg border border-border bg-surface";
+  const cls = "min-h-11 px-3 py-2 text-sm rounded-lg border border-border bg-surface lg:min-h-0";
   return (
     <div className="bg-surface border border-border rounded-card p-4 w-full max-w-xl space-y-3">
       <div className="flex justify-between items-center">
@@ -51,7 +51,7 @@ export function TripCreate({ orders }: { orders: { id: string; label: string }[]
       <div className="max-h-52 overflow-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-border-soft">
         {orders.length === 0 && <p className="p-4 text-sm text-slate-400">{t("delivery.noOrders")}</p>}
         {orders.map((o) => (
-          <label key={o.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-surface-2">
+          <label key={o.id} className="flex min-h-11 min-w-11 items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-surface-2 lg:min-h-0 lg:min-w-0">
             <input
               type="checkbox"
               checked={selected.includes(o.id)}
@@ -63,7 +63,7 @@ export function TripCreate({ orders }: { orders: { id: string; label: string }[]
       </div>
       {error && <p className="text-xs text-er">{error}</p>}
       <button onClick={submit} disabled={busy || !vehicle.trim() || !driver.trim() || selected.length === 0}
-        className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium disabled:opacity-50 inline-flex items-center gap-2">
+        className="px-4 py-2 rounded-lg bg-primary-600 text-white text-sm font-medium disabled:opacity-50 inline-flex items-center gap-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
         {busy && <Loader2 className="w-4 h-4 animate-spin" />}
         {t("delivery.createTripBtn", { count: selected.length })}
       </button>

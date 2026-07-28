@@ -216,7 +216,7 @@ export function ProductBulkActions() {
           <button
             type="button"
             onClick={stopSelling}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium hover:bg-surface-2"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
           >
             <Ban className="h-4 w-4 text-amber-600" />
             {t("products.actions.stopSelling")}
@@ -224,7 +224,7 @@ export function ProductBulkActions() {
           <button
             type="button"
             onClick={remove}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
           >
             <Trash2 className="h-4 w-4" />
             {t("products.actions.delete")}

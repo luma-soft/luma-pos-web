@@ -421,7 +421,7 @@ export function ElectricalLabelsClient() {
                   <button
                     type="button"
                     onClick={clearColors}
-                    className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface p-2.5 text-xs font-semibold text-slate-600 transition-colors hover:border-primary-300 hover:text-primary-700 dark:text-slate-300"
+                    className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface p-2.5 text-xs font-semibold text-slate-600 transition-colors hover:border-primary-300 hover:text-primary-700 dark:text-slate-300 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
                   >
                     <Ban className="size-4" />
                     {t("noColor")}
@@ -433,7 +433,7 @@ export function ElectricalLabelsClient() {
                       type="button"
                       key={palette.id}
                       onClick={() => applyPalette(palette.colors)}
-                      className="rounded-xl border border-border bg-surface p-2 text-xs font-medium text-slate-600 transition-colors hover:border-primary-300 hover:text-primary-700 dark:text-slate-300"
+                      className="rounded-xl border border-border bg-surface p-2 text-xs font-medium text-slate-600 transition-colors hover:border-primary-300 hover:text-primary-700 dark:text-slate-300 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
                     >
                       <span className="mb-1.5 flex justify-center gap-1" aria-hidden="true">
                         {palette.colors.map((color) => (

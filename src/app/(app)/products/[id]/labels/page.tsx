@@ -109,7 +109,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
 
         <form className="mb-4 grid gap-3 rounded-card border border-border bg-surface p-4 print:hidden sm:grid-cols-[minmax(0,1fr)_120px_150px_150px_auto]">
           <Field label={t("products.labels.template")}>
-            <select name="templateId" defaultValue={template.id} className="h-10 w-full rounded-lg border border-border bg-canvas px-3 text-sm">
+            <select name="templateId" defaultValue={template.id} className="h-10 w-full rounded-lg border border-border bg-canvas px-3 text-sm min-h-11 lg:min-h-0">
               {templates.map((item) => (
                 <option key={item.id} value={item.id}>{item.name}</option>
               ))}
@@ -119,7 +119,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
             <NumberInput name="qty" min={1} max={500} defaultValue={qty} thousandSeparator={false} className="h-10 bg-canvas" />
           </Field>
           <Field label={t("products.labels.codeSource")}>
-            <select name="codeSource" defaultValue={codeSource} className="h-10 w-full rounded-lg border border-border bg-canvas px-3 text-sm">
+            <select name="codeSource" defaultValue={codeSource} className="h-10 w-full rounded-lg border border-border bg-canvas px-3 text-sm min-h-11 lg:min-h-0">
               <option value="barcode">{t("products.labels.codeSourceBarcode")}</option>
               <option value="sku">{t("products.labels.codeSourceSku")}</option>
             </select>
@@ -128,7 +128,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
             <NumberInput name="price" min={0} step={1000} defaultValue={Number(query.price || product.retailPrice)} suffix="đ" className="h-10 bg-canvas" />
           </Field>
           <div className="flex items-end">
-            <button type="submit" className="h-10 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700">
+            <button type="submit" className="h-10 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
               {t("common.apply")}
             </button>
           </div>

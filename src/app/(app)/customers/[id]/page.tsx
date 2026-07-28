@@ -44,7 +44,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
             address: customer.address, type: customer.type, taxCode: customer.taxCode,
             debtLimit: customer.debtLimit, note: customer.note,
           }} />
-          <Link href={Routes.POS} className="px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium">
+          <Link href={Routes.POS} className="inline-flex min-h-11 min-w-11 items-center justify-center px-4 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium lg:min-h-0 lg:min-w-0">
             {t("orders.createViaPos")}
           </Link>
           </>

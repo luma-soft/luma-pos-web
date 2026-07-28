@@ -360,7 +360,7 @@ export function WarrantyClaimQuickCreate({
 
   return (
     <>
-      <Button type="button" variant={initial ? "link" : "default"} size={initial ? "sm" : "default"} className={initial ? "h-auto px-0 text-xs" : undefined} onClick={() => setOpen(true)}>
+      <Button type="button" variant={initial ? "link" : "default"} size={initial ? "sm" : "default"} className={initial ? "h-auto px-0 text-xs min-h-11 min-w-11 lg:min-h-0 lg:min-w-0" : undefined} onClick={() => setOpen(true)}>
         {initial ? t("common.edit") : <><Plus className="h-4 w-4" />{t("services.warranty.create")}</>}
       </Button>
       <RowPreviewModal
@@ -500,7 +500,7 @@ export function InstalledAssetQuickCreate({
 
   return (
     <>
-      <Button type="button" variant={initial ? "link" : "default"} size="sm" className={initial ? "h-auto px-0 text-xs" : undefined} onClick={() => setOpen(true)}>
+      <Button type="button" variant={initial ? "link" : "default"} size="sm" className={initial ? "h-auto px-0 text-xs min-h-11 min-w-11 lg:min-h-0 lg:min-w-0" : undefined} onClick={() => setOpen(true)}>
         {initial ? t("common.edit") : <><Plus className="h-4 w-4" />{t("services.assets.create")}</>}
       </Button>
       <RowPreviewModal
@@ -641,7 +641,7 @@ export function ServiceJobEdit({
 
   return (
     <>
-      <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs" onClick={() => setOpen(true)} tx="common.edit" />
+      <Button type="button" variant="link" size="sm" className="h-auto px-0 text-xs min-h-11 min-w-11 lg:min-h-0 lg:min-w-0" onClick={() => setOpen(true)} tx="common.edit" />
       <RowPreviewModal
         open={open}
         onClose={() => {
@@ -753,7 +753,7 @@ export function ServiceMaterialEditor({
         type="button"
         variant={initial ? "link" : "outline"}
         size="sm"
-        className={initial ? "h-auto px-0 text-xs" : undefined}
+        className={initial ? "h-auto px-0 text-xs min-h-11 min-w-11 lg:min-h-0 lg:min-w-0" : undefined}
         onClick={openEditor}
         disabled={disabled}
       >

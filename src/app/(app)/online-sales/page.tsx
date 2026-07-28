@@ -53,13 +53,13 @@ export default async function OnlineSalesPage({ searchParams }: { searchParams: 
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href={tabHref("inbox")} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2">
+          <Link href={tabHref("inbox")} className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
             <Inbox className="h-4 w-4" /> {L ? "Inbox" : "Inbox"}
           </Link>
-          <Link href="/settings?tab=shopee" className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2">
+          <Link href="/settings?tab=shopee" className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
             <Store className="h-4 w-4" /> {L ? "Developer apps" : "Developer apps"}
           </Link>
-          <Link href={tabHref("channels")} className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110">
+          <Link href={tabHref("channels")} className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
             <ShoppingBag className="h-4 w-4" /> {L ? "Thêm kênh" : "Add channel"}
           </Link>
         </div>
@@ -71,7 +71,7 @@ export default async function OnlineSalesPage({ searchParams }: { searchParams: 
             key={item}
             href={tabHref(item)}
             className={cn(
-              "shrink-0 border-b-2 px-3 py-2 text-sm font-semibold",
+              "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center border-b-2 px-3 py-2 text-sm font-semibold lg:min-h-0 lg:min-w-0",
               tab === item ? "border-primary-600 text-primary-600" : "border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-200",
             )}
           >
@@ -101,7 +101,7 @@ export default async function OnlineSalesPage({ searchParams }: { searchParams: 
                 <h2 className="text-sm font-extrabold">{L ? "Kênh bán hàng" : "Sales channels"}</h2>
                 <p className="text-xs text-slate-500">{L ? "Kết nối gian hàng và cấu hình chính sách đồng bộ theo từng sàn." : "Connect shops and configure sync policy per marketplace."}</p>
               </div>
-              <Link href={tabHref("channels")} className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs font-bold hover:bg-surface-2">
+              <Link href={tabHref("channels")} className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1.5 text-xs font-bold hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
                 <Layers3 className="h-3.5 w-3.5" /> {L ? "Quản lý kênh" : "Manage channels"}
               </Link>
             </div>
@@ -211,14 +211,14 @@ function ShopPolicyForm({
           ["syncMessages", L ? "Sync tin nhắn" : "Sync messages", policy.syncMessages],
           ["autoCreateCustomer", L ? "Tự tạo khách" : "Auto-create customer", policy.autoCreateCustomer],
         ].map(([name, label, checked]) => (
-          <label key={String(name)} className="flex items-center justify-between gap-3 rounded-lg border border-border-soft bg-canvas px-3 py-2 text-sm font-semibold">
+          <label key={String(name)} className="flex min-h-11 min-w-11 items-center justify-between gap-3 rounded-lg border border-border-soft bg-canvas px-3 py-2 text-sm font-semibold lg:min-h-0 lg:min-w-0">
             <span>{label}</span>
             <input name={String(name)} type="checkbox" defaultChecked={Boolean(checked)} className="h-4 w-4" />
           </label>
         ))}
       </div>
       <div className="flex items-start justify-end">
-        <button className="rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110">{L ? "Lưu" : "Save"}</button>
+        <button className="rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">{L ? "Lưu" : "Save"}</button>
       </div>
     </form>
   );
@@ -304,15 +304,15 @@ function ProviderCard({ provider, shop, L }: { provider: (typeof PROVIDERS)[numb
               "use server";
               await disconnectShopeeShop(shop.id);
             }}>
-              <button className="w-full rounded-full border border-border px-3 py-2 text-xs font-bold hover:bg-surface-2">{L ? "Ngắt kết nối" : "Disconnect"}</button>
+              <button className="w-full rounded-full border border-border px-3 py-2 text-xs font-bold hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">{L ? "Ngắt kết nối" : "Disconnect"}</button>
             </form>
           ) : (
-            <Link href="/api/shopee/connect" className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary-600 px-3 py-2 text-xs font-bold text-white hover:brightness-110">
+            <Link href="/api/shopee/connect" className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary-600 px-3 py-2 text-xs font-bold text-white hover:brightness-110 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
               <ExternalLink className="h-3.5 w-3.5" /> {L ? "Kết nối" : "Connect"}
             </Link>
           )
         ) : (
-          <button disabled className="w-full rounded-full border border-border px-3 py-2 text-xs font-bold text-slate-400">{L ? "Sắp ra mắt" : "Coming soon"}</button>
+          <button disabled className="w-full rounded-full border border-border px-3 py-2 text-xs font-bold text-slate-400 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">{L ? "Sắp ra mắt" : "Coming soon"}</button>
         )}
       </div>
     </div>
@@ -506,8 +506,8 @@ function InboxSection({ threads, L }: { threads: Awaited<ReturnType<typeof getSh
             "use server";
             await sendMarketplaceMessage({ threadId: thread.id, body: String(formData.get("body") ?? "") });
           }} className="flex gap-2 border-t border-border-soft px-4 py-3">
-            <input name="body" className="min-w-0 flex-1 rounded-lg border border-border bg-canvas px-3 py-2 text-sm outline-none focus:border-primary-500" placeholder={L ? "Nhập phản hồi..." : "Type a reply..."} />
-            <button className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110">
+            <input name="body" className="min-w-0 flex-1 rounded-lg border border-border bg-canvas px-3 py-2 text-sm outline-none focus:border-primary-500 min-h-11 lg:min-h-0" placeholder={L ? "Nhập phản hồi..." : "Type a reply..."} />
+            <button className="inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:brightness-110 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
               <Send className="h-4 w-4" /> {L ? "Gửi" : "Send"}
             </button>
           </form>
