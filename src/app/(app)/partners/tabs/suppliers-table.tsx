@@ -322,7 +322,7 @@ function SupplierDetailTabs({
             onClick={() => { if (!editing || key === "info") setTab(key); }}
             disabled={editing && key !== "info"}
             className={cn(
-              "shrink-0 border-b-2 pb-2 transition-colors",
+              "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center border-b-2 px-2 transition-colors lg:min-h-0 lg:min-w-0 lg:pb-2",
               visibleTab === key ? "border-primary-600 text-primary-600" : "border-transparent hover:text-slate-800 dark:hover:text-slate-200",
               editing && key !== "info" && "cursor-not-allowed opacity-40",
             )}

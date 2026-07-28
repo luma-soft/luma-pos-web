@@ -60,7 +60,7 @@ function Category({ row }: { row: CashbookRow }) {
 }
 
 function Note({ row }: { row: CashbookRow }) {
-  if (row.refType === "order" && row.refId) return <OrderDetailLink orderId={row.refId} className="text-primary-600 hover:underline">{row.note}</OrderDetailLink>;
+  if (row.refType === "order" && row.refId) return <OrderDetailLink orderId={row.refId} className="inline-flex min-h-11 min-w-11 items-center text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">{row.note}</OrderDetailLink>;
   return <span className="text-slate-500">{row.note ?? "—"}</span>;
 }
 

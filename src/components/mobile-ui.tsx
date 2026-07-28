@@ -123,7 +123,7 @@ export function TouchTargetToggle({
       aria-label={ariaLabel}
       disabled={disabled}
       onClick={() => onChange?.(!checked)}
-      className="relative h-11 w-11 shrink-0 rounded-full transition disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 md:h-[21px] md:w-[38px]"
+      className="relative h-11 w-11 shrink-0 rounded-full transition disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:h-[21px] lg:w-[38px]"
     >
       <span
         aria-hidden="true"

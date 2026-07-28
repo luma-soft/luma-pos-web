@@ -130,7 +130,7 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
                 </td>
                 <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatCurrency(l.quantity * l.unitPrice)}</td>
                 <td className="px-4 py-2.5">
-                  <button onClick={() => setItems((ls) => ls.filter((_, i) => i !== idx))} className="text-slate-400 hover:text-red-500">
+                  <button onClick={() => setItems((ls) => ls.filter((_, i) => i !== idx))} className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-400 hover:text-red-500 lg:min-h-0 lg:min-w-0">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </td>

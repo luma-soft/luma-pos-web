@@ -438,14 +438,14 @@ function PackageEditor({
         <button
           type="button"
           onClick={() => onChange({ materialLines: [...row.materialLines, { productId: options.materials[0]?.id ?? "", quantity: 1 }] })}
-          className="justify-self-start text-xs font-semibold text-primary-600 hover:text-primary-700"
+          className="inline-flex min-h-11 min-w-11 items-center justify-center justify-self-start px-3 text-xs font-semibold text-primary-600 hover:text-primary-700 lg:min-h-0 lg:min-w-0"
         >
           + {t("addMaterial")}
         </button>
       </div>
 
       <details className="mt-3 rounded-lg border border-border-soft bg-surface px-3 py-2 text-xs">
-        <summary className="cursor-pointer font-semibold text-slate-600">{t("cameraSpecs")}</summary>
+        <summary className="min-h-11 cursor-pointer py-3 font-semibold text-slate-600 lg:min-h-0 lg:py-0">{t("cameraSpecs")}</summary>
         <dl className="mt-2 divide-y divide-border-soft">
           {Object.entries(camera.specs).map(([label, values]) => (
             <div key={label} className="grid grid-cols-[110px_1fr] gap-2 py-1.5">
@@ -493,7 +493,7 @@ function QuoteSelect({
       <div className="min-w-0 [&>div]:block [&>div]:w-full">
         <Select
           size="sm"
-          className="h-9 w-full text-xs"
+          className="h-11 w-full text-xs lg:h-9"
           options={options.map((option) => ({
             value: option.id,
             label: `${option.name} · ${money.format(option.retailPrice)}`,

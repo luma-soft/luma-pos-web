@@ -19,7 +19,7 @@ export async function ReturnDetailPanel({ ret, compact = false }: { ret: ReturnD
             <h2 className="truncate text-xl font-bold text-slate-900 dark:text-slate-100">{ret.customerName ?? t("orders.walkIn")}</h2>
             <span className="text-sm font-semibold text-slate-500">{ret.code}</span>
             {ret.orderId && ret.orderCode && (
-              <OrderDetailLink orderId={ret.orderId} className="text-sm font-semibold text-primary-600 hover:underline">
+              <OrderDetailLink orderId={ret.orderId} className="inline-flex min-h-11 min-w-11 items-center text-sm font-semibold text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">
                 {ret.orderCode}
               </OrderDetailLink>
             )}

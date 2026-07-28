@@ -46,7 +46,7 @@ export function RestockTable({ rows }: { rows: RestockRow[] }) {
       minWidth="1040px"
       renderMobileRow={({ row, toggle }) => (
         <div className="p-3">
-          <button type="button" onClick={toggle} className="w-full text-left">
+          <button type="button" onClick={toggle} className="min-h-11 w-full text-left">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="break-words font-semibold">{row.name}</div>

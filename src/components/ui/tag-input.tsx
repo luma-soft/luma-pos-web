@@ -70,7 +70,7 @@ export const TagInput = React.forwardRef<HTMLInputElement, TagInputProps>(
               size="iconSm"
               onClick={(e) => { e.stopPropagation(); remove(idx); }}
               disabled={disabled}
-              className="h-4 w-4 rounded-full p-0 hover:bg-primary-100"
+              className="h-11 w-11 rounded-full p-0 hover:bg-primary-100 lg:h-4 lg:w-4"
             >
               <X className="w-3 h-3" />
             </Button>

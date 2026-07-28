@@ -49,7 +49,7 @@ export function ProductDetailDialog({
             type="button"
             onClick={close}
             aria-label="Đóng chi tiết sản phẩm"
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-surface-2 hover:text-slate-700 dark:hover:text-slate-200 sm:h-9 sm:w-9"
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-surface-2 hover:text-slate-700 dark:hover:text-slate-200 lg:h-9 lg:w-9"
           >
             <X className="h-5 w-5" />
           </button>

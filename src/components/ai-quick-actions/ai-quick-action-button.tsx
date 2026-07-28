@@ -22,7 +22,7 @@ export function AiQuickActionButton({
       title={label}
       aria-label={label}
       className={cn(
-        "h-10 w-10 shrink-0 rounded-xl border-primary-200 bg-primary-50 text-primary-700 shadow-[0_10px_24px_rgba(15,118,110,0.10)] hover:bg-primary-100",
+        "h-11 w-11 shrink-0 rounded-xl border-primary-200 bg-primary-50 text-primary-700 shadow-[0_10px_24px_rgba(15,118,110,0.10)] hover:bg-primary-100 lg:h-10 lg:w-10",
         className,
       )}
     >

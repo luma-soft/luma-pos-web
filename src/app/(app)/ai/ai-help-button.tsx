@@ -22,7 +22,7 @@ export function AiHelpButton() {
         variant="outline"
         size="iconSm"
         onClick={() => setOpen(true)}
-        className="h-7 w-7 rounded-full text-slate-500 hover:bg-surface-2"
+        className="h-11 w-11 rounded-full text-slate-500 hover:bg-surface-2 lg:h-7 lg:w-7"
         title={t("ai.help.open")}
         aria-label={t("ai.help.open")}
       >

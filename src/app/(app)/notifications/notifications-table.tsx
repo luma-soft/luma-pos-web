@@ -201,12 +201,12 @@ function ExpandedAudit({ row }: { row: AuditRow }) {
               );
               if (recordId && ["order", "invoice", "quote"].includes(recordType ?? "")) {
                 return (
-                  <OrderDetailLink key={`${label}-${index}`} orderId={recordId} onClick={stopRowToggle}>
+                  <OrderDetailLink key={`${label}-${index}`} orderId={recordId} onClick={stopRowToggle} className="inline-flex min-h-11 min-w-11">
                     {chip}
                   </OrderDetailLink>
                 );
               }
-              return href ? <Link key={`${label}-${index}`} href={href} onClick={stopRowToggle}>{chip}</Link> : <span key={`${label}-${index}`}>{chip}</span>;
+              return href ? <Link key={`${label}-${index}`} href={href} onClick={stopRowToggle} className="inline-flex min-h-11 min-w-11">{chip}</Link> : <span key={`${label}-${index}`}>{chip}</span>;
             })}
           </div>
         </div>

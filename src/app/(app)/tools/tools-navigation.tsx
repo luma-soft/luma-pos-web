@@ -61,7 +61,7 @@ export function ToolsNavigation() {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex w-full items-center gap-2 border-l-2 px-3.5 py-2 text-xs font-semibold transition",
+                  "flex min-h-11 w-full items-center gap-2 border-l-2 px-3.5 py-2 text-xs font-semibold transition lg:min-h-0",
                   active
                     ? "border-primary-600 bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300"
                     : "border-transparent text-slate-500 hover:bg-surface-2 hover:text-slate-900 dark:hover:text-slate-200",

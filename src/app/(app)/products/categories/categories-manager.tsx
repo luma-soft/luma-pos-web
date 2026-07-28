@@ -136,7 +136,7 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
         empty={<p className="rounded-card border border-border-soft bg-surface p-8 text-center text-sm text-slate-400">{t("categories.empty")}</p>}
         renderMobileRow={({ row, toggle, expanded }) => (
           <div className="flex items-center justify-between gap-3 p-3">
-            <div role="button" tabIndex={0} onClick={toggle} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") toggle(); }} className="min-w-0 flex-1 space-y-1 text-left">
+            <div role="button" tabIndex={0} onClick={toggle} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") toggle(); }} className="min-h-11 min-w-11 flex-1 space-y-1 text-left lg:min-h-0 lg:min-w-0">
               <CategoryName c={row} />
               <div className="text-xs text-slate-500">
                 {row.parentName ?? t("categories.noParent")} · {row.productCount} {t("categories.productCount")}

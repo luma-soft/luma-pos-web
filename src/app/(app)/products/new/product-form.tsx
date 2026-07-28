@@ -416,7 +416,7 @@ function FormActions({
         align === "footer" && "justify-between",
       )}
     >
-      <label className="flex items-center gap-2 text-sm cursor-pointer">
+      <label className="flex min-h-11 min-w-11 cursor-pointer items-center gap-2 text-sm lg:min-h-0 lg:min-w-0">
         <input
           type="checkbox"
           {...registerDirectSale}
@@ -1236,7 +1236,7 @@ function ImageUploadGrid() {
             <button
               type="button"
               onClick={() => remove(u)}
-              className="absolute right-1 top-1 grid h-11 w-11 place-items-center rounded-full bg-black/55 text-white opacity-100 transition sm:h-9 sm:w-9 sm:opacity-0 sm:group-hover:opacity-100"
+              className="absolute right-1 top-1 grid h-11 w-11 place-items-center rounded-full bg-black/55 text-white opacity-100 transition lg:h-9 lg:w-9 lg:opacity-0 lg:group-hover:opacity-100"
               aria-label={t("common.delete")}
             >
               <X className="w-4 h-4" />
@@ -1246,7 +1246,7 @@ function ImageUploadGrid() {
         {urls.length < MAX_IMAGES && (
           <label
             className={cn(
-              "aspect-square border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg flex flex-col items-center justify-center gap-1 bg-slate-50 dark:bg-slate-800/50 cursor-pointer hover:border-primary-500 transition text-slate-400",
+              "flex min-h-11 min-w-11 aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 text-slate-400 transition hover:border-primary-500 dark:border-slate-700 dark:bg-slate-800/50",
               urls.length === 0 && "col-span-2",
             )}
           >

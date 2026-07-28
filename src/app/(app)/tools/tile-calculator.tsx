@@ -250,7 +250,7 @@ function RoomCard({
             value={room.name}
             onChange={(event) => onPatch({ name: event.target.value })}
             placeholder={t("roomNamePlaceholder")}
-            className="h-11 md:h-9 border-transparent bg-transparent px-2 text-base font-semibold hover:border-border hover:bg-surface focus:bg-surface"
+            className="h-11 lg:h-9 border-transparent bg-transparent px-2 text-base font-semibold hover:border-border hover:bg-surface focus:bg-surface"
           />
         </label>
         <Button
@@ -594,7 +594,7 @@ function SelectField({ id, label, value, options, disabled, onChange }: {
           options={options}
           disabled={disabled}
           onValueChange={onChange}
-          optionClassName="min-h-11 md:min-h-0"
+          optionClassName="min-h-11 lg:min-h-0"
           className="w-full"
         />
       </span>

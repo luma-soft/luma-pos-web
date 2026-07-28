@@ -45,7 +45,7 @@ export function ModeSwitcher({ current }: { current: Mode }) {
             onClick={() => pick(m)}
             title={t(`theme.mode.${m}`)}
             className={cn(
-              "flex-1 h-8 px-2 rounded-md text-xs font-medium",
+              "h-11 flex-1 rounded-md px-2 text-xs font-medium lg:h-8",
               active === m
                 ? "bg-surface text-slate-900 dark:text-slate-100 shadow-sm"
                 : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"

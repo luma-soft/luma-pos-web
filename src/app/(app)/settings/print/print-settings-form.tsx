@@ -114,7 +114,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
     );
   }
 
-  const inputCls = "min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm md:min-h-10";
+  const inputCls = "min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm lg:min-h-10";
 
   return (
     <div className="px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+3rem)] md:p-6">
@@ -188,7 +188,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                         type="button"
                         onClick={() => patch({ paperDefault: size })}
                         className={cn(
-                          "min-h-11 rounded-lg border px-3 text-xs font-bold uppercase md:min-h-10",
+                          "min-h-11 rounded-lg border px-3 text-xs font-bold uppercase lg:min-h-10",
                           selected.paperDefault === size ? "border-primary-600 bg-primary-600 text-white" : "border-border text-slate-600 dark:text-slate-300",
                         )}
                       >
@@ -198,7 +198,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                   </div>
                 </Field>
               </div>
-              <label className="mt-3 flex min-h-11 items-center gap-2 text-sm font-semibold md:min-h-0">
+              <label className="mt-3 flex min-h-11 items-center gap-2 text-sm font-semibold lg:min-h-0">
                 <input type="checkbox" checked={selected.isDefault} onChange={(event) => patch({ isDefault: event.target.checked })} />
                 {t("printSettings.defaultTemplate")}
               </label>
@@ -216,7 +216,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
             <Panel title={t("printSettings.optionsSection")}>
               <div className="grid gap-2 sm:grid-cols-2">
                 {TOGGLES.map((key) => (
-                  <label key={key} className="flex min-h-11 items-center gap-2 text-sm md:min-h-0">
+                  <label key={key} className="flex min-h-11 items-center gap-2 text-sm lg:min-h-0">
                     <input type="checkbox" checked={Boolean(selected.options[key])} onChange={(event) => patchOption(key, event.target.checked)} />
                     {t(`printSettings.toggles.${key}`)}
                   </label>

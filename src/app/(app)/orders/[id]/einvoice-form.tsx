@@ -35,7 +35,7 @@ export function EInvoiceForm({ orderId, defaultBuyer }: { orderId: string; defau
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="text-xs font-medium text-primary-600 hover:underline">
+      <button onClick={() => setOpen(true)} className="inline-flex min-h-11 min-w-11 items-center text-xs font-medium text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">
         + {t("einvoice.issue")}
       </button>
     );

@@ -284,11 +284,11 @@ function Card({ title, vi, action, children }: { title: string; vi: string; acti
   );
 }
 const FL = "text-[9px] font-bold uppercase tracking-wide text-slate-500";
-const FI = "min-h-11 w-full px-[11px] py-[9px] bg-canvas border-[1.5px] border-border rounded-[10px] text-[13px] outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 md:min-h-0";
+const FI = "min-h-11 w-full px-[11px] py-[9px] bg-canvas border-[1.5px] border-border rounded-[10px] text-[13px] outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 lg:min-h-0";
 const ROW = "flex min-h-11 items-center justify-between gap-3 px-3.5 py-2.5 bg-canvas rounded-[10px] border border-border-soft";
-const btnS = "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-full border border-border-soft text-xs font-semibold hover:bg-surface-2 transition md:min-h-0 md:min-w-0";
-const btnF = "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-600 text-white text-xs font-semibold hover:brightness-110 transition md:min-h-0 md:min-w-0";
-const searchableTouch = "[&>button]:h-11 md:[&>button]:h-10";
+const btnS = "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-full border border-border-soft text-xs font-semibold hover:bg-surface-2 transition lg:min-h-0 lg:min-w-0";
+const btnF = "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-600 text-white text-xs font-semibold hover:brightness-110 transition lg:min-h-0 lg:min-w-0";
+const searchableTouch = "[&>button]:h-11 lg:[&>button]:h-10";
 
 export function SettingsClient({
   store,
@@ -374,7 +374,7 @@ export function SettingsClient({
                 key={it.id}
                 onClick={() => pick(it.id)}
                 className={cn(
-                  "w-full flex items-center gap-2 px-3.5 py-2 text-xs font-semibold border-l-2 transition",
+                  "flex min-h-11 w-full items-center gap-2 border-l-2 px-3.5 py-2 text-xs font-semibold transition lg:min-h-0",
                   active === it.id
                     ? "bg-primary-50 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300 border-primary-600"
                     : "text-slate-500 border-transparent hover:bg-surface-2 hover:text-slate-900 dark:hover:text-slate-200"
@@ -521,7 +521,7 @@ function StaffRowItem({ s, i, L, canManage }: { s: StaffRow; i: number; L: boole
             onChange={(e) => { const r = e.target.value as StaffRole; setRole(r); start(() => { updateStaffRole(s.id, r); }); }}
             size="sm"
             options={STAFF_ROLES.map((r) => ({ value: r, label: L ? ROLE_TEXT[r][1] : ROLE_TEXT[r][0] }))}
-            className="min-h-11 text-xs md:min-h-0"
+            className="min-h-11 text-xs lg:min-h-0"
           />
         ) : <span className={cn("inline-block px-2 py-0.5 rounded-full text-[9px] font-bold", ROLE_PILL[role] ?? "bg-surface-2 text-slate-500")}>{L ? (ROLE_TEXT[role]?.[1] ?? role) : (ROLE_TEXT[role]?.[0] ?? role)}</span>}
       </td>
@@ -976,7 +976,7 @@ function SePayAccountsSection({ L, accounts, canManage }: { L: boolean; accounts
                 type="button"
                 onClick={closeForm}
                 disabled={pending}
-                className="grid min-h-11 min-w-11 place-items-center rounded-lg p-2 text-slate-400 transition hover:bg-surface-2 hover:text-slate-700 disabled:opacity-50 md:min-h-0 md:min-w-0"
+                className="grid min-h-11 min-w-11 place-items-center rounded-lg p-2 text-slate-400 transition hover:bg-surface-2 hover:text-slate-700 disabled:opacity-50 lg:min-h-0 lg:min-w-0"
                 aria-label={t("cancel")}
               >
                 <X className="h-4 w-4" />
@@ -1141,7 +1141,7 @@ function PrintSection({ L }: { L: boolean }) {
               key={item.href}
               href={item.href}
               className={cn(
-                "group rounded-[10px] border p-4 transition hover:-translate-y-0.5 hover:shadow-e1",
+                "group block rounded-[10px] border p-4 transition hover:-translate-y-0.5 hover:shadow-e1",
                 item.primary
                   ? "border-primary-200 bg-primary-50/70 text-primary-900 dark:border-primary-900 dark:bg-primary-950/30 dark:text-primary-100"
                   : "border-border bg-canvas text-slate-900 hover:bg-surface-2 dark:text-slate-100",
@@ -1308,7 +1308,7 @@ function ZaloSecretInput({
         placeholder={setFlag ? (L ? "Để trống để giữ giá trị hiện tại" : "Leave blank to keep current value") : ""}
         onChange={(e) => onValueChange(id, e.target.value)}
       />
-      <label className="mt-1 flex min-h-11 items-center gap-2 text-[11px] text-slate-500 md:min-h-0">
+      <label className="mt-1 flex min-h-11 items-center gap-2 text-[11px] text-slate-500 lg:min-h-0">
         <input type="checkbox" checked={clear} disabled={!canEdit} onChange={(e) => onClearChange(id, e.target.checked)} />
         {L ? "Xóa giá trị đang lưu" : "Clear saved value"}
       </label>
@@ -1403,7 +1403,7 @@ function ShopeeSettingsSection({ L, prefs, canEdit }: { L: boolean; prefs: Store
                 placeholder={partnerKeySet ? (L ? "Đã lưu, nhập key mới để thay" : "Saved, enter a new key to replace") : (L ? "Chưa cấu hình" : "Not configured")}
                 onChange={(e) => set("partnerKey", e.target.value)}
               />
-              <label className="mt-1 flex min-h-11 items-center gap-2 text-[11px] text-slate-500 md:min-h-0">
+              <label className="mt-1 flex min-h-11 items-center gap-2 text-[11px] text-slate-500 lg:min-h-0">
                 <input type="checkbox" checked={clearPartnerKey} disabled={!canEdit} onChange={(e) => { setClearPartnerKey(e.target.checked); mark(); }} />
                 {L ? "Xóa partner key đang lưu" : "Clear saved partner key"}
               </label>
@@ -1689,7 +1689,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
                 onChange={(e) => set("openaiApiKey", e.target.value)}
               />
               <span className="text-[11px] text-slate-500">{providerKeyHelp(form.provider, L)}</span>
-              <label className="mt-1 flex min-h-11 items-center gap-2 text-[11px] text-slate-500 md:min-h-0">
+              <label className="mt-1 flex min-h-11 items-center gap-2 text-[11px] text-slate-500 lg:min-h-0">
                 <input type="checkbox" checked={clearOpenaiApiKey} disabled={!canEdit} onChange={(e) => toggleClearKey(e.target.checked)} />
                 {L ? "Xóa API key đang lưu" : "Clear saved API key"}
               </label>

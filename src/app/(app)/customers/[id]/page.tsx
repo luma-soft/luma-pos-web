@@ -95,7 +95,7 @@ export default async function CustomerDetailPage({ params }: { params: Promise<{
           <div className="space-y-1">
             {owingOrders.map((o) => (
               <div key={o.id} className="flex justify-between">
-                <OrderDetailLink orderId={o.id} className="text-primary-600 hover:underline font-medium">{o.code}</OrderDetailLink>
+                <OrderDetailLink orderId={o.id} className="inline-flex min-h-11 min-w-11 items-center font-medium text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">{o.code}</OrderDetailLink>
                 <span className="tabular-nums font-semibold text-er">{formatCurrency(Number(o.total) - Number(o.amountPaid))}</span>
               </div>
             ))}

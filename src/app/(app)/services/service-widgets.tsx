@@ -162,7 +162,7 @@ export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProject
           <Text size="sm" text={row.address ?? "—"} />
           <Text size="sm" text={t("services.summary.openJobs", { count: row.openJobCount })} />
           <Text size="sm" text={t("services.summary.assets", { count: row.assetCount })} />
-          <Link href={Routes.project(row.id)} className="text-right text-sm font-semibold text-primary-600 hover:underline">{t("projects.viewDetail")}</Link>
+          <Link href={Routes.project(row.id)} className="inline-flex min-h-11 min-w-11 items-center justify-end text-right text-sm font-semibold text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">{t("projects.viewDetail")}</Link>
         </div>
       )}
     />

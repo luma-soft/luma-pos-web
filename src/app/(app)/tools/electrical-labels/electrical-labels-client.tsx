@@ -253,7 +253,7 @@ export function ElectricalLabelsClient() {
 
   return (
     <>
-      <div className="mx-auto grid w-full max-w-[1600px] gap-4 p-4 [&_button]:min-h-11 [&_button]:min-w-11 sm:p-6 md:[&_button]:min-h-0 md:[&_button]:min-w-0 xl:grid-cols-[minmax(320px,0.82fr)_minmax(0,1.18fr)]">
+      <div className="mx-auto grid w-full max-w-[1600px] gap-4 p-4 [&_button]:min-h-11 [&_button]:min-w-11 sm:p-6 lg:[&_button]:min-h-0 lg:[&_button]:min-w-0 xl:grid-cols-[minmax(320px,0.82fr)_minmax(0,1.18fr)]">
         <div className="min-w-0 space-y-4">
           <Section
             collapsible={false}
@@ -270,7 +270,7 @@ export function ElectricalLabelsClient() {
               <Field label={t("profileLabel")}>
                 <Select
                   className="w-full"
-                  optionClassName="min-h-11 md:min-h-0"
+                  optionClassName="min-h-11 lg:min-h-0"
                   value={settings.profileId}
                   options={profileOptions}
                   onValueChange={(profileId) => setSettings((current) => ({ ...current, profileId }))}
@@ -343,7 +343,7 @@ export function ElectricalLabelsClient() {
                   <Field label={t("modules")} className="min-w-0">
                     <Select
                       className="w-full"
-                      optionClassName="min-h-11 md:min-h-0"
+                      optionClassName="min-h-11 lg:min-h-0"
                       value={String(circuit.modules)}
                       options={moduleOptions}
                       onValueChange={(value) => updateCircuit(circuit.id, { modules: Number(value) as ModuleCount })}
@@ -526,9 +526,9 @@ function CircuitColorPicker({
   onChange: (color: string | null) => void;
 }) {
   return (
-    <div className="relative mt-1 flex w-fit gap-1 md:block">
+    <div className="relative mt-1 flex w-fit gap-1 lg:block">
       <label
-        className="relative grid size-11 cursor-pointer place-items-center overflow-hidden rounded-lg border border-border bg-surface shadow-sm transition-colors hover:border-primary-400 focus-within:ring-2 focus-within:ring-primary-500/30 md:size-9"
+        className="relative grid size-11 cursor-pointer place-items-center overflow-hidden rounded-lg border border-border bg-surface shadow-sm transition-colors hover:border-primary-400 focus-within:ring-2 focus-within:ring-primary-500/30 lg:size-9"
         title={chooseLabel}
       >
         {color ? (
@@ -550,7 +550,7 @@ function CircuitColorPicker({
           aria-label={clearLabel}
           title={clearLabel}
           onClick={() => onChange(null)}
-          className="relative z-10 grid size-11 place-items-center rounded-lg border border-border bg-surface text-base font-bold leading-none text-slate-500 shadow-sm hover:border-red-300 hover:text-red-600 md:absolute md:-right-1.5 md:-top-1.5 md:size-4 md:rounded-full md:text-[10px]"
+          className="relative z-10 grid size-11 place-items-center rounded-lg border border-border bg-surface text-base font-bold leading-none text-slate-500 shadow-sm hover:border-red-300 hover:text-red-600 lg:absolute lg:-right-1.5 lg:-top-1.5 lg:size-4 lg:rounded-full lg:text-[10px]"
         >
           ×
         </button>

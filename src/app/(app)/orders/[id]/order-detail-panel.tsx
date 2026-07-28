@@ -267,7 +267,7 @@ export async function OrderDetailPanel({
             {order.customerId ? (
               <>
                 <InfoLine label={t("orders.cols.customer")}>
-                  <Link href={Routes.customer(order.customerId)} className="font-medium text-primary-600 hover:underline">{order.customerName}</Link>
+                  <Link href={Routes.customer(order.customerId)} className="inline-flex min-h-11 min-w-11 items-center font-medium text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">{order.customerName}</Link>
                 </InfoLine>
                 <InfoLine label={t("customers.cols.phone")} value={order.customerPhone ?? "—"} />
                 <InfoLine label={t("customers.cols.debt")} value={formatCurrency(Number(order.customerDebt ?? 0))} valueClassName={Number(order.customerDebt ?? 0) > 0 ? "text-er" : "text-slate-500"} strong />
@@ -321,32 +321,32 @@ export async function OrderDetailPanel({
         </div>
         <div className="flex flex-nowrap gap-2 overflow-x-auto xl:flex-wrap xl:justify-end">
           {isQuote && !order.hasCreatedOrder && (
-            <Link href={posSourceHref("copy", "invoice")} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-11 sm:h-9")}>
+            <Link href={posSourceHref("copy", "invoice")} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-11 lg:h-9")}>
               {t("quotes.convert")}
             </Link>
           )}
           {isBooking && !cancelled && <BookingCreateOrderButton bookingId={order.id} />}
           {shareDocType && shareHref && <SharePrintDocButton href={shareHref} code={order.code} docType={shareDocType} />}
-          <Link href={`${Routes.order(order.id)}/print`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-11 sm:h-9")}>
+          <Link href={`${Routes.order(order.id)}/print`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-11 lg:h-9")}>
             {t("print.printBtn")}
           </Link>
           {(order.status === "completed" || order.status === "quote" || order.status === "confirmed") && order.returns.length === 0 && (
-            <Link href={posSourceHref("edit")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-11 bg-white dark:bg-surface sm:h-9")}>
+            <Link href={posSourceHref("edit")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-11 bg-white dark:bg-surface lg:h-9")}>
               {isQuote ? t("quotes.edit") : isBooking ? t("bookings.edit") : t("orderEdit.action")}
             </Link>
           )}
           {!cancelled && (
-            <Link href={posSourceHref("copy")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-11 sm:h-9")}>
+            <Link href={posSourceHref("copy")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-11 lg:h-9")}>
               {t("pos.modes.copyShort")}
             </Link>
           )}
           {order.status === "completed" && (
-            <Link href={posSourceHref("return")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-11 sm:h-9")}>
+            <Link href={posSourceHref("return")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-11 lg:h-9")}>
               {t("returns.action")}
             </Link>
           )}
           {showOpenAction && (
-            <Link href={openInListHref} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-11 sm:h-9")}>
+            <Link href={openInListHref} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-11 lg:h-9")}>
               Mở phiếu
             </Link>
           )}

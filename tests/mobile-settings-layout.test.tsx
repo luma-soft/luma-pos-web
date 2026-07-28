@@ -18,7 +18,7 @@ describe("mobile settings shell", () => {
     expect(settingsSource).toMatch(/className="hidden md:block"[\s\S]*?breadcrumb\.settings/);
     expect(settingsSource).toMatch(/const FI = "min-h-11/);
     expect(settingsSource).toMatch(/const btnS = "inline-flex min-h-11 min-w-11/);
-    expect(settingsSource).toContain('const searchableTouch = "[&>button]:h-11 md:[&>button]:h-10"');
+    expect(settingsSource).toContain('const searchableTouch = "[&>button]:h-11 lg:[&>button]:h-10"');
     expect(settingsSource.match(/<TouchTargetToggle/g)?.length).toBeGreaterThanOrEqual(6);
   });
 
@@ -30,7 +30,7 @@ describe("mobile settings shell", () => {
     expect(html).toContain('role="switch"');
     expect(html).toContain('aria-checked="true"');
     expect(html).toContain('aria-label="Thông báo"');
-    expect(html).toMatch(/class="[^"]*h-11[^"]*w-11[^"]*md:h-\[21px\][^"]*md:w-\[38px\]/);
+    expect(html).toMatch(/class="[^"]*h-11[^"]*w-11[^"]*lg:h-\[21px\][^"]*lg:w-\[38px\]/);
   });
 });
 

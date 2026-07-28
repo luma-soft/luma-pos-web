@@ -116,7 +116,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
             </select>
           </Field>
           <Field label={t("products.labels.quantity")}>
-            <NumberInput name="qty" min={1} max={500} defaultValue={qty} thousandSeparator={false} className="h-10 bg-canvas" />
+            <NumberInput name="qty" min={1} max={500} defaultValue={qty} thousandSeparator={false} className="h-11 bg-canvas lg:h-10" />
           </Field>
           <Field label={t("products.labels.codeSource")}>
             <select name="codeSource" defaultValue={codeSource} className="h-10 w-full rounded-lg border border-border bg-canvas px-3 text-sm min-h-11 lg:min-h-0">
@@ -125,7 +125,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
             </select>
           </Field>
           <Field label={t("products.labels.price")}>
-            <NumberInput name="price" min={0} step={1000} defaultValue={Number(query.price || product.retailPrice)} suffix="đ" className="h-10 bg-canvas" />
+            <NumberInput name="price" min={0} step={1000} defaultValue={Number(query.price || product.retailPrice)} suffix="đ" className="h-11 bg-canvas lg:h-10" />
           </Field>
           <div className="flex items-end">
             <button type="submit" className="h-10 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">

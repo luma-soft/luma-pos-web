@@ -73,7 +73,7 @@ export function ActionPresetButtons({
             disabled={busy}
             onClick={() => onSelect(preset)}
             className={cn(
-              "group h-auto min-w-0 border text-left transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0",
+              "group h-auto min-h-11 min-w-11 border text-left transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 lg:min-h-0 lg:min-w-0",
               actionPresetToneClass(preset.tone, active),
               variant === "grid"
                 ? "justify-start rounded-2xl px-3 py-2.5"
@@ -104,7 +104,7 @@ export function ActionPresetButtons({
             disabled={busy}
             onClick={() => setOpen((value) => !value)}
             className={cn(
-              "group h-auto min-w-0 border border-border-soft bg-surface/90 text-left text-slate-600 transition hover:-translate-y-0.5 hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0",
+              "group h-auto min-h-11 min-w-11 border border-border-soft bg-surface/90 text-left text-slate-600 transition hover:-translate-y-0.5 hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 lg:min-h-0 lg:min-w-0",
               variant === "grid"
                 ? "w-full justify-start rounded-2xl px-3 py-2.5"
                 : "max-w-full rounded-full px-2.5 py-1.5"
@@ -155,7 +155,7 @@ export function ActionPresetButtons({
                                 onSelect(preset);
                               }}
                               className={cn(
-                                "h-auto justify-start rounded-lg px-2.5 py-2 text-left",
+                                "h-auto min-h-11 min-w-11 justify-start rounded-lg px-2.5 py-2 text-left lg:min-h-0 lg:min-w-0",
                                 active ? "bg-primary-50 text-primary-700" : "text-slate-600 hover:bg-surface-2 dark:text-slate-300"
                               )}
                               title={preset.description}

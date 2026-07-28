@@ -181,7 +181,7 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
         <div className="space-y-2 rounded-lg border border-border-soft p-3">
           <div className="font-semibold">{t("purchases.detail.info")}</div>
           <InfoLine label={t("purchases.cols.supplier")}>
-            <Link href={Routes.supplier(purchase.supplierId)} className="font-medium text-primary-600 hover:underline">
+            <Link href={Routes.supplier(purchase.supplierId)} className="inline-flex min-h-11 min-w-11 items-center font-medium text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">
               {purchase.supplierName}
             </Link>
           </InfoLine>

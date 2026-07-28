@@ -112,7 +112,7 @@ export function ReportPeriodFilter({
               value={customFrom}
               max={customTo}
               onChange={(event) => setCustomFrom(event.target.value)}
-              className="h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-slate-900 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 sm:h-10 dark:text-slate-100"
+              className="h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-slate-900 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 lg:h-10 dark:text-slate-100"
             />
           </label>
           <label className="space-y-1.5 text-sm font-medium text-slate-600 dark:text-slate-300">
@@ -122,7 +122,7 @@ export function ReportPeriodFilter({
               value={customTo}
               min={customFrom}
               onChange={(event) => setCustomTo(event.target.value)}
-              className="h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-slate-900 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 sm:h-10 dark:text-slate-100"
+              className="h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-slate-900 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 lg:h-10 dark:text-slate-100"
             />
           </label>
         </div>

@@ -308,7 +308,7 @@ function CustomerDetail({
             type="button"
             onClick={() => onTabChange(key)}
             className={cn(
-              "shrink-0 border-b-2 pb-2 transition-colors",
+              "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center border-b-2 px-2 transition-colors lg:min-h-0 lg:min-w-0 lg:pb-2",
               tab === key ? "border-primary-600 text-primary-600" : "border-transparent hover:text-slate-800 dark:hover:text-slate-200",
             )}
           >

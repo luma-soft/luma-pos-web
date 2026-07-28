@@ -298,7 +298,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
                 <button type="button" onClick={() => setFUnit("pct")} className={cn("min-h-11 min-w-11 px-2 lg:min-h-0 lg:min-w-0 lg:py-1.5", fUnit === "pct" ? "bg-primary-600 text-white" : "")}>%</button>
               </div>
             </div>
-            <label className="mt-4 flex items-start gap-2 text-sm">
+            <label className="mt-4 flex min-h-11 min-w-11 items-start gap-2 text-sm lg:min-h-0 lg:min-w-0">
               <input type="checkbox" checked={fAll} onChange={(e) => setFAll(e.target.checked)} className="mt-0.5" />
               <span>{t("pricing.formula.applyAll", { n: total })} <b>{formulaBook.name}</b></span>
             </label>

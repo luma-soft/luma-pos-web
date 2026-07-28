@@ -672,7 +672,7 @@ export function RowPreviewModal({
             <div id={titleId} className="truncate text-lg font-bold">{title}</div>
             {subtitle && <div className="mt-0.5 truncate text-sm text-slate-500">{subtitle}</div>}
           </div>
-          <button type="button" onClick={onClose} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-700 sm:h-9 sm:w-9" aria-label={closeLabel}>
+          <button type="button" onClick={onClose} className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-700 lg:h-9 lg:w-9" aria-label={closeLabel}>
             <X className="h-5 w-5" />
           </button>
         </div>

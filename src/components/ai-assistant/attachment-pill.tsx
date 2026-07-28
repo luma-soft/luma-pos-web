@@ -105,7 +105,7 @@ export function AttachmentPill({
             variant="ghost"
             size="iconSm"
             onClick={onRemove}
-            className="h-5 w-5 rounded-full p-0 opacity-60 hover:bg-black/10 hover:opacity-100"
+            className="h-11 w-11 rounded-full p-0 opacity-60 hover:bg-black/10 hover:opacity-100 lg:h-5 lg:w-5"
             aria-label={t("ai.composer.removeAttachment", { name: attachment.name })}
           >
             <X className="h-3.5 w-3.5" />

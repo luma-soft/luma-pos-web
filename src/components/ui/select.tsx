@@ -132,8 +132,8 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
     }
 
     const sizeCls = {
-      sm: "h-11 px-2.5 pr-8 text-base sm:h-8 sm:text-xs",
-      default: "h-11 px-3 pr-9 text-base sm:h-10 sm:text-sm",
+      sm: "h-11 px-2.5 pr-8 text-base lg:h-8 lg:text-xs",
+      default: "h-11 px-3 pr-9 text-base lg:h-10 lg:text-sm",
       lg: "h-12 px-4 pr-10 text-base",
     }[size];
 
@@ -156,7 +156,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
             "relative w-full rounded-lg border bg-surface text-left transition-[border-color,box-shadow,background-color] duration-150 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50",
             sizeCls,
             variantCls,
-            wrapLabel && "h-auto min-h-11 py-2 sm:min-h-10",
+            wrapLabel && "h-auto min-h-11 py-2 lg:min-h-10",
             !selected && "text-slate-400",
             className
           )}
@@ -214,7 +214,7 @@ export function SelectOptionRow({
       aria-selected={active}
       onClick={onSelect}
       className={cn(
-        "flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2 sm:min-h-0",
+        "flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2 lg:min-h-0",
         active && "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-200",
         className,
       )}

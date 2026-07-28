@@ -105,7 +105,7 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
     );
   }
 
-  const inputCls = "min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm md:min-h-10";
+  const inputCls = "min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm lg:min-h-10";
 
   return (
     <div className="px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+3rem)] md:p-6">
@@ -159,7 +159,7 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
                 <Field label={t("labelSettings.templateName")}><input value={selected.name} onChange={(event) => patch({ name: event.target.value })} className={inputCls} /></Field>
                 <Field label={t("labelSettings.sortOrder")}><NumberInput value={selected.sortOrder} min={0} max={9999} onChange={(value) => patch({ sortOrder: value ?? selected.sortOrder })} className={inputCls} /></Field>
               </div>
-              <label className="mt-3 flex min-h-11 items-center gap-2 text-sm font-semibold md:min-h-0">
+              <label className="mt-3 flex min-h-11 items-center gap-2 text-sm font-semibold lg:min-h-0">
                 <input type="checkbox" checked={selected.isDefault} onChange={(event) => patch({ isDefault: event.target.checked })} />
                 {t("labelSettings.defaultTemplate")}
               </label>
@@ -192,7 +192,7 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
             <Panel title={t("labelSettings.contentSection")}>
               <div className="grid gap-2 sm:grid-cols-2">
                 {TOGGLES.map((key) => (
-                  <label key={key} className="flex min-h-11 items-center gap-2 text-sm md:min-h-0">
+                  <label key={key} className="flex min-h-11 items-center gap-2 text-sm lg:min-h-0">
                     <input type="checkbox" checked={Boolean(selected[key])} onChange={(event) => patch({ [key]: event.target.checked })} />
                     {t(`labelSettings.toggles.${key}`)}
                   </label>

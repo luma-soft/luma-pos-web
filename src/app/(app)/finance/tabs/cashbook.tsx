@@ -27,12 +27,12 @@ export async function CashbookTab({ searchParams }: { searchParams: SP }) {
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
-        <Link href={href({ fund: params.fund === "cash" ? undefined : "cash", page: undefined })} className={cn("bg-surface border rounded-card p-4", params.fund === "cash" ? "border-primary-600" : "border-border")}>
+        <Link href={href({ fund: params.fund === "cash" ? undefined : "cash", page: undefined })} className={cn("block bg-surface border rounded-card p-4", params.fund === "cash" ? "border-primary-600" : "border-border")}>
           <div className="text-xs font-medium text-slate-500">💵 {t("cashbook.fundCash")}</div>
           <div className="text-xl font-bold mt-1 tabular-nums">{formatCurrency(data.cash.balance)}</div>
           <div className="text-xs text-slate-400 mt-0.5"><span className="text-ok">+{formatCurrency(data.cash.in)}</span> · <span className="text-er">−{formatCurrency(data.cash.out)}</span></div>
         </Link>
-        <Link href={href({ fund: params.fund === "bank" ? undefined : "bank", page: undefined })} className={cn("bg-surface border rounded-card p-4", params.fund === "bank" ? "border-primary-600" : "border-border")}>
+        <Link href={href({ fund: params.fund === "bank" ? undefined : "bank", page: undefined })} className={cn("block bg-surface border rounded-card p-4", params.fund === "bank" ? "border-primary-600" : "border-border")}>
           <div className="text-xs font-medium text-slate-500">🏦 {t("cashbook.fundBank")}</div>
           <div className="text-xl font-bold mt-1 tabular-nums">{formatCurrency(data.bank.balance)}</div>
           <div className="text-xs text-slate-400 mt-0.5"><span className="text-ok">+{formatCurrency(data.bank.in)}</span> · <span className="text-er">−{formatCurrency(data.bank.out)}</span></div>

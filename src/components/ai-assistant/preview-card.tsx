@@ -139,7 +139,7 @@ export function PreviewCard({
                       size="sm"
                       disabled={busy}
                       onClick={() => onSelectChoice(selection.type, candidate)}
-                      className="h-auto rounded-full px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-surface-2"
+                      className="h-auto min-h-11 min-w-11 rounded-full px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-surface-2 lg:min-h-0 lg:min-w-0"
                     >
                       {candidate.label}{candidate.code ? ` · ${candidate.code}` : ""}
                     </Button>

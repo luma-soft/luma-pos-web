@@ -21,11 +21,11 @@ export const buttonVariants = cva(
           "bg-emerald-600 text-white hover:bg-emerald-700",
       },
       size: {
-        sm: "h-11 px-3 text-xs sm:h-8",
-        default: "h-11 px-4 py-2 text-sm sm:h-10",
+        sm: "h-11 px-3 text-xs lg:h-8",
+        default: "h-11 px-4 py-2 text-sm lg:h-10",
         lg: "h-12 px-6 text-base",
-        icon: "h-11 w-11 sm:h-10 sm:w-10",
-        iconSm: "h-11 w-11 sm:h-8 sm:w-8",
+        icon: "h-11 w-11 lg:h-10 lg:w-10",
+        iconSm: "h-11 w-11 lg:h-8 lg:w-8",
       },
       block: {
         true: "w-full",

@@ -136,10 +136,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                       <Text as="div" weight="semibold" size="sm" text={`${t(`services.documents.${document.type}` as never)} · ${document.title}`} />
                       <Text as="div" variant="muted" size="xs" text={`${t(`services.documents.status.${document.status}` as never)}${document.signedBy ? ` · ${document.signedBy}` : ""}${document.signedAt ? ` · ${document.signedAt}` : ""}`} />
                       {document.content && <Text as="p" size="sm" variant="muted" className="mt-1 whitespace-pre-wrap" text={document.content} />}
-                      {document.photoUrls.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{document.photoUrls.map((url) => <a key={url} href={url} target="_blank" rel="noreferrer" className="text-xs font-semibold text-primary-600 hover:underline">{t("services.documents.photoLink")}</a>)}</div>}
+                      {document.photoUrls.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{document.photoUrls.map((url) => <a key={url} href={url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 min-w-11 items-center text-xs font-semibold text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">{t("services.documents.photoLink")}</a>)}</div>}
                     </div>
                     <div className="flex items-center gap-2">
-                      <Link href={`/projects/${project.id}/documents/${document.id}/print`} className="text-xs font-semibold text-primary-600 hover:underline">{t("services.documents.print")}</Link>
+                      <Link href={`/projects/${project.id}/documents/${document.id}/print`} className="inline-flex min-h-11 min-w-11 items-center text-xs font-semibold text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">{t("services.documents.print")}</Link>
                       <ServiceHandoverEditor projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} initial={document} />
                     </div>
                   </div>
@@ -279,8 +279,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                     {job.description && <Text as="p" size="sm" variant="muted" className="mb-3" text={job.description} />}
                     {(job.quoteOrderId || job.materialOrderId) && (
                       <div className="mb-3 flex flex-wrap gap-3 text-xs">
-                        {job.quoteOrderId && <OrderDetailLink orderId={job.quoteOrderId} className="font-semibold text-primary-600 hover:underline">{t("services.fields.quote")}</OrderDetailLink>}
-                        {job.materialOrderId && <OrderDetailLink orderId={job.materialOrderId} className="font-semibold text-primary-600 hover:underline">{t("services.fields.materialOrder")}</OrderDetailLink>}
+                        {job.quoteOrderId && <OrderDetailLink orderId={job.quoteOrderId} className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">{t("services.fields.quote")}</OrderDetailLink>}
+                        {job.materialOrderId && <OrderDetailLink orderId={job.materialOrderId} className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">{t("services.fields.materialOrder")}</OrderDetailLink>}
                       </div>
                     )}
                     <ServiceChecklistEditor jobId={job.id} checklist={job.checklist} />
@@ -631,7 +631,7 @@ function CostMetric({ label, value, tone = "" }: { label: string; value: number;
 
 function WorkflowStep({ href, number, title, hint, count }: { href: string; number: string; title: string; hint: string; count: number }) {
   return (
-    <a href={href} className="group rounded-xl border border-primary-100 bg-surface px-3 py-3 transition-colors hover:border-primary-300 hover:bg-white dark:border-primary-900/70 dark:hover:bg-slate-900">
+    <a href={href} className="group block rounded-xl border border-primary-100 bg-surface px-3 py-3 transition-colors hover:border-primary-300 hover:bg-white dark:border-primary-900/70 dark:hover:bg-slate-900">
       <div className="flex items-start gap-3">
         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary-600 text-xs font-bold text-white">{number}</span>
         <span className="min-w-0">

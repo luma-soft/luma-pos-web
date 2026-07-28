@@ -48,7 +48,7 @@ export default async function MergeOrdersPage({ searchParams }: Props) {
       {rows.length === 0 ? (
         <div className="bg-surface border border-dashed border-border rounded-card p-10 text-center text-slate-400">
           <p>{t("merge.noneSelected")}</p>
-          <Link href={Routes.Orders} className="text-primary-600 hover:underline text-sm mt-2 inline-block">← {t("orders.title")}</Link>
+          <Link href={Routes.Orders} className="mt-2 inline-flex min-h-11 min-w-11 items-center text-sm text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">← {t("orders.title")}</Link>
         </div>
       ) : (
         <>

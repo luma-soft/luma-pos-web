@@ -231,15 +231,17 @@ function SelectionCheckbox({
     if (ref.current) ref.current.indeterminate = indeterminate;
   }, [indeterminate]);
   return (
-    <input
-      ref={ref}
-      type="checkbox"
-      checked={checked}
-      onChange={onChange}
-      onClick={stopRowToggle}
-      aria-label={label}
-      className="h-4 w-4 rounded border-slate-300 accent-primary-600"
-    />
+    <label className="inline-grid size-11 cursor-pointer place-items-center lg:size-4">
+      <input
+        ref={ref}
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        onClick={stopRowToggle}
+        aria-label={label}
+        className="h-4 w-4 rounded border-slate-300 accent-primary-600"
+      />
+    </label>
   );
 }
 
@@ -1129,7 +1131,7 @@ function DocumentValue({ movement }: { movement: StockMovementRow }) {
     return (
       <OrderDetailLink
         orderId={movement.refId}
-        className="text-primary-600 hover:underline"
+        className="inline-flex min-h-11 min-w-11 items-center text-primary-600 hover:underline lg:min-h-0 lg:min-w-0"
       >
         {label}
       </OrderDetailLink>
@@ -1537,7 +1539,7 @@ function ActionButton({
 }
 
 const actionClassName =
-  "inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 sm:h-10";
+  "inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border px-3 text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 lg:h-10";
 
 function StatusBadge({ product }: { product: ProductRow }) {
   const t = useTranslations();

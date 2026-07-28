@@ -43,15 +43,15 @@ describe("mobile specialist layouts", () => {
     const tile = read("src/app/(app)/tools/tile-calculator.tsx");
     const electrical = read("src/app/(app)/tools/electrical-labels/electrical-labels-client.tsx");
 
-    expect(tile).toContain("h-11 md:h-9");
-    expect(tile).toContain('optionClassName="min-h-11 md:min-h-0"');
-    expect(electrical).toContain('optionClassName="min-h-11 md:min-h-0"');
+    expect(tile).toContain("h-11 lg:h-9");
+    expect(tile).toContain('optionClassName="min-h-11 lg:min-h-0"');
+    expect(electrical).toContain('optionClassName="min-h-11 lg:min-h-0"');
 
     const optionHtml = renderToStaticMarkup(createElement(SelectOptionRow, {
       active: true,
       wrapLabel: false,
       onSelect: () => undefined,
-      className: "min-h-11 md:min-h-0",
+      className: "min-h-11 lg:min-h-0",
       label: "60 × 60 cm",
     }));
     expect(optionHtml).toContain("min-h-11");

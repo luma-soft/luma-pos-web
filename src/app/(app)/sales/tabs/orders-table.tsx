@@ -128,10 +128,10 @@ export function OrdersTable({
           <div className="hidden flex-1 items-center gap-3 text-sm sm:flex">
             <span className="hidden text-xs text-slate-500 sm:inline">{t("orders.batchHint")}</span>
             <div className="flex-1" />
-            <button type="submit" formAction="/orders/merge" className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2">
+            <button type="submit" formAction="/orders/merge" className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2 lg:min-h-0 lg:min-w-0">
               {t("merge.title")}
             </button>
-            <button type="submit" className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2">
+            <button type="submit" className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2 lg:min-h-0 lg:min-w-0">
               {t("orders.printSelected")}
             </button>
           </div>

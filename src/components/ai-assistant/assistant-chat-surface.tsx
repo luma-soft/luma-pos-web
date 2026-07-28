@@ -327,7 +327,7 @@ export function AssistantChatSurface({
             disabled={busy}
             variant="ghost"
             size="sm"
-            className="h-auto px-0 py-0 text-[11px] font-semibold text-slate-400 hover:bg-transparent hover:text-er"
+            className="h-auto min-h-11 min-w-11 px-0 py-0 text-[11px] font-semibold text-slate-400 hover:bg-transparent hover:text-er lg:min-h-0 lg:min-w-0"
           >
             {t("ai.session.clearMessages")}
           </Button>
@@ -439,7 +439,7 @@ export function AssistantChatSurface({
                     onClick={() => send(s)}
                     variant="outline"
                     size="sm"
-                    className="h-auto max-w-full rounded-full px-2.5 py-1 text-xs text-slate-600 hover:bg-surface-2 dark:text-slate-300"
+                    className="h-auto min-h-11 min-w-11 max-w-full rounded-full px-2.5 py-1 text-xs text-slate-600 hover:bg-surface-2 dark:text-slate-300 lg:min-h-0 lg:min-w-0"
                   >
                     <span className="truncate">{s}</span>
                   </Button>
@@ -490,7 +490,7 @@ export function AssistantChatSurface({
               onClick={() => fileRef.current?.click()}
               variant="outline"
               size="iconSm"
-              className="h-9 w-9 rounded-full bg-surface text-slate-600 hover:bg-surface-2 shrink-0"
+              className="h-11 w-11 shrink-0 rounded-full bg-surface text-slate-600 hover:bg-surface-2 lg:h-9 lg:w-9"
               title={t("ai.composer.attachFile")}
               aria-label={t("ai.composer.attachFile")}
             >
@@ -504,7 +504,7 @@ export function AssistantChatSurface({
                 variant="outline"
                 size="iconSm"
                 className={cn(
-                  "h-9 w-9 rounded-full bg-surface text-slate-600 hover:bg-surface-2 shrink-0",
+                  "h-11 w-11 shrink-0 rounded-full bg-surface text-slate-600 hover:bg-surface-2 lg:h-9 lg:w-9",
                   listening && "border-primary-500 text-primary-600 bg-primary-50"
                 )}
                 title={listening ? t("ai.composer.listeningTitle") : t("ai.composer.voiceTitle")}
@@ -533,7 +533,7 @@ export function AssistantChatSurface({
               disabled={sendDisabled}
               type="submit"
               size="iconSm"
-              className="h-9 w-9 rounded-full bg-primary-600 text-white shrink-0"
+              className="h-11 w-11 shrink-0 rounded-full bg-primary-600 text-white lg:h-9 lg:w-9"
               title={hasUploadingAttachment ? t("ai.composer.uploadingTitle") : hasComposerPayload ? t("ai.composer.sendTitle") : t("ai.composer.enterBeforeSend")}
               aria-label={t("ai.composer.sendTitle")}
             >

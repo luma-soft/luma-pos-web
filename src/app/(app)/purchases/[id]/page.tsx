@@ -174,7 +174,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
             <h2 className="font-semibold mb-1">{t("purchases.detail.info")}</h2>
             <div className="flex justify-between gap-3">
               <span className="text-slate-500">{t("purchases.cols.supplier")}</span>
-              <Link href={Routes.supplier(purchase.supplierId)} className="font-medium text-primary-600 hover:underline text-right">
+              <Link href={Routes.supplier(purchase.supplierId)} className="inline-flex min-h-11 min-w-11 items-center justify-end text-right font-medium text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">
                 {purchase.supplierName}
               </Link>
             </div>

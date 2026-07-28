@@ -43,7 +43,7 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
               key={tab}
               href={href({ status: tab, page: undefined })}
               className={cn(
-              "inline-flex min-h-11 shrink-0 snap-start items-center justify-center border-b-2 px-4 py-2 text-sm font-medium sm:min-h-0",
+              "inline-flex min-h-11 shrink-0 snap-start items-center justify-center border-b-2 px-4 py-2 text-sm font-medium lg:min-h-0",
                 status === tab ? "border-primary-600 text-primary-600" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
               )}
             >
@@ -51,7 +51,7 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
             </Link>
           ))}
         </div>
-        <Link href={Routes.POS} className="mb-2 inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 active:scale-[0.98] sm:mb-1.5 sm:min-h-0 sm:w-auto">
+        <Link href={Routes.POS} className="mb-2 inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 active:scale-[0.98] lg:mb-1.5 lg:min-h-0 lg:w-auto">
           <ShoppingCart className="w-4 h-4" />
           {t("orders.createViaPos")}
         </Link>

@@ -101,7 +101,7 @@ export function SearchableSelect({
         block
         disabled={disabled}
         onClick={() => { setOpen((v) => !v); setQ(""); }}
-        className="relative h-10 justify-start pl-3 pr-9 text-left rounded-[10px]"
+        className="relative h-11 justify-start rounded-[10px] pl-3 pr-9 text-left lg:h-10"
       >
         <Text
           as="span"
