@@ -32,6 +32,8 @@ export interface SelectProps
   wrapLabel?: boolean;
   /** Applied to each portaled option row (for route-scoped touch sizing). */
   optionClassName?: string;
+  /** Applied to the non-portaled root wrapper when Select participates in flex/grid layout. */
+  rootClassName?: string;
 }
 
 export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
@@ -51,6 +53,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
       placeholderTxOptions,
       wrapLabel = false,
       optionClassName,
+      rootClassName,
       disabled,
       ...props
     },
@@ -143,7 +146,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
     }[variant];
 
     return (
-      <div ref={rootRef} className="relative inline-block align-middle">
+      <div ref={rootRef} className={cn("relative inline-block align-middle", rootClassName)}>
         {name && <input type="hidden" name={name} value={currentValue} />}
         <button
           ref={ref}
@@ -153,7 +156,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
           aria-expanded={open}
           onClick={() => setOpen((state) => !state)}
           className={cn(
-            "relative w-full rounded-lg border bg-surface text-left transition-[border-color,box-shadow,background-color] duration-150 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50",
+            "relative min-h-11 min-w-11 w-full rounded-lg border bg-surface text-left transition-[border-color,box-shadow,background-color] duration-150 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:min-w-0",
             sizeCls,
             variantCls,
             wrapLabel && "h-auto min-h-11 py-2 lg:min-h-10",

@@ -71,6 +71,33 @@ describe("project service mobile records", () => {
 
     expect(source.match(/\[&_button\]:min-h-11 lg:\[&_button\]:min-h-0/g)).toHaveLength(4);
   });
+
+  test("service job and warranty mobile rows keep project navigation outside row buttons", () => {
+    const source = readFileSync("src/app/(app)/services/service-widgets.tsx", "utf8");
+    const jobs = source.slice(
+      source.indexOf("export function ServiceJobsTable"),
+      source.indexOf("export function WarrantyClaimsTable"),
+    );
+    const warranty = source.slice(
+      source.indexOf("export function WarrantyClaimsTable"),
+      source.indexOf("export function ServiceJobQuickCreate"),
+    );
+
+    for (const mobile of [jobs, warranty]) {
+      expect(mobile).toContain("renderMobileRow=");
+      expect(mobile).toContain("<article");
+      expect(mobile).toContain("<Link");
+      expect(mobile).toContain("min-h-11 min-w-11");
+      expect(mobile).not.toContain("<button");
+      expect(mobile).toContain("row.projectName");
+    }
+    expect(jobs).toContain("row.assignedToName");
+    expect(jobs).toContain("row.scheduledAt");
+    expect(jobs).toContain("row.checklist");
+    expect(warranty).toContain("row.assetName");
+    expect(warranty).toContain("row.reportedAt");
+    expect(warranty).toContain("row.priority");
+  });
 });
 
 describe("notification mobile records", () => {

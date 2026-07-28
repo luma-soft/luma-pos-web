@@ -186,7 +186,7 @@ export function SearchableSelect({
                   onMouseEnter={() => setActive(i)}
                   onClick={() => pick(o.value)}
                   className={cn(
-                    "h-auto justify-between rounded-none px-3 text-left",
+                    "h-auto min-h-12 min-w-11 justify-between rounded-none px-3 text-left",
                     o.imageUrl ? "min-h-16 py-2.5" : "min-h-12 py-2",
                     i === active && "bg-surface-2",
                     o.value === value && "bg-primary-50 dark:bg-primary-950/40"

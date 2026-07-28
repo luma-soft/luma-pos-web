@@ -71,7 +71,8 @@ export function PrintToolbar({
           onChange={(event) => { window.location.href = hrefFor({ size, templateId: event.target.value }); }}
           size="sm"
           options={templates.map((template) => ({ value: template.id, label: template.name }))}
-          className="order-4 w-full min-w-0 text-xs font-medium lg:order-none lg:max-w-[220px]"
+          rootClassName="order-4 w-full min-w-0 lg:order-none lg:w-auto lg:max-w-[220px]"
+          className="min-w-0 text-xs font-medium"
           aria-label={t("printSettings.templateName")}
         />
       )}

@@ -29,7 +29,6 @@ const PASSTHROUGH_CONTROL_LINKS = new Set(["OrderDetailLink"]);
 const NATIVE_PRIMITIVE_IMPLEMENTATIONS = new Set([
   "src/components/order-detail-link.tsx",
   "src/components/ui/button.tsx",
-  "src/components/ui/input.tsx",
   "src/components/ui/quantity-input.tsx",
 ]);
 const PRE_LG_BREAKPOINTS = new Set(["sm", "md"]);
@@ -106,6 +105,17 @@ function classTokens(
 
   const fragments: string[] = [];
   const visit = (child: ts.Node) => {
+    if (
+      ts.isBinaryExpression(child) &&
+      child.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+    ) {
+      visit(child.left);
+      return;
+    }
+    if (ts.isConditionalExpression(child)) {
+      visit(child.condition);
+      return;
+    }
     if (ts.isTemplateExpression(child)) {
       fragments.push(child.head.text);
       for (const span of child.templateSpans) fragments.push(span.literal.text);
@@ -151,20 +161,6 @@ function isHiddenInput(
         ["hidden", "sr-only"].includes(token),
       ))
   );
-}
-
-function isDataTableColumnRenderer(node: ts.Node) {
-  let current: ts.Node | undefined = node;
-  while (current) {
-    if (
-      ts.isVariableDeclaration(current) &&
-      current.type?.getText().includes("DataTableColumn")
-    ) {
-      return true;
-    }
-    current = current.parent;
-  }
-  return false;
 }
 
 function isPrintOnly(
@@ -347,6 +343,39 @@ function hasDisplayBox(classes: string[]) {
 function sharedControlHasUnsafeOverride(
   classes: string[],
 ) {
+  const hasUnsafeFixed = (axis: "h" | "w") =>
+    classes.some((token) => {
+      const parsed = responsiveParts(token);
+      if (!parsed || !["base", "sm", "md"].includes(parsed.breakpoint)) {
+        return false;
+      }
+      return new RegExp(`^(?:${axis}|size)-(?:0|[1-9]|10)$`).test(parsed.utility);
+    });
+  const hasSafeMin = (axis: "h" | "w") =>
+    classes.some((token) => {
+      const parsed = responsiveParts(token);
+      if (!parsed || !["base", "sm", "md"].includes(parsed.breakpoint)) {
+        return false;
+      }
+      const match = parsed.utility.match(new RegExp(`^min-${axis}-(.+)$`));
+      return Boolean(match && (axis === "h"
+        ? numericScaleIsSafe(match[1])
+        : widthValueIsSafe(match[1])));
+    });
+  if (
+    classes.some((token) => {
+      const parsed = responsiveParts(token);
+      return Boolean(
+        parsed &&
+        ["base", "sm", "md"].includes(parsed.breakpoint) &&
+        /^min-h-(?:auto|0|[1-9]|10)$/.test(parsed.utility),
+      );
+    }) ||
+    (hasUnsafeFixed("h") && !hasSafeMin("h")) ||
+    (hasUnsafeFixed("w") && !hasSafeMin("w"))
+  ) {
+    return true;
+  }
   if (
     classes.some((token) =>
       /^(?:sm|md):\[[^\]]+\]:(?:h|size|min-h|min-w|w)-(?:auto|0|[1-9]|10)$/.test(
@@ -376,6 +405,73 @@ function sharedControlHasUnsafeOverride(
     ) {
       return true;
     }
+  }
+  return false;
+}
+
+function explicitMobileColumnDeclarations(source: ts.SourceFile) {
+  const declarations: Array<{
+    name: string;
+    scope: ts.Node;
+    declaration: ts.VariableDeclaration;
+  }> = [];
+  const mobileTables: Array<{ name: string; scope: ts.Node }> = [];
+  const functionScope = (node: ts.Node) => {
+    let current: ts.Node | undefined = node;
+    while (current && !ts.isFunctionLike(current)) current = current.parent;
+    return current ?? source;
+  };
+  const visit = (node: ts.Node) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.type?.getText().includes("DataTableColumn")
+    ) {
+      declarations.push({
+        name: node.name.text,
+        scope: functionScope(node),
+        declaration: node,
+      });
+    }
+    if (
+      (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
+      jsxTagName(node) === "DataTableShell" &&
+      attribute(node, "renderMobileRow")
+    ) {
+      const columns = attribute(node, "columns")?.initializer;
+      if (
+        columns &&
+        ts.isJsxExpression(columns) &&
+        columns.expression &&
+        ts.isIdentifier(columns.expression)
+      ) {
+        mobileTables.push({
+          name: columns.expression.text,
+          scope: functionScope(node),
+        });
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return new Set(
+    declarations
+      .filter((declaration) =>
+        mobileTables.some((table) =>
+          table.name === declaration.name && table.scope === declaration.scope,
+        ))
+      .map((declaration) => declaration.declaration),
+  );
+}
+
+function isCoveredByExplicitMobileRenderer(
+  node: ts.Node,
+  declarations: Set<ts.VariableDeclaration>,
+) {
+  let current: ts.Node | undefined = node;
+  while (current) {
+    if (ts.isVariableDeclaration(current)) return declarations.has(current);
+    current = current.parent;
   }
   return false;
 }
@@ -443,6 +539,7 @@ function auditSource(
     ts.ScriptKind.TSX,
   );
   const constants = stringConstants(source);
+  const explicitMobileColumns = explicitMobileColumnDeclarations(source);
   const candidates: Candidate[] = [];
 
   const visit = (node: ts.Node) => {
@@ -453,7 +550,7 @@ function auditSource(
         GUARANTEED_SHARED_CONTROLS.has(jsxTagName(node))) &&
       !isHiddenInput(node, constants) &&
       !NATIVE_PRIMITIVE_IMPLEMENTATIONS.has(file) &&
-      !isDataTableColumnRenderer(node) &&
+      !isCoveredByExplicitMobileRenderer(node, explicitMobileColumns) &&
       !isInsideNamedFunction(node, "ColumnVisibilityMenu") &&
       !isDesktopOnly(node, constants) &&
       !isPrintOnly(node, constants)
@@ -657,6 +754,9 @@ describe("mobile active-control audit oracle", () => {
             <button className="p-3"><Icon /></button>
             <button className="h-11 px-3">{dynamicLabel}</button>
             <button className="h-11 px-3 sm:h-8">shrinks at tablet</button>
+            <MoneyInput value={0} className="min-h-0" />
+            <Button className="w-8">narrow shared button</Button>
+            <button className={cn(active && "min-h-11 min-w-11")}>conditional sizing</button>
             <SearchableSelect className="[&>button]:h-11 md:[&>button]:h-10" />
           </div>;
         }
@@ -671,8 +771,26 @@ describe("mobile active-control audit oracle", () => {
       "button",
       "button",
       "button",
+      "MoneyInput",
+      "Button",
+      "button",
       "SearchableSelect",
     ]);
+  });
+
+  test("audits classless links rendered by the default DataTable mobile fallback", () => {
+    const failures = auditSource(
+      "fixture.tsx",
+      `
+        const columns: DataTableColumn<Row>[] = [{
+          key: "project",
+          label: "Project",
+          render: (row) => <Link href={"/projects/" + row.id}>{row.name}</Link>,
+        }];
+      `,
+    );
+
+    expect(failures.map(({ tag }) => tag)).toEqual(["Link"]);
   });
 
   test("accepts persistent pre-lg sizing, safe label wrappers, and lg-only surfaces", () => {
@@ -723,6 +841,9 @@ describe("mobile active-control audit", () => {
     expect(buttons).toContain('iconSm: "h-11 w-11 lg:h-8 lg:w-8"');
     expect(inputs).toContain('sm: "h-11 px-2 text-base lg:h-8 lg:text-xs"');
     expect(inputs).toContain('default: "h-11 text-base lg:h-10 lg:text-sm"');
+    expect(inputs).toContain(
+      '"min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"',
+    );
     expect(selects).toContain('sm: "h-11 px-2.5 pr-8 text-base lg:h-8 lg:text-xs"');
     expect(selects).toContain('default: "h-11 px-3 pr-9 text-base lg:h-10 lg:text-sm"');
     expect(selects).toContain(

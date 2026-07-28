@@ -527,7 +527,7 @@ export function AssistantChatSurface({
               placeholder={attachments.length ? t("ai.composer.attachmentPlaceholder") : composerPlaceholder}
               rows={1}
               disabled={composerDisabled}
-              className="ai-composer-scrollbar-hidden min-h-9 max-h-32 sm:max-h-40 flex-1 min-w-0 resize-none overflow-y-auto rounded-[18px] bg-canvas px-3 py-2 text-sm leading-5"
+              className="ai-composer-scrollbar-hidden min-h-11 max-h-32 sm:max-h-40 flex-1 min-w-0 resize-none overflow-y-auto rounded-[18px] bg-canvas px-3 py-2 text-sm leading-5 lg:min-h-9"
             />
             <Button
               disabled={sendDisabled}

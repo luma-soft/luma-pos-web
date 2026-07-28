@@ -188,7 +188,38 @@ export function ServiceJobsTable({ rows }: { rows: ServiceJobRow[] }) {
     { key: "status", label: t("orders.cols.status"), required: true, render: (row) => <ServiceJobStatusAction jobId={row.id} status={row.status} /> },
   ];
 
-  return <DataTableShell tableId="services.jobs" rows={rows} columns={columns} getRowId={(row) => row.id} minWidth="1020px" />;
+  return (
+    <DataTableShell
+      tableId="services.jobs"
+      rows={rows}
+      columns={columns}
+      getRowId={(row) => row.id}
+      minWidth="1020px"
+      renderMobileRow={({ row }) => (
+        <article className="space-y-3 p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-mono text-xs font-semibold">{row.code}</p>
+              <p className="mt-1 break-words text-sm font-semibold">{row.title}</p>
+            </div>
+            <ServiceJobStatusAction jobId={row.id} status={row.status} />
+          </div>
+          <Link
+            href={Routes.project(row.projectId)}
+            className="inline-flex min-h-11 min-w-11 max-w-full items-center break-words text-sm font-medium text-primary-600 hover:underline"
+          >
+            {row.projectName}
+          </Link>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+            <div><dt className="text-slate-500">{t("services.fields.type")}</dt><dd className="mt-0.5 font-medium">{serviceTypeLabel(t, row.serviceType)}</dd></div>
+            <div><dt className="text-slate-500">{t("services.fields.assignee")}</dt><dd className="mt-0.5 font-medium">{row.assignedToName ?? "—"}</dd></div>
+            <div><dt className="text-slate-500">{t("services.fields.schedule")}</dt><dd className="mt-0.5 font-medium">{row.scheduledAt ? formatDate(row.scheduledAt) : "—"}</dd></div>
+            <div><dt className="text-slate-500">{t("services.fields.checklist")}</dt><dd className="mt-0.5 font-medium">{row.checklist.filter((item) => item.completed).length}/{row.checklist.length}</dd></div>
+          </dl>
+        </article>
+      )}
+    />
+  );
 }
 
 export function WarrantyClaimsTable({ rows }: { rows: WarrantyClaimRow[] }) {
@@ -203,7 +234,37 @@ export function WarrantyClaimsTable({ rows }: { rows: WarrantyClaimRow[] }) {
     { key: "status", label: t("orders.cols.status"), required: true, render: (row) => <WarrantyClaimStatusAction claimId={row.id} status={row.status} /> },
   ];
 
-  return <DataTableShell tableId="services.warranty" rows={rows} columns={columns} getRowId={(row) => row.id} minWidth="900px" />;
+  return (
+    <DataTableShell
+      tableId="services.warranty"
+      rows={rows}
+      columns={columns}
+      getRowId={(row) => row.id}
+      minWidth="900px"
+      renderMobileRow={({ row }) => (
+        <article className="space-y-3 p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-mono text-xs font-semibold">{row.code}</p>
+              <p className="mt-1 break-words text-sm font-semibold">{row.title}</p>
+            </div>
+            <WarrantyClaimStatusAction claimId={row.id} status={row.status} />
+          </div>
+          <Link
+            href={Routes.project(row.projectId)}
+            className="inline-flex min-h-11 min-w-11 max-w-full items-center break-words text-sm font-medium text-primary-600 hover:underline"
+          >
+            {row.projectName}
+          </Link>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+            <div><dt className="text-slate-500">{t("services.fields.asset")}</dt><dd className="mt-0.5 font-medium">{row.assetName ?? "—"}</dd></div>
+            <div><dt className="text-slate-500">{t("services.fields.reportedAt")}</dt><dd className="mt-0.5 font-medium">{formatDate(row.reportedAt)}</dd></div>
+            <div><dt className="text-slate-500">{t("services.fields.priority")}</dt><dd className="mt-0.5 font-medium">{t(`services.priorities.${row.priority}` as never)}</dd></div>
+          </dl>
+        </article>
+      )}
+    />
+  );
 }
 
 export function ServiceJobQuickCreate({

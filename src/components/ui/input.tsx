@@ -55,6 +55,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             placeholder={finalPlaceholder}
             className={cn(
+              "min-h-11 min-w-11 lg:min-h-0 lg:min-w-0",
               inputVariants({ size, variant }),
               leftIcon && "pl-10",
               rightIcon && "pr-10",
@@ -74,7 +75,11 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       <input
         ref={ref}
         placeholder={finalPlaceholder}
-        className={cn(inputVariants({ size, variant }), className)}
+        className={cn(
+          "min-h-11 min-w-11 lg:min-h-0 lg:min-w-0",
+          inputVariants({ size, variant }),
+          className,
+        )}
         {...props}
       />
     );
@@ -113,7 +118,11 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         ref={ref}
         rows={rows}
         placeholder={finalPlaceholder}
-        className={cn(textareaVariants({ variant }), className)}
+        className={cn(
+          "min-h-11 min-w-11 lg:min-h-0 lg:min-w-0",
+          textareaVariants({ variant }),
+          className,
+        )}
         {...props}
       />
     );

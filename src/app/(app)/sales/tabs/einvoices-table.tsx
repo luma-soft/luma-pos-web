@@ -43,6 +43,29 @@ export function EInvoicesTable({ rows }: { rows: EInvoiceRow[] }) {
       columns={columns}
       getRowId={(row) => row.id}
       minWidth="1040px"
+      renderMobileRow={({ row, toggle }) => (
+        <div className="space-y-2 p-3">
+          <button
+            type="button"
+            onClick={toggle}
+            className="flex min-h-11 min-w-11 w-full items-start justify-between gap-3 text-left"
+          >
+            <span className="min-w-0">
+              <span className="block truncate font-medium">{row.number ?? "—"}</span>
+              <span className="mt-1 block text-xs font-semibold">{t(`einvoice.status.${row.status}`)}</span>
+            </span>
+            <span className="shrink-0 font-semibold tabular-nums">{formatCurrency(Number(row.orderTotal))}</span>
+          </button>
+          <OrderDetailLink
+            orderId={row.orderId}
+            className="inline-flex min-h-11 min-w-11 items-center text-sm font-semibold text-primary-600 hover:underline"
+          >
+            {row.orderCode}
+          </OrderDetailLink>
+          <p className="break-words text-sm">{row.buyerName}{row.buyerTaxCode ? ` · MST: ${row.buyerTaxCode}` : ""}</p>
+          <p className="text-xs text-slate-500">{row.issuedAt ? formatDate(row.issuedAt) : "—"} · VAT {formatCurrency(Number(row.vatAmount))} ({Number(row.vatRate)}%)</p>
+        </div>
+      )}
       renderDetail={(row) => (
         <div className="grid gap-4 bg-surface px-4 py-4 md:grid-cols-4">
           <Info label={t("einvoice.cols.number")} value={row.number ? `${row.serial ? `${row.serial} · ` : ""}${row.number}` : "-"} />

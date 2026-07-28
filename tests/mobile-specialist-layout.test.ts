@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { SelectOptionRow } from "@/components/ui/select";
+import { NextIntlClientProvider } from "next-intl";
+import { Textarea } from "@/components/ui/input";
+import { Select, SelectOptionRow } from "@/components/ui/select";
 import { MobilePrintPreviewFrame } from "@/app/(app)/tools/electrical-labels/electrical-labels-client";
 import { SplitGuestRow } from "@/app/(app)/tables/[id]/split-guest-row";
 import {
@@ -103,6 +105,63 @@ describe("mobile specialist layouts", () => {
     expect(toolbar).toContain("overflow-x-auto");
     expect(toolbar).toContain("w-full min-w-0");
     expect(toolbar).toContain("print:hidden");
+  });
+
+  test("print template selector puts containment geometry on its real flex item", () => {
+    const toolbar = read("src/components/print/print-toolbar.tsx");
+    expect(toolbar).toContain('rootClassName="order-4 w-full min-w-0');
+
+    const html = renderToStaticMarkup(createElement(
+      NextIntlClientProvider,
+      {
+        locale: "vi",
+        messages: {},
+        timeZone: "Asia/Ho_Chi_Minh",
+        now: new Date("2026-07-29T00:00:00+07:00"),
+      },
+      createElement(Select, {
+        value: "long",
+        options: [{
+          value: "long",
+          label: "Mẫu hóa đơn tùy chỉnh có tên cực kỳ dài để kiểm tra tràn ngang",
+        }],
+        rootClassName: "order-4 w-full min-w-0",
+        className: "min-w-0",
+      }),
+    ));
+
+    expect(html).toContain("relative inline-block align-middle order-4 w-full min-w-0");
+    expect(html).toContain("<button");
+    expect(html).toContain("w-full");
+    expect(html).toContain("min-w-0");
+    expect(html).toContain('<span class="block truncate">');
+    expect(html).toContain("Mẫu hóa đơn tùy chỉnh có tên cực kỳ dài");
+  });
+
+  test("shared textarea keeps auto-resize-compatible semantics with tablet-safe geometry", () => {
+    const html = renderToStaticMarkup(createElement(
+      NextIntlClientProvider,
+      {
+        locale: "vi",
+        messages: {},
+        timeZone: "Asia/Ho_Chi_Minh",
+        now: new Date("2026-07-29T00:00:00+07:00"),
+      },
+      createElement(Textarea, {
+        rows: 1,
+        className: "resize-none overflow-y-auto",
+        defaultValue: "Nội dung",
+      }),
+    ));
+
+    expect(html).toContain("<textarea");
+    expect(html).toContain('rows="1"');
+    expect(html).toContain("min-h-11");
+    expect(html).toContain("min-w-11");
+    expect(html).toContain("lg:min-h-0");
+    expect(html).toContain("lg:min-w-0");
+    expect(html).toContain("resize-none");
+    expect(html).toContain("overflow-y-auto");
   });
 
   test("electrical preview fits mobile while the print portal retains A4 output", () => {

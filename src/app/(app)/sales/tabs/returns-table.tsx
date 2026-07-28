@@ -91,6 +91,33 @@ export function ReturnsTable({
       expandedParam="expandedReturn"
       initialExpandedId={expandedId}
       minWidth="1120px"
+      renderMobileRow={({ row, toggle }) => (
+        <div className="space-y-2 p-3">
+          <button
+            type="button"
+            onClick={toggle}
+            className="flex min-h-11 min-w-11 w-full items-start justify-between gap-3 text-left"
+          >
+            <span>
+              <span className="block font-semibold text-primary-600">{row.code}</span>
+              <span className="mt-1 block text-xs text-slate-500">{formatDate(row.createdAt)}</span>
+            </span>
+            <span className="shrink-0 font-semibold tabular-nums text-er">{formatCurrency(Number(row.totalRefund))}</span>
+          </button>
+          {row.orderId && row.orderCode && (
+            <OrderDetailLink
+              orderId={row.orderId}
+              className="inline-flex min-h-11 min-w-11 items-center text-sm font-semibold text-primary-600 hover:underline"
+            >
+              {row.orderCode}
+            </OrderDetailLink>
+          )}
+          <p className="text-sm font-medium">{row.customerName ?? t("orders.walkIn")}</p>
+          <p className="text-xs text-slate-500">
+            {row.reason ? t(`returns.reasons.${row.reason}` as never) : "—"} · {t(`returns.refundMethods.${row.refundMethod}`)}
+          </p>
+        </div>
+      )}
       renderDetail={(row) => (
         expandedId === row.id && expandedContent
           ? expandedContent
