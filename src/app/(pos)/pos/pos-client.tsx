@@ -20,6 +20,12 @@ import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-acti
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
 import { CustomerCreateDialog, type CustomerCreateResult } from "@/components/partners/customer-create-dialog";
 import { CameraQuotePanel, type CameraQuotePackage } from "@/components/pos/camera-quote-panel";
+import {
+  buildPosUnitOptions,
+  PosCartScrollSurface,
+  PosSearchResultLayout,
+  posUnitSuffix,
+} from "@/components/pos/pos-mobile-layout";
 import type { PaperSize, PrintTemplate } from "@/lib/print/template-shared";
 import type { StorePrefs } from "@/lib/schemas/settings";
 import type { AiActionPreview } from "@/lib/ai/actions";
@@ -1470,6 +1476,7 @@ export function PosClient({
           const eff = effPrice(l);
           const stockManaged = isProductStockManaged(l.product.categoryName);
           const outOfStock = stockManaged && Number(l.product.stock) <= 0;
+          const unitOptions = buildPosUnitOptions(l.product.baseUnit, l.product.units);
           return (
             <div
               key={l.key}
@@ -1512,18 +1519,17 @@ export function PosClient({
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
-                <div className="mt-3 grid grid-cols-[minmax(0,1fr)_7.5rem] gap-2">
-                  <Select
-                    value={l.unitName}
-                    onChange={(e) => changeUnit(l.key, e.target.value)}
-                    disabled={isCameraQuoteDraft}
-                    size="sm"
-                    options={[
-                      { value: l.product.baseUnit, label: l.product.baseUnit },
-                      ...l.product.units.map((unit) => ({ value: unit.unitName, label: unit.unitName })),
-                    ]}
-                    className="w-full min-w-0 font-medium text-slate-700 dark:text-slate-200"
-                  />
+                <div className={cn("mt-3 gap-2", unitOptions.length > 0 ? "grid grid-cols-[minmax(0,1fr)_7.5rem]" : "flex justify-end")}>
+                  {unitOptions.length > 0 && (
+                    <Select
+                      value={l.unitName}
+                      onChange={(e) => changeUnit(l.key, e.target.value)}
+                      disabled={isCameraQuoteDraft}
+                      size="sm"
+                      options={unitOptions}
+                      className="w-full min-w-0 font-medium text-slate-700 dark:text-slate-200"
+                    />
+                  )}
                   <QuantityInput
                     value={l.quantity}
                     onChange={(quantity) => setQty(l.key, quantity)}
@@ -1531,7 +1537,7 @@ export function PosClient({
                     max={l.returnSoldQuantity}
                     readOnly={isCameraQuoteDraft}
                     size="sm"
-                    className={cn("w-full", outOfStock && "border-er text-er")}
+                    className={cn(unitOptions.length > 0 ? "w-full" : "w-[7.5rem]", outOfStock && "border-er text-er")}
                     inputClassName={cn(outOfStock && "border-er text-er")}
                   />
                 </div>
@@ -1542,7 +1548,7 @@ export function PosClient({
                     onClick={() => setEditKey(editKey === l.key ? null : l.key)}
                     className="text-sm tabular-nums text-slate-500 hover:text-primary-600"
                   >
-                    {formatCurrency(eff.price)} / {l.unitName}
+                    {formatCurrency(eff.price)}{posUnitSuffix(l.unitName)}
                   </button>
                   <span className="text-base font-bold tabular-nums">{formatCurrency(eff.price * l.quantity)}</span>
                 </div>
@@ -1584,17 +1590,16 @@ export function PosClient({
                   )}
                   {m2 > 0 && <span className="shrink-0 text-xs text-primary-600">≈{m2.toFixed(1)}m²</span>}
                 </div>
-                <Select
-                  value={l.unitName}
-                  onChange={(e) => changeUnit(l.key, e.target.value)}
-                  disabled={isCameraQuoteDraft}
-                  size="sm"
-                  options={[
-                    { value: l.product.baseUnit, label: l.product.baseUnit },
-                    ...l.product.units.map((u) => ({ value: u.unitName, label: u.unitName })),
-                  ]}
-                  className="min-w-20 shrink-0 font-medium text-slate-700 dark:text-slate-200"
-                />
+                {unitOptions.length > 0 && (
+                  <Select
+                    value={l.unitName}
+                    onChange={(e) => changeUnit(l.key, e.target.value)}
+                    disabled={isCameraQuoteDraft}
+                    size="sm"
+                    options={unitOptions}
+                    className="min-w-20 shrink-0 font-medium text-slate-700 dark:text-slate-200"
+                  />
+                )}
                 <div className="group relative shrink-0">
                   <QuantityInput
                     value={l.quantity}
@@ -1667,7 +1672,7 @@ export function PosClient({
   );
 
   return (
-    <div className="h-full flex relative">
+    <div className="relative flex h-full min-h-0 overflow-hidden">
       {/* trạng thái offline / đồng bộ */}
       {(!online || pending > 0 || syncing || offlineSaved) && (
         <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 text-xs font-medium">
@@ -1812,16 +1817,17 @@ export function PosClient({
                       const line = cart.find((l) => l.product.id === p.id);
                       const children = productChildren(p);
                       return (
-                        <div
+                        <PosSearchResultLayout
                           key={p.id}
+                          selected={Boolean(line)}
                           onClick={line ? undefined : () => selectProduct(p)}
-                          className={cn(
-                            "flex items-center gap-3 px-3 py-2 text-left",
-                            line ? "bg-primary-50 dark:bg-primary-950/40" : "hover:bg-surface-2 cursor-pointer"
+                          leading={(
+                            <div className="grid h-9 w-9 place-items-center rounded-md bg-surface-2 text-lg">
+                              {categoryEmoji(p.categoryName)}
+                            </div>
                           )}
-                        >
-                          <div className="w-9 h-9 rounded-md bg-surface-2 grid place-items-center text-lg shrink-0">{categoryEmoji(p.categoryName)}</div>
-                          <div className="min-w-0 flex-1">
+                          summary={(
+                            <>
                             <div className="text-sm font-medium whitespace-normal break-words">{p.name}</div>
                             {p.isVariantParent ? (
                               <div className="text-xs text-slate-400">{children.length} SKU con</div>
@@ -1830,8 +1836,10 @@ export function PosClient({
                                 {t("pos.stockLabel")} {formatNumber(stock)} {p.baseUnit}
                               </div>
                             ) : null}
-                          </div>
-                          <div className="flex items-center justify-end gap-2 w-auto sm:w-64 shrink-0">
+                            </>
+                          )}
+                          controls={(
+                            <>
                             {line && (
                               <div className="group relative flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                 <QuantityInput
@@ -1849,10 +1857,11 @@ export function PosClient({
                               </div>
                             )}
                             <div className="text-sm font-semibold text-primary-600 tabular-nums text-right w-24 sm:w-32">
-                              {priceLabelFor(p, priceBook)}{p.isVariantParent ? "" : `/${p.baseUnit}`}
+                              {priceLabelFor(p, priceBook)}{p.isVariantParent ? "" : posUnitSuffix(p.baseUnit)}
                             </div>
-                          </div>
-                        </div>
+                            </>
+                          )}
+                        />
                       );
                     })}
                   </div>
@@ -1866,7 +1875,7 @@ export function PosClient({
       </div>
 
       {/* right: cart — rộng hơn để thao tác đơn thoải mái, nhận thả SP từ danh sách */}
-      <div
+      <PosCartScrollSurface
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes("pos/product")) {
             e.preventDefault();
@@ -1886,7 +1895,6 @@ export function PosClient({
           if (p) selectProduct(p);
         }}
         className={cn(
-          "w-full lg:w-[560px] shrink-0 bg-surface border-t lg:border-t-0 lg:border-l border-border flex flex-col transition-colors",
           mobileView === "catalog" && "hidden lg:flex",
           dropHover && "bg-primary-50/60 dark:bg-primary-950/30 border-l-primary-400"
         )}
@@ -2193,7 +2201,7 @@ export function PosClient({
             <Text as="p" variant="muted" className="text-[11px] text-right" tx="pos.invoiceEdit.editFootnote" />
           )}
         </div>
-      </div>
+      </PosCartScrollSurface>
 
       <AiQuickActionModal
         open={aiQuickOpen}
