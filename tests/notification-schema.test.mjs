@@ -15,6 +15,12 @@ const ok = (name, condition) => {
 
 await client.exec("CREATE ROLE anon");
 await client.exec("CREATE ROLE authenticated");
+await client.exec(`
+  ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT ALL PRIVILEGES ON TABLES TO anon;
+  ALTER DEFAULT PRIVILEGES IN SCHEMA public
+    GRANT ALL PRIVILEGES ON TABLES TO authenticated;
+`);
 
 for (const file of readdirSync(`${PROJ}/drizzle`).filter((name) => name.endsWith(".sql")).sort()) {
   for (const statement of readFileSync(`${PROJ}/drizzle/${file}`, "utf8").split("--> statement-breakpoint")) {
