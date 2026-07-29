@@ -4,8 +4,7 @@ import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
 
 export async function GET() {
   const gate = await requireMobileSalesAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (gate.ok === false) return mobileGate(gate);
 
   try {
     return mobileOk(await getMobilePosData(gate.role));
