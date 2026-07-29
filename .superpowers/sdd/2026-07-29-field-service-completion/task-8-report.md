@@ -110,3 +110,31 @@
   failures, chiefly legacy PGlite fixtures that do not create the
   `anon`/`authenticated` roles required by migration `0081`, plus existing UI
   audit failures outside Task 8.
+
+## Review fix round 2
+
+- Applied immutable migration
+  `0085_service_assets_version_ownership.sql`; migrations through `0084`
+  remain unchanged.
+- The `service_jobs` revision trigger now runs before both INSERT and UPDATE.
+  Every direct INSERT is normalized to `version = 1`,
+  `checklist_version = 1`, and `assets_version = 1`, even when the caller
+  supplies explicit inflated values.
+- On a top-level job UPDATE, caller attempts to inflate, reset, or decrement
+  `assets_version` are ignored. A nested trigger write may leave the collection
+  revision unchanged or advance it by exactly one; every other nested delta is
+  rejected with `SERVICE_ASSETS_VERSION_INVALID_DELTA`.
+- The installed-assets collection trigger remains the owner of collection
+  increments. Real PostgreSQL tests verify exact `+1` behavior for asset
+  insert, canonical update, move between jobs, and delete, while an
+  `updated_at`-only asset update does not advance the collection.
+- RED was observed on the applied `0084` database: an INSERT supplying all
+  three revisions as `77` persisted them as `77`. After applying `0085`, the
+  ownership suite passes, including explicit INSERT values, direct
+  inflate/reset/decrement attempts, and rejection of a nested `+2` write.
+- Focused real-PostgreSQL suites pass for version ownership, stale-write
+  concurrency, manager no-op/exact bumps, and visit/assignment lock isolation.
+  Production build and targeted ESLint pass. Direct catalog inspection confirms
+  the trigger is `BEFORE INSERT OR UPDATE`, the function ACL remains restricted
+  to `postgres` and `service_role`, migration `0085` is tracked, and a repeated
+  migration run reports zero pending.
