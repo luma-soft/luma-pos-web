@@ -70,3 +70,47 @@
 - Existing deployments with an unclassified legacy plan under a mixed project
   would be stopped by migration with an explicit error instead of guessing a
   trade. The configured database had no maintenance plans requiring backfill.
+
+## Review fix round 1
+
+The initial scoped review found two Critical and three Important gaps. This
+round addresses all five:
+
+- Manager `transitionServiceJob` now locks the job and invokes the same
+  transactional maintenance lifecycle used by mobile completion, including
+  replay recovery for an already-completed job.
+- Migration `0076_service_maintenance_review_fixes.sql` changes occurrence
+  history to `ON DELETE RESTRICT`; the delete action returns a specific
+  conflict for plans with history while unused plans remain deletable.
+- Push delivery now atomically claims a device/key row with a token and lease
+  before FCM. Only the claimant sends, token-matched acknowledgement publishes
+  the result, terminal success cannot be overwritten, and failed/stale claims
+  can retry.
+- A preflight-backed partial unique index permits only one scheduled/overdue
+  occurrence per plan. Generation locks the plan first, schedule edits reject
+  conflicting outstanding work, completion uses plan-then-occurrence order,
+  and completion dates are monotonic under out-of-order work.
+- Web job reassignment now atomically keeps `service_jobs.assigned_to` and the
+  active primary assignment row aligned. Plan/job assignees must be active
+  technicians, form options are technician-only, and overdue recipients use
+  only the canonical current technician, active crew, and active owners/
+  managers.
+
+### Review-fix RED/GREEN evidence
+
+- RED: edited `next_due_on` generated a second outstanding occurrence.
+- RED: web-style primary reassignment left job and assignment state divergent.
+- RED: invalid manager-as-technician assignment returned a generic server
+  error.
+- GREEN:
+  - `bun tests/service-maintenance-worker.test.mjs`
+  - `bun tests/service-maintenance-manager-actions.test.mjs`
+  - `bun tests/service-maintenance-concurrency-postgres.test.mjs`
+  - `bun tests/push-delivery-concurrency-postgres.test.mjs`
+- The independent-session tests prove one generated occurrence/job and one
+  push send under concurrency. They also prove terminal push success is not
+  regressed and failed delivery is retryable.
+- `0076` applied successfully; the immediate rerun reported zero pending.
+  Direct checks confirmed the RESTRICT FK, outstanding partial unique index,
+  push claim columns/index, and no anon/authenticated INSERT privilege.
+- Changed-file ESLint and `bun run build` pass.

@@ -10,6 +10,7 @@ import {
   serviceMaintenancePlans,
 } from "@/db/schema";
 import { createDefaultChecklist } from "@/lib/services/domain";
+import { requireActiveTechnicianCore } from "@/lib/services/job-assignment";
 export { completeMaintenanceOccurrenceForJobCore } from "@/lib/services/maintenance-lifecycle";
 
 type ServiceTransaction = Parameters<
@@ -28,12 +29,14 @@ export async function markOverdueMaintenanceOccurrencesCore(
   const overdue = await tx.select({
     id: serviceMaintenanceOccurrences.id,
     jobId: serviceMaintenanceOccurrences.jobId,
+    assignedTo: serviceJobs.assignedTo,
   }).from(serviceMaintenanceOccurrences)
+    .leftJoin(serviceJobs, eq(serviceMaintenanceOccurrences.jobId, serviceJobs.id))
     .where(and(
       inArray(serviceMaintenanceOccurrences.status, ["scheduled", "overdue"]),
       lt(serviceMaintenanceOccurrences.dueOn, today),
     ))
-    .for("update");
+    .for("update", { of: serviceMaintenanceOccurrences });
 
   const scheduledIds = overdue.map((item) => item.id);
   if (scheduledIds.length > 0) {
@@ -54,21 +57,30 @@ export async function markOverdueMaintenanceOccurrencesCore(
   const alerts = [];
   for (const occurrence of overdue) {
     if (!occurrence.jobId) continue;
-    const technicianRows = await tx.select({ id: profiles.id })
+    const crewRows = await tx.select({ id: profiles.id })
       .from(serviceJobAssignments)
       .innerJoin(profiles, eq(serviceJobAssignments.profileId, profiles.id))
       .where(and(
         eq(serviceJobAssignments.jobId, occurrence.jobId),
+        eq(serviceJobAssignments.assignmentRole, "crew"),
         isNull(serviceJobAssignments.removedAt),
         eq(profiles.role, "technician"),
         eq(profiles.isActive, true),
       ));
+    const canonicalAssignee = occurrence.assignedTo
+      ? await tx.select({ id: profiles.id }).from(profiles).where(and(
+          eq(profiles.id, occurrence.assignedTo),
+          eq(profiles.role, "technician"),
+          eq(profiles.isActive, true),
+        )).limit(1)
+      : [];
     alerts.push({
       occurrenceId: occurrence.id,
       jobId: occurrence.jobId,
       notificationKey: `service-maintenance-overdue:${occurrence.id}`,
       userIds: [...new Set([
-        ...technicianRows.map((item) => item.id),
+        ...canonicalAssignee.map((item) => item.id),
+        ...crewRows.map((item) => item.id),
         ...managerIds,
       ])],
     });
@@ -91,10 +103,32 @@ export async function generateMaintenanceOccurrenceCore(
     serviceType: serviceMaintenancePlans.serviceType,
   }).from(serviceMaintenancePlans)
     .where(eq(serviceMaintenancePlans.id, planId))
-    .limit(1);
+    .limit(1)
+    .for("update");
   if (!plan?.isActive) throw new Error("SERVICE_MAINTENANCE_PLAN_NOT_FOUND");
   if (plan.serviceType === "mixed") {
     throw new Error("SERVICE_MAINTENANCE_SERVICE_TYPE_REQUIRED");
+  }
+  await requireActiveTechnicianCore(tx, plan.assignedTo);
+  const [outstanding] = await tx.select({
+    jobId: serviceMaintenanceOccurrences.jobId,
+    dueOn: serviceMaintenanceOccurrences.dueOn,
+  }).from(serviceMaintenanceOccurrences)
+    .where(and(
+      eq(serviceMaintenanceOccurrences.planId, plan.id),
+      inArray(serviceMaintenanceOccurrences.status, ["scheduled", "overdue"]),
+    ))
+    .limit(1);
+  if (outstanding) {
+    if (outstanding.dueOn !== plan.nextDueOn) {
+      throw new Error("SERVICE_MAINTENANCE_OUTSTANDING");
+    }
+    return {
+      created: false,
+      jobId: outstanding.jobId,
+      dueOn: outstanding.dueOn,
+      assignedTo: plan.assignedTo,
+    };
   }
 
   const [occurrence] = await tx.insert(serviceMaintenanceOccurrences).values({

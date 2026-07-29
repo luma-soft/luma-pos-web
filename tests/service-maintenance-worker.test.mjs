@@ -16,6 +16,9 @@ const {
 const maintenanceModule = await import(
   `${projectRoot}/src/lib/services/maintenance-worker.ts`
 );
+const assignmentModule = await import(
+  `${projectRoot}/src/lib/services/job-assignment.ts`
+).catch(() => ({}));
 const { generateMaintenanceOccurrenceCore } = maintenanceModule;
 const completeMaintenanceOccurrenceForJobCore =
   maintenanceModule.completeMaintenanceOccurrenceForJobCore
@@ -23,6 +26,9 @@ const completeMaintenanceOccurrenceForJobCore =
 const markOverdueMaintenanceOccurrencesCore =
   maintenanceModule.markOverdueMaintenanceOccurrencesCore
   ?? (async () => []);
+const syncServiceJobPrimaryAssigneeCore =
+  assignmentModule.syncServiceJobPrimaryAssigneeCore
+  ?? (async () => undefined);
 
 const client = new PGlite();
 const db = drizzle(client, { schema });
@@ -142,6 +148,39 @@ if (
 ) {
   throw new Error("consecutive maintenance cycle drifted or failed to advance");
 }
+await db.update(serviceMaintenancePlans).set({
+  lastCompletedOn: "2027-05-01",
+  nextDueOn: "2027-06-01",
+}).where(eq(serviceMaintenancePlans.id, plan.id));
+const [lateOldJob] = await db.insert(serviceJobs).values({
+  projectId: project.id,
+  code: "BT-OUT-OF-ORDER",
+  serviceType: "camera",
+  title: "Old cycle completed late",
+  status: "completed",
+  priority: "normal",
+  assignedTo: technicianId,
+}).returning();
+await db.insert(serviceMaintenanceOccurrences).values({
+  planId: plan.id,
+  projectId: project.id,
+  jobId: lateOldJob.id,
+  dueOn: "2026-01-01",
+  status: "scheduled",
+});
+await db.transaction((tx) => completeMaintenanceOccurrenceForJobCore(
+  tx,
+  lateOldJob.id,
+  new Date("2026-02-01T09:00:00.000Z"),
+));
+[advancedPlan] = await db.select().from(serviceMaintenancePlans)
+  .where(eq(serviceMaintenancePlans.id, plan.id));
+if (
+  advancedPlan.lastCompletedOn !== "2027-05-01"
+  || advancedPlan.nextDueOn !== "2027-06-01"
+) {
+  throw new Error("out-of-order completion moved maintenance schedule backward");
+}
 
 const [mixedProject] = await db.insert(projects).values({
   name: "Công trình hỗn hợp",
@@ -167,12 +206,54 @@ if (mixedJob?.serviceType !== "electrical") {
   throw new Error("mixed project plan did not retain its explicit concrete service type");
 }
 
+await db.update(serviceMaintenancePlans).set({ nextDueOn: "2026-09-01" })
+  .where(eq(serviceMaintenancePlans.id, mixedPlan.id));
+let secondOutstandingRejected = false;
+try {
+  await db.transaction((tx) => generateMaintenanceOccurrenceCore(
+    tx,
+    mixedPlan.id,
+    new Date("2026-08-01T01:00:00.000Z"),
+  ));
+} catch (error) {
+  secondOutstandingRejected =
+    error instanceof Error
+    && error.message === "SERVICE_MAINTENANCE_OUTSTANDING";
+}
+if (!secondOutstandingRejected) {
+  throw new Error("plan schedule edit spawned a second outstanding occurrence");
+}
+await db.update(serviceMaintenancePlans).set({ nextDueOn: "2026-08-01" })
+  .where(eq(serviceMaintenancePlans.id, mixedPlan.id));
+
 await db.insert(serviceJobAssignments).values({
   jobId: mixedJob.id,
   profileId: secondaryTechnicianId,
   assignmentRole: "crew",
   assignedAt: new Date("2026-07-29T03:05:00.000Z"),
 });
+await db.transaction((tx) => syncServiceJobPrimaryAssigneeCore(
+  tx,
+  mixedJob.id,
+  secondaryTechnicianId,
+  managerId,
+  new Date("2026-07-29T03:10:00.000Z"),
+));
+const [reassignedJob] = await db.select().from(serviceJobs)
+  .where(eq(serviceJobs.id, mixedJob.id));
+const activeAssignments = await db.select().from(serviceJobAssignments)
+  .where(eq(serviceJobAssignments.jobId, mixedJob.id));
+if (
+  reassignedJob.assignedTo !== secondaryTechnicianId
+  || activeAssignments.filter((row) =>
+    row.assignmentRole === "primary" && row.removedAt === null
+  ).length !== 1
+  || activeAssignments.find((row) =>
+    row.assignmentRole === "primary" && row.removedAt === null
+  )?.profileId !== secondaryTechnicianId
+) {
+  throw new Error("primary reassignment did not synchronize job and assignment rows");
+}
 const firstOverdue = await db.transaction((tx) =>
   markOverdueMaintenanceOccurrencesCore(
     tx,
@@ -188,7 +269,6 @@ const replayOverdue = await db.transaction((tx) =>
 const [overdueOccurrence] = await db.select().from(serviceMaintenanceOccurrences)
   .where(eq(serviceMaintenanceOccurrences.jobId, mixedJob.id));
 const expectedTargets = [
-  technicianId,
   secondaryTechnicianId,
   managerId,
   ownerId,
@@ -232,6 +312,26 @@ if (
   || rolledBackPlan.nextDueOn !== "2026-08-01"
 ) {
   throw new Error("maintenance completion did not roll back atomically");
+}
+
+let historyDeleteRestricted = false;
+try {
+  await db.delete(serviceMaintenancePlans)
+    .where(eq(serviceMaintenancePlans.id, mixedPlan.id));
+} catch (error) {
+  let current = error;
+  for (let depth = 0; depth < 5 && current; depth += 1) {
+    if (typeof current === "object" && "code" in current && current.code === "23503") {
+      historyDeleteRestricted = true;
+      break;
+    }
+    current = typeof current === "object" && "cause" in current
+      ? current.cause
+      : null;
+  }
+}
+if (!historyDeleteRestricted) {
+  throw new Error("maintenance plan deletion destroyed occurrence/job history");
 }
 
 console.log("maintenance worker: lifecycle, idempotency, overdue, and targets verified");

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   installedAssets,
@@ -10,6 +10,7 @@ import {
   serviceCostEntries,
   serviceHandoverDocuments,
   serviceMaintenancePlans,
+  serviceMaintenanceOccurrences,
   serviceJobMaterials,
   serviceJobs,
   serviceStatusLogs,
@@ -19,6 +20,7 @@ import {
   type ActionResult,
   generateCode,
   isUniqueViolation,
+  pgErrorCode,
   requireManager,
   requireStockAccess,
   toMoney,
@@ -72,6 +74,11 @@ import {
 import { Routes } from "@/lib/routes";
 import { writeAuditLog } from "@/lib/audit";
 import { releaseServiceJobMaterialReservationsCore, reserveServiceJobMaterialStockCore, syncServiceJobMaterialStockCore } from "@/lib/services/material-stock";
+import {
+  requireActiveTechnicianCore,
+  syncServiceJobPrimaryAssigneeCore,
+} from "@/lib/services/job-assignment";
+import { completeMaintenanceOccurrenceForJobCore } from "@/lib/services/maintenance-lifecycle";
 
 function revalidateServiceProject(projectId?: string) {
   revalidatePath(Routes.Services);
@@ -82,6 +89,11 @@ function revalidateServiceProject(projectId?: string) {
 
 async function auditServiceMutation(actorUserId: string, action: string, entityType: string, entityId: string | null, metadata?: Record<string, unknown>) {
   await writeAuditLog({ actorUserId, source: "manual", action, entityType, entityId, metadata });
+}
+
+function isInvalidServiceAssignee(error: unknown) {
+  return error instanceof Error
+    && error.message === "SERVICE_MAINTENANCE_ASSIGNEE_INVALID";
 }
 
 async function loadJobProject(jobId?: string | null) {
@@ -196,27 +208,42 @@ export async function createServiceJob(
     })) return { ok: false, error: "services.errors.relationMismatch" };
 
     const code = generateCode("DV");
-    const [job] = await db.insert(serviceJobs).values({
-      projectId: value.projectId,
-      code,
-      serviceType: value.serviceType,
-      title: value.title,
-      priority: value.priority,
-      assignedTo: value.assignedTo ?? null,
-      scheduledAt: value.scheduledAt ? new Date(value.scheduledAt) : null,
-      description: value.description || null,
-      checklist: createDefaultChecklist(value.serviceType),
-      quoteOrderId: value.quoteOrderId ?? null,
-      materialOrderId: value.materialOrderId ?? null,
-      createdBy: gate.userId,
-    }).returning({ id: serviceJobs.id, code: serviceJobs.code });
+    const job = await db.transaction(async (tx) => {
+      await requireActiveTechnicianCore(tx, value.assignedTo);
+      const [created] = await tx.insert(serviceJobs).values({
+        projectId: value.projectId,
+        code,
+        serviceType: value.serviceType,
+        title: value.title,
+        priority: value.priority,
+        assignedTo: null,
+        scheduledAt: value.scheduledAt ? new Date(value.scheduledAt) : null,
+        description: value.description || null,
+        checklist: createDefaultChecklist(value.serviceType),
+        quoteOrderId: value.quoteOrderId ?? null,
+        materialOrderId: value.materialOrderId ?? null,
+        createdBy: gate.userId,
+      }).returning({ id: serviceJobs.id, code: serviceJobs.code });
+      await syncServiceJobPrimaryAssigneeCore(
+        tx, created.id, value.assignedTo, gate.userId,
+      );
+      return created;
+    });
 
     await db.update(projects).set({ serviceStage: "active" }).where(eq(projects.id, value.projectId));
     revalidateServiceProject(value.projectId);
     return { ok: true, data: job };
   } catch (error) {
+    if (isInvalidServiceAssignee(error)) {
+      return { ok: false, error: "services.errors.invalidAssignee" };
+    }
     console.error("createServiceJob failed:", error);
-    return { ok: false, error: isUniqueViolation(error) ? "services.errors.duplicateCode" : "errors.serverError" };
+    return {
+      ok: false,
+      error: isUniqueViolation(error)
+        ? "services.errors.duplicateCode"
+        : "errors.serverError",
+    };
   }
 }
 
@@ -246,20 +273,27 @@ export async function updateServiceJob(
       materialOrderId: value.materialOrderId,
     })) return { ok: false, error: "services.errors.relationMismatch" };
 
-    await db.update(serviceJobs).set({
-      serviceType: value.serviceType,
-      title: value.title,
-      priority: value.priority,
-      assignedTo: value.assignedTo ?? null,
-      scheduledAt: value.scheduledAt ? new Date(value.scheduledAt) : null,
-      description: value.description || null,
-      quoteOrderId: value.quoteOrderId ?? null,
-      materialOrderId: value.materialOrderId ?? null,
-      updatedAt: new Date(),
-    }).where(eq(serviceJobs.id, value.jobId));
+    await db.transaction(async (tx) => {
+      await syncServiceJobPrimaryAssigneeCore(
+        tx, value.jobId, value.assignedTo, gate.userId,
+      );
+      await tx.update(serviceJobs).set({
+        serviceType: value.serviceType,
+        title: value.title,
+        priority: value.priority,
+        scheduledAt: value.scheduledAt ? new Date(value.scheduledAt) : null,
+        description: value.description || null,
+        quoteOrderId: value.quoteOrderId ?? null,
+        materialOrderId: value.materialOrderId ?? null,
+        updatedAt: new Date(),
+      }).where(eq(serviceJobs.id, value.jobId));
+    });
     revalidateServiceProject(current.projectId);
     return { ok: true, data: undefined };
   } catch (error) {
+    if (isInvalidServiceAssignee(error)) {
+      return { ok: false, error: "services.errors.invalidAssignee" };
+    }
     console.error("updateServiceJob failed:", error);
     return {
       ok: false,
@@ -281,6 +315,7 @@ export async function transitionServiceJob(
 
   try {
     const result = await db.transaction(async (tx) => {
+      const now = new Date();
       const [current] = await tx.select({
         projectId: serviceJobs.projectId,
         status: serviceJobs.status,
@@ -288,20 +323,27 @@ export async function transitionServiceJob(
       }).from(serviceJobs)
         .innerJoin(projects, eq(serviceJobs.projectId, projects.id))
         .where(eq(serviceJobs.id, value.jobId))
-        .limit(1);
+        .limit(1)
+        .for("update", { of: serviceJobs });
       if (!current) return { ok: false as const, error: "errors.notFound" };
       if (!canTransitionServiceJob(current.status, value.status)) {
         return { ok: false as const, error: "services.errors.invalidTransition" };
       }
       if (current.status === value.status) {
+        if (value.status === "completed") {
+          await completeMaintenanceOccurrenceForJobCore(tx, value.jobId, now);
+        }
         return { ok: true as const, projectId: current.projectId };
       }
 
       await tx.update(serviceJobs).set({
         status: value.status,
-        completedAt: value.status === "completed" ? new Date() : null,
-        updatedAt: new Date(),
+        completedAt: value.status === "completed" ? now : null,
+        updatedAt: now,
       }).where(eq(serviceJobs.id, value.jobId));
+      if (value.status === "completed") {
+        await completeMaintenanceOccurrenceForJobCore(tx, value.jobId, now);
+      }
       await tx.insert(serviceStatusLogs).values({
         jobId: value.jobId,
         fromStatus: current.status,
@@ -568,26 +610,60 @@ export async function saveServiceMaintenancePlan(
       note: value.note || null,
       updatedAt: new Date(),
     };
-    if (value.id) {
-      const [current] = await db.select({ projectId: serviceMaintenancePlans.projectId })
-        .from(serviceMaintenancePlans)
-        .where(eq(serviceMaintenancePlans.id, value.id))
-        .limit(1);
-      if (!current) return { ok: false, error: "errors.notFound" };
-      if (!await serviceLinksAreValid(value.projectId, {
-        record: current,
-        assetId: value.assetId,
-      })) return { ok: false, error: "services.errors.relationMismatch" };
-      const [plan] = await db.update(serviceMaintenancePlans).set(values).where(eq(serviceMaintenancePlans.id, value.id)).returning({ id: serviceMaintenancePlans.id });
-      revalidateServiceProject(value.projectId);
-      await auditServiceMutation(gate.userId, "update_service_maintenance", "service_maintenance_plan", value.id);
-      return { ok: true, data: plan };
+    const mutation = await db.transaction(async (tx) => {
+      await requireActiveTechnicianCore(tx, value.assignedTo);
+      if (value.id) {
+        const [current] = await tx.select({
+          projectId: serviceMaintenancePlans.projectId,
+        }).from(serviceMaintenancePlans)
+          .where(eq(serviceMaintenancePlans.id, value.id))
+          .limit(1)
+          .for("update");
+        if (!current) return { outcome: "notFound" as const };
+        if (current.projectId !== value.projectId) {
+          return { outcome: "relationMismatch" as const };
+        }
+        const [outstanding] = await tx.select({
+          dueOn: serviceMaintenanceOccurrences.dueOn,
+        }).from(serviceMaintenanceOccurrences)
+          .where(and(
+            eq(serviceMaintenanceOccurrences.planId, value.id),
+            inArray(serviceMaintenanceOccurrences.status, ["scheduled", "overdue"]),
+          ))
+          .limit(1);
+        if (outstanding && outstanding.dueOn !== value.nextDueOn) {
+          return { outcome: "outstanding" as const };
+        }
+        const [plan] = await tx.update(serviceMaintenancePlans).set(values)
+          .where(eq(serviceMaintenancePlans.id, value.id))
+          .returning({ id: serviceMaintenancePlans.id });
+        return { outcome: "saved" as const, plan };
+      }
+      const [plan] = await tx.insert(serviceMaintenancePlans)
+        .values({ ...values, createdBy: gate.userId })
+        .returning({ id: serviceMaintenancePlans.id });
+      return { outcome: "saved" as const, plan };
+    });
+    if (mutation.outcome === "notFound") return { ok: false, error: "errors.notFound" };
+    if (mutation.outcome === "relationMismatch") {
+      return { ok: false, error: "services.errors.relationMismatch" };
     }
-    const [plan] = await db.insert(serviceMaintenancePlans).values({ ...values, createdBy: gate.userId }).returning({ id: serviceMaintenancePlans.id });
+    if (mutation.outcome === "outstanding") {
+      return { ok: false, error: "services.errors.maintenanceOutstanding" };
+    }
+    const plan = mutation.plan;
     revalidateServiceProject(value.projectId);
-    await auditServiceMutation(gate.userId, "create_service_maintenance", "service_maintenance_plan", plan.id);
+    await auditServiceMutation(
+      gate.userId,
+      value.id ? "update_service_maintenance" : "create_service_maintenance",
+      "service_maintenance_plan",
+      plan.id,
+    );
     return { ok: true, data: plan };
   } catch (error) {
+    if (isInvalidServiceAssignee(error)) {
+      return { ok: false, error: "services.errors.invalidAssignee" };
+    }
     console.error("saveServiceMaintenancePlan failed:", error);
     return { ok: false, error: "errors.serverError" };
   }
@@ -604,11 +680,21 @@ export async function deleteServiceMaintenancePlan(id: string): Promise<ActionRe
   const gate = await requireManager();
   if (!gate.ok) return gate;
   try {
+    const [history] = await db.select({ id: serviceMaintenanceOccurrences.id })
+      .from(serviceMaintenanceOccurrences)
+      .where(eq(serviceMaintenanceOccurrences.planId, id))
+      .limit(1);
+    if (history) {
+      return { ok: false, error: "services.errors.maintenanceHistoryExists" };
+    }
     const [plan] = await db.delete(serviceMaintenancePlans).where(eq(serviceMaintenancePlans.id, id)).returning({ projectId: serviceMaintenancePlans.projectId });
     if (!plan) return { ok: false, error: "errors.notFound" };
     revalidateServiceProject(plan.projectId);
     return { ok: true, data: undefined };
   } catch (error) {
+    if (pgErrorCode(error) === "23503") {
+      return { ok: false, error: "services.errors.maintenanceHistoryExists" };
+    }
     console.error("deleteServiceMaintenancePlan failed:", error);
     return { ok: false, error: "errors.serverError" };
   }

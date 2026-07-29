@@ -21,13 +21,31 @@ export async function completeMaintenanceOccurrenceForJobCore(
   jobId: string,
   now = new Date(),
 ) {
+  const [linked] = await tx.select({
+    id: serviceMaintenanceOccurrences.id,
+    planId: serviceMaintenanceOccurrences.planId,
+  }).from(serviceMaintenanceOccurrences)
+    .where(eq(serviceMaintenanceOccurrences.jobId, jobId))
+    .limit(1);
+  if (!linked) {
+    return { completed: false };
+  }
+  const [plan] = await tx.select({
+    intervalDays: serviceMaintenancePlans.intervalDays,
+    lastCompletedOn: serviceMaintenancePlans.lastCompletedOn,
+    nextDueOn: serviceMaintenancePlans.nextDueOn,
+  }).from(serviceMaintenancePlans)
+    .where(eq(serviceMaintenancePlans.id, linked.planId))
+    .limit(1)
+    .for("update");
+  if (!plan) throw new Error("SERVICE_MAINTENANCE_PLAN_NOT_FOUND");
   const [occurrence] = await tx.select({
     id: serviceMaintenanceOccurrences.id,
     planId: serviceMaintenanceOccurrences.planId,
     dueOn: serviceMaintenanceOccurrences.dueOn,
     status: serviceMaintenanceOccurrences.status,
   }).from(serviceMaintenanceOccurrences)
-    .where(eq(serviceMaintenanceOccurrences.jobId, jobId))
+    .where(eq(serviceMaintenanceOccurrences.id, linked.id))
     .limit(1)
     .for("update");
   if (!occurrence || occurrence.status === "completed") {
@@ -37,22 +55,20 @@ export async function completeMaintenanceOccurrenceForJobCore(
     throw new Error("SERVICE_MAINTENANCE_OCCURRENCE_STATUS_INVALID");
   }
 
-  const [plan] = await tx.select({
-    intervalDays: serviceMaintenancePlans.intervalDays,
-  }).from(serviceMaintenancePlans)
-    .where(eq(serviceMaintenancePlans.id, occurrence.planId))
-    .limit(1)
-    .for("update");
-  if (!plan) throw new Error("SERVICE_MAINTENANCE_PLAN_NOT_FOUND");
-
   const completedOn = now.toISOString().slice(0, 10);
-  const nextDueOn = addDays(occurrence.dueOn, plan.intervalDays);
+  const cycleNextDueOn = addDays(occurrence.dueOn, plan.intervalDays);
+  const lastCompletedOn = plan.lastCompletedOn && plan.lastCompletedOn > completedOn
+    ? plan.lastCompletedOn
+    : completedOn;
+  const nextDueOn = plan.nextDueOn > cycleNextDueOn
+    ? plan.nextDueOn
+    : cycleNextDueOn;
   await tx.update(serviceMaintenanceOccurrences).set({
     status: "completed",
     completedAt: now,
   }).where(eq(serviceMaintenanceOccurrences.id, occurrence.id));
   await tx.update(serviceMaintenancePlans).set({
-    lastCompletedOn: completedOn,
+    lastCompletedOn,
     nextDueOn,
     updatedAt: now,
   }).where(eq(serviceMaintenancePlans.id, occurrence.planId));

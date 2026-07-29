@@ -441,10 +441,14 @@ export const mobilePushDeliveries = pgTable("mobile_push_deliveries", {
   attempts: integer("attempts").notNull().default(1),
   errorCode: varchar("error_code", { length: 80 }),
   attemptedAt: timestamp("attempted_at", { withTimezone: true }).defaultNow().notNull(),
+  claimToken: uuid("claim_token"),
+  claimedAt: timestamp("claimed_at", { withTimezone: true }),
 }, (t) => [
   uniqueIndex("mobile_push_deliveries_device_notification_idx")
     .on(t.deviceId, t.notificationKey),
   index("mobile_push_deliveries_status_idx").on(t.status, t.attemptedAt),
+  index("mobile_push_deliveries_claim_idx").on(t.status, t.claimedAt)
+    .where(sql`${t.status} = 'sending'`),
 ]);
 
 export const mobileTelemetryEvents = pgTable("mobile_telemetry_events", {
@@ -1184,7 +1188,7 @@ export const serviceFieldMutations = pgTable("service_field_mutations", {
 
 export const serviceMaintenanceOccurrences = pgTable("service_maintenance_occurrences", {
   id: uuid("id").primaryKey().defaultRandom(),
-  planId: uuid("plan_id").notNull().references(() => serviceMaintenancePlans.id, { onDelete: "cascade" }),
+  planId: uuid("plan_id").notNull().references(() => serviceMaintenancePlans.id, { onDelete: "restrict" }),
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   jobId: uuid("job_id").references(() => serviceJobs.id, { onDelete: "set null" }),
   dueOn: date("due_on").notNull(),
@@ -1194,6 +1198,8 @@ export const serviceMaintenanceOccurrences = pgTable("service_maintenance_occurr
 }, (t) => [
   check("service_maintenance_occurrences_status_check", sql`${t.status} in ('scheduled', 'completed', 'skipped', 'overdue')`),
   uniqueIndex("service_maintenance_occurrences_plan_due_idx").on(t.planId, t.dueOn),
+  uniqueIndex("service_maintenance_occurrences_plan_outstanding_idx").on(t.planId)
+    .where(sql`${t.status} in ('scheduled', 'overdue')`),
   uniqueIndex("service_maintenance_occurrences_job_idx").on(t.jobId).where(sql`${t.jobId} is not null`),
   index("service_maintenance_occurrences_due_idx").on(t.status, t.dueOn),
 ]);

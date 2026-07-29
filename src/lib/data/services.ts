@@ -107,7 +107,10 @@ export async function getServiceFormOptions() {
       .limit(300),
     db.select({ id: profiles.id, name: profiles.fullName })
       .from(profiles)
-      .where(eq(profiles.isActive, true))
+      .where(and(
+        eq(profiles.isActive, true),
+        eq(profiles.role, "technician"),
+      ))
       .orderBy(asc(profiles.fullName)),
     db.select({
       id: serviceJobs.id,

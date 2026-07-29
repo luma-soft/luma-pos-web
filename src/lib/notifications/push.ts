@@ -3,7 +3,6 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import {
-  mobilePushDeliveries,
   mobilePushDevices,
   profiles,
 } from "@/db/schema";
@@ -14,6 +13,7 @@ import {
   resolveFirebaseServiceAccount,
   type FirebaseServiceAccount,
 } from "@/lib/notifications/firebase-config";
+import { deliverPushDeviceCore } from "@/lib/notifications/push-delivery";
 
 let cachedAccessToken: { value: string; expiresAt: number } | null = null;
 
@@ -104,21 +104,12 @@ export async function dispatchPushNotification(input: {
   let failed = 0;
   let skipped = 0;
   for (const device of devices) {
-    const [previous] = await db.select({ status: mobilePushDeliveries.status })
-      .from(mobilePushDeliveries)
-      .where(and(
-        eq(mobilePushDeliveries.deviceId, device.id),
-        eq(mobilePushDeliveries.notificationKey, input.notificationKey),
-      )).limit(1);
-    if (previous?.status === "sent") {
-      skipped++;
-      continue;
-    }
-
-    let status = "failed";
-    let errorCode: string | null = null;
-    try {
-      const response = await fetch(
+    const delivery = await deliverPushDeviceCore(db, {
+      deviceId: device.id,
+      notificationKey: input.notificationKey,
+      send: async () => {
+        try {
+          const response = await fetch(
         `https://fcm.googleapis.com/v1/projects/${account.project_id}/messages:send`,
         {
           method: "POST",
@@ -150,41 +141,27 @@ export async function dispatchPushNotification(input: {
             },
           }),
         },
-      );
-      if (response.ok) {
-        status = "sent";
-        sent++;
-      } else {
-        errorCode = `FCM_${response.status}`;
-        failed++;
-        if (response.status === 404) {
-          await db.update(mobilePushDevices).set({ enabled: false, updatedAt: sql`now()` })
-            .where(eq(mobilePushDevices.id, device.id));
+          );
+          if (response.ok) return { ok: true };
+          if (response.status === 404) {
+            await db.update(mobilePushDevices)
+              .set({ enabled: false, updatedAt: sql`now()` })
+              .where(eq(mobilePushDevices.id, device.id));
+          }
+          return { ok: false, errorCode: `FCM_${response.status}` };
+        } catch (error) {
+          return {
+            ok: false,
+            errorCode: error instanceof Error && error.message.startsWith("FCM_")
+              ? error.message.slice(0, 80)
+              : "FCM_NETWORK",
+          };
         }
-      }
-    } catch (error) {
-      errorCode = error instanceof Error && error.message.startsWith("FCM_")
-        ? error.message.slice(0, 80)
-        : "FCM_NETWORK";
-      failed++;
-    }
-    await db.insert(mobilePushDeliveries).values({
-      deviceId: device.id,
-      notificationKey: input.notificationKey,
-      status,
-      errorCode,
-    }).onConflictDoUpdate({
-      target: [
-        mobilePushDeliveries.deviceId,
-        mobilePushDeliveries.notificationKey,
-      ],
-      set: {
-        status,
-        errorCode,
-        attempts: sql`${mobilePushDeliveries.attempts} + 1`,
-        attemptedAt: sql`now()`,
       },
     });
+    if (delivery.outcome === "sent") sent++;
+    else if (delivery.outcome === "failed") failed++;
+    else skipped++;
   }
   return { configured: true, sent, failed, skipped };
 }
