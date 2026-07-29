@@ -222,6 +222,92 @@ const assetResult = await db.transaction((tx) =>
 );
 assert.equal(assetResult.assetsVersion, 2);
 assert.equal(assetResult.version, 1);
+
+const [versionsBeforeHousekeeping] = await db.select({
+  version: serviceJobs.version,
+  checklistVersion: serviceJobs.checklistVersion,
+  assetsVersion: serviceJobs.assetsVersion,
+}).from(serviceJobs).where(eq(serviceJobs.id, job.id));
+await db.update(serviceJobs).set({
+  updatedAt: new Date("2026-07-29T03:16:00.000Z"),
+}).where(eq(serviceJobs.id, job.id));
+const [versionsAfterHousekeeping] = await db.select({
+  version: serviceJobs.version,
+  checklistVersion: serviceJobs.checklistVersion,
+  assetsVersion: serviceJobs.assetsVersion,
+}).from(serviceJobs).where(eq(serviceJobs.id, job.id));
+assert.deepEqual(
+  versionsAfterHousekeeping,
+  versionsBeforeHousekeeping,
+  "housekeeping-only job updates must not advance any client version",
+);
+
+await db.update(serviceJobs).set({ title: "Canonical title update" })
+  .where(eq(serviceJobs.id, job.id));
+const [versionsAfterJobUpdate] = await db.select({
+  version: serviceJobs.version,
+  checklistVersion: serviceJobs.checklistVersion,
+  assetsVersion: serviceJobs.assetsVersion,
+}).from(serviceJobs).where(eq(serviceJobs.id, job.id));
+assert.equal(versionsAfterJobUpdate.version, versionsBeforeHousekeeping.version + 1);
+assert.equal(
+  versionsAfterJobUpdate.checklistVersion,
+  versionsBeforeHousekeeping.checklistVersion,
+);
+assert.equal(versionsAfterJobUpdate.assetsVersion, versionsBeforeHousekeeping.assetsVersion);
+
+await db.update(serviceJobMaterials).set({
+  plannedQuantity: material.plannedQuantity,
+  usedQuantity: "3",
+  note: "first",
+  updatedAt: new Date("2026-07-29T03:17:00.000Z"),
+}).where(eq(serviceJobMaterials.id, material.id));
+const [materialAfterNoop] = await db.select().from(serviceJobMaterials)
+  .where(eq(serviceJobMaterials.id, material.id));
+assert.equal(materialAfterNoop.version, materialResult.version);
+await db.update(serviceJobMaterials).set({ note: "canonical material update" })
+  .where(eq(serviceJobMaterials.id, material.id));
+const [materialAfterChange] = await db.select().from(serviceJobMaterials)
+  .where(eq(serviceJobMaterials.id, material.id));
+assert.equal(materialAfterChange.version, materialResult.version + 1);
+
+await db.update(installedAssets).set({
+  updatedAt: new Date("2026-07-29T03:18:00.000Z"),
+}).where(eq(installedAssets.id, assetResult.id));
+const [assetAfterNoop] = await db.select().from(installedAssets)
+  .where(eq(installedAssets.id, assetResult.id));
+const [jobAfterAssetNoop] = await db.select({
+  assetsVersion: serviceJobs.assetsVersion,
+}).from(serviceJobs).where(eq(serviceJobs.id, job.id));
+assert.equal(assetAfterNoop.version, assetResult.version);
+assert.equal(jobAfterAssetNoop.assetsVersion, assetResult.assetsVersion);
+
+await db.update(installedAssets).set({ ipAddress: "192.0.2.10" })
+  .where(eq(installedAssets.id, assetResult.id));
+const [assetAfterChange] = await db.select().from(installedAssets)
+  .where(eq(installedAssets.id, assetResult.id));
+const [jobAfterAssetChange] = await db.select({
+  assetsVersion: serviceJobs.assetsVersion,
+}).from(serviceJobs).where(eq(serviceJobs.id, job.id));
+assert.equal(assetAfterChange.version, assetResult.version + 1);
+assert.equal(jobAfterAssetChange.assetsVersion, assetResult.assetsVersion + 1);
+
+const [secondAsset] = await db.insert(installedAssets).values({
+  projectId: project.id,
+  jobId: job.id,
+  assetKind: "camera",
+  name: "Temporary camera",
+}).returning();
+const [jobAfterAssetInsert] = await db.select({
+  assetsVersion: serviceJobs.assetsVersion,
+}).from(serviceJobs).where(eq(serviceJobs.id, job.id));
+assert.equal(jobAfterAssetInsert.assetsVersion, jobAfterAssetChange.assetsVersion + 1);
+await db.delete(installedAssets).where(eq(installedAssets.id, secondAsset.id));
+const [jobAfterAssetDelete] = await db.select({
+  assetsVersion: serviceJobs.assetsVersion,
+}).from(serviceJobs).where(eq(serviceJobs.id, job.id));
+assert.equal(jobAfterAssetDelete.assetsVersion, jobAfterAssetInsert.assetsVersion + 1);
+
 await assert.rejects(
   () => db.transaction((tx) =>
     createFieldInstalledAssetCore(tx, actor, {
@@ -312,7 +398,7 @@ assert.equal(
 const [persistedAsset] = await db.select().from(installedAssets).where(
   eq(installedAssets.id, assetResult.id),
 );
-assert.equal(persistedAsset.version, 1);
+assert.equal(persistedAsset.version, assetAfterChange.version);
 
 console.log(
   "offline field conflicts: versions, replay, safe payload, and isolation verified",

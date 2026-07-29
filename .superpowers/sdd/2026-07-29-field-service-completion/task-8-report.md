@@ -74,3 +74,39 @@
   Sync Center never renders raw mutation bodies or private response data.
 - No push or deployment was performed. Web and mobile changes are committed
   separately as requested.
+
+## Review fix round 1
+
+- Auto/bulk queue flushes now exclude every persisted `409` row. A normal
+  successful GET and `syncAll` leave its conflict JSON and refresh marker
+  untouched across process close/reopen. Refresh performs only the authorized
+  GET; the subsequent explicit retry sends exactly the selected mutation once.
+  If that retry receives a newer `409`, another refresh is required.
+- Mobile regression coverage now includes SQLite v5→v6 upgrade, real
+  close/reopen persistence, auto-sync exclusion, normal-GET exclusion,
+  refresh-without-send, selected retry, newer-conflict reset, and actor-scoped
+  discard. Focused tests pass 34/34 and the full Flutter suite passes 465/465.
+- Applied immutable migration
+  `0084_service_version_canonical_changes.sql`. Job, checklist, material,
+  installed-asset, and asset-collection counters now use canonical
+  `IS DISTINCT FROM` comparisons. `updated_at`, caller-supplied revisions,
+  housekeeping writes, and no-op saves do not advance client revisions.
+  Asset insert/delete advances the collection once; a meaningful asset update
+  advances the row and collection once; an identical asset save advances
+  neither.
+- `updateServiceJob` now locks and synchronizes primary-assignment rows first,
+  then writes assignee plus manager-editable job fields in one canonical
+  `service_jobs` update. A combined assignee/content save advances the job
+  revision exactly once; an identical manager save does not advance it.
+  Identical material upserts and installed-asset saves likewise preserve their
+  revisions.
+- Real PostgreSQL tests with two independent sessions verify single-winner
+  same-version checklist, material, and asset-collection writes. Existing
+  independent-session visit/assignment coverage also passes, including lock
+  ordering and removed-assignment isolation.
+- Migration `0084` applied successfully; a second migration-runner execution
+  reports zero pending. Focused PGlite/PostgreSQL suites and production build
+  pass. The full web test command still reports unrelated pre-existing suite
+  failures, chiefly legacy PGlite fixtures that do not create the
+  `anon`/`authenticated` roles required by migration `0081`, plus existing UI
+  audit failures outside Task 8.

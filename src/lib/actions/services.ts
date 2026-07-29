@@ -308,18 +308,20 @@ export async function updateServiceJob(
     })) return { ok: false, error: "services.errors.relationMismatch" };
 
     await db.transaction(async (tx) => {
-      await syncServiceJobPrimaryAssigneeCore(
-        tx, value.jobId, value.assignedTo, gate.userId,
+      const now = new Date();
+      const assigneeId = await syncServiceJobPrimaryAssigneeCore(
+        tx, value.jobId, value.assignedTo, gate.userId, now, false,
       );
       await tx.update(serviceJobs).set({
         serviceType: value.serviceType,
         title: value.title,
         priority: value.priority,
+        assignedTo: assigneeId,
         scheduledAt: value.scheduledAt ? new Date(value.scheduledAt) : null,
         description: value.description || null,
         quoteOrderId: value.quoteOrderId ?? null,
         materialOrderId: value.materialOrderId ?? null,
-        updatedAt: new Date(),
+        updatedAt: now,
       }).where(eq(serviceJobs.id, value.jobId));
     });
     revalidateServiceProject(current.projectId);

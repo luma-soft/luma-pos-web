@@ -37,6 +37,7 @@ export async function syncServiceJobPrimaryAssigneeCore(
   profileId: string | null | undefined,
   actorId: string | null,
   now = new Date(),
+  updateJob = true,
 ) {
   const [job] = await tx.select({ id: serviceJobs.id })
     .from(serviceJobs)
@@ -51,10 +52,12 @@ export async function syncServiceJobPrimaryAssigneeCore(
       eq(serviceJobAssignments.assignmentRole, "primary"),
       isNull(serviceJobAssignments.removedAt),
     ));
-  await tx.update(serviceJobs).set({
-    assignedTo: assigneeId,
-    updatedAt: now,
-  }).where(eq(serviceJobs.id, jobId));
+  if (updateJob) {
+    await tx.update(serviceJobs).set({
+      assignedTo: assigneeId,
+      updatedAt: now,
+    }).where(eq(serviceJobs.id, jobId));
+  }
   if (assigneeId) {
     await tx.insert(serviceJobAssignments).values({
       jobId,
