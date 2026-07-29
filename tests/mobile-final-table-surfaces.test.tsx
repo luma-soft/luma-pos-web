@@ -4,6 +4,17 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
 import viMessages from "../messages/vi.json";
 
+const capturedDataTableProps: Record<string, unknown>[] = [];
+const capturedProjectEditProps: Record<string, unknown>[] = [];
+
+mock.module("@/components/data-table", () => ({
+  DataTableShell: (props: Record<string, unknown>) => {
+    capturedDataTableProps.push(props);
+    return <div data-testid="captured-data-table" />;
+  },
+  RowPreviewModal: () => null,
+  stopRowToggle: () => undefined,
+}));
 mock.module("@/lib/actions/price-books", () => ({
   createPriceBook: async () => ({ ok: true }),
   renamePriceBook: async () => ({ ok: true }),
@@ -49,7 +60,10 @@ mock.module("@/app/(app)/promotions/promo-widgets", () => ({
   PromoToggle: () => null,
 }));
 mock.module("@/app/(app)/projects/project-widgets", () => ({
-  ProjectEdit: () => null,
+  ProjectEdit: (props: Record<string, unknown>) => {
+    capturedProjectEditProps.push(props);
+    return <button type="button" className="min-h-11 min-w-11">Sửa</button>;
+  },
   ProjectToggle: () => null,
 }));
 mock.module("@/lib/actions/product-catalog", () => ({
@@ -313,11 +327,10 @@ describe("final mobile table surfaces", () => {
     expect(html.startsWith("<article")).toBe(true);
   });
 
-  test("service project row preserves table parity and its editor seam", async () => {
-    const { ServiceProjectMobileRow } = await import(
+  test("service projects table binds its mobile renderer to the exact row and editor props", async () => {
+    const { ServiceProjectsTable } = await import(
       "@/app/(app)/services/service-widgets"
     );
-    const actionCalls: unknown[][] = [];
     const row = {
       id: "service-project-1",
       name: "Lắp camera nhà xưởng Bình Minh",
@@ -339,17 +352,39 @@ describe("final mobile table surfaces", () => {
       openClaimCount: 1,
       createdAt: new Date("2026-07-01T08:00:00+07:00"),
     };
-    const html = renderWithMessages(
-      <ServiceProjectMobileRow
-        row={row}
-        renderActions={(actionRow) => {
-          actionCalls.push([actionRow.id, actionRow.serviceStage]);
-          return <button type="button" className="min-h-11 min-w-11">Sửa</button>;
-        }}
-      />,
-    );
+    const otherRow = {
+      ...row,
+      id: "service-project-other",
+      name: "Công trình không được chọn",
+      serviceStage: "planning",
+    };
+    const rows = [otherRow, row];
+    const customers = [
+      { id: "customer-1", name: "Công ty Bình Minh" },
+      { id: "customer-2", name: "Khách hàng khác" },
+    ];
+    capturedDataTableProps.length = 0;
+    capturedProjectEditProps.length = 0;
 
+    renderWithMessages(
+      <ServiceProjectsTable rows={rows} customers={customers} />,
+    );
+    expect(capturedDataTableProps).toHaveLength(1);
+    const tableProps = capturedDataTableProps[0];
+    expect(tableProps.tableId).toBe("services.projects");
+    expect(tableProps.rows).toBe(rows);
+    expect(tableProps.renderMobileRow).toBeFunction();
+
+    const renderMobileRow = tableProps.renderMobileRow as (props: {
+      row: typeof row;
+      expanded: boolean;
+      toggle: () => void;
+    }) => ReactNode;
+    const html = renderWithMessages(
+      renderMobileRow({ row, expanded: false, toggle: () => undefined }),
+    );
     expect(html).toContain("Lắp camera nhà xưởng Bình Minh");
+    expect(html).not.toContain("Công trình không được chọn");
     expect(html).toContain("Camera");
     expect(html).toContain("Công ty Bình Minh");
     expect(html).toContain("65%");
@@ -364,7 +399,9 @@ describe("final mobile table surfaces", () => {
     expect(html).toContain('href="/projects/service-project-1"');
     expect(html).toContain("Sửa");
     expect(html.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(2);
-    expect(actionCalls).toEqual([["service-project-1", "active"]]);
     expect(html.startsWith("<article")).toBe(true);
+    expect(capturedProjectEditProps).toHaveLength(1);
+    expect(capturedProjectEditProps[0].project).toBe(row);
+    expect(capturedProjectEditProps[0].customers).toBe(customers);
   });
 });
