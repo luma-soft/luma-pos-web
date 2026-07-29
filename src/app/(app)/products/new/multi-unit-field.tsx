@@ -80,7 +80,8 @@ export function MultiUnitField() {
                 variant="ghost"
                 size="icon"
                 onClick={() => remove(idx)}
-                className="h-10 md:mt-[26px] md:self-start min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
+                aria-label={t("common.delete")}
+                className="h-10 min-h-11 min-w-11 justify-self-end md:mt-[26px] md:self-start lg:min-h-0 lg:min-w-0"
               >
                 <Trash2 className="w-4 h-4 text-slate-400" />
               </Button>

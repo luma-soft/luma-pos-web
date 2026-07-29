@@ -57,6 +57,8 @@ export function AttributesField() {
             variant="ghost"
             size="icon"
             onClick={() => remove(idx)}
+            aria-label={t("common.delete")}
+            className="min-h-11 min-w-11 justify-self-end lg:min-h-0 lg:min-w-0"
           >
             <Trash2 className="w-4 h-4 text-slate-400" />
           </Button>

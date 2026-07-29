@@ -126,6 +126,38 @@ describe("mobile specialist layouts", () => {
     expect(productForm).toContain('"order-2 w-full sm:order-none sm:w-auto"');
   });
 
+  test("product image URL controls do not squeeze inside the narrow image column", () => {
+    const productForm = read("src/app/(app)/products/new/product-form.tsx");
+
+    expect(productForm).toContain('className="mb-3 flex flex-col gap-2"');
+    expect(productForm).toContain('tx="products.fields.addImageUrl"');
+    expect(productForm).toContain('className="w-full"');
+  });
+
+  test("product price-book editor behaves as a full-height nested mobile dialog", () => {
+    const productForm = read("src/app/(app)/products/new/product-form.tsx");
+
+    expect(productForm).toContain('role="dialog"');
+    expect(productForm).toContain('aria-modal="true"');
+    expect(productForm).toContain('aria-labelledby="product-price-books-title"');
+    expect(productForm).toContain('id="product-price-books-title"');
+    expect(productForm).toContain("h-dvh w-full max-w-5xl");
+    expect(productForm).toContain("overscroll-contain");
+    expect(productForm).toContain("safe-area-inset-bottom");
+  });
+
+  test("product dimensions and dynamic-row actions remain usable on narrow screens", () => {
+    const productForm = read("src/app/(app)/products/new/product-form.tsx");
+    const units = read("src/app/(app)/products/new/multi-unit-field.tsx");
+    const attributes = read("src/app/(app)/products/new/attributes-field.tsx");
+
+    expect(productForm).toContain('className="grid grid-cols-2 gap-2 sm:grid-cols-4"');
+    expect(units).toContain('aria-label={t("common.delete")}');
+    expect(units).toContain("justify-self-end");
+    expect(attributes).toContain('aria-label={t("common.delete")}');
+    expect(attributes).toContain("justify-self-end");
+  });
+
   test("print toolbar reflows every action inside a narrow viewport", () => {
     const toolbar = read("src/components/print/print-toolbar.tsx");
 

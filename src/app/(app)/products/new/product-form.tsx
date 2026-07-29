@@ -1196,7 +1196,7 @@ function ImageUploadGrid() {
   return (
     <div>
       {urls.length < MAX_IMAGES && (
-        <div className="mb-3 flex gap-2">
+        <div className="mb-3 flex flex-col gap-2">
           <Input
             type="url"
             value={urlInput}
@@ -1215,9 +1215,9 @@ function ImageUploadGrid() {
             variant="secondary"
             onClick={addImageUrl}
             disabled={!urlInput.trim()}
-          >
-            {t("products.fields.addImageUrl")}
-          </Button>
+            tx="products.fields.addImageUrl"
+            className="w-full"
+          />
         </div>
       )}
       <div className="grid grid-cols-2 gap-2">
@@ -1366,11 +1366,19 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
       </div>
 
       {open && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-3 sm:p-6">
-          <div className="flex max-h-[88dvh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-surface shadow-2xl">
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-0 sm:p-6">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="product-price-books-title"
+            className="flex h-dvh w-full max-w-5xl flex-col overflow-hidden bg-surface shadow-2xl sm:h-auto sm:max-h-[88dvh] sm:rounded-2xl"
+          >
             <header className="flex items-start justify-between gap-3 px-5 py-4 sm:px-6">
               <div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                <h3
+                  id="product-price-books-title"
+                  className="text-xl font-bold text-slate-900 dark:text-slate-100"
+                >
                   {t("products.pricing.choosePriceBooks")}
                 </h3>
                 <p className="mt-1 text-sm text-slate-500">
@@ -1388,7 +1396,7 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
                 <X className="h-5 w-5" />
               </button>
             </header>
-            <div className="min-h-0 flex-1 overflow-auto px-5 pb-4 sm:px-6" data-mobile-audit="product-price-books">
+            <div className="min-h-0 flex-1 overflow-auto overscroll-contain px-5 pb-4 sm:px-6" data-mobile-audit="product-price-books">
               <table className="block w-full min-w-0 text-sm lg:table lg:min-w-[640px]">
                 <thead className="hidden lg:table-header-group">
                   <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
@@ -1449,17 +1457,19 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
                 </tbody>
               </table>
             </div>
-            <footer className="flex justify-end gap-2 border-t border-border px-5 py-4 sm:px-6">
+            <footer className="grid grid-cols-2 gap-2 border-t border-border px-5 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:flex sm:justify-end sm:px-6 sm:pb-4">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setOpen(false)}
                 tx="common.cancel"
+                className="w-full sm:w-auto"
               />
               <Button
                 type="button"
                 onClick={applyPriceBooks}
                 tx="common.done"
+                className="w-full sm:w-auto"
               />
             </footer>
           </div>
@@ -1532,7 +1542,7 @@ function PhysicalFields() {
       </div>
 
       <Field labelTx="products.physical.dimensions">
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <NumberInput
             value={watch("width") ?? null}
             onChange={(v) => setValue("width", v)}
