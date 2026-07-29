@@ -19,9 +19,7 @@ import {
 } from "@/lib/services/customer-request-token";
 import { serviceCustomerRequestSubmitSchema } from "@/lib/services/schemas";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-
-const MAX_EVIDENCE_COUNT = 3;
-const MAX_MULTIPART_BYTES = MAX_EVIDENCE_COUNT * CUSTOMER_REQUEST_EVIDENCE_MAX_BYTES + 256 * 1024;
+import { parseCustomerRequestMultipart } from "@/lib/services/customer-request-multipart";
 
 async function consumeLimit(input: { key: string; limit: number; windowSeconds: number }) {
   return db.transaction((tx) => consumePublicRateLimitCore(tx, input));
@@ -151,35 +149,28 @@ export async function POST(
     windowSeconds: 900,
   }));
   if (tokenBlocked) return tokenBlocked;
-  const contentLength = Number(request.headers.get("content-length"));
-  if (Number.isFinite(contentLength) && contentLength > MAX_MULTIPART_BYTES) {
-    return mobileError("errors.invalidData", 413);
-  }
-  let form: FormData;
+  let multipart: Awaited<ReturnType<typeof parseCustomerRequestMultipart>>;
   try {
-    form = await request.formData();
-  } catch {
-    return mobileError("errors.invalidData", 400);
+    multipart = await parseCustomerRequestMultipart(request);
+  } catch (error) {
+    return mobileError(
+      "errors.invalidData",
+      error instanceof Error && error.message === "CUSTOMER_REQUEST_MULTIPART_TOO_LARGE"
+        ? 413
+        : 400,
+    );
   }
-  const parsed = serviceCustomerRequestSubmitSchema.safeParse(Object.fromEntries(
-    [...form.entries()].filter(([, value]) => typeof value === "string"),
-  ));
+  const parsed = serviceCustomerRequestSubmitSchema.safeParse(multipart.fields);
   if (!parsed.success) return mobileError("errors.invalidData", 400);
-  const files = form.getAll("evidence").filter((value): value is File =>
-    value instanceof File && value.size > 0);
-  if (files.length > MAX_EVIDENCE_COUNT) return mobileError("errors.invalidData", 400);
   const sanitized: Array<{
-    file: File;
+    file: (typeof multipart.files)[number];
     image: NonNullable<Awaited<ReturnType<typeof sanitizeCustomerRequestEvidence>>>;
   }> = [];
-  for (const file of files) {
-    if (file.size > CUSTOMER_REQUEST_EVIDENCE_MAX_BYTES) {
-      return mobileError("errors.invalidData", 413);
-    }
+  for (const file of multipart.files) {
     const image = await sanitizeCustomerRequestEvidence({
-      bytes: new Uint8Array(await file.arrayBuffer()),
-      declaredMimeType: file.type,
-      fileName: file.name,
+      bytes: file.bytes,
+      declaredMimeType: file.mimeType,
+      fileName: file.fileName,
     });
     if (!image) return mobileError("services.errors.unsupportedEvidence", 400);
     sanitized.push({ file, image });
@@ -246,7 +237,7 @@ export async function POST(
         cleanupId: staged[index].id,
         bucket: staged[index].bucket,
         path: staged[index].path,
-        fileName: item.file.name.replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 200),
+        fileName: item.file.fileName.replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 200),
         mimeType: item.image.mimeType,
         sizeBytes: item.image.bytes.length,
         width: item.image.width,

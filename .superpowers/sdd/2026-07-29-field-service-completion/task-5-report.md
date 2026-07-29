@@ -154,3 +154,54 @@ addresses all six:
   - cleanup RLS enabled;
   - no anon/authenticated SELECT or INSERT cleanup privilege;
   - `_migrations` contains `0078_service_customer_request_security.sql`.
+
+## Review fix round 2
+
+The second review accepted all prior fixes and identified two remaining
+boundaries. Both are now closed:
+
+- Public multipart parsing uses the explicitly declared Busboy dependency over
+  `request.body`; `request.formData()` is no longer used. A Transform counts
+  authoritative raw bytes and aborts above the total ceiling regardless of
+  missing or forged `Content-Length`.
+- Parser limits independently cap total bytes, file bytes, file count, control
+  fields, field bytes, total parts, field-name bytes, and header pairs. Only
+  the five exact one-time controls and up to three `evidence` files are
+  accepted. Duplicate/unknown controls, unknown file fields, truncation, and
+  all limit events destroy the source/limiter and reject before image
+  sanitization or persistence.
+- Migration `0079_service_customer_request_job_locking.sql` serializes request
+  linking with job project moves. The request trigger locks its target job
+  before comparing projects. The job-move trigger runs under the job row lock
+  and performs a read-only linked-request existence check; it never waits on a
+  request row. Thus the only wait edge is request → job and no job → request
+  edge exists.
+- Both trigger functions have PUBLIC, anon, and authenticated EXECUTE revoked.
+
+### Review-fix RED/GREEN evidence
+
+- RED:
+  - the streaming parser module did not exist;
+  - direct SQL allowed a linked job to move to another project.
+- GREEN:
+  - `bun test tests/service-customer-request-multipart.test.ts`
+    - normal chunked multipart success with no length;
+    - missing-length oversized stream;
+    - forged low length;
+    - oversized unexpected file field;
+    - duplicate controls, excess fields, and excess parts.
+  - Combined focused suite:
+    - 13 tests, 72 assertions, plus PGlite scripts.
+  - `bun --env-file=.env.local test
+    tests/service-customer-request-job-concurrency-postgres.test.mjs`
+    - real configured PostgreSQL verifies both lock interleavings without
+      deadlock: link-first rejects the waiting move, and move-first rejects the
+      waiting link.
+
+### Migration 0079 verification
+
+- Applied successfully; immediate rerun reported zero pending migrations.
+- Direct configured-database checks confirmed:
+  - both trigger functions exist and have active triggers;
+  - PUBLIC, anon, and authenticated cannot execute either trigger function;
+  - `_migrations` contains `0079_service_customer_request_job_locking.sql`.

@@ -431,6 +431,16 @@ try {
   directCrossProjectRejected = true;
 }
 if (!directCrossProjectRejected) throw new Error("database allowed a cross-project request job");
+let linkedJobMoveRejected = false;
+try {
+  await db.update(serviceJobs).set({ projectId: foreignProject.id })
+    .where(eq(serviceJobs.id, sameProjectJob.id));
+} catch {
+  linkedJobMoveRejected = true;
+}
+if (!linkedJobMoveRejected) {
+  throw new Error("database allowed a linked job to move across projects");
+}
 
 const acl = await client.query(`
   select c.relname, c.relrowsecurity,
