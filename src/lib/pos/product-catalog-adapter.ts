@@ -50,6 +50,8 @@ export function catalogItemToPosProduct(
     m2PerUnit: product.m2PerUnit,
     categoryId: product.categoryId,
     categoryName: product.categoryName,
+    // Catalog offline không có lịch sử bán; thứ tự fallback vẫn theo tên sản phẩm.
+    lastSoldAt: null,
     comboItems: product.comboItems,
     childCount: children.length,
     minRetailPrice: String(childPrices.length > 0 ? Math.min(...childPrices) : Number(product.retailPrice)),

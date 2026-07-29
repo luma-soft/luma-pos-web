@@ -14,6 +14,28 @@ export interface PosUnit {
   priceOverride: string | null;
 }
 
+/** Lần bán hoàn tất gần nhất; biến thể cha kế thừa lần bán mới nhất của SKU con. */
+function lastCompletedSaleAt() {
+  return sql<Date | null>`case when ${products.isVariantParent} then (
+    select max(${orders.createdAt})
+    from ${orderItems}
+    inner join ${orders} on ${orders.id} = ${orderItems.orderId}
+    inner join products child on child.id = ${orderItems.productId}
+    where child.parent_product_id = ${products.id}
+      and ${orders.status} = 'completed'
+  ) else (
+    select max(${orders.createdAt})
+    from ${orderItems}
+    inner join ${orders} on ${orders.id} = ${orderItems.orderId}
+    where ${orderItems.productId} = ${products.id}
+      and ${orders.status} = 'completed'
+  ) end`;
+}
+
+function recentSaleOrder() {
+  return [sql`${lastCompletedSaleAt()} desc nulls last`, asc(products.name)] as const;
+}
+
 /** Select dùng chung cho lưới POS + tìm kiếm (cùng shape PosProduct). */
 function posProductSelect(warehouseId: string | null, hasComplianceColumns: boolean) {
   return {
@@ -39,6 +61,7 @@ function posProductSelect(warehouseId: string | null, hasComplianceColumns: bool
     m2PerUnit: products.m2PerUnit,
     categoryId: products.categoryId,
     categoryName: categories.name,
+    lastSoldAt: lastCompletedSaleAt(),
     comboItems: sql<Array<{ productId: string; quantity: string }>>`coalesce((
       select json_agg(json_build_object(
         'productId', ${productComboItems.componentProductId},
@@ -173,7 +196,7 @@ export async function getPosData(options?: {
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(activeRootCondition())
-      .orderBy(asc(products.name))
+      .orderBy(...recentSaleOrder())
       .limit(200),
     includeProductIds.length || includeProductSkus.length || includeProductCategories.length
       ? db
@@ -211,7 +234,7 @@ export async function getPosData(options?: {
         .from(products)
         .leftJoin(categories, eq(products.categoryId, categories.id))
         .where(and(eq(products.isActive, true), inArray(products.parentProductId, parentIds)))
-        .orderBy(asc(products.name))
+        .orderBy(...recentSaleOrder())
     : [];
 
   const productRows = attachChildren(rootRows, childRows);
@@ -370,14 +393,14 @@ export async function searchPosProductRows(q: string): Promise<PosProduct[]> {
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(and(eq(products.isActive, true), eq(products.isVariantParent, false), match))
-      .orderBy(asc(products.name))
+      .orderBy(...recentSaleOrder())
       .limit(40),
     db
       .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(and(activeRootCondition(), match))
-      .orderBy(asc(products.name))
+      .orderBy(...recentSaleOrder())
       .limit(20),
   ]);
 
@@ -388,7 +411,7 @@ export async function searchPosProductRows(q: string): Promise<PosProduct[]> {
         .from(products)
         .leftJoin(categories, eq(products.categoryId, categories.id))
         .where(and(eq(products.isActive, true), inArray(products.parentProductId, parentIds)))
-        .orderBy(asc(products.name))
+      .orderBy(...recentSaleOrder())
     : [];
 
   const rootsWithChildren = attachChildren(rootRows, pickerChildren);
