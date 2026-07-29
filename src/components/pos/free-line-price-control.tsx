@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+
 type FreeLinePriceControlProps = {
   checked: boolean;
   label: string;
@@ -15,12 +17,12 @@ export function FreeLinePriceControl({
       role="switch"
       aria-checked={checked}
       onClick={() => onCheckedChange(!checked)}
-      className={[
-        "flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm font-medium transition",
+      className={cn(
+        "flex min-h-11 min-w-11 w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left text-sm font-medium transition",
         checked
           ? "border-primary-500 bg-primary-50 text-primary-800 dark:bg-primary-950/30 dark:text-primary-200"
           : "border-border bg-surface text-slate-700 hover:bg-surface-2 dark:text-slate-200",
-      ].join(" ")}
+      )}
     >
       <span>{label}</span>
       <span
