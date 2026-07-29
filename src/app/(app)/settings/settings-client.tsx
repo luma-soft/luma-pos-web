@@ -284,7 +284,7 @@ function Card({ title, vi, action, children }: { title: string; vi: string; acti
   );
 }
 const FL = "text-[9px] font-bold uppercase tracking-wide text-slate-500";
-const FI = "min-h-11 w-full px-[11px] py-[9px] bg-canvas border-[1.5px] border-border rounded-[10px] text-[13px] outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/30 lg:min-h-0";
+const FI = "min-h-11 w-full px-[11px] py-[9px] bg-canvas border-[1.5px] border-border rounded-[10px] text-[13px] focus:border-primary-500 focus:outline-none lg:min-h-0";
 const ROW = "flex min-h-11 items-center justify-between gap-3 px-3.5 py-2.5 bg-canvas rounded-[10px] border border-border-soft min-w-11";
 const btnS = "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-full border border-border-soft text-xs font-semibold hover:bg-surface-2 transition lg:min-h-0 lg:min-w-0";
 const btnF = "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-600 text-white text-xs font-semibold hover:brightness-110 transition lg:min-h-0 lg:min-w-0";

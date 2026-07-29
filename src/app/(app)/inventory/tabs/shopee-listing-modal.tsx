@@ -41,7 +41,7 @@ type FormState = {
   outOfStockBehavior: "keep_visible" | "unlist" | "set_zero";
 };
 
-const FIELD = "min-h-11 w-full rounded-lg border border-border bg-canvas px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 lg:min-h-0";
+const FIELD = "min-h-11 w-full rounded-lg border border-border bg-canvas px-3 py-2 text-sm focus:border-primary-500 focus:outline-none lg:min-h-0";
 const LABEL = "text-[10px] font-bold uppercase tracking-wide text-slate-500";
 const PROVIDERS = [
   { id: "shopee", name: "Shopee", ready: true },
@@ -357,7 +357,7 @@ function ShopeeCategoryPicker({ L, value, onChange }: { L: boolean; value: strin
         type="button"
         onClick={openPicker}
         className={cn(
-          "flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-border bg-canvas px-3 text-left text-sm outline-none hover:bg-surface-2 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20",
+          "flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-border bg-canvas px-3 text-left text-sm hover:bg-surface-2 focus:border-primary-500 focus:outline-none",
           !value && "text-slate-400",
         )}
       >
@@ -425,7 +425,7 @@ function ShopeeCategoryDialog({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               autoFocus
-              className="h-12 w-full rounded-lg border border-border bg-canvas pl-10 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
+              className="h-12 w-full rounded-lg border border-border bg-canvas pl-10 pr-3 text-sm focus:border-primary-500 focus:outline-none"
               placeholder={L ? "Tìm kiếm" : "Search"}
             />
           </div>
@@ -1033,7 +1033,7 @@ function ProductSearchInListing({
         value={search}
         onChange={(event) => setSearch(event.target.value)}
         placeholder={selectedProduct ? selectedProduct.name : (L ? "Tìm theo tên, SKU hoặc barcode..." : "Search by name, SKU, or barcode...")}
-        className="h-10 w-full rounded-lg border border-border bg-canvas pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 min-h-11 lg:min-h-0"
+        className="h-10 w-full rounded-lg border border-border bg-canvas pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none min-h-11 lg:min-h-0"
       />
       {selectedProduct && !query && <div className="text-xs text-slate-500">{selectedProduct.sku} · {selectedProduct.categoryName ?? (L ? "Chưa có danh mục" : "No category")}</div>}
       {(query || isPending) && (

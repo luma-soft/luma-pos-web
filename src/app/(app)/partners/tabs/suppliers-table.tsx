@@ -353,7 +353,7 @@ function SupplierInfoPanel({
   onDraftChange: (field: keyof SupplierDraft, value: string) => void;
 }) {
   const t = useTranslations();
-  const inputClassName = "h-10 min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100 lg:min-h-0";
+  const inputClassName = "h-10 min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm focus:border-primary-500 focus:outline-none lg:min-h-0";
   const labelClassName = "mb-1.5 block text-xs font-semibold text-slate-500";
 
   return (

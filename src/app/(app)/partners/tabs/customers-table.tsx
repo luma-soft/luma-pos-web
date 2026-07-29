@@ -144,7 +144,7 @@ function CustomerSearch({
           name="q"
           defaultValue={filters.q ?? ""}
           placeholder={t("customers.searchPlaceholder")}
-          className="h-11 w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-14 text-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+          className="h-11 w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-14 text-sm focus:border-primary-500 focus:outline-none"
         />
         <button
           type="button"

@@ -17,7 +17,7 @@ const INDUSTRY = [
   ["petshop", "Pet Shop", "Thú cưng"], ["mobile", "Mobile & Gadgets", "Điện thoại & Phụ kiện"],
   ["construction", "Construction Materials", "Vật liệu xây dựng"],
 ] as const;
-const FI = "w-full px-3 py-2.5 text-sm rounded-[10px] border border-border bg-canvas focus:outline-none focus:ring-2 focus:ring-primary-500";
+const FI = "w-full px-3 py-2.5 text-sm rounded-[10px] border border-border bg-canvas focus:border-primary-500 focus:outline-none";
 const FL = "text-[10px] font-bold uppercase tracking-wide text-slate-500";
 
 export function OnboardingWizard({ initial }: { initial: StoreSettings }) {

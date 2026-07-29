@@ -2527,7 +2527,7 @@ function PrintSizePicker({
         onClick={() => setOpen((current) => !current)}
         className={cn(
           "flex h-11 w-full items-center justify-between gap-2 rounded-lg border border-border bg-surface px-2.5 text-left text-xs font-semibold lg:h-8",
-          "transition hover:bg-surface-2 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
+          "transition hover:bg-surface-2 focus:border-primary-500 focus:outline-none"
         )}
       >
         <span className="whitespace-normal break-words">{selected?.label}</span>
