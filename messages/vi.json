@@ -719,6 +719,7 @@
       "physical": "Vị trí, trọng lượng, kích thước",
       "physicalDesc": "Quản lý việc sắp xếp kho, vị trí bán hàng hoặc quy cách giao hàng",
       "warranty": "Bảo hành",
+      "requests": "Yêu cầu khách hàng",
       "warrantyDesc": "Cấu hình thời gian bảo hành sản phẩm",
       "units": "Đơn vị tính",
       "unitsDesc": "Thêm đơn vị bán hoặc nhập như chai, lốc, thùng",

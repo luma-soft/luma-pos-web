@@ -16,6 +16,8 @@ import {
 } from "./service-widgets";
 import { ProductsTab } from "../inventory/tabs/products";
 import { parsePageSize } from "@/lib/pagination";
+import { getManagerServiceCustomerRequests } from "@/lib/data/service-customer-requests";
+import { CustomerRequestsManager } from "./customer-requests-manager";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +25,7 @@ const TABS = [
   { tab: "projects", labelKey: "services.tabs.projects" },
   { tab: "jobs", labelKey: "services.tabs.jobs" },
   { tab: "warranty", labelKey: "services.tabs.warranty" },
+  { tab: "requests", labelKey: "services.tabs.requests" },
   { tab: "camera-materials", labelKey: "inventory.cameraMaterials" },
 ];
 
@@ -31,11 +34,12 @@ export default async function ServicesPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const [t, params, dashboard, options] = await Promise.all([
+  const [t, params, dashboard, options, customerRequests] = await Promise.all([
     getTranslations(),
     searchParams,
     getServiceDashboard(),
     getServiceFormOptions(),
+    getManagerServiceCustomerRequests(),
   ]);
   const tab = params.tab ?? "projects";
   const serviceType = params.type ?? "";
@@ -70,7 +74,9 @@ export default async function ServicesPage({
                 : item.tab === "jobs"
                   ? dashboard.metrics.openJobs
                   : item.tab === "warranty"
-                    ? dashboard.metrics.openClaims
+                  ? dashboard.metrics.openClaims
+                  : item.tab === "requests" && customerRequests.allowed
+                    ? customerRequests.rows.filter((request) => !["closed", "void"].includes(request.status)).length
                     : undefined,
             }))}
           />
@@ -92,6 +98,15 @@ export default async function ServicesPage({
             ? <ServiceJobsTable rows={jobRows} />
             : <Section collapsible={false}><Text variant="muted" size="sm" text={t("services.jobs.empty")} /></Section>}
         </div>
+      ) : tab === "requests" ? (
+        customerRequests.allowed ? (
+          <CustomerRequestsManager
+            rows={customerRequests.rows}
+            jobs={options.jobOptions}
+          />
+        ) : (
+          <Section collapsible={false}><Text variant="muted" size="sm" text={t("errors.forbidden")} /></Section>
+        )
       ) : tab === "warranty" ? (
         <div className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">

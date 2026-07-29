@@ -1234,6 +1234,12 @@ export const serviceCustomerRequests = pgTable("service_customer_requests", {
   status: text("status").notNull().default("new"),
   tokenHash: varchar("token_hash", { length: 64 }).notNull(),
   tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }).notNull(),
+  submittedAt: timestamp("submitted_at", { withTimezone: true }),
+  respondedAt: timestamp("responded_at", { withTimezone: true }),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  linkedJobId: uuid("linked_job_id").references(() => serviceJobs.id, { onDelete: "set null" }),
+  triagedBy: uuid("triaged_by").references(() => profiles.id, { onDelete: "set null" }),
+  internalNote: text("internal_note"),
   responseDueAt: timestamp("response_due_at", { withTimezone: true }),
   resolutionDueAt: timestamp("resolution_due_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -1242,6 +1248,46 @@ export const serviceCustomerRequests = pgTable("service_customer_requests", {
   check("service_customer_requests_status_check", sql`${t.status} in ('new', 'triaged', 'scheduled', 'in_progress', 'resolved', 'closed', 'void')`),
   uniqueIndex("service_customer_requests_token_idx").on(t.tokenHash),
   index("service_customer_requests_sla_idx").on(t.status, t.responseDueAt, t.resolutionDueAt),
+]);
+
+export const serviceCustomerRequestAttachments = pgTable("service_customer_request_attachments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  requestId: uuid("request_id").notNull().references(() => serviceCustomerRequests.id, { onDelete: "cascade" }),
+  bucket: text("bucket").notNull(),
+  path: text("path").notNull().unique(),
+  fileName: text("file_name").notNull(),
+  mimeType: text("mime_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  sha256: varchar("sha256", { length: 64 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("service_customer_request_attachments_mime_check", sql`${t.mimeType} in ('image/jpeg', 'image/png', 'image/webp', 'application/pdf')`),
+  check("service_customer_request_attachments_size_check", sql`${t.sizeBytes} > 0 and ${t.sizeBytes} <= 8388608`),
+  check("service_customer_request_attachments_sha_check", sql`${t.sha256} ~ '^[0-9a-f]{64}$'`),
+  index("service_customer_request_attachments_request_idx").on(t.requestId, t.createdAt),
+]);
+
+export const serviceCustomerRequestNotifications = pgTable("service_customer_request_notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  requestId: uuid("request_id").notNull().references(() => serviceCustomerRequests.id, { onDelete: "cascade" }),
+  recipientId: uuid("recipient_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  notificationType: text("notification_type").notNull(),
+  readAt: timestamp("read_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("service_customer_request_notifications_unique_idx").on(t.requestId, t.recipientId, t.notificationType),
+  index("service_customer_request_notifications_recipient_idx").on(t.recipientId, t.readAt, t.createdAt),
+]);
+
+export const servicePublicRateLimits = pgTable("service_public_rate_limits", {
+  bucketKey: varchar("bucket_key", { length: 160 }).notNull(),
+  windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+  requestCount: integer("request_count").notNull().default(1),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.bucketKey, t.windowStart] }),
+  check("service_public_rate_limits_count_check", sql`${t.requestCount} > 0`),
+  index("service_public_rate_limits_expiry_idx").on(t.expiresAt),
 ]);
 
 export const cameraVendorConnections = pgTable("camera_vendor_connections", {

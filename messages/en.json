@@ -719,6 +719,7 @@
       "physical": "Position, weight, dimensions",
       "physicalDesc": "Manage warehouse placement and shipping",
       "warranty": "Warranty",
+      "requests": "Customer requests",
       "warrantyDesc": "Product warranty configuration",
       "units": "Units of measure",
       "unitsDesc": "Add units like bottle, pack, case",

@@ -295,6 +295,12 @@ export const serviceCustomerRequestSubmitSchema = z.object({
   priority: z.enum(["low", "normal", "high", "urgent"]).default("normal"),
 });
 
+export const serviceCustomerRequestManageSchema = z.object({
+  status: z.enum(["new", "triaged", "scheduled", "in_progress", "resolved", "closed", "void"]).optional(),
+  linkedJobId: z.uuid().nullable().optional(),
+  internalNote: z.string().trim().max(5000).nullable().optional(),
+});
+
 export type ServiceJobAssignmentInput = z.input<typeof serviceJobAssignmentSchema>;
 export type ServiceVisitMutationInput = z.input<typeof serviceVisitMutationSchema>;
 export type ServiceChecklistUpdateInput = z.input<typeof serviceChecklistUpdateSchema>;

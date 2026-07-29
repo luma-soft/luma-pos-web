@@ -6,19 +6,41 @@ export function ServiceRequestForm({
   token,
   defaultContactName,
   defaultContactPhone,
+  initialStatus,
+  canSubmit,
 }: {
   token: string;
   defaultContactName: string;
   defaultContactPhone: string;
+  initialStatus: {
+    code: string | null;
+    title: string | null;
+    priority: string | null;
+    status: string;
+    submittedAt: string | null;
+    responseDueAt: string | null;
+    resolutionDueAt: string | null;
+    respondedAt: string | null;
+    resolvedAt: string | null;
+  };
+  canSubmit: boolean;
 }) {
-  const [sent, setSent] = useState(false);
+  const [sent, setSent] = useState(!canSubmit);
+  const [statusView, setStatusView] = useState(initialStatus);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   if (sent) {
     return (
-      <div className="mt-6 rounded-2xl bg-emerald-50 p-5 text-sm font-semibold text-emerald-800">
-        Đã gửi yêu cầu. Bộ phận kỹ thuật sẽ liên hệ theo thông tin bạn cung cấp.
+      <div className="mt-6 space-y-3 rounded-2xl bg-emerald-50 p-5 text-sm text-emerald-900">
+        <p className="font-bold">Đã nhận yêu cầu của bạn.</p>
+        <dl className="grid gap-2 sm:grid-cols-2">
+          <div><dt className="text-xs font-semibold uppercase text-emerald-700">Trạng thái</dt><dd className="font-semibold">{statusView.status}</dd></div>
+          {statusView.title && <div><dt className="text-xs font-semibold uppercase text-emerald-700">Yêu cầu</dt><dd className="font-semibold">{statusView.title}</dd></div>}
+          {statusView.responseDueAt && <div><dt className="text-xs font-semibold uppercase text-emerald-700">Phản hồi dự kiến</dt><dd>{new Date(statusView.responseDueAt).toLocaleString("vi-VN")}</dd></div>}
+          {statusView.resolutionDueAt && <div><dt className="text-xs font-semibold uppercase text-emerald-700">Xử lý dự kiến</dt><dd>{new Date(statusView.resolutionDueAt).toLocaleString("vi-VN")}</dd></div>}
+        </dl>
+        <p>Bạn có thể mở lại liên kết này để theo dõi cho đến khi liên kết hết hạn.</p>
       </div>
     );
   }
@@ -31,19 +53,67 @@ export function ServiceRequestForm({
         setBusy(true);
         setError("");
         const form = new FormData(event.currentTarget);
+        const files = form.getAll("evidence").filter((value): value is File =>
+          value instanceof File && value.size > 0);
+        if (files.length > 3) {
+          setBusy(false);
+          setError("Chỉ được chọn tối đa 3 tệp.");
+          return;
+        }
+        for (const file of files) {
+          const upload = new FormData();
+          upload.set("file", file);
+          const uploadResponse = await fetch(`/api/portal/service-request/${token}/evidence`, {
+            method: "POST",
+            body: upload,
+          });
+          if (!uploadResponse.ok) {
+            setBusy(false);
+            setError("Tệp đính kèm không hợp lệ, quá lớn hoặc đã vượt giới hạn.");
+            return;
+          }
+        }
+        form.delete("evidence");
         const response = await fetch(`/api/portal/service-request/${token}`, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(Object.fromEntries(form.entries())),
         });
         setBusy(false);
-        if (response.ok) setSent(true);
-        else setError("Không thể gửi yêu cầu. Liên kết có thể đã hết hạn.");
+        if (response.ok) {
+          const body = await response.json() as {
+            data?: {
+              status?: string;
+              responseDueAt?: string | null;
+              resolutionDueAt?: string | null;
+            };
+          };
+          setStatusView((current) => ({
+            ...current,
+            title: String(form.get("title") ?? ""),
+            priority: String(form.get("priority") ?? "normal"),
+            status: body.data?.status ?? "new",
+            submittedAt: new Date().toISOString(),
+            responseDueAt: body.data?.responseDueAt ?? null,
+            resolutionDueAt: body.data?.resolutionDueAt ?? null,
+          }));
+          setSent(true);
+        } else setError("Không thể gửi yêu cầu. Liên kết có thể đã hết hạn.");
       }}
     >
       <label className="block text-sm font-semibold">
         Tiêu đề
         <input name="title" required minLength={3} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
+      </label>
+      <label className="block text-sm font-semibold">
+        Ảnh/PDF hiện trạng (không bắt buộc, tối đa 3 tệp, mỗi tệp 8 MB)
+        <input
+          name="evidence"
+          type="file"
+          multiple
+          accept="image/jpeg,image/png,image/webp,application/pdf"
+          className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+        />
       </label>
       <label className="block text-sm font-semibold">
         Mô tả tình trạng
