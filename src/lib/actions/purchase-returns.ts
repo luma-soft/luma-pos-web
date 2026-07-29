@@ -18,6 +18,8 @@ import { Routes } from "@/lib/routes";
 import { type ActionResult, generateCode, getProfileId, requireStockAccess, toMoney, toQty } from "./common";
 import { getCurrentShift } from "@/lib/data/shifts";
 import { consumeTrackedStockLots } from "@/lib/inventory/stock-lot-service";
+import { createDebtChangedEventInTx } from "@/lib/notifications/events-core";
+import { publishCommittedNotification } from "@/lib/notifications/outbox";
 
 export async function searchPurchaseReturnProducts(q: string, warehouseId: string): Promise<PurchaseReturnProductRow[]> {
   const gate = await requireStockAccess();
@@ -169,17 +171,40 @@ export async function createPurchaseReturn(
         });
       }
 
+      let debtDelta = 0;
       if (totals.debtAmount > 0) {
+        const [supplier] = await tx
+          .select({ currentDebt: suppliers.currentDebt })
+          .from(suppliers)
+          .where(eq(suppliers.id, v.supplierId))
+          .limit(1)
+          .for("update");
+        debtDelta = -Math.min(
+          Number(supplier?.currentDebt ?? 0),
+          totals.debtAmount,
+        );
         await tx.update(suppliers).set({
           currentDebt: sql`greatest(${suppliers.currentDebt} - ${toMoney(totals.debtAmount)}, 0)`,
         }).where(eq(suppliers.id, v.supplierId));
       }
 
-      return ret;
+      const debtNotification = await createDebtChangedEventInTx(tx, {
+        entityType: "supplier",
+        entityId: v.supplierId,
+        operationType: "purchase_return",
+        operationId: ret.id,
+        delta: debtDelta,
+        actorId: profileId,
+      });
+
+      return { ret, debtNotification };
     });
 
-    revalidatePurchaseReturnPaths(result.id);
-    return { ok: true, data: result };
+    if (result.debtNotification?.created) {
+      await publishCommittedNotification(result.debtNotification.eventId);
+    }
+    revalidatePurchaseReturnPaths(result.ret.id);
+    return { ok: true, data: result.ret };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
     const known: Record<string, string> = {

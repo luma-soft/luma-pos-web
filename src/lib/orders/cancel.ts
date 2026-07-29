@@ -14,6 +14,8 @@ import {
   toMoney,
   toQty,
 } from "@/lib/actions/common";
+import { createDebtChangedEventInTx } from "@/lib/notifications/events-core";
+import { publishCommittedNotification } from "@/lib/notifications/outbox";
 
 export async function cancelQuoteForUser(
   _userId: string,
@@ -50,7 +52,7 @@ export async function cancelOrderForUser(
   try {
     const profileId = await getProfileId(userId);
 
-    await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       const [order] = await tx
         .select()
         .from(orders)
@@ -96,8 +98,20 @@ export async function cancelOrderForUser(
         }
       }
 
+      let debtNotification = null;
       if (order.customerId) {
         const remaining = Number(order.total) - Number(order.amountPaid);
+        const reversedDebt = Math.max(0, remaining);
+        const [customer] = await tx
+          .select({ currentDebt: customers.currentDebt })
+          .from(customers)
+          .where(eq(customers.id, order.customerId))
+          .limit(1)
+          .for("update");
+        const debtDelta = -Math.min(
+          Number(customer?.currentDebt ?? 0),
+          reversedDebt,
+        );
         await tx
           .update(customers)
           .set({
@@ -105,6 +119,14 @@ export async function cancelOrderForUser(
             totalSpent: sql`greatest(${customers.totalSpent} - ${order.total}, 0)`,
           })
           .where(eq(customers.id, order.customerId));
+        debtNotification = await createDebtChangedEventInTx(tx, {
+          entityType: "customer",
+          entityId: order.customerId,
+          operationType: "order_cancel",
+          operationId: order.id,
+          delta: debtDelta,
+          actorId: profileId,
+        });
       }
 
       await tx
@@ -114,8 +136,12 @@ export async function cancelOrderForUser(
           updatedAt: sql`now()`,
         })
         .where(eq(orders.id, orderId));
+      return { debtNotification };
     });
 
+    if (result.debtNotification?.created) {
+      await publishCommittedNotification(result.debtNotification.eventId);
+    }
     return { ok: true, data: undefined };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";

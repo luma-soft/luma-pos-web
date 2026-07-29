@@ -2,13 +2,14 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { customers, orders, payments } from "@/db/schema";
 import { recordCashTx, fundForMethod } from "@/lib/cash";
 import { addPaymentSchema, type AddPaymentInput } from "@/lib/schemas/order";
+import { createDebtChangedEventInTx } from "@/lib/notifications/events-core";
 
 // Drizzle Postgres and PGlite expose the same runtime transaction API.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type DbLike = any;
 
 export type ManualPaymentCoreResult =
-  | { ok: true; data: { replayed: boolean } }
+  | { ok: true; data: { replayed: boolean; notificationEventId?: string } }
   | { ok: false; error: string };
 
 export async function addManualPaymentCore(
@@ -68,7 +69,7 @@ export async function addManualPaymentCore(
         throw new Error("AMOUNT_EXCEEDS_REMAINING");
       }
 
-      await tx.insert(payments).values({
+      const [payment] = await tx.insert(payments).values({
         orderId: order.id,
         shiftId: actor.shiftId,
         amount: value.amount.toFixed(2),
@@ -78,7 +79,7 @@ export async function addManualPaymentCore(
         reference: value.reference?.trim() || null,
         note: value.note?.trim() || null,
         createdBy: actor.profileId,
-      });
+      }).returning({ id: payments.id });
       await recordCashTx(tx, {
         type: "in",
         fund: fundForMethod(value.method),
@@ -101,15 +102,42 @@ export async function addManualPaymentCore(
         })
         .where(eq(orders.id, order.id));
 
+      let notification = null;
       if (order.customerId) {
+        const [customer] = await tx
+          .select({ currentDebt: customers.currentDebt })
+          .from(customers)
+          .where(eq(customers.id, order.customerId))
+          .limit(1)
+          .for("update");
+        const debtDelta = -Math.min(
+          Number(customer?.currentDebt ?? 0),
+          value.amount,
+        );
         await tx
           .update(customers)
           .set({
             currentDebt: sql`greatest(${customers.currentDebt} - ${value.amount.toFixed(2)}, 0)`,
           })
           .where(eq(customers.id, order.customerId));
+        notification = await createDebtChangedEventInTx(tx, {
+          entityType: "customer",
+          entityId: order.customerId,
+          operationType: "manual_payment",
+          operationId: value.clientRequestId ?? payment.id,
+          delta: debtDelta,
+          actorId: actor.profileId,
+        });
       }
-      return { ok: true as const, data: { replayed: false } };
+      return {
+        ok: true as const,
+        data: {
+          replayed: false,
+          ...(notification?.created
+            ? { notificationEventId: notification.eventId }
+            : {}),
+        },
+      };
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
