@@ -148,8 +148,8 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
     }[size];
 
     const variantCls = {
-      default: "border-border focus:ring-primary-500/30 focus:border-primary-500",
-      error: "border-red-500 focus:ring-red-500/30 focus:border-red-500",
+      default: "border-border focus:border-primary-500",
+      error: "border-red-500 focus:border-red-500",
     }[variant];
 
     return (
@@ -163,7 +163,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
           aria-expanded={open}
           onClick={() => setOpen((state) => !state)}
           className={cn(
-            "relative min-h-11 min-w-11 w-full rounded-lg border bg-surface text-left transition-[border-color,box-shadow,background-color] duration-150 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:min-w-0",
+            "relative min-h-11 min-w-11 w-full rounded-lg border bg-surface text-left transition-[border-color,background-color] duration-150 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:min-w-0",
             sizeCls,
             variantCls,
             wrapLabel && "h-auto min-h-11 py-2 lg:min-h-10",
