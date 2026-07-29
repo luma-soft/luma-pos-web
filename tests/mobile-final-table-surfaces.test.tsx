@@ -634,6 +634,10 @@ describe("final mobile table surfaces", () => {
     expect(toolbarHtml).toContain(">2<");
     expect(toolbarHtml).toContain("size-11");
     expect(toolbarHtml.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(toolbarHtml).toContain(
+      "grid-cols-[auto_minmax(0,1fr)_auto]",
+    );
+    expect(toolbarHtml).toContain("col-span-3 grid grid-cols-2");
     expect(calls).toEqual([
       "toggle:order-mobile-1",
       "open:order-mobile-1",

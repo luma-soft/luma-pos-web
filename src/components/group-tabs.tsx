@@ -42,33 +42,39 @@ export function GroupTabs({
   }
 
   return (
-    <div className={cn(
-      "flex snap-x snap-mandatory items-center gap-5 overflow-x-auto overscroll-x-contain scroll-px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:gap-1",
-      edgeToEdge && "-mx-4 px-4 sm:-mx-6 sm:px-6",
-    )}>
-      {items.map((it) => {
-        const on = it.tab === active;
-        return (
-          <Link
-            key={it.tab}
-            href={tabHref(it.tab)}
-            aria-current={on ? "page" : undefined}
-            className={cn(
-              "shrink-0 snap-start items-center gap-2 border-b-2 px-0.5 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:h-9 lg:min-w-0 lg:rounded-[10px] lg:border-b-0 lg:px-3.5 lg:font-semibold",
-              on
-                ? "border-primary-600 text-primary-700 dark:text-primary-300 lg:bg-primary-50 lg:dark:bg-primary-950/40"
-                : "border-transparent text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 lg:text-slate-500 lg:hover:bg-surface-2",
-              linkClassName,
-              "inline-flex h-11 min-h-11 min-w-11 sm:h-11 sm:min-h-11 sm:min-w-11 md:h-11 md:min-h-11 md:min-w-11",
-            )}
-          >
-            <Text as="span" size="xs" weight="semibold" className="text-current" text={t(it.labelKey)} />
-            {it.count != null && it.count > 0 && (
-              <Text as="span" weight="bold" className="min-w-4 h-4 px-1 rounded-full bg-surface-2 text-[9px] font-mono grid place-items-center text-current" text={it.count} />
-            )}
-          </Link>
-        );
-      })}
+    <div className="relative">
+      <div className={cn(
+        "flex snap-x snap-mandatory items-center gap-5 overflow-x-auto overscroll-x-contain scroll-px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:gap-1",
+        edgeToEdge && "-mx-4 px-4 sm:-mx-6 sm:px-6",
+      )}>
+        {items.map((it) => {
+          const on = it.tab === active;
+          return (
+            <Link
+              key={it.tab}
+              href={tabHref(it.tab)}
+              aria-current={on ? "page" : undefined}
+              className={cn(
+                "shrink-0 snap-start items-center gap-2 border-b-2 px-0.5 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:h-9 lg:min-w-0 lg:rounded-[10px] lg:border-b-0 lg:px-3.5 lg:font-semibold",
+                on
+                  ? "border-primary-600 text-primary-700 dark:text-primary-300 lg:bg-primary-50 lg:dark:bg-primary-950/40"
+                  : "border-transparent text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 lg:text-slate-500 lg:hover:bg-surface-2",
+                linkClassName,
+                "inline-flex h-11 min-h-11 min-w-11 sm:h-11 sm:min-h-11 sm:min-w-11 md:h-11 md:min-h-11 md:min-w-11",
+              )}
+            >
+              <Text as="span" size="xs" weight="semibold" className="text-current" text={t(it.labelKey)} />
+              {it.count != null && it.count > 0 && (
+                <Text as="span" weight="bold" className="min-w-4 h-4 px-1 rounded-full bg-surface-2 text-[9px] font-mono grid place-items-center text-current" text={it.count} />
+              )}
+            </Link>
+          );
+        })}
+      </div>
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-surface via-surface/80 to-transparent lg:hidden"
+      />
     </div>
   );
 }

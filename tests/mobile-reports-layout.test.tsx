@@ -145,6 +145,23 @@ describe("mobile report controls", () => {
     expect(html.match(/<a [^>]*class="(?=[^"]*h-11)(?=[^"]*lg:h-9)[^"]*"/g)).toHaveLength(2);
   });
 
+  test("group tabs expose a non-interactive mobile overflow cue", () => {
+    const html = renderWithMessages(
+      <GroupTabs
+        base="/reports"
+        items={[
+          { tab: "overview", labelKey: "reports.overview" },
+          { tab: "invoices", labelKey: "reports.invoices" },
+        ]}
+      />,
+    );
+
+    expect(html).toContain('aria-hidden="true"');
+    expect(html).toContain("pointer-events-none");
+    expect(html).toContain("bg-gradient-to-l");
+    expect(html).toContain("lg:hidden");
+  });
+
   test("group tabs reject arbitrary pre-lg geometry overrides while preserving lg customization", () => {
     const html = renderWithMessages(
       <GroupTabs

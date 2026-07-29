@@ -115,7 +115,7 @@ export function OrderBatchToolbar({
   };
 }) {
   return (
-    <div className="flex w-full flex-wrap items-center gap-2 text-sm">
+    <div className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 text-sm lg:flex lg:flex-wrap">
       <OrderSelectionCheckbox
         checked={allSelected}
         indeterminate={partiallySelected}
@@ -132,22 +132,24 @@ export function OrderBatchToolbar({
       <span className="rounded-full bg-primary-100 px-2 py-1 text-xs font-bold text-primary-700" aria-live="polite">
         {selectedCount}
       </span>
-      <button
-        type="submit"
-        formAction="/orders/merge"
-        disabled={selectedCount < 2}
-        className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:min-w-0"
-      >
-        {labels.merge}
-      </button>
-      <button
-        type="submit"
-        formAction="/orders/print-batch"
-        disabled={selectedCount === 0}
-        className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:min-w-0"
-      >
-        {labels.print}
-      </button>
+      <div className="col-span-3 grid grid-cols-2 gap-2 lg:contents">
+        <button
+          type="submit"
+          formAction="/orders/merge"
+          disabled={selectedCount < 2}
+          className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:min-w-0"
+        >
+          {labels.merge}
+        </button>
+        <button
+          type="submit"
+          formAction="/orders/print-batch"
+          disabled={selectedCount === 0}
+          className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:min-w-0"
+        >
+          {labels.print}
+        </button>
+      </div>
     </div>
   );
 }
