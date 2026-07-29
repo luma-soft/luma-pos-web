@@ -218,7 +218,9 @@ export async function createPurchase(
 }
 
 /** Sửa phiếu nhập đã nhận: hoàn tác dòng cũ, áp dòng mới, cập nhật chênh lệch nợ/tiền. */
-export async function updatePurchase(input: UpdatePurchaseOutput): Promise<ActionResult> {
+export async function updatePurchase(
+  input: UpdatePurchaseOutput,
+): Promise<ActionResult<{ updatedAt: string }>> {
   const gate = await requireStockAccess();
   if (!gate.ok) return gate;
   const userId = gate.userId;
@@ -487,14 +489,17 @@ export async function updatePurchase(input: UpdatePurchaseOutput): Promise<Actio
             actorId: profileId,
             relatedAdjustments,
           });
-      return { notification };
+      return {
+        notification,
+        updatedAt: committedMutation.committedAt,
+      };
     });
 
     if (result.notification?.created) {
       await publishCommittedNotification(result.notification.eventId);
     }
     revalidatePurchasePaths(v.id);
-    return { ok: true, data: undefined };
+    return { ok: true, data: { updatedAt: result.updatedAt } };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
     const known: Record<string, string> = {
