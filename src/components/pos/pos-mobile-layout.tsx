@@ -21,6 +21,21 @@ export function posUnitSuffix(unitName: string) {
   return unit ? `/${unit}` : "";
 }
 
+export function PosSearchQuantitySlot({
+  className,
+  children,
+  ...props
+}: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      className={cn("group relative w-[8.25rem] shrink-0 lg:w-28", className)}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function PosSearchResultLayout({
   selected = false,
   leading,
@@ -45,7 +60,7 @@ export function PosSearchResultLayout({
     >
       <div className="shrink-0">{leading}</div>
       <div className="min-w-0 flex-1">{summary}</div>
-      <div className="col-span-2 flex min-w-0 items-center justify-end gap-2 sm:col-auto sm:ml-auto sm:w-64 sm:shrink-0">
+      <div className="col-span-2 flex min-w-0 items-center justify-end gap-2 sm:col-auto sm:ml-auto sm:w-auto sm:shrink-0">
         {controls}
       </div>
     </div>

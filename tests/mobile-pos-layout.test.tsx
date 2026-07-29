@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   buildPosUnitOptions,
   PosCartScrollSurface,
+  PosSearchQuantitySlot,
   PosSearchResultLayout,
   posUnitSuffix,
 } from "@/components/pos/pos-mobile-layout";
@@ -27,7 +28,21 @@ describe("POS mobile search results", () => {
     expect(markup).toContain("col-span-2");
     expect(markup).toContain("min-w-0");
     expect(markup).toContain("sm:flex");
+    expect(markup).toContain("sm:w-auto");
+    expect(markup).not.toContain("sm:w-64");
     expect(markup).not.toContain("w-auto sm:w-64 shrink-0");
+  });
+
+  test("reserves all three 44px quantity tracks until the desktop breakpoint", () => {
+    const markup = renderToStaticMarkup(
+      <PosSearchQuantitySlot>
+        <span>− 1 +</span>
+      </PosSearchQuantitySlot>,
+    );
+
+    expect(markup).toContain("w-[8.25rem]");
+    expect(markup).toContain("lg:w-28");
+    expect(markup).not.toContain('class="w-28"');
   });
 });
 

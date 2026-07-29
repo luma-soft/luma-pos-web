@@ -23,6 +23,7 @@ import { CameraQuotePanel, type CameraQuotePackage } from "@/components/pos/came
 import {
   buildPosUnitOptions,
   PosCartScrollSurface,
+  PosSearchQuantitySlot,
   PosSearchResultLayout,
   posUnitSuffix,
 } from "@/components/pos/pos-mobile-layout";
@@ -1841,20 +1842,20 @@ export function PosClient({
                           controls={(
                             <>
                             {line && (
-                              <div className="group relative flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                              <PosSearchQuantitySlot onClick={(e) => e.stopPropagation()}>
                                 <QuantityInput
                                   value={line.quantity}
                                   onChange={(quantity) => setQty(line.key, quantity)}
                                   min={0}
                                   max={line.returnSoldQuantity}
                                   size="sm"
-                                  className={cn("w-28", outOfStock && "border-er text-er")}
+                                  className={cn("w-full", outOfStock && "border-er text-er")}
                                   inputClassName={cn(outOfStock && "border-er text-er")}
                                 />
                                 {stockManaged && (
                                   <StockQuantityTooltip stock={stock} ordered={line.quantity * line.unitMultiplier} unit={p.baseUnit} />
                                 )}
-                              </div>
+                              </PosSearchQuantitySlot>
                             )}
                             <div className="text-sm font-semibold text-primary-600 tabular-nums text-right w-24 sm:w-32">
                               {priceLabelFor(p, priceBook)}{p.isVariantParent ? "" : posUnitSuffix(p.baseUnit)}
