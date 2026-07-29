@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import Link from "next/link";
 import { Maximize2, Minus, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -32,14 +33,14 @@ export function AssistantHeader({
       </div>
       <div className="flex items-center gap-1">
         {!isPos && (
-          <a
+          <Link
             href="/ai?tab=assistant"
             className={cn(buttonVariants({ variant: "outline", size: "iconSm" }), "hidden sm:grid text-slate-500 hover:bg-surface-2")}
             title={t("ai.openWorkspace")}
             aria-label={t("ai.openWorkspace")}
           >
             <Maximize2 className="w-4 h-4" />
-          </a>
+          </Link>
         )}
         <Button
           type="button"

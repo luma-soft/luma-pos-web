@@ -671,7 +671,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
         : boundedErrorCode(result.code, "FCM_FAILED");
       const [persisted] = await database
         .update(mobilePushDeliveries)
-        .set({ status, errorCode })
+        .set({ status, errorCode, attemptedAt })
         .where(and(
           eq(mobilePushDeliveries.id, deviceClaim.id),
           eq(mobilePushDeliveries.status, "sending"),

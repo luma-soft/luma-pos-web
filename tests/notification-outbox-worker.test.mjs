@@ -282,6 +282,42 @@ function core({
   assert.equal((await deliveryRow(ownerDevice.id, seeded.eventId)).attempts, 1);
 }
 
+// A successful delivery records FCM acceptance time, not the earlier send claim.
+{
+  const seeded = await seedEvent();
+  await db.update(mobilePushDevices).set({ enabled: false })
+    .where(eq(mobilePushDevices.id, managerDevice.id));
+  let clock = new Date("2026-07-28T12:00:00.000Z");
+  const service = createNotificationOutboxCore({
+    database: db,
+    publisher: {
+      async publish() {
+        return { providerMessageId: "acceptance-time-message" };
+      },
+    },
+    sender: async () => {
+      clock = new Date("2026-07-28T12:00:02.000Z");
+      return { kind: "sent" };
+    },
+    now: () => new Date(clock),
+    jitter: () => 0,
+  });
+
+  await service.processNotificationMessage({
+    version: 1,
+    eventId: seeded.eventId,
+    deduplicationKey: `notification:${seeded.eventId}`,
+    queuedAt: "2026-07-28T12:00:00.000Z",
+  });
+
+  assert.equal(
+    (await deliveryRow(ownerDevice.id, seeded.eventId)).attemptedAt.toISOString(),
+    "2026-07-28T12:00:02.000Z",
+  );
+  await db.update(mobilePushDevices).set({ enabled: true })
+    .where(eq(mobilePushDevices.id, managerDevice.id));
+}
+
 // A fresh per-device sending claim fences a concurrent worker from FCM.
 {
   const seeded = await seedEvent();

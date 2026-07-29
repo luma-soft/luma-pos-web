@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { einvoices } from "@/db/schema";
 import { getRestockSuggestions } from "@/lib/data/ai-restock";
@@ -21,6 +21,122 @@ function dateKey(timezone: string) {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+}
+
+type OperationsDatabase = {
+  execute(query: ReturnType<typeof sql>): Promise<unknown>;
+};
+
+type NotificationOperationsSummary = {
+  pending: number;
+  retry: number;
+  dead: number;
+  oldestDueAgeSeconds: number;
+  fcmAcceptedLastHour: number;
+  fcmFailedLastHour: number;
+  qrP95FcmAcceptedMs: number | null;
+};
+
+function firstResultRow(result: unknown): Record<string, unknown> {
+  if (Array.isArray(result)) {
+    return (result[0] ?? {}) as Record<string, unknown>;
+  }
+  if (
+    result
+    && typeof result === "object"
+    && "rows" in result
+    && Array.isArray((result as { rows: unknown }).rows)
+  ) {
+    return ((result as { rows: unknown[] }).rows[0] ?? {}) as Record<string, unknown>;
+  }
+  return {};
+}
+
+function metricNumber(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export async function getNotificationOperationsSummary(
+  database: OperationsDatabase = db,
+  now = new Date(),
+): Promise<NotificationOperationsSummary> {
+  const hourStart = new Date(now.getTime() - 60 * 60 * 1000);
+  const result = await database.execute(sql`
+    WITH qr_first_acceptance AS (
+      SELECT
+        events.id,
+        events.created_at,
+        min(deliveries.attempted_at) AS accepted_at
+      FROM notification_events AS events
+      INNER JOIN mobile_push_deliveries AS deliveries
+        ON deliveries.notification_key = 'event:' || events.id::text
+      WHERE events.category IN ('qrPaymentConfirmed', 'qrPaymentException')
+        AND events.created_at >= ${hourStart}
+        AND events.created_at <= ${now}
+        AND deliveries.status = 'sent'
+        AND deliveries.attempted_at >= events.created_at
+        AND deliveries.attempted_at <= ${now}
+      GROUP BY events.id, events.created_at
+    )
+    SELECT
+      (
+        SELECT count(*)::integer
+        FROM notification_outbox
+        WHERE status = 'pending'
+      ) AS pending,
+      (
+        SELECT count(*)::integer
+        FROM notification_outbox
+        WHERE status = 'retry'
+      ) AS retry,
+      (
+        SELECT count(*)::integer
+        FROM notification_outbox
+        WHERE status = 'dead'
+      ) AS dead,
+      coalesce((
+        SELECT floor(extract(epoch FROM (${now}::timestamptz - min(available_at))))::integer
+        FROM notification_outbox
+        WHERE status IN ('pending', 'retry')
+          AND available_at <= ${now}
+      ), 0) AS "oldestDueAgeSeconds",
+      (
+        SELECT count(*)::integer
+        FROM mobile_push_deliveries
+        WHERE status = 'sent'
+          AND attempted_at >= ${hourStart}
+          AND attempted_at <= ${now}
+      ) AS "fcmAcceptedLastHour",
+      (
+        SELECT count(*)::integer
+        FROM mobile_push_deliveries
+        WHERE status = 'failed'
+          AND attempted_at >= ${hourStart}
+          AND attempted_at <= ${now}
+      ) AS "fcmFailedLastHour",
+      (
+        SELECT round((
+          percentile_cont(0.95) WITHIN GROUP (
+            ORDER BY extract(epoch FROM (accepted_at - created_at)) * 1000
+          )
+        )::numeric)::double precision
+        FROM qr_first_acceptance
+      ) AS "qrP95FcmAcceptedMs"
+  `);
+  const row = firstResultRow(result);
+
+  return {
+    pending: metricNumber(row.pending),
+    retry: metricNumber(row.retry),
+    dead: metricNumber(row.dead),
+    oldestDueAgeSeconds: metricNumber(row.oldestDueAgeSeconds),
+    fcmAcceptedLastHour: metricNumber(row.fcmAcceptedLastHour),
+    fcmFailedLastHour: metricNumber(row.fcmFailedLastHour),
+    qrP95FcmAcceptedMs: row.qrP95FcmAcceptedMs == null
+      ? null
+      : metricNumber(row.qrP95FcmAcceptedMs),
+  };
 }
 
 export async function GET(request: Request) {
@@ -66,11 +182,13 @@ export async function GET(request: Request) {
     }
   }
 
+  const operations = await getNotificationOperationsSummary();
   return mobileOk({
     evaluated: results.length,
     sent: results.reduce((sum, result) => sum + result.sent, 0),
     failed: results.reduce((sum, result) => sum + result.failed, 0),
     skipped: results.reduce((sum, result) => sum + result.skipped, 0),
     configured: results.every((result) => result.configured),
+    ...operations,
   });
 }
