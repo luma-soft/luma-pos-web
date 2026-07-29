@@ -29,6 +29,7 @@
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.105.3",
     "@tanstack/react-query": "^5.100.9",
+    "@upstash/qstash": "^2.11.3",
     "@vercel/functions": "3.7.5",
     "busboy": "^1.6.0",
     "bwip-js": "^4.11.1",

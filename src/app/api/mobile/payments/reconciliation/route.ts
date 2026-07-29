@@ -4,8 +4,10 @@ import { requireMobileManager } from "@/lib/mobile/auth";
 import {
   expirePendingPayment,
   getPaymentReconciliation,
+  getPaymentReconciliationEvent,
   reconcilePaymentWithEvent,
 } from "@/lib/payments/service";
+import { isMobileEntityId } from "@/lib/mobile/exact-entity";
 import {
   mobileAction,
   mobileError,
@@ -35,7 +37,17 @@ type ReconciliationStatus =
 
 export async function GET(request: Request) {
   const gate = await requireMobileManager();
+  const eventId = searchParam(request, "eventId");
+  if (eventId && (!gate.ok || !isMobileEntityId(eventId))) {
+    return mobileError("errors.notFound", 404);
+  }
   if (!gate.ok) return mobileGate(gate)!;
+  if (eventId) {
+    const result = await getPaymentReconciliationEvent(eventId);
+    if (!result.ok) return mobileError(result.error, 503);
+    if (!result.data) return mobileError("errors.notFound", 404);
+    return mobileOk(result.data);
+  }
   const requestedStatus = searchParam(request, "status") ?? "actionable";
   const status = (statuses.has(requestedStatus)
     ? requestedStatus

@@ -3035,6 +3035,16 @@
     "productCount": "Số sản phẩm",
     "noParent": "— Không có nhóm cha —"
   },
+  "internalNotifications": {
+    "titles": {
+      "invoiceCreated": "Hóa đơn mới đã được tạo",
+      "purchaseReceived": "Đã ghi nhận phiếu nhập hàng",
+      "debtChanged": "Công nợ vừa được cập nhật",
+      "qrPaymentConfirmed": "Đã xác nhận thanh toán QR",
+      "qrPaymentException": "Cần kiểm tra giao dịch QR"
+    },
+    "body": "Mở LumaPOS để xem chi tiết."
+  },
   "pagination": {
     "show": "Hiển thị",
     "rows": "{n} dòng",

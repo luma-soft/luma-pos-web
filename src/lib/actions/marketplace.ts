@@ -39,6 +39,8 @@ import {
 import { Routes } from "@/lib/routes";
 import { getShopeeAttributes, getShopeeCategories, getShopeeLogisticsChannels, type ShopeeApiCategory } from "@/lib/shopee/client";
 import { generateCode, requireManager, requireOwner, toMoney, toQty, type ActionResult } from "./common";
+import { createNotificationEventInTx } from "@/lib/notifications/events-core";
+import { publishCommittedNotification } from "@/lib/notifications/outbox";
 
 function numberFrom(value: unknown, fallback = 0) {
   const n = Number(value);
@@ -630,11 +632,31 @@ export async function importShopeeOrder(input: ImportShopeeOrderInput): Promise<
         externalStatus: v.status,
         rawPayload: v.rawPayload,
       });
-      return order;
+      const notification = isCancelled
+        ? null
+        : await createNotificationEventInTx(tx, {
+            eventKey: `invoice-created:${order.id}`,
+            category: "invoiceCreated",
+            entityType: "order",
+            entityId: order.id,
+            actorId: gate.userId,
+            target: "invoices",
+            priority: "normal",
+            quietHoursPolicy: "defer",
+            excludeActor: true,
+            metadata: {
+              debtDelta: "0.00",
+              source: "shopee",
+            },
+          });
+      return { order, notification };
     });
+    if (result.notification?.created) {
+      await publishCommittedNotification(result.notification.eventId);
+    }
     revalidatePath(Routes.Sales);
     revalidatePath(Routes.OnlineSales);
-    return { ok: true, data: { orderId: result.id, code: result.code, duplicate: false } };
+    return { ok: true, data: { orderId: result.order.id, code: result.order.code, duplicate: false } };
   } catch (e) {
     if (e instanceof Error && e.message === "INSUFFICIENT_BATCH_STOCK") {
       return { ok: false, error: "orders.errors.insufficientStock" };

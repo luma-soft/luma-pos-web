@@ -1,10 +1,14 @@
-import { and, eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { mobilePushDevices } from "@/db/schema";
 import { requireMobileUser } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
 import { pushDeviceBinding } from "@/lib/notifications/device-binding";
+import {
+  deactivatePushDeviceBinding,
+  registerPushDeviceBinding,
+} from "@/lib/notifications/device-registration-core";
 
 const deviceSchema = z.object({
   deviceId: z.string().trim().min(8).max(120),
@@ -12,6 +16,7 @@ const deviceSchema = z.object({
   token: z.string().trim().min(20).max(4096),
   permission: z.enum(["authorized", "provisional"]),
   locale: z.string().trim().max(20).optional(),
+  bindingGeneration: z.number().int().nonnegative().safe().default(0),
 });
 
 export async function GET() {
@@ -38,29 +43,22 @@ export async function POST(request: Request) {
   const device = parsed.data;
   const binding = pushDeviceBinding(gate);
 
-  await db.transaction(async (tx) => {
-    await tx.delete(mobilePushDevices)
-      .where(eq(mobilePushDevices.token, device.token));
-    await tx.insert(mobilePushDevices).values({
-      userId: binding.principalId,
-      effectiveUserId: binding.effectiveUserId,
-      ...device,
-    }).onConflictDoUpdate({
-      target: [mobilePushDevices.userId, mobilePushDevices.deviceId],
-      set: {
-        token: device.token,
-        platform: device.platform,
-        permission: device.permission,
-        effectiveUserId: binding.effectiveUserId,
-        locale: device.locale,
-        enabled: true,
-        lastSeenAt: sql`now()`,
-        updatedAt: sql`now()`,
-      },
-    });
+  const result = await registerPushDeviceBinding(db, {
+    principalId: binding.principalId,
+    effectiveUserId: binding.effectiveUserId,
+    device,
   });
 
-  return mobileOk({ registered: true });
+  if (result.kind === "busy") {
+    return mobileError("errors.deviceBindingBusy", 409);
+  }
+  if (result.kind === "stale") {
+    return mobileError("errors.deviceBindingStale", 409);
+  }
+  return mobileOk({
+    registered: true,
+    bindingGeneration: device.bindingGeneration,
+  });
 }
 
 export async function DELETE(request: Request) {
@@ -70,13 +68,27 @@ export async function DELETE(request: Request) {
   const deviceId = body && typeof body === "object" && "deviceId" in body
     ? String(body.deviceId).trim()
     : "";
+  const bindingGeneration = body
+    && typeof body === "object"
+    && "bindingGeneration" in body
+    && Number.isSafeInteger(Number(body.bindingGeneration))
+    && Number(body.bindingGeneration) >= 0
+    ? Number(body.bindingGeneration)
+    : 0;
   if (deviceId.length < 8 || deviceId.length > 120) {
     return mobileError("errors.invalidData");
   }
   const binding = pushDeviceBinding(gate);
-  await db.delete(mobilePushDevices).where(and(
-    eq(mobilePushDevices.userId, binding.principalId),
-    eq(mobilePushDevices.deviceId, deviceId),
-  ));
-  return mobileOk({ unregistered: true });
+  const result = await deactivatePushDeviceBinding(db, {
+    principalId: binding.principalId,
+    deviceId,
+    bindingGeneration,
+  });
+  if (result.kind === "busy") {
+    return mobileError("errors.deviceBindingBusy", 409);
+  }
+  if (result.kind === "stale") {
+    return mobileError("errors.deviceBindingStale", 409);
+  }
+  return mobileOk({ unregistered: true, bindingGeneration });
 }

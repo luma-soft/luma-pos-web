@@ -12,6 +12,7 @@ import {
   shopeeSettingsInputSchema,
   storeSettingsSchema,
   storePrefsPatchSchema,
+  mobileNotificationSettingsPatchSchema,
   zaloSettingsInputSchema,
   parseStorePrefs,
   type AiSettingsInput,
@@ -19,9 +20,15 @@ import {
   type ShopeeSettingsInput,
   type StoreSettingsInput,
   type StaffRole,
+  type MobileNotificationSettingsPatch,
   type StorePrefsPatch,
   type ZaloSettingsInput,
 } from "@/lib/schemas/settings";
+import {
+  persistNotificationSettingsPatch,
+  persistStorePrefsMutation,
+  persistStorePrefsPatch,
+} from "@/lib/settings/notification-settings-core";
 import { writeAuditLog } from "@/lib/audit";
 import { buildAiProviderConfig, completeAiText, completeAiVision } from "@/lib/ai/provider-adapter";
 import { type ActionResult, requireManager, requireOwner, requireUser } from "./common";
@@ -128,17 +135,31 @@ export async function updateStorePrefsForUser(
   const parsed = storePrefsPatchSchema.safeParse(patch);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   try {
-    const [row] = await db.select({ prefs: storeSettings.prefs }).from(storeSettings).where(eq(storeSettings.id, "default")).limit(1);
-    const current = parseStorePrefs(row?.prefs);
-    const next = { ...current, ...parsed.data };
-    await db.insert(storeSettings)
-      .values({ id: "default", prefs: next })
-      .onConflictDoUpdate({ target: storeSettings.id, set: { prefs: next, updatedAt: sql`now()` } });
+    await persistStorePrefsPatch(db, parsed.data);
     revalidatePath(Routes.Settings);
     revalidatePath(Routes.POS);
     return { ok: true, data: undefined };
   } catch (e) {
     console.error("updateStorePrefs failed:", e);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function updateNotificationSettingsForUser(
+  _userId: string,
+  patch: MobileNotificationSettingsPatch,
+): Promise<ActionResult> {
+  const parsed = mobileNotificationSettingsPatchSchema.safeParse(patch);
+  if (!parsed.success || Object.keys(parsed.data).length === 0) {
+    return { ok: false, error: "errors.invalidData" };
+  }
+  try {
+    await persistNotificationSettingsPatch(db, parsed.data);
+    revalidatePath(Routes.Settings);
+    revalidatePath(Routes.POS);
+    return { ok: true, data: undefined };
+  } catch (error) {
+    console.error("updateNotificationSettings failed:", error);
     return { ok: false, error: "errors.serverError" };
   }
 }
@@ -150,28 +171,33 @@ export async function updateAiSettings(input: AiSettingsInput): Promise<ActionRe
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
   try {
-    const [row] = await db.select({ prefs: storeSettings.prefs }).from(storeSettings).where(eq(storeSettings.id, "default")).limit(1);
-    const current = parseStorePrefs(row?.prefs);
-    const nextKey = v.clearOpenaiApiKey
-      ? ""
-      : (v.openaiApiKey?.trim() || current.ai.openaiApiKey);
     const requested = input && typeof input === "object" ? input as Record<string, unknown> : {};
-    const nextAi = {
-      ...current.ai,
-      provider: v.provider,
-      textModel: v.textModel,
-      visionModel: v.visionModel,
-      openaiApiKey: nextKey,
-      openaiApiKeySet: Boolean(nextKey),
-      openaiVisionModel: v.visionModel,
-      attachmentsBucket: v.attachmentsBucket,
-      monthlyUsageLimit: typeof requested.monthlyUsageLimit === "number" ? v.monthlyUsageLimit : current.ai.monthlyUsageLimit,
-      showFloatingLauncher: typeof requested.showFloatingLauncher === "boolean" ? v.showFloatingLauncher : current.ai.showFloatingLauncher,
-    };
-    const next = { ...current, ai: nextAi };
-    await db.insert(storeSettings)
-      .values({ id: "default", prefs: next })
-      .onConflictDoUpdate({ target: storeSettings.id, set: { prefs: next, updatedAt: sql`now()` } });
+    const persisted = await persistStorePrefsMutation(db, (current) => {
+      const nextKey = v.clearOpenaiApiKey
+        ? ""
+        : (v.openaiApiKey?.trim() || current.ai.openaiApiKey);
+      const nextAi = {
+        ...current.ai,
+        provider: v.provider,
+        textModel: v.textModel,
+        visionModel: v.visionModel,
+        openaiApiKey: nextKey,
+        openaiApiKeySet: Boolean(nextKey),
+        openaiVisionModel: v.visionModel,
+        attachmentsBucket: v.attachmentsBucket,
+        monthlyUsageLimit: typeof requested.monthlyUsageLimit === "number"
+          ? v.monthlyUsageLimit
+          : current.ai.monthlyUsageLimit,
+        showFloatingLauncher: typeof requested.showFloatingLauncher === "boolean"
+          ? v.showFloatingLauncher
+          : current.ai.showFloatingLauncher,
+      };
+      return {
+        next: { ...current, ai: nextAi },
+        value: { currentAi: current.ai, nextAi },
+      };
+    });
+    const { currentAi, nextAi } = persisted.value;
     await writeAuditLog({
       actorUserId: gate.userId,
       source: "manual",
@@ -180,14 +206,14 @@ export async function updateAiSettings(input: AiSettingsInput): Promise<ActionRe
       entityId: "default",
       status: "succeeded",
       before: {
-        provider: current.ai.provider,
-        textModel: current.ai.textModel,
-        visionModel: current.ai.visionModel || current.ai.openaiVisionModel,
-        openaiApiKeySet: Boolean(current.ai.openaiApiKey),
-        openaiVisionModel: current.ai.openaiVisionModel,
-        attachmentsBucket: current.ai.attachmentsBucket,
-        monthlyUsageLimit: current.ai.monthlyUsageLimit,
-        showFloatingLauncher: current.ai.showFloatingLauncher,
+        provider: currentAi.provider,
+        textModel: currentAi.textModel,
+        visionModel: currentAi.visionModel || currentAi.openaiVisionModel,
+        openaiApiKeySet: Boolean(currentAi.openaiApiKey),
+        openaiVisionModel: currentAi.openaiVisionModel,
+        attachmentsBucket: currentAi.attachmentsBucket,
+        monthlyUsageLimit: currentAi.monthlyUsageLimit,
+        showFloatingLauncher: currentAi.showFloatingLauncher,
       },
       after: {
         provider: nextAi.provider,
@@ -216,34 +242,43 @@ export async function updateZaloSettings(input: ZaloSettingsInput): Promise<Acti
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
   try {
-    const [row] = await db.select({ prefs: storeSettings.prefs }).from(storeSettings).where(eq(storeSettings.id, "default")).limit(1);
-    const current = parseStorePrefs(row?.prefs);
-    const nextAppSecret = v.clearAppSecret ? "" : (v.appSecret?.trim() || current.zalo.appSecret);
-    const nextAccessToken = v.clearAccessToken ? "" : (v.accessToken?.trim() || current.zalo.accessToken);
-    const nextRefreshToken = v.clearRefreshToken ? "" : (v.refreshToken?.trim() || current.zalo.refreshToken);
-    const nextWebhookSecret = v.clearWebhookSecret ? "" : (v.webhookSecret?.trim() || current.zalo.webhookSecret);
-    const nextZalo = {
-      ...current.zalo,
-      enabled: v.enabled,
-      deliveryMode: v.deliveryMode,
-      oaId: v.oaId,
-      appId: v.appId,
-      appSecret: nextAppSecret,
-      appSecretSet: Boolean(nextAppSecret),
-      accessToken: nextAccessToken,
-      accessTokenSet: Boolean(nextAccessToken),
-      refreshToken: nextRefreshToken,
-      refreshTokenSet: Boolean(nextRefreshToken),
-      webhookSecret: nextWebhookSecret,
-      webhookSecretSet: Boolean(nextWebhookSecret),
-      portalTemplateId: v.portalTemplateId,
-      invoiceTemplateId: v.invoiceTemplateId,
-      debtTemplateId: v.debtTemplateId,
-    };
-    const next = { ...current, zalo: nextZalo };
-    await db.insert(storeSettings)
-      .values({ id: "default", prefs: next })
-      .onConflictDoUpdate({ target: storeSettings.id, set: { prefs: next, updatedAt: sql`now()` } });
+    const persisted = await persistStorePrefsMutation(db, (current) => {
+      const nextAppSecret = v.clearAppSecret
+        ? ""
+        : (v.appSecret?.trim() || current.zalo.appSecret);
+      const nextAccessToken = v.clearAccessToken
+        ? ""
+        : (v.accessToken?.trim() || current.zalo.accessToken);
+      const nextRefreshToken = v.clearRefreshToken
+        ? ""
+        : (v.refreshToken?.trim() || current.zalo.refreshToken);
+      const nextWebhookSecret = v.clearWebhookSecret
+        ? ""
+        : (v.webhookSecret?.trim() || current.zalo.webhookSecret);
+      const nextZalo = {
+        ...current.zalo,
+        enabled: v.enabled,
+        deliveryMode: v.deliveryMode,
+        oaId: v.oaId,
+        appId: v.appId,
+        appSecret: nextAppSecret,
+        appSecretSet: Boolean(nextAppSecret),
+        accessToken: nextAccessToken,
+        accessTokenSet: Boolean(nextAccessToken),
+        refreshToken: nextRefreshToken,
+        refreshTokenSet: Boolean(nextRefreshToken),
+        webhookSecret: nextWebhookSecret,
+        webhookSecretSet: Boolean(nextWebhookSecret),
+        portalTemplateId: v.portalTemplateId,
+        invoiceTemplateId: v.invoiceTemplateId,
+        debtTemplateId: v.debtTemplateId,
+      };
+      return {
+        next: { ...current, zalo: nextZalo },
+        value: { currentZalo: current.zalo, nextZalo },
+      };
+    });
+    const { currentZalo, nextZalo } = persisted.value;
     await writeAuditLog({
       actorUserId: gate.userId,
       source: "manual",
@@ -252,17 +287,17 @@ export async function updateZaloSettings(input: ZaloSettingsInput): Promise<Acti
       entityId: "default",
       status: "succeeded",
       before: {
-        enabled: current.zalo.enabled,
-        deliveryMode: current.zalo.deliveryMode,
-        oaId: current.zalo.oaId,
-        appId: current.zalo.appId,
-        appSecretSet: Boolean(current.zalo.appSecret),
-        accessTokenSet: Boolean(current.zalo.accessToken),
-        refreshTokenSet: Boolean(current.zalo.refreshToken),
-        webhookSecretSet: Boolean(current.zalo.webhookSecret),
-        portalTemplateId: current.zalo.portalTemplateId,
-        invoiceTemplateId: current.zalo.invoiceTemplateId,
-        debtTemplateId: current.zalo.debtTemplateId,
+        enabled: currentZalo.enabled,
+        deliveryMode: currentZalo.deliveryMode,
+        oaId: currentZalo.oaId,
+        appId: currentZalo.appId,
+        appSecretSet: Boolean(currentZalo.appSecret),
+        accessTokenSet: Boolean(currentZalo.accessToken),
+        refreshTokenSet: Boolean(currentZalo.refreshToken),
+        webhookSecretSet: Boolean(currentZalo.webhookSecret),
+        portalTemplateId: currentZalo.portalTemplateId,
+        invoiceTemplateId: currentZalo.invoiceTemplateId,
+        debtTemplateId: currentZalo.debtTemplateId,
       },
       after: {
         enabled: nextZalo.enabled,
@@ -301,29 +336,32 @@ export async function updateShopeeSettings(input: ShopeeSettingsInput): Promise<
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
   try {
-    const [row] = await db.select({ prefs: storeSettings.prefs }).from(storeSettings).where(eq(storeSettings.id, "default")).limit(1);
-    const current = parseStorePrefs(row?.prefs);
-    const nextPartnerKey = v.clearPartnerKey ? "" : (v.partnerKey?.trim() || current.shopee.partnerKey);
-    const nextShopee = {
-      ...current.shopee,
-      enabled: v.enabled,
-      environment: v.environment,
-      region: v.region || "VN",
-      partnerId: v.partnerId,
-      partnerKey: nextPartnerKey,
-      partnerKeySet: Boolean(nextPartnerKey),
-      redirectPath: v.redirectPath || "/api/shopee/callback",
-      defaultShopId: v.defaultShopId,
-      defaultWarehouseId: v.defaultWarehouseId,
-      syncInventory: v.syncInventory,
-      syncOrders: v.syncOrders,
-      syncMessages: v.syncMessages,
-      autoCreateCustomer: v.autoCreateCustomer,
-    };
-    const next = { ...current, shopee: nextShopee };
-    await db.insert(storeSettings)
-      .values({ id: "default", prefs: next })
-      .onConflictDoUpdate({ target: storeSettings.id, set: { prefs: next, updatedAt: sql`now()` } });
+    const persisted = await persistStorePrefsMutation(db, (current) => {
+      const nextPartnerKey = v.clearPartnerKey
+        ? ""
+        : (v.partnerKey?.trim() || current.shopee.partnerKey);
+      const nextShopee = {
+        ...current.shopee,
+        enabled: v.enabled,
+        environment: v.environment,
+        region: v.region || "VN",
+        partnerId: v.partnerId,
+        partnerKey: nextPartnerKey,
+        partnerKeySet: Boolean(nextPartnerKey),
+        redirectPath: v.redirectPath || "/api/shopee/callback",
+        defaultShopId: v.defaultShopId,
+        defaultWarehouseId: v.defaultWarehouseId,
+        syncInventory: v.syncInventory,
+        syncOrders: v.syncOrders,
+        syncMessages: v.syncMessages,
+        autoCreateCustomer: v.autoCreateCustomer,
+      };
+      return {
+        next: { ...current, shopee: nextShopee },
+        value: { currentShopee: current.shopee, nextShopee },
+      };
+    });
+    const { currentShopee, nextShopee } = persisted.value;
     await writeAuditLog({
       actorUserId: gate.userId,
       source: "manual",
@@ -332,15 +370,15 @@ export async function updateShopeeSettings(input: ShopeeSettingsInput): Promise<
       entityId: "default",
       status: "succeeded",
       before: {
-        enabled: current.shopee.enabled,
-        environment: current.shopee.environment,
-        region: current.shopee.region,
-        partnerId: current.shopee.partnerId,
-        partnerKeySet: Boolean(current.shopee.partnerKey),
-        defaultShopId: current.shopee.defaultShopId,
-        syncInventory: current.shopee.syncInventory,
-        syncOrders: current.shopee.syncOrders,
-        syncMessages: current.shopee.syncMessages,
+        enabled: currentShopee.enabled,
+        environment: currentShopee.environment,
+        region: currentShopee.region,
+        partnerId: currentShopee.partnerId,
+        partnerKeySet: Boolean(currentShopee.partnerKey),
+        defaultShopId: currentShopee.defaultShopId,
+        syncInventory: currentShopee.syncInventory,
+        syncOrders: currentShopee.syncOrders,
+        syncMessages: currentShopee.syncMessages,
       },
       after: {
         enabled: nextShopee.enabled,

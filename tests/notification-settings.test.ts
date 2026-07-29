@@ -17,6 +17,32 @@ describe("notification settings contract", () => {
     });
   });
 
+  test("defaults internal event categories and role routing", () => {
+    const notifications = parseStorePrefs({}).notifications;
+    expect(notifications.serviceDue).toBe(true);
+    expect(notifications.roleRouting.serviceDue)
+      .toEqual(["owner", "manager", "technician"]);
+    expect({
+      invoiceCreated: notifications.invoiceCreated,
+      purchaseReceived: notifications.purchaseReceived,
+      debtChanged: notifications.debtChanged,
+      qrPaymentConfirmed: notifications.qrPaymentConfirmed,
+      qrPaymentException: notifications.qrPaymentException,
+    }).toEqual({
+      invoiceCreated: true,
+      purchaseReceived: true,
+      debtChanged: true,
+      qrPaymentConfirmed: true,
+      qrPaymentException: true,
+    });
+    expect(notifications.roleRouting.invoiceCreated).toEqual(["owner", "manager"]);
+    expect(notifications.roleRouting.purchaseReceived)
+      .toEqual(["owner", "manager", "warehouse"]);
+    expect(notifications.roleRouting.debtChanged).toEqual(["owner", "manager"]);
+    expect(notifications.roleRouting.qrPaymentConfirmed).toEqual(["owner", "manager"]);
+    expect(notifications.roleRouting.qrPaymentException).toEqual(["owner", "manager"]);
+  });
+
   test("upgrades legacy settings with server-owned delivery defaults", () => {
     const prefs = parseStorePrefs({
       notifications: {
@@ -39,6 +65,26 @@ describe("notification settings contract", () => {
     expect(prefs.notifications.thresholds.einvoiceFailureAttempts).toBe(1);
     expect(prefs.notifications.roleRouting.lowStock)
       .toEqual(["owner", "manager", "warehouse"]);
+    expect(prefs.notifications.serviceDue).toBe(true);
+    expect(prefs.notifications.roleRouting.serviceDue)
+      .toEqual(["owner", "manager", "technician"]);
+    expect({
+      invoiceCreated: prefs.notifications.invoiceCreated,
+      purchaseReceived: prefs.notifications.purchaseReceived,
+      debtChanged: prefs.notifications.debtChanged,
+      qrPaymentConfirmed: prefs.notifications.qrPaymentConfirmed,
+      qrPaymentException: prefs.notifications.qrPaymentException,
+    }).toEqual({
+      invoiceCreated: true,
+      purchaseReceived: true,
+      debtChanged: true,
+      qrPaymentConfirmed: true,
+      qrPaymentException: true,
+    });
+    expect(prefs.notifications.roleRouting.purchaseReceived)
+      .toEqual(["owner", "manager", "warehouse"]);
+    expect(prefs.notifications.roleRouting.qrPaymentException)
+      .toEqual(["owner", "manager"]);
   });
 
   test("rejects malformed quiet hours, thresholds, and empty role routes", () => {

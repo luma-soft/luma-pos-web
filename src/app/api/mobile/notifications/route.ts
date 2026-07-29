@@ -1,16 +1,32 @@
 import { getProfileId } from "@/lib/actions/common";
 import { db } from "@/db";
 import { einvoices, mobileNotificationStates, orders } from "@/db/schema";
+import type { Role } from "@/lib/auth/roles";
 import { getRestockSuggestions } from "@/lib/data/ai-restock";
 import { getCurrentShift } from "@/lib/data/shifts";
 import { getStoreSettings } from "@/lib/data/settings";
 import { requireMobileUser } from "@/lib/mobile/auth";
 import { mobileGate, mobileOk } from "@/lib/mobile/response";
+import {
+  countPersistedMobileEvents,
+  listPersistedMobileEvents,
+} from "@/lib/notifications/mobile-events";
 import { mobileNotificationSettingsForRole } from "@/lib/settings/mobile-settings-access";
 import { listWarrantyNotificationsForRecipientCore } from "@/lib/services/technician-warranty";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
-export async function GET() {
+const LEGACY_FALLBACK_CREATED_AT = new Date(0).toISOString();
+
+function requestedLocale(request: Request) {
+  const queryLocale = new URL(request.url).searchParams.get("locale");
+  if (queryLocale?.toLowerCase().startsWith("en")) return "en";
+  if (queryLocale?.toLowerCase().startsWith("vi")) return "vi";
+  return request.headers.get("accept-language")?.toLowerCase().startsWith("en")
+    ? "en"
+    : "vi";
+}
+
+export async function GET(request: Request) {
   const gate = await requireMobileUser();
   if (!gate.ok) return mobileGate(gate)!;
 
@@ -24,6 +40,7 @@ export async function GET() {
       id: einvoices.id,
       orderCode: orders.code,
       attemptCount: einvoices.attemptCount,
+      createdAt: einvoices.createdAt,
     })
       .from(einvoices)
       .innerJoin(orders, eq(orders.id, einvoices.orderId))
@@ -32,9 +49,14 @@ export async function GET() {
       .limit(10),
     listWarrantyNotificationsForRecipientCore(db, stateUserId),
   ]);
+  const effectiveProfileId = profileId ?? gate.userId;
+  const [persistedRows, persistedCounts] = await Promise.all([
+    listPersistedMobileEvents(effectiveProfileId, requestedLocale(request)),
+    countPersistedMobileEvents(effectiveProfileId),
+  ]);
   const prefs = store.prefs.notifications;
   const routed = (category: keyof typeof prefs.roleRouting) =>
-    prefs.roleRouting[category].includes(gate.role);
+    (prefs.roleRouting[category] as readonly Role[]).includes(gate.role);
   const restockRows = prefs.lowStock && routed("lowStock")
     ? restock.filter((row) =>
         row.priority === "high"
@@ -52,6 +74,7 @@ export async function GET() {
       body: `${row.projectName}${row.assetName ? ` · ${row.assetName}` : ""}`,
       unread: true,
       priority: row.priority,
+      createdAt: row.createdAt.toISOString(),
       action: {
         type: "open",
         target: "services",
@@ -65,6 +88,7 @@ export async function GET() {
       body: `Tồn ${row.stock} ${row.baseUnit}, bán TB ${row.velocity.toFixed(1)}/ngày`,
       unread: true,
       priority: row.priority,
+      createdAt: LEGACY_FALLBACK_CREATED_AT,
       action: { type: "open", target: "aiRestocking", id: row.id },
     })),
     ...(prefs.einvoiceError && routed("einvoiceError")
@@ -75,6 +99,7 @@ export async function GET() {
           body: "Mở hóa đơn để kiểm tra trạng thái và thử lại.",
           unread: true,
           priority: "high" as const,
+          createdAt: row.createdAt.toISOString(),
           action: { type: "open", target: "invoices", id: row.id },
         }))
       : []),
@@ -87,6 +112,7 @@ export async function GET() {
         : "Mở ca trước khi bán hàng để chốt quỹ chính xác.",
       unread: !shift,
       priority: shift ? "low" : "medium",
+      createdAt: shift?.openedAt.toISOString() ?? LEGACY_FALLBACK_CREATED_AT,
       action: { type: "open", target: "shift" },
     }] : []),
   ];
@@ -107,23 +133,41 @@ export async function GET() {
         )
     : [];
   const stateById = new Map(states.map((state) => [state.notificationId, state]));
-  const visibleRows = rows
+  const visibleLegacyRows = rows
     .filter((row) => stateById.get(row.id)?.dismissed !== true)
     .map((row) => ({
       ...row,
       unread: row.unread && stateById.get(row.id)?.read !== true,
     }));
+  const visibleRows = [...persistedRows, ...visibleLegacyRows].sort(
+    (left, right) =>
+      Date.parse(right.createdAt) - Date.parse(left.createdAt)
+      || left.id.localeCompare(right.id),
+  );
   const visibleSettings = mobileNotificationSettingsForRole(prefs, gate.role);
+  const countLegacyCategory = (category: string) =>
+    visibleLegacyRows.filter((row) => row.category === category).length;
 
   return mobileOk({
     rows: visibleRows,
     counts: {
-      all: visibleRows.length,
-      unread: visibleRows.filter((row) => row.unread).length,
-      lowStock: restockRows.length,
-      einvoiceError: routedEinvoices.length,
-      shiftClose: prefs.shiftClose && routed("shiftClose") ? 1 : 0,
-      warranty: warrantyNotifications.length,
+      all: persistedCounts.all + visibleLegacyRows.length,
+      unread: persistedCounts.unread
+        + visibleLegacyRows.filter((row) => row.unread).length,
+      lowStock: countLegacyCategory("lowStock"),
+      einvoiceError: countLegacyCategory("einvoiceError"),
+      shiftClose: countLegacyCategory("shiftClose"),
+      warranty: countLegacyCategory("serviceDue"),
+      invoiceCreated: persistedCounts.invoiceCreated
+        + countLegacyCategory("invoiceCreated"),
+      purchaseReceived: persistedCounts.purchaseReceived
+        + countLegacyCategory("purchaseReceived"),
+      debtChanged: persistedCounts.debtChanged
+        + countLegacyCategory("debtChanged"),
+      qrPaymentConfirmed: persistedCounts.qrPaymentConfirmed
+        + countLegacyCategory("qrPaymentConfirmed"),
+      qrPaymentException: persistedCounts.qrPaymentException
+        + countLegacyCategory("qrPaymentException"),
     },
     ...(visibleSettings ? { settings: visibleSettings } : {}),
   });

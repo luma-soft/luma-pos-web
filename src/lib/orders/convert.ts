@@ -2,6 +2,8 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { orders, orderItems, customers, stockLevels, stockMovements } from "@/db/schema";
 import { type ActionResult, getProfileId, generateCode, toQty } from "@/lib/actions/common";
+import { createNotificationEventInTx } from "@/lib/notifications/events-core";
+import { publishCommittedNotification } from "@/lib/notifications/outbox";
 
 /**
  * Lõi chốt báo giá/đặt hàng → đơn bán — KHÔNG phải server action (nhận userId đã xác thực).
@@ -60,10 +62,30 @@ export async function convertQuoteToOrderForUser(
         }).where(eq(customers.id, order.customerId));
       }
 
-      return { code: newCode };
+      const remaining = Math.max(0, Number(order.total) - Number(order.amountPaid));
+      const notification = await createNotificationEventInTx(tx, {
+        eventKey: `invoice-created:${order.id}`,
+        category: "invoiceCreated",
+        entityType: "order",
+        entityId: order.id,
+        actorId: profileId,
+        target: "invoices",
+        priority: "normal",
+        quietHoursPolicy: "defer",
+        excludeActor: true,
+        metadata: {
+          debtDelta: remaining.toFixed(2),
+          source: order.status === "quote" ? "quote_conversion" : "booking_conversion",
+        },
+      });
+
+      return { code: newCode, notification };
     });
 
-    return { ok: true, data: result };
+    if (result.notification?.created) {
+      await publishCommittedNotification(result.notification.eventId);
+    }
+    return { ok: true, data: { code: result.code } };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
     if (msg === "NOT_CONVERTIBLE") return { ok: false, error: "orders.errors.notConvertible" };

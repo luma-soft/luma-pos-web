@@ -32,6 +32,20 @@ describe("mobile settings shell", () => {
     expect(html).toContain('aria-label="Thông báo"');
     expect(html).toMatch(/class="[^"]*h-11[^"]*w-11[^"]*lg:h-\[21px\][^"]*lg:w-\[38px\]/);
   });
+
+  test("notification role controls are generated from the authoritative target policy", () => {
+    expect(settingsSource).toContain(
+      'from "@/lib/notifications/routing-policy"',
+    );
+    expect(settingsSource).toContain(
+      "configurableRolesForNotificationCategory",
+    );
+    expect(settingsSource).toContain("notificationRoutingPolicy");
+    expect(settingsSource).toContain("notifications.route.");
+    expect(settingsSource).not.toMatch(
+      /notificationRoleRoutes\s*=\s*\[[\s\S]*?allowedRoles:/,
+    );
+  });
 });
 
 describe("mobile settings template editors", () => {

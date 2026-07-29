@@ -199,6 +199,11 @@ qr-payment-confirmed:<payment-id>
 qr-payment-exception:<webhook-event-id>:<reason>
 ```
 
+For `purchase_edit`, the operation ID is
+`<purchase-id>:<committed-mutation-timestamp>`, where the timestamp is returned
+by the authoritative purchase update. This prevents one legitimate later edit
+from colliding with an earlier edit, while rounded-zero replays remain silent.
+
 Webhook replay, mobile retry, server-action retry, queue redelivery, and recovery publication must converge on the existing event and delivery rows.
 
 ## Transaction and queue flow

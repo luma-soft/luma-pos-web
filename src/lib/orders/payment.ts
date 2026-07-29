@@ -5,6 +5,7 @@ import { type ActionResult, getProfileId, UnauthorizedError } from "@/lib/action
 import { Routes } from "@/lib/routes";
 import { getCurrentShift } from "@/lib/data/shifts";
 import { addManualPaymentCore } from "@/lib/orders/payment-core";
+import { publishCommittedNotification } from "@/lib/notifications/outbox";
 
 /**
  * Lõi THU NỢ / thu tiền theo đơn — KHÔNG phải server action (nhận userId đã xác thực).
@@ -24,6 +25,9 @@ export async function addPaymentForUser(userId: string, input: AddPaymentInput):
       shiftId: currentShift?.id ?? null,
     });
     if (!result.ok) return result;
+    if (result.data.notificationEventId) {
+      await publishCommittedNotification(result.data.notificationEventId);
+    }
 
     revalidatePath(Routes.Orders);
     revalidatePath(Routes.order(v.orderId));

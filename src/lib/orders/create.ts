@@ -14,6 +14,8 @@ import { normalizeOrderItems } from "@/lib/orders/normalize";
 import { getCurrentShift } from "@/lib/data/shifts";
 import { calculateProductTax } from "@/lib/orders/product-tax";
 import { consumeTrackedStockLots, restoreTrackedStockLots } from "@/lib/inventory/stock-lot-service";
+import { createNotificationEventInTx } from "@/lib/notifications/events-core";
+import { publishCommittedNotification } from "@/lib/notifications/outbox";
 
 function revalidateOrderPaths(sourceOrderId?: string) {
   try {
@@ -282,7 +284,9 @@ export async function createOrderForUser(
       }
 
       // Báo giá / đặt hàng: không trừ kho, không ghi công nợ doanh thu.
-      if (isQuote || isBooking || paymentPending) return order;
+      if (isQuote || isBooking || paymentPending) {
+        return { order, notification: null };
+      }
 
       // Trừ kho theo base unit + ghi movement
       for (const i of trustedItems) {
@@ -331,11 +335,32 @@ export async function createOrderForUser(
         }).where(eq(customers.id, v.customerId));
       }
 
-      return order;
+      const notification = v.source?.mode === "edit"
+        ? null
+        : await createNotificationEventInTx(tx, {
+            eventKey: `invoice-created:${order.id}`,
+            category: "invoiceCreated",
+            entityType: "order",
+            entityId: order.id,
+            actorId: profileId,
+            target: "invoices",
+            priority: "normal",
+            quietHoursPolicy: "defer",
+            excludeActor: true,
+            metadata: {
+              debtDelta: remaining.toFixed(2),
+              source: v.source?.mode ?? "sale",
+            },
+          });
+
+      return { order, notification };
     });
 
+    if (result.notification?.created) {
+      await publishCommittedNotification(result.notification.eventId);
+    }
     revalidateOrderPaths(v.source?.orderId);
-    return { ok: true, data: result };
+    return { ok: true, data: result.order };
   } catch (e) {
     // Trùng clientId (đua khi đồng bộ song song) → đơn đã tồn tại, trả về đơn cũ.
     if (v.clientId && isUniqueViolation(e)) {
