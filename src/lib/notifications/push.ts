@@ -8,12 +8,22 @@ import {
   profiles,
 } from "@/db/schema";
 import type { Role } from "@/lib/actions/common";
-import type { StorePrefs } from "@/lib/schemas/settings";
-import { isWithinQuietHours } from "@/lib/notifications/policy";
+import {
+  notificationCategories,
+  type NotificationCategory,
+  type NotificationTarget,
+} from "@/lib/notifications/contracts";
+import {
+  buildFcmMessage,
+  classifyFcmFailure,
+  type FcmFailure,
+} from "@/lib/notifications/fcm-message";
 import {
   resolveFirebaseServiceAccount,
   type FirebaseServiceAccount,
 } from "@/lib/notifications/firebase-config";
+import { isWithinQuietHours } from "@/lib/notifications/policy";
+import type { StorePrefs } from "@/lib/schemas/settings";
 
 let cachedAccessToken: { value: string; expiresAt: number } | null = null;
 
@@ -46,6 +56,7 @@ async function firebaseAccessToken(account: FirebaseServiceAccount) {
       grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
       assertion,
     }),
+    signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) throw new Error(`FCM_AUTH_${response.status}`);
   const body = await response.json() as { access_token?: string; expires_in?: number };
@@ -58,6 +69,125 @@ async function firebaseAccessToken(account: FirebaseServiceAccount) {
 }
 
 export type PushCategory = "lowStock" | "einvoiceError" | "shiftClose" | "syncDone";
+
+type LegacyDeviceNotificationInput = {
+  token: string;
+  locale?: string | null;
+  notificationKey: string;
+  category: PushCategory;
+  target: string;
+  entityId?: string;
+};
+
+type EventDeviceNotificationInput = {
+  token: string;
+  locale?: string | null;
+  eventId: string;
+  notificationKey: string;
+  category: NotificationCategory;
+  target: NotificationTarget;
+  entityId: string;
+};
+
+export type DeviceNotificationInput =
+  | LegacyDeviceNotificationInput
+  | EventDeviceNotificationInput;
+
+export type DeviceNotificationResult = { kind: "sent" } | FcmFailure;
+
+function isEventInput(
+  input: DeviceNotificationInput,
+): input is EventDeviceNotificationInput {
+  return "eventId" in input
+    && (notificationCategories as readonly string[]).includes(input.category);
+}
+
+function legacyFcmMessage(input: LegacyDeviceNotificationInput) {
+  return {
+    message: {
+      token: input.token,
+      notification: {
+        title: "LumaPOS",
+        body: input.locale?.toLowerCase().startsWith("en")
+          ? "You have a new operational alert."
+          : "Bạn có cảnh báo vận hành mới.",
+      },
+      data: {
+        kind: "operational_alert",
+        category: input.category,
+        target: input.target,
+        notificationKey: input.notificationKey,
+        ...(input.entityId ? { entityId: input.entityId } : {}),
+      },
+      android: { priority: "high" },
+      apns: {
+        headers: { "apns-priority": "5" },
+        payload: { aps: { "content-available": 1 } },
+      },
+    },
+  } as const;
+}
+
+function retryAfterMilliseconds(value: string | null, now = Date.now()) {
+  if (!value) return undefined;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.ceil(seconds * 1000);
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return undefined;
+  return Math.max(0, timestamp - now);
+}
+
+async function safeResponseBody(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    return undefined;
+  }
+}
+
+export async function sendNotificationToDevice(
+  input: DeviceNotificationInput,
+): Promise<DeviceNotificationResult> {
+  const account = resolveFirebaseServiceAccount();
+  if (!account) return { kind: "permanent", code: "FCM_NOT_CONFIGURED" };
+
+  try {
+    const accessToken = await firebaseAccessToken(account);
+    const response = await fetch(
+      `https://fcm.googleapis.com/v1/projects/${account.project_id}/messages:send`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(
+          isEventInput(input) ? buildFcmMessage(input) : legacyFcmMessage(input),
+        ),
+        signal: AbortSignal.timeout(15_000),
+      },
+    );
+    if (response.ok) return { kind: "sent" };
+
+    const failure = classifyFcmFailure(
+      response.status,
+      await safeResponseBody(response),
+    );
+    if (failure.kind !== "retry") return failure;
+    return {
+      ...failure,
+      retryAfterMs: retryAfterMilliseconds(response.headers.get("retry-after")),
+    };
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("FCM_AUTH_")) {
+      return {
+        kind: "permanent",
+        code: error.message.slice(0, 80),
+      };
+    }
+    return { kind: "retry", code: "FCM_NETWORK" };
+  }
+}
 
 export async function dispatchPushNotification(input: {
   notificationKey: string;
@@ -95,7 +225,6 @@ export async function dispatchPushNotification(input: {
     return { configured: true, sent: 0, failed: 0, skipped: 0 };
   }
 
-  const accessToken = await firebaseAccessToken(account);
   let sent = 0;
   let failed = 0;
   let skipped = 0;
@@ -107,62 +236,29 @@ export async function dispatchPushNotification(input: {
         eq(mobilePushDeliveries.notificationKey, input.notificationKey),
       )).limit(1);
     if (previous?.status === "sent") {
-      skipped++;
+      skipped += 1;
       continue;
     }
 
-    let status = "failed";
-    let errorCode: string | null = null;
-    try {
-      const response = await fetch(
-        `https://fcm.googleapis.com/v1/projects/${account.project_id}/messages:send`,
-        {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${accessToken}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            message: {
-              token: device.token,
-              notification: {
-                title: "LumaPOS",
-                body: device.locale?.toLowerCase().startsWith("en")
-                  ? "You have a new operational alert."
-                  : "Bạn có cảnh báo vận hành mới.",
-              },
-              data: {
-                kind: "operational_alert",
-                category: input.category,
-                target: input.target,
-                notificationKey: input.notificationKey,
-                ...(input.entityId ? { entityId: input.entityId } : {}),
-              },
-              android: { priority: "high" },
-              apns: {
-                headers: { "apns-priority": "5" },
-                payload: { aps: { "content-available": 1 } },
-              },
-            },
-          }),
-        },
-      );
-      if (response.ok) {
-        status = "sent";
-        sent++;
-      } else {
-        errorCode = `FCM_${response.status}`;
-        failed++;
-        if (response.status === 404) {
-          await db.update(mobilePushDevices).set({ enabled: false, updatedAt: sql`now()` })
-            .where(eq(mobilePushDevices.id, device.id));
-        }
+    const result = await sendNotificationToDevice({
+      token: device.token,
+      locale: device.locale,
+      notificationKey: input.notificationKey,
+      category: input.category,
+      target: input.target,
+      entityId: input.entityId,
+    });
+    const status = result.kind === "sent" ? "sent" : "failed";
+    const errorCode = result.kind === "sent" ? null : result.code;
+    if (result.kind === "sent") {
+      sent += 1;
+    } else {
+      failed += 1;
+      if (result.kind === "disable-token") {
+        await db.update(mobilePushDevices)
+          .set({ enabled: false, updatedAt: sql`now()` })
+          .where(eq(mobilePushDevices.id, device.id));
       }
-    } catch (error) {
-      errorCode = error instanceof Error && error.message.startsWith("FCM_")
-        ? error.message.slice(0, 80)
-        : "FCM_NETWORK";
-      failed++;
     }
     await db.insert(mobilePushDeliveries).values({
       deviceId: device.id,
