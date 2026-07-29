@@ -530,6 +530,12 @@ describe("final mobile table surfaces", () => {
     expect(select).toBeDefined();
     if (!select) return;
     expect(select.props.onClick).toBeUndefined();
+    expect(
+      (multi as React.ReactElement<{ className: string }>).props.className
+        .split(/\s+/),
+    ).toContain("w-full");
+    expect(String(select.props.rootClassName).split(/\s+/)).toContain("w-full");
+    expect(select.props.wrapLabel).toBe(true);
 
     const clickEvent = { type: "click" };
     const pointerEvent = { type: "pointerdown" };
