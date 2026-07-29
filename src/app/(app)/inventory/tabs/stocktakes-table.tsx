@@ -1,11 +1,12 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { cn, formatDate, formatNumber } from "@/lib/utils";
 import { StocktakeRowActions } from "../../stocktakes/stocktake-actions";
 
-type StocktakeRow = {
+export type StocktakeRow = {
   id: string;
   code: string;
   status: string;
@@ -23,6 +24,42 @@ const STATUS_STYLES: Record<string, string> = {
   balanced: "bg-ok-soft text-ok",
   cancelled: "bg-surface-2 text-slate-500",
 };
+
+export function StocktakeMobileRow({
+  row,
+  renderActions,
+}: {
+  row: StocktakeRow;
+  renderActions: (row: StocktakeRow) => ReactNode;
+}) {
+  const t = useTranslations();
+  return (
+    <article className={cn("min-w-0 p-4", row.status === "cancelled" && "opacity-60")}>
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="break-words text-sm font-semibold text-primary-600">{row.code}</h3>
+          <p className="mt-1 break-words text-xs text-slate-500">
+            {formatDate(row.createdAt)} · {row.warehouseName}
+          </p>
+        </div>
+        <Status row={row} />
+      </div>
+      <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-4">
+        <Info label={t("stocktakes.cols.items")} value={String(row.itemCount)} />
+        <Info label={t("stocktakes.cols.totalDiff")} value={diffText(Number(row.totalDiff))} tone={diffTone(Number(row.totalDiff))} />
+        <Info label={t("stocktakes.cols.balancedAt")} value={row.balancedAt ? formatDate(row.balancedAt) : "—"} />
+        <Info label={t("internalUse.cols.by")} value={row.byName ?? "—"} />
+      </dl>
+      <div className="mt-4 grid gap-3">
+        <Info label={t("purchases.cols.warehouse")} value={row.warehouseName} />
+        <Info label={t("customers.fields.note")} value={row.note ?? "—"} />
+      </div>
+      <div className="mt-4 flex min-h-11 flex-wrap items-center justify-end gap-2 border-t border-border-soft pt-3">
+        {renderActions(row)}
+      </div>
+    </article>
+  );
+}
 
 export function StocktakesTable({ rows }: { rows: StocktakeRow[] }) {
   const t = useTranslations();
@@ -44,6 +81,14 @@ export function StocktakesTable({ rows }: { rows: StocktakeRow[] }) {
       getRowId={(row) => row.id}
       minWidth="1080px"
       rowClassName={(row) => cn(row.status === "cancelled" && "opacity-60")}
+      renderMobileRow={({ row }) => (
+        <StocktakeMobileRow
+          row={row}
+          renderActions={(actionRow) => (
+            <StocktakeRowActions id={actionRow.id} status={actionRow.status} />
+          )}
+        />
+      )}
       renderDetail={(row) => (
         <div className="grid gap-4 bg-surface px-4 py-4 md:grid-cols-4">
           <Info label={t("stocktakes.cols.code")} value={row.code} />

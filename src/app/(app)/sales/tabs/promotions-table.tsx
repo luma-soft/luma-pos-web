@@ -1,12 +1,13 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { cn, formatDate, formatNumber } from "@/lib/utils";
 import { isPromoActive } from "@/lib/promo";
 import { PromoToggle } from "../../promotions/promo-widgets";
 
-type PromotionRow = {
+export type PromotionRow = {
   id: string;
   name: string;
   tiers: { minQty: number; discountPct: number }[] | null;
@@ -16,6 +17,42 @@ type PromotionRow = {
   productName: string;
   baseUnit: string;
 };
+
+export function PromotionMobileRow({
+  row,
+  renderActions,
+}: {
+  row: PromotionRow;
+  renderActions: (row: PromotionRow) => ReactNode;
+}) {
+  const t = useTranslations();
+  return (
+    <article className={cn("min-w-0 p-4", !isPromoActive(row) && "opacity-60")}>
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="break-words text-sm font-semibold">{row.name}</h3>
+          <p className="mt-1 break-words text-xs text-slate-500">
+            {row.productName} · {row.baseUnit}
+          </p>
+        </div>
+        <Status row={row} />
+      </div>
+      <dl className="mt-4 grid gap-4">
+        <Info
+          label={t("promos.cols.period")}
+          value={`${row.startsAt ? formatDate(row.startsAt) : "—"} → ${row.endsAt ? formatDate(row.endsAt) : t("promos.noEnd")}`}
+        />
+      </dl>
+      <div className="mt-4">
+        <div className="mb-2 text-xs font-semibold text-slate-500">{t("promos.cols.tiers")}</div>
+        <TierList row={row} />
+      </div>
+      <div className="mt-4 flex min-h-11 flex-wrap items-center justify-end gap-2 border-t border-border-soft pt-3">
+        {renderActions(row)}
+      </div>
+    </article>
+  );
+}
 
 export function PromotionsTable({ rows }: { rows: PromotionRow[] }) {
   const t = useTranslations();
@@ -49,6 +86,14 @@ export function PromotionsTable({ rows }: { rows: PromotionRow[] }) {
       getRowId={(row) => row.id}
       minWidth="980px"
       rowClassName={(row) => cn(!isPromoActive(row) && "opacity-60")}
+      renderMobileRow={({ row }) => (
+        <PromotionMobileRow
+          row={row}
+          renderActions={(actionRow) => (
+            <PromoToggle id={actionRow.id} isActive={actionRow.isActive} />
+          )}
+        />
+      )}
       renderDetail={(row) => (
         <div className="space-y-4 bg-surface px-4 py-4">
           <div className="grid gap-4 md:grid-cols-3">

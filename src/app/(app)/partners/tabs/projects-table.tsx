@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
@@ -7,6 +8,51 @@ import { Routes } from "@/lib/routes";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { ProjectRow } from "@/lib/data/projects";
 import { ProjectEdit, ProjectToggle } from "../../projects/project-widgets";
+
+export function ProjectMobileRow({
+  row,
+  renderActions,
+}: {
+  row: ProjectRow;
+  renderActions: (row: ProjectRow) => ReactNode;
+}) {
+  const t = useTranslations();
+  const remaining = Number(row.remaining);
+  return (
+    <article className={cn("min-w-0 p-4", row.status === "done" && "opacity-60")}>
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="break-words text-sm font-semibold text-primary-600">{row.name}</h3>
+          <p className="mt-1 break-words text-xs text-slate-500">{row.customerName ?? "—"}</p>
+        </div>
+        <Status row={row} />
+      </div>
+      <dl className="mt-4 grid grid-cols-2 gap-x-3 gap-y-4">
+        <Info label={t("projects.cols.orders")} value={String(row.orderCount)} />
+        <Info label={t("projects.cols.value")} value={formatCurrency(Number(row.totalValue))} />
+        <Info
+          label={t("orders.cols.remaining")}
+          value={remaining > 0 ? formatCurrency(remaining) : "—"}
+          tone={remaining > 0 ? "danger" : undefined}
+        />
+        <Info label={t("orders.cols.status")} value={t(`projects.status.${row.status}` as never)} />
+      </dl>
+      <div className="mt-4 grid gap-3">
+        <Info label={t("customers.fields.address")} value={row.address ?? "—"} />
+        <Info label={t("customers.fields.note")} value={row.note ?? "—"} />
+      </div>
+      <div className="mt-4 flex min-h-11 flex-wrap items-center justify-end gap-2 border-t border-border-soft pt-3">
+        <Link
+          href={Routes.project(row.id)}
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-border px-3 text-sm font-semibold text-primary-600 hover:bg-surface-2"
+        >
+          {t("projects.viewDetail")}
+        </Link>
+        {renderActions(row)}
+      </div>
+    </article>
+  );
+}
 
 export function ProjectsTable({ rows, customers }: { rows: ProjectRow[]; customers: { id: string; name: string }[] }) {
   const t = useTranslations();
@@ -48,6 +94,17 @@ export function ProjectsTable({ rows, customers }: { rows: ProjectRow[]; custome
       getRowId={(row) => row.id}
       minWidth="980px"
       rowClassName={(row) => cn(row.status === "done" && "opacity-60")}
+      renderMobileRow={({ row }) => (
+        <ProjectMobileRow
+          row={row}
+          renderActions={(actionRow) => (
+            <>
+              <ProjectEdit project={actionRow} customers={customers} />
+              <ProjectToggle id={actionRow.id} status={actionRow.status} />
+            </>
+          )}
+        />
+      )}
       renderDetail={(row) => (
         <div className="space-y-4 bg-surface px-4 py-4">
           <div className="grid gap-4 md:grid-cols-4">
