@@ -634,6 +634,8 @@ export const orderItems = pgTable("order_items", {
   productName: text("product_name").notNull(), // snapshot
   unitName: varchar("unit_name", { length: 30 }).notNull(), // unit dùng khi bán
   unitMultiplier: decimal("unit_multiplier", { precision: 14, scale: 4 }).notNull(), // snapshot
+  // Nguồn bảng giá của dòng; null = Giá Chung, null field ở bản ghi cũ = không lưu nguồn.
+  priceBookId: uuid("price_book_id").references(() => priceBooks.id, { onDelete: "set null" }),
 
   quantity: decimal("quantity", { precision: 14, scale: 4 }).notNull(),
   unitPrice: decimal("unit_price", { precision: 14, scale: 2 }).notNull(),

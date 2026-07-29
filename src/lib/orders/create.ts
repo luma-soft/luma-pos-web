@@ -44,14 +44,16 @@ export async function createOrderForUser(
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
 
-  if (v.priceBookId) {
-    const [priceBook] = await db
-      .select({ managerOnly: priceBooks.managerOnly })
+  const requestedPriceBookIds = [...new Set(v.items
+    .map((item) => item.priceBookId === undefined ? v.priceBookId : item.priceBookId)
+    .filter((id): id is string => Boolean(id)))];
+  if (requestedPriceBookIds.length > 0) {
+    const selectedPriceBooks = await db
+      .select({ id: priceBooks.id, managerOnly: priceBooks.managerOnly })
       .from(priceBooks)
-      .where(eq(priceBooks.id, v.priceBookId))
-      .limit(1);
-    if (!priceBook) return { ok: false, error: "errors.invalidData" };
-    if (priceBook.managerOnly) {
+      .where(inArray(priceBooks.id, requestedPriceBookIds));
+    if (selectedPriceBooks.length !== requestedPriceBookIds.length) return { ok: false, error: "errors.invalidData" };
+    if (selectedPriceBooks.some((priceBook) => priceBook.managerOnly)) {
       const role = await getRole(userId);
       if (role !== "owner" && role !== "manager") return { ok: false, error: "errors.forbidden" };
     }
@@ -261,6 +263,7 @@ export async function createOrderForUser(
           productName: i.productName,
           unitName: i.unitName,
           unitMultiplier: toQty(i.unitMultiplier),
+          priceBookId: i.priceBookId,
           quantity: toQty(i.quantity),
           unitPrice: toMoney(i.unitPrice),
           total: toMoney(i.quantity * i.unitPrice),

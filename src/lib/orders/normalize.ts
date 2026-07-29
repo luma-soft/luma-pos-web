@@ -11,6 +11,7 @@ export type NormalizedOrderItem = {
   productName: string;
   unitName: string;
   unitMultiplier: number;
+  priceBookId: string | null;
   quantity: number;
   preDiscountUnitPrice: number;
   lineDiscount: number;
@@ -49,10 +50,13 @@ function listedUnitPrice(
  */
 export async function normalizeOrderItems(
   rawItems: RawOrderItem[],
-  priceBookId?: string | null
+  invoicePriceBookId?: string | null,
 ): Promise<NormalizedOrderItem[]> {
   const productIds = [...new Set(rawItems.map((i) => i.productId))];
   if (productIds.length === 0) throw new Error("INVALID_ITEMS");
+  const requestedPriceBookIds = [...new Set(rawItems
+    .map((item) => item.priceBookId === undefined ? invoicePriceBookId : item.priceBookId)
+    .filter((id): id is string => Boolean(id)))];
 
   const [productRows, unitRows, priceRows, priceBookRows, promoRows, comboRows] = await Promise.all([
     db
@@ -76,18 +80,17 @@ export async function normalizeOrderItems(
       })
       .from(productUnits)
       .where(inArray(productUnits.productId, productIds)),
-    priceBookId
+    requestedPriceBookIds.length > 0
       ? db
-          .select({ productId: productPrices.productId, price: productPrices.price })
+          .select({ priceBookId: productPrices.priceBookId, productId: productPrices.productId, price: productPrices.price })
           .from(productPrices)
-          .where(and(eq(productPrices.priceBookId, priceBookId), inArray(productPrices.productId, productIds)))
+          .where(and(inArray(productPrices.priceBookId, requestedPriceBookIds), inArray(productPrices.productId, productIds)))
       : Promise.resolve([]),
-    priceBookId
+    requestedPriceBookIds.length > 0
       ? db
-          .select({ costBased: priceBooks.costBased })
+          .select({ id: priceBooks.id, costBased: priceBooks.costBased })
           .from(priceBooks)
-          .where(eq(priceBooks.id, priceBookId))
-          .limit(1)
+          .where(inArray(priceBooks.id, requestedPriceBookIds))
       : Promise.resolve([]),
     db
       .select({
@@ -112,7 +115,8 @@ export async function normalizeOrderItems(
   ]);
 
   const productById = new Map(productRows.map((p) => [p.id, p]));
-  const priceByProduct = new Map(priceRows.map((p) => [p.productId, p.price]));
+  const priceByBookProduct = new Map(priceRows.map((p) => [`${p.priceBookId}:${p.productId}`, p.price]));
+  const priceBookById = new Map(priceBookRows.map((book) => [book.id, book]));
   const unitsByProduct = new Map<string, typeof unitRows>();
   for (const unit of unitRows) {
     const list = unitsByProduct.get(unit.productId) ?? [];
@@ -142,10 +146,15 @@ export async function normalizeOrderItems(
     if (unit === undefined) throw new Error("UNIT_NOT_FOUND");
 
     const multiplier = unit ? Number(unit.multiplier) : 1;
+    const itemPriceBookId = item.priceBookId === undefined ? invoicePriceBookId ?? null : item.priceBookId;
+    const itemPriceBook = itemPriceBookId ? priceBookById.get(itemPriceBookId) : undefined;
+    if (itemPriceBookId && !itemPriceBook) throw new Error("PRICE_BOOK_NOT_FOUND");
     const listedPrice = listedUnitPrice(
       product,
       unit,
-      priceBookRows[0]?.costBased ? product.costPrice : priceByProduct.get(product.id),
+      itemPriceBook?.costBased ? product.costPrice : itemPriceBookId
+        ? priceByBookProduct.get(`${itemPriceBookId}:${product.id}`)
+        : undefined,
     );
     const manualUnitPrice = item.manualUnitPrice;
     const lineDiscount = Math.max(0, item.lineDiscount ?? 0);
@@ -161,6 +170,7 @@ export async function normalizeOrderItems(
       productName: product.name,
       unitName: unit?.unitName ?? product.baseUnit,
       unitMultiplier: multiplier,
+      priceBookId: itemPriceBookId,
       quantity: item.quantity,
       preDiscountUnitPrice,
       lineDiscount,

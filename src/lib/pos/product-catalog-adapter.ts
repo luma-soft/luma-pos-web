@@ -8,6 +8,7 @@ export function catalogItemToPosProduct(
   product: ProductCatalogItem,
   catalog: readonly ProductCatalogItem[],
   warehouseId: string | null,
+  costPriceBookIds: readonly string[] = [],
 ): PosProduct {
   const children = product.isVariantParent
     ? catalog.filter((candidate) => candidate.parentProductId === product.id)
@@ -23,7 +24,7 @@ export function catalogItemToPosProduct(
       : 0;
 
   const mapChild = (child: ProductCatalogItem): PosProduct => ({
-    ...catalogItemToPosProduct(child, [], warehouseId),
+    ...catalogItemToPosProduct(child, [], warehouseId, costPriceBookIds),
     children: [],
   });
 
@@ -39,6 +40,8 @@ export function catalogItemToPosProduct(
     variantName: product.variantName,
     isVariantParent: product.isVariantParent,
     baseUnit: product.baseUnit,
+    // POS chỉ dùng giá vốn khi bảng giá nội bộ đã được server cho phép.
+    costPrice: product.costPrice ?? "0",
     retailPrice: product.retailPrice,
     wholesalePrice: product.wholesalePrice,
     contractorPrice: product.contractorPrice,
@@ -57,7 +60,10 @@ export function catalogItemToPosProduct(
       multiplier: unit.multiplier,
       priceOverride: unit.priceOverride,
     })),
-    prices: product.prices,
+    prices: {
+      ...product.prices,
+      ...Object.fromEntries(costPriceBookIds.map((bookId) => [bookId, product.costPrice ?? "0"])),
+    },
     children: children.map(mapChild),
   };
 }

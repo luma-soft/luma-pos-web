@@ -57,6 +57,19 @@ describe("POS free line", () => {
     });
   });
 
+  test("includes an explicit per-line price book in the trusted payload", () => {
+    expect(buildPosOrderItemPayload({
+      product: { id: "product-1", name: "Cable" },
+      unitName: "m",
+      unitMultiplier: 1,
+      quantity: 2,
+      unitPrice: 18_000,
+      priceBook: "b3b3b3b3-1111-4111-8111-b3b3b3b3b3b3",
+    })).toMatchObject({
+      priceBookId: "b3b3b3b3-1111-4111-8111-b3b3b3b3b3b3",
+    });
+  });
+
   test("renders an accessible touch-safe Free control", () => {
     const markup = renderToStaticMarkup(
       <FreeLinePriceControl

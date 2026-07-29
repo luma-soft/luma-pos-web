@@ -12,6 +12,8 @@ export const orderItemSchema = z.object({
   unitPrice: z.number().min(0).optional(),
   manualUnitPrice: z.number().min(0).optional(),
   lineDiscount: z.number().min(0).optional(),
+  // Undefined kế thừa bảng giá hóa đơn; null chọn riêng Giá Chung.
+  priceBookId: z.uuid().nullable().optional(),
 });
 
 export const createOrderSchema = z.object({

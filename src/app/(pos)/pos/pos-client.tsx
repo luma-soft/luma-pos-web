@@ -64,6 +64,10 @@ type CartLine = {
   returnSoldQuantity?: number;
   lineDiscount?: number;  // giảm giá tay (VND) trên mỗi đơn vị
   manualPrice?: boolean;  // đã sửa giá/giảm giá tay → bỏ qua KM tự động
+  /** undefined = theo bảng giá của hóa đơn; "" = Giá Chung được chọn riêng. */
+  priceBook?: PriceBook;
+  /** Giá cần khôi phục khi thu ngân tắt trạng thái miễn phí. */
+  freeRestore?: { unitPrice: number; lineDiscount: number; priceBook?: PriceBook };
   note?: string;
 };
 
@@ -790,8 +794,9 @@ export function PosClient({
     const h = setTimeout(() => {
       if (cancelled) return;
       if (!q) { setServerResults([]); setSearching(false); return; }
+      const costPriceBookIds = data.priceBooks.filter((book) => book.costBased).map((book) => book.id);
       const cachedResults = () => productCatalog.search(q, { limit: 40 }).map((product) =>
-        catalogItemToPosProduct(product, productCatalog.products, data.warehouse?.id ?? null)
+        catalogItemToPosProduct(product, productCatalog.products, data.warehouse?.id ?? null, costPriceBookIds)
       );
       // offline → tìm trong Product Catalog dùng chung; online → hỏi server
       if (typeof navigator !== "undefined" && !navigator.onLine) {
@@ -808,7 +813,7 @@ export function PosClient({
         } });
     }, q ? 250 : 0);
     return () => { cancelled = true; clearTimeout(h); };
-  }, [data.warehouse?.id, productCatalog, search]);
+  }, [data.priceBooks, data.warehouse?.id, productCatalog, search]);
 
   useEffect(() => {
     if (!isReturnInvoiceDraft) return;
@@ -901,11 +906,37 @@ export function PosClient({
   }
 
   /** Sửa giá/giảm giá 1 dòng (từ popup). */
-  function applyLinePrice(key: string, unitPrice: number, lineDiscount: number) {
+  function applyLinePrice(key: string, linePriceBook: PriceBook | undefined, unitPrice: number, lineDiscount: number, free: boolean) {
     setCart((c) => c.map((l) =>
-      l.key === key
-        ? { ...l, unitPrice: Math.max(0, unitPrice), lineDiscount: Math.max(0, lineDiscount), manualPrice: true }
-        : l
+      {
+        if (l.key !== key) return l;
+        const unit = l.product.units.find((u) => u.unitName === l.unitName) ?? null;
+        const listedPrice = unitPriceFor(l.product, unit, linePriceBook ?? priceBook);
+        const nextUnitPrice = Math.max(0, unitPrice);
+        const nextDiscount = Math.max(0, lineDiscount);
+        if (free) {
+          return {
+            ...l,
+            priceBook: linePriceBook,
+            unitPrice: 0,
+            lineDiscount: 0,
+            manualPrice: true,
+            freeRestore: l.freeRestore ?? {
+              unitPrice: nextUnitPrice || listedPrice,
+              lineDiscount: nextDiscount,
+              priceBook: linePriceBook,
+            },
+          };
+        }
+        return {
+          ...l,
+          priceBook: linePriceBook,
+          unitPrice: nextUnitPrice,
+          lineDiscount: nextDiscount,
+          manualPrice: nextDiscount > 0 || nextUnitPrice !== listedPrice,
+          freeRestore: undefined,
+        };
+      }
     ));
     setEditKey(null);
   }
@@ -963,7 +994,7 @@ export function PosClient({
       return;
     }
     setCart((c) => {
-      const existing = c.find((l) => l.product.id === p.id);
+      const existing = c.find((l) => l.product.id === p.id && l.priceBook === undefined);
       if (existing) {
         return c.map((l) => (l.key === existing.key ? { ...l, quantity: l.quantity + 1 } : l));
       }
@@ -1109,7 +1140,7 @@ export function PosClient({
         ...l,
         unitName: unit?.unitName ?? l.product.baseUnit,
         unitMultiplier: unit ? Number(unit.multiplier) : 1,
-        unitPrice: unitPriceFor(l.product, unit, priceBook),
+        unitPrice: unitPriceFor(l.product, unit, l.priceBook ?? priceBook),
         lineDiscount: 0,
         manualPrice: false,
       };
@@ -1143,7 +1174,7 @@ export function PosClient({
     patchActive((inv) => ({
       priceBook: pb,
       cart: inv.cart.map((l) => {
-        if (l.manualPrice) return l;
+        if (l.manualPrice || l.priceBook !== undefined) return l;
         const unit = l.product.units.find((u) => u.unitName === l.unitName) ?? null;
         return { ...l, unitPrice: unitPriceFor(l.product, unit, pb) };
       }),
@@ -1580,6 +1611,11 @@ export function PosClient({
                     <GripVertical className="w-3.5 h-3.5" />
                   </button>
                   <span className={cn("font-medium text-sm whitespace-normal break-words", outOfStock && "text-er")}>{l.product.name}</span>
+                  {l.priceBook !== undefined && (
+                    <span className="shrink-0 rounded bg-sky-50 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
+                      {data.priceBooks.find((book) => (book.isDefault ? "" : book.id) === l.priceBook)?.name ?? "Giá Chung"}
+                    </span>
+                  )}
                   {eff.pct > 0 && (
                     <span className={cn(
                       "shrink-0 text-xs font-bold rounded px-1",
@@ -1649,7 +1685,9 @@ export function PosClient({
               {editKey === l.key && (
                 <LinePriceEditor
                   line={l}
-                  onApply={(price, disc) => applyLinePrice(l.key, price, disc)}
+                  invoicePriceBook={priceBook}
+                  priceBooks={data.priceBooks}
+                  onApply={(book, price, disc, free) => applyLinePrice(l.key, book, price, disc, free)}
                   onClose={() => setEditKey(null)}
                 />
               )}
@@ -2624,21 +2662,57 @@ function AmountModeInput({
 
 /** Popup sửa đơn giá + giảm giá (VND/%) cho 1 dòng — giống KiotViet. */
 function LinePriceEditor({
-  line, onApply, onClose,
+  line, invoicePriceBook, priceBooks, onApply, onClose,
 }: {
   line: CartLine;
-  onApply: (unitPrice: number, lineDiscount: number) => void;
+  invoicePriceBook: PriceBook;
+  priceBooks: PosData["priceBooks"];
+  onApply: (priceBook: PriceBook | undefined, unitPrice: number, lineDiscount: number, free: boolean) => void;
   onClose: () => void;
 }) {
   const t = useTranslations();
+  const defaultBook = priceBooks.find((book) => book.isDefault) ?? priceBooks[0];
+  const inheritedValue = "__invoice_price_book__";
+  const [selectedBook, setSelectedBook] = useState(
+    line.priceBook === undefined ? inheritedValue : line.priceBook || defaultBook?.id || inheritedValue,
+  );
+  const editablePrice = line.freeRestore?.unitPrice ?? line.unitPrice;
+  const editableDiscount = line.freeRestore?.lineDiscount ?? line.lineDiscount ?? 0;
   const [editor, setEditor] = useState(() =>
-    createLinePriceEditorState(line.unitPrice, line.lineDiscount ?? 0)
+    createLinePriceEditorState(editablePrice, editableDiscount)
   );
   const resolved = resolveLinePriceEditor(editor);
   const discountInput = Math.max(0, Number(editor.discount) || 0);
 
   function apply() {
-    onApply(resolved.unitPrice, resolved.lineDiscount);
+    const selected = selectedBook === inheritedValue
+      ? undefined
+      : selectedBook === defaultBook?.id ? "" : selectedBook;
+    onApply(selected, resolved.unitPrice, resolved.lineDiscount, editor.free);
+  }
+
+  function changeBook(value: string) {
+    setSelectedBook(value);
+    const selected = value === inheritedValue
+      ? undefined
+      : value === defaultBook?.id ? "" : value;
+    const unit = line.product.units.find((item) => item.unitName === line.unitName) ?? null;
+    setEditor(createLinePriceEditorState(unitPriceFor(line.product, unit, selected ?? invoicePriceBook), 0));
+  }
+
+  function changeFree(free: boolean) {
+    setEditor((state) => {
+      const next = setLineFree(state, free);
+      // Dòng miễn phí cũ chưa có freeRestore: lấy lại giá niêm yết theo bảng giá đang chọn.
+      if (!free && !state.restore && Number(next.price) === 0) {
+        const selected = selectedBook === inheritedValue
+          ? undefined
+          : selectedBook === defaultBook?.id ? "" : selectedBook;
+        const unit = line.product.units.find((item) => item.unitName === line.unitName) ?? null;
+        return createLinePriceEditorState(unitPriceFor(line.product, unit, selected ?? invoicePriceBook), 0);
+      }
+      return next;
+    });
   }
 
   return (
@@ -2652,6 +2726,19 @@ function LinePriceEditor({
         className="fixed left-1/2 top-1/2 z-60 w-100 max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 space-y-3 rounded-xl border border-border bg-surface p-4 text-sm shadow-e2"
       >
         <div id="pos-price-editor-title" className="mb-1 text-base font-semibold">{line.product.name}</div>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-slate-500 shrink-0">{t("pos.priceBook.title")}</span>
+          <Select
+            value={selectedBook}
+            onChange={(event) => changeBook(event.target.value)}
+            size="sm"
+            className="w-40"
+            options={[
+              { value: inheritedValue, label: `Theo hóa đơn (${priceBooks.find((book) => (book.isDefault ? "" : book.id) === invoicePriceBook)?.name ?? "Giá Chung"})` },
+              ...priceBooks.map((book) => ({ value: book.id, label: book.name })),
+            ]}
+          />
+        </div>
         <div className="flex items-center justify-between gap-2">
           <span className="text-slate-500 shrink-0">{t("pos.priceEditor.unitPrice")}</span>
           <MoneyInput
@@ -2680,7 +2767,7 @@ function LinePriceEditor({
         <FreeLinePriceControl
           checked={editor.free}
           label={t("pos.priceEditor.free")}
-          onCheckedChange={(free) => setEditor((state) => setLineFree(state, free))}
+          onCheckedChange={changeFree}
         />
         <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
           <span className="text-slate-500 shrink-0">{t("pos.priceEditor.sellPrice")}</span>
