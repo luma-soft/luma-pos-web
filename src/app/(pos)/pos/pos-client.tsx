@@ -1609,6 +1609,7 @@ export function PosClient({
                       disabled={isCameraQuoteDraft}
                       size="sm"
                       options={unitOptions}
+                      menuMinWidth={192}
                       className="w-full min-w-0 font-medium text-slate-700 dark:text-slate-200"
                     />
                   )}
@@ -1690,6 +1691,7 @@ export function PosClient({
                     disabled={isCameraQuoteDraft}
                     size="sm"
                     options={unitOptions}
+                    menuMinWidth={192}
                     className="min-w-20 shrink-0 font-medium text-slate-700 dark:text-slate-200"
                   />
                 )}
