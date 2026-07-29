@@ -187,6 +187,15 @@ export const warrantyClaimCreateSchema = z.object({
 
 export type WarrantyClaimCreateInput = z.input<typeof warrantyClaimCreateSchema>;
 
+export const technicianWarrantyClaimCreateSchema = z.object({
+  jobId: z.uuid(),
+  assetId: z.uuid(),
+  title: z.string().trim().min(1).max(240),
+  description: z.string().trim().max(4_000).optional(),
+  priority: z.enum(["low", "normal", "high", "urgent"]).default("normal"),
+  scheduledAt: z.iso.datetime({ local: true }).nullable().optional(),
+}).strict();
+
 export const warrantyClaimUpdateSchema = warrantyClaimCreateSchema.omit({
   projectId: true,
 }).extend({

@@ -1045,6 +1045,23 @@ export const warrantyClaims = pgTable("warranty_claims", {
   index("warranty_claims_schedule_idx").on(t.status, t.scheduledAt),
 ]);
 
+export const warrantyClaimNotifications = pgTable("warranty_claim_notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  claimId: uuid("claim_id").notNull().references(() => warrantyClaims.id, { onDelete: "cascade" }),
+  recipientId: uuid("recipient_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  notificationType: text("notification_type").notNull().default("created"),
+  readAt: timestamp("read_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("warranty_claim_notifications_type_check", sql`${t.notificationType} in ('created', 'status_changed')`),
+  uniqueIndex("warranty_claim_notifications_claim_recipient_type_idx").on(
+    t.claimId,
+    t.recipientId,
+    t.notificationType,
+  ),
+  index("warranty_claim_notifications_recipient_idx").on(t.recipientId, t.readAt, t.createdAt),
+]);
+
 export const serviceStatusLogs = pgTable("service_status_logs", {
   id: uuid("id").primaryKey().defaultRandom(),
   jobId: uuid("job_id").notNull().references(() => serviceJobs.id, { onDelete: "cascade" }),
@@ -1111,6 +1128,8 @@ export const serviceAttachments = pgTable("service_attachments", {
   id: uuid("id").primaryKey().defaultRandom(),
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   jobId: uuid("job_id").references(() => serviceJobs.id, { onDelete: "cascade" }),
+  claimId: uuid("claim_id").references(() => warrantyClaims.id, { onDelete: "cascade" }),
+  assetId: uuid("asset_id").references(() => installedAssets.id, { onDelete: "restrict" }),
   requestId: uuid("request_id").references((): AnyPgColumn => serviceCustomerRequests.id, { onDelete: "cascade" }),
   category: text("category").notNull(),
   bucket: varchar("bucket", { length: 80 }).notNull(),
@@ -1134,6 +1153,7 @@ export const serviceAttachments = pgTable("service_attachments", {
   check("service_attachments_size_check", sql`${t.sizeBytes} > 0`),
   uniqueIndex("service_attachments_bucket_path_idx").on(t.bucket, t.path),
   index("service_attachments_job_idx").on(t.jobId, t.createdAt),
+  index("service_attachments_claim_idx").on(t.claimId, t.createdAt),
   index("service_attachments_active_job_idx").on(t.jobId, t.createdAt).where(sql`${t.deletedAt} is null`),
   index("service_attachments_cleanup_retry_idx").on(t.cleanupClaimedAt, t.createdAt).where(sql`${t.deletedAt} is not null and ${t.storageDeletedAt} is null`),
 ]);
