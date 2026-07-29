@@ -143,4 +143,34 @@ describe("notification queue boundary", () => {
       reason: "invalid_message",
     });
   });
+
+  test("verifier accepts a signed ISO timestamp with an offset", async () => {
+    const queue = createQstashNotificationQueue(config, {
+      async verify() {
+        return true;
+      },
+    });
+    const queuedAt = "2026-07-28T19:00:00+07:00";
+
+    await expect(queue.verifier.verify(new Request(config.workerUrl, {
+      method: "POST",
+      headers: { "Upstash-Signature": "valid-signature" },
+      body: JSON.stringify({ ...message, queuedAt }),
+    }))).resolves.toEqual({ ...message, queuedAt });
+  });
+
+  test("verifier accepts a signed ISO timestamp without fractional seconds", async () => {
+    const queue = createQstashNotificationQueue(config, {
+      async verify() {
+        return true;
+      },
+    });
+    const queuedAt = "2026-07-28T12:00:00Z";
+
+    await expect(queue.verifier.verify(new Request(config.workerUrl, {
+      method: "POST",
+      headers: { "Upstash-Signature": "valid-signature" },
+      body: JSON.stringify({ ...message, queuedAt }),
+    }))).resolves.toEqual({ ...message, queuedAt });
+  });
 });

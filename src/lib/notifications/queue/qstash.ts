@@ -34,14 +34,39 @@ type QstashClientLike = {
 
 const queueMessageKeys = ["version", "eventId", "deduplicationKey", "queuedAt"] as const;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const isoTimestampPattern = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-](\d{2}):(\d{2}))$/;
 
 function invalidMessage(): never {
   throw new NotificationQueueVerificationError("invalid_message");
 }
 
-function isCanonicalIsoTimestamp(value: string): boolean {
-  const timestamp = Date.parse(value);
-  return !Number.isNaN(timestamp) && new Date(timestamp).toISOString() === value;
+function isValidIsoTimestamp(value: string): boolean {
+  const match = isoTimestampPattern.exec(value);
+  if (!match) return false;
+
+  const [, yearValue, monthValue, dayValue, hourValue, minuteValue, secondValue, offsetHourValue, offsetMinuteValue] = match;
+  const year = Number(yearValue);
+  const month = Number(monthValue);
+  const day = Number(dayValue);
+  const hour = Number(hourValue);
+  const minute = Number(minuteValue);
+  const second = Number(secondValue);
+  const offsetHour = offsetHourValue === undefined ? 0 : Number(offsetHourValue);
+  const offsetMinute = offsetMinuteValue === undefined ? 0 : Number(offsetMinuteValue);
+  const daysInMonth = month === 2
+    ? (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 29 : 28)
+    : [4, 6, 9, 11].includes(month) ? 30 : 31;
+
+  return month >= 1
+    && month <= 12
+    && day >= 1
+    && day <= daysInMonth
+    && hour <= 23
+    && minute <= 59
+    && second <= 59
+    && offsetHour <= 23
+    && offsetMinute <= 59
+    && !Number.isNaN(Date.parse(value));
 }
 
 function toNotificationQueueMessage(value: NotificationQueueMessageV1): NotificationQueueMessageV1 {
@@ -77,7 +102,7 @@ function parseNotificationQueueMessage(body: string): NotificationQueueMessageV1
   ) return invalidMessage();
   if (
     typeof message.queuedAt !== "string"
-    || !isCanonicalIsoTimestamp(message.queuedAt)
+    || !isValidIsoTimestamp(message.queuedAt)
   ) return invalidMessage();
 
   return toNotificationQueueMessage({
