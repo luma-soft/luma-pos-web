@@ -20,11 +20,11 @@ export const dynamic = "force-dynamic";
 
 const TABS = [
   { tab: "products", labelKey: "nav.products" },
-  { tab: "stock", labelKey: "inventory.title" },
   { tab: "pricing", labelKey: "nav.pricing" },
   { tab: "purchases", labelKey: "nav.purchases" },
   { tab: "purchase-returns", labelKey: "purchaseReturns.title" },
   { tab: "internal", labelKey: "nav.internalUse" },
+  { tab: "stock", labelKey: "inventory.title" },
   { tab: "stocktakes", labelKey: "nav.stocktakes" },
   { tab: "categories", labelKey: "categories.title" },
 ];
