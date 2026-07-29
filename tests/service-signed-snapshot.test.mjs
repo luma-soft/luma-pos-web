@@ -26,6 +26,10 @@ const {
 const {
   serviceSignatureSchema,
 } = await import(`${projectRoot}/src/lib/services/schemas.ts`);
+const {
+  isServiceSnapshotJobLocked,
+  mobileFieldOperation,
+} = await import(`${projectRoot}/src/lib/services/field-api.ts`);
 
 const client = new PGlite();
 const db = drizzle(client, { schema });
@@ -54,6 +58,17 @@ const parsedClientPayload = serviceSignatureSchema.parse({
 });
 assert.equal("document" in parsedClientPayload, false);
 assert.equal("documentId" in parsedClientPayload, false);
+const mappedLockResponse = await mobileFieldOperation(async () => {
+  const databaseError = new Error("database query failed", {
+    cause: new Error("SERVICE_SIGNED_SNAPSHOT_JOB_LOCKED"),
+  });
+  throw databaseError;
+});
+assert.equal(mappedLockResponse.status, 409);
+assert.deepEqual(await mappedLockResponse.json(), {
+  ok: false,
+  error: "services.errors.signedSnapshotLocked",
+});
 
 async function createFixture(code) {
   const [project] = await db.insert(projects).values({
@@ -210,5 +225,96 @@ await assert.rejects(
   })),
   /SERVICE_SIGNATURE_OWNERSHIP_INVALID/,
 );
+
+const cleanupFixture = await createFixture("DV-SNAPSHOT-5");
+const cleanupSigned = await signFixture(cleanupFixture, "cleanup-old");
+const cleanupEvidence = (await db.select().from(serviceAttachments)
+  .where(eq(serviceAttachments.jobId, cleanupFixture.job.id)))
+  .find((item) => item.category === "before");
+const tombstonedAt = new Date("2026-07-29T03:15:00.000Z");
+await db.update(serviceAttachments).set({
+  deletedAt: tombstonedAt,
+  deletedBy: technicianId,
+}).where(eq(serviceAttachments.id, cleanupEvidence.id));
+const [invalidatedBeforeCleanup] = await db.select().from(serviceSignatures)
+  .where(eq(serviceSignatures.id, cleanupSigned.signatureId));
+assert.ok(invalidatedBeforeCleanup.invalidatedAt);
+assert.equal(invalidatedBeforeCleanup.invalidationReason, "evidence.changed");
+
+const cleanupResigned = await signFixture(cleanupFixture, "cleanup-new");
+const cleanupClaimToken = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+await db.update(serviceAttachments).set({
+  cleanupClaimedAt: new Date("2026-07-29T03:16:00.000Z"),
+  cleanupClaimToken,
+  storageDeleteAttempts: 1,
+  storageDeleteLastError: "temporary storage failure",
+}).where(eq(serviceAttachments.id, cleanupEvidence.id));
+await db.update(serviceAttachments).set({
+  cleanupClaimedAt: null,
+  cleanupClaimToken: null,
+  storageDeletedAt: new Date("2026-07-29T03:17:00.000Z"),
+  storageDeleteAttempts: 2,
+  storageDeleteLastError: null,
+}).where(eq(serviceAttachments.id, cleanupEvidence.id));
+const [resignedAfterCleanup] = await db.select().from(serviceSignatures)
+  .where(eq(serviceSignatures.id, cleanupResigned.signatureId));
+assert.equal(
+  resignedAfterCleanup.invalidatedAt,
+  null,
+  "cleanup bookkeeping for a tombstone must not invalidate a new snapshot",
+);
+
+const completionFirstFixture = await createFixture("DV-SNAPSHOT-6");
+await signFixture(completionFirstFixture, "completion-first");
+await db.transaction((tx) => completeFieldServiceJobCore(tx, actor, {
+  jobId: completionFirstFixture.job.id,
+  clientMutationId: "snapshot-completion-first",
+  completionNote: "Hoàn tất trước mutation",
+}));
+await assert.rejects(
+  db.update(serviceJobs).set({ title: "Không được đổi" })
+    .where(eq(serviceJobs.id, completionFirstFixture.job.id)),
+  isServiceSnapshotJobLocked,
+);
+await assert.rejects(
+  db.update(projects).set({ name: "Không được đổi" })
+    .where(eq(projects.id, completionFirstFixture.project.id)),
+  isServiceSnapshotJobLocked,
+);
+await assert.rejects(
+  db.update(installedAssets).set({ ipAddress: "10.0.0.9" })
+    .where(eq(installedAssets.id, completionFirstFixture.asset.id)),
+  isServiceSnapshotJobLocked,
+);
+await assert.rejects(
+  db.update(serviceAttachments).set({ caption: "Không được đổi" })
+    .where(eq(serviceAttachments.id, completionFirstFixture.signatureAttachment.id)),
+  isServiceSnapshotJobLocked,
+);
+await db.update(installedAssets).set({
+  updatedAt: new Date("2026-07-29T03:30:00.000Z"),
+}).where(eq(installedAssets.id, completionFirstFixture.asset.id));
+const [stillCompleted] = await db.select().from(serviceJobs)
+  .where(eq(serviceJobs.id, completionFirstFixture.job.id));
+const [stillValid] = await db.select().from(serviceSignatures)
+  .where(eq(serviceSignatures.jobId, completionFirstFixture.job.id));
+assert.equal(stillCompleted.status, "completed");
+assert.equal(stillValid.invalidatedAt, null);
+
+const mutationFirstFixture = await createFixture("DV-SNAPSHOT-7");
+await signFixture(mutationFirstFixture, "mutation-first");
+await db.update(installedAssets).set({ locationLabel: "Vị trí mới" })
+  .where(eq(installedAssets.id, mutationFirstFixture.asset.id));
+await assert.rejects(
+  db.transaction((tx) => completeFieldServiceJobCore(tx, actor, {
+    jobId: mutationFirstFixture.job.id,
+    clientMutationId: "snapshot-mutation-first",
+    completionNote: "Không được hoàn tất snapshot cũ",
+  })),
+  /SERVICE_SIGNATURE_STALE/,
+);
+const [mutationFirstJob] = await db.select().from(serviceJobs)
+  .where(eq(serviceJobs.id, mutationFirstFixture.job.id));
+assert.equal(mutationFirstJob.status, "in_progress");
 
 console.log("server-owned signed snapshots: canonical authority, integrity, freshness, and ownership verified");

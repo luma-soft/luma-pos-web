@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { customers, projects, promotions } from "@/db/schema";
 import { type ActionResult, requireUser, requireManager } from "./common";
 import { Routes } from "@/lib/routes";
+import { isServiceSnapshotJobLocked } from "@/lib/services/field-api";
 
 // ============ Công trình ============
 
@@ -184,6 +185,11 @@ export async function updateProject(input: UpdateProjectInput): Promise<ActionRe
     return { ok: true, data: undefined };
   } catch (e) {
     console.error("updateProject failed:", e);
-    return { ok: false, error: "errors.serverError" };
+    return {
+      ok: false,
+      error: isServiceSnapshotJobLocked(e)
+        ? "services.errors.signedSnapshotLocked"
+        : "errors.serverError",
+    };
   }
 }

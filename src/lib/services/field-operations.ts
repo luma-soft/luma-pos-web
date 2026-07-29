@@ -77,6 +77,9 @@ async function buildAuthoritativeSignedSnapshot(
       .for("update", { of: serviceJobs }),
     tx.select({
       id: installedAssets.id,
+      projectId: installedAssets.projectId,
+      jobId: installedAssets.jobId,
+      productId: installedAssets.productId,
       assetKind: installedAssets.assetKind,
       name: installedAssets.name,
       brand: installedAssets.brand,
@@ -89,6 +92,8 @@ async function buildAuthoritativeSignedSnapshot(
       customerWarrantyEndsOn: installedAssets.customerWarrantyEndsOn,
       supplierWarrantyEndsOn: installedAssets.supplierWarrantyEndsOn,
       status: installedAssets.status,
+      note: installedAssets.note,
+      createdAt: installedAssets.createdAt,
     }).from(installedAssets)
       .where(eq(installedAssets.jobId, jobId))
       .orderBy(asc(installedAssets.id)),
@@ -138,6 +143,7 @@ async function buildAuthoritativeSignedSnapshot(
     assets: assets.map((asset) => ({
       ...asset,
       installedAt: asset.installedAt?.toISOString() ?? null,
+      createdAt: asset.createdAt.toISOString(),
     })),
     evidence: attachments.map((attachment) => ({
       ...attachment,

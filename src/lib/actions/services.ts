@@ -33,6 +33,7 @@ import {
   validateServiceLinks,
   type ServiceChecklistItem,
 } from "@/lib/services/domain";
+import { isServiceSnapshotJobLocked } from "@/lib/services/field-api";
 import {
   installedAssetCreateSchema,
   type InstalledAssetCreateInput,
@@ -257,7 +258,12 @@ export async function updateServiceJob(
     return { ok: true, data: undefined };
   } catch (error) {
     console.error("updateServiceJob failed:", error);
-    return { ok: false, error: "errors.serverError" };
+    return {
+      ok: false,
+      error: isServiceSnapshotJobLocked(error)
+        ? "services.errors.signedSnapshotLocked"
+        : "errors.serverError",
+    };
   }
 }
 
@@ -730,7 +736,14 @@ export async function createInstalledAsset(
     return { ok: true, data: asset };
   } catch (error) {
     console.error("createInstalledAsset failed:", error);
-    return { ok: false, error: isUniqueViolation(error) ? "services.errors.duplicateSerial" : "errors.serverError" };
+    return {
+      ok: false,
+      error: isServiceSnapshotJobLocked(error)
+        ? "services.errors.signedSnapshotLocked"
+        : isUniqueViolation(error)
+          ? "services.errors.duplicateSerial"
+          : "errors.serverError",
+    };
   }
 }
 
@@ -775,7 +788,14 @@ export async function updateInstalledAsset(
     return { ok: true, data: undefined };
   } catch (error) {
     console.error("updateInstalledAsset failed:", error);
-    return { ok: false, error: isUniqueViolation(error) ? "services.errors.duplicateSerial" : "errors.serverError" };
+    return {
+      ok: false,
+      error: isServiceSnapshotJobLocked(error)
+        ? "services.errors.signedSnapshotLocked"
+        : isUniqueViolation(error)
+          ? "services.errors.duplicateSerial"
+          : "errors.serverError",
+    };
   }
 }
 

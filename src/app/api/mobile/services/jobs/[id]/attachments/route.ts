@@ -16,7 +16,10 @@ import {
   completeServiceEvidenceStorageRemoval,
   deleteServiceEvidenceCore,
 } from "@/lib/services/evidence-deletion";
-import { mobileFieldOperation } from "@/lib/services/field-api";
+import {
+  isServiceSnapshotJobLocked,
+  mobileFieldOperation,
+} from "@/lib/services/field-api";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 async function ensureEvidenceBucket() {
@@ -117,6 +120,9 @@ export async function POST(
       throw error;
     }
   } catch (error) {
+    if (isServiceSnapshotJobLocked(error)) {
+      return mobileError("services.errors.signedSnapshotLocked", 409);
+    }
     console.error("service evidence upload failed:", error);
     return mobileError("errors.serverError", 500);
   }

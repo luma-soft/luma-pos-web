@@ -89,3 +89,65 @@ the focused Bun/PGlite suites, and `flutter analyze lib` are clean.
 
 Migrations 0067, 0068, and 0069 are applied and immutable. The next migration
 must be 0070 or later.
+
+## Review fix round 1
+
+Reviewer findings addressed:
+
+1. Attachment cleanup bookkeeping no longer invalidates a newly re-signed
+   snapshot. The attachment trigger now reacts only to active-row
+   insert/delete, active/tombstone transitions, and columns actually present in
+   the snapshot. Lease, attempt, error, and Storage cleanup updates on an
+   already tombstoned row are ignored.
+2. Snapshot-relevant mutations are rejected once a job is completed. Project,
+   job, asset, and evidence direct-DB paths serialize through the same locked
+   `service_jobs` row. If mutation wins before completion it invalidates and
+   audits normally, so completion rejects the stale signature; if completion
+   wins, the later mutation rolls back and the completed signature remains
+   valid.
+
+Additional corrections:
+
+- Asset invalidation now compares exactly the business fields persisted in the
+  snapshot; technical `updated_at` changes remain allowed.
+- Job code and the complete asset ownership/business fields were added to the
+  canonical snapshot/invalidation contract.
+- Nested Drizzle/Postgres errors are unwrapped and mapped to the safe mobile
+  `409 services.errors.signedSnapshotLocked` response, including evidence
+  uploads. Manager project/job/asset actions return the same business key
+  instead of a generic server error.
+
+TDD evidence:
+
+```text
+RED: cleanup bookkeeping for a tombstone must not invalidate a new snapshot
+actual invalidated_at was non-null
+
+GREEN:
+bun test tests/service-signed-snapshot.test.mjs \
+  tests/service-field-operations.test.mjs \
+  tests/service-evidence.test.ts \
+  tests/service-domain.test.ts \
+  tests/service-field-schema.test.mjs \
+  tests/service-evidence-deletion.test.mjs
+44 pass, 0 fail
+```
+
+The new regression covers delete → invalidation → re-sign while cleanup is
+pending → cleanup failure/success without invalidation. Direct trigger tests
+cover completed project/job/asset/evidence mutation rejection, technical asset
+bookkeeping allowance, mutation-before-completion, completion-before-mutation,
+rollback state, retained signature validity, and wrapped error mapping.
+
+Verification:
+
+- Changed-file ESLint and scoped `git diff --check`: pass.
+- `bun run build`: pass, including production TypeScript.
+- `0070_service_signature_terminal_guards.sql`: applied.
+- Migration runner second pass: zero pending.
+- Direct DB verification confirms the 0070 record, completed-state guard,
+  tombstone-state predicate, row-locked helper, and denied `PUBLIC` function
+  execution.
+
+Migration 0070 is now applied and immutable. The next migration must be 0071 or
+later.

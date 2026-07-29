@@ -1,5 +1,19 @@
 import { mobileError, mobileOk } from "@/lib/mobile/response";
 
+export function isServiceSnapshotJobLocked(error: unknown) {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current; depth += 1) {
+    if (
+      current instanceof Error
+      && current.message.includes("SERVICE_SIGNED_SNAPSHOT_JOB_LOCKED")
+    ) return true;
+    current = typeof current === "object" && "cause" in current
+      ? (current as { cause?: unknown }).cause
+      : null;
+  }
+  return false;
+}
+
 export async function mobileFieldOperation<T>(operation: () => Promise<T>) {
   try {
     return mobileOk(await operation());
@@ -40,6 +54,9 @@ export async function mobileFieldOperation<T>(operation: () => Promise<T>) {
     }
     if (message === "SERVICE_COMPLETION_STATUS_INVALID") {
       return mobileError("services.errors.invalidTransition", 409);
+    }
+    if (isServiceSnapshotJobLocked(error)) {
+      return mobileError("services.errors.signedSnapshotLocked", 409);
     }
     if (message.startsWith("SERVICE_COMPLETION_INVALID:")) {
       return mobileError(message.slice("SERVICE_COMPLETION_INVALID:".length), 409);
