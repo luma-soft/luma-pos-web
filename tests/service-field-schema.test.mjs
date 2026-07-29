@@ -4,6 +4,7 @@ import { PGlite } from "@electric-sql/pglite";
 const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const schema = await import(`${projectRoot}/src/db/schema.ts`);
 const client = new PGlite();
+await client.exec("create role anon; create role authenticated;");
 
 for (const file of readdirSync(`${projectRoot}/drizzle`)
   .filter((name) => name.endsWith(".sql"))
