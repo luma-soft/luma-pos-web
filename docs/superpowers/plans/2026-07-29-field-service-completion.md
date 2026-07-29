@@ -1,5 +1,9 @@
 # Field Service Completion Plan
 
+**Implementation status:** Tasks 1–8 complete, independently reviewed, and
+integrated verification complete. See
+`../reviews/2026-07-29-field-service-completion-review.md`.
+
 ## Global Constraints
 
 - Work on `main`; preserve and never stage unrelated web inventory changes or

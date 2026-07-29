@@ -11,7 +11,6 @@ const {
   serviceAttachments,
   serviceFieldMutations,
   serviceJobs,
-  serviceSignatures,
   serviceVisits,
 } = schema;
 const {
@@ -107,7 +106,7 @@ if (!completionError.includes("beforeEvidenceRequired")) {
   throw new Error(`completion did not enforce evidence: ${completionError}`);
 }
 
-const [before] = await db.insert(serviceAttachments).values({
+await db.insert(serviceAttachments).values({
   projectId: project.id,
   jobId: job.id,
   category: "before",

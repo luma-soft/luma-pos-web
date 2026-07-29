@@ -1,8 +1,9 @@
 # LumaPOS Field Service Platform — Technical Design
 
 **Date:** 2026-07-29  
-**Status:** Implemented; vendor polling awaits verified EZVIZ partner access
-**Source:** `../../../../document/lumapos/LUMAPOS_CAMERA_PROJECT_MANAGEMENT_REVIEW.md`
+**Status:** Completed and verified; live vendor polling remains disabled pending
+verified EZVIZ partner access
+**Completion review:** `../reviews/2026-07-29-field-service-completion-review.md`
 
 ## Outcome
 
@@ -19,12 +20,17 @@ Delivered on 2026-07-29:
 - technician role, least-privilege service access, primary/crew assignment;
 - Today/Week mobile workspace, job detail, visits, checklist, actual materials,
   QR asset capture, private evidence, signature, directions, and completion;
-- idempotent field mutations with timeline, visit/time records, and offline
-  replay restricted to safe operations;
+- idempotent, versioned field mutations with timeline, visit/time records and
+  explicit offline conflict refresh/retry/discard;
 - maintenance occurrence/job generation through the protected notification
-  cron, SLA fields, targeted service-due notifications, and a scoped one-time
-  customer request portal;
-- manager dispatch and vendor device-link/sync APIs;
+  cron, overdue escalation, targeted notifications, and monotonic plan cycles;
+- a scoped one-time customer request portal with bounded private image
+  evidence, status viewing, manager triage and response/resolution SLA;
+- manager dispatch calendar, filters, productivity reporting and transactional
+  assignment history;
+- technician warranty intake with private evidence and manager inbox/push;
+- server-owned handover snapshots and durable evidence cleanup;
+- manager vendor device-link/sync APIs;
 - disabled-by-default camera vendor adapter with normalized health/alerts and
   persistence of snapshots, alerts, and sync runs.
 
@@ -96,6 +102,11 @@ New operational tables:
 - `service_job_events`: append-only normalized timeline;
 - `service_maintenance_occurrences`: idempotent generation per plan/due date;
 - `service_customer_requests`: token-scoped service/warranty intake and SLA;
+- customer-request evidence, notification, rate-limit and storage-cleanup
+  tables for private public-portal intake;
+- warranty claim attachment and notification tables;
+- `service_job_asset_revisions`: private authority for installed-asset
+  collection revisions mirrored onto service jobs;
 - `service_sla_policies`: priority-based response/resolution targets;
 - `camera_vendor_connections`: server-side connection metadata without secrets;
 - `camera_device_links`: mapping from installed assets to vendor identifiers;
@@ -118,32 +129,41 @@ is exposed to web or Flutter clients.
 3. Check-in starts a visit and work timer; pause/end records server time.
 4. Technician completes checklist, records actual material, scans asset
    serial/QR, and uploads categorized before/after evidence.
-5. Customer signs the handover snapshot. The server hashes the immutable
-   document payload and stores signature evidence privately.
+5. Customer signs the handover snapshot. The server builds the canonical
+   snapshot from authoritative project/job/checklist/asset/evidence data,
+   hashes it, and stores signature evidence privately.
 6. Completion validates required checklist/evidence/signature rules, completes
    the job, emits timeline/audit events, and re-derives project stage.
 
 ### Maintenance
 
 The existing protected notification cron invokes a maintenance worker. For each
-active plan within the lead window, it atomically creates one occurrence and one
-service job. A unique `(plan_id, due_on)` constraint makes retries idempotent.
-The assigned technician and managers receive notifications. Overdue occurrences
-are escalated without generating duplicate jobs.
+active plan within the lead window, it atomically creates one outstanding
+occurrence and one service job. Unique plan/due-date, outstanding-occurrence and
+job-link constraints make retries idempotent. Completion advances the plan from
+the occurrence due date without moving the schedule backwards. The assigned
+technician and managers receive notifications. Overdue occurrences are
+escalated through durable push claims without duplicate delivery.
 
 ### Warranty/customer request
 
 A manager creates an expiring portal link scoped to one customer/project. The
 customer submits contact details, description, priority hints, and optional
-photos. The server creates a request, calculates SLA deadlines, and notifies
-managers. Triage may link it to an installed asset and warranty claim/job.
+photos in one bounded streaming request. The server decodes and canonicalizes
+photos, stages durable Storage cleanup, creates the request at `new`, calculates
+SLA deadlines, and notifies managers. The same token remains status-viewable
+until expiry but cannot submit twice. Triage may link the request to a job in
+the same project.
 
 ### Dispatch and offline
 
-Managers view jobs by day, status, and assignee and can assign multiple crew
-members. Flutter queues only idempotent, safe field mutations with a client
-mutation ID. Server uniqueness guarantees replay safety. Conflicts return the
-current server version and remain visible in the sync center.
+Managers view jobs by day, status, priority, assignee, SLA and overdue
+maintenance, with bounded pagination and consistent-snapshot metrics. Flutter
+queues only versioned, idempotent checklist/material/asset mutations with a
+client mutation ID. Server-owned revisions and mutation fingerprints guarantee
+replay safety. Stale writes return a minimal authorized `409`; conflicts remain
+paused in Sync Center until the user refreshes, explicitly retries, or discards.
+Visits, evidence, signatures and completion remain online-only.
 
 ### Camera vendor integration
 
@@ -202,6 +222,8 @@ It contains:
   maintenance generation.
 - Mutations are transactional when they update more than one aggregate.
 - Field mutations include an idempotency key and append an audit/timeline event.
+- Mutable field resources use server-owned revisions; direct/no-op writes cannot
+  forge or noisily advance those revisions.
 - Attachments are private, MIME/size checked, path-scoped, and served by short
   signed URLs.
 - Signature records include a SHA-256 hash of the signed document snapshot.
@@ -239,3 +261,25 @@ and direct schema verification before completion.
 - Vendor failures never block core field-service workflows.
 - No camera credential or vendor access token is exposed to clients or stored
   in ordinary business fields.
+
+## Completion Audit
+
+The follow-up completion audit closed all eight review gaps:
+
+1. durable evidence tombstones, Storage cleanup leases and signed-evidence
+   deletion protection;
+2. server-owned signed snapshots with freshness and post-sign mutation guards;
+3. visit/time-entry, terminal mutation and assignment concurrency state
+   machines;
+4. complete maintenance occurrence/job/plan lifecycle and idempotent overdue
+   escalation;
+5. bounded customer portal uploads, durable cleanup, manager triage and SLA;
+6. dispatch calendar/filtering, consistent metrics and transactional
+   assignment audit;
+7. assigned-technician warranty intake, private evidence and manager
+   notifications;
+8. server-owned optimistic revisions and explicit offline conflict recovery.
+
+Schema changes were delivered as immutable migrations `0065` through `0087`.
+The detailed requirement-to-evidence record is
+`../reviews/2026-07-29-field-service-completion-review.md`.
