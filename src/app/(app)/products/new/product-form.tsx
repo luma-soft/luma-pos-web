@@ -293,7 +293,7 @@ export function NewProductForm({
               size="iconSm"
               onClick={close}
               aria-label={t("common.back")}
-              className="h-11 w-11 rounded-xl lg:h-9 lg:w-9"
+              className="h-11 w-11 shrink-0 rounded-xl lg:h-9 lg:w-9"
             >
               <ArrowLeft className="h-5 w-5 lg:h-4 lg:w-4" />
             </Button>

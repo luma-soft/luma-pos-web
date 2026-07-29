@@ -116,6 +116,14 @@ describe("mobile specialist layouts", () => {
     expect(productForm).toContain('"flex-1 overflow-auto overscroll-contain');
   });
 
+  test("product editor keeps its mobile back target from shrinking beside long actions", () => {
+    const productForm = read("src/app/(app)/products/new/product-form.tsx");
+
+    expect(productForm).toContain(
+      'className="h-11 w-11 shrink-0 rounded-xl lg:h-9 lg:w-9"',
+    );
+  });
+
   test("product editor footer keeps the primary actions aligned on narrow screens", () => {
     const productForm = read("src/app/(app)/products/new/product-form.tsx");
 

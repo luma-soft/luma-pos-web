@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
   buildPosUnitOptions,
@@ -94,5 +95,50 @@ describe("POS mobile checkout", () => {
     expect(markup).toContain("overscroll-contain");
     expect(markup).toContain("lg:overflow-hidden");
     expect(markup).toContain(">Thanh toán</button>");
+  });
+
+  test("keeps cart line actions and notes at least 44px tall on mobile", () => {
+    const source = readFileSync(
+      "src/app/(pos)/pos/pos-client.tsx",
+      "utf8",
+    );
+
+    expect(source).toContain(
+      'className="grid h-11 w-11 shrink-0 place-items-center rounded-lg',
+    );
+    expect(source).toContain(
+      'className="flex min-h-11 items-center text-sm tabular-nums',
+    );
+    expect(source).toContain(
+      'className="mt-2 min-h-11 w-full bg-transparent',
+    );
+    expect(source).toContain(
+      'className="grid h-11 w-11 place-items-center rounded',
+    );
+  });
+
+  test("keeps POS search and nested modal controls touch-safe on mobile", () => {
+    const source = readFileSync(
+      "src/app/(pos)/pos/pos-client.tsx",
+      "utf8",
+    );
+
+    expect(source).toContain(
+      'className="absolute right-16 top-1/2 z-10 grid h-11 w-11',
+    );
+    expect(source).toContain(
+      'className="flex min-h-11 items-center gap-1.5',
+    );
+    expect(source).toContain(
+      'className="flex min-h-11 w-full items-center gap-2',
+    );
+    expect(source).toContain(
+      'className="grid h-11 w-11 place-items-center rounded-lg text-slate-400',
+    );
+    expect(source).toContain(
+      'className="flex-1 min-h-11 py-2 rounded-lg',
+    );
+    expect(source).toContain('aria-modal="true"');
+    expect(source).toContain('aria-labelledby="pos-price-editor-title"');
   });
 });

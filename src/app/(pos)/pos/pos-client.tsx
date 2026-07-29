@@ -1431,7 +1431,7 @@ export function PosClient({
                   if (invoices.length > 1) closeInvoice(inv.id);
                   else clearInvoice(inv.id);
                 }}
-                className="p-0.5 rounded text-slate-400 hover:text-er hover:bg-slate-200/70 dark:hover:bg-slate-700"
+                className="-my-2 -mr-1 grid h-11 w-11 place-items-center rounded text-slate-400 hover:bg-slate-200/70 hover:text-er dark:hover:bg-slate-700"
                 title={t(invoices.length > 1 ? "pos.invoice.close" : "pos.invoice.clear")}
                 aria-label={t(invoices.length > 1 ? "pos.invoice.close" : "pos.invoice.clear")}
               >
@@ -1447,7 +1447,7 @@ export function PosClient({
           type="button"
           onClick={toggleAddMenu}
           title={t("pos.draftTabs.addLabel")}
-          className="h-full px-3 py-2.5 rounded-lg border border-border text-slate-400 hover:text-primary-600 hover:border-primary-300"
+          className="grid h-11 w-11 place-items-center rounded-lg border border-border text-slate-400 hover:border-primary-300 hover:text-primary-600"
         >
           <Plus className="w-4 h-4" />
         </button>
@@ -1515,7 +1515,7 @@ export function PosClient({
                     type="button"
                     disabled={isCameraQuoteDraft}
                     onClick={() => setCart((current) => current.filter((item) => item.key !== l.key))}
-                    className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-er disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-slate-800"
+                    className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-er disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-slate-800"
                     aria-label={t("common.delete")}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -1548,7 +1548,7 @@ export function PosClient({
                     type="button"
                     disabled={isCameraQuoteDraft}
                     onClick={() => setEditKey(editKey === l.key ? null : l.key)}
-                    className="text-sm tabular-nums text-slate-500 hover:text-primary-600"
+                    className="flex min-h-11 items-center text-sm tabular-nums text-slate-500 hover:text-primary-600"
                   >
                     {formatCurrency(eff.price)}{posUnitSuffix(l.unitName)}
                   </button>
@@ -1559,7 +1559,7 @@ export function PosClient({
                   value={l.note ?? ""}
                   onChange={(e) => setLineNote(l.key, e.target.value)}
                   placeholder={t("pos.lineNotePlaceholder")}
-                  className="mt-2 w-full bg-transparent text-xs text-slate-400 outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                  className="mt-2 min-h-11 w-full bg-transparent text-xs text-slate-400 outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
                 />
               </div>
               <div className="hidden items-center gap-2 px-3 py-3 lg:flex">
@@ -1795,7 +1795,7 @@ export function PosClient({
                 type="button"
                 onClick={closeSearch}
                 title={t("common.close")}
-                className="absolute right-16 top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-md text-slate-400 hover:bg-surface-2 hover:text-slate-600 lg:h-7 lg:w-7"
+                className="absolute right-16 top-1/2 z-10 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-md text-slate-400 hover:bg-surface-2 hover:text-slate-600 lg:h-7 lg:w-7"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1902,7 +1902,7 @@ export function PosClient({
         )}
       >
         {/* nút quay lại danh sách SP — chỉ mobile */}
-        <button onClick={() => setMobileView("catalog")} className="lg:hidden flex items-center gap-1.5 px-3 py-2 text-sm text-primary-600 border-b border-border">
+        <button onClick={() => setMobileView("catalog")} className="flex min-h-11 items-center gap-1.5 border-b border-border px-3 py-2 text-sm text-primary-600 lg:hidden">
           <X className="w-4 h-4" /> {t("pos.searchPlaceholder")}
         </button>
         {/* customer + bảng giá */}
@@ -1962,7 +1962,7 @@ export function PosClient({
                       setReturnSourceQuery(e.target.value);
                     }}
                     placeholder={t("pos.returns.sourcePlaceholder")}
-                    className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm"
+                    className="min-h-11 w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm"
                   />
                   {(returnSourceSearching || returnSourceOptions.length > 0) && !returnOrderId && (
                     <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-border bg-surface shadow-e2">
@@ -1978,7 +1978,7 @@ export function PosClient({
                               setReturnSourceQuery("");
                               setReturnSourceOptions([]);
                             }}
-                            className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-surface-2"
+                            className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-surface-2"
                           >
                             <span className="min-w-0">
                               <span className="font-semibold text-primary-600">{order.code}</span>
@@ -2026,7 +2026,7 @@ export function PosClient({
                 value={projectName}
                 onChange={(e) => { setProjectName(e.target.value); setProjectId(""); }}
                 placeholder={t("pos.projectPlaceholder")}
-                className="flex-1 px-3 py-2 text-sm rounded-lg border border-border bg-surface"
+                className="min-h-11 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-sm"
               />
             </div>
           )}
@@ -2037,7 +2037,7 @@ export function PosClient({
                 type="datetime-local"
                 value={deliveryDate ?? ""}
                 onChange={(e) => setDeliveryDate(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+                className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm"
               />
             </div>
           )}
@@ -2262,7 +2262,7 @@ export function PosClient({
                   key={kind}
                   type="button"
                   onClick={() => addDraft(kind)}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2"
+                  className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2"
                 >
                   <ItemIcon className="h-4 w-4 text-slate-400" />
                   {t(`pos.draftTabs.add.${kind}`)}
@@ -2272,7 +2272,7 @@ export function PosClient({
             <button
               type="button"
               onClick={() => addDraft("quote", true)}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2"
+              className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2"
             >
               <FileText className="h-4 w-4 text-primary-500" />
               {t("pos.draftTabs.add.cameraQuote")}
@@ -2341,13 +2341,18 @@ function SepayCheckoutModal({ checkout, onClose }: { checkout: SepayCheckout; on
   return (
     <>
       <div className="fixed inset-0 z-[90] bg-slate-950/45" />
-      <div className="fixed inset-x-3 top-1/2 z-[100] mx-auto max-w-md -translate-y-1/2 overflow-hidden rounded-2xl border border-border bg-surface shadow-e2 sm:inset-x-0">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pos-sepay-title"
+        className="fixed inset-x-3 top-1/2 z-[100] mx-auto max-w-md -translate-y-1/2 overflow-hidden rounded-2xl border border-border bg-surface shadow-e2 sm:inset-x-0"
+      >
         <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
           <div>
-            <div className="text-sm font-bold">{t("pos.sepay.title")}</div>
+            <div id="pos-sepay-title" className="text-sm font-bold">{t("pos.sepay.title")}</div>
             <div className="mt-0.5 text-xs text-slate-500">{checkout.orderCode} · {formatCurrency(checkout.amount)}</div>
           </div>
-          <button type="button" onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-600">
+          <button type="button" onClick={onClose} aria-label={t("common.close")} className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-600 lg:h-8 lg:w-8">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -2369,7 +2374,7 @@ function SepayCheckoutModal({ checkout, onClose }: { checkout: SepayCheckout; on
             {confirmed ? <CheckCircle2 className="h-4 w-4" /> : <Loader2 className="h-4 w-4 animate-spin" />}
             <span>{confirmed ? t("pos.sepay.confirmed") : t("pos.sepay.waiting")}</span>
           </div>
-          <button type="button" onClick={onClose} className="w-full rounded-xl border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2">
+          <button type="button" onClick={onClose} className="min-h-11 w-full rounded-xl border border-border px-4 py-2 text-sm font-semibold hover:bg-surface-2">
             {t("pos.sepay.viewOrder")}
           </button>
         </div>
@@ -2395,13 +2400,18 @@ function VariantPickerModal({
   return (
     <>
       <div className="fixed inset-0 z-55 bg-slate-950/30" onClick={onClose} />
-      <div className="fixed z-60 left-1/2 top-1/2 w-[560px] max-w-[calc(100vw-32px)] max-h-[min(80dvh,640px)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-border bg-surface shadow-e2">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pos-variant-picker-title"
+        className="fixed left-1/2 top-1/2 z-60 max-h-[min(80dvh,640px)] w-[560px] max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border border-border bg-surface shadow-e2"
+      >
         <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
           <div className="min-w-0">
-            <div className="font-semibold whitespace-normal break-words">{parent.name}</div>
+            <div id="pos-variant-picker-title" className="whitespace-normal break-words font-semibold">{parent.name}</div>
             <div className="mt-0.5 text-xs text-slate-500">{children.length} SKU con · {priceLabelFor(parent, priceBook)}</div>
           </div>
-          <button type="button" onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-600">
+          <button type="button" onClick={onClose} aria-label={t("common.close")} className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-600 lg:h-8 lg:w-8">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -2418,7 +2428,7 @@ function VariantPickerModal({
                     key={child.id}
                     type="button"
                     onClick={() => onSelect(child)}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 text-left hover:border-primary-300 hover:bg-primary-50/50 dark:hover:bg-primary-950/20"
+                    className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 py-2.5 text-left hover:border-primary-300 hover:bg-primary-50/50 dark:hover:bg-primary-950/20"
                   >
                     <span className="min-w-0">
                       <span className="block whitespace-normal break-words text-sm font-semibold">{child.variantName ?? child.name}</span>
@@ -2520,7 +2530,7 @@ function PrintSizePicker({
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
         className={cn(
-          "flex h-8 w-full items-center justify-between gap-2 rounded-lg border border-border bg-surface px-2.5 text-left text-xs font-semibold",
+          "flex h-11 w-full items-center justify-between gap-2 rounded-lg border border-border bg-surface px-2.5 text-left text-xs font-semibold lg:h-8",
           "transition hover:bg-surface-2 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500"
         )}
       >
@@ -2545,7 +2555,7 @@ function PrintSizePicker({
                   setOpen(false);
                 }}
                 className={cn(
-                  "flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-surface-2",
+                  "flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-surface-2 lg:min-h-0",
                   active && "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-200"
                 )}
               >
@@ -2643,14 +2653,19 @@ function LinePriceEditor({
     <>
       {/* lớp nền để click ra ngoài đóng popup */}
       <div className="fixed inset-0 z-55" onClick={onClose} />
-      <div className="fixed z-60 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-100 max-w-[calc(100vw-32px)] bg-surface rounded-xl border border-border shadow-e2 p-4 space-y-3 text-sm">
-        <div className="font-semibold text-base mb-1">{line.product.name}</div>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="pos-price-editor-title"
+        className="fixed left-1/2 top-1/2 z-60 w-100 max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 space-y-3 rounded-xl border border-border bg-surface p-4 text-sm shadow-e2"
+      >
+        <div id="pos-price-editor-title" className="mb-1 text-base font-semibold">{line.product.name}</div>
         <div className="flex items-center justify-between gap-2">
           <span className="text-slate-500 shrink-0">{t("pos.priceEditor.unitPrice")}</span>
           <MoneyInput
             value={price} autoFocus
             onChange={(v) => setPrice(v == null ? "" : String(v))}
-            className="no-spinner w-40 px-2 py-1.5 text-right rounded-md border border-border bg-surface"
+            className="no-spinner min-h-11 w-40 rounded-md border border-border bg-surface px-2 py-1.5 text-right"
           />
         </div>
         <div className="flex items-center justify-between gap-2">
@@ -2667,10 +2682,10 @@ function LinePriceEditor({
           <span className="font-bold text-primary-600 tabular-nums">{formatCurrency(sell)}</span>
         </div>
         <div className="flex gap-2 pt-1">
-          <button onClick={onClose} className="flex-1 py-2 rounded-lg border border-border text-slate-600 dark:text-slate-300 font-medium">
+          <button onClick={onClose} className="flex-1 min-h-11 py-2 rounded-lg border border-border text-slate-600 dark:text-slate-300 font-medium">
             {t("common.cancel")}
           </button>
-          <button onClick={apply} className="flex-1 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-semibold">
+          <button onClick={apply} className="flex-1 min-h-11 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-semibold">
             {t("common.apply")}
           </button>
         </div>

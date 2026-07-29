@@ -126,7 +126,10 @@ export function ServiceProjectMobileRow({
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="break-words text-sm font-semibold text-primary-600">
-            <Link href={Routes.project(row.id)} className="hover:underline">
+            <Link
+              href={Routes.project(row.id)}
+              className="inline-flex min-h-11 min-w-11 items-center hover:underline lg:min-h-0 lg:min-w-0"
+            >
               {row.name}
             </Link>
           </h3>
