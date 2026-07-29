@@ -65,7 +65,8 @@ async function verifyRevisionRollback() {
   assert.equal(await revision(), before);
 }
 
-if (process.env.NODE_ENV === "test") {
+let registeredWithRunner = false;
+try {
   beforeAll(setup);
   afterAll(cleanup);
 
@@ -78,7 +79,14 @@ if (process.env.NODE_ENV === "test") {
       await verifyRevisionRollback();
     });
   });
-} else {
+  registeredWithRunner = true;
+} catch (error) {
+  const outsideRunner = error instanceof Error
+    && error.message.startsWith("Cannot use beforeAll() outside of the test runner");
+  if (!outsideRunner) throw error;
+}
+
+if (!registeredWithRunner) {
   await setup();
   try {
     await verifyRevisionAdvances();
