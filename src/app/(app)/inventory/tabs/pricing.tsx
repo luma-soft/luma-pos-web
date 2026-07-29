@@ -1,15 +1,12 @@
 import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
-import { Search } from "lucide-react";
-import { Routes } from "@/lib/routes";
 import { getProducts, getProductFormOptions } from "@/lib/data/products";
 import { getPriceBooks, getPriceOverridesForProducts } from "@/lib/data/price-books";
 import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
 import { PricingTable } from "../../pricing/pricing-table";
 import { TableSkeleton } from "@/components/table-skeleton";
-import { Select } from "@/components/ui/select";
-import { InstantFilterForm } from "@/components/instant-filter-form";
+import { PricingFilters } from "./pricing-filters";
 
 type SP = Record<string, string | undefined>;
 type PriceBook = Awaited<ReturnType<typeof getPriceBooks>>[number];
@@ -62,19 +59,16 @@ async function PricingContent({
     <>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <h2 className="shrink-0 text-sm font-bold">{t("pricing.booksCount", { n: books.length })}</h2>
-        <InstantFilterForm className="flex min-w-0 flex-1 flex-wrap items-center gap-3" action={Routes.Inventory}>
-          <input type="hidden" name="tab" value="pricing" />
-          <div className="relative min-w-[240px] flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface focus:border-primary-500 focus:outline-none min-h-11 lg:min-h-0" />
-          </div>
-          <Select
-            name="category"
-            defaultValue={params.category ?? ""}
-            options={[{ value: "", label: t("products.list.allCategories") }, ...categories.map((c) => ({ value: c.id, label: c.name }))]}
-            className="min-w-44"
-          />
-        </InstantFilterForm>
+        <PricingFilters
+          query={params.q ?? ""}
+          category={params.category ?? ""}
+          categories={categories}
+          labels={{
+            searchProducts: t("products.list.searchPlaceholder"),
+            allCategories: t("products.list.allCategories"),
+            searchCategories: t("products.list.searchCategories"),
+          }}
+        />
       </div>
       <PricingTable books={books} rows={tableRows} total={total} />
       <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("products.unitLabel")} />
