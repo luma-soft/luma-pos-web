@@ -1641,12 +1641,16 @@ export function PosClient({
                   </div>
                   <span className="text-base font-bold tabular-nums">{formatCurrency(eff.price * l.quantity)}</span>
                 </div>
-                <input
-                  type="text"
+                <textarea
+                  rows={1}
                   value={l.note ?? ""}
                   onChange={(e) => setLineNote(l.key, e.target.value)}
+                  onInput={(e) => {
+                    e.currentTarget.style.height = "auto";
+                    e.currentTarget.style.height = `${Math.min(e.currentTarget.scrollHeight, 64)}px`;
+                  }}
                   placeholder={t("pos.lineNotePlaceholder")}
-                  className="mt-2 min-h-11 w-full bg-transparent text-xs text-slate-400 outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                  className="mt-2 block min-h-4 max-h-16 w-full resize-none overflow-y-auto bg-transparent py-0 text-xs leading-4 text-slate-400 outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
                 />
               </div>
               <div className="hidden items-center gap-2 px-3 py-3 lg:flex">
@@ -1709,7 +1713,7 @@ export function PosClient({
                     <StockQuantityTooltip stock={Number(l.product.stock)} booked={Number(l.product.booked)} unit={l.product.baseUnit} />
                   )}
                 </PosQuantitySlot>
-                <div className="flex w-28 shrink-0 flex-col items-end gap-1">
+                <div className="relative flex h-8 w-28 shrink-0 items-start justify-end">
                   <button
                     disabled={isCameraQuoteDraft}
                     onClick={() => setEditKey(editKey === l.key ? null : l.key)}
@@ -1719,7 +1723,7 @@ export function PosClient({
                     {formatCurrency(eff.price)}
                   </button>
                   {linePriceBookName && (
-                    <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
+                    <span className="absolute right-0 top-6 rounded bg-sky-50 px-1.5 py-0 text-[11px] font-semibold leading-4 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
                       {linePriceBookName}
                     </span>
                   )}
@@ -1729,18 +1733,22 @@ export function PosClient({
                   <MoreVertical className="w-4 h-4" />
                 </button>
               </div>
-              <div className="-mt-1 hidden items-center gap-2 px-3 pb-2.5 lg:flex">
+              <div className="-mt-1 hidden items-start gap-2 px-3 pb-1 lg:flex">
                 <span className="w-5 shrink-0" />
                 <span className="w-4 shrink-0" />
                 <span className="w-24 shrink-0" />
-                <div className="min-w-0 flex-1 flex items-center gap-1.5">
+                <div className="min-w-0 flex flex-1 items-start gap-1.5 pr-36">
                   <span className="w-3.5 shrink-0" />
-                  <input
-                    type="text"
+                  <textarea
+                    rows={1}
                     value={l.note ?? ""}
                     onChange={(e) => setLineNote(l.key, e.target.value)}
+                    onInput={(e) => {
+                      e.currentTarget.style.height = "auto";
+                      e.currentTarget.style.height = `${Math.min(e.currentTarget.scrollHeight, 64)}px`;
+                    }}
                     placeholder={t("pos.lineNotePlaceholder")}
-                    className="min-w-0 flex-1 text-left text-xs text-slate-400 bg-transparent outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                    className="block min-h-4 max-h-16 min-w-0 flex-1 resize-none overflow-y-auto bg-transparent py-0 text-left text-xs leading-4 text-slate-400 outline-none placeholder:text-slate-300 dark:placeholder:text-slate-600"
                   />
                 </div>
               </div>
