@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { ProductListResult } from "@/lib/data/products";
 import { projectProductUnit } from "@/lib/product-unit-projection";
 
 const cable = {
@@ -13,7 +14,25 @@ const cable = {
   ],
 };
 
+function firstUnit(row: ProductListResult["rows"][number]) {
+  return row.unitDefinitions[0];
+}
+
 describe("projectProductUnit", () => {
+  test("accepts the structured unit contract returned by getProducts", () => {
+    const row = {
+      unitDefinitions: [
+        { unitName: "cuộn", multiplier: "305", priceOverride: "2500000" },
+      ],
+    } as unknown as ProductListResult["rows"][number];
+
+    expect(firstUnit(row)).toEqual({
+      unitName: "cuộn",
+      multiplier: "305",
+      priceOverride: "2500000",
+    });
+  });
+
   test("keeps base-unit values when no alternate unit is selected", () => {
     expect(projectProductUnit(cable)).toEqual({
       unitName: "m",

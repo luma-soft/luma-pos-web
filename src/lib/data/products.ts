@@ -260,6 +260,19 @@ export async function getProducts(filters: ProductListFilters = {}) {
           select string_agg(${productUnits.unitName}, ', ' order by ${productUnits.sortOrder})
           from ${productUnits} where ${productUnits.productId} = ${products.id}
         )`,
+        unitDefinitions: sql<Array<{
+          unitName: string;
+          multiplier: string;
+          priceOverride: string | null;
+        }>>`coalesce((
+          select json_agg(json_build_object(
+            'unitName', ${productUnits.unitName},
+            'multiplier', ${productUnits.multiplier},
+            'priceOverride', ${productUnits.priceOverride}
+          ) order by ${productUnits.sortOrder})
+          from ${productUnits}
+          where ${productUnits.productId} = ${products.id}
+        ), '[]'::json)`,
       })
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
@@ -327,6 +340,19 @@ export async function getProducts(filters: ProductListFilters = {}) {
             select string_agg(${productUnits.unitName}, ', ' order by ${productUnits.sortOrder})
             from ${productUnits} where ${productUnits.productId} = ${products.id}
           )`,
+            unitDefinitions: sql<Array<{
+              unitName: string;
+              multiplier: string;
+              priceOverride: string | null;
+            }>>`coalesce((
+              select json_agg(json_build_object(
+                'unitName', ${productUnits.unitName},
+                'multiplier', ${productUnits.multiplier},
+                'priceOverride', ${productUnits.priceOverride}
+              ) order by ${productUnits.sortOrder})
+              from ${productUnits}
+              where ${productUnits.productId} = ${products.id}
+            ), '[]'::json)`,
           })
           .from(products)
           .leftJoin(categories, eq(products.categoryId, categories.id))
