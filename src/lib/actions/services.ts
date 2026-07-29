@@ -28,6 +28,7 @@ import {
   canTransitionWarrantyClaim,
   canTransitionServiceJob,
   createDefaultChecklist,
+  deriveServiceProjectStage,
   isServiceTypeAllowedForProject,
   validateServiceLinks,
   type ServiceChecklistItem,
@@ -109,6 +110,7 @@ async function loadOrderProject(orderId?: string | null) {
 async function serviceLinksAreValid(projectId: string, links: {
   jobId?: string | null;
   assetId?: string | null;
+  record?: { projectId: string | null } | null;
   quoteOrderId?: string | null;
   materialOrderId?: string | null;
 }) {
@@ -118,7 +120,14 @@ async function serviceLinksAreValid(projectId: string, links: {
     loadOrderProject(links.quoteOrderId),
     loadOrderProject(links.materialOrderId),
   ]);
-  return validateServiceLinks({ projectId, job, asset, quoteOrder, materialOrder });
+  return validateServiceLinks({
+    projectId,
+    job,
+    asset,
+    record: links.record,
+    quoteOrder,
+    materialOrder,
+  });
 }
 
 async function isServiceProject(projectId: string) {
@@ -266,7 +275,11 @@ export async function transitionServiceJob(
       const [current] = await tx.select({
         projectId: serviceJobs.projectId,
         status: serviceJobs.status,
-      }).from(serviceJobs).where(eq(serviceJobs.id, value.jobId)).limit(1);
+        projectStage: projects.serviceStage,
+      }).from(serviceJobs)
+        .innerJoin(projects, eq(serviceJobs.projectId, projects.id))
+        .where(eq(serviceJobs.id, value.jobId))
+        .limit(1);
       if (!current) return { ok: false as const, error: "errors.notFound" };
       if (!canTransitionServiceJob(current.status, value.status)) {
         return { ok: false as const, error: "services.errors.invalidTransition" };
@@ -291,16 +304,19 @@ export async function transitionServiceJob(
       const rows = await tx.select({ status: serviceJobs.status })
         .from(serviceJobs)
         .where(eq(serviceJobs.projectId, current.projectId));
+      const claimRows = await tx.select({ status: warrantyClaims.status })
+        .from(warrantyClaims)
+        .where(eq(warrantyClaims.projectId, current.projectId));
       const countable = rows.filter((row) => row.status !== "cancelled");
       const completed = countable.filter((row) => row.status === "completed").length;
       const progressPercent = countable.length === 0
         ? 0
         : Math.round((completed / countable.length) * 100);
-      const serviceStage = value.status === "warranty"
-        ? "warranty" as const
-        : progressPercent === 100
-          ? "completed" as const
-          : "active" as const;
+      const serviceStage = deriveServiceProjectStage({
+        fallbackStage: current.projectStage ?? "active",
+        jobStatuses: rows.map((row) => row.status),
+        warrantyClaimStatuses: claimRows.map((row) => row.status),
+      });
       await tx.update(projects).set({ progressPercent, serviceStage })
         .where(eq(projects.id, current.projectId));
       return { ok: true as const, projectId: current.projectId };
@@ -472,9 +488,17 @@ export async function saveServiceHandoverDocument(
       updatedAt: new Date(),
     };
     if (value.id) {
+      const [current] = await db.select({ projectId: serviceHandoverDocuments.projectId })
+        .from(serviceHandoverDocuments)
+        .where(eq(serviceHandoverDocuments.id, value.id))
+        .limit(1);
+      if (!current) return { ok: false, error: "errors.notFound" };
+      if (!await serviceLinksAreValid(value.projectId, {
+        record: current,
+        jobId: value.jobId,
+      })) return { ok: false, error: "services.errors.relationMismatch" };
       const [document] = await db.update(serviceHandoverDocuments).set(values)
         .where(eq(serviceHandoverDocuments.id, value.id)).returning({ id: serviceHandoverDocuments.id });
-      if (!document) return { ok: false, error: "errors.notFound" };
       revalidateServiceProject(value.projectId);
       await auditServiceMutation(gate.userId, "update_service_handover", "service_handover_document", value.id);
       return { ok: true, data: document };
@@ -528,8 +552,16 @@ export async function saveServiceMaintenancePlan(
       updatedAt: new Date(),
     };
     if (value.id) {
+      const [current] = await db.select({ projectId: serviceMaintenancePlans.projectId })
+        .from(serviceMaintenancePlans)
+        .where(eq(serviceMaintenancePlans.id, value.id))
+        .limit(1);
+      if (!current) return { ok: false, error: "errors.notFound" };
+      if (!await serviceLinksAreValid(value.projectId, {
+        record: current,
+        assetId: value.assetId,
+      })) return { ok: false, error: "services.errors.relationMismatch" };
       const [plan] = await db.update(serviceMaintenancePlans).set(values).where(eq(serviceMaintenancePlans.id, value.id)).returning({ id: serviceMaintenancePlans.id });
-      if (!plan) return { ok: false, error: "errors.notFound" };
       revalidateServiceProject(value.projectId);
       await auditServiceMutation(gate.userId, "update_service_maintenance", "service_maintenance_plan", value.id);
       return { ok: true, data: plan };
@@ -598,6 +630,15 @@ export async function saveServiceCostEntry(
       if (!job || job.projectId !== value.projectId) return { ok: false, error: "services.errors.relationMismatch" };
     }
     if (value.id) {
+      const [current] = await db.select({ projectId: serviceCostEntries.projectId })
+        .from(serviceCostEntries)
+        .where(eq(serviceCostEntries.id, value.id))
+        .limit(1);
+      if (!current) return { ok: false, error: "errors.notFound" };
+      if (!validateServiceLinks({
+        projectId: value.projectId,
+        record: current,
+      })) return { ok: false, error: "services.errors.relationMismatch" };
       const [entry] = await db.update(serviceCostEntries).set({
         jobId: value.jobId ?? null,
         type: value.type,
@@ -610,7 +651,6 @@ export async function saveServiceCostEntry(
         note: value.note || null,
         updatedAt: new Date(),
       }).where(eq(serviceCostEntries.id, value.id)).returning({ id: serviceCostEntries.id });
-      if (!entry) return { ok: false, error: "errors.notFound" };
       revalidateServiceProject(value.projectId);
       await auditServiceMutation(gate.userId, "update_service_cost", "service_cost_entry", value.id);
       return { ok: true, data: entry };
@@ -823,26 +863,51 @@ export async function transitionWarrantyClaim(
   const value = parsed.data;
 
   try {
-    const [current] = await db.select({
-      projectId: warrantyClaims.projectId,
-      status: warrantyClaims.status,
-    }).from(warrantyClaims).where(eq(warrantyClaims.id, value.claimId)).limit(1);
-    if (!current) return { ok: false, error: "errors.notFound" };
-    if (!canTransitionWarrantyClaim(current.status, value.status)) {
-      return { ok: false, error: "services.errors.invalidTransition" };
-    }
-    await db.update(warrantyClaims).set({
-      status: value.status,
-      diagnosis: value.diagnosis || undefined,
-      resolution: value.resolution || undefined,
-      resolvedAt: value.status === "resolved" || value.status === "closed" ? new Date() : null,
-      updatedAt: new Date(),
-    }).where(eq(warrantyClaims.id, value.claimId));
-    if (value.status !== current.status) {
-      await db.update(projects).set({ serviceStage: "warranty" })
+    const result = await db.transaction(async (tx) => {
+      const [current] = await tx.select({
+        projectId: warrantyClaims.projectId,
+        status: warrantyClaims.status,
+        projectStage: projects.serviceStage,
+      }).from(warrantyClaims)
+        .innerJoin(projects, eq(warrantyClaims.projectId, projects.id))
+        .where(eq(warrantyClaims.id, value.claimId))
+        .limit(1);
+      if (!current) return { ok: false as const, error: "errors.notFound" };
+      if (!canTransitionWarrantyClaim(current.status, value.status)) {
+        return { ok: false as const, error: "services.errors.invalidTransition" };
+      }
+
+      await tx.update(warrantyClaims).set({
+        status: value.status,
+        diagnosis: value.diagnosis || undefined,
+        resolution: value.resolution || undefined,
+        resolvedAt: value.status === "resolved" || value.status === "closed" ? new Date() : null,
+        updatedAt: new Date(),
+      }).where(eq(warrantyClaims.id, value.claimId));
+
+      const [jobRows, claimRows] = await Promise.all([
+        tx.select({ status: serviceJobs.status })
+          .from(serviceJobs)
+          .where(eq(serviceJobs.projectId, current.projectId)),
+        tx.select({ status: warrantyClaims.status })
+          .from(warrantyClaims)
+          .where(eq(warrantyClaims.projectId, current.projectId)),
+      ]);
+      const serviceStage = deriveServiceProjectStage({
+        fallbackStage: current.projectStage ?? "active",
+        jobStatuses: jobRows.map((row) => row.status),
+        warrantyClaimStatuses: claimRows.map((row) => row.status),
+      });
+      await tx.update(projects).set({ serviceStage })
         .where(eq(projects.id, current.projectId));
-    }
-    revalidateServiceProject(current.projectId);
+      return { ok: true as const, projectId: current.projectId };
+    });
+
+    if (!result.ok) return result;
+    revalidateServiceProject(result.projectId);
+    await auditServiceMutation(gate.userId, "transition_warranty_claim", "warranty_claim", value.claimId, {
+      status: value.status,
+    });
     return { ok: true, data: undefined };
   } catch (error) {
     console.error("transitionWarrantyClaim failed:", error);

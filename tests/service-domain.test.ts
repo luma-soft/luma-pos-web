@@ -5,6 +5,7 @@ import {
   calculateServiceMaterialStockSync,
   calculateServiceProjectProfitability,
   createDefaultChecklist,
+  deriveServiceProjectStage,
   isServiceTypeAllowedForProject,
   validateServiceLinks,
 } from "@/lib/services/domain";
@@ -58,6 +59,30 @@ describe("service job status", () => {
   it("allows field work to start but prevents an unstarted job from completing", () => {
     expect(canTransitionServiceJob("scheduled", "in_progress")).toBe(true);
     expect(canTransitionServiceJob("new", "completed")).toBe(false);
+  });
+
+  it("keeps the project in warranty while any warranty case remains open", () => {
+    expect(deriveServiceProjectStage({
+      fallbackStage: "completed",
+      jobStatuses: ["completed"],
+      warrantyClaimStatuses: ["closed", "in_progress"],
+    })).toBe("warranty");
+  });
+
+  it("returns a project to completed after its final warranty case closes", () => {
+    expect(deriveServiceProjectStage({
+      fallbackStage: "warranty",
+      jobStatuses: ["completed", "cancelled"],
+      warrantyClaimStatuses: ["closed", "void"],
+    })).toBe("completed");
+  });
+
+  it("returns a project with unfinished jobs to active after warranty closes", () => {
+    expect(deriveServiceProjectStage({
+      fallbackStage: "warranty",
+      jobStatuses: ["completed", "scheduled"],
+      warrantyClaimStatuses: ["closed"],
+    })).toBe("active");
   });
 });
 
@@ -216,6 +241,20 @@ describe("service quote links", () => {
     expect(validateServiceLinks({ projectId, asset: null })).toBe(false);
     expect(validateServiceLinks({ projectId, quoteOrder: { projectId, status: "confirmed" } })).toBe(false);
     expect(validateServiceLinks({ projectId, materialOrder: { projectId, status: "cancelled" } })).toBe(false);
+  });
+
+  it("rejects updating a service record through a different project", () => {
+    const projectId = "d5a84a82-d4c0-4b8f-b20d-87501d14a727";
+    const otherProjectId = "cf3dbf89-6b79-441c-b4cd-934ce25fdf80";
+
+    expect(validateServiceLinks({
+      projectId,
+      record: { projectId },
+    })).toBe(true);
+    expect(validateServiceLinks({
+      projectId,
+      record: { projectId: otherProjectId },
+    })).toBe(false);
   });
 });
 

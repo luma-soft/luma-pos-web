@@ -35,6 +35,15 @@ export const warrantyClaimStatuses = [
 
 export type WarrantyClaimStatus = (typeof warrantyClaimStatuses)[number];
 
+export type ServiceProjectStage =
+  | "planning"
+  | "quoted"
+  | "active"
+  | "paused"
+  | "completed"
+  | "warranty"
+  | "cancelled";
+
 const allowedStatusTransitions: Record<ServiceJobStatus, readonly ServiceJobStatus[]> = {
   new: ["scheduled", "in_progress", "cancelled"],
   scheduled: ["in_progress", "waiting_materials", "waiting_customer", "cancelled"],
@@ -114,6 +123,26 @@ export function canTransitionWarrantyClaim(
   return current === next || allowedWarrantyTransitions[current].includes(next);
 }
 
+export function deriveServiceProjectStage(input: {
+  fallbackStage: ServiceProjectStage;
+  jobStatuses: readonly ServiceJobStatus[];
+  warrantyClaimStatuses: readonly WarrantyClaimStatus[];
+}): ServiceProjectStage {
+  const hasOpenWarrantyClaim = input.warrantyClaimStatuses.some(
+    (status) => status !== "closed" && status !== "void",
+  );
+  if (hasOpenWarrantyClaim) return "warranty";
+
+  const countableJobs = input.jobStatuses.filter((status) => status !== "cancelled");
+  if (countableJobs.length > 0) {
+    return countableJobs.every((status) => status === "completed")
+      ? "completed"
+      : "active";
+  }
+
+  return input.fallbackStage === "warranty" ? "completed" : input.fallbackStage;
+}
+
 type ProjectLink = { projectId: string | null } | null;
 type OrderProjectLink = { projectId: string | null; status: string } | null;
 
@@ -121,17 +150,20 @@ export function validateServiceLinks({
   projectId,
   job,
   asset,
+  record,
   quoteOrder,
   materialOrder,
 }: {
   projectId: string;
   job?: ProjectLink;
   asset?: ProjectLink;
+  record?: ProjectLink;
   quoteOrder?: OrderProjectLink;
   materialOrder?: OrderProjectLink;
 }): boolean {
   if (job !== undefined && job?.projectId !== projectId) return false;
   if (asset !== undefined && asset?.projectId !== projectId) return false;
+  if (record !== undefined && record?.projectId !== projectId) return false;
   if (quoteOrder !== undefined && (quoteOrder?.projectId !== projectId || quoteOrder.status !== "quote")) return false;
   if (materialOrder !== undefined && (
     materialOrder?.projectId !== projectId

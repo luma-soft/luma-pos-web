@@ -1,14 +1,26 @@
 ALTER TABLE "catalog_sync_state" ENABLE ROW LEVEL SECURITY;
 --> statement-breakpoint
-GRANT SELECT ON TABLE "catalog_sync_state" TO authenticated;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    GRANT SELECT ON TABLE "catalog_sync_state" TO authenticated;
+  END IF;
+END;
+$$;
 --> statement-breakpoint
 DROP POLICY IF EXISTS "authenticated_read_catalog_sync_state" ON "catalog_sync_state";
 --> statement-breakpoint
-CREATE POLICY "authenticated_read_catalog_sync_state"
-ON "catalog_sync_state"
-FOR SELECT
-TO authenticated
-USING (true);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    CREATE POLICY "authenticated_read_catalog_sync_state"
+    ON "catalog_sync_state"
+    FOR SELECT
+    TO authenticated
+    USING (true);
+  END IF;
+END;
+$$;
 --> statement-breakpoint
 DO $$
 BEGIN
