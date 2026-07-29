@@ -1178,6 +1178,47 @@ export async function getPaymentReconciliation(
   }
 }
 
+export async function getPaymentReconciliationEvent(
+  db: DbLike,
+  eventId: string,
+): Promise<PaymentActionResult<Record<string, unknown> | null>> {
+  try {
+    const [event] = await db
+      .select({
+        id: paymentWebhookEvents.id,
+        provider: paymentWebhookEvents.provider,
+        providerEventId: paymentWebhookEvents.providerEventId,
+        accountNumber: paymentWebhookEvents.accountNumber,
+        transferType: paymentWebhookEvents.transferType,
+        transferAmount: paymentWebhookEvents.transferAmount,
+        matchStatus: paymentWebhookEvents.matchStatus,
+        matchReason: paymentWebhookEvents.matchReason,
+        createdAt: paymentWebhookEvents.createdAt,
+      })
+      .from(paymentWebhookEvents)
+      .where(eq(paymentWebhookEvents.id, eventId))
+      .limit(1);
+    if (!event) return { ok: true, data: null };
+    const accountNumber = event.accountNumber;
+    const suffix = accountNumber?.slice(-4) ?? "";
+    return {
+      ok: true,
+      data: {
+        ...event,
+        accountNumber: accountNumber
+          ? suffix.length === accountNumber.length
+            ? suffix
+            : `••••${suffix}`
+          : null,
+        transferAmount: Number(event.transferAmount),
+      },
+    };
+  } catch (error) {
+    console.error("getPaymentReconciliationEvent failed:", error);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
 export async function recordSepayWebhookEvent(
   db: DbLike,
   input: SepayWebhookInput,

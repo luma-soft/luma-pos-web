@@ -9,6 +9,7 @@ import {
   createPendingSepayPayment as createPendingSepayPaymentCore,
   expirePendingPayment as expirePendingPaymentCore,
   getPaymentReconciliation as getPaymentReconciliationCore,
+  getPaymentReconciliationEvent as getPaymentReconciliationEventCore,
   getGatewayPaymentStatus as getGatewayPaymentStatusCore,
   failGatewayPayment as failGatewayPaymentCore,
   cancelDraftOrder as cancelDraftOrderCore,
@@ -102,6 +103,10 @@ export async function getPaymentReconciliation(
   input?: Parameters<typeof getPaymentReconciliationCore>[1],
 ) {
   return getPaymentReconciliationCore(db, input);
+}
+
+export async function getPaymentReconciliationEvent(eventId: string) {
+  return getPaymentReconciliationEventCore(db, eventId);
 }
 
 export async function recordSepayWebhookEvent(
