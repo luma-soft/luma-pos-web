@@ -1554,7 +1554,7 @@ export function PosClient({
           const eff = effPrice(l);
           const stockManaged = isProductStockManaged(l.product.categoryName);
           const ordered = orderedBaseQuantityByProduct.get(l.product.id) ?? 0;
-          const stockInsufficient = exceedsAvailableStock(stockManaged, Number(l.product.stock), ordered, isReturnDraft);
+          const stockInsufficient = exceedsAvailableStock(stockManaged, Number(l.product.stock), ordered + Number(l.product.booked), isReturnDraft);
           const unitOptions = buildPosUnitOptions(l.product.baseUnit, l.product.units);
           const linePriceBookName = l.priceBook === undefined
             ? null
@@ -1706,7 +1706,7 @@ export function PosClient({
                     </div>
                   )}
                   {stockManaged && (
-                    <StockQuantityTooltip stock={Number(l.product.stock)} ordered={l.quantity * l.unitMultiplier} unit={l.product.baseUnit} />
+                    <StockQuantityTooltip stock={Number(l.product.stock)} booked={Number(l.product.booked)} unit={l.product.baseUnit} />
                   )}
                 </PosQuantitySlot>
                 <div className="flex w-28 shrink-0 flex-col items-end gap-1">
@@ -1913,7 +1913,7 @@ export function PosClient({
                       const stockManaged = isProductStockManaged(p.categoryName);
                       const line = cart.find((l) => l.product.id === p.id);
                       const ordered = orderedBaseQuantityByProduct.get(p.id) ?? 0;
-                      const stockInsufficient = exceedsAvailableStock(stockManaged, stock, ordered, isReturnDraft);
+                      const stockInsufficient = exceedsAvailableStock(stockManaged, stock, ordered + Number(p.booked), isReturnDraft);
                       const children = productChildren(p);
                       return (
                         <PosSearchResultLayout
@@ -1947,7 +1947,7 @@ export function PosClient({
                                   inputClassName={cn(stockInsufficient && "border-er text-er")}
                                 />
                                 {stockManaged && (
-                                  <StockQuantityTooltip stock={stock} ordered={line.quantity * line.unitMultiplier} unit={p.baseUnit} />
+                                  <StockQuantityTooltip stock={stock} booked={Number(p.booked)} unit={p.baseUnit} />
                                 )}
                               </PosQuantitySlot>
                             )}
@@ -2577,11 +2577,11 @@ function SummaryAdjustRow({
   );
 }
 
-function StockQuantityTooltip({ stock, ordered, unit }: { stock: number; ordered: number; unit: string }) {
+function StockQuantityTooltip({ stock, booked, unit }: { stock: number; booked: number; unit: string }) {
   return (
     <div className="pointer-events-none absolute left-1/2 top-full z-[80] mt-2 min-w-34 -translate-x-1/2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-semibold text-slate-800 opacity-0 shadow-e2 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 dark:text-slate-100">
       <div>{`Tồn: ${formatNumber(stock)} ${unit}`}</div>
-      <div>{`Đặt: ${formatNumber(ordered)} ${unit}`}</div>
+      <div>{`Đặt: ${formatNumber(booked)} ${unit}`}</div>
     </div>
   );
 }

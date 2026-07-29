@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
-import { categories, customers, paymentBankAccounts, products, productComboItems, productPrices, productUnits, projects, promotions, stockLevels, warehouses } from "@/db/schema";
+import { categories, customers, orderItems, orders, paymentBankAccounts, products, productComboItems, productPrices, productUnits, projects, promotions, stockLevels, warehouses } from "@/db/schema";
 import { isPromoActive, type PromoTier } from "@/lib/promo";
 import { getPriceBooks } from "@/lib/data/price-books";
 import type { Role } from "@/lib/actions/common";
@@ -65,6 +65,23 @@ function posProductSelect(warehouseId: string | null, hasComplianceColumns: bool
       select ${stockLevels.quantity} from ${stockLevels}
       where ${stockLevels.productId} = ${products.id}
         and ${stockLevels.warehouseId} = ${warehouseId ?? sql`null`}
+    ), 0) end`,
+    // Tổng số lượng của các phiếu đặt hàng còn hiệu lực tại kho POS.
+    booked: sql<string>`case when ${products.isVariantParent} then (
+      select coalesce(sum(${orderItems.quantity} * ${orderItems.unitMultiplier}), 0)
+      from ${orderItems}
+      inner join ${orders} on ${orders.id} = ${orderItems.orderId}
+      inner join products child on child.id = ${orderItems.productId}
+      where child.parent_product_id = ${products.id}
+        and ${orders.status} = 'confirmed'
+        and ${orders.warehouseId} = ${warehouseId ?? sql`null`}
+    ) else coalesce((
+      select sum(${orderItems.quantity} * ${orderItems.unitMultiplier})
+      from ${orderItems}
+      inner join ${orders} on ${orders.id} = ${orderItems.orderId}
+      where ${orderItems.productId} = ${products.id}
+        and ${orders.status} = 'confirmed'
+        and ${orders.warehouseId} = ${warehouseId ?? sql`null`}
     ), 0) end`,
     units: sql<PosUnit[]>`coalesce((
       select json_agg(json_build_object(

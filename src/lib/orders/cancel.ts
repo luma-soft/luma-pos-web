@@ -1,4 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import {
   customers,
@@ -14,6 +15,7 @@ import {
   toMoney,
   toQty,
 } from "@/lib/actions/common";
+import { Routes } from "@/lib/routes";
 import { createDebtChangedEventInTx } from "@/lib/notifications/events-core";
 import { publishCommittedNotification } from "@/lib/notifications/outbox";
 
@@ -72,8 +74,20 @@ export async function cancelOrderForUser(
         .select()
         .from(orderItems)
         .where(eq(orderItems.orderId, orderId));
+      const isBooking = order.status === "confirmed";
+      const isCompletedSale = order.status === "completed";
 
-      if (order.warehouseId) {
+      if (order.warehouseId && isBooking) {
+        for (const i of items) {
+          const baseQty = Number(i.quantity) * Number(i.unitMultiplier);
+          await tx.update(stockLevels).set({
+            reserved: sql`greatest(0, ${stockLevels.reserved} - ${toQty(baseQty)})`,
+            updatedAt: sql`now()`,
+          }).where(sql`${stockLevels.productId} = ${i.productId} and ${stockLevels.warehouseId} = ${order.warehouseId}`);
+        }
+      }
+
+      if (order.warehouseId && isCompletedSale) {
         for (const i of items) {
           const baseQty = Number(i.quantity) * Number(i.unitMultiplier);
           await tx
@@ -99,7 +113,7 @@ export async function cancelOrderForUser(
       }
 
       let debtNotification = null;
-      if (order.customerId) {
+      if (order.customerId && isCompletedSale) {
         const remaining = Number(order.total) - Number(order.amountPaid);
         const reversedDebt = Math.max(0, remaining);
         const [customer] = await tx
@@ -142,6 +156,10 @@ export async function cancelOrderForUser(
     if (result.debtNotification?.created) {
       await publishCommittedNotification(result.debtNotification.eventId);
     }
+    revalidatePath(Routes.POS);
+    revalidatePath(Routes.Sales);
+    revalidatePath(Routes.Orders);
+    revalidatePath(Routes.order(orderId));
     return { ok: true, data: undefined };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";

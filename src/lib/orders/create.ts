@@ -22,6 +22,7 @@ function revalidateOrderPaths(sourceOrderId?: string) {
     revalidatePath(Routes.Orders);
     revalidatePath(Routes.Sales);
     revalidatePath(Routes.Products);
+    revalidatePath(Routes.POS);
     if (sourceOrderId) revalidatePath(Routes.order(sourceOrderId));
   } catch (e) {
     if (e instanceof Error && e.message.includes("static generation store missing")) return;
@@ -186,6 +187,18 @@ export async function createOrderForUser(
           }
         }
 
+        // Phiếu đặt cũ đã giữ tồn nhưng chưa xuất kho: giải phóng trước khi tạo phiếu thay thế.
+        if (sourceIsBooking && sourceOrder.warehouseId) {
+          const sourceItems = await tx.select().from(orderItems).where(eq(orderItems.orderId, sourceOrder.id));
+          for (const item of sourceItems) {
+            const baseQty = Number(item.quantity) * Number(item.unitMultiplier);
+            await tx.update(stockLevels).set({
+              reserved: sql`greatest(0, ${stockLevels.reserved} - ${toQty(baseQty)})`,
+              updatedAt: sql`now()`,
+            }).where(sql`${stockLevels.productId} = ${item.productId} and ${stockLevels.warehouseId} = ${sourceOrder.warehouseId}`);
+          }
+        }
+
         if (sourceIsSale && sourceOrder.customerId) {
           const sourceRemaining = Number(sourceOrder.total) - Number(sourceOrder.amountPaid);
           await tx.update(customers).set({
@@ -286,8 +299,30 @@ export async function createOrderForUser(
         });
       }
 
-      // Báo giá / đặt hàng: không trừ kho, không ghi công nợ doanh thu.
-      if (isQuote || isBooking || paymentPending) {
+      // Phiếu đặt hàng giữ số lượng tại kho nhưng chưa trừ tồn thực tế.
+      if (isBooking) {
+        for (const item of trustedItems) {
+          for (const stockItem of item.stockItems) {
+            const baseQty = stockItem.quantity;
+            await tx.insert(stockLevels).values({
+              productId: stockItem.productId,
+              warehouseId: v.warehouseId,
+              quantity: "0",
+              reserved: toQty(baseQty),
+            }).onConflictDoUpdate({
+              target: [stockLevels.productId, stockLevels.warehouseId],
+              set: {
+                reserved: sql`${stockLevels.reserved} + ${toQty(baseQty)}`,
+                updatedAt: sql`now()`,
+              },
+            });
+          }
+        }
+        return { order, notification: null };
+      }
+
+      // Báo giá / đơn chờ thanh toán: chưa ảnh hưởng tồn kho hoặc công nợ doanh thu.
+      if (isQuote || paymentPending) {
         return { order, notification: null };
       }
 

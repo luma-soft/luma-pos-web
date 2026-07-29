@@ -1,7 +1,9 @@
 import { eq, sql } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { orders, orderItems, customers, stockLevels, stockMovements } from "@/db/schema";
 import { type ActionResult, getProfileId, generateCode, toQty } from "@/lib/actions/common";
+import { Routes } from "@/lib/routes";
 import { createNotificationEventInTx } from "@/lib/notifications/events-core";
 import { publishCommittedNotification } from "@/lib/notifications/outbox";
 
@@ -23,6 +25,7 @@ export async function convertQuoteToOrderForUser(
       if (!order.warehouseId) throw new Error("NO_WAREHOUSE");
 
       const items = await tx.select().from(orderItems).where(eq(orderItems.orderId, quoteId));
+      const sourceWasBooking = order.status === "confirmed";
 
       const newCode = generateCode("DH");
       const sourceLabel = order.status === "quote" ? "báo giá" : "đặt hàng";
@@ -40,7 +43,13 @@ export async function convertQuoteToOrderForUser(
           .values({ productId: i.productId, warehouseId: order.warehouseId, quantity: toQty(-baseQty) })
           .onConflictDoUpdate({
             target: [stockLevels.productId, stockLevels.warehouseId],
-            set: { quantity: sql`${stockLevels.quantity} - ${toQty(baseQty)}`, updatedAt: sql`now()` },
+            set: {
+              quantity: sql`${stockLevels.quantity} - ${toQty(baseQty)}`,
+              reserved: sourceWasBooking
+                ? sql`greatest(0, ${stockLevels.reserved} - ${toQty(baseQty)})`
+                : stockLevels.reserved,
+              updatedAt: sql`now()`,
+            },
           });
         await tx.insert(stockMovements).values({
           productId: i.productId,
@@ -85,6 +94,10 @@ export async function convertQuoteToOrderForUser(
     if (result.notification?.created) {
       await publishCommittedNotification(result.notification.eventId);
     }
+    revalidatePath(Routes.POS);
+    revalidatePath(Routes.Sales);
+    revalidatePath(Routes.Orders);
+    revalidatePath(Routes.order(quoteId));
     return { ok: true, data: { code: result.code } };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";

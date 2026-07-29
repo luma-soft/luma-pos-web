@@ -55,6 +55,8 @@ export function catalogItemToPosProduct(
     minRetailPrice: String(childPrices.length > 0 ? Math.min(...childPrices) : Number(product.retailPrice)),
     maxRetailPrice: String(childPrices.length > 0 ? Math.max(...childPrices) : Number(product.retailPrice)),
     stock: String(stock),
+    // Bản sao catalog offline không chứa tổng phiếu đặt; khi offline coi như chưa có dữ liệu giữ chỗ.
+    booked: "0",
     units: product.units.map((unit) => ({
       unitName: unit.unitName,
       multiplier: unit.multiplier,
