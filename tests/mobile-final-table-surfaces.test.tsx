@@ -24,6 +24,26 @@ mock.module("@/lib/actions/extras", () => ({
 }));
 mock.module("@/lib/actions/services", () => ({
   createServiceProject: async () => ({ ok: true }),
+  createInstalledAsset: async () => ({ ok: true }),
+  createServiceJob: async () => ({ ok: true }),
+  createWarrantyClaim: async () => ({ ok: true }),
+  deleteServiceCostEntry: async () => ({ ok: true }),
+  deleteServiceHandoverDocument: async () => ({ ok: true }),
+  completeServiceMaintenancePlan: async () => ({ ok: true }),
+  deleteServiceMaintenancePlan: async () => ({ ok: true }),
+  releaseServiceJobMaterialReservations: async () => ({ ok: true }),
+  reserveServiceJobMaterial: async () => ({ ok: true }),
+  saveServiceJobMaterial: async () => ({ ok: true }),
+  saveServiceCostEntry: async () => ({ ok: true }),
+  saveServiceHandoverDocument: async () => ({ ok: true }),
+  saveServiceMaintenancePlan: async () => ({ ok: true }),
+  syncServiceJobMaterialStock: async () => ({ ok: true }),
+  transitionServiceJob: async () => ({ ok: true }),
+  transitionWarrantyClaim: async () => ({ ok: true }),
+  updateInstalledAsset: async () => ({ ok: true }),
+  updateServiceJob: async () => ({ ok: true }),
+  updateServiceChecklist: async () => ({ ok: true }),
+  updateWarrantyClaim: async () => ({ ok: true }),
 }));
 mock.module("@/app/(app)/promotions/promo-widgets", () => ({
   PromoToggle: () => null,
@@ -31,6 +51,10 @@ mock.module("@/app/(app)/promotions/promo-widgets", () => ({
 mock.module("@/app/(app)/projects/project-widgets", () => ({
   ProjectEdit: () => null,
   ProjectToggle: () => null,
+}));
+mock.module("@/lib/actions/product-catalog", () => ({
+  checkProductCatalogRevision: async () => ({ revision: "test" }),
+  syncProductCatalog: async () => ({ revision: "test", products: [] }),
 }));
 
 function renderWithMessages(node: ReactNode) {
@@ -286,6 +310,61 @@ describe("final mobile table surfaces", () => {
     expect(html).toContain("Hoàn tất");
     expect(html.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(3);
     expect(actionCalls).toEqual([["project-1", "active"]]);
+    expect(html.startsWith("<article")).toBe(true);
+  });
+
+  test("service project row preserves table parity and its editor seam", async () => {
+    const { ServiceProjectMobileRow } = await import(
+      "@/app/(app)/services/service-widgets"
+    );
+    const actionCalls: unknown[][] = [];
+    const row = {
+      id: "service-project-1",
+      name: "Lắp camera nhà xưởng Bình Minh",
+      customerId: "customer-1",
+      customerName: "Công ty Bình Minh",
+      address: "KCN Sóng Thần, Bình Dương",
+      note: "Thi công ngoài giờ",
+      status: "active",
+      serviceType: "camera",
+      serviceStage: "active",
+      progressPercent: 65,
+      startsOn: "2026-07-01",
+      targetEndsOn: "2026-08-15",
+      siteContactName: "Anh Minh",
+      siteContactPhone: "0909000000",
+      jobCount: 5,
+      openJobCount: 2,
+      assetCount: 4,
+      openClaimCount: 1,
+      createdAt: new Date("2026-07-01T08:00:00+07:00"),
+    };
+    const html = renderWithMessages(
+      <ServiceProjectMobileRow
+        row={row}
+        renderActions={(actionRow) => {
+          actionCalls.push([actionRow.id, actionRow.serviceStage]);
+          return <button type="button" className="min-h-11 min-w-11">Sửa</button>;
+        }}
+      />,
+    );
+
+    expect(html).toContain("Lắp camera nhà xưởng Bình Minh");
+    expect(html).toContain("Camera");
+    expect(html).toContain("Công ty Bình Minh");
+    expect(html).toContain("65%");
+    expect(html).toContain("2/5");
+    expect(html).toContain(">4<");
+    expect(html).toContain(">1<");
+    expect(html).toContain("Đang thi công");
+    expect(html).toContain("KCN Sóng Thần, Bình Dương");
+    expect(html).toContain("2 lệnh việc chưa hoàn tất");
+    expect(html).toContain("4 thiết bị đang lắp đặt");
+    expect(html).toContain("Xem chi tiết");
+    expect(html).toContain('href="/projects/service-project-1"');
+    expect(html).toContain("Sửa");
+    expect(html.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(actionCalls).toEqual([["service-project-1", "active"]]);
     expect(html.startsWith("<article")).toBe(true);
   });
 });

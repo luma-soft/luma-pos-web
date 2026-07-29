@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Plus } from "lucide-react";
@@ -113,6 +113,65 @@ export function ServiceDashboardFilters({
   );
 }
 
+export function ServiceProjectMobileRow({
+  row,
+  renderActions,
+}: {
+  row: ServiceProjectRow;
+  renderActions: (row: ServiceProjectRow) => ReactNode;
+}) {
+  const t = useTranslations();
+  return (
+    <article className="min-w-0 space-y-4 p-4">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="break-words text-sm font-semibold text-primary-600">{row.name}</h3>
+          <p className="mt-1 break-words text-xs font-medium text-slate-600 dark:text-slate-300">
+            {serviceTypeLabel(t, row.serviceType)}
+          </p>
+          <p className="mt-1 break-words text-xs text-slate-500">{row.customerName ?? "—"}</p>
+        </div>
+        <ServiceBadge
+          label={row.serviceStage ? t(`services.stages.${row.serviceStage}` as never) : "—"}
+          tone={row.serviceStage === "completed" ? "success" : "default"}
+        />
+      </div>
+      <dl className="grid grid-cols-2 gap-x-3 gap-y-4 text-sm">
+        <div className="min-w-0">
+          <dt className="text-xs font-medium text-slate-500">{t("services.fields.progress")}</dt>
+          <dd className="mt-1 font-semibold tabular-nums">{row.progressPercent}%</dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="text-xs font-medium text-slate-500">{t("services.tabs.jobs")}</dt>
+          <dd className="mt-1 font-semibold tabular-nums">{row.openJobCount}/{row.jobCount}</dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="text-xs font-medium text-slate-500">{t("services.fields.assets")}</dt>
+          <dd className="mt-1 font-semibold tabular-nums">{row.assetCount}</dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="text-xs font-medium text-slate-500">{t("services.tabs.warranty")}</dt>
+          <dd className="mt-1 font-semibold tabular-nums">{row.openClaimCount}</dd>
+        </div>
+      </dl>
+      <div className="grid gap-2 border-t border-border-soft pt-3 text-sm text-slate-600 dark:text-slate-300">
+        <p className="break-words">{row.address ?? "—"}</p>
+        <p>{t("services.summary.openJobs", { count: row.openJobCount })}</p>
+        <p>{t("services.summary.assets", { count: row.assetCount })}</p>
+      </div>
+      <div className="flex min-h-11 flex-wrap items-center justify-end gap-2 border-t border-border-soft pt-3">
+        <Link
+          href={Routes.project(row.id)}
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-border px-3 text-sm font-semibold text-primary-600 hover:bg-surface-2"
+        >
+          {t("projects.viewDetail")}
+        </Link>
+        {renderActions(row)}
+      </div>
+    </article>
+  );
+}
+
 export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProjectRow[]; customers: { id: string; name: string }[] }) {
   const t = useTranslations();
   const columns: DataTableColumn<ServiceProjectRow>[] = [
@@ -157,6 +216,14 @@ export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProject
       columns={columns}
       getRowId={(row) => row.id}
       minWidth="980px"
+      renderMobileRow={({ row }) => (
+        <ServiceProjectMobileRow
+          row={row}
+          renderActions={(actionRow) => (
+            <ProjectEdit project={actionRow} customers={customers} />
+          )}
+        />
+      )}
       renderDetail={(row) => (
         <div className="grid gap-3 bg-surface px-4 py-4 sm:grid-cols-2 lg:grid-cols-4">
           <Text size="sm" text={row.address ?? "—"} />
