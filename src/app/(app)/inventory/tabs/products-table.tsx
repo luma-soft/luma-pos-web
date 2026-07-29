@@ -426,7 +426,7 @@ export function ProductUnitSelector({
       onPointerDown={stopRowToggle}
       onKeyDown={stopRowToggle}
       aria-label={`Đơn vị tính ${productName}`}
-      className="min-h-9 max-w-full rounded-lg border border-border-soft bg-surface px-2 py-1 text-sm text-slate-600 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:text-slate-300"
+      className="min-h-11 min-w-11 max-w-full rounded-lg border border-border-soft bg-surface px-2 py-1 text-sm text-slate-600 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:text-slate-300"
     >
       <option value={baseUnit}>{baseUnit}</option>
       {units.map((unit) => (
