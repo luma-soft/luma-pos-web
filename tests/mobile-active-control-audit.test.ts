@@ -354,16 +354,20 @@ function classTokenScenarios(
         if (child.arguments.length > 1) return unknown();
         const options = child.arguments[0];
         if (!ts.isObjectLiteralExpression(options)) return unknown();
-        const optionClassName = (
+        type OptionClasses = {
+          class: string[][];
+          className: string[][];
+        };
+        const optionClasses = (
           object: ts.ObjectLiteralExpression,
-          initial: string[][],
-        ): string[][] => {
+          initial: OptionClasses,
+        ): OptionClasses => {
           let result = initial;
           for (const property of object.properties) {
             if (ts.isSpreadAssignment(property)) {
               result = ts.isObjectLiteralExpression(property.expression)
-                ? optionClassName(property.expression, result)
-                : unknown();
+                ? optionClasses(property.expression, result)
+                : { class: unknown(), className: unknown() };
               continue;
             }
             if (
@@ -371,22 +375,33 @@ function classTokenScenarios(
               !ts.isShorthandPropertyAssignment(property)
             ) {
               const key = staticPropertyName(property.name);
-              if (!key || key === "className") result = unknown();
+              if (!key) {
+                result = { class: unknown(), className: unknown() };
+              } else if (key === "class" || key === "className") {
+                result = { ...result, [key]: unknown() };
+              }
               continue;
             }
             const key = staticPropertyName(property.name);
             if (!key) {
-              result = unknown();
+              result = { class: unknown(), className: unknown() };
               continue;
             }
-            if (key !== "className") continue;
-            result = ts.isPropertyAssignment(property)
-              ? scenarios(property.initializer)
-              : scenarios(property.name);
+            if (key !== "class" && key !== "className") continue;
+            result = {
+              ...result,
+              [key]: ts.isPropertyAssignment(property)
+                ? scenarios(property.initializer)
+                : scenarios(property.name),
+            };
           }
           return result;
         };
-        return optionClassName(options, [[]]);
+        const classes = optionClasses(options, {
+          class: [[]],
+          className: [[]],
+        });
+        return combine(classes.class, classes.className);
       }
       if (
         !ts.isIdentifier(child.expression) ||
@@ -1555,6 +1570,115 @@ describe("mobile active-control audit oracle", () => {
     );
 
     expect(failures.map(({ tag }) => tag)).toEqual(["Link"]);
+  });
+
+  test("buttonVariants models CVA class then className merge and per-key spread overwrites", () => {
+    const failures = auditSource(
+      "fixture.tsx",
+      `
+        const safe = "inline-flex h-11 min-w-11 sm:h-11 sm:min-w-11 md:h-11 md:min-w-11";
+
+        export function Fixture() {
+          return <div>
+            <a
+              href="/class-only"
+              className={buttonVariants({ class: "h-8 w-8" })}
+            >
+              unsafe class
+            </a>
+            <button
+              type="button"
+              className={buttonVariants({
+                class: "h-8 w-8",
+                className: safe,
+              })}
+            >
+              safe className wins
+            </button>
+            <button
+              type="button"
+              className={buttonVariants({
+                className: safe,
+                class: "h-8 w-8",
+              })}
+            >
+              safe regardless of object key order
+            </button>
+            <Link
+              href="/class-name-unsafe"
+              className={buttonVariants({
+                class: safe,
+                className: "h-8 w-8",
+              })}
+            >
+              unsafe className
+            </Link>
+            <button
+              type="button"
+              className={buttonVariants({
+                class: "h-8 w-8",
+                ...{ class: safe },
+              })}
+            >
+              safe later class overwrite
+            </button>
+            <button
+              type="button"
+              className={buttonVariants({
+                className: "h-8 w-8",
+                ...{ className: safe },
+              })}
+            >
+              safe later className overwrite
+            </button>
+            <Link
+              href="/spread-after-class"
+              className={buttonVariants({
+                class: safe,
+                ...dynamicOptions,
+              })}
+            >
+              unsafe spread after class
+            </Link>
+            <Link
+              href="/spread-after-class-name"
+              className={buttonVariants({
+                className: safe,
+                ...dynamicOptions,
+              })}
+            >
+              unsafe spread after className
+            </Link>
+            <Link
+              href="/class-after-spread"
+              className={buttonVariants({
+                ...dynamicOptions,
+                class: safe,
+              })}
+            >
+              unsafe unknown className still appends
+            </Link>
+            <button
+              type="button"
+              className={buttonVariants({
+                ...dynamicOptions,
+                className: safe,
+              })}
+            >
+              safe className restores both axes
+            </button>
+          </div>;
+        }
+      `,
+    );
+
+    expect(failures.map(({ tag }) => tag)).toEqual([
+      "a",
+      "Link",
+      "Link",
+      "Link",
+      "Link",
+    ]);
   });
 
   test("accepts persistent pre-lg sizing, safe label wrappers, and lg-only surfaces", () => {
