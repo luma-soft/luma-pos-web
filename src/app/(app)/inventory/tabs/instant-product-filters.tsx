@@ -39,6 +39,7 @@ export function InstantProductFilters({
           ...categories.map((item) => ({ value: item.id, label: item.name })),
         ]}
         aria-label={labels.allCategories}
+        menuMinWidth={440}
         rootClassName="w-full sm:w-auto"
         className="min-w-0 sm:min-w-44"
       />
