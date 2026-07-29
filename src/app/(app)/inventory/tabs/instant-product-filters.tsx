@@ -40,8 +40,8 @@ export function InstantProductFilters({
         ]}
         aria-label={labels.allCategories}
         menuMinWidth={440}
-        rootClassName="w-full sm:w-auto"
-        className="min-w-0 sm:min-w-44"
+        rootClassName="w-full sm:w-64"
+        className="min-w-0"
       />
       <details className="group w-full sm:contents">
         <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center gap-2 rounded-xl border border-border bg-surface text-sm font-bold text-slate-600 marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:hidden min-w-11">
