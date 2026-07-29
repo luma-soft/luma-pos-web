@@ -1556,6 +1556,9 @@ export function PosClient({
           const ordered = orderedBaseQuantityByProduct.get(l.product.id) ?? 0;
           const stockInsufficient = exceedsAvailableStock(stockManaged, Number(l.product.stock), ordered, isReturnDraft);
           const unitOptions = buildPosUnitOptions(l.product.baseUnit, l.product.units);
+          const linePriceBookName = l.priceBook === undefined
+            ? null
+            : data.priceBooks.find((book) => (book.isDefault ? "" : book.id) === l.priceBook)?.name ?? "Giá Chung";
           return (
             <div
               key={l.key}
@@ -1621,14 +1624,21 @@ export function PosClient({
                   />
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-3">
-                  <button
-                    type="button"
-                    disabled={isCameraQuoteDraft}
-                    onClick={() => setEditKey(editKey === l.key ? null : l.key)}
-                    className="flex min-h-11 items-center text-sm tabular-nums text-slate-500 hover:text-primary-600"
-                  >
-                    {formatCurrency(eff.price)}{posUnitSuffix(l.unitName)}
-                  </button>
+                  <div className="flex flex-col items-start gap-1">
+                    <button
+                      type="button"
+                      disabled={isCameraQuoteDraft}
+                      onClick={() => setEditKey(editKey === l.key ? null : l.key)}
+                      className="flex min-h-11 items-center text-sm tabular-nums text-slate-500 hover:text-primary-600"
+                    >
+                      {formatCurrency(eff.price)}{posUnitSuffix(l.unitName)}
+                    </button>
+                    {linePriceBookName && (
+                      <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
+                        {linePriceBookName}
+                      </span>
+                    )}
+                  </div>
                   <span className="text-base font-bold tabular-nums">{formatCurrency(eff.price * l.quantity)}</span>
                 </div>
                 <input
@@ -1661,11 +1671,6 @@ export function PosClient({
                     <GripVertical className="w-3.5 h-3.5" />
                   </button>
                   <span className={cn("font-medium text-sm whitespace-normal break-words", stockInsufficient && "text-er")}>{l.product.name}</span>
-                  {l.priceBook !== undefined && (
-                    <span className="shrink-0 rounded bg-sky-50 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
-                      {data.priceBooks.find((book) => (book.isDefault ? "" : book.id) === l.priceBook)?.name ?? "Giá Chung"}
-                    </span>
-                  )}
                   {eff.pct > 0 && (
                     <span className={cn(
                       "shrink-0 text-xs font-bold rounded px-1",
@@ -1704,14 +1709,21 @@ export function PosClient({
                     <StockQuantityTooltip stock={Number(l.product.stock)} ordered={l.quantity * l.unitMultiplier} unit={l.product.baseUnit} />
                   )}
                 </PosQuantitySlot>
-                <button
-                  disabled={isCameraQuoteDraft}
-                  onClick={() => setEditKey(editKey === l.key ? null : l.key)}
-                  title={t("pos.priceEditor.editHint")}
-                  className="w-28 text-right text-base tabular-nums text-slate-500 hover:text-primary-600 shrink-0"
-                >
-                  {formatCurrency(eff.price)}
-                </button>
+                <div className="flex w-28 shrink-0 flex-col items-end gap-1">
+                  <button
+                    disabled={isCameraQuoteDraft}
+                    onClick={() => setEditKey(editKey === l.key ? null : l.key)}
+                    title={t("pos.priceEditor.editHint")}
+                    className="w-full text-right text-base tabular-nums text-slate-500 hover:text-primary-600"
+                  >
+                    {formatCurrency(eff.price)}
+                  </button>
+                  {linePriceBookName && (
+                    <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
+                      {linePriceBookName}
+                    </span>
+                  )}
+                </div>
                 <span className="w-28 text-right text-base font-bold tabular-nums shrink-0">{formatCurrency(eff.price * l.quantity)}</span>
                 <button disabled={isCameraQuoteDraft} onClick={() => setEditKey(editKey === l.key ? null : l.key)} className="w-7 h-7 rounded-md hover:bg-surface-2 grid place-items-center shrink-0 text-slate-400 disabled:cursor-not-allowed disabled:opacity-40">
                   <MoreVertical className="w-4 h-4" />
