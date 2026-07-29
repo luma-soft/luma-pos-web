@@ -125,7 +125,11 @@ export function ServiceProjectMobileRow({
     <article className="min-w-0 space-y-4 p-4">
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="break-words text-sm font-semibold text-primary-600">{row.name}</h3>
+          <h3 className="break-words text-sm font-semibold text-primary-600">
+            <Link href={Routes.project(row.id)} className="hover:underline">
+              {row.name}
+            </Link>
+          </h3>
           <p className="mt-1 break-words text-xs font-medium text-slate-600 dark:text-slate-300">
             {serviceTypeLabel(t, row.serviceType)}
           </p>
@@ -179,7 +183,15 @@ export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProject
       key: "name",
       label: t("projects.cols.name"),
       required: true,
-      render: (row) => <span className="font-semibold text-primary-600">{row.name}</span>,
+      render: (row) => (
+        <Link
+          href={Routes.project(row.id)}
+          onClick={stopRowToggle}
+          className="font-semibold text-primary-600 hover:underline"
+        >
+          {row.name}
+        </Link>
+      ),
     },
     { key: "type", label: t("services.fields.type"), defaultVisible: true, render: (row) => serviceTypeLabel(t, row.serviceType) },
     { key: "customer", label: t("orders.cols.customer"), defaultVisible: true, render: (row) => row.customerName ?? "—" },

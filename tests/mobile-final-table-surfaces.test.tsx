@@ -7,6 +7,7 @@ import viMessages from "../messages/vi.json";
 
 const capturedDataTableProps: Record<string, unknown>[] = [];
 const capturedProjectEditProps: Record<string, unknown>[] = [];
+const stoppedRowToggleEvents: unknown[] = [];
 const navigationCalls: string[] = [];
 let productSelectedIds = new Set<string>();
 let productVisibleIds: string[] = [];
@@ -18,7 +19,9 @@ mock.module("@/components/data-table", () => ({
     return <div data-testid="captured-data-table" />;
   },
   RowPreviewModal: () => null,
-  stopRowToggle: () => undefined,
+  stopRowToggle: (event: unknown) => {
+    stoppedRowToggleEvents.push(event);
+  },
 }));
 mock.module("next/navigation", () => ({
   usePathname: () => "/test",
@@ -386,7 +389,7 @@ describe("final mobile table surfaces", () => {
     expect(html.startsWith("<article")).toBe(true);
   });
 
-  test("service projects table binds its mobile renderer to the exact row and editor props", async () => {
+  test("service projects table links its mobile and desktop project names without toggling the desktop row", async () => {
     const { ServiceProjectsTable } = await import(
       "@/app/(app)/services/service-widgets"
     );
@@ -424,6 +427,7 @@ describe("final mobile table surfaces", () => {
     ];
     capturedDataTableProps.length = 0;
     capturedProjectEditProps.length = 0;
+    stoppedRowToggleEvents.length = 0;
 
     renderWithMessages(
       <ServiceProjectsTable rows={rows} customers={customers} />,
@@ -433,7 +437,6 @@ describe("final mobile table surfaces", () => {
     expect(tableProps.tableId).toBe("services.projects");
     expect(tableProps.rows).toBe(rows);
     expect(tableProps.renderMobileRow).toBeFunction();
-
     const renderMobileRow = tableProps.renderMobileRow as (props: {
       row: typeof row;
       expanded: boolean;
@@ -456,12 +459,37 @@ describe("final mobile table surfaces", () => {
     expect(html).toContain("4 thiết bị đang lắp đặt");
     expect(html).toContain("Xem chi tiết");
     expect(html).toContain('href="/projects/service-project-1"');
+    expect(html).toMatch(
+      /<h3[^>]*><a [^>]*href="\/projects\/service-project-1"[^>]*>Lắp camera nhà xưởng Bình Minh<\/a><\/h3>/,
+    );
     expect(html).toContain("Sửa");
     expect(html.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(2);
     expect(html.startsWith("<article")).toBe(true);
     expect(capturedProjectEditProps).toHaveLength(1);
     expect(capturedProjectEditProps[0].project).toBe(row);
     expect(capturedProjectEditProps[0].customers).toBe(customers);
+
+    const nameColumn = (
+      tableProps.columns as Array<{
+        key: string;
+        render: (row: typeof row) => ReactNode;
+      }>
+    ).find((column) => column.key === "name");
+    expect(nameColumn).toBeDefined();
+    const desktopName = nameColumn!.render(row);
+    expect(renderToStaticMarkup(desktopName)).toMatch(
+      /^<a [^>]*href="\/projects\/service-project-1"[^>]*>Lắp camera nhà xưởng Bình Minh<\/a>$/,
+    );
+    expect(isValidElement(desktopName)).toBe(true);
+    const desktopNameProps = (
+      desktopName as React.ReactElement<{
+        onClick?: (event: unknown) => void;
+      }>
+    ).props;
+    const clickEvent = { type: "click" };
+    expect(desktopNameProps.onClick).toBeFunction();
+    desktopNameProps.onClick!(clickEvent);
+    expect(stoppedRowToggleEvents).toEqual([clickEvent]);
   });
 
   test("product mobile row and select-all toolbar invoke the existing selection seams", async () => {
