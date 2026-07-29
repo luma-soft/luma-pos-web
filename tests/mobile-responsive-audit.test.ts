@@ -265,6 +265,21 @@ function pairedRegions(surface: PairedSurface) {
 }
 
 describe("route-wide mobile responsive audit", () => {
+  test("e-invoice mobile row preserves the desktop before-VAT amount", () => {
+    const source = readFileSync(
+      "src/app/(app)/sales/tabs/einvoices-table.tsx",
+      "utf8",
+    );
+    const mobile = source.slice(
+      source.indexOf("renderMobileRow="),
+      source.indexOf("renderDetail="),
+    );
+
+    expect(source).toContain('key: "beforeVat"');
+    expect(mobile).toContain('t("einvoice.cols.beforeVat")');
+    expect(mobile).toContain("formatCurrency(Number(row.totalBeforeVat))");
+  });
+
   test("every mobile record surface preserves required business fields beside its desktop table", () => {
     for (const surface of pairedSurfaces) {
       const { mobile, desktop } = pairedRegions(surface);

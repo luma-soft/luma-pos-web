@@ -63,6 +63,10 @@ export function EInvoicesTable({ rows }: { rows: EInvoiceRow[] }) {
             {row.orderCode}
           </OrderDetailLink>
           <p className="break-words text-sm">{row.buyerName}{row.buyerTaxCode ? ` · MST: ${row.buyerTaxCode}` : ""}</p>
+          <p className="flex items-center justify-between gap-3 text-sm">
+            <span className="text-slate-500">{t("einvoice.cols.beforeVat")}</span>
+            <span className="shrink-0 font-medium tabular-nums">{formatCurrency(Number(row.totalBeforeVat))}</span>
+          </p>
           <p className="text-xs text-slate-500">{row.issuedAt ? formatDate(row.issuedAt) : "—"} · VAT {formatCurrency(Number(row.vatAmount))} ({Number(row.vatRate)}%)</p>
         </div>
       )}

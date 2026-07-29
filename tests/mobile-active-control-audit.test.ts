@@ -136,6 +136,79 @@ function classTokens(
   );
 }
 
+function classTokenScenarios(
+  node: ts.JsxOpeningLikeElement,
+  constants: Map<string, string>,
+) {
+  const className = attribute(node, "className");
+  if (!className?.initializer) return [[]];
+  const tokens = (value: string) => value.split(/\s+/).filter(Boolean);
+  const combine = (left: string[][], right: string[][]) => {
+    const combined: string[][] = [];
+    for (const a of left) {
+      for (const b of right) {
+        combined.push([...a, ...b]);
+        if (combined.length >= 64) return combined;
+      }
+    }
+    return combined;
+  };
+  const scenarios = (child: ts.Node): string[][] => {
+    if (ts.isJsxExpression(child)) {
+      return child.expression ? scenarios(child.expression) : [[]];
+    }
+    if (
+      ts.isStringLiteral(child) ||
+      ts.isNoSubstitutionTemplateLiteral(child)
+    ) {
+      return [tokens(child.text)];
+    }
+    if (ts.isIdentifier(child)) {
+      const resolved = constants.get(child.text);
+      return resolved ? [tokens(resolved)] : [[]];
+    }
+    if (
+      ts.isBinaryExpression(child) &&
+      child.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+    ) {
+      return [[], ...scenarios(child.right)];
+    }
+    if (ts.isConditionalExpression(child)) {
+      return [
+        ...scenarios(child.whenTrue),
+        ...scenarios(child.whenFalse),
+      ];
+    }
+    if (ts.isCallExpression(child)) {
+      return child.arguments.reduce<string[][]>(
+        (result, argument) => combine(result, scenarios(argument)),
+        [[]],
+      );
+    }
+    if (ts.isParenthesizedExpression(child)) {
+      return scenarios(child.expression);
+    }
+    if (ts.isArrayLiteralExpression(child)) {
+      return child.elements.reduce<string[][]>(
+        (result, element) => combine(result, scenarios(element)),
+        [[]],
+      );
+    }
+    if (ts.isTemplateExpression(child)) {
+      return child.templateSpans.reduce<string[][]>(
+        (result, span) =>
+          combine(
+            combine(result, scenarios(span.expression)),
+            [tokens(span.literal.text)],
+          ),
+        [tokens(child.head.text)],
+      );
+    }
+    return [[]];
+  };
+  return scenarios(className.initializer);
+}
+
 function isInsideNamedFunction(node: ts.Node, name: string) {
   let current: ts.Node | undefined = node;
   while (current) {
@@ -341,41 +414,9 @@ function hasDisplayBox(classes: string[]) {
 }
 
 function sharedControlHasUnsafeOverride(
+  tag: string,
   classes: string[],
 ) {
-  const hasUnsafeFixed = (axis: "h" | "w") =>
-    classes.some((token) => {
-      const parsed = responsiveParts(token);
-      if (!parsed || !["base", "sm", "md"].includes(parsed.breakpoint)) {
-        return false;
-      }
-      return new RegExp(`^(?:${axis}|size)-(?:0|[1-9]|10)$`).test(parsed.utility);
-    });
-  const hasSafeMin = (axis: "h" | "w") =>
-    classes.some((token) => {
-      const parsed = responsiveParts(token);
-      if (!parsed || !["base", "sm", "md"].includes(parsed.breakpoint)) {
-        return false;
-      }
-      const match = parsed.utility.match(new RegExp(`^min-${axis}-(.+)$`));
-      return Boolean(match && (axis === "h"
-        ? numericScaleIsSafe(match[1])
-        : widthValueIsSafe(match[1])));
-    });
-  if (
-    classes.some((token) => {
-      const parsed = responsiveParts(token);
-      return Boolean(
-        parsed &&
-        ["base", "sm", "md"].includes(parsed.breakpoint) &&
-        /^min-h-(?:auto|0|[1-9]|10)$/.test(parsed.utility),
-      );
-    }) ||
-    (hasUnsafeFixed("h") && !hasSafeMin("h")) ||
-    (hasUnsafeFixed("w") && !hasSafeMin("w"))
-  ) {
-    return true;
-  }
   if (
     classes.some((token) =>
       /^(?:sm|md):\[[^\]]+\]:(?:h|size|min-h|min-w|w)-(?:auto|0|[1-9]|10)$/.test(
@@ -385,54 +426,81 @@ function sharedControlHasUnsafeOverride(
   ) {
     return true;
   }
-  let minHeightSafe = false;
+  const minimumSized = tag === "MoneyInput" || tag === "Textarea";
+  const state = {
+    fixedH: !minimumSized,
+    minH: minimumSized,
+    fixedW: tag !== "MoneyInput",
+    minW: minimumSized,
+  };
   for (const breakpoint of ["base", "sm", "md"]) {
     for (const token of classes) {
       const parsed = responsiveParts(token);
       if (parsed?.breakpoint !== breakpoint) continue;
+      const height = parsed.utility.match(/^h-(.+)$/);
+      const width = parsed.utility.match(/^w-(.+)$/);
+      const size = parsed.utility.match(/^size-(.+)$/);
       const minHeight = parsed.utility.match(/^min-h-(.+)$/);
-      if (minHeight) minHeightSafe = numericScaleIsSafe(minHeight[1]);
+      const minWidth = parsed.utility.match(/^min-w-(.+)$/);
+      if (height) state.fixedH = numericScaleIsSafe(height[1]);
+      if (width && width[1] !== "auto") {
+        state.fixedW = widthValueIsSafe(width[1]);
+      }
+      if (size) {
+        state.fixedH = numericScaleIsSafe(size[1]);
+        state.fixedW = widthValueIsSafe(size[1]);
+      }
+      if (minHeight) state.minH = numericScaleIsSafe(minHeight[1]);
+      if (minWidth) state.minW = widthValueIsSafe(minWidth[1]);
     }
-    if (
-      !minHeightSafe &&
-      classes.some((token) => {
-        const parsed = responsiveParts(token);
-        return (
-          parsed?.breakpoint === breakpoint &&
-          /^(?:h|size)-(?:auto|0|[1-9]|10)$/.test(parsed.utility)
-        );
-      })
-    ) {
-      return true;
-    }
+    if (!(state.fixedH || state.minH) || !(state.fixedW || state.minW)) return true;
   }
   return false;
 }
 
 function explicitMobileColumnDeclarations(source: ts.SourceFile) {
-  const declarations: Array<{
-    name: string;
-    scope: ts.Node;
-    declaration: ts.VariableDeclaration;
-  }> = [];
-  const mobileTables: Array<{ name: string; scope: ts.Node }> = [];
-  const functionScope = (node: ts.Node) => {
+  const declarations: ts.VariableDeclaration[] = [];
+  const lexicalScope = (node: ts.Node) => {
     let current: ts.Node | undefined = node;
-    while (current && !ts.isFunctionLike(current)) current = current.parent;
+    while (
+      current &&
+      !ts.isBlock(current) &&
+      !ts.isSourceFile(current) &&
+      !ts.isCaseBlock(current)
+    ) {
+      current = current.parent;
+    }
     return current ?? source;
   };
+  const isAncestor = (ancestor: ts.Node, node: ts.Node) =>
+    ancestor.getStart(source) <= node.getStart(source) &&
+    ancestor.getEnd() >= node.getEnd();
+  const resolve = (identifier: ts.Identifier) => {
+    const candidates = declarations.filter((declaration) =>
+      ts.isIdentifier(declaration.name) &&
+      declaration.name.text === identifier.text &&
+      declaration.getStart(source) < identifier.getStart(source) &&
+      isAncestor(lexicalScope(declaration), identifier),
+    );
+    candidates.sort((a, b) => {
+      const scopeWidth = lexicalScope(a).getWidth(source) - lexicalScope(b).getWidth(source);
+      return scopeWidth || b.getStart(source) - a.getStart(source);
+    });
+    return candidates[0];
+  };
+  const mobileDeclarations = new Set<ts.VariableDeclaration>();
   const visit = (node: ts.Node) => {
     if (
       ts.isVariableDeclaration(node) &&
       ts.isIdentifier(node.name) &&
       node.type?.getText().includes("DataTableColumn")
     ) {
-      declarations.push({
-        name: node.name.text,
-        scope: functionScope(node),
-        declaration: node,
-      });
+      declarations.push(node);
     }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  const associate = (node: ts.Node) => {
     if (
       (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
       jsxTagName(node) === "DataTableShell" &&
@@ -445,23 +513,14 @@ function explicitMobileColumnDeclarations(source: ts.SourceFile) {
         columns.expression &&
         ts.isIdentifier(columns.expression)
       ) {
-        mobileTables.push({
-          name: columns.expression.text,
-          scope: functionScope(node),
-        });
+        const declaration = resolve(columns.expression);
+        if (declaration) mobileDeclarations.add(declaration);
       }
     }
-    ts.forEachChild(node, visit);
+    ts.forEachChild(node, associate);
   };
-  visit(source);
-  return new Set(
-    declarations
-      .filter((declaration) =>
-        mobileTables.some((table) =>
-          table.name === declaration.name && table.scope === declaration.scope,
-        ))
-      .map((declaration) => declaration.declaration),
-  );
+  associate(source);
+  return mobileDeclarations;
 }
 
 function isCoveredByExplicitMobileRenderer(
@@ -488,10 +547,10 @@ function ownHitArea(
     return true;
   }
   if (node.getText().includes("buttonVariants(")) {
-    return !sharedControlHasUnsafeOverride(classes);
+    return !sharedControlHasUnsafeOverride(tag, classes);
   }
   if (GUARANTEED_SHARED_CONTROLS.has(tag)) {
-    return !sharedControlHasUnsafeOverride(classes);
+    return !sharedControlHasUnsafeOverride(tag, classes);
   }
 
   const vertical = safeAtBaseAndTablet(classes, "vertical");
@@ -562,10 +621,13 @@ function auditSource(
         ["checkbox", "radio", "file", "color"].includes(inputType ?? "") &&
         insideInteractiveLabel(node);
       const classes = classTokens(node, constants);
+      const scenarios = classTokenScenarios(node, constants);
       if (
         !isNestedChoice &&
-        !ownHitArea(node, classes) &&
-        !outerHitArea(node, constants)
+        scenarios.some((scenario) =>
+          !ownHitArea(node, scenario) &&
+          !outerHitArea(node, constants),
+        )
       ) {
         const { line } = source.getLineAndCharacterOfPosition(node.getStart());
         candidates.push({
@@ -756,6 +818,8 @@ describe("mobile active-control audit oracle", () => {
             <button className="h-11 px-3 sm:h-8">shrinks at tablet</button>
             <MoneyInput value={0} className="min-h-0" />
             <Button className="w-8">narrow shared button</Button>
+            <MoneyInput value={0} className={cn(compact && "min-h-0")} />
+            <button className={cn("h-11 w-11", compact && "w-8")}>conditionally narrow</button>
             <button className={cn(active && "min-h-11 min-w-11")}>conditional sizing</button>
             <SearchableSelect className="[&>button]:h-11 md:[&>button]:h-10" />
           </div>;
@@ -773,6 +837,8 @@ describe("mobile active-control audit oracle", () => {
       "button",
       "MoneyInput",
       "Button",
+      "MoneyInput",
+      "button",
       "button",
       "SearchableSelect",
     ]);
@@ -787,6 +853,37 @@ describe("mobile active-control audit oracle", () => {
           label: "Project",
           render: (row) => <Link href={"/projects/" + row.id}>{row.name}</Link>,
         }];
+      `,
+    );
+
+    expect(failures.map(({ tag }) => tag)).toEqual(["Link"]);
+  });
+
+  test("associates custom mobile renderers with the exact block-scoped columns binding", () => {
+    const failures = auditSource(
+      "fixture.tsx",
+      `
+        export function Fixture() {
+          let safeTable;
+          {
+            const columns: DataTableColumn<Row>[] = [{
+              key: "safe",
+              label: "Safe",
+              render: (row) => <Link href={"/safe/" + row.id}>{row.name}</Link>,
+            }];
+            safeTable = <DataTableShell columns={columns} renderMobileRow={() => <div>safe</div>} />;
+          }
+          let unsafeTable;
+          {
+            const columns: DataTableColumn<Row>[] = [{
+              key: "unsafe",
+              label: "Unsafe",
+              render: (row) => <Link href={"/unsafe/" + row.id}>{row.name}</Link>,
+            }];
+            unsafeTable = <DataTableShell columns={columns} />;
+          }
+          return <>{safeTable}{unsafeTable}</>;
+        }
       `,
     );
 
@@ -809,6 +906,10 @@ describe("mobile active-control audit oracle", () => {
                 <button className="h-8 w-8">desktop only</button>
               </div>
               <button className="fixed inset-0">full-screen dismiss target</button>
+              <MoneyInput
+                value={0}
+                className={cn(compact && "min-h-0", "min-h-11")}
+              />
             </div>;
           }
         `,
