@@ -15,9 +15,10 @@ import {
   calculateDashboardFinancials,
   mergeNetRevenueByDay,
 } from "@/lib/dashboard/financials";
+import { resolveDashboardRange, type DashboardRange } from "@/lib/dashboard/range";
 import { stockManagedCategoryCondition } from "@/lib/data/product-stock";
 
-export type DashboardRange = "today" | "7d" | "30d" | "month";
+export type { DashboardRange } from "@/lib/dashboard/range";
 
 function rangeStart(range: DashboardRange): Date {
   const d = new Date();
@@ -28,7 +29,8 @@ function rangeStart(range: DashboardRange): Date {
   return d;
 }
 
-export async function getDashboard(range: DashboardRange = "7d") {
+export async function getDashboard(requestedRange?: DashboardRange) {
+  const range = resolveDashboardRange(requestedRange);
   const since = rangeStart(range);
   // chỉ đơn bán thật: loại quote/merged/cancelled/draft
   const realSale = inArray(orders.status, ["completed", "returned"]);
