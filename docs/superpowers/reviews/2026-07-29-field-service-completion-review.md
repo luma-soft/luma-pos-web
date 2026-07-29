@@ -12,7 +12,7 @@ credentials and regional endpoint documentation are available.
 | # | Area | Delivered invariant | Primary evidence |
 |---|---|---|---|
 | 1 | Evidence deletion | Signed evidence cannot be deleted; unsigned evidence is tombstoned transactionally and Storage cleanup is leased/idempotent. | Evidence deletion PGlite suite and migrations `0065–0066` |
-| 2 | Signed handover | Server builds and hashes the canonical snapshot; stale or invalidated signatures cannot complete a job. | Signed-snapshot suite and migrations `0067–0070` |
+| 2 | Signed handover | Server builds and hashes the canonical snapshot; stale or invalidated signatures cannot complete a job; terminal handovers cannot be replaced through either the core or direct database writes. | Signed-snapshot suite and migrations `0067–0070`, `0088` |
 | 3 | Visits and field state | Actionable check-in only, one active visit, exact checkout, terminal guards, assignment reauthorization and real lock-order tests. | Visit state/concurrency suites and migrations `0071–0074` |
 | 4 | Maintenance | One outstanding occurrence/job, transactional completion and monotonic cycles, exact technician/manager notifications and durable push claims. | Maintenance manager/concurrency/push suites and migrations `0075–0076` |
 | 5 | Customer portal and SLA | One-time submit plus status view, streaming/canonical private photos, durable rate limits/cleanup, manager triage and SLA. | Portal/multipart/job-lock suites and migrations `0077–0079` |
@@ -39,7 +39,7 @@ credentials and regional endpoint documentation are available.
 
 ## Migration record
 
-- Field-service completion migrations: `0065` through `0087`.
+- Field-service completion migrations: `0065` through `0088`.
 - Applied migrations are immutable.
 - The migration runner was executed twice against the configured PostgreSQL
   database; both runs reported zero pending migrations.
@@ -73,8 +73,19 @@ Fresh verification against the delivery source state:
   analyze lib` reported no issues; all 465 tests passed.
 - Flutter repository-wide format check identified 17 pre-existing formatting
   drifts outside this delivery and made no writes (`--output=none`).
-- Migration runner: two consecutive zero-pending runs. Direct PostgreSQL audit:
-  24 migration records in the `0065–0087` filename range (23 Field Service plus
+- Migration runner: migration `0088` applied followed by a zero-pending run.
+  Direct PostgreSQL audit: 25 migration records in the `0065–0088` filename
+  range (24 Field Service plus
   the separate `0065_store_settings_baseline_repair.sql`), installed-device IP
   column present, active-visit index present, private revision table present
   with RLS, and `service_role` authority access denied.
+
+## Final review closure
+
+The final read-only acceptance review found one Important issue: an assigned
+technician could supersede an active signature after a job had already reached
+`completed`. The delivery now rejects new terminal-job signatures after the
+locked idempotency lookup and migration `0088` blocks direct
+`INSERT`/`UPDATE`/`DELETE` on terminal-job signature rows. Regression coverage
+proves core replacement and direct database mutation are both rejected while
+exact idempotent replay remains available.

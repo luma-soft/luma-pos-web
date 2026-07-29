@@ -544,6 +544,7 @@ export async function createServiceSignatureCore(
   ) throw new Error("SERVICE_SIGNATURE_ATTACHMENT_INVALID");
   const job = await requireLockedServiceJobAccess(tx, actor, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "job.signature", async () => {
+    requireFieldJobMutable(job.status);
     const snapshot = await buildAuthoritativeSignedSnapshot(tx, input.jobId, {
       signerName: input.signerName,
       signerRole: input.signerRole || null,

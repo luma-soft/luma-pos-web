@@ -266,7 +266,10 @@ assert.equal(
 );
 
 const completionFirstFixture = await createFixture("DV-SNAPSHOT-6");
-await signFixture(completionFirstFixture, "completion-first");
+const completionFirstSignature = await signFixture(
+  completionFirstFixture,
+  "completion-first",
+);
 await db.transaction((tx) => completeFieldServiceJobCore(tx, actor, {
   jobId: completionFirstFixture.job.id,
   clientMutationId: "snapshot-completion-first",
@@ -301,6 +304,59 @@ const [stillValid] = await db.select().from(serviceSignatures)
   .where(eq(serviceSignatures.jobId, completionFirstFixture.job.id));
 assert.equal(stillCompleted.status, "completed");
 assert.equal(stillValid.invalidatedAt, null);
+const terminalReplay = await signFixture(completionFirstFixture, "completion-first");
+assert.equal(terminalReplay.signatureId, completionFirstSignature.signatureId);
+await assert.rejects(
+  db.transaction((tx) => createServiceSignatureCore(tx, actor, {
+    jobId: completionFirstFixture.job.id,
+    attachmentId: completionFirstFixture.signatureAttachment.id,
+    signerName: "Không được ký đè",
+    clientMutationId: "snapshot-terminal-resign",
+  })),
+  isServiceSnapshotJobLocked,
+);
+await assert.rejects(
+  db.update(serviceSignatures).set({ signerName: "Không được sửa trực tiếp" })
+    .where(eq(serviceSignatures.id, stillValid.id)),
+  isServiceSnapshotJobLocked,
+);
+await assert.rejects(
+  db.insert(serviceSignatures).values({
+    projectId: stillValid.projectId,
+    jobId: stillValid.jobId,
+    attachmentId: stillValid.attachmentId,
+    signerName: "Không được chèn trực tiếp",
+    documentHash: stillValid.documentHash,
+    canonicalSnapshot: stillValid.canonicalSnapshot,
+    snapshotSchemaVersion: stillValid.snapshotSchemaVersion,
+    signedByProfileId: stillValid.signedByProfileId,
+    evidence: stillValid.evidence,
+  }),
+  isServiceSnapshotJobLocked,
+);
+await assert.rejects(
+  db.delete(serviceSignatures).where(eq(serviceSignatures.id, stillValid.id)),
+  isServiceSnapshotJobLocked,
+);
+
+const cancelledFixture = await createFixture("DV-SNAPSHOT-CANCELLED");
+const cancelledSignature = await signFixture(cancelledFixture, "cancelled");
+await db.update(serviceJobs).set({ status: "cancelled" })
+  .where(eq(serviceJobs.id, cancelledFixture.job.id));
+await assert.rejects(
+  db.transaction((tx) => createServiceSignatureCore(tx, actor, {
+    jobId: cancelledFixture.job.id,
+    attachmentId: cancelledFixture.signatureAttachment.id,
+    signerName: "Không được ký job đã huỷ",
+    clientMutationId: "snapshot-cancelled-resign",
+  })),
+  /SERVICE_FIELD_JOB_TERMINAL/,
+);
+await assert.rejects(
+  db.delete(serviceSignatures)
+    .where(eq(serviceSignatures.id, cancelledSignature.signatureId)),
+  isServiceSnapshotJobLocked,
+);
 
 const mutationFirstFixture = await createFixture("DV-SNAPSHOT-7");
 await signFixture(mutationFirstFixture, "mutation-first");

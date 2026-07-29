@@ -280,6 +280,6 @@ The follow-up completion audit closed all eight review gaps:
    notifications;
 8. server-owned optimistic revisions and explicit offline conflict recovery.
 
-Schema changes were delivered as immutable migrations `0065` through `0087`.
+Schema changes were delivered as immutable migrations `0065` through `0088`.
 The detailed requirement-to-evidence record is
 `../reviews/2026-07-29-field-service-completion-review.md`.
