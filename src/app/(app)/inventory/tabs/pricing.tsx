@@ -66,7 +66,7 @@ async function PricingContent({
           <input type="hidden" name="tab" value="pricing" />
           <div className="relative min-w-[240px] flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface min-h-11 lg:min-h-0" />
+            <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface focus:border-primary-500 focus:outline-none min-h-11 lg:min-h-0" />
           </div>
           <Select
             name="category"

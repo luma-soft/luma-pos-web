@@ -39,7 +39,7 @@ async function PurchasesContent({ searchParams }: { searchParams: SP }) {
           <input type="hidden" name="tab" value="purchases" />
           <div className="relative min-w-[240px] flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("purchases.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface min-h-11 lg:min-h-0" />
+            <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("purchases.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface focus:border-primary-500 focus:outline-none min-h-11 lg:min-h-0" />
           </div>
           <Select name="status" defaultValue={status} options={[{ value: "", label: t("orders.tabs.all") }, { value: "draft", label: t("purchases.status.draft") }, { value: "received", label: t("purchases.status.received") }, { value: "returned", label: t("purchases.status.returned") }, { value: "cancelled", label: t("purchases.status.cancelled") }]} />
           <Link href={Routes.PurchaseNew} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98] ml-auto shrink-0 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"><Plus className="w-4 h-4" />{t("purchases.createNew")}</Link>

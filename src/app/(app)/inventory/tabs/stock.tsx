@@ -35,7 +35,7 @@ export async function StockTab({ searchParams }: { searchParams: SP }) {
         <input type="hidden" name="tab" value="stock" />
         <div className="relative w-full max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("inventory.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface focus:outline-none focus:ring-2 focus:ring-primary-500 min-h-11 lg:min-h-0" />
+          <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("inventory.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface focus:border-primary-500 focus:outline-none min-h-11 lg:min-h-0" />
         </div>
         <Select
           name="stock"
