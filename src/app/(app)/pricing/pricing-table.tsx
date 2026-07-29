@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Check, Loader2, Pencil, Plus, X, Calculator } from "lucide-react";
+import { Calculator, Check, ChevronDown, Loader2, Pencil, Plus, X } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { MoneyInput } from "@/components/ui/money-input";
@@ -220,11 +220,32 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
   const [deleteCandidate, setDeleteCandidate] = useState<PricingBook | null>(null);
   const [deletingBook, setDeletingBook] = useState(false);
+  const [bookMenuOpen, setBookMenuOpen] = useState(false);
+  const bookMenuRef = useRef<HTMLDivElement>(null);
 
   const defaultBookId = books.find((b) => b.isDefault)?.id ?? books[0]?.id ?? "";
   const cellKey = (rowId: string, bookId: string) => `${rowId}:${bookId}`;
   const formulaRow = formula ? rows.find((row) => row.id === formula.rowId) : null;
   const formulaBook = formula ? books.find((book) => book.id === formula.bookId) : null;
+
+  useEffect(() => {
+    if (!bookMenuOpen) return;
+
+    function closeBookMenu(event: MouseEvent) {
+      if (!bookMenuRef.current?.contains(event.target as Node)) setBookMenuOpen(false);
+    }
+
+    function closeBookMenuWithKeyboard(event: KeyboardEvent) {
+      if (event.key === "Escape") setBookMenuOpen(false);
+    }
+
+    document.addEventListener("mousedown", closeBookMenu);
+    document.addEventListener("keydown", closeBookMenuWithKeyboard);
+    return () => {
+      document.removeEventListener("mousedown", closeBookMenu);
+      document.removeEventListener("keydown", closeBookMenuWithKeyboard);
+    };
+  }, [bookMenuOpen]);
 
   async function addBook() {
     const name = newName.trim();
@@ -328,7 +349,8 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
     ...books.map((b): DataTableColumn<PricingRow> => ({
       key: `book:${b.id}`,
       label: b.name,
-      defaultVisible: true,
+      required: b.isDefault,
+      defaultVisible: b.isDefault,
       align: "right",
       width: "170px",
       render: (r) => {
@@ -349,9 +371,12 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
       },
     })),
   ];
-  const visibleBooks = books.filter((book) => visibleColumnKeys?.has(`book:${book.id}`) ?? true);
+  const visibleBooks = books.filter(
+    (book) => book.isDefault || (visibleColumnKeys?.has(`book:${book.id}`) ?? false),
+  );
 
   function setBookVisible(bookId: string, visible: boolean) {
+    if (books.find((book) => book.id === bookId)?.isDefault) return;
     const key = `book:${bookId}`;
     setVisibleColumnKeys((current) => {
       const next = new Set(
@@ -366,52 +391,105 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
   }
 
   return (
-    <div className="bg-surface border border-border rounded-card overflow-hidden">
+    <div className="rounded-card border border-border bg-surface">
       {/* thanh quản lý bảng giá */}
       <div className="px-4 py-3 border-b border-border flex items-center gap-2 flex-wrap">
-        <span className="text-sm font-medium text-slate-500 mr-1">{t("pricing.booksLabel")}</span>
-        {books.map((b) => (
-          <span key={b.id} className="group inline-flex min-h-11 items-center gap-1 rounded-lg border border-slate-200 pl-2.5 pr-1.5 text-sm dark:border-slate-700">
-            <button
-              type="button"
-              role="checkbox"
-              aria-checked={visibleColumnKeys?.has(`book:${b.id}`) ?? true}
-              aria-label={t("pricing.bookVisibility", { name: b.name })}
-              title={t("pricing.bookVisibility", { name: b.name })}
-              onClick={() => setBookVisible(b.id, !(visibleColumnKeys?.has(`book:${b.id}`) ?? true))}
-              className={cn(
-                "grid h-5 w-5 shrink-0 place-items-center rounded border transition-colors",
-                (visibleColumnKeys?.has(`book:${b.id}`) ?? true)
-                  ? "border-primary-600 bg-primary-600 text-white"
-                  : "border-slate-300 bg-surface text-transparent hover:border-primary-400",
-              )}
+        <div ref={bookMenuRef} className="relative">
+          <button
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded={bookMenuOpen}
+            onClick={() => setBookMenuOpen((open) => !open)}
+            className="inline-flex min-h-11 min-w-44 items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 text-sm font-medium hover:bg-surface-2"
+          >
+            <span>{t("pricing.booksLabel")} · {visibleBooks.length}</span>
+            <ChevronDown className={cn("h-4 w-4 text-slate-400 transition-transform", bookMenuOpen && "rotate-180")} />
+          </button>
+          {bookMenuOpen && (
+            <div
+              role="menu"
+              className="absolute left-0 top-full z-50 mt-1 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-surface p-1.5 shadow-e2"
             >
-              <Check className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-            {editing?.id === b.id ? (
-              <input
-                autoFocus
-                value={editing.name}
-                onChange={(e) => setEditing({ id: b.id, name: e.target.value })}
-                onBlur={() => rename(b.id, editing.name)}
-                onKeyDown={(e) => { if (e.key === "Enter") rename(b.id, editing.name); if (e.key === "Escape") setEditing(null); }}
-                className="min-h-11 w-28 rounded border border-primary-400 bg-surface px-1 text-sm lg:min-h-0 lg:py-0.5"
-              />
-            ) : (
-              <>
-                <span className={cn(b.isDefault && "font-semibold")}>{b.name}</span>
-                <button onClick={() => setEditing({ id: b.id, name: b.name })} className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-400 hover:text-primary-600 lg:min-h-0 lg:min-w-0 lg:p-0.5 lg:opacity-0 lg:group-hover:opacity-100" title={t("common.edit")}>
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
-                {!b.isDefault && (
-                  <button onClick={() => setDeleteCandidate(b)} className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-400 hover:text-red-500 lg:min-h-0 lg:min-w-0 lg:p-0.5 lg:opacity-0 lg:group-hover:opacity-100" title={t("common.delete")}>
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </>
-            )}
-          </span>
-        ))}
+              {books.map((b) => {
+                const visible = b.isDefault || (visibleColumnKeys?.has(`book:${b.id}`) ?? false);
+                return (
+                  <div key={b.id} className="group flex min-h-11 items-center gap-2 rounded-lg px-2 hover:bg-surface-2">
+                    <button
+                      type="button"
+                      role="menuitemcheckbox"
+                      aria-checked={visible}
+                      aria-disabled={b.isDefault}
+                      disabled={b.isDefault}
+                      aria-label={t("pricing.bookVisibility", { name: b.name })}
+                      title={t("pricing.bookVisibility", { name: b.name })}
+                      onClick={() => setBookVisible(b.id, !visible)}
+                      className={cn(
+                        "grid h-5 w-5 shrink-0 place-items-center rounded border transition-colors",
+                        visible
+                          ? "border-primary-600 bg-primary-600 text-white"
+                          : "border-slate-300 bg-surface text-transparent hover:border-primary-400",
+                        b.isDefault && "cursor-not-allowed opacity-70",
+                      )}
+                    >
+                      <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                    </button>
+                    {editing?.id === b.id ? (
+                      <input
+                        autoFocus
+                        value={editing.name}
+                        onChange={(e) => setEditing({ id: b.id, name: e.target.value })}
+                        onBlur={() => rename(b.id, editing.name)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") rename(b.id, editing.name);
+                          if (e.key === "Escape") setEditing(null);
+                        }}
+                        className="min-h-9 min-w-0 flex-1 rounded border border-primary-400 bg-surface px-2 text-sm"
+                      />
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          role="menuitemcheckbox"
+                          aria-checked={visible}
+                          aria-disabled={b.isDefault}
+                          disabled={b.isDefault}
+                          onClick={() => setBookVisible(b.id, !visible)}
+                          className={cn(
+                            "min-w-0 flex-1 truncate text-left text-sm",
+                            b.isDefault && "cursor-default font-semibold",
+                          )}
+                        >
+                          {b.name}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditing({ id: b.id, name: b.name })}
+                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-surface hover:text-primary-600"
+                          title={t("common.edit")}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        {!b.isDefault && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setBookMenuOpen(false);
+                              setDeleteCandidate(b);
+                            }}
+                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-surface hover:text-red-500"
+                            title={t("common.delete")}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
         {creating ? (
           <input
             autoFocus
@@ -437,7 +515,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
         visibleColumnKeys={visibleColumnKeys}
         onColumnVisibilityChange={setVisibleColumnKeys}
         getRowId={(row) => row.id}
-        minWidth={`${Math.max(780, 610 + books.length * 170)}px`}
+        minWidth={`${Math.max(780, 610 + visibleBooks.length * 170)}px`}
         maxHeight="calc(100dvh - 340px)"
         fillHeight
         renderMobileRow={({ row }) => (
