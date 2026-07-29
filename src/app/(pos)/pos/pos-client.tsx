@@ -2721,13 +2721,23 @@ function LinePriceEditor({
   const defaultBook = priceBooks.find((book) => book.isDefault) ?? priceBooks[0];
   const inheritedValue = "__invoice_price_book__";
   const [selectedBook, setSelectedBook] = useState(
-    line.priceBook === undefined ? inheritedValue : line.priceBook || defaultBook?.id || inheritedValue,
+    line.freeRestore
+      ? inheritedValue
+      : line.priceBook === undefined ? inheritedValue : line.priceBook || defaultBook?.id || inheritedValue,
   );
   const editablePrice = line.freeRestore?.unitPrice ?? line.unitPrice;
   const editableDiscount = line.freeRestore?.lineDiscount ?? line.lineDiscount ?? 0;
-  const [editor, setEditor] = useState(() =>
-    createLinePriceEditorState(editablePrice, editableDiscount)
-  );
+  const [editor, setEditor] = useState(() => {
+    if (!line.freeRestore) return createLinePriceEditorState(editablePrice, editableDiscount);
+    return {
+      ...createLinePriceEditorState(0, 0),
+      restore: {
+        price: String(editablePrice),
+        discount: String(editableDiscount),
+        discountMode: "vnd" as const,
+      },
+    };
+  });
   const changedRef = useRef(false);
   const onChangeRef = useRef(onChange);
   useEffect(() => {
@@ -2765,6 +2775,8 @@ function LinePriceEditor({
 
   function changeFree(free: boolean) {
     markChanged();
+    // Miễn phí luôn theo bảng giá của hóa đơn; lúc bật lại sẽ khôi phục giá theo bảng này.
+    if (free) setSelectedBook(inheritedValue);
     setEditor((state) => {
       const next = setLineFree(state, free);
       // Dòng miễn phí cũ chưa có freeRestore: lấy lại giá niêm yết theo bảng giá đang chọn.
@@ -2810,6 +2822,7 @@ function LinePriceEditor({
           <Select
             value={selectedBook}
             onChange={(event) => changeBook(event.target.value)}
+            disabled={editor.free}
             size="sm"
             className="w-40"
             options={[
