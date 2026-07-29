@@ -23,7 +23,7 @@ import { CameraQuotePanel, type CameraQuotePackage } from "@/components/pos/came
 import {
   buildPosUnitOptions,
   PosCartScrollSurface,
-  PosSearchQuantitySlot,
+  PosQuantitySlot,
   PosSearchResultLayout,
   posUnitSuffix,
 } from "@/components/pos/pos-mobile-layout";
@@ -1520,7 +1520,7 @@ export function PosClient({
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
-                <div className={cn("mt-3 gap-2", unitOptions.length > 0 ? "grid grid-cols-[minmax(0,1fr)_7.5rem]" : "flex justify-end")}>
+                <div className={cn("mt-3 gap-2", unitOptions.length > 0 ? "grid grid-cols-[minmax(0,1fr)_8.25rem]" : "flex justify-end")}>
                   {unitOptions.length > 0 && (
                     <Select
                       value={l.unitName}
@@ -1538,7 +1538,7 @@ export function PosClient({
                     max={l.returnSoldQuantity}
                     readOnly={isCameraQuoteDraft}
                     size="sm"
-                    className={cn(unitOptions.length > 0 ? "w-full" : "w-[7.5rem]", outOfStock && "border-er text-er")}
+                    className={cn(unitOptions.length > 0 ? "w-full" : "w-[8.25rem]", outOfStock && "border-er text-er")}
                     inputClassName={cn(outOfStock && "border-er text-er")}
                   />
                 </div>
@@ -1601,7 +1601,7 @@ export function PosClient({
                     className="min-w-20 shrink-0 font-medium text-slate-700 dark:text-slate-200"
                   />
                 )}
-                <div className="group relative shrink-0">
+                <PosQuantitySlot>
                   <QuantityInput
                     value={l.quantity}
                     onChange={(quantity) => setQty(l.key, quantity)}
@@ -1609,7 +1609,7 @@ export function PosClient({
                     max={l.returnSoldQuantity}
                     readOnly={isCameraQuoteDraft}
                     size="sm"
-                    className={cn("w-28", outOfStock && "border-er text-er")}
+                    className={cn("w-full", outOfStock && "border-er text-er")}
                     inputClassName={cn(outOfStock && "border-er text-er")}
                   />
                   {isReturnDraft && l.returnSoldQuantity != null && (
@@ -1620,7 +1620,7 @@ export function PosClient({
                   {stockManaged && (
                     <StockQuantityTooltip stock={Number(l.product.stock)} ordered={l.quantity * l.unitMultiplier} unit={l.product.baseUnit} />
                   )}
-                </div>
+                </PosQuantitySlot>
                 <button
                   disabled={isCameraQuoteDraft}
                   onClick={() => setEditKey(editKey === l.key ? null : l.key)}
@@ -1842,7 +1842,7 @@ export function PosClient({
                           controls={(
                             <>
                             {line && (
-                              <PosSearchQuantitySlot onClick={(e) => e.stopPropagation()}>
+                              <PosQuantitySlot onClick={(e) => e.stopPropagation()}>
                                 <QuantityInput
                                   value={line.quantity}
                                   onChange={(quantity) => setQty(line.key, quantity)}
@@ -1855,7 +1855,7 @@ export function PosClient({
                                 {stockManaged && (
                                   <StockQuantityTooltip stock={stock} ordered={line.quantity * line.unitMultiplier} unit={p.baseUnit} />
                                 )}
-                              </PosSearchQuantitySlot>
+                              </PosQuantitySlot>
                             )}
                             <div className="text-sm font-semibold text-primary-600 tabular-nums text-right w-24 sm:w-32">
                               {priceLabelFor(p, priceBook)}{p.isVariantParent ? "" : posUnitSuffix(p.baseUnit)}

@@ -21,14 +21,14 @@ export function posUnitSuffix(unitName: string) {
   return unit ? `/${unit}` : "";
 }
 
-export function PosSearchQuantitySlot({
+export function PosQuantitySlot({
   className,
   children,
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("group relative w-[8.25rem] shrink-0 lg:w-28", className)}
+      className={cn("group relative w-[8.25rem] shrink-0", className)}
       {...props}
     >
       {children}
