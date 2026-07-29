@@ -14,6 +14,12 @@ export function isServiceSnapshotJobLocked(error: unknown) {
   return false;
 }
 
+export function serviceSnapshotMutationErrorKey(error: unknown) {
+  return isServiceSnapshotJobLocked(error)
+    ? "services.errors.signedSnapshotLocked"
+    : "errors.serverError";
+}
+
 export async function mobileFieldOperation<T>(operation: () => Promise<T>) {
   try {
     return mobileOk(await operation());

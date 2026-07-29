@@ -33,7 +33,10 @@ import {
   validateServiceLinks,
   type ServiceChecklistItem,
 } from "@/lib/services/domain";
-import { isServiceSnapshotJobLocked } from "@/lib/services/field-api";
+import {
+  isServiceSnapshotJobLocked,
+  serviceSnapshotMutationErrorKey,
+} from "@/lib/services/field-api";
 import {
   installedAssetCreateSchema,
   type InstalledAssetCreateInput,
@@ -356,7 +359,7 @@ export async function updateServiceChecklist(
     return { ok: true, data: undefined };
   } catch (error) {
     console.error("updateServiceChecklist failed:", error);
-    return { ok: false, error: "errors.serverError" };
+    return { ok: false, error: serviceSnapshotMutationErrorKey(error) };
   }
 }
 

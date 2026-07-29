@@ -151,3 +151,24 @@ Verification:
 
 Migration 0070 is now applied and immutable. The next migration must be 0071 or
 later.
+
+## Review fix round 2
+
+- `updateServiceChecklist` now maps both direct and wrapped
+  `SERVICE_SIGNED_SNAPSHOT_JOB_LOCKED` failures to
+  `services.errors.signedSnapshotLocked`, matching the other manager mutation
+  paths.
+- Added the executable `serviceSnapshotMutationErrorKey` regression rather than
+  relying on a source-text assertion.
+
+TDD and verification:
+
+```text
+RED: Export named 'serviceSnapshotMutationErrorKey' not found
+GREEN: focused mapping + signed snapshot suites passed
+       1 Bun test / 3 assertions, 0 failures
+Changed-file ESLint: pass
+Scoped git diff --check: pass
+```
+
+No migration was required.
