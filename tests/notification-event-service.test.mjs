@@ -1,0 +1,179 @@
+import { strict as assert } from "node:assert";
+import { readFileSync, readdirSync } from "node:fs";
+import { PGlite } from "@electric-sql/pglite";
+import { drizzle } from "drizzle-orm/pglite";
+import { eq } from "drizzle-orm";
+
+const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const schema = await import(`${projectRoot}/src/db/schema.ts`);
+const events = await import(`${projectRoot}/src/lib/notifications/events-core.ts`);
+const {
+  notificationEvents,
+  notificationOutbox,
+  notificationRecipients,
+  profiles,
+  storeSettings,
+} = schema;
+
+const client = new PGlite();
+const db = drizzle(client, { schema });
+
+for (const file of readdirSync(`${projectRoot}/drizzle`).filter((name) => name.endsWith(".sql")).sort()) {
+  for (const statement of readFileSync(`${projectRoot}/drizzle/${file}`, "utf8").split("--> statement-breakpoint")) {
+    const sql = statement.trim();
+    if (sql && !/create extension/i.test(sql)) await client.exec(sql);
+  }
+}
+
+// `store_settings` predates the tracked migrations in this isolated fixture.
+// Define its schema-owned singleton shape here so the service is exercised
+// against PGlite without touching a developer database.
+await client.exec(`
+  CREATE TABLE "store_settings" (
+    "id" text PRIMARY KEY DEFAULT 'default' NOT NULL,
+    "name" text DEFAULT '' NOT NULL,
+    "address" text DEFAULT '' NOT NULL,
+    "phone" text DEFAULT '' NOT NULL,
+    "tax_code" text DEFAULT '' NOT NULL,
+    "industry" text DEFAULT 'grocery' NOT NULL,
+    "currency" text DEFAULT 'VND' NOT NULL,
+    "locale" text DEFAULT 'vi-VN' NOT NULL,
+    "onboarded" boolean DEFAULT false NOT NULL,
+    "prefs" jsonb DEFAULT '{}'::jsonb NOT NULL,
+    "updated_at" timestamptz DEFAULT now() NOT NULL
+  )
+`);
+
+const [owner, manager, cashier, warehouse] = await db.insert(profiles).values([
+  { id: "10000000-0000-4000-8000-000000000001", fullName: "Owner", role: "owner" },
+  { id: "10000000-0000-4000-8000-000000000002", fullName: "Manager", role: "manager" },
+  { id: "10000000-0000-4000-8000-000000000003", fullName: "Cashier", role: "cashier" },
+  { id: "10000000-0000-4000-8000-000000000004", fullName: "Warehouse", role: "warehouse" },
+  { id: "10000000-0000-4000-8000-000000000005", fullName: "Inactive", role: "manager", isActive: false },
+]).returning();
+await db.insert(storeSettings).values({ id: "default" });
+
+async function rowsFor(eventId) {
+  const [recipients, outbox] = await Promise.all([
+    db.select().from(notificationRecipients).where(eq(notificationRecipients.eventId, eventId)),
+    db.select().from(notificationOutbox).where(eq(notificationOutbox.eventId, eventId)),
+  ]);
+  return { recipients, outbox };
+}
+
+async function notificationRowCounts() {
+  const [events, recipients, outbox] = await Promise.all([
+    db.select().from(notificationEvents),
+    db.select().from(notificationRecipients),
+    db.select().from(notificationOutbox),
+  ]);
+  return { events: events.length, recipients: recipients.length, outbox: outbox.length };
+}
+
+const purchaseInput = {
+  eventKey: "purchase-received:10000000-0000-0000-0000-000000000001",
+  category: "purchaseReceived",
+  entityType: "purchase",
+  entityId: "10000000-0000-0000-0000-000000000001",
+  actorId: warehouse.id,
+  target: "purchases",
+  priority: "normal",
+  quietHoursPolicy: "defer",
+  excludeActor: true,
+};
+
+const createdPurchase = await db.transaction((tx) => events.createNotificationEventInTx(tx, purchaseInput));
+assert.equal(createdPurchase?.created, true, "creates a new event");
+const purchaseRows = await rowsFor(createdPurchase.eventId);
+assert.deepEqual(
+  purchaseRows.recipients.map((recipient) => recipient.userId).sort(),
+  [owner.id, manager.id].sort(),
+  "routes active owner and manager while excluding the actor and inactive manager",
+);
+assert.equal(purchaseRows.outbox.length, 1, "creates exactly one provider-neutral outbox row");
+
+const createdQr = await db.transaction((tx) => events.createNotificationEventInTx(tx, {
+  eventKey: "qr-confirmed:10000000-0000-0000-0000-000000000002",
+  category: "qrPaymentConfirmed",
+  entityType: "payment",
+  entityId: "10000000-0000-0000-0000-000000000002",
+  actorId: cashier.id,
+  target: "paymentReconciliation",
+  priority: "high",
+  quietHoursPolicy: "bypass",
+  directUserIds: [cashier.id],
+  excludeActor: true,
+}));
+assert.equal(createdQr?.created, true, "creates QR confirmation event");
+const qrRows = await rowsFor(createdQr.eventId);
+assert.deepEqual(
+  qrRows.recipients.map((recipient) => recipient.userId).sort(),
+  [owner.id, manager.id, cashier.id].sort(),
+  "keeps the direct cashier actor alongside active role recipients",
+);
+assert.equal(qrRows.recipients.find((recipient) => recipient.userId === cashier.id)?.reason, "direct");
+
+const replayedPurchase = await db.transaction((tx) => events.createNotificationEventInTx(tx, purchaseInput));
+assert.deepEqual(replayedPurchase, { eventId: createdPurchase.eventId, created: false }, "replays the durable event key");
+assert.equal((await rowsFor(createdPurchase.eventId)).recipients.length, 2, "does not duplicate recipients on replay");
+
+await db.update(storeSettings).set({
+  prefs: { notifications: { purchaseReceived: false } },
+}).where(eq(storeSettings.id, "default"));
+const disabled = await db.transaction((tx) => events.createNotificationEventInTx(tx, {
+  ...purchaseInput,
+  eventKey: "purchase-received:10000000-0000-0000-0000-000000000003",
+  entityId: "10000000-0000-0000-0000-000000000003",
+}));
+assert.equal(disabled, null, "does not persist disabled categories");
+await db.update(storeSettings).set({ prefs: {} }).where(eq(storeSettings.id, "default"));
+
+const beforeRollback = await notificationRowCounts();
+try {
+  await db.transaction(async (tx) => {
+    await events.createNotificationEventInTx(tx, {
+      ...purchaseInput,
+      eventKey: "purchase-received:10000000-0000-0000-0000-000000000004",
+      entityId: "10000000-0000-0000-0000-000000000004",
+    });
+    throw new Error("force rollback");
+  });
+} catch (error) {
+  assert.equal(error instanceof Error ? error.message : "", "force rollback");
+}
+const rolledBack = await db.select().from(notificationEvents)
+  .where(eq(notificationEvents.eventKey, "purchase-received:10000000-0000-0000-0000-000000000004"));
+assert.equal(rolledBack.length, 0, "rolls event, recipients, and outbox back together");
+assert.deepEqual(await notificationRowCounts(), beforeRollback, "does not leave recipients or outbox rows after rollback");
+
+assert.equal(events.debtEventKey({
+  entityType: "customer",
+  entityId: "10000000-0000-0000-0000-000000000005",
+  operationType: "payment",
+  operationId: "10000000-0000-0000-0000-000000000006",
+}), "debt-changed:customer:10000000-0000-0000-0000-000000000005:payment:10000000-0000-0000-0000-000000000006");
+
+const zeroDebt = await db.transaction((tx) => events.createDebtChangedEventInTx(tx, {
+  entityType: "customer",
+  entityId: "10000000-0000-0000-0000-000000000005",
+  operationType: "settlement",
+  operationId: "10000000-0000-0000-0000-000000000007",
+  delta: 10,
+  relatedAdjustments: [{ entityType: "supplier", entityId: "10000000-0000-0000-0000-000000000006", delta: -10 }],
+}));
+assert.equal(zeroDebt, null, "does not create a debt event for a zero net change");
+
+const debt = await db.transaction((tx) => events.createDebtChangedEventInTx(tx, {
+  entityType: "customer",
+  entityId: "10000000-0000-0000-0000-000000000005",
+  operationType: "payment",
+  operationId: "10000000-0000-0000-0000-000000000008",
+  delta: 1.005,
+  actorId: owner.id,
+}));
+assert.equal(debt?.created, true, "creates non-zero debt events");
+const [debtEvent] = await db.select().from(notificationEvents).where(eq(notificationEvents.id, debt.eventId));
+assert.deepEqual(debtEvent.metadata, { delta: 1.01, operationType: "payment" }, "keeps rounded protected debt metadata minimal");
+
+await client.close();
+console.log("✅ notification event service records events, recipients, and outbox atomically");
