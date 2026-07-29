@@ -2666,7 +2666,7 @@ function AmountModeInput({
 }) {
   return (
     <div className={cn(
-      "w-full max-w-[184px] h-11 grid grid-cols-[1fr_56px] rounded-lg border border-border bg-surface overflow-hidden",
+      "w-full max-w-[184px] h-11 grid grid-cols-[1fr_56px] rounded-lg border border-border bg-surface overflow-hidden transition-[border-color] duration-150 focus-within:border-primary-500",
       className
     )}>
       {mode === "pct" ? (
