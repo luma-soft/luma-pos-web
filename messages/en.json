@@ -2847,6 +2847,7 @@
       "insufficientMaterialStock": "The warehouse does not have enough available stock for this material.",
       "reservationExceedsPlan": "The reserved quantity exceeds the remaining planned material.",
       "invalidTransition": "This status transition is not allowed.",
+      "attachmentSigned": "Signed evidence cannot be deleted.",
       "duplicateCode": "The document code already exists. Try again.",
       "duplicateSerial": "This asset serial already exists."
     }

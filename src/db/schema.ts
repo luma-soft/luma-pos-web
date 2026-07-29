@@ -1115,11 +1115,17 @@ export const serviceAttachments = pgTable("service_attachments", {
   caption: text("caption"),
   createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  deletedBy: uuid("deleted_by").references(() => profiles.id, { onDelete: "set null" }),
+  storageDeletedAt: timestamp("storage_deleted_at", { withTimezone: true }),
+  storageDeleteAttempts: integer("storage_delete_attempts").notNull().default(0),
+  storageDeleteLastError: text("storage_delete_last_error"),
 }, (t) => [
   check("service_attachments_category_check", sql`${t.category} in ('before', 'after', 'issue', 'document', 'signature')`),
   check("service_attachments_size_check", sql`${t.sizeBytes} > 0`),
   uniqueIndex("service_attachments_bucket_path_idx").on(t.bucket, t.path),
   index("service_attachments_job_idx").on(t.jobId, t.createdAt),
+  index("service_attachments_active_job_idx").on(t.jobId, t.createdAt).where(sql`${t.deletedAt} is null`),
 ]);
 
 export const serviceSignatures = pgTable("service_signatures", {

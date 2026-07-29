@@ -10,11 +10,15 @@ const {
   profiles,
   projects,
   serviceAttachments,
+  serviceJobAssignments,
   serviceJobEvents,
   serviceJobs,
   serviceSignatures,
 } = schema;
-const { deleteServiceEvidenceCore } = await import(
+const {
+  deleteServiceEvidenceCore,
+  completeServiceEvidenceStorageRemoval,
+} = await import(
   `${projectRoot}/src/lib/services/evidence-deletion.ts`
 );
 
@@ -77,16 +81,28 @@ function storageThatRemoves() {
 }
 
 describe("service evidence deletion", () => {
-  test("deletes unsigned creator evidence and records a job event", async () => {
+  test("tombstones unsigned creator evidence before Storage cleanup and records a job event", async () => {
     const { db, job, attachment } = await createFixture();
     const { storage, removed } = storageThatRemoves();
 
-    await db.transaction((tx) => deleteServiceEvidenceCore(tx, storage, {
+    await db.transaction((tx) => deleteServiceEvidenceCore(tx, {
       userId: creatorId,
       role: "technician",
     }, { jobId: job.id, attachmentId: attachment.id }));
 
-    expect(await db.select().from(serviceAttachments).where(eq(serviceAttachments.id, attachment.id))).toEqual([]);
+    const [tombstone] = await db.select().from(serviceAttachments)
+      .where(eq(serviceAttachments.id, attachment.id));
+    expect(tombstone.deletedAt).toBeInstanceOf(Date);
+    expect(tombstone.storageDeletedAt).toBeNull();
+    await completeServiceEvidenceStorageRemoval(db, storage, {
+      jobId: job.id,
+      attachmentId: attachment.id,
+    });
+
+    const [cleaned] = await db.select().from(serviceAttachments)
+      .where(eq(serviceAttachments.id, attachment.id));
+    expect(cleaned.deletedAt).toBeInstanceOf(Date);
+    expect(cleaned.storageDeletedAt).toBeInstanceOf(Date);
     expect(removed).toEqual([{ bucket: "service-evidence", path: attachment.path }]);
     expect(await db.select({ eventType: serviceJobEvents.eventType, payload: serviceJobEvents.payload })
       .from(serviceJobEvents)
@@ -96,7 +112,6 @@ describe("service evidence deletion", () => {
 
   test("rejects signed evidence before deleting its Storage object", async () => {
     const { db, project, job, attachment } = await createFixture();
-    const { storage, removed } = storageThatRemoves();
     await db.insert(serviceSignatures).values({
       projectId: project.id,
       jobId: job.id,
@@ -105,59 +120,108 @@ describe("service evidence deletion", () => {
       documentHash: "a".repeat(64),
     });
 
-    await expect(db.transaction((tx) => deleteServiceEvidenceCore(tx, storage, {
+    await expect(db.transaction((tx) => deleteServiceEvidenceCore(tx, {
       userId: creatorId,
       role: "technician",
     }, { jobId: job.id, attachmentId: attachment.id }))).rejects.toThrow("SERVICE_ATTACHMENT_SIGNED");
 
     expect(await db.select().from(serviceAttachments).where(eq(serviceAttachments.id, attachment.id))).toHaveLength(1);
-    expect(removed).toEqual([]);
   });
 
   test("rejects a foreign technician from deleting unsigned evidence", async () => {
     const { db, job, attachment } = await createFixture();
-    const { storage, removed } = storageThatRemoves();
+    await db.insert(serviceJobAssignments).values({
+      jobId: job.id,
+      profileId: foreignId,
+      assignmentRole: "crew",
+    });
 
-    await expect(db.transaction((tx) => deleteServiceEvidenceCore(tx, storage, {
+    await expect(db.transaction((tx) => deleteServiceEvidenceCore(tx, {
       userId: foreignId,
       role: "technician",
     }, { jobId: job.id, attachmentId: attachment.id }))).rejects.toThrow("SERVICE_ATTACHMENT_FORBIDDEN");
 
     expect(await db.select().from(serviceAttachments).where(eq(serviceAttachments.id, attachment.id))).toHaveLength(1);
-    expect(removed).toEqual([]);
   });
 
-  test("allows a manager to delete unsigned evidence created by another technician", async () => {
+  test("allows a manager to tombstone unsigned evidence created by another technician", async () => {
     const { db, job, attachment } = await createFixture();
-    const { storage } = storageThatRemoves();
 
-    await db.transaction((tx) => deleteServiceEvidenceCore(tx, storage, {
+    await db.transaction((tx) => deleteServiceEvidenceCore(tx, {
       userId: managerId,
       role: "manager",
     }, { jobId: job.id, attachmentId: attachment.id }));
 
-    expect(await db.select().from(serviceAttachments).where(eq(serviceAttachments.id, attachment.id))).toEqual([]);
+    const [tombstone] = await db.select().from(serviceAttachments)
+      .where(eq(serviceAttachments.id, attachment.id));
+    expect(tombstone.deletedAt).toBeInstanceOf(Date);
   });
 
-  test("keeps metadata when Storage deletion fails", async () => {
+  test("keeps an unsigned tombstone when Storage cleanup fails so retry cannot restore signing", async () => {
     const { db, job, attachment } = await createFixture();
+    const { storage, removed } = storageThatRemoves();
 
-    await expect(db.transaction((tx) => deleteServiceEvidenceCore(tx, {
+    await db.transaction((tx) => deleteServiceEvidenceCore(tx, {
+      userId: creatorId,
+      role: "technician",
+    }, {
+      jobId: job.id,
+      attachmentId: attachment.id,
+    }));
+    await expect(completeServiceEvidenceStorageRemoval(db, {
       async remove() {
         throw new Error("storage unavailable");
       },
-    }, { userId: creatorId, role: "technician" }, {
+    }, {
       jobId: job.id,
       attachmentId: attachment.id,
-    }))).rejects.toThrow("storage unavailable");
+    })).rejects.toThrow("storage unavailable");
 
-    expect(await db.select().from(serviceAttachments).where(eq(serviceAttachments.id, attachment.id))).toHaveLength(1);
-    expect(await db.select().from(serviceJobEvents).where(eq(serviceJobEvents.jobId, job.id))).toEqual([]);
+    const [tombstone] = await db.select().from(serviceAttachments)
+      .where(eq(serviceAttachments.id, attachment.id));
+    expect(tombstone.deletedAt).toBeInstanceOf(Date);
+    expect(tombstone.storageDeletedAt).toBeNull();
+    expect(tombstone.storageDeleteAttempts).toBe(1);
+    expect(await db.select().from(serviceJobEvents).where(eq(serviceJobEvents.jobId, job.id))).toHaveLength(1);
+
+    await completeServiceEvidenceStorageRemoval(db, storage, {
+      jobId: job.id,
+      attachmentId: attachment.id,
+    });
+    const [cleaned] = await db.select().from(serviceAttachments)
+      .where(eq(serviceAttachments.id, attachment.id));
+    expect(cleaned.storageDeletedAt).toBeInstanceOf(Date);
+    expect(removed).toEqual([{ bucket: "service-evidence", path: attachment.path }]);
   });
 
-  test("rolls back metadata deletion when the post-Storage database write fails", async () => {
+  test("database rejects direct signatures for tombstoned evidence", async () => {
+    const { db, project, job, attachment } = await createFixture();
+
+    await db.transaction((tx) => deleteServiceEvidenceCore(tx, {
+      userId: creatorId,
+      role: "technician",
+    }, {
+      jobId: job.id,
+      attachmentId: attachment.id,
+    }));
+
+    let failure;
+    try {
+      await db.insert(serviceSignatures).values({
+        projectId: project.id,
+        jobId: job.id,
+        attachmentId: attachment.id,
+        signerName: "Customer",
+        documentHash: "a".repeat(64),
+      });
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toBeDefined();
+  });
+
+  test("rolls back the tombstone when the deletion event database write fails", async () => {
     const { db, job, attachment } = await createFixture();
-    const { storage, removed } = storageThatRemoves();
 
     await expect(db.transaction((tx) => deleteServiceEvidenceCore(new Proxy(tx, {
       get(target, property, receiver) {
@@ -168,26 +232,55 @@ describe("service evidence deletion", () => {
         }
         return Reflect.get(target, property, receiver);
       },
-    }), storage, { userId: creatorId, role: "technician" }, {
+    }), { userId: creatorId, role: "technician" }, {
       jobId: job.id,
       attachmentId: attachment.id,
     }))).rejects.toThrow("event insert failed");
 
-    expect(await db.select().from(serviceAttachments).where(eq(serviceAttachments.id, attachment.id))).toHaveLength(1);
+    const [attachmentAfterRollback] = await db.select().from(serviceAttachments)
+      .where(eq(serviceAttachments.id, attachment.id));
+    expect(attachmentAfterRollback.deletedAt).toBeNull();
     expect(await db.select().from(serviceJobEvents).where(eq(serviceJobEvents.jobId, job.id))).toEqual([]);
-    expect(removed).toEqual([{ bucket: "service-evidence", path: attachment.path }]);
   });
 
   test("locks deletion after a job is completed", async () => {
     const { db, job, attachment } = await createFixture("completed");
-    const { storage, removed } = storageThatRemoves();
 
-    await expect(db.transaction((tx) => deleteServiceEvidenceCore(tx, storage, {
+    await expect(db.transaction((tx) => deleteServiceEvidenceCore(tx, {
       userId: managerId,
       role: "manager",
     }, { jobId: job.id, attachmentId: attachment.id }))).rejects.toThrow("SERVICE_ATTACHMENT_JOB_LOCKED");
 
     expect(await db.select().from(serviceAttachments).where(eq(serviceAttachments.id, attachment.id))).toHaveLength(1);
-    expect(removed).toEqual([]);
+  });
+
+  test("locks deletion after a job is cancelled", async () => {
+    const { db, job, attachment } = await createFixture("cancelled");
+
+    await expect(db.transaction((tx) => deleteServiceEvidenceCore(tx, {
+      userId: managerId,
+      role: "manager",
+    }, { jobId: job.id, attachmentId: attachment.id }))).rejects.toThrow("SERVICE_ATTACHMENT_JOB_LOCKED");
+
+    expect(await db.select().from(serviceAttachments).where(eq(serviceAttachments.id, attachment.id))).toHaveLength(1);
+  });
+
+  test("rejects a creator who was removed from the job assignment", async () => {
+    const { db, job, attachment } = await createFixture();
+    await db.update(serviceJobs).set({ assignedTo: foreignId })
+      .where(eq(serviceJobs.id, job.id));
+    await db.insert(serviceJobAssignments).values({
+      jobId: job.id,
+      profileId: creatorId,
+      assignmentRole: "crew",
+      removedAt: new Date(),
+    });
+
+    await expect(db.transaction((tx) => deleteServiceEvidenceCore(tx, {
+      userId: creatorId,
+      role: "technician",
+    }, { jobId: job.id, attachmentId: attachment.id }))).rejects.toThrow("SERVICE_JOB_FORBIDDEN");
+
+    expect(await db.select().from(serviceAttachments).where(eq(serviceAttachments.id, attachment.id))).toHaveLength(1);
   });
 });

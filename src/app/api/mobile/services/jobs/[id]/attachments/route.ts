@@ -12,7 +12,10 @@ import {
   sniffServiceEvidenceMime,
 } from "@/lib/services/evidence-storage";
 import { serviceAttachmentMetadataSchema } from "@/lib/services/schemas";
-import { deleteServiceEvidenceCore } from "@/lib/services/evidence-deletion";
+import {
+  completeServiceEvidenceStorageRemoval,
+  deleteServiceEvidenceCore,
+} from "@/lib/services/evidence-deletion";
 import { mobileFieldOperation } from "@/lib/services/field-api";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -131,10 +134,17 @@ export async function DELETE(
   const attachmentId = new URL(request.url).searchParams.get("attachmentId");
   if (!attachmentId) return mobileError("errors.invalidData", 400);
   const supabase = createSupabaseAdminClient();
-  return mobileFieldOperation(() => db.transaction((tx) => deleteServiceEvidenceCore(tx, {
+  return mobileFieldOperation(async () => {
+    const result = await db.transaction((tx) => deleteServiceEvidenceCore(tx, {
+      userId: gate.userId,
+      role: gate.role,
+    }, { jobId: id, attachmentId }));
+    if (result.storagePending) await completeServiceEvidenceStorageRemoval(db, {
     async remove(bucket, path) {
       const { error } = await supabase.storage.from(bucket).remove([path]);
       if (error) throw error;
     },
-  }, { userId: gate.userId, role: gate.role }, { jobId: id, attachmentId })));
+    }, { jobId: id, attachmentId });
+    return { id: result.id };
+  });
 }

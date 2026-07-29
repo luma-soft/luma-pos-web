@@ -49,3 +49,50 @@ Results: 11 tests passed, 0 failed; changed-file ESLint passed with no warnings 
 ## Concerns
 
 No schema migration was added or applied; migration `0064` was not changed. The Storage provider has no distributed transaction with PostgreSQL, so a database failure after successful object removal intentionally retains recoverable metadata rather than deleting it silently. Restoring the object, if required, remains an operational recovery action.
+
+---
+
+## Review fix — durable tombstones
+
+### RED evidence
+
+Updated `tests/service-evidence-deletion.test.mjs` before changing the implementation, then ran:
+
+```sh
+bun test tests/service-evidence-deletion.test.mjs
+```
+
+Result: 0 passed, 9 failed. The old core required Storage as an in-transaction parameter, so the new tombstone API tests failed with `input.attachmentId` undefined. This demonstrated the old Storage-before-commit contract could not satisfy the durable-deletion requirements.
+
+### Implementation
+
+- Added `0065_service_attachment_tombstones.sql` without changing applied migration `0064`.
+- Added durable deletion state (`deleted_at`, actor, cleanup timestamp, attempt count, and error) plus an active-evidence index.
+- Added a database trigger that rejects direct signature inserts/updates referencing tombstoned attachments.
+- Tombstone and `job.attachment_deleted` event now commit in one transaction before any Storage call.
+- Storage cleanup now runs after commit, records failures, and is retryable/idempotent while preserving the tombstone.
+- Restored active-assignment authorization for technicians; owner/manager access remains available.
+- Excluded tombstones from field-job attachment reads, attachment signed-URL retrieval, completion evidence checks, and signature creation.
+- Added the English and Vietnamese `services.errors.attachmentSigned` translation.
+
+### GREEN evidence
+
+```sh
+bun test tests/service-evidence-deletion.test.mjs tests/service-evidence.test.ts tests/service-field-operations.test.mjs tests/service-field-schema.test.mjs
+bunx eslint src/db/schema.ts src/lib/services/evidence-deletion.ts src/lib/services/field-operations.ts src/lib/services/field-api.ts src/lib/data/service-field.ts 'src/app/api/mobile/services/jobs/[id]/attachments/route.ts' 'src/app/api/mobile/services/jobs/[id]/attachments/[attachmentId]/route.ts' tests/service-evidence-deletion.test.mjs
+git diff --check
+```
+
+Results: 14 tests passed, 0 failed; changed-file ESLint and diff hygiene passed.
+
+Migration application and verification:
+
+```sh
+bun run src/db/apply-migrations.ts
+```
+
+Result: applied `0065_service_attachment_tombstones.sql` (4 statements). A database query then confirmed all five tombstone columns and the `_migrations` record; a second migration run reported no pending migrations.
+
+### Review-fix concerns
+
+Storage cleanup is deliberately post-commit. If its acknowledgement update fails after the provider removed the object, the persisted tombstone remains permanently unsigned and a later cleanup retry is safe. An operational worker is still needed to proactively drain failed cleanup attempts rather than relying only on a later DELETE retry.

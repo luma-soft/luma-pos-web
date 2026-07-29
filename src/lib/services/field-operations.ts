@@ -254,6 +254,7 @@ export async function createServiceSignatureCore(
       id: serviceAttachments.id,
       jobId: serviceAttachments.jobId,
       category: serviceAttachments.category,
+      deletedAt: serviceAttachments.deletedAt,
     }).from(serviceAttachments)
       .where(eq(serviceAttachments.id, input.attachmentId))
       .limit(1);
@@ -261,6 +262,7 @@ export async function createServiceSignatureCore(
       !attachment
       || attachment.jobId !== input.jobId
       || attachment.category !== "signature"
+      || attachment.deletedAt
     ) throw new Error("SERVICE_SIGNATURE_ATTACHMENT_INVALID");
     const canonicalDocument = canonicalizeSignedDocument(input.document as JsonValue);
     const documentHash = hashSignedDocument(canonicalDocument);
@@ -372,7 +374,10 @@ export async function completeFieldServiceJobCore(
     const [attachments, signatures] = await Promise.all([
       tx.select({ category: serviceAttachments.category })
         .from(serviceAttachments)
-        .where(eq(serviceAttachments.jobId, input.jobId)),
+        .where(and(
+          eq(serviceAttachments.jobId, input.jobId),
+          isNull(serviceAttachments.deletedAt),
+        )),
       tx.select({ id: serviceSignatures.id })
         .from(serviceSignatures)
         .where(eq(serviceSignatures.jobId, input.jobId)),

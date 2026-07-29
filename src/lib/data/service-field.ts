@@ -175,7 +175,10 @@ export async function getFieldServiceJobDetail(actor: FieldServiceActor, jobId: 
       caption: serviceAttachments.caption,
       createdAt: serviceAttachments.createdAt,
     }).from(serviceAttachments)
-      .where(eq(serviceAttachments.jobId, jobId))
+      .where(and(
+        eq(serviceAttachments.jobId, jobId),
+        isNull(serviceAttachments.deletedAt),
+      ))
       .orderBy(desc(serviceAttachments.createdAt)),
     db.select({
       id: serviceSignatures.id,

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { serviceAttachments } from "@/db/schema";
 import { resolveServiceJobAccess } from "@/lib/data/service-field";
@@ -27,6 +27,7 @@ export async function GET(
     .where(and(
       eq(serviceAttachments.id, attachmentId),
       eq(serviceAttachments.jobId, id),
+      isNull(serviceAttachments.deletedAt),
     ))
     .limit(1);
   if (!attachment) return mobileError("errors.notFound", 404);
