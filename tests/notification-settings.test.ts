@@ -17,6 +17,29 @@ describe("notification settings contract", () => {
     });
   });
 
+  test("defaults internal event categories and role routing", () => {
+    const notifications = parseStorePrefs({}).notifications;
+    expect({
+      invoiceCreated: notifications.invoiceCreated,
+      purchaseReceived: notifications.purchaseReceived,
+      debtChanged: notifications.debtChanged,
+      qrPaymentConfirmed: notifications.qrPaymentConfirmed,
+      qrPaymentException: notifications.qrPaymentException,
+    }).toEqual({
+      invoiceCreated: true,
+      purchaseReceived: true,
+      debtChanged: true,
+      qrPaymentConfirmed: true,
+      qrPaymentException: true,
+    });
+    expect(notifications.roleRouting.invoiceCreated).toEqual(["owner", "manager"]);
+    expect(notifications.roleRouting.purchaseReceived)
+      .toEqual(["owner", "manager", "warehouse"]);
+    expect(notifications.roleRouting.debtChanged).toEqual(["owner", "manager"]);
+    expect(notifications.roleRouting.qrPaymentConfirmed).toEqual(["owner", "manager"]);
+    expect(notifications.roleRouting.qrPaymentException).toEqual(["owner", "manager"]);
+  });
+
   test("upgrades legacy settings with server-owned delivery defaults", () => {
     const prefs = parseStorePrefs({
       notifications: {

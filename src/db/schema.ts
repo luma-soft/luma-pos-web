@@ -447,6 +447,55 @@ export const mobilePushDeliveries = pgTable("mobile_push_deliveries", {
   index("mobile_push_deliveries_status_idx").on(t.status, t.attemptedAt),
 ]);
 
+export const notificationEvents = pgTable("notification_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  eventKey: varchar("event_key", { length: 200 }).notNull().unique(),
+  category: varchar("category", { length: 40 }).notNull(),
+  entityType: varchar("entity_type", { length: 40 }).notNull(),
+  entityId: uuid("entity_id").notNull(),
+  actorId: uuid("actor_id").references(() => profiles.id, { onDelete: "set null" }),
+  target: varchar("target", { length: 40 }).notNull(),
+  priority: varchar("priority", { length: 16 }).notNull(),
+  quietHoursPolicy: varchar("quiet_hours_policy", { length: 16 }).notNull(),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("notification_events_category_created_idx").on(t.category, t.createdAt),
+]);
+
+export const notificationRecipients = pgTable("notification_recipients", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  eventId: uuid("event_id").notNull().references(() => notificationEvents.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  reason: varchar("reason", { length: 16 }).notNull(),
+  readAt: timestamp("read_at", { withTimezone: true }),
+  dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("notification_recipients_event_user_unique").on(t.eventId, t.userId),
+  index("notification_recipients_user_created_idx").on(t.userId, t.createdAt),
+]);
+
+export const notificationOutbox = pgTable("notification_outbox", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  eventId: uuid("event_id").notNull().unique().references(() => notificationEvents.id, { onDelete: "cascade" }),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  provider: varchar("provider", { length: 32 }),
+  providerMessageId: varchar("provider_message_id", { length: 180 }),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  availableAt: timestamp("available_at", { withTimezone: true }).defaultNow().notNull(),
+  leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+  lastErrorCode: varchar("last_error_code", { length: 80 }),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  firstAttemptAt: timestamp("first_attempt_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("notification_outbox_status_available_idx").on(t.status, t.availableAt),
+]);
+
 export const mobileTelemetryEvents = pgTable("mobile_telemetry_events", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),

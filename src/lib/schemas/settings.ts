@@ -57,6 +57,11 @@ const notificationPrefs = z.object({
   shiftClose: z.boolean().default(true),
   einvoiceError: z.boolean().default(true),
   syncDone: z.boolean().default(false),
+  invoiceCreated: z.boolean().default(true),
+  purchaseReceived: z.boolean().default(true),
+  debtChanged: z.boolean().default(true),
+  qrPaymentConfirmed: z.boolean().default(true),
+  qrPaymentException: z.boolean().default(true),
   channels: z.record(z.string().trim().min(1).max(40), z.boolean())
     .transform((channels) => ({
       ...defaultNotificationChannelPreferences(),
@@ -87,11 +92,26 @@ const notificationPrefs = z.object({
       .min(1).default(["owner", "manager", "cashier"]),
     syncDone: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
       .min(1).default(["owner", "manager"]),
+    invoiceCreated: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
+      .min(1).default(["owner", "manager"]),
+    purchaseReceived: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
+      .min(1).default(["owner", "manager", "warehouse"]),
+    debtChanged: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
+      .min(1).default(["owner", "manager"]),
+    qrPaymentConfirmed: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
+      .min(1).default(["owner", "manager"]),
+    qrPaymentException: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
+      .min(1).default(["owner", "manager"]),
   }).default({
     lowStock: ["owner", "manager", "warehouse"],
     einvoiceError: ["owner", "manager"],
     shiftClose: ["owner", "manager", "cashier"],
     syncDone: ["owner", "manager"],
+    invoiceCreated: ["owner", "manager"],
+    purchaseReceived: ["owner", "manager", "warehouse"],
+    debtChanged: ["owner", "manager"],
+    qrPaymentConfirmed: ["owner", "manager"],
+    qrPaymentException: ["owner", "manager"],
   }),
 });
 
@@ -173,6 +193,11 @@ export const storePrefsSchema = z.object({
     shiftClose: true,
     einvoiceError: true,
     syncDone: false,
+    invoiceCreated: true,
+    purchaseReceived: true,
+    debtChanged: true,
+    qrPaymentConfirmed: true,
+    qrPaymentException: true,
     channels: defaultNotificationChannelPreferences(),
     quietHours: { enabled: false, start: "22:00", end: "07:00", timezone: "Asia/Ho_Chi_Minh" },
     thresholds: { lowStockDays: 7, einvoiceFailureAttempts: 1 },
@@ -181,6 +206,11 @@ export const storePrefsSchema = z.object({
       einvoiceError: ["owner", "manager"],
       shiftClose: ["owner", "manager", "cashier"],
       syncDone: ["owner", "manager"],
+      invoiceCreated: ["owner", "manager"],
+      purchaseReceived: ["owner", "manager", "warehouse"],
+      debtChanged: ["owner", "manager"],
+      qrPaymentConfirmed: ["owner", "manager"],
+      qrPaymentException: ["owner", "manager"],
     },
   }),
   hardware: hardwarePrefs.default({ paperSize: "K80", autoPrint: false, openDrawer: true, printEinvoiceQr: true }),
