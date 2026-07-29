@@ -16,7 +16,6 @@ const {
   profiles,
   purchaseOrders,
   stockLevels,
-  storeSettings,
   suppliers,
   warehouses,
 } = schema;
@@ -118,27 +117,10 @@ for (const file of readdirSync(`${projectRoot}/drizzle`).filter((name) => name.e
     if (sql && !/create extension/i.test(sql)) await client.exec(sql);
   }
 }
-await client.exec(`
-  CREATE TABLE "store_settings" (
-    "id" text PRIMARY KEY DEFAULT 'default' NOT NULL,
-    "name" text DEFAULT '' NOT NULL,
-    "address" text DEFAULT '' NOT NULL,
-    "phone" text DEFAULT '' NOT NULL,
-    "tax_code" text DEFAULT '' NOT NULL,
-    "industry" text DEFAULT 'grocery' NOT NULL,
-    "currency" text DEFAULT 'VND' NOT NULL,
-    "locale" text DEFAULT 'vi-VN' NOT NULL,
-    "onboarded" boolean DEFAULT false NOT NULL,
-    "prefs" jsonb DEFAULT '{}'::jsonb NOT NULL,
-    "updated_at" timestamptz DEFAULT now() NOT NULL
-  )
-`);
-
 const [actor] = await db.insert(profiles).values([
   { id: actorId, fullName: "Actor", role: "owner" },
   { id: "10000000-0000-4000-8000-000000000002", fullName: "Recipient", role: "manager" },
 ]).returning();
-await db.insert(storeSettings).values({ id: "default" });
 const [warehouse] = await db.insert(warehouses).values({
   id: "20000000-0000-4000-8000-000000000001",
   name: "Event warehouse",

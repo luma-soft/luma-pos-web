@@ -25,25 +25,6 @@ for (const file of readdirSync(`${projectRoot}/drizzle`).filter((name) => name.e
   }
 }
 
-// `store_settings` predates the tracked migrations in this isolated fixture.
-// Define its schema-owned singleton shape here so the service is exercised
-// against PGlite without touching a developer database.
-await client.exec(`
-  CREATE TABLE "store_settings" (
-    "id" text PRIMARY KEY DEFAULT 'default' NOT NULL,
-    "name" text DEFAULT '' NOT NULL,
-    "address" text DEFAULT '' NOT NULL,
-    "phone" text DEFAULT '' NOT NULL,
-    "tax_code" text DEFAULT '' NOT NULL,
-    "industry" text DEFAULT 'grocery' NOT NULL,
-    "currency" text DEFAULT 'VND' NOT NULL,
-    "locale" text DEFAULT 'vi-VN' NOT NULL,
-    "onboarded" boolean DEFAULT false NOT NULL,
-    "prefs" jsonb DEFAULT '{}'::jsonb NOT NULL,
-    "updated_at" timestamptz DEFAULT now() NOT NULL
-  )
-`);
-
 const [owner, manager, cashier, warehouse] = await db.insert(profiles).values([
   { id: "10000000-0000-4000-8000-000000000001", fullName: "Owner", role: "owner" },
   { id: "10000000-0000-4000-8000-000000000002", fullName: "Manager", role: "manager" },
@@ -51,8 +32,6 @@ const [owner, manager, cashier, warehouse] = await db.insert(profiles).values([
   { id: "10000000-0000-4000-8000-000000000004", fullName: "Warehouse", role: "warehouse" },
   { id: "10000000-0000-4000-8000-000000000005", fullName: "Inactive", role: "manager", isActive: false },
 ]).returning();
-await db.insert(storeSettings).values({ id: "default" });
-
 async function rowsFor(eventId) {
   const [recipients, outbox] = await Promise.all([
     db.select().from(notificationRecipients).where(eq(notificationRecipients.eventId, eventId)),

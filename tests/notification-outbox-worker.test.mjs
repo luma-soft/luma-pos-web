@@ -33,22 +33,6 @@ for (const file of readdirSync(`${projectRoot}/drizzle`).filter((name) => name.e
   }
 }
 
-await client.exec(`
-  CREATE TABLE "store_settings" (
-    "id" text PRIMARY KEY DEFAULT 'default' NOT NULL,
-    "name" text DEFAULT '' NOT NULL,
-    "address" text DEFAULT '' NOT NULL,
-    "phone" text DEFAULT '' NOT NULL,
-    "tax_code" text DEFAULT '' NOT NULL,
-    "industry" text DEFAULT 'grocery' NOT NULL,
-    "currency" text DEFAULT 'VND' NOT NULL,
-    "locale" text DEFAULT 'vi-VN' NOT NULL,
-    "onboarded" boolean DEFAULT false NOT NULL,
-    "prefs" jsonb DEFAULT '{}'::jsonb NOT NULL,
-    "updated_at" timestamptz DEFAULT now() NOT NULL
-  )
-`);
-
 const userIds = {
   owner: "20000000-0000-4000-8000-000000000001",
   manager: "20000000-0000-4000-8000-000000000002",
@@ -61,8 +45,6 @@ await db.insert(profiles).values([
   { id: userIds.cashier, fullName: "Cashier", role: "cashier" },
   { id: userIds.inactive, fullName: "Inactive", role: "manager", isActive: false },
 ]);
-await db.insert(storeSettings).values({ id: "default" });
-
 const [ownerDevice, managerDevice, cashierDevice] = await db.insert(mobilePushDevices).values([
   {
     userId: userIds.owner,
@@ -216,6 +198,47 @@ function core({
   const row = await outboxRow(seeded.eventId);
   assert.equal(row.status, "published");
   assert.equal(row.providerMessageId, "replacement-publication");
+}
+
+// QStash can invoke the callback before publish() returns. The callback must
+// report not-ready, the publisher must leave a recoverable published row, and
+// recovery must create another provider message that can complete the event.
+{
+  const seeded = await seedEvent({ status: "pending" });
+  const callbackResults = [];
+  const publishedEnvelopes = [];
+  let clock = new Date("2026-07-28T12:00:00.000Z");
+  let service;
+  service = createNotificationOutboxCore({
+    database: db,
+    publisher: {
+      async publish(message) {
+        publishedEnvelopes.push(message);
+        if (publishedEnvelopes.length === 1) {
+          callbackResults.push(await service.processNotificationMessage(message));
+        }
+        return { providerMessageId: `immediate-${publishedEnvelopes.length}` };
+      },
+    },
+    sender: async () => ({ kind: "sent" }),
+    now: () => new Date(clock),
+    jitter: () => 0,
+  });
+
+  assert.equal(await service.publishCommittedNotification(seeded.eventId), true);
+  assert.deepEqual(callbackResults, [{ completed: false, reason: "not_ready" }]);
+  assert.equal((await outboxRow(seeded.eventId)).status, "published");
+
+  clock = new Date("2026-07-28T12:02:01.000Z");
+  assert.ok(await service.recoverDueNotifications(50) >= 1);
+  const recoveredEnvelope = publishedEnvelopes.findLast(
+    (message) => message.eventId === seeded.eventId,
+  );
+  assert.ok(recoveredEnvelope);
+  assert.deepEqual(await service.processNotificationMessage(recoveredEnvelope), {
+    completed: true,
+  });
+  assert.equal((await outboxRow(seeded.eventId)).status, "completed");
 }
 
 // Arbitrary provider failures are reduced to a bounded operational class.
@@ -514,6 +537,114 @@ function core({
   }).where(eq(notificationOutbox.eventId, seeded.eventId));
 }
 
+// Every mutable authorization/binding field is re-read after the delivery
+// claim and immediately before network I/O. A stale candidate never reaches
+// FCM, while the durable in-app recipient remains untouched.
+for (const scenario of [
+  {
+    name: "token",
+    mutate: () => db.update(mobilePushDevices).set({ token: "rotated-owner-token" })
+      .where(eq(mobilePushDevices.id, ownerDevice.id)),
+    restore: () => db.update(mobilePushDevices).set({ token: "owner-token" })
+      .where(eq(mobilePushDevices.id, ownerDevice.id)),
+  },
+  {
+    name: "effective user",
+    mutate: () => db.update(mobilePushDevices).set({ effectiveUserId: userIds.cashier })
+      .where(eq(mobilePushDevices.id, ownerDevice.id)),
+    restore: () => db.update(mobilePushDevices).set({ effectiveUserId: userIds.owner })
+      .where(eq(mobilePushDevices.id, ownerDevice.id)),
+  },
+  {
+    name: "principal",
+    mutate: () => db.update(mobilePushDevices).set({ userId: userIds.cashier })
+      .where(eq(mobilePushDevices.id, ownerDevice.id)),
+    restore: () => db.update(mobilePushDevices).set({ userId: userIds.owner })
+      .where(eq(mobilePushDevices.id, ownerDevice.id)),
+  },
+  {
+    name: "permission",
+    mutate: () => db.update(mobilePushDevices).set({ permission: "denied" })
+      .where(eq(mobilePushDevices.id, ownerDevice.id)),
+    restore: () => db.update(mobilePushDevices).set({ permission: "authorized" })
+      .where(eq(mobilePushDevices.id, ownerDevice.id)),
+  },
+  {
+    name: "enabled flag",
+    mutate: () => db.update(mobilePushDevices).set({ enabled: false })
+      .where(eq(mobilePushDevices.id, ownerDevice.id)),
+    restore: () => db.update(mobilePushDevices).set({ enabled: true })
+      .where(eq(mobilePushDevices.id, ownerDevice.id)),
+  },
+  {
+    name: "recipient role",
+    mutate: () => db.update(profiles).set({ role: "cashier" })
+      .where(eq(profiles.id, userIds.owner)),
+    restore: () => db.update(profiles).set({ role: "owner" })
+      .where(eq(profiles.id, userIds.owner)),
+  },
+  {
+    name: "live settings",
+    mutate: () => db.update(storeSettings).set({
+      prefs: { notifications: { invoiceCreated: false } },
+    }).where(eq(storeSettings.id, "default")),
+    restore: () => db.update(storeSettings).set({ prefs: {} })
+      .where(eq(storeSettings.id, "default")),
+  },
+]) {
+  await db.update(storeSettings).set({ prefs: {} }).where(eq(storeSettings.id, "default"));
+  await db.update(mobilePushDevices).set({ enabled: false })
+    .where(eq(mobilePushDevices.id, managerDevice.id));
+  const seeded = await seedEvent();
+  let transactionCount = 0;
+  const raceDatabase = new Proxy(db, {
+    get(target, property) {
+      if (property === "transaction") {
+        return async (callback) => {
+          transactionCount += 1;
+          if (transactionCount === 2) await scenario.mutate();
+          return db.transaction(callback);
+        };
+      }
+      const value = Reflect.get(target, property);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  let calls = 0;
+  const service = createNotificationOutboxCore({
+    database: raceDatabase,
+    publisher: {
+      async publish() {
+        return { providerMessageId: "unused" };
+      },
+    },
+    sender: async () => {
+      calls += 1;
+      return { kind: "sent" };
+    },
+    now: () => new Date("2026-07-28T12:00:00.000Z"),
+    jitter: () => 0,
+  });
+
+  await service.processNotificationMessage({
+    version: 1,
+    eventId: seeded.eventId,
+    deduplicationKey: `notification:${seeded.eventId}`,
+    queuedAt: "2026-07-28T12:00:00.000Z",
+  });
+
+  assert.equal(calls, 0, `${scenario.name} change must fence FCM`);
+  assert.equal((await outboxRow(seeded.eventId)).status, "completed");
+  assert.equal(
+    (await db.select().from(notificationRecipients)
+      .where(eq(notificationRecipients.eventId, seeded.eventId))).length,
+    2,
+  );
+  await scenario.restore();
+  await db.update(mobilePushDevices).set({ enabled: true })
+    .where(eq(mobilePushDevices.id, managerDevice.id));
+}
+
 // Routine events defer to the first minute outside quiet hours without consuming
 // a delivery attempt.
 {
@@ -751,12 +882,15 @@ await db.update(storeSettings).set({ prefs: {} }).where(eq(storeSettings.id, "de
   assert.equal(calls, 0);
 }
 
-// Recovery publishes only due pending/retry rows.
+// Recovery publishes due pending/retry rows and orphaned published rows.
 {
   const duePending = await seedEvent({ status: "pending" });
   const futurePending = await seedEvent({ status: "pending" });
   const dueRetry = await seedEvent({ status: "retry" });
   const alreadyPublished = await seedEvent({ status: "published" });
+  await db.update(notificationOutbox).set({
+    publishedAt: new Date("2026-07-28T11:57:59.000Z"),
+  }).where(eq(notificationOutbox.eventId, alreadyPublished.eventId));
   await db.update(notificationOutbox).set({
     availableAt: new Date("2026-07-28T12:05:00.000Z"),
   }).where(eq(notificationOutbox.eventId, futurePending.eventId));
@@ -769,8 +903,11 @@ await db.update(storeSettings).set({ prefs: {} }).where(eq(storeSettings.id, "de
       },
     },
   }).recoverDueNotifications(50);
-  assert.equal(recovered, 2);
-  assert.deepEqual(published.sort(), [duePending.eventId, dueRetry.eventId].sort());
+  assert.equal(recovered, 3);
+  assert.deepEqual(
+    published.sort(),
+    [duePending.eventId, dueRetry.eventId, alreadyPublished.eventId].sort(),
+  );
   assert.equal((await outboxRow(futurePending.eventId)).status, "pending");
   assert.equal((await outboxRow(alreadyPublished.eventId)).status, "published");
 }

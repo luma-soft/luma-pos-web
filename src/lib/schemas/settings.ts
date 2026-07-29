@@ -154,6 +154,9 @@ export const mobileNotificationSettingsPatchSchema = z.object({
     qrPaymentException: notificationRoutePatchSchema.optional(),
   }).strict().optional(),
 }).strict();
+export type MobileNotificationSettingsPatch = z.infer<
+  typeof mobileNotificationSettingsPatchSchema
+>;
 
 const hardwarePrefs = z.object({
   paperSize: z.enum(PAPER_SIZES).default("K80"),

@@ -38,23 +38,6 @@ for (const file of readdirSync(`${PROJ}/drizzle`).filter((name) => name.endsWith
     if (sql && !/create extension/i.test(sql)) await client.exec(sql);
   }
 }
-// `store_settings` predates the tracked migrations used by this PGlite fixture.
-await client.exec(`
-  CREATE TABLE "store_settings" (
-    "id" text PRIMARY KEY DEFAULT 'default' NOT NULL,
-    "name" text DEFAULT '' NOT NULL,
-    "address" text DEFAULT '' NOT NULL,
-    "phone" text DEFAULT '' NOT NULL,
-    "tax_code" text DEFAULT '' NOT NULL,
-    "industry" text DEFAULT 'grocery' NOT NULL,
-    "currency" text DEFAULT 'VND' NOT NULL,
-    "locale" text DEFAULT 'vi-VN' NOT NULL,
-    "onboarded" boolean DEFAULT false NOT NULL,
-    "prefs" jsonb DEFAULT '{}'::jsonb NOT NULL,
-    "updated_at" timestamptz DEFAULT now() NOT NULL
-  )
-`);
-
 const [cashier] = await db.insert(profiles).values({
   id: "00000000-0000-0000-0000-000000000301",
   fullName: "Gateway Cashier",

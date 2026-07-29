@@ -42,5 +42,30 @@ ok("outbox is provider neutral", [
   "published_at", "first_attempt_at", "completed_at",
 ].every((name) => outboxColumns.rows.some((row) => row.column_name === name)));
 
+const storeSettingsColumns = await client.query(`
+  select column_name
+  from information_schema.columns
+  where table_name = 'store_settings'
+`);
+ok("tracked migrations provide the store settings baseline", [
+  "id", "name", "address", "phone", "tax_code", "industry", "currency",
+  "locale", "onboarded", "prefs", "updated_at",
+].every((name) =>
+  storeSettingsColumns.rows.some((row) => row.column_name === name)
+));
+
+const recipientUnique = await client.query(`
+  select 1
+  from pg_constraint
+  where conrelid = 'notification_recipients'::regclass
+    and contype = 'u'
+    and pg_get_constraintdef(oid) =
+      'UNIQUE (event_id, user_id)'
+`);
+ok(
+  "recipient schema enforces one event/user row",
+  recipientUnique.rows.length === 1,
+);
+
 await client.close();
 assert.equal(fail, 0, `${fail} notification schema checks failed`);

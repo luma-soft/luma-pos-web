@@ -12,6 +12,7 @@ import {
   shopeeSettingsInputSchema,
   storeSettingsSchema,
   storePrefsPatchSchema,
+  mobileNotificationSettingsPatchSchema,
   zaloSettingsInputSchema,
   parseStorePrefs,
   type AiSettingsInput,
@@ -19,9 +20,13 @@ import {
   type ShopeeSettingsInput,
   type StoreSettingsInput,
   type StaffRole,
+  type MobileNotificationSettingsPatch,
   type StorePrefsPatch,
   type ZaloSettingsInput,
 } from "@/lib/schemas/settings";
+import {
+  persistNotificationSettingsPatch,
+} from "@/lib/settings/notification-settings-core";
 import { writeAuditLog } from "@/lib/audit";
 import { buildAiProviderConfig, completeAiText, completeAiVision } from "@/lib/ai/provider-adapter";
 import { type ActionResult, requireManager, requireOwner, requireUser } from "./common";
@@ -139,6 +144,25 @@ export async function updateStorePrefsForUser(
     return { ok: true, data: undefined };
   } catch (e) {
     console.error("updateStorePrefs failed:", e);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function updateNotificationSettingsForUser(
+  _userId: string,
+  patch: MobileNotificationSettingsPatch,
+): Promise<ActionResult> {
+  const parsed = mobileNotificationSettingsPatchSchema.safeParse(patch);
+  if (!parsed.success || Object.keys(parsed.data).length === 0) {
+    return { ok: false, error: "errors.invalidData" };
+  }
+  try {
+    await persistNotificationSettingsPatch(db, parsed.data);
+    revalidatePath(Routes.Settings);
+    revalidatePath(Routes.POS);
+    return { ok: true, data: undefined };
+  } catch (error) {
+    console.error("updateNotificationSettings failed:", error);
     return { ok: false, error: "errors.serverError" };
   }
 }

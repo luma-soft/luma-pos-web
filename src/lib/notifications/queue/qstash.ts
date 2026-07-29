@@ -25,7 +25,6 @@ type QstashClientLike = {
   publishJSON(input: {
     url: string;
     body: NotificationQueueMessageV1;
-    deduplicationId: string;
     retries: 10;
     retryDelay: "max(1000, pow(2, retried) * 1000)";
     timeout: "15s";
@@ -143,7 +142,6 @@ export function createQstashNotificationQueue(
       const result = await sdkClient.publishJSON({
         url: input.url,
         body: input.body,
-        deduplicationId: input.deduplicationId,
         retries: 10,
         retryDelay: "max(1000, pow(2, retried) * 1000)",
         timeout: "15s",
@@ -162,7 +160,6 @@ export function createQstashNotificationQueue(
         const result = await publish({
           url: config.workerUrl,
           body: envelope,
-          deduplicationId: envelope.deduplicationKey,
           retries: 10,
           retryDelay: "max(1000, pow(2, retried) * 1000)",
           timeout: "15s",

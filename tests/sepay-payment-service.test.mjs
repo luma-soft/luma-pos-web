@@ -32,6 +32,74 @@ const ok = (name, cond, extra = "") => {
 };
 const money = (n) => n.toFixed(2);
 
+function withConcurrentPaymentReads(database, paymentTable, reference) {
+  let arrivals = 0;
+  let releasePair = () => {};
+  let pairGate = new Promise((resolve) => {
+    releasePair = resolve;
+  });
+
+  async function waitForPair(rows) {
+    if (
+      arrivals >= 4
+      || rows[0]?.reference !== reference
+      || rows[0]?.status !== "pending"
+    ) {
+      return rows;
+    }
+    const gate = pairGate;
+    arrivals += 1;
+    if (arrivals % 2 === 0) {
+      releasePair();
+      pairGate = new Promise((resolve) => {
+        releasePair = resolve;
+      });
+    }
+    await gate;
+    return rows;
+  }
+
+  function wrapQuery(builder, fromPayments = false) {
+    return new Proxy(builder, {
+      get(target, property) {
+        if (property === "from") {
+          return (table) => wrapQuery(target.from(table), table === paymentTable);
+        }
+        if (property === "then") {
+          return (resolve, reject) => target.then(
+            (rows) => fromPayments
+              ? waitForPair(rows).then(resolve, reject)
+              : resolve(rows),
+            reject,
+          );
+        }
+        const value = Reflect.get(target, property);
+        if (typeof value !== "function") return value;
+        return (...args) => wrapQuery(value.apply(target, args), fromPayments);
+      },
+    });
+  }
+
+  const concurrentTx = new Proxy(database, {
+    get(target, property) {
+      if (property === "select") {
+        return (...args) => wrapQuery(target.select(...args));
+      }
+      const value = Reflect.get(target, property);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  return new Proxy(database, {
+    get(target, property) {
+      if (property === "transaction") {
+        return (callback) => callback(concurrentTx);
+      }
+      const value = Reflect.get(target, property);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
+
 console.log("0) Apply all migrations");
 for (const f of readdirSync(`${PROJ}/drizzle`).filter((x) => x.endsWith(".sql")).sort()) {
   for (const stmt of readFileSync(`${PROJ}/drizzle/${f}`, "utf8").split("--> statement-breakpoint")) {
@@ -39,23 +107,6 @@ for (const f of readdirSync(`${PROJ}/drizzle`).filter((x) => x.endsWith(".sql"))
     if (s && !/create extension/i.test(s)) await client.exec(s);
   }
 }
-// `store_settings` predates the tracked migrations used by this PGlite fixture.
-await client.exec(`
-  CREATE TABLE "store_settings" (
-    "id" text PRIMARY KEY DEFAULT 'default' NOT NULL,
-    "name" text DEFAULT '' NOT NULL,
-    "address" text DEFAULT '' NOT NULL,
-    "phone" text DEFAULT '' NOT NULL,
-    "tax_code" text DEFAULT '' NOT NULL,
-    "industry" text DEFAULT 'grocery' NOT NULL,
-    "currency" text DEFAULT 'VND' NOT NULL,
-    "locale" text DEFAULT 'vi-VN' NOT NULL,
-    "onboarded" boolean DEFAULT false NOT NULL,
-    "prefs" jsonb DEFAULT '{}'::jsonb NOT NULL,
-    "updated_at" timestamptz DEFAULT now() NOT NULL
-  )
-`);
-
 const [cashier] = await db.insert(profiles).values({
   id: "00000000-0000-0000-0000-000000000201",
   fullName: "Cashier Service",
@@ -195,6 +246,82 @@ ok(
     && !replay.data.notificationEventId
     && cashRows.length === 1
     && qrEvents.length === 1,
+);
+
+console.log("2a) Concurrent provider events fence one payment transition");
+const [concurrentOrder] = await db.insert(orders).values({
+  code: "DH-CONCURRENT",
+  status: "completed",
+  paymentStatus: "unpaid",
+  shiftId: shift.id,
+  subtotal: money(180_000),
+  total: money(180_000),
+  amountPaid: money(0),
+  createdBy: cashier.id,
+}).returning();
+const concurrentPending = await service.createPendingSepayPayment(db, {
+  orderId: concurrentOrder.id,
+  bankAccountId: account.id,
+  amount: 180_000,
+  reference: "LUMA-DH-CONCURRENT",
+  createdBy: cashier.id,
+});
+const concurrentEvents = await db.insert(paymentWebhookEvents).values([
+  {
+    provider: "sepay",
+    providerEventId: "sepay-svc-concurrent-a",
+    referenceCode: "LUMA-DH-CONCURRENT",
+    accountNumber: account.accountNumber,
+    gateway: account.gateway,
+    transferType: "in",
+    transferAmount: money(180_000),
+    status: "verified",
+    rawPayload: { id: "sepay-svc-concurrent-a" },
+  },
+  {
+    provider: "sepay",
+    providerEventId: "sepay-svc-concurrent-b",
+    referenceCode: "LUMA-DH-CONCURRENT",
+    accountNumber: account.accountNumber,
+    gateway: account.gateway,
+    transferType: "in",
+    transferAmount: money(180_000),
+    status: "verified",
+    rawPayload: { id: "sepay-svc-concurrent-b" },
+  },
+]).returning();
+const concurrentDb = withConcurrentPaymentReads(
+  db,
+  payments,
+  "LUMA-DH-CONCURRENT",
+);
+const concurrentResults = await Promise.all(
+  concurrentEvents.map((row) => service.matchSepayWebhookEvent(concurrentDb, row.id)),
+);
+const [concurrentPaymentAfter] = await db.select().from(payments)
+  .where(eq(payments.id, concurrentPending.data.id));
+const [concurrentOrderAfter] = await db.select().from(orders)
+  .where(eq(orders.id, concurrentOrder.id));
+const concurrentCash = await db.select().from(cashTransactions)
+  .where(eq(cashTransactions.refId, concurrentOrder.id));
+const concurrentNotifications = await db.select().from(notificationEvents)
+  .where(eq(
+    notificationEvents.eventKey,
+    `qr-payment-confirmed:${concurrentPending.data.id}`,
+  ));
+ok(
+  "two concurrent events produce exactly one business effect and notification",
+  concurrentResults.every((result) => result.ok)
+    && concurrentPaymentAfter.status === "confirmed"
+    && Number(concurrentOrderAfter.amountPaid) === 180_000
+    && concurrentCash.length === 1
+    && concurrentNotifications.length === 1,
+  JSON.stringify({
+    results: concurrentResults,
+    amountPaid: concurrentOrderAfter.amountPaid,
+    cash: concurrentCash.length,
+    notifications: concurrentNotifications.length,
+  }),
 );
 
 const normalized = sepay.normalizeSepayWebhookPayload({

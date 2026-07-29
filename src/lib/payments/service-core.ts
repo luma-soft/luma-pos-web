@@ -147,13 +147,35 @@ async function confirmPaymentInTx(
     source?: ConfirmSource;
   }
 ) {
-  const [payment] = await tx.select().from(payments).where(eq(payments.id, input.paymentId)).limit(1);
-  if (!payment) throw new Error("PAYMENT_NOT_FOUND");
-
-  if (payment.status === "confirmed" || payment.status === "reconciled" || payment.status === "manual_confirmed") {
-    return { alreadyConfirmed: true };
+  const nextPaymentStatus = input.source === "api"
+    ? "reconciled"
+    : input.source === "manual"
+      ? "manual_confirmed"
+      : "confirmed";
+  const [payment] = await tx
+    .update(payments)
+    .set({ status: nextPaymentStatus })
+    .where(and(
+      eq(payments.id, input.paymentId),
+      inArray(payments.status, ["pending", "expired"]),
+    ))
+    .returning();
+  if (!payment) {
+    const [current] = await tx
+      .select({ status: payments.status })
+      .from(payments)
+      .where(eq(payments.id, input.paymentId))
+      .limit(1);
+    if (!current) throw new Error("PAYMENT_NOT_FOUND");
+    if (
+      current.status === "confirmed"
+      || current.status === "reconciled"
+      || current.status === "manual_confirmed"
+    ) {
+      return { alreadyConfirmed: true };
+    }
+    throw new Error("PAYMENT_NOT_CONFIRMABLE");
   }
-  if (payment.status !== "pending" && payment.status !== "expired") throw new Error("PAYMENT_NOT_CONFIRMABLE");
 
   const [order] = await tx.select().from(orders).where(eq(orders.id, payment.orderId)).limit(1);
   if (!order) throw new Error("ORDER_NOT_FOUND");
@@ -164,10 +186,7 @@ async function confirmPaymentInTx(
   const draftOrder = order.status === "draft";
   const newPaid = Math.min(total, alreadyPaid + amount);
   const confirmedAt = input.confirmedAt ?? new Date();
-  const nextPaymentStatus = input.source === "api" ? "reconciled" : input.source === "manual" ? "manual_confirmed" : "confirmed";
-
   await tx.update(payments).set({
-    status: nextPaymentStatus,
     providerTransactionId: input.providerTransactionId ?? payment.providerTransactionId,
     gateway: input.gateway ?? payment.gateway,
     accountNumber: input.accountNumber ?? payment.accountNumber,

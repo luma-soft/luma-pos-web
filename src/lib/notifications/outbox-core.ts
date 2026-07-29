@@ -52,6 +52,7 @@ type NotificationOutboxCoreOptions = {
 
 const publishLeaseMs = 30_000;
 const processingLeaseMs = 2 * 60_000;
+const publishedRecoveryMs = processingLeaseMs;
 const deviceSendLeaseMs = processingLeaseMs + 60_000;
 const maxAttemptAgeMs = 60 * 60_000;
 const maxAttempts = 10;
@@ -125,8 +126,12 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
     provider = "queue",
   } = options;
 
-  async function publishCommittedNotification(eventId: string): Promise<boolean> {
+  async function publishCommittedNotification(
+    eventId: string,
+    includeOrphanedPublished = false,
+  ): Promise<boolean> {
     const claimedAt = now();
+    const publishedBefore = addMilliseconds(claimedAt, -publishedRecoveryMs);
     const [claim] = await database
       .update(notificationOutbox)
       .set({
@@ -139,6 +144,12 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
         lte(notificationOutbox.availableAt, claimedAt),
         or(
           inArray(notificationOutbox.status, ["pending", "retry"]),
+          includeOrphanedPublished
+            ? and(
+              eq(notificationOutbox.status, "published"),
+              lte(notificationOutbox.publishedAt, publishedBefore),
+            )
+            : undefined,
           and(
             eq(notificationOutbox.status, "publishing"),
             lte(notificationOutbox.leaseExpiresAt, claimedAt),
@@ -214,7 +225,16 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
       .select({ eventId: notificationOutbox.eventId })
       .from(notificationOutbox)
       .where(and(
-        inArray(notificationOutbox.status, ["pending", "retry"]),
+        or(
+          inArray(notificationOutbox.status, ["pending", "retry"]),
+          and(
+            eq(notificationOutbox.status, "published"),
+            lte(
+              notificationOutbox.publishedAt,
+              addMilliseconds(recoveryAt, -publishedRecoveryMs),
+            ),
+          ),
+        ),
         lte(notificationOutbox.availableAt, recoveryAt),
         or(
           isNull(notificationOutbox.leaseExpiresAt),
@@ -226,7 +246,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
 
     let published = 0;
     for (const row of dueRows as Array<{ eventId: string }>) {
-      if (await publishCommittedNotification(row.eventId)) published += 1;
+      if (await publishCommittedNotification(row.eventId, true)) published += 1;
     }
     return published;
   }
@@ -275,7 +295,11 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
 
   async function processNotificationMessage(
     message: NotificationQueueMessageV1,
-  ): Promise<{ completed: boolean; retryAt?: Date }> {
+  ): Promise<{
+    completed: boolean;
+    retryAt?: Date;
+    reason?: "not_ready" | "busy";
+  }> {
     if (message.deduplicationKey !== `notification:${message.eventId}`) {
       throw new Error("NOTIFICATION_QUEUE_MESSAGE_MISMATCH");
     }
@@ -328,8 +352,15 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
       if (current?.status === "completed" || current?.status === "dead") {
         return { completed: true };
       }
+      if (
+        current?.status === "pending"
+        || current?.status === "publishing"
+      ) {
+        return { completed: false, reason: "not_ready" };
+      }
       return {
         completed: false,
+        reason: "busy",
         ...(current?.availableAt ? { retryAt: current.availableAt } : {}),
       };
     }
@@ -475,6 +506,8 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
     const devices = await database
       .select({
         id: mobilePushDevices.id,
+        userId: mobilePushDevices.userId,
+        effectiveUserId: mobilePushDevices.effectiveUserId,
         token: mobilePushDevices.token,
         locale: mobilePushDevices.locale,
       })
@@ -500,6 +533,8 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
     const notificationKey = `event:${message.eventId}`;
     const typedDevices = devices as Array<{
       id: string;
+      userId: string;
+      effectiveUserId: string;
       token: string;
       locale: string | null;
     }>;
@@ -612,7 +647,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
         return deviceClaim;
       }
 
-      const ownsSend = await database.transaction(async (tx: DatabaseLike) => {
+      const sendFence = await database.transaction(async (tx: DatabaseLike) => {
         const [owner] = await tx
           .select({ leaseExpiresAt: notificationOutbox.leaseExpiresAt })
           .from(notificationOutbox)
@@ -634,26 +669,110 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
           .limit(1)
           .for("update");
         const validationAt = now();
-        return Boolean(
-          owner?.leaseExpiresAt
-          && owner.leaseExpiresAt.getTime() > validationAt.getTime()
-          && delivery
-          && delivery.attemptedAt.getTime() + deviceSendLeaseMs > validationAt.getTime(),
+        if (
+          !owner?.leaseExpiresAt
+          || owner.leaseExpiresAt.getTime() <= validationAt.getTime()
+          || !delivery
+          || delivery.attemptedAt.getTime() + deviceSendLeaseMs <= validationAt.getTime()
+        ) {
+          return { kind: "retry" as const };
+        }
+
+        const validationPrincipalProfiles = alias(
+          profiles,
+          "notification_validation_principal_profiles",
         );
+        const validationEffectiveProfiles = alias(
+          profiles,
+          "notification_validation_effective_profiles",
+        );
+        const [live] = await tx
+          .select({
+            token: mobilePushDevices.token,
+            locale: mobilePushDevices.locale,
+            reason: notificationRecipients.reason,
+            role: validationEffectiveProfiles.role,
+            principalActive: validationPrincipalProfiles.isActive,
+            effectiveActive: validationEffectiveProfiles.isActive,
+            prefs: storeSettings.prefs,
+          })
+          .from(mobilePushDevices)
+          .innerJoin(
+            validationPrincipalProfiles,
+            eq(validationPrincipalProfiles.id, mobilePushDevices.userId),
+          )
+          .innerJoin(
+            validationEffectiveProfiles,
+            eq(validationEffectiveProfiles.id, mobilePushDevices.effectiveUserId),
+          )
+          .innerJoin(
+            notificationRecipients,
+            and(
+              eq(notificationRecipients.eventId, message.eventId),
+              eq(notificationRecipients.userId, mobilePushDevices.effectiveUserId),
+            ),
+          )
+          .leftJoin(storeSettings, eq(storeSettings.id, "default"))
+          .where(and(
+            eq(mobilePushDevices.id, device.id),
+            eq(mobilePushDevices.userId, device.userId),
+            eq(mobilePushDevices.effectiveUserId, device.effectiveUserId),
+            eq(mobilePushDevices.token, device.token),
+            eq(mobilePushDevices.enabled, true),
+            eq(mobilePushDevices.permission, "authorized"),
+          ))
+          .limit(1);
+
+        const liveNotifications = parseStorePrefs(live?.prefs).notifications;
+        const liveAllowedRoles = liveNotifications.roleRouting[category] as Role[];
+        const eligible = Boolean(
+          live
+          && live.principalActive
+          && live.effectiveActive
+          && liveNotifications.channels.push
+          && liveNotifications[category]
+          && (
+            live.reason === "direct"
+            || liveAllowedRoles.includes(live.role as Role)
+          ),
+        );
+        if (!eligible) {
+          await tx
+            .update(mobilePushDeliveries)
+            .set({
+              status: "failed",
+              errorCode: "NOTIFICATION_BINDING_STALE",
+              attemptedAt: validationAt,
+            })
+            .where(and(
+              eq(mobilePushDeliveries.id, deviceClaim.id),
+              eq(mobilePushDeliveries.status, "sending"),
+              eq(mobilePushDeliveries.attemptedAt, deviceClaim.attemptedAt),
+            ));
+          return { kind: "skip" as const };
+        }
+        return {
+          kind: "send" as const,
+          token: live.token,
+          locale: live.locale,
+        };
       });
-      if (!ownsSend) {
+      if (sendFence.kind === "retry") {
         return {
           kind: "retry" as const,
           code: "NOTIFICATION_LEASE_EXPIRED",
           retryAfterMs: 0,
         };
       }
+      if (sendFence.kind === "skip") {
+        return { kind: "sent" as const, skipped: true };
+      }
 
       let result: DeviceNotificationResult;
       try {
         result = await sender({
-          token: device.token,
-          locale: device.locale,
+          token: sendFence.token,
+          locale: sendFence.locale,
           eventId: message.eventId,
           notificationKey,
           category,

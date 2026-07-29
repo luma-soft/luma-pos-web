@@ -27,7 +27,7 @@ describe("notification queue boundary", () => {
     })).toThrow("NOTIFICATION_QUEUE_NOT_CONFIGURED");
   });
 
-  test("publisher sends a closed envelope with the required QStash delivery settings", async () => {
+  test("publisher sends a closed envelope without provider-level deduplication", async () => {
     const published: unknown[] = [];
     const queue = createQstashNotificationQueue(config, {
       async verify() {
@@ -50,11 +50,38 @@ describe("notification queue boundary", () => {
     expect(published).toEqual([{
       url: config.workerUrl,
       body: message,
-      deduplicationId: message.deduplicationKey,
       retries: 10,
       retryDelay: "max(1000, pow(2, retried) * 1000)",
       timeout: "15s",
     }]);
+  });
+
+  test("QStash retry, recovery, and dead replay each create a fresh provider message", async () => {
+    const published: unknown[] = [];
+    const queue = createQstashNotificationQueue(config, {
+      async verify() {
+        return true;
+      },
+    }, {
+      async publishJSON(input) {
+        published.push(input);
+        return { messageId: `qstash-message-${published.length}` };
+      },
+    });
+
+    await expect(Promise.all([
+      queue.publisher.publish(message),
+      queue.publisher.publish({ ...message, queuedAt: "2026-07-28T12:01:00.000Z" }),
+      queue.publisher.publish({ ...message, queuedAt: "2026-07-28T12:02:00.000Z" }),
+    ])).resolves.toEqual([
+      { providerMessageId: "qstash-message-1" },
+      { providerMessageId: "qstash-message-2" },
+      { providerMessageId: "qstash-message-3" },
+    ]);
+    expect(published).toHaveLength(3);
+    expect(published.every((input) =>
+      !Object.hasOwn(input as Record<string, unknown>, "deduplicationId")
+    )).toBe(true);
   });
 
   test("verifier checks the raw QStash request against the configured worker URL", async () => {

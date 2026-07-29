@@ -16,7 +16,6 @@ const {
   orders,
   payments,
   profiles,
-  storeSettings,
 } = schema;
 const client = new PGlite();
 const db = drizzle(client, { schema });
@@ -31,28 +30,11 @@ for (const file of readdirSync(`${PROJ}/drizzle`)
     if (sql && !/create extension/i.test(sql)) await client.exec(sql);
   }
 }
-await client.exec(`
-  CREATE TABLE "store_settings" (
-    "id" text PRIMARY KEY DEFAULT 'default' NOT NULL,
-    "name" text DEFAULT '' NOT NULL,
-    "address" text DEFAULT '' NOT NULL,
-    "phone" text DEFAULT '' NOT NULL,
-    "tax_code" text DEFAULT '' NOT NULL,
-    "industry" text DEFAULT 'grocery' NOT NULL,
-    "currency" text DEFAULT 'VND' NOT NULL,
-    "locale" text DEFAULT 'vi-VN' NOT NULL,
-    "onboarded" boolean DEFAULT false NOT NULL,
-    "prefs" jsonb DEFAULT '{}'::jsonb NOT NULL,
-    "updated_at" timestamptz DEFAULT now() NOT NULL
-  )
-`);
-
 const [actor] = await db.insert(profiles).values({
   id: "10000000-0000-4000-8000-000000000001",
   fullName: "Manual payment actor",
   role: "cashier",
 }).returning();
-await db.insert(storeSettings).values({ id: "default" });
 const [customer] = await db.insert(customers).values({
   code: "KH-IDEMPOTENT-001",
   name: "Manual payment customer",

@@ -55,6 +55,10 @@ mock.module("@/lib/actions/settings", () => ({
     updateCalls.push({ userId, patch });
     return { ok: true, data: undefined };
   },
+  async updateNotificationSettingsForUser(userId, patch) {
+    updateCalls.push({ userId, patch });
+    return { ok: true, data: undefined };
+  },
 }));
 mock.module("@/lib/data/settings", () => ({
   async getStoreSettings() {
@@ -135,6 +139,7 @@ await check("cashier and warehouse cannot read or mutate notification administra
 await check("truthy primitives, arrays, unknown keys, and malformed nested values fail before approval", async () => {
   role = "manager";
   const malformedPayloads = [
+    {},
     true,
     "notifications",
     [],
@@ -183,7 +188,7 @@ await check("valid manager patch still requires sensitive approval", async () =>
   assert.equal(updateCalls.length, 0);
 });
 
-await check("manager GET and approved legacy partial PATCH preserve complete settings", async () => {
+await check("manager GET and approved PATCH persists only the supplied partial", async () => {
   role = "manager";
   authorization = { ok: true };
   approvalCalls = 0;
@@ -209,18 +214,15 @@ await check("manager GET and approved legacy partial PATCH preserve complete set
   assert.equal(updateCalls.length, 1);
   assert.equal(updateCalls[0].userId, "settings-manager");
 
-  const saved = updateCalls[0].patch.notifications;
+  const saved = updateCalls[0].patch;
   assert.equal(saved.lowStock, false);
-  assert.equal(saved.invoiceCreated, false);
-  assert.equal(saved.purchaseReceived, false);
-  assert.equal(saved.debtChanged, false);
-  assert.equal(saved.qrPaymentConfirmed, false);
-  assert.equal(saved.qrPaymentException, false);
-  assert.deepEqual(saved.channels, { inApp: false, push: false });
+  assert.deepEqual(saved.channels, { inApp: false });
   assert.deepEqual(saved.roleRouting.lowStock, ["owner"]);
-  assert.deepEqual(saved.roleRouting.invoiceCreated, ["owner"]);
-  assert.deepEqual(saved.roleRouting.purchaseReceived, ["warehouse"]);
-  assert.deepEqual(saved.roleRouting.qrPaymentConfirmed, ["cashier"]);
+  assert.deepEqual(Object.keys(saved).sort(), [
+    "channels",
+    "lowStock",
+    "roleRouting",
+  ]);
 });
 
 console.log(`\n${failed === 0 ? "🎉" : "⚠️"} ${passed} passed, ${failed} failed`);

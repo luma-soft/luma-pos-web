@@ -6,13 +6,25 @@ import { getCurrentShift } from "@/lib/data/shifts";
 import { getStoreSettings } from "@/lib/data/settings";
 import { requireMobileUser } from "@/lib/mobile/auth";
 import { mobileGate, mobileOk } from "@/lib/mobile/response";
-import { listPersistedMobileEvents } from "@/lib/notifications/mobile-events";
+import {
+  countPersistedMobileEvents,
+  listPersistedMobileEvents,
+} from "@/lib/notifications/mobile-events";
 import { mobileNotificationSettingsForRole } from "@/lib/settings/mobile-settings-access";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 const LEGACY_FALLBACK_CREATED_AT = new Date(0).toISOString();
 
-export async function GET() {
+function requestedLocale(request: Request) {
+  const queryLocale = new URL(request.url).searchParams.get("locale");
+  if (queryLocale?.toLowerCase().startsWith("en")) return "en";
+  if (queryLocale?.toLowerCase().startsWith("vi")) return "vi";
+  return request.headers.get("accept-language")?.toLowerCase().startsWith("en")
+    ? "en"
+    : "vi";
+}
+
+export async function GET(request: Request) {
   const gate = await requireMobileUser();
   if (!gate.ok) return mobileGate(gate)!;
 
@@ -34,10 +46,10 @@ export async function GET() {
       .limit(10),
   ]);
   const effectiveProfileId = profileId ?? gate.userId;
-  const persistedRows = await listPersistedMobileEvents(
-    effectiveProfileId,
-    store.locale,
-  );
+  const [persistedRows, persistedCounts] = await Promise.all([
+    listPersistedMobileEvents(effectiveProfileId, requestedLocale(request)),
+    countPersistedMobileEvents(effectiveProfileId),
+  ]);
   const prefs = store.prefs.notifications;
   const routed = (category: keyof typeof prefs.roleRouting) =>
     prefs.roleRouting[category].includes(gate.role);
@@ -116,22 +128,28 @@ export async function GET() {
       || left.id.localeCompare(right.id),
   );
   const visibleSettings = mobileNotificationSettingsForRole(prefs, gate.role);
-  const countCategory = (category: string) =>
-    visibleRows.filter((row) => row.category === category).length;
+  const countLegacyCategory = (category: string) =>
+    visibleLegacyRows.filter((row) => row.category === category).length;
 
   return mobileOk({
     rows: visibleRows,
     counts: {
-      all: visibleRows.length,
-      unread: visibleRows.filter((row) => row.unread).length,
-      lowStock: countCategory("lowStock"),
-      einvoiceError: countCategory("einvoiceError"),
-      shiftClose: countCategory("shiftClose"),
-      invoiceCreated: countCategory("invoiceCreated"),
-      purchaseReceived: countCategory("purchaseReceived"),
-      debtChanged: countCategory("debtChanged"),
-      qrPaymentConfirmed: countCategory("qrPaymentConfirmed"),
-      qrPaymentException: countCategory("qrPaymentException"),
+      all: persistedCounts.all + visibleLegacyRows.length,
+      unread: persistedCounts.unread
+        + visibleLegacyRows.filter((row) => row.unread).length,
+      lowStock: countLegacyCategory("lowStock"),
+      einvoiceError: countLegacyCategory("einvoiceError"),
+      shiftClose: countLegacyCategory("shiftClose"),
+      invoiceCreated: persistedCounts.invoiceCreated
+        + countLegacyCategory("invoiceCreated"),
+      purchaseReceived: persistedCounts.purchaseReceived
+        + countLegacyCategory("purchaseReceived"),
+      debtChanged: persistedCounts.debtChanged
+        + countLegacyCategory("debtChanged"),
+      qrPaymentConfirmed: persistedCounts.qrPaymentConfirmed
+        + countLegacyCategory("qrPaymentConfirmed"),
+      qrPaymentException: persistedCounts.qrPaymentException
+        + countLegacyCategory("qrPaymentException"),
     },
     ...(visibleSettings ? { settings: visibleSettings } : {}),
   });

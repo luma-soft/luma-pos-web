@@ -2,29 +2,7 @@ import type {
   NotificationCategory,
   NotificationTarget,
 } from "@/lib/notifications/contracts";
-
-const localizedTitles: Record<NotificationCategory, { vi: string; en: string }> = {
-  invoiceCreated: {
-    vi: "Hóa đơn mới đã được tạo",
-    en: "A new invoice was created",
-  },
-  purchaseReceived: {
-    vi: "Đã ghi nhận phiếu nhập hàng",
-    en: "A purchase receipt was recorded",
-  },
-  debtChanged: {
-    vi: "Công nợ vừa được cập nhật",
-    en: "A debt balance was updated",
-  },
-  qrPaymentConfirmed: {
-    vi: "Đã xác nhận thanh toán QR",
-    en: "QR payment confirmed",
-  },
-  qrPaymentException: {
-    vi: "Cần kiểm tra giao dịch QR",
-    en: "QR payment needs review",
-  },
-};
+import { localizedNotificationCopy } from "@/lib/notifications/notification-copy";
 
 const qrCategories = new Set<NotificationCategory>([
   "qrPaymentConfirmed",
@@ -119,18 +97,16 @@ export function classifyFcmFailure(statusCode: number, body: unknown): FcmFailur
 
 export function buildFcmMessage(input: FcmMessageInput) {
   const highPriority = qrCategories.has(input.category);
-  const language = input.locale?.toLowerCase().startsWith("en") ? "en" : "vi";
   const ttlSeconds = highPriority ? 10 * 60 : 24 * 60 * 60;
   const now = input.now ?? new Date();
+  const copy = localizedNotificationCopy(input.category, input.locale);
 
   return {
     message: {
       token: input.token,
       notification: {
-        title: localizedTitles[input.category][language],
-        body: language === "en"
-          ? "Open LumaPOS to view details."
-          : "Mở LumaPOS để xem chi tiết.",
+        title: copy.title,
+        body: copy.body,
       },
       data: {
         kind: "operational_alert",

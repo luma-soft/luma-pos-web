@@ -53,7 +53,7 @@ export async function recoverDueNotifications(limit = 50): Promise<number> {
 
 export async function processNotificationMessage(
   message: NotificationQueueMessageV1,
-): Promise<{ completed: boolean; retryAt?: Date }> {
+) {
   return productionCore().processNotificationMessage(message);
 }
 

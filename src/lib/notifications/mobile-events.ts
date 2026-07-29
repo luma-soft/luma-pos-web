@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { notificationEvents, notificationRecipients } from "@/db/schema";
 import {
@@ -7,6 +7,7 @@ import {
   type NotificationCategory,
   type NotificationTarget,
 } from "@/lib/notifications/contracts";
+import { localizedNotificationCopy } from "@/lib/notifications/notification-copy";
 
 export type MobileNotificationEventRow = {
   id: string;
@@ -31,31 +32,7 @@ export type MobileNotificationResolution = {
   entityId: string;
 };
 
-const localizedTitles: Record<
-  NotificationCategory,
-  { vi: string; en: string }
-> = {
-  invoiceCreated: {
-    vi: "Hóa đơn mới đã được tạo",
-    en: "A new invoice was created",
-  },
-  purchaseReceived: {
-    vi: "Đã ghi nhận phiếu nhập hàng",
-    en: "A purchase receipt was recorded",
-  },
-  debtChanged: {
-    vi: "Công nợ vừa được cập nhật",
-    en: "A debt balance was updated",
-  },
-  qrPaymentConfirmed: {
-    vi: "Đã xác nhận thanh toán QR",
-    en: "QR payment confirmed",
-  },
-  qrPaymentException: {
-    vi: "Cần kiểm tra giao dịch QR",
-    en: "QR payment needs review",
-  },
-};
+export const persistedMobileEventLimit = 50;
 
 const uuidPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
@@ -71,13 +48,7 @@ export function localizedMobileEventCopy(
   category: NotificationCategory,
   locale: string,
 ) {
-  const language = locale.toLowerCase().startsWith("en") ? "en" : "vi";
-  return {
-    title: localizedTitles[category][language],
-    body: language === "en"
-      ? "Open LumaPOS to view details."
-      : "Mở LumaPOS để xem chi tiết.",
-  };
+  return localizedNotificationCopy(category, locale);
 }
 
 export async function listPersistedMobileEvents(
@@ -103,7 +74,8 @@ export async function listPersistedMobileEvents(
       eq(notificationRecipients.userId, effectiveProfileId),
       isNull(notificationRecipients.dismissedAt),
     ))
-    .orderBy(desc(notificationEvents.createdAt));
+    .orderBy(desc(notificationEvents.createdAt))
+    .limit(persistedMobileEventLimit);
 
   return rows.flatMap((row) => {
     if (
@@ -128,6 +100,62 @@ export async function listPersistedMobileEvents(
       },
     }];
   });
+}
+
+export type PersistedMobileEventCounts = {
+  all: number;
+  unread: number;
+  invoiceCreated: number;
+  purchaseReceived: number;
+  debtChanged: number;
+  qrPaymentConfirmed: number;
+  qrPaymentException: number;
+};
+
+export async function countPersistedMobileEvents(
+  effectiveProfileId: string,
+): Promise<PersistedMobileEventCounts> {
+  const [row] = await db
+    .select({
+      all: sql<number>`count(*)::int`,
+      unread: sql<number>`
+        count(*) filter (where ${notificationRecipients.readAt} is null)::int
+      `,
+      invoiceCreated: sql<number>`
+        count(*) filter (where ${notificationEvents.category} = 'invoiceCreated')::int
+      `,
+      purchaseReceived: sql<number>`
+        count(*) filter (where ${notificationEvents.category} = 'purchaseReceived')::int
+      `,
+      debtChanged: sql<number>`
+        count(*) filter (where ${notificationEvents.category} = 'debtChanged')::int
+      `,
+      qrPaymentConfirmed: sql<number>`
+        count(*) filter (where ${notificationEvents.category} = 'qrPaymentConfirmed')::int
+      `,
+      qrPaymentException: sql<number>`
+        count(*) filter (where ${notificationEvents.category} = 'qrPaymentException')::int
+      `,
+    })
+    .from(notificationRecipients)
+    .innerJoin(
+      notificationEvents,
+      eq(notificationEvents.id, notificationRecipients.eventId),
+    )
+    .where(and(
+      eq(notificationRecipients.userId, effectiveProfileId),
+      isNull(notificationRecipients.dismissedAt),
+    ));
+
+  return {
+    all: Number(row?.all ?? 0),
+    unread: Number(row?.unread ?? 0),
+    invoiceCreated: Number(row?.invoiceCreated ?? 0),
+    purchaseReceived: Number(row?.purchaseReceived ?? 0),
+    debtChanged: Number(row?.debtChanged ?? 0),
+    qrPaymentConfirmed: Number(row?.qrPaymentConfirmed ?? 0),
+    qrPaymentException: Number(row?.qrPaymentException ?? 0),
+  };
 }
 
 export async function resolvePersistedMobileEvent(

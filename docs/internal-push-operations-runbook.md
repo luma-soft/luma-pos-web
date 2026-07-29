@@ -60,7 +60,11 @@ Initial setup:
    copy them into mobile configuration.
 3. Set the public worker URL to
    `https://<deployment>/api/workers/notifications/push`.
-4. Deploy, then publish one non-sensitive test event through the application.
+4. Do not configure QStash provider deduplication for outbox publications.
+   The immutable event key and delivery rows are the application idempotency
+   boundary; recovery, retry, and authorized replay must each be able to
+   create a fresh provider message.
+5. Deploy, then publish one non-sensitive test event through the application.
    Confirm a QStash `2xx`, one completed outbox row, and one successful FCM
    delivery. Record only timestamps and bounded result codes.
 
@@ -95,8 +99,11 @@ step. That preserves a known-good rollback boundary.
 2. Confirm the path is exactly `/api/workers/notifications/push`.
 3. An unsigned request must return `401`; a signed malformed message must
    return a bounded `400`; neither response may echo the body or signature.
-4. A valid signed queue message must return `2xx`. Confirm the matching outbox
-   transitions and delivery counters instead of logging the request body.
+4. A valid signed queue message normally returns `2xx`. A delivery that races
+   ahead of the publisher's final `published` transition returns `409`, which
+   instructs QStash to retry; it must not acknowledge and strand the event.
+   Confirm the matching outbox transitions and delivery counters instead of
+   logging the request body.
 5. Confirm `GET /api/cron/notifications` with no/incorrect bearer returns
    `401`. Authorization behavior must not be weakened to expose metrics.
 
@@ -154,6 +161,15 @@ Metrics never project event metadata, entity IDs, device IDs/tokens, amounts,
 or identities. Operational p95 is a health signal; the release SLA is accepted
 only from the physical-device SIT set of at least twenty healthy QR samples.
 
+Alert policy:
+
+- Evaluate the protected summary once per minute without logging its bearer.
+- Warn when `oldestDueAgeSeconds > 120` for two consecutive evaluations.
+- Page the notification on-call when it exceeds `300`, continues increasing
+  across three evaluations, or any `dead` row appears.
+- After recovery, close the alert only when `oldestDueAgeSeconds` returns to
+  `0` and `retry` is no longer increasing. Record counts and timestamps only.
+
 Latency interpretation:
 
 - Event-to-queue:
@@ -188,6 +204,11 @@ them with SQL.
 
 ## Queue outage recovery
 
+The deployment schedule invokes
+`/api/cron/notifications/outbox` once per minute. The route remains
+bearer-protected and processes at most 50 rows per run. Manual invocations
+below are for incident acceleration and verification, not the normal trigger.
+
 1. Confirm whether publication or signed delivery is failing using bounded
    status counts and provider health; do not enable request-body logging.
 2. If needed, stop new publication by removing/invalidating
@@ -195,8 +216,10 @@ them with SQL.
    Business transactions continue to commit their immutable event and outbox
    rows; publication fails closed into recoverable work.
 3. Restore the provider configuration and verify one signed test delivery.
-4. Invoke protected `GET /api/cron/notifications/outbox` with the cron bearer.
-   Each run republishes at most 50 due rows and returns only `{ recovered }`.
+4. Invoke protected `GET /api/cron/notifications/outbox` with the cron bearer
+   if an immediate run is needed. Each run republishes at most 50 due rows and
+   returns only `{ recovered }`. It also recovers a `published` publication
+   whose worker callback was lost after the bounded two-minute orphan window.
 5. Repeat bounded recovery invocations while `oldestDueAgeSeconds` falls.
    Investigate rather than looping if `retry`/`dead` rises.
 6. Replay dead events individually through the manager/owner application

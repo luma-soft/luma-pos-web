@@ -186,8 +186,12 @@ async function body(response) {
   return response.json();
 }
 
-async function list() {
-  const response = await listRoute.GET();
+async function list(requestLocale = "vi") {
+  const response = await listRoute.GET(
+    new Request(
+      `https://luma.test/api/mobile/notifications?locale=${requestLocale}`,
+    ),
+  );
   assert.equal(response.status, 200);
   return (await body(response)).data;
 }
@@ -252,8 +256,8 @@ await check("effective recipient sees a privacy-reduced Vietnamese event row", a
 });
 
 await check("English locale uses the category-safe English title and body", async () => {
-  locale = "en-US";
-  const data = await list();
+  locale = "vi-VN";
+  const data = await list("en");
   assert.equal(data.rows[0].title, "A new invoice was created");
   assert.equal(data.rows[0].body, "Open LumaPOS to view details.");
 });
@@ -490,6 +494,42 @@ await check("manager receives complete internal category settings while cashier 
   };
   const cashierData = await list();
   assert.equal(cashierData.settings, undefined);
+});
+
+await check("persisted rows are capped while aggregate counts remain authoritative", async () => {
+  gate = {
+    ok: true,
+    userId: ids.cashier,
+    role: "cashier",
+    principalId: ids.owner,
+  };
+  const extraEvents = Array.from({ length: 55 }, (_, index) => ({
+    id: crypto.randomUUID(),
+    eventKey: `bounded-list-${index}`,
+    category: "invoiceCreated",
+    entityType: "order",
+    entityId: ids.invoice,
+    actorId: ids.owner,
+    target: "invoices",
+    priority: "normal",
+    quietHoursPolicy: "defer",
+    metadata: {},
+    occurredAt: new Date(`2026-07-29T00:${String(index).padStart(2, "0")}:00.000Z`),
+    createdAt: new Date(`2026-07-29T00:${String(index).padStart(2, "0")}:01.000Z`),
+  }));
+  await db.insert(notificationEvents).values(extraEvents);
+  await db.insert(notificationRecipients).values(extraEvents.map((event) => ({
+    eventId: event.id,
+    userId: ids.cashier,
+    reason: "direct",
+  })));
+
+  const data = await list("en");
+  assert.equal(data.rows.length, 50);
+  assert.equal(data.counts.all, 56);
+  assert.equal(data.counts.unread, 56);
+  assert.equal(data.counts.invoiceCreated, 56);
+  assert.equal(data.rows.every((row) => row.title === "A new invoice was created"), true);
 });
 
 await client.close();

@@ -37,7 +37,11 @@ export async function POST(request: Request) {
   }
 
   try {
-    return mobileOk(await processNotificationMessage(message));
+    const result = await processNotificationMessage(message);
+    if (!result.completed && result.reason === "not_ready") {
+      return mobileError("errors.conflict", 409);
+    }
+    return mobileOk(result);
   } catch {
     return mobileError("errors.serverError", 500);
   }
