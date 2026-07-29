@@ -2953,8 +2953,14 @@
     "saved": "Saved",
     "booksCount": "{n} price books",
     "booksLabel": "Price books",
+    "bookVisibility": "Show {name} column",
     "addBook": "Add book",
     "newBookPlaceholder": "Book name…",
+    "deleteBook": {
+      "title": "Delete price book?",
+      "description": "{name} and all prices configured in this price book will be deleted. This cannot be undone.",
+      "confirm": "Delete price book"
+    },
     "errors": {
       "cannotDeleteDefault": "Cannot delete default price book"
     },

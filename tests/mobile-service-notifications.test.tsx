@@ -20,6 +20,14 @@ function renderWithMessages(node: React.ReactNode, locale: "vi" | "en" = "vi") {
 }
 
 describe("project service mobile records", () => {
+  test("customer request tab is translated in both supported locales", () => {
+    const viTabs = viMessages.services.tabs as Record<string, string>;
+    const enTabs = enMessages.services.tabs as Record<string, string>;
+
+    expect(viTabs.requests).toBe("Yêu cầu khách hàng");
+    expect(enTabs.requests).toBe("Customer requests");
+  });
+
   test("service tab carousel exposes selected state, snap alignment, focus, and 44px targets", () => {
     const html = renderToStaticMarkup(
       <ProjectServiceTabs initialActive="overview">

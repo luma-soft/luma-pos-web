@@ -8,7 +8,7 @@ export async function GET() {
   if (blocked) return blocked;
 
   try {
-    return mobileOk(await getMobilePosData());
+    return mobileOk(await getMobilePosData(gate.role));
   } catch {
     return mobileError("errors.serverError", 503);
   }

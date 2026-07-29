@@ -2953,8 +2953,14 @@
     "saved": "Đã lưu",
     "booksCount": "{n} bảng giá",
     "booksLabel": "Bảng giá",
+    "bookVisibility": "Hiển thị cột {name}",
     "addBook": "Thêm bảng giá",
     "newBookPlaceholder": "Tên bảng giá…",
+    "deleteBook": {
+      "title": "Xóa bảng giá?",
+      "description": "Bảng giá {name} và toàn bộ giá đã thiết lập trong bảng này sẽ bị xóa. Thao tác không thể hoàn tác.",
+      "confirm": "Xóa bảng giá"
+    },
     "errors": {
       "cannotDeleteDefault": "Không thể xóa bảng giá mặc định"
     },

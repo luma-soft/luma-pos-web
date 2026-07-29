@@ -174,6 +174,8 @@ export function DataTableShell<T>({
   rowClassName,
   onRowClick,
   toolbar,
+  visibleColumnKeys,
+  onColumnVisibilityChange,
   maxHeight = "calc(100dvh - 250px)",
   fillHeight = true,
   canExpand,
@@ -202,6 +204,10 @@ export function DataTableShell<T>({
   rowClassName?: (row: T, expanded: boolean) => string | undefined;
   onRowClick?: (row: T) => void;
   toolbar?: ReactNode;
+  /** Điều khiển hiển thị cột từ UI bên ngoài bảng (ví dụ chip bảng giá). */
+  visibleColumnKeys?: Set<string>;
+  /** Đồng bộ thay đổi từ menu chọn cột về UI bên ngoài. */
+  onColumnVisibilityChange?: (keys: Set<string>) => void;
   maxHeight?: string;
   fillHeight?: boolean;
   canExpand?: (row: T) => boolean;
@@ -227,7 +233,11 @@ export function DataTableShell<T>({
         const raw = window.localStorage.getItem(storageKey);
         if (!raw) return;
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) setStoredVisible(new Set(parsed.filter((key) => typeof key === "string")));
+        if (Array.isArray(parsed)) {
+          const next = new Set(parsed.filter((key) => typeof key === "string"));
+          setStoredVisible(next);
+          onColumnVisibilityChange?.(next);
+        }
       } catch {
         setStoredVisible(null);
       }
@@ -235,7 +245,16 @@ export function DataTableShell<T>({
     return () => {
       active = false;
     };
-  }, [storageKey]);
+  }, [onColumnVisibilityChange, storageKey]);
+
+  useEffect(() => {
+    if (!visibleColumnKeys) return;
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(Array.from(visibleColumnKeys)));
+    } catch {
+      // Non-critical preference; ignore storage failures.
+    }
+  }, [storageKey, visibleColumnKeys]);
 
   useEffect(() => {
     if (!fillHeight || !maxHeight) return;
@@ -256,7 +275,7 @@ export function DataTableShell<T>({
     [columns],
   );
 
-  const visibleKeys = storedVisible ?? defaultVisible;
+  const visibleKeys = visibleColumnKeys ?? storedVisible ?? defaultVisible;
   const visibleColumns = columns.filter((column) => column.required || visibleKeys.has(column.key));
   const displayRows = useMemo(() => {
     if (!sort) return rows;
@@ -279,6 +298,7 @@ export function DataTableShell<T>({
     const normalized = new Set(next);
     for (const column of columns) if (column.required) normalized.add(column.key);
     setStoredVisible(normalized);
+    onColumnVisibilityChange?.(normalized);
     try {
       window.localStorage.setItem(storageKey, JSON.stringify(Array.from(normalized)));
     } catch {

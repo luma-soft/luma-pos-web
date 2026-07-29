@@ -2,11 +2,11 @@ import { revalidatePath } from "next/cache";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  orders, orderItems, payments, customers, products, stockLevels, stockMovements, einvoices, returns,
+  orders, orderItems, payments, customers, products, priceBooks, stockLevels, stockMovements, einvoices, returns,
 } from "@/db/schema";
 import { createOrderSchema, type CreateOrderInput } from "@/lib/schemas/order";
 import {
-  type ActionResult, getProfileId, generateCode, toMoney, toQty, isUniqueViolation,
+  type ActionResult, getProfileId, getRole, generateCode, toMoney, toQty, isUniqueViolation,
 } from "@/lib/actions/common";
 import { recordCashTx, fundForMethod } from "@/lib/cash";
 import { Routes } from "@/lib/routes";
@@ -41,6 +41,19 @@ export async function createOrderForUser(
   const parsed = createOrderSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
+
+  if (v.priceBookId) {
+    const [priceBook] = await db
+      .select({ managerOnly: priceBooks.managerOnly })
+      .from(priceBooks)
+      .where(eq(priceBooks.id, v.priceBookId))
+      .limit(1);
+    if (!priceBook) return { ok: false, error: "errors.invalidData" };
+    if (priceBook.managerOnly) {
+      const role = await getRole(userId);
+      if (role !== "owner" && role !== "manager") return { ok: false, error: "errors.forbidden" };
+    }
+  }
 
   const paymentPending = v.paymentPending === true;
   if (

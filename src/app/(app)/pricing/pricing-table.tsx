@@ -179,6 +179,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
   const [error, setError] = useState("");
   const [savingCell, setSavingCell] = useState<Set<string>>(new Set());
   const [savedCell, setSavedCell] = useState<Set<string>>(new Set());
+  const [visibleColumnKeys, setVisibleColumnKeys] = useState<Set<string> | undefined>();
 
   // popover "Đặt giá theo công thức"
   const [formula, setFormula] = useState<{ rowId: string; bookId: string } | null>(null);
@@ -217,6 +218,8 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
+  const [deleteCandidate, setDeleteCandidate] = useState<PricingBook | null>(null);
+  const [deletingBook, setDeletingBook] = useState(false);
 
   const defaultBookId = books.find((b) => b.isDefault)?.id ?? books[0]?.id ?? "";
   const cellKey = (rowId: string, bookId: string) => `${rowId}:${bookId}`;
@@ -251,7 +254,15 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
     if (res.ok) {
       setBooks((b) => b.filter((x) => x.id !== id));
       setRows((rs) => rs.map((r) => { const p = { ...r.prices }; delete p[id]; return { ...r, prices: p }; }));
+      setDeleteCandidate(null);
     } else setError(t(res.error as never));
+  }
+
+  async function confirmRemoveBook() {
+    if (!deleteCandidate) return;
+    setDeletingBook(true);
+    await removeBook(deleteCandidate.id);
+    setDeletingBook(false);
   }
 
   async function saveCell(row: PricingRow, bookId: string, value: number | null) {
@@ -338,6 +349,21 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
       },
     })),
   ];
+  const visibleBooks = books.filter((book) => visibleColumnKeys?.has(`book:${book.id}`) ?? true);
+
+  function setBookVisible(bookId: string, visible: boolean) {
+    const key = `book:${bookId}`;
+    setVisibleColumnKeys((current) => {
+      const next = new Set(
+        current ?? columns
+          .filter((column) => column.required || column.defaultVisible !== false)
+          .map((column) => column.key),
+      );
+      if (visible) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }
 
   return (
     <div className="bg-surface border border-border rounded-card overflow-hidden">
@@ -346,6 +372,22 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
         <span className="text-sm font-medium text-slate-500 mr-1">{t("pricing.booksLabel")}</span>
         {books.map((b) => (
           <span key={b.id} className="group inline-flex min-h-11 items-center gap-1 rounded-lg border border-slate-200 pl-2.5 pr-1.5 text-sm dark:border-slate-700">
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={visibleColumnKeys?.has(`book:${b.id}`) ?? true}
+              aria-label={t("pricing.bookVisibility", { name: b.name })}
+              title={t("pricing.bookVisibility", { name: b.name })}
+              onClick={() => setBookVisible(b.id, !(visibleColumnKeys?.has(`book:${b.id}`) ?? true))}
+              className={cn(
+                "grid h-5 w-5 shrink-0 place-items-center rounded border transition-colors",
+                (visibleColumnKeys?.has(`book:${b.id}`) ?? true)
+                  ? "border-primary-600 bg-primary-600 text-white"
+                  : "border-slate-300 bg-surface text-transparent hover:border-primary-400",
+              )}
+            >
+              <Check className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
             {editing?.id === b.id ? (
               <input
                 autoFocus
@@ -362,7 +404,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
                 {!b.isDefault && (
-                  <button onClick={() => removeBook(b.id)} className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-400 hover:text-red-500 lg:min-h-0 lg:min-w-0 lg:p-0.5 lg:opacity-0 lg:group-hover:opacity-100" title={t("common.delete")}>
+                  <button onClick={() => setDeleteCandidate(b)} className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-400 hover:text-red-500 lg:min-h-0 lg:min-w-0 lg:p-0.5 lg:opacity-0 lg:group-hover:opacity-100" title={t("common.delete")}>
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
@@ -392,6 +434,8 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
         tableId="inventory.pricing"
         rows={rows}
         columns={columns}
+        visibleColumnKeys={visibleColumnKeys}
+        onColumnVisibilityChange={setVisibleColumnKeys}
         getRowId={(row) => row.id}
         minWidth={`${Math.max(780, 610 + books.length * 170)}px`}
         maxHeight="calc(100dvh - 340px)"
@@ -399,7 +443,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
         renderMobileRow={({ row }) => (
           <PricingMobileRow
             row={row}
-            books={books}
+            books={visibleBooks}
             defaultBookId={defaultBookId}
             savingCell={savingCell}
             savedCell={savedCell}
@@ -410,6 +454,42 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
           />
         )}
       />
+      {deleteCandidate && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/45 p-3 sm:p-6"
+          onMouseDown={() => !deletingBook && setDeleteCandidate(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-price-book-title"
+            className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 text-left shadow-2xl"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div id="delete-price-book-title" className="font-semibold">{t("pricing.deleteBook.title")}</div>
+                <p className="mt-1 text-sm text-slate-500">{t("pricing.deleteBook.description", { name: deleteCandidate.name })}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeleteCandidate(null)}
+                disabled={deletingBook}
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-700 disabled:opacity-50 lg:h-8 lg:w-8"
+                aria-label={t("common.close")}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setDeleteCandidate(null)} disabled={deletingBook} className="min-h-11 rounded-lg border border-border px-3 text-sm disabled:opacity-50">{t("common.cancel")}</button>
+              <button type="button" onClick={confirmRemoveBook} disabled={deletingBook} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
+                {deletingBook && <Loader2 className="h-4 w-4 animate-spin" />} {t("pricing.deleteBook.confirm")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {formulaRow && formulaBook && (
         <div
           className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/45 p-3 sm:p-6"

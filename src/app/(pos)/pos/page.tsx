@@ -8,6 +8,7 @@ import { getOrder } from "@/lib/data/orders";
 import { getPrintTemplate } from "@/lib/print/template";
 import { Routes } from "@/lib/routes";
 import { formatDate } from "@/lib/utils";
+import { getRole, requireUser } from "@/lib/actions/common";
 import { PosClient, type PosSourceInvoice } from "./pos-client";
 import type { PosInitialContext } from "./pos-client";
 
@@ -101,6 +102,8 @@ function initialContextFromParams(params: PosSearchParams): PosInitialContext | 
 
 export default async function POSPage({ searchParams }: { searchParams: Promise<PosSearchParams> }) {
   const params = await searchParams;
+  const user = await requireUser();
+  const role = await getRole(user.id);
   const sourceInvoice = await sourceInvoiceFromParams(params);
   const initialContext = initialContextFromParams(params);
   const aiProductIds = csvUuids(params.aiProducts);
@@ -109,7 +112,12 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
     ...aiProductIds,
   ];
   const [data, settings, t, orderPrintTemplate, quotePrintTemplate, bookingPrintTemplate, returnPrintTemplate] = await Promise.all([
-    getPosData({ includeProductIds, includeProductSkus: CAMERA_QUOTE_UTILITY_SKUS, includeProductCategories: ["Camera giám sát"] }),
+    getPosData({
+      includeProductIds,
+      includeProductSkus: CAMERA_QUOTE_UTILITY_SKUS,
+      includeProductCategories: ["Camera giám sát"],
+      role,
+    }),
     getStoreSettings(),
     getTranslations(),
     getPrintTemplate("order"),

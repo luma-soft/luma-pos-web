@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { categories, customers, paymentBankAccounts, products, productComboItems, productPrices, productUnits, projects, promotions, stockLevels, warehouses } from "@/db/schema";
 import { isPromoActive, type PromoTier } from "@/lib/promo";
 import { getPriceBooks } from "@/lib/data/price-books";
+import type { Role } from "@/lib/actions/common";
 import { getMobileProducts } from "@/lib/data/products";
 import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
 import { accentInsensitiveLike } from "@/lib/search";
@@ -111,7 +112,12 @@ function activeRootCondition() {
 }
 
 /** Toàn bộ data POS cần khi mở trang: SP active + đơn vị + tồn kho mặc định, KH, kho. */
-export async function getPosData(options?: { includeProductIds?: readonly string[]; includeProductSkus?: readonly string[]; includeProductCategories?: readonly string[] }) {
+export async function getPosData(options?: {
+  includeProductIds?: readonly string[];
+  includeProductSkus?: readonly string[];
+  includeProductCategories?: readonly string[];
+  role?: Role;
+}) {
   const hasComplianceColumns = await hasProductComplianceColumns();
   const [defaultWh] = await db
     .select({ id: warehouses.id, name: warehouses.name })
@@ -174,7 +180,9 @@ export async function getPosData(options?: { includeProductIds?: readonly string
   for (const p of sourceProductRows) byId.set(p.id, p);
   const productsForPos = [...byId.values()];
 
-  const priceBookRows = await getPriceBooks();
+  const priceBookRows = await getPriceBooks({
+    includeManagerOnly: options?.role === "owner" || options?.role === "manager",
+  });
 
   const [promoRows, projectRows, defaultBankAccount] = await Promise.all([
     db
@@ -225,7 +233,7 @@ export async function getPosData(options?: { includeProductIds?: readonly string
   };
 }
 
-export async function getMobilePosData() {
+export async function getMobilePosData(role: Role) {
   const [defaultWh] = await db
     .select({ id: warehouses.id, name: warehouses.name })
     .from(warehouses)
@@ -248,7 +256,7 @@ export async function getMobilePosData() {
         .where(and(eq(customers.isActive, true)))
         .orderBy(asc(customers.name))
         .limit(100),
-      getPriceBooks(),
+      getPriceBooks({ includeManagerOnly: role === "owner" || role === "manager" }),
       db
         .select({
           id: projects.id,

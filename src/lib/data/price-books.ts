@@ -6,14 +6,22 @@ export interface PriceBookRow {
   id: string;
   name: string;
   isDefault: boolean;
+  managerOnly: boolean;
   sortOrder: number;
 }
 
 /** Danh sách bảng giá — mặc định lên đầu. */
-export async function getPriceBooks(): Promise<PriceBookRow[]> {
+export async function getPriceBooks(options?: { includeManagerOnly?: boolean }): Promise<PriceBookRow[]> {
   return db
-    .select({ id: priceBooks.id, name: priceBooks.name, isDefault: priceBooks.isDefault, sortOrder: priceBooks.sortOrder })
+    .select({
+      id: priceBooks.id,
+      name: priceBooks.name,
+      isDefault: priceBooks.isDefault,
+      managerOnly: priceBooks.managerOnly,
+      sortOrder: priceBooks.sortOrder,
+    })
     .from(priceBooks)
+    .where(options?.includeManagerOnly === false ? eq(priceBooks.managerOnly, false) : undefined)
     .orderBy(desc(priceBooks.isDefault), asc(priceBooks.sortOrder), asc(priceBooks.name));
 }
 

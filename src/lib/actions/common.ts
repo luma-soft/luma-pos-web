@@ -57,11 +57,11 @@ export async function getProfileId(userId: string): Promise<string | null> {
 }
 
 /** Vai trò của user (profiles.role). User không có profile active bị từ chối. */
-export async function getRole(userId: string): Promise<string> {
+export async function getRole(userId: string): Promise<Role> {
   const [p] = await db.select({ role: profiles.role, isActive: profiles.isActive }).from(profiles).where(eq(profiles.id, userId)).limit(1);
   const profile = activeProfile(p);
   if (!profile) throw new UnauthorizedError();
-  return profile.role;
+  return profile.role as Role;
 }
 
 export type Role = "owner" | "manager" | "cashier" | "warehouse" | "technician";
