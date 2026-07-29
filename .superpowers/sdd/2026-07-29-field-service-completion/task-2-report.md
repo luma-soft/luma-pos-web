@@ -75,7 +75,8 @@ stale/hash/ownership failures block completion.
 ## Commits
 
 - Mobile: `8f4f35f fix(field-service): stop sending client signature snapshot`
-- Web: recorded after this report is committed.
+- Web implementation: `67ecd42 feat(field-service): own signed handover snapshots`
+- Web report metadata: committed immediately after this update.
 
 ## Concern
 
