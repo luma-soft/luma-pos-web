@@ -171,7 +171,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
     }[size];
 
     const variantCls = {
-      default: "border-border focus:border-primary-500",
+      default: "border-border focus:border-primary-600",
       error: "border-red-500 focus:border-red-500",
     }[variant];
 
@@ -223,7 +223,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                     placeholder={searchPlaceholder ?? t("common.search")}
                     aria-label={searchPlaceholder ?? t("common.search")}
                     autoComplete="off"
-                    className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                    className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-600"
                   />
                 </div>
               </div>

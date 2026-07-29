@@ -165,15 +165,19 @@ html {
   scroll-behavior: smooth;
 }
 
-:where(a, button, input, select, textarea, summary):focus-visible {
+/* Keyboard focus stays visible for non-form controls. Form controls communicate
+   focus with their own border, avoiding the duplicate outer outline. */
+:where(a, button, summary):focus-visible {
   outline: 2px solid var(--primary-500);
   outline-offset: 2px;
 }
 
-/* Form fields that express focus through their border must not also inherit
-   the global keyboard outline, otherwise two primary-colored borders appear. */
-:where(input, select, textarea)[class*="focus:border-"]:focus-visible {
+/* Use one, stronger inner border colour for every native form field. Individual
+   error variants can still override this through their utility classes. */
+:where(input, select, textarea):focus {
   outline: none;
+  box-shadow: none;
+  border-color: var(--primary-600);
 }
 
 textarea.ai-composer-scrollbar-hidden {

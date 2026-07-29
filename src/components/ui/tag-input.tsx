@@ -52,7 +52,7 @@ export const TagInput = React.forwardRef<HTMLInputElement, TagInputProps>(
       <div
         onClick={() => inputRef.current?.focus()}
         className={cn(
-          "flex min-h-11 w-full flex-wrap items-center gap-1.5 rounded-lg border border-border bg-surface px-2 py-1.5 cursor-text transition-[border-color,box-shadow,background-color] duration-150 focus-within:ring-2 focus-within:ring-primary-500/30 focus-within:border-primary-500",
+          "flex min-h-11 w-full flex-wrap items-center gap-1.5 rounded-lg border border-border bg-surface px-2 py-1.5 cursor-text transition-[border-color,background-color] duration-150 focus-within:border-primary-600",
           disabled && "opacity-50 cursor-not-allowed",
           className
         )}
