@@ -180,6 +180,7 @@ export function ServiceProjectMobileRow({
 
 export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProjectRow[]; customers: { id: string; name: string }[] }) {
   const t = useTranslations();
+  const router = useRouter();
   const columns: DataTableColumn<ServiceProjectRow>[] = [
     {
       key: "name",
@@ -230,6 +231,7 @@ export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProject
       columns={columns}
       getRowId={(row) => row.id}
       minWidth="980px"
+      onRowClick={(row) => router.push(Routes.project(row.id))}
       renderMobileRow={({ row }) => (
         <ServiceProjectMobileRow
           row={row}
@@ -237,14 +239,6 @@ export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProject
             <ProjectEdit project={actionRow} customers={customers} />
           )}
         />
-      )}
-      renderDetail={(row) => (
-        <div className="grid gap-3 bg-surface px-4 py-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Text size="sm" text={row.address ?? "—"} />
-          <Text size="sm" text={t("services.summary.openJobs", { count: row.openJobCount })} />
-          <Text size="sm" text={t("services.summary.assets", { count: row.assetCount })} />
-          <Link href={Routes.project(row.id)} className="inline-flex min-h-11 min-w-11 items-center justify-end text-right text-sm font-semibold text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">{t("projects.viewDetail")}</Link>
-        </div>
       )}
     />
   );

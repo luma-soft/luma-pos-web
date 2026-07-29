@@ -389,7 +389,7 @@ describe("final mobile table surfaces", () => {
     expect(html.startsWith("<article")).toBe(true);
   });
 
-  test("service projects table links its mobile and desktop project names without toggling the desktop row", async () => {
+  test("service projects table opens the project modal route when its desktop row is clicked", async () => {
     const { ServiceProjectsTable } = await import(
       "@/app/(app)/services/service-widgets"
     );
@@ -436,6 +436,13 @@ describe("final mobile table surfaces", () => {
     const tableProps = capturedDataTableProps[0];
     expect(tableProps.tableId).toBe("services.projects");
     expect(tableProps.rows).toBe(rows);
+    expect(tableProps.onRowClick).toBeFunction();
+    expect(tableProps.renderDetail).toBeUndefined();
+    navigationCalls.length = 0;
+    (tableProps.onRowClick as (row: typeof row) => void)(row);
+    expect(navigationCalls).toEqual([
+      "push:/projects/service-project-1",
+    ]);
     expect(tableProps.renderMobileRow).toBeFunction();
     const renderMobileRow = tableProps.renderMobileRow as (props: {
       row: typeof row;
