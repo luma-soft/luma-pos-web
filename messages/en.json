@@ -777,6 +777,7 @@
     },
     "list": {
       "searchPlaceholder": "Search name, SKU, barcode…",
+      "searchCategories": "Search categories…",
       "filters": "Product filters",
       "allCategories": "Category: All",
       "total": "{total} products",

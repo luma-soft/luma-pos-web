@@ -78,7 +78,7 @@ async function ProductsToolbar({
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2 sm:gap-3">
       <InstantProductSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />
-      <InstantProductFilters category={params.category ?? ""} status={status} view={view} categories={categories} labels={{ filters: t("products.list.filters"), allCategories: t("products.list.allCategories"), active: t("products.list.statusActive"), inactive: t("products.list.statusInactive"), all: t("products.list.statusAll"), grouped: t("products.list.viewGrouped"), flat: t("products.list.viewFlat") }} />
+      <InstantProductFilters category={params.category ?? ""} status={status} view={view} categories={categories} labels={{ filters: t("products.list.filters"), allCategories: t("products.list.allCategories"), searchCategories: t("products.list.searchCategories"), active: t("products.list.statusActive"), inactive: t("products.list.statusInactive"), all: t("products.list.statusAll"), grouped: t("products.list.viewGrouped"), flat: t("products.list.viewFlat") }} />
       <ProductCreateMenu
         label={t("products.createNew")}
         items={[

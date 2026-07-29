@@ -15,7 +15,7 @@ export function InstantProductFilters({
   status: string;
   view: string;
   categories: { id: string; name: string }[];
-  labels: { filters: string; allCategories: string; active: string; inactive: string; all: string; grouped: string; flat: string };
+  labels: { filters: string; allCategories: string; searchCategories: string; active: string; inactive: string; all: string; grouped: string; flat: string };
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -40,6 +40,8 @@ export function InstantProductFilters({
         ]}
         aria-label={labels.allCategories}
         menuMinWidth={440}
+        searchable
+        searchPlaceholder={labels.searchCategories}
         rootClassName="w-full sm:w-64"
         className="min-w-0"
       />

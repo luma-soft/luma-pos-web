@@ -777,6 +777,7 @@
     },
     "list": {
       "searchPlaceholder": "Tìm tên, SKU, barcode…",
+      "searchCategories": "Tìm danh mục…",
       "filters": "Bộ lọc sản phẩm",
       "allCategories": "Danh mục: Tất cả",
       "total": "{total} sản phẩm",

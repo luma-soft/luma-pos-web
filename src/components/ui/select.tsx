@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, Search } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
+import { normalizeSearch } from "@/lib/normalize";
 import type { TxValues } from "./_tx";
 
 export interface SelectOption {
@@ -36,6 +37,10 @@ export interface SelectProps
   rootClassName?: string;
   /** Minimum width in pixels for the portaled options menu. */
   menuMinWidth?: number;
+  /** Show a search field above the options list. */
+  searchable?: boolean;
+  /** Plain placeholder text for the option search field. */
+  searchPlaceholder?: string;
 }
 
 export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
@@ -57,6 +62,8 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
       optionClassName,
       rootClassName,
       menuMinWidth,
+      searchable = false,
+      searchPlaceholder,
       disabled,
       ...props
     },
@@ -67,12 +74,20 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
     const controlled = value !== undefined;
     const [internalValue, setInternalValue] = React.useState(() => stringValue(defaultValue));
     const [open, setOpen] = React.useState(false);
+    const [searchQuery, setSearchQuery] = React.useState("");
     const [menuStyle, setMenuStyle] = React.useState<React.CSSProperties | null>(null);
     const rootRef = React.useRef<HTMLDivElement>(null);
     const menuRef = React.useRef<HTMLDivElement>(null);
+    const searchRef = React.useRef<HTMLInputElement>(null);
     const currentValue = controlled ? stringValue(value) : internalValue;
     const selected = options.find((option) => option.value === currentValue);
     const selectedLabel = selected ? optionLabel(selected, t) : ph;
+    const normalizedQuery = normalizeSearch(searchQuery);
+    const filteredOptions = normalizedQuery
+      ? options.filter((option) =>
+          matchesSelectSearch(optionLabel(option, t), normalizedQuery),
+        )
+      : options;
 
     const updateMenuPosition = React.useCallback(() => {
       const root = rootRef.current;
@@ -100,8 +115,10 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
     }, [menuMinWidth]);
 
     React.useLayoutEffect(() => {
-      if (open) updateMenuPosition();
-    }, [open, updateMenuPosition]);
+      if (!open) return;
+      updateMenuPosition();
+      if (searchable) searchRef.current?.focus();
+    }, [open, searchable, updateMenuPosition]);
 
     React.useEffect(() => {
       if (!open) return;
@@ -138,7 +155,13 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
       if (typeof window !== "undefined") {
         queueMicrotask(() => window.dispatchEvent(new CustomEvent("luma:select-change", { detail: { name, value: nextValue } })));
       }
+      setSearchQuery("");
       setOpen(false);
+    }
+
+    function toggleOpen() {
+      if (!open) setSearchQuery("");
+      setOpen(!open);
     }
 
     const sizeCls = {
@@ -161,7 +184,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
           disabled={disabled}
           aria-haspopup="listbox"
           aria-expanded={open}
-          onClick={() => setOpen((state) => !state)}
+          onClick={toggleOpen}
           className={cn(
             "relative min-h-11 min-w-11 w-full rounded-lg border bg-surface text-left transition-[border-color,background-color] duration-150 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:min-w-0",
             sizeCls,
@@ -179,23 +202,53 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
         {open && !disabled && menuStyle && typeof document !== "undefined" && createPortal(
           <div
             ref={menuRef}
-            role="listbox"
             style={menuStyle}
-            className="z-[100] overflow-auto rounded-lg border border-border bg-surface py-1 shadow-e2"
+            className="z-[100] flex flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-e2"
           >
-            {options.map((option) => {
-              const active = option.value === currentValue;
-              return (
-                <SelectOptionRow
-                  key={option.value}
-                  active={active}
-                  wrapLabel={wrapLabel}
-                  onSelect={() => pick(option.value)}
-                  className={optionClassName}
-                  label={optionLabel(option, t)}
-                />
-              );
-            })}
+            {searchable && (
+              <div className="shrink-0 border-b border-border-soft bg-surface p-2">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    ref={searchRef}
+                    type="search"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key !== "Enter" || filteredOptions.length === 0)
+                        return;
+                      event.preventDefault();
+                      pick(filteredOptions[0].value);
+                    }}
+                    placeholder={searchPlaceholder ?? t("common.search")}
+                    aria-label={searchPlaceholder ?? t("common.search")}
+                    autoComplete="off"
+                    className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                  />
+                </div>
+              </div>
+            )}
+            <div role="listbox" className="min-h-0 overflow-auto py-1">
+              {filteredOptions.length > 0 ? (
+                filteredOptions.map((option) => {
+                  const active = option.value === currentValue;
+                  return (
+                    <SelectOptionRow
+                      key={option.value}
+                      active={active}
+                      wrapLabel={wrapLabel}
+                      onSelect={() => pick(option.value)}
+                      className={optionClassName}
+                      label={optionLabel(option, t)}
+                    />
+                  );
+                })
+              ) : (
+                <div className="px-3 py-6 text-center text-sm text-slate-400">
+                  {t("common.noResults")}
+                </div>
+              )}
+            </div>
           </div>,
           document.body
         )}
@@ -204,6 +257,10 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
   }
 );
 Select.displayName = "Select";
+
+export function matchesSelectSearch(label: string, query: string) {
+  return normalizeSearch(label).includes(normalizeSearch(query));
+}
 
 export function SelectOptionRow({
   active,
