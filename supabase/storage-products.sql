@@ -15,11 +15,8 @@ drop policy if exists "products_authenticated_write" on storage.objects;
 drop policy if exists "products_authenticated_update" on storage.objects;
 drop policy if exists "products_authenticated_delete" on storage.objects;
 
--- Đọc công khai (bucket public → ảnh hiển thị qua getPublicUrl)
-create policy "products_public_read"
-  on storage.objects for select
-  to public
-  using (bucket_id = 'products');
+-- Bucket public đã phục vụ ảnh qua getPublicUrl mà không cần SELECT policy.
+-- Không tạo SELECT policy rộng vì policy đó cho phép client liệt kê toàn bộ file.
 
 -- User đã đăng nhập được upload
 create policy "products_authenticated_write"
