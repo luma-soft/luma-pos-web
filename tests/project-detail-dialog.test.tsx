@@ -13,6 +13,32 @@ mock.module("next/navigation", () => ({
 }));
 
 describe("ProjectDetailDialog", () => {
+  test("owns Escape only while it is the unconsumed topmost modal", async () => {
+    const { shouldCloseProjectDetailOnEscape } = await import(
+      "@/components/project-detail-dialog"
+    );
+    const projectDialog = { id: "project-detail" } as Element;
+    const nestedDialog = { id: "project-edit" } as Element;
+    const escape = { key: "Escape", defaultPrevented: false };
+
+    expect(
+      shouldCloseProjectDetailOnEscape(escape, projectDialog, [projectDialog]),
+    ).toBe(true);
+    expect(
+      shouldCloseProjectDetailOnEscape(escape, projectDialog, [
+        projectDialog,
+        nestedDialog,
+      ]),
+    ).toBe(false);
+    expect(
+      shouldCloseProjectDetailOnEscape(
+        { key: "Escape", defaultPrevented: true },
+        projectDialog,
+        [projectDialog],
+      ),
+    ).toBe(false);
+  });
+
   test("renders an accessible, viewport-safe project detail dialog", async () => {
     const { ProjectDetailDialog } = await import(
       "@/components/project-detail-dialog"
