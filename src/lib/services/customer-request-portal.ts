@@ -1,10 +1,14 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { createHash, randomUUID } from "node:crypto";
+import { and, eq, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
+import sharp from "sharp";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type * as schema from "@/db/schema";
 import {
   profiles,
   serviceCustomerRequestNotifications,
   serviceCustomerRequests,
+  serviceCustomerRequestAttachments,
+  serviceCustomerRequestStorageCleanup,
   serviceJobs,
   servicePublicRateLimits,
 } from "@/db/schema";
@@ -16,45 +20,108 @@ type ServiceTransaction = Parameters<
 
 export const CUSTOMER_REQUEST_EVIDENCE_BUCKET = "service-customer-request-evidence";
 export const CUSTOMER_REQUEST_EVIDENCE_MAX_BYTES = 8 * 1024 * 1024;
+export const CUSTOMER_REQUEST_EVIDENCE_MAX_DIMENSION = 6000;
+export const CUSTOMER_REQUEST_EVIDENCE_MAX_PIXELS = 20_000_000;
 export const CUSTOMER_REQUEST_EVIDENCE_MIME_TYPES = [
   "image/jpeg",
   "image/png",
   "image/webp",
-  "application/pdf",
 ] as const;
 
-function ascii(bytes: Uint8Array) {
-  return new TextDecoder("latin1").decode(bytes);
+function completePng(bytes: Uint8Array) {
+  let offset = 8;
+  while (offset + 12 <= bytes.length) {
+    const view = new DataView(bytes.buffer, bytes.byteOffset + offset, 4);
+    const length = view.getUint32(0, false);
+    const end = offset + 12 + length;
+    if (end > bytes.length) return false;
+    const type = new TextDecoder("ascii").decode(bytes.subarray(offset + 4, offset + 8));
+    if (type === "IEND") return length === 0 && end === bytes.length;
+    offset = end;
+  }
+  return false;
 }
 
-export function sniffCustomerRequestEvidence(bytes: Uint8Array): {
-  mimeType: (typeof CUSTOMER_REQUEST_EVIDENCE_MIME_TYPES)[number];
-  extension: string;
-} | null {
-  if (bytes.length < 10 || bytes.length > CUSTOMER_REQUEST_EVIDENCE_MAX_BYTES) return null;
-  const text = ascii(bytes);
-  const activeContent = /<script|javascript:|\/javascript|\/launch|\/embeddedfile/i.test(text);
-  if (activeContent) return null;
-  if (
+function structurallyComplete(bytes: Uint8Array, format: string) {
+  if (format === "jpeg") return (
     bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
     && bytes.at(-2) === 0xff && bytes.at(-1) === 0xd9
-  ) return { mimeType: "image/jpeg", extension: "jpg" };
-  if (
+  );
+  if (format === "png") return (
     bytes.slice(0, 8).every((value, index) =>
       value === [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a][index])
-    && bytes.slice(-12).some((_, index, tail) =>
-      index <= tail.length - 4
-      && tail[index] === 0x49 && tail[index + 1] === 0x45
-      && tail[index + 2] === 0x4e && tail[index + 3] === 0x44)
-  ) return { mimeType: "image/png", extension: "png" };
-  if (
-    text.startsWith("RIFF") && text.slice(8, 12) === "WEBP"
-    && new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(4, true) + 8 === bytes.length
-  ) return { mimeType: "image/webp", extension: "webp" };
-  if (text.startsWith("%PDF-") && /%%EOF\s*$/.test(text)) {
-    return { mimeType: "application/pdf", extension: "pdf" };
+    && completePng(bytes)
+  );
+  if (format === "webp") {
+    const text = new TextDecoder("ascii").decode(bytes.subarray(0, 12));
+    return text.startsWith("RIFF") && text.slice(8, 12) === "WEBP"
+      && bytes.length >= 12
+      && new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(4, true) + 8 === bytes.length;
   }
-  return null;
+  return false;
+}
+
+const imageContract = {
+  jpeg: { mimeType: "image/jpeg" as const, extensions: ["jpg", "jpeg"], extension: "jpg" },
+  png: { mimeType: "image/png" as const, extensions: ["png"], extension: "png" },
+  webp: { mimeType: "image/webp" as const, extensions: ["webp"], extension: "webp" },
+};
+
+export async function sanitizeCustomerRequestEvidence(input: {
+  bytes: Uint8Array;
+  declaredMimeType: string;
+  fileName: string;
+}) {
+  if (input.bytes.length < 12 || input.bytes.length > CUSTOMER_REQUEST_EVIDENCE_MAX_BYTES) return null;
+  try {
+    const decoder = sharp(input.bytes, {
+      failOn: "error",
+      limitInputPixels: CUSTOMER_REQUEST_EVIDENCE_MAX_PIXELS,
+      sequentialRead: true,
+    });
+    const metadata = await decoder.metadata();
+    const contract = metadata.format && metadata.format in imageContract
+      ? imageContract[metadata.format as keyof typeof imageContract]
+      : null;
+    const extension = input.fileName.split(".").pop()?.toLowerCase() ?? "";
+    if (
+      !contract
+      || input.declaredMimeType.toLowerCase() !== contract.mimeType
+      || !contract.extensions.includes(extension)
+      || !structurallyComplete(input.bytes, metadata.format ?? "")
+      || !metadata.width || !metadata.height
+      || metadata.width > CUSTOMER_REQUEST_EVIDENCE_MAX_DIMENSION
+      || metadata.height > CUSTOMER_REQUEST_EVIDENCE_MAX_DIMENSION
+      || metadata.width * metadata.height > CUSTOMER_REQUEST_EVIDENCE_MAX_PIXELS
+      || (metadata.pages ?? 1) !== 1
+    ) return null;
+    const pipeline = sharp(input.bytes, {
+      failOn: "error",
+      limitInputPixels: CUSTOMER_REQUEST_EVIDENCE_MAX_PIXELS,
+      sequentialRead: true,
+    }).rotate();
+    const output = contract.mimeType === "image/jpeg"
+      ? await pipeline.jpeg({ quality: 88, mozjpeg: true }).toBuffer()
+      : contract.mimeType === "image/png"
+        ? await pipeline.png({ compressionLevel: 9, adaptiveFiltering: true }).toBuffer()
+        : await pipeline.webp({ quality: 88 }).toBuffer();
+    if (output.length > CUSTOMER_REQUEST_EVIDENCE_MAX_BYTES) return null;
+    const canonical = await sharp(output, {
+      failOn: "error",
+      limitInputPixels: CUSTOMER_REQUEST_EVIDENCE_MAX_PIXELS,
+    }).metadata();
+    if (!canonical.width || !canonical.height) return null;
+    return {
+      bytes: new Uint8Array(output),
+      mimeType: contract.mimeType,
+      extension: contract.extension,
+      width: canonical.width,
+      height: canonical.height,
+      sha256: createHash("sha256").update(output).digest("hex"),
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function calculateCustomerRequestSlaState(input: {
@@ -137,6 +204,17 @@ export async function submitCustomerRequestCore(
     now?: Date;
     responseMinutes: number | null;
     resolutionMinutes: number | null;
+    attachments?: Array<{
+      cleanupId: string;
+      bucket: string;
+      path: string;
+      fileName: string;
+      mimeType: "image/jpeg" | "image/png" | "image/webp";
+      sizeBytes: number;
+      width: number;
+      height: number;
+      sha256: string;
+    }>;
   },
 ) {
   const now = input.now ?? new Date();
@@ -155,6 +233,32 @@ export async function submitCustomerRequestCore(
     expiresAt: current.tokenExpiresAt,
     now,
   })) throw new Error("CUSTOMER_REQUEST_NOT_SUBMITTABLE");
+  if ((input.attachments?.length ?? 0) > 3) {
+    throw new Error("CUSTOMER_REQUEST_EVIDENCE_LIMIT");
+  }
+  if (input.attachments?.length) {
+    const cleanupRows = await tx.select({
+      id: serviceCustomerRequestStorageCleanup.id,
+      requestId: serviceCustomerRequestStorageCleanup.requestId,
+      bucket: serviceCustomerRequestStorageCleanup.bucket,
+      path: serviceCustomerRequestStorageCleanup.path,
+      claimToken: serviceCustomerRequestStorageCleanup.claimToken,
+    }).from(serviceCustomerRequestStorageCleanup).where(inArray(
+      serviceCustomerRequestStorageCleanup.id,
+      input.attachments.map((attachment) => attachment.cleanupId),
+    )).for("update");
+    if (
+      cleanupRows.length !== input.attachments.length
+      || input.attachments.some((attachment) => {
+        const cleanup = cleanupRows.find((row) => row.id === attachment.cleanupId);
+        return !cleanup
+          || cleanup.requestId !== current.id
+          || cleanup.bucket !== attachment.bucket
+          || cleanup.path !== attachment.path
+          || cleanup.claimToken !== null;
+      })
+    ) throw new Error("CUSTOMER_REQUEST_STORAGE_CLEANUP_CLAIMED");
+  }
 
   const responseDueAt = input.responseMinutes
     ? new Date(now.getTime() + input.responseMinutes * 60_000)
@@ -178,6 +282,25 @@ export async function submitCustomerRequestCore(
     code: serviceCustomerRequests.code,
     status: serviceCustomerRequests.status,
   });
+  if (input.attachments?.length) {
+    await tx.insert(serviceCustomerRequestAttachments).values(
+      input.attachments.map((attachment) => ({
+        requestId: current.id,
+        bucket: attachment.bucket,
+        path: attachment.path,
+        fileName: attachment.fileName,
+        mimeType: attachment.mimeType,
+        sizeBytes: attachment.sizeBytes,
+        width: attachment.width,
+        height: attachment.height,
+        sha256: attachment.sha256,
+      })),
+    );
+    await tx.delete(serviceCustomerRequestStorageCleanup).where(inArray(
+      serviceCustomerRequestStorageCleanup.id,
+      input.attachments.map((attachment) => attachment.cleanupId),
+    ));
+  }
   const managers = await tx.select({ id: profiles.id }).from(profiles).where(and(
     eq(profiles.isActive, true),
     inArray(profiles.role, ["owner", "manager"]),
@@ -217,11 +340,12 @@ export async function manageCustomerRequestCore(
     linkedJobId: serviceCustomerRequests.linkedJobId,
     respondedAt: serviceCustomerRequests.respondedAt,
     resolvedAt: serviceCustomerRequests.resolvedAt,
+    submittedAt: serviceCustomerRequests.submittedAt,
   }).from(serviceCustomerRequests)
     .where(eq(serviceCustomerRequests.id, input.requestId))
     .for("update")
     .limit(1);
-  if (!current) throw new Error("CUSTOMER_REQUEST_NOT_FOUND");
+  if (!current?.submittedAt) throw new Error("CUSTOMER_REQUEST_NOT_FOUND");
   const linkedJobId = input.linkedJobId === undefined
     ? current.linkedJobId
     : input.linkedJobId;
@@ -236,6 +360,10 @@ export async function manageCustomerRequestCore(
   }
   const nextStatus = input.status ?? current.status;
   if (
+    ["scheduled", "in_progress", "resolved", "closed"].includes(nextStatus)
+    && !linkedJobId
+  ) throw new Error("CUSTOMER_REQUEST_JOB_REQUIRED");
+  if (
     input.status
     && input.status !== current.status
     && !canTransitionCustomerRequest(current.status, input.status, Boolean(linkedJobId))
@@ -247,10 +375,98 @@ export async function manageCustomerRequestCore(
     internalNote: input.internalNote === undefined ? undefined : input.internalNote,
     triagedBy: nextStatus !== "new" ? input.actorId : undefined,
     respondedAt: !current.respondedAt && nextStatus !== "new" ? now : current.respondedAt,
-    resolvedAt: !current.resolvedAt && ["resolved", "closed"].includes(nextStatus)
-      ? now
-      : current.resolvedAt,
+    resolvedAt: current.status === "resolved" && nextStatus === "in_progress"
+      ? null
+      : !current.resolvedAt && ["resolved", "closed"].includes(nextStatus)
+        ? now
+        : current.resolvedAt,
     updatedAt: now,
   }).where(eq(serviceCustomerRequests.id, current.id)).returning();
   return updated;
+}
+
+export async function stageCustomerRequestStorageCleanupCore(
+  tx: ServiceTransaction,
+  input: {
+    requestId: string;
+    objects: Array<{ bucket: string; path: string }>;
+    now?: Date;
+  },
+) {
+  const now = input.now ?? new Date();
+  if (input.objects.length === 0) return [];
+  return tx.insert(serviceCustomerRequestStorageCleanup).values(
+    input.objects.map((object) => ({
+      requestId: input.requestId,
+      bucket: object.bucket,
+      path: object.path,
+      notBefore: new Date(now.getTime() + 15 * 60 * 1000),
+    })),
+  ).returning({
+    id: serviceCustomerRequestStorageCleanup.id,
+    bucket: serviceCustomerRequestStorageCleanup.bucket,
+    path: serviceCustomerRequestStorageCleanup.path,
+  });
+}
+
+const CUSTOMER_REQUEST_CLEANUP_LEASE_MS = 5 * 60 * 1000;
+
+export async function drainCustomerRequestStorageCleanup(input: {
+  database: NodePgDatabase<typeof schema>;
+  storage: { remove(bucket: string, path: string): Promise<void> };
+  now?: Date;
+  limit?: number;
+}) {
+  const now = input.now ?? new Date();
+  const staleAt = new Date(now.getTime() - CUSTOMER_REQUEST_CLEANUP_LEASE_MS);
+  const candidates = await input.database.select({
+    id: serviceCustomerRequestStorageCleanup.id,
+  }).from(serviceCustomerRequestStorageCleanup).where(and(
+    lte(serviceCustomerRequestStorageCleanup.notBefore, now),
+    or(
+      isNull(serviceCustomerRequestStorageCleanup.claimedAt),
+      lt(serviceCustomerRequestStorageCleanup.claimedAt, staleAt),
+    ),
+  )).limit(Math.min(100, Math.max(1, input.limit ?? 25)));
+  let cleaned = 0;
+  let failed = 0;
+  for (const candidate of candidates) {
+    const claimToken = randomUUID();
+    const [claimed] = await input.database.update(serviceCustomerRequestStorageCleanup).set({
+      claimToken,
+      claimedAt: now,
+    }).where(and(
+      eq(serviceCustomerRequestStorageCleanup.id, candidate.id),
+      or(
+        isNull(serviceCustomerRequestStorageCleanup.claimedAt),
+        lt(serviceCustomerRequestStorageCleanup.claimedAt, staleAt),
+      ),
+    )).returning({
+      id: serviceCustomerRequestStorageCleanup.id,
+      bucket: serviceCustomerRequestStorageCleanup.bucket,
+      path: serviceCustomerRequestStorageCleanup.path,
+    });
+    if (!claimed) continue;
+    try {
+      await input.storage.remove(claimed.bucket, claimed.path);
+      await input.database.delete(serviceCustomerRequestStorageCleanup).where(and(
+        eq(serviceCustomerRequestStorageCleanup.id, claimed.id),
+        eq(serviceCustomerRequestStorageCleanup.claimToken, claimToken),
+      ));
+      cleaned++;
+    } catch (error) {
+      await input.database.update(serviceCustomerRequestStorageCleanup).set({
+        attempts: sql`${serviceCustomerRequestStorageCleanup.attempts} + 1`,
+        lastError: error instanceof Error ? error.message.slice(0, 1000) : "Storage cleanup failed",
+        claimToken: null,
+        claimedAt: null,
+        notBefore: new Date(now.getTime() + 5 * 60 * 1000),
+      }).where(and(
+        eq(serviceCustomerRequestStorageCleanup.id, claimed.id),
+        eq(serviceCustomerRequestStorageCleanup.claimToken, claimToken),
+      ));
+      failed++;
+    }
+  }
+  return { evaluated: candidates.length, cleaned, failed };
 }

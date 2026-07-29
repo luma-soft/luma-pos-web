@@ -34,6 +34,8 @@ type RequestRow = {
     fileName: string;
     mimeType: string;
     sizeBytes: number;
+    width: number | null;
+    height: number | null;
     sha256: string;
   }[];
 };
@@ -141,7 +143,9 @@ export function CustomerRequestsManager({
                   value={selected.linkedJobId ?? ""}
                   onChange={(event) => update(selected.id, { linkedJobId: event.target.value || null })}
                   options={[
-                    { value: "", label: "Chưa liên kết" },
+                    ...(["scheduled", "in_progress", "resolved", "closed"].includes(selected.status)
+                      ? []
+                      : [{ value: "", label: "Chưa liên kết" }]),
                     ...jobs.filter((job) => job.projectId === selected.projectId).map((job) => ({ value: job.id, label: `${job.code} · ${job.title}` })),
                   ]}
                 />

@@ -86,3 +86,71 @@
 - Durable manager notifications are recorded in the service notification
   table. Delivery through optional external channels would need a separate
   idempotent delivery worker and credentials.
+
+## Review fix round 1
+
+The independent review found one Critical and five Important gaps. This round
+addresses all six:
+
+- Evidence is photo-only. JPEG, PNG, and WebP must match declared MIME and
+  extension, pass exact container-boundary validation, and fully decode through
+  Sharp under 8 MiB, 6000×6000, and 20-million-pixel limits. The server rotates
+  and re-encodes canonical bytes without input metadata before computing the
+  persisted SHA-256. PDF support was removed.
+- Public limits no longer use forwarding headers. Fixed route-global buckets
+  provide a non-bypassable ceiling and valid token-hash buckets provide
+  per-link limits. Invalid/guessed tokens never create token-specific buckets.
+  This covers page, GET, and the combined submit/upload POST.
+- Migration `0078_service_customer_request_security.sql` adds a validated
+  operational-state/job constraint and a trigger that rejects cross-project
+  links even for direct SQL writers. The application rejects an unlink if the
+  resulting status requires a job, and the UI does not offer that unlink.
+- Reopening `resolved -> in_progress` transactionally clears `resolved_at`.
+  Resolution overdue calculation therefore resumes against the original
+  deadline.
+- Stored contact name/phone and stored request title are no longer selected or
+  hydrated into the public client component. New submissions begin with blank
+  contact inputs; the public status payload remains a minimal bearer-token DTO.
+- The old one-file-at-a-time endpoint was removed. A single multipart request
+  validates and canonicalizes all photos before any upload. Cleanup intents
+  are durably committed before Storage writes; the final transaction locks
+  those intents, persists all evidence metadata, submits the request, creates
+  manager notifications, and acknowledges cleanup together. Partial upload or
+  finalization failure remains unsubmitted and manager-invisible.
+- The existing authenticated notification cron now drains orphan cleanup rows.
+  Cleanup uses token-fenced five-minute claims, retry backoff, and idempotent
+  missing-object removal. Finalization locks cleanup ownership, so a cleaner
+  can never race a committed attachment into a missing object.
+
+### Review-fix RED/GREEN evidence
+
+- RED:
+  - decoder/dimension/canonicalization exports were absent;
+  - `resolved -> in_progress` retained `resolved_at`;
+  - an operational request could unlink its job;
+  - manager core could triage an unsubmitted partial upload;
+  - finalization could commit while cleanup owned the object.
+- GREEN:
+  - `bun test tests/service-customer-request.test.ts`
+    - 8 tests, 60 assertions, including real generated image fixtures,
+      truncation, SVG/ZIP marker wrapping, trailing payload, MIME/extension
+      mismatch, dimension/decompression limits, PII hydration, and forwarding
+      header rotation.
+  - `bun test tests/service-customer-request-portal.test.mjs`
+    - PGlite covers atomic success, partial multi-file failure, cleanup
+      retry/backoff/replay, cleanup/finalization fencing, unsubmitted manager
+      isolation, reopen SLA, direct unlink constraint, and direct
+      cross-project trigger.
+  - Focused field schema, changed-file ESLint, and `bun run build` pass.
+
+### Migration 0078 verification
+
+- Applied successfully; immediate rerun reported zero pending migrations.
+- Direct configured-database checks confirmed:
+  - `width`/`height` image metadata columns;
+  - validated `service_customer_requests_operational_job_check`;
+  - enabled `service_customer_requests_job_scope_trigger` and backing function;
+  - cleanup table and retry index;
+  - cleanup RLS enabled;
+  - no anon/authenticated SELECT or INSERT cleanup privilege;
+  - `_migrations` contains `0078_service_customer_request_security.sql`.

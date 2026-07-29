@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { projects, serviceCustomerRequestAttachments, serviceCustomerRequests, serviceJobs } from "@/db/schema";
 import { requireMobileManager } from "@/lib/mobile/auth";
@@ -36,13 +36,18 @@ export async function GET(
   }).from(serviceCustomerRequests)
     .innerJoin(projects, eq(serviceCustomerRequests.projectId, projects.id))
     .leftJoin(serviceJobs, eq(serviceCustomerRequests.linkedJobId, serviceJobs.id))
-    .where(eq(serviceCustomerRequests.id, id)).limit(1);
+    .where(and(
+      eq(serviceCustomerRequests.id, id),
+      isNotNull(serviceCustomerRequests.submittedAt),
+    )).limit(1);
   if (!row) return mobileError("errors.notFound", 404);
   const attachments = await db.select({
     id: serviceCustomerRequestAttachments.id,
     fileName: serviceCustomerRequestAttachments.fileName,
     mimeType: serviceCustomerRequestAttachments.mimeType,
     sizeBytes: serviceCustomerRequestAttachments.sizeBytes,
+    width: serviceCustomerRequestAttachments.width,
+    height: serviceCustomerRequestAttachments.height,
     sha256: serviceCustomerRequestAttachments.sha256,
     createdAt: serviceCustomerRequestAttachments.createdAt,
   }).from(serviceCustomerRequestAttachments)
@@ -77,6 +82,9 @@ export async function PATCH(
     }
     if (error instanceof Error && error.message === "CUSTOMER_REQUEST_INVALID_TRANSITION") {
       return mobileError("services.errors.invalidTransition", 409);
+    }
+    if (error instanceof Error && error.message === "CUSTOMER_REQUEST_JOB_REQUIRED") {
+      return mobileError("services.errors.relationMismatch", 409);
     }
     throw error;
   }

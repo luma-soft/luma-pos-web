@@ -1,5 +1,4 @@
 import { eq } from "drizzle-orm";
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { projects, serviceCustomerRequests } from "@/db/schema";
@@ -21,30 +20,14 @@ export default async function ServiceRequestPage({
   const { token } = await params;
   if (token.length < 40) notFound();
   const tokenHash = hashCustomerRequestToken(token);
-  const headerStore = await headers();
-  const ip = (
-    headerStore.get("cf-connecting-ip")
-    ?? headerStore.get("x-real-ip")
-    ?? headerStore.get("x-forwarded-for")?.split(",")[0]?.trim()
-    ?? "unknown"
-  ).slice(0, 80);
-  for (const key of [
-    `customer-request:page:token:${tokenHash}`,
-    ...(ip === "unknown" ? [] : [`customer-request:page:ip:${ip}`]),
-  ]) {
-    const limited = await db.transaction((tx) => consumePublicRateLimitCore(tx, {
-      key,
-      limit: 60,
-      windowSeconds: 3600,
-    }));
-    if (!limited.allowed) notFound();
-  }
+  const globalLimit = await db.transaction((tx) => consumePublicRateLimitCore(tx, {
+    key: "customer-request:page:global",
+    limit: 10_000,
+    windowSeconds: 60,
+  }));
+  if (!globalLimit.allowed) notFound();
   const [request] = await db.select({
     projectName: projects.name,
-    contactName: serviceCustomerRequests.contactName,
-    contactPhone: serviceCustomerRequests.contactPhone,
-    title: serviceCustomerRequests.title,
-    priority: serviceCustomerRequests.priority,
     status: serviceCustomerRequests.status,
     submittedAt: serviceCustomerRequests.submittedAt,
     responseDueAt: serviceCustomerRequests.responseDueAt,
@@ -59,6 +42,12 @@ export default async function ServiceRequestPage({
   if (!request || !isCustomerRequestTokenViewable({
     expiresAt: request.tokenExpiresAt,
   })) notFound();
+  const tokenLimit = await db.transaction((tx) => consumePublicRateLimitCore(tx, {
+    key: `customer-request:page:token:${tokenHash}`,
+    limit: 60,
+    windowSeconds: 3600,
+  }));
+  if (!tokenLimit.allowed) notFound();
   const canSubmit = isCustomerRequestTokenSubmittable({
     status: request.status,
     submittedAt: request.submittedAt,
@@ -73,12 +62,10 @@ export default async function ServiceRequestPage({
         <p className="mt-2 text-sm text-slate-600">{request.projectName}</p>
         <ServiceRequestForm
           token={token}
-          defaultContactName={request.contactName}
-          defaultContactPhone={request.contactPhone ?? ""}
           initialStatus={{
             code: null,
-            title: request.submittedAt ? request.title : null,
-            priority: request.submittedAt ? request.priority : null,
+            title: null,
+            priority: null,
             status: request.status,
             submittedAt: request.submittedAt?.toISOString() ?? null,
             responseDueAt: request.responseDueAt?.toISOString() ?? null,

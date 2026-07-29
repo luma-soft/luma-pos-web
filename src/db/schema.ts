@@ -1258,13 +1258,33 @@ export const serviceCustomerRequestAttachments = pgTable("service_customer_reque
   fileName: text("file_name").notNull(),
   mimeType: text("mime_type").notNull(),
   sizeBytes: integer("size_bytes").notNull(),
+  width: integer("width"),
+  height: integer("height"),
   sha256: varchar("sha256", { length: 64 }).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
-  check("service_customer_request_attachments_mime_check", sql`${t.mimeType} in ('image/jpeg', 'image/png', 'image/webp', 'application/pdf')`),
+  check("service_customer_request_attachments_mime_check", sql`${t.mimeType} in ('image/jpeg', 'image/png', 'image/webp')`),
   check("service_customer_request_attachments_size_check", sql`${t.sizeBytes} > 0 and ${t.sizeBytes} <= 8388608`),
+  check("service_customer_request_attachments_dimensions_check", sql`(${t.width} is null and ${t.height} is null) or (${t.width} > 0 and ${t.height} > 0 and ${t.width} <= 6000 and ${t.height} <= 6000 and (${t.width}::bigint * ${t.height}::bigint) <= 20000000)`),
   check("service_customer_request_attachments_sha_check", sql`${t.sha256} ~ '^[0-9a-f]{64}$'`),
   index("service_customer_request_attachments_request_idx").on(t.requestId, t.createdAt),
+]);
+
+export const serviceCustomerRequestStorageCleanup = pgTable("service_customer_request_storage_cleanup", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  requestId: uuid("request_id").references(() => serviceCustomerRequests.id, { onDelete: "set null" }),
+  bucket: text("bucket").notNull(),
+  path: text("path").notNull().unique(),
+  notBefore: timestamp("not_before", { withTimezone: true }).notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  lastError: text("last_error"),
+  claimToken: uuid("claim_token"),
+  claimedAt: timestamp("claimed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("service_customer_request_cleanup_claim_check", sql`(${t.claimToken} is null) = (${t.claimedAt} is null)`),
+  check("service_customer_request_cleanup_attempts_check", sql`${t.attempts} >= 0`),
+  index("service_customer_request_cleanup_retry_idx").on(t.notBefore, t.claimedAt, t.createdAt),
 ]);
 
 export const serviceCustomerRequestNotifications = pgTable("service_customer_request_notifications", {

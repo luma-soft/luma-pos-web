@@ -7,6 +7,8 @@ import { getRawStorePrefs } from "@/lib/data/settings";
 import { dispatchPushNotification } from "@/lib/notifications/push";
 import { mobileError, mobileOk } from "@/lib/mobile/response";
 import { runMaintenanceWorker } from "@/lib/services/maintenance-worker";
+import { drainCustomerRequestStorageCleanup } from "@/lib/services/customer-request-portal";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 function authorized(request: Request) {
   const expected = process.env.NOTIFICATION_CRON_SECRET?.trim() ?? "";
@@ -30,6 +32,16 @@ export async function GET(request: Request) {
   const day = dateKey(prefs.quietHours.timezone);
   const results = [];
   const maintenance = await runMaintenanceWorker();
+  const cleanupStorage = createSupabaseAdminClient();
+  const customerRequestStorageCleanup = await drainCustomerRequestStorageCleanup({
+    database: db,
+    storage: {
+      async remove(bucket, path) {
+        const { error } = await cleanupStorage.storage.from(bucket).remove([path]);
+        if (error) throw error;
+      },
+    },
+  });
 
   if (prefs.serviceDue) {
     for (const occurrence of maintenance.results.filter((item) => item.created && item.jobId)) {
@@ -98,5 +110,6 @@ export async function GET(request: Request) {
     skipped: results.reduce((sum, result) => sum + result.skipped, 0),
     configured: results.every((result) => result.configured),
     maintenance,
+    customerRequestStorageCleanup,
   });
 }

@@ -1,5 +1,5 @@
 import "server-only";
-import { desc, eq, inArray, sql } from "drizzle-orm";
+import { desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   projects,
@@ -46,6 +46,7 @@ export async function getManagerServiceCustomerRequests() {
   }).from(serviceCustomerRequests)
     .innerJoin(projects, eq(serviceCustomerRequests.projectId, projects.id))
     .leftJoin(serviceJobs, eq(serviceCustomerRequests.linkedJobId, serviceJobs.id))
+    .where(isNotNull(serviceCustomerRequests.submittedAt))
     .orderBy(desc(serviceCustomerRequests.createdAt))
     .limit(100);
   const attachments = rows.length === 0 ? [] : await db.select({
@@ -54,6 +55,8 @@ export async function getManagerServiceCustomerRequests() {
     fileName: serviceCustomerRequestAttachments.fileName,
     mimeType: serviceCustomerRequestAttachments.mimeType,
     sizeBytes: serviceCustomerRequestAttachments.sizeBytes,
+    width: serviceCustomerRequestAttachments.width,
+    height: serviceCustomerRequestAttachments.height,
     sha256: serviceCustomerRequestAttachments.sha256,
   }).from(serviceCustomerRequestAttachments).where(inArray(
     serviceCustomerRequestAttachments.requestId,

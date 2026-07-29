@@ -1,13 +1,15 @@
+import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import {
-  projects,
-  serviceCustomerRequests,
-  serviceSlaPolicies,
-} from "@/db/schema";
-import { mobileError, mobileOk, readJson } from "@/lib/mobile/response";
+import { projects, serviceCustomerRequests, serviceSlaPolicies } from "@/db/schema";
+import { mobileError, mobileOk } from "@/lib/mobile/response";
 import {
   consumePublicRateLimitCore,
+  CUSTOMER_REQUEST_EVIDENCE_BUCKET,
+  CUSTOMER_REQUEST_EVIDENCE_MAX_BYTES,
+  CUSTOMER_REQUEST_EVIDENCE_MIME_TYPES,
+  sanitizeCustomerRequestEvidence,
+  stageCustomerRequestStorageCleanupCore,
   submitCustomerRequestCore,
 } from "@/lib/services/customer-request-portal";
 import {
@@ -16,46 +18,62 @@ import {
   isCustomerRequestTokenViewable,
 } from "@/lib/services/customer-request-token";
 import { serviceCustomerRequestSubmitSchema } from "@/lib/services/schemas";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
-function clientIdentity(request: Request) {
-  const ip = request.headers.get("cf-connecting-ip")
-    ?? request.headers.get("x-real-ip")
-    ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
-    ?? "unknown";
-  return ip.slice(0, 80);
+const MAX_EVIDENCE_COUNT = 3;
+const MAX_MULTIPART_BYTES = MAX_EVIDENCE_COUNT * CUSTOMER_REQUEST_EVIDENCE_MAX_BYTES + 256 * 1024;
+
+async function consumeLimit(input: { key: string; limit: number; windowSeconds: number }) {
+  return db.transaction((tx) => consumePublicRateLimitCore(tx, input));
 }
 
-async function rateLimit(request: Request, tokenHash: string, operation: "get" | "post") {
-  const limit = operation === "get" ? 60 : 10;
-  const windowSeconds = operation === "get" ? 3600 : 900;
-  const keys = [
-    `customer-request:${operation}:token:${tokenHash}`,
-    ...(clientIdentity(request) === "unknown"
-      ? []
-      : [`customer-request:${operation}:ip:${clientIdentity(request)}`]),
-  ];
-  for (const key of keys) {
-    const result = await db.transaction((tx) =>
-      consumePublicRateLimitCore(tx, { key, limit, windowSeconds }));
-    if (!result.allowed) return result;
+function limited(result: { allowed: boolean; retryAfterSeconds: number }) {
+  if (result.allowed) return null;
+  return Response.json(
+    { ok: false, error: "errors.rateLimited" },
+    { status: 429, headers: { "retry-after": String(result.retryAfterSeconds) } },
+  );
+}
+
+async function ensurePrivateBucket() {
+  const supabase = createSupabaseAdminClient();
+  const { data, error } = await supabase.storage.listBuckets();
+  if (error) throw error;
+  const existing = data.find((bucket) => bucket.name === CUSTOMER_REQUEST_EVIDENCE_BUCKET);
+  const options = {
+    public: false,
+    fileSizeLimit: CUSTOMER_REQUEST_EVIDENCE_MAX_BYTES,
+    allowedMimeTypes: [...CUSTOMER_REQUEST_EVIDENCE_MIME_TYPES],
+  };
+  if (!existing) {
+    const { error: createError } = await supabase.storage.createBucket(
+      CUSTOMER_REQUEST_EVIDENCE_BUCKET,
+      options,
+    );
+    if (createError) throw createError;
+  } else if (existing.public) {
+    const { error: updateError } = await supabase.storage.updateBucket(
+      CUSTOMER_REQUEST_EVIDENCE_BUCKET,
+      options,
+    );
+    if (updateError) throw updateError;
   }
-  return null;
+  return supabase;
 }
 
 export async function GET(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ token: string }> },
 ) {
+  const globalBlocked = limited(await consumeLimit({
+    key: "customer-request:get:global",
+    limit: 10_000,
+    windowSeconds: 60,
+  }));
+  if (globalBlocked) return globalBlocked;
   const { token } = await params;
   if (token.length < 40) return mobileError("errors.notFound", 404);
   const tokenHash = hashCustomerRequestToken(token);
-  const limited = await rateLimit(request, tokenHash, "get");
-  if (limited) {
-    return Response.json(
-      { ok: false, error: "errors.rateLimited" },
-      { status: 429, headers: { "retry-after": String(limited.retryAfterSeconds) } },
-    );
-  }
   const [row] = await db.select({
     code: serviceCustomerRequests.code,
     projectName: projects.name,
@@ -75,6 +93,12 @@ export async function GET(
   if (!row || !isCustomerRequestTokenViewable({ expiresAt: row.tokenExpiresAt })) {
     return mobileError("errors.notFound", 404);
   }
+  const tokenBlocked = limited(await consumeLimit({
+    key: `customer-request:get:token:${tokenHash}`,
+    limit: 60,
+    windowSeconds: 3600,
+  }));
+  if (tokenBlocked) return tokenBlocked;
   return mobileOk({
     code: row.code,
     projectName: row.projectName,
@@ -99,25 +123,67 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ token: string }> },
 ) {
+  const globalBlocked = limited(await consumeLimit({
+    key: "customer-request:submit:global",
+    limit: 1_000,
+    windowSeconds: 60,
+  }));
+  if (globalBlocked) return globalBlocked;
   const { token } = await params;
   if (token.length < 40) return mobileError("errors.notFound", 404);
   const tokenHash = hashCustomerRequestToken(token);
-  const limited = await rateLimit(request, tokenHash, "post");
-  if (limited) {
-    return Response.json(
-      { ok: false, error: "errors.rateLimited" },
-      { status: 429, headers: { "retry-after": String(limited.retryAfterSeconds) } },
-    );
-  }
-  const parsed = serviceCustomerRequestSubmitSchema.safeParse(await readJson(request));
-  if (!parsed.success) return mobileError("errors.invalidData", 400);
   const [current] = await db.select({
     id: serviceCustomerRequests.id,
-    priority: serviceCustomerRequests.priority,
+    status: serviceCustomerRequests.status,
+    submittedAt: serviceCustomerRequests.submittedAt,
+    tokenExpiresAt: serviceCustomerRequests.tokenExpiresAt,
   }).from(serviceCustomerRequests)
     .where(eq(serviceCustomerRequests.tokenHash, tokenHash))
     .limit(1);
-  if (!current) return mobileError("errors.notFound", 404);
+  if (!current || !isCustomerRequestTokenSubmittable({
+    status: current.status,
+    submittedAt: current.submittedAt,
+    expiresAt: current.tokenExpiresAt,
+  })) return mobileError("errors.notFound", 404);
+  const tokenBlocked = limited(await consumeLimit({
+    key: `customer-request:submit:token:${tokenHash}`,
+    limit: 10,
+    windowSeconds: 900,
+  }));
+  if (tokenBlocked) return tokenBlocked;
+  const contentLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(contentLength) && contentLength > MAX_MULTIPART_BYTES) {
+    return mobileError("errors.invalidData", 413);
+  }
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return mobileError("errors.invalidData", 400);
+  }
+  const parsed = serviceCustomerRequestSubmitSchema.safeParse(Object.fromEntries(
+    [...form.entries()].filter(([, value]) => typeof value === "string"),
+  ));
+  if (!parsed.success) return mobileError("errors.invalidData", 400);
+  const files = form.getAll("evidence").filter((value): value is File =>
+    value instanceof File && value.size > 0);
+  if (files.length > MAX_EVIDENCE_COUNT) return mobileError("errors.invalidData", 400);
+  const sanitized: Array<{
+    file: File;
+    image: NonNullable<Awaited<ReturnType<typeof sanitizeCustomerRequestEvidence>>>;
+  }> = [];
+  for (const file of files) {
+    if (file.size > CUSTOMER_REQUEST_EVIDENCE_MAX_BYTES) {
+      return mobileError("errors.invalidData", 413);
+    }
+    const image = await sanitizeCustomerRequestEvidence({
+      bytes: new Uint8Array(await file.arrayBuffer()),
+      declaredMimeType: file.type,
+      fileName: file.name,
+    });
+    if (!image) return mobileError("services.errors.unsupportedEvidence", 400);
+    sanitized.push({ file, image });
+  }
   const [policy] = await db.select({
     responseMinutes: serviceSlaPolicies.responseMinutes,
     resolutionMinutes: serviceSlaPolicies.resolutionMinutes,
@@ -125,12 +191,68 @@ export async function POST(
     eq(serviceSlaPolicies.priority, parsed.data.priority),
     eq(serviceSlaPolicies.isActive, true),
   )).limit(1);
+  const now = new Date();
+  const objects = sanitized.map(({ image }) => ({
+    bucket: CUSTOMER_REQUEST_EVIDENCE_BUCKET,
+    path: `${current.id}/${now.getTime()}-${randomUUID()}.${image.extension}`,
+  }));
+  if (sanitized.length === 0) {
+    try {
+      const result = await db.transaction((tx) => submitCustomerRequestCore(tx, {
+        requestId: current.id,
+        ...parsed.data,
+        now,
+        responseMinutes: policy?.responseMinutes ?? null,
+        resolutionMinutes: policy?.resolutionMinutes ?? null,
+      }));
+      return mobileOk({
+        code: result.code,
+        status: result.status,
+        responseDueAt: result.responseDueAt,
+        resolutionDueAt: result.resolutionDueAt,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message === "CUSTOMER_REQUEST_NOT_SUBMITTABLE") {
+        return mobileError("errors.notFound", 404);
+      }
+      return mobileError("errors.serverError", 500);
+    }
+  }
+  let staged: Awaited<ReturnType<typeof stageCustomerRequestStorageCleanupCore>> = [];
   try {
+    const supabase = await ensurePrivateBucket();
+    staged = await db.transaction((tx) => stageCustomerRequestStorageCleanupCore(tx, {
+      requestId: current.id,
+      objects,
+      now,
+    }));
+    for (let index = 0; index < sanitized.length; index++) {
+      const item = sanitized[index];
+      const object = staged[index];
+      const { error } = await supabase.storage.from(object.bucket).upload(
+        object.path,
+        item.image.bytes,
+        { contentType: item.image.mimeType, upsert: false },
+      );
+      if (error) throw error;
+    }
     const result = await db.transaction((tx) => submitCustomerRequestCore(tx, {
       requestId: current.id,
       ...parsed.data,
+      now,
       responseMinutes: policy?.responseMinutes ?? null,
       resolutionMinutes: policy?.resolutionMinutes ?? null,
+      attachments: sanitized.map((item, index) => ({
+        cleanupId: staged[index].id,
+        bucket: staged[index].bucket,
+        path: staged[index].path,
+        fileName: item.file.name.replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 200),
+        mimeType: item.image.mimeType,
+        sizeBytes: item.image.bytes.length,
+        width: item.image.width,
+        height: item.image.height,
+        sha256: item.image.sha256,
+      })),
     }));
     return mobileOk({
       code: result.code,
@@ -142,6 +264,11 @@ export async function POST(
     if (error instanceof Error && error.message === "CUSTOMER_REQUEST_NOT_SUBMITTABLE") {
       return mobileError("errors.notFound", 404);
     }
-    throw error;
+    console.error("customer request atomic submit failed", {
+      requestId: current.id,
+      stagedCount: staged.length,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return mobileError("errors.serverError", 500);
   }
 }

@@ -4,14 +4,10 @@ import { useState } from "react";
 
 export function ServiceRequestForm({
   token,
-  defaultContactName,
-  defaultContactPhone,
   initialStatus,
   canSubmit,
 }: {
   token: string;
-  defaultContactName: string;
-  defaultContactPhone: string;
   initialStatus: {
     code: string | null;
     title: string | null;
@@ -60,24 +56,9 @@ export function ServiceRequestForm({
           setError("Chỉ được chọn tối đa 3 tệp.");
           return;
         }
-        for (const file of files) {
-          const upload = new FormData();
-          upload.set("file", file);
-          const uploadResponse = await fetch(`/api/portal/service-request/${token}/evidence`, {
-            method: "POST",
-            body: upload,
-          });
-          if (!uploadResponse.ok) {
-            setBusy(false);
-            setError("Tệp đính kèm không hợp lệ, quá lớn hoặc đã vượt giới hạn.");
-            return;
-          }
-        }
-        form.delete("evidence");
         const response = await fetch(`/api/portal/service-request/${token}`, {
           method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(Object.fromEntries(form.entries())),
+          body: form,
         });
         setBusy(false);
         if (response.ok) {
@@ -106,12 +87,12 @@ export function ServiceRequestForm({
         <input name="title" required minLength={3} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
       </label>
       <label className="block text-sm font-semibold">
-        Ảnh/PDF hiện trạng (không bắt buộc, tối đa 3 tệp, mỗi tệp 8 MB)
+        Ảnh hiện trạng (không bắt buộc, JPEG/PNG/WebP, tối đa 3 ảnh, mỗi ảnh 8 MB)
         <input
           name="evidence"
           type="file"
           multiple
-          accept="image/jpeg,image/png,image/webp,application/pdf"
+          accept="image/jpeg,image/png,image/webp"
           className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
         />
       </label>
@@ -122,11 +103,11 @@ export function ServiceRequestForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm font-semibold">
           Người liên hệ
-          <input name="contactName" required defaultValue={defaultContactName} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
+          <input name="contactName" required autoComplete="name" className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
         </label>
         <label className="block text-sm font-semibold">
           Số điện thoại
-          <input name="contactPhone" required defaultValue={defaultContactPhone} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
+          <input name="contactPhone" required autoComplete="tel" className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
         </label>
       </div>
       <label className="block text-sm font-semibold">

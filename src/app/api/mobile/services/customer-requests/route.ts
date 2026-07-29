@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   projects,
@@ -16,7 +16,12 @@ export async function GET(request: Request) {
   const page = Math.max(1, numberParam(request, "page", 1));
   const pageSize = Math.min(100, Math.max(1, numberParam(request, "size", 25)));
   const status = searchParam(request, "status");
-  const where = status ? eq(serviceCustomerRequests.status, status) : undefined;
+  const where = status
+    ? and(
+        isNotNull(serviceCustomerRequests.submittedAt),
+        eq(serviceCustomerRequests.status, status),
+      )
+    : isNotNull(serviceCustomerRequests.submittedAt);
   const rows = await db.select({
     id: serviceCustomerRequests.id,
     code: serviceCustomerRequests.code,
