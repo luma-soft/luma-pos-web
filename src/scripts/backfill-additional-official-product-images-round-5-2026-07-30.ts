@@ -20,6 +20,24 @@ type ImageRule = {
 };
 
 const imageRules: readonly ImageRule[] = [
+  // Apollo Silicone — trang chính thức dùng chung ảnh A500 cho các màu sản phẩm.
+  {
+    key: "apollo-silicone-a300",
+    source:
+      "https://static.quochuyanhcorp.vn/17328/sp/ver2-apollo-a300.jpg",
+    sourcePage:
+      "https://apollosilicone.vn/san-pham/keo-silicon-apollo-silicone-sealant-a300",
+    skus: ["SP000593"],
+  },
+  {
+    key: "apollo-silicone-a500",
+    source:
+      "https://static.quochuyanhcorp.vn/17329/sp/ver2-apollo-a500.jpg",
+    sourcePage:
+      "https://apollosilicone.vn/san-pham/keo-silicon-apollo-silicone-sealant-a500",
+    skus: ["SP000594", "SP000595", "SP000596", "SP000597"],
+  },
+
   // Eurofire — ảnh đúng model từ website chính thức.
   {
     key: "eurofire-ief001",
