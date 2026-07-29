@@ -96,6 +96,26 @@ describe("mobile specialist layouts", () => {
     expect(productCreate).toContain("sm:top-full");
   });
 
+  test("product-create menu gives its icon-only mobile trigger an accessible menu contract", () => {
+    const productCreate = read("src/app/(app)/inventory/tabs/product-create-menu.tsx");
+
+    expect(productCreate).toContain("aria-label={label}");
+    expect(productCreate).toContain('aria-haspopup="menu"');
+    expect(productCreate).toContain('role="menu"');
+    expect(productCreate).toContain('role="menuitem"');
+  });
+
+  test("product editor modal is labelled and contains scroll chaining", () => {
+    const products = read("src/app/(app)/inventory/tabs/products.tsx");
+    const productForm = read("src/app/(app)/products/new/product-form.tsx");
+
+    expect(products).toContain('role="dialog"');
+    expect(products).toContain('aria-modal="true"');
+    expect(products).toContain('aria-labelledby="product-editor-title"');
+    expect(productForm).toContain('id={isModal ? "product-editor-title" : undefined}');
+    expect(productForm).toContain('"flex-1 overflow-auto overscroll-contain');
+  });
+
   test("print toolbar reflows every action inside a narrow viewport", () => {
     const toolbar = read("src/components/print/print-toolbar.tsx");
 

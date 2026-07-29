@@ -148,7 +148,12 @@ export async function ProductEditorModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-0 sm:p-5">
-      <div className="h-dvh w-full max-w-7xl overflow-hidden bg-surface shadow-2xl sm:h-[min(92dvh,920px)] sm:rounded-2xl">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="product-editor-title"
+        className="h-dvh w-full max-w-7xl overflow-hidden bg-surface shadow-2xl sm:h-[min(92dvh,920px)] sm:rounded-2xl"
+      >
         <NewProductForm
           mode={mode}
           productId={editId}

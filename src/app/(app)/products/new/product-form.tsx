@@ -299,6 +299,7 @@ export function NewProductForm({
             </Button>
           )}
           <Heading
+            id={isModal ? "product-editor-title" : undefined}
             as="h1"
             size="lg"
             text={t(
@@ -356,7 +357,7 @@ export function NewProductForm({
 
       <div
         className={cn(
-          "flex-1 overflow-auto p-4 sm:p-6 w-full space-y-4",
+          "flex-1 overflow-auto overscroll-contain p-4 sm:p-6 w-full space-y-4",
           isModal ? "mx-auto max-w-7xl" : "mx-auto max-w-5xl",
         )}
       >

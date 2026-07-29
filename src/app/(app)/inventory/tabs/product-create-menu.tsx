@@ -34,22 +34,36 @@ export function ProductCreateMenu({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const close = (event: MouseEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
+    const closeWithKeyboard = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
     document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
+    document.addEventListener("keydown", closeWithKeyboard);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", closeWithKeyboard);
+    };
   }, [open]);
 
   return (
     <div ref={rootRef} className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-4 z-30 w-auto shrink-0 sm:relative sm:bottom-auto sm:right-auto sm:w-auto">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
+        aria-label={label}
+        aria-haspopup="menu"
         aria-expanded={open}
+        aria-controls={open ? "product-create-menu" : undefined}
         className="inline-flex h-12 w-12 items-center justify-center gap-2 rounded-2xl bg-primary-600 p-0 text-sm font-medium text-white shadow-e2 transition hover:brightness-110 active:scale-[0.98] lg:h-auto lg:min-h-0 lg:w-auto lg:rounded-full lg:px-4 lg:py-2 lg:shadow-none"
       >
         <PackagePlus className="h-4 w-4" />
@@ -62,13 +76,14 @@ export function ProductCreateMenu({
         />
       </button>
       {open && (
-        <div className="absolute bottom-full right-0 z-50 mb-2 w-72 overflow-hidden rounded-xl border border-border bg-surface p-1 shadow-e2 sm:bottom-auto sm:top-full sm:mb-0 sm:mt-2 sm:w-80">
+        <div id="product-create-menu" role="menu" className="absolute bottom-full right-0 z-50 mb-2 w-72 overflow-hidden rounded-xl border border-border bg-surface p-1 shadow-e2 sm:bottom-auto sm:top-full sm:mb-0 sm:mt-2 sm:w-80">
           {items.map((item) => {
             const Icon = icons[item.kind];
             return (
               <button
                 key={item.kind}
                 type="button"
+                role="menuitem"
                 onClick={() => {
                   setOpen(false);
                   router.push(item.href, { scroll: false });
