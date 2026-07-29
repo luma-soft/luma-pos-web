@@ -1188,14 +1188,30 @@ export function PosClient({
     setCustomerCreateOpen(false);
   }
 
-  /** Đổi bảng giá cho đơn đang mở + tính lại giá toàn giỏ (giữ dòng sửa giá tay). */
+  /** Đổi bảng giá cho đơn đang mở, bỏ mọi bảng giá riêng của dòng và tính lại giá niêm yết. */
   function changePriceBook(pb: PriceBook) {
     patchActive((inv) => ({
       priceBook: pb,
       cart: inv.cart.map((l) => {
-        if (l.manualPrice || l.priceBook !== undefined) return l;
         const unit = l.product.units.find((u) => u.unitName === l.unitName) ?? null;
-        return { ...l, unitPrice: unitPriceFor(l.product, unit, pb) };
+        const listedPrice = unitPriceFor(l.product, unit, pb);
+        // Giá nhập tay vẫn được tôn trọng, nhưng không còn gắn với bảng giá riêng.
+        if (l.manualPrice) {
+          return {
+            ...l,
+            priceBook: undefined,
+            freeRestore: l.freeRestore
+              ? { unitPrice: listedPrice, lineDiscount: 0, priceBook: undefined }
+              : undefined,
+          };
+        }
+        return {
+          ...l,
+          priceBook: undefined,
+          unitPrice: listedPrice,
+          lineDiscount: 0,
+          freeRestore: undefined,
+        };
       }),
     }));
   }
