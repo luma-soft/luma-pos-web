@@ -131,6 +131,9 @@ export const mobileNotificationSettingsPatchSchema = z.object({
   channels: z.record(
     z.string().trim().min(1).max(40),
     z.boolean(),
+  ).refine(
+    (value) => Object.keys(value).length > 0,
+    "channels patch must not be empty",
   ).optional(),
   quietHours: z.object({
     enabled: z.boolean().optional(),
@@ -144,7 +147,10 @@ export const mobileNotificationSettingsPatchSchema = z.object({
   thresholds: z.object({
     lowStockDays: z.number().int().min(1).max(90).optional(),
     einvoiceFailureAttempts: z.number().int().min(1).max(20).optional(),
-  }).strict().optional(),
+  }).strict().refine(
+    (value) => Object.keys(value).length > 0,
+    "thresholds patch must not be empty",
+  ).optional(),
   roleRouting: z.object({
     lowStock: notificationRoutePatchSchema.optional(),
     einvoiceError: notificationRoutePatchSchema.optional(),
