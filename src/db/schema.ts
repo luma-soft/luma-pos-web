@@ -1120,12 +1120,15 @@ export const serviceAttachments = pgTable("service_attachments", {
   storageDeletedAt: timestamp("storage_deleted_at", { withTimezone: true }),
   storageDeleteAttempts: integer("storage_delete_attempts").notNull().default(0),
   storageDeleteLastError: text("storage_delete_last_error"),
+  cleanupClaimedAt: timestamp("cleanup_claimed_at", { withTimezone: true }),
+  cleanupClaimToken: uuid("cleanup_claim_token"),
 }, (t) => [
   check("service_attachments_category_check", sql`${t.category} in ('before', 'after', 'issue', 'document', 'signature')`),
   check("service_attachments_size_check", sql`${t.sizeBytes} > 0`),
   uniqueIndex("service_attachments_bucket_path_idx").on(t.bucket, t.path),
   index("service_attachments_job_idx").on(t.jobId, t.createdAt),
   index("service_attachments_active_job_idx").on(t.jobId, t.createdAt).where(sql`${t.deletedAt} is null`),
+  index("service_attachments_cleanup_retry_idx").on(t.cleanupClaimedAt, t.createdAt).where(sql`${t.deletedAt} is not null and ${t.storageDeletedAt} is null`),
 ]);
 
 export const serviceSignatures = pgTable("service_signatures", {

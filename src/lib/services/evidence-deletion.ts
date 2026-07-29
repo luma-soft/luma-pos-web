@@ -1,4 +1,5 @@
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type * as schema from "@/db/schema";
 import {
@@ -20,6 +21,17 @@ type ServiceEvidenceActor = { userId: string; role: Role };
 export type ServiceEvidenceStorage = {
   remove(bucket: string, path: string): Promise<void>;
 };
+
+const CLEANUP_LEASE_MS = 5 * 60 * 1000;
+
+function storageObjectIsMissing(error: unknown) {
+  if (!error || typeof error !== "object") return false;
+  const detail = error as { code?: unknown; status?: unknown; statusCode?: unknown };
+  return detail.code === "OBJECT_NOT_FOUND"
+    || detail.code === "NoSuchKey"
+    || detail.status === 404
+    || detail.statusCode === 404;
+}
 
 export async function deleteServiceEvidenceCore(
   tx: ServiceTransaction,
@@ -118,44 +130,77 @@ export async function completeServiceEvidenceStorageRemoval(
   input: { jobId: string; attachmentId: string },
   now = new Date(),
 ) {
-  const attachment = await database.transaction(async (tx) => {
-    const [row] = await tx.select({
+  const claimToken = randomUUID();
+  const staleClaimAt = new Date(now.getTime() - CLEANUP_LEASE_MS);
+  const [attachment] = await database.update(serviceAttachments).set({
+    cleanupClaimedAt: now,
+    cleanupClaimToken: claimToken,
+  }).where(and(
+    eq(serviceAttachments.id, input.attachmentId),
+    eq(serviceAttachments.jobId, input.jobId),
+    isNull(serviceAttachments.storageDeletedAt),
+    sql`${serviceAttachments.deletedAt} is not null`,
+    or(
+      isNull(serviceAttachments.cleanupClaimedAt),
+      lt(serviceAttachments.cleanupClaimedAt, staleClaimAt),
+    ),
+  )).returning({
       id: serviceAttachments.id,
       bucket: serviceAttachments.bucket,
       path: serviceAttachments.path,
+  });
+  if (!attachment) {
+    const [existing] = await database.select({
+      storageDeletedAt: serviceAttachments.storageDeletedAt,
+      deletedAt: serviceAttachments.deletedAt,
     }).from(serviceAttachments)
       .where(and(
         eq(serviceAttachments.id, input.attachmentId),
         eq(serviceAttachments.jobId, input.jobId),
-        isNull(serviceAttachments.storageDeletedAt),
-        sql`${serviceAttachments.deletedAt} is not null`,
       ))
-      .limit(1)
-      .for("update");
-    return row;
-  });
-  if (!attachment) return { id: input.attachmentId, storagePending: false };
+      .limit(1);
+    return {
+      id: input.attachmentId,
+      storagePending: Boolean(existing?.deletedAt && !existing.storageDeletedAt),
+    };
+  }
 
   try {
     await storage.remove(attachment.bucket, attachment.path);
   } catch (error) {
+    if (storageObjectIsMissing(error)) {
+      await database.update(serviceAttachments).set({
+        storageDeletedAt: now,
+        storageDeleteLastError: null,
+        cleanupClaimedAt: null,
+        cleanupClaimToken: null,
+      }).where(and(
+        eq(serviceAttachments.id, attachment.id),
+        eq(serviceAttachments.cleanupClaimToken, claimToken),
+      ));
+      return { id: attachment.id, storagePending: false };
+    }
     const message = error instanceof Error ? error.message : "Storage deletion failed";
-    await database.transaction((tx) => tx.update(serviceAttachments).set({
+    await database.update(serviceAttachments).set({
       storageDeleteAttempts: sql`${serviceAttachments.storageDeleteAttempts} + 1`,
       storageDeleteLastError: message,
+      cleanupClaimedAt: null,
+      cleanupClaimToken: null,
     }).where(and(
       eq(serviceAttachments.id, attachment.id),
-      isNull(serviceAttachments.storageDeletedAt),
-    )));
+      eq(serviceAttachments.cleanupClaimToken, claimToken),
+    ));
     throw error;
   }
 
-  await database.transaction((tx) => tx.update(serviceAttachments).set({
+  await database.update(serviceAttachments).set({
     storageDeletedAt: now,
     storageDeleteLastError: null,
+    cleanupClaimedAt: null,
+    cleanupClaimToken: null,
   }).where(and(
     eq(serviceAttachments.id, attachment.id),
-    isNull(serviceAttachments.storageDeletedAt),
-  )));
+    eq(serviceAttachments.cleanupClaimToken, claimToken),
+  ));
   return { id: attachment.id, storagePending: false };
 }

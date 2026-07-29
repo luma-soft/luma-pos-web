@@ -257,7 +257,8 @@ export async function createServiceSignatureCore(
       deletedAt: serviceAttachments.deletedAt,
     }).from(serviceAttachments)
       .where(eq(serviceAttachments.id, input.attachmentId))
-      .limit(1);
+      .limit(1)
+      .for("update");
     if (
       !attachment
       || attachment.jobId !== input.jobId

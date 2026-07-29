@@ -194,6 +194,46 @@ describe("service evidence deletion", () => {
     expect(removed).toEqual([{ bucket: "service-evidence", path: attachment.path }]);
   });
 
+  test("allows only one concurrent cleanup claimant to remove the Storage object", async () => {
+    const { db, job, attachment } = await createFixture();
+    await db.transaction((tx) => deleteServiceEvidenceCore(tx, {
+      userId: creatorId,
+      role: "technician",
+    }, { jobId: job.id, attachmentId: attachment.id }));
+
+    let removeCalls = 0;
+    let startRemoval;
+    let releaseRemoval;
+    const removalStarted = new Promise((resolve) => { startRemoval = resolve; });
+    const removalReleased = new Promise((resolve) => { releaseRemoval = resolve; });
+    const storage = {
+      async remove() {
+        removeCalls++;
+        startRemoval();
+        await removalReleased;
+      },
+    };
+
+    const firstCleanup = completeServiceEvidenceStorageRemoval(db, storage, {
+      jobId: job.id,
+      attachmentId: attachment.id,
+    });
+    await removalStarted;
+    const secondResult = await completeServiceEvidenceStorageRemoval(db, storage, {
+      jobId: job.id,
+      attachmentId: attachment.id,
+    });
+    expect(removeCalls).toBe(1);
+    expect(secondResult.storagePending).toBe(true);
+
+    releaseRemoval();
+    await firstCleanup;
+    const [attachmentAfterCleanup] = await db.select().from(serviceAttachments)
+      .where(eq(serviceAttachments.id, attachment.id));
+    expect(attachmentAfterCleanup.storageDeletedAt).toBeInstanceOf(Date);
+    expect(attachmentAfterCleanup.cleanupClaimedAt).toBeNull();
+  });
+
   test("database rejects direct signatures for tombstoned evidence", async () => {
     const { db, project, job, attachment } = await createFixture();
 
