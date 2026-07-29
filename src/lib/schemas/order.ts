@@ -4,7 +4,9 @@ import { z } from "zod";
 export const orderItemSchema = z.object({
   productId: z.uuid(),
   productName: z.string().min(1).optional(),
-  unitName: z.string().min(1),
+  // Empty is valid for products/services whose authoritative base unit is empty.
+  // normalizeOrderItems still rejects any unit that does not match the catalog.
+  unitName: z.string(),
   unitMultiplier: z.number().positive().optional(),
   quantity: z.number().positive(),
   unitPrice: z.number().min(0).optional(),
