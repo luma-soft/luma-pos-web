@@ -13,6 +13,7 @@ import { OrderActions, PaymentForm, SendOrderZaloButton } from "./order-actions"
 import { EInvoiceForm } from "./einvoice-form";
 import { SharePrintDocButton } from "./share-print-doc-button";
 import { buttonVariants } from "@/components/ui/button-variants";
+import { OrderDetailActionGroup } from "@/components/order-detail-action-group";
 import { OrderProductLink } from "@/components/order-product-link";
 import { BookingCreateOrderButton, QuoteDeleteButton } from "../../quotes/quote-actions";
 
@@ -315,11 +316,11 @@ export async function OrderDetailPanel({
           compact ? "bg-surface px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] sm:px-5 sm:py-4" : "mt-4 pt-4",
         )}
       >
-        <div className="flex flex-nowrap gap-2 overflow-x-auto xl:flex-wrap">
+        <OrderDetailActionGroup label={t("common.actions")}>
           {isQuote && !cancelled ? <QuoteDeleteButton quoteId={order.id} /> : !cancelled && <OrderActions orderId={order.id} />}
           {!isQuote && canSendZalo && <SendOrderZaloButton orderId={order.id} />}
-        </div>
-        <div className="flex flex-nowrap gap-2 overflow-x-auto xl:flex-wrap xl:justify-end">
+        </OrderDetailActionGroup>
+        <OrderDetailActionGroup label={t("common.actions")} alignEnd>
           {isQuote && !order.hasCreatedOrder && (
             <Link href={posSourceHref("copy", "invoice")} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-11 lg:h-9")}>
               {t("quotes.convert")}
@@ -350,7 +351,7 @@ export async function OrderDetailPanel({
               Mở phiếu
             </Link>
           )}
-        </div>
+        </OrderDetailActionGroup>
       </div>
     </div>
   );
