@@ -605,7 +605,7 @@ git add src messages tests docs/superpowers/plans/2026-07-28-mobile-web-completi
 git commit -m "chore: complete mobile web responsive audit"
 ```
 
-- [ ] **Step 8: Push and verify remote state**
+- [x] **Step 8: Push and verify remote state**
 
 Run:
 
