@@ -53,7 +53,11 @@ export const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
         ref={ref}
         type="text"
         inputMode="numeric"
-        className={cn("min-h-11 min-w-11 lg:min-h-0 lg:min-w-0", className)}
+        className={cn(
+          "min-h-11 min-w-11 lg:min-h-0 lg:min-w-0",
+          className,
+          "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
+        )}
         value={text}
         onFocus={(e) => {
           editing.current = true;

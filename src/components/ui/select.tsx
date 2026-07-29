@@ -161,7 +161,8 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
             variantCls,
             wrapLabel && "h-auto min-h-11 py-2 lg:min-h-10",
             !selected && "text-slate-400",
-            className
+            className,
+            "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
           )}
           {...props}
         >
@@ -220,6 +221,7 @@ export function SelectOptionRow({
         "flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2 lg:min-h-0",
         active && "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-200",
         className,
+        "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
       )}
     >
       <span className={cn("min-w-0", wrapLabel ? "whitespace-normal break-words" : "truncate")}>{label}</span>

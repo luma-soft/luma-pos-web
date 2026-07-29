@@ -77,7 +77,8 @@ export function ActionPresetButtons({
               actionPresetToneClass(preset.tone, active),
               variant === "grid"
                 ? "justify-start rounded-2xl px-3 py-2.5"
-                : "max-w-full rounded-full px-2.5 py-1.5"
+                : "max-w-full rounded-full px-2.5 py-1.5",
+              "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
             )}
             title={preset.description}
           >

@@ -213,7 +213,10 @@ function ReportPeriodSelect({
     <Select
       value={period}
       aria-label={t("reports.period.label")}
-      className={className}
+      className={cn(
+        className,
+        "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
+      )}
       options={PERIODS.map((value) => ({
         value,
         label: t(`reports.period.options.${value}` as never),

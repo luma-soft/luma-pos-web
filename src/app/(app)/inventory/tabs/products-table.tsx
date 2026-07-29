@@ -1449,6 +1449,7 @@ function ActionLink({
           ? "border-primary-600 bg-primary-600 text-white hover:border-primary-700 hover:bg-primary-700"
           : "border-border bg-surface text-slate-700 hover:bg-surface-2 dark:text-slate-200",
         className,
+        "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
       )}
     >
       <Icon className="h-4 w-4" />
@@ -1469,7 +1470,11 @@ function MenuActionLink({
   className?: string;
 }) {
   return (
-    <Link href={href} className={cn("flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-surface-2 dark:text-slate-200 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0", className)}>
+    <Link href={href} className={cn(
+      "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-surface-2 dark:text-slate-200 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0",
+      className,
+      "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
+    )}>
       <Icon className="h-4 w-4" />
       {label}
     </Link>

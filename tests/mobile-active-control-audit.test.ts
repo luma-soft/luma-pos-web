@@ -146,10 +146,7 @@ function classTokenScenarios(
   if (!className?.initializer) return [[]];
   const tokens = (value: string) => value.split(/\s+/).filter(Boolean);
   const unknown = () => [[UNKNOWN_CLASS_SCENARIO]];
-  const isUnknown = (values: string[][]) =>
-    values.some((value) => value.includes(UNKNOWN_CLASS_SCENARIO));
   const bounded = (values: string[][]) => {
-    if (isUnknown(values)) return unknown();
     const unique = new Map<string, string[]>();
     for (const value of values) {
       unique.set(value.join("\u0000"), value);
@@ -158,11 +155,7 @@ function classTokenScenarios(
     return [...unique.values()];
   };
   const combine = (left: string[][], right: string[][]) => {
-    if (
-      isUnknown(left) ||
-      isUnknown(right) ||
-      left.length * right.length > MAX_CLASS_SCENARIOS
-    ) {
+    if (left.length * right.length > MAX_CLASS_SCENARIOS) {
       return unknown();
     }
     const combined: string[][] = [];
@@ -337,7 +330,8 @@ function classTokenScenarios(
     }
     if (ts.isIdentifier(child)) {
       const resolved = constants.get(child.text);
-      return resolved ? [tokens(resolved)] : [[]];
+      if (resolved) return [tokens(resolved)];
+      return child.text === "undefined" ? [[]] : unknown();
     }
     if (
       ts.isBinaryExpression(child) &&
@@ -352,6 +346,33 @@ function classTokenScenarios(
       ]);
     }
     if (ts.isCallExpression(child)) {
+      if (
+        ts.isIdentifier(child.expression) &&
+        child.expression.text === "buttonVariants"
+      ) {
+        if (child.arguments.length === 0) return [[]];
+        const options = child.arguments[0];
+        if (!ts.isObjectLiteralExpression(options)) return unknown();
+        for (const property of options.properties) {
+          if (
+            (ts.isPropertyAssignment(property) ||
+              ts.isShorthandPropertyAssignment(property)) &&
+            property.name.getText() === "className"
+          ) {
+            return ts.isPropertyAssignment(property)
+              ? scenarios(property.initializer)
+              : scenarios(property.name);
+          }
+          if (ts.isSpreadAssignment(property)) return unknown();
+        }
+        return [[]];
+      }
+      if (
+        !ts.isIdentifier(child.expression) ||
+        !["cn", "clsx"].includes(child.expression.text)
+      ) {
+        return unknown();
+      }
       return child.arguments.reduce<string[][]>(
         (result, argument) => combine(result, scenarios(argument)),
         [[]],
@@ -572,6 +593,11 @@ function safeAtBaseAndTablet(
   const state: LengthState = { fixed: false, min: false };
   for (const breakpoint of ["base", "sm", "md"]) {
     for (const token of classes) {
+      if (token === UNKNOWN_CLASS_SCENARIO) {
+        state.fixed = false;
+        state.min = false;
+        continue;
+      }
       const parsed = responsiveParts(token);
       if (parsed?.breakpoint === breakpoint) {
         applyLengthUtility(parsed.utility, axis, state);
@@ -610,6 +636,13 @@ function sharedControlHasUnsafeOverride(
   };
   for (const breakpoint of ["base", "sm", "md"]) {
     for (const token of classes) {
+      if (token === UNKNOWN_CLASS_SCENARIO) {
+        state.fixedH = false;
+        state.minH = false;
+        state.fixedW = false;
+        state.minW = false;
+        continue;
+      }
       const parsed = responsiveParts(token);
       if (parsed?.breakpoint !== breakpoint) continue;
       const height = parsed.utility.match(/^h-(.+)$/);
@@ -698,7 +731,7 @@ function explicitMobileColumnDeclarations(source: ts.SourceFile) {
     );
     return sameScope.length === 1 ? nearest : undefined;
   };
-  const mobileDeclarations = new Set<ts.VariableDeclaration>();
+  const mobileBindings = new Set<ts.Identifier>();
   const visit = (node: ts.Node) => {
     if (
       ts.isVariableDeclaration(node) ||
@@ -730,23 +763,135 @@ function explicitMobileColumnDeclarations(source: ts.SourceFile) {
           ts.isVariableDeclaration(binding.declaration) &&
           binding.declaration.type?.getText().includes("DataTableColumn")
         ) {
-          mobileDeclarations.add(binding.declaration);
+          mobileBindings.add(binding.name);
         }
       }
     }
     ts.forEachChild(node, associate);
   };
   associate(source);
-  return mobileDeclarations;
+  return mobileBindings;
+}
+
+function initializerBindingForNode(
+  name: ts.BindingName,
+  initializer: ts.Expression | undefined,
+  node: ts.Node,
+): ts.Identifier | undefined {
+  const contains = (container: ts.Node | undefined) =>
+    Boolean(
+      container &&
+      container.getStart() <= node.getStart() &&
+      container.getEnd() >= node.getEnd(),
+    );
+  if (ts.isIdentifier(name)) return contains(initializer) ? name : undefined;
+
+  if (ts.isObjectBindingPattern(name) && initializer) {
+    for (const element of name.elements) {
+      if (element.initializer && contains(element.initializer)) {
+        return initializerBindingForNode(
+          element.name,
+          element.initializer,
+          node,
+        );
+      }
+    }
+    if (!ts.isObjectLiteralExpression(initializer)) return undefined;
+    const propertyName = (property: ts.PropertyName) => {
+      if (
+        ts.isIdentifier(property) ||
+        ts.isStringLiteral(property) ||
+        ts.isNumericLiteral(property) ||
+        ts.isNoSubstitutionTemplateLiteral(property)
+      ) {
+        return property.text;
+      }
+      return undefined;
+    };
+    const claimed = new Set(
+      name.elements.flatMap((element) => {
+        const source = element.propertyName ??
+          (ts.isIdentifier(element.name) ? element.name : undefined);
+        const resolved = source && propertyName(source);
+        return resolved ? [resolved] : [];
+      }),
+    );
+    for (const element of name.elements) {
+      if (element.dotDotDotToken) {
+        const restProperty = initializer.properties.find((property) => {
+          if (
+            !ts.isPropertyAssignment(property) &&
+            !ts.isShorthandPropertyAssignment(property)
+          ) {
+            return false;
+          }
+          const key = propertyName(property.name);
+          return Boolean(key && !claimed.has(key) && contains(property));
+        });
+        if (restProperty) {
+          return ts.isIdentifier(element.name) ? element.name : undefined;
+        }
+        continue;
+      }
+      const source = element.propertyName ??
+        (ts.isIdentifier(element.name) ? element.name : undefined);
+      const key = source && propertyName(source);
+      if (!key) continue;
+      const property = initializer.properties.find((candidate) =>
+        (ts.isPropertyAssignment(candidate) ||
+          ts.isShorthandPropertyAssignment(candidate)) &&
+        propertyName(candidate.name) === key
+      );
+      if (!property || !contains(property)) continue;
+      const value = ts.isPropertyAssignment(property)
+        ? property.initializer
+        : property.name;
+      return initializerBindingForNode(element.name, value, node);
+    }
+    return undefined;
+  }
+
+  if (ts.isArrayBindingPattern(name) && initializer) {
+    if (!ts.isArrayLiteralExpression(initializer)) return undefined;
+    for (let index = 0; index < name.elements.length; index += 1) {
+      const element = name.elements[index];
+      if (!ts.isBindingElement(element)) continue;
+      if (element.initializer && contains(element.initializer)) {
+        return initializerBindingForNode(
+          element.name,
+          element.initializer,
+          node,
+        );
+      }
+      if (element.dotDotDotToken) {
+        if (initializer.elements.slice(index).some(contains)) {
+          return ts.isIdentifier(element.name) ? element.name : undefined;
+        }
+        continue;
+      }
+      const value = initializer.elements[index];
+      if (value && contains(value)) {
+        return initializerBindingForNode(element.name, value, node);
+      }
+    }
+  }
+  return undefined;
 }
 
 function isCoveredByExplicitMobileRenderer(
   node: ts.Node,
-  declarations: Set<ts.VariableDeclaration>,
+  bindings: Set<ts.Identifier>,
 ) {
   let current: ts.Node | undefined = node;
   while (current) {
-    if (ts.isVariableDeclaration(current)) return declarations.has(current);
+    if (ts.isVariableDeclaration(current)) {
+      const binding = initializerBindingForNode(
+        current.name,
+        current.initializer,
+        node,
+      );
+      return Boolean(binding && bindings.has(binding));
+    }
     current = current.parent;
   }
   return false;
@@ -757,7 +902,6 @@ function ownHitArea(
   classes: string[],
 ) {
   const tag = jsxTagName(node);
-  if (classes.includes(UNKNOWN_CLASS_SCENARIO)) return false;
   if (
     classes.includes("fixed") &&
     classes.includes("inset-0")
@@ -1200,6 +1344,53 @@ describe("mobile active-control audit oracle", () => {
     expect(failures.map(({ tag }) => tag)).toEqual(["Link"]);
   });
 
+  test("exempts only the exact destructured column binding with a mobile renderer", () => {
+    const failures = auditSource(
+      "fixture.tsx",
+      `
+        const {
+          safeColumns,
+          source: unsafeColumns,
+        }: {
+          safeColumns: DataTableColumn<Row>[];
+          source: DataTableColumn<Row>[];
+        } = {
+          safeColumns: [{
+            key: "safe-object",
+            render: (row) => <Link href={"/safe-object/" + row.id}>{row.name}</Link>,
+          }],
+          source: [{
+            key: "unsafe-object",
+            render: (row) => <Link href={"/unsafe-object/" + row.id}>{row.name}</Link>,
+          }],
+        };
+        const [
+          safeArrayColumns,
+          unsafeArrayColumns,
+        ]: [
+          DataTableColumn<Row>[],
+          DataTableColumn<Row>[],
+        ] = [
+          [{
+            key: "safe-array",
+            render: (row) => <Link href={"/safe-array/" + row.id}>{row.name}</Link>,
+          }],
+          [{
+            key: "unsafe-array",
+            render: (row) => <Link href={"/unsafe-array/" + row.id}>{row.name}</Link>,
+          }],
+        ];
+
+        const safeObjectTable = <DataTableShell columns={safeColumns} renderMobileRow={() => <div>safe</div>} />;
+        const unsafeObjectTable = <DataTableShell columns={unsafeColumns} />;
+        const safeArrayTable = <DataTableShell columns={safeArrayColumns} renderMobileRow={() => <div>safe</div>} />;
+        const unsafeArrayTable = <DataTableShell columns={unsafeArrayColumns} />;
+      `,
+    );
+
+    expect(failures.map(({ tag }) => tag)).toEqual(["Link", "Link"]);
+  });
+
   test("rejects unsafe conditional overrides in cn object arguments", () => {
     const failures = auditSource(
       "fixture.tsx",
@@ -1260,6 +1451,32 @@ describe("mobile active-control audit oracle", () => {
     );
 
     expect(failures.map(({ tag }) => tag)).toEqual(["Button"]);
+  });
+
+  test("fails closed for unresolved class and cn arguments", () => {
+    const failures = auditSource(
+      "fixture.tsx",
+      `
+        const unsafe = { "w-8": true };
+        export function Fixture() {
+          return <div>
+            <Button className={cn("h-11 w-11", unsafe)} />
+            <Link href="/unknown" className={cn("inline-flex h-11 min-w-11", linkClassName)}>unknown</Link>
+            <Button className={cn("h-11 w-11", getClassName())} />
+            <Button className={cn("h-11 w-11", { [dynamicKey]: active })} />
+            <Button className={cn("h-11 w-11", { ...dynamicClasses })} />
+          </div>;
+        }
+      `,
+    );
+
+    expect(failures.map(({ tag }) => tag)).toEqual([
+      "Button",
+      "Link",
+      "Button",
+      "Button",
+      "Button",
+    ]);
   });
 
   test("accepts persistent pre-lg sizing, safe label wrappers, and lg-only surfaces", () => {

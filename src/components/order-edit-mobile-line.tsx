@@ -107,7 +107,10 @@ export function OrderEditMobileLine({
         <MoneyInput
             value={line.unitPrice}
             onChange={(value) => onUnitPriceChange(value ?? 0)}
-            className={cn(inputClassName, "w-full text-right")}
+            className={cn(
+              inputClassName,
+              "w-full text-right min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
+            )}
         />
       }
       lineTotal={formatCurrency(line.quantity * line.unitPrice)}

@@ -196,7 +196,11 @@ export function MobileActionRow({
     red: "bg-er-soft text-er",
   }[tone];
   return (
-    <Link href={href} className={cn("flex min-h-[62px] min-w-11 items-center gap-3 rounded-2xl border border-border bg-surface px-3 py-2.5 shadow-e1 transition hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 active:scale-[0.99]", className)}>
+    <Link href={href} className={cn(
+      "flex min-h-[62px] min-w-11 items-center gap-3 rounded-2xl border border-border bg-surface px-3 py-2.5 shadow-e1 transition hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 active:scale-[0.99]",
+      className,
+      "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
+    )}>
       <span className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-xl", iconTone)}>
         <Icon className="h-[21px] w-[21px]" strokeWidth={2.1} aria-hidden="true" />
       </span>

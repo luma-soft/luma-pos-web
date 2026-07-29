@@ -145,6 +145,48 @@ describe("mobile report controls", () => {
     expect(html.match(/<a [^>]*class="(?=[^"]*h-11)(?=[^"]*lg:h-9)[^"]*"/g)).toHaveLength(2);
   });
 
+  test("group tabs reject arbitrary pre-lg geometry overrides while preserving lg customization", () => {
+    const html = renderWithMessages(
+      <GroupTabs
+        base="/reports"
+        items={[
+          { tab: "overview", labelKey: "reports.overview" },
+          { tab: "invoices", labelKey: "reports.invoices" },
+        ]}
+        linkClassName="h-8 w-8 sm:h-8 sm:w-8 md:h-8 md:w-8 lg:h-10 lg:w-auto"
+      />,
+    );
+    const classes = [...html.matchAll(/<a [^>]*class="([^"]*)"/g)].map(
+      (match) => match[1].split(/\s+/),
+    );
+
+    expect(classes).toHaveLength(2);
+    for (const tokens of classes) {
+      expect(tokens).toEqual(
+        expect.arrayContaining([
+          "h-11",
+          "min-w-11",
+          "sm:h-11",
+          "sm:min-w-11",
+          "md:h-11",
+          "md:min-w-11",
+          "lg:h-10",
+          "lg:w-auto",
+        ]),
+      );
+      expect(tokens).not.toEqual(
+        expect.arrayContaining([
+          "h-8",
+          "w-8",
+          "sm:h-8",
+          "sm:w-8",
+          "md:h-8",
+          "md:w-8",
+        ]),
+      );
+    }
+  });
+
   test("page separates mobile and desktop headers and keeps chart metrics accessible", () => {
     const source = readFileSync("src/app/(app)/reports/page.tsx", "utf8");
 

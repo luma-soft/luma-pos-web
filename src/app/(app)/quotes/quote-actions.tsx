@@ -43,6 +43,7 @@ export function QuoteCreateOrderButton({
       className={cn(
         "inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-primary-600 px-3 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0",
         className,
+        "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
       )}
     >
       {busy && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -85,6 +86,7 @@ export function BookingCreateOrderButton({
       className={cn(
         "inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-primary-600 px-3 text-sm font-semibold text-white hover:bg-primary-700 disabled:opacity-50 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0",
         className,
+        "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
       )}
     >
       {busy && <Loader2 className="h-4 w-4 animate-spin" />}
@@ -128,6 +130,7 @@ export function QuoteDeleteButton({
       className={cn(
         "inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-er hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:hover:bg-red-950/40 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0",
         className,
+        "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
       )}
     >
       {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}

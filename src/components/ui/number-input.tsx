@@ -117,7 +117,8 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
             prefix && "pl-7",
             suffix && "pr-10",
             "text-right tabular-nums",
-            className
+            className,
+            "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
           )}
           {...props}
         />
