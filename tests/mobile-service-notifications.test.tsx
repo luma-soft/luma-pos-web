@@ -37,7 +37,7 @@ describe("project service mobile records", () => {
   });
 
   test("every scoped project record has a mobile renderer and a desktop-only presentation", () => {
-    const source = readFileSync("src/app/(app)/projects/[id]/page.tsx", "utf8");
+    const source = readFileSync("src/app/(app)/projects/[id]/project-detail-view.tsx", "utf8");
 
     for (const kind of ["maintenance", "cost", "asset", "warranty", "material", "order"]) {
       expect(source).toContain(`data-mobile-record="${kind}"`);
@@ -47,7 +47,7 @@ describe("project service mobile records", () => {
   });
 
   test("date-only service values stay verbatim and do not pass through timezone conversion", () => {
-    const source = readFileSync("src/app/(app)/projects/[id]/page.tsx", "utf8");
+    const source = readFileSync("src/app/(app)/projects/[id]/project-detail-view.tsx", "utf8");
 
     expect(source).toContain('value={plan.nextDueOn}');
     expect(source).toContain('subtitle={entry.incurredOn}');
@@ -56,7 +56,7 @@ describe("project service mobile records", () => {
   });
 
   test("mobile cost and warranty cards retain long desktop-visible notes", () => {
-    const source = readFileSync("src/app/(app)/projects/[id]/page.tsx", "utf8");
+    const source = readFileSync("src/app/(app)/projects/[id]/project-detail-view.tsx", "utf8");
     const costMobile = source.slice(source.indexOf('data-mobile-record="cost"'), source.indexOf('className="hidden space-y-2 lg:block"', source.indexOf('data-mobile-record="cost"')));
     const warrantyMobile = source.slice(source.indexOf('data-mobile-record="warranty"'), source.indexOf('className="hidden space-y-2 lg:block"', source.indexOf('data-mobile-record="warranty"')));
 
@@ -67,7 +67,7 @@ describe("project service mobile records", () => {
   });
 
   test("service section create actions are 44px on mobile and retain desktop density", () => {
-    const source = readFileSync("src/app/(app)/projects/[id]/page.tsx", "utf8");
+    const source = readFileSync("src/app/(app)/projects/[id]/project-detail-view.tsx", "utf8");
 
     expect(source.match(/\[&_button\]:min-h-11 lg:\[&_button\]:min-h-0/g)).toHaveLength(4);
   });
