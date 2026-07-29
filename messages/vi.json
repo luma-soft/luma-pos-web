@@ -2591,7 +2591,8 @@
       "jobs": "Lệnh việc",
       "dispatch": "Điều phối",
       "reporting": "Báo cáo dịch vụ",
-      "warranty": "Bảo hành"
+      "warranty": "Bảo hành",
+      "requests": "Yêu cầu khách hàng"
     },
     "types": {
       "camera": "Camera",

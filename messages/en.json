@@ -2591,7 +2591,8 @@
       "jobs": "Work orders",
       "dispatch": "Dispatch",
       "reporting": "Service reports",
-      "warranty": "Warranty"
+      "warranty": "Warranty",
+      "requests": "Customer requests"
     },
     "types": {
       "camera": "Camera",
