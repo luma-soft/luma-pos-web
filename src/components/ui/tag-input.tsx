@@ -85,7 +85,7 @@ export const TagInput = React.forwardRef<HTMLInputElement, TagInputProps>(
           onKeyDown={handleKeyDown}
           onBlur={() => draft && add(draft)}
           placeholder={value.length === 0 ? ph : ""}
-          className="min-h-11 min-w-[120px] flex-1 bg-transparent text-sm outline-none lg:min-h-0"
+          className="min-h-11 min-w-[120px] flex-1 border-0 bg-transparent text-sm outline-none focus-visible:outline-none lg:min-h-0"
         />
       </div>
     );
