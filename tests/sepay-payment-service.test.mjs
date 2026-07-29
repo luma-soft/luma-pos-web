@@ -133,6 +133,7 @@ const [event] = await db.insert(paymentWebhookEvents).values({
   transferType: "in",
   transferAmount: money(1_000_000),
   transactionDate: new Date("2026-06-29T10:00:00Z"),
+  status: "verified",
   rawPayload: { id: "sepay-svc-evt-1", content: "LUMA-DH-SVC" },
 }).returning();
 
@@ -354,8 +355,67 @@ const unverifiedExceptions = await db.select().from(notificationEvents)
 ok(
   "unverified incoming event never emits a QR exception",
   unverifiedMatch.ok
-    && unverifiedMatch.data.reason === "missing_reference"
+    && unverifiedMatch.data.reason === "event_not_verified"
     && unverifiedExceptions.length === 0,
+);
+
+console.log("3b) Unverified exact evidence cannot confirm or reconcile");
+const [unverifiedExactOrder] = await db.insert(orders).values({
+  code: "DH-UNVERIFIED-EXACT",
+  status: "completed",
+  paymentStatus: "unpaid",
+  subtotal: money(140_000),
+  total: money(140_000),
+  amountPaid: money(0),
+  createdBy: cashier.id,
+}).returning();
+const unverifiedExactPending = await service.createPendingSepayPayment(db, {
+  orderId: unverifiedExactOrder.id,
+  bankAccountId: account.id,
+  amount: 140_000,
+  reference: "LUMA-DH-UNVERIFIED-EXACT",
+  createdBy: cashier.id,
+});
+const [unverifiedExactEvent] = await db.insert(paymentWebhookEvents).values({
+  provider: "sepay",
+  providerEventId: "sepay-svc-evt-unverified-exact",
+  referenceCode: "LUMA-DH-UNVERIFIED-EXACT",
+  accountNumber: account.accountNumber,
+  bankAccountId: account.id,
+  transferType: "in",
+  transferAmount: money(140_000),
+  status: "received",
+  rawPayload: { privateBankPayload: "must-not-confirm" },
+}).returning();
+const unverifiedExactMatch = await service.matchSepayWebhookEvent(db, unverifiedExactEvent.id);
+const unverifiedExactReconcile = await service.reconcilePaymentWithEvent(db, {
+  paymentId: unverifiedExactPending.data.id,
+  eventId: unverifiedExactEvent.id,
+  actorId: cashier.id,
+});
+const [unverifiedExactPaymentAfter] = await db.select().from(payments)
+  .where(eq(payments.id, unverifiedExactPending.data.id));
+const [unverifiedExactEventAfter] = await db.select().from(paymentWebhookEvents)
+  .where(eq(paymentWebhookEvents.id, unverifiedExactEvent.id));
+const [unverifiedExactOrderAfter] = await db.select().from(orders)
+  .where(eq(orders.id, unverifiedExactOrder.id));
+const unverifiedExactCash = await db.select().from(cashTransactions)
+  .where(eq(cashTransactions.refId, unverifiedExactOrder.id));
+const unverifiedExactQrEvents = await db.select().from(notificationEvents)
+  .where(eq(notificationEvents.eventKey, `qr-payment-confirmed:${unverifiedExactPending.data.id}`));
+ok(
+  "unverified exact event remains unmatched and cannot settle payment",
+  unverifiedExactMatch.ok
+    && unverifiedExactMatch.data.matched === false
+    && unverifiedExactMatch.data.reason === "event_not_verified"
+    && !unverifiedExactReconcile.ok
+    && unverifiedExactReconcile.error === "payments.errors.eventNotVerified"
+    && unverifiedExactEventAfter.matchStatus === "unmatched"
+    && unverifiedExactEventAfter.matchReason === "event_not_verified"
+    && unverifiedExactPaymentAfter.status === "pending"
+    && Number(unverifiedExactOrderAfter.amountPaid) === 0
+    && unverifiedExactCash.length === 0
+    && unverifiedExactQrEvents.length === 0,
 );
 
 console.log("4) Provider confirmation reduces customer debt");
@@ -387,6 +447,7 @@ const [debtEvent] = await db.insert(paymentWebhookEvents).values({
   accountNumber: account.accountNumber,
   transferType: "in",
   transferAmount: money(200_000),
+  status: "verified",
   rawPayload: { id: "sepay-svc-evt-debt" },
 }).returning();
 const debtMatch = await service.matchSepayWebhookEvent(db, debtEvent.id);
@@ -440,6 +501,7 @@ const [unmatchedEvidence] = await db.insert(paymentWebhookEvents).values({
   bankAccountId: account.id,
   transferType: "in",
   transferAmount: money(320_000),
+  status: "verified",
   matchStatus: "unmatched",
   matchReason: "missing_reference",
   rawPayload: { id: "sepay-svc-evt-reconcile" },
@@ -480,6 +542,7 @@ const [wrongEvidence] = await db.insert(paymentWebhookEvents).values({
   bankAccountId: account.id,
   transferType: "in",
   transferAmount: money(99_000),
+  status: "verified",
   matchStatus: "wrong_amount",
   rawPayload: { id: "sepay-svc-evt-reconcile-wrong" },
 }).returning();

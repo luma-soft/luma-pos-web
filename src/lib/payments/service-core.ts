@@ -1241,6 +1241,9 @@ export async function reconcilePaymentWithEvent(
         .limit(1)
         .for("update");
       if (!payment || !event) throw new Error("RECONCILIATION_NOT_FOUND");
+      if (payment.provider === "sepay" && event.status !== "verified") {
+        throw new Error("EVENT_NOT_VERIFIED");
+      }
 
       if (
         payment.rawMatchedEventId === event.id &&
@@ -1341,6 +1344,20 @@ export async function matchSepayWebhookEvent(
     return await db.transaction(async (tx: DbLike) => {
       const [event] = await tx.select().from(paymentWebhookEvents).where(eq(paymentWebhookEvents.id, eventId)).limit(1);
       if (!event) throw new Error("EVENT_NOT_FOUND");
+      if (event.status !== "verified") {
+        await tx
+          .update(paymentWebhookEvents)
+          .set({
+            matchStatus: "unmatched",
+            matchReason: "event_not_verified",
+            updatedAt: new Date(),
+          })
+          .where(eq(paymentWebhookEvents.id, event.id));
+        return {
+          ok: true,
+          data: { matched: false, reason: "event_not_verified" },
+        };
+      }
       if (event.matchStatus === "matched" && event.matchedPaymentId) {
         await confirmPaymentInTx(tx, {
           paymentId: event.matchedPaymentId,
