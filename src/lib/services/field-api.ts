@@ -17,6 +17,15 @@ export async function mobileFieldOperation<T>(operation: () => Promise<T>) {
     if (message === "SERVICE_SIGNATURE_ATTACHMENT_INVALID") {
       return mobileError("services.errors.signatureAttachmentInvalid", 409);
     }
+    if (message === "SERVICE_ATTACHMENT_SIGNED") {
+      return mobileError("services.errors.attachmentSigned", 409);
+    }
+    if (message === "SERVICE_ATTACHMENT_JOB_LOCKED") {
+      return mobileError("services.errors.invalidTransition", 409);
+    }
+    if (message === "SERVICE_ATTACHMENT_NOT_FOUND" || message === "SERVICE_ATTACHMENT_FORBIDDEN") {
+      return mobileError("errors.notFound", 404);
+    }
     if (message === "SERVICE_MATERIAL_NOT_FOUND") {
       return mobileError("errors.notFound", 404);
     }

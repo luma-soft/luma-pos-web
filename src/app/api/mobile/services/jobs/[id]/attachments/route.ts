@@ -1,5 +1,4 @@
 import { createHash, randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { serviceAttachments, serviceJobEvents } from "@/db/schema";
 import { getFieldServiceJobDetail } from "@/lib/data/service-field";
@@ -13,6 +12,8 @@ import {
   sniffServiceEvidenceMime,
 } from "@/lib/services/evidence-storage";
 import { serviceAttachmentMetadataSchema } from "@/lib/services/schemas";
+import { deleteServiceEvidenceCore } from "@/lib/services/evidence-deletion";
+import { mobileFieldOperation } from "@/lib/services/field-api";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 async function ensureEvidenceBucket() {
@@ -129,29 +130,11 @@ export async function DELETE(
   const { id } = await params;
   const attachmentId = new URL(request.url).searchParams.get("attachmentId");
   if (!attachmentId) return mobileError("errors.invalidData", 400);
-  const detail = await getFieldServiceJobDetail(
-    { userId: gate.userId, role: gate.role },
-    id,
-  );
-  if (!detail) return mobileError("errors.notFound", 404);
-  const [attachment] = await db.select({
-    id: serviceAttachments.id,
-    bucket: serviceAttachments.bucket,
-    path: serviceAttachments.path,
-  }).from(serviceAttachments)
-    .where(eq(serviceAttachments.id, attachmentId))
-    .limit(1);
-  if (!attachment || !detail.attachments.some((item) => item.id === attachment.id)) {
-    return mobileError("errors.notFound", 404);
-  }
-  try {
-    const supabase = createSupabaseAdminClient();
-    const { error } = await supabase.storage.from(attachment.bucket).remove([attachment.path]);
-    if (error) throw error;
-    await db.delete(serviceAttachments).where(eq(serviceAttachments.id, attachment.id));
-    return mobileOk({ id: attachment.id });
-  } catch (error) {
-    console.error("service evidence delete failed:", error);
-    return mobileError("errors.serverError", 500);
-  }
+  const supabase = createSupabaseAdminClient();
+  return mobileFieldOperation(() => db.transaction((tx) => deleteServiceEvidenceCore(tx, {
+    async remove(bucket, path) {
+      const { error } = await supabase.storage.from(bucket).remove([path]);
+      if (error) throw error;
+    },
+  }, { userId: gate.userId, role: gate.role }, { jobId: id, attachmentId })));
 }
