@@ -1,5 +1,16 @@
 import { z } from "zod";
+import {
+  SALES_ACCESS_ROLES,
+  STAFF_ROLES,
+  STOCK_ACCESS_ROLES,
+  type Role,
+} from "@/lib/auth/roles";
 import { defaultNotificationChannelPreferences } from "@/lib/notifications/channel-registry";
+import {
+  defaultInternalNotificationRoleRouting,
+  normalizeConfiguredNotificationRoles,
+} from "@/lib/notifications/routing-policy";
+import type { NotificationCategory } from "@/lib/notifications/contracts";
 
 export const storeSettingsSchema = z.object({
   name: z.string().max(200).default(""),
@@ -12,8 +23,8 @@ export const storeSettingsSchema = z.object({
 });
 export type StoreSettingsInput = z.input<typeof storeSettingsSchema>;
 
-export const STAFF_ROLES = ["owner", "manager", "cashier", "warehouse"] as const;
-export type StaffRole = (typeof STAFF_ROLES)[number];
+export { STAFF_ROLES } from "@/lib/auth/roles";
+export type StaffRole = Role;
 
 /* ── Operational prefs (Tax / Payments / Notifications / Hardware) — lưu jsonb store_settings.prefs ── */
 
@@ -84,38 +95,44 @@ const notificationPrefs = z.object({
     einvoiceFailureAttempts: z.number().int().min(1).max(20).default(1),
   }).default({ lowStockDays: 7, einvoiceFailureAttempts: 1 }),
   roleRouting: z.object({
-    lowStock: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
+    lowStock: z.array(z.enum(STAFF_ROLES))
       .min(1).default(["owner", "manager", "warehouse"]),
-    einvoiceError: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
+    einvoiceError: z.array(z.enum(STAFF_ROLES))
       .min(1).default(["owner", "manager"]),
-    shiftClose: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
+    shiftClose: z.array(z.enum(STAFF_ROLES))
       .min(1).default(["owner", "manager", "cashier"]),
-    syncDone: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
+    syncDone: z.array(z.enum(STAFF_ROLES))
       .min(1).default(["owner", "manager"]),
-    invoiceCreated: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
-      .min(1).default(["owner", "manager"]),
-    purchaseReceived: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
-      .min(1).default(["owner", "manager", "warehouse"]),
-    debtChanged: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
-      .min(1).default(["owner", "manager"]),
-    qrPaymentConfirmed: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
-      .min(1).default(["owner", "manager"]),
-    qrPaymentException: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
-      .min(1).default(["owner", "manager"]),
+    invoiceCreated: z.array(z.enum(SALES_ACCESS_ROLES))
+      .min(1).default([...defaultInternalNotificationRoleRouting.invoiceCreated]),
+    purchaseReceived: z.array(z.enum(STOCK_ACCESS_ROLES))
+      .min(1).default([...defaultInternalNotificationRoleRouting.purchaseReceived]),
+    debtChanged: z.array(z.enum(STAFF_ROLES))
+      .min(1).default([...defaultInternalNotificationRoleRouting.debtChanged]),
+    qrPaymentConfirmed: z.array(z.enum(SALES_ACCESS_ROLES))
+      .min(1).default([...defaultInternalNotificationRoleRouting.qrPaymentConfirmed]),
+    qrPaymentException: z.array(z.enum(["owner", "manager"]))
+      .min(1).default([...defaultInternalNotificationRoleRouting.qrPaymentException]),
   }).default({
     lowStock: ["owner", "manager", "warehouse"],
     einvoiceError: ["owner", "manager"],
     shiftClose: ["owner", "manager", "cashier"],
     syncDone: ["owner", "manager"],
-    invoiceCreated: ["owner", "manager"],
-    purchaseReceived: ["owner", "manager", "warehouse"],
-    debtChanged: ["owner", "manager"],
-    qrPaymentConfirmed: ["owner", "manager"],
-    qrPaymentException: ["owner", "manager"],
+    invoiceCreated: [...defaultInternalNotificationRoleRouting.invoiceCreated],
+    purchaseReceived: [...defaultInternalNotificationRoleRouting.purchaseReceived],
+    debtChanged: [...defaultInternalNotificationRoleRouting.debtChanged],
+    qrPaymentConfirmed: [...defaultInternalNotificationRoleRouting.qrPaymentConfirmed],
+    qrPaymentException: [...defaultInternalNotificationRoleRouting.qrPaymentException],
   }),
 });
 
 const notificationRoutePatchSchema = z.array(z.enum(STAFF_ROLES)).min(1);
+const notificationSalesRoutePatchSchema =
+  z.array(z.enum(SALES_ACCESS_ROLES)).min(1);
+const notificationStockRoutePatchSchema =
+  z.array(z.enum(STOCK_ACCESS_ROLES)).min(1);
+const notificationManagerRoutePatchSchema =
+  z.array(z.enum(["owner", "manager"])).min(1);
 
 export const mobileNotificationSettingsPatchSchema = z.object({
   lowStock: z.boolean().optional(),
@@ -156,11 +173,11 @@ export const mobileNotificationSettingsPatchSchema = z.object({
     einvoiceError: notificationRoutePatchSchema.optional(),
     shiftClose: notificationRoutePatchSchema.optional(),
     syncDone: notificationRoutePatchSchema.optional(),
-    invoiceCreated: notificationRoutePatchSchema.optional(),
-    purchaseReceived: notificationRoutePatchSchema.optional(),
+    invoiceCreated: notificationSalesRoutePatchSchema.optional(),
+    purchaseReceived: notificationStockRoutePatchSchema.optional(),
     debtChanged: notificationRoutePatchSchema.optional(),
-    qrPaymentConfirmed: notificationRoutePatchSchema.optional(),
-    qrPaymentException: notificationRoutePatchSchema.optional(),
+    qrPaymentConfirmed: notificationSalesRoutePatchSchema.optional(),
+    qrPaymentException: notificationManagerRoutePatchSchema.optional(),
   }).strict().refine(
     (value) => Object.keys(value).length > 0,
     "roleRouting patch must not be empty",
@@ -261,11 +278,11 @@ export const storePrefsSchema = z.object({
       einvoiceError: ["owner", "manager"],
       shiftClose: ["owner", "manager", "cashier"],
       syncDone: ["owner", "manager"],
-      invoiceCreated: ["owner", "manager"],
-      purchaseReceived: ["owner", "manager", "warehouse"],
-      debtChanged: ["owner", "manager"],
-      qrPaymentConfirmed: ["owner", "manager"],
-      qrPaymentException: ["owner", "manager"],
+      invoiceCreated: [...defaultInternalNotificationRoleRouting.invoiceCreated],
+      purchaseReceived: [...defaultInternalNotificationRoleRouting.purchaseReceived],
+      debtChanged: [...defaultInternalNotificationRoleRouting.debtChanged],
+      qrPaymentConfirmed: [...defaultInternalNotificationRoleRouting.qrPaymentConfirmed],
+      qrPaymentException: [...defaultInternalNotificationRoleRouting.qrPaymentException],
     },
   }),
   hardware: hardwarePrefs.default({ paperSize: "K80", autoPrint: false, openDrawer: true, printEinvoiceQr: true }),
@@ -329,7 +346,46 @@ export type StorePrefsPatch = z.infer<typeof storePrefsPatchSchema>;
 
 /** Parse prefs lưu trong DB → đầy đủ field (điền default cho field thiếu). */
 export function parseStorePrefs(raw: unknown): StorePrefs {
-  return storePrefsSchema.parse(raw ?? {});
+  return storePrefsSchema.parse(normalizeStoredNotificationRouting(raw));
+}
+
+function normalizeStoredNotificationRouting(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw ?? {};
+  const prefs = raw as Record<string, unknown>;
+  const notifications = prefs.notifications;
+  if (
+    !notifications
+    || typeof notifications !== "object"
+    || Array.isArray(notifications)
+  ) {
+    return raw;
+  }
+  const notificationRecord = notifications as Record<string, unknown>;
+  const roleRouting = notificationRecord.roleRouting;
+  const routingRecord = roleRouting
+    && typeof roleRouting === "object"
+    && !Array.isArray(roleRouting)
+    ? roleRouting as Record<string, unknown>
+    : {};
+  const normalizedInternalRoutes = Object.fromEntries(
+    Object.keys(defaultInternalNotificationRoleRouting).map((category) => [
+      category,
+      normalizeConfiguredNotificationRoles(
+        category as NotificationCategory,
+        routingRecord[category],
+      ),
+    ]),
+  );
+  return {
+    ...prefs,
+    notifications: {
+      ...notificationRecord,
+      roleRouting: {
+        ...routingRecord,
+        ...normalizedInternalRoutes,
+      },
+    },
+  };
 }
 
 export const aiSettingsInputSchema = z.object({

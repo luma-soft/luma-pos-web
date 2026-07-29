@@ -30,6 +30,7 @@ import type {
   DeviceNotificationResult,
 } from "@/lib/notifications/push";
 import { isWithinQuietHours } from "@/lib/notifications/policy";
+import { allowedRolesForNotificationTarget } from "@/lib/notifications/routing-policy";
 import { parseStorePrefs } from "@/lib/schemas/settings";
 
 // Drizzle's production PostgreSQL and PGlite test runtimes expose the same
@@ -370,6 +371,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
         .select({
           category: notificationEvents.category,
           target: notificationEvents.target,
+          entityType: notificationEvents.entityType,
           entityId: notificationEvents.entityId,
           quietHoursPolicy: notificationEvents.quietHoursPolicy,
         })
@@ -387,6 +389,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
       {
         category: string;
         target: string;
+        entityType: string;
         entityId: string;
         quietHoursPolicy: string;
       } | undefined,
@@ -484,7 +487,13 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
       .from(notificationRecipients)
       .innerJoin(profiles, eq(profiles.id, notificationRecipients.userId))
       .where(eq(notificationRecipients.eventId, message.eventId));
-    const allowedRoles = notifications.roleRouting[category] as Role[];
+    const targetRoles = allowedRolesForNotificationTarget({
+      category,
+      target: event.target as NotificationTarget,
+      entityType: event.entityType,
+    });
+    const allowedRoles = notifications.roleRouting[category]
+      .filter((role) => targetRoles.includes(role));
     const eligibleUserIds = (recipients as Array<{
       userId: string;
       reason: string;
@@ -738,7 +747,8 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
           .limit(1);
 
         const liveNotifications = parseStorePrefs(live?.prefs).notifications;
-        const liveAllowedRoles = liveNotifications.roleRouting[category] as Role[];
+        const liveAllowedRoles = liveNotifications.roleRouting[category]
+          .filter((role) => targetRoles.includes(role));
         if (!live) {
           await tx
             .update(mobilePushDeliveries)

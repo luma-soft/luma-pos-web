@@ -1,6 +1,7 @@
 import { getProfileId } from "@/lib/actions/common";
 import { db } from "@/db";
 import { einvoices, mobileNotificationStates, orders } from "@/db/schema";
+import type { Role } from "@/lib/auth/roles";
 import { getRestockSuggestions } from "@/lib/data/ai-restock";
 import { getCurrentShift } from "@/lib/data/shifts";
 import { getStoreSettings } from "@/lib/data/settings";
@@ -52,7 +53,7 @@ export async function GET(request: Request) {
   ]);
   const prefs = store.prefs.notifications;
   const routed = (category: keyof typeof prefs.roleRouting) =>
-    prefs.roleRouting[category].includes(gate.role);
+    (prefs.roleRouting[category] as readonly Role[]).includes(gate.role);
   const restockRows = prefs.lowStock && routed("lowStock")
     ? restock.filter((row) =>
         row.priority === "high"

@@ -6,6 +6,13 @@ import { profiles } from "@/db/schema";
 import { requireRole, type Gate, type Role } from "@/lib/actions/common";
 import { activeProfile } from "@/lib/auth/profile-access";
 import {
+  MANAGER_ROLES,
+  OWNER_ROLES,
+  SALES_ACCESS_ROLES,
+  STAFF_ROLES,
+  STOCK_ACCESS_ROLES,
+} from "@/lib/auth/roles";
+import {
   cashierContextSecret,
   verifyCashierContextToken,
 } from "@/lib/auth/cashier-pin";
@@ -83,16 +90,16 @@ export async function requireMobileRole(roles: readonly Role[]): Promise<MobileG
 }
 
 export const requireMobileSalesAccess = () =>
-  requireMobileRole(["owner", "manager", "cashier"]);
+  requireMobileRole(SALES_ACCESS_ROLES);
 
 export const requireMobileStockAccess = () =>
-  requireMobileRole(["owner", "manager", "warehouse"]);
+  requireMobileRole(STOCK_ACCESS_ROLES);
 
 export const requireMobileManager = () =>
-  requireMobileRole(["owner", "manager"]);
+  requireMobileRole(MANAGER_ROLES);
 
 export const requireMobileOwner = () =>
-  requireMobileRole(["owner"]);
+  requireMobileRole(OWNER_ROLES);
 
 export const requireMobileUser = () =>
-  requireMobileRole(["owner", "manager", "cashier", "warehouse"]);
+  requireMobileRole(STAFF_ROLES);

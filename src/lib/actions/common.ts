@@ -6,6 +6,15 @@ import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import { createClient as createCookieClient } from "@/lib/supabase/server";
 import { activeProfile } from "@/lib/auth/profile-access";
+import {
+  MANAGER_ROLES,
+  OWNER_ROLES,
+  SALES_ACCESS_ROLES,
+  STOCK_ACCESS_ROLES,
+  type Role,
+} from "@/lib/auth/roles";
+
+export type { Role } from "@/lib/auth/roles";
 
 export type ActionResult<T = undefined> =
   | { ok: true; data: T }
@@ -64,7 +73,6 @@ export async function getRole(userId: string): Promise<string> {
   return profile.role;
 }
 
-export type Role = "owner" | "manager" | "cashier" | "warehouse";
 export type Gate = { ok: true; userId: string; role: Role } | { ok: false; error: string };
 
 /** Cổng RBAC: yêu cầu login + vai trò nằm trong `roles`. Trả userId+role nếu hợp lệ. */
@@ -78,16 +86,16 @@ export async function requireRole(roles: Role[]): Promise<Gate> {
 }
 
 /** Chủ/Quản lý — nghiệp vụ quản trị (giá, hủy/sửa đơn, hoàn tiền, KM, sổ quỹ...). */
-export const requireManager = () => requireRole(["owner", "manager"]);
+export const requireManager = () => requireRole([...MANAGER_ROLES]);
 
 /** Chỉ Chủ cửa hàng — cấu hình nhạy cảm như AI provider/API key. */
-export const requireOwner = () => requireRole(["owner"]);
+export const requireOwner = () => requireRole([...OWNER_ROLES]);
 
 /** Chủ/Quản lý/Thủ kho — hàng hóa & kho (sản phẩm, nhập hàng, kiểm kho). */
-export const requireStockAccess = () => requireRole(["owner", "manager", "warehouse"]);
+export const requireStockAccess = () => requireRole([...STOCK_ACCESS_ROLES]);
 
 /** Chủ/Quản lý/Thu ngân — bán hàng và thu tiền. */
-export const requireSalesAccess = () => requireRole(["owner", "manager", "cashier"]);
+export const requireSalesAccess = () => requireRole([...SALES_ACCESS_ROLES]);
 
 /** Drizzle bọc lỗi PG vào DrizzleQueryError — lỗi gốc ở e.cause. */
 export function pgErrorCode(e: unknown): string | undefined {

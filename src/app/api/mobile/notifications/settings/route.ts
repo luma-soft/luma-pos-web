@@ -3,6 +3,7 @@ import { authorizeMobileSensitiveAction } from "@/lib/auth/mobile-approval";
 import { getStoreSettings } from "@/lib/data/settings";
 import { requireMobileManager, requireMobileRole } from "@/lib/mobile/auth";
 import { resolveNotificationChannels } from "@/lib/notifications/channels";
+import { notificationRoutingPolicyContract } from "@/lib/notifications/routing-policy";
 import { notificationSettingsAuthorization } from "@/lib/notifications/settings-authorization";
 import {
   MOBILE_SETTINGS_ADMIN_ROLES,
@@ -31,6 +32,7 @@ export async function GET() {
   return mobileOk({
     ...settings,
     availableChannels: resolveNotificationChannels(),
+    routingPolicy: notificationRoutingPolicyContract(),
   });
 }
 

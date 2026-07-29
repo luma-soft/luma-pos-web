@@ -157,6 +157,10 @@ await check("truthy primitives, arrays, unknown keys, and malformed nested value
     { roleRouting: { invoiceCreated: [] } },
     { roleRouting: {} },
     { roleRouting: { invoiceCreated: ["accountant"] } },
+    { roleRouting: { invoiceCreated: ["warehouse"] } },
+    { roleRouting: { purchaseReceived: ["cashier"] } },
+    { roleRouting: { qrPaymentConfirmed: ["warehouse"] } },
+    { roleRouting: { qrPaymentException: ["cashier"] } },
     { roleRouting: { unknown: ["owner"] } },
   ];
 
@@ -207,6 +211,26 @@ await check("manager GET and approved PATCH persists only the supplied partial",
     { id: "inApp", configured: true },
     { id: "push", configured: true },
   ]);
+  assert.equal(getData.routingPolicy.version, 1);
+  assert.deepEqual(
+    getData.routingPolicy.routes.filter(
+      (route) => route.category === "debtChanged",
+    ),
+    [
+      {
+        category: "debtChanged",
+        target: "debt",
+        entityType: "customer",
+        allowedRoles: ["owner", "manager", "cashier"],
+      },
+      {
+        category: "debtChanged",
+        target: "debt",
+        entityType: "supplier",
+        allowedRoles: ["owner", "manager", "warehouse"],
+      },
+    ],
+  );
 
   const patchResponse = await settingsRoute.PATCH(patchRequest({
     lowStock: false,

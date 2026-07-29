@@ -124,14 +124,17 @@ const featureTableSecurity = await client.query(`
   ) as p(privilege)
   where c.oid in (
     'public.store_settings'::regclass,
-    'public.mobile_push_device_binding_fences'::regclass
+    'public.mobile_push_device_binding_fences'::regclass,
+    'public.notification_events'::regclass,
+    'public.notification_recipients'::regclass,
+    'public.notification_outbox'::regclass
   )
   group by c.relname, c.relrowsecurity
   order by c.relname
 `);
 ok(
   "feature-created server tables cannot silently omit RLS or Data API ACL revocation",
-  featureTableSecurity.rows.length === 2
+  featureTableSecurity.rows.length === 5
     && featureTableSecurity.rows.every((row) =>
       row.relrowsecurity === true
       && row.anon_any_access === false
@@ -146,7 +149,10 @@ const featureTablePolicies = await client.query(`
   where schemaname = 'public'
     and tablename in (
       'store_settings',
-      'mobile_push_device_binding_fences'
+      'mobile_push_device_binding_fences',
+      'notification_events',
+      'notification_recipients',
+      'notification_outbox'
     )
 `);
 ok(

@@ -12,6 +12,7 @@ import type {
   NotificationTarget,
   QuietHoursPolicy,
 } from "@/lib/notifications/contracts";
+import { allowedRolesForNotificationTarget } from "@/lib/notifications/routing-policy";
 import { parseStorePrefs } from "@/lib/schemas/settings";
 
 // Drizzle's Postgres and PGlite transactions expose the same fluent API with
@@ -92,13 +93,22 @@ export async function createNotificationEventInTx(
   }
 
   const directUserIds = [...new Set(input.directUserIds ?? [])];
-  const roleRecipients = await tx
-    .select({ id: profiles.id })
-    .from(profiles)
-    .where(and(
-      eq(profiles.isActive, true),
-      inArray(profiles.role, prefs.notifications.roleRouting[input.category]),
-    ));
+  const targetRoles = allowedRolesForNotificationTarget({
+    category: input.category,
+    target: input.target,
+    entityType: input.entityType,
+  });
+  const routedRoles = prefs.notifications.roleRouting[input.category]
+    .filter((role) => targetRoles.includes(role));
+  const roleRecipients = routedRoles.length === 0
+    ? []
+    : await tx
+      .select({ id: profiles.id })
+      .from(profiles)
+      .where(and(
+        eq(profiles.isActive, true),
+        inArray(profiles.role, routedRoles),
+      ));
   const directRecipients = directUserIds.length === 0
     ? []
     : await tx

@@ -42,6 +42,14 @@ import {
   type PaymentBankAccountInput,
   type StorePrefs,
 } from "@/lib/schemas/settings";
+import {
+  configurableRolesForNotificationCategory,
+  notificationRoutingPolicy,
+} from "@/lib/notifications/routing-policy";
+import {
+  notificationCategories,
+  type NotificationCategory,
+} from "@/lib/notifications/contracts";
 
 /* ── sample data (design preview — chưa nối backend) ── */
 const ROLE_LABELS: Record<string, [string, string]> = {
@@ -1239,6 +1247,27 @@ function NotificationsSection({
     | "qrPaymentException";
   const setType = (k: TK, v: boolean) => { setForm((p) => ({ ...p, [k]: v })); mark(); };
   const setChannel = (k: string, v: boolean) => { setForm((p) => ({ ...p, channels: { ...p.channels, [k]: v } })); mark(); };
+  const setRoutingRole = (
+    category: NotificationCategory,
+    role: StaffRole,
+    enabled: boolean,
+  ) => {
+    setForm((previous) => {
+      const current = previous.roleRouting[category] as StaffRole[];
+      const next = STAFF_ROLES.filter((candidate) =>
+        candidate === role ? enabled : current.includes(candidate)
+      );
+      if (next.length === 0) return previous;
+      return {
+        ...previous,
+        roleRouting: {
+          ...previous.roleRouting,
+          [category]: next,
+        },
+      };
+    });
+    mark();
+  };
   function save() { start(async () => { const r = await updateStorePrefs({ notifications: form }); if (r.ok) { setDirty(false); setSaved(true); } }); }
 
   const types: { k: TK; title: string; desc: string }[] = [
@@ -1258,11 +1287,96 @@ function NotificationsSection({
     : id === "inApp"
       ? { ico: "🔔", name: L ? "Thông báo trong ứng dụng" : "In-app" }
       : { ico: "🔌", name: id };
+  const roleLabel = (role: StaffRole) => ({
+    owner: L ? "Chủ cửa hàng" : "Owner",
+    manager: L ? "Quản lý" : "Manager",
+    cashier: L ? "Thu ngân" : "Cashier",
+    warehouse: L ? "Thủ kho" : "Warehouse",
+  }[role]);
+  const entityLabel = (entityType: string) => ({
+    order: L ? "Đơn bán" : "Sales order",
+    purchase: L ? "Phiếu nhập" : "Purchase",
+    customer: L ? "Công nợ khách hàng" : "Customer debt",
+    supplier: L ? "Công nợ nhà cung cấp" : "Supplier debt",
+    payment: L ? "Giao dịch thanh toán" : "Payment",
+  }[entityType] ?? entityType);
   return (
     <>
       <Card title={L ? "Loại thông báo" : "Notification Types"} vi={L ? "Ngưỡng & sự kiện" : "Thresholds & events"}>
         <div className="p-4.5 flex flex-col gap-1.5">
           {types.map((tp) => <CtrlRow key={tp.k} title={tp.title} desc={tp.desc} checked={form[tp.k]} onChange={canManage ? (v) => setType(tp.k, v) : undefined} />)}
+        </div>
+      </Card>
+      <Card
+        title={L ? "Vai trò nhận thông báo nội bộ" : "Internal notification roles"}
+        vi={L
+          ? "Chỉ hiển thị vai trò có quyền mở đúng màn hình đích"
+          : "Only roles authorized to open each target are configurable"}
+      >
+        <div className="p-3.5 flex flex-col gap-2">
+          {notificationCategories.map((category) => {
+            const typeView = types.find((type) => type.k === category);
+            const selectedRoles =
+              form.roleRouting[category] as StaffRole[];
+            const configurableRoles =
+              configurableRolesForNotificationCategory(category);
+            const entityRoutes = Object.entries(
+              notificationRoutingPolicy[category].entities,
+            ) as Array<[string, readonly StaffRole[]]>;
+            return (
+              <div key={category} className={cn(ROW, "items-start")}>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-bold">
+                    {typeView?.title ?? category}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {configurableRoles.map((role) => {
+                      const selected = selectedRoles.includes(role);
+                      const lastSelected =
+                        selected && selectedRoles.length === 1;
+                      return (
+                        <button
+                          key={role}
+                          type="button"
+                          aria-label={`notifications.route.${category}.${role}`}
+                          aria-pressed={selected}
+                          disabled={!canManage || lastSelected}
+                          title={lastSelected
+                            ? (L
+                              ? "Mỗi sự kiện cần ít nhất một vai trò"
+                              : "Each event needs at least one role")
+                            : undefined}
+                          onClick={() =>
+                            setRoutingRole(category, role, !selected)}
+                          className={cn(
+                            "inline-flex min-h-11 min-w-11 items-center rounded-full border px-3 text-[11px] font-bold transition lg:min-h-8 lg:min-w-0",
+                            selected
+                              ? "border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300"
+                              : "border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-400",
+                            (!canManage || lastSelected) &&
+                              "cursor-not-allowed opacity-60",
+                          )}
+                        >
+                          {selected && <Check className="mr-1 h-3.5 w-3.5" />}
+                          {roleLabel(role)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-2 space-y-0.5 text-[10px] text-slate-500 dark:text-slate-400">
+                    {entityRoutes.map(([entityType, allowedRoles]) => (
+                      <div key={entityType}>
+                        <span className="font-semibold">
+                          {entityLabel(entityType)}:
+                        </span>{" "}
+                        {allowedRoles.map(roleLabel).join(", ")}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </Card>
       <Card title={L ? "Kênh thông báo" : "Notification Channels"} vi={L ? "Nơi gửi thông báo" : "Where alerts are sent"}>

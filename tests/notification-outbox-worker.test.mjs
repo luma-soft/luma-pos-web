@@ -82,6 +82,13 @@ let eventSequence = 0;
 async function seedEvent({
   category = "invoiceCreated",
   target = "invoices",
+  entityType = category === "purchaseReceived"
+    ? "purchase"
+    : category === "debtChanged"
+      ? "customer"
+      : category === "qrPaymentException"
+        ? "payment"
+        : "order",
   priority = "normal",
   quietHoursPolicy = "defer",
   directUserIds,
@@ -93,7 +100,7 @@ async function seedEvent({
   const created = await db.transaction((tx) => events.createNotificationEventInTx(tx, {
     eventKey: `outbox-test:${eventSequence}`,
     category,
-    entityType: category.startsWith("qr") ? "payment" : "order",
+    entityType,
     entityId,
     target,
     priority,
@@ -839,6 +846,53 @@ for (const scenario of [
 }
 
 await db.update(storeSettings).set({ prefs: {} }).where(eq(storeSettings.id, "default"));
+
+// A role recipient persisted before the entity-aware policy repair cannot be
+// delivered when that role cannot open this exact debt target.
+{
+  await db.update(profiles).set({ role: "warehouse" })
+    .where(eq(profiles.id, userIds.cashier));
+  await db.update(storeSettings).set({
+    prefs: {
+      notifications: {
+        roleRouting: { debtChanged: ["warehouse"] },
+      },
+    },
+  }).where(eq(storeSettings.id, "default"));
+  const seeded = await seedEvent({
+    category: "debtChanged",
+    target: "debt",
+    entityType: "customer",
+  });
+  await db.insert(notificationRecipients).values({
+    eventId: seeded.eventId,
+    userId: userIds.cashier,
+    reason: "role",
+  });
+  const sentTokens = [];
+
+  assert.deepEqual(await core({
+    sender: async (input) => {
+      sentTokens.push(input.token);
+      return { kind: "sent" };
+    },
+  }).processNotificationMessage({
+    version: 1,
+    eventId: seeded.eventId,
+    deduplicationKey: `notification:${seeded.eventId}`,
+    queuedAt: "2026-07-28T12:00:00.000Z",
+  }), { completed: true });
+
+  assert.deepEqual(
+    sentTokens,
+    [],
+    "customer debt never reaches a warehouse-only stale role recipient",
+  );
+  await db.update(profiles).set({ role: "cashier" })
+    .where(eq(profiles.id, userIds.cashier));
+  await db.update(storeSettings).set({ prefs: {} })
+    .where(eq(storeSettings.id, "default"));
+}
 
 // Retryable FCM results persist the device attempt and return a due time.
 {
