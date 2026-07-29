@@ -50,7 +50,7 @@ async function createFixture(status = "scheduled") {
     code: "EVIDENCE-DELETE-1",
     serviceType: "camera",
     title: "Evidence deletion",
-    status: status === "completed" ? "in_progress" : status,
+    status: status === "completed" || status === "cancelled" ? "in_progress" : status,
     assignedTo: creatorId,
     checklist: [],
   }).returning();
@@ -65,8 +65,8 @@ async function createFixture(status = "scheduled") {
     sizeBytes: 100,
     createdBy: creatorId,
   }).returning();
-  if (status === "completed") {
-    await db.update(serviceJobs).set({ status: "completed" })
+  if (status === "completed" || status === "cancelled") {
+    await db.update(serviceJobs).set({ status })
       .where(eq(serviceJobs.id, job.id));
   }
   return { client, db, project, job, attachment };

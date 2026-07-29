@@ -73,8 +73,7 @@ async function buildAuthoritativeSignedSnapshot(
     }).from(serviceJobs)
       .innerJoin(projects, eq(serviceJobs.projectId, projects.id))
       .where(eq(serviceJobs.id, jobId))
-      .limit(1)
-      .for("update", { of: serviceJobs }),
+      .limit(1),
     tx.select({
       id: installedAssets.id,
       projectId: installedAssets.projectId,
@@ -209,7 +208,8 @@ async function requireAssignedJob(
     }).from(serviceJobs)
       .innerJoin(projects, eq(serviceJobs.projectId, projects.id))
       .where(eq(serviceJobs.id, jobId))
-      .limit(1),
+      .limit(1)
+      .for("update", { of: serviceJobs }),
     tx.select({ profileId: serviceJobAssignments.profileId })
       .from(serviceJobAssignments)
       .where(and(
@@ -226,6 +226,30 @@ async function requireAssignedJob(
     crewProfileIds: crew.map((item) => item.profileId),
   })) throw new Error("SERVICE_JOB_FORBIDDEN");
   return job;
+}
+
+async function lockServiceJob(
+  tx: ServiceTransaction,
+  jobId: string,
+) {
+  const [job] = await tx.select({
+    id: serviceJobs.id,
+    projectId: serviceJobs.projectId,
+    serviceType: serviceJobs.serviceType,
+    status: serviceJobs.status,
+    checklist: serviceJobs.checklist,
+  }).from(serviceJobs)
+    .where(eq(serviceJobs.id, jobId))
+    .limit(1)
+    .for("update");
+  if (!job) throw new Error("SERVICE_JOB_NOT_FOUND");
+  return job;
+}
+
+function requireFieldJobMutable(status: string) {
+  if (status === "completed" || status === "cancelled") {
+    throw new Error("SERVICE_FIELD_JOB_TERMINAL");
+  }
 }
 
 async function idempotentFieldMutation<T extends Record<string, unknown>>(
@@ -248,13 +272,21 @@ async function idempotentFieldMutation<T extends Record<string, unknown>>(
   }).returning({ id: serviceFieldMutations.id });
 
   if (!claimed) {
-    const [existing] = await tx.select({ result: serviceFieldMutations.result })
+    const [existing] = await tx.select({
+      jobId: serviceFieldMutations.jobId,
+      operation: serviceFieldMutations.operation,
+      result: serviceFieldMutations.result,
+    })
       .from(serviceFieldMutations)
       .where(and(
         eq(serviceFieldMutations.actorId, actor.userId),
         eq(serviceFieldMutations.clientMutationId, input.clientMutationId),
       ))
       .limit(1);
+    if (
+      existing
+      && (existing.jobId !== input.jobId || existing.operation !== operation)
+    ) throw new Error("SERVICE_MUTATION_ID_CONFLICT");
     if (!existing?.result) throw new Error("SERVICE_MUTATION_RETRY");
     return existing.result as T;
   }
@@ -272,8 +304,12 @@ export async function checkInServiceVisitCore(
   input: ServiceVisitMutationInput,
   now = new Date(),
 ) {
-  const job = await requireAssignedJob(tx, actor, input.jobId);
+  await requireAssignedJob(tx, actor, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "visit.check_in", async () => {
+    const job = await lockServiceJob(tx, input.jobId);
+    if (job.status === "completed" || job.status === "cancelled") {
+      throw new Error("SERVICE_VISIT_STATUS_INVALID");
+    }
     const [visit] = await tx.insert(serviceVisits).values({
       jobId: input.jobId,
       profileId: actor.userId,
@@ -282,7 +318,8 @@ export async function checkInServiceVisitCore(
       checkInLatitude: input.latitude == null ? null : String(input.latitude),
       checkInLongitude: input.longitude == null ? null : String(input.longitude),
       note: input.note || null,
-    }).returning({ id: serviceVisits.id });
+    }).onConflictDoNothing().returning({ id: serviceVisits.id });
+    if (!visit) throw new Error("SERVICE_ACTIVE_VISIT_EXISTS");
     await tx.insert(serviceTimeEntries).values({
       jobId: input.jobId,
       visitId: visit.id,
@@ -322,6 +359,7 @@ export async function checkOutServiceVisitCore(
 ) {
   await requireAssignedJob(tx, actor, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "visit.check_out", async () => {
+    await lockServiceJob(tx, input.jobId);
     const [visit] = await tx.select({ id: serviceVisits.id })
       .from(serviceVisits)
       .where(and(
@@ -329,7 +367,8 @@ export async function checkOutServiceVisitCore(
         eq(serviceVisits.profileId, actor.userId),
         eq(serviceVisits.status, "active"),
       ))
-      .limit(1);
+      .limit(1)
+      .for("update");
     if (!visit) throw new Error("SERVICE_ACTIVE_VISIT_NOT_FOUND");
     await tx.update(serviceVisits).set({
       status: "completed",
@@ -339,11 +378,16 @@ export async function checkOutServiceVisitCore(
       note: input.note || null,
       updatedAt: now,
     }).where(eq(serviceVisits.id, visit.id));
-    await tx.update(serviceTimeEntries).set({ endedAt: now })
+    const [timeEntry] = await tx.update(serviceTimeEntries).set({ endedAt: now })
       .where(and(
         eq(serviceTimeEntries.visitId, visit.id),
+        eq(serviceTimeEntries.jobId, input.jobId),
+        eq(serviceTimeEntries.profileId, actor.userId),
+        eq(serviceTimeEntries.entryType, "work"),
         isNull(serviceTimeEntries.endedAt),
-      ));
+      ))
+      .returning({ id: serviceTimeEntries.id });
+    if (!timeEntry) throw new Error("SERVICE_ACTIVE_TIME_ENTRY_NOT_FOUND");
     await tx.insert(serviceJobEvents).values({
       jobId: input.jobId,
       eventType: "visit.checked_out",
@@ -351,7 +395,7 @@ export async function checkOutServiceVisitCore(
       payload: { visitId: visit.id },
       createdAt: now,
     });
-    return { visitId: visit.id, status: "completed" };
+    return { visitId: visit.id, timeEntryId: timeEntry.id, status: "completed" };
   });
 }
 
@@ -361,8 +405,10 @@ export async function updateFieldChecklistCore(
   input: ServiceChecklistUpdateInput,
   now = new Date(),
 ) {
-  const job = await requireAssignedJob(tx, actor, input.jobId);
+  await requireAssignedJob(tx, actor, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "job.checklist", async () => {
+    const job = await lockServiceJob(tx, input.jobId);
+    requireFieldJobMutable(job.status);
     const submitted = new Map(input.checklist.map((item) => [item.code, item.completed]));
     if (
       submitted.size !== job.checklist.length
@@ -461,8 +507,10 @@ export async function createFieldInstalledAssetCore(
   input: ServiceFieldAssetCreateInput,
   now = new Date(),
 ) {
-  const job = await requireAssignedJob(tx, actor, input.jobId);
+  await requireAssignedJob(tx, actor, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "job.asset_created", async () => {
+    const job = await lockServiceJob(tx, input.jobId);
+    requireFieldJobMutable(job.status);
     const [asset] = await tx.insert(installedAssets).values({
       projectId: job.projectId,
       jobId: input.jobId,
@@ -506,6 +554,8 @@ export async function updateFieldMaterialUsageCore(
 ) {
   await requireAssignedJob(tx, actor, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "job.material_usage", async () => {
+    const job = await lockServiceJob(tx, input.jobId);
+    requireFieldJobMutable(job.status);
     const [material] = await tx.update(serviceJobMaterials).set({
       usedQuantity: Number(input.usedQuantity).toFixed(4),
       note: input.note || null,
@@ -535,8 +585,36 @@ export async function completeFieldServiceJobCore(
   input: ServiceCompletionInput,
   now = new Date(),
 ) {
-  const job = await requireAssignedJob(tx, actor, input.jobId);
+  const authorizedJob = await requireAssignedJob(tx, actor, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "job.complete", async () => {
+    const job = {
+      ...await lockServiceJob(tx, input.jobId),
+      projectStage: authorizedJob.projectStage,
+    };
+    if (job.status !== "in_progress" && job.status !== "warranty") {
+      throw new Error("SERVICE_COMPLETION_STATUS_INVALID");
+    }
+    const [openVisit, openTimeEntry] = await Promise.all([
+      tx.select({ id: serviceVisits.id })
+        .from(serviceVisits)
+        .where(and(
+          eq(serviceVisits.jobId, input.jobId),
+          eq(serviceVisits.status, "active"),
+        ))
+        .limit(1)
+        .for("update"),
+      tx.select({ id: serviceTimeEntries.id })
+        .from(serviceTimeEntries)
+        .where(and(
+          eq(serviceTimeEntries.jobId, input.jobId),
+          isNull(serviceTimeEntries.endedAt),
+        ))
+        .limit(1)
+        .for("update"),
+    ]);
+    if (openVisit[0] || openTimeEntry[0]) {
+      throw new Error("SERVICE_COMPLETION_OPEN_WORK");
+    }
     const [attachments, signatures] = await Promise.all([
       tx.select({ category: serviceAttachments.category })
         .from(serviceAttachments)
@@ -573,10 +651,6 @@ export async function completeFieldServiceJobCore(
       signatureCount: signatures.length,
     });
     if (errors.length) throw new Error(`SERVICE_COMPLETION_INVALID:${errors.join(",")}`);
-    if (job.status !== "in_progress" && job.status !== "warranty") {
-      throw new Error("SERVICE_COMPLETION_STATUS_INVALID");
-    }
-
     const signature = signatures
       .filter((item) => !item.invalidatedAt)
       .sort((left, right) => right.signedAt.getTime() - left.signedAt.getTime())[0];

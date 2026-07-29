@@ -86,10 +86,12 @@ const uniqueRows = await client.query(`
     and indexname in (
       'service_job_assignments_job_profile_idx',
       'service_field_mutations_client_idx',
-      'service_maintenance_occurrences_plan_due_idx'
+      'service_maintenance_occurrences_plan_due_idx',
+      'service_visits_job_profile_active_idx',
+      'service_time_entries_visit_open_idx'
     )
 `);
-if (uniqueRows.rows.length !== 3) {
+if (uniqueRows.rows.length !== 5) {
   throw new Error("field-service idempotency constraints are incomplete");
 }
 

@@ -17,6 +17,7 @@ import {
   deleteServiceEvidenceCore,
 } from "@/lib/services/evidence-deletion";
 import {
+  isServiceFieldJobTerminal,
   isServiceSnapshotJobLocked,
   mobileFieldOperation,
 } from "@/lib/services/field-api";
@@ -122,6 +123,9 @@ export async function POST(
   } catch (error) {
     if (isServiceSnapshotJobLocked(error)) {
       return mobileError("services.errors.signedSnapshotLocked", 409);
+    }
+    if (isServiceFieldJobTerminal(error)) {
+      return mobileError("services.errors.invalidTransition", 409);
     }
     console.error("service evidence upload failed:", error);
     return mobileError("errors.serverError", 500);

@@ -1081,7 +1081,7 @@ export const serviceVisits = pgTable("service_visits", {
   check("service_visits_status_check", sql`${t.status} in ('active', 'completed', 'cancelled')`),
   check("service_visits_check_out_check", sql`${t.checkedOutAt} is null or ${t.checkedOutAt} >= ${t.checkedInAt}`),
   index("service_visits_job_time_idx").on(t.jobId, t.checkedInAt),
-  uniqueIndex("service_visits_profile_active_idx").on(t.profileId).where(sql`${t.status} = 'active'`),
+  uniqueIndex("service_visits_job_profile_active_idx").on(t.jobId, t.profileId).where(sql`${t.status} = 'active'`),
 ]);
 
 export const serviceTimeEntries = pgTable("service_time_entries", {
@@ -1098,6 +1098,7 @@ export const serviceTimeEntries = pgTable("service_time_entries", {
   check("service_time_entries_type_check", sql`${t.entryType} in ('work', 'travel')`),
   check("service_time_entries_end_check", sql`${t.endedAt} is null or ${t.endedAt} >= ${t.startedAt}`),
   index("service_time_entries_job_profile_idx").on(t.jobId, t.profileId, t.startedAt),
+  uniqueIndex("service_time_entries_visit_open_idx").on(t.visitId).where(sql`${t.visitId} is not null and ${t.endedAt} is null`),
 ]);
 
 export const serviceAttachments = pgTable("service_attachments", {

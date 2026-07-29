@@ -14,6 +14,20 @@ export function isServiceSnapshotJobLocked(error: unknown) {
   return false;
 }
 
+export function isServiceFieldJobTerminal(error: unknown) {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current; depth += 1) {
+    if (
+      current instanceof Error
+      && current.message.includes("SERVICE_FIELD_JOB_TERMINAL")
+    ) return true;
+    current = typeof current === "object" && "cause" in current
+      ? (current as { cause?: unknown }).cause
+      : null;
+  }
+  return false;
+}
+
 export function serviceSnapshotMutationErrorKey(error: unknown) {
   return isServiceSnapshotJobLocked(error)
     ? "services.errors.signedSnapshotLocked"
@@ -29,6 +43,12 @@ export async function mobileFieldOperation<T>(operation: () => Promise<T>) {
       return mobileError("errors.notFound", 404);
     }
     if (message === "SERVICE_ACTIVE_VISIT_NOT_FOUND") {
+      return mobileError("services.errors.activeVisitNotFound", 409);
+    }
+    if (message === "SERVICE_ACTIVE_VISIT_EXISTS") {
+      return mobileError("services.errors.invalidTransition", 409);
+    }
+    if (message === "SERVICE_ACTIVE_TIME_ENTRY_NOT_FOUND") {
       return mobileError("services.errors.activeVisitNotFound", 409);
     }
     if (message === "SERVICE_CHECKLIST_MISMATCH") {
@@ -58,7 +78,12 @@ export async function mobileFieldOperation<T>(operation: () => Promise<T>) {
     if (message === "SERVICE_MATERIAL_NOT_FOUND") {
       return mobileError("errors.notFound", 404);
     }
-    if (message === "SERVICE_COMPLETION_STATUS_INVALID") {
+    if (
+      message === "SERVICE_COMPLETION_STATUS_INVALID"
+      || message === "SERVICE_VISIT_STATUS_INVALID"
+      || message === "SERVICE_COMPLETION_OPEN_WORK"
+      || isServiceFieldJobTerminal(error)
+    ) {
       return mobileError("services.errors.invalidTransition", 409);
     }
     if (isServiceSnapshotJobLocked(error)) {
@@ -69,6 +94,9 @@ export async function mobileFieldOperation<T>(operation: () => Promise<T>) {
     }
     if (message === "SERVICE_MUTATION_RETRY") {
       return mobileError("services.errors.mutationRetry", 409);
+    }
+    if (message === "SERVICE_MUTATION_ID_CONFLICT") {
+      return mobileError("services.errors.invalidTransition", 409);
     }
     console.error("field service operation failed:", error);
     return mobileError("errors.serverError", 500);
