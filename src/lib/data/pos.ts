@@ -4,7 +4,6 @@ import { categories, customers, orderItems, orders, paymentBankAccounts, product
 import { isPromoActive, type PromoTier } from "@/lib/promo";
 import { getPriceBooks } from "@/lib/data/price-books";
 import type { Role } from "@/lib/actions/common";
-import { getMobileProducts } from "@/lib/data/products";
 import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
 import { accentInsensitiveLike } from "@/lib/search";
 
@@ -301,70 +300,14 @@ export async function getPosData(options?: {
 }
 
 export async function getMobilePosData(role: Role) {
-  const [defaultWh] = await db
-    .select({ id: warehouses.id, name: warehouses.name })
-    .from(warehouses)
-    .orderBy(desc(warehouses.isDefault))
-    .limit(1);
-
-  const [productPage, customerRows, priceBookRows, projectRows, defaultBankAccount] =
-    await Promise.all([
-      getMobileProducts({ pageSize: 30 }),
-      db
-        .select({
-          id: customers.id,
-          name: customers.name,
-          phone: customers.phone,
-          type: customers.type,
-          currentDebt: customers.currentDebt,
-          debtLimit: customers.debtLimit,
-        })
-        .from(customers)
-        .where(and(eq(customers.isActive, true)))
-        .orderBy(asc(customers.name))
-        .limit(100),
-      getPriceBooks({ includeManagerOnly: role === "owner" || role === "manager" }),
-      db
-        .select({
-          id: projects.id,
-          name: projects.name,
-          customerId: projects.customerId,
-        })
-        .from(projects)
-        .where(eq(projects.status, "active"))
-        .orderBy(asc(projects.name))
-        .limit(100),
-      db
-        .select({
-          id: paymentBankAccounts.id,
-          bankCode: paymentBankAccounts.bankCode,
-          gateway: paymentBankAccounts.gateway,
-          accountNumber: paymentBankAccounts.accountNumber,
-          subAccount: paymentBankAccounts.subAccount,
-          accountName: paymentBankAccounts.accountName,
-        })
-        .from(paymentBankAccounts)
-        .where(
-          and(
-            eq(paymentBankAccounts.provider, "sepay"),
-            eq(paymentBankAccounts.enabled, true),
-          ),
-        )
-        .orderBy(
-          sql`${paymentBankAccounts.isDefault} desc`,
-          asc(paymentBankAccounts.createdAt),
-        )
-        .limit(1),
-    ]);
-
+  // Reuse the POS dataset so mobile gets the same recent-sales ranking,
+  // manager-only price books, stock reservations, and product image data.
+  const data = await getPosData({ role });
   return {
-    warehouse: defaultWh ?? null,
-    products: productPage.rows,
-    customers: customerRows,
-    promoByProduct: {},
-    projects: projectRows,
-    priceBooks: priceBookRows,
-    defaultBankAccount: defaultBankAccount[0] ?? null,
+    ...data,
+    products: data.products.slice(0, 30),
+    customers: data.customers.slice(0, 100),
+    projects: data.projects.slice(0, 100),
   };
 }
 
