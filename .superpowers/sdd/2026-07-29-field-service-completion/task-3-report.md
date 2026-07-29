@@ -233,3 +233,40 @@ fixture projects or profiles.
 - Changed-file ESLint: exit code 0.
 - `bun run build`: compiled, type-checked, and generated all 97 static pages
   successfully.
+
+## Reviewer fix round 3
+
+The third review found that assignment POST did not lock the target job before
+deciding which primary-assignment rows to retire. If a job had no existing
+primary row, two transactions could both complete that decision before
+serializing on the later `assigned_to` update.
+
+### RED evidence
+
+The independent-session PostgreSQL regression invoked the real assignment POST
+route twice while a third session held the job-row lock. Both requests returned
+HTTP 200, but the database retained two active `primary` assignment rows while
+`service_jobs.assigned_to` matched only one of them.
+
+### Fix
+
+- Assignment POST now locks the target `service_jobs` row `FOR UPDATE` as the
+  first database operation in its transaction.
+- Assignee validity is read after that lock, and all primary-retirement,
+  `assigned_to`, assignment upsert, and event decisions remain in the same
+  transaction.
+- No schema migration was required.
+
+### Verification
+
+- The same real-route PostgreSQL regression now leaves exactly one active
+  primary assignment matching `service_jobs.assigned_to`.
+- The earlier committed primary is marked removed and fails a subsequent field
+  check-in with `SERVICE_JOB_FORBIDDEN`.
+- The complete independent-session PostgreSQL concurrency harness passed.
+- Focused state-machine, field-operation, access, and schema regression:
+  `6 pass, 0 fail, 12 expect() calls`.
+- Changed-file ESLint: exit code 0.
+- `bun run build`: compiled, type-checked, and generated all 97 static pages
+  successfully.
+- Cleanup audit found zero namespaced fixture projects or profiles.

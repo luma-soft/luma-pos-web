@@ -26,22 +26,23 @@ export async function POST(
   });
   if (!parsed.success) return mobileError("errors.invalidData", 400);
   const value = parsed.data;
-  const [profile] = await db.select({
-    id: profiles.id,
-    role: profiles.role,
-    isActive: profiles.isActive,
-  }).from(profiles).where(eq(profiles.id, value.profileId)).limit(1);
-  if (
-    !profile?.isActive
-    || !["owner", "manager", "technician"].includes(profile.role)
-  ) return mobileError("services.errors.invalidAssignee", 409);
   try {
     const result = await db.transaction(async (tx) => {
       const [job] = await tx.select({ id: serviceJobs.id })
         .from(serviceJobs)
         .where(eq(serviceJobs.id, id))
-        .limit(1);
-      if (!job) return null;
+        .limit(1)
+        .for("update");
+      if (!job) return { outcome: "notFound" } as const;
+      const [profile] = await tx.select({
+        id: profiles.id,
+        role: profiles.role,
+        isActive: profiles.isActive,
+      }).from(profiles).where(eq(profiles.id, value.profileId)).limit(1);
+      if (
+        !profile?.isActive
+        || !["owner", "manager", "technician"].includes(profile.role)
+      ) return { outcome: "invalidAssignee" } as const;
       const now = new Date();
       if (value.assignmentRole === "primary") {
         await tx.update(serviceJobAssignments).set({ removedAt: now })
@@ -82,10 +83,13 @@ export async function POST(
           assignmentRole: value.assignmentRole,
         },
       });
-      return assignment;
+      return { outcome: "assigned", assignment } as const;
     });
-    if (!result) return mobileError("errors.notFound", 404);
-    return mobileOk(result);
+    if (result.outcome === "notFound") return mobileError("errors.notFound", 404);
+    if (result.outcome === "invalidAssignee") {
+      return mobileError("services.errors.invalidAssignee", 409);
+    }
+    return mobileOk(result.assignment);
   } catch (error) {
     console.error("service assignment failed:", error);
     return mobileError("errors.serverError", 500);

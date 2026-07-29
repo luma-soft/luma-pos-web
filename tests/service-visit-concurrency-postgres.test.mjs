@@ -1,14 +1,24 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
+import { mock } from "bun:test";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { Pool } from "pg";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
   console.log("service visit PostgreSQL concurrency: skipped because DATABASE_URL is unset");
 } else {
+  let assignmentManagerId;
+  mock.module("@/lib/mobile/auth", () => ({
+    requireMobileManager: async () => ({
+      ok: true,
+      userId: assignmentManagerId,
+      role: "manager",
+    }),
+  }));
+
   const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
   const schema = await import(`${projectRoot}/src/db/schema.ts`);
   const {
@@ -25,6 +35,9 @@ if (!databaseUrl) {
     completeFieldServiceJobCore,
     createServiceSignatureCore,
   } = await import(`${projectRoot}/src/lib/services/field-operations.ts`);
+  const { POST: assignServiceJob } = await import(
+    `${projectRoot}/src/app/api/mobile/services/jobs/[id]/assignments/route.ts`
+  );
   const { createDefaultChecklist } = await import(`${projectRoot}/src/lib/services/domain.ts`);
 
   const pool = new Pool({ connectionString: databaseUrl, max: 6 });
@@ -33,6 +46,8 @@ if (!databaseUrl) {
   const clientB = await pool.connect();
   const technicianId = randomUUID();
   const otherTechnicianId = randomUUID();
+  const thirdTechnicianId = randomUUID();
+  assignmentManagerId = technicianId;
   const namespace = `visit-race-${randomUUID()}`;
   let projectId;
 
@@ -122,6 +137,11 @@ if (!databaseUrl) {
       fullName: `${namespace}-other`,
       role: "technician",
     });
+    await db.insert(profiles).values({
+      id: thirdTechnicianId,
+      fullName: `${namespace}-third`,
+      role: "technician",
+    });
     const [project] = await db.insert(projects).values({
       name: namespace,
       serviceType: "camera",
@@ -129,6 +149,70 @@ if (!databaseUrl) {
     }).returning();
     projectId = project.id;
     const actor = { userId: technicianId, role: "technician" };
+
+    const concurrentAssignmentJob = await createJob();
+    await clientA.query("BEGIN");
+    await clientA.query("SELECT id FROM service_jobs WHERE id = $1 FOR UPDATE", [
+      concurrentAssignmentJob.id,
+    ]);
+    const assignPrimary = (profileId) => assignServiceJob(
+      new Request(
+        `http://localhost/api/mobile/services/jobs/${concurrentAssignmentJob.id}/assignments`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ profileId, assignmentRole: "primary" }),
+        },
+      ),
+      { params: Promise.resolve({ id: concurrentAssignmentJob.id }) },
+    );
+    let concurrentAssignmentsSettled = false;
+    const concurrentAssignments = Promise.all([
+      assignPrimary(otherTechnicianId),
+      assignPrimary(thirdTechnicianId),
+    ]).finally(() => {
+      concurrentAssignmentsSettled = true;
+    });
+    await delay(1000);
+    assert.equal(
+      concurrentAssignmentsSettled,
+      false,
+      "both primary assignments must wait behind the existing job lock",
+    );
+    await clientA.query("COMMIT");
+    const assignmentResponses = await concurrentAssignments;
+    assert.deepEqual(
+      assignmentResponses.map((response) => response.status),
+      [200, 200],
+    );
+    const [assignedJob] = await db.select({ assignedTo: serviceJobs.assignedTo })
+      .from(serviceJobs)
+      .where(eq(serviceJobs.id, concurrentAssignmentJob.id));
+    const activePrimaryAssignments = await db.select({
+      profileId: serviceJobAssignments.profileId,
+    }).from(serviceJobAssignments).where(and(
+      eq(serviceJobAssignments.jobId, concurrentAssignmentJob.id),
+      eq(serviceJobAssignments.assignmentRole, "primary"),
+      isNull(serviceJobAssignments.removedAt),
+    ));
+    assert.deepEqual(
+      activePrimaryAssignments.map((assignment) => assignment.profileId),
+      [assignedJob.assignedTo],
+      "concurrent primary assignment must leave one active row matching assigned_to",
+    );
+    const staleAssigneeId = assignedJob.assignedTo === otherTechnicianId
+      ? thirdTechnicianId
+      : otherTechnicianId;
+    await assert.rejects(
+      db.transaction((tx) => checkInServiceVisitCore(tx, {
+        userId: staleAssigneeId,
+        role: "technician",
+      }, {
+        jobId: concurrentAssignmentJob.id,
+        clientMutationId: `stale-concurrent-primary-${randomUUID()}`,
+      })),
+      (error) => hasCode(error, "SERVICE_JOB_FORBIDDEN"),
+    );
 
     const primaryRemovalJob = await createJob();
     await clientA.query("BEGIN");
@@ -374,6 +458,7 @@ if (!databaseUrl) {
     }
     await db.delete(profiles).where(eq(profiles.id, technicianId));
     await db.delete(profiles).where(eq(profiles.id, otherTechnicianId));
+    await db.delete(profiles).where(eq(profiles.id, thirdTechnicianId));
     clientA.release();
     clientB.release();
     await pool.end();
