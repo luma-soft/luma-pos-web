@@ -22,10 +22,12 @@ export default async function AppLayout({
   children,
   productModal,
   orderModal,
+  projectModal,
 }: {
   children: React.ReactNode;
   productModal: React.ReactNode;
   orderModal: React.ReactNode;
+  projectModal: React.ReactNode;
 }) {
   let user: Awaited<ReturnType<typeof requireUser>>;
   try {
@@ -81,6 +83,7 @@ export default async function AppLayout({
       </main>
       {orderModal}
       {productModal}
+      {projectModal}
     </div>
     </ProductCatalogProvider>
   );
