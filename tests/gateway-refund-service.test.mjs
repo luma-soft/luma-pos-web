@@ -11,6 +11,7 @@ const service = await import(`${PROJ}/src/lib/payments/refund-service-core.ts`);
 const { profiles, orders, payments, returns, paymentRefunds, cashTransactions } = schema;
 const client = new PGlite();
 const db = drizzle(client, { schema });
+await client.exec("create role anon; create role authenticated;");
 let pass = 0, fail = 0;
 const ok = (name, condition) => {
   if (condition) { pass++; console.log(`  ✅ ${name}`); }

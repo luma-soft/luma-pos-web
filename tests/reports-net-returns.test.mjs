@@ -9,6 +9,7 @@ const { getReportsForDatabase } = await import(`${project}/src/lib/data/reports.
 
 const client = new PGlite();
 const database = drizzle(client, { schema });
+await client.exec("create role anon; create role authenticated;");
 
 for (const file of readdirSync(`${project}/drizzle`).filter((name) => name.endsWith(".sql")).sort()) {
   for (const statement of readFileSync(`${project}/drizzle/${file}`, "utf8").split("--> statement-breakpoint")) {

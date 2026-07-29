@@ -11,6 +11,7 @@ const { products, productUnits, stockLevels, stockMovements, warehouses, categor
 
 const client = new PGlite();
 const db = drizzle(client, { schema });
+await client.exec("create role anon; create role authenticated;");
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra = "") => {

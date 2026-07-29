@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 import { readFileSync, readdirSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
@@ -24,6 +23,7 @@ const money = (value) => value.toFixed(2);
 
 const client = new PGlite();
 const db = drizzle(client, { schema });
+await client.exec("create role anon; create role authenticated;");
 
 for (const file of readdirSync(`${PROJ}/drizzle`).filter((name) => name.endsWith(".sql")).sort()) {
   for (const statement of readFileSync(`${PROJ}/drizzle/${file}`, "utf8").split("--> statement-breakpoint")) {
@@ -168,7 +168,7 @@ if (sepayOrder[0]?.status !== "cancelled") {
   throw new Error("sepay draft order not cancelled");
 }
 
-if (!rejectExpireConfirmed.ok || rejectExpireConfirmed.error !== "payments.errors.notConfirmable") {
+if (rejectExpireConfirmed.ok || rejectExpireConfirmed.error !== "payments.errors.notConfirmable") {
   throw new Error("non-pending payment should not be expired");
 }
 

@@ -23,6 +23,7 @@ const {
 
 const client = new PGlite();
 const db = drizzle(client, { schema });
+await client.exec("create role anon; create role authenticated;");
 let pass = 0, fail = 0;
 const ok = (name, condition) => {
   if (condition) { pass++; console.log(`  ✅ ${name}`); }

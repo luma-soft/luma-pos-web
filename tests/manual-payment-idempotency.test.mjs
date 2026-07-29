@@ -11,6 +11,7 @@ const { addManualPaymentCore } = await import(
 const { cashTransactions, orders, payments } = schema;
 const client = new PGlite();
 const db = drizzle(client, { schema });
+await client.exec("create role anon; create role authenticated;");
 
 for (const file of readdirSync(`${PROJ}/drizzle`)
   .filter((name) => name.endsWith(".sql"))

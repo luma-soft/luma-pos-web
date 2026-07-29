@@ -11,6 +11,7 @@ const { tableCartItemSchema } = await import(`${PROJ}/src/lib/schemas/table.ts`)
 const { diningTables, kitchenTickets, kitchenTicketItems } = schema;
 const client = new PGlite();
 const db = drizzle(client, { schema });
+await client.exec("create role anon; create role authenticated;");
 
 let pass = 0;
 let fail = 0;
