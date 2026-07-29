@@ -32,6 +32,8 @@ const NATIVE_PRIMITIVE_IMPLEMENTATIONS = new Set([
   "src/components/ui/quantity-input.tsx",
 ]);
 const PRE_LG_BREAKPOINTS = new Set(["sm", "md"]);
+const MAX_CLASS_SCENARIOS = 64;
+const UNKNOWN_CLASS_SCENARIO = "__mobile_audit_unknown_class_scenario__";
 
 type Candidate = {
   file: string;
@@ -143,15 +145,33 @@ function classTokenScenarios(
   const className = attribute(node, "className");
   if (!className?.initializer) return [[]];
   const tokens = (value: string) => value.split(/\s+/).filter(Boolean);
+  const unknown = () => [[UNKNOWN_CLASS_SCENARIO]];
+  const isUnknown = (values: string[][]) =>
+    values.some((value) => value.includes(UNKNOWN_CLASS_SCENARIO));
+  const bounded = (values: string[][]) => {
+    if (isUnknown(values)) return unknown();
+    const unique = new Map<string, string[]>();
+    for (const value of values) {
+      unique.set(value.join("\u0000"), value);
+      if (unique.size > MAX_CLASS_SCENARIOS) return unknown();
+    }
+    return [...unique.values()];
+  };
   const combine = (left: string[][], right: string[][]) => {
+    if (
+      isUnknown(left) ||
+      isUnknown(right) ||
+      left.length * right.length > MAX_CLASS_SCENARIOS
+    ) {
+      return unknown();
+    }
     const combined: string[][] = [];
     for (const a of left) {
       for (const b of right) {
         combined.push([...a, ...b]);
-        if (combined.length >= 64) return combined;
       }
     }
-    return combined;
+    return bounded(combined);
   };
   const staticTruthiness = (child: ts.Expression): boolean | undefined => {
     if (child.kind === ts.SyntaxKind.TrueKeyword) return true;
@@ -178,6 +198,16 @@ function classTokenScenarios(
     ) {
       return child.text.length > 0;
     }
+    if (
+      ts.isObjectLiteralExpression(child) ||
+      ts.isArrayLiteralExpression(child) ||
+      ts.isArrowFunction(child) ||
+      ts.isFunctionExpression(child) ||
+      ts.isClassExpression(child)
+    ) {
+      return true;
+    }
+    if (ts.isIdentifier(child) && child.text === "undefined") return false;
     return undefined;
   };
   const staticPropertyName = (
@@ -203,16 +233,97 @@ function classTokenScenarios(
     }
     return undefined;
   };
-  const conditionalProperty = (
-    name: ts.PropertyName,
-    condition: ts.Expression,
-  ) => {
-    const resolved = staticPropertyName(name);
-    if (!resolved) return [[]];
-    const enabled = staticTruthiness(condition);
-    if (enabled === false) return [[]];
-    const present = [tokens(resolved)];
-    return enabled === true ? present : [[], ...present];
+  type ObjectState = Map<string, boolean>;
+  const objectStateKey = (state: ObjectState) =>
+    JSON.stringify([...state.entries()]);
+  const boundedObjectStates = (
+    states: ObjectState[],
+  ): ObjectState[] | undefined => {
+    const unique = new Map<string, ObjectState>();
+    for (const state of states) {
+      unique.set(objectStateKey(state), state);
+      if (unique.size > MAX_CLASS_SCENARIOS) return undefined;
+    }
+    return [...unique.values()];
+  };
+  const objectStates = (
+    object: ts.ObjectLiteralExpression,
+  ): ObjectState[] | undefined => {
+    let states: ObjectState[] = [new Map()];
+    for (const property of object.properties) {
+      if (
+        ts.isPropertyAssignment(property) ||
+        ts.isShorthandPropertyAssignment(property)
+      ) {
+        const key = staticPropertyName(property.name);
+        if (!key) return undefined;
+        const condition = ts.isPropertyAssignment(property)
+          ? property.initializer
+          : property.name;
+        const truthiness = staticTruthiness(condition);
+        const values = truthiness === undefined
+          ? [false, true]
+          : [truthiness];
+        const next = states.flatMap((state) =>
+          values.map((value) => {
+            const updated = new Map(state);
+            updated.set(key, value);
+            return updated;
+          }),
+        );
+        const boundedStates = boundedObjectStates(next);
+        if (!boundedStates) return undefined;
+        states = boundedStates;
+        continue;
+      }
+      if (ts.isSpreadAssignment(property)) {
+        if (!ts.isObjectLiteralExpression(property.expression)) {
+          return undefined;
+        }
+        const spreadStates = objectStates(property.expression);
+        if (!spreadStates) return undefined;
+        const next = states.flatMap((state) =>
+          spreadStates.map((spreadState) => {
+            const updated = new Map(state);
+            for (const [key, value] of spreadState) updated.set(key, value);
+            return updated;
+          }),
+        );
+        const boundedStates = boundedObjectStates(next);
+        if (!boundedStates) return undefined;
+        states = boundedStates;
+        continue;
+      }
+      if (ts.isMethodDeclaration(property)) {
+        const key = staticPropertyName(property.name);
+        if (!key) return undefined;
+        states = states.map((state) => {
+          const updated = new Map(state);
+          updated.set(key, true);
+          return updated;
+        });
+        continue;
+      }
+      if (
+        ts.isGetAccessorDeclaration(property) ||
+        ts.isSetAccessorDeclaration(property)
+      ) {
+        return undefined;
+      }
+      return undefined;
+    }
+    return states;
+  };
+  const objectClassScenarios = (object: ts.ObjectLiteralExpression) => {
+    const states = objectStates(object);
+    if (!states) return unknown();
+    return bounded(
+      states.map((state) =>
+        [...state.entries()].flatMap(([key, enabled]) =>
+          enabled ? tokens(key) : [],
+        ),
+      ),
+    );
   };
   const scenarios = (child: ts.Node): string[][] => {
     if (ts.isJsxExpression(child)) {
@@ -232,13 +343,13 @@ function classTokenScenarios(
       ts.isBinaryExpression(child) &&
       child.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
     ) {
-      return [[], ...scenarios(child.right)];
+      return bounded([[], ...scenarios(child.right)]);
     }
     if (ts.isConditionalExpression(child)) {
-      return [
+      return bounded([
         ...scenarios(child.whenTrue),
         ...scenarios(child.whenFalse),
-      ];
+      ]);
     }
     if (ts.isCallExpression(child)) {
       return child.arguments.reduce<string[][]>(
@@ -256,24 +367,7 @@ function classTokenScenarios(
       );
     }
     if (ts.isObjectLiteralExpression(child)) {
-      return child.properties.reduce<string[][]>((result, property) => {
-        if (ts.isPropertyAssignment(property)) {
-          return combine(
-            result,
-            conditionalProperty(property.name, property.initializer),
-          );
-        }
-        if (ts.isShorthandPropertyAssignment(property)) {
-          return combine(
-            result,
-            conditionalProperty(property.name, property.name),
-          );
-        }
-        if (ts.isSpreadAssignment(property)) {
-          return combine(result, scenarios(property.expression));
-        }
-        return result;
-      }, [[]]);
+      return objectClassScenarios(child);
     }
     if (ts.isTemplateExpression(child)) {
       return child.templateSpans.reduce<string[][]>(
@@ -543,7 +637,19 @@ function explicitMobileColumnDeclarations(source: ts.SourceFile) {
   type BindingDeclaration =
     | ts.VariableDeclaration
     | ts.ParameterDeclaration;
-  const bindings: BindingDeclaration[] = [];
+  type Binding = {
+    declaration: BindingDeclaration;
+    name: ts.Identifier;
+  };
+  const bindings: Binding[] = [];
+  const boundIdentifiers = (name: ts.BindingName): ts.Identifier[] => {
+    if (ts.isIdentifier(name)) return [name];
+    return name.elements.flatMap((element) =>
+      ts.isBindingElement(element)
+        ? boundIdentifiers(element.name)
+        : [],
+    );
+  };
   const lexicalScope = (node: ts.Node) => {
     let current: ts.Node | undefined = node;
     while (
@@ -562,7 +668,8 @@ function explicitMobileColumnDeclarations(source: ts.SourceFile) {
     if (!current) return source;
     return current.body && ts.isBlock(current.body) ? current.body : current;
   };
-  const bindingScope = (declaration: BindingDeclaration) => {
+  const bindingScope = (binding: Binding) => {
+    const { declaration } = binding;
     if (ts.isParameter(declaration)) return functionScope(declaration);
     if (
       ts.isVariableDeclarationList(declaration.parent) &&
@@ -576,10 +683,9 @@ function explicitMobileColumnDeclarations(source: ts.SourceFile) {
     ancestor.getStart(source) <= node.getStart(source) &&
     ancestor.getEnd() >= node.getEnd();
   const resolve = (identifier: ts.Identifier) => {
-    const candidates = bindings.filter((declaration) =>
-      ts.isIdentifier(declaration.name) &&
-      declaration.name.text === identifier.text &&
-      isAncestor(bindingScope(declaration), identifier),
+    const candidates = bindings.filter((binding) =>
+      binding.name.text === identifier.text &&
+      isAncestor(bindingScope(binding), identifier),
     );
     candidates.sort((a, b) => {
       return bindingScope(a).getWidth(source) - bindingScope(b).getWidth(source);
@@ -595,10 +701,12 @@ function explicitMobileColumnDeclarations(source: ts.SourceFile) {
   const mobileDeclarations = new Set<ts.VariableDeclaration>();
   const visit = (node: ts.Node) => {
     if (
-      (ts.isVariableDeclaration(node) || ts.isParameter(node)) &&
-      ts.isIdentifier(node.name)
+      ts.isVariableDeclaration(node) ||
+      ts.isParameter(node)
     ) {
-      bindings.push(node);
+      for (const name of boundIdentifiers(node.name)) {
+        bindings.push({ declaration: node, name });
+      }
     }
     ts.forEachChild(node, visit);
   };
@@ -619,10 +727,10 @@ function explicitMobileColumnDeclarations(source: ts.SourceFile) {
         const binding = resolve(columns.expression);
         if (
           binding &&
-          ts.isVariableDeclaration(binding) &&
-          binding.type?.getText().includes("DataTableColumn")
+          ts.isVariableDeclaration(binding.declaration) &&
+          binding.declaration.type?.getText().includes("DataTableColumn")
         ) {
-          mobileDeclarations.add(binding);
+          mobileDeclarations.add(binding.declaration);
         }
       }
     }
@@ -649,6 +757,7 @@ function ownHitArea(
   classes: string[],
 ) {
   const tag = jsxTagName(node);
+  if (classes.includes(UNKNOWN_CLASS_SCENARIO)) return false;
   if (
     classes.includes("fixed") &&
     classes.includes("inset-0")
@@ -1051,6 +1160,46 @@ describe("mobile active-control audit oracle", () => {
     expect(failures.map(({ tag }) => tag)).toEqual(["Link"]);
   });
 
+  test("extracts nested destructured binding names before applying mobile column metadata", () => {
+    const failures = auditSource(
+      "fixture.tsx",
+      `
+        const columns: DataTableColumn<Row>[] = [{
+          key: "outer",
+          label: "Outer",
+          render: (row) => <Link href={"/outer/" + row.id}>{row.name}</Link>,
+        }];
+
+        function ObjectParameter({ columns }: Props) {
+          return <DataTableShell columns={columns} renderMobileRow={() => <div>object</div>} />;
+        }
+        function AliasedParameter({ source: columns = [] }: Props) {
+          return <DataTableShell columns={columns} renderMobileRow={() => <div>alias</div>} />;
+        }
+        function NestedParameter({ payload: { columns } }: Props) {
+          return <DataTableShell columns={columns} renderMobileRow={() => <div>nested</div>} />;
+        }
+        function ArrayParameter([columns, ...rest]: Row[][]) {
+          return <DataTableShell columns={columns} renderMobileRow={() => <div>{rest.length}</div>} />;
+        }
+        function VariableBindings(source: Source, values: Row[][]) {
+          {
+            const { payload: { source: columns = [] } } = source;
+            return <DataTableShell columns={columns} renderMobileRow={() => <div>variable</div>} />;
+          }
+          {
+            const [first, ...columns] = values;
+            return <DataTableShell columns={columns} renderMobileRow={() => <div>{first.length}</div>} />;
+          }
+        }
+
+        const fallback = <DataTableShell columns={columns} />;
+      `,
+    );
+
+    expect(failures.map(({ tag }) => tag)).toEqual(["Link"]);
+  });
+
   test("rejects unsafe conditional overrides in cn object arguments", () => {
     const failures = auditSource(
       "fixture.tsx",
@@ -1073,6 +1222,44 @@ describe("mobile active-control audit oracle", () => {
       "Button",
       "Button",
     ]);
+  });
+
+  test("honors static object spread overwrite order", () => {
+    const failures = auditSource(
+      "fixture.tsx",
+      `
+        export function Fixture() {
+          return <div>
+            <button className={cn("h-11", { "w-11": true, ...{ "w-11": false } })} />
+            <Button className={cn("h-11 w-11", { ...{ "w-8": true } })} />
+          </div>;
+        }
+      `,
+    );
+
+    expect(failures.map(({ tag }) => tag)).toEqual(["button", "Button"]);
+  });
+
+  test("fails conservatively instead of truncating conditional object scenarios", () => {
+    const failures = auditSource(
+      "fixture.tsx",
+      `
+        export function Fixture() {
+          return <Button className={cn("h-11 w-11", {
+            "w-8": compact,
+            alpha,
+            beta,
+            gamma,
+            delta,
+            epsilon,
+            zeta,
+            eta,
+          })} />;
+        }
+      `,
+    );
+
+    expect(failures.map(({ tag }) => tag)).toEqual(["Button"]);
   });
 
   test("accepts persistent pre-lg sizing, safe label wrappers, and lg-only surfaces", () => {
@@ -1105,6 +1292,22 @@ describe("mobile active-control audit oracle", () => {
               />
               <Button className={cn({ "w-11": roomy })} />
               <Button className={cn("h-11 w-11", { compact })} />
+              <button
+                className={cn("h-11", { "w-11": false, ...{ "w-11": true } })}
+              />
+              <Button
+                className={cn(
+                  "h-11 w-11",
+                  { ...{ "w-8": true }, ...{ "w-11": true } },
+                )}
+              />
+              <Button
+                className={cn(
+                  "h-11 w-11",
+                  { ...{ "w-8": compact } },
+                  "w-11",
+                )}
+              />
             </div>;
           }
         `,
