@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Search, Plus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, ChevronDown, Printer, MoreVertical, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw } from "lucide-react";
@@ -37,7 +37,6 @@ import { createPosReturn, searchReturnableOrders, type ReturnableOrderOption } f
 import { searchPosProducts } from "@/lib/actions/pos-search";
 import { enqueueOrder, getOutbox, removeOutbox, markFailed } from "@/lib/offline/pos-store";
 import { applyPromo } from "@/lib/promo";
-import { categoryEmoji } from "@/lib/category-emoji";
 import { Routes } from "@/lib/routes";
 import type { PosData, PosProduct, PosUnit } from "@/lib/data/pos";
 import { isProductStockManaged } from "@/lib/product-stock";
@@ -53,6 +52,13 @@ import {
 } from "@/lib/pos/line-price-editor";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPosProduct } from "@/lib/pos/product-catalog-adapter";
+import {
+  PosAmountModeInput,
+  PosPrintSizePicker,
+  PosStockQuantityTooltip,
+  PosSummaryAdjustRow,
+} from "@/components/pos/pos-summary-controls";
+import { PosProductThumbnail } from "@/components/pos/pos-product-thumbnail";
 
 type CartLine = {
   key: string;
@@ -459,58 +465,6 @@ function buildVietQrImageUrl(input: { bankCode: string; accountNumber: string; a
 
 function currentTimestamp(): number {
   return Date.now();
-}
-
-function PosProductThumbnail({ product }: { product: PosProduct }) {
-  const imageUrl = Array.isArray(product.imageUrls) && typeof product.imageUrls[0] === "string"
-    ? product.imageUrls[0].trim()
-    : "";
-  const [imageFailed, setImageFailed] = useState(false);
-  const [previewOpen, setPreviewOpen] = useState(false);
-
-  return (
-    <>
-      {imageUrl && !imageFailed ? (
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            setPreviewOpen(true);
-          }}
-          className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-md bg-surface-2 text-lg transition-opacity hover:opacity-80"
-          aria-label={`Xem ảnh ${product.name}`}
-        >
-        <img
-          src={imageUrl}
-          alt={product.name}
-          className="h-full w-full object-cover"
-          onError={() => setImageFailed(true)}
-        />
-        </button>
-      ) : (
-        <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-md bg-surface-2 text-lg">
-          {categoryEmoji(product.categoryName)}
-        </div>
-      )}
-      {previewOpen && imageUrl && typeof document !== "undefined" && createPortal(
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Ảnh ${product.name}`}
-          className="fixed inset-0 z-[120] grid place-items-center bg-slate-950/70 p-6"
-          onClick={() => setPreviewOpen(false)}
-        >
-          <img
-            src={imageUrl}
-            alt={product.name}
-            className="max-h-full max-w-full rounded-xl object-contain shadow-e2"
-            onClick={(event) => event.stopPropagation()}
-          />
-        </div>,
-        document.body,
-      )}
-    </>
-  );
 }
 
 export function PosClient({
@@ -1749,7 +1703,7 @@ export function PosClient({
                     </div>
                   )}
                   {stockManaged && (
-                    <StockQuantityTooltip stock={Number(l.product.stock)} booked={Number(l.product.booked)} unit={l.product.baseUnit} />
+                    <PosStockQuantityTooltip stock={Number(l.product.stock)} booked={Number(l.product.booked)} unit={l.product.baseUnit} />
                   )}
                 </PosQuantitySlot>
                 <div className="relative flex h-8 w-28 shrink-0 items-start justify-end">
@@ -1994,7 +1948,7 @@ export function PosClient({
                                   inputClassName={cn(stockInsufficient && "border-er text-er")}
                                 />
                                 {stockManaged && (
-                                  <StockQuantityTooltip stock={stock} booked={Number(p.booked)} unit={p.baseUnit} />
+                                  <PosStockQuantityTooltip stock={stock} booked={Number(p.booked)} unit={p.baseUnit} />
                                 )}
                               </PosQuantitySlot>
                             )}
@@ -2191,28 +2145,28 @@ export function PosClient({
           </div>
           {!isReturnDraft && (
             <>
-              <SummaryAdjustRow
+              <PosSummaryAdjustRow
                 label={t("pos.discount")}
                 hint={`− ${formatCurrency(discountVnd)}`}
                 hintVisible={discountMode === "pct" && discountInput > 0}
               >
-                <AmountModeInput
+                <PosAmountModeInput
                   value={discountInput}
                   mode={discountMode}
                   onValueChange={setDiscountInput}
                   onModeChange={setDiscountMode}
                 />
-              </SummaryAdjustRow>
-              <SummaryAdjustRow
+              </PosSummaryAdjustRow>
+              <PosSummaryAdjustRow
                 label={t("pos.tax")}
                 hint={`+ ${formatCurrency(taxAmount)}`}
                 hintVisible={taxRate > 0}
               >
-                <AmountModeInput value={taxRate} mode="pct" onValueChange={setTaxRate} />
-              </SummaryAdjustRow>
-              <SummaryAdjustRow label={t("pos.shipping")}>
-                <AmountModeInput value={shippingFee} mode="vnd" onValueChange={setShippingFee} />
-              </SummaryAdjustRow>
+                <PosAmountModeInput value={taxRate} mode="pct" onValueChange={setTaxRate} />
+              </PosSummaryAdjustRow>
+              <PosSummaryAdjustRow label={t("pos.shipping")}>
+                <PosAmountModeInput value={shippingFee} mode="vnd" onValueChange={setShippingFee} />
+              </PosSummaryAdjustRow>
             </>
           )}
           <div className="flex justify-between text-base font-semibold pt-1">
@@ -2298,7 +2252,7 @@ export function PosClient({
           )}
           <div className="flex items-center justify-between gap-2">
             <span className="text-slate-500">{t("pos.defaultPrintTemplate")}</span>
-            <PrintSizePicker
+            <PosPrintSizePicker
               value={printDefaultSize}
               options={[
                 { value: "a4", label: t("pos.printA4Short") },
@@ -2591,181 +2545,6 @@ function VariantPickerModal({
   );
 }
 
-function SummaryAdjustRow({
-  label,
-  hint,
-  hintVisible = false,
-  children,
-}: {
-  label: ReactNode;
-  hint?: ReactNode;
-  hintVisible?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div className="grid grid-cols-[minmax(0,1fr)_minmax(150px,184px)] items-start gap-2">
-      <Text as="span" variant="muted" className="pt-2.5" text={label} />
-      <div className="grid justify-items-end gap-1">
-        {children}
-        <Text
-          as="div"
-          variant="muted"
-          size="xs"
-          aria-hidden={!hintVisible}
-          className={cn(
-            "h-4 tabular-nums transition-opacity duration-150",
-            hintVisible ? "opacity-100" : "opacity-0"
-          )}
-        >
-          {hint ?? "\u00a0"}
-        </Text>
-      </div>
-    </div>
-  );
-}
-
-function StockQuantityTooltip({ stock, booked, unit }: { stock: number; booked: number; unit: string }) {
-  return (
-    <div className="pointer-events-none absolute left-1/2 top-full z-[80] mt-2 min-w-34 -translate-x-1/2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-semibold text-slate-800 opacity-0 shadow-e2 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 dark:text-slate-100">
-      <div>{`Tồn: ${formatNumber(stock)} ${unit}`}</div>
-      <div>{`Đặt: ${formatNumber(booked)} ${unit}`}</div>
-    </div>
-  );
-}
-
-function PrintSizePicker({
-  value,
-  options,
-  onChange,
-}: {
-  value: PaperSize;
-  options: { value: PaperSize; label: string }[];
-  onChange: (value: PaperSize) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const selected = options.find((option) => option.value === value) ?? options[0];
-
-  useEffect(() => {
-    if (!open) return;
-    const onPointerDown = (event: MouseEvent) => {
-      if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
-  return (
-    <div ref={ref} className="relative w-28">
-      <button
-        type="button"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-        className={cn(
-          "flex h-11 w-full items-center justify-between gap-2 rounded-lg border border-border bg-surface px-2.5 text-left text-xs font-semibold lg:h-8",
-          "transition hover:bg-surface-2 focus:border-primary-600 focus:outline-none"
-        )}
-      >
-        <span className="whitespace-normal break-words">{selected?.label}</span>
-        <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform", open && "rotate-180")} />
-      </button>
-      {open && (
-        <div
-          role="listbox"
-          className="absolute bottom-full right-0 z-50 mb-1 w-32 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-e2"
-        >
-          {options.map((option) => {
-            const active = option.value === value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                role="option"
-                aria-selected={active}
-                onClick={() => {
-                  onChange(option.value);
-                  setOpen(false);
-                }}
-                className={cn(
-                  "flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-medium hover:bg-surface-2 lg:min-h-0",
-                  active && "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-200"
-                )}
-              >
-                <span>{option.label}</span>
-                {active && <CheckCircle2 className="h-4 w-4 text-primary-600" />}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function AmountModeInput({
-  value,
-  mode,
-  onValueChange,
-  onModeChange,
-  className,
-}: {
-  value: number;
-  mode: "vnd" | "pct";
-  onValueChange: (value: number) => void;
-  onModeChange?: (mode: "vnd" | "pct") => void;
-  className?: string;
-}) {
-  return (
-    <div className={cn(
-      "w-full max-w-[184px] h-11 grid grid-cols-[1fr_56px] rounded-lg border border-border bg-surface overflow-hidden transition-[border-color] duration-150 focus-within:border-primary-600",
-      className
-    )}>
-      {mode === "pct" ? (
-        <NumberInput
-          min={0}
-          max={100}
-          value={value}
-          onChange={(nextValue) => onValueChange(nextValue ?? 0)}
-          placeholder="0"
-          thousandSeparator={false}
-          className="h-full min-w-0 rounded-none border-0 bg-transparent px-3 text-right text-sm tabular-nums outline-none focus:border-transparent focus-visible:border-transparent focus:ring-0"
-        />
-      ) : (
-        <MoneyInput
-          value={value || ""}
-          onChange={(v) => onValueChange(v ?? 0)}
-          placeholder="0"
-          className="no-spinner h-full min-w-0 px-3 text-right text-sm tabular-nums bg-transparent outline-none border-0 focus:border-transparent focus-visible:border-transparent"
-        />
-      )}
-      {onModeChange ? (
-        <Button
-          type="button"
-          onClick={() => onModeChange(mode === "vnd" ? "pct" : "vnd")}
-          variant="ghost"
-          size="default"
-          className="h-full rounded-none border-l border-border text-sm font-semibold text-slate-600 hover:text-primary-700 hover:bg-primary-50 dark:hover:bg-primary-950/30"
-        >
-          {mode === "vnd" ? "đ" : "%"}
-          <ChevronDown className="w-3 h-3 text-slate-400" />
-        </Button>
-      ) : (
-        <Text as="span" variant="muted" weight="semibold" className="border-l border-border text-sm grid place-items-center">
-          {mode === "vnd" ? "đ" : "%"}
-        </Text>
-      )}
-    </div>
-  );
-}
-
 /** Popup sửa đơn giá + giảm giá (VND/%) cho 1 dòng — giống KiotViet. */
 function LinePriceEditor({
   line, invoicePriceBook, priceBooks, onChange, onClose,
@@ -2901,7 +2680,7 @@ function LinePriceEditor({
         <div className="flex items-center justify-between gap-2">
           <span className="text-slate-500 shrink-0">{t("pos.priceEditor.discount")}</span>
           <fieldset disabled={editor.free} className="m-0 min-w-0 border-0 p-0 disabled:opacity-50">
-            <AmountModeInput
+            <PosAmountModeInput
               value={discountInput}
               mode={editor.discountMode}
               onValueChange={setDiscount}
