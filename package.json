@@ -21,6 +21,7 @@
     "db:backfill-official-brand-images-2026-07": "bun run src/scripts/backfill-official-brand-product-images-2026-07-29.ts",
     "db:backfill-additional-official-images-2026-07": "bun run src/scripts/backfill-additional-official-product-images-2026-07-29.ts",
     "db:backfill-additional-official-images-round-3-2026-07": "bun run src/scripts/backfill-additional-official-product-images-round-3-2026-07-30.ts",
+    "db:backfill-additional-official-images-round-4-2026-07": "bun run src/scripts/backfill-additional-official-product-images-round-4-2026-07-30.ts",
     "db:set-camera-bracket-image": "bun run src/scripts/set-camera-bracket-image.ts",
     "db:fix-camera-accessory-prices-2026-07": "bun run src/scripts/fix-camera-accessory-retail-prices-2026-07-27.ts",
     "db:seed-network-cables-2026-07": "bun run src/scripts/seed-network-cables-2026-07-29.ts",
