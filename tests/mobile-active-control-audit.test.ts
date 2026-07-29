@@ -351,21 +351,42 @@ function classTokenScenarios(
         child.expression.text === "buttonVariants"
       ) {
         if (child.arguments.length === 0) return [[]];
+        if (child.arguments.length > 1) return unknown();
         const options = child.arguments[0];
         if (!ts.isObjectLiteralExpression(options)) return unknown();
-        for (const property of options.properties) {
-          if (
-            (ts.isPropertyAssignment(property) ||
-              ts.isShorthandPropertyAssignment(property)) &&
-            property.name.getText() === "className"
-          ) {
-            return ts.isPropertyAssignment(property)
+        const optionClassName = (
+          object: ts.ObjectLiteralExpression,
+          initial: string[][],
+        ): string[][] => {
+          let result = initial;
+          for (const property of object.properties) {
+            if (ts.isSpreadAssignment(property)) {
+              result = ts.isObjectLiteralExpression(property.expression)
+                ? optionClassName(property.expression, result)
+                : unknown();
+              continue;
+            }
+            if (
+              !ts.isPropertyAssignment(property) &&
+              !ts.isShorthandPropertyAssignment(property)
+            ) {
+              const key = staticPropertyName(property.name);
+              if (!key || key === "className") result = unknown();
+              continue;
+            }
+            const key = staticPropertyName(property.name);
+            if (!key) {
+              result = unknown();
+              continue;
+            }
+            if (key !== "className") continue;
+            result = ts.isPropertyAssignment(property)
               ? scenarios(property.initializer)
               : scenarios(property.name);
           }
-          if (ts.isSpreadAssignment(property)) return unknown();
-        }
-        return [[]];
+          return result;
+        };
+        return optionClassName(options, [[]]);
       }
       if (
         !ts.isIdentifier(child.expression) ||
@@ -400,7 +421,7 @@ function classTokenScenarios(
         [tokens(child.head.text)],
       );
     }
-    return [[]];
+    return unknown();
   };
   return scenarios(className.initializer);
 }
@@ -1477,6 +1498,63 @@ describe("mobile active-control audit oracle", () => {
       "Button",
       "Button",
     ]);
+  });
+
+  test("fails closed for unmodeled property, element, template, and arbitrary expressions", () => {
+    const failures = auditSource(
+      "fixture.tsx",
+      `
+        export function Fixture() {
+          return <div>
+            <Button className={cn("h-11 w-11", styles[mode])} />
+            <Button className={cn("h-11 w-11", styles.compact)} />
+            <Button className={cn("h-11 w-11", \`\${styles[mode]}\`)} />
+            <Button className={cn("h-11 w-11", tw\`size-\${mode}\`)} />
+            <Button className={cn("h-11 w-11", (styles as Record<string, string>)[mode])} />
+          </div>;
+        }
+      `,
+    );
+
+    expect(failures.map(({ tag }) => tag)).toEqual([
+      "Button",
+      "Button",
+      "Button",
+      "Button",
+      "Button",
+    ]);
+  });
+
+  test("buttonVariants processes className option overwrites in source order", () => {
+    const failures = auditSource(
+      "fixture.tsx",
+      `
+        export function Fixture() {
+          return <div>
+            <Link
+              href="/unsafe"
+              className={cn(buttonVariants({
+                className: "inline-flex h-11 min-w-11",
+                ...unsafeOptions,
+              }))}
+            >
+              unsafe
+            </Link>
+            <button
+              type="button"
+              className={cn(buttonVariants({
+                ...unsafeOptions,
+                className: "inline-flex h-11 min-w-11 sm:h-11 sm:min-w-11 md:h-11 md:min-w-11",
+              }))}
+            >
+              safe
+            </button>
+          </div>;
+        }
+      `,
+    );
+
+    expect(failures.map(({ tag }) => tag)).toEqual(["Link"]);
   });
 
   test("accepts persistent pre-lg sizing, safe label wrappers, and lg-only surfaces", () => {
