@@ -1,4 +1,5 @@
 import type { MobilePermission } from "@/lib/auth/mobile-permissions";
+import type { Role } from "@/lib/actions/common";
 
 type RawPricingLine = {
   quantity: number;
@@ -18,7 +19,7 @@ export type OrderApprovalRequirement = {
 };
 
 export function roleCanApproveOrderRequirement(
-  role: "owner" | "manager" | "cashier" | "warehouse",
+  role: Role,
   requirement: OrderApprovalRequirement | null,
 ) {
   return requirement == null || role === "owner" || role === "manager";

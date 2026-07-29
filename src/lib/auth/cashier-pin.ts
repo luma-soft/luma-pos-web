@@ -12,7 +12,7 @@ const SCRYPT_R = 8;
 const SCRYPT_P = 1;
 const MIN_CONTEXT_SECRET_LENGTH = 32;
 
-export type CashierContextRole = "owner" | "manager" | "cashier" | "warehouse";
+export type CashierContextRole = "owner" | "manager" | "cashier" | "warehouse" | "technician";
 
 export type CashierContextClaims = {
   principalId: string;
@@ -159,5 +159,6 @@ function isCashierContextRole(value: unknown): value is CashierContextRole {
   return value === "owner" ||
     value === "manager" ||
     value === "cashier" ||
-    value === "warehouse";
+    value === "warehouse" ||
+    value === "technician";
 }

@@ -9,7 +9,7 @@ import type { ServiceChecklistItem } from "@/lib/services/domain";
 
 // ============= Enums =============
 
-export const userRoleEnum = pgEnum("user_role", ["owner", "manager", "cashier", "warehouse"]);
+export const userRoleEnum = pgEnum("user_role", ["owner", "manager", "cashier", "warehouse", "technician"]);
 export const orderStatusEnum = pgEnum("order_status", [
   "draft", "quote", "confirmed", "delivering", "completed", "cancelled", "returned", "merged",
 ]);
@@ -1048,6 +1048,247 @@ export const serviceStatusLogs = pgTable("service_status_logs", {
   createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [index("service_status_logs_job_idx").on(t.jobId, t.createdAt)]);
+
+export const serviceJobAssignments = pgTable("service_job_assignments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  jobId: uuid("job_id").notNull().references(() => serviceJobs.id, { onDelete: "cascade" }),
+  profileId: uuid("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  assignmentRole: text("assignment_role").notNull().default("crew"),
+  assignedBy: uuid("assigned_by").references(() => profiles.id, { onDelete: "set null" }),
+  assignedAt: timestamp("assigned_at", { withTimezone: true }).defaultNow().notNull(),
+  removedAt: timestamp("removed_at", { withTimezone: true }),
+}, (t) => [
+  check("service_job_assignments_role_check", sql`${t.assignmentRole} in ('primary', 'crew')`),
+  uniqueIndex("service_job_assignments_job_profile_idx").on(t.jobId, t.profileId),
+  index("service_job_assignments_profile_active_idx").on(t.profileId, t.removedAt),
+]);
+
+export const serviceVisits = pgTable("service_visits", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  jobId: uuid("job_id").notNull().references(() => serviceJobs.id, { onDelete: "cascade" }),
+  profileId: uuid("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("active"),
+  checkedInAt: timestamp("checked_in_at", { withTimezone: true }).defaultNow().notNull(),
+  checkedOutAt: timestamp("checked_out_at", { withTimezone: true }),
+  checkInLatitude: decimal("check_in_latitude", { precision: 9, scale: 6 }),
+  checkInLongitude: decimal("check_in_longitude", { precision: 9, scale: 6 }),
+  checkOutLatitude: decimal("check_out_latitude", { precision: 9, scale: 6 }),
+  checkOutLongitude: decimal("check_out_longitude", { precision: 9, scale: 6 }),
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("service_visits_status_check", sql`${t.status} in ('active', 'completed', 'cancelled')`),
+  check("service_visits_check_out_check", sql`${t.checkedOutAt} is null or ${t.checkedOutAt} >= ${t.checkedInAt}`),
+  index("service_visits_job_time_idx").on(t.jobId, t.checkedInAt),
+  uniqueIndex("service_visits_profile_active_idx").on(t.profileId).where(sql`${t.status} = 'active'`),
+]);
+
+export const serviceTimeEntries = pgTable("service_time_entries", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  jobId: uuid("job_id").notNull().references(() => serviceJobs.id, { onDelete: "cascade" }),
+  visitId: uuid("visit_id").references(() => serviceVisits.id, { onDelete: "set null" }),
+  profileId: uuid("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  entryType: text("entry_type").notNull().default("work"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+  endedAt: timestamp("ended_at", { withTimezone: true }),
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("service_time_entries_type_check", sql`${t.entryType} in ('work', 'travel')`),
+  check("service_time_entries_end_check", sql`${t.endedAt} is null or ${t.endedAt} >= ${t.startedAt}`),
+  index("service_time_entries_job_profile_idx").on(t.jobId, t.profileId, t.startedAt),
+]);
+
+export const serviceAttachments = pgTable("service_attachments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  jobId: uuid("job_id").references(() => serviceJobs.id, { onDelete: "cascade" }),
+  requestId: uuid("request_id").references((): AnyPgColumn => serviceCustomerRequests.id, { onDelete: "cascade" }),
+  category: text("category").notNull(),
+  bucket: varchar("bucket", { length: 80 }).notNull(),
+  path: text("path").notNull(),
+  fileName: text("file_name").notNull(),
+  mimeType: varchar("mime_type", { length: 120 }).notNull(),
+  sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
+  sha256: varchar("sha256", { length: 64 }),
+  caption: text("caption"),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("service_attachments_category_check", sql`${t.category} in ('before', 'after', 'issue', 'document', 'signature')`),
+  check("service_attachments_size_check", sql`${t.sizeBytes} > 0`),
+  uniqueIndex("service_attachments_bucket_path_idx").on(t.bucket, t.path),
+  index("service_attachments_job_idx").on(t.jobId, t.createdAt),
+]);
+
+export const serviceSignatures = pgTable("service_signatures", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  jobId: uuid("job_id").notNull().references(() => serviceJobs.id, { onDelete: "cascade" }),
+  documentId: uuid("document_id").references(() => serviceHandoverDocuments.id, { onDelete: "set null" }),
+  attachmentId: uuid("attachment_id").notNull().references(() => serviceAttachments.id, { onDelete: "restrict" }),
+  signerName: text("signer_name").notNull(),
+  signerRole: text("signer_role"),
+  documentHash: varchar("document_hash", { length: 64 }).notNull(),
+  signedByProfileId: uuid("signed_by_profile_id").references(() => profiles.id, { onDelete: "set null" }),
+  signedAt: timestamp("signed_at", { withTimezone: true }).defaultNow().notNull(),
+  evidence: jsonb("evidence").$type<Record<string, unknown>>().notNull().default({}),
+}, (t) => [
+  check("service_signatures_hash_check", sql`${t.documentHash} ~ '^[0-9a-f]{64}$'`),
+  index("service_signatures_job_idx").on(t.jobId, t.signedAt),
+]);
+
+export const serviceJobEvents = pgTable("service_job_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  jobId: uuid("job_id").notNull().references(() => serviceJobs.id, { onDelete: "cascade" }),
+  eventType: text("event_type").notNull(),
+  actorId: uuid("actor_id").references(() => profiles.id, { onDelete: "set null" }),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [index("service_job_events_job_idx").on(t.jobId, t.createdAt)]);
+
+export const serviceFieldMutations = pgTable("service_field_mutations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clientMutationId: varchar("client_mutation_id", { length: 100 }).notNull(),
+  actorId: uuid("actor_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  jobId: uuid("job_id").notNull().references(() => serviceJobs.id, { onDelete: "cascade" }),
+  operation: text("operation").notNull(),
+  result: jsonb("result").$type<Record<string, unknown> | null>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [uniqueIndex("service_field_mutations_client_idx").on(t.actorId, t.clientMutationId)]);
+
+export const serviceMaintenanceOccurrences = pgTable("service_maintenance_occurrences", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  planId: uuid("plan_id").notNull().references(() => serviceMaintenancePlans.id, { onDelete: "cascade" }),
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  jobId: uuid("job_id").references(() => serviceJobs.id, { onDelete: "set null" }),
+  dueOn: date("due_on").notNull(),
+  status: text("status").notNull().default("scheduled"),
+  generatedAt: timestamp("generated_at", { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (t) => [
+  check("service_maintenance_occurrences_status_check", sql`${t.status} in ('scheduled', 'completed', 'skipped', 'overdue')`),
+  uniqueIndex("service_maintenance_occurrences_plan_due_idx").on(t.planId, t.dueOn),
+  index("service_maintenance_occurrences_due_idx").on(t.status, t.dueOn),
+]);
+
+export const serviceSlaPolicies = pgTable("service_sla_policies", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  priority: serviceJobPriorityEnum("priority").notNull(),
+  responseMinutes: integer("response_minutes").notNull(),
+  resolutionMinutes: integer("resolution_minutes").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("service_sla_policies_minutes_check", sql`${t.responseMinutes} > 0 and ${t.resolutionMinutes} >= ${t.responseMinutes}`),
+  uniqueIndex("service_sla_policies_priority_active_idx").on(t.priority).where(sql`${t.isActive}`),
+]);
+
+export const serviceCustomerRequests = pgTable("service_customer_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: varchar("code", { length: 30 }).notNull().unique(),
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  customerId: uuid("customer_id").references(() => customers.id, { onDelete: "set null" }),
+  assetId: uuid("asset_id").references(() => installedAssets.id, { onDelete: "set null" }),
+  claimId: uuid("claim_id").references(() => warrantyClaims.id, { onDelete: "set null" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  contactName: text("contact_name").notNull(),
+  contactPhone: varchar("contact_phone", { length: 20 }),
+  priority: serviceJobPriorityEnum("priority").notNull().default("normal"),
+  status: text("status").notNull().default("new"),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+  tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }).notNull(),
+  responseDueAt: timestamp("response_due_at", { withTimezone: true }),
+  resolutionDueAt: timestamp("resolution_due_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("service_customer_requests_status_check", sql`${t.status} in ('new', 'triaged', 'scheduled', 'in_progress', 'resolved', 'closed', 'void')`),
+  uniqueIndex("service_customer_requests_token_idx").on(t.tokenHash),
+  index("service_customer_requests_sla_idx").on(t.status, t.responseDueAt, t.resolutionDueAt),
+]);
+
+export const cameraVendorConnections = pgTable("camera_vendor_connections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  vendor: text("vendor").notNull(),
+  name: text("name").notNull(),
+  region: varchar("region", { length: 40 }),
+  status: text("status").notNull().default("disabled"),
+  config: jsonb("config").$type<Record<string, unknown>>().notNull().default({}),
+  lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("camera_vendor_connections_vendor_check", sql`${t.vendor} in ('ezviz', 'hikvision', 'dahua', 'uniview')`),
+  check("camera_vendor_connections_status_check", sql`${t.status} in ('disabled', 'active', 'error')`),
+]);
+
+export const cameraDeviceLinks = pgTable("camera_device_links", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  connectionId: uuid("connection_id").notNull().references(() => cameraVendorConnections.id, { onDelete: "cascade" }),
+  assetId: uuid("asset_id").notNull().references(() => installedAssets.id, { onDelete: "cascade" }),
+  externalDeviceId: text("external_device_id").notNull(),
+  vendorAppUrl: text("vendor_app_url"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("camera_device_links_connection_external_idx").on(t.connectionId, t.externalDeviceId),
+  uniqueIndex("camera_device_links_asset_connection_idx").on(t.assetId, t.connectionId),
+]);
+
+export const cameraHealthSnapshots = pgTable("camera_health_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  deviceLinkId: uuid("device_link_id").notNull().references(() => cameraDeviceLinks.id, { onDelete: "cascade" }),
+  online: boolean("online"),
+  status: text("status").notNull().default("unknown"),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+  firmwareVersion: text("firmware_version"),
+  storageStatus: text("storage_status"),
+  channelCount: integer("channel_count"),
+  capturedAt: timestamp("captured_at", { withTimezone: true }).defaultNow().notNull(),
+  rawHash: varchar("raw_hash", { length: 64 }),
+}, (t) => [
+  check("camera_health_snapshots_status_check", sql`${t.status} in ('healthy', 'warning', 'offline', 'unknown')`),
+  index("camera_health_snapshots_device_idx").on(t.deviceLinkId, t.capturedAt),
+]);
+
+export const cameraDeviceAlerts = pgTable("camera_device_alerts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  deviceLinkId: uuid("device_link_id").notNull().references(() => cameraDeviceLinks.id, { onDelete: "cascade" }),
+  externalAlertId: text("external_alert_id").notNull(),
+  alertType: text("alert_type").notNull(),
+  severity: text("severity").notNull().default("warning"),
+  message: text("message"),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("camera_device_alerts_severity_check", sql`${t.severity} in ('info', 'warning', 'critical')`),
+  uniqueIndex("camera_device_alerts_device_external_idx").on(t.deviceLinkId, t.externalAlertId),
+  index("camera_device_alerts_open_idx").on(t.deviceLinkId, t.resolvedAt, t.occurredAt),
+]);
+
+export const cameraSyncRuns = pgTable("camera_sync_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  connectionId: uuid("connection_id").notNull().references(() => cameraVendorConnections.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("running"),
+  deviceCount: integer("device_count").notNull().default(0),
+  alertCount: integer("alert_count").notNull().default(0),
+  errorCode: text("error_code"),
+  errorMessage: text("error_message"),
+  startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+}, (t) => [
+  check("camera_sync_runs_status_check", sql`${t.status} in ('running', 'succeeded', 'partial', 'failed')`),
+  index("camera_sync_runs_connection_idx").on(t.connectionId, t.startedAt),
+]);
 
 // ============= Khuyến mãi (bậc thang theo SL) =============
 

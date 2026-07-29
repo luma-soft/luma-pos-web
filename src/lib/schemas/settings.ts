@@ -12,7 +12,7 @@ export const storeSettingsSchema = z.object({
 });
 export type StoreSettingsInput = z.input<typeof storeSettingsSchema>;
 
-export const STAFF_ROLES = ["owner", "manager", "cashier", "warehouse"] as const;
+export const STAFF_ROLES = ["owner", "manager", "cashier", "warehouse", "technician"] as const;
 export type StaffRole = (typeof STAFF_ROLES)[number];
 
 /* ── Operational prefs (Tax / Payments / Notifications / Hardware) — lưu jsonb store_settings.prefs ── */
@@ -79,13 +79,13 @@ const notificationPrefs = z.object({
     einvoiceFailureAttempts: z.number().int().min(1).max(20).default(1),
   }).default({ lowStockDays: 7, einvoiceFailureAttempts: 1 }),
   roleRouting: z.object({
-    lowStock: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
+    lowStock: z.array(z.enum(STAFF_ROLES))
       .min(1).default(["owner", "manager", "warehouse"]),
-    einvoiceError: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
+    einvoiceError: z.array(z.enum(STAFF_ROLES))
       .min(1).default(["owner", "manager"]),
-    shiftClose: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
+    shiftClose: z.array(z.enum(STAFF_ROLES))
       .min(1).default(["owner", "manager", "cashier"]),
-    syncDone: z.array(z.enum(["owner", "manager", "cashier", "warehouse"]))
+    syncDone: z.array(z.enum(STAFF_ROLES))
       .min(1).default(["owner", "manager"]),
   }).default({
     lowStock: ["owner", "manager", "warehouse"],

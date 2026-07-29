@@ -64,7 +64,7 @@ export async function getRole(userId: string): Promise<string> {
   return profile.role;
 }
 
-export type Role = "owner" | "manager" | "cashier" | "warehouse";
+export type Role = "owner" | "manager" | "cashier" | "warehouse" | "technician";
 export type Gate = { ok: true; userId: string; role: Role } | { ok: false; error: string };
 
 /** Cổng RBAC: yêu cầu login + vai trò nằm trong `roles`. Trả userId+role nếu hợp lệ. */

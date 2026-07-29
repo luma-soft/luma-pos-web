@@ -44,6 +44,8 @@ export type ServiceProjectStage =
   | "warranty"
   | "cancelled";
 
+export type ServiceVisitStatus = "active" | "completed" | "cancelled";
+
 const allowedStatusTransitions: Record<ServiceJobStatus, readonly ServiceJobStatus[]> = {
   new: ["scheduled", "in_progress", "cancelled"],
   scheduled: ["in_progress", "waiting_materials", "waiting_customer", "cancelled"],
@@ -121,6 +123,55 @@ export function canTransitionWarrantyClaim(
   next: WarrantyClaimStatus,
 ): boolean {
   return current === next || allowedWarrantyTransitions[current].includes(next);
+}
+
+export function canTransitionServiceVisit(
+  current: ServiceVisitStatus,
+  next: ServiceVisitStatus,
+): boolean {
+  if (current === next) return true;
+  return current === "active" && (next === "completed" || next === "cancelled");
+}
+
+export function fieldCompletionErrors(input: {
+  serviceType: ConcreteServiceType;
+  checklist: readonly ServiceChecklistItem[];
+  beforeEvidenceCount: number;
+  afterEvidenceCount: number;
+  signatureCount: number;
+}): string[] {
+  const errors: string[] = [];
+  if (input.checklist.some((item) => !item.completed)) {
+    errors.push("services.completion.checklistIncomplete");
+  }
+  if (input.beforeEvidenceCount < 1) {
+    errors.push("services.completion.beforeEvidenceRequired");
+  }
+  if (input.afterEvidenceCount < 1) {
+    errors.push("services.completion.afterEvidenceRequired");
+  }
+  if (input.signatureCount < 1) {
+    errors.push("services.completion.signatureRequired");
+  }
+  return errors;
+}
+
+export function calculateServiceSlaDeadlines(input: {
+  reportedAt: Date;
+  responseMinutes: number;
+  resolutionMinutes: number;
+}) {
+  if (
+    Number.isNaN(input.reportedAt.getTime())
+    || !Number.isInteger(input.responseMinutes)
+    || !Number.isInteger(input.resolutionMinutes)
+    || input.responseMinutes <= 0
+    || input.resolutionMinutes < input.responseMinutes
+  ) return null;
+  return {
+    responseDueAt: new Date(input.reportedAt.getTime() + input.responseMinutes * 60_000),
+    resolutionDueAt: new Date(input.reportedAt.getTime() + input.resolutionMinutes * 60_000),
+  };
 }
 
 export function deriveServiceProjectStage(input: {

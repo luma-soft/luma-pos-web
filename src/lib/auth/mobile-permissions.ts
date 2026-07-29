@@ -2,6 +2,7 @@ import type { Role } from "@/lib/actions/common";
 
 export const mobilePermissionKeys = [
   "dashboard.view",
+  "service.field",
   "pos.sell",
   "catalog.manage",
   "reports.view",
@@ -56,12 +57,12 @@ function emptyMatrix(): MobilePermissionMatrix {
 export function permissionMatrixForRole(role: Role): MobilePermissionMatrix {
   const matrix = emptyMatrix();
   matrix["dashboard.view"] = direct();
-  matrix["reports.view"] = direct();
 
   if (role === "owner") {
     for (const permission of mobilePermissionKeys) {
       const sensitive = ![
         "dashboard.view",
+        "service.field",
         "pos.sell",
         "catalog.manage",
         "reports.view",
@@ -72,6 +73,8 @@ export function permissionMatrixForRole(role: Role): MobilePermissionMatrix {
   }
 
   if (role === "manager") {
+    matrix["service.field"] = direct();
+    matrix["reports.view"] = direct();
     matrix["pos.sell"] = direct();
     matrix["catalog.manage"] = direct();
     matrix["price.override"] = direct(true);
@@ -87,6 +90,7 @@ export function permissionMatrixForRole(role: Role): MobilePermissionMatrix {
   }
 
   if (role === "cashier") {
+    matrix["reports.view"] = direct();
     matrix["pos.sell"] = direct();
     matrix["price.override"] = approval();
     matrix["discount.override_limit"] = approval();
@@ -96,7 +100,13 @@ export function permissionMatrixForRole(role: Role): MobilePermissionMatrix {
     return matrix;
   }
 
-  matrix["catalog.manage"] = direct();
-  matrix["stock.adjust"] = approval();
+  if (role === "warehouse") {
+    matrix["reports.view"] = direct();
+    matrix["catalog.manage"] = direct();
+    matrix["stock.adjust"] = approval();
+    return matrix;
+  }
+
+  matrix["service.field"] = direct();
   return matrix;
 }

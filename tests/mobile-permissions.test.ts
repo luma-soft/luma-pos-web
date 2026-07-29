@@ -39,4 +39,15 @@ describe("mobile permission matrix", () => {
     expect(permissions["payment.reconcile"].reauthRequired).toBe(true);
     expect(permissions["customer.erase"].reauthRequired).toBe(true);
   });
+
+  test("technician can perform field service without commercial access", () => {
+    const permissions = permissionMatrixForRole("technician");
+
+    expect(permissions["service.field"].allowed).toBe(true);
+    expect(permissions["dashboard.view"].allowed).toBe(true);
+    expect(permissions["pos.sell"].allowed).toBe(false);
+    expect(permissions["catalog.manage"].allowed).toBe(false);
+    expect(permissions["reports.view"].allowed).toBe(false);
+    expect(permissions["cash.manage"].managerApprovalAllowed).toBe(false);
+  });
 });

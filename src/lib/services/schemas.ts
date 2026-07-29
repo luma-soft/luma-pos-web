@@ -213,3 +213,61 @@ export const warrantyClaimTransitionSchema = z.object({
 });
 
 export type WarrantyClaimTransitionInput = z.input<typeof warrantyClaimTransitionSchema>;
+
+const clientMutationIdSchema = z.string().trim().min(8).max(100);
+
+export const serviceJobAssignmentSchema = z.object({
+  jobId: z.uuid(),
+  profileId: z.uuid(),
+  assignmentRole: z.enum(["primary", "crew"]).default("crew"),
+});
+
+export const serviceVisitMutationSchema = z.object({
+  jobId: z.uuid(),
+  clientMutationId: clientMutationIdSchema,
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
+  note: z.string().trim().max(1000).optional(),
+});
+
+export const serviceChecklistUpdateSchema = z.object({
+  jobId: z.uuid(),
+  clientMutationId: clientMutationIdSchema,
+  checklist: z.array(z.object({
+    code: z.string().trim().min(1).max(80),
+    labelKey: z.string().trim().min(1).max(160),
+    completed: z.boolean(),
+  })).min(1).max(100),
+});
+
+export const serviceAttachmentMetadataSchema = z.object({
+  jobId: z.uuid(),
+  category: z.enum(["before", "after", "issue", "document", "signature"]),
+  fileName: z.string().trim().min(1).max(255),
+  mimeType: z.enum(["image/jpeg", "image/png", "image/webp", "application/pdf"]),
+  sizeBytes: z.coerce.number().int().positive().max(15 * 1024 * 1024),
+  caption: z.string().trim().max(500).optional(),
+});
+
+export const serviceSignatureSchema = z.object({
+  jobId: z.uuid(),
+  attachmentId: z.uuid(),
+  documentId: z.uuid().nullable().optional(),
+  signerName: z.string().trim().min(1).max(200),
+  signerRole: z.string().trim().max(100).optional(),
+  document: z.record(z.string(), z.unknown()),
+  clientMutationId: clientMutationIdSchema,
+});
+
+export const serviceCompletionSchema = z.object({
+  jobId: z.uuid(),
+  clientMutationId: clientMutationIdSchema,
+  completionNote: z.string().trim().min(1).max(4000),
+});
+
+export type ServiceJobAssignmentInput = z.input<typeof serviceJobAssignmentSchema>;
+export type ServiceVisitMutationInput = z.input<typeof serviceVisitMutationSchema>;
+export type ServiceChecklistUpdateInput = z.input<typeof serviceChecklistUpdateSchema>;
+export type ServiceAttachmentMetadataInput = z.input<typeof serviceAttachmentMetadataSchema>;
+export type ServiceSignatureInput = z.input<typeof serviceSignatureSchema>;
+export type ServiceCompletionInput = z.input<typeof serviceCompletionSchema>;

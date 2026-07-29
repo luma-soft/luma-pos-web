@@ -4,17 +4,26 @@ import {
   canTransitionServiceJob,
   calculateServiceMaterialStockSync,
   calculateServiceProjectProfitability,
+  calculateServiceSlaDeadlines,
+  canTransitionServiceVisit,
   createDefaultChecklist,
   deriveServiceProjectStage,
+  fieldCompletionErrors,
   isServiceTypeAllowedForProject,
   validateServiceLinks,
 } from "@/lib/services/domain";
 import {
   installedAssetCreateSchema,
   installedAssetUpdateSchema,
+  serviceAttachmentMetadataSchema,
+  serviceChecklistUpdateSchema,
+  serviceCompletionSchema,
+  serviceJobAssignmentSchema,
   serviceJobCreateSchema,
   serviceJobUpdateSchema,
   serviceProjectCreateSchema,
+  serviceSignatureSchema,
+  serviceVisitMutationSchema,
   warrantyClaimCreateSchema,
   warrantyClaimUpdateSchema,
 } from "@/lib/services/schemas";
@@ -83,6 +92,97 @@ describe("service job status", () => {
       jobStatuses: ["completed", "scheduled"],
       warrantyClaimStatuses: ["closed"],
     })).toBe("active");
+  });
+});
+
+describe("field service completion", () => {
+  it("allows an active visit to complete but not return to active", () => {
+    expect(canTransitionServiceVisit("active", "completed")).toBe(true);
+    expect(canTransitionServiceVisit("completed", "active")).toBe(false);
+  });
+
+  it("requires checklist, before/after evidence, and signature for camera installation", () => {
+    expect(fieldCompletionErrors({
+      serviceType: "camera",
+      checklist: [
+        { code: "site-survey", labelKey: "survey", completed: true },
+        { code: "handover", labelKey: "handover", completed: false },
+      ],
+      beforeEvidenceCount: 0,
+      afterEvidenceCount: 1,
+      signatureCount: 0,
+    })).toEqual([
+      "services.completion.checklistIncomplete",
+      "services.completion.beforeEvidenceRequired",
+      "services.completion.signatureRequired",
+    ]);
+  });
+
+  it("accepts complete field evidence", () => {
+    expect(fieldCompletionErrors({
+      serviceType: "camera",
+      checklist: createDefaultChecklist("camera").map((item) => ({ ...item, completed: true })),
+      beforeEvidenceCount: 1,
+      afterEvidenceCount: 1,
+      signatureCount: 1,
+    })).toEqual([]);
+  });
+
+  it("calculates response and resolution SLA from one server timestamp", () => {
+    expect(calculateServiceSlaDeadlines({
+      reportedAt: new Date("2026-07-29T01:00:00.000Z"),
+      responseMinutes: 30,
+      resolutionMinutes: 240,
+    })).toEqual({
+      responseDueAt: new Date("2026-07-29T01:30:00.000Z"),
+      resolutionDueAt: new Date("2026-07-29T05:00:00.000Z"),
+    });
+  });
+
+  it("validates idempotent field mutation payloads", () => {
+    const jobId = "11111111-1111-4111-8111-111111111111";
+    const clientMutationId = "mobile-20260729-0001";
+    expect(serviceVisitMutationSchema.safeParse({
+      jobId,
+      clientMutationId,
+      latitude: 10.7769,
+      longitude: 106.7009,
+    }).success).toBe(true);
+    expect(serviceChecklistUpdateSchema.safeParse({
+      jobId,
+      clientMutationId,
+      checklist: createDefaultChecklist("camera"),
+    }).success).toBe(true);
+    expect(serviceCompletionSchema.safeParse({
+      jobId,
+      clientMutationId,
+      completionNote: "Đã bàn giao",
+    }).success).toBe(true);
+  });
+
+  it("validates private attachment, signature, and crew metadata", () => {
+    const jobId = "11111111-1111-4111-8111-111111111111";
+    const profileId = "22222222-2222-4222-8222-222222222222";
+    const attachmentId = "33333333-3333-4333-8333-333333333333";
+    expect(serviceAttachmentMetadataSchema.safeParse({
+      jobId,
+      category: "before",
+      fileName: "truoc-lap.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: 120_000,
+    }).success).toBe(true);
+    expect(serviceSignatureSchema.safeParse({
+      jobId,
+      attachmentId,
+      signerName: "Nguyễn Văn A",
+      document: { accepted: true },
+      clientMutationId: "mobile-sign-1",
+    }).success).toBe(true);
+    expect(serviceJobAssignmentSchema.safeParse({
+      jobId,
+      profileId,
+      assignmentRole: "crew",
+    }).success).toBe(true);
   });
 });
 
