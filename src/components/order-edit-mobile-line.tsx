@@ -1,7 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 import { Trash2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { MoneyInput } from "@/components/ui/money-input";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -38,11 +39,19 @@ export function OrderEditMobileLineLayout({
   lineTotal: string;
   onDelete: () => void;
 }) {
+  const headingId = `${useId()}-product-name`;
+  const quantityLabelId = `${headingId}-quantity`;
+
   return (
-    <article className="space-y-3 rounded-xl border border-border-soft p-3">
+    <article
+      aria-labelledby={headingId}
+      className="space-y-3 rounded-xl border border-border-soft p-3"
+    >
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="break-words text-sm font-medium">{productName}</p>
+          <h3 id={headingId} className="break-words text-sm font-medium">
+            {productName}
+          </h3>
           <p className="mt-0.5 text-xs text-slate-500">
             {labels.unit}: {unitName}
           </p>
@@ -57,10 +66,14 @@ export function OrderEditMobileLineLayout({
         </button>
       </div>
       <div className="grid grid-cols-1 gap-3 min-[360px]:grid-cols-[132px_minmax(0,1fr)]">
-        <label className="space-y-1 text-xs font-medium text-slate-500">
-          <span className="block">{labels.quantity}</span>
+        <div
+          role="group"
+          aria-labelledby={`${headingId} ${quantityLabelId}`}
+          className="space-y-1 text-xs font-medium text-slate-500"
+        >
+          <span id={quantityLabelId} className="block">{labels.quantity}</span>
           {quantityControl}
-        </label>
+        </div>
         <label className="min-w-0 space-y-1 text-xs font-medium text-slate-500">
           <span className="block">{labels.unitPrice}</span>
           {unitPriceControl}
@@ -89,6 +102,8 @@ export function OrderEditMobileLine({
   onUnitPriceChange: (unitPrice: number) => void;
   onDelete: () => void;
 }) {
+  const t = useTranslations();
+
   return (
     <OrderEditMobileLineLayout
       productName={line.productName}
@@ -96,21 +111,30 @@ export function OrderEditMobileLine({
       labels={labels}
       quantityControl={
         <QuantityInput
-            min={0}
-            value={line.quantity}
-            onChange={onQuantityChange}
-            size="sm"
-            className="w-[132px]"
+          min={0}
+          value={line.quantity}
+          onChange={onQuantityChange}
+          size="sm"
+          className="w-[132px]"
+          decrementLabel={t("common.decreaseProductQuantity", {
+            product: line.productName,
+          })}
+          inputLabel={t("common.productQuantity", {
+            product: line.productName,
+          })}
+          incrementLabel={t("common.increaseProductQuantity", {
+            product: line.productName,
+          })}
         />
       }
       unitPriceControl={
         <MoneyInput
-            value={line.unitPrice}
-            onChange={(value) => onUnitPriceChange(value ?? 0)}
-            className={cn(
-              inputClassName,
-              "w-full text-right min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
-            )}
+          value={line.unitPrice}
+          onChange={(value) => onUnitPriceChange(value ?? 0)}
+          className={cn(
+            inputClassName,
+            "w-full text-right min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
+          )}
         />
       }
       lineTotal={formatCurrency(line.quantity * line.unitPrice)}
