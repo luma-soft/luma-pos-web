@@ -4,7 +4,10 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { eq } from "drizzle-orm";
 import * as schema from "../src/db/schema.ts";
-import { persistNotificationSettingsPatch } from "../src/lib/settings/notification-settings-core.ts";
+import {
+  persistNotificationSettingsPatch,
+  persistStorePrefsPatch,
+} from "../src/lib/settings/notification-settings-core.ts";
 
 const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const client = new PGlite();
@@ -73,8 +76,13 @@ await Promise.all([
   persistNotificationSettingsPatch(synchronizedDatabase, {
     invoiceCreated: false,
   }),
-  persistNotificationSettingsPatch(synchronizedDatabase, {
-    purchaseReceived: false,
+  persistStorePrefsPatch(synchronizedDatabase, {
+    hardware: {
+      paperSize: "A4",
+      autoPrint: true,
+      openDrawer: false,
+      printEinvoiceQr: false,
+    },
   }),
 ]);
 
@@ -84,8 +92,14 @@ const [saved] = await database
   .where(eq(schema.storeSettings.id, "default"));
 
 assert.equal(saved.prefs.notifications.invoiceCreated, false);
-assert.equal(saved.prefs.notifications.purchaseReceived, false);
+assert.equal(saved.prefs.notifications.purchaseReceived, true);
 assert.equal(saved.prefs.notifications.debtChanged, true);
+assert.deepEqual(saved.prefs.hardware, {
+  paperSize: "A4",
+  autoPrint: true,
+  openDrawer: false,
+  printEinvoiceQr: false,
+});
 
 await client.close();
-console.log("✅ concurrent partial notification settings patches preserve both updates");
+console.log("✅ legacy web prefs and mobile notification CAS writes preserve both intents");

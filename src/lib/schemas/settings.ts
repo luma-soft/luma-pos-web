@@ -137,7 +137,10 @@ export const mobileNotificationSettingsPatchSchema = z.object({
     start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
     end: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
     timezone: z.string().trim().min(1).max(80).optional(),
-  }).strict().optional(),
+  }).strict().refine(
+    (value) => Object.keys(value).length > 0,
+    "quietHours patch must not be empty",
+  ).optional(),
   thresholds: z.object({
     lowStockDays: z.number().int().min(1).max(90).optional(),
     einvoiceFailureAttempts: z.number().int().min(1).max(20).optional(),
@@ -152,7 +155,10 @@ export const mobileNotificationSettingsPatchSchema = z.object({
     debtChanged: notificationRoutePatchSchema.optional(),
     qrPaymentConfirmed: notificationRoutePatchSchema.optional(),
     qrPaymentException: notificationRoutePatchSchema.optional(),
-  }).strict().optional(),
+  }).strict().refine(
+    (value) => Object.keys(value).length > 0,
+    "roleRouting patch must not be empty",
+  ).optional(),
 }).strict();
 export type MobileNotificationSettingsPatch = z.infer<
   typeof mobileNotificationSettingsPatchSchema

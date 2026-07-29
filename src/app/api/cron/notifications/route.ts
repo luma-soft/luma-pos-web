@@ -1,18 +1,11 @@
-import { timingSafeEqual } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { einvoices } from "@/db/schema";
 import { getRestockSuggestions } from "@/lib/data/ai-restock";
 import { getRawStorePrefs } from "@/lib/data/settings";
 import { dispatchPushNotification } from "@/lib/notifications/push";
+import { isNotificationCronAuthorized } from "@/lib/notifications/cron-auth";
 import { mobileError, mobileOk } from "@/lib/mobile/response";
-
-function authorized(request: Request) {
-  const expected = process.env.NOTIFICATION_CRON_SECRET?.trim() ?? "";
-  const actual = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim() ?? "";
-  if (!expected || actual.length !== expected.length) return false;
-  return timingSafeEqual(Buffer.from(actual), Buffer.from(expected));
-}
 
 function dateKey(timezone: string) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -140,7 +133,9 @@ export async function getNotificationOperationsSummary(
 }
 
 export async function GET(request: Request) {
-  if (!authorized(request)) return mobileError("errors.unauthorized", 401);
+  if (!isNotificationCronAuthorized(request)) {
+    return mobileError("errors.unauthorized", 401);
+  }
   const prefs = (await getRawStorePrefs()).notifications;
   const day = dateKey(prefs.quietHours.timezone);
   const results = [];

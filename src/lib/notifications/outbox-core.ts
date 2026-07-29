@@ -510,6 +510,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
         effectiveUserId: mobilePushDevices.effectiveUserId,
         token: mobilePushDevices.token,
         locale: mobilePushDevices.locale,
+        bindingGeneration: mobilePushDevices.bindingGeneration,
       })
       .from(mobilePushDevices)
       .innerJoin(profiles, eq(profiles.id, mobilePushDevices.userId))
@@ -537,6 +538,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
       effectiveUserId: string;
       token: string;
       locale: string | null;
+      bindingGeneration: number;
     }>;
     const deviceClaims: Array<{
       device: (typeof typedDevices)[number];
@@ -647,6 +649,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
         return deviceClaim;
       }
 
+      const sendLeaseId = crypto.randomUUID();
       const sendFence = await database.transaction(async (tx: DatabaseLike) => {
         const [owner] = await tx
           .select({ leaseExpiresAt: notificationOutbox.leaseExpiresAt })
@@ -675,7 +678,11 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
           || !delivery
           || delivery.attemptedAt.getTime() + deviceSendLeaseMs <= validationAt.getTime()
         ) {
-          return { kind: "retry" as const };
+          return {
+            kind: "retry" as const,
+            code: "NOTIFICATION_LEASE_EXPIRED",
+            retryAfterMs: 0,
+          };
         }
 
         const validationPrincipalProfiles = alias(
@@ -690,6 +697,11 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
           .select({
             token: mobilePushDevices.token,
             locale: mobilePushDevices.locale,
+            bindingGeneration: mobilePushDevices.bindingGeneration,
+            sendLeaseId: mobilePushDevices.sendLeaseId,
+            sendLeaseExpiresAt: mobilePushDevices.sendLeaseExpiresAt,
+            permission: mobilePushDevices.permission,
+            enabled: mobilePushDevices.enabled,
             reason: notificationRecipients.reason,
             role: validationEffectiveProfiles.role,
             principalActive: validationPrincipalProfiles.isActive,
@@ -718,15 +730,37 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
             eq(mobilePushDevices.userId, device.userId),
             eq(mobilePushDevices.effectiveUserId, device.effectiveUserId),
             eq(mobilePushDevices.token, device.token),
-            eq(mobilePushDevices.enabled, true),
-            eq(mobilePushDevices.permission, "authorized"),
+            eq(
+              mobilePushDevices.bindingGeneration,
+              device.bindingGeneration,
+            ),
           ))
           .limit(1);
 
         const liveNotifications = parseStorePrefs(live?.prefs).notifications;
         const liveAllowedRoles = liveNotifications.roleRouting[category] as Role[];
+        if (!live) {
+          await tx
+            .update(mobilePushDeliveries)
+            .set({
+              status: "failed",
+              errorCode: "NOTIFICATION_BINDING_STALE",
+              attemptedAt: validationAt,
+            })
+            .where(and(
+              eq(mobilePushDeliveries.id, deviceClaim.id),
+              eq(mobilePushDeliveries.status, "sending"),
+              eq(mobilePushDeliveries.attemptedAt, deviceClaim.attemptedAt),
+            ));
+          return {
+            kind: "retry" as const,
+            code: "NOTIFICATION_BINDING_STALE",
+            retryAfterMs: 0,
+          };
+        }
         const eligible = Boolean(
-          live
+          live.enabled
+          && live.permission === "authorized"
           && live.principalActive
           && live.effectiveActive
           && liveNotifications.channels.push
@@ -751,17 +785,55 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
             ));
           return { kind: "skip" as const };
         }
+        const [leased] = await tx
+          .update(mobilePushDevices)
+          .set({
+            sendLeaseId,
+            sendLeaseGeneration: live.bindingGeneration,
+            sendLeaseExpiresAt: addMilliseconds(validationAt, deviceSendLeaseMs),
+            updatedAt: validationAt,
+          })
+          .where(and(
+            eq(mobilePushDevices.id, device.id),
+            eq(mobilePushDevices.userId, device.userId),
+            eq(mobilePushDevices.effectiveUserId, device.effectiveUserId),
+            eq(mobilePushDevices.token, device.token),
+            eq(
+              mobilePushDevices.bindingGeneration,
+              device.bindingGeneration,
+            ),
+            or(
+              isNull(mobilePushDevices.sendLeaseId),
+              lte(mobilePushDevices.sendLeaseExpiresAt, validationAt),
+            ),
+          ))
+          .returning({ id: mobilePushDevices.id });
+        if (!leased) {
+          const retryAfterMs = live.sendLeaseExpiresAt
+            ? Math.max(
+              0,
+              live.sendLeaseExpiresAt.getTime() - validationAt.getTime(),
+            )
+            : deviceSendLeaseMs;
+          return {
+            kind: "retry" as const,
+            code: "NOTIFICATION_DEVICE_BUSY",
+            retryAfterMs,
+          };
+        }
         return {
           kind: "send" as const,
           token: live.token,
           locale: live.locale,
+          leaseId: sendLeaseId,
+          bindingGeneration: live.bindingGeneration,
         };
       });
       if (sendFence.kind === "retry") {
         return {
           kind: "retry" as const,
-          code: "NOTIFICATION_LEASE_EXPIRED",
-          retryAfterMs: 0,
+          code: sendFence.code,
+          retryAfterMs: sendFence.retryAfterMs,
         };
       }
       if (sendFence.kind === "skip") {
@@ -788,15 +860,41 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
       const errorCode = result.kind === "sent"
         ? null
         : boundedErrorCode(result.code, "FCM_FAILED");
-      const [persisted] = await database
-        .update(mobilePushDeliveries)
-        .set({ status, errorCode, attemptedAt })
-        .where(and(
-          eq(mobilePushDeliveries.id, deviceClaim.id),
-          eq(mobilePushDeliveries.status, "sending"),
-          eq(mobilePushDeliveries.attemptedAt, deviceClaim.attemptedAt),
-        ))
-        .returning({ status: mobilePushDeliveries.status });
+      const persisted = await database.transaction(async (tx: DatabaseLike) => {
+        const [released] = await tx
+          .update(mobilePushDevices)
+          .set({
+            sendLeaseId: null,
+            sendLeaseGeneration: null,
+            sendLeaseExpiresAt: null,
+            updatedAt: attemptedAt,
+          })
+          .where(and(
+            eq(mobilePushDevices.id, device.id),
+            eq(
+              mobilePushDevices.bindingGeneration,
+              sendFence.bindingGeneration,
+            ),
+            eq(mobilePushDevices.sendLeaseId, sendFence.leaseId),
+            eq(
+              mobilePushDevices.sendLeaseGeneration,
+              sendFence.bindingGeneration,
+            ),
+          ))
+          .returning({ id: mobilePushDevices.id });
+        if (!released) return undefined;
+
+        const [saved] = await tx
+          .update(mobilePushDeliveries)
+          .set({ status, errorCode, attemptedAt })
+          .where(and(
+            eq(mobilePushDeliveries.id, deviceClaim.id),
+            eq(mobilePushDeliveries.status, "sending"),
+            eq(mobilePushDeliveries.attemptedAt, deviceClaim.attemptedAt),
+          ))
+          .returning({ status: mobilePushDeliveries.status });
+        return saved;
+      });
 
       if (!persisted) {
         const [current] = await database
@@ -821,6 +919,10 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
           .where(and(
             eq(mobilePushDevices.id, device.id),
             eq(mobilePushDevices.token, device.token),
+            eq(
+              mobilePushDevices.bindingGeneration,
+              sendFence.bindingGeneration,
+            ),
           ));
       }
       return result;

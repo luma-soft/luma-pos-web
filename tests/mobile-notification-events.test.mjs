@@ -4,6 +4,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { mock } from "bun:test";
 import { drizzle } from "drizzle-orm/pglite";
 import { and, eq } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 
 const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const schema = await import(`${projectRoot}/src/db/schema.ts`);
@@ -164,7 +165,10 @@ mock.module("@/lib/data/settings", () => ({
 
 const listRoute = await import("../src/app/api/mobile/notifications/route.ts");
 const eventRoute = await import("../src/app/api/mobile/notifications/[id]/route.ts");
-const { localizedMobileEventCopy } = await import(
+const {
+  localizedMobileEventCopy,
+  persistedMobileEventListQuery,
+} = await import(
   "../src/lib/notifications/mobile-events.ts"
 );
 
@@ -523,6 +527,70 @@ await check("persisted rows are capped while aggregate counts remain authoritati
     userId: ids.cashier,
     reason: "direct",
   })));
+  const invalidEvents = [
+    {
+      id: crypto.randomUUID(),
+      eventKey: "bounded-list-invalid-category",
+      category: "unsupportedCategory",
+      entityType: "order",
+      entityId: ids.invoice,
+      target: "invoices",
+      priority: "normal",
+      quietHoursPolicy: "defer",
+      contractVersion: 1,
+      metadata: {},
+      occurredAt: new Date("2026-07-29T00:59:00.000Z"),
+      createdAt: new Date("2026-07-29T00:59:01.000Z"),
+    },
+    {
+      id: crypto.randomUUID(),
+      eventKey: "bounded-list-invalid-target-pair",
+      category: "invoiceCreated",
+      entityType: "order",
+      entityId: ids.invoice,
+      target: "purchases",
+      priority: "normal",
+      quietHoursPolicy: "defer",
+      contractVersion: 1,
+      metadata: {},
+      occurredAt: new Date("2026-07-29T00:58:00.000Z"),
+      createdAt: new Date("2026-07-29T00:58:01.000Z"),
+    },
+    {
+      id: crypto.randomUUID(),
+      eventKey: "bounded-list-unsupported-version",
+      category: "invoiceCreated",
+      entityType: "order",
+      entityId: ids.invoice,
+      target: "invoices",
+      priority: "normal",
+      quietHoursPolicy: "defer",
+      contractVersion: 2,
+      metadata: {},
+      occurredAt: new Date("2026-07-29T00:57:00.000Z"),
+      createdAt: new Date("2026-07-29T00:57:01.000Z"),
+    },
+    {
+      id: crypto.randomUUID(),
+      eventKey: "bounded-list-old-invalid",
+      category: "unsupportedCategory",
+      entityType: "order",
+      entityId: ids.invoice,
+      target: "invoices",
+      priority: "normal",
+      quietHoursPolicy: "defer",
+      contractVersion: 1,
+      metadata: {},
+      occurredAt: new Date("2026-07-27T00:00:00.000Z"),
+      createdAt: new Date("2026-07-27T00:00:01.000Z"),
+    },
+  ];
+  await db.insert(notificationEvents).values(invalidEvents);
+  await db.insert(notificationRecipients).values(invalidEvents.map((event) => ({
+    eventId: event.id,
+    userId: ids.cashier,
+    reason: "direct",
+  })));
 
   const data = await list("en");
   assert.equal(data.rows.length, 50);
@@ -530,6 +598,21 @@ await check("persisted rows are capped while aggregate counts remain authoritati
   assert.equal(data.counts.unread, 56);
   assert.equal(data.counts.invoiceCreated, 56);
   assert.equal(data.rows.every((row) => row.title === "A new invoice was created"), true);
+});
+
+await check("the production list query uses the ordered valid-event index without a sort", async () => {
+  await client.exec("SET enable_seqscan = off");
+  const compiled = new PgDialect().sqlToQuery(
+    persistedMobileEventListQuery(ids.cashier),
+  );
+  const explained = await client.query(
+    `EXPLAIN (COSTS OFF) ${compiled.sql}`,
+    compiled.params,
+  );
+  const plan = explained.rows.map((row) => row["QUERY PLAN"]).join("\n");
+  assert.match(plan, /notification_events_mobile_recent_valid_idx/);
+  assert.doesNotMatch(plan, /Sort/);
+  assert.match(plan, /notification_recipients_event_user_visible_idx/);
 });
 
 await client.close();

@@ -8,7 +8,7 @@ data.
 ## Security and evidence rules
 
 - Keep `QSTASH_TOKEN`, both QStash signing keys,
-  `FIREBASE_SERVICE_ACCOUNT_JSON`, and `NOTIFICATION_CRON_SECRET` in the
+  `FIREBASE_SERVICE_ACCOUNT_JSON`, and `CRON_SECRET` in the
   deployment secret store. Never print their values.
 - Never copy an authorization header, raw webhook body, device token, service
   account JSON, payment amount, event metadata, or payment-partner identity
@@ -19,7 +19,8 @@ data.
 - Record timestamps, bounded status counts, opaque event IDs when access is
   restricted, and pass/fail results. Redact screenshots before attaching them.
 - Both notification cron routes remain protected by
-  `Authorization: Bearer <NOTIFICATION_CRON_SECRET>`. Do not place the bearer
+  `Authorization: Bearer <CRON_SECRET>`. Vercel injects this header for
+  configured cron invocations. Do not place the bearer
   value in a shell history, command transcript, or monitoring URL.
 
 ## Production configuration
@@ -33,7 +34,7 @@ QSTASH_TOKEN=<secret-store reference>
 QSTASH_CURRENT_SIGNING_KEY=<secret-store reference>
 QSTASH_NEXT_SIGNING_KEY=<secret-store reference>
 FIREBASE_SERVICE_ACCOUNT_JSON=<secret-store reference>
-NOTIFICATION_CRON_SECRET=<secret-store reference>
+CRON_SECRET=<secret-store reference>
 ```
 
 The release preflight requires all values, requires the provider to equal
@@ -48,6 +49,11 @@ dart run tool/release_preflight.dart
 The second command is expected to exit `2` until all release-owned inputs,
 signing evidence, and attestations exist. Its output contains issue codes, not
 secret values.
+
+`NOTIFICATION_CRON_SECRET` is accepted only when it is explicitly configured
+for a legacy caller during migration. The route compares every configured
+candidate in constant time. New deployments must use `CRON_SECRET`; remove
+the legacy value after all non-Vercel callers have rotated.
 
 ## QStash setup and safe rotation
 
@@ -122,6 +128,18 @@ step. That preserves a known-good rollback boundary.
 5. Verify foreground `View`, background navigation, and terminated-app
    navigation resolve the exact entity. Verify a cashier switch on a shared
    terminal cannot resolve the previous cashier's event.
+
+Each device send acquires a short database lease tied to the device, token,
+principal, effective actor, and binding generation. Rebinding returns a
+retryable conflict while that lease is active. Android `collapse_key` and APNs
+`apns-collapse-id` remain stable for the same event/device delivery.
+
+There is one unavoidable provider boundary: if the worker crashes or loses its
+connection after FCM accepted a request but before the response is persisted,
+the server cannot prove whether FCM accepted it. Recovery waits for the bounded
+lease and retries with the same collapse identity. Treat this as
+response-unknown recovery rather than claiming physical exactly-once delivery;
+never clear the lease early or invent provider evidence.
 
 ## Protected operational summary
 

@@ -37,7 +37,8 @@ type ConfirmSource = "webhook" | "api" | "manual";
 type SepayExceptionReason =
   | "missing_reference"
   | "pending_payment_not_found"
-  | "amount_mismatch";
+  | "amount_mismatch"
+  | "payment_already_confirmed";
 
 export const SEPAY_PAYMENT_TIMEOUT_MS = 90_000;
 export const GATEWAY_PAYMENT_TIMEOUT_MS = 15 * 60_000;
@@ -1429,6 +1430,19 @@ export async function matchSepayWebhookEvent(
         });
         return { ok: true, data: { matched: true } };
       }
+      if (
+        event.matchStatus === "unmatched"
+        && event.matchReason === "payment_already_confirmed"
+        && event.matchedPaymentId
+      ) {
+        return {
+          ok: true,
+          data: {
+            matched: false,
+            reason: "payment_already_confirmed",
+          },
+        };
+      }
       if (event.transferType !== "in") {
         await tx.update(paymentWebhookEvents).set({ matchStatus: "ignored", matchReason: "not_incoming_transfer" }).where(eq(paymentWebhookEvents.id, event.id));
         return { ok: true, data: { matched: false, reason: "not_incoming_transfer" } };
@@ -1505,13 +1519,6 @@ export async function matchSepayWebhookEvent(
         };
       }
 
-      await tx.update(paymentWebhookEvents).set({
-        bankAccountId: bankAccount.id,
-        matchedPaymentId: payment.id,
-        matchStatus: "matched",
-        matchReason: null,
-      }).where(eq(paymentWebhookEvents.id, event.id));
-
       const confirmation = await confirmPaymentInTx(tx, {
         paymentId: payment.id,
         providerTransactionId: event.providerEventId,
@@ -1521,6 +1528,42 @@ export async function matchSepayWebhookEvent(
         confirmedAt: event.transactionDate ?? undefined,
         source: "webhook",
       });
+      if (confirmation.alreadyConfirmed) {
+        const [claimedPayment] = await tx
+          .select({ rawMatchedEventId: payments.rawMatchedEventId })
+          .from(payments)
+          .where(eq(payments.id, payment.id))
+          .limit(1);
+        if (claimedPayment?.rawMatchedEventId === event.id) {
+          return { ok: true, data: { matched: true } };
+        }
+        const reason = "payment_already_confirmed";
+        const notification = await createSepayExceptionInTx(tx, event, reason);
+        await tx.update(paymentWebhookEvents).set({
+          bankAccountId: bankAccount.id,
+          matchedPaymentId: payment.id,
+          matchStatus: "unmatched",
+          matchReason: reason,
+          updatedAt: new Date(),
+        }).where(eq(paymentWebhookEvents.id, event.id));
+        return {
+          ok: true,
+          data: {
+            matched: false,
+            reason,
+            notificationEventId: notification?.eventId,
+            notificationCreated: notification?.created,
+          },
+        };
+      }
+
+      await tx.update(paymentWebhookEvents).set({
+        bankAccountId: bankAccount.id,
+        matchedPaymentId: payment.id,
+        matchStatus: "matched",
+        matchReason: null,
+        updatedAt: new Date(),
+      }).where(eq(paymentWebhookEvents.id, event.id));
       return {
         ok: true,
         data: {

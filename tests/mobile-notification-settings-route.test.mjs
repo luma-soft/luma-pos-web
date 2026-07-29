@@ -148,10 +148,12 @@ await check("truthy primitives, arrays, unknown keys, and malformed nested value
     { invoiceCreated: "yes" },
     { channels: { push: "yes" } },
     { quietHours: { start: "25:00" } },
+    { quietHours: {} },
     { quietHours: { unknown: true } },
     { thresholds: { lowStockDays: 0 } },
     { thresholds: { unknown: 1 } },
     { roleRouting: { invoiceCreated: [] } },
+    { roleRouting: {} },
     { roleRouting: { invoiceCreated: ["accountant"] } },
     { roleRouting: { unknown: ["owner"] } },
   ];

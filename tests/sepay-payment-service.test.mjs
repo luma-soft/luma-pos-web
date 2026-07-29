@@ -309,8 +309,18 @@ const concurrentNotifications = await db.select().from(notificationEvents)
     notificationEvents.eventKey,
     `qr-payment-confirmed:${concurrentPending.data.id}`,
   ));
+const concurrentWebhookEvents = await db.select().from(paymentWebhookEvents)
+  .where(eq(paymentWebhookEvents.referenceCode, "LUMA-DH-CONCURRENT"));
+const concurrentExceptionNotifications = await db.select().from(notificationEvents)
+  .where(eq(notificationEvents.category, "qrPaymentException"));
+const concurrentWinner = concurrentWebhookEvents.find(
+  (row) => row.matchStatus === "matched",
+);
+const concurrentLoser = concurrentWebhookEvents.find(
+  (row) => row.matchReason === "payment_already_confirmed",
+);
 ok(
-  "two concurrent events produce exactly one business effect and notification",
+  "two concurrent events produce exactly one business effect and success notification",
   concurrentResults.every((result) => result.ok)
     && concurrentPaymentAfter.status === "confirmed"
     && Number(concurrentOrderAfter.amountPaid) === 180_000
@@ -322,6 +332,49 @@ ok(
     cash: concurrentCash.length,
     notifications: concurrentNotifications.length,
   }),
+);
+ok(
+  "only the winning transfer is matched and the distinct loser is terminally auditable",
+  concurrentWinner?.matchedPaymentId === concurrentPending.data.id
+    && concurrentLoser?.matchedPaymentId === concurrentPending.data.id
+    && concurrentLoser.matchStatus === "unmatched"
+    && concurrentResults.filter((result) => result.data.matched === true).length === 1
+    && concurrentResults.filter(
+      (result) => result.data.reason === "payment_already_confirmed",
+    ).length === 1,
+  JSON.stringify({
+    events: concurrentWebhookEvents.map((row) => ({
+      id: row.providerEventId,
+      matchStatus: row.matchStatus,
+      matchReason: row.matchReason,
+    })),
+    results: concurrentResults,
+  }),
+);
+ok(
+  "the losing distinct transfer emits exactly one reconciliation exception",
+  concurrentExceptionNotifications.filter(
+    (row) => row.entityId === concurrentLoser?.id,
+  ).length === 1,
+);
+const concurrentLoserReplay = await service.matchSepayWebhookEvent(
+  db,
+  concurrentLoser.id,
+);
+const [concurrentLoserAfterReplay] = await db.select()
+  .from(paymentWebhookEvents)
+  .where(eq(paymentWebhookEvents.id, concurrentLoser.id));
+const concurrentLoserExceptionsAfterReplay = await db.select()
+  .from(notificationEvents)
+  .where(eq(notificationEvents.entityId, concurrentLoser.id));
+ok(
+  "the losing transfer terminal classification is replay-safe",
+  concurrentLoserReplay.ok
+    && concurrentLoserReplay.data.matched === false
+    && concurrentLoserReplay.data.reason === "payment_already_confirmed"
+    && concurrentLoserAfterReplay.matchStatus === "unmatched"
+    && concurrentLoserAfterReplay.matchReason === "payment_already_confirmed"
+    && concurrentLoserExceptionsAfterReplay.length === 1,
 );
 
 const normalized = sepay.normalizeSepayWebhookPayload({

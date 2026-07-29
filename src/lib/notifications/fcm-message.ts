@@ -120,11 +120,13 @@ export function buildFcmMessage(input: FcmMessageInput) {
       android: {
         priority: highPriority ? "high" : "normal",
         ttl: `${ttlSeconds}s`,
+        collapse_key: input.notificationKey,
       },
       apns: {
         headers: {
           "apns-priority": highPriority ? "10" : "5",
           "apns-push-type": "alert",
+          "apns-collapse-id": input.notificationKey,
           "apns-expiration": String(Math.floor(now.getTime() / 1000) + ttlSeconds),
         },
         payload: {

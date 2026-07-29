@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { notificationEvents, notificationRecipients } from "@/db/schema";
 import {
@@ -51,31 +51,127 @@ export function localizedMobileEventCopy(
   return localizedNotificationCopy(category, locale);
 }
 
+const persistedMobileEventValidity = sql`
+  events.contract_version = 1
+  AND events.priority IN ('normal', 'high')
+  AND (
+    (events.category = 'invoiceCreated' AND events.target = 'invoices')
+    OR (
+      events.category = 'purchaseReceived'
+      AND events.target = 'purchases'
+    )
+    OR (events.category = 'debtChanged' AND events.target = 'debt')
+    OR (
+      events.category = 'qrPaymentConfirmed'
+      AND events.target = 'invoices'
+    )
+    OR (
+      events.category = 'qrPaymentException'
+      AND events.target = 'paymentReconciliation'
+    )
+  )
+`;
+
+export function persistedMobileEventListQuery(effectiveProfileId: string) {
+  return sql`
+    SELECT
+      events.id,
+      events.category,
+      events.target,
+      events.entity_id AS "entityId",
+      events.priority,
+      events.created_at AS "createdAt",
+      (
+        SELECT recipients.read_at
+        FROM notification_recipients AS recipients
+        WHERE recipients.event_id = events.id
+          AND recipients.user_id = ${effectiveProfileId}
+          AND recipients.dismissed_at IS NULL
+        LIMIT 1
+      ) AS "readAt"
+    FROM notification_events AS events
+    WHERE ${persistedMobileEventValidity}
+      AND EXISTS (
+        SELECT 1
+        FROM notification_recipients AS recipients
+        WHERE recipients.event_id = events.id
+          AND recipients.user_id = ${effectiveProfileId}
+          AND recipients.dismissed_at IS NULL
+      )
+    ORDER BY events.created_at DESC, events.id DESC
+    LIMIT ${persistedMobileEventLimit}
+  `;
+}
+
+function persistedMobileEventCountQuery(effectiveProfileId: string) {
+  return sql`
+    SELECT
+      count(*)::int AS "all",
+      count(*) FILTER (
+        WHERE (
+          SELECT recipients.read_at
+          FROM notification_recipients AS recipients
+          WHERE recipients.event_id = events.id
+            AND recipients.user_id = ${effectiveProfileId}
+            AND recipients.dismissed_at IS NULL
+          LIMIT 1
+        ) IS NULL
+      )::int AS "unread",
+      count(*) FILTER (
+        WHERE events.category = 'invoiceCreated'
+      )::int AS "invoiceCreated",
+      count(*) FILTER (
+        WHERE events.category = 'purchaseReceived'
+      )::int AS "purchaseReceived",
+      count(*) FILTER (
+        WHERE events.category = 'debtChanged'
+      )::int AS "debtChanged",
+      count(*) FILTER (
+        WHERE events.category = 'qrPaymentConfirmed'
+      )::int AS "qrPaymentConfirmed",
+      count(*) FILTER (
+        WHERE events.category = 'qrPaymentException'
+      )::int AS "qrPaymentException"
+    FROM notification_events AS events
+    WHERE ${persistedMobileEventValidity}
+      AND EXISTS (
+        SELECT 1
+        FROM notification_recipients AS recipients
+        WHERE recipients.event_id = events.id
+          AND recipients.user_id = ${effectiveProfileId}
+          AND recipients.dismissed_at IS NULL
+      )
+  `;
+}
+
+function resultRows(result: unknown): Record<string, unknown>[] {
+  if (Array.isArray(result)) return result as Record<string, unknown>[];
+  if (
+    result
+    && typeof result === "object"
+    && "rows" in result
+    && Array.isArray((result as { rows: unknown }).rows)
+  ) {
+    return (result as { rows: Record<string, unknown>[] }).rows;
+  }
+  return [];
+}
+
 export async function listPersistedMobileEvents(
   effectiveProfileId: string,
   locale: string,
 ): Promise<MobileNotificationEventRow[]> {
-  const rows = await db
-    .select({
-      id: notificationEvents.id,
-      category: notificationEvents.category,
-      target: notificationEvents.target,
-      entityId: notificationEvents.entityId,
-      priority: notificationEvents.priority,
-      createdAt: notificationEvents.createdAt,
-      readAt: notificationRecipients.readAt,
-    })
-    .from(notificationRecipients)
-    .innerJoin(
-      notificationEvents,
-      eq(notificationEvents.id, notificationRecipients.eventId),
-    )
-    .where(and(
-      eq(notificationRecipients.userId, effectiveProfileId),
-      isNull(notificationRecipients.dismissedAt),
-    ))
-    .orderBy(desc(notificationEvents.createdAt))
-    .limit(persistedMobileEventLimit);
+  const rows = resultRows(
+    await db.execute(persistedMobileEventListQuery(effectiveProfileId)),
+  ) as Array<{
+    id: string;
+    category: string;
+    target: string;
+    entityId: string;
+    priority: string;
+    createdAt: Date | string;
+    readAt: Date | string | null;
+  }>;
 
   return rows.flatMap((row) => {
     if (
@@ -92,7 +188,7 @@ export async function listPersistedMobileEvents(
       ...copy,
       unread: row.readAt === null,
       priority: row.priority,
-      createdAt: row.createdAt.toISOString(),
+      createdAt: new Date(row.createdAt).toISOString(),
       action: {
         type: "open" as const,
         target: row.target,
@@ -115,37 +211,9 @@ export type PersistedMobileEventCounts = {
 export async function countPersistedMobileEvents(
   effectiveProfileId: string,
 ): Promise<PersistedMobileEventCounts> {
-  const [row] = await db
-    .select({
-      all: sql<number>`count(*)::int`,
-      unread: sql<number>`
-        count(*) filter (where ${notificationRecipients.readAt} is null)::int
-      `,
-      invoiceCreated: sql<number>`
-        count(*) filter (where ${notificationEvents.category} = 'invoiceCreated')::int
-      `,
-      purchaseReceived: sql<number>`
-        count(*) filter (where ${notificationEvents.category} = 'purchaseReceived')::int
-      `,
-      debtChanged: sql<number>`
-        count(*) filter (where ${notificationEvents.category} = 'debtChanged')::int
-      `,
-      qrPaymentConfirmed: sql<number>`
-        count(*) filter (where ${notificationEvents.category} = 'qrPaymentConfirmed')::int
-      `,
-      qrPaymentException: sql<number>`
-        count(*) filter (where ${notificationEvents.category} = 'qrPaymentException')::int
-      `,
-    })
-    .from(notificationRecipients)
-    .innerJoin(
-      notificationEvents,
-      eq(notificationEvents.id, notificationRecipients.eventId),
-    )
-    .where(and(
-      eq(notificationRecipients.userId, effectiveProfileId),
-      isNull(notificationRecipients.dismissedAt),
-    ));
+  const [row] = resultRows(
+    await db.execute(persistedMobileEventCountQuery(effectiveProfileId)),
+  );
 
   return {
     all: Number(row?.all ?? 0),

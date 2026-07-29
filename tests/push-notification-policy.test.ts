@@ -67,7 +67,9 @@ describe("FCM notification boundary", () => {
     expect(payload.message.apns.headers).toMatchObject({
       "apns-priority": "10",
       "apns-push-type": "alert",
+      "apns-collapse-id": `event:${EVENT_ID}`,
     });
+    expect(payload.message.android.collapse_key).toBe(`event:${EVENT_ID}`);
     expect(JSON.stringify(payload)).not.toContain("1000000");
   });
 

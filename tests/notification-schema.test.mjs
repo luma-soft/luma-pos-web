@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { strict as assert } from "node:assert";
 import { PGlite } from "@electric-sql/pglite";
 
@@ -12,6 +12,9 @@ const ok = (name, condition) => {
     console.log(`  ❌ ${name}`);
   }
 };
+
+await client.exec("CREATE ROLE anon");
+await client.exec("CREATE ROLE authenticated");
 
 for (const file of readdirSync(`${PROJ}/drizzle`).filter((name) => name.endsWith(".sql")).sort()) {
   for (const statement of readFileSync(`${PROJ}/drizzle/${file}`, "utf8").split("--> statement-breakpoint")) {
@@ -65,6 +68,71 @@ const recipientUnique = await client.query(`
 ok(
   "recipient schema enforces one event/user row",
   recipientUnique.rows.length === 1,
+);
+
+const repairMigrationPath = `${PROJ}/drizzle/0066_internal_push_repair_cycle_2.sql`;
+ok("repair cycle 2 migration is tracked", existsSync(repairMigrationPath));
+if (existsSync(repairMigrationPath)) {
+  for (const statement of readFileSync(repairMigrationPath, "utf8").split("--> statement-breakpoint")) {
+    const sql = statement.trim();
+    if (sql) await client.exec(sql);
+  }
+}
+
+const [storeSettingsSecurity] = (await client.query(`
+  select
+    c.relrowsecurity,
+    has_table_privilege('anon', 'public.store_settings', 'SELECT') as anon_select,
+    has_table_privilege('authenticated', 'public.store_settings', 'UPDATE') as authenticated_update,
+    has_table_privilege(current_user, 'public.store_settings', 'SELECT,INSERT,UPDATE,DELETE') as owner_access
+  from pg_class c
+  where c.oid = 'public.store_settings'::regclass
+`)).rows;
+ok("store settings explicitly enables row-level security", storeSettingsSecurity?.relrowsecurity === true);
+ok(
+  "Data API roles have no direct store settings privileges",
+  storeSettingsSecurity?.anon_select === false
+    && storeSettingsSecurity?.authenticated_update === false,
+);
+ok("migration owner retains server-side store settings access", storeSettingsSecurity?.owner_access === true);
+
+const repairColumns = await client.query(`
+  select table_name, column_name
+  from information_schema.columns
+  where (table_name = 'notification_events' and column_name = 'contract_version')
+     or (
+       table_name = 'mobile_push_devices'
+       and column_name in (
+         'binding_generation',
+         'send_lease_id',
+         'send_lease_generation',
+         'send_lease_expires_at'
+       )
+     )
+`);
+ok("repair migration tracks event version and durable device send lease", repairColumns.rows.length === 5);
+
+const repairIndexes = await client.query(`
+  select indexname, indexdef
+  from pg_indexes
+  where schemaname = 'public'
+    and indexname in (
+      'notification_events_mobile_recent_valid_idx',
+      'notification_recipients_event_user_visible_idx'
+    )
+`);
+ok(
+  "recent valid event scan and recipient probe indexes are tracked",
+  repairIndexes.rows.length === 2
+    && repairIndexes.rows.some((row) =>
+      row.indexname === "notification_events_mobile_recent_valid_idx"
+      && /created_at DESC, id DESC/i.test(row.indexdef)
+      && /WHERE/i.test(row.indexdef)
+    )
+    && repairIndexes.rows.some((row) =>
+      row.indexname === "notification_recipients_event_user_visible_idx"
+      && /event_id, user_id/i.test(row.indexdef)
+    ),
 );
 
 await client.close();

@@ -14,6 +14,9 @@ const {
   classifyFcmFailure,
 } = await import(`${projectRoot}/src/lib/notifications/fcm-message.ts`);
 const {
+  registerPushDeviceBinding,
+} = await import(`${projectRoot}/src/lib/notifications/device-registration-core.ts`);
+const {
   mobilePushDeliveries,
   mobilePushDevices,
   notificationEvents,
@@ -543,13 +546,23 @@ function core({
 for (const scenario of [
   {
     name: "token",
-    mutate: () => db.update(mobilePushDevices).set({ token: "rotated-owner-token" })
+    retryable: true,
+    expectedRecoveryToken: "rotated-owner-token",
+    restoreBeforeRecovery: false,
+    mutate: () => db.update(mobilePushDevices).set({
+      token: "rotated-owner-token",
+      bindingGeneration: ownerDevice.bindingGeneration + 1,
+    })
       .where(eq(mobilePushDevices.id, ownerDevice.id)),
-    restore: () => db.update(mobilePushDevices).set({ token: "owner-token" })
+    restore: () => db.update(mobilePushDevices).set({
+      token: "owner-token",
+      bindingGeneration: ownerDevice.bindingGeneration,
+    })
       .where(eq(mobilePushDevices.id, ownerDevice.id)),
   },
   {
     name: "effective user",
+    retryable: true,
     mutate: () => db.update(mobilePushDevices).set({ effectiveUserId: userIds.cashier })
       .where(eq(mobilePushDevices.id, ownerDevice.id)),
     restore: () => db.update(mobilePushDevices).set({ effectiveUserId: userIds.owner })
@@ -557,6 +570,7 @@ for (const scenario of [
   },
   {
     name: "principal",
+    retryable: true,
     mutate: () => db.update(mobilePushDevices).set({ userId: userIds.cashier })
       .where(eq(mobilePushDevices.id, ownerDevice.id)),
     restore: () => db.update(mobilePushDevices).set({ userId: userIds.owner })
@@ -564,6 +578,7 @@ for (const scenario of [
   },
   {
     name: "permission",
+    retryable: false,
     mutate: () => db.update(mobilePushDevices).set({ permission: "denied" })
       .where(eq(mobilePushDevices.id, ownerDevice.id)),
     restore: () => db.update(mobilePushDevices).set({ permission: "authorized" })
@@ -571,6 +586,7 @@ for (const scenario of [
   },
   {
     name: "enabled flag",
+    retryable: false,
     mutate: () => db.update(mobilePushDevices).set({ enabled: false })
       .where(eq(mobilePushDevices.id, ownerDevice.id)),
     restore: () => db.update(mobilePushDevices).set({ enabled: true })
@@ -578,6 +594,7 @@ for (const scenario of [
   },
   {
     name: "recipient role",
+    retryable: false,
     mutate: () => db.update(profiles).set({ role: "cashier" })
       .where(eq(profiles.id, userIds.owner)),
     restore: () => db.update(profiles).set({ role: "owner" })
@@ -585,6 +602,7 @@ for (const scenario of [
   },
   {
     name: "live settings",
+    retryable: false,
     mutate: () => db.update(storeSettings).set({
       prefs: { notifications: { invoiceCreated: false } },
     }).where(eq(storeSettings.id, "default")),
@@ -618,8 +636,11 @@ for (const scenario of [
         return { providerMessageId: "unused" };
       },
     },
-    sender: async () => {
+    sender: async (input) => {
       calls += 1;
+      if (scenario.expectedRecoveryToken) {
+        assert.equal(input.token, scenario.expectedRecoveryToken);
+      }
       return { kind: "sent" };
     },
     now: () => new Date("2026-07-28T12:00:00.000Z"),
@@ -634,15 +655,118 @@ for (const scenario of [
   });
 
   assert.equal(calls, 0, `${scenario.name} change must fence FCM`);
-  assert.equal((await outboxRow(seeded.eventId)).status, "completed");
+  assert.equal(
+    (await outboxRow(seeded.eventId)).status,
+    scenario.retryable ? "retry" : "completed",
+  );
   assert.equal(
     (await db.select().from(notificationRecipients)
       .where(eq(notificationRecipients.eventId, seeded.eventId))).length,
     2,
   );
-  await scenario.restore();
+  if (scenario.retryable) {
+    if (scenario.restoreBeforeRecovery !== false) {
+      await scenario.restore();
+    }
+    await db.update(notificationOutbox).set({
+      status: "published",
+      availableAt: new Date("2026-07-28T12:00:00.000Z"),
+      leaseExpiresAt: null,
+    }).where(eq(notificationOutbox.eventId, seeded.eventId));
+    assert.deepEqual(await service.processNotificationMessage({
+      version: 1,
+      eventId: seeded.eventId,
+      deduplicationKey: `notification:${seeded.eventId}`,
+      queuedAt: "2026-07-28T12:00:00.000Z",
+    }), { completed: true });
+    assert.equal(calls, 1, `${scenario.name} recovery sends exactly once`);
+    if (scenario.restoreBeforeRecovery === false) {
+      await scenario.restore();
+    }
+  } else {
+    await scenario.restore();
+  }
   await db.update(mobilePushDevices).set({ enabled: true })
     .where(eq(mobilePushDevices.id, managerDevice.id));
+}
+
+// A committed device send lease keeps the old actor authoritative until FCM
+// returns. Rebinding receives a retryable busy result, then succeeds after the
+// lease is released without producing a second visible send.
+{
+  await db.update(mobilePushDevices).set({ enabled: false })
+    .where(eq(mobilePushDevices.id, managerDevice.id));
+  await db.update(mobilePushDevices).set({ enabled: false })
+    .where(eq(mobilePushDevices.id, cashierDevice.id));
+  const seeded = await seedEvent();
+  let releaseSend;
+  let sendStarted;
+  const started = new Promise((resolve) => { sendStarted = resolve; });
+  const release = new Promise((resolve) => { releaseSend = resolve; });
+  let calls = 0;
+  const processing = core({
+    sender: async () => {
+      calls += 1;
+      const [leased] = await db.select().from(mobilePushDevices)
+        .where(eq(mobilePushDevices.id, ownerDevice.id));
+      assert.ok(leased.sendLeaseId);
+      assert.equal(leased.sendLeaseGeneration, leased.bindingGeneration);
+      sendStarted();
+      await release;
+      return { kind: "sent" };
+    },
+  }).processNotificationMessage({
+    version: 1,
+    eventId: seeded.eventId,
+    deduplicationKey: `notification:${seeded.eventId}`,
+    queuedAt: "2026-07-28T12:00:00.000Z",
+  });
+  await started;
+
+  const busy = await registerPushDeviceBinding(db, {
+    principalId: userIds.owner,
+    effectiveUserId: userIds.cashier,
+    device: {
+      deviceId: ownerDevice.deviceId,
+      platform: ownerDevice.platform,
+      token: "rebound-owner-token-value",
+      permission: "authorized",
+      locale: "en",
+      bindingGeneration: ownerDevice.bindingGeneration + 1,
+    },
+    now: new Date("2026-07-28T12:00:00.000Z"),
+  });
+  assert.equal(busy.kind, "busy");
+  releaseSend();
+  assert.deepEqual(await processing, { completed: true });
+
+  const rebound = await registerPushDeviceBinding(db, {
+    principalId: userIds.owner,
+    effectiveUserId: userIds.cashier,
+    device: {
+      deviceId: ownerDevice.deviceId,
+      platform: ownerDevice.platform,
+      token: "rebound-owner-token-value",
+      permission: "authorized",
+      locale: "en",
+      bindingGeneration: ownerDevice.bindingGeneration + 1,
+    },
+    now: new Date("2026-07-28T12:00:01.000Z"),
+  });
+  assert.deepEqual(rebound, { kind: "registered" });
+  assert.equal(calls, 1);
+  assert.equal((await deliveryRow(ownerDevice.id, seeded.eventId)).status, "sent");
+
+  await db.update(mobilePushDevices).set({
+    effectiveUserId: userIds.owner,
+    token: "owner-token",
+    bindingGeneration: ownerDevice.bindingGeneration,
+    enabled: true,
+  }).where(eq(mobilePushDevices.id, ownerDevice.id));
+  await db.update(mobilePushDevices).set({ enabled: true })
+    .where(eq(mobilePushDevices.id, managerDevice.id));
+  await db.update(mobilePushDevices).set({ enabled: true })
+    .where(eq(mobilePushDevices.id, cashierDevice.id));
 }
 
 // Routine events defer to the first minute outside quiet hours without consuming
