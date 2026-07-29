@@ -5,6 +5,7 @@ import {
   PosCartScrollSurface,
   PosQuantitySlot,
   PosSearchResultLayout,
+  PosSearchResultsSurface,
   posUnitSuffix,
 } from "@/components/pos/pos-mobile-layout";
 
@@ -43,6 +44,18 @@ describe("POS mobile search results", () => {
     expect(markup).toContain("w-[8.25rem]");
     expect(markup).not.toContain("lg:w-28");
     expect(markup).not.toContain('class="w-28"');
+  });
+
+  test("keeps search results scrollable without exposing a native scrollbar", () => {
+    const markup = renderToStaticMarkup(
+      <PosSearchResultsSurface>
+        <div>Sản phẩm</div>
+      </PosSearchResultsSurface>,
+    );
+
+    expect(markup).toContain("overflow-auto");
+    expect(markup).toContain("[scrollbar-width:none]");
+    expect(markup).toContain("[&amp;::-webkit-scrollbar]:hidden");
   });
 });
 

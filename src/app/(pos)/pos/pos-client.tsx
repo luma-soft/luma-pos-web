@@ -25,6 +25,7 @@ import {
   PosCartScrollSurface,
   PosQuantitySlot,
   PosSearchResultLayout,
+  PosSearchResultsSurface,
   posUnitSuffix,
 } from "@/components/pos/pos-mobile-layout";
 import type { PaperSize, PrintTemplate } from "@/lib/print/template-shared";
@@ -1802,7 +1803,7 @@ export function PosClient({
 
             {/* dropdown kết quả nổi dưới ô tìm — giỏ hàng vẫn hiện phía sau */}
             {showResults && (
-              <div className="absolute left-0 right-14 top-full z-40 mt-1 max-h-[min(64dvh,520px)] overflow-auto rounded-xl border border-border bg-surface shadow-e2">
+              <PosSearchResultsSurface>
                 {searching ? (
                   <div className="px-4 py-6 text-center text-sm text-slate-400">
                     <span className="inline-flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" />{t("common.search")}…</span>
@@ -1867,7 +1868,7 @@ export function PosClient({
                     })}
                   </div>
                 )}
-              </div>
+              </PosSearchResultsSurface>
             )}
           </div>}
         </div>
