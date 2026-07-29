@@ -4,9 +4,9 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { eq } from "drizzle-orm";
 import { Pool } from "pg";
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.TEST_DATABASE_URL;
 if (!databaseUrl) {
-  console.log("offline PostgreSQL concurrency: skipped because DATABASE_URL is unset");
+  console.log("offline PostgreSQL concurrency: skipped because TEST_DATABASE_URL is unset");
 } else {
   const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
   const schema = await import(`${projectRoot}/src/db/schema.ts`);
@@ -33,6 +33,7 @@ if (!databaseUrl) {
   const technicianId = randomUUID();
   const namespace = `offline-race-${randomUUID()}`;
   let projectId;
+  let productId;
 
   async function transactionOn(client, operation) {
     await client.query("BEGIN");
@@ -97,6 +98,7 @@ if (!databaseUrl) {
       sku: `OFF-${randomUUID()}`,
       unit: "m",
     }).returning();
+    productId = product.id;
     const actor = { userId: technicianId, role: "technician" };
 
     const checklistJob = await createJob();
@@ -170,6 +172,7 @@ if (!databaseUrl) {
     );
   } finally {
     if (projectId) await db.delete(projects).where(eq(projects.id, projectId));
+    if (productId) await db.delete(products).where(eq(products.id, productId));
     await db.delete(profiles).where(eq(profiles.id, technicianId));
     clientA.release();
     clientB.release();
