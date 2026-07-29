@@ -884,6 +884,9 @@ export const serviceJobs = pgTable("service_jobs", {
   completedAt: timestamp("completed_at", { withTimezone: true }),
   description: text("description"),
   checklist: jsonb("checklist").$type<ServiceChecklistItem[]>().notNull().default([]),
+  version: integer("version").notNull().default(1),
+  checklistVersion: integer("checklist_version").notNull().default(1),
+  assetsVersion: integer("assets_version").notNull().default(1),
   quoteOrderId: uuid("quote_order_id").references(() => orders.id, { onDelete: "set null" }),
   materialOrderId: uuid("material_order_id").references(() => orders.id, { onDelete: "set null" }),
   completionNote: text("completion_note"),
@@ -891,6 +894,7 @@ export const serviceJobs = pgTable("service_jobs", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
+  check("service_jobs_version_check", sql`${t.version} > 0 and ${t.checklistVersion} > 0 and ${t.assetsVersion} > 0`),
   index("service_jobs_project_idx").on(t.projectId, t.createdAt),
   index("service_jobs_status_schedule_idx").on(t.status, t.scheduledAt),
   index("service_jobs_assignee_idx").on(t.assignedTo, t.status),
@@ -904,9 +908,11 @@ export const serviceJobMaterials = pgTable("service_job_materials", {
   plannedQuantity: decimal("planned_quantity", { precision: 14, scale: 4 }).notNull().default("0"),
   usedQuantity: decimal("used_quantity", { precision: 14, scale: 4 }).notNull().default("0"),
   note: text("note"),
+  version: integer("version").notNull().default(1),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
+  check("service_job_materials_version_check", sql`${t.version} > 0`),
   uniqueIndex("service_job_materials_job_product_unit_idx").on(t.jobId, t.productId, t.unitName),
   index("service_job_materials_product_idx").on(t.productId),
 ]);
@@ -1010,10 +1016,12 @@ export const installedAssets = pgTable("installed_assets", {
   supplierWarrantyEndsOn: date("supplier_warranty_ends_on"),
   status: serviceAssetStatusEnum("status").notNull().default("installed"),
   note: text("note"),
+  version: integer("version").notNull().default(1),
   createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
+  check("installed_assets_version_check", sql`${t.version} > 0`),
   index("installed_assets_project_idx").on(t.projectId, t.status),
   index("installed_assets_job_idx").on(t.jobId),
   uniqueIndex("installed_assets_serial_idx").on(t.serialNumber),

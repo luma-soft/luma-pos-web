@@ -1,4 +1,5 @@
-import { mobileError, mobileOk } from "@/lib/mobile/response";
+import { mobileConflict, mobileError, mobileOk } from "@/lib/mobile/response";
+import { ServiceVersionConflictError } from "@/lib/services/field-operations";
 
 export function isServiceSnapshotJobLocked(error: unknown) {
   let current: unknown = error;
@@ -38,6 +39,12 @@ export async function mobileFieldOperation<T>(operation: () => Promise<T>) {
   try {
     return mobileOk(await operation());
   } catch (error) {
+    if (error instanceof ServiceVersionConflictError) {
+      return mobileConflict(
+        "services.errors.versionConflict",
+        error.conflict as unknown as Record<string, unknown>,
+      );
+    }
     const message = error instanceof Error ? error.message : "";
     if (message === "SERVICE_JOB_NOT_FOUND" || message === "SERVICE_JOB_FORBIDDEN") {
       return mobileError("errors.notFound", 404);

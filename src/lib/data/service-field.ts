@@ -82,6 +82,9 @@ export async function getFieldServiceJobs(input: {
     assignedToName: profiles.fullName,
     scheduledAt: serviceJobs.scheduledAt,
     checklist: serviceJobs.checklist,
+    version: serviceJobs.version,
+    checklistVersion: serviceJobs.checklistVersion,
+    assetsVersion: serviceJobs.assetsVersion,
     completionNote: serviceJobs.completionNote,
     updatedAt: serviceJobs.updatedAt,
   }).from(serviceJobs)
@@ -118,6 +121,9 @@ export async function getFieldServiceJobDetail(actor: FieldServiceActor, jobId: 
     scheduledAt: serviceJobs.scheduledAt,
     completedAt: serviceJobs.completedAt,
     checklist: serviceJobs.checklist,
+    version: serviceJobs.version,
+    checklistVersion: serviceJobs.checklistVersion,
+    assetsVersion: serviceJobs.assetsVersion,
     completionNote: serviceJobs.completionNote,
     updatedAt: serviceJobs.updatedAt,
   }).from(serviceJobs)
@@ -148,6 +154,8 @@ export async function getFieldServiceJobDetail(actor: FieldServiceActor, jobId: 
       plannedQuantity: serviceJobMaterials.plannedQuantity,
       usedQuantity: serviceJobMaterials.usedQuantity,
       note: serviceJobMaterials.note,
+      version: serviceJobMaterials.version,
+      updatedAt: serviceJobMaterials.updatedAt,
     }).from(serviceJobMaterials)
       .innerJoin(products, eq(serviceJobMaterials.productId, products.id))
       .where(eq(serviceJobMaterials.jobId, jobId))
@@ -163,6 +171,8 @@ export async function getFieldServiceJobDetail(actor: FieldServiceActor, jobId: 
       ipAddress: installedAssets.ipAddress,
       locationLabel: installedAssets.locationLabel,
       status: installedAssets.status,
+      version: installedAssets.version,
+      updatedAt: installedAssets.updatedAt,
     }).from(installedAssets)
       .where(eq(installedAssets.jobId, jobId))
       .orderBy(asc(installedAssets.name)),

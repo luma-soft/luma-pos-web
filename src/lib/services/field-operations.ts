@@ -45,6 +45,23 @@ type ServiceTransaction = Parameters<
 type FieldActor = { userId: string; role: Role };
 const SERVICE_SIGNATURE_SNAPSHOT_VERSION = 1;
 
+export type ServiceVersionConflictPayload = {
+  resourceType: "checklist" | "material" | "asset" | "job";
+  resourceId: string;
+  currentVersion: number;
+  updatedAt: string;
+  refresh: Record<string, unknown>;
+};
+
+export class ServiceVersionConflictError extends Error {
+  readonly code = "SERVICE_VERSION_CONFLICT";
+
+  constructor(readonly conflict: ServiceVersionConflictPayload) {
+    super("SERVICE_VERSION_CONFLICT");
+    this.name = "ServiceVersionConflictError";
+  }
+}
+
 type SignedSnapshotIdentity = {
   signerName: string;
   signerRole: string | null;
@@ -203,6 +220,10 @@ async function requireAssignedJob(
       status: serviceJobs.status,
       assignedTo: serviceJobs.assignedTo,
       checklist: serviceJobs.checklist,
+      version: serviceJobs.version,
+      checklistVersion: serviceJobs.checklistVersion,
+      assetsVersion: serviceJobs.assetsVersion,
+      updatedAt: serviceJobs.updatedAt,
       projectStage: projects.serviceStage,
     }).from(serviceJobs)
       .innerJoin(projects, eq(serviceJobs.projectId, projects.id))
@@ -237,6 +258,10 @@ export async function requireLockedServiceJobAccess(
     status: serviceJobs.status,
     assignedTo: serviceJobs.assignedTo,
     checklist: serviceJobs.checklist,
+    version: serviceJobs.version,
+    checklistVersion: serviceJobs.checklistVersion,
+    assetsVersion: serviceJobs.assetsVersion,
+    updatedAt: serviceJobs.updatedAt,
     projectStage: projects.serviceStage,
   }).from(serviceJobs)
     .innerJoin(projects, eq(serviceJobs.projectId, projects.id))
@@ -257,6 +282,25 @@ export async function requireLockedServiceJobAccess(
     crewProfileIds: crew.map((item) => item.profileId),
   })) throw new Error("SERVICE_JOB_FORBIDDEN");
   return job;
+}
+
+function requireExpectedVersion(input: {
+  expectedVersion: number;
+}, current: {
+  resourceType: ServiceVersionConflictPayload["resourceType"];
+  resourceId: string;
+  version: number;
+  updatedAt: Date;
+  refresh: Record<string, unknown>;
+}) {
+  if (input.expectedVersion === current.version) return;
+  throw new ServiceVersionConflictError({
+    resourceType: current.resourceType,
+    resourceId: current.resourceId,
+    currentVersion: current.version,
+    updatedAt: current.updatedAt.toISOString(),
+    refresh: current.refresh,
+  });
 }
 
 function requireFieldJobMutable(status: string) {
@@ -434,6 +478,13 @@ export async function updateFieldChecklistCore(
   const job = await requireLockedServiceJobAccess(tx, actor, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "job.checklist", async () => {
     requireFieldJobMutable(job.status);
+    requireExpectedVersion(input, {
+      resourceType: "checklist",
+      resourceId: job.id,
+      version: job.checklistVersion,
+      updatedAt: job.updatedAt,
+      refresh: { checklist: job.checklist },
+    });
     const submitted = new Map(input.checklist.map((item) => [item.code, item.completed]));
     if (
       submitted.size !== job.checklist.length
@@ -443,8 +494,12 @@ export async function updateFieldChecklistCore(
       ...item,
       completed: submitted.get(item.code) ?? false,
     }));
-    await tx.update(serviceJobs).set({ checklist, updatedAt: now })
-      .where(eq(serviceJobs.id, input.jobId));
+    const [updated] = await tx.update(serviceJobs).set({ checklist, updatedAt: now })
+      .where(eq(serviceJobs.id, input.jobId))
+      .returning({
+        checklistVersion: serviceJobs.checklistVersion,
+        updatedAt: serviceJobs.updatedAt,
+      });
     await tx.insert(serviceJobEvents).values({
       jobId: input.jobId,
       eventType: "job.checklist_updated",
@@ -458,6 +513,9 @@ export async function updateFieldChecklistCore(
     return {
       completed: checklist.filter((item) => item.completed).length,
       total: checklist.length,
+      checklist,
+      version: updated.checklistVersion,
+      updatedAt: updated.updatedAt.toISOString(),
     };
   });
 }
@@ -536,6 +594,22 @@ export async function createFieldInstalledAssetCore(
   const job = await requireLockedServiceJobAccess(tx, actor, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "job.asset_created", async () => {
     requireFieldJobMutable(job.status);
+    if (input.expectedVersion !== job.assetsVersion) {
+      const assets = await tx.select({
+        id: installedAssets.id,
+        name: installedAssets.name,
+        version: installedAssets.version,
+      }).from(installedAssets)
+        .where(eq(installedAssets.jobId, input.jobId))
+        .orderBy(asc(installedAssets.id));
+      requireExpectedVersion(input, {
+        resourceType: "asset",
+        resourceId: job.id,
+        version: job.assetsVersion,
+        updatedAt: job.updatedAt,
+        refresh: { assets },
+      });
+    }
     const [asset] = await tx.insert(installedAssets).values({
       projectId: job.projectId,
       jobId: input.jobId,
@@ -559,7 +633,12 @@ export async function createFieldInstalledAssetCore(
       id: installedAssets.id,
       serialNumber: installedAssets.serialNumber,
       name: installedAssets.name,
+      version: installedAssets.version,
     });
+    const [versionRow] = await tx.select({
+      assetsVersion: serviceJobs.assetsVersion,
+      updatedAt: serviceJobs.updatedAt,
+    }).from(serviceJobs).where(eq(serviceJobs.id, input.jobId)).limit(1);
     await tx.insert(serviceJobEvents).values({
       jobId: input.jobId,
       eventType: "job.asset_created",
@@ -567,7 +646,11 @@ export async function createFieldInstalledAssetCore(
       payload: { assetId: asset.id, serialNumber: asset.serialNumber },
       createdAt: now,
     });
-    return asset;
+    return {
+      ...asset,
+      assetsVersion: versionRow.assetsVersion,
+      updatedAt: versionRow.updatedAt.toISOString(),
+    };
   });
 }
 
@@ -580,6 +663,27 @@ export async function updateFieldMaterialUsageCore(
   const job = await requireLockedServiceJobAccess(tx, actor, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "job.material_usage", async () => {
     requireFieldJobMutable(job.status);
+    const [current] = await tx.select({
+      id: serviceJobMaterials.id,
+      usedQuantity: serviceJobMaterials.usedQuantity,
+      note: serviceJobMaterials.note,
+      version: serviceJobMaterials.version,
+      updatedAt: serviceJobMaterials.updatedAt,
+    }).from(serviceJobMaterials).where(and(
+      eq(serviceJobMaterials.id, input.materialId),
+      eq(serviceJobMaterials.jobId, input.jobId),
+    )).limit(1).for("update");
+    if (!current) throw new Error("SERVICE_MATERIAL_NOT_FOUND");
+    requireExpectedVersion(input, {
+      resourceType: "material",
+      resourceId: current.id,
+      version: current.version,
+      updatedAt: current.updatedAt,
+      refresh: {
+        usedQuantity: current.usedQuantity,
+        note: current.note,
+      },
+    });
     const [material] = await tx.update(serviceJobMaterials).set({
       usedQuantity: Number(input.usedQuantity).toFixed(4),
       note: input.note || null,
@@ -590,6 +694,9 @@ export async function updateFieldMaterialUsageCore(
     )).returning({
       id: serviceJobMaterials.id,
       usedQuantity: serviceJobMaterials.usedQuantity,
+      note: serviceJobMaterials.note,
+      version: serviceJobMaterials.version,
+      updatedAt: serviceJobMaterials.updatedAt,
     });
     if (!material) throw new Error("SERVICE_MATERIAL_NOT_FOUND");
     await tx.insert(serviceJobEvents).values({
@@ -599,7 +706,10 @@ export async function updateFieldMaterialUsageCore(
       payload: { materialId: material.id, usedQuantity: material.usedQuantity },
       createdAt: now,
     });
-    return material;
+    return {
+      ...material,
+      updatedAt: material.updatedAt.toISOString(),
+    };
   });
 }
 

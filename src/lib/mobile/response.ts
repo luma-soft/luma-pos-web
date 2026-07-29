@@ -9,6 +9,13 @@ export function mobileError(error: string, status = 400) {
   return NextResponse.json({ ok: false, error }, { status });
 }
 
+export function mobileConflict(
+  error: string,
+  conflict: Record<string, unknown>,
+) {
+  return NextResponse.json({ ok: false, error, conflict }, { status: 409 });
+}
+
 export function mobileGate(gate: { ok: true } | { ok: false; error: string }) {
   if (gate.ok) return null;
   return mobileError(

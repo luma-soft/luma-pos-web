@@ -225,6 +225,7 @@ export const warrantyClaimTransitionSchema = z.object({
 export type WarrantyClaimTransitionInput = z.input<typeof warrantyClaimTransitionSchema>;
 
 const clientMutationIdSchema = z.string().trim().min(8).max(100);
+const expectedVersionSchema = z.number().int().positive();
 
 export const serviceJobAssignmentSchema = z.object({
   jobId: z.uuid(),
@@ -243,6 +244,7 @@ export const serviceVisitMutationSchema = z.object({
 export const serviceChecklistUpdateSchema = z.object({
   jobId: z.uuid(),
   clientMutationId: clientMutationIdSchema,
+  expectedVersion: expectedVersionSchema,
   checklist: z.array(z.object({
     code: z.string().trim().min(1).max(80),
     labelKey: z.string().trim().min(1).max(160),
@@ -279,6 +281,7 @@ export const serviceFieldAssetCreateSchema = installedAssetCreateSchema.omit({
 }).extend({
   jobId: z.uuid(),
   clientMutationId: clientMutationIdSchema,
+  expectedVersion: expectedVersionSchema,
 });
 
 export const serviceFieldMaterialUsageSchema = z.object({
@@ -287,6 +290,7 @@ export const serviceFieldMaterialUsageSchema = z.object({
   usedQuantity: z.coerce.number().min(0),
   note: z.string().trim().max(1000).optional(),
   clientMutationId: clientMutationIdSchema,
+  expectedVersion: expectedVersionSchema,
 });
 
 export const serviceCustomerRequestLinkSchema = z.object({

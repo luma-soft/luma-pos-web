@@ -229,6 +229,7 @@ await expectCode(
   () => db.transaction((tx) => updateFieldChecklistCore(tx, actor, {
     jobId: cancelledJob.id,
     clientMutationId: "terminal-checklist-update",
+    expectedVersion: 1,
     checklist: cancelledChecklist,
   })),
   "SERVICE_FIELD_JOB_TERMINAL",
@@ -239,6 +240,7 @@ await expectCode(
   () => db.transaction((tx) => updateFieldChecklistCore(tx, actor, {
     jobId: completedJob.id,
     clientMutationId: "completed-checklist-update",
+    expectedVersion: 1,
     checklist: cancelledChecklist,
   })),
   "SERVICE_SIGNED_SNAPSHOT_JOB_LOCKED",
@@ -247,6 +249,7 @@ await expectCode(
   () => db.transaction((tx) => createFieldInstalledAssetCore(tx, actor, {
     jobId: completedJob.id,
     clientMutationId: "completed-asset-create",
+    expectedVersion: 1,
     assetKind: "camera",
     name: "Must not exist after completion",
   })),
@@ -298,6 +301,7 @@ await expectCode(
   () => db.transaction((tx) => createFieldInstalledAssetCore(tx, actor, {
     jobId: cancelledJob.id,
     clientMutationId: "terminal-asset-create",
+    expectedVersion: 1,
     assetKind: "camera",
     name: "Must not exist",
   })),
@@ -323,6 +327,7 @@ await expectCode(
     jobId: completedMaterialJob.id,
     materialId: completedMaterial.id,
     clientMutationId: "completed-material-update",
+    expectedVersion: 1,
     usedQuantity: 1,
   })),
   "SERVICE_SIGNED_SNAPSHOT_JOB_LOCKED",
@@ -342,6 +347,7 @@ await expectCode(
     jobId: materialJob.id,
     materialId: material.id,
     clientMutationId: "terminal-material-update",
+    expectedVersion: 1,
     usedQuantity: 1,
   })),
   "SERVICE_FIELD_JOB_TERMINAL",

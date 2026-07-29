@@ -81,6 +81,7 @@ if (mutations.length !== 1) throw new Error("check-in mutation was not tracked")
 await db.transaction((tx) => updateFieldChecklistCore(tx, actor, {
   jobId: job.id,
   clientMutationId: "field-checklist-0001",
+  expectedVersion: 1,
   checklist: createDefaultChecklist("camera").map((item) => ({ ...item, completed: true })),
 }, new Date("2026-07-29T01:30:00.000Z")));
 
