@@ -441,8 +441,8 @@ export function DataTableShell<T>({
                       >
                         {sortable ? (
                           <div className={cn(
-                            "flex min-w-0 items-center gap-1.5",
-                            column.align === "right" && "justify-end",
+                            "relative flex min-w-0 items-center gap-1.5",
+                            column.align === "right" && "flex-row-reverse justify-start",
                             column.align === "center" && "justify-center",
                           )}>
                             <button
@@ -460,7 +460,10 @@ export function DataTableShell<T>({
                             >
                               {column.label}
                             </button>
-                            <span className="inline-flex h-4 w-4 shrink-0 flex-col items-center justify-center">
+                            <span className={cn(
+                              "inline-flex h-4 w-4 shrink-0 flex-col items-center justify-center",
+                              column.align === "center" && "absolute right-0",
+                            )}>
                               {controlsVisible && (
                                 <>
                                   <button
