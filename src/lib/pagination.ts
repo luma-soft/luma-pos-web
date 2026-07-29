@@ -1,5 +1,5 @@
 export const PAGE_SIZES = [15, 30, 50, 100] as const;
-export const DEFAULT_PAGE_SIZE = 15;
+export const DEFAULT_PAGE_SIZE = 30;
 
 /** Ép số dòng/trang về một giá trị hợp lệ (từ query string). */
 export function parsePageSize(v: string | undefined, fallback: number = DEFAULT_PAGE_SIZE): number {
