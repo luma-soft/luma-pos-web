@@ -69,10 +69,10 @@ export async function dispatchPushNotification(input: {
 }) {
   const account = resolveFirebaseServiceAccount();
   if (!account || !input.prefs.channels.push) {
-    return { configured: Boolean(account), sent: 0, failed: 0, skipped: 0 };
+    return { configured: Boolean(account), sent: 0, failed: 0, skipped: 0, deferred: 0 };
   }
   if (isWithinQuietHours({ now: new Date(), ...input.prefs.quietHours })) {
-    return { configured: true, sent: 0, failed: 0, skipped: 1 };
+    return { configured: true, sent: 0, failed: 0, skipped: 1, deferred: 1 };
   }
   const roles = input.prefs.roleRouting[input.category] as Role[];
   const userIds = input.userIds?.filter(Boolean) ?? [];
@@ -96,7 +96,7 @@ export async function dispatchPushNotification(input: {
       eq(effectiveProfiles.isActive, true),
     ));
   if (devices.length === 0) {
-    return { configured: true, sent: 0, failed: 0, skipped: 0 };
+    return { configured: true, sent: 0, failed: 0, skipped: 0, deferred: 0 };
   }
 
   const accessToken = await firebaseAccessToken(account);
@@ -164,5 +164,5 @@ export async function dispatchPushNotification(input: {
     else if (delivery.outcome === "failed") failed++;
     else skipped++;
   }
-  return { configured: true, sent, failed, skipped };
+  return { configured: true, sent, failed, skipped, deferred: 0 };
 }

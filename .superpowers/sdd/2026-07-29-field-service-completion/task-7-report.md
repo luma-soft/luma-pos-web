@@ -101,3 +101,31 @@
   - migration runner repeated with zero pending;
   - direct database inspection confirmed RLS, push columns, migration tracking,
     no anon/auth table privileges, and no PUBLIC/anon/auth trigger execution.
+
+## Review fix round 2
+
+- Manager list/detail queries now use nullable asset projections and preserve
+  valid legacy `job_id = NULL, asset_id = NULL` claims. Technician queries
+  require complete linkage and a current canonical assignment. Real API tests
+  cover manager list/detail DTOs and technician 404/exclusion behavior.
+- Technician detail now locks the warranty claim row before reading its scope,
+  then locks and authorizes the canonical job. The final claim query pins the
+  same locked job/asset pair before returning attachment metadata.
+- Manager scope updates now run in one transaction with a claim-first lock,
+  followed by deterministic sorted old/new job locks, exact job/asset
+  validation, and the guarded update. Evidence-scope immutability remains
+  enforced.
+- The configured two-session PostgreSQL regression now also moves a no-evidence
+  claim from assigned job A to unassigned job B. Move-first blocks the reader
+  then denies it; read-first returns only A data and blocks the move until
+  commit. Both orderings finish without deadlock and never expose B data.
+- Push delivery results now distinguish `deferred` quiet-hour work from benign
+  device-ledger skips/no-device completion. The service-level warranty
+  dispatcher acknowledges only configured deliveries with zero failures and
+  zero deferrals; deferred/mixed/failed rows release their lease for retry.
+  Stable per-row notification keys preserve per-device deduplication.
+- Service-level tests cover all-quiet deferral, mixed sent+quiet deferral, and a
+  later benign-ledger retry that finally acknowledges the notification row.
+- No migration was needed; applied migrations `0080` and `0081` were not
+  modified. Focused tests (15), configured PostgreSQL races, affected ESLint,
+  and the production build all passed. Mobile remained unchanged and clean.

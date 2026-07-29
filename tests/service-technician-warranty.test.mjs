@@ -26,6 +26,7 @@ const {
   createTechnicianWarrantyClaimCore,
   claimWarrantyNotificationDeliveriesCore,
   completeWarrantyNotificationDeliveryCore,
+  dispatchPendingWarrantyNotificationsCore,
   finalizeTechnicianWarrantyClaimEvidenceCore,
   getWarrantyClaimForActorCore,
   listWarrantyNotificationsForRecipientCore,
@@ -38,6 +39,7 @@ if (
   typeof createTechnicianWarrantyClaimCore !== "function"
   || typeof claimWarrantyNotificationDeliveriesCore !== "function"
   || typeof completeWarrantyNotificationDeliveryCore !== "function"
+  || typeof dispatchPendingWarrantyNotificationsCore !== "function"
   || typeof finalizeTechnicianWarrantyClaimEvidenceCore !== "function"
   || typeof getWarrantyClaimForActorCore !== "function"
   || typeof listWarrantyNotificationsForRecipientCore !== "function"
@@ -324,6 +326,41 @@ await db.update(warrantyClaims).set({
   jobId: null,
   assetId: null,
 }).where(eq(warrantyClaims.id, legacyManagerClaim.id));
+const managerLegacyList = await listWarrantyClaimsForActorCore(db, {
+  actorId: managerId,
+  role: "manager",
+});
+if (
+  !managerLegacyList.some((row) =>
+    row.id === legacyManagerClaim.id
+    && row.jobId === null
+    && row.assetId === null
+    && row.assetName === null
+  )
+) throw new Error("manager list omitted a valid null/null legacy claim");
+const managerLegacyDetail = await db.transaction((tx) =>
+  getWarrantyClaimForActorCore(tx, {
+    actorId: managerId,
+    role: "manager",
+    claimId: legacyManagerClaim.id,
+  }));
+if (
+  managerLegacyDetail?.jobId !== null
+  || managerLegacyDetail.assetId !== null
+  || managerLegacyDetail.assetName !== null
+) throw new Error("manager detail omitted or corrupted a null/null legacy claim");
+const technicianLegacyList = await listWarrantyClaimsForActorCore(db, {
+  actorId: technicianId,
+  role: "technician",
+});
+if (
+  technicianLegacyList.some((row) => row.id === legacyManagerClaim.id)
+  || await db.transaction((tx) => getWarrantyClaimForActorCore(tx, {
+    actorId: technicianId,
+    role: "technician",
+    claimId: legacyManagerClaim.id,
+  })) !== null
+) throw new Error("technician could read an unlinked legacy claim");
 let partialManagerScopeRejected = false;
 try {
   await db.update(warrantyClaims).set({ jobId: job.id, assetId: null })
@@ -444,6 +481,70 @@ if (
   retryDeliveries.some((row) => row.id === deliveryClaims[0].id)
   || !retryDeliveries.some((row) => row.id === deliveryClaims[1].id)
 ) throw new Error("notification delivery success/retry state is incorrect");
+for (const row of retryDeliveries) {
+  await completeWarrantyNotificationDeliveryCore(db, {
+    id: row.id,
+    claimToken: row.claimToken,
+    delivered: false,
+    now: new Date("2026-07-29T04:04:00.000Z"),
+  });
+}
+for (const row of deliveryClaims.slice(2)) {
+  await completeWarrantyNotificationDeliveryCore(db, {
+    id: row.id,
+    claimToken: row.claimToken,
+    delivered: false,
+    now: new Date("2026-07-29T04:04:00.000Z"),
+  });
+}
+const quietAttempt = await dispatchPendingWarrantyNotificationsCore({
+  database: db,
+  now: new Date("2026-07-29T04:05:00.000Z"),
+  dispatch: async () => ({
+    configured: true,
+    sent: 0,
+    failed: 0,
+    skipped: 1,
+    deferred: 1,
+  }),
+});
+if (
+  quietAttempt.evaluated === 0
+  || quietAttempt.dispatched !== 0
+  || quietAttempt.deferred !== quietAttempt.evaluated
+) throw new Error("quiet-hour notifications were acknowledged as delivered");
+const mixedAttempt = await dispatchPendingWarrantyNotificationsCore({
+  database: db,
+  now: new Date("2026-07-29T04:06:00.000Z"),
+  dispatch: async () => ({
+    configured: true,
+    sent: 1,
+    failed: 0,
+    skipped: 1,
+    deferred: 1,
+  }),
+});
+if (
+  mixedAttempt.evaluated !== quietAttempt.evaluated
+  || mixedAttempt.dispatched !== 0
+  || mixedAttempt.deferred !== mixedAttempt.evaluated
+) throw new Error("mixed sent/quiet notification was acknowledged too early");
+const retryAttempt = await dispatchPendingWarrantyNotificationsCore({
+  database: db,
+  now: new Date("2026-07-29T04:07:00.000Z"),
+  dispatch: async () => ({
+    configured: true,
+    sent: 0,
+    failed: 0,
+    skipped: 1,
+    deferred: 0,
+  }),
+});
+if (
+  retryAttempt.evaluated !== quietAttempt.evaluated
+  || retryAttempt.dispatched !== retryAttempt.evaluated
+  || retryAttempt.deferred !== 0
+) throw new Error("subsequent benign-ledger retry did not acknowledge delivery");
 
 const sharp = (await import("sharp")).default;
 const realPng = new Uint8Array(await sharp({

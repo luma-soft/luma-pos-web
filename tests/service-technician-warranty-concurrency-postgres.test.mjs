@@ -49,21 +49,26 @@ if (!databaseUrl) {
     }
   }
 
-  async function fixture(sequence) {
+  async function fixture(sequence, {
+    assigned = true,
+    withAttachment = true,
+  } = {}) {
     const [job] = await db.insert(serviceJobs).values({
       projectId,
       code: `WR-${namespace.slice(-8)}-${sequence}`,
       serviceType: "camera",
       title: `Warranty read ${sequence}`,
       status: "warranty",
-      assignedTo: technicianId,
+      assignedTo: assigned ? technicianId : null,
     }).returning();
-    await db.insert(serviceJobAssignments).values({
-      jobId: job.id,
-      profileId: technicianId,
-      assignmentRole: "primary",
-      assignedBy: managerId,
-    });
+    if (assigned) {
+      await db.insert(serviceJobAssignments).values({
+        jobId: job.id,
+        profileId: technicianId,
+        assignmentRole: "primary",
+        assignedBy: managerId,
+      });
+    }
     const [asset] = await db.insert(installedAssets).values({
       projectId,
       jobId: job.id,
@@ -79,21 +84,23 @@ if (!databaseUrl) {
       title: `Claim ${sequence}`,
       createdBy: technicianId,
     }).returning();
-    await db.insert(serviceAttachments).values({
-      projectId,
-      jobId: job.id,
-      claimId: claim.id,
-      assetId: asset.id,
-      category: "issue",
-      bucket: "service-evidence",
-      path: `${namespace}/${claim.id}/issue.png`,
-      fileName: "issue.png",
-      mimeType: "image/png",
-      sizeBytes: 128,
-      sha256: "a".repeat(64),
-      createdBy: technicianId,
-    });
-    return { job, claim };
+    if (withAttachment) {
+      await db.insert(serviceAttachments).values({
+        projectId,
+        jobId: job.id,
+        claimId: claim.id,
+        assetId: asset.id,
+        category: "issue",
+        bucket: "service-evidence",
+        path: `${namespace}/${claim.id}/issue.png`,
+        fileName: "issue.png",
+        mimeType: "image/png",
+        sizeBytes: 128,
+        sha256: "a".repeat(64),
+        createdBy: technicianId,
+      });
+    }
+    return { job, asset, claim };
   }
 
   try {
@@ -161,7 +168,79 @@ if (!databaseUrl) {
       }));
     assert.equal(afterRemoval, null);
 
-    console.log("technician warranty PostgreSQL concurrency: both lock orderings verified");
+    const moveSource = await fixture(3, { withAttachment: false });
+    const moveTarget = await fixture(4, {
+      assigned: false,
+      withAttachment: false,
+    });
+    await clientA.query("BEGIN");
+    await clientA.query(
+      "UPDATE warranty_claims SET job_id = $1, asset_id = $2 WHERE id = $3",
+      [moveTarget.job.id, moveTarget.asset.id, moveSource.claim.id],
+    );
+    let moveFirstReadSettled = false;
+    const moveFirstRead = transactionOn(clientB, (tx) =>
+      getWarrantyClaimForActorCore(tx, {
+        actorId: technicianId,
+        role: "technician",
+        claimId: moveSource.claim.id,
+      })).finally(() => {
+      moveFirstReadSettled = true;
+    });
+    await delay(100);
+    assert.equal(
+      moveFirstReadSettled,
+      false,
+      "claim move did not hold the claim row against technician read",
+    );
+    await clientA.query("COMMIT");
+    assert.equal(
+      await moveFirstRead,
+      null,
+      "technician assigned only to old job received moved claim data",
+    );
+
+    await db.update(warrantyClaims).set({
+      jobId: moveSource.job.id,
+      assetId: moveSource.asset.id,
+    }).where(eq(warrantyClaims.id, moveSource.claim.id));
+    await clientA.query("BEGIN");
+    const readBeforeMove = await getWarrantyClaimForActorCore(
+      drizzle(clientA, { schema }),
+      {
+        actorId: technicianId,
+        role: "technician",
+        claimId: moveSource.claim.id,
+      },
+    );
+    assert.equal(readBeforeMove?.jobId, moveSource.job.id);
+    let readFirstMoveSettled = false;
+    const readFirstMove = transactionOn(clientB, (tx) =>
+      tx.update(warrantyClaims).set({
+        jobId: moveTarget.job.id,
+        assetId: moveTarget.asset.id,
+      }).where(eq(warrantyClaims.id, moveSource.claim.id))).finally(() => {
+      readFirstMoveSettled = true;
+    });
+    await delay(100);
+    assert.equal(
+      readFirstMoveSettled,
+      false,
+      "claim move bypassed the claim-first technician read lock",
+    );
+    await clientA.query("COMMIT");
+    await readFirstMove;
+    assert.equal(
+      await db.transaction((tx) => getWarrantyClaimForActorCore(tx, {
+        actorId: technicianId,
+        role: "technician",
+        claimId: moveSource.claim.id,
+      })),
+      null,
+      "technician received new-job data after read-first claim move",
+    );
+
+    console.log("technician warranty PostgreSQL concurrency: assignment and scope-move lock orderings verified");
   } finally {
     try {
       if (projectId) await db.delete(projects).where(eq(projects.id, projectId));

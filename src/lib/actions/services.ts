@@ -972,27 +972,75 @@ export async function updateWarrantyClaim(
   const value = parsed.data;
 
   try {
-    const [current] = await db.select({ projectId: warrantyClaims.projectId })
-      .from(warrantyClaims)
-      .where(eq(warrantyClaims.id, value.claimId))
-      .limit(1);
-    if (!current) return { ok: false, error: "errors.notFound" };
-    if (!await warrantyLinksAreValid(current.projectId, value.jobId, value.assetId)) {
+    const result = await db.transaction(async (tx) => {
+      const [current] = await tx.select({
+        projectId: warrantyClaims.projectId,
+        jobId: warrantyClaims.jobId,
+      }).from(warrantyClaims)
+        .where(eq(warrantyClaims.id, value.claimId))
+        .limit(1)
+        .for("update");
+      if (!current) return { outcome: "notFound" as const };
+
+      const jobIds = [...new Set([
+        current.jobId,
+        value.jobId ?? null,
+      ].filter((id): id is string => Boolean(id)))].sort();
+      for (const jobId of jobIds) {
+        await tx.select({ id: serviceJobs.id }).from(serviceJobs)
+          .where(eq(serviceJobs.id, jobId))
+          .limit(1)
+          .for("update");
+      }
+
+      if (Boolean(value.jobId) !== Boolean(value.assetId)) {
+        return { outcome: "relationMismatch" as const };
+      }
+      if (value.jobId && value.assetId) {
+        const [[job], [asset]] = await Promise.all([
+          tx.select({ projectId: serviceJobs.projectId })
+            .from(serviceJobs)
+            .where(eq(serviceJobs.id, value.jobId))
+            .limit(1),
+          tx.select({
+            projectId: installedAssets.projectId,
+            jobId: installedAssets.jobId,
+          }).from(installedAssets)
+            .where(eq(installedAssets.id, value.assetId))
+            .limit(1),
+        ]);
+        if (
+          !job
+          || !asset
+          || job.projectId !== current.projectId
+          || asset.projectId !== current.projectId
+          || asset.jobId !== value.jobId
+        ) return { outcome: "relationMismatch" as const };
+      }
+
+      await tx.update(warrantyClaims).set({
+        jobId: value.jobId ?? null,
+        assetId: value.assetId ?? null,
+        title: value.title,
+        description: value.description || null,
+        priority: value.priority,
+        scheduledAt: value.scheduledAt ? new Date(value.scheduledAt) : null,
+        laborCharge: toMoney(value.laborCharge),
+        materialCharge: toMoney(value.materialCharge),
+        updatedAt: new Date(),
+      }).where(eq(warrantyClaims.id, value.claimId));
+      return {
+        outcome: "updated" as const,
+        projectId: current.projectId,
+      };
+    });
+    if (result.outcome === "notFound") {
+      return { ok: false, error: "errors.notFound" };
+    }
+    if (result.outcome === "relationMismatch") {
       return { ok: false, error: "services.errors.relationMismatch" };
     }
-
-    await db.update(warrantyClaims).set({
-      jobId: value.jobId ?? null,
-      assetId: value.assetId ?? null,
-      title: value.title,
-      description: value.description || null,
-      priority: value.priority,
-      scheduledAt: value.scheduledAt ? new Date(value.scheduledAt) : null,
-      laborCharge: toMoney(value.laborCharge),
-      materialCharge: toMoney(value.materialCharge),
-      updatedAt: new Date(),
-    }).where(eq(warrantyClaims.id, value.claimId));
-    revalidateServiceProject(current.projectId);
+    revalidateServiceProject(result.projectId);
     return { ok: true, data: undefined };
   } catch (error) {
     console.error("updateWarrantyClaim failed:", error);

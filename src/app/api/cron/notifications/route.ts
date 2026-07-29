@@ -10,8 +10,7 @@ import { runMaintenanceWorker } from "@/lib/services/maintenance-worker";
 import { drainCustomerRequestStorageCleanup } from "@/lib/services/customer-request-portal";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
-  claimWarrantyNotificationDeliveriesCore,
-  completeWarrantyNotificationDeliveryCore,
+  dispatchPendingWarrantyNotificationsCore,
 } from "@/lib/services/technician-warranty";
 
 function authorized(request: Request) {
@@ -46,30 +45,26 @@ export async function GET(request: Request) {
       },
     },
   });
-  const warrantyNotificationClaims = prefs.serviceDue
-    ? await claimWarrantyNotificationDeliveriesCore(db)
-    : [];
-  let warrantyNotificationsDispatched = 0;
-  let warrantyNotificationsFailed = 0;
-  for (const notification of warrantyNotificationClaims) {
-    const delivery = await dispatchPushNotification({
-      notificationKey: `service-warranty:${notification.id}`,
-      category: "serviceDue",
-      target: "services",
-      entityId: notification.jobId ?? notification.claimId,
-      prefs,
-      userIds: [notification.recipientId],
-    });
-    const delivered = delivery.configured && delivery.failed === 0;
-    await completeWarrantyNotificationDeliveryCore(db, {
-      id: notification.id,
-      claimToken: notification.claimToken,
-      delivered,
-    });
-    if (delivered) warrantyNotificationsDispatched++;
-    else warrantyNotificationsFailed++;
-    results.push(delivery);
-  }
+  const warrantyNotifications = prefs.serviceDue
+    ? await dispatchPendingWarrantyNotificationsCore({
+      database: db,
+      dispatch: (notification) => dispatchPushNotification({
+        notificationKey: `service-warranty:${notification.id}`,
+        category: "serviceDue",
+        target: "services",
+        entityId: notification.jobId ?? notification.claimId,
+        prefs,
+        userIds: [notification.recipientId],
+      }),
+    })
+    : {
+      evaluated: 0,
+      dispatched: 0,
+      deferred: 0,
+      failed: 0,
+      deliveries: [],
+    };
+  results.push(...warrantyNotifications.deliveries);
 
   if (prefs.serviceDue) {
     for (const occurrence of maintenance.results.filter((item) => item.created && item.jobId)) {
@@ -140,9 +135,10 @@ export async function GET(request: Request) {
     maintenance,
     customerRequestStorageCleanup,
     warrantyNotifications: {
-      evaluated: warrantyNotificationClaims.length,
-      dispatched: warrantyNotificationsDispatched,
-      failed: warrantyNotificationsFailed,
+      evaluated: warrantyNotifications.evaluated,
+      dispatched: warrantyNotifications.dispatched,
+      deferred: warrantyNotifications.deferred,
+      failed: warrantyNotifications.failed,
     },
   });
 }

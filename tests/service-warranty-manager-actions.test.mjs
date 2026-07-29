@@ -23,9 +23,14 @@ for (const file of readdirSync(`${projectRoot}/drizzle`).filter((name) => name.e
 }
 
 const managerId = "11111111-1111-4111-8111-111111111111";
+const technicianId = "22222222-2222-4222-8222-222222222222";
+let mobileActor = { userId: managerId, role: "manager" };
 let codeSequence = 0;
 mock.module("@/db", () => ({ db, schema }));
 mock.module("next/cache", () => ({ revalidatePath: () => undefined }));
+mock.module("@/lib/mobile/auth", () => ({
+  requireMobileServiceAccess: async () => ({ ok: true, ...mobileActor }),
+}));
 mock.module("@/lib/actions/common", () => ({
   generateCode: () => `BH-MANAGER-${++codeSequence}`,
   getProfileId: async (id) => id,
@@ -40,12 +45,25 @@ const {
   createWarrantyClaim,
   updateWarrantyClaim,
 } = await import(`${projectRoot}/src/lib/actions/services.ts`);
+const { GET: listWarrantyClaimsApi } = await import(
+  `${projectRoot}/src/app/api/mobile/services/warranty-claims/route.ts`
+);
+const { GET: getWarrantyClaimApi } = await import(
+  `${projectRoot}/src/app/api/mobile/services/warranty-claims/[id]/route.ts`
+);
 
-await db.insert(profiles).values({
-  id: managerId,
-  fullName: "Manager",
-  role: "manager",
-});
+await db.insert(profiles).values([
+  {
+    id: managerId,
+    fullName: "Manager",
+    role: "manager",
+  },
+  {
+    id: technicianId,
+    fullName: "Technician",
+    role: "technician",
+  },
+]);
 const [project] = await db.insert(projects).values({
   name: "Manager warranty project",
   serviceType: "camera",
@@ -96,6 +114,45 @@ const unlinkedUpdate = await updateWarrantyClaim({
   materialCharge: 0,
 });
 if (!unlinkedUpdate.ok) throw new Error(`manager null/null update failed: ${unlinkedUpdate.error}`);
+const managerListResponse = await listWarrantyClaimsApi(
+  new Request("http://localhost/api/mobile/services/warranty-claims"),
+);
+const managerListBody = await managerListResponse.json();
+const managerLegacyRow = managerListBody.data.rows.find(
+  (row) => row.id === unlinked.data.id,
+);
+if (
+  managerListResponse.status !== 200
+  || managerLegacyRow?.jobId !== null
+  || managerLegacyRow.assetId !== null
+  || managerLegacyRow.assetName !== null
+) throw new Error("manager API list omitted or corrupted null/null claim DTO");
+const managerDetailResponse = await getWarrantyClaimApi(
+  new Request(`http://localhost/api/mobile/services/warranty-claims/${unlinked.data.id}`),
+  { params: Promise.resolve({ id: unlinked.data.id }) },
+);
+const managerDetailBody = await managerDetailResponse.json();
+if (
+  managerDetailResponse.status !== 200
+  || managerDetailBody.data.jobId !== null
+  || managerDetailBody.data.assetId !== null
+  || managerDetailBody.data.assetName !== null
+) throw new Error("manager API detail omitted or corrupted null/null claim DTO");
+mobileActor = { userId: technicianId, role: "technician" };
+const technicianListBody = await (
+  await listWarrantyClaimsApi(
+    new Request("http://localhost/api/mobile/services/warranty-claims"),
+  )
+).json();
+const technicianDetailResponse = await getWarrantyClaimApi(
+  new Request(`http://localhost/api/mobile/services/warranty-claims/${unlinked.data.id}`),
+  { params: Promise.resolve({ id: unlinked.data.id }) },
+);
+if (
+  technicianListBody.data.rows.some((row) => row.id === unlinked.data.id)
+  || technicianDetailResponse.status !== 404
+) throw new Error("technician API exposed an unlinked legacy manager claim");
+mobileActor = { userId: managerId, role: "manager" };
 
 const linked = await createWarrantyClaim({
   projectId: project.id,

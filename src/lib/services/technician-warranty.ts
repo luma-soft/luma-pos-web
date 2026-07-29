@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type * as schema from "@/db/schema";
 import {
@@ -266,10 +266,17 @@ export async function listWarrantyClaimsForActorCore(
     reportedAt: warrantyClaims.reportedAt,
     scheduledAt: warrantyClaims.scheduledAt,
   }).from(warrantyClaims)
-    .innerJoin(installedAssets, eq(warrantyClaims.assetId, installedAssets.id))
+    .leftJoin(installedAssets, eq(warrantyClaims.assetId, installedAssets.id))
     .where(and(
       input.jobId ? eq(warrantyClaims.jobId, input.jobId) : undefined,
-      input.role === "technician" ? technicianClaimFilter(input.actorId) : undefined,
+      input.role === "technician"
+        ? and(
+          isNotNull(warrantyClaims.jobId),
+          isNotNull(warrantyClaims.assetId),
+          eq(installedAssets.jobId, warrantyClaims.jobId),
+          technicianClaimFilter(input.actorId),
+        )
+        : undefined,
     ))
     .orderBy(desc(warrantyClaims.reportedAt));
 }
@@ -281,10 +288,13 @@ export async function getWarrantyClaimForActorCore(
   const [scope] = await database.select({
     id: warrantyClaims.id,
     jobId: warrantyClaims.jobId,
+    assetId: warrantyClaims.assetId,
   }).from(warrantyClaims)
     .where(eq(warrantyClaims.id, input.claimId))
-    .limit(1);
+    .limit(1)
+    .for("update");
   if (!scope) return null;
+  if (input.role === "technician" && (!scope.jobId || !scope.assetId)) return null;
   if (scope.jobId) {
     const [lockedJob] = await database.select({ id: serviceJobs.id })
       .from(serviceJobs)
@@ -292,8 +302,6 @@ export async function getWarrantyClaimForActorCore(
       .limit(1)
       .for("update");
     if (!lockedJob) return null;
-  } else if (input.role === "technician") {
-    return null;
   }
   if (input.role === "technician") {
     const [assignment] = await database.select({ id: serviceJobAssignments.id })
@@ -327,9 +335,18 @@ export async function getWarrantyClaimForActorCore(
     resolution: warrantyClaims.resolution,
   }).from(warrantyClaims)
     .innerJoin(projects, eq(warrantyClaims.projectId, projects.id))
-    .innerJoin(installedAssets, eq(warrantyClaims.assetId, installedAssets.id))
+    .leftJoin(installedAssets, eq(warrantyClaims.assetId, installedAssets.id))
     .where(and(
       eq(warrantyClaims.id, input.claimId),
+      scope.jobId
+        ? eq(warrantyClaims.jobId, scope.jobId)
+        : isNull(warrantyClaims.jobId),
+      scope.assetId
+        ? eq(warrantyClaims.assetId, scope.assetId)
+        : isNull(warrantyClaims.assetId),
+      input.role === "technician"
+        ? eq(installedAssets.jobId, scope.jobId!)
+        : undefined,
     ))
     .limit(1);
   if (!claim) return null;
@@ -436,4 +453,65 @@ export async function completeWarrantyNotificationDeliveryCore(
     eq(warrantyClaimNotifications.pushClaimToken, input.claimToken),
   )).returning({ id: warrantyClaimNotifications.id });
   return Boolean(updated);
+}
+
+export async function dispatchPendingWarrantyNotificationsCore(input: {
+  database: NodePgDatabase<typeof schema>;
+  now?: Date;
+  limit?: number;
+  dispatch(notification: {
+    id: string;
+    recipientId: string;
+    claimId: string;
+    jobId: string | null;
+  }): Promise<{
+    configured: boolean;
+    sent: number;
+    failed: number;
+    skipped: number;
+    deferred: number;
+  }>;
+}) {
+  const claims = await claimWarrantyNotificationDeliveriesCore(input.database, {
+    now: input.now,
+    limit: input.limit,
+  });
+  const deliveries = [];
+  let dispatched = 0;
+  let deferred = 0;
+  let failed = 0;
+  for (const notification of claims) {
+    let delivery;
+    try {
+      delivery = await input.dispatch(notification);
+    } catch {
+      delivery = {
+        configured: true,
+        sent: 0,
+        failed: 1,
+        skipped: 0,
+        deferred: 0,
+      };
+    }
+    const complete = delivery.configured
+      && delivery.failed === 0
+      && delivery.deferred === 0;
+    await completeWarrantyNotificationDeliveryCore(input.database, {
+      id: notification.id,
+      claimToken: notification.claimToken,
+      delivered: complete,
+      now: input.now,
+    });
+    deliveries.push(delivery);
+    if (complete) dispatched++;
+    else if (delivery.deferred > 0) deferred++;
+    else failed++;
+  }
+  return {
+    evaluated: claims.length,
+    dispatched,
+    deferred,
+    failed,
+    deliveries,
+  };
 }
