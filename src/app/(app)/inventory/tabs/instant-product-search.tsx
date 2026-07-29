@@ -19,7 +19,7 @@ export function InstantProductSearch({ value, placeholder }: { value: string; pl
       if (query.trim()) next.set("q", query.trim());
       else next.delete("q");
       router.replace(`${pathname}?${next.toString()}`, { scroll: false });
-    }, 250);
+    }, 120);
     return () => window.clearTimeout(timer);
   }, [params, pathname, query, router, value]);
 

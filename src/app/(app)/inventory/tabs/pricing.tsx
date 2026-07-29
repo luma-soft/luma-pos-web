@@ -6,7 +6,8 @@ import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
 import { PricingTable } from "../../pricing/pricing-table";
 import { TableSkeleton } from "@/components/table-skeleton";
-import { PricingFilters } from "./pricing-filters";
+import { InstantProductSearch } from "./instant-product-search";
+import { InstantProductFilters } from "./instant-product-filters";
 
 type SP = Record<string, string | undefined>;
 type PriceBook = Awaited<ReturnType<typeof getPriceBooks>>[number];
@@ -59,18 +60,34 @@ async function PricingContent({
     <>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <h2 className="shrink-0 text-sm font-bold">{t("pricing.booksCount", { n: books.length })}</h2>
-        <PricingFilters
-          query={params.q ?? ""}
+        <InstantProductSearch
+          value={params.q ?? ""}
+          placeholder={t("products.list.searchPlaceholder")}
+        />
+        <InstantProductFilters
           category={params.category ?? ""}
+          status="active"
+          view="grouped"
           categories={categories}
           labels={{
-            searchProducts: t("products.list.searchPlaceholder"),
+            filters: t("products.list.filters"),
             allCategories: t("products.list.allCategories"),
             searchCategories: t("products.list.searchCategories"),
+            active: t("products.list.statusActive"),
+            inactive: t("products.list.statusInactive"),
+            all: t("products.list.statusAll"),
+            grouped: t("products.list.viewGrouped"),
+            flat: t("products.list.viewFlat"),
           }}
+          showAdditionalFilters={false}
         />
       </div>
-      <PricingTable books={books} rows={tableRows} total={total} />
+      <PricingTable
+        key={[params.q ?? "", params.category ?? "", page, pageSize].join(":")}
+        books={books}
+        rows={tableRows}
+        total={total}
+      />
       <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("products.unitLabel")} />
     </>
   );
