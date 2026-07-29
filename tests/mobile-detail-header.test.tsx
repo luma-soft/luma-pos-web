@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import Link from "next/link";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
 
@@ -33,5 +34,29 @@ describe("MobileDetailHeader", () => {
 
     expect(markup).toContain('data-slot="mobile-detail-actions"');
     expect(markup).toContain(">Edit</button>");
+  });
+
+  test("reflows stacked mobile actions without hiding them in a horizontal scroller", () => {
+    const markup = renderToStaticMarkup(
+      <MobileDetailHeader
+        backHref="/customers"
+        backLabel="Quay lại"
+        title="Khách hàng"
+        stackActionsOnMobile
+        actions={(
+          <>
+            <button type="button">Chỉnh sửa khách hàng</button>
+            <Link href="/pos">Tạo đơn tại POS</Link>
+          </>
+        )}
+      />,
+    );
+
+    expect(markup).toContain("grid-cols-2");
+    expect(markup).toContain("[&amp;&gt;*]:min-w-0");
+    expect(markup).toContain("[&amp;&gt;button]:w-full");
+    expect(markup).toContain("[&amp;&gt;a]:w-full");
+    expect(markup).toContain("whitespace-normal");
+    expect(markup).not.toContain("overflow-x-auto");
   });
 });

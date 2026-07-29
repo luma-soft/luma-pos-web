@@ -5,6 +5,7 @@ import { Copy, FilePenLine, Printer, ReceiptText } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { MobileRecordCard, MobileRecordField } from "@/components/mobile-ui";
+import { PurchaseDetailActionGroup } from "@/components/purchase-detail-action-group";
 import { getPurchase } from "@/lib/data/inventory";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -42,25 +43,25 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
         subtitle={formatDate(purchase.createdAt)}
         badge={<span className={cn("inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium", statusClass(purchase.status))}>{t(`purchases.status.${purchase.status}` as never)}</span>}
       />
-      <div className="-mt-3 mb-5 flex items-center gap-2 overflow-x-auto pb-1 sm:justify-end sm:overflow-visible">
-          <Link href={printHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11 shrink-0")}>
+      <PurchaseDetailActionGroup label={t("common.actions")} className="-mt-3 mb-5">
+          <Link href={printHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11")}>
             <Printer className="h-4 w-4" />
             {t("print.printBtn")}
           </Link>
           {canChange && (
             <>
-              <Link href={copyHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11 shrink-0")}>
+              <Link href={copyHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11")}>
                 <Copy className="h-4 w-4" />
                 {t("purchases.copy")}
               </Link>
-              <Link href={editHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11 shrink-0")}>
+              <Link href={editHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11")}>
                 <FilePenLine className="h-4 w-4" />
                 {t("purchases.edit")}
               </Link>
               <PurchaseCancelButton purchaseId={purchase.id} className="min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background" />
             </>
           )}
-      </div>
+      </PurchaseDetailActionGroup>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
         <div className="space-y-4">
@@ -151,20 +152,22 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
           </div>
 
           {canChange && (
-            <div className="bg-surface border border-border rounded-card p-3 flex flex-wrap items-center gap-2">
-              <PurchaseCancelButton purchaseId={purchase.id} className="min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background" />
-              <Link href={copyHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11")}>
-                <Copy className="h-4 w-4" />
-                {t("purchases.copy")}
-              </Link>
-              <Link href={printHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11")}>
-                <Printer className="h-4 w-4" />
-                {t("print.printBtn")}
-              </Link>
-              <Link href={editHref} className={cn(buttonVariants({ variant: "default", size: "sm" }), "min-h-11 ml-auto")}>
-                <FilePenLine className="h-4 w-4" />
-                {t("purchases.edit")}
-              </Link>
+            <div className="rounded-card border border-border bg-surface p-3">
+              <PurchaseDetailActionGroup label={t("common.actions")}>
+                <PurchaseCancelButton purchaseId={purchase.id} className="min-h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background" />
+                <Link href={copyHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11")}>
+                  <Copy className="h-4 w-4" />
+                  {t("purchases.copy")}
+                </Link>
+                <Link href={printHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11")}>
+                  <Printer className="h-4 w-4" />
+                  {t("print.printBtn")}
+                </Link>
+                <Link href={editHref} className={cn(buttonVariants({ variant: "default", size: "sm" }), "min-h-11")}>
+                  <FilePenLine className="h-4 w-4" />
+                  {t("purchases.edit")}
+                </Link>
+              </PurchaseDetailActionGroup>
             </div>
           )}
         </div>

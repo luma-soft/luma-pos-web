@@ -61,8 +61,10 @@ export function MobileDetailHeader({
         <div
           data-slot="mobile-detail-actions"
           className={cn(
-            "flex shrink-0 items-center gap-2",
-            stackActionsOnMobile && "w-full overflow-x-auto pb-1 pl-[52px] sm:w-auto sm:overflow-visible sm:pb-0 sm:pl-0",
+            "shrink-0 items-center gap-2",
+            stackActionsOnMobile
+              ? "grid w-full min-w-0 grid-cols-2 [&>*]:min-w-0 [&>*:only-child]:col-span-2 [&>a]:h-auto [&>a]:min-h-11 [&>a]:w-full [&>a]:whitespace-normal [&>a]:py-2 [&>a]:text-center [&>button]:h-auto [&>button]:min-h-11 [&>button]:w-full [&>button]:whitespace-normal [&>button]:py-2 [&>button]:text-center lg:flex lg:w-auto lg:flex-wrap lg:justify-end lg:[&>*:only-child]:col-auto lg:[&>a]:w-auto lg:[&>button]:w-auto"
+              : "flex",
           )}
         >
           {actions}
