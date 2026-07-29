@@ -11,6 +11,7 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    "tmp/**",
     "next-env.d.ts",
     // App mobile (Expo) có toolchain/eslint riêng — không lint bằng config web.
     "mobile/**",
