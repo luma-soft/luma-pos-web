@@ -52,6 +52,8 @@ stale/hash/ownership failures block completion.
 ## Verification
 
 - Changed-file ESLint: pass.
+- `bun run build`: pass, including the production TypeScript phase and all 97
+  static page generations.
 - `dart format --output=none --set-exit-if-changed` for the changed screen: pass.
 - `flutter analyze lib`: pass.
 - Focused Flutter signature/offline policy tests: 9 pass.
