@@ -18,7 +18,7 @@ export type StaffRole = (typeof STAFF_ROLES)[number];
 /* ── Operational prefs (Tax / Payments / Notifications / Hardware) — lưu jsonb store_settings.prefs ── */
 
 export const PAYMENT_METHODS = ["cash", "qr", "momo", "zalopay", "vnpay", "card", "credit"] as const;
-export const NOTIF_TYPES = ["lowStock", "stagnant", "shiftClose", "einvoiceError", "syncDone"] as const;
+export const NOTIF_TYPES = ["lowStock", "stagnant", "shiftClose", "einvoiceError", "syncDone", "serviceDue"] as const;
 export const PAPER_SIZES = ["K80", "K57", "A5", "A4"] as const;
 export const AI_PROVIDERS = ["openai", "deepseek", "gemini"] as const;
 export const AI_TEXT_MODELS = [
@@ -57,6 +57,7 @@ const notificationPrefs = z.object({
   shiftClose: z.boolean().default(true),
   einvoiceError: z.boolean().default(true),
   syncDone: z.boolean().default(false),
+  serviceDue: z.boolean().default(true),
   channels: z.record(z.string().trim().min(1).max(40), z.boolean())
     .transform((channels) => ({
       ...defaultNotificationChannelPreferences(),
@@ -87,11 +88,14 @@ const notificationPrefs = z.object({
       .min(1).default(["owner", "manager", "cashier"]),
     syncDone: z.array(z.enum(STAFF_ROLES))
       .min(1).default(["owner", "manager"]),
+    serviceDue: z.array(z.enum(STAFF_ROLES))
+      .min(1).default(["owner", "manager", "technician"]),
   }).default({
     lowStock: ["owner", "manager", "warehouse"],
     einvoiceError: ["owner", "manager"],
     shiftClose: ["owner", "manager", "cashier"],
     syncDone: ["owner", "manager"],
+    serviceDue: ["owner", "manager", "technician"],
   }),
 });
 
@@ -173,6 +177,7 @@ export const storePrefsSchema = z.object({
     shiftClose: true,
     einvoiceError: true,
     syncDone: false,
+    serviceDue: true,
     channels: defaultNotificationChannelPreferences(),
     quietHours: { enabled: false, start: "22:00", end: "07:00", timezone: "Asia/Ho_Chi_Minh" },
     thresholds: { lowStockDays: 7, einvoiceFailureAttempts: 1 },
@@ -181,6 +186,7 @@ export const storePrefsSchema = z.object({
       einvoiceError: ["owner", "manager"],
       shiftClose: ["owner", "manager", "cashier"],
       syncDone: ["owner", "manager"],
+      serviceDue: ["owner", "manager", "technician"],
     },
   }),
   hardware: hardwarePrefs.default({ paperSize: "K80", autoPrint: false, openDrawer: true, printEinvoiceQr: true }),

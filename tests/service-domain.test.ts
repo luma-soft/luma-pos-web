@@ -18,6 +18,8 @@ import {
   serviceAttachmentMetadataSchema,
   serviceChecklistUpdateSchema,
   serviceCompletionSchema,
+  serviceFieldAssetCreateSchema,
+  serviceFieldMaterialUsageSchema,
   serviceJobAssignmentSchema,
   serviceJobCreateSchema,
   serviceJobUpdateSchema,
@@ -182,6 +184,20 @@ describe("field service completion", () => {
       jobId,
       profileId,
       assignmentRole: "crew",
+    }).success).toBe(true);
+    expect(serviceFieldAssetCreateSchema.safeParse({
+      jobId,
+      clientMutationId: "mobile-asset-1",
+      assetKind: "camera",
+      name: "Camera cổng",
+      serialNumber: "EZVIZ-001",
+      locationLabel: "Cổng chính",
+    }).success).toBe(true);
+    expect(serviceFieldMaterialUsageSchema.safeParse({
+      jobId,
+      materialId: attachmentId,
+      usedQuantity: 12.5,
+      clientMutationId: "mobile-material-1",
     }).success).toBe(true);
   });
 });

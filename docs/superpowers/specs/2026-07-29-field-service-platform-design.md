@@ -1,7 +1,7 @@
 # LumaPOS Field Service Platform — Technical Design
 
 **Date:** 2026-07-29  
-**Status:** Approved for implementation  
+**Status:** Implemented; vendor polling awaits verified EZVIZ partner access
 **Source:** `../../../../document/lumapos/LUMAPOS_CAMERA_PROJECT_MANAGEMENT_REVIEW.md`
 
 ## Outcome
@@ -11,6 +11,28 @@ service. A technician can receive, execute, document, and complete assigned work
 from the Flutter app. Managers can dispatch teams, monitor SLA and maintenance,
 and review a complete evidence trail. Camera vendor systems remain responsible
 for video, firmware, device configuration, and customer device ownership.
+
+## Delivery status
+
+Delivered on 2026-07-29:
+
+- technician role, least-privilege service access, primary/crew assignment;
+- Today/Week mobile workspace, job detail, visits, checklist, actual materials,
+  QR asset capture, private evidence, signature, directions, and completion;
+- idempotent field mutations with timeline, visit/time records, and offline
+  replay restricted to safe operations;
+- maintenance occurrence/job generation through the protected notification
+  cron, SLA fields, targeted service-due notifications, and a scoped one-time
+  customer request portal;
+- manager dispatch and vendor device-link/sync APIs;
+- disabled-by-default camera vendor adapter with normalized health/alerts and
+  persistence of snapshots, alerts, and sync runs.
+
+The EZVIZ adapter is production-safe but intentionally inactive. Enabling live
+vendor polling still requires EZVIZ-issued partner credentials, confirmed
+regional endpoint templates, rate limits, device authorization, and a supported
+model list. Live view, playback, firmware, configuration, and device ownership
+remain in the EZVIZ app.
 
 ## Product Boundary
 

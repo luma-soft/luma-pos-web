@@ -1226,7 +1226,7 @@ function NotificationsSection({
   const [saved, setSaved] = useState(false);
   const [pending, start] = useTransition();
   const mark = () => { setDirty(true); setSaved(false); };
-  type TK = "lowStock" | "stagnant" | "shiftClose" | "einvoiceError" | "syncDone";
+  type TK = "lowStock" | "stagnant" | "shiftClose" | "einvoiceError" | "syncDone" | "serviceDue";
   const setType = (k: TK, v: boolean) => { setForm((p) => ({ ...p, [k]: v })); mark(); };
   const setChannel = (k: string, v: boolean) => { setForm((p) => ({ ...p, channels: { ...p.channels, [k]: v } })); mark(); };
   function save() { start(async () => { const r = await updateStorePrefs({ notifications: form }); if (r.ok) { setDirty(false); setSaved(true); } }); }
@@ -1237,6 +1237,7 @@ function NotificationsSection({
     { k: "shiftClose", title: L ? "Nhắc đóng ca (18:00)" : "Shift close reminder (18:00)", desc: L ? "Nhắc đóng ca mỗi ngày" : "Daily shift close reminder" },
     { k: "einvoiceError", title: L ? "Lỗi hóa đơn điện tử" : "E-invoice error", desc: L ? "Khi HĐĐT gửi thất bại" : "When e-invoice fails" },
     { k: "syncDone", title: L ? "Đồng bộ hoàn tất" : "Sync completed", desc: L ? "Khi dữ liệu offline đồng bộ xong" : "When offline data syncs" },
+    { k: "serviceDue", title: L ? "Công việc bảo trì đến hạn" : "Maintenance due", desc: L ? "Khi hệ thống tự tạo việc bảo trì" : "When a maintenance job is generated" },
   ];
   const channelView = (id: string) => id === "push"
     ? { ico: "📲", name: "Push" }

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   canAccessServiceJob,
   canManageServiceDispatch,
+  fieldJobDateRange,
 } from "../src/lib/services/access";
 
 const technicianId = "11111111-1111-4111-8111-111111111111";
@@ -58,5 +59,17 @@ describe("service job access", () => {
     expect(canManageServiceDispatch("owner")).toBe(true);
     expect(canManageServiceDispatch("manager")).toBe(true);
     expect(canManageServiceDispatch("technician")).toBe(false);
+  });
+
+  test("builds Today and Week ranges from the store UTC offset", () => {
+    const now = new Date("2026-07-29T03:00:00.000Z");
+    expect(fieldJobDateRange("today", now, 420)).toEqual({
+      from: new Date("2026-07-28T17:00:00.000Z"),
+      to: new Date("2026-07-29T17:00:00.000Z"),
+    });
+    expect(fieldJobDateRange("week", now, 420)).toEqual({
+      from: new Date("2026-07-28T17:00:00.000Z"),
+      to: new Date("2026-08-04T17:00:00.000Z"),
+    });
   });
 });

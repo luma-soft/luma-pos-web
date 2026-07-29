@@ -1,0 +1,125 @@
+import { and, eq, ne } from "drizzle-orm";
+import { db } from "@/db";
+import {
+  profiles,
+  serviceJobAssignments,
+  serviceJobEvents,
+  serviceJobs,
+} from "@/db/schema";
+import { requireMobileManager } from "@/lib/mobile/auth";
+import { mobileError, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
+import { serviceJobAssignmentSchema } from "@/lib/services/schemas";
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const gate = await requireMobileManager();
+  const blocked = mobileGate(gate);
+  if (blocked) return blocked;
+  if (!gate.ok) return mobileError("errors.unauthorized", 401);
+  const body = await readJson(request);
+  const { id } = await params;
+  const parsed = serviceJobAssignmentSchema.safeParse({
+    ...(body && typeof body === "object" ? body : {}),
+    jobId: id,
+  });
+  if (!parsed.success) return mobileError("errors.invalidData", 400);
+  const value = parsed.data;
+  const [profile] = await db.select({
+    id: profiles.id,
+    role: profiles.role,
+    isActive: profiles.isActive,
+  }).from(profiles).where(eq(profiles.id, value.profileId)).limit(1);
+  if (
+    !profile?.isActive
+    || !["owner", "manager", "technician"].includes(profile.role)
+  ) return mobileError("services.errors.invalidAssignee", 409);
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [job] = await tx.select({ id: serviceJobs.id })
+        .from(serviceJobs)
+        .where(eq(serviceJobs.id, id))
+        .limit(1);
+      if (!job) return null;
+      const now = new Date();
+      if (value.assignmentRole === "primary") {
+        await tx.update(serviceJobAssignments).set({ removedAt: now })
+          .where(and(
+            eq(serviceJobAssignments.jobId, id),
+            eq(serviceJobAssignments.assignmentRole, "primary"),
+            ne(serviceJobAssignments.profileId, value.profileId),
+          ));
+        await tx.update(serviceJobs).set({
+          assignedTo: value.profileId,
+          updatedAt: now,
+        }).where(eq(serviceJobs.id, id));
+      }
+      const [assignment] = await tx.insert(serviceJobAssignments).values({
+        jobId: id,
+        profileId: value.profileId,
+        assignmentRole: value.assignmentRole,
+        assignedBy: gate.userId,
+        assignedAt: now,
+      }).onConflictDoUpdate({
+        target: [
+          serviceJobAssignments.jobId,
+          serviceJobAssignments.profileId,
+        ],
+        set: {
+          assignmentRole: value.assignmentRole,
+          assignedBy: gate.userId,
+          assignedAt: now,
+          removedAt: null,
+        },
+      }).returning();
+      await tx.insert(serviceJobEvents).values({
+        jobId: id,
+        eventType: "job.assigned",
+        actorId: gate.userId,
+        payload: {
+          profileId: value.profileId,
+          assignmentRole: value.assignmentRole,
+        },
+      });
+      return assignment;
+    });
+    if (!result) return mobileError("errors.notFound", 404);
+    return mobileOk(result);
+  } catch (error) {
+    console.error("service assignment failed:", error);
+    return mobileError("errors.serverError", 500);
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const gate = await requireMobileManager();
+  const blocked = mobileGate(gate);
+  if (blocked) return blocked;
+  if (!gate.ok) return mobileError("errors.unauthorized", 401);
+  const { id } = await params;
+  const profileId = new URL(request.url).searchParams.get("profileId");
+  if (!profileId) return mobileError("errors.invalidData", 400);
+  const now = new Date();
+  const [removed] = await db.update(serviceJobAssignments).set({ removedAt: now })
+    .where(and(
+      eq(serviceJobAssignments.jobId, id),
+      eq(serviceJobAssignments.profileId, profileId),
+    ))
+    .returning({ assignmentRole: serviceJobAssignments.assignmentRole });
+  if (!removed) return mobileError("errors.notFound", 404);
+  if (removed.assignmentRole === "primary") {
+    await db.update(serviceJobs).set({ assignedTo: null, updatedAt: now })
+      .where(and(eq(serviceJobs.id, id), eq(serviceJobs.assignedTo, profileId)));
+  }
+  await db.insert(serviceJobEvents).values({
+    jobId: id,
+    eventType: "job.unassigned",
+    actorId: gate.userId,
+    payload: { profileId },
+  });
+  return mobileOk({ profileId });
+}

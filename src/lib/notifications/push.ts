@@ -57,13 +57,14 @@ async function firebaseAccessToken(account: FirebaseServiceAccount) {
   return body.access_token;
 }
 
-export type PushCategory = "lowStock" | "einvoiceError" | "shiftClose" | "syncDone";
+export type PushCategory = "lowStock" | "einvoiceError" | "shiftClose" | "syncDone" | "serviceDue";
 
 export async function dispatchPushNotification(input: {
   notificationKey: string;
   category: PushCategory;
   target: string;
   entityId?: string;
+  userIds?: string[];
   prefs: StorePrefs["notifications"];
 }) {
   const account = resolveFirebaseServiceAccount();
@@ -74,6 +75,7 @@ export async function dispatchPushNotification(input: {
     return { configured: true, sent: 0, failed: 0, skipped: 1 };
   }
   const roles = input.prefs.roleRouting[input.category] as Role[];
+  const userIds = input.userIds?.filter(Boolean) ?? [];
   const effectiveProfiles = alias(profiles, "push_effective_profiles");
   const devices = await db.select({
     id: mobilePushDevices.id,
@@ -87,7 +89,9 @@ export async function dispatchPushNotification(input: {
     )
     .where(and(
       eq(mobilePushDevices.enabled, true),
-      inArray(effectiveProfiles.role, roles),
+      userIds.length > 0
+        ? inArray(effectiveProfiles.id, userIds)
+        : inArray(effectiveProfiles.role, roles),
       eq(profiles.isActive, true),
       eq(effectiveProfiles.isActive, true),
     ));

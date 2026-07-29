@@ -1,13 +1,22 @@
 import { createServiceJob } from "@/lib/actions/services";
-import { getServiceDashboard } from "@/lib/data/services";
-import { requireMobileManager, requireMobileSalesAccess } from "@/lib/mobile/auth";
-import { mobileAction, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
+import { getFieldServiceJobs } from "@/lib/data/service-field";
+import { requireMobileManager, requireMobileServiceAccess } from "@/lib/mobile/auth";
+import { mobileAction, mobileError, mobileGate, mobileOk, readJson, searchParam } from "@/lib/mobile/response";
 
-export async function GET() {
-  const gate = await requireMobileSalesAccess();
+export async function GET(request: Request) {
+  const gate = await requireMobileServiceAccess();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
-  return mobileOk({ rows: (await getServiceDashboard()).jobs });
+  if (!gate.ok) return mobileError("errors.unauthorized", 401);
+  const requestedScope = searchParam(request, "scope", "today");
+  const scope = requestedScope === "week" ? "week" : "today";
+  return mobileOk({
+    rows: await getFieldServiceJobs({
+      actor: { userId: gate.userId, role: gate.role },
+      scope,
+    }),
+    scope,
+  });
 }
 
 export async function POST(request: Request) {

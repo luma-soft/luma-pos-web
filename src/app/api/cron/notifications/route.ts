@@ -6,6 +6,7 @@ import { getRestockSuggestions } from "@/lib/data/ai-restock";
 import { getRawStorePrefs } from "@/lib/data/settings";
 import { dispatchPushNotification } from "@/lib/notifications/push";
 import { mobileError, mobileOk } from "@/lib/mobile/response";
+import { runMaintenanceWorker } from "@/lib/services/maintenance-worker";
 
 function authorized(request: Request) {
   const expected = process.env.NOTIFICATION_CRON_SECRET?.trim() ?? "";
@@ -28,6 +29,20 @@ export async function GET(request: Request) {
   const prefs = (await getRawStorePrefs()).notifications;
   const day = dateKey(prefs.quietHours.timezone);
   const results = [];
+  const maintenance = await runMaintenanceWorker();
+
+  if (prefs.serviceDue) {
+    for (const occurrence of maintenance.results.filter((item) => item.created && item.jobId)) {
+      results.push(await dispatchPushNotification({
+        notificationKey: `service-due:${occurrence.jobId}`,
+        category: "serviceDue",
+        target: "services",
+        entityId: occurrence.jobId!,
+        prefs,
+        userIds: occurrence.assignedTo ? [occurrence.assignedTo] : undefined,
+      }));
+    }
+  }
 
   if (prefs.lowStock) {
     const restock = await getRestockSuggestions(30);
@@ -72,5 +87,6 @@ export async function GET(request: Request) {
     failed: results.reduce((sum, result) => sum + result.failed, 0),
     skipped: results.reduce((sum, result) => sum + result.skipped, 0),
     configured: results.every((result) => result.configured),
+    maintenance,
   });
 }

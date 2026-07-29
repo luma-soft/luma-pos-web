@@ -134,7 +134,7 @@ export function canTransitionServiceVisit(
 }
 
 export function fieldCompletionErrors(input: {
-  serviceType: ConcreteServiceType;
+  serviceType: ServiceType;
   checklist: readonly ServiceChecklistItem[];
   beforeEvidenceCount: number;
   afterEvidenceCount: number;

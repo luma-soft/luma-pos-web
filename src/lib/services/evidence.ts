@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-type JsonValue =
+export type JsonValue =
   | null
   | boolean
   | number

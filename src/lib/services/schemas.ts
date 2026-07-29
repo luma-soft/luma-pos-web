@@ -265,9 +265,44 @@ export const serviceCompletionSchema = z.object({
   completionNote: z.string().trim().min(1).max(4000),
 });
 
+export const serviceFieldAssetCreateSchema = installedAssetCreateSchema.omit({
+  projectId: true,
+  jobId: true,
+}).extend({
+  jobId: z.uuid(),
+  clientMutationId: clientMutationIdSchema,
+});
+
+export const serviceFieldMaterialUsageSchema = z.object({
+  jobId: z.uuid(),
+  materialId: z.uuid(),
+  usedQuantity: z.coerce.number().min(0),
+  note: z.string().trim().max(1000).optional(),
+  clientMutationId: clientMutationIdSchema,
+});
+
+export const serviceCustomerRequestLinkSchema = z.object({
+  projectId: z.uuid(),
+  customerId: z.uuid().nullable().optional(),
+  assetId: z.uuid().nullable().optional(),
+  expiresInDays: z.coerce.number().int().min(1).max(30).default(7),
+});
+
+export const serviceCustomerRequestSubmitSchema = z.object({
+  title: z.string().trim().min(3).max(200),
+  description: z.string().trim().min(5).max(5000),
+  contactName: z.string().trim().min(1).max(200),
+  contactPhone: z.string().trim().min(8).max(20),
+  priority: z.enum(["low", "normal", "high", "urgent"]).default("normal"),
+});
+
 export type ServiceJobAssignmentInput = z.input<typeof serviceJobAssignmentSchema>;
 export type ServiceVisitMutationInput = z.input<typeof serviceVisitMutationSchema>;
 export type ServiceChecklistUpdateInput = z.input<typeof serviceChecklistUpdateSchema>;
 export type ServiceAttachmentMetadataInput = z.input<typeof serviceAttachmentMetadataSchema>;
 export type ServiceSignatureInput = z.input<typeof serviceSignatureSchema>;
 export type ServiceCompletionInput = z.input<typeof serviceCompletionSchema>;
+export type ServiceFieldAssetCreateInput = z.input<typeof serviceFieldAssetCreateSchema>;
+export type ServiceFieldMaterialUsageInput = z.input<typeof serviceFieldMaterialUsageSchema>;
+export type ServiceCustomerRequestLinkInput = z.input<typeof serviceCustomerRequestLinkSchema>;
+export type ServiceCustomerRequestSubmitInput = z.input<typeof serviceCustomerRequestSubmitSchema>;
