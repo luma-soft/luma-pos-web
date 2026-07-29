@@ -31,6 +31,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
+import { AutoLinkText } from "@/components/ui/auto-link-text";
 import { Select } from "@/components/ui/select";
 import {
   DataTableShell,
@@ -1106,16 +1107,16 @@ function TextPanel({
       <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">
         {title}
       </h4>
-      <p
+      <AutoLinkText
         className={cn(
-          "mt-4 min-h-7 whitespace-pre-wrap text-sm",
+          "mt-4 block min-h-7 whitespace-pre-wrap text-sm",
           muted
             ? "text-center text-slate-400"
             : "text-slate-700 dark:text-slate-200",
         )}
       >
         {value}
-      </p>
+      </AutoLinkText>
     </section>
   );
 }
@@ -1928,9 +1929,9 @@ function InfoItem({
   return (
     <div className={cn("min-w-0 rounded-xl bg-surface px-3 py-2.5 shadow-sm lg:rounded-none lg:border-b lg:border-border-soft lg:bg-transparent lg:px-0 lg:pb-2 lg:pt-0 lg:shadow-none", className)}>
       <div className="truncate text-[10px] font-semibold text-slate-400 lg:text-xs lg:font-normal lg:text-slate-500">{label}</div>
-      <div className="mt-1 min-h-5 break-words text-sm font-semibold text-slate-800 lg:font-medium dark:text-slate-100">
+      <AutoLinkText className="mt-1 block min-h-5 break-words text-sm font-semibold text-slate-800 lg:font-medium dark:text-slate-100">
         {value || "—"}
-      </div>
+      </AutoLinkText>
     </div>
   );
 }
