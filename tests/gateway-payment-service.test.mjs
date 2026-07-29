@@ -19,6 +19,8 @@ const {
   payments,
   cashTransactions,
   paymentWebhookEvents,
+  notificationEvents,
+  notificationRecipients,
 } = schema;
 
 const client = new PGlite();
@@ -36,6 +38,22 @@ for (const file of readdirSync(`${PROJ}/drizzle`).filter((name) => name.endsWith
     if (sql && !/create extension/i.test(sql)) await client.exec(sql);
   }
 }
+// `store_settings` predates the tracked migrations used by this PGlite fixture.
+await client.exec(`
+  CREATE TABLE "store_settings" (
+    "id" text PRIMARY KEY DEFAULT 'default' NOT NULL,
+    "name" text DEFAULT '' NOT NULL,
+    "address" text DEFAULT '' NOT NULL,
+    "phone" text DEFAULT '' NOT NULL,
+    "tax_code" text DEFAULT '' NOT NULL,
+    "industry" text DEFAULT 'grocery' NOT NULL,
+    "currency" text DEFAULT 'VND' NOT NULL,
+    "locale" text DEFAULT 'vi-VN' NOT NULL,
+    "onboarded" boolean DEFAULT false NOT NULL,
+    "prefs" jsonb DEFAULT '{}'::jsonb NOT NULL,
+    "updated_at" timestamptz DEFAULT now() NOT NULL
+  )
+`);
 
 const [cashier] = await db.insert(profiles).values({
   id: "00000000-0000-0000-0000-000000000301",
@@ -150,11 +168,29 @@ const replay = await service.recordGatewayCallbackAndMatch(db, {
 const [paymentAfterCallback] = await db.select().from(payments).where(eq(payments.id, pending.data.id));
 const [orderAfterCallback] = await db.select().from(orders).where(eq(orders.id, order.id));
 const cashRows = await db.select().from(cashTransactions).where(eq(cashTransactions.refId, order.id));
+const gatewayQrEvents = await db.select().from(notificationEvents)
+  .where(eq(notificationEvents.eventKey, `qr-payment-confirmed:${pending.data.id}`));
+const gatewayQrRecipients = gatewayQrEvents[0]
+  ? await db.select().from(notificationRecipients)
+    .where(eq(notificationRecipients.eventId, gatewayQrEvents[0].id))
+  : [];
 ok("valid callback confirms payment", confirmed.ok && confirmed.data.matched && paymentAfterCallback.status === "confirmed" && paymentAfterCallback.providerTransactionId === "momo-tx-success");
 const [stockAfterCallback] = await db.select().from(stockLevels).where(eq(stockLevels.productId, product.id));
 ok("callback posts order and cashbook exactly once", Number(orderAfterCallback.amountPaid) === 450_000 && orderAfterCallback.status === "completed" && cashRows.length === 1);
 ok("confirmed draft consumes stock exactly once", Number(stockAfterCallback.quantity) === 1);
 ok("callback replay is idempotent", replay.ok && replay.data.duplicate === true && cashRows.length === 1);
+ok(
+  "hosted QR confirmation emits once with its creator as direct recipient",
+  gatewayQrEvents.length === 1
+    && confirmed.data.notificationCreated === true
+    && confirmed.data.notificationEventId === gatewayQrEvents[0].id
+    && !replay.data.notificationEventId
+    && gatewayQrEvents[0].category === "qrPaymentConfirmed"
+    && gatewayQrEvents[0].entityId === order.id
+    && gatewayQrRecipients.some((recipient) => (
+      recipient.userId === cashier.id && recipient.reason === "direct"
+    )),
+);
 
 console.log("3) Non-success callback is evidence only");
 const [failedOrder] = await db.insert(orders).values({

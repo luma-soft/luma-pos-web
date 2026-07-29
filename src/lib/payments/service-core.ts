@@ -17,10 +17,16 @@ import type { SepayWebhookInput } from "@/lib/payments/sepay";
 import type { GatewayProvider } from "@/lib/payments/gateways";
 import type { GatewayInquiryResult } from "@/lib/payments/gateway-adapter";
 import { consumeTrackedStockLots } from "@/lib/inventory/stock-lot-service";
+import { createNotificationEventInTx } from "@/lib/notifications/events-core";
 
 export type PaymentActionResult<T = undefined> =
   | { ok: true; data: T }
   | { ok: false; error: string };
+
+export type PaymentNotificationResult = {
+  notificationEventId?: string;
+  notificationCreated?: boolean;
+};
 
 // Drizzle's Postgres and PGlite databases expose the same fluent API with
 // different generic brands. This core accepts either runtime for production and tests.
@@ -28,6 +34,10 @@ export type PaymentActionResult<T = undefined> =
 type DbLike = any;
 
 type ConfirmSource = "webhook" | "api" | "manual";
+type SepayExceptionReason =
+  | "missing_reference"
+  | "pending_payment_not_found"
+  | "amount_mismatch";
 
 export const SEPAY_PAYMENT_TIMEOUT_MS = 90_000;
 export const GATEWAY_PAYMENT_TIMEOUT_MS = 15 * 60_000;
@@ -192,7 +202,29 @@ async function confirmPaymentInTx(
     createdBy: payment.createdBy ?? null,
   });
 
-  return { alreadyConfirmed: false };
+  const notification = await createNotificationEventInTx(tx, {
+    eventKey: `qr-payment-confirmed:${payment.id}`,
+    category: "qrPaymentConfirmed",
+    entityType: "order",
+    entityId: order.id,
+    actorId: payment.createdBy,
+    directUserIds: payment.createdBy ? [payment.createdBy] : [],
+    target: "invoices",
+    priority: "high",
+    quietHoursPolicy: "bypass",
+    metadata: {
+      paymentId: payment.id,
+      provider: payment.provider,
+      debtDelta: draftOrder
+        ? Math.max(total - newPaid, 0).toFixed(2)
+        : (-amount).toFixed(2),
+    },
+  });
+  return {
+    alreadyConfirmed: false,
+    notificationEventId: notification?.eventId,
+    notificationCreated: notification?.created,
+  };
 }
 
 async function currentShiftIdForProfile(db: DbLike, profileId: string | null | undefined) {
@@ -204,6 +236,24 @@ async function currentShiftIdForProfile(db: DbLike, profileId: string | null | u
     .orderBy(sql`${shifts.openedAt} desc`)
     .limit(1);
   return shift?.id ?? null;
+}
+
+async function createSepayExceptionInTx(
+  tx: DbLike,
+  event: typeof paymentWebhookEvents.$inferSelect,
+  reason: SepayExceptionReason,
+) {
+  if (event.status !== "verified" || event.transferType !== "in") return null;
+  return createNotificationEventInTx(tx, {
+    eventKey: `qr-payment-exception:${event.id}:${reason}`,
+    category: "qrPaymentException",
+    entityType: "payment",
+    entityId: event.id,
+    target: "paymentReconciliation",
+    priority: "high",
+    quietHoursPolicy: "bypass",
+    metadata: { reason },
+  });
 }
 
 export async function createPendingSepayPayment(
@@ -575,7 +625,11 @@ export async function recordGatewayCallbackAndMatch(
     rawPayload: Record<string, unknown>;
     evidenceStatus?: "verified" | "queried";
   },
-): Promise<PaymentActionResult<{ matched: boolean; duplicate: boolean; reason?: string }>> {
+): Promise<PaymentActionResult<{
+  matched: boolean;
+  duplicate: boolean;
+  reason?: string;
+} & PaymentNotificationResult>> {
   const providerEventId = input.providerEventId.trim();
   if (!providerEventId || input.amount == null || input.amount < 0) {
     return { ok: false, error: "errors.invalidData" };
@@ -663,7 +717,7 @@ export async function recordGatewayCallbackAndMatch(
         matchReason: null,
         updatedAt: new Date(),
       }).where(eq(paymentWebhookEvents.id, event.id));
-      await confirmPaymentInTx(tx, {
+      const confirmation = await confirmPaymentInTx(tx, {
         paymentId: payment.id,
         providerTransactionId: input.providerTransactionId || providerEventId,
         rawMatchedEventId: event.id,
@@ -671,14 +725,22 @@ export async function recordGatewayCallbackAndMatch(
         gateway: input.provider,
         source: "webhook",
       });
-      return { ok: true, data: { matched: true, duplicate: false } };
+      return {
+        ok: true,
+        data: {
+          matched: true,
+          duplicate: false,
+          notificationEventId: confirmation.notificationEventId,
+          notificationCreated: confirmation.notificationCreated,
+        },
+      };
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message === "PAYMENT_NOT_CONFIRMABLE") {
       return { ok: false, error: "payments.errors.notConfirmable" };
     }
-    console.error("recordGatewayCallbackAndMatch failed:", error);
+    console.error("recordGatewayCallbackAndMatch failed");
     return { ok: false, error: "errors.serverError" };
   }
 }
@@ -697,7 +759,9 @@ export async function refreshGatewayPaymentFromInquiry(
   paymentId: string,
   inquiry: (payment: GatewayInquiryPayment) => Promise<GatewayInquiryResult>,
   options: { now?: Date; minIntervalMs?: number } = {},
-): Promise<PaymentActionResult<GatewayPaymentStatus & { queried: boolean }>> {
+): Promise<PaymentActionResult<
+  GatewayPaymentStatus & { queried: boolean } & PaymentNotificationResult
+>> {
   const now = options.now ?? new Date();
   const minIntervalMs = Math.max(1_000, options.minIntervalMs ?? GATEWAY_INQUIRY_MIN_INTERVAL_MS);
   const queryBefore = new Date(now.getTime() - minIntervalMs);
@@ -747,6 +811,7 @@ export async function refreshGatewayPaymentFromInquiry(
     };
 
     let result: GatewayInquiryResult;
+    let notification: PaymentNotificationResult = {};
     try {
       result = await inquiry(ownedPayment);
     } catch (error) {
@@ -783,6 +848,10 @@ export async function refreshGatewayPaymentFromInquiry(
           evidenceStatus: "queried",
         });
         if (!matched.ok) return matched;
+        notification = {
+          notificationEventId: matched.data.notificationEventId,
+          notificationCreated: matched.data.notificationCreated,
+        };
       } else if (result.state === "failed" && exactReference) {
         await failGatewayPayment(db, {
           paymentId,
@@ -794,7 +863,7 @@ export async function refreshGatewayPaymentFromInquiry(
 
     const current = await getGatewayPaymentStatus(db, paymentId);
     return current.ok
-      ? { ok: true, data: { ...current.data, queried: true } }
+      ? { ok: true, data: { ...current.data, queried: true, ...notification } }
       : current;
   } catch (error) {
     console.error("refreshGatewayPaymentFromInquiry failed:", error);
@@ -813,7 +882,7 @@ export async function confirmPaymentFromProvider(
     confirmedAt?: Date;
     source?: ConfirmSource;
   }
-): Promise<PaymentActionResult<{ alreadyConfirmed: boolean }>> {
+): Promise<PaymentActionResult<{ alreadyConfirmed: boolean } & PaymentNotificationResult>> {
   try {
     return await db.transaction(async (tx: DbLike) => {
       return { ok: true, data: await confirmPaymentInTx(tx, input) };
@@ -1111,7 +1180,8 @@ export async function getPaymentReconciliation(
 
 export async function recordSepayWebhookEvent(
   db: DbLike,
-  input: SepayWebhookInput
+  input: SepayWebhookInput,
+  options: { verified?: boolean } = {},
 ): Promise<PaymentActionResult<{ eventId: string; duplicate: boolean }>> {
   try {
     const [existing] = await db
@@ -1136,11 +1206,12 @@ export async function recordSepayWebhookEvent(
       transactionDate: input.transactionDate,
       content: input.content,
       rawPayload: input.rawPayload,
+      status: options.verified ? "verified" : "received",
     }).returning({ id: paymentWebhookEvents.id });
 
     return { ok: true, data: { eventId: event.id, duplicate: false } };
-  } catch (e) {
-    console.error("recordSepayWebhookEvent failed:", e);
+  } catch {
+    console.error("recordSepayWebhookEvent failed");
     return { ok: false, error: "errors.serverError" };
   }
 }
@@ -1152,7 +1223,9 @@ export async function reconcilePaymentWithEvent(
     eventId: string;
     actorId?: string | null;
   }
-): Promise<PaymentActionResult<{ alreadyReconciled: boolean }>> {
+): Promise<PaymentActionResult<{
+  alreadyReconciled: boolean;
+} & PaymentNotificationResult>> {
   try {
     return await db.transaction(async (tx: DbLike) => {
       const [payment] = await tx
@@ -1221,7 +1294,7 @@ export async function reconcilePaymentWithEvent(
         })
         .where(eq(paymentWebhookEvents.id, event.id));
 
-      await confirmPaymentInTx(tx, {
+      const confirmation = await confirmPaymentInTx(tx, {
         paymentId: payment.id,
         providerTransactionId: event.providerEventId,
         rawMatchedEventId: event.id,
@@ -1230,7 +1303,14 @@ export async function reconcilePaymentWithEvent(
         confirmedAt: event.transactionDate ?? undefined,
         source: "api",
       });
-      return { ok: true, data: { alreadyReconciled: false } };
+      return {
+        ok: true,
+        data: {
+          alreadyReconciled: false,
+          notificationEventId: confirmation.notificationEventId,
+          notificationCreated: confirmation.notificationCreated,
+        },
+      };
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
@@ -1253,7 +1333,10 @@ export async function reconcilePaymentWithEvent(
 export async function matchSepayWebhookEvent(
   db: DbLike,
   eventId: string
-): Promise<PaymentActionResult<{ matched: boolean; reason?: string }>> {
+): Promise<PaymentActionResult<{
+  matched: boolean;
+  reason?: string;
+} & PaymentNotificationResult>> {
   try {
     return await db.transaction(async (tx: DbLike) => {
       const [event] = await tx.select().from(paymentWebhookEvents).where(eq(paymentWebhookEvents.id, eventId)).limit(1);
@@ -1290,8 +1373,17 @@ export async function matchSepayWebhookEvent(
 
       const reference = event.referenceCode?.trim();
       if (!reference) {
+        const notification = await createSepayExceptionInTx(tx, event, "missing_reference");
         await tx.update(paymentWebhookEvents).set({ bankAccountId: bankAccount.id, matchStatus: "unmatched", matchReason: "missing_reference" }).where(eq(paymentWebhookEvents.id, event.id));
-        return { ok: true, data: { matched: false, reason: "missing_reference" } };
+        return {
+          ok: true,
+          data: {
+            matched: false,
+            reason: "missing_reference",
+            notificationEventId: notification?.eventId,
+            notificationCreated: notification?.created,
+          },
+        };
       }
 
       const [payment] = await tx
@@ -1305,13 +1397,35 @@ export async function matchSepayWebhookEvent(
         ))
         .limit(1);
       if (!payment) {
+        const notification = await createSepayExceptionInTx(
+          tx,
+          event,
+          "pending_payment_not_found",
+        );
         await tx.update(paymentWebhookEvents).set({ bankAccountId: bankAccount.id, matchStatus: "unmatched", matchReason: "pending_payment_not_found" }).where(eq(paymentWebhookEvents.id, event.id));
-        return { ok: true, data: { matched: false, reason: "pending_payment_not_found" } };
+        return {
+          ok: true,
+          data: {
+            matched: false,
+            reason: "pending_payment_not_found",
+            notificationEventId: notification?.eventId,
+            notificationCreated: notification?.created,
+          },
+        };
       }
 
       if (Number(payment.amount) !== Number(event.transferAmount)) {
+        const notification = await createSepayExceptionInTx(tx, event, "amount_mismatch");
         await tx.update(paymentWebhookEvents).set({ bankAccountId: bankAccount.id, matchedPaymentId: payment.id, matchStatus: "wrong_amount", matchReason: "amount_mismatch" }).where(eq(paymentWebhookEvents.id, event.id));
-        return { ok: true, data: { matched: false, reason: "amount_mismatch" } };
+        return {
+          ok: true,
+          data: {
+            matched: false,
+            reason: "amount_mismatch",
+            notificationEventId: notification?.eventId,
+            notificationCreated: notification?.created,
+          },
+        };
       }
 
       await tx.update(paymentWebhookEvents).set({
@@ -1321,7 +1435,7 @@ export async function matchSepayWebhookEvent(
         matchReason: null,
       }).where(eq(paymentWebhookEvents.id, event.id));
 
-      await confirmPaymentInTx(tx, {
+      const confirmation = await confirmPaymentInTx(tx, {
         paymentId: payment.id,
         providerTransactionId: event.providerEventId,
         rawMatchedEventId: event.id,
@@ -1330,7 +1444,14 @@ export async function matchSepayWebhookEvent(
         confirmedAt: event.transactionDate ?? undefined,
         source: "webhook",
       });
-      return { ok: true, data: { matched: true } };
+      return {
+        ok: true,
+        data: {
+          matched: true,
+          notificationEventId: confirmation.notificationEventId,
+          notificationCreated: confirmation.notificationCreated,
+        },
+      };
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";

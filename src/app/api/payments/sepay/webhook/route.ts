@@ -59,8 +59,12 @@ export async function POST(request: Request) {
   if (hasConfiguredAuth && !validSignature && !validApiKey) {
     return NextResponse.json({ ok: false, error: "errors.unauthorized" }, { status: 401 });
   }
+  const verified = Boolean(
+    (configuredSecret && validSignature)
+    || (configuredApiKey && validApiKey),
+  );
 
-  const recorded = await recordSepayWebhookEvent(event);
+  const recorded = await recordSepayWebhookEvent(event, { verified });
   if (!recorded.ok) {
     return NextResponse.json({ ok: false, error: recorded.error }, { status: 500 });
   }

@@ -18,6 +18,8 @@ const {
   cashTransactions,
   paymentBankAccounts,
   paymentWebhookEvents,
+  notificationEvents,
+  notificationRecipients,
 } = schema;
 
 const client = new PGlite();
@@ -37,12 +39,40 @@ for (const f of readdirSync(`${PROJ}/drizzle`).filter((x) => x.endsWith(".sql"))
     if (s && !/create extension/i.test(s)) await client.exec(s);
   }
 }
+// `store_settings` predates the tracked migrations used by this PGlite fixture.
+await client.exec(`
+  CREATE TABLE "store_settings" (
+    "id" text PRIMARY KEY DEFAULT 'default' NOT NULL,
+    "name" text DEFAULT '' NOT NULL,
+    "address" text DEFAULT '' NOT NULL,
+    "phone" text DEFAULT '' NOT NULL,
+    "tax_code" text DEFAULT '' NOT NULL,
+    "industry" text DEFAULT 'grocery' NOT NULL,
+    "currency" text DEFAULT 'VND' NOT NULL,
+    "locale" text DEFAULT 'vi-VN' NOT NULL,
+    "onboarded" boolean DEFAULT false NOT NULL,
+    "prefs" jsonb DEFAULT '{}'::jsonb NOT NULL,
+    "updated_at" timestamptz DEFAULT now() NOT NULL
+  )
+`);
 
 const [cashier] = await db.insert(profiles).values({
   id: "00000000-0000-0000-0000-000000000201",
   fullName: "Cashier Service",
   role: "cashier",
 }).returning();
+const [owner, manager] = await db.insert(profiles).values([
+  {
+    id: "00000000-0000-0000-0000-000000000202",
+    fullName: "Owner Service",
+    role: "owner",
+  },
+  {
+    id: "00000000-0000-0000-0000-000000000203",
+    fullName: "Manager Service",
+    role: "manager",
+  },
+]).returning();
 const [shift] = await db.insert(shifts).values({
   code: "CA-SVC",
   userId: cashier.id,
@@ -112,13 +142,59 @@ ok("webhook matched", match.ok && match.data.matched === true);
 const [confirmedPayment] = await db.select().from(payments).where(eq(payments.id, payment.id));
 [orderAfterPending] = await db.select().from(orders).where(eq(orders.id, order.id));
 cashRows = await db.select().from(cashTransactions).where(eq(cashTransactions.refId, order.id));
+let qrEvents = await db.select().from(notificationEvents)
+  .where(eq(notificationEvents.category, "qrPaymentConfirmed"));
+const qrRecipients = qrEvents[0]
+  ? await db.select().from(notificationRecipients)
+    .where(eq(notificationRecipients.eventId, qrEvents[0].id))
+  : [];
+const debtEvents = await db.select().from(notificationEvents)
+  .where(eq(notificationEvents.category, "debtChanged"));
+const invoiceEvents = await db.select().from(notificationEvents)
+  .where(eq(notificationEvents.category, "invoiceCreated"));
 ok("payment confirmed with provider transaction", confirmedPayment.status === "confirmed" && confirmedPayment.providerTransactionId === "sepay-svc-evt-1");
 ok("order paid after webhook", Number(orderAfterPending.amountPaid) === 1_000_000 && orderAfterPending.paymentStatus === "paid");
 ok("cashbook posted once", cashRows.length === 1 && cashRows[0].fund === "bank" && Number(cashRows[0].amount) === 1_000_000);
+ok(
+  "QR confirmation emits once and returns its newly created event",
+  qrEvents.length === 1
+    && match.ok
+    && match.data.notificationCreated === true
+    && match.data.notificationEventId === qrEvents[0].id,
+);
+ok(
+  "QR event points to order and protects debt metadata",
+  qrEvents[0]?.entityId === order.id
+    && qrEvents[0]?.target === "invoices"
+    && qrEvents[0]?.priority === "high"
+    && qrEvents[0]?.quietHoursPolicy === "bypass"
+    && qrEvents[0]?.metadata?.paymentId === payment.id
+    && qrEvents[0]?.metadata?.provider === "sepay"
+    && qrEvents[0]?.metadata?.debtDelta === "-1000000.00",
+);
+ok(
+  "QR confirmation routes to creator directly plus owner and manager",
+  JSON.stringify(qrRecipients.map((recipient) => recipient.userId).sort())
+    === JSON.stringify([cashier.id, manager.id, owner.id].sort())
+    && qrRecipients.find((recipient) => recipient.userId === cashier.id)?.reason === "direct",
+);
+ok(
+  "QR event is the only primary event and absorbs debt change",
+  debtEvents.length === 0 && invoiceEvents.length === 0,
+);
 
 const replay = await service.matchSepayWebhookEvent(db, event.id);
 cashRows = await db.select().from(cashTransactions).where(eq(cashTransactions.refId, order.id));
-ok("webhook replay is idempotent", replay.ok && replay.data.matched === true && cashRows.length === 1);
+qrEvents = await db.select().from(notificationEvents)
+  .where(eq(notificationEvents.category, "qrPaymentConfirmed"));
+ok(
+  "webhook replay is idempotent",
+  replay.ok
+    && replay.data.matched === true
+    && !replay.data.notificationEventId
+    && cashRows.length === 1
+    && qrEvents.length === 1,
+);
 
 const normalized = sepay.normalizeSepayWebhookPayload({
   id: "sepay-svc-evt-normalized",
@@ -165,13 +241,122 @@ const [wrongEvent] = await db.insert(paymentWebhookEvents).values({
   accountNumber: account.accountNumber,
   transferType: "in",
   transferAmount: money(499_000),
+  status: "verified",
   rawPayload: { id: "sepay-svc-evt-wrong" },
 }).returning();
 const wrongMatch = await service.matchSepayWebhookEvent(db, wrongEvent.id);
+const wrongReplay = await service.matchSepayWebhookEvent(db, wrongEvent.id);
 const [wrongEventAfter] = await db.select().from(paymentWebhookEvents).where(eq(paymentWebhookEvents.id, wrongEvent.id));
 const wrongCashRows = await db.select().from(cashTransactions).where(eq(cashTransactions.refId, wrongOrder.id));
+const wrongExceptionEvents = await db.select().from(notificationEvents)
+  .where(eq(notificationEvents.eventKey, `qr-payment-exception:${wrongEvent.id}:amount_mismatch`));
 ok("wrong amount remains unmatched", wrongMatch.ok && wrongMatch.data.matched === false && wrongEventAfter.matchStatus === "wrong_amount");
 ok("wrong amount does not post cashbook", wrongCashRows.length === 0);
+ok(
+  "verified amount mismatch emits one replay-safe QR exception",
+  wrongReplay.ok
+    && wrongExceptionEvents.length === 1
+    && wrongMatch.data.notificationCreated === true
+    && wrongMatch.data.notificationEventId === wrongExceptionEvents[0].id
+    && wrongReplay.data.notificationCreated === false
+    && wrongExceptionEvents[0].category === "qrPaymentException"
+    && wrongExceptionEvents[0].entityId === wrongEvent.id
+    && wrongExceptionEvents[0].target === "paymentReconciliation"
+    && wrongExceptionEvents[0].priority === "high"
+    && wrongExceptionEvents[0].quietHoursPolicy === "bypass"
+    && JSON.stringify(wrongExceptionEvents[0].metadata) === JSON.stringify({ reason: "amount_mismatch" }),
+);
+
+console.log("3a) Verified reconciliation exceptions emit once per reason");
+const recordedMissingReference = await service.recordSepayWebhookEvent(db, {
+  providerEventId: "sepay-svc-evt-missing-reference",
+  referenceCode: null,
+  accountNumber: account.accountNumber,
+  subAccount: null,
+  gateway: account.gateway,
+  transferType: "in",
+  transferAmount: 90_000,
+  transactionDate: null,
+  content: null,
+  rawPayload: { privateBankPayload: "must-not-reach-notifications" },
+}, { verified: true });
+const [missingReferenceEvent] = await db.select().from(paymentWebhookEvents)
+  .where(eq(paymentWebhookEvents.id, recordedMissingReference.data.eventId));
+const missingReferenceMatch = await service.matchSepayWebhookEvent(db, missingReferenceEvent.id);
+const missingReferenceReplay = await service.matchSepayWebhookEvent(db, missingReferenceEvent.id);
+const missingReferenceExceptions = await db.select().from(notificationEvents)
+  .where(eq(notificationEvents.eventKey, `qr-payment-exception:${missingReferenceEvent.id}:missing_reference`));
+const missingReferenceRecipients = missingReferenceExceptions[0]
+  ? await db.select().from(notificationRecipients)
+    .where(eq(notificationRecipients.eventId, missingReferenceExceptions[0].id))
+  : [];
+ok(
+  "verified missing reference emits one replay-safe QR exception",
+  missingReferenceMatch.ok
+    && missingReferenceMatch.data.reason === "missing_reference"
+    && missingReferenceReplay.ok
+    && missingReferenceExceptions.length === 1
+    && missingReferenceMatch.data.notificationCreated === true
+    && missingReferenceMatch.data.notificationEventId === missingReferenceExceptions[0].id
+    && missingReferenceReplay.data.notificationCreated === false
+    && missingReferenceExceptions[0].category === "qrPaymentException"
+    && missingReferenceExceptions[0].entityId === missingReferenceEvent.id
+    && JSON.stringify(missingReferenceRecipients.map((recipient) => recipient.userId).sort())
+      === JSON.stringify([manager.id, owner.id].sort())
+    && JSON.stringify(missingReferenceExceptions[0].metadata) === JSON.stringify({ reason: "missing_reference" }),
+);
+
+const [missingPaymentEvent] = await db.insert(paymentWebhookEvents).values({
+  provider: "sepay",
+  providerEventId: "sepay-svc-evt-missing-payment",
+  referenceCode: "LUMA-NOT-A-PENDING-PAYMENT",
+  accountNumber: account.accountNumber,
+  transferType: "in",
+  transferAmount: money(90_000),
+  status: "verified",
+  rawPayload: { privateBankPayload: "must-not-reach-notifications" },
+}).returning();
+const missingPaymentMatch = await service.matchSepayWebhookEvent(db, missingPaymentEvent.id);
+const missingPaymentReplay = await service.matchSepayWebhookEvent(db, missingPaymentEvent.id);
+const missingPaymentExceptions = await db.select().from(notificationEvents)
+  .where(eq(notificationEvents.eventKey, `qr-payment-exception:${missingPaymentEvent.id}:pending_payment_not_found`));
+ok(
+  "verified missing pending payment emits one replay-safe QR exception",
+  missingPaymentMatch.ok
+    && missingPaymentMatch.data.reason === "pending_payment_not_found"
+    && missingPaymentReplay.ok
+    && missingPaymentExceptions.length === 1
+    && missingPaymentMatch.data.notificationCreated === true
+    && missingPaymentMatch.data.notificationEventId === missingPaymentExceptions[0].id
+    && missingPaymentReplay.data.notificationCreated === false
+    && missingPaymentExceptions[0].category === "qrPaymentException"
+    && missingPaymentExceptions[0].entityId === missingPaymentEvent.id
+    && JSON.stringify(missingPaymentExceptions[0].metadata) === JSON.stringify({ reason: "pending_payment_not_found" }),
+);
+
+const recordedUnverified = await service.recordSepayWebhookEvent(db, {
+  providerEventId: "sepay-svc-evt-unverified",
+  referenceCode: null,
+  accountNumber: account.accountNumber,
+  subAccount: null,
+  gateway: account.gateway,
+  transferType: "in",
+  transferAmount: 90_000,
+  transactionDate: null,
+  content: null,
+  rawPayload: { privateBankPayload: "must-not-reach-notifications" },
+});
+const [unverifiedEvent] = await db.select().from(paymentWebhookEvents)
+  .where(eq(paymentWebhookEvents.id, recordedUnverified.data.eventId));
+const unverifiedMatch = await service.matchSepayWebhookEvent(db, unverifiedEvent.id);
+const unverifiedExceptions = await db.select().from(notificationEvents)
+  .where(eq(notificationEvents.eventKey, `qr-payment-exception:${unverifiedEvent.id}:missing_reference`));
+ok(
+  "unverified incoming event never emits a QR exception",
+  unverifiedMatch.ok
+    && unverifiedMatch.data.reason === "missing_reference"
+    && unverifiedExceptions.length === 0,
+);
 
 console.log("4) Provider confirmation reduces customer debt");
 const [customer] = await db.insert(customers).values({
