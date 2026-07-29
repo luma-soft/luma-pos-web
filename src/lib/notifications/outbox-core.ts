@@ -52,6 +52,7 @@ type NotificationOutboxCoreOptions = {
 
 const publishLeaseMs = 30_000;
 const processingLeaseMs = 2 * 60_000;
+const deviceSendLeaseMs = processingLeaseMs + 60_000;
 const maxAttemptAgeMs = 60 * 60_000;
 const maxAttempts = 10;
 
@@ -135,7 +136,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
         or(
           inArray(notificationOutbox.status, ["pending", "retry"]),
           and(
-            inArray(notificationOutbox.status, ["publishing", "processing"]),
+            eq(notificationOutbox.status, "publishing"),
             lte(notificationOutbox.leaseExpiresAt, claimedAt),
           ),
         ),
@@ -149,7 +150,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
 
     try {
       const result = await publisher.publish(notificationQueueMessage(eventId, claimedAt));
-      await database
+      const [published] = await database
         .update(notificationOutbox)
         .set({
           status: "published",
@@ -164,8 +165,9 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
           eq(notificationOutbox.id, claim.id),
           eq(notificationOutbox.status, "publishing"),
           eq(notificationOutbox.leaseExpiresAt, claim.leaseExpiresAt),
-        ));
-      return true;
+        ))
+        .returning({ id: notificationOutbox.id });
+      return Boolean(published);
     } catch {
       const failedAt = now();
       await database
@@ -401,13 +403,18 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
     }
 
     if (
-      claim.firstAttemptAt
-      && claimAt.getTime() - claim.firstAttemptAt.getTime() >= maxAttemptAgeMs
+      claim.attemptCount >= maxAttempts
+      || (
+        claim.firstAttemptAt
+        && claimAt.getTime() - claim.firstAttemptAt.getTime() >= maxAttemptAgeMs
+      )
     ) {
       await markDead(
         claim.id,
         claim.leaseExpiresAt,
-        "NOTIFICATION_MAX_AGE",
+        claim.attemptCount >= maxAttempts
+          ? "NOTIFICATION_MAX_ATTEMPTS"
+          : "NOTIFICATION_MAX_AGE",
         now(),
       );
       return { completed: true };
@@ -487,20 +494,119 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
     }
 
     const notificationKey = `event:${message.eventId}`;
-    const results = await Promise.all((devices as Array<{
+    const typedDevices = devices as Array<{
       id: string;
       token: string;
       locale: string | null;
-    }>).map(async (device) => {
-      const [previous] = await database
-        .select({ status: mobilePushDeliveries.status })
-        .from(mobilePushDeliveries)
-        .where(and(
-          eq(mobilePushDeliveries.deviceId, device.id),
-          eq(mobilePushDeliveries.notificationKey, notificationKey),
-        ))
-        .limit(1);
-      if (previous?.status === "sent") return { kind: "sent" as const, skipped: true };
+    }>;
+    const deviceClaims: Array<{
+      device: (typeof typedDevices)[number];
+      claim:
+        | { kind: "owned"; id: string; attemptedAt: Date }
+        | { kind: "sent" }
+        | { kind: "retry"; code: string; retryAfterMs: number };
+    }> = [];
+
+    for (const device of typedDevices) {
+      const deviceClaimAt = now();
+      const deviceClaim = await database.transaction(async (tx: DatabaseLike) => {
+        const [owner] = await tx
+          .select({ id: notificationOutbox.id })
+          .from(notificationOutbox)
+          .where(and(
+            eq(notificationOutbox.id, claim.id),
+            eq(notificationOutbox.status, "processing"),
+            eq(notificationOutbox.leaseExpiresAt, claim.leaseExpiresAt),
+          ))
+          .limit(1)
+          .for("update");
+        if (!owner) {
+          return {
+            kind: "retry" as const,
+            code: "NOTIFICATION_LEASE_LOST",
+            retryAfterMs: processingLeaseMs,
+          };
+        }
+
+        const [insertedClaim] = await tx
+          .insert(mobilePushDeliveries)
+          .values({
+            deviceId: device.id,
+            notificationKey,
+            status: "sending",
+            errorCode: null,
+            attemptedAt: deviceClaimAt,
+          })
+          .onConflictDoNothing({
+            target: [
+              mobilePushDeliveries.deviceId,
+              mobilePushDeliveries.notificationKey,
+            ],
+          })
+          .returning({
+            id: mobilePushDeliveries.id,
+            attemptedAt: mobilePushDeliveries.attemptedAt,
+          });
+        if (insertedClaim) return { kind: "owned" as const, ...insertedClaim };
+
+        const [previous] = await tx
+          .select({
+            id: mobilePushDeliveries.id,
+            status: mobilePushDeliveries.status,
+            attemptedAt: mobilePushDeliveries.attemptedAt,
+          })
+          .from(mobilePushDeliveries)
+          .where(and(
+            eq(mobilePushDeliveries.deviceId, device.id),
+            eq(mobilePushDeliveries.notificationKey, notificationKey),
+          ))
+          .limit(1);
+        if (previous?.status === "sent") {
+          return { kind: "sent" as const };
+        }
+
+        const staleSending = previous?.status === "sending"
+          && previous.attemptedAt.getTime() + deviceSendLeaseMs <= deviceClaimAt.getTime();
+        if (previous && (previous.status === "failed" || staleSending)) {
+          const [reclaimed] = await tx
+            .update(mobilePushDeliveries)
+            .set({
+              status: "sending",
+              errorCode: null,
+              attempts: sql`${mobilePushDeliveries.attempts} + 1`,
+              attemptedAt: deviceClaimAt,
+            })
+            .where(and(
+              eq(mobilePushDeliveries.id, previous.id),
+              eq(mobilePushDeliveries.status, previous.status),
+              eq(mobilePushDeliveries.attemptedAt, previous.attemptedAt),
+            ))
+            .returning({
+              id: mobilePushDeliveries.id,
+              attemptedAt: mobilePushDeliveries.attemptedAt,
+            });
+          if (reclaimed) return { kind: "owned" as const, ...reclaimed };
+        }
+
+        const retryAt = previous?.attemptedAt
+          ? addMilliseconds(previous.attemptedAt, deviceSendLeaseMs)
+          : addMilliseconds(deviceClaimAt, deviceSendLeaseMs);
+        return {
+          kind: "retry" as const,
+          code: "NOTIFICATION_DEVICE_BUSY",
+          retryAfterMs: Math.max(0, retryAt.getTime() - deviceClaimAt.getTime()),
+        };
+      });
+      deviceClaims.push({ device, claim: deviceClaim });
+    }
+
+    const results = await Promise.all(deviceClaims.map(async ({ device, claim: deviceClaim }) => {
+      if (deviceClaim.kind === "sent") {
+        return { kind: "sent" as const, skipped: true };
+      }
+      if (deviceClaim.kind === "retry") {
+        return deviceClaim;
+      }
 
       let result: DeviceNotificationResult;
       try {
@@ -522,33 +628,40 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
       const errorCode = result.kind === "sent"
         ? null
         : boundedErrorCode(result.code, "FCM_FAILED");
-      await database
-        .insert(mobilePushDeliveries)
-        .values({
-          deviceId: device.id,
-          notificationKey,
-          status,
-          errorCode,
-          attemptedAt,
-        })
-        .onConflictDoUpdate({
-          target: [
-            mobilePushDeliveries.deviceId,
-            mobilePushDeliveries.notificationKey,
-          ],
-          set: {
-            status,
-            errorCode,
-            attempts: sql`${mobilePushDeliveries.attempts} + 1`,
-            attemptedAt,
-          },
-        });
+      const [persisted] = await database
+        .update(mobilePushDeliveries)
+        .set({ status, errorCode })
+        .where(and(
+          eq(mobilePushDeliveries.id, deviceClaim.id),
+          eq(mobilePushDeliveries.status, "sending"),
+          eq(mobilePushDeliveries.attemptedAt, deviceClaim.attemptedAt),
+        ))
+        .returning({ status: mobilePushDeliveries.status });
+
+      if (!persisted) {
+        const [current] = await database
+          .select({ status: mobilePushDeliveries.status })
+          .from(mobilePushDeliveries)
+          .where(eq(mobilePushDeliveries.id, deviceClaim.id))
+          .limit(1);
+        if (current?.status === "sent") {
+          return { kind: "sent" as const, skipped: true };
+        }
+        return {
+          kind: "retry" as const,
+          code: "NOTIFICATION_DEVICE_STALE",
+          retryAfterMs: deviceSendLeaseMs,
+        };
+      }
 
       if (result.kind === "disable-token") {
         await database
           .update(mobilePushDevices)
           .set({ enabled: false, updatedAt: attemptedAt })
-          .where(eq(mobilePushDevices.id, device.id));
+          .where(and(
+            eq(mobilePushDevices.id, device.id),
+            eq(mobilePushDevices.token, device.token),
+          ));
       }
       return result;
     }));
@@ -611,20 +724,21 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
     userId: string,
     eventId: string,
   ): Promise<ActionResult<void>> {
-    const [actor] = await database
-      .select({ role: profiles.role, isActive: profiles.isActive })
-      .from(profiles)
-      .where(eq(profiles.id, userId))
-      .limit(1);
-    if (
-      !actor?.isActive
-      || (actor.role !== "owner" && actor.role !== "manager")
-    ) {
-      return { ok: false, error: "errors.forbidden" };
-    }
-
     const resetAt = now();
     const reset = await database.transaction(async (tx: DatabaseLike) => {
+      const [actor] = await tx
+        .select({ role: profiles.role, isActive: profiles.isActive })
+        .from(profiles)
+        .where(eq(profiles.id, userId))
+        .limit(1)
+        .for("update");
+      if (
+        !actor?.isActive
+        || (actor.role !== "owner" && actor.role !== "manager")
+      ) {
+        return { authorized: false, row: undefined };
+      }
+
       const [row] = await tx
         .update(notificationOutbox)
         .set({
@@ -645,9 +759,10 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
           eq(notificationOutbox.status, "dead"),
         ))
         .returning({ id: notificationOutbox.id });
-      return row;
+      return { authorized: true, row };
     });
-    if (!reset) return { ok: false, error: "errors.conflict" };
+    if (!reset.authorized) return { ok: false, error: "errors.forbidden" };
+    if (!reset.row) return { ok: false, error: "errors.conflict" };
 
     await publishCommittedNotification(eventId);
     return { ok: true, data: undefined };

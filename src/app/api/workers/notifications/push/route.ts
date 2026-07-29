@@ -25,7 +25,11 @@ export async function POST(request: Request) {
       error instanceof NotificationQueueVerificationError
       && error.reason === "invalid_message"
     ) {
-      recordNotificationQueueRejection("invalid_message", queue.provider, "unknown");
+      recordNotificationQueueRejection(
+        "invalid_message",
+        queue.provider,
+        error.envelopeVersion,
+      );
       return mobileError("errors.invalidData", 400);
     }
     recordNotificationQueueRejection("invalid_signature", queue.provider, "unknown");

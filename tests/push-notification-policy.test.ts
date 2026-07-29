@@ -79,4 +79,18 @@ describe("FCM notification boundary", () => {
     expect(classifyFcmFailure(401, { error: { status: "UNAUTHENTICATED" } }))
       .toEqual({ kind: "permanent", code: "FCM_UNAUTHENTICATED" });
   });
+
+  test("disables only structured token-local invalid registrations", () => {
+    expect(classifyFcmFailure(404, { error: { status: "NOT_FOUND" } }))
+      .toEqual({ kind: "permanent", code: "FCM_NOT_FOUND" });
+    expect(classifyFcmFailure(400, {
+      error: {
+        status: "INVALID_ARGUMENT",
+        details: [{
+          "@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError",
+          errorCode: "INVALID_ARGUMENT",
+        }],
+      },
+    })).toEqual({ kind: "disable-token", code: "FCM_INVALID_TOKEN" });
+  });
 });

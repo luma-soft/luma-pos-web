@@ -5,16 +5,18 @@ import { resolveNotificationQueue } from "@/lib/notifications/queue/config";
 import { sendNotificationToDevice } from "@/lib/notifications/push";
 
 type QueueRejectionClass = "invalid_signature" | "invalid_message";
-type QueueEnvelopeVersion = 1 | "unknown";
 
 const queueRejectionCounters = new Map<string, number>();
 
 export function recordNotificationQueueRejection(
   resultClass: QueueRejectionClass,
   provider = "qstash",
-  envelopeVersion: QueueEnvelopeVersion = "unknown",
+  envelopeVersion = "unknown",
 ) {
-  const key = JSON.stringify({ provider, resultClass, envelopeVersion });
+  const safeVersion = envelopeVersion === "unknown" || /^v\d{1,3}$/.test(envelopeVersion)
+    ? envelopeVersion
+    : "unknown";
+  const key = JSON.stringify({ provider, resultClass, envelopeVersion: safeVersion });
   queueRejectionCounters.set(key, (queueRejectionCounters.get(key) ?? 0) + 1);
 }
 

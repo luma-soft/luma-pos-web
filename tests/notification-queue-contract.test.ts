@@ -109,6 +109,7 @@ describe("notification queue boundary", () => {
       body: JSON.stringify({ ...message, version: 2 }),
     }))).rejects.toMatchObject<Partial<NotificationQueueVerificationError>>({
       reason: "invalid_message",
+      envelopeVersion: "v2",
     });
   });
 

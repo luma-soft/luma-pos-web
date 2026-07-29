@@ -178,6 +178,43 @@ function core({
   assert.equal((await outboxRow(seeded.eventId)).status, "published");
 }
 
+// An expired publication owner cannot report or persist over its replacement.
+{
+  const seeded = await seedEvent({ status: "pending" });
+  let clock = new Date("2026-07-28T12:00:00.000Z");
+  let releaseFirst;
+  let firstStarted;
+  const started = new Promise((resolve) => { firstStarted = resolve; });
+  const release = new Promise((resolve) => { releaseFirst = resolve; });
+  let calls = 0;
+  const service = createNotificationOutboxCore({
+    database: db,
+    publisher: {
+      async publish() {
+        calls += 1;
+        if (calls === 1) {
+          firstStarted();
+          await release;
+          return { providerMessageId: "stale-publication" };
+        }
+        return { providerMessageId: "replacement-publication" };
+      },
+    },
+    sender: async () => ({ kind: "sent" }),
+    now: () => new Date(clock),
+    jitter: () => 0,
+  });
+  const first = service.publishCommittedNotification(seeded.eventId);
+  await started;
+  clock = new Date("2026-07-28T12:00:31.000Z");
+  assert.equal(await service.publishCommittedNotification(seeded.eventId), true);
+  releaseFirst();
+  assert.equal(await first, false);
+  const row = await outboxRow(seeded.eventId);
+  assert.equal(row.status, "published");
+  assert.equal(row.providerMessageId, "replacement-publication");
+}
+
 // Arbitrary provider failures are reduced to a bounded operational class.
 {
   const seeded = await seedEvent({ status: "pending" });
@@ -191,6 +228,30 @@ function core({
   const row = await outboxRow(seeded.eventId);
   assert.equal(row.status, "retry");
   assert.equal(row.lastErrorCode, "QUEUE_PUBLISH_FAILED");
+}
+
+// Publication never steals an expired processing lease directly.
+{
+  const seeded = await seedEvent();
+  await db.update(notificationOutbox).set({
+    status: "processing",
+    leaseExpiresAt: new Date("2026-07-28T11:59:00.000Z"),
+  }).where(eq(notificationOutbox.eventId, seeded.eventId));
+  let calls = 0;
+  assert.equal(await core({
+    publisher: {
+      async publish() {
+        calls += 1;
+        return { providerMessageId: "must-not-publish" };
+      },
+    },
+  }).publishCommittedNotification(seeded.eventId), false);
+  assert.equal(calls, 0);
+  assert.equal((await outboxRow(seeded.eventId)).status, "processing");
+  await db.update(notificationOutbox).set({
+    status: "completed",
+    leaseExpiresAt: null,
+  }).where(eq(notificationOutbox.eventId, seeded.eventId));
 }
 
 // A sent event/device pair is a stable idempotency boundary.
@@ -216,6 +277,124 @@ function core({
   assert.deepEqual(result, { completed: true });
   assert.equal(calls, 1, "only the manager device still needs a send");
   assert.equal((await deliveryRow(ownerDevice.id, seeded.eventId)).attempts, 1);
+}
+
+// A fresh per-device sending claim fences a concurrent worker from FCM.
+{
+  const seeded = await seedEvent();
+  await db.update(mobilePushDevices).set({ enabled: false })
+    .where(eq(mobilePushDevices.id, managerDevice.id));
+  await db.insert(mobilePushDeliveries).values({
+    deviceId: ownerDevice.id,
+    notificationKey: `event:${seeded.eventId}`,
+    status: "sending",
+    attemptedAt: new Date("2026-07-28T12:00:00.000Z"),
+  });
+  let calls = 0;
+  const result = await core({
+    sender: async () => {
+      calls += 1;
+      return { kind: "sent" };
+    },
+  }).processNotificationMessage({
+    version: 1,
+    eventId: seeded.eventId,
+    deduplicationKey: `notification:${seeded.eventId}`,
+    queuedAt: "2026-07-28T12:00:00.000Z",
+  });
+  assert.equal(result.completed, false);
+  assert.equal(calls, 0);
+  assert.equal((await deliveryRow(ownerDevice.id, seeded.eventId)).status, "sending");
+  await db.update(mobilePushDevices).set({ enabled: true })
+    .where(eq(mobilePushDevices.id, managerDevice.id));
+}
+
+// A stale sender cannot overwrite a newer terminal sent result.
+{
+  const seeded = await seedEvent();
+  await db.update(mobilePushDevices).set({ enabled: false })
+    .where(eq(mobilePushDevices.id, managerDevice.id));
+  await core({
+    sender: async () => {
+      await db.insert(mobilePushDeliveries).values({
+        deviceId: ownerDevice.id,
+        notificationKey: `event:${seeded.eventId}`,
+        status: "sent",
+        attemptedAt: new Date("2026-07-28T12:00:01.000Z"),
+      }).onConflictDoUpdate({
+        target: [
+          mobilePushDeliveries.deviceId,
+          mobilePushDeliveries.notificationKey,
+        ],
+        set: {
+          status: "sent",
+          errorCode: null,
+          attemptedAt: new Date("2026-07-28T12:00:01.000Z"),
+        },
+      });
+      return { kind: "retry", code: "FCM_UNAVAILABLE" };
+    },
+  }).processNotificationMessage({
+    version: 1,
+    eventId: seeded.eventId,
+    deduplicationKey: `notification:${seeded.eventId}`,
+    queuedAt: "2026-07-28T12:00:00.000Z",
+  });
+  assert.equal((await deliveryRow(ownerDevice.id, seeded.eventId)).status, "sent");
+  assert.equal((await outboxRow(seeded.eventId)).status, "completed");
+  await db.update(mobilePushDevices).set({ enabled: true })
+    .where(eq(mobilePushDevices.id, managerDevice.id));
+}
+
+// Losing the outbox ownership token before a device claim prevents FCM.
+{
+  const seeded = await seedEvent();
+  let deviceClaimTransactionStarted = false;
+  const raceDatabase = new Proxy(db, {
+    get(target, property) {
+      if (property === "transaction") {
+        return async (callback) => {
+          if (!deviceClaimTransactionStarted) {
+            deviceClaimTransactionStarted = true;
+            await db.update(notificationOutbox).set({
+              status: "retry",
+              leaseExpiresAt: null,
+            }).where(eq(notificationOutbox.eventId, seeded.eventId));
+          }
+          return db.transaction(callback);
+        };
+      }
+      const value = Reflect.get(target, property);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  let calls = 0;
+  const service = createNotificationOutboxCore({
+    database: raceDatabase,
+    publisher: {
+      async publish() {
+        return { providerMessageId: "unused" };
+      },
+    },
+    sender: async () => {
+      calls += 1;
+      return { kind: "sent" };
+    },
+    now: () => new Date("2026-07-28T12:00:00.000Z"),
+    jitter: () => 0,
+  });
+  await service.processNotificationMessage({
+    version: 1,
+    eventId: seeded.eventId,
+    deduplicationKey: `notification:${seeded.eventId}`,
+    queuedAt: "2026-07-28T12:00:00.000Z",
+  });
+  assert.equal(deviceClaimTransactionStarted, true);
+  assert.equal(calls, 0);
+  await db.update(notificationOutbox).set({
+    status: "completed",
+    leaseExpiresAt: null,
+  }).where(eq(notificationOutbox.eventId, seeded.eventId));
 }
 
 // Routine events defer to the first minute outside quiet hours without consuming
@@ -369,6 +548,41 @@ await db.update(storeSettings).set({ prefs: {} }).where(eq(storeSettings.id, "de
   assert.equal(calls, 0);
 }
 
+// A worker recovered after attempt ten dies before incrementing or sending.
+{
+  const seeded = await seedEvent();
+  await db.update(notificationOutbox).set({
+    status: "processing",
+    attemptCount: 10,
+    firstAttemptAt: new Date("2026-07-28T11:50:00.000Z"),
+    leaseExpiresAt: new Date("2026-07-28T11:59:00.000Z"),
+  }).where(eq(notificationOutbox.eventId, seeded.eventId));
+  let calls = 0;
+  const service = core({
+    publisher: {
+      async publish() {
+        return { providerMessageId: "recovered-attempt-ten" };
+      },
+    },
+    sender: async () => {
+      calls += 1;
+      return { kind: "sent" };
+    },
+  });
+  assert.equal(await service.recoverDueNotifications(50), 1);
+  assert.equal((await outboxRow(seeded.eventId)).status, "published");
+  await service.processNotificationMessage({
+    version: 1,
+    eventId: seeded.eventId,
+    deduplicationKey: `notification:${seeded.eventId}`,
+    queuedAt: "2026-07-28T12:00:00.000Z",
+  });
+  const row = await outboxRow(seeded.eventId);
+  assert.equal(row.status, "dead");
+  assert.equal(row.attemptCount, 10);
+  assert.equal(calls, 0);
+}
+
 // Recovery publishes only due pending/retry rows.
 {
   const duePending = await seedEvent({ status: "pending" });
@@ -475,6 +689,42 @@ await db.update(storeSettings).set({ prefs: {} }).where(eq(storeSettings.id, "de
   await db.update(profiles).set({ isActive: true }).where(eq(profiles.id, userIds.cashier));
 }
 
+// Token-local invalidation completes mixed delivery without disabling a token
+// refreshed while the old send was in flight.
+{
+  const seeded = await seedEvent();
+  await core({
+    sender: async (input) => {
+      if (input.token === "owner-token") {
+        await db.update(mobilePushDevices).set({
+          token: "owner-replacement-token",
+          enabled: true,
+        }).where(eq(mobilePushDevices.id, ownerDevice.id));
+        return { kind: "disable-token", code: "FCM_INVALID_TOKEN" };
+      }
+      return { kind: "sent" };
+    },
+  }).processNotificationMessage({
+    version: 1,
+    eventId: seeded.eventId,
+    deduplicationKey: `notification:${seeded.eventId}`,
+    queuedAt: "2026-07-28T12:00:00.000Z",
+  });
+  const [refreshed] = await db.select({
+    token: mobilePushDevices.token,
+    enabled: mobilePushDevices.enabled,
+  }).from(mobilePushDevices).where(eq(mobilePushDevices.id, ownerDevice.id));
+  assert.deepEqual(refreshed, {
+    token: "owner-replacement-token",
+    enabled: true,
+  });
+  assert.equal((await deliveryRow(ownerDevice.id, seeded.eventId)).status, "failed");
+  assert.equal((await deliveryRow(managerDevice.id, seeded.eventId)).status, "sent");
+  assert.equal((await outboxRow(seeded.eventId)).status, "completed");
+  await db.update(mobilePushDevices).set({ token: "owner-token", enabled: true })
+    .where(eq(mobilePushDevices.id, ownerDevice.id));
+}
+
 // Dead-event republish is manager-only, commits the reset before publication,
 // and preserves the immutable event and per-device dedupe row.
 {
@@ -518,6 +768,50 @@ await db.update(storeSettings).set({ prefs: {} }).where(eq(storeSettings.id, "de
     await service.republishDeadNotificationForUser(userIds.owner, seeded.eventId),
     { ok: false, error: "errors.conflict" },
   );
+}
+
+// Authorization is revalidated inside the reset transaction.
+{
+  const seeded = await seedEvent();
+  await db.update(notificationOutbox).set({
+    status: "dead",
+    attemptCount: 10,
+    lastErrorCode: "FCM_UNAVAILABLE",
+  }).where(eq(notificationOutbox.eventId, seeded.eventId));
+  let transactionStarted = false;
+  const raceDatabase = new Proxy(db, {
+    get(target, property) {
+      if (property === "transaction") {
+        return async (callback) => {
+          transactionStarted = true;
+          await db.update(profiles).set({ role: "cashier" })
+            .where(eq(profiles.id, userIds.manager));
+          return db.transaction(callback);
+        };
+      }
+      const value = Reflect.get(target, property);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+  const service = createNotificationOutboxCore({
+    database: raceDatabase,
+    publisher: {
+      async publish() {
+        return { providerMessageId: "must-not-publish" };
+      },
+    },
+    sender: async () => ({ kind: "sent" }),
+    now: () => new Date("2026-07-28T12:00:00.000Z"),
+    jitter: () => 0,
+  });
+  assert.deepEqual(
+    await service.republishDeadNotificationForUser(userIds.manager, seeded.eventId),
+    { ok: false, error: "errors.forbidden" },
+  );
+  assert.equal(transactionStarted, true);
+  assert.equal((await outboxRow(seeded.eventId)).status, "dead");
+  await db.update(profiles).set({ role: "manager" })
+    .where(eq(profiles.id, userIds.manager));
 }
 
 await client.close();

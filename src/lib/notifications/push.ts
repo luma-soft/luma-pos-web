@@ -26,15 +26,19 @@ import { isWithinQuietHours } from "@/lib/notifications/policy";
 import type { StorePrefs } from "@/lib/schemas/settings";
 
 let cachedAccessToken: { value: string; expiresAt: number } | null = null;
+let accessTokenRefresh: Promise<string> | null = null;
+
+class FirebaseAuthFailure extends Error {
+  constructor(readonly result: FcmFailure) {
+    super(result.code);
+  }
+}
 
 function encode(value: string | Buffer) {
   return Buffer.from(value).toString("base64url");
 }
 
-async function firebaseAccessToken(account: FirebaseServiceAccount) {
-  if (cachedAccessToken && cachedAccessToken.expiresAt > Date.now() + 60_000) {
-    return cachedAccessToken.value;
-  }
+async function refreshFirebaseAccessToken(account: FirebaseServiceAccount) {
   const now = Math.floor(Date.now() / 1000);
   const header = encode(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const claim = encode(JSON.stringify({
@@ -49,23 +53,71 @@ async function firebaseAccessToken(account: FirebaseServiceAccount) {
   signer.update(unsigned);
   signer.end();
   const assertion = `${unsigned}.${encode(signer.sign(account.private_key))}`;
-  const response = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion,
-    }),
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!response.ok) throw new Error(`FCM_AUTH_${response.status}`);
+  let response: Response;
+  try {
+    response = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+        assertion,
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    throw new FirebaseAuthFailure({
+      kind: "retry",
+      code: "FCM_AUTH_NETWORK",
+    });
+  }
+  if (!response.ok) {
+    const retryAfterMs = retryAfterMilliseconds(response.headers.get("retry-after"));
+    if (response.status === 429) {
+      throw new FirebaseAuthFailure({
+        kind: "retry",
+        code: "FCM_AUTH_RATE_LIMITED",
+        ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+      });
+    }
+    if (response.status >= 500) {
+      throw new FirebaseAuthFailure({
+        kind: "retry",
+        code: "FCM_AUTH_UNAVAILABLE",
+        ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+      });
+    }
+    throw new FirebaseAuthFailure({
+      kind: "permanent",
+      code: `FCM_AUTH_${response.status}`,
+    });
+  }
   const body = await response.json() as { access_token?: string; expires_in?: number };
-  if (!body.access_token) throw new Error("FCM_AUTH_INVALID");
+  if (!body.access_token) {
+    throw new FirebaseAuthFailure({
+      kind: "permanent",
+      code: "FCM_AUTH_INVALID",
+    });
+  }
   cachedAccessToken = {
     value: body.access_token,
     expiresAt: Date.now() + (body.expires_in ?? 3600) * 1000,
   };
   return body.access_token;
+}
+
+async function firebaseAccessToken(account: FirebaseServiceAccount) {
+  if (cachedAccessToken && cachedAccessToken.expiresAt > Date.now() + 60_000) {
+    return cachedAccessToken.value;
+  }
+  if (accessTokenRefresh) return accessTokenRefresh;
+
+  const refresh = refreshFirebaseAccessToken(account);
+  accessTokenRefresh = refresh;
+  try {
+    return await refresh;
+  } finally {
+    if (accessTokenRefresh === refresh) accessTokenRefresh = null;
+  }
 }
 
 export type PushCategory = "lowStock" | "einvoiceError" | "shiftClose" | "syncDone";
@@ -179,12 +231,7 @@ export async function sendNotificationToDevice(
       retryAfterMs: retryAfterMilliseconds(response.headers.get("retry-after")),
     };
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("FCM_AUTH_")) {
-      return {
-        kind: "permanent",
-        code: error.message.slice(0, 80),
-      };
-    }
+    if (error instanceof FirebaseAuthFailure) return error.result;
     return { kind: "retry", code: "FCM_NETWORK" };
   }
 }
@@ -257,7 +304,10 @@ export async function dispatchPushNotification(input: {
       if (result.kind === "disable-token") {
         await db.update(mobilePushDevices)
           .set({ enabled: false, updatedAt: sql`now()` })
-          .where(eq(mobilePushDevices.id, device.id));
+          .where(and(
+            eq(mobilePushDevices.id, device.id),
+            eq(mobilePushDevices.token, device.token),
+          ));
       }
     }
     await db.insert(mobilePushDeliveries).values({

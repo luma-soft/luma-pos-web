@@ -62,27 +62,35 @@ function safeStatus(body: unknown): string | undefined {
     : undefined;
 }
 
-function hasUnregisteredTokenDetail(body: unknown): boolean {
-  if (!body || typeof body !== "object") return false;
+function tokenErrorDetail(body: unknown): string | undefined {
+  if (!body || typeof body !== "object") return undefined;
   const details = (body as FcmErrorBody).error?.details;
-  if (!Array.isArray(details)) return false;
-  return details.some((detail) => {
-    if (!detail || typeof detail !== "object") return false;
+  if (!Array.isArray(details)) return undefined;
+  for (const detail of details) {
+    if (!detail || typeof detail !== "object") continue;
     const value = detail as Record<string, unknown>;
-    return value.errorCode === "UNREGISTERED"
-      && value["@type"] === "type.googleapis.com/google.firebase.fcm.v1.FcmError";
-  });
+    if (
+      value["@type"] === "type.googleapis.com/google.firebase.fcm.v1.FcmError"
+      && typeof value.errorCode === "string"
+    ) {
+      return value.errorCode;
+    }
+  }
+  return undefined;
 }
 
 export function classifyFcmFailure(statusCode: number, body: unknown): FcmFailure {
   const status = safeStatus(body);
+  const tokenError = tokenErrorDetail(body);
 
   if (
-    statusCode === 404
-    || status === "UNREGISTERED"
-    || (status === "INVALID_ARGUMENT" && hasUnregisteredTokenDetail(body))
+    status === "UNREGISTERED"
+    || tokenError === "UNREGISTERED"
   ) {
     return { kind: "disable-token", code: "FCM_UNREGISTERED" };
+  }
+  if (status === "INVALID_ARGUMENT" && tokenError === "INVALID_ARGUMENT") {
+    return { kind: "disable-token", code: "FCM_INVALID_TOKEN" };
   }
 
   if (

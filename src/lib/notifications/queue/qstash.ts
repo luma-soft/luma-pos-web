@@ -36,8 +36,17 @@ const queueMessageKeys = ["version", "eventId", "deduplicationKey", "queuedAt"] 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isoTimestampPattern = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-](\d{2}):(\d{2}))$/;
 
-function invalidMessage(): never {
-  throw new NotificationQueueVerificationError("invalid_message");
+function boundedEnvelopeVersion(value: unknown): string {
+  return typeof value === "number"
+    && Number.isInteger(value)
+    && value >= 0
+    && value <= 999
+    ? `v${value}`
+    : "unknown";
+}
+
+function invalidMessage(envelopeVersion = "unknown"): never {
+  throw new NotificationQueueVerificationError("invalid_message", envelopeVersion);
 }
 
 function isValidIsoTimestamp(value: string): boolean {
@@ -89,21 +98,24 @@ function parseNotificationQueueMessage(body: string): NotificationQueueMessageV1
   if (!value || typeof value !== "object" || Array.isArray(value)) return invalidMessage();
 
   const message = value as Record<string, unknown>;
+  const envelopeVersion = boundedEnvelopeVersion(message.version);
   if (
     Object.keys(message).length !== queueMessageKeys.length
     || !queueMessageKeys.every((key) => Object.hasOwn(message, key))
-  ) return invalidMessage();
-  if (message.version !== 1) return invalidMessage();
-  if (typeof message.eventId !== "string" || !uuidPattern.test(message.eventId)) return invalidMessage();
+  ) return invalidMessage(envelopeVersion);
+  if (message.version !== 1) return invalidMessage(envelopeVersion);
+  if (typeof message.eventId !== "string" || !uuidPattern.test(message.eventId)) {
+    return invalidMessage(envelopeVersion);
+  }
   if (
     typeof message.deduplicationKey !== "string"
     || !message.deduplicationKey.trim()
     || message.deduplicationKey.length > 200
-  ) return invalidMessage();
+  ) return invalidMessage(envelopeVersion);
   if (
     typeof message.queuedAt !== "string"
     || !isValidIsoTimestamp(message.queuedAt)
-  ) return invalidMessage();
+  ) return invalidMessage(envelopeVersion);
 
   return toNotificationQueueMessage({
     version: 1,

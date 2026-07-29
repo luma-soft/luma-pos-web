@@ -39,6 +39,7 @@ export interface NotificationQueueRequestVerifier {
 export class NotificationQueueVerificationError extends Error {
   constructor(
     readonly reason: "invalid_signature" | "invalid_message",
+    readonly envelopeVersion: string = "unknown",
   ) {
     super(reason);
   }
