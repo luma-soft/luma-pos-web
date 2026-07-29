@@ -205,7 +205,15 @@ type EditableProject = Pick<ProjectRow,
   | "siteContactPhone"
 >;
 
-export function ProjectEdit({ project, customers }: { project: EditableProject; customers: { id: string; name: string }[] }) {
+export function ProjectEdit({
+  project,
+  customers,
+  triggerVariant = "link",
+}: {
+  project: EditableProject;
+  customers: { id: string; name: string }[];
+  triggerVariant?: "link" | "outline";
+}) {
   const t = useTranslations();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -268,7 +276,14 @@ export function ProjectEdit({ project, customers }: { project: EditableProject; 
 
   return (
     <>
-      <Button type="button" variant="link" size="sm" onClick={() => setOpen(true)} className="h-auto px-0 text-xs min-h-11 min-w-11 lg:min-h-0 lg:min-w-0" tx="common.edit" />
+      <Button
+        type="button"
+        variant={triggerVariant}
+        size="sm"
+        onClick={() => setOpen(true)}
+        className={triggerVariant === "link" ? "h-auto px-0 text-xs min-h-11 min-w-11 lg:min-h-0 lg:min-w-0" : undefined}
+        tx="common.edit"
+      />
       <RowPreviewModal
         open={open && !customerCreateOpen}
         onClose={() => {

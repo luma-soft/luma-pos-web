@@ -101,11 +101,15 @@ export function ProjectDetailActions({
   serviceOptions: ServiceOptions;
 }) {
   return (
-    <>
+    <div
+      data-project-detail-actions="true"
+      className="flex flex-wrap items-center justify-end gap-2"
+    >
       {serviceOptions && (
         <ProjectEdit
           project={project}
           customers={serviceOptions.customerOptions}
+          triggerVariant="outline"
         />
       )}
       {project.serviceType && (
@@ -117,7 +121,7 @@ export function ProjectDetailActions({
           }}
         />
       )}
-    </>
+    </div>
   );
 }
 

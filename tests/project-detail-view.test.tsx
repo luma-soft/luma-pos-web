@@ -111,6 +111,38 @@ function expectSharedDetailContent(html: string) {
 }
 
 describe("ProjectDetailView", () => {
+  test("renders project actions as two separated buttons in the modal toolbar", async () => {
+    const { ProjectDetailActions } = await import(
+      "@/app/(app)/projects/[id]/project-detail-view"
+    );
+    const html = renderToStaticMarkup(
+      <NextIntlClientProvider
+        locale="vi"
+        messages={viMessages}
+        timeZone="Asia/Ho_Chi_Minh"
+      >
+        <ProjectDetailActions
+          project={{ ...detail.project, serviceType: "camera" }}
+          serviceOptions={{
+            customerOptions: [],
+            projectOptions: [],
+            assigneeOptions: [],
+            jobOptions: [],
+            assetOptions: [],
+            warehouseOptions: [],
+          }}
+        />
+      </NextIntlClientProvider>,
+    );
+
+    expect(html).toContain('data-project-detail-actions="true"');
+    expect(html).toContain("flex-wrap items-center justify-end gap-2");
+    expect(html).toMatch(
+      /<button[^>]*class="[^"]*border-border[^"]*"[^>]*>Sửa<\/button>/,
+    );
+    expect(html).toContain("Tạo báo giá");
+  });
+
   test("shares project metrics and related orders while keeping page navigation out of the modal", async () => {
     const pageHtml = await renderProjectDetail("page");
     const modalHtml = await renderProjectDetail("modal");
