@@ -79,6 +79,7 @@ export const TagInput = React.forwardRef<HTMLInputElement, TagInputProps>(
         <input
           ref={inputRef}
           type="text"
+          style={{ outline: "none" }}
           value={draft}
           disabled={disabled}
           onChange={(e) => setDraft(e.target.value)}
