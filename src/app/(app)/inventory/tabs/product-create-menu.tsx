@@ -55,7 +55,7 @@ export function ProductCreateMenu({
   }, [open]);
 
   return (
-    <div ref={rootRef} className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-4 z-30 w-auto shrink-0 sm:relative sm:bottom-auto sm:right-auto sm:w-auto">
+    <div ref={rootRef} className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-4 z-30 w-auto shrink-0 sm:relative sm:bottom-auto sm:right-auto sm:ml-auto sm:w-auto">
       <button
         ref={triggerRef}
         type="button"
