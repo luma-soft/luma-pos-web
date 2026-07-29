@@ -1,8 +1,8 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { Maximize2, Minus, Sparkles, X } from "lucide-react";
 import Link from "next/link";
+import { Maximize2, Minus, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";

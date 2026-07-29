@@ -52,15 +52,31 @@ export async function POST(request: Request) {
     .limit(1);
 
   const configuredSecret = process.env.SEPAY_WEBHOOK_SECRET?.trim() || account?.webhookSecret?.trim() || null;
-  const validSignature = verifySepaySignature(rawBody, headerSignature(request), configuredSecret, headerTimestamp(request));
   const configuredApiKey = process.env.SEPAY_API_KEY?.trim() || account?.apiKey?.trim();
-  const validApiKey = Boolean(configuredApiKey && headerApiKey(request) === configuredApiKey);
-  const hasConfiguredAuth = Boolean(configuredSecret || configuredApiKey);
-  if (hasConfiguredAuth && !validSignature && !validApiKey) {
+  const hasConfiguredSecret = Boolean(configuredSecret);
+  const hasConfiguredApiKey = Boolean(configuredApiKey);
+  if (!hasConfiguredSecret && !hasConfiguredApiKey) {
+    return NextResponse.json({ ok: false, error: "errors.serverError" }, { status: 503 });
+  }
+
+  const validSignature = Boolean(
+    configuredSecret
+    && verifySepaySignature(
+      rawBody,
+      headerSignature(request),
+      configuredSecret,
+      headerTimestamp(request),
+    ),
+  );
+  const validApiKey = Boolean(
+    configuredApiKey
+    && headerApiKey(request) === configuredApiKey,
+  );
+  if (!validSignature && !validApiKey) {
     return NextResponse.json({ ok: false, error: "errors.unauthorized" }, { status: 401 });
   }
 
-  const recorded = await recordSepayWebhookEvent(event);
+  const recorded = await recordSepayWebhookEvent(event, { verified: true });
   if (!recorded.ok) {
     return NextResponse.json({ ok: false, error: recorded.error }, { status: 500 });
   }

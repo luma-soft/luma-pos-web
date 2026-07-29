@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/db";
+import { publishCommittedNotification } from "@/lib/notifications/outbox";
 import {
   confirmPaymentFromProvider as confirmPaymentFromProviderCore,
   attachGatewayIntent as attachGatewayIntentCore,
@@ -8,6 +9,7 @@ import {
   createPendingSepayPayment as createPendingSepayPaymentCore,
   expirePendingPayment as expirePendingPaymentCore,
   getPaymentReconciliation as getPaymentReconciliationCore,
+  getPaymentReconciliationEvent as getPaymentReconciliationEventCore,
   getGatewayPaymentStatus as getGatewayPaymentStatusCore,
   failGatewayPayment as failGatewayPaymentCore,
   cancelDraftOrder as cancelDraftOrderCore,
@@ -18,6 +20,30 @@ import {
   refreshGatewayPaymentFromInquiry as refreshGatewayPaymentFromInquiryCore,
   recordSepayWebhookEvent as recordSepayWebhookEventCore,
 } from "@/lib/payments/service-core";
+
+async function publishNewPaymentNotification<T>(
+  result: T,
+): Promise<T> {
+  const notification = result as {
+    ok?: boolean;
+    data?: {
+      notificationEventId?: string;
+      notificationCreated?: boolean;
+    };
+  };
+  if (
+    notification.ok
+    && notification.data?.notificationCreated
+    && notification.data.notificationEventId
+  ) {
+    try {
+      await publishCommittedNotification(notification.data.notificationEventId);
+    } catch {
+      // The durable outbox will retry; payment/webhook success remains authoritative.
+    }
+  }
+  return result;
+}
 
 export async function createPendingSepayPayment(input: Parameters<typeof createPendingSepayPaymentCore>[1]) {
   return createPendingSepayPaymentCore(db, input);
@@ -44,7 +70,9 @@ export async function cancelDraftOrder(orderId: string) {
 }
 
 export async function recordGatewayCallbackAndMatch(input: Parameters<typeof recordGatewayCallbackAndMatchCore>[1]) {
-  return recordGatewayCallbackAndMatchCore(db, input);
+  return publishNewPaymentNotification(
+    await recordGatewayCallbackAndMatchCore(db, input),
+  );
 }
 
 export async function refreshGatewayPaymentFromInquiry(
@@ -52,11 +80,15 @@ export async function refreshGatewayPaymentFromInquiry(
   inquiry: Parameters<typeof refreshGatewayPaymentFromInquiryCore>[2],
   options?: Parameters<typeof refreshGatewayPaymentFromInquiryCore>[3],
 ) {
-  return refreshGatewayPaymentFromInquiryCore(db, paymentId, inquiry, options);
+  return publishNewPaymentNotification(
+    await refreshGatewayPaymentFromInquiryCore(db, paymentId, inquiry, options),
+  );
 }
 
 export async function confirmPaymentFromProvider(input: Parameters<typeof confirmPaymentFromProviderCore>[1]) {
-  return confirmPaymentFromProviderCore(db, input);
+  return publishNewPaymentNotification(
+    await confirmPaymentFromProviderCore(db, input),
+  );
 }
 
 export async function expirePendingPayment(paymentId: string) {
@@ -73,16 +105,27 @@ export async function getPaymentReconciliation(
   return getPaymentReconciliationCore(db, input);
 }
 
-export async function recordSepayWebhookEvent(input: Parameters<typeof recordSepayWebhookEventCore>[1]) {
-  return recordSepayWebhookEventCore(db, input);
+export async function getPaymentReconciliationEvent(eventId: string) {
+  return getPaymentReconciliationEventCore(db, eventId);
+}
+
+export async function recordSepayWebhookEvent(
+  input: Parameters<typeof recordSepayWebhookEventCore>[1],
+  options?: Parameters<typeof recordSepayWebhookEventCore>[2],
+) {
+  return recordSepayWebhookEventCore(db, input, options);
 }
 
 export async function reconcilePaymentWithEvent(
   input: Parameters<typeof reconcilePaymentWithEventCore>[1],
 ) {
-  return reconcilePaymentWithEventCore(db, input);
+  return publishNewPaymentNotification(
+    await reconcilePaymentWithEventCore(db, input),
+  );
 }
 
 export async function matchSepayWebhookEvent(eventId: string) {
-  return matchSepayWebhookEventCore(db, eventId);
+  return publishNewPaymentNotification(
+    await matchSepayWebhookEventCore(db, eventId),
+  );
 }

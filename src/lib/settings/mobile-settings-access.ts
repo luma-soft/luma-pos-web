@@ -47,5 +47,50 @@ export function mobileNotificationSettingsForRole(
   notifications: StorePrefs["notifications"],
   role: Role,
 ) {
-  return canReadMobileSettingsAdministration(role) ? notifications : undefined;
+  if (!canReadMobileSettingsAdministration(role)) return undefined;
+
+  return {
+    ...notifications,
+    channels: { ...notifications.channels },
+    quietHours: { ...notifications.quietHours },
+    thresholds: { ...notifications.thresholds },
+    roleRouting: Object.fromEntries(
+      Object.entries(notifications.roleRouting).map(([category, roles]) => [
+        category,
+        [...roles],
+      ]),
+    ) as StorePrefs["notifications"]["roleRouting"],
+  };
+}
+
+function mergeDefined<T extends object>(current: T, patch?: Partial<T>): T {
+  if (!patch) return { ...current };
+  return {
+    ...current,
+    ...Object.fromEntries(
+      Object.entries(patch).filter(([, value]) => value !== undefined),
+    ),
+  };
+}
+
+export function mergeMobileNotificationSettings(
+  current: StorePrefs["notifications"],
+  patch: Omit<
+    Partial<StorePrefs["notifications"]>,
+    "channels" | "quietHours" | "thresholds" | "roleRouting"
+  > & {
+    channels?: Partial<StorePrefs["notifications"]["channels"]>;
+    quietHours?: Partial<StorePrefs["notifications"]["quietHours"]>;
+    thresholds?: Partial<StorePrefs["notifications"]["thresholds"]>;
+    roleRouting?: Partial<StorePrefs["notifications"]["roleRouting"]>;
+  },
+): StorePrefs["notifications"] {
+  return {
+    ...current,
+    ...patch,
+    channels: mergeDefined(current.channels, patch.channels),
+    quietHours: mergeDefined(current.quietHours, patch.quietHours),
+    thresholds: mergeDefined(current.thresholds, patch.thresholds),
+    roleRouting: mergeDefined(current.roleRouting, patch.roleRouting),
+  };
 }

@@ -36,6 +36,11 @@ import {
 } from "@/lib/inventory/stock-lot-service";
 import type { GatewayProvider } from "@/lib/payments/gateways";
 import { gatewayRefundReference } from "@/lib/payments/refund-service";
+import {
+  createDebtChangedEventInTx,
+  createNotificationEventInTx,
+} from "@/lib/notifications/events-core";
+import { publishCommittedNotification } from "@/lib/notifications/outbox";
 
 const GATEWAY_REFUND_METHODS = new Set<GatewayProvider>(["momo", "zalopay", "vnpay"]);
 const isGatewayRefundMethod = (value: string): value is GatewayProvider =>
@@ -142,6 +147,10 @@ export type ExchangeResult = {
   gatewayRefundId?: string;
 };
 
+type ExchangeTransactionResult = ExchangeResult & {
+  notification: Awaited<ReturnType<typeof createNotificationEventInTx>>;
+};
+
 async function exchangeResultForClientId(
   clientId: string,
 ): Promise<ExchangeResult | null> {
@@ -197,7 +206,7 @@ export async function createExchangeForUser(
   try {
     const profileId = await getProfileId(userId);
     const currentShift = profileId ? await getCurrentShift(profileId) : null;
-    const result = await db.transaction(async (tx): Promise<ExchangeResult> => {
+    const result = await db.transaction(async (tx): Promise<ExchangeTransactionResult> => {
       const [order] = await tx.select().from(orders)
         .where(eq(orders.id, v.orderId)).limit(1).for("update");
       if (!order) throw new Error("ORDER_NOT_FOUND");
@@ -497,6 +506,22 @@ export async function createExchangeForUser(
           .where(eq(orders.id, order.id));
       }
 
+      const notification = await createNotificationEventInTx(tx, {
+        eventKey: `invoice-created:${exchangeOrder.id}`,
+        category: "invoiceCreated",
+        entityType: "order",
+        entityId: exchangeOrder.id,
+        actorId: profileId,
+        target: "invoices",
+        priority: "normal",
+        quietHoursPolicy: "defer",
+        excludeActor: true,
+        metadata: {
+          debtDelta: settlement.debtDelta.toFixed(2),
+          source: "exchange",
+        },
+      });
+
       return {
         returnId: returned.id,
         returnCode: returned.code,
@@ -505,16 +530,33 @@ export async function createExchangeForUser(
         difference,
         direction: settlement.direction,
         ...(gatewayRefund ? { gatewayRefundId: gatewayRefund.id } : {}),
+        notification,
       };
     });
 
+    if (result.notification?.created) {
+      await publishCommittedNotification(result.notification.eventId);
+    }
     revalidatePath(Routes.order(v.orderId));
     revalidatePath(Routes.order(result.exchangeOrderId));
     revalidatePath(Routes.Orders);
     revalidatePath(Routes.Sales);
     revalidatePath(Routes.Inventory);
     revalidatePath(Routes.Customers);
-    return { ok: true, data: result };
+    return {
+      ok: true,
+      data: {
+        returnId: result.returnId,
+        returnCode: result.returnCode,
+        exchangeOrderId: result.exchangeOrderId,
+        exchangeOrderCode: result.exchangeOrderCode,
+        difference: result.difference,
+        direction: result.direction,
+        ...(result.gatewayRefundId
+          ? { gatewayRefundId: result.gatewayRefundId }
+          : {}),
+      },
+    };
   } catch (error) {
     if (isUniqueViolation(error)) {
       const existing = await exchangeResultForClientId(v.clientId);
@@ -639,10 +681,17 @@ export async function createReturnForUser(
       if (gatewayPayment && !gatewayReference) throw new Error("REFUND_PROVIDER_NOT_CONFIGURED");
 
       // Trừ nợ không vượt quá nợ hiện tại của khách
+      let debtDelta = 0;
       if (v.refundMethod === "debt_deduct") {
         if (!order.customerId) throw new Error("DEBT_NEEDS_CUSTOMER");
-        const [cust] = await tx.select({ debt: customers.currentDebt }).from(customers).where(eq(customers.id, order.customerId)).limit(1);
+        const [cust] = await tx
+          .select({ debt: customers.currentDebt })
+          .from(customers)
+          .where(eq(customers.id, order.customerId))
+          .limit(1)
+          .for("update");
         if (Number(cust.debt) < totalRefund - 1e-9) throw new Error("DEBT_TOO_SMALL");
+        debtDelta = -Math.min(Number(cust.debt), totalRefund);
       }
 
       const [ret] = await tx.insert(returns).values({
@@ -757,18 +806,42 @@ export async function createReturnForUser(
         await tx.update(orders).set({ status: "returned", updatedAt: sql`now()` }).where(eq(orders.id, order.id));
       }
 
+      const debtNotification = order.customerId && v.refundMethod === "debt_deduct"
+        ? await createDebtChangedEventInTx(tx, {
+            entityType: "customer",
+            entityId: order.customerId,
+            operationType: "sale_return",
+            operationId: ret.id,
+            delta: debtDelta,
+            actorId: profileId,
+          })
+        : null;
+
       return {
         ...ret,
         ...(gatewayRefund ? { gatewayRefundId: gatewayRefund.id } : {}),
+        debtNotification,
       };
     });
 
+    if (result.debtNotification?.created) {
+      await publishCommittedNotification(result.debtNotification.eventId);
+    }
     revalidatePath(Routes.order(v.orderId));
     revalidatePath(Routes.Orders);
     revalidatePath(Routes.Sales);
     revalidatePath(Routes.Inventory);
     revalidatePath(Routes.Customers);
-    return { ok: true, data: result };
+    return {
+      ok: true,
+      data: {
+        id: result.id,
+        code: result.code,
+        ...(result.gatewayRefundId
+          ? { gatewayRefundId: result.gatewayRefundId }
+          : {}),
+      },
+    };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
     const known: Record<string, string> = {
@@ -860,10 +933,17 @@ export async function createPosReturn(
       }
 
       const totalRefund = rows.reduce((sum, item) => sum + Number(item.total), 0);
+      let debtDelta = 0;
       if (v.refundMethod === "debt_deduct") {
         if (!customerId) throw new Error("DEBT_NEEDS_CUSTOMER");
-        const [cust] = await tx.select({ debt: customers.currentDebt }).from(customers).where(eq(customers.id, customerId)).limit(1);
+        const [cust] = await tx
+          .select({ debt: customers.currentDebt })
+          .from(customers)
+          .where(eq(customers.id, customerId))
+          .limit(1)
+          .for("update");
         if (!cust || Number(cust.debt) < totalRefund - 1e-9) throw new Error("DEBT_TOO_SMALL");
+        debtDelta = -Math.min(Number(cust.debt), totalRefund);
       }
 
       const [ret] = await tx.insert(returns).values({
@@ -976,15 +1056,28 @@ export async function createPosReturn(
         }
       }
 
-      return ret;
+      const debtNotification = customerId && v.refundMethod === "debt_deduct"
+        ? await createDebtChangedEventInTx(tx, {
+            entityType: "customer",
+            entityId: customerId,
+            operationType: "sale_return",
+            operationId: ret.id,
+            delta: debtDelta,
+            actorId: profileId,
+          })
+        : null;
+      return { ret, debtNotification };
     });
 
+    if (result.debtNotification?.created) {
+      await publishCommittedNotification(result.debtNotification.eventId);
+    }
     revalidatePath(Routes.Sales);
     revalidatePath(Routes.Orders);
     if (v.orderId) revalidatePath(Routes.order(v.orderId));
     revalidatePath(Routes.Inventory);
     revalidatePath(Routes.Customers);
-    return { ok: true, data: result };
+    return { ok: true, data: result.ret };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
     const known: Record<string, string> = {

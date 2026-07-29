@@ -1,10 +1,17 @@
-import { updateStorePrefsForUser } from "@/lib/actions/settings";
+import { updateNotificationSettingsForUser } from "@/lib/actions/settings";
 import { authorizeMobileSensitiveAction } from "@/lib/auth/mobile-approval";
 import { getStoreSettings } from "@/lib/data/settings";
 import { requireMobileManager, requireMobileRole } from "@/lib/mobile/auth";
 import { resolveNotificationChannels } from "@/lib/notifications/channels";
+import { notificationRoutingPolicyContract } from "@/lib/notifications/routing-policy";
 import { notificationSettingsAuthorization } from "@/lib/notifications/settings-authorization";
-import { MOBILE_SETTINGS_ADMIN_ROLES } from "@/lib/settings/mobile-settings-access";
+import {
+  MOBILE_SETTINGS_ADMIN_ROLES,
+  mobileNotificationSettingsForRole,
+} from "@/lib/settings/mobile-settings-access";
+import {
+  mobileNotificationSettingsPatchSchema,
+} from "@/lib/schemas/settings";
 import {
   mobileAction,
   mobileError,
@@ -15,15 +22,17 @@ import {
 
 export async function GET() {
   const gate = await requireMobileRole(MOBILE_SETTINGS_ADMIN_ROLES);
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const store = await getStoreSettings();
-  const channels = store.prefs.notifications.channels;
+  const settings = mobileNotificationSettingsForRole(
+    store.prefs.notifications,
+    gate.role,
+  )!;
   return mobileOk({
-    ...store.prefs.notifications,
-    channels,
+    ...settings,
     availableChannels: resolveNotificationChannels(),
+    routingPolicy: notificationRoutingPolicyContract(),
   });
 }
 
@@ -32,7 +41,18 @@ export async function PATCH(request: Request) {
   if (!gate.ok) return mobileGate(gate)!;
 
   const body = await readJson(request);
-  if (!body) return mobileAction({ ok: false, error: "errors.invalidData" });
+  if (
+    !body
+    || typeof body !== "object"
+    || Array.isArray(body)
+    || Object.getPrototypeOf(body) !== Object.prototype
+  ) {
+    return mobileAction({ ok: false, error: "errors.invalidData" });
+  }
+  const parsed = mobileNotificationSettingsPatchSchema.safeParse(body);
+  if (!parsed.success || Object.keys(parsed.data).length === 0) {
+    return mobileAction({ ok: false, error: "errors.invalidData" });
+  }
   const authorization = await authorizeMobileSensitiveAction({
     request,
     requesterId: gate.userId,
@@ -43,8 +63,6 @@ export async function PATCH(request: Request) {
   if (!authorization.ok) return mobileError(authorization.error, 403);
 
   return mobileAction(
-    await updateStorePrefsForUser(gate.userId, {
-      notifications: body as Parameters<typeof updateStorePrefsForUser>[1]["notifications"],
-    })
+    await updateNotificationSettingsForUser(gate.userId, parsed.data)
   );
 }

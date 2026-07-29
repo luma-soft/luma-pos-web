@@ -3035,6 +3035,16 @@
     "productCount": "Products",
     "noParent": "— No parent —"
   },
+  "internalNotifications": {
+    "titles": {
+      "invoiceCreated": "A new invoice was created",
+      "purchaseReceived": "A purchase receipt was recorded",
+      "debtChanged": "A debt balance was updated",
+      "qrPaymentConfirmed": "QR payment confirmed",
+      "qrPaymentException": "QR payment needs review"
+    },
+    "body": "Open LumaPOS to view details."
+  },
   "pagination": {
     "show": "Show",
     "rows": "{n} rows",

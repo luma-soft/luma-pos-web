@@ -931,7 +931,7 @@ Call `createDebtChangedEventInTx` once at the end of each transaction with the n
 | Mutation | `entityType` | `operationType` | `operationId` |
 | --- | --- | --- | --- |
 | Order cancellation debt reversal | `customer` | `order_cancel` | order ID |
-| Purchase edit debt difference | `supplier` | `purchase_edit` | purchase ID |
+| Purchase edit debt difference | `supplier` | `purchase_edit` | `<purchase ID>:<committed mutation timestamp>` |
 | Purchase cancellation debt reversal | `supplier` | `purchase_cancel` | purchase ID |
 | Purchase return debt deduction | `supplier` | `purchase_return` | purchase-return ID |
 | Customer return/refund debt adjustment | `customer` | `sale_return` | return ID |
@@ -950,6 +950,11 @@ const debtNotification = await createDebtChangedEventInTx(tx, {
 ```
 
 Pass the signed delta applied to `currentDebt`, not the resulting balance. The helper suppresses rounded zero deltas. If a transaction adjusts both an old and a new supplier, still create only one primary event: use the purchase's resulting supplier as `entityId`, use the net signed delta as `delta`, and pass both ledger changes as `relatedAdjustments`. The mobile action opens the resulting supplier while the authenticated detail API remains authoritative for both ledgers.
+
+For `purchase_edit`, obtain the mutation timestamp from the authoritative
+purchase `UPDATE ... RETURNING` statement and append it to the purchase ID.
+This gives each committed debt-changing edit a distinct deterministic operation
+ID. A replay that applies a rounded-zero debt delta still creates no event.
 
 - [ ] **Step 6: Run integration and regression tests**
 

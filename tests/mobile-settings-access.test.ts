@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   canReadMobileSettingsAdministration,
   canReadMobileAiAdministration,
+  mergeMobileNotificationSettings,
   mobileAiSettingsForRole,
   mobileNotificationSettingsForRole,
   mobileStoreSettingsForRole,
@@ -42,6 +43,7 @@ describe("mobile settings read access", () => {
     expect(canReadMobileSettingsAdministration("manager")).toBe(true);
     expect(canReadMobileSettingsAdministration("cashier")).toBe(false);
     expect(canReadMobileSettingsAdministration("warehouse")).toBe(false);
+    expect(canReadMobileSettingsAdministration("technician")).toBe(false);
   });
 
   test("non-owner AI settings expose readiness without provider configuration", () => {
@@ -81,10 +83,50 @@ describe("mobile settings read access", () => {
       .toBeUndefined();
   });
 
+  test("legacy mobile patches preserve newer categories and nested routing", () => {
+    const current = parseStorePrefs({
+      notifications: {
+        serviceDue: false,
+        invoiceCreated: false,
+        purchaseReceived: false,
+        debtChanged: false,
+        qrPaymentConfirmed: false,
+        qrPaymentException: false,
+        channels: { inApp: true, push: false },
+        roleRouting: {
+          invoiceCreated: ["owner"],
+          purchaseReceived: ["warehouse"],
+          debtChanged: ["manager"],
+          qrPaymentConfirmed: ["cashier"],
+          qrPaymentException: ["owner", "manager"],
+        },
+      },
+    }).notifications;
+
+    const merged = mergeMobileNotificationSettings(current, {
+      lowStock: false,
+      channels: { inApp: false },
+      roleRouting: { lowStock: ["owner"] },
+    });
+
+    expect(merged.lowStock).toBe(false);
+    expect(merged.serviceDue).toBe(false);
+    expect(merged.invoiceCreated).toBe(false);
+    expect(merged.purchaseReceived).toBe(false);
+    expect(merged.debtChanged).toBe(false);
+    expect(merged.qrPaymentConfirmed).toBe(false);
+    expect(merged.qrPaymentException).toBe(false);
+    expect(merged.channels).toEqual({ inApp: false, push: false });
+    expect(merged.roleRouting.lowStock).toEqual(["owner"]);
+    expect(merged.roleRouting.purchaseReceived).toEqual(["warehouse"]);
+    expect(merged.roleRouting.qrPaymentConfirmed).toEqual(["cashier"]);
+  });
+
   test("AI usage administration is owner-only", () => {
     expect(canReadMobileAiAdministration("owner")).toBe(true);
     expect(canReadMobileAiAdministration("manager")).toBe(false);
     expect(canReadMobileAiAdministration("cashier")).toBe(false);
     expect(canReadMobileAiAdministration("warehouse")).toBe(false);
+    expect(canReadMobileAiAdministration("technician")).toBe(false);
   });
 });

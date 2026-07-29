@@ -13,6 +13,11 @@ import { Routes } from "@/lib/routes";
 import { getCurrentShift } from "@/lib/data/shifts";
 import { validateReceiptBatchLines } from "@/lib/inventory/batch-policy";
 import { recordStockLotReceipt } from "@/lib/inventory/stock-lot-service";
+import {
+  createDebtChangedEventInTx,
+  createNotificationEventInTx,
+} from "@/lib/notifications/events-core";
+import { publishCommittedNotification } from "@/lib/notifications/outbox";
 
 type PurchaseCalcInput = Pick<CreatePurchaseOutput, "items" | "discount" | "vatRate" | "amountPaid">;
 
@@ -180,11 +185,29 @@ export async function createPurchase(
         });
       }
 
-      return po;
+      const notification = await createNotificationEventInTx(tx, {
+        eventKey: `purchase-received:${po.id}`,
+        category: "purchaseReceived",
+        entityType: "purchase",
+        entityId: po.id,
+        actorId: profileId,
+        target: "purchases",
+        priority: "normal",
+        quietHoursPolicy: "defer",
+        excludeActor: true,
+        metadata: {
+          debtDelta: totals.owed.toFixed(2),
+        },
+      });
+
+      return { po, notification };
     });
 
-    revalidatePurchasePaths(result.id);
-    return { ok: true, data: result };
+    if (result.notification?.created) {
+      await publishCommittedNotification(result.notification.eventId);
+    }
+    revalidatePurchasePaths(result.po.id);
+    return { ok: true, data: result.po };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
     if (msg === "PRODUCT_NOT_FOUND") return { ok: false, error: "errors.invalidData" };
@@ -195,7 +218,9 @@ export async function createPurchase(
 }
 
 /** Sửa phiếu nhập đã nhận: hoàn tác dòng cũ, áp dòng mới, cập nhật chênh lệch nợ/tiền. */
-export async function updatePurchase(input: UpdatePurchaseOutput): Promise<ActionResult> {
+export async function updatePurchase(
+  input: UpdatePurchaseOutput,
+): Promise<ActionResult<{ updatedAt: string }>> {
   const gate = await requireStockAccess();
   if (!gate.ok) return gate;
   const userId = gate.userId;
@@ -209,7 +234,7 @@ export async function updatePurchase(input: UpdatePurchaseOutput): Promise<Actio
     const profileId = await getProfileId(userId);
     const currentShift = profileId ? await getCurrentShift(profileId) : null;
 
-    await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       const [po] = await tx.select().from(purchaseOrders).where(eq(purchaseOrders.id, v.id)).limit(1);
       if (!po) throw new Error("PURCHASE_NOT_FOUND");
       if (po.status !== "received" && po.status !== "draft") throw new Error("NOT_EDITABLE");
@@ -341,14 +366,53 @@ export async function updatePurchase(input: UpdatePurchaseOutput): Promise<Actio
         .set({ supplierId: v.supplierId })
         .where(and(inArray(products.id, v.items.map((i) => i.productId)), isNull(products.supplierId)));
 
+      let debtDelta = 0;
+      let relatedAdjustments:
+        | Array<{ entityType: "supplier"; entityId: string; delta: number }>
+        | undefined;
       if (po.supplierId === v.supplierId) {
         const debtDiff = totals.owed - oldOwed;
         if (Math.abs(debtDiff) > 1e-9) {
+          const [supplier] = await tx
+            .select({ currentDebt: suppliers.currentDebt })
+            .from(suppliers)
+            .where(eq(suppliers.id, v.supplierId))
+            .limit(1)
+            .for("update");
+          debtDelta = debtDiff < 0
+            ? -Math.min(Number(supplier?.currentDebt ?? 0), -debtDiff)
+            : debtDiff;
           await tx.update(suppliers).set({
             currentDebt: sql`greatest(${suppliers.currentDebt} + ${toMoney(debtDiff)}, 0)`,
           }).where(eq(suppliers.id, v.supplierId));
         }
       } else {
+        const supplierDebts = await tx
+          .select({ id: suppliers.id, currentDebt: suppliers.currentDebt })
+          .from(suppliers)
+          .where(inArray(suppliers.id, [po.supplierId, v.supplierId]))
+          .for("update");
+        const debtBySupplier = new Map(
+          supplierDebts.map((supplier) => [supplier.id, Number(supplier.currentDebt)]),
+        );
+        const oldSupplierDelta = -Math.min(
+          debtBySupplier.get(po.supplierId) ?? 0,
+          oldOwed,
+        );
+        const newSupplierDelta = totals.owed;
+        debtDelta = oldSupplierDelta + newSupplierDelta;
+        relatedAdjustments = [
+          {
+            entityType: "supplier",
+            entityId: po.supplierId,
+            delta: oldSupplierDelta,
+          },
+          {
+            entityType: "supplier",
+            entityId: v.supplierId,
+            delta: newSupplierDelta,
+          },
+        ];
         if (oldOwed > 0) {
           await tx.update(suppliers).set({
             currentDebt: sql`greatest(${suppliers.currentDebt} - ${toMoney(oldOwed)}, 0)`,
@@ -376,23 +440,66 @@ export async function updatePurchase(input: UpdatePurchaseOutput): Promise<Actio
         });
       }
 
-      await tx.update(purchaseOrders).set({
-        supplierId: v.supplierId,
-        warehouseId: v.warehouseId,
-        status: "received",
-        subtotal: toMoney(totals.subtotal),
-        discount: toMoney(v.discount),
-        vatRate: String(v.vatRate),
-        tax: toMoney(totals.tax),
-        total: toMoney(totals.total),
-        amountPaid: toMoney(totals.paid),
-        invoiceNumber: v.invoiceNumber?.trim()?.slice(0, 50) || null,
-        note: v.note || null,
-      }).where(eq(purchaseOrders.id, po.id));
+      const [committedMutation] = await tx
+        .update(purchaseOrders)
+        .set({
+          supplierId: v.supplierId,
+          warehouseId: v.warehouseId,
+          status: "received",
+          subtotal: toMoney(totals.subtotal),
+          discount: toMoney(v.discount),
+          vatRate: String(v.vatRate),
+          tax: toMoney(totals.tax),
+          total: toMoney(totals.total),
+          amountPaid: toMoney(totals.paid),
+          invoiceNumber: v.invoiceNumber?.trim()?.slice(0, 50) || null,
+          note: v.note || null,
+        })
+        .where(eq(purchaseOrders.id, po.id))
+        .returning({
+          committedAt: sql<string>`
+            to_char(
+              clock_timestamp() at time zone 'UTC',
+              'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+            )
+          `,
+        });
+
+      const notification = po.status === "draft"
+        ? await createNotificationEventInTx(tx, {
+            eventKey: `purchase-received:${po.id}`,
+            category: "purchaseReceived",
+            entityType: "purchase",
+            entityId: po.id,
+            actorId: profileId,
+            target: "purchases",
+            priority: "normal",
+            quietHoursPolicy: "defer",
+            excludeActor: true,
+            metadata: {
+              debtDelta: totals.owed.toFixed(2),
+            },
+          })
+        : await createDebtChangedEventInTx(tx, {
+            entityType: "supplier",
+            entityId: v.supplierId,
+            operationType: "purchase_edit",
+            operationId: `${po.id}:${committedMutation.committedAt}`,
+            delta: debtDelta,
+            actorId: profileId,
+            relatedAdjustments,
+          });
+      return {
+        notification,
+        updatedAt: committedMutation.committedAt,
+      };
     });
 
+    if (result.notification?.created) {
+      await publishCommittedNotification(result.notification.eventId);
+    }
     revalidatePurchasePaths(v.id);
-    return { ok: true, data: undefined };
+    return { ok: true, data: { updatedAt: result.updatedAt } };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
     const known: Record<string, string> = {
@@ -420,12 +527,13 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
     const profileId = await getProfileId(userId);
     const currentShift = profileId ? await getCurrentShift(profileId) : null;
 
-    await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       const [po] = await tx.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)).limit(1);
       if (!po) throw new Error("PURCHASE_NOT_FOUND");
       if (po.status === "cancelled") throw new Error("ALREADY_CANCELLED");
       if (po.status === "returned") throw new Error("NOT_EDITABLE");
 
+      let debtNotification = null;
       if (po.status === "received") {
         const items = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, po.id));
         const receiptLots = items.length > 0
@@ -459,6 +567,13 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
 
         const paid = Number(po.amountPaid);
         const owed = Math.max(0, Number(po.total) - paid);
+        const [supplier] = await tx
+          .select({ currentDebt: suppliers.currentDebt })
+          .from(suppliers)
+          .where(eq(suppliers.id, po.supplierId))
+          .limit(1)
+          .for("update");
+        const debtDelta = -Math.min(Number(supplier?.currentDebt ?? 0), owed);
         if (owed > 0) {
           await tx.update(suppliers).set({
             currentDebt: sql`greatest(${suppliers.currentDebt} - ${toMoney(owed)}, 0)`,
@@ -471,11 +586,23 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
             note: `Hoàn tiền đã trả do hủy ${po.code}`, createdBy: profileId, shiftId: currentShift?.id ?? null,
           });
         }
+        debtNotification = await createDebtChangedEventInTx(tx, {
+          entityType: "supplier",
+          entityId: po.supplierId,
+          operationType: "purchase_cancel",
+          operationId: po.id,
+          delta: debtDelta,
+          actorId: profileId,
+        });
       }
 
       await tx.update(purchaseOrders).set({ status: "cancelled" }).where(eq(purchaseOrders.id, po.id));
+      return { debtNotification };
     });
 
+    if (result.debtNotification?.created) {
+      await publishCommittedNotification(result.debtNotification.eventId);
+    }
     revalidatePurchasePaths(id);
     return { ok: true, data: undefined };
   } catch (e) {
