@@ -153,6 +153,7 @@ describe("field service completion", () => {
     expect(serviceChecklistUpdateSchema.safeParse({
       jobId,
       clientMutationId,
+      expectedVersion: 1,
       checklist: createDefaultChecklist("camera"),
     }).success).toBe(true);
     expect(serviceCompletionSchema.safeParse({
@@ -188,6 +189,7 @@ describe("field service completion", () => {
     expect(serviceFieldAssetCreateSchema.safeParse({
       jobId,
       clientMutationId: "mobile-asset-1",
+      expectedVersion: 1,
       assetKind: "camera",
       name: "Camera cổng",
       serialNumber: "EZVIZ-001",
@@ -198,6 +200,7 @@ describe("field service completion", () => {
       materialId: attachmentId,
       usedQuantity: 12.5,
       clientMutationId: "mobile-material-1",
+      expectedVersion: 1,
     }).success).toBe(true);
   });
 });

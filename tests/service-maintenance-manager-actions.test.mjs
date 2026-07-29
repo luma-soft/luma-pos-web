@@ -18,7 +18,10 @@ if (!databaseUrl) {
       role: "manager",
     }),
   }));
-  mock.module("next/cache", () => ({ revalidatePath: () => undefined }));
+  mock.module("next/cache", () => ({
+    revalidatePath: () => undefined,
+    unstable_cache: (callback) => callback,
+  }));
 
   const { db } = await import(`${projectRoot}/src/db/index.ts`);
   const schema = await import(`${projectRoot}/src/db/schema.ts`);

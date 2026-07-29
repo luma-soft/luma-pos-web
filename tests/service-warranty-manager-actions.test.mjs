@@ -27,16 +27,22 @@ const technicianId = "22222222-2222-4222-8222-222222222222";
 let mobileActor = { userId: managerId, role: "manager" };
 let codeSequence = 0;
 mock.module("@/db", () => ({ db, schema }));
-mock.module("next/cache", () => ({ revalidatePath: () => undefined }));
+mock.module("next/cache", () => ({
+  revalidatePath: () => undefined,
+  unstable_cache: (callback) => callback,
+}));
 mock.module("@/lib/mobile/auth", () => ({
   requireMobileServiceAccess: async () => ({ ok: true, ...mobileActor }),
 }));
+const common = await import(`${projectRoot}/src/lib/actions/common.ts`);
 mock.module("@/lib/actions/common", () => ({
+  ...common,
   generateCode: () => `BH-MANAGER-${++codeSequence}`,
   getProfileId: async (id) => id,
   isUniqueViolation: () => false,
   pgErrorCode: () => null,
   requireManager: async () => ({ ok: true, userId: managerId, role: "manager" }),
+  requireUser: async () => ({ id: managerId }),
   requireStockAccess: async () => ({ ok: false, error: "errors.forbidden" }),
   toMoney: (value) => String(value ?? 0),
   toQty: (value) => String(value ?? 0),

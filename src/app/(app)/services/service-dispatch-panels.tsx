@@ -13,10 +13,6 @@ type DispatchData = Awaited<ReturnType<typeof getServiceDispatchPage>>;
 type ReportData = Awaited<ReturnType<typeof getServiceManagerReport>>;
 type Technician = { id: string; name: string };
 
-function selectClass() {
-  return "min-h-10 rounded-lg border border-border bg-surface px-3 text-sm";
-}
-
 export function ServiceDispatchPanel({
   data,
   technicians,
@@ -40,41 +36,41 @@ export function ServiceDispatchPanel({
       <Section collapsible={false}>
         <form className="flex flex-wrap gap-2" method="get">
           <input type="hidden" name="tab" value="dispatch" />
-          <select name="scope" defaultValue={params.scope ?? "week"} className={selectClass()}>
+          <select name="scope" defaultValue={params.scope ?? "week"} className="min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm">
             <option value="today">Hôm nay</option>
             <option value="week">7 ngày</option>
           </select>
-          <select name="status" defaultValue={params.status ?? ""} className={selectClass()}>
+          <select name="status" defaultValue={params.status ?? ""} className="min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm">
             <option value="">Tất cả trạng thái</option>
             <option value="new,scheduled">Mới / đã lên lịch</option>
             <option value="in_progress">Đang làm</option>
             <option value="waiting_materials,waiting_customer">Đang chờ</option>
             <option value="completed">Hoàn tất</option>
           </select>
-          <select name="priority" defaultValue={params.priority ?? ""} className={selectClass()}>
+          <select name="priority" defaultValue={params.priority ?? ""} className="min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm">
             <option value="">Tất cả ưu tiên</option>
             <option value="urgent">Khẩn</option>
             <option value="high">Cao</option>
             <option value="normal">Bình thường</option>
             <option value="low">Thấp</option>
           </select>
-          <select name="technicianId" defaultValue={params.technicianId ?? ""} className={selectClass()}>
+          <select name="technicianId" defaultValue={params.technicianId ?? ""} className="min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm">
             <option value="">Tất cả kỹ thuật viên</option>
             {technicians.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
-          <label className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm">
+          <label className="inline-flex min-h-11 min-w-11 items-center gap-2 rounded-lg border border-border px-3 text-sm">
             <input type="checkbox" name="unassigned" value="true" defaultChecked={params.unassigned === "true"} />
             Chưa phân công
           </label>
-          <label className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm">
+          <label className="inline-flex min-h-11 min-w-11 items-center gap-2 rounded-lg border border-border px-3 text-sm">
             <input type="checkbox" name="slaOverdue" value="true" defaultChecked={params.slaOverdue === "true"} />
             Quá hạn SLA
           </label>
-          <label className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-sm">
+          <label className="inline-flex min-h-11 min-w-11 items-center gap-2 rounded-lg border border-border px-3 text-sm">
             <input type="checkbox" name="maintenanceOverdue" value="true" defaultChecked={params.maintenanceOverdue === "true"} />
             Trễ bảo trì
           </label>
-          <button className="min-h-10 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white" type="submit">
+          <button className="min-h-11 min-w-11 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white" type="submit">
             Lọc lịch
           </button>
         </form>
@@ -133,9 +129,9 @@ export function ServiceReportPanel({ data }: { data: ReportData }) {
       <Section collapsible={false}>
         <form className="flex flex-wrap items-end gap-2" method="get">
           <input type="hidden" name="tab" value="reporting" />
-          <label className="text-xs text-slate-500">Từ ngày<input className={`${selectClass()} ml-2`} type="date" name="from" /></label>
-          <label className="text-xs text-slate-500">Đến trước ngày<input className={`${selectClass()} ml-2`} type="date" name="to" /></label>
-          <button className="min-h-10 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white" type="submit">Xem báo cáo</button>
+          <label className="text-xs text-slate-500">Từ ngày<input className="ml-2 min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm" type="date" name="from" /></label>
+          <label className="text-xs text-slate-500">Đến trước ngày<input className="ml-2 min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm" type="date" name="to" /></label>
+          <button className="min-h-11 min-w-11 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white" type="submit">Xem báo cáo</button>
         </form>
       </Section>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -170,7 +166,7 @@ export function ServiceReportPanel({ data }: { data: ReportData }) {
         </p>
       </Section>
       <Pagination page={data.page} pageCount={data.pageCount} total={data.total} pageSize={data.limit} pageSizes={SERVICE_PAGE_SIZES} unitLabel="lệnh việc" />
-      <Link href="/services?tab=reporting" className="text-sm font-semibold text-primary-600">Đặt lại khoảng báo cáo</Link>
+      <Link href="/services?tab=reporting" className="inline-flex min-h-11 min-w-11 items-center text-sm font-semibold text-primary-600">Đặt lại khoảng báo cáo</Link>
     </div>
   );
 }
