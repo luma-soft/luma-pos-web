@@ -155,15 +155,49 @@ if (!databaseUrl) {
     assert.equal(overlap.outcome, "skipped");
     assert.equal(overlappingSendCalls, 0);
     settleNonCooperative({ ok: true });
-    assert.equal((await heldDelivery).outcome, "failed");
+    assert.equal((await heldDelivery).outcome, "sent");
+    let postSuccessSendCalls = 0;
     assert.equal((await deliverPushDeviceCore(db, {
       deviceId,
       notificationKey: nonCooperativeKey,
       leaseMs: 400,
       sendTimeoutMs: 80,
       safetyMarginMs: 80,
-      send: async () => ({ ok: true }),
+      send: async () => {
+        postSuccessSendCalls += 1;
+        return { ok: true };
+      },
+    })).outcome, "skipped");
+    assert.equal(postSuccessSendCalls, 0);
+
+    const lateFailureKey = `push-late-failure:${randomUUID()}`;
+    let settleLateFailure;
+    const lateFailure = deliverPushDeviceCore(db, {
+      deviceId,
+      notificationKey: lateFailureKey,
+      leaseMs: 400,
+      sendTimeoutMs: 80,
+      safetyMarginMs: 80,
+      send: () => new Promise((resolve) => {
+        settleLateFailure = resolve;
+      }),
+    });
+    await delay(150);
+    settleLateFailure({ ok: false, errorCode: "FCM_LATE_FAILURE" });
+    assert.equal((await lateFailure).outcome, "failed");
+    let lateFailureRetryCalls = 0;
+    assert.equal((await deliverPushDeviceCore(db, {
+      deviceId,
+      notificationKey: lateFailureKey,
+      leaseMs: 400,
+      sendTimeoutMs: 80,
+      safetyMarginMs: 80,
+      send: async () => {
+        lateFailureRetryCalls += 1;
+        return { ok: true };
+      },
     })).outcome, "sent");
+    assert.equal(lateFailureRetryCalls, 1);
     console.log("push delivery PostgreSQL concurrency: one send and terminal success verified");
   } finally {
     if (deviceId) {

@@ -133,3 +133,17 @@ The remaining push-delivery lease issue is closed without a schema change:
   invalid timeout configuration, and a non-cooperative sender held beyond the
   original lease. A concurrent retry remains skipped until settlement, then
   sends exactly once.
+
+## Review fix round 3
+
+- Timeout remains a cancellation boundary, not a fabricated delivery result.
+  After abort, a still-owned sender's eventual settlement is preserved:
+  late success acknowledges `sent`, while late failure/rejection acknowledges
+  `failed`.
+- Token fencing remains authoritative. If lease ownership is genuinely lost,
+  the stale sender returns a safe failure and cannot acknowledge over the
+  current owner.
+- The PostgreSQL regression now proves late non-cooperative success becomes
+  terminal `sent` and the next attempt skips without invoking its sender. It
+  separately proves late failure releases the claim and exactly one retry
+  succeeds.

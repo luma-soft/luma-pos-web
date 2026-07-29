@@ -158,9 +158,13 @@ export async function deliverPushDeviceCore(
       1,
       Math.min(Math.floor(safetyMarginMs / 2), Math.floor(leaseMs / 3)),
     );
+    let lateDelivery: { ok: boolean; errorCode?: string | null } | null = null;
     for (;;) {
       const settled = await settleBefore(sendResult, heartbeatMs);
-      if (settled.settled) break;
+      if (settled.settled) {
+        lateDelivery = settled.value;
+        break;
+      }
       const renewed = await renewPushDeliveryClaimCore(database, {
         deviceId: input.deviceId,
         notificationKey: input.notificationKey,
@@ -171,7 +175,7 @@ export async function deliverPushDeviceCore(
         return { outcome: "failed" as const, errorCode: "CLAIM_LOST" };
       }
     }
-    delivery = { ok: false, errorCode: "FCM_TIMEOUT" };
+    delivery = lateDelivery ?? { ok: false, errorCode: "FCM_TIMEOUT" };
   }
   const acknowledged = await acknowledgePushDeliveryCore(database, {
     ...input,
