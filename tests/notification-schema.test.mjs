@@ -96,6 +96,58 @@ ok(
 );
 ok("migration owner retains server-side store settings access", storeSettingsSecurity?.owner_access === true);
 
+const featureTableSecurity = await client.query(`
+  select
+    c.relname as table_name,
+    c.relrowsecurity,
+    bool_or(has_table_privilege('anon', c.oid, p.privilege)) as anon_any_access,
+    bool_or(has_table_privilege('authenticated', c.oid, p.privilege))
+      as authenticated_any_access,
+    bool_and(has_table_privilege(current_user, c.oid, p.privilege))
+      as owner_all_access
+  from pg_class c
+  cross join (
+    values
+      ('SELECT'),
+      ('INSERT'),
+      ('UPDATE'),
+      ('DELETE'),
+      ('TRUNCATE'),
+      ('REFERENCES'),
+      ('TRIGGER')
+  ) as p(privilege)
+  where c.oid in (
+    'public.store_settings'::regclass,
+    'public.mobile_push_device_binding_fences'::regclass
+  )
+  group by c.relname, c.relrowsecurity
+  order by c.relname
+`);
+ok(
+  "feature-created server tables cannot silently omit RLS or Data API ACL revocation",
+  featureTableSecurity.rows.length === 2
+    && featureTableSecurity.rows.every((row) =>
+      row.relrowsecurity === true
+      && row.anon_any_access === false
+      && row.authenticated_any_access === false
+      && row.owner_all_access === true
+    ),
+);
+
+const featureTablePolicies = await client.query(`
+  select tablename, policyname
+  from pg_policies
+  where schemaname = 'public'
+    and tablename in (
+      'store_settings',
+      'mobile_push_device_binding_fences'
+    )
+`);
+ok(
+  "feature-created server tables expose no Data API policy path",
+  featureTablePolicies.rows.length === 0,
+);
+
 const repairColumns = await client.query(`
   select table_name, column_name
   from information_schema.columns
