@@ -564,7 +564,7 @@ async function main() {
         description: item.description,
         categoryId,
         brandId: brand.id,
-        baseUnit: "bộ",
+        baseUnit: "cái",
         costPrice: String(item.costPrice),
         lastPurchasePrice: String(item.costPrice),
         retailPrice: String(item.retailPrice),
