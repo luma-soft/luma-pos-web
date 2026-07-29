@@ -138,3 +138,41 @@
   the trigger is `BEFORE INSERT OR UPDATE`, the function ACL remains restricted
   to `postgres` and `service_role`, migration `0085` is tracked, and a repeated
   migration run reports zero pending.
+
+## Review fix round 3
+
+- Replaced trigger-depth trust with a durable authority table in immutable
+  migration `0086_service_asset_revision_authority.sql`:
+  `service_job_asset_revisions(job_id, version)`. Existing job collection
+  revisions are backfilled without changing their values.
+- `service_jobs.assets_version` is now only a readable mirror. Every job UPDATE,
+  including an unrelated nested trigger attempting `+1`, reloads the authority
+  value and ignores the caller's proposed mirror. Job INSERT still normalizes
+  all counters to one, then an AFTER INSERT trigger creates the matching
+  authority row.
+- The installed-assets collection helper is `SECURITY DEFINER`, locks affected
+  jobs and authority rows in UUID order, increments the private authority row,
+  then synchronizes the public mirror. Concurrent inserts serialize without a
+  lost bump; insert, canonical update, move, and delete advance each affected
+  collection exactly once; housekeeping-only updates do not.
+- The authority table has RLS enabled and no application policies. PUBLIC,
+  `anon`, `authenticated`, and `service_role` have no table access. All three
+  authority helper functions have execute restricted to their owner. A real
+  `service_role` test confirms direct SELECT/UPDATE is denied while normal
+  `service_jobs.assets_version` reads and the installed-assets trigger path
+  still work.
+- Material and installed-asset row-version triggers now run before INSERT or
+  UPDATE. Explicit `version = 77` inserts normalize to one; canonical updates
+  advance once and no-op updates preserve the row revision.
+- Applying `0086` exposed a project-delete cascade ordering edge during the
+  real PostgreSQL cleanup. Immutable follow-up
+  `0087_service_asset_revision_delete_cascade.sql` skips only affected jobs
+  already deleted by the cascade, while a live job missing its authority row
+  still fails closed.
+- Real PostgreSQL coverage now includes explicit revision inserts, unrelated
+  nested mirror writes, service-role ACL/RLS boundaries, concurrent collection
+  inserts, no-op/canonical asset updates, moves, deletes, and cascade cleanup.
+  Focused PGlite/PostgreSQL suites, targeted ESLint, and the production build
+  pass. Catalog inspection confirms RLS, owner-only function ACLs,
+  `SECURITY DEFINER`, all expected trigger events, zero mirror mismatches, and
+  zero pending migrations through `0087`.
