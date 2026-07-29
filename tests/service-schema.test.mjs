@@ -72,6 +72,7 @@ if (document.status !== "signed" || document.photoUrls.length !== 1) {
 const [plan] = await db.insert(serviceMaintenancePlans).values({
   projectId: project.id,
   assetId: null,
+  serviceType: "camera",
   title: "Vệ sinh đầu ghi",
   intervalDays: 90,
   nextDueOn: "2026-10-20",

@@ -42,6 +42,16 @@ export async function GET(request: Request) {
         userIds: occurrence.assignedTo ? [occurrence.assignedTo] : undefined,
       }));
     }
+    for (const occurrence of maintenance.overdue) {
+      results.push(await dispatchPushNotification({
+        notificationKey: occurrence.notificationKey,
+        category: "serviceDue",
+        target: "services",
+        entityId: occurrence.jobId,
+        prefs,
+        userIds: occurrence.userIds,
+      }));
+    }
   }
 
   if (prefs.lowStock) {

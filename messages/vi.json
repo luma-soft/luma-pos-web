@@ -2842,6 +2842,7 @@
       "projectRequired": "Cần chọn công trình dịch vụ hợp lệ.",
       "tradeMismatch": "Nghiệp vụ của lệnh việc không phù hợp với công trình.",
       "relationMismatch": "Dữ liệu được chọn không thuộc công trình này hoặc không đúng loại chứng từ.",
+      "completeMaintenanceThroughJob": "Hãy hoàn tất lệnh việc bảo trì được tạo để chuyển kế hoạch sang chu kỳ tiếp theo.",
       "invalidMaterialUnit": "Đơn vị vật tư không khớp với đơn vị của sản phẩm.",
       "materialWarehouseMismatch": "Vật tư này đã được xuất từ kho khác.",
       "insufficientMaterialStock": "Kho không đủ tồn khả dụng để xuất vật tư.",

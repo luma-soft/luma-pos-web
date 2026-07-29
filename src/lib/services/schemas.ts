@@ -135,6 +135,7 @@ export const serviceMaintenancePlanSchema = z.object({
   id: z.uuid().nullable().optional(),
   projectId: z.uuid(),
   assetId: z.uuid().nullable().optional(),
+  serviceType: concreteServiceTypeSchema,
   title: z.string().trim().min(1),
   intervalDays: z.coerce.number().int().positive(),
   nextDueOn: z.iso.date(),

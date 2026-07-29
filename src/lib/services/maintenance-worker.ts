@@ -1,9 +1,8 @@
-import { and, eq, lte } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, lte } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { db } from "@/db";
 import type * as schema from "@/db/schema";
 import {
-  projects,
+  profiles,
   serviceJobAssignments,
   serviceJobEvents,
   serviceJobs,
@@ -11,6 +10,7 @@ import {
   serviceMaintenancePlans,
 } from "@/db/schema";
 import { createDefaultChecklist } from "@/lib/services/domain";
+export { completeMaintenanceOccurrenceForJobCore } from "@/lib/services/maintenance-lifecycle";
 
 type ServiceTransaction = Parameters<
   Parameters<NodePgDatabase<typeof schema>["transaction"]>[0]
@@ -18,6 +18,62 @@ type ServiceTransaction = Parameters<
 
 function maintenanceJobCode(planId: string, dueOn: string) {
   return `BT-${planId.slice(0, 8).toUpperCase()}-${dueOn.replaceAll("-", "")}`;
+}
+
+export async function markOverdueMaintenanceOccurrencesCore(
+  tx: ServiceTransaction,
+  now = new Date(),
+) {
+  const today = now.toISOString().slice(0, 10);
+  const overdue = await tx.select({
+    id: serviceMaintenanceOccurrences.id,
+    jobId: serviceMaintenanceOccurrences.jobId,
+  }).from(serviceMaintenanceOccurrences)
+    .where(and(
+      inArray(serviceMaintenanceOccurrences.status, ["scheduled", "overdue"]),
+      lt(serviceMaintenanceOccurrences.dueOn, today),
+    ))
+    .for("update");
+
+  const scheduledIds = overdue.map((item) => item.id);
+  if (scheduledIds.length > 0) {
+    await tx.update(serviceMaintenanceOccurrences).set({ status: "overdue" })
+      .where(and(
+        inArray(serviceMaintenanceOccurrences.id, scheduledIds),
+        eq(serviceMaintenanceOccurrences.status, "scheduled"),
+      ));
+  }
+
+  const managerRows = await tx.select({ id: profiles.id })
+    .from(profiles)
+    .where(and(
+      eq(profiles.isActive, true),
+      inArray(profiles.role, ["owner", "manager"]),
+    ));
+  const managerIds = managerRows.map((item) => item.id);
+  const alerts = [];
+  for (const occurrence of overdue) {
+    if (!occurrence.jobId) continue;
+    const technicianRows = await tx.select({ id: profiles.id })
+      .from(serviceJobAssignments)
+      .innerJoin(profiles, eq(serviceJobAssignments.profileId, profiles.id))
+      .where(and(
+        eq(serviceJobAssignments.jobId, occurrence.jobId),
+        isNull(serviceJobAssignments.removedAt),
+        eq(profiles.role, "technician"),
+        eq(profiles.isActive, true),
+      ));
+    alerts.push({
+      occurrenceId: occurrence.id,
+      jobId: occurrence.jobId,
+      notificationKey: `service-maintenance-overdue:${occurrence.id}`,
+      userIds: [...new Set([
+        ...technicianRows.map((item) => item.id),
+        ...managerIds,
+      ])],
+    });
+  }
+  return alerts;
 }
 
 export async function generateMaintenanceOccurrenceCore(
@@ -32,12 +88,14 @@ export async function generateMaintenanceOccurrenceCore(
     nextDueOn: serviceMaintenancePlans.nextDueOn,
     assignedTo: serviceMaintenancePlans.assignedTo,
     isActive: serviceMaintenancePlans.isActive,
-    serviceType: projects.serviceType,
+    serviceType: serviceMaintenancePlans.serviceType,
   }).from(serviceMaintenancePlans)
-    .innerJoin(projects, eq(serviceMaintenancePlans.projectId, projects.id))
     .where(eq(serviceMaintenancePlans.id, planId))
     .limit(1);
-  if (!plan?.isActive || !plan.serviceType) throw new Error("SERVICE_MAINTENANCE_PLAN_NOT_FOUND");
+  if (!plan?.isActive) throw new Error("SERVICE_MAINTENANCE_PLAN_NOT_FOUND");
+  if (plan.serviceType === "mixed") {
+    throw new Error("SERVICE_MAINTENANCE_SERVICE_TYPE_REQUIRED");
+  }
 
   const [occurrence] = await tx.insert(serviceMaintenanceOccurrences).values({
     planId: plan.id,
@@ -68,7 +126,7 @@ export async function generateMaintenanceOccurrenceCore(
     };
   }
 
-  const serviceType = plan.serviceType === "mixed" ? "camera" : plan.serviceType;
+  const serviceType = plan.serviceType;
   const [job] = await tx.insert(serviceJobs).values({
     projectId: plan.projectId,
     code: maintenanceJobCode(plan.id, plan.nextDueOn),
@@ -114,6 +172,7 @@ export async function runMaintenanceWorker(input?: {
   now?: Date;
   leadDays?: number;
 }) {
+  const { db } = await import("@/db");
   const now = input?.now ?? new Date();
   const leadDays = input?.leadDays ?? 14;
   const dueThrough = new Date(now.getTime() + leadDays * 24 * 60 * 60 * 1000)
@@ -131,9 +190,13 @@ export async function runMaintenanceWorker(input?: {
       generateMaintenanceOccurrenceCore(tx, plan.id, now)
     ));
   }
+  const overdue = await db.transaction((tx) =>
+    markOverdueMaintenanceOccurrencesCore(tx, now)
+  );
   return {
     evaluated: plans.length,
     created: results.filter((result) => result.created).length,
     results,
+    overdue,
   };
 }

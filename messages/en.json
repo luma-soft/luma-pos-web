@@ -2842,6 +2842,7 @@
       "projectRequired": "Select a valid service project.",
       "tradeMismatch": "The work order trade does not match this project.",
       "relationMismatch": "The selected record does not belong to this project or has the wrong document type.",
+      "completeMaintenanceThroughJob": "Complete the generated maintenance job to advance this plan.",
       "invalidMaterialUnit": "The material unit does not match the product units.",
       "materialWarehouseMismatch": "This material was already issued from another warehouse.",
       "insufficientMaterialStock": "The warehouse does not have enough available stock for this material.",

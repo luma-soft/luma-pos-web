@@ -547,11 +547,19 @@ export async function saveServiceMaintenancePlan(
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const value = parsed.data;
   try {
-    if (!await isServiceProject(value.projectId)) return { ok: false, error: "services.errors.projectRequired" };
+    const [project] = await db.select({ serviceType: projects.serviceType })
+      .from(projects)
+      .where(eq(projects.id, value.projectId))
+      .limit(1);
+    if (!project?.serviceType) return { ok: false, error: "services.errors.projectRequired" };
+    if (!isServiceTypeAllowedForProject(project.serviceType, value.serviceType)) {
+      return { ok: false, error: "services.errors.tradeMismatch" };
+    }
     if (value.assetId && !await serviceLinksAreValid(value.projectId, { assetId: value.assetId })) return { ok: false, error: "services.errors.relationMismatch" };
     const values = {
       projectId: value.projectId,
       assetId: value.assetId ?? null,
+      serviceType: value.serviceType,
       title: value.title,
       intervalDays: value.intervalDays,
       nextDueOn: value.nextDueOn,
@@ -588,21 +596,8 @@ export async function saveServiceMaintenancePlan(
 export async function completeServiceMaintenancePlan(id: string): Promise<ActionResult> {
   const gate = await requireManager();
   if (!gate.ok) return gate;
-  try {
-    const [current] = await db.select({ projectId: serviceMaintenancePlans.projectId, intervalDays: serviceMaintenancePlans.intervalDays, isActive: serviceMaintenancePlans.isActive })
-      .from(serviceMaintenancePlans).where(eq(serviceMaintenancePlans.id, id)).limit(1);
-    if (!current) return { ok: false, error: "errors.notFound" };
-    const completedOn = new Date();
-    const nextDueOn = new Date(completedOn);
-    nextDueOn.setDate(nextDueOn.getDate() + current.intervalDays);
-    await db.update(serviceMaintenancePlans).set({ lastCompletedOn: completedOn.toISOString().slice(0, 10), nextDueOn: nextDueOn.toISOString().slice(0, 10), updatedAt: completedOn }).where(eq(serviceMaintenancePlans.id, id));
-    revalidateServiceProject(current.projectId);
-    await auditServiceMutation(gate.userId, "complete_service_maintenance", "service_maintenance_plan", id);
-    return { ok: true, data: undefined };
-  } catch (error) {
-    console.error("completeServiceMaintenancePlan failed:", error);
-    return { ok: false, error: "errors.serverError" };
-  }
+  void id;
+  return { ok: false, error: "services.errors.completeMaintenanceThroughJob" };
 }
 
 export async function deleteServiceMaintenancePlan(id: string): Promise<ActionResult> {

@@ -28,6 +28,7 @@ import {
   hashSignedDocument,
   type JsonValue,
 } from "@/lib/services/evidence";
+import { completeMaintenanceOccurrenceForJobCore } from "@/lib/services/maintenance-lifecycle";
 import type {
   ServiceChecklistUpdateInput,
   ServiceCompletionInput,
@@ -713,6 +714,7 @@ export async function completeFieldServiceJobCore(
       completedAt: now,
       updatedAt: now,
     }).where(eq(serviceJobs.id, input.jobId));
+    await completeMaintenanceOccurrenceForJobCore(tx, input.jobId, now);
     await tx.insert(serviceStatusLogs).values({
       jobId: input.jobId,
       fromStatus: job.status,

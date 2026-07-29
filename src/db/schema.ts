@@ -970,6 +970,7 @@ export const serviceMaintenancePlans = pgTable("service_maintenance_plans", {
   id: uuid("id").primaryKey().defaultRandom(),
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   assetId: uuid("asset_id").references(() => installedAssets.id, { onDelete: "set null" }),
+  serviceType: serviceTypeEnum("service_type").notNull(),
   title: text("title").notNull(),
   intervalDays: integer("interval_days").notNull(),
   nextDueOn: date("next_due_on").notNull(),
@@ -982,6 +983,7 @@ export const serviceMaintenancePlans = pgTable("service_maintenance_plans", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   check("service_maintenance_plans_interval_check", sql`${t.intervalDays} > 0`),
+  check("service_maintenance_plans_service_type_check", sql`${t.serviceType} in ('camera', 'electrical', 'plumbing')`),
   index("service_maintenance_plans_due_idx").on(t.isActive, t.nextDueOn),
   index("service_maintenance_plans_project_idx").on(t.projectId, t.isActive),
 ]);
@@ -1192,6 +1194,7 @@ export const serviceMaintenanceOccurrences = pgTable("service_maintenance_occurr
 }, (t) => [
   check("service_maintenance_occurrences_status_check", sql`${t.status} in ('scheduled', 'completed', 'skipped', 'overdue')`),
   uniqueIndex("service_maintenance_occurrences_plan_due_idx").on(t.planId, t.dueOn),
+  uniqueIndex("service_maintenance_occurrences_job_idx").on(t.jobId).where(sql`${t.jobId} is not null`),
   index("service_maintenance_occurrences_due_idx").on(t.status, t.dueOn),
 ]);
 

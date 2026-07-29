@@ -251,6 +251,7 @@ export async function getProjectDetail(id: string) {
       id: serviceMaintenancePlans.id,
       assetId: serviceMaintenancePlans.assetId,
       assetName: installedAssets.name,
+      serviceType: serviceMaintenancePlans.serviceType,
       title: serviceMaintenancePlans.title,
       intervalDays: serviceMaintenancePlans.intervalDays,
       nextDueOn: serviceMaintenancePlans.nextDueOn,

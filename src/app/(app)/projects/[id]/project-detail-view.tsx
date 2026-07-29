@@ -232,7 +232,7 @@ function ProjectDetailBody({
             id="maintenance"
             title={t("services.maintenance.title")}
             description={t("services.maintenance.summary", { count: maintenancePlans.filter((plan) => plan.isActive).length })}
-            action={<div className="[&_button]:min-h-11 lg:[&_button]:min-h-0"><ServiceMaintenanceEditor projectId={project.id} assets={assets.map((asset) => ({ id: asset.id, name: asset.name, serialNumber: asset.serialNumber }))} staff={serviceOptions.assigneeOptions} /></div>}
+            action={<div className="[&_button]:min-h-11 lg:[&_button]:min-h-0"><ServiceMaintenanceEditor projectId={project.id} projectServiceType={project.serviceType} assets={assets.map((asset) => ({ id: asset.id, name: asset.name, serialNumber: asset.serialNumber }))} staff={serviceOptions.assigneeOptions} /></div>}
           >
             {maintenancePlans.length === 0 ? (
               <Text variant="muted" size="sm" text={t("services.maintenance.empty")} />
@@ -250,7 +250,7 @@ function ProjectDetailBody({
                       </span>
                     )}
                     className="[&_button]:min-h-11 [&_h3]:break-words [&_h3]:whitespace-normal"
-                    actions={<ServiceMaintenanceEditor projectId={project.id} assets={assets.map((asset) => ({ id: asset.id, name: asset.name, serialNumber: asset.serialNumber }))} staff={serviceOptions.assigneeOptions} initial={plan} />}
+                    actions={<ServiceMaintenanceEditor projectId={project.id} projectServiceType={project.serviceType} assets={assets.map((asset) => ({ id: asset.id, name: asset.name, serialNumber: asset.serialNumber }))} staff={serviceOptions.assigneeOptions} initial={plan} />}
                   >
                     <MobileRecordField label={t("services.maintenance.nextDueOn")} value={plan.nextDueOn} />
                     <MobileRecordField label={t("services.fields.assignee")} value={plan.assignedToName ?? t("services.fields.unassigned")} />
@@ -266,7 +266,7 @@ function ProjectDetailBody({
                       <Text size="sm" weight="medium" text={plan.title} />
                       <Text size="xs" variant="muted" text={`${plan.assetName ?? t("services.assets.noProduct")} · ${t("services.maintenance.nextDueOn")}: ${plan.nextDueOn}${plan.assignedToName ? ` · ${plan.assignedToName}` : ""}`} />
                     </div>
-                    <ServiceMaintenanceEditor projectId={project.id} assets={assets.map((asset) => ({ id: asset.id, name: asset.name, serialNumber: asset.serialNumber }))} staff={serviceOptions.assigneeOptions} initial={plan} />
+                    <ServiceMaintenanceEditor projectId={project.id} projectServiceType={project.serviceType} assets={assets.map((asset) => ({ id: asset.id, name: asset.name, serialNumber: asset.serialNumber }))} staff={serviceOptions.assigneeOptions} initial={plan} />
                   </div>
                 ))}
               </div>

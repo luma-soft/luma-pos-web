@@ -20,7 +20,6 @@ import {
   createWarrantyClaim,
   deleteServiceCostEntry,
   deleteServiceHandoverDocument,
-  completeServiceMaintenancePlan,
   deleteServiceMaintenancePlan,
   releaseServiceJobMaterialReservations,
   reserveServiceJobMaterial,
@@ -1327,16 +1326,19 @@ export function ServiceHandoverEditor({
 
 export function ServiceMaintenanceEditor({
   projectId,
+  projectServiceType,
   assets,
   staff,
   initial,
 }: {
   projectId: string;
+  projectServiceType: string | null;
   assets: MaintenanceAssetOption[];
   staff: MaintenanceStaffOption[];
   initial?: {
     id: string;
     assetId: string | null;
+    serviceType: string;
     title: string;
     intervalDays: number;
     nextDueOn: string;
@@ -1351,6 +1353,10 @@ export function ServiceMaintenanceEditor({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [assetId, setAssetId] = useState(initial?.assetId ?? "");
+  const [serviceType, setServiceType] = useState(
+    initial?.serviceType
+      ?? (projectServiceType && projectServiceType !== "mixed" ? projectServiceType : ""),
+  );
   const [title, setTitle] = useState(initial?.title ?? "");
   const [intervalDays, setIntervalDays] = useState<number | null>(initial?.intervalDays ?? 90);
   const [nextDueOn, setNextDueOn] = useState(initial?.nextDueOn ?? new Date().toISOString().slice(0, 10));
@@ -1359,18 +1365,11 @@ export function ServiceMaintenanceEditor({
   const [note, setNote] = useState(initial?.note ?? "");
 
   async function submit() {
-    if (!title.trim() || !intervalDays || busy) return;
+    if (!title.trim() || !intervalDays || !serviceType || busy) return;
     setBusy(true);
-    const result = await saveServiceMaintenancePlan({ id: initial?.id ?? null, projectId, assetId: assetId || null, title, intervalDays, nextDueOn, assignedTo: assignedTo || null, isActive, note });
+    const result = await saveServiceMaintenancePlan({ id: initial?.id ?? null, projectId, assetId: assetId || null, serviceType: serviceType as "camera" | "electrical" | "plumbing", title, intervalDays, nextDueOn, assignedTo: assignedTo || null, isActive, note });
     setBusy(false);
     if (result.ok) { setOpen(false); router.refresh(); }
-  }
-  async function complete() {
-    if (!initial || busy) return;
-    setBusy(true);
-    const result = await completeServiceMaintenancePlan(initial.id);
-    setBusy(false);
-    if (result.ok) router.refresh();
   }
   async function remove() {
     if (!initial || busy) return;
@@ -1384,18 +1383,27 @@ export function ServiceMaintenanceEditor({
   return (
     <>
       <div className="flex items-center gap-2">
-        {initial && <Button type="button" variant="outline" size="sm" onClick={complete} disabled={busy || !initial.isActive} loading={busy} tx="services.maintenance.complete" />}
         <Button type="button" variant={initial ? "ghost" : "default"} size="sm" onClick={() => setOpen(true)} tx={initial ? "common.edit" : "services.maintenance.create"} />
       </div>
       <RowPreviewModal open={open} onClose={() => !busy && setOpen(false)} title={t(initial ? "services.maintenance.edit" : "services.maintenance.create")} closeLabel={t("common.close")} size="md" footer={(
         <div className="flex items-center justify-between gap-2">
           {initial ? <Button type="button" variant="ghost" onClick={remove} disabled={busy} tx="services.maintenance.delete" /> : <span />}
-          <div className="flex gap-2"><Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy} tx="common.cancel" /><Button type="button" onClick={submit} disabled={busy || !title.trim() || !intervalDays} loading={busy} tx="common.save" /></div>
+          <div className="flex gap-2"><Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy} tx="common.cancel" /><Button type="button" onClick={submit} disabled={busy || !title.trim() || !intervalDays || !serviceType} loading={busy} tx="common.save" /></div>
         </div>
       )}>
         <div className="grid gap-3 sm:grid-cols-2">
           <Select value={assetId} onChange={(event) => setAssetId(event.target.value)} options={[{ value: "", label: t("services.assets.noProduct") }, ...assets.map((asset) => ({ value: asset.id, label: `${asset.name}${asset.serialNumber ? ` · ${asset.serialNumber}` : ""}` }))]} />
           <Select value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...staff.map((person) => ({ value: person.id, label: person.name }))]} />
+          <Select
+            value={serviceType}
+            onChange={(event) => setServiceType(event.target.value)}
+            options={[
+              { value: "", label: t("services.fields.type") },
+              ...concreteTypeOptions(t).filter((option) =>
+                projectServiceType === "mixed" || option.value === projectServiceType
+              ),
+            ]}
+          />
           <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={`${t("services.maintenance.titleField")} *`} className="sm:col-span-2" />
           <NumberInput value={intervalDays} onChange={setIntervalDays} min={1} decimals={0} suffix={t("services.maintenance.days")} placeholder={t("services.maintenance.interval")} />
           <Input type="date" value={nextDueOn} onChange={(event) => setNextDueOn(event.target.value)} aria-label={t("services.maintenance.nextDueOn")} />
