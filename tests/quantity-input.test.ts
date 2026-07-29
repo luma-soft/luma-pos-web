@@ -47,4 +47,21 @@ describe("shared quantity input", () => {
     expect(markup).toContain('aria-label="Quantity for Camera H6C"');
     expect(markup).toContain('aria-label="Increase quantity for Camera H6C"');
   });
+
+  it("keeps the compact numeric field the same height as its container", () => {
+    const markup = renderToStaticMarkup(
+      createElement(
+        NextIntlClientProvider,
+        { locale: "en", messages: {}, timeZone: "UTC" },
+        createElement(QuantityInput, {
+          value: 1,
+          onChange: () => undefined,
+          size: "sm",
+        }),
+      ),
+    );
+
+    expect(markup.match(/lg:h-8/g)).toHaveLength(2);
+    expect(markup).not.toContain("lg:h-10");
+  });
 });
