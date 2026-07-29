@@ -94,3 +94,75 @@ test fixture type errors); it did not report an error in a Task 3 source file.
 - The database unique indexes are the concurrency authority. The PGlite
   regression exercises the actual constraints and application transaction
   paths, but does not create two simultaneous server connections.
+
+## Reviewer fix round 1
+
+All six reviewer findings and the follow-up payload-fingerprint finding were
+addressed without editing applied migration `0071`.
+
+### Additional RED evidence
+
+- The expanded all-status test failed because `waiting_materials` check-in was
+  accepted instead of raising `SERVICE_VISIT_STATUS_INVALID`.
+- Reusing the same mutation/job/operation tuple with a different latitude
+  returned the original result instead of raising
+  `SERVICE_MUTATION_PAYLOAD_CONFLICT`.
+- The first independent-session PostgreSQL run found a real `40P01` deadlock:
+  competing receipt inserts held foreign-key locks before both transactions
+  tried to lock the same job row.
+
+### Fixes
+
+- Check-in is explicitly limited to `new`, `scheduled`, `in_progress`, and
+  `warranty`; waiting and terminal states create neither visit nor time entry.
+- Migration `0072_service_visit_concurrency_guards.sql` replaces the checklist
+  guard using both `OLD.status` and `NEW.status`, rejects completion with open
+  work, guards direct visit/time-entry insertion/reopening/reassignment, and
+  adds `installed_assets.created_by` to terminal business fields.
+- Completed business changes retain
+  `SERVICE_SIGNED_SNAPSHOT_JOB_LOCKED`; cancelled changes return
+  `SERVICE_FIELD_JOB_TERMINAL`.
+- Closing an existing visit/time entry remains possible after cancellation.
+- Core mutations now lock the job before inserting their idempotency receipt,
+  eliminating the PostgreSQL FK/job-lock deadlock. Signature creation retains
+  the Task 1 attachment-then-job order.
+- Migration `0073_service_field_mutation_input_hash.sql` adds a constrained
+  SHA-256 input fingerprint. New receipts reject same-key/different-payload
+  replay. Legacy receipts with a null fingerprint remain replay-compatible
+  because their original payload cannot be reconstructed.
+
+### Independent-session PostgreSQL evidence
+
+Command:
+
+```text
+bun --env-file=.env.local test \
+  tests/service-visit-concurrency-postgres.test.mjs
+```
+
+The harness uses two checked-out `pg` sessions, UUID-namespaced fixtures, and
+`finally` cleanup. It verified:
+
+- simultaneous check-ins produce one active visit and one open work entry;
+- when check-in holds the job lock first, completion waits then rejects open
+  work;
+- when completion holds the job lock first, check-in waits then rejects the
+  completed status;
+- simultaneous open time-entry inserts produce one row and one partial-index
+  rejection.
+
+The final run completed without warnings. A direct cleanup audit found zero
+`visit-race-*` projects and profiles.
+
+### Migration and final verification
+
+- Applied `0072` (9 statements) and `0073` (2 statements).
+- A subsequent migration run reported zero pending.
+- Direct schema checks confirmed both new triggers, the replaced checklist and
+  asset functions, `input_hash varchar(64)`, its check constraint, both
+  migration records, and function ACLs limited to `postgres`/`service_role`.
+- Focused PGlite/Task 1/Task 2 regression: `11 pass, 0 fail`.
+- Independent PostgreSQL concurrency harness: completed successfully.
+- Changed-file ESLint: exit code 0.
+- `bun run build`: compiled, type-checked, and generated all 97 static pages
+  successfully.

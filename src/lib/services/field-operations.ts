@@ -56,8 +56,7 @@ async function buildAuthoritativeSignedSnapshot(
   jobId: string,
   identity: SignedSnapshotIdentity,
 ) {
-  const [jobRows, assets, attachments] = await Promise.all([
-    tx.select({
+  const jobRows = await tx.select({
       id: serviceJobs.id,
       projectId: serviceJobs.projectId,
       code: serviceJobs.code,
@@ -73,8 +72,9 @@ async function buildAuthoritativeSignedSnapshot(
     }).from(serviceJobs)
       .innerJoin(projects, eq(serviceJobs.projectId, projects.id))
       .where(eq(serviceJobs.id, jobId))
-      .limit(1),
-    tx.select({
+      .limit(1)
+      .for("update", { of: serviceJobs });
+  const assets = await tx.select({
       id: installedAssets.id,
       projectId: installedAssets.projectId,
       jobId: installedAssets.jobId,
@@ -95,8 +95,8 @@ async function buildAuthoritativeSignedSnapshot(
       createdAt: installedAssets.createdAt,
     }).from(installedAssets)
       .where(eq(installedAssets.jobId, jobId))
-      .orderBy(asc(installedAssets.id)),
-    tx.select({
+      .orderBy(asc(installedAssets.id));
+  const attachments = await tx.select({
       id: serviceAttachments.id,
       category: serviceAttachments.category,
       fileName: serviceAttachments.fileName,
@@ -110,8 +110,7 @@ async function buildAuthoritativeSignedSnapshot(
         eq(serviceAttachments.jobId, jobId),
         isNull(serviceAttachments.deletedAt),
       ))
-      .orderBy(asc(serviceAttachments.id)),
-  ]);
+      .orderBy(asc(serviceAttachments.id));
   const job = jobRows[0];
   if (!job) throw new Error("SERVICE_JOB_NOT_FOUND");
 
@@ -196,8 +195,7 @@ async function requireAssignedJob(
   actor: FieldActor,
   jobId: string,
 ) {
-  const [jobRows, crew] = await Promise.all([
-    tx.select({
+  const jobRows = await tx.select({
       id: serviceJobs.id,
       projectId: serviceJobs.projectId,
       serviceType: serviceJobs.serviceType,
@@ -208,15 +206,13 @@ async function requireAssignedJob(
     }).from(serviceJobs)
       .innerJoin(projects, eq(serviceJobs.projectId, projects.id))
       .where(eq(serviceJobs.id, jobId))
-      .limit(1)
-      .for("update", { of: serviceJobs }),
-    tx.select({ profileId: serviceJobAssignments.profileId })
+      .limit(1);
+  const crew = await tx.select({ profileId: serviceJobAssignments.profileId })
       .from(serviceJobAssignments)
       .where(and(
         eq(serviceJobAssignments.jobId, jobId),
         isNull(serviceJobAssignments.removedAt),
-      )),
-  ]);
+      ));
   const job = jobRows[0];
   if (!job) throw new Error("SERVICE_JOB_NOT_FOUND");
   if (!canAccessServiceJob({
@@ -247,8 +243,17 @@ async function lockServiceJob(
 }
 
 function requireFieldJobMutable(status: string) {
-  if (status === "completed" || status === "cancelled") {
+  if (status === "completed") {
+    throw new Error("SERVICE_SIGNED_SNAPSHOT_JOB_LOCKED");
+  }
+  if (status === "cancelled") {
     throw new Error("SERVICE_FIELD_JOB_TERMINAL");
+  }
+}
+
+function requireCheckInStatus(status: string) {
+  if (!["new", "scheduled", "in_progress", "warranty"].includes(status)) {
+    throw new Error("SERVICE_VISIT_STATUS_INVALID");
   }
 }
 
@@ -259,11 +264,15 @@ async function idempotentFieldMutation<T extends Record<string, unknown>>(
   operation: string,
   mutate: () => Promise<T>,
 ): Promise<T> {
+  const inputHash = hashSignedDocument(canonicalizeSignedDocument(
+    JSON.parse(JSON.stringify(input)) as JsonValue,
+  ));
   const [claimed] = await tx.insert(serviceFieldMutations).values({
     actorId: actor.userId,
     jobId: input.jobId,
     clientMutationId: input.clientMutationId,
     operation,
+    inputHash,
   }).onConflictDoNothing({
     target: [
       serviceFieldMutations.actorId,
@@ -275,6 +284,7 @@ async function idempotentFieldMutation<T extends Record<string, unknown>>(
     const [existing] = await tx.select({
       jobId: serviceFieldMutations.jobId,
       operation: serviceFieldMutations.operation,
+      inputHash: serviceFieldMutations.inputHash,
       result: serviceFieldMutations.result,
     })
       .from(serviceFieldMutations)
@@ -287,6 +297,9 @@ async function idempotentFieldMutation<T extends Record<string, unknown>>(
       existing
       && (existing.jobId !== input.jobId || existing.operation !== operation)
     ) throw new Error("SERVICE_MUTATION_ID_CONFLICT");
+    if (existing?.inputHash && existing.inputHash !== inputHash) {
+      throw new Error("SERVICE_MUTATION_PAYLOAD_CONFLICT");
+    }
     if (!existing?.result) throw new Error("SERVICE_MUTATION_RETRY");
     return existing.result as T;
   }
@@ -305,11 +318,9 @@ export async function checkInServiceVisitCore(
   now = new Date(),
 ) {
   await requireAssignedJob(tx, actor, input.jobId);
+  const job = await lockServiceJob(tx, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "visit.check_in", async () => {
-    const job = await lockServiceJob(tx, input.jobId);
-    if (job.status === "completed" || job.status === "cancelled") {
-      throw new Error("SERVICE_VISIT_STATUS_INVALID");
-    }
+    requireCheckInStatus(job.status);
     const [visit] = await tx.insert(serviceVisits).values({
       jobId: input.jobId,
       profileId: actor.userId,
@@ -358,8 +369,8 @@ export async function checkOutServiceVisitCore(
   now = new Date(),
 ) {
   await requireAssignedJob(tx, actor, input.jobId);
+  await lockServiceJob(tx, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "visit.check_out", async () => {
-    await lockServiceJob(tx, input.jobId);
     const [visit] = await tx.select({ id: serviceVisits.id })
       .from(serviceVisits)
       .where(and(
@@ -406,8 +417,8 @@ export async function updateFieldChecklistCore(
   now = new Date(),
 ) {
   await requireAssignedJob(tx, actor, input.jobId);
+  const job = await lockServiceJob(tx, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "job.checklist", async () => {
-    const job = await lockServiceJob(tx, input.jobId);
     requireFieldJobMutable(job.status);
     const submitted = new Map(input.checklist.map((item) => [item.code, item.completed]));
     if (
@@ -443,9 +454,8 @@ export async function createServiceSignatureCore(
   input: ServiceSignatureInput,
   now = new Date(),
 ) {
-  const job = await requireAssignedJob(tx, actor, input.jobId);
-  return idempotentFieldMutation(tx, actor, input, "job.signature", async () => {
-    const [attachment] = await tx.select({
+  await requireAssignedJob(tx, actor, input.jobId);
+  const [attachment] = await tx.select({
       id: serviceAttachments.id,
       jobId: serviceAttachments.jobId,
       category: serviceAttachments.category,
@@ -454,12 +464,14 @@ export async function createServiceSignatureCore(
       .where(eq(serviceAttachments.id, input.attachmentId))
       .limit(1)
       .for("update");
-    if (
-      !attachment
-      || attachment.jobId !== input.jobId
-      || attachment.category !== "signature"
-      || attachment.deletedAt
-    ) throw new Error("SERVICE_SIGNATURE_ATTACHMENT_INVALID");
+  if (
+    !attachment
+    || attachment.jobId !== input.jobId
+    || attachment.category !== "signature"
+    || attachment.deletedAt
+  ) throw new Error("SERVICE_SIGNATURE_ATTACHMENT_INVALID");
+  const job = await lockServiceJob(tx, input.jobId);
+  return idempotentFieldMutation(tx, actor, input, "job.signature", async () => {
     const snapshot = await buildAuthoritativeSignedSnapshot(tx, input.jobId, {
       signerName: input.signerName,
       signerRole: input.signerRole || null,
@@ -508,8 +520,8 @@ export async function createFieldInstalledAssetCore(
   now = new Date(),
 ) {
   await requireAssignedJob(tx, actor, input.jobId);
+  const job = await lockServiceJob(tx, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "job.asset_created", async () => {
-    const job = await lockServiceJob(tx, input.jobId);
     requireFieldJobMutable(job.status);
     const [asset] = await tx.insert(installedAssets).values({
       projectId: job.projectId,
@@ -553,8 +565,8 @@ export async function updateFieldMaterialUsageCore(
   now = new Date(),
 ) {
   await requireAssignedJob(tx, actor, input.jobId);
+  const job = await lockServiceJob(tx, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "job.material_usage", async () => {
-    const job = await lockServiceJob(tx, input.jobId);
     requireFieldJobMutable(job.status);
     const [material] = await tx.update(serviceJobMaterials).set({
       usedQuantity: Number(input.usedQuantity).toFixed(4),
@@ -586,43 +598,40 @@ export async function completeFieldServiceJobCore(
   now = new Date(),
 ) {
   const authorizedJob = await requireAssignedJob(tx, actor, input.jobId);
+  const job = {
+    ...await lockServiceJob(tx, input.jobId),
+    projectStage: authorizedJob.projectStage,
+  };
   return idempotentFieldMutation(tx, actor, input, "job.complete", async () => {
-    const job = {
-      ...await lockServiceJob(tx, input.jobId),
-      projectStage: authorizedJob.projectStage,
-    };
     if (job.status !== "in_progress" && job.status !== "warranty") {
       throw new Error("SERVICE_COMPLETION_STATUS_INVALID");
     }
-    const [openVisit, openTimeEntry] = await Promise.all([
-      tx.select({ id: serviceVisits.id })
+    const openVisit = await tx.select({ id: serviceVisits.id })
         .from(serviceVisits)
         .where(and(
           eq(serviceVisits.jobId, input.jobId),
           eq(serviceVisits.status, "active"),
         ))
         .limit(1)
-        .for("update"),
-      tx.select({ id: serviceTimeEntries.id })
+        .for("update");
+    const openTimeEntry = await tx.select({ id: serviceTimeEntries.id })
         .from(serviceTimeEntries)
         .where(and(
           eq(serviceTimeEntries.jobId, input.jobId),
           isNull(serviceTimeEntries.endedAt),
         ))
         .limit(1)
-        .for("update"),
-    ]);
+        .for("update");
     if (openVisit[0] || openTimeEntry[0]) {
       throw new Error("SERVICE_COMPLETION_OPEN_WORK");
     }
-    const [attachments, signatures] = await Promise.all([
-      tx.select({ category: serviceAttachments.category })
+    const attachments = await tx.select({ category: serviceAttachments.category })
         .from(serviceAttachments)
         .where(and(
           eq(serviceAttachments.jobId, input.jobId),
           isNull(serviceAttachments.deletedAt),
-        )),
-      tx.select({
+        ));
+    const signatures = await tx.select({
         id: serviceSignatures.id,
         projectId: serviceSignatures.projectId,
         jobId: serviceSignatures.jobId,
@@ -641,8 +650,7 @@ export async function completeFieldServiceJobCore(
       })
         .from(serviceSignatures)
         .innerJoin(serviceAttachments, eq(serviceSignatures.attachmentId, serviceAttachments.id))
-        .where(eq(serviceSignatures.jobId, input.jobId)),
-    ]);
+        .where(eq(serviceSignatures.jobId, input.jobId));
     const errors = fieldCompletionErrors({
       serviceType: job.serviceType,
       checklist: job.checklist,
@@ -714,14 +722,12 @@ export async function completeFieldServiceJobCore(
       createdAt: now,
     });
 
-    const [jobRows, claimRows] = await Promise.all([
-      tx.select({ status: serviceJobs.status })
+    const jobRows = await tx.select({ status: serviceJobs.status })
         .from(serviceJobs)
-        .where(eq(serviceJobs.projectId, job.projectId)),
-      tx.select({ status: warrantyClaims.status })
+        .where(eq(serviceJobs.projectId, job.projectId));
+    const claimRows = await tx.select({ status: warrantyClaims.status })
         .from(warrantyClaims)
-        .where(eq(warrantyClaims.projectId, job.projectId)),
-    ]);
+        .where(eq(warrantyClaims.projectId, job.projectId));
     const countable = jobRows.filter((row) => row.status !== "cancelled");
     const completedCount = countable.filter((row) => row.status === "completed").length;
     await tx.update(projects).set({

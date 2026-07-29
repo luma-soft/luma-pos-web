@@ -51,6 +51,9 @@ export async function mobileFieldOperation<T>(operation: () => Promise<T>) {
     if (message === "SERVICE_ACTIVE_TIME_ENTRY_NOT_FOUND") {
       return mobileError("services.errors.activeVisitNotFound", 409);
     }
+    if (message === "SERVICE_TIME_ENTRY_VISIT_INVALID") {
+      return mobileError("services.errors.invalidTransition", 409);
+    }
     if (message === "SERVICE_CHECKLIST_MISMATCH") {
       return mobileError("services.errors.checklistMismatch", 409);
     }
@@ -96,6 +99,9 @@ export async function mobileFieldOperation<T>(operation: () => Promise<T>) {
       return mobileError("services.errors.mutationRetry", 409);
     }
     if (message === "SERVICE_MUTATION_ID_CONFLICT") {
+      return mobileError("services.errors.invalidTransition", 409);
+    }
+    if (message === "SERVICE_MUTATION_PAYLOAD_CONFLICT") {
       return mobileError("services.errors.invalidTransition", 409);
     }
     console.error("field service operation failed:", error);

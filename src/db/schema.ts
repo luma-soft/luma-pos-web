@@ -1172,9 +1172,13 @@ export const serviceFieldMutations = pgTable("service_field_mutations", {
   actorId: uuid("actor_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   jobId: uuid("job_id").notNull().references(() => serviceJobs.id, { onDelete: "cascade" }),
   operation: text("operation").notNull(),
+  inputHash: varchar("input_hash", { length: 64 }),
   result: jsonb("result").$type<Record<string, unknown> | null>(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => [uniqueIndex("service_field_mutations_client_idx").on(t.actorId, t.clientMutationId)]);
+}, (t) => [
+  check("service_field_mutations_input_hash_check", sql`${t.inputHash} is null or ${t.inputHash} ~ '^[0-9a-f]{64}$'`),
+  uniqueIndex("service_field_mutations_client_idx").on(t.actorId, t.clientMutationId),
+]);
 
 export const serviceMaintenanceOccurrences = pgTable("service_maintenance_occurrences", {
   id: uuid("id").primaryKey().defaultRandom(),

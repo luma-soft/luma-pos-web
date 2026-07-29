@@ -84,15 +84,45 @@ async function expectCode(operation, code) {
   }, `expected ${code}`);
 }
 
-for (const status of ["completed", "cancelled"]) {
+const checkInStatusCases = [
+  ["new", true],
+  ["scheduled", true],
+  ["in_progress", true],
+  ["warranty", true],
+  ["waiting_materials", false],
+  ["waiting_customer", false],
+  ["completed", false],
+  ["cancelled", false],
+];
+for (const [status, permitted] of checkInStatusCases) {
   const job = await createJob(status);
-  await expectCode(
-    () => db.transaction((tx) => checkInServiceVisitCore(tx, actor, {
+  const input = {
+    jobId: job.id,
+    clientMutationId: `status-${status}-checkin`,
+  };
+  if (permitted) {
+    const visit = await db.transaction((tx) => checkInServiceVisitCore(tx, actor, input));
+    assert.ok(visit.visitId, `${status} must permit check-in`);
+    await db.transaction((tx) => checkOutServiceVisitCore(tx, actor, {
       jobId: job.id,
-      clientMutationId: `terminal-${status}-checkin`,
-    })),
-    "SERVICE_VISIT_STATUS_INVALID",
-  );
+      clientMutationId: `status-${status}-checkout`,
+    }));
+  } else {
+    await expectCode(
+      () => db.transaction((tx) => checkInServiceVisitCore(tx, actor, input)),
+      "SERVICE_VISIT_STATUS_INVALID",
+    );
+    assert.equal(
+      (await db.select().from(serviceVisits).where(eq(serviceVisits.jobId, job.id))).length,
+      0,
+      `${status} rejection must not create a visit`,
+    );
+    assert.equal(
+      (await db.select().from(serviceTimeEntries).where(eq(serviceTimeEntries.jobId, job.id))).length,
+      0,
+      `${status} rejection must not create a time entry`,
+    );
+  }
 }
 
 const visitJob = await createJob();
@@ -105,6 +135,14 @@ const replayedVisit = await db.transaction((tx) => checkInServiceVisitCore(tx, a
   clientMutationId: "state-first-checkin",
 }, new Date("2026-07-29T01:05:00.000Z")));
 assert.equal(replayedVisit.visitId, firstVisit.visitId, "check-in replay must return its original visit");
+await expectCode(
+  () => db.transaction((tx) => checkInServiceVisitCore(tx, actor, {
+    jobId: visitJob.id,
+    clientMutationId: "state-first-checkin",
+    latitude: 11.111111,
+  })),
+  "SERVICE_MUTATION_PAYLOAD_CONFLICT",
+);
 await expectCode(
   () => db.transaction((tx) => checkOutServiceVisitCore(tx, actor, {
     jobId: visitJob.id,
@@ -180,6 +218,7 @@ const mutationRows = await db.select().from(serviceFieldMutations).where(and(
   eq(serviceFieldMutations.clientMutationId, "state-first-checkin"),
 ));
 assert.equal(mutationRows.length, 1, "replay must retain one mutation receipt");
+assert.match(mutationRows[0].inputHash, /^[0-9a-f]{64}$/, "mutation receipt must hash its input");
 
 const cancelledJob = await createJob("cancelled");
 const cancelledChecklist = createDefaultChecklist("camera").map((item) => ({
@@ -194,6 +233,67 @@ await expectCode(
   })),
   "SERVICE_FIELD_JOB_TERMINAL",
 );
+
+const completedJob = await createJob("completed");
+await expectCode(
+  () => db.transaction((tx) => updateFieldChecklistCore(tx, actor, {
+    jobId: completedJob.id,
+    clientMutationId: "completed-checklist-update",
+    checklist: cancelledChecklist,
+  })),
+  "SERVICE_SIGNED_SNAPSHOT_JOB_LOCKED",
+);
+await expectCode(
+  () => db.transaction((tx) => createFieldInstalledAssetCore(tx, actor, {
+    jobId: completedJob.id,
+    clientMutationId: "completed-asset-create",
+    assetKind: "camera",
+    name: "Must not exist after completion",
+  })),
+  "SERVICE_SIGNED_SNAPSHOT_JOB_LOCKED",
+);
+
+const transitionCancelledJob = await createJob("in_progress");
+await expectCode(
+  () => db.update(serviceJobs).set({
+    status: "cancelled",
+    checklist: cancelledChecklist,
+  }).where(eq(serviceJobs.id, transitionCancelledJob.id)),
+  "SERVICE_FIELD_JOB_TERMINAL",
+);
+const transitionCompletedJob = await createJob("in_progress");
+await expectCode(
+  () => db.update(serviceJobs).set({
+    status: "completed",
+    checklist: cancelledChecklist,
+  }).where(eq(serviceJobs.id, transitionCompletedJob.id)),
+  "SERVICE_SIGNED_SNAPSHOT_JOB_LOCKED",
+);
+
+const directWaitingJob = await createJob("waiting_materials");
+await expectCode(
+  () => db.insert(serviceVisits).values({
+    jobId: directWaitingJob.id,
+    profileId: technicianId,
+    status: "active",
+  }),
+  "SERVICE_VISIT_STATUS_INVALID",
+);
+
+const terminalCloseJob = await createJob("in_progress");
+const terminalCloseVisit = await db.transaction((tx) => checkInServiceVisitCore(tx, actor, {
+  jobId: terminalCloseJob.id,
+  clientMutationId: "terminal-close-checkin",
+}));
+await db.update(serviceJobs).set({ status: "cancelled" })
+  .where(eq(serviceJobs.id, terminalCloseJob.id));
+await db.transaction((tx) => checkOutServiceVisitCore(tx, actor, {
+  jobId: terminalCloseJob.id,
+  clientMutationId: "terminal-close-checkout",
+}));
+const [closedAfterTerminal] = await db.select().from(serviceVisits)
+  .where(eq(serviceVisits.id, terminalCloseVisit.visitId));
+assert.equal(closedAfterTerminal.status, "completed", "closing terminal work must remain permitted");
 await expectCode(
   () => db.transaction((tx) => createFieldInstalledAssetCore(tx, actor, {
     jobId: cancelledJob.id,
@@ -209,6 +309,25 @@ const [product] = await db.insert(products).values({
   sku: `STATE-CABLE-${Date.now()}`,
   retailPrice: "1000",
 }).returning();
+const completedMaterialJob = await createJob("in_progress");
+const [completedMaterial] = await db.insert(serviceJobMaterials).values({
+  jobId: completedMaterialJob.id,
+  productId: product.id,
+  unitName: "m",
+  plannedQuantity: "10",
+}).returning();
+await db.update(serviceJobs).set({ status: "completed" })
+  .where(eq(serviceJobs.id, completedMaterialJob.id));
+await expectCode(
+  () => db.transaction((tx) => updateFieldMaterialUsageCore(tx, actor, {
+    jobId: completedMaterialJob.id,
+    materialId: completedMaterial.id,
+    clientMutationId: "completed-material-update",
+    usedQuantity: 1,
+  })),
+  "SERVICE_SIGNED_SNAPSHOT_JOB_LOCKED",
+);
+
 const materialJob = await createJob("in_progress");
 const [material] = await db.insert(serviceJobMaterials).values({
   jobId: materialJob.id,
@@ -226,6 +345,64 @@ await expectCode(
     usedQuantity: 1,
   })),
   "SERVICE_FIELD_JOB_TERMINAL",
+);
+await expectCode(
+  () => db.insert(serviceAttachments).values({
+    projectId: project.id,
+    jobId: completedJob.id,
+    category: "before",
+    bucket: "service-evidence",
+    path: `${completedJob.id}/must-not-exist.jpg`,
+    fileName: "must-not-exist.jpg",
+    mimeType: "image/jpeg",
+    sizeBytes: 100,
+    createdBy: technicianId,
+  }),
+  "SERVICE_SIGNED_SNAPSHOT_JOB_LOCKED",
+);
+
+const createdByJob = await createJob("in_progress");
+const [createdByAsset] = await db.insert(installedAssets).values({
+  projectId: project.id,
+  jobId: createdByJob.id,
+  assetKind: "camera",
+  name: "Created-by guard",
+  createdBy: technicianId,
+}).returning();
+await db.update(serviceJobs).set({ status: "completed" })
+  .where(eq(serviceJobs.id, createdByJob.id));
+await expectCode(
+  () => db.update(installedAssets).set({ createdBy: null })
+    .where(eq(installedAssets.id, createdByAsset.id)),
+  "SERVICE_SIGNED_SNAPSHOT_JOB_LOCKED",
+);
+await db.update(serviceJobs).set({ status: "cancelled" })
+  .where(eq(serviceJobs.id, createdByJob.id));
+await expectCode(
+  () => db.update(installedAssets).set({ createdBy: null })
+    .where(eq(installedAssets.id, createdByAsset.id)),
+  "SERVICE_FIELD_JOB_TERMINAL",
+);
+
+const directTimeJob = await createJob("in_progress");
+const [directTimeVisit] = await db.insert(serviceVisits).values({
+  jobId: directTimeJob.id,
+  profileId: technicianId,
+  status: "completed",
+  checkedInAt: new Date("2026-07-29T05:00:00.000Z"),
+  checkedOutAt: new Date("2026-07-29T06:00:00.000Z"),
+}).returning();
+await db.update(serviceJobs).set({ status: "cancelled" })
+  .where(eq(serviceJobs.id, directTimeJob.id));
+await expectCode(
+  () => db.insert(serviceTimeEntries).values({
+    jobId: directTimeJob.id,
+    visitId: directTimeVisit.id,
+    profileId: technicianId,
+    entryType: "work",
+    startedAt: new Date(),
+  }),
+  "SERVICE_VISIT_STATUS_INVALID",
 );
 await expectCode(
   () => db.insert(serviceAttachments).values({
