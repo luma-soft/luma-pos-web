@@ -107,40 +107,41 @@ export async function dispatchPushNotification(input: {
     const delivery = await deliverPushDeviceCore(db, {
       deviceId: device.id,
       notificationKey: input.notificationKey,
-      send: async () => {
+      send: async (signal) => {
         try {
           const response = await fetch(
-        `https://fcm.googleapis.com/v1/projects/${account.project_id}/messages:send`,
-        {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${accessToken}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            message: {
-              token: device.token,
-              notification: {
-                title: "LumaPOS",
-                body: device.locale?.toLowerCase().startsWith("en")
-                  ? "You have a new operational alert."
-                  : "Bạn có cảnh báo vận hành mới.",
+            `https://fcm.googleapis.com/v1/projects/${account.project_id}/messages:send`,
+            {
+              method: "POST",
+              signal,
+              headers: {
+                authorization: `Bearer ${accessToken}`,
+                "content-type": "application/json",
               },
-              data: {
-                kind: "operational_alert",
-                category: input.category,
-                target: input.target,
-                notificationKey: input.notificationKey,
-                ...(input.entityId ? { entityId: input.entityId } : {}),
-              },
-              android: { priority: "high" },
-              apns: {
-                headers: { "apns-priority": "5" },
-                payload: { aps: { "content-available": 1 } },
-              },
+              body: JSON.stringify({
+                message: {
+                  token: device.token,
+                  notification: {
+                    title: "LumaPOS",
+                    body: device.locale?.toLowerCase().startsWith("en")
+                      ? "You have a new operational alert."
+                      : "Bạn có cảnh báo vận hành mới.",
+                  },
+                  data: {
+                    kind: "operational_alert",
+                    category: input.category,
+                    target: input.target,
+                    notificationKey: input.notificationKey,
+                    ...(input.entityId ? { entityId: input.entityId } : {}),
+                  },
+                  android: { priority: "high" },
+                  apns: {
+                    headers: { "apns-priority": "5" },
+                    payload: { aps: { "content-available": 1 } },
+                  },
+                },
+              }),
             },
-          }),
-        },
           );
           if (response.ok) return { ok: true };
           if (response.status === 404) {

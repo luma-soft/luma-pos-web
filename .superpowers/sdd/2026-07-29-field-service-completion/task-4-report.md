@@ -114,3 +114,22 @@ round addresses all five:
   Direct checks confirmed the RESTRICT FK, outstanding partial unique index,
   push claim columns/index, and no anon/authenticated INSERT privilege.
 - Changed-file ESLint and `bun run build` pass.
+
+## Review fix round 2
+
+The remaining push-delivery lease issue is closed without a schema change:
+
+- The send collaborator now receives an `AbortSignal`; production passes it
+  directly to FCM `fetch`.
+- Defaults bound FCM to four minutes inside a five-minute claim lease, leaving
+  sixty seconds for abort propagation, settlement, and token-fenced
+  acknowledgement. Configuration is rejected unless
+  `sendTimeout + safetyMargin < leaseDuration`.
+- Timeout aborts the request and waits for actual sender settlement before
+  marking the matching claim failed. A sender that ignores abort remains
+  fail-closed: the worker renews its token-matched lease and does not release
+  the claim until that sender settles.
+- The real PostgreSQL regression covers cooperative abort, failed retry,
+  invalid timeout configuration, and a non-cooperative sender held beyond the
+  original lease. A concurrent retry remains skipped until settlement, then
+  sends exactly once.

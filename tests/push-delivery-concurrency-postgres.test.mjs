@@ -91,6 +91,79 @@ if (!databaseUrl) {
       notificationKey: retryKey,
       send: async () => ({ ok: true }),
     })).outcome, "sent");
+
+    const timeoutKey = `push-timeout:${randomUUID()}`;
+    let abortObserved = false;
+    const timedOut = await deliverPushDeviceCore(db, {
+      deviceId,
+      notificationKey: timeoutKey,
+      leaseMs: 500,
+      sendTimeoutMs: 100,
+      safetyMarginMs: 100,
+      send: (signal) => new Promise((resolve, reject) => {
+        signal.addEventListener("abort", () => {
+          abortObserved = true;
+          setTimeout(() => reject(new Error("ABORTED")), 25);
+        }, { once: true });
+      }),
+    });
+    assert.equal(abortObserved, true, "timed-out sender did not receive abort");
+    assert.equal(timedOut.outcome, "failed");
+    assert.equal((await deliverPushDeviceCore(db, {
+      deviceId,
+      notificationKey: timeoutKey,
+      send: async () => ({ ok: true }),
+    })).outcome, "sent");
+
+    await assert.rejects(
+      deliverPushDeviceCore(db, {
+        deviceId,
+        notificationKey: `push-invalid-timeout:${randomUUID()}`,
+        leaseMs: 100,
+        sendTimeoutMs: 80,
+        safetyMarginMs: 20,
+        send: async () => ({ ok: true }),
+      }),
+      /PUSH_DELIVERY_TIMEOUT_CONFIG_INVALID/,
+    );
+
+    const nonCooperativeKey = `push-noncooperative:${randomUUID()}`;
+    let settleNonCooperative;
+    let overlappingSendCalls = 0;
+    const heldDelivery = deliverPushDeviceCore(db, {
+      deviceId,
+      notificationKey: nonCooperativeKey,
+      leaseMs: 400,
+      sendTimeoutMs: 80,
+      safetyMarginMs: 80,
+      send: () => new Promise((resolve) => {
+        settleNonCooperative = resolve;
+      }),
+    });
+    await delay(500);
+    const overlap = await deliverPushDeviceCore(db, {
+      deviceId,
+      notificationKey: nonCooperativeKey,
+      leaseMs: 400,
+      sendTimeoutMs: 80,
+      safetyMarginMs: 80,
+      send: async () => {
+        overlappingSendCalls += 1;
+        return { ok: true };
+      },
+    });
+    assert.equal(overlap.outcome, "skipped");
+    assert.equal(overlappingSendCalls, 0);
+    settleNonCooperative({ ok: true });
+    assert.equal((await heldDelivery).outcome, "failed");
+    assert.equal((await deliverPushDeviceCore(db, {
+      deviceId,
+      notificationKey: nonCooperativeKey,
+      leaseMs: 400,
+      sendTimeoutMs: 80,
+      safetyMarginMs: 80,
+      send: async () => ({ ok: true }),
+    })).outcome, "sent");
     console.log("push delivery PostgreSQL concurrency: one send and terminal success verified");
   } finally {
     if (deviceId) {
