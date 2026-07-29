@@ -1,5 +1,8 @@
 import { and, eq, ne, or, sql } from "drizzle-orm";
-import { mobilePushDevices } from "@/db/schema";
+import {
+  mobilePushDeviceBindingFences,
+  mobilePushDevices,
+} from "@/db/schema";
 
 // Drizzle's PostgreSQL and PGlite adapters share this transaction surface.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -26,6 +29,12 @@ const retryableBindingMutationCodes = new Set([
   "40P01", // deadlock while two tokens/devices cross over
 ]);
 
+class BindingBusyError extends Error {
+  constructor(readonly result: BindingMutationResult) {
+    super("DEVICE_BINDING_BUSY");
+  }
+}
+
 async function runBindingMutation(
   database: DatabaseLike,
   mutation: (tx: DatabaseLike) => Promise<BindingMutationResult>,
@@ -34,6 +43,9 @@ async function runBindingMutation(
     try {
       return await database.transaction(mutation);
     } catch (error) {
+      if (error instanceof BindingBusyError) {
+        return error.result;
+      }
       const code = error && typeof error === "object" && "code" in error
         ? String(error.code)
         : "";
@@ -46,6 +58,66 @@ async function runBindingMutation(
     }
   }
   throw new Error("DEVICE_BINDING_RETRY_EXHAUSTED");
+}
+
+async function lockBindingFence(
+  tx: DatabaseLike,
+  input: {
+    principalId: string;
+    deviceId: string;
+    bindingGeneration: number;
+    active: boolean;
+    now: Date;
+  },
+) {
+  await tx
+    .insert(mobilePushDeviceBindingFences)
+    .values({
+      userId: input.principalId,
+      deviceId: input.deviceId,
+      bindingGeneration: input.bindingGeneration,
+      active: input.active,
+      updatedAt: input.now,
+    })
+    .onConflictDoNothing();
+
+  const [fence] = await tx
+    .select()
+    .from(mobilePushDeviceBindingFences)
+    .where(and(
+      eq(mobilePushDeviceBindingFences.userId, input.principalId),
+      eq(mobilePushDeviceBindingFences.deviceId, input.deviceId),
+    ))
+    .limit(1)
+    .for("update");
+
+  if (fence.bindingGeneration > input.bindingGeneration) {
+    return { kind: "stale" } as const;
+  }
+  if (
+    input.active
+    && fence.bindingGeneration === input.bindingGeneration
+    && !fence.active
+  ) {
+    return { kind: "stale" } as const;
+  }
+  if (
+    fence.bindingGeneration < input.bindingGeneration
+    || fence.active !== input.active
+  ) {
+    await tx
+      .update(mobilePushDeviceBindingFences)
+      .set({
+        bindingGeneration: input.bindingGeneration,
+        active: input.active,
+        updatedAt: input.now,
+      })
+      .where(and(
+        eq(mobilePushDeviceBindingFences.userId, input.principalId),
+        eq(mobilePushDeviceBindingFences.deviceId, input.deviceId),
+      ));
+  }
+  return { kind: "accepted" } as const;
 }
 
 function activeLease(
@@ -86,6 +158,15 @@ export async function registerPushDeviceBinding(
 ): Promise<BindingMutationResult> {
   const mutationAt = input.now ?? new Date();
   return runBindingMutation(database, async (tx: DatabaseLike) => {
+    const fence = await lockBindingFence(tx, {
+      principalId: input.principalId,
+      deviceId: input.device.deviceId,
+      bindingGeneration: input.device.bindingGeneration,
+      active: true,
+      now: mutationAt,
+    });
+    if (fence.kind === "stale") return fence;
+
     const [existing] = await tx
       .select()
       .from(mobilePushDevices)
@@ -98,7 +179,7 @@ export async function registerPushDeviceBinding(
 
     if (existing) {
       if (activeLease(existing, mutationAt)) {
-        return busyResult(existing, mutationAt);
+        throw new BindingBusyError(busyResult(existing, mutationAt));
       }
       if (existing.bindingGeneration > input.device.bindingGeneration) {
         return { kind: "stale" };
@@ -127,7 +208,7 @@ export async function registerPushDeviceBinding(
       .limit(1)
       .for("update");
     if (tokenOwner && activeLease(tokenOwner, mutationAt)) {
-      return busyResult(tokenOwner, mutationAt);
+      throw new BindingBusyError(busyResult(tokenOwner, mutationAt));
     }
     if (tokenOwner) {
       await tx.delete(mobilePushDevices).where(eq(mobilePushDevices.id, tokenOwner.id));
@@ -176,6 +257,15 @@ export async function deactivatePushDeviceBinding(
 ): Promise<BindingMutationResult> {
   const mutationAt = input.now ?? new Date();
   return runBindingMutation(database, async (tx: DatabaseLike) => {
+    const fence = await lockBindingFence(tx, {
+      principalId: input.principalId,
+      deviceId: input.deviceId,
+      bindingGeneration: input.bindingGeneration,
+      active: false,
+      now: mutationAt,
+    });
+    if (fence.kind === "stale") return fence;
+
     const [existing] = await tx
       .select()
       .from(mobilePushDevices)
@@ -187,7 +277,7 @@ export async function deactivatePushDeviceBinding(
       .for("update");
     if (!existing) return { kind: "deactivated" };
     if (activeLease(existing, mutationAt)) {
-      return busyResult(existing, mutationAt);
+      throw new BindingBusyError(busyResult(existing, mutationAt));
     }
     if (existing.bindingGeneration > input.bindingGeneration) {
       return { kind: "stale" };

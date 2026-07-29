@@ -33,12 +33,63 @@ const ids = {
   principal: "81000000-0000-4000-8000-000000000001",
   oldActor: "81000000-0000-4000-8000-000000000002",
   newActor: "81000000-0000-4000-8000-000000000003",
+  otherPrincipal: "81000000-0000-4000-8000-000000000004",
 };
 await database.insert(schema.profiles).values([
   { id: ids.principal, fullName: "Principal", role: "owner" },
   { id: ids.oldActor, fullName: "Old actor", role: "cashier" },
   { id: ids.newActor, fullName: "New actor", role: "cashier" },
+  { id: ids.otherPrincipal, fullName: "Other principal", role: "owner" },
 ]);
+
+const unknownDeviceId = "unknown-device-tombstone";
+const unknownDeactivation = await deactivatePushDeviceBinding(database, {
+  principalId: ids.principal,
+  deviceId: unknownDeviceId,
+  bindingGeneration: 2,
+  now: new Date("2026-07-29T11:59:00.000Z"),
+});
+assert.deepEqual(unknownDeactivation, { kind: "deactivated" });
+const lateUnknownRegistration = await registerPushDeviceBinding(database, {
+  principalId: ids.principal,
+  effectiveUserId: ids.newActor,
+  device: {
+    deviceId: unknownDeviceId,
+    platform: "ios",
+    token: "late-unknown-device-token-value",
+    permission: "authorized",
+    locale: "vi",
+    bindingGeneration: 1,
+  },
+  now: new Date("2026-07-29T11:59:01.000Z"),
+});
+assert.deepEqual(lateUnknownRegistration, { kind: "stale" });
+const unknownRows = await database.select()
+  .from(schema.mobilePushDevices)
+  .where(eq(schema.mobilePushDevices.deviceId, unknownDeviceId));
+assert.equal(unknownRows.length, 0);
+const repeatedUnknownDeactivation = await deactivatePushDeviceBinding(database, {
+  principalId: ids.principal,
+  deviceId: unknownDeviceId,
+  bindingGeneration: 2,
+  now: new Date("2026-07-29T11:59:02.000Z"),
+});
+assert.deepEqual(repeatedUnknownDeactivation, { kind: "deactivated" });
+
+const isolatedRegistration = await registerPushDeviceBinding(database, {
+  principalId: ids.otherPrincipal,
+  effectiveUserId: ids.otherPrincipal,
+  device: {
+    deviceId: unknownDeviceId,
+    platform: "android",
+    token: "same-device-other-principal-token",
+    permission: "authorized",
+    bindingGeneration: 1,
+  },
+  now: new Date("2026-07-29T11:59:03.000Z"),
+});
+assert.deepEqual(isolatedRegistration, { kind: "registered" });
+
 const [device] = await database.insert(schema.mobilePushDevices).values({
   userId: ids.principal,
   effectiveUserId: ids.oldActor,
@@ -160,6 +211,43 @@ assert.deepEqual(duplicateResults, [
   { kind: "registered" },
 ]);
 assert.equal(duplicateRows.length, 1);
+
+const inFlightDevice = {
+  deviceId: "post-then-delete-fence",
+  platform: "ios",
+  token: "post-then-delete-real-pglite-token",
+  permission: "authorized",
+  bindingGeneration: 1,
+};
+const registrationInFlight = registerPushDeviceBinding(database, {
+  principalId: ids.principal,
+  effectiveUserId: ids.newActor,
+  device: inFlightDevice,
+  now: new Date("2026-07-29T12:04:00.000Z"),
+});
+await Promise.resolve();
+const deactivationAfterPost = deactivatePushDeviceBinding(database, {
+  principalId: ids.principal,
+  deviceId: inFlightDevice.deviceId,
+  bindingGeneration: 2,
+  now: new Date("2026-07-29T12:04:01.000Z"),
+});
+const [inFlightRegistrationResult, inFlightDeactivationResult] =
+  await Promise.all([registrationInFlight, deactivationAfterPost]);
+assert.deepEqual(inFlightRegistrationResult, { kind: "registered" });
+assert.deepEqual(inFlightDeactivationResult, { kind: "deactivated" });
+const [postThenDelete] = await database.select()
+  .from(schema.mobilePushDevices)
+  .where(eq(schema.mobilePushDevices.deviceId, inFlightDevice.deviceId));
+assert.equal(postThenDelete.enabled, false);
+assert.equal(postThenDelete.bindingGeneration, 2);
+const lateAfterConcurrentDelete = await registerPushDeviceBinding(database, {
+  principalId: ids.principal,
+  effectiveUserId: ids.newActor,
+  device: inFlightDevice,
+  now: new Date("2026-07-29T12:04:02.000Z"),
+});
+assert.deepEqual(lateAfterConcurrentDelete, { kind: "stale" });
 
 await client.close();
 console.log("✅ shared-terminal binding generation and active-send lease fence rebinds");

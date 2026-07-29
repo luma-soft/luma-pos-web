@@ -437,6 +437,16 @@ export const mobilePushDevices = pgTable("mobile_push_devices", {
   index("mobile_push_devices_effective_user_enabled_idx").on(t.effectiveUserId, t.enabled),
 ]);
 
+export const mobilePushDeviceBindingFences = pgTable("mobile_push_device_binding_fences", {
+  userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  deviceId: varchar("device_id", { length: 120 }).notNull(),
+  bindingGeneration: bigint("binding_generation", { mode: "number" }).notNull().default(0),
+  active: boolean("active").notNull().default(false),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.userId, t.deviceId] }),
+]);
+
 export const mobilePushDeliveries = pgTable("mobile_push_deliveries", {
   id: uuid("id").primaryKey().defaultRandom(),
   deviceId: uuid("device_id").notNull().references(() => mobilePushDevices.id, { onDelete: "cascade" }),
