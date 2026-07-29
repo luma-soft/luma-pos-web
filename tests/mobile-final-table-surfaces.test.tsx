@@ -1,4 +1,5 @@
 import { describe, expect, mock, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { Children, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
@@ -25,6 +26,16 @@ mock.module("@/lib/actions/price-books", () => ({
 mock.module("@/lib/actions/stocktakes", () => ({
   balanceStocktake: async () => ({ ok: true }),
   cancelStocktake: async () => ({ ok: true }),
+}));
+mock.module("@/lib/actions/products", () => ({
+  deleteProduct: async () => ({ ok: true }),
+  setProductActive: async () => ({ ok: true }),
+  setCameraMaterial: async () => ({ ok: true }),
+  bulkDeleteProducts: async () => ({
+    ok: true,
+    data: { deleted: 0, failedIds: [] },
+  }),
+  bulkStopSellingProducts: async () => ({ ok: true }),
 }));
 mock.module("@/lib/actions/extras", () => ({
   createPromotion: async () => ({ ok: true }),
@@ -403,5 +414,148 @@ describe("final mobile table surfaces", () => {
     expect(capturedProjectEditProps).toHaveLength(1);
     expect(capturedProjectEditProps[0].project).toBe(row);
     expect(capturedProjectEditProps[0].customers).toBe(customers);
+  });
+
+  test("product mobile row and select-all toolbar invoke the existing selection seams", async () => {
+    const {
+      ProductMobileRow,
+      ProductMobileSelectionToolbar,
+      SelectionCheckbox,
+    } = await import("@/app/(app)/inventory/tabs/products-table");
+    const calls: string[] = [];
+    const product = {
+      id: "product-mobile-1",
+      name: "Camera chọn hàng loạt",
+      sku: "CAM-BATCH",
+      categoryName: "Camera",
+      productKind: "product",
+      imageUrls: [],
+      minRetailPrice: null,
+      maxRetailPrice: null,
+      retailPrice: "1250000",
+      totalStock: "8",
+      minLevel: "1",
+      baseUnit: "cái",
+    };
+    const row = ProductMobileRow({
+      product: product as never,
+      selectionEnabled: true,
+      selected: false,
+      selectLabel: "Chọn Camera chọn hàng loạt",
+      stockNotTrackedLabel: "Không theo dõi tồn",
+      onToggle: () => calls.push("toggle:product-mobile-1"),
+      onOpen: () => calls.push("open:product-mobile-1"),
+    });
+    const html = renderToStaticMarkup(row);
+    const checkbox = elementsOfType(row, SelectionCheckbox)[0];
+    const openButton = elementsOfType(row, "button")[0];
+
+    expect(html).toContain('aria-label="Chọn Camera chọn hàng loạt"');
+    expect(html).toContain("size-11");
+    expect(html).not.toMatch(/class="[^"]*hidden[^"]*sm:block/);
+    (checkbox.props.onChange as () => void)();
+    (openButton.props.onClick as () => void)();
+
+    const toolbar = ProductMobileSelectionToolbar({
+      checked: false,
+      indeterminate: true,
+      selectedCount: 1,
+      selectAllLabel: "Chọn tất cả sản phẩm đang hiển thị",
+      selectedLabel: "Đã chọn 1",
+      onToggleAll: () => calls.push("toggle-all"),
+    });
+    const toolbarHtml = renderToStaticMarkup(toolbar);
+    const toolbarCheckbox = elementsOfType(toolbar, SelectionCheckbox)[0];
+    (toolbarCheckbox.props.onChange as () => void)();
+
+    expect(toolbarHtml).toContain("lg:hidden");
+    expect(toolbarHtml).toContain("Đã chọn 1");
+    expect(calls).toEqual([
+      "toggle:product-mobile-1",
+      "open:product-mobile-1",
+      "toggle-all",
+    ]);
+
+    const productsPage = readFileSync(
+      "src/app/(app)/inventory/tabs/products.tsx",
+      "utf8",
+    );
+    const bulkActions = readFileSync(
+      "src/app/(app)/inventory/tabs/product-selection.tsx",
+      "utf8",
+    );
+    expect(productsPage).toContain("<ProductBulkActions />");
+    expect(bulkActions).toContain("products.actions.stopSelling");
+    expect(bulkActions).toContain("products.actions.delete");
+    expect(bulkActions).not.toMatch(/ProductBulkActions[\s\S]*?hidden[^"]*sm:/);
+  });
+
+  test("order mobile selection and batch toolbar invoke selection and preserve form actions", async () => {
+    const {
+      OrderBatchToolbar,
+      OrderMobileRow,
+      OrderSelectionCheckbox,
+    } = await import("@/app/(app)/sales/tabs/orders-table");
+    const calls: string[] = [];
+    const order = {
+      id: "order-mobile-1",
+      code: "HD-MOBILE-1",
+      status: "completed",
+      paymentStatus: "partial",
+      createdAt: new Date("2026-07-29T08:00:00+07:00"),
+      customerName: "Khách hàng mobile",
+      sourceMode: "pos",
+      total: "2500000",
+      amountPaid: "1000000",
+    };
+    const row = OrderMobileRow({
+      order: order as never,
+      selected: false,
+      onToggle: () => calls.push("toggle:order-mobile-1"),
+      onOpen: () => calls.push("open:order-mobile-1"),
+      labels: {
+        walkIn: "Khách lẻ",
+        remaining: "Còn nợ",
+      },
+    });
+    const html = renderWithMessages(row);
+    const checkbox = elementsOfType(row, OrderSelectionCheckbox)[0];
+    const openButton = elementsOfType(row, "button")[0];
+
+    expect(html).toContain('aria-label="HD-MOBILE-1"');
+    expect(html).toContain("min-h-11");
+    expect(html).not.toMatch(/class="[^"]*hidden[^"]*sm:block/);
+    (checkbox.props.onChange as () => void)();
+    (openButton.props.onClick as () => void)();
+
+    const toolbar = OrderBatchToolbar({
+      selectedCount: 2,
+      allSelected: false,
+      partiallySelected: true,
+      onToggleAll: () => calls.push("toggle-all"),
+      labels: {
+        selectAll: "Chọn tất cả",
+        hint: "Chọn đơn hàng loạt",
+        merge: "Gộp đơn",
+        print: "In đã chọn",
+      },
+    });
+    const toolbarHtml = renderToStaticMarkup(toolbar);
+    const toolbarCheckbox = elementsOfType(
+      toolbar,
+      OrderSelectionCheckbox,
+    )[0];
+    (toolbarCheckbox.props.onChange as () => void)();
+
+    expect(toolbarHtml).toContain('formAction="/orders/merge"');
+    expect(toolbarHtml).toContain('formAction="/orders/print-batch"');
+    expect(toolbarHtml).toContain(">2<");
+    expect(toolbarHtml).toContain("size-11");
+    expect(toolbarHtml.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(calls).toEqual([
+      "toggle:order-mobile-1",
+      "open:order-mobile-1",
+      "toggle-all",
+    ]);
   });
 });

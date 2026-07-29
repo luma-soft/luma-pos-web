@@ -161,61 +161,140 @@ export function ProductsTable({
   ];
 
   return (
-    <DataTableShell
-      tableId="inventory.products"
-      rows={rows}
-      columns={columns}
-      getRowId={(product) => product.id}
-      minWidth="1120px"
-      maxHeight="calc(100dvh - 250px)"
-      fillHeight
-      mobileListClassName="!space-y-0 overflow-hidden rounded-xl border border-border-soft bg-surface"
-      mobileRowClassName="!rounded-none !border-x-0 !border-t-0 last:!border-b-0"
-      onRowClick={openProduct}
-      rowClassName={(product) =>
-        selectedIds.has(product.id)
-          ? "bg-primary-50/50 dark:bg-primary-950/20"
-          : undefined
-      }
-      renderMobileRow={({ row: product }) => (
-        <div className="flex items-stretch">
-          {selectionEnabled && (
-            <div className="hidden shrink-0 p-3 pr-0 pt-4 sm:block">
-              <SelectionCheckbox
-                checked={selectedIds.has(product.id)}
-                onChange={() => toggle(product.id)}
-                label={t("products.bulk.selectProduct", {
-                  name: product.name,
-                })}
-              />
-            </div>
-          )}
-          <button type="button" onClick={() => openProduct(product)} className="flex-1 p-3 text-left min-h-11 min-w-11">
-            <div className="flex min-w-0 items-center gap-3">
-              <ProductThumbnail product={product} />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{product.name}</div>
-                <div className="mt-0.5 truncate text-xs text-slate-400">
-                  {product.sku}{product.categoryName ? ` · ${product.categoryName}` : ""}
-                </div>
-              </div>
-              <div className="shrink-0 text-right">
-                <p className="text-sm font-bold tabular-nums text-primary-700 dark:text-primary-300">
-                  {priceRange(product.minRetailPrice, product.maxRetailPrice, product.retailPrice)}
-                </p>
-                <span className="mt-1.5 inline-flex rounded-md bg-primary-50 px-2 py-1 text-[11px] font-semibold tabular-nums text-primary-700 dark:bg-primary-950/60 dark:text-primary-300">
-                  {productStockDisplay(product, t("products.stock.notTracked"))}
-                </span>
-              </div>
-            </div>
-          </button>
-        </div>
+    <>
+      {selectionEnabled && (
+        <ProductMobileSelectionToolbar
+          checked={allSelected}
+          indeterminate={selectedVisibleIds.length > 0 && !allSelected}
+          selectedCount={selectedVisibleIds.length}
+          selectAllLabel={t("products.bulk.selectAll")}
+          selectedLabel={t("products.bulk.selected", {
+            count: selectedVisibleIds.length,
+          })}
+          onToggleAll={toggleAll}
+        />
       )}
-    />
+      <DataTableShell
+        tableId="inventory.products"
+        rows={rows}
+        columns={columns}
+        getRowId={(product) => product.id}
+        minWidth="1120px"
+        maxHeight="calc(100dvh - 250px)"
+        fillHeight
+        mobileListClassName="!space-y-0 overflow-hidden rounded-xl border border-border-soft bg-surface"
+        mobileRowClassName="!rounded-none !border-x-0 !border-t-0 last:!border-b-0"
+        onRowClick={openProduct}
+        rowClassName={(product) =>
+          selectedIds.has(product.id)
+            ? "bg-primary-50/50 dark:bg-primary-950/20"
+            : undefined
+        }
+        renderMobileRow={({ row: product }) => (
+          <ProductMobileRow
+            product={product}
+            selectionEnabled={selectionEnabled}
+            selected={selectedIds.has(product.id)}
+            selectLabel={t("products.bulk.selectProduct", {
+              name: product.name,
+            })}
+            stockNotTrackedLabel={t("products.stock.notTracked")}
+            onToggle={() => toggle(product.id)}
+            onOpen={() => openProduct(product)}
+          />
+        )}
+      />
+    </>
   );
 }
 
-function SelectionCheckbox({
+export function ProductMobileSelectionToolbar({
+  checked,
+  indeterminate,
+  selectedCount,
+  selectAllLabel,
+  selectedLabel,
+  onToggleAll,
+}: {
+  checked: boolean;
+  indeterminate: boolean;
+  selectedCount: number;
+  selectAllLabel: string;
+  selectedLabel: string;
+  onToggleAll: () => void;
+}) {
+  return (
+    <div className="mb-2 flex w-full items-center gap-2 lg:hidden">
+      <SelectionCheckbox
+        checked={checked}
+        indeterminate={indeterminate}
+        onChange={onToggleAll}
+        label={selectAllLabel}
+      />
+      <span className="text-xs font-semibold text-slate-600 dark:text-slate-300" aria-live="polite">
+        {selectedLabel}
+      </span>
+      {selectedCount > 0 && (
+        <span className="rounded-full bg-primary-100 px-2 py-0.5 text-xs font-bold text-primary-700">
+          {selectedCount}
+        </span>
+      )}
+    </div>
+  );
+}
+
+export function ProductMobileRow({
+  product,
+  selectionEnabled,
+  selected,
+  selectLabel,
+  stockNotTrackedLabel,
+  onToggle,
+  onOpen,
+}: {
+  product: ProductRow;
+  selectionEnabled: boolean;
+  selected: boolean;
+  selectLabel: string;
+  stockNotTrackedLabel: string;
+  onToggle: () => void;
+  onOpen: () => void;
+}) {
+  return (
+    <div className={cn("flex min-w-0 items-stretch", selected && "bg-primary-50/50 dark:bg-primary-950/20")}>
+      {selectionEnabled && (
+        <div className="shrink-0 p-3 pr-0 pt-4">
+          <SelectionCheckbox
+            checked={selected}
+            onChange={onToggle}
+            label={selectLabel}
+          />
+        </div>
+      )}
+      <button type="button" onClick={onOpen} className="min-h-11 min-w-11 flex-1 p-3 text-left">
+        <div className="flex min-w-0 items-center gap-3">
+          <ProductThumbnail product={product} />
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{product.name}</div>
+            <div className="mt-0.5 truncate text-xs text-slate-400">
+              {product.sku}{product.categoryName ? ` · ${product.categoryName}` : ""}
+            </div>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="text-sm font-bold tabular-nums text-primary-700 dark:text-primary-300">
+              {priceRange(product.minRetailPrice, product.maxRetailPrice, product.retailPrice)}
+            </p>
+            <span className="mt-1.5 inline-flex rounded-md bg-primary-50 px-2 py-1 text-[11px] font-semibold tabular-nums text-primary-700 dark:bg-primary-950/60 dark:text-primary-300">
+              {productStockDisplay(product, stockNotTrackedLabel)}
+            </span>
+          </div>
+        </div>
+      </button>
+    </div>
+  );
+}
+
+export function SelectionCheckbox({
   checked,
   indeterminate = false,
   onChange,
