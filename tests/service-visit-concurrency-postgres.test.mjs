@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import { mock } from "bun:test";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { Pool } from "pg";
@@ -10,15 +9,6 @@ const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
   console.log("service visit PostgreSQL concurrency: skipped because DATABASE_URL is unset");
 } else {
-  let assignmentManagerId;
-  mock.module("@/lib/mobile/auth", () => ({
-    requireMobileManager: async () => ({
-      ok: true,
-      userId: assignmentManagerId,
-      role: "manager",
-    }),
-  }));
-
   const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
   const schema = await import(`${projectRoot}/src/db/schema.ts`);
   const {
@@ -36,8 +26,8 @@ if (!databaseUrl) {
     completeFieldServiceJobCore,
     createServiceSignatureCore,
   } = await import(`${projectRoot}/src/lib/services/field-operations.ts`);
-  const { POST: assignServiceJob } = await import(
-    `${projectRoot}/src/app/api/mobile/services/jobs/[id]/assignments/route.ts`
+  const { assignServiceJobCore } = await import(
+    `${projectRoot}/src/lib/services/job-assignment.ts`
   );
   const { createDefaultChecklist } = await import(`${projectRoot}/src/lib/services/domain.ts`);
 
@@ -48,7 +38,6 @@ if (!databaseUrl) {
   const technicianId = randomUUID();
   const otherTechnicianId = randomUUID();
   const thirdTechnicianId = randomUUID();
-  assignmentManagerId = technicianId;
   const namespace = `visit-race-${randomUUID()}`;
   let projectId;
 
@@ -156,17 +145,12 @@ if (!databaseUrl) {
     await clientA.query("SELECT id FROM service_jobs WHERE id = $1 FOR UPDATE", [
       concurrentAssignmentJob.id,
     ]);
-    const assignPrimary = (profileId) => assignServiceJob(
-      new Request(
-        `http://localhost/api/mobile/services/jobs/${concurrentAssignmentJob.id}/assignments`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ profileId, assignmentRole: "primary" }),
-        },
-      ),
-      { params: Promise.resolve({ id: concurrentAssignmentJob.id }) },
-    );
+    const assignPrimary = (profileId) => db.transaction((tx) => assignServiceJobCore(tx, {
+      jobId: concurrentAssignmentJob.id,
+      profileId,
+      assignmentRole: "primary",
+      actorId: technicianId,
+    }));
     let concurrentAssignmentsSettled = false;
     const concurrentAssignments = Promise.all([
       assignPrimary(otherTechnicianId),
@@ -181,10 +165,11 @@ if (!databaseUrl) {
       "both primary assignments must wait behind the existing job lock",
     );
     await clientA.query("COMMIT");
-    const assignmentResponses = await concurrentAssignments;
+    const assignmentResults = await concurrentAssignments;
     assert.deepEqual(
-      assignmentResponses.map((response) => response.status),
-      [200, 200],
+      assignmentResults.map((assignment) => assignment.profileId).sort(),
+      [otherTechnicianId, thirdTechnicianId].sort(),
+      "both serialized assignment calls must succeed for their requested technician",
     );
     const [assignedJob] = await db.select({ assignedTo: serviceJobs.assignedTo })
       .from(serviceJobs)

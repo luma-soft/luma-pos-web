@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -8,8 +9,8 @@ if (!databaseUrl) {
   console.log("service dispatch snapshot PostgreSQL: skipped because DATABASE_URL is unset");
 } else {
   const root = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
-  const { db } = await import(`${root}/src/db/index.ts`);
-  const { profiles, projects, serviceJobs } = await import(`${root}/src/db/schema.ts`);
+  const schema = await import(`${root}/src/db/schema.ts`);
+  const { profiles, projects, serviceJobs } = schema;
   const { readRepeatableSnapshot } = await import(
     `${root}/src/lib/services/consistent-read.ts`
   );
@@ -19,22 +20,24 @@ if (!databaseUrl) {
     parseServiceDispatchQuery,
     parseServiceReportQuery,
   } = await import(`${root}/src/lib/services/dispatch-reporting.ts`);
+  const fixturePool = new Pool({ connectionString: databaseUrl, max: 2 });
   const writerPool = new Pool({ connectionString: databaseUrl, max: 1 });
+  const fixtureDb = drizzle(fixturePool, { schema });
   const technicianId = randomUUID();
   let projectId;
   try {
-    await db.insert(profiles).values({
+    await fixtureDb.insert(profiles).values({
       id: technicianId,
       fullName: "Snapshot Technician",
       role: "technician",
     });
-    const [project] = await db.insert(projects).values({
+    const [project] = await fixtureDb.insert(projects).values({
       name: `snapshot-${randomUUID()}`,
       serviceType: "camera",
       serviceStage: "active",
     }).returning();
     projectId = project.id;
-    const [firstJob] = await db.insert(serviceJobs).values({
+    const [firstJob] = await fixtureDb.insert(serviceJobs).values({
       projectId,
       code: `SNP-${randomUUID().slice(0, 12)}`,
       serviceType: "camera",
@@ -44,7 +47,7 @@ if (!databaseUrl) {
       scheduledAt: new Date("2045-07-29T02:00:00.000Z"),
     }).returning();
 
-    const insertBetweenReads = (database, reads) => readRepeatableSnapshot(database, {
+    const insertBetweenReads = (_database, reads) => readRepeatableSnapshot(fixtureDb, {
       first: async (tx) => {
         const first = await reads.first(tx);
         await writerPool.query(
@@ -76,7 +79,7 @@ if (!databaseUrl) {
     assert.equal(dispatch.total, 1);
     assert.equal(dispatch.pageCount, 1);
 
-    const updateBetweenReads = (database, reads) => readRepeatableSnapshot(database, {
+    const updateBetweenReads = (_database, reads) => readRepeatableSnapshot(fixtureDb, {
       first: async (tx) => {
         const first = await reads.first(tx);
         await writerPool.query(
@@ -105,8 +108,9 @@ if (!databaseUrl) {
     );
     console.log("service dispatch snapshot PostgreSQL: insert/update interleavings stayed consistent");
   } finally {
-    if (projectId) await db.delete(projects).where(eq(projects.id, projectId));
-    await db.delete(profiles).where(inArray(profiles.id, [technicianId]));
+    if (projectId) await fixtureDb.delete(projects).where(eq(projects.id, projectId));
+    await fixtureDb.delete(profiles).where(inArray(profiles.id, [technicianId]));
     await writerPool.end();
+    await fixturePool.end();
   }
 }
