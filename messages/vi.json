@@ -2848,6 +2848,8 @@
       "reservationExceedsPlan": "Số lượng giữ vượt quá vật tư còn lại theo kế hoạch.",
       "invalidTransition": "Không thể chuyển sang trạng thái này.",
       "attachmentSigned": "Không thể xóa bằng chứng đã ký.",
+      "signatureStale": "Biên bản đã ký không còn khớp dữ liệu hiện tại. Vui lòng ký lại trước khi hoàn tất.",
+      "signatureIntegrityInvalid": "Không thể xác minh biên bản đã ký. Vui lòng ký lại trước khi hoàn tất.",
       "duplicateCode": "Mã chứng từ đã tồn tại, vui lòng thử lại.",
       "duplicateSerial": "Serial thiết bị đã tồn tại."
     }

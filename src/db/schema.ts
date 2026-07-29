@@ -1140,12 +1140,20 @@ export const serviceSignatures = pgTable("service_signatures", {
   signerName: text("signer_name").notNull(),
   signerRole: text("signer_role"),
   documentHash: varchar("document_hash", { length: 64 }).notNull(),
+  canonicalSnapshot: jsonb("canonical_snapshot").$type<Record<string, unknown>>(),
+  snapshotSchemaVersion: integer("snapshot_schema_version"),
   signedByProfileId: uuid("signed_by_profile_id").references(() => profiles.id, { onDelete: "set null" }),
   signedAt: timestamp("signed_at", { withTimezone: true }).defaultNow().notNull(),
+  invalidatedAt: timestamp("invalidated_at", { withTimezone: true }),
+  invalidatedBy: uuid("invalidated_by").references(() => profiles.id, { onDelete: "set null" }),
+  invalidationReason: text("invalidation_reason"),
   evidence: jsonb("evidence").$type<Record<string, unknown>>().notNull().default({}),
 }, (t) => [
   check("service_signatures_hash_check", sql`${t.documentHash} ~ '^[0-9a-f]{64}$'`),
+  check("service_signatures_snapshot_version_check", sql`${t.snapshotSchemaVersion} is null or ${t.snapshotSchemaVersion} > 0`),
+  check("service_signatures_invalidation_check", sql`${t.invalidatedAt} is not null or (${t.invalidatedBy} is null and ${t.invalidationReason} is null)`),
   index("service_signatures_job_idx").on(t.jobId, t.signedAt),
+  index("service_signatures_active_job_idx").on(t.jobId, t.signedAt).where(sql`${t.invalidatedAt} is null`),
 ]);
 
 export const serviceJobEvents = pgTable("service_job_events", {

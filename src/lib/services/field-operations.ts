@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type * as schema from "@/db/schema";
 import {
@@ -42,6 +42,149 @@ type ServiceTransaction = Parameters<
 >[0];
 
 type FieldActor = { userId: string; role: Role };
+const SERVICE_SIGNATURE_SNAPSHOT_VERSION = 1;
+
+type SignedSnapshotIdentity = {
+  signerName: string;
+  signerRole: string | null;
+  signedByProfileId: string;
+  signedAt: Date;
+};
+
+async function buildAuthoritativeSignedSnapshot(
+  tx: ServiceTransaction,
+  jobId: string,
+  identity: SignedSnapshotIdentity,
+) {
+  const [jobRows, assets, attachments] = await Promise.all([
+    tx.select({
+      id: serviceJobs.id,
+      projectId: serviceJobs.projectId,
+      code: serviceJobs.code,
+      serviceType: serviceJobs.serviceType,
+      title: serviceJobs.title,
+      description: serviceJobs.description,
+      checklist: serviceJobs.checklist,
+      projectName: projects.name,
+      projectAddress: projects.address,
+      projectServiceType: projects.serviceType,
+      siteContactName: projects.siteContactName,
+      siteContactPhone: projects.siteContactPhone,
+    }).from(serviceJobs)
+      .innerJoin(projects, eq(serviceJobs.projectId, projects.id))
+      .where(eq(serviceJobs.id, jobId))
+      .limit(1)
+      .for("update", { of: serviceJobs }),
+    tx.select({
+      id: installedAssets.id,
+      assetKind: installedAssets.assetKind,
+      name: installedAssets.name,
+      brand: installedAssets.brand,
+      model: installedAssets.model,
+      serialNumber: installedAssets.serialNumber,
+      macAddress: installedAssets.macAddress,
+      ipAddress: installedAssets.ipAddress,
+      locationLabel: installedAssets.locationLabel,
+      installedAt: installedAssets.installedAt,
+      customerWarrantyEndsOn: installedAssets.customerWarrantyEndsOn,
+      supplierWarrantyEndsOn: installedAssets.supplierWarrantyEndsOn,
+      status: installedAssets.status,
+    }).from(installedAssets)
+      .where(eq(installedAssets.jobId, jobId))
+      .orderBy(asc(installedAssets.id)),
+    tx.select({
+      id: serviceAttachments.id,
+      category: serviceAttachments.category,
+      fileName: serviceAttachments.fileName,
+      mimeType: serviceAttachments.mimeType,
+      sizeBytes: serviceAttachments.sizeBytes,
+      sha256: serviceAttachments.sha256,
+      caption: serviceAttachments.caption,
+      createdAt: serviceAttachments.createdAt,
+    }).from(serviceAttachments)
+      .where(and(
+        eq(serviceAttachments.jobId, jobId),
+        isNull(serviceAttachments.deletedAt),
+      ))
+      .orderBy(asc(serviceAttachments.id)),
+  ]);
+  const job = jobRows[0];
+  if (!job) throw new Error("SERVICE_JOB_NOT_FOUND");
+
+  return {
+    schemaVersion: SERVICE_SIGNATURE_SNAPSHOT_VERSION,
+    signedAt: identity.signedAt.toISOString(),
+    signer: {
+      name: identity.signerName,
+      role: identity.signerRole,
+      signedByProfileId: identity.signedByProfileId,
+    },
+    project: {
+      id: job.projectId,
+      name: job.projectName,
+      address: job.projectAddress,
+      serviceType: job.projectServiceType,
+      siteContactName: job.siteContactName,
+      siteContactPhone: job.siteContactPhone,
+    },
+    job: {
+      id: job.id,
+      code: job.code,
+      serviceType: job.serviceType,
+      title: job.title,
+      description: job.description,
+      checklist: job.checklist,
+    },
+    assets: assets.map((asset) => ({
+      ...asset,
+      installedAt: asset.installedAt?.toISOString() ?? null,
+    })),
+    evidence: attachments.map((attachment) => ({
+      ...attachment,
+      createdAt: attachment.createdAt.toISOString(),
+    })),
+  };
+}
+
+function signedSnapshotOwnsSignature(
+  snapshot: Record<string, unknown>,
+  signature: {
+    projectId: string;
+    jobId: string;
+    attachmentId: string;
+    signerName: string;
+    signerRole: string | null;
+    signedByProfileId: string;
+  },
+) {
+  const signer = snapshot.signer;
+  const project = snapshot.project;
+  const job = snapshot.job;
+  const evidence = snapshot.evidence;
+  if (
+    !signer || typeof signer !== "object" || Array.isArray(signer)
+    || !project || typeof project !== "object" || Array.isArray(project)
+    || !job || typeof job !== "object" || Array.isArray(job)
+    || !Array.isArray(evidence)
+  ) return false;
+  const signerRecord = signer as Record<string, unknown>;
+  const projectRecord = project as Record<string, unknown>;
+  const jobRecord = job as Record<string, unknown>;
+  return (
+    signerRecord.signedByProfileId === signature.signedByProfileId
+    && signerRecord.name === signature.signerName
+    && (signerRecord.role ?? null) === signature.signerRole
+    && projectRecord.id === signature.projectId
+    && jobRecord.id === signature.jobId
+    && evidence.some((item) => (
+      item
+      && typeof item === "object"
+      && !Array.isArray(item)
+      && (item as Record<string, unknown>).id === signature.attachmentId
+      && (item as Record<string, unknown>).category === "signature"
+    ))
+  );
+}
 
 async function requireAssignedJob(
   tx: ServiceTransaction,
@@ -265,19 +408,35 @@ export async function createServiceSignatureCore(
       || attachment.category !== "signature"
       || attachment.deletedAt
     ) throw new Error("SERVICE_SIGNATURE_ATTACHMENT_INVALID");
-    const canonicalDocument = canonicalizeSignedDocument(input.document as JsonValue);
+    const snapshot = await buildAuthoritativeSignedSnapshot(tx, input.jobId, {
+      signerName: input.signerName,
+      signerRole: input.signerRole || null,
+      signedByProfileId: actor.userId,
+      signedAt: now,
+    });
+    const canonicalDocument = canonicalizeSignedDocument(snapshot as JsonValue);
     const documentHash = hashSignedDocument(canonicalDocument);
+    await tx.update(serviceSignatures).set({
+      invalidatedAt: now,
+      invalidatedBy: actor.userId,
+      invalidationReason: "signature.superseded",
+    }).where(and(
+      eq(serviceSignatures.jobId, input.jobId),
+      isNull(serviceSignatures.invalidatedAt),
+    ));
     const [signature] = await tx.insert(serviceSignatures).values({
       projectId: job.projectId,
       jobId: input.jobId,
-      documentId: input.documentId ?? null,
+      documentId: null,
       attachmentId: input.attachmentId,
       signerName: input.signerName,
       signerRole: input.signerRole || null,
       documentHash,
+      canonicalSnapshot: JSON.parse(canonicalDocument) as Record<string, unknown>,
+      snapshotSchemaVersion: SERVICE_SIGNATURE_SNAPSHOT_VERSION,
       signedByProfileId: actor.userId,
       signedAt: now,
-      evidence: { canonicalDocument },
+      evidence: { source: "authoritative-server-snapshot" },
     }).returning({ id: serviceSignatures.id });
     await tx.insert(serviceJobEvents).values({
       jobId: input.jobId,
@@ -379,8 +538,25 @@ export async function completeFieldServiceJobCore(
           eq(serviceAttachments.jobId, input.jobId),
           isNull(serviceAttachments.deletedAt),
         )),
-      tx.select({ id: serviceSignatures.id })
+      tx.select({
+        id: serviceSignatures.id,
+        projectId: serviceSignatures.projectId,
+        jobId: serviceSignatures.jobId,
+        attachmentId: serviceSignatures.attachmentId,
+        signerName: serviceSignatures.signerName,
+        signerRole: serviceSignatures.signerRole,
+        documentHash: serviceSignatures.documentHash,
+        canonicalSnapshot: serviceSignatures.canonicalSnapshot,
+        snapshotSchemaVersion: serviceSignatures.snapshotSchemaVersion,
+        signedByProfileId: serviceSignatures.signedByProfileId,
+        signedAt: serviceSignatures.signedAt,
+        invalidatedAt: serviceSignatures.invalidatedAt,
+        attachmentProjectId: serviceAttachments.projectId,
+        attachmentJobId: serviceAttachments.jobId,
+        attachmentDeletedAt: serviceAttachments.deletedAt,
+      })
         .from(serviceSignatures)
+        .innerJoin(serviceAttachments, eq(serviceSignatures.attachmentId, serviceAttachments.id))
         .where(eq(serviceSignatures.jobId, input.jobId)),
     ]);
     const errors = fieldCompletionErrors({
@@ -394,6 +570,47 @@ export async function completeFieldServiceJobCore(
     if (job.status !== "in_progress" && job.status !== "warranty") {
       throw new Error("SERVICE_COMPLETION_STATUS_INVALID");
     }
+
+    const signature = signatures
+      .filter((item) => !item.invalidatedAt)
+      .sort((left, right) => right.signedAt.getTime() - left.signedAt.getTime())[0];
+    if (!signature) throw new Error("SERVICE_SIGNATURE_STALE");
+    if (
+      signature.projectId !== job.projectId
+      || signature.jobId !== input.jobId
+      || signature.attachmentProjectId !== job.projectId
+      || signature.attachmentJobId !== input.jobId
+      || signature.attachmentDeletedAt
+      || !signature.signedByProfileId
+    ) throw new Error("SERVICE_SIGNATURE_OWNERSHIP_INVALID");
+    if (
+      signature.snapshotSchemaVersion !== SERVICE_SIGNATURE_SNAPSHOT_VERSION
+      || !signature.canonicalSnapshot
+    ) throw new Error("SERVICE_SIGNATURE_STALE");
+    if (!signedSnapshotOwnsSignature(signature.canonicalSnapshot, {
+      projectId: signature.projectId,
+      jobId: signature.jobId,
+      attachmentId: signature.attachmentId,
+      signerName: signature.signerName,
+      signerRole: signature.signerRole,
+      signedByProfileId: signature.signedByProfileId,
+    })) throw new Error("SERVICE_SIGNATURE_OWNERSHIP_INVALID");
+    const persistedCanonical = canonicalizeSignedDocument(
+      signature.canonicalSnapshot as JsonValue,
+    );
+    if (hashSignedDocument(persistedCanonical) !== signature.documentHash) {
+      throw new Error("SERVICE_SIGNATURE_HASH_INVALID");
+    }
+    const currentSnapshot = await buildAuthoritativeSignedSnapshot(tx, input.jobId, {
+      signerName: signature.signerName,
+      signerRole: signature.signerRole,
+      signedByProfileId: signature.signedByProfileId,
+      signedAt: signature.signedAt,
+    });
+    if (
+      hashSignedDocument(canonicalizeSignedDocument(currentSnapshot as JsonValue))
+      !== signature.documentHash
+    ) throw new Error("SERVICE_SIGNATURE_STALE");
 
     await tx.update(serviceJobs).set({
       status: "completed",

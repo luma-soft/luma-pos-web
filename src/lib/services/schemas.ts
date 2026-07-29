@@ -252,10 +252,8 @@ export const serviceAttachmentMetadataSchema = z.object({
 export const serviceSignatureSchema = z.object({
   jobId: z.uuid(),
   attachmentId: z.uuid(),
-  documentId: z.uuid().nullable().optional(),
   signerName: z.string().trim().min(1).max(200),
   signerRole: z.string().trim().max(100).optional(),
-  document: z.record(z.string(), z.unknown()),
   clientMutationId: clientMutationIdSchema,
 });
 

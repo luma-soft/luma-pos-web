@@ -17,6 +17,15 @@ export async function mobileFieldOperation<T>(operation: () => Promise<T>) {
     if (message === "SERVICE_SIGNATURE_ATTACHMENT_INVALID") {
       return mobileError("services.errors.signatureAttachmentInvalid", 409);
     }
+    if (message === "SERVICE_SIGNATURE_STALE") {
+      return mobileError("services.errors.signatureStale", 409);
+    }
+    if (
+      message === "SERVICE_SIGNATURE_HASH_INVALID"
+      || message === "SERVICE_SIGNATURE_OWNERSHIP_INVALID"
+    ) {
+      return mobileError("services.errors.signatureIntegrityInvalid", 409);
+    }
     if (message === "SERVICE_ATTACHMENT_SIGNED") {
       return mobileError("services.errors.attachmentSigned", 409);
     }
