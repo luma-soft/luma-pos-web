@@ -53,7 +53,7 @@ Fresh verification against the delivery source state:
 
 - Web Field Service suite: 21 files, zero failures, including PGlite and real
   PostgreSQL concurrency coverage.
-- Full web suite: all 122 test files passed in isolated Bun processes. Isolation
+- Full web suite: all 124 test files passed in isolated Bun processes. Isolation
   is required because legacy script-style tests call `process.exit` and several
   Bun module mocks are process-global; a single shared process can terminate
   early or leak mocks between otherwise-passing files.
