@@ -224,8 +224,9 @@ async function requireAssignedJob(
   return job;
 }
 
-async function lockServiceJob(
+export async function requireLockedServiceJobAccess(
   tx: ServiceTransaction,
+  actor: FieldActor,
   jobId: string,
 ) {
   const [job] = await tx.select({
@@ -233,12 +234,27 @@ async function lockServiceJob(
     projectId: serviceJobs.projectId,
     serviceType: serviceJobs.serviceType,
     status: serviceJobs.status,
+    assignedTo: serviceJobs.assignedTo,
     checklist: serviceJobs.checklist,
+    projectStage: projects.serviceStage,
   }).from(serviceJobs)
+    .innerJoin(projects, eq(serviceJobs.projectId, projects.id))
     .where(eq(serviceJobs.id, jobId))
     .limit(1)
-    .for("update");
+    .for("update", { of: serviceJobs });
   if (!job) throw new Error("SERVICE_JOB_NOT_FOUND");
+  const crew = await tx.select({ profileId: serviceJobAssignments.profileId })
+    .from(serviceJobAssignments)
+    .where(and(
+      eq(serviceJobAssignments.jobId, jobId),
+      isNull(serviceJobAssignments.removedAt),
+    ));
+  if (!canAccessServiceJob({
+    role: actor.role,
+    profileId: actor.userId,
+    primaryAssigneeId: job.assignedTo,
+    crewProfileIds: crew.map((item) => item.profileId),
+  })) throw new Error("SERVICE_JOB_FORBIDDEN");
   return job;
 }
 
@@ -317,8 +333,7 @@ export async function checkInServiceVisitCore(
   input: ServiceVisitMutationInput,
   now = new Date(),
 ) {
-  await requireAssignedJob(tx, actor, input.jobId);
-  const job = await lockServiceJob(tx, input.jobId);
+  const job = await requireLockedServiceJobAccess(tx, actor, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "visit.check_in", async () => {
     requireCheckInStatus(job.status);
     const [visit] = await tx.insert(serviceVisits).values({
@@ -368,8 +383,7 @@ export async function checkOutServiceVisitCore(
   input: ServiceVisitMutationInput,
   now = new Date(),
 ) {
-  await requireAssignedJob(tx, actor, input.jobId);
-  await lockServiceJob(tx, input.jobId);
+  await requireLockedServiceJobAccess(tx, actor, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "visit.check_out", async () => {
     const [visit] = await tx.select({ id: serviceVisits.id })
       .from(serviceVisits)
@@ -416,8 +430,7 @@ export async function updateFieldChecklistCore(
   input: ServiceChecklistUpdateInput,
   now = new Date(),
 ) {
-  await requireAssignedJob(tx, actor, input.jobId);
-  const job = await lockServiceJob(tx, input.jobId);
+  const job = await requireLockedServiceJobAccess(tx, actor, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "job.checklist", async () => {
     requireFieldJobMutable(job.status);
     const submitted = new Map(input.checklist.map((item) => [item.code, item.completed]));
@@ -470,7 +483,7 @@ export async function createServiceSignatureCore(
     || attachment.category !== "signature"
     || attachment.deletedAt
   ) throw new Error("SERVICE_SIGNATURE_ATTACHMENT_INVALID");
-  const job = await lockServiceJob(tx, input.jobId);
+  const job = await requireLockedServiceJobAccess(tx, actor, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "job.signature", async () => {
     const snapshot = await buildAuthoritativeSignedSnapshot(tx, input.jobId, {
       signerName: input.signerName,
@@ -519,8 +532,7 @@ export async function createFieldInstalledAssetCore(
   input: ServiceFieldAssetCreateInput,
   now = new Date(),
 ) {
-  await requireAssignedJob(tx, actor, input.jobId);
-  const job = await lockServiceJob(tx, input.jobId);
+  const job = await requireLockedServiceJobAccess(tx, actor, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "job.asset_created", async () => {
     requireFieldJobMutable(job.status);
     const [asset] = await tx.insert(installedAssets).values({
@@ -564,8 +576,7 @@ export async function updateFieldMaterialUsageCore(
   input: ServiceFieldMaterialUsageInput,
   now = new Date(),
 ) {
-  await requireAssignedJob(tx, actor, input.jobId);
-  const job = await lockServiceJob(tx, input.jobId);
+  const job = await requireLockedServiceJobAccess(tx, actor, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "job.material_usage", async () => {
     requireFieldJobMutable(job.status);
     const [material] = await tx.update(serviceJobMaterials).set({
@@ -597,11 +608,7 @@ export async function completeFieldServiceJobCore(
   input: ServiceCompletionInput,
   now = new Date(),
 ) {
-  const authorizedJob = await requireAssignedJob(tx, actor, input.jobId);
-  const job = {
-    ...await lockServiceJob(tx, input.jobId),
-    projectStage: authorizedJob.projectStage,
-  };
+  const job = await requireLockedServiceJobAccess(tx, actor, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "job.complete", async () => {
     if (job.status !== "in_progress" && job.status !== "warranty") {
       throw new Error("SERVICE_COMPLETION_STATUS_INVALID");

@@ -404,6 +404,52 @@ await expectCode(
   }),
   "SERVICE_VISIT_STATUS_INVALID",
 );
+
+const immutableJob = await createJob("in_progress");
+const [immutableVisit, otherImmutableVisit] = await db.insert(serviceVisits).values([
+  {
+    jobId: immutableJob.id,
+    profileId: technicianId,
+    status: "completed",
+    checkedInAt: new Date("2026-07-29T07:00:00.000Z"),
+    checkedOutAt: new Date("2026-07-29T08:00:00.000Z"),
+  },
+  {
+    jobId: immutableJob.id,
+    profileId: technicianId,
+    status: "completed",
+    checkedInAt: new Date("2026-07-29T09:00:00.000Z"),
+    checkedOutAt: new Date("2026-07-29T10:00:00.000Z"),
+  },
+]).returning();
+await expectCode(
+  () => db.update(serviceVisits).set({ jobId: visitJob.id })
+    .where(eq(serviceVisits.id, immutableVisit.id)),
+  "SERVICE_VISIT_IDENTITY_IMMUTABLE",
+);
+await expectCode(
+  () => db.update(serviceVisits).set({ status: "active", checkedOutAt: null })
+    .where(eq(serviceVisits.id, immutableVisit.id)),
+  "SERVICE_VISIT_REOPEN_FORBIDDEN",
+);
+const [closedImmutableTime] = await db.insert(serviceTimeEntries).values({
+  jobId: immutableJob.id,
+  visitId: immutableVisit.id,
+  profileId: technicianId,
+  entryType: "work",
+  startedAt: new Date("2026-07-29T07:00:00.000Z"),
+  endedAt: new Date("2026-07-29T08:00:00.000Z"),
+}).returning();
+await expectCode(
+  () => db.update(serviceTimeEntries).set({ endedAt: null })
+    .where(eq(serviceTimeEntries.id, closedImmutableTime.id)),
+  "SERVICE_TIME_ENTRY_REOPEN_FORBIDDEN",
+);
+await expectCode(
+  () => db.update(serviceTimeEntries).set({ visitId: otherImmutableVisit.id })
+    .where(eq(serviceTimeEntries.id, closedImmutableTime.id)),
+  "SERVICE_TIME_ENTRY_IDENTITY_IMMUTABLE",
+);
 await expectCode(
   () => db.insert(serviceAttachments).values({
     projectId: project.id,

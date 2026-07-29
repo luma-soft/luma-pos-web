@@ -104,22 +104,31 @@ export async function DELETE(
   const profileId = new URL(request.url).searchParams.get("profileId");
   if (!profileId) return mobileError("errors.invalidData", 400);
   const now = new Date();
-  const [removed] = await db.update(serviceJobAssignments).set({ removedAt: now })
-    .where(and(
-      eq(serviceJobAssignments.jobId, id),
-      eq(serviceJobAssignments.profileId, profileId),
-    ))
-    .returning({ assignmentRole: serviceJobAssignments.assignmentRole });
-  if (!removed) return mobileError("errors.notFound", 404);
-  if (removed.assignmentRole === "primary") {
-    await db.update(serviceJobs).set({ assignedTo: null, updatedAt: now })
-      .where(and(eq(serviceJobs.id, id), eq(serviceJobs.assignedTo, profileId)));
+  try {
+    const removed = await db.transaction(async (tx) => {
+      const [assignment] = await tx.update(serviceJobAssignments).set({ removedAt: now })
+        .where(and(
+          eq(serviceJobAssignments.jobId, id),
+          eq(serviceJobAssignments.profileId, profileId),
+        ))
+        .returning({ assignmentRole: serviceJobAssignments.assignmentRole });
+      if (!assignment) return null;
+      if (assignment.assignmentRole === "primary") {
+        await tx.update(serviceJobs).set({ assignedTo: null, updatedAt: now })
+          .where(and(eq(serviceJobs.id, id), eq(serviceJobs.assignedTo, profileId)));
+      }
+      await tx.insert(serviceJobEvents).values({
+        jobId: id,
+        eventType: "job.unassigned",
+        actorId: gate.userId,
+        payload: { profileId },
+      });
+      return assignment;
+    });
+    if (!removed) return mobileError("errors.notFound", 404);
+    return mobileOk({ profileId });
+  } catch (error) {
+    console.error("service unassignment failed:", error);
+    return mobileError("errors.serverError", 500);
   }
-  await db.insert(serviceJobEvents).values({
-    jobId: id,
-    eventType: "job.unassigned",
-    actorId: gate.userId,
-    payload: { profileId },
-  });
-  return mobileOk({ profileId });
 }

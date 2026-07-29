@@ -55,21 +55,19 @@ export async function deleteServiceEvidenceCore(
     .for("update");
   if (!attachment) throw new Error("SERVICE_ATTACHMENT_NOT_FOUND");
 
-  const [[job], crew] = await Promise.all([
-    tx.select({
+  const [job] = await tx.select({
       status: serviceJobs.status,
       assignedTo: serviceJobs.assignedTo,
     }).from(serviceJobs)
       .where(eq(serviceJobs.id, input.jobId))
       .limit(1)
-      .for("update"),
-    tx.select({ profileId: serviceJobAssignments.profileId })
+      .for("update");
+  const crew = await tx.select({ profileId: serviceJobAssignments.profileId })
       .from(serviceJobAssignments)
       .where(and(
         eq(serviceJobAssignments.jobId, input.jobId),
         isNull(serviceJobAssignments.removedAt),
-      )),
-  ]);
+      ));
   if (!job) throw new Error("SERVICE_JOB_NOT_FOUND");
   if (!canAccessServiceJob({
     role: actor.role,

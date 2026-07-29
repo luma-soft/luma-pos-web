@@ -15,6 +15,7 @@ if (!databaseUrl) {
     profiles,
     projects,
     serviceAttachments,
+    serviceJobAssignments,
     serviceJobs,
     serviceTimeEntries,
     serviceVisits,
@@ -31,6 +32,7 @@ if (!databaseUrl) {
   const clientA = await pool.connect();
   const clientB = await pool.connect();
   const technicianId = randomUUID();
+  const otherTechnicianId = randomUUID();
   const namespace = `visit-race-${randomUUID()}`;
   let projectId;
 
@@ -115,6 +117,11 @@ if (!databaseUrl) {
       fullName: namespace,
       role: "technician",
     });
+    await db.insert(profiles).values({
+      id: otherTechnicianId,
+      fullName: `${namespace}-other`,
+      role: "technician",
+    });
     const [project] = await db.insert(projects).values({
       name: namespace,
       serviceType: "camera",
@@ -122,6 +129,71 @@ if (!databaseUrl) {
     }).returning();
     projectId = project.id;
     const actor = { userId: technicianId, role: "technician" };
+
+    const primaryRemovalJob = await createJob();
+    await clientA.query("BEGIN");
+    await drizzle(clientA, { schema }).update(serviceJobs).set({
+      assignedTo: otherTechnicianId,
+    }).where(eq(serviceJobs.id, primaryRemovalJob.id));
+    let stalePrimarySettled = false;
+    const stalePrimaryMutation = transactionOn(clientB, (tx) => checkInServiceVisitCore(
+      tx,
+      actor,
+      {
+        jobId: primaryRemovalJob.id,
+        clientMutationId: `stale-primary-${randomUUID()}`,
+      },
+    )).finally(() => {
+      stalePrimarySettled = true;
+    });
+    await delay(75);
+    assert.equal(stalePrimarySettled, false, "primary reassignment must hold the job lock");
+    await clientA.query("COMMIT");
+    await assert.rejects(
+      stalePrimaryMutation,
+      (error) => hasCode(error, "SERVICE_JOB_FORBIDDEN"),
+    );
+    assert.equal(
+      (await db.select().from(serviceVisits)
+        .where(eq(serviceVisits.jobId, primaryRemovalJob.id))).length,
+      0,
+    );
+
+    const crewRemovalJob = await createJob();
+    await db.update(serviceJobs).set({ assignedTo: otherTechnicianId })
+      .where(eq(serviceJobs.id, crewRemovalJob.id));
+    const [crewAssignment] = await db.insert(serviceJobAssignments).values({
+      jobId: crewRemovalJob.id,
+      profileId: technicianId,
+      assignmentRole: "crew",
+      assignedBy: otherTechnicianId,
+    }).returning();
+    await clientA.query("BEGIN");
+    await drizzle(clientA, { schema }).update(serviceJobAssignments).set({
+      removedAt: new Date(),
+    }).where(eq(serviceJobAssignments.id, crewAssignment.id));
+    let staleCrewSettled = false;
+    const staleCrewMutation = transactionOn(clientB, (tx) => checkInServiceVisitCore(
+      tx,
+      actor,
+      {
+        jobId: crewRemovalJob.id,
+        clientMutationId: `stale-crew-${randomUUID()}`,
+      },
+    )).finally(() => {
+      staleCrewSettled = true;
+    });
+    await delay(75);
+    const crewRemovalHeldJobLock = !staleCrewSettled;
+    await clientA.query("COMMIT");
+    let crewRemovalRejected = false;
+    try {
+      await staleCrewMutation;
+    } catch (error) {
+      crewRemovalRejected = hasCode(error, "SERVICE_JOB_FORBIDDEN");
+    }
+    assert.equal(crewRemovalHeldJobLock, true, "crew removal must hold the job lock");
+    assert.equal(crewRemovalRejected, true, "removed crew must fail locked reauthorization");
 
     const sameJob = await createJob();
     const sameJobResults = await Promise.allSettled([
@@ -238,6 +310,54 @@ if (!databaseUrl) {
       "one concurrent open time entry must lose to the partial unique index",
     );
 
+    const closureRaceJob = await createJob({ readyToComplete: true });
+    const closureRaceCheckIn = await db.transaction((tx) => checkInServiceVisitCore(
+      tx,
+      actor,
+      {
+        jobId: closureRaceJob.id,
+        clientMutationId: `closure-race-checkin-${randomUUID()}`,
+      },
+    ));
+    const [closureTimeEntry] = await db.select().from(serviceTimeEntries)
+      .where(eq(serviceTimeEntries.visitId, closureRaceCheckIn.visitId));
+    await clientA.query("BEGIN");
+    await clientA.query("SELECT id FROM service_jobs WHERE id = $1 FOR UPDATE", [
+      closureRaceJob.id,
+    ]);
+    let closureSettled = false;
+    const childClosure = transactionOn(clientB, async (tx) => {
+      await tx.update(serviceVisits).set({
+        status: "completed",
+        checkedOutAt: new Date(),
+        updatedAt: new Date(),
+      }).where(eq(serviceVisits.id, closureRaceCheckIn.visitId));
+      await tx.update(serviceTimeEntries).set({
+        endedAt: new Date(),
+      }).where(eq(serviceTimeEntries.id, closureTimeEntry.id));
+    }).finally(() => {
+      closureSettled = true;
+    });
+    await delay(3000);
+    const childClosureAvoidedJobLock = closureSettled;
+    if (!childClosureAvoidedJobLock) {
+      await clientA.query("ROLLBACK");
+      await childClosure;
+    } else {
+      await childClosure;
+      await completeFieldServiceJobCore(drizzle(clientA, { schema }), actor, {
+        jobId: closureRaceJob.id,
+        clientMutationId: `closure-race-complete-${randomUUID()}`,
+        completionNote: "Children closed without inverse job lock",
+      });
+      await clientA.query("COMMIT");
+    }
+    assert.equal(
+      childClosureAvoidedJobLock,
+      true,
+      "visit/time closure must not wait on a job lock held by completion",
+    );
+
     console.log("service visit PostgreSQL concurrency: independent-session races verified");
   } finally {
     for (const client of [clientA, clientB]) {
@@ -253,6 +373,7 @@ if (!databaseUrl) {
       await db.delete(projects).where(eq(projects.id, projectId));
     }
     await db.delete(profiles).where(eq(profiles.id, technicianId));
+    await db.delete(profiles).where(eq(profiles.id, otherTechnicianId));
     clientA.release();
     clientB.release();
     await pool.end();

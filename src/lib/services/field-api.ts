@@ -54,6 +54,16 @@ export async function mobileFieldOperation<T>(operation: () => Promise<T>) {
     if (message === "SERVICE_TIME_ENTRY_VISIT_INVALID") {
       return mobileError("services.errors.invalidTransition", 409);
     }
+    if (
+      message === "SERVICE_VISIT_IDENTITY_IMMUTABLE"
+      || message === "SERVICE_VISIT_REOPEN_FORBIDDEN"
+      || message === "SERVICE_VISIT_UPDATE_INVALID"
+      || message === "SERVICE_TIME_ENTRY_IDENTITY_IMMUTABLE"
+      || message === "SERVICE_TIME_ENTRY_REOPEN_FORBIDDEN"
+      || message === "SERVICE_TIME_ENTRY_UPDATE_INVALID"
+    ) {
+      return mobileError("services.errors.invalidTransition", 409);
+    }
     if (message === "SERVICE_CHECKLIST_MISMATCH") {
       return mobileError("services.errors.checklistMismatch", 409);
     }

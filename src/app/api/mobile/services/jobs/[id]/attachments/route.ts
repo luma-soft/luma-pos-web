@@ -21,6 +21,7 @@ import {
   isServiceSnapshotJobLocked,
   mobileFieldOperation,
 } from "@/lib/services/field-api";
+import { requireLockedServiceJobAccess } from "@/lib/services/field-operations";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 async function ensureEvidenceBucket() {
@@ -87,6 +88,10 @@ export async function POST(
     if (uploadError) throw uploadError;
     try {
       const [attachment] = await db.transaction(async (tx) => {
+        await requireLockedServiceJobAccess(tx, {
+          userId: gate.userId,
+          role: gate.role,
+        }, id);
         const rows = await tx.insert(serviceAttachments).values({
           projectId: detail.projectId,
           jobId: id,
@@ -126,6 +131,12 @@ export async function POST(
     }
     if (isServiceFieldJobTerminal(error)) {
       return mobileError("services.errors.invalidTransition", 409);
+    }
+    if (
+      error instanceof Error
+      && (error.message === "SERVICE_JOB_NOT_FOUND" || error.message === "SERVICE_JOB_FORBIDDEN")
+    ) {
+      return mobileError("errors.notFound", 404);
     }
     console.error("service evidence upload failed:", error);
     return mobileError("errors.serverError", 500);

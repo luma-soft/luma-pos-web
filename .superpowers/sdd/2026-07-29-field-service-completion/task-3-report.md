@@ -166,3 +166,70 @@ The final run completed without warnings. A direct cleanup audit found zero
 - Changed-file ESLint: exit code 0.
 - `bun run build`: compiled, type-checked, and generated all 97 static pages
   successfully.
+
+## Reviewer fix round 2
+
+The second review found two remaining concurrency hazards: field authorization
+could become stale while an assignment was being revoked, and visit/time-entry
+updates could form a child-to-job lock cycle with job completion.
+
+### RED evidence
+
+- A direct visit reassignment was accepted instead of raising
+  `SERVICE_VISIT_IDENTITY_IMMUTABLE`.
+- In the independent-session PostgreSQL harness, a primary-assignment writer
+  held the job lock and committed reassignment, but the original technician's
+  waiting mutation still succeeded because authorization was not re-read after
+  the lock.
+
+### Fixes
+
+- Added and applied immutable migration
+  `0074_service_assignment_and_closure_locks.sql`.
+- Primary and crew-assignment changes now serialize through the canonical
+  service-job row. Field mutations lock that row first and then re-read current
+  assignment membership before authorizing the actor.
+- Evidence deletion preserves its attachment-then-job order and now performs
+  crew authorization only after acquiring the job lock.
+- Evidence upload revalidates assignment inside the attachment insert
+  transaction.
+- Assignment removal, primary-assignee cleanup, and audit-event creation now
+  commit atomically.
+- Visit identity and time-entry identity are immutable. Closed visits and time
+  entries cannot be reopened.
+- Visit checkout and time-entry closure are intentionally child-only updates:
+  they do not acquire the parent job lock. Only the permitted active-to-terminal
+  closure shape is accepted, removing the inverse child-to-job edge while
+  retaining terminal and identity guards.
+- The API maps the new immutable/reopen guard errors to HTTP 409 invalid
+  transition responses.
+
+### Independent-session PostgreSQL evidence
+
+The PostgreSQL harness now also verifies:
+
+- primary reassignment obtains the job lock first, the original technician's
+  mutation waits, then rejects with `SERVICE_JOB_FORBIDDEN`;
+- crew removal obtains the job lock first, the removed technician's mutation
+  waits, then rejects;
+- while completion holds the job lock, visit checkout and time-entry closure
+  can finish without waiting for that parent lock, after which completion
+  succeeds without a deadlock.
+
+The harness completed successfully and its cleanup audit found zero namespaced
+fixture projects or profiles.
+
+### Migration and final verification
+
+- Applied `0074` (8 statements); a subsequent migration run reported zero
+  pending.
+- Direct schema checks confirmed the assignment, primary-assignment, visit, and
+  time-entry triggers and function ACLs limited to
+  `postgres`/`service_role`.
+- Focused state-machine, field-operation, signed-snapshot,
+  evidence-deletion, schema, and access regression:
+  `17 pass, 0 fail, 44 expect() calls`.
+- Independent PostgreSQL concurrency harness: completed successfully.
+- Changed-file ESLint: exit code 0.
+- `bun run build`: compiled, type-checked, and generated all 97 static pages
+  successfully.
