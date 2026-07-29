@@ -9,7 +9,10 @@ import {
   MOBILE_SETTINGS_ADMIN_ROLES,
   mobileNotificationSettingsForRole,
 } from "@/lib/settings/mobile-settings-access";
-import type { StorePrefs } from "@/lib/schemas/settings";
+import {
+  mobileNotificationSettingsPatchSchema,
+  type StorePrefs,
+} from "@/lib/schemas/settings";
 import {
   mobileAction,
   mobileError,
@@ -38,7 +41,18 @@ export async function PATCH(request: Request) {
   if (!gate.ok) return mobileGate(gate)!;
 
   const body = await readJson(request);
-  if (!body) return mobileAction({ ok: false, error: "errors.invalidData" });
+  if (
+    !body
+    || typeof body !== "object"
+    || Array.isArray(body)
+    || Object.getPrototypeOf(body) !== Object.prototype
+  ) {
+    return mobileAction({ ok: false, error: "errors.invalidData" });
+  }
+  const parsed = mobileNotificationSettingsPatchSchema.safeParse(body);
+  if (!parsed.success) {
+    return mobileAction({ ok: false, error: "errors.invalidData" });
+  }
   const authorization = await authorizeMobileSensitiveAction({
     request,
     requesterId: gate.userId,
@@ -51,7 +65,7 @@ export async function PATCH(request: Request) {
   const current = (await getStoreSettings()).prefs.notifications;
   const notifications = mergeMobileNotificationSettings(
     current,
-    body as Parameters<typeof mergeMobileNotificationSettings>[1],
+    parsed.data,
   );
   return mobileAction(
     await updateStorePrefsForUser(gate.userId, {

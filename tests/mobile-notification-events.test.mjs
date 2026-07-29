@@ -114,6 +114,8 @@ let gate = {
   principalId: ids.owner,
 };
 let locale = "vi-VN";
+let restockSuggestions = [];
+let currentShift = null;
 const notificationPrefs = parseStorePrefs({
   notifications: {
     lowStock: false,
@@ -121,6 +123,7 @@ const notificationPrefs = parseStorePrefs({
     einvoiceError: false,
   },
 }).notifications;
+let currentNotificationPrefs = notificationPrefs;
 
 mock.module("@/db", () => ({ db }));
 mock.module("@/lib/actions/common", () => ({
@@ -135,12 +138,12 @@ mock.module("@/lib/mobile/auth", () => ({
 }));
 mock.module("@/lib/data/ai-restock", () => ({
   async getRestockSuggestions() {
-    return [];
+    return restockSuggestions;
   },
 }));
 mock.module("@/lib/data/shifts", () => ({
   async getCurrentShift() {
-    return null;
+    return currentShift;
   },
 }));
 mock.module("@/lib/data/settings", () => ({
@@ -154,7 +157,7 @@ mock.module("@/lib/data/settings", () => ({
       currency: "VND",
       locale,
       onboarded: true,
-      prefs: parseStorePrefs({ notifications: notificationPrefs }),
+      prefs: parseStorePrefs({ notifications: currentNotificationPrefs }),
     };
   },
 }));
@@ -279,6 +282,75 @@ await check("dismissed recipient rows stay hidden and do not inflate category co
   const data = await list();
   assert.equal(data.rows.some((row) => row.id === ids.dismissedEvent), false);
   assert.equal(data.counts.purchaseReceived, 0);
+});
+
+await check("mixed persisted and synthetic rows keep stable IDs, ordering, and visible counts", async () => {
+  gate = {
+    ok: true,
+    userId: ids.cashier,
+    role: "cashier",
+    principalId: ids.owner,
+  };
+  const productId = "74000000-0000-4000-8000-000000000001";
+  const shiftId = "75000000-0000-4000-8000-000000000001";
+  restockSuggestions = [{
+    id: productId,
+    name: "Mixed low stock",
+    sku: "MIXED-LOW",
+    baseUnit: "cái",
+    stock: 1,
+    velocity: 2,
+    daysOfStock: 0.5,
+    suggestedQty: 27,
+    priority: "high",
+    unitCost: 1000,
+  }];
+  currentShift = {
+    id: shiftId,
+    code: "CA-MIXED",
+    openedAt: new Date("2026-07-28T12:00:00.000Z"),
+  };
+  currentNotificationPrefs = {
+    ...notificationPrefs,
+    lowStock: true,
+    shiftClose: true,
+    roleRouting: {
+      ...notificationPrefs.roleRouting,
+      lowStock: ["cashier"],
+      shiftClose: ["cashier"],
+    },
+  };
+
+  try {
+    const data = await list();
+    assert.deepEqual(data.rows.map((row) => row.id), [
+      `shift-${shiftId}`,
+      ids.visibleEvent,
+      `restock-${productId}`,
+    ]);
+    assert.deepEqual(data.rows.map((row) => row.createdAt), [
+      "2026-07-28T12:00:00.000Z",
+      "2026-07-28T10:30:01.000Z",
+      "1970-01-01T00:00:00.000Z",
+    ]);
+    assert.deepEqual(data.counts, {
+      all: 3,
+      unread: 2,
+      lowStock: 1,
+      einvoiceError: 0,
+      shiftClose: 1,
+      invoiceCreated: 1,
+      purchaseReceived: 0,
+      debtChanged: 0,
+      qrPaymentConfirmed: 0,
+      qrPaymentException: 0,
+    });
+    assert.equal(data.rows.some((row) => row.id === ids.dismissedEvent), false);
+  } finally {
+    restockSuggestions = [];
+    currentShift = null;
+    currentNotificationPrefs = notificationPrefs;
+  }
 });
 
 await check("warehouse can read its routed event without inheriting cashier dismissal", async () => {

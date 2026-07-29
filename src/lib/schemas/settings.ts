@@ -115,6 +115,46 @@ const notificationPrefs = z.object({
   }),
 });
 
+const notificationRoutePatchSchema = z.array(z.enum(STAFF_ROLES)).min(1);
+
+export const mobileNotificationSettingsPatchSchema = z.object({
+  lowStock: z.boolean().optional(),
+  stagnant: z.boolean().optional(),
+  shiftClose: z.boolean().optional(),
+  einvoiceError: z.boolean().optional(),
+  syncDone: z.boolean().optional(),
+  invoiceCreated: z.boolean().optional(),
+  purchaseReceived: z.boolean().optional(),
+  debtChanged: z.boolean().optional(),
+  qrPaymentConfirmed: z.boolean().optional(),
+  qrPaymentException: z.boolean().optional(),
+  channels: z.record(
+    z.string().trim().min(1).max(40),
+    z.boolean(),
+  ).optional(),
+  quietHours: z.object({
+    enabled: z.boolean().optional(),
+    start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+    end: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+    timezone: z.string().trim().min(1).max(80).optional(),
+  }).strict().optional(),
+  thresholds: z.object({
+    lowStockDays: z.number().int().min(1).max(90).optional(),
+    einvoiceFailureAttempts: z.number().int().min(1).max(20).optional(),
+  }).strict().optional(),
+  roleRouting: z.object({
+    lowStock: notificationRoutePatchSchema.optional(),
+    einvoiceError: notificationRoutePatchSchema.optional(),
+    shiftClose: notificationRoutePatchSchema.optional(),
+    syncDone: notificationRoutePatchSchema.optional(),
+    invoiceCreated: notificationRoutePatchSchema.optional(),
+    purchaseReceived: notificationRoutePatchSchema.optional(),
+    debtChanged: notificationRoutePatchSchema.optional(),
+    qrPaymentConfirmed: notificationRoutePatchSchema.optional(),
+    qrPaymentException: notificationRoutePatchSchema.optional(),
+  }).strict().optional(),
+}).strict();
+
 const hardwarePrefs = z.object({
   paperSize: z.enum(PAPER_SIZES).default("K80"),
   autoPrint: z.boolean().default(false),
