@@ -75,11 +75,15 @@ function retryDate(
   attempt: number,
   jitter: () => number,
   minimumMs = 0,
+  deadline?: Date,
 ) {
   const exponentialMs = Math.min(15 * 60_000, 60_000 * (2 ** Math.max(0, attempt - 1)));
   const baseMs = Math.max(minimumMs, exponentialMs);
   const jitterMs = Math.floor(Math.max(0, Math.min(1, jitter())) * Math.min(30_000, baseMs / 4));
-  return addMilliseconds(now, baseMs + jitterMs);
+  const scheduledAt = addMilliseconds(now, baseMs + jitterMs);
+  return deadline && scheduledAt.getTime() > deadline.getTime()
+    ? deadline
+    : scheduledAt;
 }
 
 function quietHoursEnd(now: Date, quietHours: {
@@ -608,6 +612,43 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
         return deviceClaim;
       }
 
+      const ownsSend = await database.transaction(async (tx: DatabaseLike) => {
+        const [owner] = await tx
+          .select({ leaseExpiresAt: notificationOutbox.leaseExpiresAt })
+          .from(notificationOutbox)
+          .where(and(
+            eq(notificationOutbox.id, claim.id),
+            eq(notificationOutbox.status, "processing"),
+            eq(notificationOutbox.leaseExpiresAt, claim.leaseExpiresAt),
+          ))
+          .limit(1)
+          .for("update");
+        const [delivery] = await tx
+          .select({ attemptedAt: mobilePushDeliveries.attemptedAt })
+          .from(mobilePushDeliveries)
+          .where(and(
+            eq(mobilePushDeliveries.id, deviceClaim.id),
+            eq(mobilePushDeliveries.status, "sending"),
+            eq(mobilePushDeliveries.attemptedAt, deviceClaim.attemptedAt),
+          ))
+          .limit(1)
+          .for("update");
+        const validationAt = now();
+        return Boolean(
+          owner?.leaseExpiresAt
+          && owner.leaseExpiresAt.getTime() > validationAt.getTime()
+          && delivery
+          && delivery.attemptedAt.getTime() + deviceSendLeaseMs > validationAt.getTime(),
+        );
+      });
+      if (!ownsSend) {
+        return {
+          kind: "retry" as const,
+          code: "NOTIFICATION_LEASE_EXPIRED",
+          retryAfterMs: 0,
+        };
+      }
+
       let result: DeviceNotificationResult;
       try {
         result = await sender({
@@ -698,7 +739,17 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
         return { completed: true };
       }
 
-      const retryAt = retryDate(failedAt, attempt.attemptCount, jitter, retryAfterMs);
+      const retryDeadline = addMilliseconds(
+        attempt.firstAttemptAt ?? claimAt,
+        maxAttemptAgeMs,
+      );
+      const retryAt = retryDate(
+        failedAt,
+        attempt.attemptCount,
+        jitter,
+        retryAfterMs,
+        retryDeadline,
+      );
       await database
         .update(notificationOutbox)
         .set({

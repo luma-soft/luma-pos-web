@@ -92,6 +92,9 @@ export function classifyFcmFailure(statusCode: number, body: unknown): FcmFailur
   if (status === "INVALID_ARGUMENT" && tokenError === "INVALID_ARGUMENT") {
     return { kind: "disable-token", code: "FCM_INVALID_TOKEN" };
   }
+  if (tokenError === "SENDER_ID_MISMATCH") {
+    return { kind: "disable-token", code: "FCM_SENDER_ID_MISMATCH" };
+  }
 
   if (
     statusCode === 429

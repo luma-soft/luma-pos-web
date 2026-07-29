@@ -93,4 +93,19 @@ describe("FCM notification boundary", () => {
       },
     })).toEqual({ kind: "disable-token", code: "FCM_INVALID_TOKEN" });
   });
+
+  test("treats structured sender-ID mismatch as token-local", () => {
+    expect(classifyFcmFailure(403, {
+      error: {
+        status: "PERMISSION_DENIED",
+        details: [{
+          "@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError",
+          errorCode: "SENDER_ID_MISMATCH",
+        }],
+      },
+    })).toEqual({
+      kind: "disable-token",
+      code: "FCM_SENDER_ID_MISMATCH",
+    });
+  });
 });

@@ -11,6 +11,9 @@ const {
   createNotificationOutboxCore,
 } = await import(`${projectRoot}/src/lib/notifications/outbox-core.ts`);
 const {
+  classifyFcmFailure,
+} = await import(`${projectRoot}/src/lib/notifications/fcm-message.ts`);
+const {
   mobilePushDeliveries,
   mobilePushDevices,
   notificationEvents,
@@ -346,6 +349,84 @@ function core({
     .where(eq(mobilePushDevices.id, managerDevice.id));
 }
 
+// A structured sender-ID mismatch invalidates only the failed token, so a
+// successful sibling delivery still completes the event.
+{
+  const seeded = await seedEvent();
+  await core({
+    sender: async (input) => input.token === "owner-token"
+      ? classifyFcmFailure(403, {
+        error: {
+          status: "PERMISSION_DENIED",
+          details: [{
+            "@type": "type.googleapis.com/google.firebase.fcm.v1.FcmError",
+            errorCode: "SENDER_ID_MISMATCH",
+          }],
+        },
+      })
+      : { kind: "sent" },
+  }).processNotificationMessage({
+    version: 1,
+    eventId: seeded.eventId,
+    deduplicationKey: `notification:${seeded.eventId}`,
+    queuedAt: "2026-07-28T12:00:00.000Z",
+  });
+  assert.equal((await deliveryRow(ownerDevice.id, seeded.eventId)).status, "failed");
+  assert.equal((await deliveryRow(managerDevice.id, seeded.eventId)).status, "sent");
+  assert.equal((await outboxRow(seeded.eventId)).status, "completed");
+  assert.equal(
+    (await db.select({ enabled: mobilePushDevices.enabled })
+      .from(mobilePushDevices)
+      .where(eq(mobilePushDevices.id, ownerDevice.id)))[0].enabled,
+    false,
+  );
+  await db.update(mobilePushDevices).set({ enabled: true })
+    .where(eq(mobilePushDevices.id, ownerDevice.id));
+}
+
+// Claims that expire while a worker is delayed must be revalidated immediately
+// before network I/O.
+{
+  const seeded = await seedEvent();
+  let clockReads = 0;
+  let calls = 0;
+  const service = createNotificationOutboxCore({
+    database: db,
+    publisher: {
+      async publish() {
+        return { providerMessageId: "unused" };
+      },
+    },
+    sender: async () => {
+      calls += 1;
+      return { kind: "sent" };
+    },
+    now: () => {
+      clockReads += 1;
+      return new Date(
+        clockReads <= 3
+          ? "2026-07-28T12:00:00.000Z"
+          : "2026-07-28T12:04:00.000Z",
+      );
+    },
+    jitter: () => 0,
+  });
+  const result = await service.processNotificationMessage({
+    version: 1,
+    eventId: seeded.eventId,
+    deduplicationKey: `notification:${seeded.eventId}`,
+    queuedAt: "2026-07-28T12:00:00.000Z",
+  });
+  assert.equal(result.completed, false);
+  assert.equal(calls, 0);
+  assert.equal((await deliveryRow(ownerDevice.id, seeded.eventId)).status, "sending");
+  assert.equal((await deliveryRow(managerDevice.id, seeded.eventId)).status, "sending");
+  await db.update(notificationOutbox).set({
+    status: "completed",
+    leaseExpiresAt: null,
+  }).where(eq(notificationOutbox.eventId, seeded.eventId));
+}
+
 // Losing the outbox ownership token before a device claim prevents FCM.
 {
   const seeded = await seedEvent();
@@ -487,6 +568,57 @@ await db.update(storeSettings).set({ prefs: {} }).where(eq(storeSettings.id, "de
   assert.equal(row.attemptCount, 1);
   assert.equal(row.availableAt.toISOString(), "2026-07-28T12:01:00.000Z");
   assert.equal((await deliveryRow(ownerDevice.id, seeded.eventId)).status, "failed");
+}
+
+// Provider delays cannot schedule work beyond the first-attempt age deadline.
+{
+  const startedAt = new Date("2026-07-28T12:00:00.000Z");
+  const deadline = new Date("2026-07-28T13:00:00.000Z");
+  const seeded = await seedEvent();
+  const initialResult = await core({
+    now: startedAt,
+    sender: async () => ({
+      kind: "retry",
+      code: "FCM_RATE_LIMITED",
+      retryAfterMs: 24 * 60 * 60_000,
+    }),
+  }).processNotificationMessage({
+    version: 1,
+    eventId: seeded.eventId,
+    deduplicationKey: `notification:${seeded.eventId}`,
+    queuedAt: startedAt.toISOString(),
+  });
+  assert.equal(initialResult.retryAt?.toISOString(), deadline.toISOString());
+  assert.equal((await outboxRow(seeded.eventId)).availableAt.toISOString(), deadline.toISOString());
+
+  const published = [];
+  let calls = 0;
+  const deadlineService = core({
+    now: deadline,
+    publisher: {
+      async publish(message) {
+        published.push(message.eventId);
+        return { providerMessageId: `deadline:${message.eventId}` };
+      },
+    },
+    sender: async () => {
+      calls += 1;
+      return { kind: "sent" };
+    },
+  });
+  await deadlineService.recoverDueNotifications(50);
+  assert.equal(published.includes(seeded.eventId), true);
+  assert.equal((await outboxRow(seeded.eventId)).status, "published");
+  await deadlineService.processNotificationMessage({
+    version: 1,
+    eventId: seeded.eventId,
+    deduplicationKey: `notification:${seeded.eventId}`,
+    queuedAt: deadline.toISOString(),
+  });
+  const row = await outboxRow(seeded.eventId);
+  assert.equal(row.status, "dead");
+  assert.equal(row.attemptCount, 1);
+  assert.equal(calls, 0);
 }
 
 // Permanent failures stop immediately.
