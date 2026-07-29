@@ -385,9 +385,6 @@ describe("route-wide mobile responsive audit", () => {
     expect(customers).toMatch(
       /href="\/settings\/import"[\s\S]{0,220}min-h-11/,
     );
-    expect(customers).toMatch(
-      /inline-flex h-10 w-10[^"]*min-h-11 min-w-11/,
-    );
     expect(customers).toContain(
       "h-10 min-h-11 min-w-11 shrink-0",
     );
@@ -426,5 +423,49 @@ describe("route-wide mobile responsive audit", () => {
     expect(product).toMatch(
       /onClick=\{openPriceBooks\}[\s\S]{0,220}min-h-11/,
     );
+  });
+
+  test("partner mobile controls avoid inert actions and native horizontal scrollbars", () => {
+    const customers = read(
+      "src/app/(app)/partners/tabs/customers-table.tsx",
+    );
+    const suppliers = read(
+      "src/app/(app)/partners/tabs/suppliers-table.tsx",
+    );
+    const toolbarStart = customers.indexOf(
+      '<div className="flex shrink-0 flex-wrap items-center gap-2',
+    );
+    const toolbarEnd = customers.indexOf("</div>", toolbarStart);
+    const customerDetailStart = customers.indexOf(
+      "function CustomerDetail(",
+    );
+    const customerDetailEnd = customers.indexOf(
+      "function CustomerInfoPanel(",
+      customerDetailStart,
+    );
+    const supplierTabsStart = suppliers.indexOf(
+      '<div className="flex shrink-0 items-center gap-6',
+    );
+    const supplierTabsEnd = suppliers.indexOf(
+      "</div>",
+      supplierTabsStart,
+    );
+
+    expect(toolbarStart).toBeGreaterThan(-1);
+    expect(customerDetailStart).toBeGreaterThan(-1);
+    expect(supplierTabsStart).toBeGreaterThan(-1);
+
+    const toolbar = customers.slice(toolbarStart, toolbarEnd);
+    expect(toolbar).toContain("flex-wrap");
+    expect(toolbar).not.toContain("overflow-x-auto");
+    expect(toolbar).not.toContain("<ToolbarIcon");
+
+    for (const tabs of [
+      customers.slice(customerDetailStart, customerDetailEnd),
+      suppliers.slice(supplierTabsStart, supplierTabsEnd),
+    ]) {
+      expect(tabs).toContain("[scrollbar-width:none]");
+      expect(tabs).toContain("[&::-webkit-scrollbar]:hidden");
+    }
   });
 });

@@ -11,11 +11,8 @@ import {
   ExternalLink,
   FileDown,
   FileInput,
-  Filter,
-  HelpCircle,
   Lock,
   Loader2,
-  MoreHorizontal,
   Pencil,
   Plus,
   QrCode,
@@ -226,7 +223,7 @@ function CustomerRows({
         toolbar={(
           <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <CustomerSearch filters={filters} pageSize={data.pageSize} onOpenFilters={onOpenFilters} activeFilterCount={activeFilterCount} />
-            <div className="flex shrink-0 items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
               <button type="button" onClick={() => setCreateOpen(true)} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-10 shrink-0 rounded-lg min-h-11 min-w-11 lg:min-h-0 lg:min-w-0")}>
                 <Plus className="h-4 w-4" />
                 {t("customers.createNew")}
@@ -235,9 +232,6 @@ function CustomerRows({
                 <FileInput className="h-4 w-4" />
                 {t("customers.actions.importFile")}
               </Link>
-              <ToolbarIcon icon={MoreHorizontal} label={t("customers.actions.more")} />
-              <ToolbarIcon icon={Filter} label={t("customers.filters.title")} onClick={onOpenFilters} />
-              <ToolbarIcon icon={HelpCircle} label={t("customers.actions.help")} />
             </div>
           </div>
         )}
@@ -301,7 +295,7 @@ function CustomerDetail({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-surface">
-      <div className="flex shrink-0 items-center gap-6 overflow-x-auto border-b border-border-soft text-sm font-semibold text-slate-500">
+      <div className="flex shrink-0 items-center gap-6 overflow-x-auto overscroll-x-contain border-b border-border-soft text-sm font-semibold text-slate-500 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {CUSTOMER_EXPAND_TABS.map((key) => (
           <button
             key={key}
@@ -918,20 +912,6 @@ function EmptyPanel({ message }: { message: string }) {
     <div className="rounded-card border border-border-soft px-4 py-10 text-center text-sm font-medium text-slate-400">
       {message}
     </div>
-  );
-}
-
-function ToolbarIcon({ icon: Icon, label, onClick }: { icon: LucideIcon; label: string; onClick?: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-slate-600 hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
-    >
-      <Icon className="h-4 w-4" />
-    </button>
   );
 }
 

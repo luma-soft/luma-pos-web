@@ -314,7 +314,7 @@ function SupplierDetailTabs({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center gap-6 overflow-x-auto border-b border-border-soft text-sm font-semibold text-slate-500">
+      <div className="flex shrink-0 items-center gap-6 overflow-x-auto overscroll-x-contain border-b border-border-soft text-sm font-semibold text-slate-500 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {DETAIL_TABS.map((key) => (
           <button
             key={key}
