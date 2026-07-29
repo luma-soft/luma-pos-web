@@ -41,6 +41,7 @@ import { Routes } from "@/lib/routes";
 import type { PosData, PosProduct, PosUnit } from "@/lib/data/pos";
 import { isProductStockManaged } from "@/lib/product-stock";
 import { rehydrateCartProducts } from "@/lib/pos/rehydrate-cart-products";
+import { buildPosOrderItemPayload } from "@/lib/pos/order-item-payload";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPosProduct } from "@/lib/pos/product-catalog-adapter";
 
@@ -1181,15 +1182,7 @@ export function PosClient({
       taxRate,
       shippingFee,
       priceBookId: priceBook || null,
-      items: cart.map((l) => ({
-        productId: l.product.id,
-        productName: l.product.name,
-        unitName: l.unitName,
-        unitMultiplier: l.unitMultiplier,
-        quantity: l.quantity,
-        manualUnitPrice: l.manualPrice ? l.unitPrice : undefined,
-        lineDiscount: l.lineDiscount ?? 0,
-      })),
+      items: cart.map(buildPosOrderItemPayload),
       payment: { method: isCheckoutMode ? payMethod : "credit", amount: isCheckoutMode && payMethod !== "bank_transfer" ? paid : 0 },
     };
     setSubmittingMode(submitMode);
@@ -1301,13 +1294,7 @@ export function PosClient({
         refundMethod: payMethod === "credit" ? "debt_deduct" : payMethod,
         note: orderNote || undefined,
         items: cart.filter((l) => l.quantity > 0).map((l) => ({
-          productId: l.product.id,
-          productName: l.product.name,
-          unitName: l.unitName,
-          unitMultiplier: l.unitMultiplier,
-          quantity: l.quantity,
-          manualUnitPrice: l.manualPrice ? l.unitPrice : undefined,
-          lineDiscount: l.lineDiscount ?? 0,
+          ...buildPosOrderItemPayload(l),
           restock: returnRestock ?? true,
         })),
       });

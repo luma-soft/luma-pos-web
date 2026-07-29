@@ -5,6 +5,7 @@ import {
   setLineFree,
   setLinePriceInput,
 } from "@/lib/pos/line-price-editor";
+import { buildPosOrderItemPayload } from "@/lib/pos/order-item-payload";
 
 describe("POS free line", () => {
   test("applies zero price and restores the draft when Free is unchecked", () => {
@@ -32,5 +33,25 @@ describe("POS free line", () => {
 
     expect(state.free).toBe(true);
     expect(resolveLinePriceEditor(state).sellPrice).toBe(0);
+  });
+
+  test("keeps zero as an explicit manual unit price", () => {
+    expect(buildPosOrderItemPayload({
+      product: { id: "product-1", name: "Free bracket" },
+      unitName: "cái",
+      unitMultiplier: 1,
+      quantity: 1,
+      unitPrice: 0,
+      lineDiscount: 0,
+      manualPrice: true,
+    })).toEqual({
+      productId: "product-1",
+      productName: "Free bracket",
+      unitName: "cái",
+      unitMultiplier: 1,
+      quantity: 1,
+      manualUnitPrice: 0,
+      lineDiscount: 0,
+    });
   });
 });
