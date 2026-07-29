@@ -571,6 +571,7 @@
       "unitPrice": "Đơn giá",
       "discount": "Giảm giá",
       "sellPrice": "Giá bán",
+      "free": "Miễn phí / Không thu tiền",
       "editHint": "Sửa giá / giảm giá"
     },
     "noSearchResults": "Không tìm thấy sản phẩm phù hợp",

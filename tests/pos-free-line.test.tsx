@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { renderToStaticMarkup } from "react-dom/server";
+import { FreeLinePriceControl } from "@/components/pos/free-line-price-control";
 import {
   createLinePriceEditorState,
   resolveLinePriceEditor,
@@ -53,5 +55,20 @@ describe("POS free line", () => {
       manualUnitPrice: 0,
       lineDiscount: 0,
     });
+  });
+
+  test("renders an accessible touch-safe Free control", () => {
+    const markup = renderToStaticMarkup(
+      <FreeLinePriceControl
+        checked
+        label="Miễn phí / Không thu tiền"
+        onCheckedChange={() => undefined}
+      />,
+    );
+
+    expect(markup).toContain('role="switch"');
+    expect(markup).toContain('aria-checked="true"');
+    expect(markup).toContain("Miễn phí / Không thu tiền");
+    expect(markup).toContain("min-h-11");
   });
 });

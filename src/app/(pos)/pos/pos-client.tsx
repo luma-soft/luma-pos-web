@@ -20,6 +20,7 @@ import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-acti
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
 import { CustomerCreateDialog, type CustomerCreateResult } from "@/components/partners/customer-create-dialog";
 import { CameraQuotePanel, type CameraQuotePackage } from "@/components/pos/camera-quote-panel";
+import { FreeLinePriceControl } from "@/components/pos/free-line-price-control";
 import {
   buildPosUnitOptions,
   PosCartScrollSurface,
@@ -42,6 +43,14 @@ import type { PosData, PosProduct, PosUnit } from "@/lib/data/pos";
 import { isProductStockManaged } from "@/lib/product-stock";
 import { rehydrateCartProducts } from "@/lib/pos/rehydrate-cart-products";
 import { buildPosOrderItemPayload } from "@/lib/pos/order-item-payload";
+import {
+  createLinePriceEditorState,
+  resolveLinePriceEditor,
+  setLineDiscountInput,
+  setLineDiscountMode,
+  setLineFree,
+  setLinePriceInput,
+} from "@/lib/pos/line-price-editor";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPosProduct } from "@/lib/pos/product-catalog-adapter";
 
@@ -2622,18 +2631,14 @@ function LinePriceEditor({
   onClose: () => void;
 }) {
   const t = useTranslations();
-  const [price, setPrice] = useState(String(line.unitPrice));
-  const [discMode, setDiscMode] = useState<"vnd" | "pct">("vnd");
-  // khởi tạo ô giảm giá theo VND hiện có
-  const [disc, setDisc] = useState(String(line.lineDiscount ?? 0));
-
-  const priceNum = Math.max(0, Number(price) || 0);
-  const discNum = Math.max(0, Number(disc) || 0);
-  const discVnd = discMode === "pct" ? Math.round((priceNum * discNum) / 100) : discNum;
-  const sell = Math.max(0, priceNum - discVnd);
+  const [editor, setEditor] = useState(() =>
+    createLinePriceEditorState(line.unitPrice, line.lineDiscount ?? 0)
+  );
+  const resolved = resolveLinePriceEditor(editor);
+  const discountInput = Math.max(0, Number(editor.discount) || 0);
 
   function apply() {
-    onApply(priceNum, discVnd);
+    onApply(resolved.unitPrice, resolved.lineDiscount);
   }
 
   return (
@@ -2650,23 +2655,36 @@ function LinePriceEditor({
         <div className="flex items-center justify-between gap-2">
           <span className="text-slate-500 shrink-0">{t("pos.priceEditor.unitPrice")}</span>
           <MoneyInput
-            value={price} autoFocus
-            onChange={(v) => setPrice(v == null ? "" : String(v))}
+            value={editor.price} autoFocus
+            onChange={(v) => setEditor((state) =>
+              setLinePriceInput(state, v == null ? "" : String(v))
+            )}
             className="no-spinner min-h-11 w-40 rounded-md border border-border bg-surface px-2 py-1.5 text-right"
           />
         </div>
         <div className="flex items-center justify-between gap-2">
           <span className="text-slate-500 shrink-0">{t("pos.priceEditor.discount")}</span>
-          <AmountModeInput
-            value={discNum}
-            mode={discMode}
-            onValueChange={(v) => setDisc(String(v))}
-            onModeChange={setDiscMode}
-          />
+          <fieldset disabled={editor.free} className="m-0 min-w-0 border-0 p-0 disabled:opacity-50">
+            <AmountModeInput
+              value={discountInput}
+              mode={editor.discountMode}
+              onValueChange={(v) => setEditor((state) =>
+                setLineDiscountInput(state, String(v))
+              )}
+              onModeChange={(mode) => setEditor((state) =>
+                setLineDiscountMode(state, mode)
+              )}
+            />
+          </fieldset>
         </div>
+        <FreeLinePriceControl
+          checked={editor.free}
+          label={t("pos.priceEditor.free")}
+          onCheckedChange={(free) => setEditor((state) => setLineFree(state, free))}
+        />
         <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
           <span className="text-slate-500 shrink-0">{t("pos.priceEditor.sellPrice")}</span>
-          <span className="font-bold text-primary-600 tabular-nums">{formatCurrency(sell)}</span>
+          <span className="font-bold text-primary-600 tabular-nums">{formatCurrency(resolved.sellPrice)}</span>
         </div>
         <div className="flex gap-2 pt-1">
           <button onClick={onClose} className="flex-1 min-h-11 py-2 rounded-lg border border-border text-slate-600 dark:text-slate-300 font-medium">

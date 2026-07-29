@@ -571,6 +571,7 @@
       "unitPrice": "Unit price",
       "discount": "Discount",
       "sellPrice": "Sell price",
+      "free": "Free / No charge",
       "editHint": "Edit price / discount"
     },
     "noSearchResults": "No matching products",
