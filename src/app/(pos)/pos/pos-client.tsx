@@ -457,6 +457,26 @@ function currentTimestamp(): number {
   return Date.now();
 }
 
+function PosProductThumbnail({ product }: { product: PosProduct }) {
+  const imageUrl = Array.isArray(product.imageUrls) && typeof product.imageUrls[0] === "string"
+    ? product.imageUrls[0].trim()
+    : "";
+  const [imageFailed, setImageFailed] = useState(false);
+
+  return (
+    <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-md bg-surface-2 text-lg">
+      {imageUrl && !imageFailed ? (
+        <img
+          src={imageUrl}
+          alt=""
+          className="h-full w-full object-cover"
+          onError={() => setImageFailed(true)}
+        />
+      ) : categoryEmoji(product.categoryName)}
+    </div>
+  );
+}
+
 export function PosClient({
   data,
   printTemplate,
@@ -1856,11 +1876,7 @@ export function PosClient({
                           key={p.id}
                           selected={Boolean(line)}
                           onClick={line ? undefined : () => selectProduct(p)}
-                          leading={(
-                            <div className="grid h-9 w-9 place-items-center rounded-md bg-surface-2 text-lg">
-                              {categoryEmoji(p.categoryName)}
-                            </div>
-                          )}
+                          leading={<PosProductThumbnail product={p} />}
                           summary={(
                             <>
                             <div className="text-sm font-medium whitespace-normal break-words">{p.name}</div>
