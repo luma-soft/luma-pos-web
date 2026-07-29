@@ -7,6 +7,7 @@ export interface PriceBookRow {
   name: string;
   isDefault: boolean;
   managerOnly: boolean;
+  costBased: boolean;
   sortOrder: number;
 }
 
@@ -18,6 +19,7 @@ export async function getPriceBooks(options?: { includeManagerOnly?: boolean }):
       name: priceBooks.name,
       isDefault: priceBooks.isDefault,
       managerOnly: priceBooks.managerOnly,
+      costBased: priceBooks.costBased,
       sortOrder: priceBooks.sortOrder,
     })
     .from(priceBooks)

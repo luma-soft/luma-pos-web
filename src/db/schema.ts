@@ -174,6 +174,8 @@ export const priceBooks = pgTable("price_books", {
   isDefault: boolean("is_default").notNull().default(false),
   // Bảng giá nội bộ (ví dụ giá nhập) chỉ owner/manager được chọn khi bán hàng.
   managerOnly: boolean("manager_only").notNull().default(false),
+  // Bảng giá vốn luôn lấy products.costPrice hiện tại, không dùng giá override tĩnh.
+  costBased: boolean("cost_based").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

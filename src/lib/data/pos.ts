@@ -28,6 +28,9 @@ function posProductSelect(warehouseId: string | null, hasComplianceColumns: bool
     variantName: products.variantName,
     isVariantParent: products.isVariantParent,
     baseUnit: products.baseUnit,
+    // Chỉ dùng nội bộ để gắn vào bảng giá vốn cho owner/manager bên dưới.
+    // Không trả trực tiếp trường này ra client.
+    costPrice: products.costPrice,
     retailPrice: products.retailPrice,
     wholesalePrice: products.wholesalePrice,
     contractorPrice: products.contractorPrice,
@@ -95,6 +98,25 @@ function attachChildren<
     ...root,
     children: root.isVariantParent ? byParent.get(root.id) ?? [] : [],
   }));
+}
+
+/**
+ * Bảng giá vốn không lưu product_prices, vì giá vốn có thể đổi sau mỗi phiếu nhập.
+ * Chỉ nhúng giá vốn vào map giá khi caller đã được phép đọc bảng giá nội bộ.
+ */
+type CostPriceBookProduct = {
+  costPrice: string;
+  prices: Record<string, string>;
+  children: CostPriceBookProduct[];
+};
+
+function applyCostPriceBooks(rows: CostPriceBookProduct[], costBookIds: string[]): void {
+  for (const product of rows) {
+    Object.assign(product.prices, Object.fromEntries(costBookIds.map((bookId) => [bookId, product.costPrice])));
+    applyCostPriceBooks(product.children, costBookIds);
+    // costPrice là dữ liệu nhạy cảm: chỉ trả ra dưới priceBookId nội bộ khi được phép.
+    delete (product as { costPrice?: string }).costPrice;
+  }
 }
 
 function activeRootCondition() {
@@ -221,6 +243,11 @@ export async function getPosData(options?: {
   for (const p of promoRows) {
     if (isPromoActive(p)) promoByProduct[p.productId] = p.tiers ?? [];
   }
+
+  const costBookIds = options?.role === "owner" || options?.role === "manager"
+    ? priceBookRows.filter((book) => book.costBased).map((book) => book.id)
+    : [];
+  applyCostPriceBooks(productsForPos as unknown as CostPriceBookProduct[], costBookIds);
 
   return {
     warehouse: defaultWh ?? null,

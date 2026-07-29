@@ -1,6 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { products, productComboItems, productPrices, productUnits, promotions } from "@/db/schema";
+import { products, productComboItems, productPrices, productUnits, promotions, priceBooks } from "@/db/schema";
 import { applyPromo, isPromoActive } from "@/lib/promo";
 import type { CreateOrderOutput, UpdateOrderOutput } from "@/lib/schemas/order";
 
@@ -54,12 +54,13 @@ export async function normalizeOrderItems(
   const productIds = [...new Set(rawItems.map((i) => i.productId))];
   if (productIds.length === 0) throw new Error("INVALID_ITEMS");
 
-  const [productRows, unitRows, priceRows, promoRows, comboRows] = await Promise.all([
+  const [productRows, unitRows, priceRows, priceBookRows, promoRows, comboRows] = await Promise.all([
     db
       .select({
         id: products.id,
         name: products.name,
         baseUnit: products.baseUnit,
+        costPrice: products.costPrice,
         retailPrice: products.retailPrice,
         isActive: products.isActive,
         productKind: products.productKind,
@@ -80,6 +81,13 @@ export async function normalizeOrderItems(
           .select({ productId: productPrices.productId, price: productPrices.price })
           .from(productPrices)
           .where(and(eq(productPrices.priceBookId, priceBookId), inArray(productPrices.productId, productIds)))
+      : Promise.resolve([]),
+    priceBookId
+      ? db
+          .select({ costBased: priceBooks.costBased })
+          .from(priceBooks)
+          .where(eq(priceBooks.id, priceBookId))
+          .limit(1)
       : Promise.resolve([]),
     db
       .select({
@@ -134,7 +142,11 @@ export async function normalizeOrderItems(
     if (unit === undefined) throw new Error("UNIT_NOT_FOUND");
 
     const multiplier = unit ? Number(unit.multiplier) : 1;
-    const listedPrice = listedUnitPrice(product, unit, priceByProduct.get(product.id));
+    const listedPrice = listedUnitPrice(
+      product,
+      unit,
+      priceBookRows[0]?.costBased ? product.costPrice : priceByProduct.get(product.id),
+    );
     const manualUnitPrice = item.manualUnitPrice;
     const lineDiscount = Math.max(0, item.lineDiscount ?? 0);
     const baseQty = item.quantity * multiplier;
