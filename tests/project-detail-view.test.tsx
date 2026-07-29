@@ -155,5 +155,6 @@ describe("ProjectDetailView", () => {
     expectSharedDetailContent(modalHtml);
     expect(modalHtml).not.toContain("<header");
     expect(modalHtml).not.toContain('href="/services?tab=projects"');
+    expect(modalHtml).toContain("flex justify-end px-4 py-4 sm:px-6");
   });
 });
