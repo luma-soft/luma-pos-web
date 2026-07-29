@@ -533,8 +533,8 @@ describe("final mobile table surfaces", () => {
     expect(
       (multi as React.ReactElement<{ className: string }>).props.className
         .split(/\s+/),
-    ).toContain("w-full");
-    expect(String(select.props.rootClassName).split(/\s+/)).toContain("w-full");
+    ).not.toContain("w-full");
+    expect(select.props.menuMinWidth).toBe(160);
     expect(select.props.wrapLabel).toBe(true);
 
     const clickEvent = { type: "click" };

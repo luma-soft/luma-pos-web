@@ -34,6 +34,8 @@ export interface SelectProps
   optionClassName?: string;
   /** Applied to the non-portaled root wrapper when Select participates in flex/grid layout. */
   rootClassName?: string;
+  /** Minimum width in pixels for the portaled options menu. */
+  menuMinWidth?: number;
 }
 
 export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
@@ -54,6 +56,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
       wrapLabel = false,
       optionClassName,
       rootClassName,
+      menuMinWidth,
       disabled,
       ...props
     },
@@ -76,7 +79,11 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
       if (!root || typeof window === "undefined") return;
       const rect = root.getBoundingClientRect();
       const margin = 8;
-      const width = rect.width;
+      const maxWidth = Math.max(0, window.innerWidth - margin * 2);
+      const width = Math.min(
+        Math.max(rect.width, menuMinWidth ?? 0),
+        maxWidth,
+      );
       const left = Math.min(Math.max(rect.left, margin), Math.max(margin, window.innerWidth - width - margin));
       const availableBelow = window.innerHeight - rect.bottom - margin;
       const availableAbove = rect.top - margin;
@@ -90,7 +97,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
         width,
         maxHeight,
       });
-    }, []);
+    }, [menuMinWidth]);
 
     React.useLayoutEffect(() => {
       if (open) updateMenuPosition();

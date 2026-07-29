@@ -421,7 +421,7 @@ export function ProductUnitSelector({
       onClick={stopRowToggle}
       onPointerDown={stopRowToggle}
       onKeyDown={stopRowToggle}
-      className="w-full max-w-full"
+      className="inline-block max-w-full"
     >
       <Select
         value={value}
@@ -436,8 +436,9 @@ export function ProductUnitSelector({
         aria-label={`Đơn vị tính ${productName}`}
         size="sm"
         wrapLabel
-        rootClassName="w-full max-w-full"
-        className="w-full max-w-full text-slate-600 dark:text-slate-300"
+        menuMinWidth={160}
+        rootClassName="max-w-full"
+        className="max-w-full text-slate-600 dark:text-slate-300"
       />
     </div>
   );
