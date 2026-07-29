@@ -492,6 +492,177 @@ describe("final mobile table surfaces", () => {
     expect(stoppedRowToggleEvents).toEqual([clickEvent]);
   });
 
+  test("product unit selector renders alternate units and isolates row events", async () => {
+    const {
+      ProductUnitSelector,
+    } = await import("@/app/(app)/inventory/tabs/products-table");
+    const changes: string[] = [];
+
+    const single = ProductUnitSelector({
+      productName: "Router",
+      baseUnit: "cái",
+      units: [],
+      value: "cái",
+      onChange: () => undefined,
+    });
+    expect(renderToStaticMarkup(single)).not.toContain("<select");
+    expect(renderToStaticMarkup(single)).toContain("cái");
+
+    const multi = ProductUnitSelector({
+      productName: "Dây mạng",
+      baseUnit: "m",
+      units: [
+        { unitName: "cuộn", multiplier: "305", priceOverride: null },
+      ],
+      value: "m",
+      onChange: (unitName) => changes.push(unitName),
+    });
+    const multiHtml = renderToStaticMarkup(multi);
+    const select = elementsOfType(multi, "select")[0];
+
+    expect(multiHtml).toContain('aria-label="Đơn vị tính Dây mạng"');
+    expect(multiHtml).toContain('<option value="m" selected="">m</option>');
+    expect(multiHtml).toContain('<option value="cuộn">cuộn</option>');
+
+    const clickEvent = { type: "click" };
+    const pointerEvent = { type: "pointerdown" };
+    const keyEvent = { type: "keydown" };
+    const changeEvent = { currentTarget: { value: "cuộn" } };
+    stoppedRowToggleEvents.length = 0;
+    (select.props.onClick as (event: unknown) => void)(clickEvent);
+    (select.props.onPointerDown as (event: unknown) => void)(pointerEvent);
+    (select.props.onKeyDown as (event: unknown) => void)(keyEvent);
+    (
+      select.props.onChange as (
+        event: { currentTarget: { value: string } },
+      ) => void
+    )(changeEvent);
+
+    expect(stoppedRowToggleEvents).toEqual([
+      clickEvent,
+      pointerEvent,
+      keyEvent,
+      changeEvent,
+    ]);
+    expect(changes).toEqual(["cuộn"]);
+  });
+
+  test("product unit columns render and sort by the selected unit", async () => {
+    const {
+      ProductUnitSelector,
+      buildProductUnitColumns,
+    } = await import("@/app/(app)/inventory/tabs/products-table");
+    const changes: string[] = [];
+    const cable = {
+      id: "cable-1",
+      name: "Dây mạng TAESUNG",
+      categoryName: "Dây Mạng",
+      productKind: "product",
+      baseUnit: "m",
+      costPrice: "3500",
+      minCostPrice: "3500",
+      maxCostPrice: "3500",
+      retailPrice: "4400",
+      minRetailPrice: "4400",
+      maxRetailPrice: "4400",
+      totalStock: "1000",
+      reservedStock: "25",
+      minLevel: "50",
+      isVariantParent: false,
+      unitDefinitions: [
+        {
+          unitName: "cuộn",
+          multiplier: "500",
+          priceOverride: "2100000",
+        },
+      ],
+    };
+    const columns = buildProductUnitColumns({
+      labels: {
+        units: "Đơn vị",
+        cost: "Giá nhập",
+        salePrice: "Giá bán",
+        stock: "Tồn kho",
+        stockNotTracked: "Không theo dõi tồn",
+      },
+      selectedUnitName: () => "cuộn",
+      onUnitChange: (_product, unitName) => changes.push(unitName),
+    });
+    const column = (key: string) => columns.find((item) => item.key === key)!;
+
+    const unitControl = column("units").render(cable as never);
+    const select = elementsOfType(unitControl, ProductUnitSelector)[0];
+    (
+      select.props.onChange as (unitName: string) => void
+    )("m");
+
+    expect(changes).toEqual(["m"]);
+    expect(renderToStaticMarkup(column("cost").render(cable as never)))
+      .toContain("1.750.000");
+    expect(renderToStaticMarkup(column("salePrice").render(cable as never)))
+      .toContain("2.100.000");
+    expect(renderToStaticMarkup(column("stock").render(cable as never)))
+      .toContain("2 cuộn");
+    expect(column("cost").sortValue?.(cable as never)).toBe(1_750_000);
+    expect(column("salePrice").sortValue?.(cable as never)).toBe(2_100_000);
+    expect(column("stock").sortValue?.(cable as never)).toBe(2);
+  });
+
+  test("product mobile row displays the selected unit without nesting controls", async () => {
+    const {
+      ProductMobileRow,
+      ProductUnitSelector,
+    } = await import("@/app/(app)/inventory/tabs/products-table");
+    const calls: string[] = [];
+    const cable = {
+      id: "cable-mobile-1",
+      name: "Dây điện thoại TAESUNG",
+      sku: "506640",
+      categoryName: "Điện",
+      productKind: "product",
+      imageUrls: [],
+      minRetailPrice: "4400",
+      maxRetailPrice: "4400",
+      costPrice: "3500",
+      retailPrice: "4400",
+      totalStock: "1000",
+      reservedStock: "25",
+      minLevel: "50",
+      baseUnit: "m",
+      unitDefinitions: [
+        {
+          unitName: "cuộn",
+          multiplier: "500",
+          priceOverride: "2100000",
+        },
+      ],
+    };
+    const row = ProductMobileRow({
+      product: cable as never,
+      selectionEnabled: false,
+      selected: false,
+      selectLabel: "Chọn Dây điện thoại TAESUNG",
+      stockNotTrackedLabel: "Không theo dõi tồn",
+      selectedUnitName: "cuộn",
+      onUnitChange: (unitName) => calls.push(`unit:${unitName}`),
+      onToggle: () => calls.push("toggle"),
+      onOpen: () => calls.push("open"),
+    });
+    const html = renderToStaticMarkup(row);
+    const openButton = elementsOfType(row, "button")[0];
+    const rowSelector = elementsOfType(row, ProductUnitSelector)[0];
+
+    expect(html).toContain("2.100.000");
+    expect(html).toContain("2 cuộn");
+    expect(elementsOfType(
+      openButton.props.children as ReactNode,
+      ProductUnitSelector,
+    )).toHaveLength(0);
+    (rowSelector.props.onChange as (unitName: string) => void)("m");
+
+    expect(calls).toEqual(["unit:m"]);
+  });
+
   test("product mobile row and select-all toolbar invoke the existing selection seams", async () => {
     const {
       ProductMobileRow,
@@ -509,10 +680,14 @@ describe("final mobile table surfaces", () => {
       imageUrls: [],
       minRetailPrice: "999999999999",
       maxRetailPrice: "1999999999999",
+      costPrice: "750000",
       retailPrice: "1250000",
       totalStock: "8",
+      reservedStock: "0",
       minLevel: "1",
       baseUnit: "cái",
+      isVariantParent: true,
+      unitDefinitions: [],
     };
     const row = ProductMobileRow({
       product: product as never,
@@ -520,6 +695,8 @@ describe("final mobile table surfaces", () => {
       selected: false,
       selectLabel: "Chọn Camera chọn hàng loạt",
       stockNotTrackedLabel: "Không theo dõi tồn",
+      selectedUnitName: "cái",
+      onUnitChange: (unitName) => calls.push(`unit:${unitName}`),
       onToggle: () => calls.push("toggle:product-mobile-1"),
       onOpen: () => calls.push("open:product-mobile-1"),
     });

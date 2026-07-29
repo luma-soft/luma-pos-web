@@ -45,6 +45,10 @@ import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { positionFloatingMenu } from "@/lib/floating-menu-position";
 import type { ProductListResult } from "@/lib/data/products";
 import {
+  projectProductUnit,
+  type ProductListUnit,
+} from "@/lib/product-unit-projection";
+import {
   isProductStockManaged,
   productStockDisplay,
 } from "@/lib/product-stock";
@@ -78,6 +82,154 @@ const MOVEMENT_TYPE_KEYS: Record<string, string> = {
   internal_use: "internalUse",
 };
 
+function unitProjection(product: ProductRow, selectedUnitName: string) {
+  return projectProductUnit({
+    baseUnit: product.baseUnit,
+    costPrice: product.costPrice,
+    retailPrice: product.retailPrice,
+    totalStock: product.totalStock,
+    reservedStock: product.reservedStock,
+    minLevel: product.minLevel,
+    unitDefinitions: product.unitDefinitions,
+    selectedUnitName,
+  });
+}
+
+function selectedUnitDefinition(
+  product: ProductRow,
+  selectedUnitName: string,
+) {
+  return product.unitDefinitions.find(
+    (unit) => unit.unitName === selectedUnitName,
+  );
+}
+
+export function buildProductUnitColumns({
+  labels,
+  selectedUnitName,
+  onUnitChange,
+}: {
+  labels: {
+    units: string;
+    cost: string;
+    salePrice: string;
+    stock: string;
+    stockNotTracked: string;
+  };
+  selectedUnitName: (product: ProductRow) => string;
+  onUnitChange: (product: ProductRow, unitName: string) => void;
+}): DataTableColumn<ProductRow>[] {
+  const projection = (product: ProductRow) =>
+    unitProjection(product, selectedUnitName(product));
+
+  const costRange = (product: ProductRow) => {
+    const projected = projection(product);
+    if (!product.isVariantParent) return formatCurrency(projected.costPrice);
+    return priceRange(
+      Number(product.minCostPrice) * projected.multiplier,
+      Number(product.maxCostPrice) * projected.multiplier,
+      projected.costPrice,
+    );
+  };
+
+  const retailRange = (product: ProductRow) => {
+    const selectedName = selectedUnitName(product);
+    const projected = unitProjection(product, selectedName);
+    if (!product.isVariantParent) return formatCurrency(projected.retailPrice);
+
+    const unit = selectedUnitDefinition(product, selectedName);
+    if (
+      unit?.priceOverride !== null
+      && unit?.priceOverride !== undefined
+      && Number.isFinite(Number(unit.priceOverride))
+    ) {
+      return formatCurrency(projected.retailPrice);
+    }
+
+    return priceRange(
+      Number(product.minRetailPrice) * projected.multiplier,
+      Number(product.maxRetailPrice) * projected.multiplier,
+      projected.retailPrice,
+    );
+  };
+
+  return [
+    {
+      key: "units",
+      label: labels.units,
+      defaultVisible: true,
+      render: (product) => (
+        <ProductUnitSelector
+          productName={product.name}
+          baseUnit={product.baseUnit}
+          units={product.unitDefinitions}
+          value={projection(product).unitName}
+          onChange={(unitName) => onUnitChange(product, unitName)}
+        />
+      ),
+    },
+    {
+      key: "cost",
+      label: labels.cost,
+      defaultVisible: true,
+      align: "right",
+      render: costRange,
+      sortValue: (product) =>
+        product.isVariantParent
+          ? Number(product.minCostPrice) * projection(product).multiplier
+          : projection(product).costPrice,
+    },
+    {
+      key: "salePrice",
+      label: labels.salePrice,
+      defaultVisible: true,
+      align: "right",
+      cellClassName: "font-semibold",
+      render: retailRange,
+      sortValue: (product) => {
+        const selectedName = selectedUnitName(product);
+        const projected = unitProjection(product, selectedName);
+        const unit = selectedUnitDefinition(product, selectedName);
+        const hasOverride =
+          unit?.priceOverride !== null
+          && unit?.priceOverride !== undefined
+          && Number.isFinite(Number(unit.priceOverride));
+        return product.isVariantParent && !hasOverride
+          ? Number(product.minRetailPrice) * projected.multiplier
+          : projected.retailPrice;
+      },
+    },
+    {
+      key: "stock",
+      label: labels.stock,
+      defaultVisible: true,
+      align: "right",
+      cellClassName: (product) => {
+        if (!isProductStockManaged(product.categoryName, product.productKind)) {
+          return "font-medium text-slate-400";
+        }
+        const projected = projection(product);
+        return projected.minLevel > 0
+          && projected.totalStock <= projected.minLevel
+          ? "font-semibold text-er"
+          : "font-semibold text-slate-700 dark:text-slate-300";
+      },
+      render: (product) => {
+        const projected = projection(product);
+        return productStockDisplay(
+          {
+            ...product,
+            totalStock: projected.totalStock,
+            baseUnit: projected.unitName,
+          },
+          labels.stockNotTracked,
+        );
+      },
+      sortValue: (product) => projection(product).totalStock,
+    },
+  ];
+}
+
 export function ProductsTable({
   rows,
   selectionEnabled = true,
@@ -89,6 +241,14 @@ export function ProductsTable({
   const router = useRouter();
   const { selectedIds, selectedVisibleIds, allSelected, toggle, toggleAll } =
     useProductSelection();
+  const [selectedUnits, setSelectedUnits] = useState<Record<string, string>>({});
+
+  const selectedUnitName = (product: ProductRow) =>
+    selectedUnits[product.id] ?? product.baseUnit;
+
+  const changeUnit = (productId: string, unitName: string) => {
+    setSelectedUnits((current) => ({ ...current, [productId]: unitName }));
+  };
 
   function openProduct(product: ProductRow) {
     router.push(Routes.productDetail(product.id), { scroll: false });
@@ -139,24 +299,17 @@ export function ProductsTable({
       ),
     },
     { key: "category", label: t("products.list.colCategory"), defaultVisible: true, render: (product) => <span className="text-slate-500">{product.categoryName ?? "—"}</span> },
-    { key: "units", label: t("products.list.colUnits"), defaultVisible: true, render: (product) => <span className="text-slate-500">{product.baseUnit}{product.unitNames ? ` · ${product.unitNames}` : ""}</span> },
-    { key: "cost", label: t("products.list.colCost"), defaultVisible: true, align: "right", render: (product) => priceRange(product.minCostPrice, product.maxCostPrice, product.costPrice) },
-    { key: "salePrice", label: t("products.list.colSalePrice"), defaultVisible: true, align: "right", cellClassName: "font-semibold", render: (product) => priceRange(product.minRetailPrice, product.maxRetailPrice, product.retailPrice) },
-    {
-      key: "stock",
-      label: t("products.list.colStock"),
-      defaultVisible: true,
-      align: "right",
-      cellClassName: (product) => {
-        if (!isProductStockManaged(product.categoryName, product.productKind)) {
-          return "font-medium text-slate-400";
-        }
-        const stock = Number(product.totalStock);
-        const min = Number(product.minLevel);
-        return min > 0 && stock <= min ? "font-semibold text-er" : "font-semibold text-slate-700 dark:text-slate-300";
+    ...buildProductUnitColumns({
+      labels: {
+        units: t("products.list.colUnits"),
+        cost: t("products.list.colCost"),
+        salePrice: t("products.list.colSalePrice"),
+        stock: t("products.list.colStock"),
+        stockNotTracked: t("products.stock.notTracked"),
       },
-      render: (product) => productStockDisplay(product, t("products.stock.notTracked")),
-    },
+      selectedUnitName,
+      onUnitChange: (product, unitName) => changeUnit(product.id, unitName),
+    }),
     { key: "status", label: t("products.list.colStatus"), defaultVisible: true, render: (product) => <StatusBadge product={product} /> },
   ];
 
@@ -199,6 +352,8 @@ export function ProductsTable({
               name: product.name,
             })}
             stockNotTrackedLabel={t("products.stock.notTracked")}
+            selectedUnitName={selectedUnitName(product)}
+            onUnitChange={(unitName) => changeUnit(product.id, unitName)}
             onToggle={() => toggle(product.id)}
             onOpen={() => openProduct(product)}
           />
@@ -243,12 +398,54 @@ export function ProductMobileSelectionToolbar({
   );
 }
 
+export function ProductUnitSelector({
+  productName,
+  baseUnit,
+  units,
+  value,
+  onChange,
+}: {
+  productName: string;
+  baseUnit: string;
+  units: readonly ProductListUnit[];
+  value: string;
+  onChange: (unitName: string) => void;
+}) {
+  if (units.length === 0) {
+    return <span className="text-slate-500">{baseUnit}</span>;
+  }
+
+  return (
+    <select
+      value={value}
+      onChange={(event) => {
+        stopRowToggle(event);
+        onChange(event.currentTarget.value);
+      }}
+      onClick={stopRowToggle}
+      onPointerDown={stopRowToggle}
+      onKeyDown={stopRowToggle}
+      aria-label={`Đơn vị tính ${productName}`}
+      className="min-h-9 max-w-full rounded-lg border border-border-soft bg-surface px-2 py-1 text-sm text-slate-600 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:text-slate-300"
+    >
+      <option value={baseUnit}>{baseUnit}</option>
+      {units.map((unit) => (
+        <option key={unit.unitName} value={unit.unitName}>
+          {unit.unitName}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 export function ProductMobileRow({
   product,
   selectionEnabled,
   selected,
   selectLabel,
   stockNotTrackedLabel,
+  selectedUnitName,
+  onUnitChange,
   onToggle,
   onOpen,
 }: {
@@ -257,9 +454,25 @@ export function ProductMobileRow({
   selected: boolean;
   selectLabel: string;
   stockNotTrackedLabel: string;
+  selectedUnitName: string;
+  onUnitChange: (unitName: string) => void;
   onToggle: () => void;
   onOpen: () => void;
 }) {
+  const projected = unitProjection(product, selectedUnitName);
+  const selectedUnit = selectedUnitDefinition(product, selectedUnitName);
+  const hasRetailOverride =
+    selectedUnit?.priceOverride !== null
+    && selectedUnit?.priceOverride !== undefined
+    && Number.isFinite(Number(selectedUnit.priceOverride));
+  const retailDisplay = product.isVariantParent && !hasRetailOverride
+    ? priceRange(
+        Number(product.minRetailPrice) * projected.multiplier,
+        Number(product.maxRetailPrice) * projected.multiplier,
+        projected.retailPrice,
+      )
+    : formatCurrency(projected.retailPrice);
+
   return (
     <div className={cn("flex min-w-0 items-stretch", selected && "bg-primary-50/50 dark:bg-primary-950/20")}>
       {selectionEnabled && (
@@ -271,27 +484,47 @@ export function ProductMobileRow({
           />
         </div>
       )}
-      <button type="button" onClick={onOpen} className="min-h-11 min-w-11 flex-1 p-3 text-left">
-        <div className="grid min-w-0 gap-2">
-          <div className="flex min-w-0 items-center gap-3">
-            <ProductThumbnail product={product} />
-            <div className="min-w-0 flex-1">
-              <div className="break-words text-sm font-semibold text-slate-950 dark:text-white">{product.name}</div>
-              <div className="mt-0.5 break-words text-xs text-slate-400">
-                {product.sku}{product.categoryName ? ` · ${product.categoryName}` : ""}
+      <div className="min-w-0 flex-1">
+        <button type="button" onClick={onOpen} className="min-h-11 min-w-11 w-full p-3 text-left">
+          <div className="grid min-w-0 gap-2">
+            <div className="flex min-w-0 items-center gap-3">
+              <ProductThumbnail product={product} />
+              <div className="min-w-0 flex-1">
+                <div className="break-words text-sm font-semibold text-slate-950 dark:text-white">{product.name}</div>
+                <div className="mt-0.5 break-words text-xs text-slate-400">
+                  {product.sku}{product.categoryName ? ` · ${product.categoryName}` : ""}
+                </div>
               </div>
             </div>
+            <div className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-2 sm:items-center">
+              <p className="min-w-0 break-words text-sm font-bold tabular-nums text-primary-700 dark:text-primary-300 sm:col-start-2 sm:row-start-1 sm:text-right">
+                {retailDisplay}
+              </p>
+              <span className="inline-flex min-w-0 max-w-full justify-self-start break-words rounded-md bg-primary-50 px-2 py-1 text-[11px] font-semibold tabular-nums text-primary-700 dark:bg-primary-950/60 dark:text-primary-300 sm:col-start-1 sm:row-start-1">
+                {productStockDisplay(
+                  {
+                    ...product,
+                    totalStock: projected.totalStock,
+                    baseUnit: projected.unitName,
+                  },
+                  stockNotTrackedLabel,
+                )}
+              </span>
+            </div>
           </div>
-          <div className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-2 sm:items-center">
-            <p className="min-w-0 break-words text-sm font-bold tabular-nums text-primary-700 dark:text-primary-300 sm:col-start-2 sm:row-start-1 sm:text-right">
-              {priceRange(product.minRetailPrice, product.maxRetailPrice, product.retailPrice)}
-            </p>
-            <span className="inline-flex min-w-0 max-w-full justify-self-start break-words rounded-md bg-primary-50 px-2 py-1 text-[11px] font-semibold tabular-nums text-primary-700 dark:bg-primary-950/60 dark:text-primary-300 sm:col-start-1 sm:row-start-1">
-              {productStockDisplay(product, stockNotTrackedLabel)}
-            </span>
+        </button>
+        {product.unitDefinitions.length > 0 && (
+          <div className="px-3 pb-3">
+            <ProductUnitSelector
+              productName={product.name}
+              baseUnit={product.baseUnit}
+              units={product.unitDefinitions}
+              value={projected.unitName}
+              onChange={onUnitChange}
+            />
           </div>
-        </div>
-      </button>
+        )}
+      </div>
     </div>
   );
 }
