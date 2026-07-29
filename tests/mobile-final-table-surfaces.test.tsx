@@ -667,6 +667,44 @@ describe("final mobile table surfaces", () => {
       };
     };
 
+    const targetOrderIds = manyOrders
+      .slice(0, ORDER_BATCH_LIMIT)
+      .map((item) => item.id);
+    executedSelection = new Set(
+      manyOrders
+        .slice(10, 30)
+        .map((item) => item.id),
+    );
+    const mismatchedActual = renderActualOrders();
+    const mismatchedToolbar = mismatchedActual.table
+      .toolbar as React.ReactElement<Record<string, unknown>>;
+    expect(mismatchedToolbar.props.allSelected).toBe(false);
+    expect(mismatchedToolbar.props.partiallySelected).toBe(true);
+    const selectionColumn = (
+      mismatchedActual.table.columns as Array<Record<string, unknown>>
+    )[0];
+    const desktopMaster = selectionColumn.label as React.ReactElement<
+      Record<string, unknown>
+    >;
+    expect(desktopMaster.props.checked).toBe(false);
+    (mismatchedToolbar.props.onToggleAll as () => void)();
+    expect([...executedSelection]).toEqual(targetOrderIds);
+
+    const replacedActual = renderActualOrders();
+    expect(replacedActual.actualHtml.match(/name="ids"/g)).toHaveLength(
+      ORDER_BATCH_LIMIT,
+    );
+    expect(
+      [...replacedActual.actualHtml.matchAll(/name="ids" value="([^"]+)"/g)]
+        .map((match) => match[1]),
+    ).toEqual(targetOrderIds);
+    const replacedToolbar = replacedActual.table.toolbar as React.ReactElement<
+      Record<string, unknown>
+    >;
+    expect(replacedToolbar.props.selectedCount).toBe(ORDER_BATCH_LIMIT);
+    expect(replacedToolbar.props.allSelected).toBe(true);
+
+    executedSelection = new Set();
     const initialActual = renderActualOrders();
     expect(initialActual.table.renderMobileRow).toBeFunction();
     const initialToolbar = initialActual.table.toolbar as React.ReactElement<

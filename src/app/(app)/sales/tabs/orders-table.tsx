@@ -48,7 +48,10 @@ export function toggleAllOrderBatchSelection(
 ) {
   const current = normalizeOrderBatchSelection(selectedIds, selectableIds);
   const target = selectableIds.slice(0, ORDER_BATCH_LIMIT);
-  return current.size === target.length
+  const targetFullySelected =
+    target.length > 0 &&
+    target.every((id) => current.has(id));
+  return targetFullySelected
     ? new Set<string>()
     : new Set(target);
 }
@@ -228,10 +231,10 @@ export function OrdersTable({
     selectableIds,
   );
   const selectedVisibleIds = [...normalizedSelection];
-  const selectableCount = Math.min(selectableIds.length, ORDER_BATCH_LIMIT);
+  const targetIds = selectableIds.slice(0, ORDER_BATCH_LIMIT);
   const allSelected =
-    selectableCount > 0 &&
-    selectedVisibleIds.length === selectableCount;
+    targetIds.length > 0 &&
+    targetIds.every((id) => normalizedSelection.has(id));
   const selectionLimitReached =
     selectedVisibleIds.length >= ORDER_BATCH_LIMIT;
 
