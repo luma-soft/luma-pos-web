@@ -153,6 +153,67 @@ function classTokenScenarios(
     }
     return combined;
   };
+  const staticTruthiness = (child: ts.Expression): boolean | undefined => {
+    if (child.kind === ts.SyntaxKind.TrueKeyword) return true;
+    if (
+      child.kind === ts.SyntaxKind.FalseKeyword ||
+      child.kind === ts.SyntaxKind.NullKeyword
+    ) {
+      return false;
+    }
+    if (ts.isParenthesizedExpression(child)) {
+      return staticTruthiness(child.expression);
+    }
+    if (
+      ts.isPrefixUnaryExpression(child) &&
+      child.operator === ts.SyntaxKind.ExclamationToken
+    ) {
+      const operand = staticTruthiness(child.operand);
+      return operand === undefined ? undefined : !operand;
+    }
+    if (ts.isNumericLiteral(child)) return Number(child.text) !== 0;
+    if (
+      ts.isStringLiteral(child) ||
+      ts.isNoSubstitutionTemplateLiteral(child)
+    ) {
+      return child.text.length > 0;
+    }
+    return undefined;
+  };
+  const staticPropertyName = (
+    name: ts.PropertyName,
+  ): string | undefined => {
+    if (
+      ts.isIdentifier(name) ||
+      ts.isStringLiteral(name) ||
+      ts.isNumericLiteral(name) ||
+      ts.isNoSubstitutionTemplateLiteral(name)
+    ) {
+      return name.text;
+    }
+    if (ts.isComputedPropertyName(name)) {
+      const expression = name.expression;
+      if (
+        ts.isStringLiteral(expression) ||
+        ts.isNoSubstitutionTemplateLiteral(expression)
+      ) {
+        return expression.text;
+      }
+      if (ts.isIdentifier(expression)) return constants.get(expression.text);
+    }
+    return undefined;
+  };
+  const conditionalProperty = (
+    name: ts.PropertyName,
+    condition: ts.Expression,
+  ) => {
+    const resolved = staticPropertyName(name);
+    if (!resolved) return [[]];
+    const enabled = staticTruthiness(condition);
+    if (enabled === false) return [[]];
+    const present = [tokens(resolved)];
+    return enabled === true ? present : [[], ...present];
+  };
   const scenarios = (child: ts.Node): string[][] => {
     if (ts.isJsxExpression(child)) {
       return child.expression ? scenarios(child.expression) : [[]];
@@ -193,6 +254,26 @@ function classTokenScenarios(
         (result, element) => combine(result, scenarios(element)),
         [[]],
       );
+    }
+    if (ts.isObjectLiteralExpression(child)) {
+      return child.properties.reduce<string[][]>((result, property) => {
+        if (ts.isPropertyAssignment(property)) {
+          return combine(
+            result,
+            conditionalProperty(property.name, property.initializer),
+          );
+        }
+        if (ts.isShorthandPropertyAssignment(property)) {
+          return combine(
+            result,
+            conditionalProperty(property.name, property.name),
+          );
+        }
+        if (ts.isSpreadAssignment(property)) {
+          return combine(result, scenarios(property.expression));
+        }
+        return result;
+      }, [[]]);
     }
     if (ts.isTemplateExpression(child)) {
       return child.templateSpans.reduce<string[][]>(
@@ -459,7 +540,10 @@ function sharedControlHasUnsafeOverride(
 }
 
 function explicitMobileColumnDeclarations(source: ts.SourceFile) {
-  const declarations: ts.VariableDeclaration[] = [];
+  type BindingDeclaration =
+    | ts.VariableDeclaration
+    | ts.ParameterDeclaration;
+  const bindings: BindingDeclaration[] = [];
   const lexicalScope = (node: ts.Node) => {
     let current: ts.Node | undefined = node;
     while (
@@ -472,30 +556,49 @@ function explicitMobileColumnDeclarations(source: ts.SourceFile) {
     }
     return current ?? source;
   };
+  const functionScope = (node: ts.Node) => {
+    let current: ts.Node | undefined = node.parent;
+    while (current && !ts.isFunctionLike(current)) current = current.parent;
+    if (!current) return source;
+    return current.body && ts.isBlock(current.body) ? current.body : current;
+  };
+  const bindingScope = (declaration: BindingDeclaration) => {
+    if (ts.isParameter(declaration)) return functionScope(declaration);
+    if (
+      ts.isVariableDeclarationList(declaration.parent) &&
+      !(ts.getCombinedNodeFlags(declaration.parent) & ts.NodeFlags.BlockScoped)
+    ) {
+      return functionScope(declaration);
+    }
+    return lexicalScope(declaration);
+  };
   const isAncestor = (ancestor: ts.Node, node: ts.Node) =>
     ancestor.getStart(source) <= node.getStart(source) &&
     ancestor.getEnd() >= node.getEnd();
   const resolve = (identifier: ts.Identifier) => {
-    const candidates = declarations.filter((declaration) =>
+    const candidates = bindings.filter((declaration) =>
       ts.isIdentifier(declaration.name) &&
       declaration.name.text === identifier.text &&
-      declaration.getStart(source) < identifier.getStart(source) &&
-      isAncestor(lexicalScope(declaration), identifier),
+      isAncestor(bindingScope(declaration), identifier),
     );
     candidates.sort((a, b) => {
-      const scopeWidth = lexicalScope(a).getWidth(source) - lexicalScope(b).getWidth(source);
-      return scopeWidth || b.getStart(source) - a.getStart(source);
+      return bindingScope(a).getWidth(source) - bindingScope(b).getWidth(source);
     });
-    return candidates[0];
+    const nearest = candidates[0];
+    if (!nearest) return undefined;
+    const scope = bindingScope(nearest);
+    const sameScope = candidates.filter(
+      (candidate) => bindingScope(candidate) === scope,
+    );
+    return sameScope.length === 1 ? nearest : undefined;
   };
   const mobileDeclarations = new Set<ts.VariableDeclaration>();
   const visit = (node: ts.Node) => {
     if (
-      ts.isVariableDeclaration(node) &&
-      ts.isIdentifier(node.name) &&
-      node.type?.getText().includes("DataTableColumn")
+      (ts.isVariableDeclaration(node) || ts.isParameter(node)) &&
+      ts.isIdentifier(node.name)
     ) {
-      declarations.push(node);
+      bindings.push(node);
     }
     ts.forEachChild(node, visit);
   };
@@ -513,8 +616,14 @@ function explicitMobileColumnDeclarations(source: ts.SourceFile) {
         columns.expression &&
         ts.isIdentifier(columns.expression)
       ) {
-        const declaration = resolve(columns.expression);
-        if (declaration) mobileDeclarations.add(declaration);
+        const binding = resolve(columns.expression);
+        if (
+          binding &&
+          ts.isVariableDeclaration(binding) &&
+          binding.type?.getText().includes("DataTableColumn")
+        ) {
+          mobileDeclarations.add(binding);
+        }
       }
     }
     ts.forEachChild(node, associate);
@@ -890,6 +999,82 @@ describe("mobile active-control audit oracle", () => {
     expect(failures.map(({ tag }) => tag)).toEqual(["Link"]);
   });
 
+  test("resolves inferred and parameter shadowing before applying mobile column metadata", () => {
+    const failures = auditSource(
+      "fixture.tsx",
+      `
+        const columns: DataTableColumn<Row>[] = [{
+          key: "outer",
+          label: "Outer",
+          render: (row) => <Link href={"/outer/" + row.id}>{row.name}</Link>,
+        }];
+
+        function InferredShadow() {
+          {
+            const columns = [];
+            return <DataTableShell columns={columns} renderMobileRow={() => <div>inner</div>} />;
+          }
+        }
+
+        function InferredLetShadow() {
+          {
+            let columns = [];
+            return <DataTableShell columns={columns} renderMobileRow={() => <div>inner let</div>} />;
+          }
+        }
+
+        function ParameterShadow(columns: unknown) {
+          return <DataTableShell columns={columns} renderMobileRow={() => <div>parameter</div>} />;
+        }
+
+        const fallback = <DataTableShell columns={columns} />;
+      `,
+    );
+
+    expect(failures.map(({ tag }) => tag)).toEqual(["Link"]);
+  });
+
+  test("keeps ambiguous same-scope column bindings in the default mobile audit", () => {
+    const failures = auditSource(
+      "fixture.tsx",
+      `
+        const columns: DataTableColumn<Row>[] = [{
+          key: "ambiguous",
+          label: "Ambiguous",
+          render: (row) => <Link href={"/ambiguous/" + row.id}>{row.name}</Link>,
+        }];
+        const columns = [];
+        const table = <DataTableShell columns={columns} renderMobileRow={() => <div>custom</div>} />;
+      `,
+    );
+
+    expect(failures.map(({ tag }) => tag)).toEqual(["Link"]);
+  });
+
+  test("rejects unsafe conditional overrides in cn object arguments", () => {
+    const failures = auditSource(
+      "fixture.tsx",
+      `
+        const narrowWidth = "w-8";
+        export function Fixture() {
+          return <div>
+            <Button className={cn("h-11 w-11", { "w-8": compact })} />
+            <MoneyInput value={0} className={cn({ "min-h-0": compact })} />
+            <Button className={cn("h-11 w-11", { ["h-8"]: compact })} />
+            <Button className={cn("h-11 w-11", { [narrowWidth]: compact })} />
+          </div>;
+        }
+      `,
+    );
+
+    expect(failures.map(({ tag }) => tag)).toEqual([
+      "Button",
+      "MoneyInput",
+      "Button",
+      "Button",
+    ]);
+  });
+
   test("accepts persistent pre-lg sizing, safe label wrappers, and lg-only surfaces", () => {
     expect(
       auditSource(
@@ -910,6 +1095,16 @@ describe("mobile active-control audit oracle", () => {
                 value={0}
                 className={cn(compact && "min-h-0", "min-h-11")}
               />
+              <Button className={cn("h-11 w-11", { "w-8": false })} />
+              <Button
+                className={cn("h-11 w-11", { "w-8": compact }, "w-11")}
+              />
+              <MoneyInput
+                value={0}
+                className={cn({ "min-h-0": compact }, "min-h-11")}
+              />
+              <Button className={cn({ "w-11": roomy })} />
+              <Button className={cn("h-11 w-11", { compact })} />
             </div>;
           }
         `,
