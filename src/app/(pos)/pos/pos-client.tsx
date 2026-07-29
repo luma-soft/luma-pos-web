@@ -1616,7 +1616,7 @@ export function PosClient({
                     max={l.returnSoldQuantity}
                     readOnly={isCameraQuoteDraft}
                     size="sm"
-                    className={cn(unitOptions.length > 0 ? "w-full" : "w-[8.25rem]", stockInsufficient && "border-er text-er")}
+                    className={cn(unitOptions.length > 0 ? "w-full" : "w-[8.25rem]", stockInsufficient && "border-er text-er focus-within:border-er")}
                     inputClassName={cn(stockInsufficient && "border-er text-er")}
                   />
                 </div>
@@ -1692,7 +1692,7 @@ export function PosClient({
                     max={l.returnSoldQuantity}
                     readOnly={isCameraQuoteDraft}
                     size="sm"
-                    className={cn("w-full", stockInsufficient && "border-er text-er")}
+                    className={cn("w-full", stockInsufficient && "border-er text-er focus-within:border-er")}
                     inputClassName={cn(stockInsufficient && "border-er text-er")}
                   />
                   {isReturnDraft && l.returnSoldQuantity != null && (
@@ -1931,7 +1931,7 @@ export function PosClient({
                                   min={0}
                                   max={line.returnSoldQuantity}
                                   size="sm"
-                                  className={cn("w-full", stockInsufficient && "border-er text-er")}
+                                  className={cn("w-full", stockInsufficient && "border-er text-er focus-within:border-er")}
                                   inputClassName={cn(stockInsufficient && "border-er text-er")}
                                 />
                                 {stockManaged && (
