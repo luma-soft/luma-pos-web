@@ -1,6 +1,6 @@
-import { inArray, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db";
-import { brands, categories, products } from "../db/schema";
+import { brands, categories, products, productUnits } from "../db/schema";
 import { createSupabaseAdminClient } from "../lib/supabase/admin";
 
 const catalog = [
@@ -11,7 +11,8 @@ const catalog = [
       "Dây mạng TAESUNG Cat5E UTP, đồng không dầu 8 lõi CU 0.45mm, vỏ xanh lá, dây trắng, loại đắt, 305m/cuộn (504585)",
     brand: "Taesung",
     category: "Dây Mạng",
-    baseUnit: "cuộn",
+    baseUnit: "m",
+    rollLength: 305,
     costPrice: 1_700_000,
     retailPrice: 2_500_000,
     description:
@@ -40,7 +41,8 @@ const catalog = [
       "Dây điện thoại TAESUNG 4 lõi đồng, thép gia cường 7 sợi × 0.33mm, vỏ đen, lô nhựa, có băng nhôm, 500m/cuộn (506640)",
     brand: "Taesung",
     category: "Điện",
-    baseUnit: "cuộn",
+    baseUnit: "m",
+    rollLength: 500,
     costPrice: 1_750_000,
     retailPrice: 2_200_000,
     description:
@@ -69,7 +71,8 @@ const catalog = [
       "Dây mạng WINCAP Cat6E UTP CCA, 23AWG 0.52mm, 8 lõi, vỏ PVC xanh, thùng đỏ trắng, 305m/cuộn",
     brand: "Wincap",
     category: "Dây Mạng",
-    baseUnit: "cuộn",
+    baseUnit: "m",
+    rollLength: 305,
     costPrice: 940_000,
     retailPrice: 1_290_000,
     description:
@@ -166,9 +169,9 @@ async function main() {
         categoryId: categoryIds.get(item.category)!,
         brandId: brandIds.get(item.brand)!,
         baseUnit: item.baseUnit,
-        costPrice: String(item.costPrice),
-        lastPurchasePrice: String(item.costPrice),
-        retailPrice: String(item.retailPrice),
+        costPrice: (item.costPrice / item.rollLength).toFixed(2),
+        lastPurchasePrice: (item.costPrice / item.rollLength).toFixed(2),
+        retailPrice: (item.retailPrice / item.rollLength).toFixed(2),
         specs: item.specs,
         warrantyMonths: item.warrantyMonths,
         imageUrls: [imageUrl] as string[],
@@ -177,18 +180,31 @@ async function main() {
         updatedAt: sql`now()`,
       } as const;
 
-      await tx
+      const [savedProduct] = await tx
         .insert(products)
         .values({ sku: item.sku, ...values })
         .onConflictDoUpdate({
           target: products.sku,
           set: values,
-        });
+        })
+        .returning({ id: products.id });
+
+      await tx
+        .delete(productUnits)
+        .where(eq(productUnits.productId, savedProduct.id));
+      await tx.insert(productUnits).values({
+        productId: savedProduct.id,
+        unitName: "cuộn",
+        multiplier: String(item.rollLength),
+        priceOverride: String(item.retailPrice),
+        sortOrder: 0,
+      });
     }
   });
 
   const saved = await db
     .select({
+      id: products.id,
       sku: products.sku,
       name: products.name,
       costPrice: products.costPrice,
@@ -209,15 +225,28 @@ async function main() {
     }
   }
 
+  const units = await db
+    .select({
+      productId: productUnits.productId,
+      unitName: productUnits.unitName,
+      multiplier: productUnits.multiplier,
+      priceOverride: productUnits.priceOverride,
+    })
+    .from(productUnits)
+    .where(inArray(productUnits.productId, saved.map((row) => row.id)));
+  const unitByProductId = new Map(units.map((unit) => [unit.productId, unit]));
+
   console.table(
     saved
       .sort((a, b) => a.sku.localeCompare(b.sku))
       .map((row) => ({
         SKU: row.sku,
         "Sản phẩm": row.name,
-        "Giá nhập": row.costPrice,
-        "Giá bán": row.retailPrice,
-        "Đơn vị": row.baseUnit,
+        "Giá nhập/m": row.costPrice,
+        "Giá bán/m": row.retailPrice,
+        "Đơn vị gốc": row.baseUnit,
+        "Quy đổi cuộn": unitByProductId.get(row.id)?.multiplier,
+        "Giá/cuộn": unitByProductId.get(row.id)?.priceOverride,
         Ảnh: row.imageUrls?.[0],
       })),
   );
