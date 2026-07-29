@@ -272,19 +272,21 @@ export function ProductMobileRow({
         </div>
       )}
       <button type="button" onClick={onOpen} className="min-h-11 min-w-11 flex-1 p-3 text-left">
-        <div className="flex min-w-0 items-center gap-3">
-          <ProductThumbnail product={product} />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold text-slate-950 dark:text-white">{product.name}</div>
-            <div className="mt-0.5 truncate text-xs text-slate-400">
-              {product.sku}{product.categoryName ? ` · ${product.categoryName}` : ""}
+        <div className="grid min-w-0 gap-2">
+          <div className="flex min-w-0 items-center gap-3">
+            <ProductThumbnail product={product} />
+            <div className="min-w-0 flex-1">
+              <div className="break-words text-sm font-semibold text-slate-950 dark:text-white">{product.name}</div>
+              <div className="mt-0.5 break-words text-xs text-slate-400">
+                {product.sku}{product.categoryName ? ` · ${product.categoryName}` : ""}
+              </div>
             </div>
           </div>
-          <div className="shrink-0 text-right">
-            <p className="text-sm font-bold tabular-nums text-primary-700 dark:text-primary-300">
+          <div className="grid min-w-0 grid-cols-1 gap-1.5 sm:grid-cols-2 sm:items-center">
+            <p className="min-w-0 break-words text-sm font-bold tabular-nums text-primary-700 dark:text-primary-300 sm:col-start-2 sm:row-start-1 sm:text-right">
               {priceRange(product.minRetailPrice, product.maxRetailPrice, product.retailPrice)}
             </p>
-            <span className="mt-1.5 inline-flex rounded-md bg-primary-50 px-2 py-1 text-[11px] font-semibold tabular-nums text-primary-700 dark:bg-primary-950/60 dark:text-primary-300">
+            <span className="inline-flex min-w-0 max-w-full justify-self-start break-words rounded-md bg-primary-50 px-2 py-1 text-[11px] font-semibold tabular-nums text-primary-700 dark:bg-primary-950/60 dark:text-primary-300 sm:col-start-1 sm:row-start-1">
               {productStockDisplay(product, stockNotTrackedLabel)}
             </span>
           </div>

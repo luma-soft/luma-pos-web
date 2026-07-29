@@ -7,6 +7,10 @@ import viMessages from "../messages/vi.json";
 
 const capturedDataTableProps: Record<string, unknown>[] = [];
 const capturedProjectEditProps: Record<string, unknown>[] = [];
+const navigationCalls: string[] = [];
+let productSelectedIds = new Set<string>();
+let productVisibleIds: string[] = [];
+const productSelectionCalls: string[] = [];
 
 mock.module("@/components/data-table", () => ({
   DataTableShell: (props: Record<string, unknown>) => {
@@ -16,6 +20,50 @@ mock.module("@/components/data-table", () => ({
   RowPreviewModal: () => null,
   stopRowToggle: () => undefined,
 }));
+mock.module("next/navigation", () => ({
+  usePathname: () => "/test",
+  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({
+    push: (href: string) => navigationCalls.push(`push:${href}`),
+    replace: (href: string) => navigationCalls.push(`replace:${href}`),
+    refresh: () => navigationCalls.push("refresh"),
+  }),
+}));
+mock.module(
+  "@/app/(app)/inventory/tabs/product-selection",
+  () => ({
+    useProductSelection: () => {
+      const selectedVisibleIds = productVisibleIds.filter((id) =>
+        productSelectedIds.has(id),
+      );
+      return {
+        selectedIds: productSelectedIds,
+        selectedVisibleIds,
+        allSelected:
+          productVisibleIds.length > 0 &&
+          selectedVisibleIds.length === productVisibleIds.length,
+        toggle: (id: string) => {
+          productSelectionCalls.push(`toggle:${id}`);
+          const next = new Set(productSelectedIds);
+          if (next.has(id)) next.delete(id);
+          else next.add(id);
+          productSelectedIds = next;
+        },
+        toggleAll: () => {
+          productSelectionCalls.push("toggle-all");
+          productSelectedIds =
+            selectedVisibleIds.length === productVisibleIds.length
+              ? new Set()
+              : new Set(productVisibleIds);
+        },
+        replace: (ids: Set<string>) => {
+          productSelectedIds = ids;
+        },
+      };
+    },
+    ProductBulkActions: () => null,
+  }),
+);
 mock.module("@/lib/actions/price-books", () => ({
   createPriceBook: async () => ({ ok: true }),
   renamePriceBook: async () => ({ ok: true }),
@@ -420,6 +468,7 @@ describe("final mobile table surfaces", () => {
     const {
       ProductMobileRow,
       ProductMobileSelectionToolbar,
+      ProductsTable,
       SelectionCheckbox,
     } = await import("@/app/(app)/inventory/tabs/products-table");
     const calls: string[] = [];
@@ -430,8 +479,8 @@ describe("final mobile table surfaces", () => {
       categoryName: "Camera",
       productKind: "product",
       imageUrls: [],
-      minRetailPrice: null,
-      maxRetailPrice: null,
+      minRetailPrice: "999999999999",
+      maxRetailPrice: "1999999999999",
       retailPrice: "1250000",
       totalStock: "8",
       minLevel: "1",
@@ -452,6 +501,11 @@ describe("final mobile table surfaces", () => {
 
     expect(html).toContain('aria-label="Chọn Camera chọn hàng loạt"');
     expect(html).toContain("size-11");
+    expect(html).toContain("grid-cols-1");
+    expect(html).toContain("break-words");
+    expect(html).toContain("999.999.999.999");
+    expect(html).toContain("1.999.999.999.999");
+    expect(html).not.toContain("shrink-0 text-right");
     expect(html).not.toMatch(/class="[^"]*hidden[^"]*sm:block/);
     (checkbox.props.onChange as () => void)();
     (openButton.props.onClick as () => void)();
@@ -488,6 +542,32 @@ describe("final mobile table surfaces", () => {
     expect(bulkActions).toContain("products.actions.stopSelling");
     expect(bulkActions).toContain("products.actions.delete");
     expect(bulkActions).not.toMatch(/ProductBulkActions[\s\S]*?hidden[^"]*sm:/);
+
+    productSelectedIds = new Set();
+    productVisibleIds = [product.id];
+    productSelectionCalls.length = 0;
+    capturedDataTableProps.length = 0;
+    const actualHtml = renderWithMessages(
+      <ProductsTable rows={[product] as never} />,
+    );
+    expect(actualHtml).toContain("Chọn tất cả sản phẩm đang hiển thị");
+    expect(capturedDataTableProps).toHaveLength(1);
+    const actualTable = capturedDataTableProps[0];
+    expect(actualTable.renderMobileRow).toBeFunction();
+    const actualMobileRow = (
+      actualTable.renderMobileRow as (props: {
+        row: typeof product;
+        expanded: boolean;
+        toggle: () => void;
+      }) => ReactNode
+    )({ row: product, expanded: false, toggle: () => undefined });
+    const actualRowElement = actualMobileRow as React.ReactElement<
+      Record<string, unknown>
+    >;
+    expect(actualRowElement.props.product).toBe(product);
+    (actualRowElement.props.onToggle as () => void)();
+    expect(productSelectedIds).toEqual(new Set(["product-mobile-1"]));
+    expect(productSelectionCalls).toEqual(["toggle:product-mobile-1"]);
   });
 
   test("order mobile selection and batch toolbar invoke selection and preserve form actions", async () => {
@@ -495,6 +575,8 @@ describe("final mobile table surfaces", () => {
       OrderBatchToolbar,
       OrderMobileRow,
       OrderSelectionCheckbox,
+      OrdersTable,
+      ORDER_BATCH_LIMIT,
     } = await import("@/app/(app)/sales/tabs/orders-table");
     const calls: string[] = [];
     const order = {
@@ -557,5 +639,84 @@ describe("final mobile table surfaces", () => {
       "open:order-mobile-1",
       "toggle-all",
     ]);
+
+    const manyOrders = Array.from({ length: 31 }, (_, index) => ({
+      ...order,
+      id: `order-${index + 1}`,
+      code: `HD-${String(index + 1).padStart(3, "0")}`,
+      status: index === 30 ? "cancelled" : "completed",
+    }));
+    let executedSelection = new Set<string>();
+    const renderActualOrders = () => {
+      capturedDataTableProps.length = 0;
+      const actualHtml = renderWithMessages(
+        <OrdersTable
+          rows={manyOrders as never}
+          selection={{
+            selectedIds: executedSelection,
+            onChange: (next) => {
+              executedSelection = next;
+            },
+          }}
+        />,
+      );
+      expect(capturedDataTableProps).toHaveLength(1);
+      return {
+        actualHtml,
+        table: capturedDataTableProps[0],
+      };
+    };
+
+    const initialActual = renderActualOrders();
+    expect(initialActual.table.renderMobileRow).toBeFunction();
+    const initialToolbar = initialActual.table.toolbar as React.ReactElement<
+      Record<string, unknown>
+    >;
+    expect(initialToolbar.type).toBe(OrderBatchToolbar);
+    (initialToolbar.props.onToggleAll as () => void)();
+    expect(executedSelection.size).toBe(ORDER_BATCH_LIMIT);
+    expect([...executedSelection]).toEqual(
+      manyOrders.slice(0, ORDER_BATCH_LIMIT).map((item) => item.id),
+    );
+
+    const cappedActual = renderActualOrders();
+    expect(
+      cappedActual.actualHtml.match(/name="ids"/g),
+    ).toHaveLength(ORDER_BATCH_LIMIT);
+    const cappedToolbar = cappedActual.table.toolbar as React.ReactElement<
+      Record<string, unknown>
+    >;
+    expect(cappedToolbar.props.selectedCount).toBe(ORDER_BATCH_LIMIT);
+    expect(cappedToolbar.props.limitReached).toBe(true);
+    const cappedToolbarHtml = renderToStaticMarkup(cappedToolbar);
+    expect(cappedToolbarHtml).toContain('role="status"');
+    expect(cappedToolbarHtml).toContain(
+      "Tick chọn nhiều đơn để in cùng lúc (tối đa 20)",
+    );
+
+    const actualRenderer = cappedActual.table.renderMobileRow as (props: {
+      row: typeof order;
+      expanded: boolean;
+      toggle: () => void;
+    }) => ReactNode;
+    const twentyFirst = actualRenderer({
+      row: manyOrders[20],
+      expanded: false,
+      toggle: () => undefined,
+    }) as React.ReactElement<Record<string, unknown>>;
+    expect(twentyFirst.props.order).toBe(manyOrders[20]);
+    expect(twentyFirst.props.selectionDisabled).toBe(true);
+    (twentyFirst.props.onToggle as () => void)();
+    expect(executedSelection.size).toBe(ORDER_BATCH_LIMIT);
+    expect(executedSelection.has("order-21")).toBe(false);
+
+    const cancelled = actualRenderer({
+      row: manyOrders[30],
+      expanded: false,
+      toggle: () => undefined,
+    }) as React.ReactElement<Record<string, unknown>>;
+    (cancelled.props.onToggle as () => void)();
+    expect(executedSelection.has("order-31")).toBe(false);
+    expect(renderWithMessages(cancelled)).toContain("disabled");
   });
 });
