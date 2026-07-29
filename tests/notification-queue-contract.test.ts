@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import {
   NotificationQueueVerificationError,
   type NotificationQueueMessageV1,
-  type NotificationQueuePublisher,
 } from "../src/lib/notifications/contracts";
 import { resolveNotificationQueue } from "../src/lib/notifications/queue/config";
 import { createQstashNotificationQueue } from "../src/lib/notifications/queue/qstash";
@@ -28,18 +27,34 @@ describe("notification queue boundary", () => {
     })).toThrow("NOTIFICATION_QUEUE_NOT_CONFIGURED");
   });
 
-  test("publisher transports only the neutral envelope", async () => {
+  test("publisher sends a closed envelope with the required QStash delivery settings", async () => {
     const published: unknown[] = [];
-    const fake: NotificationQueuePublisher = {
-      async publish(value) {
-        published.push(value);
-        return { providerMessageId: "fake-1" };
+    const queue = createQstashNotificationQueue(config, {
+      async verify() {
+        return true;
       },
+    }, {
+      async publishJSON(input) {
+        published.push(input);
+        return { messageId: "qstash-message-1" };
+      },
+    });
+    const messageWithBusinessMetadata = {
+      ...message,
+      orderTotal: 750_000,
     };
 
-    await fake.publish(message);
+    await expect(queue.publisher.publish(messageWithBusinessMetadata))
+      .resolves.toEqual({ providerMessageId: "qstash-message-1" });
 
-    expect(published).toEqual([message]);
+    expect(published).toEqual([{
+      url: config.workerUrl,
+      body: message,
+      deduplicationId: message.deduplicationKey,
+      retries: 10,
+      retryDelay: "max(1000, pow(2, retried) * 1000)",
+      timeout: "15s",
+    }]);
   });
 
   test("verifier checks the raw QStash request against the configured worker URL", async () => {
@@ -92,6 +107,38 @@ describe("notification queue boundary", () => {
       method: "POST",
       headers: { "Upstash-Signature": "valid-signature" },
       body: JSON.stringify({ ...message, version: 2 }),
+    }))).rejects.toMatchObject<Partial<NotificationQueueVerificationError>>({
+      reason: "invalid_message",
+    });
+  });
+
+  test("verifier rejects a signed payload with unexpected business metadata", async () => {
+    const queue = createQstashNotificationQueue(config, {
+      async verify() {
+        return true;
+      },
+    });
+
+    await expect(queue.verifier.verify(new Request(config.workerUrl, {
+      method: "POST",
+      headers: { "Upstash-Signature": "valid-signature" },
+      body: JSON.stringify({ ...message, orderTotal: 750_000 }),
+    }))).rejects.toMatchObject<Partial<NotificationQueueVerificationError>>({
+      reason: "invalid_message",
+    });
+  });
+
+  test("verifier rejects an impossible calendar date in a signed timestamp", async () => {
+    const queue = createQstashNotificationQueue(config, {
+      async verify() {
+        return true;
+      },
+    });
+
+    await expect(queue.verifier.verify(new Request(config.workerUrl, {
+      method: "POST",
+      headers: { "Upstash-Signature": "valid-signature" },
+      body: JSON.stringify({ ...message, queuedAt: "2026-02-30T12:00:00.000Z" }),
     }))).rejects.toMatchObject<Partial<NotificationQueueVerificationError>>({
       reason: "invalid_message",
     });

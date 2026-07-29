@@ -21,11 +21,36 @@ type QstashReceiverLike = {
   }): Promise<boolean>;
 };
 
+type QstashClientLike = {
+  publishJSON(input: {
+    url: string;
+    body: NotificationQueueMessageV1;
+    deduplicationId: string;
+    retries: 10;
+    retryDelay: "max(1000, pow(2, retried) * 1000)";
+    timeout: "15s";
+  }): Promise<{ messageId: string }>;
+};
+
+const queueMessageKeys = ["version", "eventId", "deduplicationKey", "queuedAt"] as const;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const isoTimestampPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})$/;
 
 function invalidMessage(): never {
   throw new NotificationQueueVerificationError("invalid_message");
+}
+
+function isCanonicalIsoTimestamp(value: string): boolean {
+  const timestamp = Date.parse(value);
+  return !Number.isNaN(timestamp) && new Date(timestamp).toISOString() === value;
+}
+
+function toNotificationQueueMessage(value: NotificationQueueMessageV1): NotificationQueueMessageV1 {
+  return {
+    version: value.version,
+    eventId: value.eventId,
+    deduplicationKey: value.deduplicationKey,
+    queuedAt: value.queuedAt,
+  };
 }
 
 function parseNotificationQueueMessage(body: string): NotificationQueueMessageV1 {
@@ -39,6 +64,10 @@ function parseNotificationQueueMessage(body: string): NotificationQueueMessageV1
   if (!value || typeof value !== "object" || Array.isArray(value)) return invalidMessage();
 
   const message = value as Record<string, unknown>;
+  if (
+    Object.keys(message).length !== queueMessageKeys.length
+    || !queueMessageKeys.every((key) => Object.hasOwn(message, key))
+  ) return invalidMessage();
   if (message.version !== 1) return invalidMessage();
   if (typeof message.eventId !== "string" || !uuidPattern.test(message.eventId)) return invalidMessage();
   if (
@@ -48,29 +77,42 @@ function parseNotificationQueueMessage(body: string): NotificationQueueMessageV1
   ) return invalidMessage();
   if (
     typeof message.queuedAt !== "string"
-    || !isoTimestampPattern.test(message.queuedAt)
-    || Number.isNaN(Date.parse(message.queuedAt))
+    || !isCanonicalIsoTimestamp(message.queuedAt)
   ) return invalidMessage();
 
-  return {
+  return toNotificationQueueMessage({
     version: 1,
     eventId: message.eventId,
     deduplicationKey: message.deduplicationKey,
     queuedAt: message.queuedAt,
-  };
+  });
 }
 
 export function createQstashNotificationQueue(
   config: QstashNotificationQueueConfig,
   injectedReceiver?: QstashReceiverLike,
+  injectedClient?: QstashClientLike,
 ): {
   publisher: NotificationQueuePublisher;
   verifier: NotificationQueueRequestVerifier;
 } {
-  const client = new Client({
+  const sdkClient = new Client({
     token: config.token,
     enableTelemetry: false,
   });
+  const publish = injectedClient
+    ? (input: Parameters<QstashClientLike["publishJSON"]>[0]) => injectedClient.publishJSON(input)
+    : async (input: Parameters<QstashClientLike["publishJSON"]>[0]) => {
+      const result = await sdkClient.publishJSON({
+        url: input.url,
+        body: input.body,
+        deduplicationId: input.deduplicationId,
+        retries: 10,
+        retryDelay: "max(1000, pow(2, retried) * 1000)",
+        timeout: "15s",
+      });
+      return { messageId: result.messageId };
+    };
   const receiver = injectedReceiver ?? new Receiver({
     currentSigningKey: config.currentSigningKey,
     nextSigningKey: config.nextSigningKey,
@@ -79,10 +121,11 @@ export function createQstashNotificationQueue(
   return {
     publisher: {
       async publish(message) {
-        const result = await client.publishJSON({
+        const envelope = toNotificationQueueMessage(message);
+        const result = await publish({
           url: config.workerUrl,
-          body: message,
-          deduplicationId: message.deduplicationKey,
+          body: envelope,
+          deduplicationId: envelope.deduplicationKey,
           retries: 10,
           retryDelay: "max(1000, pow(2, retried) * 1000)",
           timeout: "15s",
