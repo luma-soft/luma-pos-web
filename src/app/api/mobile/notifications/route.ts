@@ -6,8 +6,11 @@ import { getCurrentShift } from "@/lib/data/shifts";
 import { getStoreSettings } from "@/lib/data/settings";
 import { requireMobileUser } from "@/lib/mobile/auth";
 import { mobileGate, mobileOk } from "@/lib/mobile/response";
+import { listPersistedMobileEvents } from "@/lib/notifications/mobile-events";
 import { mobileNotificationSettingsForRole } from "@/lib/settings/mobile-settings-access";
 import { and, desc, eq, inArray } from "drizzle-orm";
+
+const LEGACY_FALLBACK_CREATED_AT = new Date(0).toISOString();
 
 export async function GET() {
   const gate = await requireMobileUser();
@@ -22,6 +25,7 @@ export async function GET() {
       id: einvoices.id,
       orderCode: orders.code,
       attemptCount: einvoices.attemptCount,
+      createdAt: einvoices.createdAt,
     })
       .from(einvoices)
       .innerJoin(orders, eq(orders.id, einvoices.orderId))
@@ -29,6 +33,11 @@ export async function GET() {
       .orderBy(desc(einvoices.createdAt))
       .limit(10),
   ]);
+  const effectiveProfileId = profileId ?? gate.userId;
+  const persistedRows = await listPersistedMobileEvents(
+    effectiveProfileId,
+    store.locale,
+  );
   const prefs = store.prefs.notifications;
   const routed = (category: keyof typeof prefs.roleRouting) =>
     prefs.roleRouting[category].includes(gate.role);
@@ -41,7 +50,7 @@ export async function GET() {
   const routedEinvoices = failedEinvoices.filter(
     (row) => row.attemptCount >= prefs.thresholds.einvoiceFailureAttempts,
   );
-  const stateUserId = profileId ?? gate.userId;
+  const stateUserId = effectiveProfileId;
   const rows = [
     ...restockRows.map((row) => ({
       id: `restock-${row.id}`,
@@ -50,6 +59,7 @@ export async function GET() {
       body: `Tồn ${row.stock} ${row.baseUnit}, bán TB ${row.velocity.toFixed(1)}/ngày`,
       unread: true,
       priority: row.priority,
+      createdAt: LEGACY_FALLBACK_CREATED_AT,
       action: { type: "open", target: "aiRestocking", id: row.id },
     })),
     ...(prefs.einvoiceError && routed("einvoiceError")
@@ -60,6 +70,7 @@ export async function GET() {
           body: "Mở hóa đơn để kiểm tra trạng thái và thử lại.",
           unread: true,
           priority: "high" as const,
+          createdAt: row.createdAt.toISOString(),
           action: { type: "open", target: "invoices", id: row.id },
         }))
       : []),
@@ -72,6 +83,7 @@ export async function GET() {
         : "Mở ca trước khi bán hàng để chốt quỹ chính xác.",
       unread: !shift,
       priority: shift ? "low" : "medium",
+      createdAt: shift?.openedAt.toISOString() ?? LEGACY_FALLBACK_CREATED_AT,
       action: { type: "open", target: "shift" },
     }] : []),
   ];
@@ -92,22 +104,34 @@ export async function GET() {
         )
     : [];
   const stateById = new Map(states.map((state) => [state.notificationId, state]));
-  const visibleRows = rows
+  const visibleLegacyRows = rows
     .filter((row) => stateById.get(row.id)?.dismissed !== true)
     .map((row) => ({
       ...row,
       unread: row.unread && stateById.get(row.id)?.read !== true,
     }));
+  const visibleRows = [...persistedRows, ...visibleLegacyRows].sort(
+    (left, right) =>
+      Date.parse(right.createdAt) - Date.parse(left.createdAt)
+      || left.id.localeCompare(right.id),
+  );
   const visibleSettings = mobileNotificationSettingsForRole(prefs, gate.role);
+  const countCategory = (category: string) =>
+    visibleRows.filter((row) => row.category === category).length;
 
   return mobileOk({
     rows: visibleRows,
     counts: {
       all: visibleRows.length,
       unread: visibleRows.filter((row) => row.unread).length,
-      lowStock: restockRows.length,
-      einvoiceError: routedEinvoices.length,
-      shiftClose: prefs.shiftClose && routed("shiftClose") ? 1 : 0,
+      lowStock: countCategory("lowStock"),
+      einvoiceError: countCategory("einvoiceError"),
+      shiftClose: countCategory("shiftClose"),
+      invoiceCreated: countCategory("invoiceCreated"),
+      purchaseReceived: countCategory("purchaseReceived"),
+      debtChanged: countCategory("debtChanged"),
+      qrPaymentConfirmed: countCategory("qrPaymentConfirmed"),
+      qrPaymentException: countCategory("qrPaymentException"),
     },
     ...(visibleSettings ? { settings: visibleSettings } : {}),
   });

@@ -62,6 +62,23 @@ describe("notification settings contract", () => {
     expect(prefs.notifications.thresholds.einvoiceFailureAttempts).toBe(1);
     expect(prefs.notifications.roleRouting.lowStock)
       .toEqual(["owner", "manager", "warehouse"]);
+    expect({
+      invoiceCreated: prefs.notifications.invoiceCreated,
+      purchaseReceived: prefs.notifications.purchaseReceived,
+      debtChanged: prefs.notifications.debtChanged,
+      qrPaymentConfirmed: prefs.notifications.qrPaymentConfirmed,
+      qrPaymentException: prefs.notifications.qrPaymentException,
+    }).toEqual({
+      invoiceCreated: true,
+      purchaseReceived: true,
+      debtChanged: true,
+      qrPaymentConfirmed: true,
+      qrPaymentException: true,
+    });
+    expect(prefs.notifications.roleRouting.purchaseReceived)
+      .toEqual(["owner", "manager", "warehouse"]);
+    expect(prefs.notifications.roleRouting.qrPaymentException)
+      .toEqual(["owner", "manager"]);
   });
 
   test("rejects malformed quiet hours, thresholds, and empty role routes", () => {

@@ -4,7 +4,12 @@ import { getStoreSettings } from "@/lib/data/settings";
 import { requireMobileManager, requireMobileRole } from "@/lib/mobile/auth";
 import { resolveNotificationChannels } from "@/lib/notifications/channels";
 import { notificationSettingsAuthorization } from "@/lib/notifications/settings-authorization";
-import { MOBILE_SETTINGS_ADMIN_ROLES } from "@/lib/settings/mobile-settings-access";
+import {
+  mergeMobileNotificationSettings,
+  MOBILE_SETTINGS_ADMIN_ROLES,
+  mobileNotificationSettingsForRole,
+} from "@/lib/settings/mobile-settings-access";
+import type { StorePrefs } from "@/lib/schemas/settings";
 import {
   mobileAction,
   mobileError,
@@ -15,14 +20,15 @@ import {
 
 export async function GET() {
   const gate = await requireMobileRole(MOBILE_SETTINGS_ADMIN_ROLES);
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const store = await getStoreSettings();
-  const channels = store.prefs.notifications.channels;
+  const settings = mobileNotificationSettingsForRole(
+    store.prefs.notifications,
+    gate.role,
+  )!;
   return mobileOk({
-    ...store.prefs.notifications,
-    channels,
+    ...settings,
     availableChannels: resolveNotificationChannels(),
   });
 }
@@ -42,9 +48,14 @@ export async function PATCH(request: Request) {
   });
   if (!authorization.ok) return mobileError(authorization.error, 403);
 
+  const current = (await getStoreSettings()).prefs.notifications;
+  const notifications = mergeMobileNotificationSettings(
+    current,
+    body as Parameters<typeof mergeMobileNotificationSettings>[1],
+  );
   return mobileAction(
     await updateStorePrefsForUser(gate.userId, {
-      notifications: body as Parameters<typeof updateStorePrefsForUser>[1]["notifications"],
+      notifications: notifications as StorePrefs["notifications"],
     })
   );
 }

@@ -1226,7 +1226,17 @@ function NotificationsSection({
   const [saved, setSaved] = useState(false);
   const [pending, start] = useTransition();
   const mark = () => { setDirty(true); setSaved(false); };
-  type TK = "lowStock" | "stagnant" | "shiftClose" | "einvoiceError" | "syncDone";
+  type TK =
+    | "lowStock"
+    | "stagnant"
+    | "shiftClose"
+    | "einvoiceError"
+    | "syncDone"
+    | "invoiceCreated"
+    | "purchaseReceived"
+    | "debtChanged"
+    | "qrPaymentConfirmed"
+    | "qrPaymentException";
   const setType = (k: TK, v: boolean) => { setForm((p) => ({ ...p, [k]: v })); mark(); };
   const setChannel = (k: string, v: boolean) => { setForm((p) => ({ ...p, channels: { ...p.channels, [k]: v } })); mark(); };
   function save() { start(async () => { const r = await updateStorePrefs({ notifications: form }); if (r.ok) { setDirty(false); setSaved(true); } }); }
@@ -1237,6 +1247,11 @@ function NotificationsSection({
     { k: "shiftClose", title: L ? "Nhắc đóng ca (18:00)" : "Shift close reminder (18:00)", desc: L ? "Nhắc đóng ca mỗi ngày" : "Daily shift close reminder" },
     { k: "einvoiceError", title: L ? "Lỗi hóa đơn điện tử" : "E-invoice error", desc: L ? "Khi HĐĐT gửi thất bại" : "When e-invoice fails" },
     { k: "syncDone", title: L ? "Đồng bộ hoàn tất" : "Sync completed", desc: L ? "Khi dữ liệu offline đồng bộ xong" : "When offline data syncs" },
+    { k: "invoiceCreated", title: L ? "Hóa đơn mới" : "New invoice", desc: L ? "Khi hóa đơn hoàn tất được tạo" : "When a completed invoice is created" },
+    { k: "purchaseReceived", title: L ? "Nhập hàng đã nhận" : "Purchase received", desc: L ? "Khi phiếu nhập được ghi nhận đã nhận hàng" : "When a purchase receipt is recorded" },
+    { k: "debtChanged", title: L ? "Thay đổi công nợ" : "Debt changed", desc: L ? "Khi công nợ khách hàng hoặc nhà cung cấp thay đổi" : "When customer or supplier debt changes" },
+    { k: "qrPaymentConfirmed", title: L ? "Thanh toán QR thành công" : "QR payment confirmed", desc: L ? "Khi hệ thống xác nhận thanh toán QR" : "When a QR payment is confirmed" },
+    { k: "qrPaymentException", title: L ? "Giao dịch QR cần kiểm tra" : "QR payment needs review", desc: L ? "Khi giao dịch QR cần đối soát thủ công" : "When a QR payment needs manual review" },
   ];
   const channelView = (id: string) => id === "push"
     ? { ico: "📲", name: "Push" }
