@@ -177,7 +177,7 @@ export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse
   }
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-auto lg:overflow-hidden">
+    <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-visible lg:overflow-hidden">
       <section className="flex-1 min-w-0 min-h-[420px] lg:min-h-0 flex flex-col p-3 sm:p-4">
             <div className="relative mb-3">
               <div className="flex gap-2">
@@ -219,7 +219,7 @@ export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse
             <FormMetric label={t("internalUse.status.draft")} value={needsApproval ? t("internalUse.status.pending") : t("internalUse.status.approved")} tone={needsApproval ? "warn" : "ok"} />
           </div>
 
-          <div className="flex-1 min-h-[320px] overflow-auto bg-surface border border-border rounded-card">
+          <div className="flex-1 min-h-[320px] overflow-visible bg-surface border border-border rounded-card lg:overflow-auto">
             <div className="space-y-2 p-3 lg:hidden">
               {lines.map((l) => {
                 const availableStock = warehouseStock.get(l.productId);

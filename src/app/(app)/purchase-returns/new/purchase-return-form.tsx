@@ -178,7 +178,7 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
   const numCls = "no-spinner min-h-11 w-full px-2 py-1.5 text-right text-sm rounded-md border border-slate-200 dark:border-slate-700 bg-surface tabular-nums lg:min-h-0";
 
   return (
-    <div className="h-dvh flex flex-col">
+    <div className="min-h-full flex flex-col lg:h-dvh">
       <MobileDetailHeader
         flush
         backHref={`${Routes.Inventory}?tab=purchase-returns`}
@@ -186,7 +186,7 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
         title={t("purchaseReturns.createTitle")}
       />
 
-      <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-auto lg:overflow-hidden bg-canvas">
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-visible lg:overflow-hidden bg-canvas">
         <div className="flex-1 min-w-0 min-h-[420px] lg:min-h-0 flex flex-col p-3 sm:p-4">
           <div className="relative mb-3">
             <div className="flex gap-2">
@@ -198,7 +198,7 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
             {results.length > 0 && <ProductResults rows={results} onPick={addProduct} />}
           </div>
 
-          <div className="flex-1 min-h-[320px] overflow-auto bg-surface border border-border rounded-card">
+          <div className="flex-1 min-h-[320px] overflow-visible bg-surface border border-border rounded-card lg:overflow-auto">
             <div className="lg:hidden">
               {lines.length === 0 ? (
                 <div className="grid min-h-[320px] place-items-center px-4 text-center text-slate-400">

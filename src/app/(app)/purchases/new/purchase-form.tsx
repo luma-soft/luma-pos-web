@@ -428,7 +428,7 @@ export function PurchaseForm({
     note !== (initialValues?.note ?? "");
 
   return (
-    <div className="h-dvh flex flex-col">
+    <div className="min-h-full flex flex-col lg:h-dvh">
       <MobileDetailHeader
         flush
         backHref={backHref}
@@ -436,7 +436,7 @@ export function PurchaseForm({
         title={title}
       />
 
-      <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-auto lg:overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-visible lg:overflow-hidden">
         {/* trái: tìm + bảng hàng */}
         <div className="flex-1 min-w-0 min-h-[420px] lg:min-h-0 flex flex-col p-3 sm:p-4">
           <div className="relative mb-3">
@@ -490,7 +490,7 @@ export function PurchaseForm({
             </div>
           )}
 
-          <div className="flex-1 min-h-[280px] overflow-auto bg-surface border border-border rounded-card">
+          <div className="flex-1 min-h-[280px] overflow-visible bg-surface border border-border rounded-card lg:overflow-auto">
             {lines.length === 0 ? (
               <Text as="div" variant="muted" className="h-full grid place-items-center" text={t("purchases.pickProduct")} />
             ) : (

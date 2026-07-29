@@ -13,7 +13,7 @@ export default async function NewInternalUsePage() {
   ]);
 
   return (
-    <div className="h-dvh flex flex-col bg-canvas">
+    <div className="min-h-full flex flex-col bg-canvas lg:h-dvh">
       <MobileDetailHeader
         flush
         backHref={`${Routes.Inventory}?tab=internal`}
