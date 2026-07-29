@@ -1,9 +1,41 @@
 import { createExchangeForUser, createReturnForUser } from "@/lib/actions/returns";
 import { authorizeMobileSensitiveAction } from "@/lib/auth/mobile-approval";
+import { getReturns } from "@/lib/data/returns";
 import { requireMobileSalesAccess } from "@/lib/mobile/auth";
-import { mobileAction, mobileError, mobileGate, readJson } from "@/lib/mobile/response";
+import {
+  mobileAction,
+  mobileError,
+  mobileGate,
+  mobileOk,
+  numberParam,
+  readJson,
+  searchParam,
+} from "@/lib/mobile/response";
 import { paymentRequestIp } from "@/lib/payments/request-ip";
 import { submitGatewayRefund } from "@/lib/payments/refund-service";
+
+export async function GET(request: Request) {
+  const gate = await requireMobileSalesAccess();
+  if (!gate.ok) return mobileGate(gate);
+
+  const page = Math.max(1, numberParam(request, "page", 1));
+  const pageSize = Math.min(
+    100,
+    Math.max(1, numberParam(request, "pageSize", 20)),
+  );
+  const result = await getReturns({
+    q: searchParam(request, "q"),
+    page,
+    pageSize,
+  });
+  return mobileOk({
+    returns: result.rows,
+    total: result.total,
+    pageCount: result.pageCount,
+    page,
+    pageSize,
+  });
+}
 
 export async function POST(request: Request) {
   const gate = await requireMobileSalesAccess();
