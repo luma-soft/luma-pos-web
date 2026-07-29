@@ -19,6 +19,7 @@
     "db:sync-camera-descriptions": "bun run src/scripts/sync-camera-product-descriptions.ts",
     "db:backfill-product-images-2026-07": "bun run src/scripts/backfill-product-images-2026-07-27.ts",
     "db:backfill-official-brand-images-2026-07": "bun run src/scripts/backfill-official-brand-product-images-2026-07-29.ts",
+    "db:backfill-additional-official-images-2026-07": "bun run src/scripts/backfill-additional-official-product-images-2026-07-29.ts",
     "db:set-camera-bracket-image": "bun run src/scripts/set-camera-bracket-image.ts",
     "db:fix-camera-accessory-prices-2026-07": "bun run src/scripts/fix-camera-accessory-retail-prices-2026-07-27.ts",
     "db:seed-network-cables-2026-07": "bun run src/scripts/seed-network-cables-2026-07-29.ts",
