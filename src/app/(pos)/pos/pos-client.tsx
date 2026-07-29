@@ -938,7 +938,6 @@ export function PosClient({
         };
       }
     ));
-    setEditKey(null);
   }
 
   const subtotal = cart.reduce((s, l) => s + effPrice(l).price * l.quantity, 0);
@@ -2630,14 +2629,14 @@ function AmountModeInput({
           onChange={(nextValue) => onValueChange(nextValue ?? 0)}
           placeholder="0"
           thousandSeparator={false}
-          className="h-full min-w-0 rounded-none border-0 bg-transparent px-3 text-right text-sm tabular-nums outline-none focus:ring-0"
+          className="h-full min-w-0 rounded-none border-0 bg-transparent px-3 text-right text-sm tabular-nums outline-none focus:border-transparent focus-visible:border-transparent focus:ring-0"
         />
       ) : (
         <MoneyInput
           value={value || ""}
           onChange={(v) => onValueChange(v ?? 0)}
           placeholder="0"
-          className="no-spinner h-full min-w-0 px-3 text-right text-sm tabular-nums bg-transparent outline-none border-0"
+          className="no-spinner h-full min-w-0 px-3 text-right text-sm tabular-nums bg-transparent outline-none border-0 focus:border-transparent focus-visible:border-transparent"
         />
       )}
       {onModeChange ? (
