@@ -116,6 +116,16 @@ describe("mobile specialist layouts", () => {
     expect(productForm).toContain('"flex-1 overflow-auto overscroll-contain');
   });
 
+  test("product editor footer keeps the primary actions aligned on narrow screens", () => {
+    const productForm = read("src/app/(app)/products/new/product-form.tsx");
+
+    expect(productForm).toContain('align === "footer" && "grid grid-cols-1');
+    expect(productForm).toContain('align === "footer" && "grid w-full grid-cols-2');
+    expect(productForm).toContain('"order-1 w-full sm:order-none sm:w-auto"');
+    expect(productForm).toContain('"order-3 col-span-2 w-full sm:order-none sm:w-auto"');
+    expect(productForm).toContain('"order-2 w-full sm:order-none sm:w-auto"');
+  });
+
   test("print toolbar reflows every action inside a narrow viewport", () => {
     const toolbar = read("src/components/print/print-toolbar.tsx");
 

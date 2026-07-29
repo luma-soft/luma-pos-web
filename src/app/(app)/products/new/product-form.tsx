@@ -414,7 +414,7 @@ function FormActions({
     <div
       className={cn(
         "flex flex-wrap items-center gap-2",
-        align === "footer" && "justify-between",
+        align === "footer" && "grid grid-cols-1 sm:flex sm:justify-between",
       )}
     >
       <label className="flex min-h-11 min-w-11 cursor-pointer items-center gap-2 text-sm lg:min-h-0 lg:min-w-0">
@@ -425,24 +425,32 @@ function FormActions({
         />
         <span>{t("products.directSale")}</span>
       </label>
-      <div className="ml-auto flex flex-wrap items-center gap-2">
+      <div
+        className={cn(
+          "ml-auto flex flex-wrap items-center gap-2",
+          align === "footer" && "grid w-full grid-cols-2 sm:ml-auto sm:flex sm:w-auto",
+        )}
+      >
         <Button
           type="button"
           variant="outline"
           onClick={onCancel}
           tx="common.cancel"
+          className={align === "footer" ? "order-1 w-full sm:order-none sm:w-auto" : undefined}
         />
         <Button
           type="submit"
           variant="secondary"
           onClick={() => onIntent("sameType")}
           tx="products.saveAndCreateSameType"
+          className={align === "footer" ? "order-3 col-span-2 w-full sm:order-none sm:w-auto" : undefined}
         />
         <Button
           type="submit"
           loading={loading}
           onClick={() => onIntent("save")}
           tx="common.save"
+          className={align === "footer" ? "order-2 w-full sm:order-none sm:w-auto" : undefined}
         />
       </div>
     </div>
