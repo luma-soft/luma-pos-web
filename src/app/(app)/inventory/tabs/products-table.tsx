@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
   useTransition,
+  type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
@@ -235,9 +236,11 @@ export function buildProductUnitColumns({
 export function ProductsTable({
   rows,
   selectionEnabled = true,
+  empty,
 }: {
   rows: ProductListResult["rows"];
   selectionEnabled?: boolean;
+  empty?: ReactNode;
 }) {
   const t = useTranslations();
   const router = useRouter();
@@ -317,7 +320,7 @@ export function ProductsTable({
 
   return (
     <>
-      {selectionEnabled && (
+      {selectionEnabled && rows.length > 0 && (
         <ProductMobileSelectionToolbar
           checked={allSelected}
           indeterminate={selectedVisibleIds.length > 0 && !allSelected}
@@ -337,6 +340,7 @@ export function ProductsTable({
         minWidth="1120px"
         maxHeight="calc(100dvh - 250px)"
         fillHeight
+        empty={empty}
         mobileListClassName="!space-y-0 overflow-hidden rounded-xl border border-border-soft bg-surface"
         mobileRowClassName="!rounded-none !border-x-0 !border-t-0 last:!border-b-0"
         onRowClick={openProduct}

@@ -349,7 +349,19 @@ export function DataTableShell<T>({
       {toolbar && <div className="mb-2 flex flex-wrap items-center justify-end gap-2">{toolbar}</div>}
 
       {rows.length === 0 && empty ? (
-        empty
+        <div
+          ref={desktopTableRef}
+          className={cn(
+            "min-h-[280px] [&>*]:flex [&>*]:h-full [&>*]:w-full [&>*]:flex-col [&>*]:items-center [&>*]:justify-center",
+            fillHeight && "h-full",
+          )}
+          style={maxHeight ? {
+            maxHeight: availableHeight ? `${availableHeight}px` : maxHeight,
+            ...(fillHeight ? { height: availableHeight ? `${availableHeight}px` : maxHeight } : {}),
+          } : undefined}
+        >
+          {empty}
+        </div>
       ) : (
         <>
           <div className={cn("space-y-2 lg:hidden", mobileListClassName)}>

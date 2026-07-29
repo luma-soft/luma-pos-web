@@ -214,17 +214,17 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
         </div>
       )}
       {!cameraMaterials && <ProductsToolbar params={params} categories={categories} status={status} view={view} />}
-      {rows.length === 0 ? (
-        <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">
-          <PackageOpen className="w-10 h-10 mx-auto mb-3 opacity-60" />
-          <p className="font-medium">{t("products.list.empty")}</p>
-          <p className="text-sm mt-1">{t("products.list.emptyHint")}</p>
-        </div>
-      ) : (
-        <>
-          <ProductsTable rows={rows} selectionEnabled={!cameraMaterials} />
-        </>
-      )}
+      <ProductsTable
+        rows={rows}
+        selectionEnabled={!cameraMaterials}
+        empty={(
+          <div className="rounded-card border border-dashed border-border bg-surface p-12 text-center text-slate-400">
+            <PackageOpen className="w-10 h-10 mx-auto mb-3 opacity-60" />
+            <p className="font-medium">{t("products.list.empty")}</p>
+            <p className="text-sm mt-1">{t("products.list.emptyHint")}</p>
+          </div>
+        )}
+      />
 
       <div className="shrink-0 pt-3">
         <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("products.unitLabel")} />
