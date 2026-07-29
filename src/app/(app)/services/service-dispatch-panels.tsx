@@ -7,6 +7,7 @@ import type {
   getServiceManagerReport,
 } from "@/lib/services/dispatch-reporting";
 import { formatDate } from "@/lib/utils";
+import { SERVICE_PAGE_SIZES } from "@/lib/services/dispatch-reporting-domain";
 
 type DispatchData = Awaited<ReturnType<typeof getServiceDispatchPage>>;
 type ReportData = Awaited<ReturnType<typeof getServiceManagerReport>>;
@@ -106,7 +107,7 @@ export function ServiceDispatchPanel({
         ))}
       </div>
       {data.rows.length === 0 && <Section collapsible={false}><Text variant="muted" size="sm" text="Không có lệnh việc phù hợp." /></Section>}
-      <Pagination page={data.page} pageCount={data.pageCount} total={data.total} pageSize={data.limit} unitLabel="lệnh việc" />
+      <Pagination page={data.page} pageCount={data.pageCount} total={data.total} pageSize={data.limit} pageSizes={SERVICE_PAGE_SIZES} unitLabel="lệnh việc" />
     </div>
   );
 }
@@ -168,7 +169,7 @@ export function ServiceReportPanel({ data }: { data: ReportData }) {
           Hoàn tất lần đầu = lệnh hoàn tất có đúng một lượt làm việc / lệnh hoàn tất có ít nhất một lượt làm việc.
         </p>
       </Section>
-      <Pagination page={data.page} pageCount={data.pageCount} total={data.total} pageSize={data.limit} unitLabel="lệnh việc" />
+      <Pagination page={data.page} pageCount={data.pageCount} total={data.total} pageSize={data.limit} pageSizes={SERVICE_PAGE_SIZES} unitLabel="lệnh việc" />
       <Link href="/services?tab=reporting" className="text-sm font-semibold text-primary-600">Đặt lại khoảng báo cáo</Link>
     </div>
   );

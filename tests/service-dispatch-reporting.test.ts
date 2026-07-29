@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import {
   parseServiceDispatchQuery,
   parseServiceReportQuery,
@@ -17,12 +18,12 @@ describe("service dispatch query", () => {
       slaOverdue: "true",
       maintenanceOverdue: "true",
       page: "2",
-      limit: "25",
+      size: "20",
     }));
     expect(query.statuses).toEqual(["scheduled", "in_progress"]);
     expect(query.priorities).toEqual(["high", "urgent"]);
     expect(query.page).toBe(2);
-    expect(query.limit).toBe(25);
+    expect(query.limit).toBe(20);
     expect(query.slaOverdue).toBe(true);
     expect(query.maintenanceOverdue).toBe(true);
   });
@@ -38,6 +39,10 @@ describe("service dispatch query", () => {
     }))).toThrow("SERVICE_DISPATCH_RANGE_INVALID");
     expect(() => parseServiceDispatchQuery(new URLSearchParams({ page: "10001" })))
       .toThrow("SERVICE_DISPATCH_PAGINATION_INVALID");
+    expect(() => parseServiceDispatchQuery(new URLSearchParams({
+      size: "20",
+      limit: "50",
+    }))).toThrow("SERVICE_DISPATCH_PAGINATION_CONFLICT");
     expect(() => parseServiceDispatchQuery(new URLSearchParams({
       technicianId: "11111111---------------------------",
     }))).toThrow("SERVICE_DISPATCH_FILTER_INVALID");
@@ -56,6 +61,45 @@ describe("service dispatch query", () => {
     }));
     expect(localDates.from.toISOString()).toBe("2026-07-28T17:00:00.000Z");
     expect(localDates.to.toISOString()).toBe("2026-07-29T17:00:00.000Z");
+    for (const timezone of ["UTC", "America/Los_Angeles", "Asia/Tokyo"]) {
+      const previous = process.env.TZ;
+      process.env.TZ = timezone;
+      try {
+        const stable = parseServiceDispatchQuery(new URLSearchParams({
+          from: "2026-07-29",
+          to: "2026-07-30",
+        }));
+        expect(stable.from.toISOString()).toBe("2026-07-28T17:00:00.000Z");
+      } finally {
+        process.env.TZ = previous;
+      }
+    }
+    for (const invalid of [
+      "2026-07-29T10:30:00",
+      "2026-07-29T10:30:00.123",
+      "not-a-date",
+    ]) {
+      expect(() => parseServiceDispatchQuery(new URLSearchParams({
+        from: invalid,
+        to: "2026-07-30T10:30:00Z",
+      }))).toThrow("SERVICE_DISPATCH_RANGE_INVALID");
+    }
+  });
+
+  test("uses the shared Pagination size contract for dispatch and reports", () => {
+    for (const size of [20, 50, 100]) {
+      expect(parseServiceDispatchQuery(new URLSearchParams({ size: String(size) })).limit)
+        .toBe(size);
+      expect(parseServiceReportQuery(new URLSearchParams({ size: String(size) })).limit)
+        .toBe(size);
+    }
+    const paginationSource = readFileSync("src/components/pagination.tsx", "utf8");
+    const panelsSource = readFileSync(
+      "src/app/(app)/services/service-dispatch-panels.tsx",
+      "utf8",
+    );
+    expect(paginationSource).toContain("go({ size: e.target.value, page: undefined })");
+    expect(panelsSource.match(/pageSizes=\{SERVICE_PAGE_SIZES\}/g)).toHaveLength(2);
   });
 });
 
@@ -93,7 +137,7 @@ describe("service manager metrics", () => {
       from: "2026-07-01T00:00:00.000Z",
       to: "2026-08-01T00:00:00.000Z",
       page: "1",
-      limit: "20",
+      size: "20",
     }));
     expect(report.limit).toBe(20);
     expect(summarizeServiceMetrics({

@@ -9,6 +9,7 @@ const DAY_MS = 86_400_000;
 const DEFAULT_OFFSET_MINUTES = 420;
 const FIRST_TIME_DEFINITION =
   "completed jobs with exactly one completed visit / completed jobs with at least one completed visit";
+export const SERVICE_PAGE_SIZES = [20, 50, 100] as const;
 
 function integerParam(value: string | null, fallback: number) {
   if (value === null || value === "") return fallback;
@@ -39,9 +40,15 @@ function explicitRange(
   const rawTo = params.get("to");
   if (!rawFrom && !rawTo) return fieldJobDateRange(fallbackScope, now, DEFAULT_OFFSET_MINUTES);
   if (!rawFrom || !rawTo) throw new Error("SERVICE_DISPATCH_RANGE_INVALID");
-  const asInstant = (value: string) => new Date(
-    /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00+07:00` : value,
-  );
+  const asInstant = (value: string) => {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      return new Date(`${value}T00:00:00+07:00`);
+    }
+    if (
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
+    ) return new Date(Number.NaN);
+    return new Date(value);
+  };
   const from = asInstant(rawFrom);
   const to = asInstant(rawTo);
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to <= from) {
@@ -55,7 +62,14 @@ function explicitRange(
 
 function pagination(params: URLSearchParams) {
   const page = integerParam(params.get("page"), 1);
-  const limit = integerParam(params.get("limit"), 50);
+  const rawSize = params.get("size");
+  const rawLimit = params.get("limit");
+  if (
+    rawSize !== null
+    && rawLimit !== null
+    && integerParam(rawSize, 50) !== integerParam(rawLimit, 50)
+  ) throw new Error("SERVICE_DISPATCH_PAGINATION_CONFLICT");
+  const limit = integerParam(rawSize ?? rawLimit, 50);
   if (page < 1 || page > 10_000 || limit < 1 || limit > 100) {
     throw new Error("SERVICE_DISPATCH_PAGINATION_INVALID");
   }

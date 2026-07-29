@@ -15,6 +15,7 @@ import { Text } from "@/components/ui/text";
  */
 export function Pagination({
   page, pageCount, total, pageSize, unitLabel, showRange = true,
+  pageSizes = PAGE_SIZES,
 }: {
   page: number;
   pageCount: number;
@@ -22,6 +23,7 @@ export function Pagination({
   pageSize: number;
   unitLabel?: string;
   showRange?: boolean;
+  pageSizes?: readonly number[];
 }) {
   const t = useTranslations();
   const router = useRouter();
@@ -49,7 +51,7 @@ export function Pagination({
           value={pageSize}
           onChange={(e) => go({ size: e.target.value, page: undefined })}
           size="sm"
-          options={PAGE_SIZES.map((s) => ({ value: String(s), label: t("pagination.rows", { n: s }) }))}
+          options={pageSizes.map((s) => ({ value: String(s), label: t("pagination.rows", { n: s }) }))}
           className="min-w-[116px]"
         />
       </div>

@@ -85,3 +85,40 @@
 - The web report date selector labels the upper bound as “Đến trước ngày” to
   make the half-open range explicit. API consumers should send ISO instants
   when they need a boundary other than Ho Chi Minh midnight.
+
+## Review fix round 1
+
+The first independent review found three Important consistency/contract gaps;
+all three are addressed without a schema change:
+
+- Dispatch rows/count and report metrics/detail now execute sequentially on
+  the same read-only `REPEATABLE READ` transaction. A reusable snapshot reader
+  keeps the isolation contract explicit and permits deterministic integration
+  coordination without adding timing hooks to query production code.
+- Date-only values still map to Asia/Ho_Chi_Minh midnight. Timestamp values
+  must now end in `Z` or a numeric `±HH:MM` offset. Offsetless datetimes and
+  malformed values are rejected before `Date` parsing, so server `TZ` cannot
+  change their meaning.
+- Service pagination now follows the shared component's canonical `size` URL
+  key. Legacy `limit` remains accepted for API compatibility; conflicting
+  simultaneous values are rejected. Dispatch and report panels explicitly
+  offer 20, 50, and 100 rows.
+
+### Review-fix RED/GREEN evidence
+
+- RED:
+  - `size=20` remained at the old default of 50;
+  - conflicting `size`/`limit` did not fail;
+  - offsetless timestamps inherited the process timezone;
+  - rows/count and metrics/detail used separate database snapshots.
+- GREEN:
+  - Domain suite covers 20/50/100 for both parsers, canonical URL emission,
+    conflict rejection, three process timezone settings, explicit UTC, local
+    date-only boundaries, and negative offsetless/malformed inputs.
+  - Configured PostgreSQL concurrency calls the real dispatch/report functions.
+    A separate connection commits an insert after dispatch rows but before
+    count; the response remains one row/total one/page count one. A separate
+    update changes a job after report metrics but before detail; metrics and
+    returned detail both retain the pre-update status from one snapshot.
+  - Original configured-PostgreSQL filters/metrics/assignment integration
+    remains green.

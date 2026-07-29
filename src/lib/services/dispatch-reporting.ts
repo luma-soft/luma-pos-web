@@ -30,6 +30,10 @@ export {
   summarizeServiceMetrics,
 } from "@/lib/services/dispatch-reporting-domain";
 import {
+  readRepeatableSnapshot,
+  type RepeatableSnapshotReader,
+} from "@/lib/services/consistent-read";
+import {
   parseServiceDispatchQuery,
   parseServiceReportQuery,
   summarizeServiceMetrics,
@@ -70,6 +74,7 @@ function localDate(now: Date) {
 export async function getServiceDispatchPage(
   query: ReturnType<typeof parseServiceDispatchQuery>,
   now = new Date(),
+  snapshotReader: RepeatableSnapshotReader = readRepeatableSnapshot,
 ) {
   const conditions: Array<SQL | undefined> = [
     gte(serviceJobs.scheduledAt, query.from),
@@ -97,8 +102,8 @@ export async function getServiceDispatchPage(
       : undefined,
   ];
   const where = and(...conditions);
-  const [rows, totals] = await Promise.all([
-    db.select({
+  const snapshot = await snapshotReader(db, {
+    first: (tx) => tx.select({
       id: serviceJobs.id,
       code: serviceJobs.code,
       projectId: serviceJobs.projectId,
@@ -123,8 +128,10 @@ export async function getServiceDispatchPage(
       .orderBy(asc(serviceJobs.scheduledAt), desc(serviceJobs.priority), asc(serviceJobs.id))
       .limit(query.limit)
       .offset((query.page - 1) * query.limit),
-    db.select({ value: count() }).from(serviceJobs).where(where),
-  ]);
+    second: (tx) => tx.select({ value: count() }).from(serviceJobs).where(where),
+  });
+  const rows = snapshot.first;
+  const totals = snapshot.second;
   const total = totals[0]?.value ?? 0;
   return {
     rows,
@@ -140,9 +147,11 @@ export async function getServiceDispatchPage(
 export async function getServiceManagerReport(
   query: ReturnType<typeof parseServiceReportQuery>,
   now = new Date(),
+  snapshotReader: RepeatableSnapshotReader = readRepeatableSnapshot,
 ) {
   const today = localDate(now);
-  const result = await db.execute(sql`
+  const snapshot = await snapshotReader(db, {
+    first: (tx) => tx.execute(sql`
     with cohort as (
       select job.id, job.code, job.title, job.status, job.priority,
         job.scheduled_at, job.completed_at, job.assigned_to,
@@ -185,7 +194,35 @@ export async function getServiceManagerReport(
       count(*) filter (where status = 'completed' and visit_count > 0)::int as completed_with_visits,
       count(*) filter (where status = 'completed' and visit_count = 1)::int as completed_with_one_visit
     from cohort
-  `);
+    `),
+    second: (tx) => tx.select({
+      id: serviceJobs.id,
+      code: serviceJobs.code,
+      title: serviceJobs.title,
+      projectName: projects.name,
+      status: serviceJobs.status,
+      priority: serviceJobs.priority,
+      assignedToName: profiles.fullName,
+      scheduledAt: serviceJobs.scheduledAt,
+      completedAt: serviceJobs.completedAt,
+      visitCount: sql<number>`(
+        select count(*)::int from ${serviceVisits} visit
+        where visit.job_id = ${serviceJobs.id} and visit.status = 'completed'
+      )`,
+      workMinutes: sql<number>`coalesce((
+        select round(sum(extract(epoch from (entry.ended_at - entry.started_at))) / 60)::int
+        from ${serviceTimeEntries} entry
+        where entry.job_id = ${serviceJobs.id} and entry.ended_at is not null
+      ), 0)`,
+    }).from(serviceJobs)
+      .innerJoin(projects, eq(serviceJobs.projectId, projects.id))
+      .leftJoin(profiles, eq(serviceJobs.assignedTo, profiles.id))
+      .where(and(gte(serviceJobs.scheduledAt, query.from), lt(serviceJobs.scheduledAt, query.to)))
+      .orderBy(desc(serviceJobs.scheduledAt), asc(serviceJobs.id))
+      .limit(query.limit)
+      .offset((query.page - 1) * query.limit),
+  });
+  const result = snapshot.first;
   const raw = result.rows[0] as Record<string, string | number> | undefined;
   const number = (key: string) => Number(raw?.[key] ?? 0);
   const metrics = summarizeServiceMetrics({
@@ -198,32 +235,7 @@ export async function getServiceManagerReport(
     completedWithVisits: number("completed_with_visits"),
     completedWithOneVisit: number("completed_with_one_visit"),
   });
-  const rows = await db.select({
-    id: serviceJobs.id,
-    code: serviceJobs.code,
-    title: serviceJobs.title,
-    projectName: projects.name,
-    status: serviceJobs.status,
-    priority: serviceJobs.priority,
-    assignedToName: profiles.fullName,
-    scheduledAt: serviceJobs.scheduledAt,
-    completedAt: serviceJobs.completedAt,
-    visitCount: sql<number>`(
-      select count(*)::int from ${serviceVisits} visit
-      where visit.job_id = ${serviceJobs.id} and visit.status = 'completed'
-    )`,
-    workMinutes: sql<number>`coalesce((
-      select round(sum(extract(epoch from (entry.ended_at - entry.started_at))) / 60)::int
-      from ${serviceTimeEntries} entry
-      where entry.job_id = ${serviceJobs.id} and entry.ended_at is not null
-    ), 0)`,
-  }).from(serviceJobs)
-    .innerJoin(projects, eq(serviceJobs.projectId, projects.id))
-    .leftJoin(profiles, eq(serviceJobs.assignedTo, profiles.id))
-    .where(and(gte(serviceJobs.scheduledAt, query.from), lt(serviceJobs.scheduledAt, query.to)))
-    .orderBy(desc(serviceJobs.scheduledAt), asc(serviceJobs.id))
-    .limit(query.limit)
-    .offset((query.page - 1) * query.limit);
+  const rows = snapshot.second;
   return {
     metrics,
     rows,
