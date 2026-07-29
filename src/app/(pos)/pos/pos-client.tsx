@@ -431,6 +431,10 @@ function priceLabelFor(p: PosProduct, priceBook: PriceBook = ""): string {
   return formatCurrency(basePriceFor(p, priceBook));
 }
 
+function exceedsAvailableStock(stockManaged: boolean, stock: number, ordered: number, isReturn: boolean) {
+  return stockManaged && !isReturn && ordered > stock + 0.0001;
+}
+
 /** id đơn sinh ở client để khử trùng khi đồng bộ offline (ngoài render scope). */
 function makeClientId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -961,6 +965,16 @@ export function PosClient({
   }
 
   const subtotal = cart.reduce((s, l) => s + effPrice(l).price * l.quantity, 0);
+  const orderedBaseQuantityByProduct = useMemo(() => {
+    const quantities = new Map<string, number>();
+    for (const line of cart) {
+      quantities.set(
+        line.product.id,
+        (quantities.get(line.product.id) ?? 0) + line.quantity * line.unitMultiplier,
+      );
+    }
+    return quantities;
+  }, [cart]);
   const returnQuantity = cart.reduce((sum, line) => sum + line.quantity, 0);
   const hasReturnQuantity = returnQuantity > 0;
   const discountVnd = isReturnDraft ? 0 : discountMode === "pct" ? Math.round(subtotal * discountInput / 100) : discountInput;
@@ -1539,7 +1553,8 @@ export function PosClient({
           const m2 = l.product.m2PerUnit ? Number(l.product.m2PerUnit) * l.unitMultiplier * l.quantity : 0;
           const eff = effPrice(l);
           const stockManaged = isProductStockManaged(l.product.categoryName);
-          const outOfStock = stockManaged && Number(l.product.stock) <= 0;
+          const ordered = orderedBaseQuantityByProduct.get(l.product.id) ?? 0;
+          const stockInsufficient = exceedsAvailableStock(stockManaged, Number(l.product.stock), ordered, isReturnDraft);
           const unitOptions = buildPosUnitOptions(l.product.baseUnit, l.product.units);
           return (
             <div
@@ -1570,7 +1585,7 @@ export function PosClient({
                 <div className="flex items-start gap-2">
                   <span className="mt-0.5 w-5 shrink-0 text-center text-xs tabular-nums text-slate-400">{idx + 1}</span>
                   <div className="min-w-0 flex-1">
-                    <p className={cn("text-sm font-semibold leading-5", outOfStock && "text-er")}>{l.product.name}</p>
+                    <p className={cn("text-sm font-semibold leading-5", stockInsufficient && "text-er")}>{l.product.name}</p>
                     <p className="mt-0.5 truncate text-xs text-slate-400">{l.product.sku ?? ""}</p>
                   </div>
                   <button
@@ -1601,8 +1616,8 @@ export function PosClient({
                     max={l.returnSoldQuantity}
                     readOnly={isCameraQuoteDraft}
                     size="sm"
-                    className={cn(unitOptions.length > 0 ? "w-full" : "w-[8.25rem]", outOfStock && "border-er text-er")}
-                    inputClassName={cn(outOfStock && "border-er text-er")}
+                    className={cn(unitOptions.length > 0 ? "w-full" : "w-[8.25rem]", stockInsufficient && "border-er text-er")}
+                    inputClassName={cn(stockInsufficient && "border-er text-er")}
                   />
                 </div>
                 <div className="mt-3 flex items-center justify-between gap-3">
@@ -1645,7 +1660,7 @@ export function PosClient({
                   >
                     <GripVertical className="w-3.5 h-3.5" />
                   </button>
-                  <span className={cn("font-medium text-sm whitespace-normal break-words", outOfStock && "text-er")}>{l.product.name}</span>
+                  <span className={cn("font-medium text-sm whitespace-normal break-words", stockInsufficient && "text-er")}>{l.product.name}</span>
                   {l.priceBook !== undefined && (
                     <span className="shrink-0 rounded bg-sky-50 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
                       {data.priceBooks.find((book) => (book.isDefault ? "" : book.id) === l.priceBook)?.name ?? "Giá Chung"}
@@ -1677,8 +1692,8 @@ export function PosClient({
                     max={l.returnSoldQuantity}
                     readOnly={isCameraQuoteDraft}
                     size="sm"
-                    className={cn("w-full", outOfStock && "border-er text-er")}
-                    inputClassName={cn(outOfStock && "border-er text-er")}
+                    className={cn("w-full", stockInsufficient && "border-er text-er")}
+                    inputClassName={cn(stockInsufficient && "border-er text-er")}
                   />
                   {isReturnDraft && l.returnSoldQuantity != null && (
                     <div className="mt-1 text-center text-xs font-medium tabular-nums text-slate-500">
@@ -1884,8 +1899,9 @@ export function PosClient({
                     {filtered.slice(0, 60).map((p) => {
                       const stock = Number(p.stock);
                       const stockManaged = isProductStockManaged(p.categoryName);
-                      const outOfStock = stockManaged && stock <= 0;
                       const line = cart.find((l) => l.product.id === p.id);
+                      const ordered = orderedBaseQuantityByProduct.get(p.id) ?? 0;
+                      const stockInsufficient = exceedsAvailableStock(stockManaged, stock, ordered, isReturnDraft);
                       const children = productChildren(p);
                       return (
                         <PosSearchResultLayout
@@ -1899,7 +1915,7 @@ export function PosClient({
                             {p.isVariantParent ? (
                               <div className="text-xs text-slate-400">{children.length} SKU con</div>
                             ) : stockManaged ? (
-                              <div className={cn("text-xs", outOfStock ? "text-er" : "text-slate-400")}>
+                              <div className={cn("text-xs", stockInsufficient ? "text-er" : "text-slate-400")}>
                                 {t("pos.stockLabel")} {formatNumber(stock)} {p.baseUnit}
                               </div>
                             ) : null}
@@ -1915,8 +1931,8 @@ export function PosClient({
                                   min={0}
                                   max={line.returnSoldQuantity}
                                   size="sm"
-                                  className={cn("w-full", outOfStock && "border-er text-er")}
-                                  inputClassName={cn(outOfStock && "border-er text-er")}
+                                  className={cn("w-full", stockInsufficient && "border-er text-er")}
+                                  inputClassName={cn(stockInsufficient && "border-er text-er")}
                                 />
                                 {stockManaged && (
                                   <StockQuantityTooltip stock={stock} ordered={line.quantity * line.unitMultiplier} unit={p.baseUnit} />
