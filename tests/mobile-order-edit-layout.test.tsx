@@ -127,19 +127,51 @@ describe("mobile order edit line parity", () => {
 
     const viHtml = renderLines("vi", viMessages);
     const enHtml = renderLines("en", enMessages);
-    const headingIds = [
-      ...viHtml.matchAll(
-        /<h3 id="([^"]+)"[^>]*>Camera (?:sân trước|kho sau)<\/h3>/g,
-      ),
-    ].map((match) => match[1]);
+    const products = ["Camera sân trước", "Camera kho sau"];
+    const articles = [
+      ...viHtml.matchAll(/<article([^>]*)>([\s\S]*?)<\/article>/g),
+    ];
+    const headingIds: string[] = [];
 
-    expect(headingIds).toHaveLength(2);
-    expect(new Set(headingIds).size).toBe(2);
-    for (const headingId of headingIds) {
-      expect(viHtml).toContain(`aria-labelledby="${headingId}"`);
-    }
+    expect(articles).toHaveLength(products.length);
+    for (const [index, product] of products.entries()) {
+      const [, articleAttributes, articleBody] = articles[index];
+      const heading = articleBody.match(
+        new RegExp(`<h3 id="([^"]+)"[^>]*>${product}</h3>`),
+      );
+      expect(heading).not.toBeNull();
+      const headingId = heading?.[1] ?? "";
+      const quantityLabelId = `${headingId}-quantity`;
+      headingIds.push(headingId);
 
-    for (const product of ["Camera sân trước", "Camera kho sau"]) {
+      expect(
+        articleAttributes.match(/aria-labelledby="([^"]+)"/g),
+      ).toEqual([`aria-labelledby="${headingId}"`]);
+      expect(articleBody).toContain(
+        `<h3 id="${headingId}" class="break-words text-sm font-medium">${product}</h3>`,
+      );
+
+      const quantityGroup = articleBody.match(
+        /<(div|label)([^>]*)role="group"([^>]*)>/,
+      );
+      expect(quantityGroup).not.toBeNull();
+      expect(quantityGroup?.[1]).toBe("div");
+      const quantityGroupAttributes =
+        `${quantityGroup?.[2] ?? ""}${quantityGroup?.[3] ?? ""}`;
+      expect(
+        quantityGroupAttributes.match(/aria-labelledby="([^"]+)"/g),
+      ).toEqual([
+        `aria-labelledby="${headingId} ${quantityLabelId}"`,
+      ]);
+      expect(articleBody).toContain(
+        `<span id="${quantityLabelId}" class="block">Quantity</span>`,
+      );
+      expect(articleBody).not.toMatch(
+        new RegExp(
+          `<label[^>]*>[\\s\\S]*aria-label="Giảm số lượng ${product}"`,
+        ),
+      );
+
       expect(viHtml).toContain(`aria-label="Giảm số lượng ${product}"`);
       expect(viHtml).toContain(`aria-label="Số lượng ${product}"`);
       expect(viHtml).toContain(`aria-label="Tăng số lượng ${product}"`);
@@ -151,6 +183,7 @@ describe("mobile order edit line parity", () => {
         `aria-label="Increase quantity for ${product}"`,
       );
     }
+    expect(new Set(headingIds).size).toBe(products.length);
     expect(viHtml).not.toContain('aria-label="Decrease quantity"');
     expect(viHtml).not.toContain('aria-label="Quantity"');
     expect(viHtml).not.toContain('aria-label="Increase quantity"');
