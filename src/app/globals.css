@@ -170,6 +170,12 @@ html {
   outline-offset: 2px;
 }
 
+/* Form fields that express focus through their border must not also inherit
+   the global keyboard outline, otherwise two primary-colored borders appear. */
+:where(input, select, textarea)[class*="focus:border-"]:focus-visible {
+  outline: none;
+}
+
 textarea.ai-composer-scrollbar-hidden {
   scrollbar-width: none;
   -ms-overflow-style: none;

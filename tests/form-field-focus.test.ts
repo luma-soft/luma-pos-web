@@ -21,4 +21,12 @@ describe("form field focus treatment", () => {
       );
     }
   });
+
+  test("does not add the global outline to fields with a focus border", () => {
+    const source = readFileSync("src/app/globals.css", "utf8");
+
+    expect(source).toMatch(
+      /:where\(input, select, textarea\)\[class\*="focus:border-"\]:focus-visible\s*\{[^}]*outline:\s*none;/s,
+    );
+  });
 });
