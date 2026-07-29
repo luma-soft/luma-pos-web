@@ -1051,6 +1051,10 @@ export const warrantyClaimNotifications = pgTable("warranty_claim_notifications"
   recipientId: uuid("recipient_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   notificationType: text("notification_type").notNull().default("created"),
   readAt: timestamp("read_at", { withTimezone: true }),
+  pushAttemptedAt: timestamp("push_attempted_at", { withTimezone: true }),
+  pushDispatchedAt: timestamp("push_dispatched_at", { withTimezone: true }),
+  pushClaimToken: uuid("push_claim_token"),
+  pushClaimedAt: timestamp("push_claimed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   check("warranty_claim_notifications_type_check", sql`${t.notificationType} in ('created', 'status_changed')`),
@@ -1060,6 +1064,8 @@ export const warrantyClaimNotifications = pgTable("warranty_claim_notifications"
     t.notificationType,
   ),
   index("warranty_claim_notifications_recipient_idx").on(t.recipientId, t.readAt, t.createdAt),
+  check("warranty_claim_notifications_push_claim_check", sql`(${t.pushClaimToken} is null) = (${t.pushClaimedAt} is null)`),
+  index("warranty_claim_notifications_push_idx").on(t.pushDispatchedAt, t.pushClaimedAt, t.createdAt),
 ]);
 
 export const serviceStatusLogs = pgTable("service_status_logs", {

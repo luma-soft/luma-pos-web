@@ -11,6 +11,7 @@ const warranty = await import(
 const {
   auditLogs,
   installedAssets,
+  mobileNotificationStates,
   profiles,
   projects,
   serviceAttachments,
@@ -19,20 +20,29 @@ const {
   serviceJobs,
   serviceCustomerRequestStorageCleanup,
   warrantyClaimNotifications,
+  warrantyClaims,
 } = schema;
 const {
   createTechnicianWarrantyClaimCore,
+  claimWarrantyNotificationDeliveriesCore,
+  completeWarrantyNotificationDeliveryCore,
   finalizeTechnicianWarrantyClaimEvidenceCore,
   getWarrantyClaimForActorCore,
+  listWarrantyNotificationsForRecipientCore,
   listWarrantyClaimsForActorCore,
+  sanitizeTechnicianWarrantyEvidence,
   stageServiceStorageCleanupCore,
 } = warranty;
 
 if (
   typeof createTechnicianWarrantyClaimCore !== "function"
+  || typeof claimWarrantyNotificationDeliveriesCore !== "function"
+  || typeof completeWarrantyNotificationDeliveryCore !== "function"
   || typeof finalizeTechnicianWarrantyClaimEvidenceCore !== "function"
   || typeof getWarrantyClaimForActorCore !== "function"
+  || typeof listWarrantyNotificationsForRecipientCore !== "function"
   || typeof listWarrantyClaimsForActorCore !== "function"
+  || typeof sanitizeTechnicianWarrantyEvidence !== "function"
   || typeof stageServiceStorageCleanupCore !== "function"
   || !warrantyClaimNotifications
   || !serviceAttachments.claimId
@@ -67,7 +77,7 @@ const [project, foreignProject] = await db.insert(projects).values([
   { name: "Camera site", serviceType: "camera", serviceStage: "completed" },
   { name: "Foreign site", serviceType: "camera", serviceStage: "completed" },
 ]).returning();
-const [job, foreignJob, cancelledJob, completedJob] = await db.insert(serviceJobs).values([
+const [job, foreignJob, cancelledJob, completedJob, sameProjectJob] = await db.insert(serviceJobs).values([
   {
     projectId: project.id,
     code: "DV-WARRANTY",
@@ -97,7 +107,15 @@ const [job, foreignJob, cancelledJob, completedJob] = await db.insert(serviceJob
     code: "DV-COMPLETED",
     serviceType: "camera",
     title: "Completed work",
-    status: "completed",
+    status: "warranty",
+    assignedTo: technicianId,
+  },
+  {
+    projectId: project.id,
+    code: "DV-SAME-PROJECT",
+    serviceType: "camera",
+    title: "Other same-project work",
+    status: "warranty",
     assignedTo: technicianId,
   },
 ]).returning();
@@ -107,8 +125,9 @@ await db.insert(serviceJobAssignments).values([
   { jobId: foreignJob.id, profileId: technicianId, assignmentRole: "primary" },
   { jobId: cancelledJob.id, profileId: technicianId, assignmentRole: "primary" },
   { jobId: completedJob.id, profileId: technicianId, assignmentRole: "primary" },
+  { jobId: sameProjectJob.id, profileId: technicianId, assignmentRole: "primary" },
 ]);
-const [asset, foreignAsset] = await db.insert(installedAssets).values([
+const [asset, foreignAsset, completedAsset, sameProjectAsset] = await db.insert(installedAssets).values([
   {
     projectId: project.id,
     jobId: job.id,
@@ -123,7 +142,23 @@ const [asset, foreignAsset] = await db.insert(installedAssets).values([
     name: "Foreign camera",
     status: "installed",
   },
+  {
+    projectId: project.id,
+    jobId: completedJob.id,
+    assetKind: "camera",
+    name: "Completed camera",
+    status: "installed",
+  },
+  {
+    projectId: project.id,
+    jobId: sameProjectJob.id,
+    assetKind: "camera",
+    name: "Same-project other camera",
+    status: "installed",
+  },
 ]).returning();
+await db.update(serviceJobs).set({ status: "completed" })
+  .where(eq(serviceJobs.id, completedJob.id));
 
 const created = await db.transaction((tx) => createTechnicianWarrantyClaimCore(tx, {
   actorId: technicianId,
@@ -156,6 +191,7 @@ if (
 
 for (const [name, input, message] of [
   ["cross-project asset", { actorId: technicianId, jobId: job.id, assetId: foreignAsset.id }, "SERVICE_WARRANTY_ASSET_MISMATCH"],
+  ["same-project cross-job asset", { actorId: technicianId, jobId: job.id, assetId: sameProjectAsset.id }, "SERVICE_WARRANTY_ASSET_MISMATCH"],
   ["cross-project job", { actorId: removedTechnicianId, jobId: foreignJob.id, assetId: foreignAsset.id }, "SERVICE_WARRANTY_FORBIDDEN"],
   ["removed technician", { actorId: removedTechnicianId, jobId: job.id, assetId: asset.id }, "SERVICE_WARRANTY_FORBIDDEN"],
   ["cancelled job", { actorId: technicianId, jobId: cancelledJob.id, assetId: asset.id }, "SERVICE_WARRANTY_JOB_CANCELLED"],
@@ -176,7 +212,7 @@ for (const [name, input, message] of [
 const completedClaim = await db.transaction((tx) => createTechnicianWarrantyClaimCore(tx, {
   actorId: technicianId,
   jobId: completedJob.id,
-  assetId: asset.id,
+  assetId: completedAsset.id,
   title: "Issue reported after handover",
   priority: "normal",
 }));
@@ -198,17 +234,17 @@ if (
     actorId: technicianId,
     role: "technician",
   })).length !== 0
-  || await getWarrantyClaimForActorCore(db, {
+  || await db.transaction((tx) => getWarrantyClaimForActorCore(tx, {
     actorId: technicianId,
     role: "technician",
     claimId: created.id,
-  }) !== null
+  })) !== null
 ) throw new Error("removed technician retained warranty claim access");
-if (!(await getWarrantyClaimForActorCore(db, {
+if (!(await db.transaction((tx) => getWarrantyClaimForActorCore(tx, {
   actorId: managerId,
   role: "manager",
   claimId: created.id,
-}))) throw new Error("manager lost warranty claim detail access");
+})))) throw new Error("manager lost warranty claim detail access");
 
 await db.update(serviceJobAssignments).set({ removedAt: null }).where(eq(
   serviceJobAssignments.profileId,
@@ -254,6 +290,48 @@ try {
     );
 }
 if (!attachmentIdorRejected) throw new Error("cross-claim attachment scope was accepted");
+
+let evidenceScopeMutationRejected = false;
+try {
+  await db.update(warrantyClaims).set({
+    jobId: sameProjectJob.id,
+    assetId: sameProjectAsset.id,
+  }).where(eq(warrantyClaims.id, created.id));
+} catch (error) {
+  const cause = error instanceof Error && "cause" in error ? error.cause : null;
+  evidenceScopeMutationRejected = (
+    error instanceof Error
+    && error.message.includes("SERVICE_WARRANTY_SCOPE_IMMUTABLE")
+  ) || (
+    cause instanceof Error
+    && cause.message.includes("SERVICE_WARRANTY_SCOPE_IMMUTABLE")
+  );
+}
+if (!evidenceScopeMutationRejected) {
+  throw new Error("claim scope changed while warranty evidence existed");
+}
+
+const [legacyManagerClaim] = await db.insert(warrantyClaims).values({
+  projectId: project.id,
+  jobId: null,
+  assetId: null,
+  code: "BH-LEGACY-MANAGER",
+  title: "Legacy manager claim",
+  createdBy: managerId,
+}).returning();
+await db.update(warrantyClaims).set({
+  title: "Legacy manager claim updated",
+  jobId: null,
+  assetId: null,
+}).where(eq(warrantyClaims.id, legacyManagerClaim.id));
+let partialManagerScopeRejected = false;
+try {
+  await db.update(warrantyClaims).set({ jobId: job.id, assetId: null })
+    .where(eq(warrantyClaims.id, legacyManagerClaim.id));
+} catch {
+  partialManagerScopeRejected = true;
+}
+if (!partialManagerScopeRejected) throw new Error("partial manager claim scope was accepted");
 
 const rollbackPath = `${job.id}/${technicianId}/rollback.jpg`;
 const [rollbackCleanup] = await db.transaction((tx) =>
@@ -320,5 +398,99 @@ if (
   || (await db.select().from(serviceCustomerRequestStorageCleanup)
     .where(eq(serviceCustomerRequestStorageCleanup.id, successCleanup.id))).length !== 0
 ) throw new Error("successful evidence claim did not acknowledge durable cleanup");
+
+const inbox = await listWarrantyNotificationsForRecipientCore(db, managerId);
+if (
+  !inbox.some((row) =>
+    row.claimId === created.id
+    && row.notificationId === `warranty-${notifications.find((item) => item.recipientId === managerId).id}`
+  )
+) throw new Error("manager warranty notification was not exposed to the mobile inbox");
+const managerNotificationId = inbox.find((row) => row.claimId === created.id).notificationId;
+await db.insert(mobileNotificationStates).values({
+  userId: managerId,
+  notificationId: managerNotificationId,
+  read: true,
+  dismissed: false,
+});
+const [readState] = await db.select().from(mobileNotificationStates)
+  .where(eq(mobileNotificationStates.notificationId, managerNotificationId));
+if (!readState?.read || readState.dismissed) {
+  throw new Error("warranty inbox notification did not use the standard read state");
+}
+const deliveryClaims = await claimWarrantyNotificationDeliveriesCore(db, {
+  now: new Date("2026-07-29T04:00:00.000Z"),
+});
+if (deliveryClaims.length < 2) throw new Error("notification delivery targets were not claimable");
+if ((await claimWarrantyNotificationDeliveriesCore(db, {
+  now: new Date("2026-07-29T04:01:00.000Z"),
+})).length !== 0) throw new Error("notification delivery lease was not idempotent");
+await completeWarrantyNotificationDeliveryCore(db, {
+  id: deliveryClaims[0].id,
+  claimToken: deliveryClaims[0].claimToken,
+  delivered: true,
+  now: new Date("2026-07-29T04:02:00.000Z"),
+});
+await completeWarrantyNotificationDeliveryCore(db, {
+  id: deliveryClaims[1].id,
+  claimToken: deliveryClaims[1].claimToken,
+  delivered: false,
+  now: new Date("2026-07-29T04:02:00.000Z"),
+});
+const retryDeliveries = await claimWarrantyNotificationDeliveriesCore(db, {
+  now: new Date("2026-07-29T04:03:00.000Z"),
+});
+if (
+  retryDeliveries.some((row) => row.id === deliveryClaims[0].id)
+  || !retryDeliveries.some((row) => row.id === deliveryClaims[1].id)
+) throw new Error("notification delivery success/retry state is incorrect");
+
+const sharp = (await import("sharp")).default;
+const realPng = new Uint8Array(await sharp({
+  create: {
+    width: 2,
+    height: 2,
+    channels: 3,
+    background: "#ff0000",
+  },
+}).png().toBuffer());
+const sanitized = await sanitizeTechnicianWarrantyEvidence({
+  bytes: realPng,
+  declaredMimeType: "image/png",
+  fileName: "issue.png",
+});
+if (
+  !sanitized
+  || sanitized.mimeType !== "image/png"
+  || sanitized.width !== 2
+  || sanitized.height !== 2
+  || sanitized.sha256.length !== 64
+) throw new Error("real warranty image was not safely decoded and canonicalized");
+for (const unsafe of [
+  {
+    bytes: realPng.subarray(0, realPng.length - 4),
+    declaredMimeType: "image/png",
+    fileName: "truncated.png",
+  },
+  {
+    bytes: new Uint8Array([...realPng, 0x50, 0x44, 0x46]),
+    declaredMimeType: "image/png",
+    fileName: "polyglot.png",
+  },
+  {
+    bytes: realPng,
+    declaredMimeType: "image/png",
+    fileName: "wrong.jpg",
+  },
+  {
+    bytes: new TextEncoder().encode("%PDF-1.4 fake warranty evidence"),
+    declaredMimeType: "application/pdf",
+    fileName: "issue.pdf",
+  },
+]) {
+  if (await sanitizeTechnicianWarrantyEvidence(unsafe)) {
+    throw new Error(`unsafe warranty evidence accepted: ${unsafe.fileName}`);
+  }
+}
 
 console.log("technician warranty: assignment, IDOR, evidence, timeline, audit, and notifications verified");

@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { db } from "@/db";
 import { requireMobileServiceAccess } from "@/lib/mobile/auth";
 import {
@@ -9,17 +9,19 @@ import {
   searchParam,
 } from "@/lib/mobile/response";
 import {
-  MAX_SERVICE_EVIDENCE_BYTES,
   safeServiceEvidenceName,
   SERVICE_EVIDENCE_BUCKET,
-  SERVICE_EVIDENCE_MIME_TYPES,
-  sniffServiceEvidenceMime,
 } from "@/lib/services/evidence-storage";
+import {
+  CUSTOMER_REQUEST_EVIDENCE_MAX_BYTES,
+  CUSTOMER_REQUEST_EVIDENCE_MIME_TYPES,
+} from "@/lib/services/customer-request-portal";
 import { technicianWarrantyClaimCreateSchema } from "@/lib/services/schemas";
 import {
   createTechnicianWarrantyClaimCore,
   finalizeTechnicianWarrantyClaimEvidenceCore,
   listWarrantyClaimsForActorCore,
+  sanitizeTechnicianWarrantyEvidence,
   stageServiceStorageCleanupCore,
 } from "@/lib/services/technician-warranty";
 import { parseTechnicianWarrantyMultipart } from "@/lib/services/technician-warranty-multipart";
@@ -32,8 +34,8 @@ async function ensureEvidenceBucket() {
   const existing = buckets.find((bucket) => bucket.name === SERVICE_EVIDENCE_BUCKET);
   const options = {
     public: false,
-    fileSizeLimit: MAX_SERVICE_EVIDENCE_BYTES,
-    allowedMimeTypes: [...SERVICE_EVIDENCE_MIME_TYPES],
+    fileSizeLimit: CUSTOMER_REQUEST_EVIDENCE_MAX_BYTES,
+    allowedMimeTypes: [...CUSTOMER_REQUEST_EVIDENCE_MIME_TYPES],
   };
   if (!existing) {
     const { error } = await supabase.storage.createBucket(
@@ -139,22 +141,17 @@ export async function POST(request: Request) {
   } | null = null;
   try {
     if (file) {
-      if (
-        file.bytes.length <= 0
-        || file.bytes.length > MAX_SERVICE_EVIDENCE_BYTES
-        || !SERVICE_EVIDENCE_MIME_TYPES.includes(
-          file.mimeType as (typeof SERVICE_EVIDENCE_MIME_TYPES)[number],
-        )
-      ) return mobileError("services.errors.unsupportedEvidence", 400);
-      if (
-        sniffServiceEvidenceMime(
-          file.bytes.subarray(0, 16),
-          file.mimeType,
-        ) !== file.mimeType
-      ) {
-        return mobileError("services.errors.unsupportedEvidence", 400);
-      }
-      const path = `${parsed.data.jobId}/${gate.userId}/${claimId}/${safeServiceEvidenceName(file.fileName)}`;
+      const image = await sanitizeTechnicianWarrantyEvidence({
+        bytes: file.bytes,
+        declaredMimeType: file.mimeType,
+        fileName: file.fileName,
+      });
+      if (!image) return mobileError("services.errors.unsupportedEvidence", 400);
+      const baseName = safeServiceEvidenceName(
+        file.fileName.replace(/\.[^.]+$/, ""),
+      );
+      const canonicalName = `${baseName}.${image.extension}`;
+      const path = `${parsed.data.jobId}/${gate.userId}/${claimId}/${randomUUID()}.${image.extension}`;
       const [cleanup] = await db.transaction((tx) =>
         stageServiceStorageCleanupCore(tx, {
           bucket: SERVICE_EVIDENCE_BUCKET,
@@ -163,15 +160,15 @@ export async function POST(request: Request) {
       uploaded = {
         cleanupId: cleanup.id,
         path,
-        fileName: file.fileName,
-        mimeType: file.mimeType,
-        sizeBytes: file.bytes.length,
-        sha256: createHash("sha256").update(file.bytes).digest("hex"),
+        fileName: canonicalName,
+        mimeType: image.mimeType,
+        sizeBytes: image.bytes.length,
+        sha256: image.sha256,
       };
       const supabase = await ensureEvidenceBucket();
       const { error } = await supabase.storage.from(SERVICE_EVIDENCE_BUCKET)
-        .upload(uploaded.path, file.bytes, {
-          contentType: file.mimeType,
+        .upload(uploaded.path, image.bytes, {
+          contentType: image.mimeType,
           upsert: false,
         });
       if (error) throw error;

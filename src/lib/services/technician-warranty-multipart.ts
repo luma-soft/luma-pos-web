@@ -1,10 +1,10 @@
 import Busboy from "busboy";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import { MAX_SERVICE_EVIDENCE_BYTES } from "@/lib/services/evidence-storage";
+import { CUSTOMER_REQUEST_EVIDENCE_MAX_BYTES } from "@/lib/services/customer-request-portal";
 
 export const SERVICE_WARRANTY_MULTIPART_MAX_BYTES =
-  MAX_SERVICE_EVIDENCE_BYTES + 64 * 1024;
+  CUSTOMER_REQUEST_EVIDENCE_MAX_BYTES + 64 * 1024;
 
 const CONTROL_FIELDS = new Set([
   "jobId",
@@ -40,7 +40,7 @@ export async function parseTechnicianWarrantyMultipart(
         "content-type": request.headers.get("content-type") ?? "",
       },
       limits: {
-        fileSize: MAX_SERVICE_EVIDENCE_BYTES,
+        fileSize: CUSTOMER_REQUEST_EVIDENCE_MAX_BYTES,
         files: 1,
         fields: 7,
         fieldNameSize: 30,
@@ -105,7 +105,7 @@ export async function parseTechnicianWarrantyMultipart(
     });
     file.on("data", (chunk: Buffer) => {
       size += chunk.length;
-      if (size > MAX_SERVICE_EVIDENCE_BYTES) {
+      if (size > CUSTOMER_REQUEST_EVIDENCE_MAX_BYTES) {
         truncated = true;
         invalidate("SERVICE_WARRANTY_MULTIPART_TOO_LARGE");
         return;

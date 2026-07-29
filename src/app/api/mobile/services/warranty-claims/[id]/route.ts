@@ -12,10 +12,10 @@ export async function GET(
   if (blocked) return blocked;
   if (!gate.ok) return mobileError("errors.unauthorized", 401);
   const { id } = await params;
-  const claim = await getWarrantyClaimForActorCore(db, {
+  const claim = await db.transaction((tx) => getWarrantyClaimForActorCore(tx, {
     actorId: gate.userId,
     role: gate.role,
     claimId: id,
-  });
+  }));
   return claim ? mobileOk(claim) : mobileError("errors.notFound", 404);
 }

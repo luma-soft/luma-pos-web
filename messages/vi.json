@@ -2857,6 +2857,7 @@
       "signatureStale": "Biên bản đã ký không còn khớp dữ liệu hiện tại. Vui lòng ký lại trước khi hoàn tất.",
       "signatureIntegrityInvalid": "Không thể xác minh biên bản đã ký. Vui lòng ký lại trước khi hoàn tất.",
       "signedSnapshotLocked": "Lệnh việc đã hoàn tất và bị khóa. Hãy mở lại bằng quy trình được cấp quyền trước khi sửa dữ liệu bàn giao.",
+      "warrantyScopeImmutable": "Yêu cầu bảo hành đã có bằng chứng nên không thể đổi lệnh việc hoặc thiết bị.",
       "duplicateCode": "Mã chứng từ đã tồn tại, vui lòng thử lại.",
       "duplicateSerial": "Serial thiết bị đã tồn tại."
     }

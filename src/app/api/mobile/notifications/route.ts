@@ -7,6 +7,7 @@ import { getStoreSettings } from "@/lib/data/settings";
 import { requireMobileUser } from "@/lib/mobile/auth";
 import { mobileGate, mobileOk } from "@/lib/mobile/response";
 import { mobileNotificationSettingsForRole } from "@/lib/settings/mobile-settings-access";
+import { listWarrantyNotificationsForRecipientCore } from "@/lib/services/technician-warranty";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 export async function GET() {
@@ -14,7 +15,8 @@ export async function GET() {
   if (!gate.ok) return mobileGate(gate)!;
 
   const profileId = await getProfileId(gate.userId);
-  const [store, restock, shift, failedEinvoices] = await Promise.all([
+  const stateUserId = profileId ?? gate.userId;
+  const [store, restock, shift, failedEinvoices, warrantyNotifications] = await Promise.all([
     getStoreSettings(),
     getRestockSuggestions(30),
     getCurrentShift(profileId ?? gate.userId),
@@ -28,6 +30,7 @@ export async function GET() {
       .where(eq(einvoices.status, "error"))
       .orderBy(desc(einvoices.createdAt))
       .limit(10),
+    listWarrantyNotificationsForRecipientCore(db, stateUserId),
   ]);
   const prefs = store.prefs.notifications;
   const routed = (category: keyof typeof prefs.roleRouting) =>
@@ -41,8 +44,20 @@ export async function GET() {
   const routedEinvoices = failedEinvoices.filter(
     (row) => row.attemptCount >= prefs.thresholds.einvoiceFailureAttempts,
   );
-  const stateUserId = profileId ?? gate.userId;
   const rows = [
+    ...warrantyNotifications.map((row) => ({
+      id: row.notificationId,
+      category: "serviceDue",
+      title: `${row.code}: ${row.title}`,
+      body: `${row.projectName}${row.assetName ? ` · ${row.assetName}` : ""}`,
+      unread: true,
+      priority: row.priority,
+      action: {
+        type: "open",
+        target: "services",
+        id: row.jobId ?? row.claimId,
+      },
+    })),
     ...restockRows.map((row) => ({
       id: `restock-${row.id}`,
       category: "lowStock",
@@ -108,6 +123,7 @@ export async function GET() {
       lowStock: restockRows.length,
       einvoiceError: routedEinvoices.length,
       shiftClose: prefs.shiftClose && routed("shiftClose") ? 1 : 0,
+      warranty: warrantyNotifications.length,
     },
     ...(visibleSettings ? { settings: visibleSettings } : {}),
   });

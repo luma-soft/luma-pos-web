@@ -107,11 +107,45 @@ async function loadJobProject(jobId?: string | null) {
 
 async function loadAssetProject(assetId?: string | null) {
   if (!assetId) return undefined;
-  const [asset] = await db.select({ projectId: installedAssets.projectId })
+  const [asset] = await db.select({
+    projectId: installedAssets.projectId,
+    jobId: installedAssets.jobId,
+  })
     .from(installedAssets)
     .where(eq(installedAssets.id, assetId))
     .limit(1);
   return asset ?? null;
+}
+
+async function warrantyLinksAreValid(
+  projectId: string,
+  jobId?: string | null,
+  assetId?: string | null,
+) {
+  if (!jobId && !assetId) return true;
+  if (!jobId || !assetId) return false;
+  const [job, asset] = await Promise.all([
+    loadJobProject(jobId),
+    loadAssetProject(assetId),
+  ]);
+  return Boolean(
+    job
+    && asset
+    && job.projectId === projectId
+    && asset.projectId === projectId
+    && asset.jobId === jobId,
+  );
+}
+
+function hasServiceWarrantyError(error: unknown, code: string) {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current; depth += 1) {
+    if (current instanceof Error && current.message.includes(code)) return true;
+    current = typeof current === "object" && "cause" in current
+      ? (current as { cause?: unknown }).cause
+      : null;
+  }
+  return false;
 }
 
 async function loadOrderProject(orderId?: string | null) {
@@ -896,7 +930,7 @@ export async function createWarrantyClaim(
     if (!await isServiceProject(value.projectId)) {
       return { ok: false, error: "services.errors.projectRequired" };
     }
-    if (!await serviceLinksAreValid(value.projectId, { jobId: value.jobId, assetId: value.assetId })) {
+    if (!await warrantyLinksAreValid(value.projectId, value.jobId, value.assetId)) {
       return { ok: false, error: "services.errors.relationMismatch" };
     }
     const code = generateCode("BH");
@@ -915,7 +949,16 @@ export async function createWarrantyClaim(
     return { ok: true, data: claim };
   } catch (error) {
     console.error("createWarrantyClaim failed:", error);
-    return { ok: false, error: isUniqueViolation(error) ? "services.errors.duplicateCode" : "errors.serverError" };
+    return {
+      ok: false,
+      error: isUniqueViolation(error)
+        ? "services.errors.duplicateCode"
+        : hasServiceWarrantyError(error, "SERVICE_WARRANTY_SCOPE_IMMUTABLE")
+          ? "services.errors.warrantyScopeImmutable"
+          : hasServiceWarrantyError(error, "SERVICE_WARRANTY_SCOPE_")
+            ? "services.errors.relationMismatch"
+            : "errors.serverError",
+    };
   }
 }
 
@@ -934,7 +977,7 @@ export async function updateWarrantyClaim(
       .where(eq(warrantyClaims.id, value.claimId))
       .limit(1);
     if (!current) return { ok: false, error: "errors.notFound" };
-    if (!await serviceLinksAreValid(current.projectId, { jobId: value.jobId, assetId: value.assetId })) {
+    if (!await warrantyLinksAreValid(current.projectId, value.jobId, value.assetId)) {
       return { ok: false, error: "services.errors.relationMismatch" };
     }
 
@@ -953,7 +996,14 @@ export async function updateWarrantyClaim(
     return { ok: true, data: undefined };
   } catch (error) {
     console.error("updateWarrantyClaim failed:", error);
-    return { ok: false, error: "errors.serverError" };
+    return {
+      ok: false,
+      error: hasServiceWarrantyError(error, "SERVICE_WARRANTY_SCOPE_IMMUTABLE")
+        ? "services.errors.warrantyScopeImmutable"
+        : hasServiceWarrantyError(error, "SERVICE_WARRANTY_SCOPE_")
+          ? "services.errors.relationMismatch"
+          : "errors.serverError",
+    };
   }
 }
 

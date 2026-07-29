@@ -61,3 +61,43 @@
 - Existing manager web/server action behavior is retained.
 - No push, deployment, or external credential change was made.
 - Web and mobile changes are committed separately, as requested.
+
+## Review fix round 1
+
+- Restored manager compatibility for legacy unlinked claims: `job_id` and
+  `asset_id` may both remain null, while partial linkage is rejected. Real
+  manager action tests cover null/null create and update.
+- Tightened linked claim scope to require the installed asset's exact `job_id`,
+  not only the same project. Both the technician core and database guard reject
+  same-project cross-job assets.
+- Made project/job/asset scope immutable once any claim evidence exists.
+  Manager actions map the database invariant to
+  `services.errors.warrantyScopeImmutable`.
+- Replaced magic-byte-only evidence handling with the Task 5 Sharp pipeline:
+  full decode, exact structural/trailing-byte checks, MIME/extension agreement,
+  dimension/pixel/page limits, rotation, canonical re-encode, and hashing of
+  the sanitized output. Warranty evidence accepts JPEG/PNG/WebP only; PDF,
+  truncated, polyglot, and wrong-extension inputs are rejected.
+- Added applied migration `0081_technician_warranty_hardening.sql`. It enables
+  RLS, revokes app-role table access, revokes trigger-function execution from
+  PUBLIC/anon/authenticated, replaces the compatibility/scope guards, and adds
+  durable push delivery leases.
+- Technician detail and attachment metadata now run inside a transaction that
+  locks the canonical job and reauthorizes active primary/crew assignment.
+  The attachment signed-URL route also locks, reauthorizes, reads metadata, and
+  mints the short-lived URL before releasing that job lock.
+- Integrated warranty notifications into the authenticated mobile inbox and
+  standard read/dismiss state. The notification cron atomically leases each
+  exact owner/manager recipient row, sends with a stable per-row delivery key,
+  acknowledges success, and releases failures for retry.
+- Added a real two-session PostgreSQL regression proving both lock orderings:
+  removal-first blocks then denies the read; read-first returns claim/evidence
+  metadata while holding the job lock and blocks removal until commit.
+- Verification after review fixes:
+  - focused PGlite/action/notification/image tests passed;
+  - real PostgreSQL concurrency test passed;
+  - affected ESLint passed;
+  - production Next.js build passed with TypeScript and all 99 pages;
+  - migration runner repeated with zero pending;
+  - direct database inspection confirmed RLS, push columns, migration tracking,
+    no anon/auth table privileges, and no PUBLIC/anon/auth trigger execution.

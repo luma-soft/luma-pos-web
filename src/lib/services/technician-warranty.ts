@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type * as schema from "@/db/schema";
 import {
@@ -16,6 +16,7 @@ import {
   warrantyClaims,
 } from "@/db/schema";
 import type { Role } from "@/lib/actions/common";
+import { sanitizeCustomerRequestEvidence } from "@/lib/services/customer-request-portal";
 
 type ServiceTransaction = Parameters<
   Parameters<NodePgDatabase<typeof schema>["transaction"]>[0]
@@ -72,6 +73,7 @@ export async function createTechnicianWarrantyClaimCore(
   const [asset] = await tx.select({
     id: installedAssets.id,
     projectId: installedAssets.projectId,
+    jobId: installedAssets.jobId,
     status: installedAssets.status,
   }).from(installedAssets)
     .where(eq(installedAssets.id, input.assetId))
@@ -80,6 +82,7 @@ export async function createTechnicianWarrantyClaimCore(
   if (
     !asset
     || asset.projectId !== job.projectId
+    || asset.jobId !== job.id
     || asset.status === "removed"
   ) throw new Error("SERVICE_WARRANTY_ASSET_MISMATCH");
 
@@ -237,6 +240,14 @@ function technicianClaimFilter(actorId: string) {
   )`;
 }
 
+export async function sanitizeTechnicianWarrantyEvidence(input: {
+  bytes: Uint8Array;
+  declaredMimeType: string;
+  fileName: string;
+}) {
+  return sanitizeCustomerRequestEvidence(input);
+}
+
 export async function listWarrantyClaimsForActorCore(
   database: NodePgDatabase<typeof schema> | ServiceTransaction,
   input: { actorId: string; role: WarrantyActorRole; jobId?: string | null },
@@ -264,9 +275,40 @@ export async function listWarrantyClaimsForActorCore(
 }
 
 export async function getWarrantyClaimForActorCore(
-  database: NodePgDatabase<typeof schema> | ServiceTransaction,
+  database: ServiceTransaction,
   input: { actorId: string; role: WarrantyActorRole; claimId: string },
 ) {
+  const [scope] = await database.select({
+    id: warrantyClaims.id,
+    jobId: warrantyClaims.jobId,
+  }).from(warrantyClaims)
+    .where(eq(warrantyClaims.id, input.claimId))
+    .limit(1);
+  if (!scope) return null;
+  if (scope.jobId) {
+    const [lockedJob] = await database.select({ id: serviceJobs.id })
+      .from(serviceJobs)
+      .where(eq(serviceJobs.id, scope.jobId))
+      .limit(1)
+      .for("update");
+    if (!lockedJob) return null;
+  } else if (input.role === "technician") {
+    return null;
+  }
+  if (input.role === "technician") {
+    const [assignment] = await database.select({ id: serviceJobAssignments.id })
+      .from(serviceJobAssignments)
+      .innerJoin(profiles, eq(serviceJobAssignments.profileId, profiles.id))
+      .where(and(
+        eq(serviceJobAssignments.jobId, scope.jobId!),
+        eq(serviceJobAssignments.profileId, input.actorId),
+        isNull(serviceJobAssignments.removedAt),
+        eq(profiles.isActive, true),
+        eq(profiles.role, "technician"),
+      ))
+      .limit(1);
+    if (!assignment) return null;
+  }
   const [claim] = await database.select({
     id: warrantyClaims.id,
     code: warrantyClaims.code,
@@ -288,7 +330,6 @@ export async function getWarrantyClaimForActorCore(
     .innerJoin(installedAssets, eq(warrantyClaims.assetId, installedAssets.id))
     .where(and(
       eq(warrantyClaims.id, input.claimId),
-      input.role === "technician" ? technicianClaimFilter(input.actorId) : undefined,
     ))
     .limit(1);
   if (!claim) return null;
@@ -305,4 +346,94 @@ export async function getWarrantyClaimForActorCore(
     isNull(serviceAttachments.deletedAt),
   )).orderBy(desc(serviceAttachments.createdAt));
   return { ...claim, attachments };
+}
+
+export async function listWarrantyNotificationsForRecipientCore(
+  database: NodePgDatabase<typeof schema> | ServiceTransaction,
+  recipientId: string,
+) {
+  return database.select({
+    id: warrantyClaimNotifications.id,
+    notificationId: sql<string>`'warranty-' || ${warrantyClaimNotifications.id}::text`,
+    claimId: warrantyClaims.id,
+    jobId: warrantyClaims.jobId,
+    code: warrantyClaims.code,
+    title: warrantyClaims.title,
+    priority: warrantyClaims.priority,
+    assetName: installedAssets.name,
+    projectName: projects.name,
+    createdAt: warrantyClaimNotifications.createdAt,
+  }).from(warrantyClaimNotifications)
+    .innerJoin(warrantyClaims, eq(warrantyClaimNotifications.claimId, warrantyClaims.id))
+    .innerJoin(projects, eq(warrantyClaims.projectId, projects.id))
+    .leftJoin(installedAssets, eq(warrantyClaims.assetId, installedAssets.id))
+    .where(eq(warrantyClaimNotifications.recipientId, recipientId))
+    .orderBy(desc(warrantyClaimNotifications.createdAt));
+}
+
+const WARRANTY_PUSH_LEASE_MS = 5 * 60 * 1000;
+
+export async function claimWarrantyNotificationDeliveriesCore(
+  database: NodePgDatabase<typeof schema>,
+  input: { now?: Date; limit?: number } = {},
+) {
+  const now = input.now ?? new Date();
+  const staleAt = new Date(now.getTime() - WARRANTY_PUSH_LEASE_MS);
+  const candidates = await database.select({
+    id: warrantyClaimNotifications.id,
+  }).from(warrantyClaimNotifications).where(and(
+    isNull(warrantyClaimNotifications.pushDispatchedAt),
+    or(
+      isNull(warrantyClaimNotifications.pushClaimedAt),
+      lt(warrantyClaimNotifications.pushClaimedAt, staleAt),
+    ),
+  )).orderBy(asc(warrantyClaimNotifications.createdAt))
+    .limit(Math.min(100, Math.max(1, input.limit ?? 25)));
+  const claimed = [];
+  for (const candidate of candidates) {
+    const claimToken = randomUUID();
+    const [row] = await database.update(warrantyClaimNotifications).set({
+      pushClaimToken: claimToken,
+      pushClaimedAt: now,
+    }).where(and(
+      eq(warrantyClaimNotifications.id, candidate.id),
+      isNull(warrantyClaimNotifications.pushDispatchedAt),
+      or(
+        isNull(warrantyClaimNotifications.pushClaimedAt),
+        lt(warrantyClaimNotifications.pushClaimedAt, staleAt),
+      ),
+    )).returning({
+      id: warrantyClaimNotifications.id,
+      recipientId: warrantyClaimNotifications.recipientId,
+      claimId: warrantyClaimNotifications.claimId,
+    });
+    if (!row) continue;
+    const [claim] = await database.select({
+      jobId: warrantyClaims.jobId,
+    }).from(warrantyClaims).where(eq(warrantyClaims.id, row.claimId)).limit(1);
+    claimed.push({ ...row, claimToken, jobId: claim?.jobId ?? null });
+  }
+  return claimed;
+}
+
+export async function completeWarrantyNotificationDeliveryCore(
+  database: NodePgDatabase<typeof schema>,
+  input: {
+    id: string;
+    claimToken: string;
+    delivered: boolean;
+    now?: Date;
+  },
+) {
+  const now = input.now ?? new Date();
+  const [updated] = await database.update(warrantyClaimNotifications).set({
+    pushAttemptedAt: now,
+    pushDispatchedAt: input.delivered ? now : null,
+    pushClaimToken: null,
+    pushClaimedAt: null,
+  }).where(and(
+    eq(warrantyClaimNotifications.id, input.id),
+    eq(warrantyClaimNotifications.pushClaimToken, input.claimToken),
+  )).returning({ id: warrantyClaimNotifications.id });
+  return Boolean(updated);
 }

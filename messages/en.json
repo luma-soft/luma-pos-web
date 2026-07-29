@@ -2857,6 +2857,7 @@
       "signatureStale": "The signed handover is out of date. Capture a new signature before completing this job.",
       "signatureIntegrityInvalid": "The signed handover could not be verified. Capture a new signature before completing this job.",
       "signedSnapshotLocked": "Completed jobs are locked. Reopen the job through an authorized workflow before changing signed handover data.",
+      "warrantyScopeImmutable": "This warranty request has evidence, so its job and asset can no longer be changed.",
       "duplicateCode": "The document code already exists. Try again.",
       "duplicateSerial": "This asset serial already exists."
     }
