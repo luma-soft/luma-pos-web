@@ -31,6 +31,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
+import { Select } from "@/components/ui/select";
 import {
   DataTableShell,
   stopRowToggle,
@@ -416,25 +417,28 @@ export function ProductUnitSelector({
   }
 
   return (
-    <select
-      value={value}
-      onChange={(event) => {
-        stopRowToggle(event);
-        onChange(event.currentTarget.value);
-      }}
+    <div
       onClick={stopRowToggle}
       onPointerDown={stopRowToggle}
       onKeyDown={stopRowToggle}
-      aria-label={`Đơn vị tính ${productName}`}
-      className="min-h-11 min-w-11 max-w-full rounded-lg border border-border-soft bg-surface px-2 py-1 text-sm text-slate-600 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 dark:text-slate-300"
+      className="inline-block max-w-full"
     >
-      <option value={baseUnit}>{baseUnit}</option>
-      {units.map((unit) => (
-        <option key={unit.unitName} value={unit.unitName}>
-          {unit.unitName}
-        </option>
-      ))}
-    </select>
+      <Select
+        value={value}
+        options={[
+          { value: baseUnit, label: baseUnit },
+          ...units.map((unit) => ({
+            value: unit.unitName,
+            label: unit.unitName,
+          })),
+        ]}
+        onValueChange={onChange}
+        aria-label={`Đơn vị tính ${productName}`}
+        size="sm"
+        rootClassName="max-w-full"
+        className="max-w-full text-slate-600 dark:text-slate-300"
+      />
+    </div>
   );
 }
 

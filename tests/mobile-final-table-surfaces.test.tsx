@@ -496,6 +496,9 @@ describe("final mobile table surfaces", () => {
     const {
       ProductUnitSelector,
     } = await import("@/app/(app)/inventory/tabs/products-table");
+    const {
+      Select,
+    } = await import("@/components/ui/select");
     const changes: string[] = [];
 
     const single = ProductUnitSelector({
@@ -517,32 +520,35 @@ describe("final mobile table surfaces", () => {
       value: "m",
       onChange: (unitName) => changes.push(unitName),
     });
-    const multiHtml = renderToStaticMarkup(multi);
-    const select = elementsOfType(multi, "select")[0];
+    const multiHtml = renderWithMessages(multi);
+    const select = elementsOfType(multi, Select)[0];
 
     expect(multiHtml).toContain('aria-label="Đơn vị tính Dây mạng"');
-    expect(multiHtml).toContain('<option value="m" selected="">m</option>');
-    expect(multiHtml).toContain('<option value="cuộn">cuộn</option>');
+    expect(multiHtml).toContain('aria-haspopup="listbox"');
+    expect(multiHtml).not.toContain("<select");
+    expect(multiHtml).toContain(">m<");
+    expect(select).toBeDefined();
+    if (!select) return;
+    expect(select.props.onClick).toBeUndefined();
 
     const clickEvent = { type: "click" };
     const pointerEvent = { type: "pointerdown" };
     const keyEvent = { type: "keydown" };
-    const changeEvent = { currentTarget: { value: "cuộn" } };
     stoppedRowToggleEvents.length = 0;
-    (select.props.onClick as (event: unknown) => void)(clickEvent);
-    (select.props.onPointerDown as (event: unknown) => void)(pointerEvent);
-    (select.props.onKeyDown as (event: unknown) => void)(keyEvent);
-    (
-      select.props.onChange as (
-        event: { currentTarget: { value: string } },
-      ) => void
-    )(changeEvent);
+    const wrapper = multi as React.ReactElement<{
+      onClick: (event: unknown) => void;
+      onPointerDown: (event: unknown) => void;
+      onKeyDown: (event: unknown) => void;
+    }>;
+    wrapper.props.onClick(clickEvent);
+    wrapper.props.onPointerDown(pointerEvent);
+    wrapper.props.onKeyDown(keyEvent);
+    (select.props.onValueChange as (value: string) => void)("cuộn");
 
     expect(stoppedRowToggleEvents).toEqual([
       clickEvent,
       pointerEvent,
       keyEvent,
-      changeEvent,
     ]);
     expect(changes).toEqual(["cuộn"]);
   });
@@ -648,7 +654,7 @@ describe("final mobile table surfaces", () => {
       onToggle: () => calls.push("toggle"),
       onOpen: () => calls.push("open"),
     });
-    const html = renderToStaticMarkup(row);
+    const html = renderWithMessages(row);
     const openButton = elementsOfType(row, "button")[0];
     const rowSelector = elementsOfType(row, ProductUnitSelector)[0];
 
