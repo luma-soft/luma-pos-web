@@ -1687,7 +1687,7 @@ export function PosClient({
                   line={l}
                   invoicePriceBook={priceBook}
                   priceBooks={data.priceBooks}
-                  onApply={(book, price, disc, free) => applyLinePrice(l.key, book, price, disc, free)}
+                  onChange={(book, price, disc, free) => applyLinePrice(l.key, book, price, disc, free)}
                   onClose={() => setEditKey(null)}
                 />
               )}
@@ -2662,12 +2662,12 @@ function AmountModeInput({
 
 /** Popup sửa đơn giá + giảm giá (VND/%) cho 1 dòng — giống KiotViet. */
 function LinePriceEditor({
-  line, invoicePriceBook, priceBooks, onApply, onClose,
+  line, invoicePriceBook, priceBooks, onChange, onClose,
 }: {
   line: CartLine;
   invoicePriceBook: PriceBook;
   priceBooks: PosData["priceBooks"];
-  onApply: (priceBook: PriceBook | undefined, unitPrice: number, lineDiscount: number, free: boolean) => void;
+  onChange: (priceBook: PriceBook | undefined, unitPrice: number, lineDiscount: number, free: boolean) => void;
   onClose: () => void;
 }) {
   const t = useTranslations();
@@ -2681,17 +2681,33 @@ function LinePriceEditor({
   const [editor, setEditor] = useState(() =>
     createLinePriceEditorState(editablePrice, editableDiscount)
   );
+  const changedRef = useRef(false);
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
   const resolved = resolveLinePriceEditor(editor);
   const discountInput = Math.max(0, Number(editor.discount) || 0);
 
-  function apply() {
-    const selected = selectedBook === inheritedValue
+  function selectedPriceBook() {
+    return selectedBook === inheritedValue
       ? undefined
       : selectedBook === defaultBook?.id ? "" : selectedBook;
-    onApply(selected, resolved.unitPrice, resolved.lineDiscount, editor.free);
+  }
+
+  useEffect(() => {
+    if (!changedRef.current) return;
+    onChangeRef.current(selectedPriceBook(), resolved.unitPrice, resolved.lineDiscount, editor.free);
+  // selectedPriceBook is derived only from the listed dependencies.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editor, selectedBook]);
+
+  function markChanged() {
+    changedRef.current = true;
   }
 
   function changeBook(value: string) {
+    markChanged();
     setSelectedBook(value);
     const selected = value === inheritedValue
       ? undefined
@@ -2701,6 +2717,7 @@ function LinePriceEditor({
   }
 
   function changeFree(free: boolean) {
+    markChanged();
     setEditor((state) => {
       const next = setLineFree(state, free);
       // Dòng miễn phí cũ chưa có freeRestore: lấy lại giá niêm yết theo bảng giá đang chọn.
@@ -2713,6 +2730,21 @@ function LinePriceEditor({
       }
       return next;
     });
+  }
+
+  function setPrice(value: number | null) {
+    markChanged();
+    setEditor((state) => setLinePriceInput(state, value == null ? "" : String(value)));
+  }
+
+  function setDiscount(value: number) {
+    markChanged();
+    setEditor((state) => setLineDiscountInput(state, String(value)));
+  }
+
+  function setDiscountMode(mode: "vnd" | "pct") {
+    markChanged();
+    setEditor((state) => setLineDiscountMode(state, mode));
   }
 
   return (
@@ -2743,9 +2775,7 @@ function LinePriceEditor({
           <span className="text-slate-500 shrink-0">{t("pos.priceEditor.unitPrice")}</span>
           <MoneyInput
             value={editor.price} autoFocus
-            onChange={(v) => setEditor((state) =>
-              setLinePriceInput(state, v == null ? "" : String(v))
-            )}
+            onChange={setPrice}
             className="no-spinner min-h-11 w-40 rounded-md border border-border bg-surface px-2 py-1.5 text-right"
           />
         </div>
@@ -2755,12 +2785,8 @@ function LinePriceEditor({
             <AmountModeInput
               value={discountInput}
               mode={editor.discountMode}
-              onValueChange={(v) => setEditor((state) =>
-                setLineDiscountInput(state, String(v))
-              )}
-              onModeChange={(mode) => setEditor((state) =>
-                setLineDiscountMode(state, mode)
-              )}
+              onValueChange={setDiscount}
+              onModeChange={setDiscountMode}
             />
           </fieldset>
         </div>
@@ -2772,14 +2798,6 @@ function LinePriceEditor({
         <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
           <span className="text-slate-500 shrink-0">{t("pos.priceEditor.sellPrice")}</span>
           <span className="font-bold text-primary-600 tabular-nums">{formatCurrency(resolved.sellPrice)}</span>
-        </div>
-        <div className="flex gap-2 pt-1">
-          <button onClick={onClose} className="flex-1 min-h-11 py-2 rounded-lg border border-border text-slate-600 dark:text-slate-300 font-medium">
-            {t("common.cancel")}
-          </button>
-          <button onClick={apply} className="flex-1 min-h-11 py-2 rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-semibold">
-            {t("common.apply")}
-          </button>
         </div>
       </div>
     </>
