@@ -3,7 +3,9 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type * as schema from "@/db/schema";
 import {
   profiles,
+  auditLogs,
   serviceJobAssignments,
+  serviceJobEvents,
   serviceJobs,
 } from "@/db/schema";
 
@@ -74,4 +76,149 @@ export async function syncServiceJobPrimaryAssigneeCore(
     });
   }
   return assigneeId;
+}
+
+export async function assignServiceJobCore(
+  tx: ServiceTransaction,
+  input: {
+    jobId: string;
+    profileId: string;
+    assignmentRole: "primary" | "crew";
+    actorId: string;
+    now?: Date;
+  },
+) {
+  const now = input.now ?? new Date();
+  const [job] = await tx.select({
+    id: serviceJobs.id,
+    assignedTo: serviceJobs.assignedTo,
+  }).from(serviceJobs)
+    .where(eq(serviceJobs.id, input.jobId))
+    .limit(1)
+    .for("update");
+  if (!job) throw new Error("SERVICE_JOB_NOT_FOUND");
+  await requireActiveTechnicianCore(tx, input.profileId);
+  if (input.assignmentRole === "crew" && job.assignedTo === input.profileId) {
+    throw new Error("SERVICE_ASSIGNMENT_PRIMARY_CONFLICT");
+  }
+
+  if (input.assignmentRole === "primary") {
+    await syncServiceJobPrimaryAssigneeCore(
+      tx,
+      input.jobId,
+      input.profileId,
+      input.actorId,
+      now,
+    );
+  } else {
+    await tx.insert(serviceJobAssignments).values({
+      jobId: input.jobId,
+      profileId: input.profileId,
+      assignmentRole: "crew",
+      assignedBy: input.actorId,
+      assignedAt: now,
+    }).onConflictDoUpdate({
+      target: [serviceJobAssignments.jobId, serviceJobAssignments.profileId],
+      set: {
+        assignmentRole: "crew",
+        assignedBy: input.actorId,
+        assignedAt: now,
+        removedAt: null,
+      },
+    });
+  }
+  await tx.insert(serviceJobEvents).values({
+    jobId: input.jobId,
+    eventType: "job.assigned",
+    actorId: input.actorId,
+    payload: {
+      profileId: input.profileId,
+      assignmentRole: input.assignmentRole,
+    },
+  });
+  await tx.insert(auditLogs).values({
+    actorId: input.actorId,
+    source: "manual",
+    action: "service_job.assignment.upsert",
+    entityType: "service_job",
+    entityId: input.jobId,
+    after: {
+      profileId: input.profileId,
+      assignmentRole: input.assignmentRole,
+    },
+    affectedRecords: [{
+      entityType: "service_job_assignment",
+      entityId: input.profileId,
+    }],
+  });
+  const [assignment] = await tx.select().from(serviceJobAssignments)
+    .where(and(
+      eq(serviceJobAssignments.jobId, input.jobId),
+      eq(serviceJobAssignments.profileId, input.profileId),
+      isNull(serviceJobAssignments.removedAt),
+    ))
+    .limit(1);
+  if (!assignment) throw new Error("SERVICE_ASSIGNMENT_NOT_FOUND");
+  return assignment;
+}
+
+export async function unassignServiceJobCore(
+  tx: ServiceTransaction,
+  input: {
+    jobId: string;
+    profileId: string;
+    actorId: string;
+    now?: Date;
+  },
+) {
+  const now = input.now ?? new Date();
+  const [job] = await tx.select({
+    id: serviceJobs.id,
+    assignedTo: serviceJobs.assignedTo,
+  }).from(serviceJobs)
+    .where(eq(serviceJobs.id, input.jobId))
+    .limit(1)
+    .for("update");
+  if (!job) throw new Error("SERVICE_JOB_NOT_FOUND");
+  const [assignment] = await tx.update(serviceJobAssignments)
+    .set({ removedAt: now })
+    .where(and(
+      eq(serviceJobAssignments.jobId, input.jobId),
+      eq(serviceJobAssignments.profileId, input.profileId),
+      isNull(serviceJobAssignments.removedAt),
+    ))
+    .returning({ assignmentRole: serviceJobAssignments.assignmentRole });
+  if (!assignment) throw new Error("SERVICE_ASSIGNMENT_NOT_FOUND");
+  if (assignment.assignmentRole === "primary") {
+    await tx.update(serviceJobs).set({ assignedTo: null, updatedAt: now })
+      .where(and(
+        eq(serviceJobs.id, input.jobId),
+        eq(serviceJobs.assignedTo, input.profileId),
+      ));
+  }
+  await tx.insert(serviceJobEvents).values({
+    jobId: input.jobId,
+    eventType: "job.unassigned",
+    actorId: input.actorId,
+    payload: {
+      profileId: input.profileId,
+      assignmentRole: assignment.assignmentRole,
+    },
+  });
+  await tx.insert(auditLogs).values({
+    actorId: input.actorId,
+    source: "manual",
+    action: "service_job.assignment.remove",
+    entityType: "service_job",
+    entityId: input.jobId,
+    before: {
+      profileId: input.profileId,
+      assignmentRole: assignment.assignmentRole,
+    },
+    affectedRecords: [{
+      entityType: "service_job_assignment",
+      entityId: input.profileId,
+    }],
+  });
+  return assignment;
 }

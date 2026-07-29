@@ -2588,6 +2588,8 @@
     "tabs": {
       "projects": "Projects",
       "jobs": "Work orders",
+      "dispatch": "Dispatch",
+      "reporting": "Service reports",
       "warranty": "Warranty"
     },
     "types": {

@@ -2588,6 +2588,8 @@
     "tabs": {
       "projects": "Công trình",
       "jobs": "Lệnh việc",
+      "dispatch": "Điều phối",
+      "reporting": "Báo cáo dịch vụ",
       "warranty": "Bảo hành"
     },
     "types": {

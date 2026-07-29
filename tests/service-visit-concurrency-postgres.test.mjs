@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { mock } from "bun:test";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { Pool } from "pg";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -22,6 +22,7 @@ if (!databaseUrl) {
   const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
   const schema = await import(`${projectRoot}/src/db/schema.ts`);
   const {
+    auditLogs,
     profiles,
     projects,
     serviceAttachments,
@@ -456,6 +457,11 @@ if (!databaseUrl) {
         .where(eq(serviceJobs.projectId, projectId));
       await db.delete(projects).where(eq(projects.id, projectId));
     }
+    await db.delete(auditLogs).where(inArray(auditLogs.actorId, [
+      technicianId,
+      otherTechnicianId,
+      thirdTechnicianId,
+    ]));
     await db.delete(profiles).where(eq(profiles.id, technicianId));
     await db.delete(profiles).where(eq(profiles.id, otherTechnicianId));
     await db.delete(profiles).where(eq(profiles.id, thirdTechnicianId));

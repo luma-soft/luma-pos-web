@@ -1,8 +1,8 @@
 import { requireMobileManager } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
 import {
-  getServiceDispatchPage,
-  parseServiceDispatchQuery,
+  getServiceManagerReport,
+  parseServiceReportQuery,
 } from "@/lib/services/dispatch-reporting";
 
 export async function GET(request: Request) {
@@ -11,14 +11,14 @@ export async function GET(request: Request) {
   if (blocked) return blocked;
   if (!gate.ok) return mobileError("errors.unauthorized", 401);
   try {
-    const query = parseServiceDispatchQuery(new URL(request.url).searchParams);
-    return mobileOk(await getServiceDispatchPage(query));
+    const query = parseServiceReportQuery(new URL(request.url).searchParams);
+    return mobileOk(await getServiceManagerReport(query));
   } catch (error) {
     if (
       error instanceof Error
       && error.message.startsWith("SERVICE_DISPATCH_")
     ) return mobileError("errors.invalidData", 400);
-    console.error("service dispatch failed:", error);
+    console.error("service report failed:", error);
     return mobileError("errors.serverError", 500);
   }
 }

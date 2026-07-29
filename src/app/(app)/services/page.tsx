@@ -18,12 +18,22 @@ import { ProductsTab } from "../inventory/tabs/products";
 import { parsePageSize } from "@/lib/pagination";
 import { getManagerServiceCustomerRequests } from "@/lib/data/service-customer-requests";
 import { CustomerRequestsManager } from "./customer-requests-manager";
+import { requireManager } from "@/lib/actions/common";
+import {
+  getServiceDispatchPage,
+  getServiceManagerReport,
+  parseServiceDispatchQuery,
+  parseServiceReportQuery,
+} from "@/lib/services/dispatch-reporting";
+import { ServiceDispatchPanel, ServiceReportPanel } from "./service-dispatch-panels";
 
 export const dynamic = "force-dynamic";
 
 const TABS = [
   { tab: "projects", labelKey: "services.tabs.projects" },
   { tab: "jobs", labelKey: "services.tabs.jobs" },
+  { tab: "dispatch", labelKey: "services.tabs.dispatch" },
+  { tab: "reporting", labelKey: "services.tabs.reporting" },
   { tab: "warranty", labelKey: "services.tabs.warranty" },
   { tab: "requests", labelKey: "services.tabs.requests" },
   { tab: "camera-materials", labelKey: "inventory.cameraMaterials" },
@@ -34,14 +44,37 @@ export default async function ServicesPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const [t, params, dashboard, options, customerRequests] = await Promise.all([
-    getTranslations(),
-    searchParams,
+  const [t, params] = await Promise.all([getTranslations(), searchParams]);
+  const tab = params.tab ?? "projects";
+  const managerGate = ["dispatch", "reporting"].includes(tab)
+    ? await requireManager()
+    : null;
+  const [dashboard, options, customerRequests] = await Promise.all([
     getServiceDashboard(),
     getServiceFormOptions(),
     getManagerServiceCustomerRequests(),
   ]);
-  const tab = params.tab ?? "projects";
+  const queryParams = new URLSearchParams(
+    Object.entries(params).filter((entry): entry is [string, string] => Boolean(entry[1])),
+  );
+  let dispatchData = null;
+  let reportData = null;
+  if (managerGate?.ok && tab === "dispatch") {
+    try {
+      dispatchData = await getServiceDispatchPage(parseServiceDispatchQuery(queryParams));
+    } catch {
+      dispatchData = await getServiceDispatchPage(
+        parseServiceDispatchQuery(new URLSearchParams({ scope: "week" })),
+      );
+    }
+  }
+  if (managerGate?.ok && tab === "reporting") {
+    try {
+      reportData = await getServiceManagerReport(parseServiceReportQuery(queryParams));
+    } catch {
+      reportData = await getServiceManagerReport(parseServiceReportQuery(new URLSearchParams()));
+    }
+  }
   const serviceType = params.type ?? "";
   const status = params.status ?? "";
   const page = Math.max(1, Number(params.page) || 1);
@@ -83,7 +116,15 @@ export default async function ServicesPage({
         </div>
       </div>
 
-      {tab === "camera-materials" ? (
+      {tab === "dispatch" ? (
+        managerGate?.ok && dispatchData
+          ? <ServiceDispatchPanel data={dispatchData} technicians={options.assigneeOptions} params={params} />
+          : <Section collapsible={false}><Text variant="muted" size="sm" text={t("errors.forbidden")} /></Section>
+      ) : tab === "reporting" ? (
+        managerGate?.ok && reportData
+          ? <ServiceReportPanel data={reportData} />
+          : <Section collapsible={false}><Text variant="muted" size="sm" text={t("errors.forbidden")} /></Section>
+      ) : tab === "camera-materials" ? (
         <ProductsTab searchParams={{ ...params, cameraMaterials: "1" }} />
       ) : tab === "jobs" ? (
         <div className="space-y-4">
