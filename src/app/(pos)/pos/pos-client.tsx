@@ -1730,7 +1730,7 @@ export function PosClient({
                 <span className="w-5 shrink-0" />
                 <span className="w-4 shrink-0" />
                 <span className="w-24 shrink-0" />
-                <div className="min-w-0 flex flex-1 items-start gap-1.5 pr-36">
+                <div className="min-w-0 flex flex-1 items-start gap-1.5 pr-72">
                   <span className="w-3.5 shrink-0" />
                   <textarea
                     rows={1}
