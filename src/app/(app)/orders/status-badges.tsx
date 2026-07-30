@@ -22,7 +22,7 @@ const PAYMENT_STYLES: Record<string, string> = {
 export function OrderStatusBadge({ status }: { status: string }) {
   const t = useTranslations();
   return (
-    <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", ORDER_STYLES[status] ?? ORDER_STYLES.draft)}>
+    <span className={cn("inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium", ORDER_STYLES[status] ?? ORDER_STYLES.draft)}>
       {t(`orders.status.${status}`)}
     </span>
   );
@@ -31,7 +31,7 @@ export function OrderStatusBadge({ status }: { status: string }) {
 export function PaymentStatusBadge({ status }: { status: string }) {
   const t = useTranslations();
   return (
-    <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", PAYMENT_STYLES[status] ?? PAYMENT_STYLES.unpaid)}>
+    <span className={cn("inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium", PAYMENT_STYLES[status] ?? PAYMENT_STYLES.unpaid)}>
       {t(`orders.paymentStatus.${status}`)}
     </span>
   );
