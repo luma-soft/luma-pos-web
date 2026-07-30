@@ -12,15 +12,12 @@ interface Props {
   searchParams: Promise<{ ids?: string | string[]; size?: string; templateId?: string }>;
 }
 
-const MAX_BATCH = 20;
-
 export default async function PrintBatchPage({ searchParams }: Props) {
   const params = await searchParams;
   const t = await getTranslations();
 
   const ids = (Array.isArray(params.ids) ? params.ids : params.ids ? [params.ids] : [])
-    .filter(Boolean)
-    .slice(0, MAX_BATCH);
+    .filter(Boolean);
 
   const [template, templates, defaultBankAccount] = await Promise.all([
     getPrintTemplate("order", params.templateId),

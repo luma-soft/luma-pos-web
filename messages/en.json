@@ -1716,7 +1716,7 @@
       "sourceNotCopyable": "This invoice cannot be copied.",
       "notConvertible": "This document cannot be converted into an order."
     },
-    "batchHint": "Tick orders to print together (max 20)",
+    "batchHint": "Tick orders to print together",
     "printSelected": "Print selected",
     "batchEmpty": "No orders selected — go back and tick some.",
     "batchCount": "Printing {count} invoices — one per page",

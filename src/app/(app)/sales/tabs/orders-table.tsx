@@ -8,17 +8,13 @@ import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { OrderListRow } from "@/lib/data/orders";
 import { OrderStatusBadge, PaymentStatusBadge } from "../../orders/status-badges";
 
-export const ORDER_BATCH_LIMIT = 20;
-
 export function normalizeOrderBatchSelection(
   selectedIds: Set<string>,
   selectableIds: string[],
 ) {
   const selectable = new Set(selectableIds);
   return new Set(
-    [...selectedIds]
-      .filter((id) => selectable.has(id))
-      .slice(0, ORDER_BATCH_LIMIT),
+    [...selectedIds].filter((id) => selectable.has(id)),
   );
 }
 
@@ -32,10 +28,7 @@ export function toggleOrderBatchSelection(
     next.delete(orderId);
     return next;
   }
-  if (
-    !selectableIds.includes(orderId) ||
-    next.size >= ORDER_BATCH_LIMIT
-  ) {
+  if (!selectableIds.includes(orderId)) {
     return next;
   }
   next.add(orderId);
@@ -47,7 +40,7 @@ export function toggleAllOrderBatchSelection(
   selectableIds: string[],
 ) {
   const current = normalizeOrderBatchSelection(selectedIds, selectableIds);
-  const target = selectableIds.slice(0, ORDER_BATCH_LIMIT);
+  const target = selectableIds;
   const targetFullySelected =
     target.length > 0 &&
     target.every((id) => current.has(id));
@@ -98,14 +91,12 @@ export function OrderBatchToolbar({
   selectedCount,
   allSelected,
   partiallySelected,
-  limitReached = false,
   onToggleAll,
   labels,
 }: {
   selectedCount: number;
   allSelected: boolean;
   partiallySelected: boolean;
-  limitReached?: boolean;
   onToggleAll: () => void;
   labels: {
     selectAll: string;
@@ -122,11 +113,7 @@ export function OrderBatchToolbar({
         onChange={onToggleAll}
         label={labels.selectAll}
       />
-      <span
-        id="orders-batch-limit"
-        className="min-w-0 flex-1 text-xs text-slate-500"
-        role={limitReached ? "status" : undefined}
-      >
+      <span className="min-w-0 flex-1 text-xs text-slate-500">
         {labels.hint}
       </span>
       <span className="rounded-full bg-primary-100 px-2 py-1 text-xs font-bold text-primary-700" aria-live="polite">
@@ -159,18 +146,15 @@ export function OrderMobileRow({
   selected,
   onToggle,
   onOpen,
-  selectionDisabled = false,
   labels,
 }: {
   order: OrderListRow;
   selected: boolean;
   onToggle: () => void;
   onOpen: () => void;
-  selectionDisabled?: boolean;
   labels: {
     walkIn: string;
     remaining: string;
-    limitReached?: string;
   };
 }) {
   const remaining = Number(order.total) - Number(order.amountPaid);
@@ -180,8 +164,7 @@ export function OrderMobileRow({
       <div className="shrink-0 p-3 pr-0 pt-3">
         <OrderSelectionCheckbox
           checked={selected}
-          disabled={!selectable || selectionDisabled}
-          disabledReason={selectionDisabled ? labels.limitReached : undefined}
+          disabled={!selectable}
           onChange={onToggle}
           label={order.code}
         />
@@ -233,12 +216,10 @@ export function OrdersTable({
     selectableIds,
   );
   const selectedVisibleIds = [...normalizedSelection];
-  const targetIds = selectableIds.slice(0, ORDER_BATCH_LIMIT);
+  const targetIds = selectableIds;
   const allSelected =
     targetIds.length > 0 &&
     targetIds.every((id) => normalizedSelection.has(id));
-  const selectionLimitReached =
-    selectedVisibleIds.length >= ORDER_BATCH_LIMIT;
 
   function toggle(orderId: string) {
     setSelectedIds(
@@ -281,11 +262,7 @@ export function OrdersTable({
       render: (order) => (
         <OrderSelectionCheckbox
           checked={normalizedSelection.has(order.id)}
-          disabled={
-            order.status === "cancelled" ||
-            (selectionLimitReached && !normalizedSelection.has(order.id))
-          }
-          disabledReason={selectionLimitReached ? t("orders.batchHint") : undefined}
+          disabled={order.status === "cancelled"}
           onChange={() => toggle(order.id)}
           label={order.code}
         />
@@ -385,7 +362,6 @@ export function OrdersTable({
             selectedCount={selectedVisibleIds.length}
             allSelected={allSelected}
             partiallySelected={selectedVisibleIds.length > 0 && !allSelected}
-            limitReached={selectionLimitReached}
             onToggleAll={toggleAll}
             labels={{
               selectAll: t("common.selectAll"),
@@ -399,16 +375,11 @@ export function OrdersTable({
           <OrderMobileRow
             order={order}
             selected={normalizedSelection.has(order.id)}
-            selectionDisabled={
-              selectionLimitReached &&
-              !normalizedSelection.has(order.id)
-            }
             onToggle={() => toggle(order.id)}
             onOpen={() => openOrder(order)}
             labels={{
               walkIn: t("orders.walkIn"),
               remaining: t("orders.cols.remaining"),
-              limitReached: t("orders.batchHint"),
             }}
           />
         )}

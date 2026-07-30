@@ -60,7 +60,7 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
       <InstantFilterForm className="mb-4 grid grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap" action={Routes.Sales}>
         <input type="hidden" name="tab" value="orders" />
         {status !== "all" && <input type="hidden" name="status" value={status} />}
-        <div className="relative col-span-2 w-full sm:w-56">
+        <div className="relative col-span-2 w-full sm:w-96">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("orders.searchPlaceholder")} aria-label={t("common.search")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface min-h-11 lg:min-h-0" />
         </div>
@@ -124,10 +124,6 @@ async function OrdersContent({ searchParams }: { searchParams: SP }) {
 
   return (
     <>
-      <div className="mb-2">
-        <span className="text-sm text-slate-500">{t("orders.total", { total })}</span>
-      </div>
-
       {rows.length === 0 ? (
         <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">
           <FileX2 className="w-10 h-10 mx-auto mb-3 opacity-60" />

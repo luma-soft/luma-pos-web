@@ -800,7 +800,6 @@ describe("final mobile table surfaces", () => {
       OrderMobileRow,
       OrderSelectionCheckbox,
       OrdersTable,
-      ORDER_BATCH_LIMIT,
     } = await import("@/app/(app)/sales/tabs/orders-table");
     const calls: string[] = [];
     const order = {
@@ -896,7 +895,7 @@ describe("final mobile table surfaces", () => {
     };
 
     const targetOrderIds = manyOrders
-      .slice(0, ORDER_BATCH_LIMIT)
+      .slice(0, 30)
       .map((item) => item.id);
     executedSelection = new Set(
       manyOrders
@@ -920,7 +919,7 @@ describe("final mobile table surfaces", () => {
 
     const replacedActual = renderActualOrders();
     expect(replacedActual.actualHtml.match(/name="ids"/g)).toHaveLength(
-      ORDER_BATCH_LIMIT,
+      30,
     );
     expect(
       [...replacedActual.actualHtml.matchAll(/name="ids" value="([^"]+)"/g)]
@@ -929,7 +928,7 @@ describe("final mobile table surfaces", () => {
     const replacedToolbar = replacedActual.table.toolbar as React.ReactElement<
       Record<string, unknown>
     >;
-    expect(replacedToolbar.props.selectedCount).toBe(ORDER_BATCH_LIMIT);
+    expect(replacedToolbar.props.selectedCount).toBe(30);
     expect(replacedToolbar.props.allSelected).toBe(true);
 
     executedSelection = new Set();
@@ -940,27 +939,24 @@ describe("final mobile table surfaces", () => {
     >;
     expect(initialToolbar.type).toBe(OrderBatchToolbar);
     (initialToolbar.props.onToggleAll as () => void)();
-    expect(executedSelection.size).toBe(ORDER_BATCH_LIMIT);
+    expect(executedSelection.size).toBe(30);
     expect([...executedSelection]).toEqual(
-      manyOrders.slice(0, ORDER_BATCH_LIMIT).map((item) => item.id),
+      manyOrders.slice(0, 30).map((item) => item.id),
     );
 
-    const cappedActual = renderActualOrders();
+    const allSelectedActual = renderActualOrders();
     expect(
-      cappedActual.actualHtml.match(/name="ids"/g),
-    ).toHaveLength(ORDER_BATCH_LIMIT);
-    const cappedToolbar = cappedActual.table.toolbar as React.ReactElement<
+      allSelectedActual.actualHtml.match(/name="ids"/g),
+    ).toHaveLength(30);
+    const allSelectedToolbar = allSelectedActual.table.toolbar as React.ReactElement<
       Record<string, unknown>
     >;
-    expect(cappedToolbar.props.selectedCount).toBe(ORDER_BATCH_LIMIT);
-    expect(cappedToolbar.props.limitReached).toBe(true);
-    const cappedToolbarHtml = renderToStaticMarkup(cappedToolbar);
-    expect(cappedToolbarHtml).toContain('role="status"');
-    expect(cappedToolbarHtml).toContain(
-      "Tick chọn nhiều đơn để in cùng lúc (tối đa 20)",
-    );
+    expect(allSelectedToolbar.props.selectedCount).toBe(30);
+    const allSelectedToolbarHtml = renderToStaticMarkup(allSelectedToolbar);
+    expect(allSelectedToolbarHtml).toContain("Tick chọn nhiều đơn để in cùng lúc");
+    expect(allSelectedToolbarHtml).not.toContain("tối đa 20");
 
-    const actualRenderer = cappedActual.table.renderMobileRow as (props: {
+    const actualRenderer = allSelectedActual.table.renderMobileRow as (props: {
       row: typeof order;
       expanded: boolean;
       toggle: () => void;
@@ -971,9 +967,8 @@ describe("final mobile table surfaces", () => {
       toggle: () => undefined,
     }) as React.ReactElement<Record<string, unknown>>;
     expect(twentyFirst.props.order).toBe(manyOrders[20]);
-    expect(twentyFirst.props.selectionDisabled).toBe(true);
     (twentyFirst.props.onToggle as () => void)();
-    expect(executedSelection.size).toBe(ORDER_BATCH_LIMIT);
+    expect(executedSelection.size).toBe(29);
     expect(executedSelection.has("order-21")).toBe(false);
 
     const cancelled = actualRenderer({
