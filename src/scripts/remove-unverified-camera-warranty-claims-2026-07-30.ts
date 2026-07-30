@@ -1,15 +1,32 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db";
 import { brands, categories, products } from "../db/schema";
+import { buildCameraProductDescription } from "./camera-product-description";
 
 const CARD_SKUS = ["MEM-HIK-32GB", "MEM-IMOU-64GB"] as const;
 const CAMERA_BRANDS = ["EZVIZ", "IMOU"] as const;
 const CARD_DESCRIPTION =
   "Thẻ nhớ chuyên dụng cho camera, dùng ghi hình liên tục hoặc theo sự kiện.";
 
+function readSpec(specs: unknown, name: string) {
+  if (!specs || typeof specs !== "object" || Array.isArray(specs)) {
+    throw new Error(`Bảng thông số không hợp lệ; thiếu “${name}”.`);
+  }
+  const value = (specs as Record<string, unknown>)[name];
+  if (!Array.isArray(value) || typeof value[0] !== "string" || !value[0].trim()) {
+    throw new Error(`Thiếu thông số “${name}”.`);
+  }
+  return value[0];
+}
+
 async function main() {
   const cameraRows = await db
-    .select({ id: products.id, sku: products.sku })
+    .select({
+      id: products.id,
+      sku: products.sku,
+      name: products.name,
+      specs: products.specs,
+    })
     .from(products)
     .innerJoin(brands, eq(products.brandId, brands.id))
     .innerJoin(categories, eq(products.categoryId, categories.id))
@@ -37,11 +54,25 @@ async function main() {
   }
 
   await db.transaction(async (tx) => {
-    if (cameraRows.length) {
+    for (const camera of cameraRows) {
+      const description = buildCameraProductDescription({
+        name: camera.name,
+        fullCode: readSpec(camera.specs, "Mã đầy đủ"),
+        resolution: readSpec(camera.specs, "Độ phân giải"),
+        lens: readSpec(camera.specs, "Ống kính / góc nhìn"),
+        connection: readSpec(camera.specs, "Kết nối"),
+        nightAndProtection: readSpec(camera.specs, "Ban đêm / bảo vệ"),
+        powerAndStorage: readSpec(camera.specs, "Nguồn / lưu trữ"),
+        features: readSpec(camera.specs, "Tính năng chính"),
+      });
       await tx
         .update(products)
-        .set({ warrantyMonths: 0, updatedAt: sql`now()` })
-        .where(inArray(products.id, cameraRows.map((row) => row.id)));
+        .set({
+          description,
+          warrantyMonths: 0,
+          updatedAt: sql`now()`,
+        })
+        .where(eq(products.id, camera.id));
     }
 
     for (const card of cardRows) {
@@ -86,6 +117,27 @@ async function main() {
   if (invalidCards.length) {
     throw new Error(
       `Metadata thẻ nhớ chưa được sửa: ${invalidCards.map((row) => row.sku).join(", ")}`,
+    );
+  }
+
+  const cameraVerification = await db
+    .select({
+      sku: products.sku,
+      description: products.description,
+      warrantyMonths: products.warrantyMonths,
+    })
+    .from(products)
+    .where(inArray(products.id, cameraRows.map((row) => row.id)));
+  const invalidCameras = cameraVerification.filter(
+    (camera) =>
+      camera.warrantyMonths !== 0 ||
+      /bảo hành\s*:\s*24 tháng/i.test(camera.description ?? ""),
+  );
+  if (invalidCameras.length) {
+    throw new Error(
+      `Camera còn claim bảo hành chưa xác minh: ${invalidCameras
+        .map((row) => row.sku)
+        .join(", ")}`,
     );
   }
 

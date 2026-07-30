@@ -7,7 +7,6 @@ export type CameraDescriptionInput = {
   nightAndProtection: string;
   powerAndStorage: string;
   features: string;
-  warrantyMonths?: number;
 };
 
 function withoutTrailingPunctuation(value: string) {
@@ -23,7 +22,6 @@ export function buildCameraProductDescription({
   nightAndProtection,
   powerAndStorage,
   features,
-  warrantyMonths = 24,
 }: CameraDescriptionInput) {
   return [
     `${withoutTrailingPunctuation(name)} – mã ${withoutTrailingPunctuation(fullCode)}.`,
@@ -33,6 +31,5 @@ export function buildCameraProductDescription({
     `• Quan sát ban đêm / bảo vệ: ${withoutTrailingPunctuation(nightAndProtection)}.`,
     `• Nguồn / lưu trữ: ${withoutTrailingPunctuation(powerAndStorage)}.`,
     `• Tính năng chính: ${withoutTrailingPunctuation(features)}.`,
-    `• Bảo hành: ${warrantyMonths} tháng.`,
   ].join("\n");
 }

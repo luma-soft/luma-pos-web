@@ -23,7 +23,6 @@ async function main() {
       sku: products.sku,
       name: products.name,
       specs: products.specs,
-      warrantyMonths: products.warrantyMonths,
     })
     .from(products)
     .where(or(like(products.sku, "EZ-%"), like(products.sku, "IM-%")));
@@ -45,7 +44,6 @@ async function main() {
           nightAndProtection: readSpec(product.specs, "Ban đêm / bảo vệ"),
           powerAndStorage: readSpec(product.specs, "Nguồn / lưu trữ"),
           features: readSpec(product.specs, "Tính năng chính"),
-          warrantyMonths: product.warrantyMonths ?? 24,
         }),
       };
     } catch (error) {
