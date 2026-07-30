@@ -7,6 +7,7 @@ import {
   LayoutDashboard, ShoppingCart, Warehouse, Users, Wallet,
   BarChart3, Settings, FileText, Utensils, Sparkles, ChefHat, Bell, Store,
   Calculator,
+  Camera,
   Wrench,
 } from "lucide-react";
 import { Routes } from "@/lib/routes";
@@ -37,6 +38,7 @@ const GROUPS: Group[] = [
       { href: Routes.Inventory, icon: Warehouse, key: "nav.groups.inventory" },
       { href: Routes.Partners, icon: Users, key: "nav.groups.partners" },
       { href: Routes.Services, icon: Wrench, key: "nav.services" },
+      { href: Routes.CameraQuote, icon: Camera, key: "mobile.more.cameraQuote" },
       { href: Routes.Finance, icon: Wallet, key: "nav.groups.finance" },
     ],
   },
