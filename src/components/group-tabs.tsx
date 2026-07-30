@@ -44,7 +44,7 @@ export function GroupTabs({
   return (
     <div className="relative">
       <div className={cn(
-        "flex snap-x snap-mandatory items-center gap-5 overflow-x-auto overscroll-x-contain scroll-px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:gap-1",
+        "flex snap-x snap-mandatory items-center gap-3 overflow-x-auto overscroll-x-contain scroll-px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:gap-1",
         edgeToEdge && "-mx-4 px-4 sm:-mx-6 sm:px-6",
       )}>
         {items.map((it) => {
@@ -55,7 +55,7 @@ export function GroupTabs({
               href={tabHref(it.tab)}
               aria-current={on ? "page" : undefined}
               className={cn(
-                "shrink-0 snap-start items-center gap-2 border-b-2 px-0.5 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:h-9 lg:min-w-0 lg:rounded-[10px] lg:border-b-0 lg:px-3.5 lg:font-semibold",
+                "shrink-0 snap-start items-center gap-2 border-b-2 px-0.5 text-[11px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 sm:text-xs lg:h-9 lg:min-w-0 lg:rounded-[10px] lg:border-b-0 lg:px-3.5 lg:font-semibold",
                 on
                   ? "border-primary-600 text-primary-700 dark:text-primary-300 lg:bg-primary-50 lg:dark:bg-primary-950/40"
                   : "border-transparent text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 lg:text-slate-500 lg:hover:bg-surface-2",

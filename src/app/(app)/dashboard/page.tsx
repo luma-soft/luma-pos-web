@@ -51,7 +51,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
           bottom={(
             <nav
               aria-label={t("mobile.dashboard.rangeLabel")}
-              className="-mx-4 flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="flex snap-x snap-mandatory gap-2 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
               {RANGES.map((r) => (
                 <Link
