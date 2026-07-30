@@ -207,7 +207,7 @@ export function CameraPriceListClient({
     ctx.fillRect(540, 375, 440, 42);
     ctx.fillStyle = "#087b74";
     ctx.font = "700 20px Arial";
-    ctx.fillText("CAMERA CHÍNH HÃNG - BẢO HÀNH 24 THÁNG", 560, 403);
+    ctx.fillText("CAMERA CHÍNH HÃNG", 560, 403);
     const variants = item.variants;
     variants.forEach((variant, variantIndex) => {
       const y = 230 + variantIndex * 74;
@@ -572,7 +572,7 @@ export function CameraPriceListClient({
                         {item.model}
                       </h3>
                       <p className="mt-3 inline-block bg-[#e1f1f1] px-3 py-1 text-sm font-bold text-[#087b74]">
-                        Camera chính hãng - bảo hành 24 tháng
+                        Camera chính hãng
                       </p>
                     </div>
                     <button
@@ -727,8 +727,8 @@ export function CameraPriceListClient({
                     </tbody>
                   </table>
                   <p className="mt-3 text-xs text-slate-500">
-                    Thẻ nhớ chính hãng chuyên dụng, bảo hành 24 tháng. Giá trọn
-                    gói đã gồm vật tư cơ bản và công lắp đặt.
+                    Thẻ nhớ chuyên dụng cho camera. Giá trọn gói đã gồm vật tư
+                    cơ bản và công lắp đặt.
                   </p>
                 </div>
               </div>

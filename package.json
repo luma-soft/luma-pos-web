@@ -18,6 +18,7 @@
     "db:seed-camera-products": "bun run src/scripts/seed-camera-products.ts",
     "db:sync-camera-descriptions": "bun run src/scripts/sync-camera-product-descriptions.ts",
     "db:fix-camera-accessory-prices-2026-07": "bun run src/scripts/fix-camera-accessory-retail-prices-2026-07-27.ts",
+    "db:remove-unverified-camera-warranty-claims-2026-07": "bun run src/scripts/remove-unverified-camera-warranty-claims-2026-07-30.ts",
     "db:seed-network-cables-2026-07": "bun run src/scripts/seed-network-cables-2026-07-29.ts",
     "db:seed-hunonic-products-2026-07": "bun run src/scripts/seed-hunonic-products-2026-07-29.ts",
     "db:round-smart-device-prices-2026-07": "bun run src/scripts/round-smart-device-retail-prices-2026-07-30.ts",

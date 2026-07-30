@@ -228,11 +228,11 @@ const catalog: CatalogProduct[] = [
     category: "Thẻ nhớ",
     costPrice: 195_000,
     retailPrice: 250_000,
-    description: "Thẻ nhớ chuyên dụng cho camera, dùng ghi hình liên tục hoặc theo sự kiện; bảo hành 24 tháng.",
+    description: "Thẻ nhớ chuyên dụng cho camera, dùng ghi hình liên tục hoặc theo sự kiện.",
+    warrantyMonths: 0,
     specs: {
       "Dung lượng": ["32GB"],
       "Loại sử dụng": ["Camera giám sát"],
-      "Bảo hành": ["24 tháng"],
     },
   },
   {
@@ -242,11 +242,11 @@ const catalog: CatalogProduct[] = [
     category: "Thẻ nhớ",
     costPrice: 250_000,
     retailPrice: 300_000,
-    description: "Thẻ nhớ chuyên dụng cho camera, dùng ghi hình liên tục hoặc theo sự kiện; bảo hành 24 tháng.",
+    description: "Thẻ nhớ chuyên dụng cho camera, dùng ghi hình liên tục hoặc theo sự kiện.",
+    warrantyMonths: 0,
     specs: {
       "Dung lượng": ["64GB"],
       "Loại sử dụng": ["Camera giám sát"],
-      "Bảo hành": ["24 tháng"],
     },
   },
   {
@@ -394,7 +394,7 @@ async function main() {
         lastPurchasePrice: String(item.costPrice),
         retailPrice: String(item.retailPrice),
         specs: item.specs,
-        warrantyMonths: item.warrantyMonths ?? 24,
+        warrantyMonths: item.warrantyMonths ?? 0,
         imageUrls: item.image ? [productImageUrl(item.image)] : [],
         lifecycleStatus: "active",
         isActive: true,
