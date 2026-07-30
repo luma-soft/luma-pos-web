@@ -110,7 +110,10 @@ export async function getCameraQuoteFormOptions() {
       return row ? [mapProduct(row)] : [];
     }),
     materials: [
-      ...CAMERA_QUOTE_MATERIAL_SKUS.map((sku) => mapProduct(utilityBySku.get(sku)!)),
+      ...CAMERA_QUOTE_MATERIAL_SKUS.flatMap((sku) => {
+        const row = utilityBySku.get(sku);
+        return row ? [mapProduct(row)] : [];
+      }),
       ...optionalMaterialSkus.flatMap((sku) => {
         const row = utilityBySku.get(sku);
         return row ? [mapProduct(row)] : [];
