@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { Copy, Edit3, ImageOff, Search, X } from "lucide-react";
+import Image from "next/image";
+import { NumberInput } from "@/components/ui/number-input";
 import { formatCurrency } from "@/lib/utils";
 
 type Variant = {
@@ -89,7 +91,7 @@ export function CameraPriceListClient({
     label: string;
     key: PriceKey;
   } | null>(null);
-  const [price, setPrice] = useState("");
+  const [price, setPrice] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
   const filtered = useMemo(
     () =>
@@ -108,7 +110,7 @@ export function CameraPriceListClient({
     key: PriceKey,
   ) {
     setEditing({ model, variant, label, key });
-    setPrice(String(variant[key]));
+    setPrice(variant[key]);
   }
 
   function scrollToPackage(modelId: string) {
@@ -119,8 +121,8 @@ export function CameraPriceListClient({
 
   function applyPrice() {
     if (!editing) return;
-    const value = Number(price.replace(/[^0-9]/g, ""));
-    if (!Number.isFinite(value) || value < 0)
+    const value = price;
+    if (value === null || !Number.isFinite(value) || value < 0)
       return setNotice("Giá chưa hợp lệ.");
     setModels((current) =>
       current.map((model) =>
@@ -377,7 +379,7 @@ export function CameraPriceListClient({
             <article
               key={item.id}
               onClick={() => scrollToPackage(item.id)}
-              className="cursor-pointer border border-slate-300 bg-white p-4 active:bg-teal-50"
+              className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-[0_4px_18px_rgba(15,23,42,.04)] transition active:bg-teal-50"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -393,7 +395,7 @@ export function CameraPriceListClient({
                     event.stopPropagation();
                     copyImage(item, index);
                   }}
-                  className="grid h-10 w-10 shrink-0 place-items-center border border-[#078a82] text-[#0b7b74]"
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-teal-200 bg-teal-50/60 text-[#0b7b74] transition hover:bg-teal-50"
                   aria-label={`Sao chép ảnh ${item.model}`}
                 >
                   <Copy className="h-4 w-4" />
@@ -406,7 +408,7 @@ export function CameraPriceListClient({
                 {item.variants.map((variant, variantIndex) => (
                   <div
                     key={variant.id}
-                    className="border border-[#078a82] bg-[#e6f3f3] p-2"
+                    className="rounded-lg border border-teal-100 bg-[#edf7f7] p-2.5"
                   >
                     <p className="text-[10px] font-bold leading-4 text-slate-500">
                       {canvasMemoryLabel(
@@ -530,7 +532,7 @@ export function CameraPriceListClient({
             <article
               id={`camera-package-${item.id}`}
               key={item.id}
-              className="scroll-mt-6 border border-[#b7c7d3] bg-white p-4 sm:p-8"
+              className="scroll-mt-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_12px_36px_rgba(15,23,42,.055)] sm:p-8"
             >
               <header className="flex items-start gap-4">
                 <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#078a82] text-xl font-black text-white">
@@ -545,14 +547,17 @@ export function CameraPriceListClient({
                   </p>
                 </div>
               </header>
-              <div className="mt-7 grid border border-slate-300 lg:grid-cols-[330px_1fr]">
-                <div className="flex min-h-80 items-center justify-center border-b border-slate-300 bg-white p-6 lg:border-b-0 lg:border-r">
+              <div className="mt-7 grid overflow-hidden rounded-xl border border-slate-200 bg-white lg:grid-cols-[330px_1fr]">
+                <div className="flex min-h-80 items-center justify-center border-b border-slate-200 bg-slate-50/35 p-6 lg:border-b-0 lg:border-r">
                   {item.imageUrl ? (
-                    <img
-                      src={item.imageUrl}
-                      alt={item.model}
-                      className="max-h-72 max-w-full object-contain"
-                    />
+                      <Image
+                        src={item.imageUrl}
+                        alt={item.model}
+                        width={288}
+                        height={288}
+                        unoptimized
+                        className="max-h-72 max-w-full object-contain"
+                      />
                   ) : (
                     <div className="text-center text-slate-400">
                       <ImageOff className="mx-auto h-10 w-10" />
@@ -572,7 +577,7 @@ export function CameraPriceListClient({
                     </div>
                     <button
                       onClick={() => copyImage(item, index)}
-                      className="inline-flex items-center justify-center gap-2 border border-[#078a82] px-3 py-2 text-sm font-bold text-[#087b74] hover:bg-teal-50"
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-teal-200 bg-white px-3.5 py-2.5 text-sm font-bold text-[#087b74] shadow-[0_2px_8px_rgba(8,129,122,.06)] transition hover:border-teal-300 hover:bg-teal-50"
                     >
                       <Copy className="h-4 w-4" />
                       Sao chép ảnh gói
@@ -582,7 +587,7 @@ export function CameraPriceListClient({
                     {item.variants.map((variant, variantIndex) => (
                       <div
                         key={variant.id}
-                        className="border border-[#078a82] bg-[#e6f3f3] px-4 py-3"
+                        className="rounded-xl border border-teal-100 bg-[#edf7f7] px-4 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,.7)]"
                       >
                         <p className="text-sm font-bold text-slate-500">
                           {memoryLabels[variantIndex] ??
@@ -597,7 +602,7 @@ export function CameraPriceListClient({
                   <h4 className="mt-7 text-lg font-black text-[#14344d]">
                     THÔNG SỐ KỸ THUẬT
                   </h4>
-                  <dl className="mt-2 divide-y divide-slate-300 border border-slate-300">
+                  <dl className="mt-2 overflow-hidden rounded-lg border border-slate-200 divide-y divide-slate-200">
                     {detailsFor(item).map(([label, value]) => (
                       <div
                         key={label}
@@ -747,12 +752,18 @@ export function CameraPriceListClient({
             <p className="mt-2 text-sm text-slate-500">
               {editing.model.model} · {editing.label}
             </p>
-            <input
-              inputMode="numeric"
-              value={price}
-              onChange={(event) => setPrice(event.target.value)}
-              className="mt-4 w-full border border-slate-300 px-3 py-2.5 text-lg font-bold"
-            />
+            <div className="mt-4">
+              <NumberInput
+                value={price}
+                onChange={setPrice}
+                thousandSeparator
+                min={0}
+                decimals={0}
+                suffix="đ"
+                aria-label="Giá tạm thời"
+                className="h-12 border-slate-200 bg-white pr-10 text-left text-lg font-bold tabular-nums focus:border-[#078a82]"
+              />
+            </div>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setEditing(null)}
