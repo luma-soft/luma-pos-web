@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { and, count, desc, eq, or } from "drizzle-orm";
 import { FileSpreadsheet, Search } from "lucide-react";
@@ -8,7 +9,6 @@ import { Routes } from "@/lib/routes";
 import { accentInsensitiveLike } from "@/lib/search";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { QuotesTable } from "./quotes-table";
-import { CameraQuoteCreateButton } from "./camera-quote-create-button";
 import { InstantFilterForm } from "@/components/instant-filter-form";
 
 type SP = Record<string, string | undefined>;
@@ -25,7 +25,7 @@ export async function QuotesTab({ searchParams }: { searchParams: SP }) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("orders.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface min-h-11 lg:min-h-0" />
         </div>
-        <CameraQuoteCreateButton className="ml-auto shrink-0" />
+        <Link href="/pos?draft=quote" className="ml-auto shrink-0 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-700">{t("quotes.createQuote")}</Link>
       </InstantFilterForm>
 
       <Suspense fallback={<TableSkeleton cols={6} rows={10} />}>

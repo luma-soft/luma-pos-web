@@ -25,7 +25,6 @@ import {
   WarrantyClaimStatusAction,
 } from "../../services/service-widgets";
 import { ProjectEdit } from "../project-widgets";
-import { CameraQuoteCreateButton } from "../../sales/tabs/camera-quote-create-button";
 import { ProjectServiceTab, ProjectServiceTabs } from "./project-service-tabs";
 import { MobileRecordCard, MobileRecordField } from "@/components/mobile-ui";
 
@@ -59,6 +58,7 @@ export async function ProjectDetailView({
           <ProjectDetailActions
             project={detail.project}
             serviceOptions={serviceOptions}
+            t={t}
           />
         </div>
       )}
@@ -87,6 +87,7 @@ function ProjectDetailHeader({
         <ProjectDetailActions
           project={project}
           serviceOptions={serviceOptions}
+          t={t}
         />
       }
     />
@@ -96,9 +97,11 @@ function ProjectDetailHeader({
 export function ProjectDetailActions({
   project,
   serviceOptions,
+  t,
 }: {
   project: ProjectDetail["project"];
   serviceOptions: ServiceOptions;
+  t: Translator;
 }) {
   return (
     <div
@@ -112,15 +115,7 @@ export function ProjectDetailActions({
           triggerVariant="outline"
         />
       )}
-      {project.serviceType && (
-        <CameraQuoteCreateButton
-          project={{
-            id: project.id,
-            name: project.name,
-            customerId: project.customerId,
-          }}
-        />
-      )}
+      {project.serviceType && <Link href={Routes.projectQuote({ projectId: project.id, projectName: project.name, customerId: project.customerId })} className="inline-flex min-h-11 items-center rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-700 lg:min-h-0">{t("quotes.createQuote")}</Link>}
     </div>
   );
 }

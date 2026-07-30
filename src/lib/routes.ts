@@ -11,7 +11,7 @@ export const Routes = {
   Home: "/",
   Dashboard: "/dashboard",
   POS: "/pos",
-  CameraQuote: "/pos?cameraQuote=1",
+  CameraQuote: "/camera-price-list",
   More: "/more",
   // Nhóm trang có tab (gộp)
   Sales: "/sales",
