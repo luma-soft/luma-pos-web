@@ -302,7 +302,7 @@ export function BrandPriceListClient({
                       <p className="text-[11px] font-black uppercase tracking-wider" style={{ color: palette.accent }}>{product.sku}</p>
                       <h3 className="mt-1 text-base font-black leading-5" style={{ color: palette.ink }}>{product.name}</h3>
                       <div className="mt-2 min-w-0 text-xs leading-5 text-slate-500">
-                        <p className={description.url ? "line-clamp-1" : "line-clamp-2"}>
+                        <p className="whitespace-pre-line">
                           {description.text || "Thiết bị chính hãng, bảo hành theo tiêu chuẩn nhà sản xuất."}
                         </p>
                         {description.url && (
@@ -311,11 +311,11 @@ export function BrandPriceListClient({
                             target="_blank"
                             rel="noopener noreferrer"
                             title={description.url}
-                            className="mt-0.5 flex min-w-0 items-center gap-1 font-semibold underline decoration-slate-300 underline-offset-2 transition hover:decoration-current"
+                            className="mt-0.5 inline-flex max-w-full items-start gap-1 break-all font-semibold underline decoration-slate-300 underline-offset-2 transition hover:decoration-current"
                             style={{ color: palette.accent }}
                           >
-                            <span className="truncate">{description.url}</span>
-                            <ExternalLink className="h-3 w-3 shrink-0" />
+                            <span className="min-w-0 break-all">{description.url}</span>
+                            <ExternalLink className="mt-1 h-3 w-3 shrink-0" />
                           </a>
                         )}
                       </div>
