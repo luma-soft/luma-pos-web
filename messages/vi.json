@@ -1716,7 +1716,6 @@
       "sourceNotCopyable": "Hóa đơn này không thể sao chép.",
       "notConvertible": "Phiếu này không thể tạo đơn hàng."
     },
-    "batchHint": "Tick chọn nhiều đơn để in cùng lúc",
     "printSelected": "In đã chọn",
     "batchEmpty": "Chưa chọn đơn nào để in — quay lại tick chọn.",
     "batchCount": "Đang in {count} hóa đơn — mỗi hóa đơn 1 trang",

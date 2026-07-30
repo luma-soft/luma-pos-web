@@ -89,37 +89,20 @@ export function OrderSelectionCheckbox({
 
 export function OrderBatchToolbar({
   selectedCount,
-  allSelected,
-  partiallySelected,
-  onToggleAll,
   labels,
 }: {
   selectedCount: number;
-  allSelected: boolean;
-  partiallySelected: boolean;
-  onToggleAll: () => void;
   labels: {
-    selectAll: string;
-    hint: string;
     merge: string;
     print: string;
   };
 }) {
   return (
-    <div className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 text-sm lg:flex lg:flex-wrap">
-      <OrderSelectionCheckbox
-        checked={allSelected}
-        indeterminate={partiallySelected}
-        onChange={onToggleAll}
-        label={labels.selectAll}
-      />
-      <span className="min-w-0 flex-1 text-xs text-slate-500">
-        {labels.hint}
-      </span>
+    <div className="flex w-full items-center justify-end gap-2 text-sm">
       <span className="rounded-full bg-primary-100 px-2 py-1 text-xs font-bold text-primary-700" aria-live="polite">
         {selectedCount}
       </span>
-      <div className="col-span-3 grid grid-cols-2 gap-2 lg:contents">
+      <div className="grid grid-cols-2 gap-2 lg:contents">
         <button
           type="submit"
           formAction="/orders/merge"
@@ -360,12 +343,7 @@ export function OrdersTable({
         toolbar={(
           <OrderBatchToolbar
             selectedCount={selectedVisibleIds.length}
-            allSelected={allSelected}
-            partiallySelected={selectedVisibleIds.length > 0 && !allSelected}
-            onToggleAll={toggleAll}
             labels={{
-              selectAll: t("common.selectAll"),
-              hint: t("orders.batchHint"),
               merge: t("merge.title"),
               print: t("orders.printSelected"),
             }}

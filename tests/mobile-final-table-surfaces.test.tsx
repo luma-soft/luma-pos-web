@@ -835,36 +835,22 @@ describe("final mobile table surfaces", () => {
 
     const toolbar = OrderBatchToolbar({
       selectedCount: 2,
-      allSelected: false,
-      partiallySelected: true,
-      onToggleAll: () => calls.push("toggle-all"),
       labels: {
-        selectAll: "Chọn tất cả",
-        hint: "Chọn đơn hàng loạt",
         merge: "Gộp đơn",
         print: "In đã chọn",
       },
     });
     const toolbarHtml = renderToStaticMarkup(toolbar);
-    const toolbarCheckbox = elementsOfType(
-      toolbar,
-      OrderSelectionCheckbox,
-    )[0];
-    (toolbarCheckbox.props.onChange as () => void)();
 
     expect(toolbarHtml).toContain('formAction="/orders/merge"');
     expect(toolbarHtml).toContain('formAction="/orders/print-batch"');
     expect(toolbarHtml).toContain(">2<");
-    expect(toolbarHtml).toContain("size-11");
     expect(toolbarHtml.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(2);
-    expect(toolbarHtml).toContain(
-      "grid-cols-[auto_minmax(0,1fr)_auto]",
-    );
-    expect(toolbarHtml).toContain("col-span-3 grid grid-cols-2");
+    expect(toolbarHtml).toContain("justify-end");
+    expect(toolbarHtml).not.toContain("Tick chọn nhiều đơn để in cùng lúc");
     expect(calls).toEqual([
       "toggle:order-mobile-1",
       "open:order-mobile-1",
-      "toggle-all",
     ]);
 
     const manyOrders = Array.from({ length: 31 }, (_, index) => ({
@@ -903,10 +889,6 @@ describe("final mobile table surfaces", () => {
         .map((item) => item.id),
     );
     const mismatchedActual = renderActualOrders();
-    const mismatchedToolbar = mismatchedActual.table
-      .toolbar as React.ReactElement<Record<string, unknown>>;
-    expect(mismatchedToolbar.props.allSelected).toBe(false);
-    expect(mismatchedToolbar.props.partiallySelected).toBe(true);
     const selectionColumn = (
       mismatchedActual.table.columns as Array<Record<string, unknown>>
     )[0];
@@ -914,7 +896,8 @@ describe("final mobile table surfaces", () => {
       Record<string, unknown>
     >;
     expect(desktopMaster.props.checked).toBe(false);
-    (mismatchedToolbar.props.onToggleAll as () => void)();
+    expect(desktopMaster.props.indeterminate).toBe(true);
+    (desktopMaster.props.onChange as () => void)();
     expect([...executedSelection]).toEqual(targetOrderIds);
 
     const replacedActual = renderActualOrders();
@@ -929,16 +912,23 @@ describe("final mobile table surfaces", () => {
       Record<string, unknown>
     >;
     expect(replacedToolbar.props.selectedCount).toBe(30);
-    expect(replacedToolbar.props.allSelected).toBe(true);
+    const replacedSelectionColumn = (
+      replacedActual.table.columns as Array<Record<string, unknown>>
+    )[0];
+    expect(
+      (replacedSelectionColumn.label as React.ReactElement<Record<string, unknown>>).props.checked,
+    ).toBe(true);
 
     executedSelection = new Set();
     const initialActual = renderActualOrders();
     expect(initialActual.table.renderMobileRow).toBeFunction();
-    const initialToolbar = initialActual.table.toolbar as React.ReactElement<
+    const initialSelectionColumn = (
+      initialActual.table.columns as Array<Record<string, unknown>>
+    )[0];
+    const initialDesktopMaster = initialSelectionColumn.label as React.ReactElement<
       Record<string, unknown>
     >;
-    expect(initialToolbar.type).toBe(OrderBatchToolbar);
-    (initialToolbar.props.onToggleAll as () => void)();
+    (initialDesktopMaster.props.onChange as () => void)();
     expect(executedSelection.size).toBe(30);
     expect([...executedSelection]).toEqual(
       manyOrders.slice(0, 30).map((item) => item.id),
@@ -953,8 +943,7 @@ describe("final mobile table surfaces", () => {
     >;
     expect(allSelectedToolbar.props.selectedCount).toBe(30);
     const allSelectedToolbarHtml = renderToStaticMarkup(allSelectedToolbar);
-    expect(allSelectedToolbarHtml).toContain("Tick chọn nhiều đơn để in cùng lúc");
-    expect(allSelectedToolbarHtml).not.toContain("tối đa 20");
+    expect(allSelectedToolbarHtml).not.toContain("Tick chọn nhiều đơn để in cùng lúc");
 
     const actualRenderer = allSelectedActual.table.renderMobileRow as (props: {
       row: typeof order;
