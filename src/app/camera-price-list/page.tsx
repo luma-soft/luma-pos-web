@@ -36,5 +36,9 @@ export default async function CameraPriceListPage() {
         price: camera.retailPrice + card.retailPrice + basePrice,
       })),
     }));
-  return <CameraPriceListClient models={models} memoryLabels={memoryOptions.map((item) => item.name)} canEdit={canEdit} />;
+  return <CameraPriceListClient
+    models={models}
+    memoryLabels={memoryOptions.map((_, index) => `Thẻ nhớ camera ${index === 0 ? "32GB" : "64GB"}`)}
+    canEdit={canEdit}
+  />;
 }

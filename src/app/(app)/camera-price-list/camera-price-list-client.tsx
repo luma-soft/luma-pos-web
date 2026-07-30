@@ -29,6 +29,11 @@ function detailsFor(model: Model) {
   return rows.length ? rows.slice(0, 6) : [["Thông tin", model.description.split("\n")[0]] as const];
 }
 
+function canvasMemoryLabel(label: string, index: number) {
+  const capacity = label.match(/\d+GB/i)?.[0] ?? `${index === 0 ? "32" : "64"}GB`;
+  return `GÓI ${capacity.toUpperCase()}`;
+}
+
 function canvasWrap(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number) {
   const words = text.split(/\s+/);
   let line = "";
@@ -75,7 +80,7 @@ export function CameraPriceListClient({ models: initialModels, memoryLabels, can
   async function copyImage(item: Model, index: number) {
     const canvas = document.createElement("canvas");
     canvas.width = 1500;
-    canvas.height = 1260;
+    canvas.height = 1400;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.fillStyle = "#ffffff";
@@ -97,7 +102,6 @@ export function CameraPriceListClient({ models: initialModels, memoryLabels, can
     ctx.fillText("Thông số, hình ảnh và hai lựa chọn thẻ nhớ", 154, 148);
     ctx.strokeStyle = "#b7c7d3";
     ctx.lineWidth = 2;
-    ctx.strokeRect(72, 195, 1356, 925);
 
     try {
       const image = await loadProductImage(item.imageUrl);
@@ -112,7 +116,7 @@ export function CameraPriceListClient({ models: initialModels, memoryLabels, can
 
     ctx.fillStyle = "#14344d";
     ctx.font = "800 34px Arial";
-    canvasWrap(ctx, item.model, 540, 285, 780, 42);
+    canvasWrap(ctx, item.model, 540, 285, 480, 42);
     ctx.fillStyle = "#e1f1f1";
     ctx.fillRect(540, 375, 440, 42);
     ctx.fillStyle = "#087b74";
@@ -127,7 +131,7 @@ export function CameraPriceListClient({ models: initialModels, memoryLabels, can
       ctx.strokeRect(1065, y, 290, 64);
       ctx.fillStyle = "#64748b";
       ctx.font = "700 18px Arial";
-      ctx.fillText(memoryLabels[variantIndex] ?? `GÓI ${variantIndex + 1}`, 1085, y + 26);
+      ctx.fillText(canvasMemoryLabel(memoryLabels[variantIndex] ?? "", variantIndex), 1085, y + 26);
       ctx.fillStyle = "#007e78";
       ctx.font = "800 24px Arial";
       ctx.fillText(formatCurrency(variant.price), 1085, y + 53);
@@ -136,7 +140,7 @@ export function CameraPriceListClient({ models: initialModels, memoryLabels, can
     ctx.font = "800 27px Arial";
     ctx.fillText("THÔNG SỐ KỸ THUẬT", 540, 490);
     let y = 520;
-    detailsFor(item).forEach(([label, value]) => {
+    detailsFor(item).slice(0, 5).forEach(([label, value]) => {
       ctx.fillStyle = "#edf3f6";
       ctx.fillRect(540, y, 245, 48);
       ctx.fillStyle = "#ffffff";
@@ -154,14 +158,17 @@ export function CameraPriceListClient({ models: initialModels, memoryLabels, can
     ctx.fillStyle = "#14344d";
     ctx.font = "700 21px Arial";
     y += 42;
-    canvasWrap(ctx, item.description.replace(/\n/g, " "), 540, y, 790, 28);
-    y = 840;
+    const description = item.description.split("\n").slice(0, 2).join(" ");
+    const descriptionLines = canvasWrap(ctx, description, 540, y, 790, 28);
+    y = Math.max(900, y + descriptionLines * 28 + 42);
     ctx.fillStyle = "#07817a";
     ctx.fillRect(540, y, 815, 42);
     ctx.fillStyle = "#ffffff";
     ctx.font = "700 18px Arial";
     ctx.fillText("HẠNG MỤC", 560, y + 27);
-    variants.forEach((_, variantIndex) => ctx.fillText(memoryLabels[variantIndex] ?? "Gói", 925 + variantIndex * 210, y + 27));
+    ctx.textAlign = "center";
+    variants.forEach((_, variantIndex) => ctx.fillText(canvasMemoryLabel(memoryLabels[variantIndex] ?? "", variantIndex), 1015 + variantIndex * 210, y + 27));
+    ctx.textAlign = "left";
     const items: Array<[string, keyof Variant]> = [["Camera", "cameraPrice"], ["Thẻ nhớ", "cardPrice"], ["Công lắp đặt", "installationPrice"], ["Vật tư cơ bản", "materialPrice"], ["TỔNG TRỌN GÓI", "price"]];
     items.forEach(([label, key], itemIndex) => {
       const rowY = y + 42 + itemIndex * 44;
@@ -178,10 +185,13 @@ export function CameraPriceListClient({ models: initialModels, memoryLabels, can
         ctx.textAlign = "left";
       });
     });
+    const contentBottom = y + 42 + items.length * 44;
+    ctx.strokeStyle = "#b7c7d3";
+    ctx.strokeRect(72, 195, 1356, contentBottom - 165);
     ctx.fillStyle = "#64748b";
     ctx.font = "17px Arial";
-    ctx.fillText("Giá trọn gói đã bao gồm vật tư cơ bản và công lắp đặt.", 72, 1170);
-    ctx.fillText("HẢI ĐĂNG TECH - 0868306286 - 0868506286", 72, 1210);
+    ctx.fillText("Giá trọn gói đã bao gồm vật tư cơ bản và công lắp đặt.", 72, contentBottom + 50);
+    ctx.fillText("HẢI ĐĂNG TECH - 0868306286 - 0868506286", 72, contentBottom + 90);
 
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
     if (!blob) return setNotice("Không tạo được ảnh báo giá.");
