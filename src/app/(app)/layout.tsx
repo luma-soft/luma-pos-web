@@ -50,7 +50,7 @@ export default async function AppLayout({
 
   return (
     <ProductCatalogProvider userId={user.id} scopeId={catalogScopeId}>
-    <div className="h-dvh min-h-0 flex bg-canvas">
+    <div className="flex min-h-dvh bg-canvas">
       <MobileNavBackdrop />
 
       <aside className="app-sidebar w-60 shrink-0 bg-surface border-r border-border flex flex-col sticky top-0 h-dvh overflow-hidden">
@@ -76,7 +76,7 @@ export default async function AppLayout({
         </div>
       </aside>
 
-      <main className="flex-1 min-h-0 min-w-0 overflow-auto overflow-x-hidden">
+      <main className="min-w-0 flex-1 overflow-x-hidden">
         <div className="pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">{children}</div>
         <MobileTabBar />
         {store.prefs.ai.openaiApiKeySet && store.prefs.ai.showFloatingLauncher && <AiAssistantLauncher />}
