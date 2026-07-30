@@ -33,7 +33,7 @@ export async function updateSession(request: NextRequest) {
   const isAuthPath = path.startsWith(Routes.Login) || path.startsWith(Routes.Register);
   const isApiPath = path.startsWith("/api");
   const isPortalPath = path.startsWith("/portal"); // đặt hàng online theo token
-  const isPublic = isAuthPath || isApiPath || isPortalPath || path === Routes.Home;
+  const isPublic = isAuthPath || isApiPath || isPortalPath || path === Routes.Home || path === Routes.CameraQuote;
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
