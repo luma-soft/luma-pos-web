@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Copy, Edit3, ExternalLink, ImageOff, Search, X } from "lucide-react";
 import Image from "next/image";
+import { NumberInput } from "@/components/ui/number-input";
 import type { BrandPriceListProduct } from "@/lib/data/brand-price-lists";
 import { formatCurrency } from "@/lib/utils";
 
@@ -104,7 +105,7 @@ export function BrandPriceListClient({
   const [products, setProducts] = useState(initialProducts);
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<BrandPriceListProduct | null>(null);
-  const [price, setPrice] = useState("");
+  const [price, setPrice] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
 
   const filtered = useMemo(() => {
@@ -121,13 +122,13 @@ export function BrandPriceListClient({
 
   function openEditor(product: BrandPriceListProduct) {
     setEditing(product);
-    setPrice(String(product.retailPrice));
+    setPrice(product.retailPrice);
   }
 
   function applyPrice() {
     if (!editing) return;
-    const value = Number(price.replace(/[^0-9]/g, ""));
-    if (!Number.isFinite(value) || value < 0) {
+    const value = price;
+    if (value === null || !Number.isFinite(value) || value < 0) {
       setNotice("Giá chưa hợp lệ.");
       return;
     }
@@ -360,7 +361,19 @@ export function BrandPriceListClient({
               <button onClick={() => setEditing(null)} aria-label="Đóng"><X className="h-5 w-5" /></button>
             </div>
             <p className="mt-2 text-sm text-slate-500">{editing.name}</p>
-            <input autoFocus inputMode="numeric" value={price} onChange={(event) => setPrice(event.target.value)} className="mt-4 w-full border border-slate-300 px-3 py-2.5 text-lg font-bold" />
+            <div className="mt-4">
+              <NumberInput
+                autoFocus
+                value={price}
+                onChange={setPrice}
+                thousandSeparator
+                min={0}
+                decimals={0}
+                suffix="đ"
+                aria-label="Giá tạm thời"
+                className="h-12 border-slate-200 bg-white pr-10 text-left text-lg font-bold tabular-nums focus:border-primary-600"
+              />
+            </div>
             <div className="mt-4 flex justify-end gap-2">
               <button onClick={() => setEditing(null)} className="px-3 py-2 text-sm font-semibold">Hủy</button>
               <button onClick={applyPrice} className="px-4 py-2 text-sm font-bold text-white" style={{ background: palette.accent }}>Áp dụng</button>
