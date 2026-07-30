@@ -88,11 +88,6 @@ export async function getCameraQuoteFormOptions() {
   ]);
 
   const utilityBySku = new Map(utilityRows.map((row) => [row.sku, row]));
-  const missing = requiredSkus.filter((sku) => !utilityBySku.has(sku));
-  if (missing.length > 0) {
-    throw new Error(`Thiếu sản phẩm cấu hình báo giá: ${missing.join(", ")}`);
-  }
-
   const mapProduct = (row: (typeof cameraRows)[number]): CameraQuoteProductOption => ({
     id: row.id,
     sku: row.sku,
@@ -106,8 +101,14 @@ export async function getCameraQuoteFormOptions() {
 
   return {
     cameras: cameraRows.map(mapProduct),
-    cards: CAMERA_QUOTE_CARD_SKUS.map((sku) => mapProduct(utilityBySku.get(sku)!)),
-    installations: CAMERA_QUOTE_INSTALL_SKUS.map((sku) => mapProduct(utilityBySku.get(sku)!)),
+    cards: CAMERA_QUOTE_CARD_SKUS.flatMap((sku) => {
+      const row = utilityBySku.get(sku);
+      return row ? [mapProduct(row)] : [];
+    }),
+    installations: CAMERA_QUOTE_INSTALL_SKUS.flatMap((sku) => {
+      const row = utilityBySku.get(sku);
+      return row ? [mapProduct(row)] : [];
+    }),
     materials: [
       ...CAMERA_QUOTE_MATERIAL_SKUS.map((sku) => mapProduct(utilityBySku.get(sku)!)),
       ...optionalMaterialSkus.flatMap((sku) => {
