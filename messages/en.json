@@ -37,6 +37,8 @@
     "loginMethod": "Sign-in method",
     "emailPassword": "Email + password",
     "phonePassword": "Phone number + password",
+    "useEmail": "Use email to sign in",
+    "usePhone": "Use phone number to sign in",
     "password": "Password",
     "loginSubtitle": "Sign in to continue",
     "loginButton": "Sign in",

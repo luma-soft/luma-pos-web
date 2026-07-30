@@ -37,6 +37,8 @@
     "loginMethod": "Cách đăng nhập",
     "emailPassword": "Email + mật khẩu",
     "phonePassword": "Số điện thoại + mật khẩu",
+    "useEmail": "Dùng email để đăng nhập",
+    "usePhone": "Dùng số điện thoại để đăng nhập",
     "password": "Mật khẩu",
     "loginSubtitle": "Đăng nhập để tiếp tục",
     "loginButton": "Đăng nhập",

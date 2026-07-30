@@ -6,6 +6,7 @@ import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useTranslations } from "next-intl";
+import { Mail, Phone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Routes } from "@/lib/routes";
 import { ONLINE_SALES_ENABLED } from "@/lib/features";
@@ -37,7 +38,7 @@ export default function LoginPage() {
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { method: "email", identifier: "", password: "" },
+    defaultValues: { method: "phone", identifier: "", password: "" },
   });
   const loginMethod = useWatch({ control: form.control, name: "method" });
 
@@ -88,24 +89,31 @@ export default function LoginPage() {
           <Muted size="sm" className="mt-1 mb-6" tx="auth.loginSubtitle" />
 
           <Form form={form} onSubmit={onSubmit} className="space-y-4">
-            <FormField name="method" labelTx="auth.loginMethod" required>
-              {(field) => (
-                <select
-                  {...field}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  onChange={(event) => {
-                    field.onChange(event);
-                    form.setValue("identifier", "");
-                  }}
-                >
-                  <option value="email">{t("auth.emailPassword")}</option>
-                  <option value="phone">{t("auth.phonePassword")}</option>
-                </select>
-              )}
-            </FormField>
-
             <FormField name="identifier" labelTx={loginMethod === "phone" ? "auth.phone" : "auth.email"} required>
-              {(field) => <Input type={loginMethod === "phone" ? "tel" : "email"} autoComplete={loginMethod === "phone" ? "tel" : "email"} {...field} />}
+              {(field) => (
+                <div className="relative">
+                  <Input
+                    type={loginMethod === "phone" ? "tel" : "email"}
+                    autoComplete={loginMethod === "phone" ? "tel" : "email"}
+                    leftIcon={loginMethod === "phone" ? <Phone /> : <Mail />}
+                    className="pr-12"
+                    {...field}
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-1.5 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 dark:hover:bg-slate-800"
+                    title={t(loginMethod === "phone" ? "auth.useEmail" : "auth.usePhone")}
+                    aria-label={t(loginMethod === "phone" ? "auth.useEmail" : "auth.usePhone")}
+                    onClick={() => {
+                      form.setValue("method", loginMethod === "phone" ? "email" : "phone");
+                      form.setValue("identifier", "");
+                      form.clearErrors("identifier");
+                    }}
+                  >
+                    {loginMethod === "phone" ? <Mail size={17} /> : <Phone size={17} />}
+                  </button>
+                </div>
+              )}
             </FormField>
 
             <FormField name="password" labelTx="auth.password" required>
