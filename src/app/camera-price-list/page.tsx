@@ -12,7 +12,9 @@ export default async function CameraPriceListPage() {
   if (user) {
     try { const role = await getRole(user.id); canEdit = role === "owner" || role === "manager"; } catch { /* guests only view */ }
   }
-  const basePrice = (options.installations[0]?.retailPrice ?? 0) + (options.materials[0]?.retailPrice ?? 0);
+  const installationPrice = options.installations[0]?.retailPrice ?? 0;
+  const materialPrice = options.materials[0]?.retailPrice ?? 0;
+  const basePrice = installationPrice + materialPrice;
   const memoryOptions = options.cards.slice(0, 2);
   // Hikvision will be added once its package prices are finalised.
   const models = options.cameras
@@ -21,10 +23,16 @@ export default async function CameraPriceListPage() {
       id: camera.id,
       model: camera.name,
       description: camera.description ?? "Thiết bị camera chính hãng, phù hợp nhu cầu giám sát.",
+      imageUrl: camera.imageUrl,
+      specs: camera.specs,
       variants: memoryOptions.map((card) => ({
         id: `${camera.id}:${card.id}`,
         cameraId: camera.id,
         cardId: card.id,
+        cameraPrice: camera.retailPrice,
+        cardPrice: card.retailPrice,
+        installationPrice,
+        materialPrice,
         price: camera.retailPrice + card.retailPrice + basePrice,
       })),
     }));
