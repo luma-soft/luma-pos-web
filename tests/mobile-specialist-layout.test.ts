@@ -29,11 +29,14 @@ describe("mobile specialist layouts", () => {
 
   test("tool pages use a native mobile header and stack editor/results below desktop", () => {
     const header = read("src/app/(app)/tools/tool-page-header.tsx");
+    const layout = read("src/app/(app)/tools/layout.tsx");
     const tile = read("src/app/(app)/tools/tile-calculator.tsx");
     const electrical = read("src/app/(app)/tools/electrical-labels/electrical-labels-client.tsx");
 
     expect(header).toContain("<MobileTopBar");
     expect(header).toContain("hidden lg:block print:block");
+    expect(layout).toContain('className="flex min-h-full bg-canvas"');
+    expect(layout).not.toContain("min-h-dvh");
     expect(tile).toContain("xl:grid-cols-[minmax(0,1fr)_22rem]");
     expect(tile).toContain("[&_button]:min-h-11");
     expect(electrical).toContain("xl:grid-cols-[minmax(320px,0.82fr)_minmax(0,1.18fr)]");
