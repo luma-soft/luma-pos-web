@@ -85,8 +85,7 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <Heading as="h2" size="xl" tx="auth.loginTitle" />
-          <Muted size="sm" className="mt-1 mb-6" tx="auth.loginSubtitle" />
+          <Heading as="h2" size="xl" className="mb-6" tx="auth.loginTitle" />
 
           <Form form={form} onSubmit={onSubmit} className="space-y-4">
             <FormField name="identifier" labelTx={loginMethod === "phone" ? "auth.phone" : "auth.email"} required>
