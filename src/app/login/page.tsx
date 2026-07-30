@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useTranslations } from "next-intl";
@@ -15,8 +15,16 @@ import {
 } from "@/components/ui";
 
 const loginSchema = z.object({
-  email: z.email({ error: "validation.email" }),
+  method: z.enum(["email", "phone"]),
+  identifier: z.string().trim().min(1, { error: "validation.required" }),
   password: z.string().min(6, { error: "validation.passwordTooShort" }),
+}).superRefine((value, ctx) => {
+  if (value.method === "email" && !z.email().safeParse(value.identifier).success) {
+    ctx.addIssue({ code: "custom", path: ["identifier"], message: "validation.email" });
+  }
+  if (value.method === "phone" && !normalizePhone(value.identifier)) {
+    ctx.addIssue({ code: "custom", path: ["identifier"], message: "validation.phone" });
+  }
 });
 
 type LoginInput = z.infer<typeof loginSchema>;
@@ -29,17 +37,21 @@ export default function LoginPage() {
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { method: "email", identifier: "", password: "" },
   });
+  const loginMethod = useWatch({ control: form.control, name: "method" });
 
   async function onSubmit(values: LoginInput) {
     setServerErr(null);
-    const { error } = await supabase.auth.signInWithPassword(values);
+    const credentials = values.method === "email"
+      ? { email: values.identifier.trim().toLowerCase(), password: values.password }
+      : { phone: normalizePhone(values.identifier)!, password: values.password };
+    const { error } = await supabase.auth.signInWithPassword(credentials);
     if (error) {
       setServerErr(error.message);
       return;
     }
-    const nextRoute = ONLINE_SALES_ENABLED && values.email.trim().toLowerCase() === "review@lumapos.shop"
+    const nextRoute = ONLINE_SALES_ENABLED && values.method === "email" && values.identifier.trim().toLowerCase() === "review@lumapos.shop"
       ? `${Routes.OnlineSales}?tab=overview&channel=shopee`
       : Routes.Dashboard;
     router.push(nextRoute);
@@ -70,8 +82,24 @@ export default function LoginPage() {
           <Muted size="sm" className="mt-1 mb-6" tx="auth.loginSubtitle" />
 
           <Form form={form} onSubmit={onSubmit} className="space-y-4">
-            <FormField name="email" labelTx="auth.email" required>
-              {(field) => <Input type="email" autoComplete="email" {...field} />}
+            <FormField name="method" labelTx="auth.loginMethod" required>
+              {(field) => (
+                <select
+                  {...field}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  onChange={(event) => {
+                    field.onChange(event);
+                    form.setValue("identifier", "");
+                  }}
+                >
+                  <option value="email">{t("auth.emailPassword")}</option>
+                  <option value="phone">{t("auth.phonePassword")}</option>
+                </select>
+              )}
+            </FormField>
+
+            <FormField name="identifier" labelTx={loginMethod === "phone" ? "auth.phone" : "auth.email"} required>
+              {(field) => <Input type={loginMethod === "phone" ? "tel" : "email"} autoComplete={loginMethod === "phone" ? "tel" : "email"} {...field} />}
             </FormField>
 
             <FormField name="password" labelTx="auth.password" required>
@@ -100,4 +128,11 @@ export default function LoginPage() {
       </div>
     </div>
   );
+}
+
+function normalizePhone(value: string) {
+  const compact = value.replace(/[\s().-]/g, "");
+  if (/^0\d{9,10}$/.test(compact)) return `+84${compact.slice(1)}`;
+  if (/^84\d{9,10}$/.test(compact)) return `+${compact}`;
+  return /^\+[1-9]\d{7,14}$/.test(compact) ? compact : null;
 }
