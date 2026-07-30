@@ -43,10 +43,16 @@ export default function LoginPage() {
 
   async function onSubmit(values: LoginInput) {
     setServerErr(null);
-    const credentials = values.method === "email"
-      ? { email: values.identifier.trim().toLowerCase(), password: values.password }
-      : { phone: normalizePhone(values.identifier)!, password: values.password };
-    const { error } = await supabase.auth.signInWithPassword(credentials);
+    const { error } = values.method === "email"
+      ? await supabase.auth.signInWithPassword({
+          email: values.identifier.trim().toLowerCase(),
+          password: values.password,
+        })
+      : await signInWithInternalPhone({
+          phone: normalizePhone(values.identifier)!,
+          password: values.password,
+          supabase,
+        });
     if (error) {
       setServerErr(error.message);
       return;
@@ -135,4 +141,31 @@ function normalizePhone(value: string) {
   if (/^0\d{9,10}$/.test(compact)) return `+84${compact.slice(1)}`;
   if (/^84\d{9,10}$/.test(compact)) return `+${compact}`;
   return /^\+[1-9]\d{7,14}$/.test(compact) ? compact : null;
+}
+
+async function signInWithInternalPhone({
+  phone,
+  password,
+  supabase,
+}: {
+  phone: string;
+  password: string;
+  supabase: ReturnType<typeof createClient>;
+}) {
+  const response = await fetch("/api/mobile/auth/login", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ phone, password }),
+  });
+  const body = await response.json().catch(() => null) as {
+    ok?: boolean;
+    data?: { accessToken?: string; refreshToken?: string };
+  } | null;
+  if (!response.ok || !body?.ok || !body.data?.accessToken || !body.data.refreshToken) {
+    return { error: new Error("Invalid login credentials") };
+  }
+  return supabase.auth.setSession({
+    access_token: body.data.accessToken,
+    refresh_token: body.data.refreshToken,
+  });
 }
