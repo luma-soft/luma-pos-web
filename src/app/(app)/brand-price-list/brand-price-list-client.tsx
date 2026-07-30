@@ -306,7 +306,11 @@ export function BrandPriceListClient({
                     <div className="flex min-w-0 flex-col p-4">
                       <p className="text-[11px] font-black uppercase tracking-wider" style={{ color: palette.accent }}>{product.sku}</p>
                       <h3 className="mt-1 text-base font-black leading-5" style={{ color: palette.ink }}>{product.name}</h3>
-                      <div className="mt-2 min-w-0 text-xs leading-5 text-slate-500">
+                      <div
+                        className="group/description relative mt-2 min-w-0 text-xs leading-5 text-slate-500 outline-none"
+                        tabIndex={0}
+                        aria-describedby={`product-description-${product.id}`}
+                      >
                         <p className={description.url ? "line-clamp-1" : "line-clamp-2"}>
                           {description.text || "Thiết bị chính hãng, bảo hành theo tiêu chuẩn nhà sản xuất."}
                         </p>
@@ -323,6 +327,13 @@ export function BrandPriceListClient({
                             <ExternalLink className="h-3 w-3 shrink-0" />
                           </a>
                         )}
+                        <div
+                          id={`product-description-${product.id}`}
+                          role="tooltip"
+                          className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-[min(28rem,calc(100vw-3rem))] rounded-lg border border-slate-200 bg-white p-3 text-sm leading-6 text-slate-700 shadow-[0_14px_36px_rgba(15,23,42,.16)] md:group-hover/description:block md:group-focus-within/description:block"
+                        >
+                          {description.text || "Thiết bị chính hãng, bảo hành theo tiêu chuẩn nhà sản xuất."}
+                        </div>
                       </div>
                       <div className="mt-auto flex items-end justify-between gap-3 pt-4">
                         <div>
