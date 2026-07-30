@@ -8,6 +8,8 @@ import {
   BarChart3, Settings, FileText, Utensils, Sparkles, ChefHat, Bell, Store,
   Calculator,
   Camera,
+  Cpu,
+  Lightbulb,
   Wrench,
 } from "lucide-react";
 import { Routes } from "@/lib/routes";
@@ -39,6 +41,8 @@ const GROUPS: Group[] = [
       { href: Routes.Partners, icon: Users, key: "nav.groups.partners" },
       { href: Routes.Services, icon: Wrench, key: "nav.services" },
       { href: Routes.CameraQuote, icon: Camera, key: "mobile.more.cameraQuote", newTab: true },
+      { href: Routes.HunonicPriceList, icon: Cpu, key: "mobile.more.hunonicPriceList", newTab: true },
+      { href: Routes.RangDongSmartPriceList, icon: Lightbulb, key: "mobile.more.rangDongPriceList", newTab: true },
       { href: Routes.Finance, icon: Wallet, key: "nav.groups.finance" },
     ],
   },

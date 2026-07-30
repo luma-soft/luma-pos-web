@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Copy, Edit3, ImageOff, Search, X } from "lucide-react";
+import { Copy, Edit3, ExternalLink, ImageOff, Search, X } from "lucide-react";
 import Image from "next/image";
 import type { BrandPriceListProduct } from "@/lib/data/brand-price-lists";
 import { formatCurrency } from "@/lib/utils";
@@ -45,6 +45,17 @@ function productDetails(product: BrandPriceListProduct) {
       ? ([["Bảo hành", `${product.warrantyMonths} tháng`]] as const)
       : []),
   ];
+}
+
+function descriptionParts(description: string | null) {
+  const value = description?.trim() ?? "";
+  const match = value.match(/https?:\/\/[^\s]+/i);
+  if (!match) return { text: value, url: null };
+  const url = match[0].replace(/[),.;]+$/, "");
+  return {
+    text: value.replace(match[0], "").trim(),
+    url,
+  };
 }
 
 function wrapText(
@@ -269,7 +280,9 @@ export function BrandPriceListClient({
                 <span className="text-xs font-bold text-slate-400">{items.length} sản phẩm</span>
               </div>
               <div className="grid gap-4 md:grid-cols-2">
-                {items.map((product) => (
+                {items.map((product) => {
+                  const description = descriptionParts(product.description);
+                  return (
                   <article key={product.id} className="grid grid-cols-[112px_1fr] border border-slate-200 bg-white sm:grid-cols-[160px_1fr]">
                     <div className="flex min-h-40 items-center justify-center border-r border-slate-200 p-3">
                       {product.imageUrl ? (
@@ -288,7 +301,24 @@ export function BrandPriceListClient({
                     <div className="flex min-w-0 flex-col p-4">
                       <p className="text-[11px] font-black uppercase tracking-wider" style={{ color: palette.accent }}>{product.sku}</p>
                       <h3 className="mt-1 text-base font-black leading-5" style={{ color: palette.ink }}>{product.name}</h3>
-                      <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{product.description || "Thiết bị chính hãng, bảo hành theo tiêu chuẩn nhà sản xuất."}</p>
+                      <div className="mt-2 min-w-0 text-xs leading-5 text-slate-500">
+                        <p className={description.url ? "line-clamp-1" : "line-clamp-2"}>
+                          {description.text || "Thiết bị chính hãng, bảo hành theo tiêu chuẩn nhà sản xuất."}
+                        </p>
+                        {description.url && (
+                          <a
+                            href={description.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={description.url}
+                            className="mt-0.5 flex min-w-0 items-center gap-1 font-semibold underline decoration-slate-300 underline-offset-2 transition hover:decoration-current"
+                            style={{ color: palette.accent }}
+                          >
+                            <span className="truncate">{description.url}</span>
+                            <ExternalLink className="h-3 w-3 shrink-0" />
+                          </a>
+                        )}
+                      </div>
                       <div className="mt-auto flex items-end justify-between gap-3 pt-4">
                         <div>
                           <p className="text-[10px] font-bold uppercase text-slate-400">Giá bán</p>
@@ -307,7 +337,8 @@ export function BrandPriceListClient({
                       </div>
                     </div>
                   </article>
-                ))}
+                  );
+                })}
               </div>
             </section>
           ))}
