@@ -2,7 +2,7 @@ import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db";
 import { brands, products } from "../db/schema";
 
-const BRAND_NAMES = ["Rạng Đông", "Rạng Đông Smart"] as const;
+const BRAND_NAMES = ["Hunonic", "Rạng Đông", "Rạng Đông Smart"] as const;
 const ROUNDING_STEP = 10_000;
 
 function roundUpPrice(value: number) {
