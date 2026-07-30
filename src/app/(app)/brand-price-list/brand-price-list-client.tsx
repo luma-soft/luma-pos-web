@@ -251,7 +251,11 @@ export function BrandPriceListClient({
               <p className="text-sm font-black uppercase" style={{ color: palette.ink }}>
                 {filtered.length} sản phẩm · {groups.length} nhóm
               </p>
-              <p className="mt-1 text-sm text-slate-500">Chạm vào biểu tượng sao chép để gửi riêng từng sản phẩm cho khách.</p>
+              {canEdit && (
+                <p className="mt-1 text-sm text-slate-500">
+                  Chạm vào biểu tượng sao chép để gửi riêng từng sản phẩm cho khách.
+                </p>
+              )}
             </div>
             <label className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-slate-400" />
