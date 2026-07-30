@@ -132,7 +132,7 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
           className="flex items-center gap-2.5 min-w-0 rounded-lg pr-2 transition hover:text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           aria-label={t("common.appName")}
         >
-          <div className="w-7 h-7 rounded-lg grid place-items-center text-white font-extrabold text-sm bg-gradient-to-br from-primary-600 to-primary-400">S</div>
+          <div className="w-7 h-7 rounded-lg grid place-items-center text-white font-extrabold text-sm bg-gradient-to-br from-primary-600 to-primary-400">H</div>
           <span className="font-bold text-sm truncate">{t("common.appName")}</span>
           <span className="text-xs text-slate-400 hidden sm:inline">· {t("nav.pos")}</span>
         </Link>

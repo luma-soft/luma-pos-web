@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -35,12 +35,24 @@ export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
   const [serverErr, setServerErr] = useState<string | null>(null);
+  const [storeName, setStoreName] = useState<string | null>(null);
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
     defaultValues: { method: "phone", identifier: "", password: "" },
   });
   const loginMethod = useWatch({ control: form.control, name: "method" });
+
+  useEffect(() => {
+    void fetch("/api/public/store", { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data: { name?: unknown } | null) => {
+        if (typeof data?.name === "string" && data.name.trim()) {
+          setStoreName(data.name.trim());
+        }
+      })
+      .catch(() => undefined);
+  }, []);
 
   async function onSubmit(values: LoginInput) {
     setServerErr(null);
@@ -77,10 +89,10 @@ export default function LoginPage() {
         <div className="w-full max-w-sm">
           <div className="flex items-center gap-3 mb-7">
             <div className="w-11 h-11 rounded-card grid place-items-center text-white text-lg font-extrabold bg-gradient-to-br from-primary-600 to-primary-400">
-              S
+              H
             </div>
             <div>
-              <Heading as="h1" size="lg" tx="common.appName" />
+              <Heading as="h1" size="lg" text={storeName || t("common.appName")} />
               <Muted size="sm" tx="auth.brandTagline" />
             </div>
           </div>

@@ -1,6 +1,6 @@
 {
-  "name": "LumaPOS — Quản lý bán hàng",
-  "short_name": "LumaPOS",
+  "name": "Hải Đăng — Quản lý bán hàng",
+  "short_name": "Hải Đăng",
   "description": "Bán hàng, quản lý kho, đơn hàng và công nợ",
   "start_url": "/dashboard",
   "scope": "/",

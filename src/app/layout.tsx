@@ -8,10 +8,10 @@ import { ConfirmDialogProvider } from "@/components/confirm-dialog-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "LumaPOS",
-  description: "LumaPOS — Quản lý bán hàng",
+  title: "Hải Đăng",
+  description: "Hải Đăng — Quản lý bán hàng",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, statusBarStyle: "default", title: "LumaPOS" },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "Hải Đăng" },
   icons: { icon: "/icon-192.png", apple: "/icon-180.png" },
 };
 

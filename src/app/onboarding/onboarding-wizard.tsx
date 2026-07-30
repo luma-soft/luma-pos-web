@@ -48,8 +48,8 @@ export function OnboardingWizard({ initial }: { initial: StoreSettings }) {
     <div className="w-full max-w-lg bg-surface border border-border rounded-card shadow-e2 overflow-hidden">
       <div className="px-6 pt-6 pb-4 border-b border-border">
         <div className="flex items-center gap-2.5 mb-3">
-          <div className="w-9 h-9 rounded-xl grid place-items-center text-white font-extrabold bg-gradient-to-br from-primary-600 to-primary-400">L</div>
-          <div className="font-bold text-lg">LumaPOS</div>
+          <div className="w-9 h-9 rounded-xl grid place-items-center text-white font-extrabold bg-gradient-to-br from-primary-600 to-primary-400">H</div>
+          <div className="font-bold text-lg">Hải Đăng</div>
         </div>
         <div className="text-xl font-extrabold">{L ? "Thiết lập cửa hàng" : "Set up your store"}</div>
         <div className="text-xs text-slate-500 mt-0.5">{L ? "Vài bước nhanh để bắt đầu bán hàng." : "A few quick steps to start selling."}</div>

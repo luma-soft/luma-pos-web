@@ -56,11 +56,11 @@ export default async function AppLayout({
       <aside className="app-sidebar w-60 shrink-0 bg-surface border-r border-border flex flex-col sticky top-0 h-dvh overflow-hidden">
         <div className="flex items-center gap-2.5 px-4 py-4 border-b border-border">
           <div className="w-9 h-9 rounded-xl shrink-0 grid place-items-center text-white font-extrabold bg-gradient-to-br from-primary-600 to-primary-400">
-            L
+            H
           </div>
           <div className="min-w-0 flex-1">
-            <Text as="h1" weight="bold" className="leading-tight" text={t("common.appName")} />
-            <Text as="p" variant="muted" truncate className="text-[11px]" text={user.email} />
+            <Text as="h1" weight="bold" truncate className="leading-tight" text={store.name || t("common.appName")} />
+            <Text as="p" variant="muted" truncate className="text-[11px]" text={role === "owner" ? "Admin" : role} />
           </div>
         </div>
         <AppNav
