@@ -98,7 +98,7 @@ export function OrderBatchToolbar({
   };
 }) {
   return (
-    <div className="flex w-full items-center justify-end gap-2 text-sm">
+    <div className="flex w-full items-center justify-end gap-2 text-sm lg:-translate-y-[88px]">
       <span className="rounded-full bg-primary-100 px-2 py-1 text-xs font-bold text-primary-700" aria-live="polite">
         {selectedCount}
       </span>

@@ -847,6 +847,7 @@ describe("final mobile table surfaces", () => {
     expect(toolbarHtml).toContain(">2<");
     expect(toolbarHtml.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(2);
     expect(toolbarHtml).toContain("justify-end");
+    expect(toolbarHtml).toContain("lg:-translate-y-[88px]");
     expect(toolbarHtml).not.toContain("Tick chọn nhiều đơn để in cùng lúc");
     expect(calls).toEqual([
       "toggle:order-mobile-1",
