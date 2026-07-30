@@ -87,7 +87,7 @@ export default async function MorePage() {
 
         {(manager || sales) && (
           <MoreSection title={t("nav.groups.manage")}>
-            {sales && <MobileSettingsRow href={Routes.CameraQuote} icon={Camera} label={t("mobile.more.cameraQuote")} subtitle={t("mobile.more.cameraQuoteHint")} tone="blue" />}
+            {sales && <MobileSettingsRow href={Routes.CameraQuote} icon={Camera} label={t("mobile.more.cameraQuote")} subtitle={t("mobile.more.cameraQuoteHint")} tone="blue" target="_blank" />}
             {sales && fnb && <MobileSettingsRow href={Routes.Tables} icon={Utensils} label={t("nav.tables")} subtitle={t("mobile.more.tablesHint")} tone="orange" />}
             {manager && <MobileSettingsRow href={Routes.Finance} icon={Wallet} label={t("nav.groups.finance")} subtitle={t("mobile.more.financeHint")} />}
             {sales && <MobileSettingsRow href={`${Routes.Sales}?tab=returns`} icon={RotateCcw} label={t("nav.returns")} subtitle={t("mobile.more.returnsHint")} tone="red" />}

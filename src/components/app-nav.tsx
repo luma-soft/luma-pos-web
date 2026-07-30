@@ -15,7 +15,7 @@ import { ONLINE_SALES_ENABLED } from "@/lib/features";
 import { cn } from "@/lib/utils";
 import { Text } from "@/components/ui/text";
 
-type Item = { href: string; icon: React.ComponentType<{ className?: string }>; key: string; badge?: "notifications" };
+type Item = { href: string; icon: React.ComponentType<{ className?: string }>; key: string; badge?: "notifications"; newTab?: boolean };
 type Group = { labelKey: string; items: Item[] };
 
 const GROUPS: Group[] = [
@@ -38,7 +38,7 @@ const GROUPS: Group[] = [
       { href: Routes.Inventory, icon: Warehouse, key: "nav.groups.inventory" },
       { href: Routes.Partners, icon: Users, key: "nav.groups.partners" },
       { href: Routes.Services, icon: Wrench, key: "nav.services" },
-      { href: Routes.CameraQuote, icon: Camera, key: "mobile.more.cameraQuote" },
+      { href: Routes.CameraQuote, icon: Camera, key: "mobile.more.cameraQuote", newTab: true },
       { href: Routes.Finance, icon: Wallet, key: "nav.groups.finance" },
     ],
   },
@@ -92,6 +92,8 @@ export function AppNav({
                 <Link
                   key={item.href}
                   href={item.href}
+                  target={item.newTab ? "_blank" : undefined}
+                  rel={item.newTab ? "noopener noreferrer" : undefined}
                   onClick={() => { document.documentElement.dataset.mobilenav = ""; }}
                   className={cn(
                     "flex min-h-11 min-w-11 items-center gap-2.5 px-3 py-2 rounded-lg font-medium transition lg:min-h-0 lg:min-w-0",

@@ -180,6 +180,7 @@ export function MobileActionRow({
   subtitle,
   tone = "teal",
   className,
+  target,
 }: {
   href: string;
   icon: LucideIcon;
@@ -187,6 +188,7 @@ export function MobileActionRow({
   subtitle?: React.ReactNode;
   tone?: "teal" | "blue" | "orange" | "purple" | "red";
   className?: string;
+  target?: "_blank";
 }) {
   const iconTone = {
     teal: "bg-primary-50 text-primary-700 dark:bg-primary-950/50 dark:text-primary-300",
@@ -196,7 +198,7 @@ export function MobileActionRow({
     red: "bg-er-soft text-er",
   }[tone];
   return (
-    <Link href={href} className={cn(
+    <Link href={href} target={target} rel={target ? "noopener noreferrer" : undefined} className={cn(
       "flex min-h-[62px] min-w-11 items-center gap-3 rounded-2xl border border-border bg-surface px-3 py-2.5 shadow-e1 transition hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 active:scale-[0.99]",
       className,
       "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
@@ -219,12 +221,14 @@ export function MobileSettingsRow({
   label,
   subtitle,
   tone = "teal",
+  target,
 }: {
   href: string;
   icon: LucideIcon;
   label: React.ReactNode;
   subtitle?: React.ReactNode;
   tone?: "teal" | "blue" | "orange" | "purple" | "red";
+  target?: "_blank";
 }) {
   return (
     <MobileActionRow
@@ -233,6 +237,7 @@ export function MobileSettingsRow({
       title={label}
       subtitle={subtitle}
       tone={tone}
+      target={target}
       className="rounded-none border-x-0 border-t-0 shadow-none last:border-b-0"
     />
   );
