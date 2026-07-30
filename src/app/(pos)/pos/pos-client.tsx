@@ -499,6 +499,7 @@ export function PosClient({
   const [overKey, setOverKey] = useState<string | null>(null);
   const [dropHover, setDropHover] = useState(false);
   const [mobileView, setMobileView] = useState<"catalog" | "cart">("catalog"); // chuyển đổi trên mobile
+  const [keyboardInset, setKeyboardInset] = useState(0);
   const [customerOptions, setCustomerOptions] = useState<PosCustomer[]>(() => data.customers);
   const [customerCreateOpen, setCustomerCreateOpen] = useState(false);
   const [variantParent, setVariantParent] = useState<PosProduct | null>(null);
@@ -510,6 +511,29 @@ export function PosClient({
   const [printSize, setPrintSize] = useState<PaperSize | null>(null); // đang in phiếu tạm
   const [printDefaultSize, setPrintDefaultSize] = useState<PaperSize>(printTemplate.paperDefault);
   const [printJob, setPrintJob] = useState<PosPrintJob | null>(null);
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (viewport == null) return;
+
+    const updateKeyboardInset = () => {
+      const inset = Math.max(
+        0,
+        Math.round(window.innerHeight - viewport.height - viewport.offsetTop),
+      );
+      // Ignore browser chrome shifts; only treat a substantial viewport loss as a keyboard.
+      setKeyboardInset(inset >= 100 ? inset : 0);
+    };
+
+    updateKeyboardInset();
+    viewport.addEventListener("resize", updateKeyboardInset);
+    viewport.addEventListener("scroll", updateKeyboardInset);
+    window.addEventListener("resize", updateKeyboardInset);
+    return () => {
+      viewport.removeEventListener("resize", updateKeyboardInset);
+      viewport.removeEventListener("scroll", updateKeyboardInset);
+      window.removeEventListener("resize", updateKeyboardInset);
+    };
+  }, []);
   useEffect(() => {
     let cancelled = false;
     queueMicrotask(() => {
@@ -1524,7 +1548,7 @@ export function PosClient({
 
   // Danh sách dòng hàng đã chọn — hiển thị ở khu chính (giống KiotViet).
   const orderLinesPanel = (
-    <div className="flex-1 flex flex-col min-h-0 border border-border rounded-xl bg-surface overflow-hidden">
+    <div className="mb-16 flex flex-1 flex-col min-h-0 overflow-hidden rounded-xl border border-border bg-surface lg:mb-0">
       <div className="px-3 py-2 border-b border-border flex items-center">
         <h2 className="font-semibold text-sm">{isCameraQuoteDraft ? t("pos.cameraQuote.lineItems") : t("pos.order")} ({cart.length})</h2>
       </div>
@@ -1771,7 +1795,10 @@ export function PosClient({
   );
 
   return (
-    <div className="relative flex h-full min-h-0 overflow-hidden">
+    <div
+      className="relative flex h-full min-h-0 overflow-hidden"
+      style={keyboardInset > 0 ? { height: `calc(100% - ${keyboardInset}px)` } : undefined}
+    >
       {/* trạng thái offline / đồng bộ */}
       {(!online || pending > 0 || syncing || offlineSaved) && (
         <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 text-xs font-medium">
@@ -1795,7 +1822,7 @@ export function PosClient({
           type="button"
           disabled={cart.length === 0}
           onClick={() => setMobileView("cart")}
-          className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-4 right-4 z-50 flex h-12 items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 font-semibold text-white shadow-e2 disabled:bg-primary-200 disabled:text-primary-700/60 disabled:shadow-none lg:hidden"
+          className={cn("fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] left-4 right-4 z-50 flex h-12 items-center justify-center gap-2 rounded-xl bg-primary-600 px-5 font-semibold text-white shadow-e2 disabled:bg-primary-200 disabled:text-primary-700/60 disabled:shadow-none lg:hidden", keyboardInset > 0 && "hidden")}
         >
           <ShoppingCart className="h-4 w-4" />
           {t("pos.checkout")} ({cart.reduce((sum, line) => sum + line.quantity, 0)}) · {formatCurrency(total)}

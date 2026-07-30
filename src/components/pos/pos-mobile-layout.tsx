@@ -75,7 +75,7 @@ export function PosSearchResultsSurface({
   return (
     <div
       className={cn(
-        "absolute left-0 right-14 top-full z-40 mt-1 max-h-[min(64dvh,520px)] overflow-auto rounded-xl border border-border bg-surface shadow-e2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "absolute inset-x-0 top-full z-[60] mt-1 max-h-[min(64dvh,520px)] overflow-auto rounded-xl border border-border bg-surface shadow-e2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         className,
       )}
       {...props}
