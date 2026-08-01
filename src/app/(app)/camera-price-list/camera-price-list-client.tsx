@@ -15,6 +15,7 @@ type Variant = {
   installationPrice: number;
   materialPrice: number;
   price: number;
+  storageEstimate: string;
 };
 
 type PriceKey =
@@ -27,6 +28,8 @@ type Model = {
   imageUrl: string | null;
   specs: Record<string, string[]>;
   installationLocation: "Trong nhà" | "Ngoài trời";
+  suitableFor: string[];
+  installationNotes: string[];
   variants: Variant[];
 };
 
@@ -211,11 +214,11 @@ export function CameraPriceListClient({
     const variants = item.variants;
     variants.forEach((variant, variantIndex) => {
       const x = 1065 + (variantIndex % 2) * 150;
-      const y = 90 + Math.floor(variantIndex / 2) * 74;
+      const y = 90 + Math.floor(variantIndex / 2) * 88;
       ctx.fillStyle = "#e6f3f3";
-      ctx.fillRect(x, y, 140, 64);
+      ctx.fillRect(x, y, 140, 78);
       ctx.strokeStyle = "#078a82";
-      ctx.strokeRect(x, y, 140, 64);
+      ctx.strokeRect(x, y, 140, 78);
       ctx.fillStyle = "#64748b";
       ctx.font = "700 14px Arial";
       ctx.fillText(
@@ -225,7 +228,10 @@ export function CameraPriceListClient({
       );
       ctx.fillStyle = "#007e78";
       ctx.font = "800 16px Arial";
-      ctx.fillText(formatCurrency(variant.price), x + 12, y + 53);
+      ctx.fillText(formatCurrency(variant.price), x + 12, y + 49);
+      ctx.fillStyle = "#64748b";
+      ctx.font = "11px Arial";
+      ctx.fillText(`Lưu ${variant.storageEstimate}`, x + 12, y + 68);
     });
     ctx.fillStyle = "#14344d";
     ctx.font = "800 27px Arial";
@@ -309,9 +315,14 @@ export function CameraPriceListClient({
       contentBottom + 50,
     );
     ctx.fillText(
+      "Thời gian lưu là ước tính khi ghi liên tục; thực tế tùy cài đặt và bối cảnh ghi hình.",
+      72,
+      contentBottom + 78,
+    );
+    ctx.fillText(
       "HẢI ĐĂNG TECH - 0868306286 - 0868506286",
       72,
-      contentBottom + 90,
+      contentBottom + 118,
     );
 
     const blob = await new Promise<Blob | null>((resolve) =>
@@ -397,6 +408,9 @@ export function CameraPriceListClient({
                   <p className="mt-1 text-xs font-bold text-[#078a82]">
                     Lắp đặt: {item.installationLocation}
                   </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Phù hợp: {item.suitableFor[0]}
+                  </p>
                 </div>
                 <button
                   onClick={(event) => {
@@ -446,6 +460,9 @@ export function CameraPriceListClient({
                         </button>
                       )}
                     </div>
+                    <p className="mt-1 text-[10px] leading-4 text-slate-500">
+                      Lưu liên tục: {variant.storageEstimate}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -598,6 +615,9 @@ export function CameraPriceListClient({
                         <p className="mt-1 text-xl font-black text-[#007e78]">
                           {formatCurrency(variant.price)}
                         </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Ghi liên tục: {variant.storageEstimate}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -617,6 +637,20 @@ export function CameraPriceListClient({
                       </div>
                     ))}
                   </dl>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    <section className="rounded-xl border border-teal-100 bg-teal-50/50 p-4">
+                      <h4 className="text-sm font-black text-[#0b7b74]">PHÙ HỢP CHO</h4>
+                      <ul className="mt-2 space-y-1 text-sm leading-5 text-slate-700">
+                        {item.suitableFor.map((recommendation) => <li key={recommendation}>• {recommendation}</li>)}
+                      </ul>
+                    </section>
+                    <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <h4 className="text-sm font-black text-[#14344d]">LƯU Ý LẮP ĐẶT</h4>
+                      <ul className="mt-2 space-y-1 text-sm leading-5 text-slate-700">
+                        {item.installationNotes.map((note) => <li key={note}>• {note}</li>)}
+                      </ul>
+                    </section>
+                  </div>
                   <p className="mt-5 whitespace-pre-line text-sm leading-6 text-slate-700">
                     {item.description}
                   </p>
@@ -729,8 +763,8 @@ export function CameraPriceListClient({
                     </tbody>
                   </table>
                   <p className="mt-3 text-xs text-slate-500">
-                    Thẻ nhớ chuyên dụng cho camera. Giá trọn gói đã gồm vật tư
-                    cơ bản và công lắp đặt.
+                    Thẻ nhớ chuyên dụng cho camera. Thời gian lưu là ước tính khi ghi liên tục;
+                    thực tế thay đổi theo cài đặt, cảnh chuyển động và chất lượng mạng.
                   </p>
                 </div>
               </div>
