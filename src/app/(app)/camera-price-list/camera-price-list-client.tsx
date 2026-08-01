@@ -201,24 +201,25 @@ export function CameraPriceListClient({
     ctx.fillRect(540, 225, 440, 42);
     ctx.fillStyle = "#087b74";
     ctx.font = "700 20px Arial";
-    ctx.fillText(`CAMERA CHÍNH HÃNG · ${item.installationLocation.toUpperCase()}`, 560, 253);
+    ctx.fillText("CAMERA CHÍNH HÃNG", 560, 253);
     const variants = item.variants;
     variants.forEach((variant, variantIndex) => {
-      const y = 90 + variantIndex * 74;
+      const x = 1065 + (variantIndex % 2) * 150;
+      const y = 90 + Math.floor(variantIndex / 2) * 74;
       ctx.fillStyle = "#e6f3f3";
-      ctx.fillRect(1065, y, 290, 64);
+      ctx.fillRect(x, y, 140, 64);
       ctx.strokeStyle = "#078a82";
-      ctx.strokeRect(1065, y, 290, 64);
+      ctx.strokeRect(x, y, 140, 64);
       ctx.fillStyle = "#64748b";
-      ctx.font = "700 18px Arial";
+      ctx.font = "700 14px Arial";
       ctx.fillText(
         canvasMemoryLabel(memoryLabels[variantIndex] ?? "", variantIndex),
-        1085,
+        x + 12,
         y + 26,
       );
       ctx.fillStyle = "#007e78";
-      ctx.font = "800 24px Arial";
-      ctx.fillText(formatCurrency(variant.price), 1085, y + 53);
+      ctx.font = "800 16px Arial";
+      ctx.fillText(formatCurrency(variant.price), x + 12, y + 53);
     });
     ctx.fillStyle = "#14344d";
     ctx.font = "800 27px Arial";
@@ -252,11 +253,12 @@ export function CameraPriceListClient({
     ctx.fillStyle = "#ffffff";
     ctx.font = "700 18px Arial";
     ctx.fillText("HẠNG MỤC", 560, y + 27);
+    const variantColumnWidth = 575 / variants.length;
     ctx.textAlign = "center";
     variants.forEach((_, variantIndex) =>
       ctx.fillText(
         canvasMemoryLabel(memoryLabels[variantIndex] ?? "", variantIndex),
-        1015 + variantIndex * 210,
+        780 + variantColumnWidth * (variantIndex + 0.5),
         y + 27,
       ),
     );
@@ -282,7 +284,7 @@ export function CameraPriceListClient({
         ctx.textAlign = "right";
         ctx.fillText(
           formatCurrency(Number(variant[key])),
-          1115 + variantIndex * 210,
+          780 + variantColumnWidth * (variantIndex + 1) - 16,
           rowY + 28,
         );
         ctx.textAlign = "left";
@@ -444,7 +446,7 @@ export function CameraPriceListClient({
           ))}
         </section>
         <section className="mt-4 hidden overflow-x-auto border border-slate-300 md:block">
-          <table className="w-full min-w-[820px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[1080px] border-collapse text-left text-sm">
             <thead className="bg-[#0b7b74] text-white">
               <tr>
                 <th className="w-14 border-r border-white/40 px-3 py-3 text-center">
@@ -571,7 +573,7 @@ export function CameraPriceListClient({
                         {item.model}
                       </h3>
                       <p className="mt-3 inline-block bg-[#e1f1f1] px-3 py-1 text-sm font-bold text-[#087b74]">
-                        Camera chính hãng · {item.installationLocation}
+                        Camera chính hãng
                       </p>
                     </div>
                     <button

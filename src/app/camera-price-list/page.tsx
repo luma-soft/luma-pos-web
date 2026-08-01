@@ -16,7 +16,9 @@ export default async function CameraPriceListPage() {
   const materialPrice = options.materials[0]?.retailPrice ?? 0;
   const basePrice = installationPrice + materialPrice;
   const memoryOptions = options.cards.filter((card) =>
-    ["128GB", "512GB"].includes(card.specs["Dung lượng"]?.[0] ?? ""),
+    ["32GB", "64GB", "128GB", "512GB"].includes(
+      card.specs["Dung lượng"]?.[0] ?? "",
+    ),
   );
   // Hikvision will be added once its package prices are finalised.
   const models = options.cameras
