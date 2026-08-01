@@ -516,26 +516,26 @@ export function WarrantyClaimQuickCreate({
         )}
       >
         <div className="grid gap-3 sm:grid-cols-2">
-          <Select value={projectId} onChange={(event) => {
+          <Field label={t("projects.cols.name")}><Select value={projectId} onChange={(event) => {
             setProjectId(event.target.value);
             setJobId("");
             setAssetId("");
-          }} options={projects.map((project) => ({ value: project.id, label: project.name }))} disabled={Boolean(initial)} />
-          <Select value={priority} onChange={(event) => setPriority(event.target.value)} options={priorityOptions(t)} />
-          <Select value={jobId} onChange={(event) => setJobId(event.target.value)} options={[{ value: "", label: t("services.warranty.noJob") }, ...jobs.filter((job) => job.projectId === projectId).map((job) => ({ value: job.id, label: `${job.code} · ${job.title}` }))]} />
-          <Select value={assetId} onChange={(event) => {
+          }} options={projects.map((project) => ({ value: project.id, label: project.name }))} disabled={Boolean(initial)} /></Field>
+          <Field label={t("services.fields.priority")}><Select value={priority} onChange={(event) => setPriority(event.target.value)} options={priorityOptions(t)} /></Field>
+          <Field label={t("services.fields.job")}><Select value={jobId} onChange={(event) => setJobId(event.target.value)} options={[{ value: "", label: t("services.warranty.noJob") }, ...jobs.filter((job) => job.projectId === projectId).map((job) => ({ value: job.id, label: `${job.code} · ${job.title}` }))]} /></Field>
+          <Field label={t("services.fields.asset")}><Select value={assetId} onChange={(event) => {
             const nextId = event.target.value;
             setAssetId(nextId);
             const asset = assets.find((item) => item.id === nextId);
             if (asset?.jobId) setJobId(asset.jobId);
-          }} options={[{ value: "", label: t("services.warranty.noAsset") }, ...assets.filter((asset) => asset.projectId === projectId).map((asset) => ({ value: asset.id, label: `${asset.name}${asset.serialNumber ? ` · ${asset.serialNumber}` : ""}` }))]} />
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={`${t("services.fields.issue")} *`} className="sm:col-span-2" />
-          <Input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} aria-label={t("services.fields.schedule")} className="sm:col-span-2" />
-          <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder={t("services.fields.description")} className="sm:col-span-2" />
+          }} options={[{ value: "", label: t("services.warranty.noAsset") }, ...assets.filter((asset) => asset.projectId === projectId).map((asset) => ({ value: asset.id, label: `${asset.name}${asset.serialNumber ? ` · ${asset.serialNumber}` : ""}` }))]} /></Field>
+          <Field label={t("services.fields.issue")} required className="sm:col-span-2"><Input value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
+          <Field label={t("services.fields.schedule")} className="sm:col-span-2"><Input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} /></Field>
+          <Field label={t("services.fields.description")} className="sm:col-span-2"><Textarea value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
           {initial && (
             <>
-              <NumberInput value={laborCharge} onChange={setLaborCharge} min={0} suffix="đ" placeholder={t("services.fields.laborCharge")} />
-              <NumberInput value={materialCharge} onChange={setMaterialCharge} min={0} suffix="đ" placeholder={t("services.fields.materialCharge")} />
+              <Field label={t("services.fields.laborCharge")}><NumberInput value={laborCharge} onChange={setLaborCharge} min={0} suffix="đ" /></Field>
+              <Field label={t("services.fields.materialCharge")}><NumberInput value={materialCharge} onChange={setMaterialCharge} min={0} suffix="đ" /></Field>
             </>
           )}
           {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
@@ -656,25 +656,25 @@ export function InstalledAssetQuickCreate({
         )}
       >
         <div className="grid gap-3 sm:grid-cols-2">
-          <SearchableSelect value={jobId} showSearch onChange={setJobId} allowClear={false} placeholder={t("services.assets.noJob")} options={[{ value: "", label: t("services.assets.noJob") }, ...jobs.map((job) => ({ value: job.id, label: `${job.code} · ${job.title}` }))]} />
-          <SearchableSelect value={productId} showSearch onChange={(nextId) => {
+          <Field label={t("services.fields.job")}><SearchableSelect value={jobId} showSearch onChange={setJobId} allowClear={false} placeholder={t("services.assets.noJob")} options={[{ value: "", label: t("services.assets.noJob") }, ...jobs.map((job) => ({ value: job.id, label: `${job.code} · ${job.title}` }))]} /></Field>
+          <Field label={t("services.assets.noProduct")}><SearchableSelect value={productId} showSearch onChange={(nextId) => {
             setProductId(nextId);
             const product = products.find((item) => item.id === nextId);
             if (product && !name.trim()) setName(product.name);
-          }} allowClear={false} placeholder={t("services.assets.noProduct")} options={[{ value: "", label: t("services.assets.noProduct") }, ...products.map((product) => ({ value: product.id, label: `${product.brandName ? `${product.brandName} · ` : ""}${product.sku} · ${product.name}`, hint: product.categoryName ?? undefined }))]} />
-          <Input value={assetKind} onChange={(event) => setAssetKind(event.target.value)} placeholder={`${t("services.fields.assetKind")} *`} />
-          <Input value={name} onChange={(event) => setName(event.target.value)} placeholder={`${t("services.fields.asset")} *`} />
-          <Input value={brand} onChange={(event) => setBrand(event.target.value)} placeholder={t("services.fields.brand")} />
-          <Input value={model} onChange={(event) => setModel(event.target.value)} placeholder={t("services.fields.model")} />
-          <Input value={serialNumber} onChange={(event) => setSerialNumber(event.target.value)} placeholder={t("services.fields.serialNumber")} />
-          <Input value={locationLabel} onChange={(event) => setLocationLabel(event.target.value)} placeholder={t("services.fields.location")} />
-          <Input value={macAddress} onChange={(event) => setMacAddress(event.target.value)} placeholder={t("services.fields.macAddress")} />
-          <Input value={ipAddress} onChange={(event) => setIpAddress(event.target.value)} placeholder={t("services.fields.ipAddress")} />
-          <Input type="datetime-local" value={installedAt} onChange={(event) => setInstalledAt(event.target.value)} aria-label={t("services.fields.installedAt")} />
-          <SearchableSelect value={status} showSearch onChange={(value) => setStatus(value as typeof status)} allowClear={false} placeholder={t("services.assetStatuses.installed")} options={["installed", "repair", "replaced", "removed"].map((value) => ({ value, label: t(`services.assetStatuses.${value}` as never) }))} disabled={!initial} />
-          <Input type="date" value={customerWarrantyEndsOn} onChange={(event) => setCustomerWarrantyEndsOn(event.target.value)} aria-label={t("services.fields.customerWarranty")} />
-          <Input type="date" value={supplierWarrantyEndsOn} onChange={(event) => setSupplierWarrantyEndsOn(event.target.value)} aria-label={t("services.fields.supplierWarranty")} />
-          <Textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder={t("customers.fields.note")} className="sm:col-span-2" />
+          }} allowClear={false} placeholder={t("services.assets.noProduct")} options={[{ value: "", label: t("services.assets.noProduct") }, ...products.map((product) => ({ value: product.id, label: `${product.brandName ? `${product.brandName} · ` : ""}${product.sku} · ${product.name}`, hint: product.categoryName ?? undefined }))]} /></Field>
+          <Field label={t("services.fields.assetKind")} required><Input value={assetKind} onChange={(event) => setAssetKind(event.target.value)} /></Field>
+          <Field label={t("services.fields.asset")} required><Input value={name} onChange={(event) => setName(event.target.value)} /></Field>
+          <Field label={t("services.fields.brand")}><Input value={brand} onChange={(event) => setBrand(event.target.value)} /></Field>
+          <Field label={t("services.fields.model")}><Input value={model} onChange={(event) => setModel(event.target.value)} /></Field>
+          <Field label={t("services.fields.serialNumber")}><Input value={serialNumber} onChange={(event) => setSerialNumber(event.target.value)} /></Field>
+          <Field label={t("services.fields.location")}><Input value={locationLabel} onChange={(event) => setLocationLabel(event.target.value)} /></Field>
+          <Field label={t("services.fields.macAddress")}><Input value={macAddress} onChange={(event) => setMacAddress(event.target.value)} /></Field>
+          <Field label={t("services.fields.ipAddress")}><Input value={ipAddress} onChange={(event) => setIpAddress(event.target.value)} /></Field>
+          <Field label={t("services.fields.installedAt")}><Input type="datetime-local" value={installedAt} onChange={(event) => setInstalledAt(event.target.value)} /></Field>
+          <Field label={t("orders.cols.status")}><SearchableSelect value={status} showSearch onChange={(value) => setStatus(value as typeof status)} allowClear={false} placeholder={t("services.assetStatuses.installed")} options={["installed", "repair", "replaced", "removed"].map((value) => ({ value, label: t(`services.assetStatuses.${value}` as never) }))} disabled={!initial} /></Field>
+          <Field label={t("services.fields.customerWarranty")}><Input type="date" value={customerWarrantyEndsOn} onChange={(event) => setCustomerWarrantyEndsOn(event.target.value)} /></Field>
+          <Field label={t("services.fields.supplierWarranty")}><Input type="date" value={supplierWarrantyEndsOn} onChange={(event) => setSupplierWarrantyEndsOn(event.target.value)} /></Field>
+          <Field label={t("customers.fields.note")} className="sm:col-span-2"><Textarea value={note} onChange={(event) => setNote(event.target.value)} /></Field>
           {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
         </div>
       </RowPreviewModal>
@@ -1212,14 +1212,14 @@ export function ServiceCostEditor({
         )}
       >
         <div className="grid gap-3 sm:grid-cols-2">
-          <Select value={type} onChange={(event) => setType(event.target.value)} options={["labor", "subcontractor", "transport", "other"].map((value) => ({ value, label: t(`services.costs.${value}` as never) }))} />
-          <Select value={jobId} onChange={(event) => setJobId(event.target.value)} options={[{ value: "", label: t("services.jobs.noQuote") }, ...jobs.map((job) => ({ value: job.id, label: `${job.code} · ${job.title}` }))]} />
-          <Input value={description} onChange={(event) => setDescription(event.target.value)} placeholder={`${t("services.costs.description")} *`} className="sm:col-span-2" />
-          <NumberInput value={quantity} onChange={setQuantity} min={0} decimals={4} placeholder={t("services.costs.quantity")} />
-          <NumberInput value={unitCost} onChange={setUnitCost} min={0} suffix="đ" placeholder={t("services.costs.unitCost")} />
-          <Select value={staffId} onChange={(event) => setStaffId(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...staff.map((person) => ({ value: person.id, label: person.name }))]} />
-          <Input type="date" value={incurredOn} onChange={(event) => setIncurredOn(event.target.value)} aria-label={t("services.costs.incurredOn")} />
-          <Textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder={t("customers.fields.note")} className="sm:col-span-2" />
+          <Field label={t("services.costs.type")}><Select value={type} onChange={(event) => setType(event.target.value)} options={["labor", "subcontractor", "transport", "other"].map((value) => ({ value, label: t(`services.costs.${value}` as never) }))} /></Field>
+          <Field label={t("services.fields.job")}><Select value={jobId} onChange={(event) => setJobId(event.target.value)} options={[{ value: "", label: t("services.jobs.noQuote") }, ...jobs.map((job) => ({ value: job.id, label: `${job.code} · ${job.title}` }))]} /></Field>
+          <Field label={t("services.costs.description")} required className="sm:col-span-2"><Input value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
+          <Field label={t("services.costs.quantity")}><NumberInput value={quantity} onChange={setQuantity} min={0} decimals={4} /></Field>
+          <Field label={t("services.costs.unitCost")}><NumberInput value={unitCost} onChange={setUnitCost} min={0} suffix="đ" /></Field>
+          <Field label={t("services.costs.staff")}><Select value={staffId} onChange={(event) => setStaffId(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...staff.map((person) => ({ value: person.id, label: person.name }))]} /></Field>
+          <Field label={t("services.costs.incurredOn")}><Input type="date" value={incurredOn} onChange={(event) => setIncurredOn(event.target.value)} /></Field>
+          <Field label={t("customers.fields.note")} className="sm:col-span-2"><Textarea value={note} onChange={(event) => setNote(event.target.value)} /></Field>
         </div>
       </RowPreviewModal>
     </>
@@ -1305,14 +1305,14 @@ export function ServiceHandoverEditor({
         )}
       >
         <div className="grid gap-3 sm:grid-cols-2">
-          <Select value={type} onChange={(event) => setType(event.target.value)} options={["survey", "acceptance", "handover"].map((value) => ({ value, label: t(`services.documents.${value}` as never) }))} />
-          <Select value={jobId} onChange={(event) => setJobId(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...jobs.map((job) => ({ value: job.id, label: `${job.code} · ${job.title}` }))]} />
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={`${t("services.documents.titleField")} *`} className="sm:col-span-2" />
-          <Textarea value={content} onChange={(event) => setContent(event.target.value)} placeholder={t("services.documents.content")} className="min-h-28 sm:col-span-2" />
-          <Textarea value={photoUrls} onChange={(event) => setPhotoUrls(event.target.value)} placeholder={t("services.documents.photoUrls")} className="min-h-20 sm:col-span-2" />
-          <Input value={signedBy} onChange={(event) => setSignedBy(event.target.value)} placeholder={t("services.documents.signedBy")} />
-          <Input type="date" value={signedAt} onChange={(event) => setSignedAt(event.target.value)} aria-label={t("services.documents.signedAt")} />
-          <Select value={status} onChange={(event) => setStatus(event.target.value)} options={["draft", "signed"].map((value) => ({ value, label: t(`services.documents.status.${value}` as never) }))} />
+          <Field label={t("services.fields.type")}><Select value={type} onChange={(event) => setType(event.target.value)} options={["survey", "acceptance", "handover"].map((value) => ({ value, label: t(`services.documents.${value}` as never) }))} /></Field>
+          <Field label={t("services.fields.job")}><Select value={jobId} onChange={(event) => setJobId(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...jobs.map((job) => ({ value: job.id, label: `${job.code} · ${job.title}` }))]} /></Field>
+          <Field label={t("services.documents.titleField")} required className="sm:col-span-2"><Input value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
+          <Field label={t("services.documents.content")} className="sm:col-span-2"><Textarea value={content} onChange={(event) => setContent(event.target.value)} className="min-h-28" /></Field>
+          <Field label={t("services.documents.photoUrls")} className="sm:col-span-2"><Textarea value={photoUrls} onChange={(event) => setPhotoUrls(event.target.value)} className="min-h-20" /></Field>
+          <Field label={t("services.documents.signedBy")}><Input value={signedBy} onChange={(event) => setSignedBy(event.target.value)} /></Field>
+          <Field label={t("services.documents.signedAt")}><Input type="date" value={signedAt} onChange={(event) => setSignedAt(event.target.value)} /></Field>
+          <Field label={t("orders.cols.status")}><Select value={status} onChange={(event) => setStatus(event.target.value)} options={["draft", "signed"].map((value) => ({ value, label: t(`services.documents.status.${value}` as never) }))} /></Field>
         </div>
       </RowPreviewModal>
     </>

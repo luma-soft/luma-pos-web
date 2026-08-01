@@ -65,7 +65,7 @@ export function Field({
   const hintContent = hintTx ? t(hintTx, hintTxOptions) : hint;
 
   return (
-    <div className={cn("space-y-1.5", className)}>
+    <div className={cn("space-y-1.5 [&>div]:w-full", className)}>
       {labelContent && <Label required={required}>{labelContent}</Label>}
       {children}
       {hintContent && !errorContent && (
