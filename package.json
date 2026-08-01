@@ -16,6 +16,7 @@
     "db:seed-demo": "bun run src/db/seed-demo.ts",
     "db:seed-price-books": "bun run src/scripts/seed-price-books.ts",
     "db:seed-camera-products": "bun run src/scripts/seed-camera-products.ts",
+    "db:seed-hikvision-quote-images": "bun run src/scripts/seed-hikvision-quote-images.ts",
     "db:sync-camera-descriptions": "bun run src/scripts/sync-camera-product-descriptions.ts",
     "db:fix-camera-accessory-prices-2026-07": "bun run src/scripts/fix-camera-accessory-retail-prices-2026-07-27.ts",
     "db:remove-unverified-camera-warranty-claims-2026-07": "bun run src/scripts/remove-unverified-camera-warranty-claims-2026-07-30.ts",
