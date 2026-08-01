@@ -6,8 +6,8 @@ import { buildCameraProductDescription } from "./camera-product-description";
 type CatalogProduct = {
   sku: string;
   name: string;
-  brand?: "EZVIZ" | "IMOU" | "Hikvision" | "Kioxia" | "Lexar";
-  category: "Camera giám sát" | "Thẻ nhớ" | "Dịch Vụ";
+  brand?: "EZVIZ" | "IMOU" | "Hikvision" | "Kioxia" | "Lexar" | "Seagate";
+  category: "Camera giám sát" | "Thẻ nhớ" | "Dịch Vụ" | "Đầu ghi camera" | "Ổ cứng camera" | "Thiết bị mạng" | "Vật tư camera";
   costPrice: number;
   retailPrice: number;
   description: string;
@@ -222,6 +222,167 @@ const catalog: CatalogProduct[] = [
     "Phát hiện người, tự động theo dõi, đèn trợ sáng và còi báo động 110dB.",
   ),
   {
+    sku: "HK-IP-DS2CD1023G2-LIUF",
+    name: "Camera IP Hikvision DS-2CD1023G2-LIUF 2MP",
+    brand: "Hikvision",
+    category: "Camera giám sát",
+    costPrice: 780_000,
+    retailPrice: 950_000,
+    description: "Camera IP thân trụ 2MP, micro tích hợp, PoE, phù hợp lắp đặt trong nhà hoặc ngoài trời có mái che.",
+    warrantyMonths: 24,
+    specs: {
+      "Mã đầy đủ": ["DS-2CD1023G2-LIUF"],
+      "Độ phân giải": ["1920 × 1080 (2MP)"],
+      "Kết nối": ["RJ45 10/100Mbps; PoE 802.3af"],
+      "Ban đêm / bảo vệ": ["IR đến 30m; IP67"],
+      "Tính năng chính": ["Micro tích hợp; phát hiện chuyển động người/phương tiện"],
+    },
+  },
+  {
+    sku: "HK-IP-DS2CD1043G2-LIUF",
+    name: "Camera IP Hikvision DS-2CD1043G2-LIUF 4MP",
+    brand: "Hikvision",
+    category: "Camera giám sát",
+    costPrice: 1_030_000,
+    retailPrice: 1_231_000,
+    description: "Camera IP thân trụ 4MP, micro tích hợp, Smart Hybrid Light và PoE; phù hợp nhà phố, cửa hàng, văn phòng, kho và khu vực ngoài trời.",
+    warrantyMonths: 24,
+    specs: {
+      "Mã đầy đủ": ["DS-2CD1043G2-LIUF"],
+      "Độ phân giải": ["2560 × 1440 (4MP)"],
+      "Kết nối": ["RJ45 10/100Mbps; PoE 802.3af"],
+      "Ban đêm / bảo vệ": ["IR và đèn trắng đến 30m; IP67"],
+      "Tính năng chính": ["Micro tích hợp; phân loại người/phương tiện; Smart Hybrid Light"],
+    },
+  },
+  {
+    sku: "HK-NVR-DS7604NI-K1",
+    name: "Đầu ghi NVR Hikvision DS-7604NI-K1 4 kênh",
+    brand: "Hikvision",
+    category: "Đầu ghi camera",
+    costPrice: 1_380_000,
+    retailPrice: 1_650_000,
+    description: "Đầu ghi NVR 4 kênh cho hệ thống IP, dùng với switch PoE rời.",
+    warrantyMonths: 24,
+    specs: { "Số kênh": ["4 camera IP"], "PoE": ["Không tích hợp; dùng switch PoE rời"], "Lưu trữ": ["1 khe HDD"], "Chuẩn nén": ["H.265+/H.265/H.264+/H.264"] },
+  },
+  {
+    sku: "HK-NVR-DS7604NI-K1-4P",
+    name: "Đầu ghi NVR Hikvision DS-7604NI-K1/4P 4 kênh PoE",
+    brand: "Hikvision",
+    category: "Đầu ghi camera",
+    costPrice: 1_820_000,
+    retailPrice: 2_150_000,
+    description: "Đầu ghi NVR 4 kênh tích hợp 4 cổng PoE, cấp nguồn trực tiếp cho camera IP.",
+    warrantyMonths: 24,
+    specs: { "Số kênh": ["4 camera IP"], "PoE": ["4 cổng PoE tích hợp"], "Lưu trữ": ["1 khe HDD"], "Chuẩn nén": ["H.265+/H.265/H.264+/H.264"] },
+  },
+  {
+    sku: "HK-NVR-DS7608NI-K1",
+    name: "Đầu ghi NVR Hikvision DS-7608NI-K1 8 kênh",
+    brand: "Hikvision",
+    category: "Đầu ghi camera",
+    costPrice: 1_830_000,
+    retailPrice: 2_200_000,
+    description: "Đầu ghi NVR 8 kênh cho hệ thống IP, dùng với switch PoE rời.",
+    warrantyMonths: 24,
+    specs: { "Số kênh": ["8 camera IP"], "PoE": ["Không tích hợp; dùng switch PoE rời"], "Lưu trữ": ["1 khe HDD"], "Chuẩn nén": ["H.265+/H.265/H.264+/H.264"] },
+  },
+  {
+    sku: "HK-NVR-DS7608NI-K1-8P",
+    name: "Đầu ghi NVR Hikvision DS-7608NI-K1/8P 8 kênh PoE",
+    brand: "Hikvision",
+    category: "Đầu ghi camera",
+    costPrice: 2_590_000,
+    retailPrice: 3_100_000,
+    description: "Đầu ghi NVR 8 kênh tích hợp 8 cổng PoE, cấp nguồn trực tiếp cho camera IP.",
+    warrantyMonths: 24,
+    specs: { "Số kênh": ["8 camera IP"], "PoE": ["8 cổng PoE tích hợp"], "Lưu trữ": ["1 khe HDD"], "Chuẩn nén": ["H.265+/H.265/H.264+/H.264"] },
+  },
+  {
+    sku: "HK-SW-DS3E0106P-EM",
+    name: "Switch PoE Hikvision DS-3E0106P-E/M 4 cổng",
+    brand: "Hikvision",
+    category: "Thiết bị mạng",
+    costPrice: 720_000,
+    retailPrice: 890_000,
+    description: "Switch PoE 4 cổng cho hệ thống camera IP quy mô nhỏ.",
+    warrantyMonths: 24,
+    specs: { "Cổng PoE": ["4 cổng"], "Uplink": ["2 cổng"], "Ứng dụng": ["Hệ thống 4 camera IP"] },
+  },
+  {
+    sku: "HK-SW-DS3E1310P-EIM",
+    name: "Switch PoE Hikvision DS-3E1310P-EI/M 8 cổng",
+    brand: "Hikvision",
+    category: "Thiết bị mạng",
+    costPrice: 1_640_000,
+    retailPrice: 2_010_000,
+    description: "Switch PoE thông minh 8 cổng cho hệ thống camera IP và nhu cầu mở rộng.",
+    warrantyMonths: 24,
+    specs: { "Cổng PoE": ["8 cổng"], "Uplink": ["2 cổng"], "Ứng dụng": ["Hệ thống 8 camera IP"] },
+  },
+  {
+    sku: "SG-SKYHAWK-1TB",
+    name: "Ổ cứng camera Seagate SkyHawk 1TB",
+    brand: "Seagate",
+    category: "Ổ cứng camera",
+    costPrice: 1_050_000,
+    retailPrice: 1_300_000,
+    description: "Ổ cứng giám sát chuyên dụng Seagate SkyHawk 1TB dùng cho đầu ghi camera.",
+    warrantyMonths: 24,
+    specs: { "Dung lượng": ["1TB"], "Loại sử dụng": ["Ghi hình giám sát 24/7"] },
+  },
+  {
+    sku: "SG-SKYHAWK-2TB",
+    name: "Ổ cứng camera Seagate SkyHawk 2TB",
+    brand: "Seagate",
+    category: "Ổ cứng camera",
+    costPrice: 1_450_000,
+    retailPrice: 1_750_000,
+    description: "Ổ cứng giám sát chuyên dụng Seagate SkyHawk 2TB dùng cho đầu ghi camera.",
+    warrantyMonths: 24,
+    specs: { "Dung lượng": ["2TB"], "Loại sử dụng": ["Ghi hình giám sát 24/7"] },
+  },
+  {
+    sku: "SG-SKYHAWK-4TB",
+    name: "Ổ cứng camera Seagate SkyHawk 4TB",
+    brand: "Seagate",
+    category: "Ổ cứng camera",
+    costPrice: 2_180_000,
+    retailPrice: 2_650_000,
+    description: "Ổ cứng giám sát chuyên dụng Seagate SkyHawk 4TB dùng cho đầu ghi camera.",
+    warrantyMonths: 24,
+    specs: { "Dung lượng": ["4TB"], "Loại sử dụng": ["Ghi hình giám sát 24/7"] },
+  },
+  {
+    sku: "MAT-HIK-IP-PER-CAMERA",
+    name: "Vật tư lắp đặt hệ thống camera IP - mỗi điểm",
+    category: "Vật tư camera",
+    costPrice: 120_000,
+    retailPrice: 180_000,
+    description: "Vật tư cơ bản cho một điểm camera IP: đầu nối, phụ kiện đi dây và cố định cơ bản.",
+    specs: { "Loại chi phí": ["Vật tư hệ thống IP"], "Đơn vị áp dụng": ["Mỗi camera"] },
+  },
+  {
+    sku: "SVC-HIK-IP-INSTALL-PER-CAMERA",
+    name: "Công lắp đặt camera IP Hikvision - mỗi điểm",
+    category: "Dịch Vụ",
+    costPrice: 0,
+    retailPrice: 250_000,
+    description: "Lắp camera IP, cấu hình đầu ghi và hướng dẫn sử dụng cơ bản cho một điểm camera.",
+    specs: { "Loại dịch vụ": ["Thi công hệ thống camera IP"], "Đơn vị áp dụng": ["Mỗi camera"] },
+  },
+  {
+    sku: "UPS-HIK-650VA",
+    name: "UPS lưu điện cho hệ thống camera 650VA",
+    category: "Thiết bị mạng",
+    costPrice: 520_000,
+    retailPrice: 650_000,
+    description: "UPS dự phòng cho đầu ghi, switch PoE và modem trong trường hợp mất điện ngắn hạn.",
+    warrantyMonths: 12,
+    specs: { "Công suất": ["650VA"], "Ứng dụng": ["Dự phòng nguồn cho hệ thống camera"] },
+  },
+  {
     sku: "MEM-HIK-32GB",
     name: "Thẻ nhớ camera 32GB chính hãng chuyên dụng",
     brand: "Hikvision",
@@ -364,17 +525,21 @@ async function main() {
     "Camera giám sát": await findOrCreateCategory("Camera giám sát"),
     "Thẻ nhớ": await findOrCreateCategory("Thẻ nhớ"),
     "Dịch Vụ": await findOrCreateCategory("Dịch Vụ"),
+    "Đầu ghi camera": await findOrCreateCategory("Đầu ghi camera"),
+    "Ổ cứng camera": await findOrCreateCategory("Ổ cứng camera"),
+    "Thiết bị mạng": await findOrCreateCategory("Thiết bị mạng"),
+    "Vật tư camera": await findOrCreateCategory("Vật tư camera"),
   } as const;
 
   await db
     .insert(brands)
-    .values(["EZVIZ", "IMOU", "Hikvision", "Kioxia", "Lexar"].map((name) => ({ name })))
+    .values(["EZVIZ", "IMOU", "Hikvision", "Kioxia", "Lexar", "Seagate"].map((name) => ({ name })))
     .onConflictDoNothing({ target: brands.name });
 
   const brandRows = await db
     .select({ id: brands.id, name: brands.name })
     .from(brands)
-    .where(inArray(brands.name, ["EZVIZ", "IMOU", "Hikvision", "Kioxia", "Lexar"]));
+    .where(inArray(brands.name, ["EZVIZ", "IMOU", "Hikvision", "Kioxia", "Lexar", "Seagate"]));
   const brandIds = new Map(brandRows.map((row) => [row.name, row.id]));
 
   await db.transaction(async (tx) => {
