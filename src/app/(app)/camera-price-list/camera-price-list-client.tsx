@@ -319,9 +319,14 @@ export function CameraPriceListClient({
       contentBottom + 78,
     );
     ctx.fillText(
+      "Có thể phát sinh chi phí theo thực tế (đi dây, vật tư bổ sung hoặc vị trí lắp đặt khó); sẽ báo trước khi thực hiện.",
+      72,
+      contentBottom + 106,
+    );
+    ctx.fillText(
       "HẢI ĐĂNG TECH - 0868306286 - 0868506286",
       72,
-      contentBottom + 118,
+      contentBottom + 146,
     );
 
     const blob = await new Promise<Blob | null>((resolve) =>
@@ -758,6 +763,10 @@ export function CameraPriceListClient({
                   <p className="mt-3 text-xs text-slate-500">
                     Thẻ nhớ chuyên dụng cho camera. Thời gian lưu là ước tính khi ghi liên tục;
                     thực tế thay đổi theo cài đặt, cảnh chuyển động và chất lượng mạng.
+                  </p>
+                  <p className="mt-2 text-xs text-slate-500">
+                    Lưu ý: Chi phí có thể phát sinh theo thực tế (đi dây, vật tư bổ sung hoặc vị
+                    trí lắp đặt khó); sẽ được báo trước khi thực hiện.
                   </p>
                 </div>
               </div>
