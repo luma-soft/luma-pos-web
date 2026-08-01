@@ -366,7 +366,7 @@ export function CameraPriceListClient({
         <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-black uppercase text-[#14344d]">
-              Tổng quan {filtered.length} camera lựa chọn
+              Danh sách {filtered.length} camera
             </h2>
             <p className="mt-1 text-sm text-slate-500">
               Mỗi camera có thông số, ảnh sản phẩm và các lựa chọn thẻ nhớ.
