@@ -454,7 +454,7 @@ export function CameraPriceListClient({
                   Model camera
                 </th>
                 <th className="border-r border-white/40 px-3 py-3">
-                  Vị trí phù hợp
+                  Vị trí lắp đặt
                 </th>
                 {memoryLabels.map((label) => (
                   <th
