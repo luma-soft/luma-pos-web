@@ -576,9 +576,6 @@ export function CameraPriceListClient({
                       <h3 className="text-2xl font-black text-[#14344d]">
                         {item.model}
                       </h3>
-                      <p className="mt-3 inline-block bg-[#e1f1f1] px-3 py-1 text-sm font-bold text-[#087b74]">
-                        Camera chính hãng
-                      </p>
                     </div>
                     <button
                       onClick={() => copyImage(item, index)}
