@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { getTranslations } from "next-intl/server";
-import { ArrowRight, Camera, Network, Wifi } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getTranslations();
@@ -14,20 +15,17 @@ const brands = [
   {
     href: "/camera-quote/ezviz",
     name: "EZVIZ",
-    Icon: Wifi,
-    accent: "bg-teal-600",
+    logo: "/brands/ezviz-logo.png",
   },
   {
     href: "/camera-quote/imou",
     name: "IMOU",
-    Icon: Camera,
-    accent: "bg-sky-600",
+    logo: "/brands/imou-logo.svg",
   },
   {
     href: "/camera-quote/hikvision",
     name: "Hikvision",
-    Icon: Network,
-    accent: "bg-indigo-600",
+    logo: "/brands/hikvision-logo.svg",
   },
 ];
 
@@ -44,10 +42,12 @@ export default async function CameraQuotePage() {
             {t("cameraQuotePage.intro")}
           </p>
           <div className="mt-9 grid gap-4 md:grid-cols-3">
-            {brands.map(({ href, name, Icon, accent }) => (
+            {brands.map(({ href, name, logo }) => (
               <Link key={name} href={href} className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-300 hover:shadow-lg">
-                <span className={`grid h-11 w-11 place-items-center rounded-xl text-white ${accent}`}><Icon className="h-5 w-5" /></span>
-                <h2 className="mt-5 text-2xl font-black text-[#14344d]">{name}</h2>
+                <div className="flex h-14 items-center">
+                  <Image src={logo} alt={`${name} logo`} width={180} height={56} className="h-12 w-36 object-contain object-left" />
+                </div>
+                <h2 className="sr-only">{name}</h2>
                 <p className="mt-2 min-h-12 text-sm leading-5 text-slate-600">{t(`cameraQuotePage.brands.${name.toLocaleLowerCase("en")}.description`)}</p>
                 <span className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-[#078a82]">{t("cameraQuotePage.viewQuote")} <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></span>
               </Link>
