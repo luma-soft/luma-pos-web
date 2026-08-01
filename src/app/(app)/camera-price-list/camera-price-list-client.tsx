@@ -197,11 +197,6 @@ export function CameraPriceListClient({
     ctx.fillStyle = "#14344d";
     ctx.font = "800 34px Arial";
     canvasWrap(ctx, item.model, 540, 135, 480, 42);
-    ctx.fillStyle = "#e1f1f1";
-    ctx.fillRect(540, 225, 440, 42);
-    ctx.fillStyle = "#087b74";
-    ctx.font = "700 20px Arial";
-    ctx.fillText("CAMERA CHÍNH HÃNG", 560, 253);
     const variants = item.variants;
     variants.forEach((variant, variantIndex) => {
       const x = 1065 + (variantIndex % 2) * 150;
@@ -542,9 +537,6 @@ export function CameraPriceListClient({
                   <h2 className="text-2xl font-black uppercase text-[#14344d]">
                     {item.model}
                   </h2>
-                  <p className="mt-1 text-slate-500">
-                    Camera lắp {item.installationLocation.toLocaleLowerCase("vi")} · thông số, hình ảnh và hai lựa chọn thẻ nhớ.
-                  </p>
                 </div>
               </header>
               <div className="mt-7 grid overflow-hidden rounded-xl border border-slate-200 bg-white lg:grid-cols-[330px_1fr]">
