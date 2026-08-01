@@ -56,19 +56,30 @@ function canvasWrap(
   maxWidth: number,
   lineHeight: number,
 ) {
-  const words = text.split(/\s+/);
-  let line = "";
-  let lines = 0;
-  for (const word of words) {
-    const candidate = line ? `${line} ${word}` : word;
-    if (ctx.measureText(candidate).width > maxWidth && line) {
-      ctx.fillText(line, x, y + lines * lineHeight);
-      line = word;
-      lines += 1;
-    } else line = candidate;
-  }
-  if (line) ctx.fillText(line, x, y + lines * lineHeight);
-  return lines + 1;
+  const lines = canvasLines(ctx, text, maxWidth);
+  lines.forEach((line, index) => ctx.fillText(line, x, y + index * lineHeight));
+  return lines.length;
+}
+
+function canvasLines(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+) {
+  return text.split(/\r?\n/).flatMap((paragraph) => {
+    const words = paragraph.split(/\s+/).filter(Boolean);
+    const lines: string[] = [];
+    let line = "";
+    for (const word of words) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (ctx.measureText(candidate).width > maxWidth && line) {
+        lines.push(line);
+        line = word;
+      } else line = candidate;
+    }
+    if (line) lines.push(line);
+    return lines.length ? lines : [""];
+  });
 }
 
 async function loadProductImage(url: string | null) {
@@ -163,7 +174,7 @@ export function CameraPriceListClient({
   async function copyImage(item: Model, index: number) {
     const canvas = document.createElement("canvas");
     canvas.width = 1500;
-    canvas.height = 1400;
+    canvas.height = 1900;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.fillStyle = "#ffffff";
@@ -221,26 +232,28 @@ export function CameraPriceListClient({
     ctx.fillText("THÔNG SỐ KỸ THUẬT", 540, 340);
     let y = 370;
     detailsFor(item)
-      .slice(0, 5)
       .forEach(([label, value]) => {
+        ctx.font = "17px Arial";
+        const valueLineCount = canvasLines(ctx, value, 530).length;
+        const rowHeight = Math.max(48, valueLineCount * 22 + 20);
         ctx.fillStyle = "#edf3f6";
-        ctx.fillRect(540, y, 245, 48);
+        ctx.fillRect(540, y, 245, rowHeight);
         ctx.fillStyle = "#ffffff";
-        ctx.fillRect(785, y, 570, 48);
+        ctx.fillRect(785, y, 570, rowHeight);
         ctx.strokeStyle = "#cbd5e1";
-        ctx.strokeRect(540, y, 815, 48);
+        ctx.strokeRect(540, y, 815, rowHeight);
         ctx.fillStyle = "#526675";
         ctx.font = "700 17px Arial";
         ctx.fillText(label, 557, y + 30);
         ctx.fillStyle = "#233947";
         ctx.font = "17px Arial";
-        ctx.fillText(value.slice(0, 64), 804, y + 30);
-        y += 48;
+        canvasWrap(ctx, value, 804, y + 30, 530, 22);
+        y += rowHeight;
       });
     ctx.fillStyle = "#14344d";
     ctx.font = "700 21px Arial";
     y += 42;
-    const description = item.description.split("\n").slice(0, 2).join(" ");
+    const description = item.description;
     const descriptionLines = canvasWrap(ctx, description, 540, y, 790, 28);
     y = Math.max(900, y + descriptionLines * 28 + 42);
     ctx.fillStyle = "#07817a";
