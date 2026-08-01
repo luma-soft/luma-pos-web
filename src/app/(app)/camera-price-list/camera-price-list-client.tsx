@@ -346,7 +346,7 @@ export function CameraPriceListClient({
   return (
     <main className="min-h-full bg-slate-100 px-3 py-7 sm:px-6 sm:py-10">
       <div
-        className="mx-auto max-w-6xl bg-white px-5 pb-10 pt-0 shadow-[0_18px_60px_rgba(15,23,42,.14)] sm:px-10"
+        className="mx-auto max-w-[1500px] bg-white px-5 pb-10 pt-0 shadow-[0_18px_60px_rgba(15,23,42,.14)] sm:px-10"
         style={{ fontFamily: "Arial, sans-serif" }}
       >
         <div className="-mx-5 flex h-8 bg-[#12364f] sm:-mx-10">
@@ -700,13 +700,13 @@ export function CameraPriceListClient({
                               : "bg-white"
                           }
                         >
-                          <td className="border border-slate-300 px-3 py-2">
+                          <td className="whitespace-nowrap border border-slate-300 px-3 py-2">
                             {label}
                           </td>
                           {item.variants.map((variant, variantIndex) => (
                             <td
                               key={variant.id}
-                              className="border border-slate-300 px-3 py-2 text-right"
+                              className="whitespace-nowrap border border-slate-300 px-3 py-2 text-right"
                             >
                               <span>{formatCurrency(variant[key])}</span>
                               {canEdit && (
