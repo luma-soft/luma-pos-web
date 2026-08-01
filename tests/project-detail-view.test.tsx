@@ -131,6 +131,7 @@ describe("ProjectDetailView", () => {
             assetOptions: [],
             warehouseOptions: [],
           }}
+          t={createTranslator({ locale: "vi", messages: viMessages })}
         />
       </NextIntlClientProvider>,
     );
@@ -140,7 +141,9 @@ describe("ProjectDetailView", () => {
     expect(html).toMatch(
       /<button[^>]*class="[^"]*border-border[^"]*"[^>]*>Sửa<\/button>/,
     );
-    expect(html).toContain("Tạo báo giá");
+    expect(html).toMatch(
+      /<a[^>]*class="[^"]*h-11[^"]*text-xs[^"]*lg:h-8[^"]*"[^>]*>Tạo báo giá<\/a>/,
+    );
   });
 
   test("shares project metrics and related orders while keeping page navigation out of the modal", async () => {

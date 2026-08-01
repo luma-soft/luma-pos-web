@@ -115,7 +115,7 @@ export function ProjectDetailActions({
           triggerVariant="outline"
         />
       )}
-      {project.serviceType && <Link href={Routes.projectQuote({ projectId: project.id, projectName: project.name, customerId: project.customerId })} className="inline-flex min-h-11 items-center rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-700 lg:min-h-0">{t("quotes.createQuote")}</Link>}
+      {project.serviceType && <Link href={Routes.projectQuote({ projectId: project.id, projectName: project.name, customerId: project.customerId })} className="inline-flex h-11 items-center justify-center rounded-lg bg-primary-600 px-3 text-xs font-medium text-white hover:bg-primary-700 lg:h-8">{t("quotes.createQuote")}</Link>}
     </div>
   );
 }
