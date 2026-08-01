@@ -27,9 +27,7 @@ export default async function CameraPriceListPage() {
       description: camera.description ?? "Thiết bị camera chính hãng, phù hợp nhu cầu giám sát.",
       imageUrl: camera.imageUrl,
       specs: camera.specs,
-      installationLocation: isOutdoorCamera(camera.name, camera.specs)
-        ? "Ngoài trời"
-        : "Trong nhà",
+      installationLocation: cameraInstallationLocation(camera.name, camera.specs),
       variants: memoryOptions.map((card) => ({
         id: `${camera.id}:${card.id}`,
         cameraId: camera.id,
@@ -51,4 +49,11 @@ export default async function CameraPriceListPage() {
 function isOutdoorCamera(name: string, specs: Record<string, string[]>) {
   const specificationText = Object.values(specs).flat().join(" ");
   return /\bIP(?:65|66|67)\b/i.test(specificationText) || /\b(?:H3|H8|H9|H80|F32|K7)/i.test(name);
+}
+
+function cameraInstallationLocation(
+  name: string,
+  specs: Record<string, string[]>,
+): "Trong nhà" | "Ngoài trời" {
+  return isOutdoorCamera(name, specs) ? "Ngoài trời" : "Trong nhà";
 }
