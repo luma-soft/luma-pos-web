@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Copy, Edit3, ImageOff, Search, X } from "lucide-react";
 import Image from "next/image";
 import { NumberInput } from "@/components/ui/number-input";
@@ -26,6 +26,7 @@ type Model = {
   description: string;
   imageUrl: string | null;
   specs: Record<string, string[]>;
+  installationLocation: "Trong nhà" | "Ngoài trời";
   variants: Variant[];
 };
 
@@ -33,9 +34,12 @@ function detailsFor(model: Model) {
   const rows = Object.entries(model.specs).flatMap(([label, values]) =>
     values.length ? [[label, values.join(" · ")] as const] : [],
   );
-  return rows.length
-    ? rows.slice(0, 6)
-    : [["Thông tin", model.description.split("\n")[0]] as const];
+  return [
+    ["Vị trí lắp đặt", model.installationLocation] as const,
+    ...(rows.length
+      ? rows
+      : [["Thông tin", model.description.split("\n")[0]] as const]),
+  ];
 }
 
 function canvasMemoryLabel(label: string, index: number) {
@@ -93,6 +97,11 @@ export function CameraPriceListClient({
   } | null>(null);
   const [price, setPrice] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
+  useEffect(() => {
+    if (!notice) return;
+    const timeout = window.setTimeout(() => setNotice(""), 3200);
+    return () => window.clearTimeout(timeout);
+  }, [notice]);
   const filtered = useMemo(
     () =>
       models.filter((item) =>
@@ -163,21 +172,6 @@ export function CameraPriceListClient({
     ctx.fillRect(0, 0, canvas.width, 34);
     ctx.fillStyle = "#078a82";
     ctx.fillRect(0, 0, 300, 34);
-    ctx.fillStyle = "#078a82";
-    ctx.fillRect(72, 84, 56, 56);
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "800 28px Arial";
-    ctx.fillText(String(index + 1), 89, 122);
-    ctx.fillStyle = "#14344d";
-    ctx.font = "800 38px Arial";
-    ctx.fillText(
-      `CHI TIẾT GÓI ${String(index + 1).padStart(2, "0")}`,
-      154,
-      110,
-    );
-    ctx.font = "24px Arial";
-    ctx.fillStyle = "#64748b";
-    ctx.fillText("Thông số, hình ảnh và hai lựa chọn thẻ nhớ", 154, 148);
     ctx.strokeStyle = "#b7c7d3";
     ctx.lineWidth = 2;
 
@@ -190,7 +184,7 @@ export function CameraPriceListClient({
         ctx.drawImage(
           image,
           110 + (380 - width) / 2,
-          425 + (380 - height) / 2,
+          270 + (380 - height) / 2,
           width,
           height,
         );
@@ -202,15 +196,15 @@ export function CameraPriceListClient({
 
     ctx.fillStyle = "#14344d";
     ctx.font = "800 34px Arial";
-    canvasWrap(ctx, item.model, 540, 285, 480, 42);
+    canvasWrap(ctx, item.model, 540, 135, 480, 42);
     ctx.fillStyle = "#e1f1f1";
-    ctx.fillRect(540, 375, 440, 42);
+    ctx.fillRect(540, 225, 440, 42);
     ctx.fillStyle = "#087b74";
     ctx.font = "700 20px Arial";
-    ctx.fillText("CAMERA CHÍNH HÃNG", 560, 403);
+    ctx.fillText(`CAMERA CHÍNH HÃNG · ${item.installationLocation.toUpperCase()}`, 560, 253);
     const variants = item.variants;
     variants.forEach((variant, variantIndex) => {
-      const y = 230 + variantIndex * 74;
+      const y = 90 + variantIndex * 74;
       ctx.fillStyle = "#e6f3f3";
       ctx.fillRect(1065, y, 290, 64);
       ctx.strokeStyle = "#078a82";
@@ -228,8 +222,8 @@ export function CameraPriceListClient({
     });
     ctx.fillStyle = "#14344d";
     ctx.font = "800 27px Arial";
-    ctx.fillText("THÔNG SỐ KỸ THUẬT", 540, 490);
-    let y = 520;
+    ctx.fillText("THÔNG SỐ KỸ THUẬT", 540, 340);
+    let y = 370;
     detailsFor(item)
       .slice(0, 5)
       .forEach(([label, value]) => {
@@ -296,7 +290,7 @@ export function CameraPriceListClient({
     });
     const contentBottom = y + 42 + items.length * 44;
     ctx.strokeStyle = "#b7c7d3";
-    ctx.strokeRect(72, 195, 1356, contentBottom - 165);
+    ctx.strokeRect(72, 58, 1356, contentBottom - 28);
     ctx.fillStyle = "#64748b";
     ctx.font = "17px Arial";
     ctx.fillText(
@@ -314,19 +308,27 @@ export function CameraPriceListClient({
       canvas.toBlob(resolve, "image/png"),
     );
     if (!blob) return setNotice("Không tạo được ảnh báo giá.");
-    if (navigator.clipboard?.write && typeof ClipboardItem !== "undefined") {
-      await navigator.clipboard.write([
-        new ClipboardItem({ "image/png": blob }),
-      ]);
-      setNotice(
-        `Đã sao chép ảnh chi tiết gói ${String(index + 1).padStart(2, "0")}.`,
-      );
-    } else {
+    const downloadImage = () => {
       const link = document.createElement("a");
       link.href = URL.createObjectURL(blob);
       link.download = `bao-gia-camera-goi-${String(index + 1).padStart(2, "0")}.png`;
       link.click();
       URL.revokeObjectURL(link.href);
+    };
+    if (navigator.clipboard?.write && typeof ClipboardItem !== "undefined") {
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({ "image/png": blob }),
+        ]);
+        setNotice(
+          `Đã sao chép ảnh chi tiết gói ${String(index + 1).padStart(2, "0")}.`,
+        );
+      } catch {
+        downloadImage();
+        setNotice("Không thể sao chép ảnh; ảnh báo giá đã được tải xuống.");
+      }
+    } else {
+      downloadImage();
       setNotice("Trình duyệt đã tải ảnh báo giá xuống.");
     }
   }
@@ -371,9 +373,6 @@ export function CameraPriceListClient({
             />
           </label>
         </div>
-        {notice && (
-          <p className="mt-3 text-sm font-semibold text-[#0b7b74]">{notice}</p>
-        )}
         <section className="mt-4 space-y-3 md:hidden">
           {filtered.map((item, index) => (
             <article
@@ -482,7 +481,7 @@ export function CameraPriceListClient({
                     {item.model}
                   </td>
                   <td className="border border-slate-300 px-3 py-3 leading-5 text-slate-600">
-                    {item.description.split("\n")[0]}
+                    {item.installationLocation}
                   </td>
                   {item.variants.map((variant, variantIndex) => (
                     <td
@@ -543,7 +542,7 @@ export function CameraPriceListClient({
                     {item.model}
                   </h2>
                   <p className="mt-1 text-slate-500">
-                    Thông số, hình ảnh và hai lựa chọn thẻ nhớ của từng model.
+                    Camera lắp {item.installationLocation.toLocaleLowerCase("vi")} · thông số, hình ảnh và hai lựa chọn thẻ nhớ.
                   </p>
                 </div>
               </header>
@@ -572,7 +571,7 @@ export function CameraPriceListClient({
                         {item.model}
                       </h3>
                       <p className="mt-3 inline-block bg-[#e1f1f1] px-3 py-1 text-sm font-bold text-[#087b74]">
-                        Camera chính hãng
+                        Camera chính hãng · {item.installationLocation}
                       </p>
                     </div>
                     <button
@@ -740,6 +739,15 @@ export function CameraPriceListClient({
           công.
         </footer>
       </div>
+      {notice && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-5 right-5 z-[60] max-w-[calc(100vw-2.5rem)] rounded-xl bg-[#14344d] px-4 py-3 text-sm font-bold text-white shadow-xl"
+        >
+          {notice}
+        </div>
+      )}
       {editing && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4">
           <div className="w-full max-w-sm bg-white p-5 shadow-2xl">

@@ -15,7 +15,9 @@ export default async function CameraPriceListPage() {
   const installationPrice = options.installations[0]?.retailPrice ?? 0;
   const materialPrice = options.materials[0]?.retailPrice ?? 0;
   const basePrice = installationPrice + materialPrice;
-  const memoryOptions = options.cards.slice(0, 2);
+  const memoryOptions = options.cards.filter((card) =>
+    ["128GB", "512GB"].includes(card.specs["Dung lượng"]?.[0] ?? ""),
+  );
   // Hikvision will be added once its package prices are finalised.
   const models = options.cameras
     .filter((camera) => !camera.name.toLocaleLowerCase("vi").includes("hikvision"))
@@ -25,6 +27,9 @@ export default async function CameraPriceListPage() {
       description: camera.description ?? "Thiết bị camera chính hãng, phù hợp nhu cầu giám sát.",
       imageUrl: camera.imageUrl,
       specs: camera.specs,
+      installationLocation: isOutdoorCamera(camera.name, camera.specs)
+        ? "Ngoài trời"
+        : "Trong nhà",
       variants: memoryOptions.map((card) => ({
         id: `${camera.id}:${card.id}`,
         cameraId: camera.id,
@@ -38,7 +43,12 @@ export default async function CameraPriceListPage() {
     }));
   return <CameraPriceListClient
     models={models}
-    memoryLabels={memoryOptions.map((_, index) => `Thẻ nhớ camera ${index === 0 ? "32GB" : "64GB"}`)}
+    memoryLabels={memoryOptions.map((card) => `Thẻ nhớ ${card.specs["Dung lượng"]?.[0] ?? card.name}`)}
     canEdit={canEdit}
   />;
+}
+
+function isOutdoorCamera(name: string, specs: Record<string, string[]>) {
+  const specificationText = Object.values(specs).flat().join(" ");
+  return /\bIP(?:65|66|67)\b/i.test(specificationText) || /\b(?:H3|H8|H9|H80|F32|K7)/i.test(name);
 }
