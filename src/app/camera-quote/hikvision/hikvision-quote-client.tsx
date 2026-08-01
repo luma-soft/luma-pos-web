@@ -2,9 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
-import { ArrowLeft, Check, CircleAlert, Copy, Database, Network, Server, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Check, CircleAlert, Copy, Database, Network, Printer, Server, ShieldCheck } from "lucide-react";
 import type { HikvisionQuoteProduct } from "@/lib/data/hikvision-quote";
 import { formatCurrency } from "@/lib/utils";
 
@@ -32,6 +33,7 @@ const POE_BUDGET_WATTS: Record<PoeMethod, Record<SystemSize, number>> = {
   nvr: { "4": 36, "8": 75, "16": 200 },
   switch: { "4": 35, "8": 80, "16": 230 },
 };
+const subscribeToNothing = () => () => {};
 
 function canvasLines(context: CanvasRenderingContext2D, text: string, maxWidth: number) {
   const words = text.split(/\s+/).filter(Boolean);
@@ -69,6 +71,7 @@ export function HikvisionQuoteClient({ backLabel, catalogReady, products }: { ba
   const [includeSurge, setIncludeSurge] = useState(false);
   const [cableMeters, setCableMeters] = useState(60);
   const [notice, setNotice] = useState("");
+  const printReady = useSyncExternalStore(subscribeToNothing, () => true, () => false);
   const bySku = useMemo(() => new Map(products.map((product) => [product.sku, product])), [products]);
   const product = useCallback((sku: string) => bySku.get(sku), [bySku]);
   const selectedStorage = storageSize(systemSize, cameraType, storageDays);
@@ -201,6 +204,18 @@ export function HikvisionQuoteClient({ backLabel, catalogReady, products }: { ba
     }
   }
 
+  function printQuote() {
+    if (hasUnavailableItem) return setNotice(t("copy.unavailable"));
+    document.body.classList.add("hikvision-quote-printing");
+    const cleanUp = () => {
+      document.body.classList.remove("hikvision-quote-printing");
+      window.removeEventListener("afterprint", cleanUp);
+    };
+    window.addEventListener("afterprint", cleanUp);
+    window.print();
+    window.setTimeout(cleanUp, 60_000);
+  }
+
   return (
     <div className="mx-auto max-w-6xl overflow-hidden bg-white shadow-[0_18px_60px_rgba(15,23,42,.14)]">
       <div className="flex h-8 bg-[#12364f]"><div className="w-1/5 bg-[#078a82]" /></div>
@@ -211,7 +226,7 @@ export function HikvisionQuoteClient({ backLabel, catalogReady, products }: { ba
             <h1 className="mt-5 text-3xl font-black tracking-tight text-[#14344d] sm:text-4xl">{t("title")}</h1>
             <p className="mt-3 max-w-2xl text-base leading-7 text-slate-600">{t("description")}</p>
           </div>
-          <div className="flex gap-3 sm:max-w-xs sm:flex-col"><button type="button" onClick={copyQuoteImage} className="inline-flex items-center justify-center gap-2 rounded-xl border border-teal-200 bg-white px-4 py-3 text-sm font-bold text-[#078a82] transition hover:bg-teal-50"><Copy className="h-4 w-4" />{t("copy.button")}</button><div className="rounded-xl border border-teal-100 bg-teal-50 px-4 py-3 text-sm leading-6 text-teal-900"><ShieldCheck className="mb-1 h-5 w-5 text-[#078a82]" />{t("catalogNotice")}</div></div>
+          <div className="flex gap-3 sm:max-w-xs sm:flex-col"><button type="button" onClick={copyQuoteImage} className="inline-flex items-center justify-center gap-2 rounded-xl border border-teal-200 bg-white px-4 py-3 text-sm font-bold text-[#078a82] transition hover:bg-teal-50"><Copy className="h-4 w-4" />{t("copy.button")}</button><button type="button" onClick={printQuote} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-[#14344d] transition hover:bg-slate-50"><Printer className="h-4 w-4" />{t("print.button")}</button><div className="rounded-xl border border-teal-100 bg-teal-50 px-4 py-3 text-sm leading-6 text-teal-900"><ShieldCheck className="mb-1 h-5 w-5 text-[#078a82]" />{t("catalogNotice")}</div></div>
         </div>
 
         {hasCatalogGap && <div className="mt-6 flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900"><CircleAlert className="mt-0.5 h-5 w-5 shrink-0" />{t("catalogMissing")}</div>}
@@ -237,6 +252,7 @@ export function HikvisionQuoteClient({ backLabel, catalogReady, products }: { ba
         <Link href="/camera-quote" className="mt-8 inline-flex items-center gap-2 text-sm font-bold text-[#078a82]"><ArrowLeft className="h-4 w-4" /> {backLabel}</Link>
       </div>
       {notice && <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-2xl bg-[#12364f] px-5 py-3 text-sm font-bold text-white shadow-xl" role="status">{notice}</div>}
+      {printReady && createPortal(<article className="hikvision-quote-print-root bg-white p-10 text-slate-900"><div className="h-6 bg-[#12364f]"><div className="h-full w-1/5 bg-[#078a82]" /></div><header className="border-b border-slate-200 px-2 py-8"><p className="text-lg font-bold tracking-[0.2em] text-[#078a82]">{t("copy.company")}</p><h1 className="mt-3 text-3xl font-black text-[#14344d]">{t("copy.title")}</h1><p className="mt-2 text-base text-slate-600">{t("copy.configuration", { count: cameraCount, type: t(`cameraTypes.${cameraType}`) })}</p></header><table className="mt-7 w-full border-collapse text-sm"><thead><tr className="bg-[#12364f] text-left text-white"><th className="p-3">{t("copy.item")}</th><th className="p-3 text-right">{t("copy.amount")}</th></tr></thead><tbody>{lineItems.map((item) => <tr key={item.label} className="border-b border-slate-200"><td className="p-3"><p className="font-bold">{item.label}</p><p className="mt-1 text-slate-500">{item.model}</p></td><td className="p-3 text-right font-bold">{item.total ? formatCurrency(item.total) : t("included")}</td></tr>)}</tbody><tfoot><tr className="bg-teal-50"><td className="p-4 text-base font-black">{t("total")}</td><td className="p-4 text-right text-lg font-black text-[#078a82]">{formatCurrency(total)}</td></tr></tfoot></table><footer className="mt-8 border-t border-slate-200 pt-4 text-xs leading-5 text-slate-500"><p>{t("copy.note")}</p><p className="mt-3 font-semibold">{t("copy.contact")}</p></footer></article>, document.body)}
     </div>
   );
 }

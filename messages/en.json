@@ -3229,6 +3229,9 @@
         "downloaded": "The image could not be copied; the quote image was downloaded instead.",
         "failed": "Could not create the quote image.",
         "unavailable": "Synchronize all product prices before copying the image."
+      },
+      "print": {
+        "button": "Print / Save PDF"
       }
     }
   },

@@ -22,6 +22,9 @@ const imageSources = [
   { sku: "SG-SKYHAWK-4TB", path: "catalog-2026-08/seagate/skyhawk-4tb.webp", source: "https://try.com.ar/wp-content/uploads/2026/03/disco-rigido-hdd-1tb-seagate-skyhawk-3-5-sata.webp" },
   { sku: "SG-SKYHAWK-6TB", path: "catalog-2026-08/seagate/skyhawk-6tb.webp", source: "https://try.com.ar/wp-content/uploads/2026/03/disco-rigido-hdd-1tb-seagate-skyhawk-3-5-sata.webp" },
   { sku: "UPS-HIK-650VA", path: "catalog-2026-08/ups/cyberpower-ut650eg.jpg", source: "https://anphat.com.vn/media/product/51702_99.jpg" },
+  { sku: "ACC-HIK-RACK-6U", path: "catalog-2026-08/accessories/rack-6u.jpeg", source: "https://turack.vn/thumb/600x600/2/data/upload/1672385841-tu-rack-treo-tuong-6u-unr-n6ud400-mk-cua-mika.jpeg" },
+  { sku: "ACC-HIK-MONITOR-22", path: "catalog-2026-08/accessories/monitor-22.jpg", source: "https://cctvdirect.co.uk/cdn/shop/collections/Collection_Image_Monitors.jpg?v=1773307869" },
+  { sku: "ACC-HIK-SURGE-PER-CAMERA", path: "catalog-2026-08/accessories/ethernet-surge-protector.png", source: "https://www.axis.com/sites/axis/files/t8061-ethernet-surge-protector.png" },
 ] as const;
 
 async function main() {

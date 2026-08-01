@@ -3229,6 +3229,9 @@
         "downloaded": "Không thể sao chép ảnh; ảnh báo giá đã được tải xuống.",
         "failed": "Không tạo được ảnh báo giá.",
         "unavailable": "Cần đồng bộ đủ giá sản phẩm trước khi sao chép ảnh."
+      },
+      "print": {
+        "button": "In / Lưu PDF"
       }
     }
   },
