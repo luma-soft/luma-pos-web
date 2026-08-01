@@ -3160,13 +3160,13 @@
       "metaDescription": "Hikvision solution quote with cameras, recorders, storage, PoE switches, and installation.",
       "description": "Choose the system size to review an IP camera, NVR, storage, PoE power, materials, and installation configuration.",
       "back": "Choose another brand",
-      "catalogNotice": "Pricing is read directly from the product catalog. Final SKU selection and pricing are confirmed after the site survey.",
+      "catalogNotice": "Pricing is read directly from the product catalog; final SKU selection and pricing are confirmed after the site survey.",
       "catalogMissing": "Some system products are not in the current catalog. The total will appear after the catalog is synchronized.",
       "configure": "System configuration",
       "cameraCount": "Camera quantity",
       "cameras": "{count} cameras",
-      "cameraQuality": "Camera resolution",
-      "quality": { "2mp": "2MP · Full HD", "4mp": "4MP · 2K" },
+      "cameraType": "Camera type",
+      "cameraTypes": { "bullet2": "2MP bullet", "bullet4": "4MP bullet", "dome4": "4MP dome", "ptz4": "4MP PTZ · 4× zoom" },
       "storageDays": "Estimated retention",
       "days": "{count} days",
       "storageHint": "Suggested {capacity}TB drive for {count} continuous-recording cameras; actual retention varies by scene, compression, and recording settings.",
@@ -3177,7 +3177,7 @@
       },
       "summaryTitle": "Reference quote details",
       "items": {
-        "camera": "4MP IP camera × {count}",
+        "camera": "IP camera × {count}",
         "recorder": "PoE NVR recorder",
         "storage": "Surveillance hard drive",
         "poeSwitch": "PoE switch",
@@ -3185,9 +3185,15 @@
         "materials": "Basic materials",
         "installation": "Installation labor",
         "perCamera": "for {count} cameras",
-        "ups": "Backup UPS"
+        "ups": "Backup UPS",
+        "cable": "Network cable × {meters}m",
+        "rack": "6U rack cabinet",
+        "monitor": "Monitoring display",
+        "surge": "Surge protection"
       },
       "ups": { "title": "Add a backup UPS", "description": "Keep the recorder, switch, and modem operating during a short outage." },
+      "cableMeters": "Network-cable length (m)",
+      "accessories": { "rack": "Add a 6U rack cabinet", "monitor": "Add a monitoring display", "surge": "Add surge protection per camera" },
       "unavailable": "No price yet",
       "included": "Included",
       "total": "ESTIMATED TOTAL",
@@ -3195,7 +3201,21 @@
       "includedTitle": "Included in the configuration",
       "includedDescription": "IP cameras, recorder, storage, PoE power, basic materials, and installation labor for the selected quantity.",
       "actualCostTitle": "Potential additional costs",
-      "actualCostDescription": "Extra cable runs, difficult labor, accessories, or special requirements will be quoted clearly after the site survey."
+      "actualCostDescription": "Extra cable runs, difficult labor, accessories, or special requirements will be quoted clearly after the site survey.",
+      "compatibility": {
+        "title": "PoE compatibility check",
+        "ok": "Estimated load {required}W is within the {budget}W PoE budget: this configuration is compatible.",
+        "warning": "Estimated load {required}W exceeds the {budget}W PoE budget. Choose a higher-power PoE switch or NVR."
+      },
+      "commercial": {
+        "title": "Quote terms",
+        "vat": { "label": "VAT", "value": "VAT is excluded." },
+        "warranty": { "label": "Warranty", "value": "Subject to the warranty period of each SKU in the catalog." },
+        "validity": { "label": "Validity", "value": "Valid for 07 days from the quotation date." },
+        "leadTime": { "label": "Delivery / installation", "value": "Confirmed after stock and site-survey checks." }
+      },
+      "priceReference": "Price source: public pricing and suppliers; last checked: {checkedAt}. Prices may change over time.",
+      "priceReferencePending": "being updated"
     }
   },
   "pagination": {

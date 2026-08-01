@@ -3160,13 +3160,13 @@
       "metaDescription": "Báo giá giải pháp Hikvision gồm camera, đầu ghi, ổ cứng, switch PoE và thi công.",
       "description": "Chọn quy mô hệ thống để xem cấu hình camera IP, đầu ghi NVR, ổ cứng, cấp nguồn PoE, vật tư và công lắp đặt.",
       "back": "Chọn hãng khác",
-      "catalogNotice": "Giá lấy trực tiếp từ danh mục sản phẩm. Báo giá cuối cùng sẽ xác nhận theo SKU và khảo sát thực tế.",
+      "catalogNotice": "Giá lấy trực tiếp từ danh mục sản phẩm; giá cuối cùng sẽ xác nhận theo SKU và khảo sát thực tế.",
       "catalogMissing": "Một vài sản phẩm hệ thống chưa có trong danh mục hiện hành. Tổng tiền sẽ hiển thị sau khi đồng bộ danh mục.",
       "configure": "Cấu hình hệ thống",
       "cameraCount": "Số lượng camera",
       "cameras": "{count} camera",
-      "cameraQuality": "Độ phân giải camera",
-      "quality": { "2mp": "2MP · Full HD", "4mp": "4MP · 2K" },
+      "cameraType": "Loại camera",
+      "cameraTypes": { "bullet2": "Thân 2MP", "bullet4": "Thân 4MP", "dome4": "Dome 4MP", "ptz4": "PTZ 4MP · zoom 4×" },
       "storageDays": "Thời gian lưu trữ dự kiến",
       "days": "{count} ngày",
       "storageHint": "Gợi ý ổ {capacity}TB cho {count} camera, ghi liên tục; thực tế thay đổi theo cảnh, chuẩn nén và thiết lập ghi.",
@@ -3177,7 +3177,7 @@
       },
       "summaryTitle": "Chi tiết báo giá tham khảo",
       "items": {
-        "camera": "Camera IP 4MP × {count}",
+        "camera": "Camera IP × {count}",
         "recorder": "Đầu ghi NVR PoE",
         "storage": "Ổ cứng chuyên dụng",
         "poeSwitch": "Switch PoE",
@@ -3185,9 +3185,15 @@
         "materials": "Vật tư cơ bản",
         "installation": "Công lắp đặt",
         "perCamera": "theo {count} camera",
-        "ups": "UPS lưu điện"
+        "ups": "UPS lưu điện",
+        "cable": "Cáp mạng × {meters}m",
+        "rack": "Tủ rack 6U",
+        "monitor": "Màn hình giám sát",
+        "surge": "Chống sét lan truyền"
       },
       "ups": { "title": "Thêm UPS lưu điện", "description": "Duy trì đầu ghi, switch và modem khi mất điện ngắn hạn." },
+      "cableMeters": "Chiều dài cáp mạng (m)",
+      "accessories": { "rack": "Thêm tủ rack 6U", "monitor": "Thêm màn hình giám sát", "surge": "Thêm chống sét cho từng camera" },
       "unavailable": "Chưa có giá",
       "included": "Đã gồm",
       "total": "TỔNG DỰ KIẾN",
@@ -3195,7 +3201,21 @@
       "includedTitle": "Cấu hình đã gồm",
       "includedDescription": "Camera IP, đầu ghi, lưu trữ, cấp nguồn PoE, vật tư cơ bản và công lắp đặt theo số lượng đã chọn.",
       "actualCostTitle": "Chi phí có thể phát sinh",
-      "actualCostDescription": "Dây cáp vượt định mức, nhân công khó, phụ kiện hoặc yêu cầu đặc biệt sẽ được báo rõ sau khảo sát."
+      "actualCostDescription": "Dây cáp vượt định mức, nhân công khó, phụ kiện hoặc yêu cầu đặc biệt sẽ được báo rõ sau khảo sát.",
+      "compatibility": {
+        "title": "Kiểm tra tương thích PoE",
+        "ok": "Công suất ước tính {required}W trên ngân sách PoE {budget}W: cấu hình phù hợp.",
+        "warning": "Công suất ước tính {required}W vượt ngân sách PoE {budget}W. Hãy chọn switch/đầu ghi PoE công suất cao hơn."
+      },
+      "commercial": {
+        "title": "Điều khoản báo giá",
+        "vat": { "label": "VAT", "value": "Chưa bao gồm VAT." },
+        "warranty": { "label": "Bảo hành", "value": "Theo thời hạn bảo hành của từng SKU trong catalog." },
+        "validity": { "label": "Hiệu lực", "value": "07 ngày kể từ ngày báo giá." },
+        "leadTime": { "label": "Giao hàng / thi công", "value": "Xác nhận sau khi kiểm tra tồn kho và khảo sát." }
+      },
+      "priceReference": "Nguồn giá: giá công khai và nhà cung cấp; kiểm tra lần gần nhất: {checkedAt}. Giá có thể thay đổi theo thời điểm.",
+      "priceReferencePending": "đang cập nhật"
     }
   },
   "pagination": {

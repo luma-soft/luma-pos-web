@@ -17,6 +17,16 @@ export const HIKVISION_QUOTE_SKUS = [
   "MAT-HIK-IP-PER-CAMERA",
   "SVC-HIK-IP-INSTALL-PER-CAMERA",
   "UPS-HIK-650VA",
+  "HK-IP-DS2CD1143G2-LIUF",
+  "HK-PTZ-DS2DE2A404IW-DE3",
+  "HK-NVR-DS7616NI-K1",
+  "HK-NVR-DS7616NI-K2-16P",
+  "HK-SW-DS3E1518P-SI",
+  "SG-SKYHAWK-6TB",
+  "ACC-HIK-RACK-6U",
+  "ACC-HIK-MONITOR-22",
+  "ACC-HIK-SURGE-PER-CAMERA",
+  "504585",
 ] as const;
 
 export type HikvisionQuoteProduct = {
@@ -24,6 +34,7 @@ export type HikvisionQuoteProduct = {
   name: string;
   brand: string | null;
   retailPrice: number;
+  specs: Record<string, string[]>;
 };
 
 export async function getHikvisionQuoteProducts(): Promise<HikvisionQuoteProduct[]> {
@@ -33,11 +44,18 @@ export async function getHikvisionQuoteProducts(): Promise<HikvisionQuoteProduct
       name: products.name,
       brand: brands.name,
       retailPrice: products.retailPrice,
+      specs: products.specs,
     })
     .from(products)
     .leftJoin(brands, eq(products.brandId, brands.id))
     .where(inArray(products.sku, [...HIKVISION_QUOTE_SKUS]))
     .orderBy(asc(products.name));
 
-  return rows.map((row) => ({ ...row, retailPrice: Number(row.retailPrice) }));
+  return rows.map((row) => ({
+    ...row,
+    retailPrice: Number(row.retailPrice),
+    specs: row.specs && typeof row.specs === "object" && !Array.isArray(row.specs)
+      ? Object.fromEntries(Object.entries(row.specs).filter(([, value]) => Array.isArray(value)).map(([key, value]) => [key, value.map(String)]))
+      : {},
+  }));
 }
