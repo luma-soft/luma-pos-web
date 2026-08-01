@@ -3215,7 +3215,21 @@
         "leadTime": { "label": "Giao hàng / thi công", "value": "Xác nhận sau khi kiểm tra tồn kho và khảo sát." }
       },
       "priceReference": "Nguồn giá: giá công khai và nhà cung cấp; kiểm tra lần gần nhất: {checkedAt}. Giá có thể thay đổi theo thời điểm.",
-      "priceReferencePending": "đang cập nhật"
+      "priceReferencePending": "đang cập nhật",
+      "copy": {
+        "button": "Sao chép ảnh báo giá",
+        "company": "HẢI ĐĂNG TECH",
+        "contact": "HẢI ĐĂNG TECH · 0868306286 · 0868506286",
+        "title": "BÁO GIÁ HỆ THỐNG HIKVISION",
+        "configuration": "Cấu hình: {count} camera · {type}",
+        "item": "HẠNG MỤC",
+        "amount": "THÀNH TIỀN",
+        "note": "Giá tham khảo chưa bao gồm VAT. Giá cuối cùng, thời gian thi công và chi phí phát sinh sẽ được xác nhận sau khảo sát thực tế.",
+        "success": "Đã sao chép ảnh báo giá {count} camera.",
+        "downloaded": "Không thể sao chép ảnh; ảnh báo giá đã được tải xuống.",
+        "failed": "Không tạo được ảnh báo giá.",
+        "unavailable": "Cần đồng bộ đủ giá sản phẩm trước khi sao chép ảnh."
+      }
     }
   },
   "pagination": {

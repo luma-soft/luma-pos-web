@@ -3215,7 +3215,21 @@
         "leadTime": { "label": "Delivery / installation", "value": "Confirmed after stock and site-survey checks." }
       },
       "priceReference": "Price source: public pricing and suppliers; last checked: {checkedAt}. Prices may change over time.",
-      "priceReferencePending": "being updated"
+      "priceReferencePending": "being updated",
+      "copy": {
+        "button": "Copy quote image",
+        "company": "HAI DANG TECH",
+        "contact": "HAI DANG TECH · 0868306286 · 0868506286",
+        "title": "HIKVISION SYSTEM QUOTE",
+        "configuration": "Configuration: {count} cameras · {type}",
+        "item": "ITEM",
+        "amount": "AMOUNT",
+        "note": "Reference pricing excludes VAT. Final pricing, installation timeline, and any additional costs are confirmed after the site survey.",
+        "success": "Copied the {count}-camera quote image.",
+        "downloaded": "The image could not be copied; the quote image was downloaded instead.",
+        "failed": "Could not create the quote image.",
+        "unavailable": "Synchronize all product prices before copying the image."
+      }
     }
   },
   "pagination": {
