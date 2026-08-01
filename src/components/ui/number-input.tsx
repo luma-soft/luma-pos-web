@@ -118,7 +118,7 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
             className,
             // Giữ vùng đệm cho nhãn ngay cả khi caller đặt px-* riêng.
             prefix && "pl-7",
-            suffix && "pr-10",
+            suffix && "pr-14",
             "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
           )}
           {...props}

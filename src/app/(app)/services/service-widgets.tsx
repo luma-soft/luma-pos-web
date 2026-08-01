@@ -9,6 +9,7 @@ import { DataTableShell, RowPreviewModal, stopRowToggle, type DataTableColumn } 
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { SearchableSelect } from "@/components/combobox";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/label";
 import { Input, Textarea } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
 import { Select } from "@/components/ui/select";
@@ -407,18 +408,18 @@ export function ServiceJobQuickCreate({
         )}
       >
         <div className="grid gap-3 sm:grid-cols-2">
-          <Select value={projectId} onChange={(event) => {
+          <Field label={t("projects.cols.name")}><Select value={projectId} onChange={(event) => {
             const nextProjectId = event.target.value;
             setProjectId(nextProjectId);
             const projectType = projects.find((project) => project.id === nextProjectId)?.serviceType;
             if (projectType && projectType !== "mixed") setServiceType(projectType);
-          }} options={projects.map((project) => ({ value: project.id, label: project.name }))} placeholder={t("projects.cols.name")} />
-          <Select value={serviceType} onChange={(event) => setServiceType(event.target.value)} options={concreteTypeOptions(t)} />
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={`${t("services.fields.job")} *`} className="sm:col-span-2" />
-          <Select value={priority} onChange={(event) => setPriority(event.target.value)} options={priorityOptions(t)} />
-          <Select value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...assignees.map((item) => ({ value: item.id, label: item.name }))]} />
-          <Input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} aria-label={t("services.fields.schedule")} className="sm:col-span-2" />
-          <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder={t("services.fields.description")} className="sm:col-span-2" />
+          }} options={projects.map((project) => ({ value: project.id, label: project.name }))} /></Field>
+          <Field label={t("services.fields.type")}><Select value={serviceType} onChange={(event) => setServiceType(event.target.value)} options={concreteTypeOptions(t)} /></Field>
+          <Field label={t("services.fields.job")} required className="sm:col-span-2"><Input value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
+          <Field label={t("services.fields.priority")}><Select value={priority} onChange={(event) => setPriority(event.target.value)} options={priorityOptions(t)} /></Field>
+          <Field label={t("services.fields.assignee")}><Select value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...assignees.map((item) => ({ value: item.id, label: item.name }))]} /></Field>
+          <Field label={t("services.fields.schedule")} className="sm:col-span-2"><Input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} /></Field>
+          <Field label={t("services.fields.description")} className="sm:col-span-2"><Textarea value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
           {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
         </div>
       </RowPreviewModal>
@@ -794,32 +795,32 @@ export function ServiceJobEdit({
         )}
       >
         <div className="grid gap-3 sm:grid-cols-2">
-          <Select
+          <Field label={t("services.fields.type")}><Select
             value={serviceType}
             onChange={(event) => setServiceType(event.target.value)}
             options={projectType === "mixed" ? concreteTypeOptions(t) : concreteTypeOptions(t).filter((item) => item.value === projectType)}
-          />
-          <Select value={priority} onChange={(event) => setPriority(event.target.value)} options={priorityOptions(t)} />
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={`${t("services.fields.job")} *`} className="sm:col-span-2" />
-          <Select value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...assignees.map((item) => ({ value: item.id, label: item.name }))]} />
-          <Input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} aria-label={t("services.fields.schedule")} />
-          <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder={t("services.fields.description")} className="sm:col-span-2" />
-          <Select
+          /></Field>
+          <Field label={t("services.fields.priority")}><Select value={priority} onChange={(event) => setPriority(event.target.value)} options={priorityOptions(t)} /></Field>
+          <Field label={t("services.fields.job")} required className="sm:col-span-2"><Input value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
+          <Field label={t("services.fields.assignee")}><Select value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...assignees.map((item) => ({ value: item.id, label: item.name }))]} /></Field>
+          <Field label={t("services.fields.schedule")}><Input type="datetime-local" value={scheduledAt} onChange={(event) => setScheduledAt(event.target.value)} /></Field>
+          <Field label={t("services.fields.description")} className="sm:col-span-2"><Textarea value={description} onChange={(event) => setDescription(event.target.value)} /></Field>
+          <Field label={t("services.fields.quote")}><Select
             value={quoteOrderId}
             onChange={(event) => setQuoteOrderId(event.target.value)}
             options={[
               { value: "", label: t("services.jobs.noQuote") },
               ...orders.filter((order) => order.status === "quote").map((order) => ({ value: order.id, label: order.code })),
             ]}
-          />
-          <Select
+          /></Field>
+          <Field label={t("services.fields.materialOrder")}><Select
             value={materialOrderId}
             onChange={(event) => setMaterialOrderId(event.target.value)}
             options={[
               { value: "", label: t("services.jobs.noMaterialOrder") },
               ...orders.filter((order) => order.status !== "quote" && order.status !== "cancelled").map((order) => ({ value: order.id, label: order.code })),
             ]}
-          />
+          /></Field>
           {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
         </div>
       </RowPreviewModal>
@@ -1386,23 +1387,14 @@ export function ServiceMaintenanceEditor({
         </div>
       )}>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Select value={assetId} onChange={(event) => setAssetId(event.target.value)} options={[{ value: "", label: t("services.assets.noProduct") }, ...assets.map((asset) => ({ value: asset.id, label: `${asset.name}${asset.serialNumber ? ` · ${asset.serialNumber}` : ""}` }))]} />
-          <Select value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...staff.map((person) => ({ value: person.id, label: person.name }))]} />
-          <Select
-            value={serviceType}
-            onChange={(event) => setServiceType(event.target.value)}
-            options={[
-              { value: "", label: t("services.fields.type") },
-              ...concreteTypeOptions(t).filter((option) =>
-                projectServiceType === "mixed" || option.value === projectServiceType
-              ),
-            ]}
-          />
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={`${t("services.maintenance.titleField")} *`} className="sm:col-span-2" />
-          <NumberInput value={intervalDays} onChange={setIntervalDays} min={1} decimals={0} suffix={t("services.maintenance.days")} placeholder={t("services.maintenance.interval")} />
-          <Input type="date" value={nextDueOn} onChange={(event) => setNextDueOn(event.target.value)} aria-label={t("services.maintenance.nextDueOn")} />
-          <Select value={isActive ? "active" : "paused"} onChange={(event) => setIsActive(event.target.value === "active")} options={[{ value: "active", label: t("services.maintenance.active") }, { value: "paused", label: t("services.maintenance.paused") }]} />
-          <Textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder={t("customers.fields.note")} className="sm:col-span-2" />
+          <Field label={t("services.fields.assets")}><Select value={assetId} onChange={(event) => setAssetId(event.target.value)} options={[{ value: "", label: t("services.assets.noProduct") }, ...assets.map((asset) => ({ value: asset.id, label: `${asset.name}${asset.serialNumber ? ` · ${asset.serialNumber}` : ""}` }))]} /></Field>
+          <Field label={t("services.fields.assignee")}><Select value={assignedTo} onChange={(event) => setAssignedTo(event.target.value)} options={[{ value: "", label: t("services.fields.unassigned") }, ...staff.map((person) => ({ value: person.id, label: person.name }))]} /></Field>
+          <Field label={t("services.fields.type")}><Select value={serviceType} onChange={(event) => setServiceType(event.target.value)} options={[{ value: "", label: t("services.fields.type") }, ...concreteTypeOptions(t).filter((option) => projectServiceType === "mixed" || option.value === projectServiceType)]} /></Field>
+          <Field label={t("services.maintenance.titleField")} required className="sm:col-span-2"><Input value={title} onChange={(event) => setTitle(event.target.value)} /></Field>
+          <Field label={t("services.maintenance.interval")}><NumberInput value={intervalDays} onChange={setIntervalDays} min={1} decimals={0} suffix={t("services.maintenance.days")} /></Field>
+          <Field label={t("services.maintenance.nextDueOn")}><Input type="date" value={nextDueOn} onChange={(event) => setNextDueOn(event.target.value)} /></Field>
+          <Field label={t("orders.cols.status")}><Select value={isActive ? "active" : "paused"} onChange={(event) => setIsActive(event.target.value === "active")} options={[{ value: "active", label: t("services.maintenance.active") }, { value: "paused", label: t("services.maintenance.paused") }]} /></Field>
+          <Field label={t("customers.fields.note")} className="sm:col-span-2"><Textarea value={note} onChange={(event) => setNote(event.target.value)} /></Field>
         </div>
       </RowPreviewModal>
     </>

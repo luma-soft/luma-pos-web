@@ -7,6 +7,7 @@ import { Plus } from "lucide-react";
 import { RowPreviewModal } from "@/components/data-table";
 import { CustomerCreateDialog, type CustomerCreateResult } from "@/components/partners/customer-create-dialog";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/label";
 import { Input, Textarea } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
@@ -118,11 +119,14 @@ export function ProjectQuickCreate({
         )}
       >
         <div className="grid gap-3 sm:grid-cols-2">
-          <Input value={name} onChange={(e) => {
-            setName(e.target.value);
-            setNameSuggested(false);
-          }} placeholder={`${t("projects.cols.name")} *`} />
-          <div className="flex min-w-0 gap-2">
+          <Field label={t("projects.cols.name")} required>
+            <Input value={name} onChange={(e) => {
+              setName(e.target.value);
+              setNameSuggested(false);
+            }} />
+          </Field>
+          <Field label={t("orders.cols.customer")}>
+            <div className="flex min-w-0 gap-2">
             <Select
               value={customerId}
               onChange={(e) => chooseCustomer(e.target.value)}
@@ -142,23 +146,17 @@ export function ProjectQuickCreate({
             >
               <Plus />
             </Button>
-          </div>
-          <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder={t("customers.fields.address")} className="sm:col-span-2" />
+            </div>
+          </Field>
+          <Field label={t("customers.fields.address")} className="sm:col-span-2">
+            <Input value={address} onChange={(e) => setAddress(e.target.value)} />
+          </Field>
           {serviceMode && (
             <>
-              <Select
-                value={serviceType}
-                onChange={(e) => chooseServiceType(e.target.value)}
-                options={[
-                  { value: "camera", label: t("services.types.camera") },
-                  { value: "electrical", label: t("services.types.electrical") },
-                  { value: "plumbing", label: t("services.types.plumbing") },
-                  { value: "mixed", label: t("services.types.mixed") },
-                ]}
-              />
-              <Input type="date" value={targetEndsOn} onChange={(e) => setTargetEndsOn(e.target.value)} aria-label={t("services.fields.targetEndsOn")} />
-              <Input value={siteContactName} onChange={(e) => setSiteContactName(e.target.value)} placeholder={t("services.fields.siteContactName")} />
-              <Input value={siteContactPhone} onChange={(e) => setSiteContactPhone(e.target.value)} placeholder={t("services.fields.siteContactPhone")} />
+              <Field label={t("services.fields.type")}><Select value={serviceType} onChange={(e) => chooseServiceType(e.target.value)} options={[{ value: "camera", label: t("services.types.camera") }, { value: "electrical", label: t("services.types.electrical") }, { value: "plumbing", label: t("services.types.plumbing") }, { value: "mixed", label: t("services.types.mixed") }]} /></Field>
+              <Field label={t("services.fields.targetEndsOn")}><Input type="date" value={targetEndsOn} onChange={(e) => setTargetEndsOn(e.target.value)} /></Field>
+              <Field label={t("services.fields.siteContactName")}><Input value={siteContactName} onChange={(e) => setSiteContactName(e.target.value)} /></Field>
+              <Field label={t("services.fields.siteContactPhone")}><Input value={siteContactPhone} onChange={(e) => setSiteContactPhone(e.target.value)} /></Field>
             </>
           )}
           {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
@@ -300,8 +298,9 @@ export function ProjectEdit({
         )}
       >
         <div className="grid gap-3 sm:grid-cols-2">
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={`${t("projects.cols.name")} *`} />
-          <div className="flex min-w-0 gap-2">
+          <Field label={t("projects.cols.name")} required><Input value={name} onChange={(e) => setName(e.target.value)} /></Field>
+          <Field label={t("orders.cols.customer")}>
+            <div className="flex min-w-0 gap-2">
             <Select
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
@@ -321,44 +320,22 @@ export function ProjectEdit({
             >
               <Plus />
             </Button>
-          </div>
-          <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder={t("customers.fields.address")} className="sm:col-span-2" />
+            </div>
+          </Field>
+          <Field label={t("customers.fields.address")} className="sm:col-span-2"><Input value={address} onChange={(e) => setAddress(e.target.value)} /></Field>
           {isServiceProject ? (
             <>
-              <Select
-                value={serviceType}
-                onChange={(e) => setServiceType(e.target.value)}
-                options={[
-                  { value: "camera", label: t("services.types.camera") },
-                  { value: "electrical", label: t("services.types.electrical") },
-                  { value: "plumbing", label: t("services.types.plumbing") },
-                  { value: "mixed", label: t("services.types.mixed") },
-                ]}
-              />
-              <Select
-                value={serviceStage}
-                onChange={(e) => setServiceStage(e.target.value)}
-                options={["planning", "quoted", "active", "paused", "completed", "warranty", "cancelled"].map((value) => ({
-                  value,
-                  label: t(`services.stages.${value}` as never),
-                }))}
-              />
-              <Input type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} aria-label={t("services.fields.startsOn")} />
-              <Input type="date" value={targetEndsOn} onChange={(e) => setTargetEndsOn(e.target.value)} aria-label={t("services.fields.targetEndsOn")} />
-              <Input value={siteContactName} onChange={(e) => setSiteContactName(e.target.value)} placeholder={t("services.fields.siteContactName")} />
-              <Input value={siteContactPhone} onChange={(e) => setSiteContactPhone(e.target.value)} placeholder={t("services.fields.siteContactPhone")} />
+              <Field label={t("services.fields.type")}><Select value={serviceType} onChange={(e) => setServiceType(e.target.value)} options={[{ value: "camera", label: t("services.types.camera") }, { value: "electrical", label: t("services.types.electrical") }, { value: "plumbing", label: t("services.types.plumbing") }, { value: "mixed", label: t("services.types.mixed") }]} /></Field>
+              <Field label={t("services.fields.stage")}><Select value={serviceStage} onChange={(e) => setServiceStage(e.target.value)} options={["planning", "quoted", "active", "paused", "completed", "warranty", "cancelled"].map((value) => ({ value, label: t(`services.stages.${value}` as never) }))} /></Field>
+              <Field label={t("services.fields.startsOn")}><Input type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} /></Field>
+              <Field label={t("services.fields.targetEndsOn")}><Input type="date" value={targetEndsOn} onChange={(e) => setTargetEndsOn(e.target.value)} /></Field>
+              <Field label={t("services.fields.siteContactName")}><Input value={siteContactName} onChange={(e) => setSiteContactName(e.target.value)} /></Field>
+              <Field label={t("services.fields.siteContactPhone")}><Input value={siteContactPhone} onChange={(e) => setSiteContactPhone(e.target.value)} /></Field>
             </>
           ) : (
-            <Select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              options={[
-                { value: "active", label: t("projects.status.active") },
-                { value: "done", label: t("projects.status.done") },
-              ]}
-            />
+            <Field label={t("orders.cols.status")}><Select value={status} onChange={(e) => setStatus(e.target.value)} options={[{ value: "active", label: t("projects.status.active") }, { value: "done", label: t("projects.status.done") }]} /></Field>
           )}
-          <Textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder={t("customers.fields.note")} className="sm:col-span-2" />
+          <Field label={t("customers.fields.note")} className="sm:col-span-2"><Textarea value={note} onChange={(e) => setNote(e.target.value)} /></Field>
           {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
         </div>
       </RowPreviewModal>
