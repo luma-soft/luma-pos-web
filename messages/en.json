@@ -3158,9 +3158,35 @@
     "hikvision": {
       "title": "Hikvision systems",
       "metaDescription": "Hikvision solution quote with cameras, recorders, storage, PoE switches, and installation.",
-      "description": "Hikvision quotes will be configured by camera count, NVR recorder, storage, PoE switch, materials, and actual installation work.",
-      "status": "The Hikvision product catalog and system pricing are being finalized to ensure accurate configurations and package prices.",
-      "back": "Choose another brand"
+      "description": "Choose the system size to review an IP camera, NVR, storage, PoE power, materials, and installation configuration.",
+      "back": "Choose another brand",
+      "referenceNotice": "Reference pricing for common configurations; final SKU selection and pricing are confirmed after the site survey.",
+      "configure": "System configuration",
+      "cameraCount": "Camera quantity",
+      "cameras": "{count} cameras",
+      "poeMethod": "PoE power",
+      "poe": {
+        "nvr": { "title": "NVR-integrated PoE", "description": "Power cameras directly from the NVR's PoE ports." },
+        "switch": { "title": "External PoE switch", "description": "Flexible expansion and switch placement near the cameras." }
+      },
+      "summaryTitle": "Reference quote details",
+      "items": {
+        "camera": "4MP IP camera × {count}",
+        "recorder": "PoE NVR recorder",
+        "storage": "Surveillance hard drive",
+        "poeSwitch": "PoE switch",
+        "poeIntegrated": "PoE power",
+        "materials": "Basic materials",
+        "installation": "Installation labor",
+        "perCamera": "for {count} cameras"
+      },
+      "included": "Included",
+      "total": "ESTIMATED TOTAL",
+      "vatExcluded": "VAT excluded",
+      "includedTitle": "Included in the configuration",
+      "includedDescription": "IP cameras, recorder, storage, PoE power, basic materials, and installation labor for the selected quantity.",
+      "actualCostTitle": "Potential additional costs",
+      "actualCostDescription": "Extra cable runs, difficult labor, accessories, or special requirements will be quoted clearly after the site survey."
     }
   },
   "pagination": {

@@ -32,7 +32,7 @@ const brands = [
 export default async function CameraQuotePage() {
   const t = await getTranslations();
   return (
-    <main className="min-h-full bg-slate-100 px-4 py-8 sm:px-6 sm:py-12">
+    <main className="min-h-dvh bg-slate-100 px-4 py-8 sm:px-6 sm:py-12">
       <div className="mx-auto max-w-5xl overflow-hidden bg-white shadow-[0_18px_60px_rgba(15,23,42,.14)]">
         <div className="flex h-8 bg-[#12364f]"><div className="w-1/5 bg-[#078a82]" /></div>
         <div className="px-6 py-10 sm:px-12 sm:py-14">

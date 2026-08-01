@@ -3158,9 +3158,35 @@
     "hikvision": {
       "title": "Hệ thống Hikvision",
       "metaDescription": "Báo giá giải pháp Hikvision gồm camera, đầu ghi, ổ cứng, switch PoE và thi công.",
-      "description": "Báo giá Hikvision sẽ được cấu hình theo số lượng camera, đầu ghi NVR, ổ cứng lưu trữ, switch PoE, vật tư và công lắp đặt thực tế.",
-      "status": "Danh mục sản phẩm Hikvision và giá thiết bị hệ thống đang được hoàn thiện để bảo đảm cấu hình và giá trọn gói chính xác.",
-      "back": "Chọn hãng khác"
+      "description": "Chọn quy mô hệ thống để xem cấu hình camera IP, đầu ghi NVR, ổ cứng, cấp nguồn PoE, vật tư và công lắp đặt.",
+      "back": "Chọn hãng khác",
+      "referenceNotice": "Giá tham khảo theo cấu hình phổ biến; sẽ xác nhận lại theo khảo sát thực tế và SKU tại thời điểm báo giá.",
+      "configure": "Cấu hình hệ thống",
+      "cameraCount": "Số lượng camera",
+      "cameras": "{count} camera",
+      "poeMethod": "Cấp nguồn PoE",
+      "poe": {
+        "nvr": { "title": "PoE tích hợp đầu ghi", "description": "Cấp nguồn trực tiếp từ các cổng PoE trên NVR." },
+        "switch": { "title": "Switch PoE rời", "description": "Linh hoạt mở rộng và đặt switch gần khu vực camera." }
+      },
+      "summaryTitle": "Chi tiết báo giá tham khảo",
+      "items": {
+        "camera": "Camera IP 4MP × {count}",
+        "recorder": "Đầu ghi NVR PoE",
+        "storage": "Ổ cứng chuyên dụng",
+        "poeSwitch": "Switch PoE",
+        "poeIntegrated": "Cấp nguồn PoE",
+        "materials": "Vật tư cơ bản",
+        "installation": "Công lắp đặt",
+        "perCamera": "theo {count} camera"
+      },
+      "included": "Đã gồm",
+      "total": "TỔNG DỰ KIẾN",
+      "vatExcluded": "Chưa bao gồm VAT",
+      "includedTitle": "Cấu hình đã gồm",
+      "includedDescription": "Camera IP, đầu ghi, lưu trữ, cấp nguồn PoE, vật tư cơ bản và công lắp đặt theo số lượng đã chọn.",
+      "actualCostTitle": "Chi phí có thể phát sinh",
+      "actualCostDescription": "Dây cáp vượt định mức, nhân công khó, phụ kiện hoặc yêu cầu đặc biệt sẽ được báo rõ sau khảo sát."
     }
   },
   "pagination": {
