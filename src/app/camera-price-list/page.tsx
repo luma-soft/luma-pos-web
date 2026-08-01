@@ -43,24 +43,31 @@ export default async function CameraPriceListPage() {
   // Hikvision will be added once its package prices are finalised.
   const models = options.cameras
     .filter((camera) => !camera.name.toLocaleLowerCase("vi").includes("hikvision"))
-    .map((camera) => ({
-      id: camera.id,
-      model: camera.name,
-      description: camera.description ?? "Thiết bị camera chính hãng, phù hợp nhu cầu giám sát.",
-      imageUrl: camera.imageUrl,
-      specs: camera.specs,
-      installationLocation: cameraInstallationLocation(camera.name, camera.specs),
-      variants: memoryOptions.map((card) => ({
-        id: `${camera.id}:${card.id}`,
-        cameraId: camera.id,
-        cardId: card.id,
-        cameraPrice: camera.retailPrice,
-        cardPrice: card.retailPrice,
-        installationPrice,
-        materialPrice,
-        price: camera.retailPrice + card.retailPrice + basePrice,
-      })),
-    }));
+    .map((camera) => {
+      const maxStorageGb = cameraMaxStorageGb(camera.specs);
+      const compatibleCards = memoryOptions.filter((card) => {
+        const capacityGb = memoryCardCapacityGb(card.specs);
+        return maxStorageGb === null || capacityGb === null || capacityGb <= maxStorageGb;
+      });
+      return {
+        id: camera.id,
+        model: camera.name,
+        description: camera.description ?? "Thiết bị camera chính hãng, phù hợp nhu cầu giám sát.",
+        imageUrl: camera.imageUrl,
+        specs: camera.specs,
+        installationLocation: cameraInstallationLocation(camera.name, camera.specs),
+        variants: compatibleCards.map((card) => ({
+          id: `${camera.id}:${card.id}`,
+          cameraId: camera.id,
+          cardId: card.id,
+          cameraPrice: camera.retailPrice,
+          cardPrice: card.retailPrice,
+          installationPrice,
+          materialPrice,
+          price: camera.retailPrice + card.retailPrice + basePrice,
+        })),
+      };
+    });
   return <CameraPriceListClient
     models={models}
     memoryLabels={memoryOptions.map((card) => `Thẻ nhớ ${card.specs["Dung lượng"]?.[0] ?? card.name}`)}
@@ -78,4 +85,17 @@ function cameraInstallationLocation(
   specs: Record<string, string[]>,
 ): "Trong nhà" | "Ngoài trời" {
   return isOutdoorCamera(name, specs) ? "Ngoài trời" : "Trong nhà";
+}
+
+function memoryCardCapacityGb(specs: Record<string, string[]>) {
+  return storageCapacityGb(specs["Dung lượng"]?.join(" ") ?? "");
+}
+
+function cameraMaxStorageGb(specs: Record<string, string[]>) {
+  return storageCapacityGb(specs["Nguồn / lưu trữ"]?.join(" ") ?? "");
+}
+
+function storageCapacityGb(value: string) {
+  const capacities = (value.match(/\d+\s*GB/gi) ?? []).map((capacity) => Number.parseInt(capacity, 10));
+  return capacities.length ? Math.max(...capacities) : null;
 }

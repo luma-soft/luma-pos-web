@@ -492,31 +492,31 @@ export function CameraPriceListClient({
                   <td className="border border-slate-300 px-3 py-3 leading-5 text-slate-600">
                     {item.installationLocation}
                   </td>
-                  {item.variants.map((variant, variantIndex) => (
-                    <td
-                      key={variant.id}
-                      className="border border-slate-300 px-3 py-3 text-right font-extrabold text-[#14344d]"
-                    >
-                      <span>{formatCurrency(variant.price)}</span>
-                      {canEdit && (
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            openPriceEditor(
-                              item,
-                              variant,
-                              memoryLabels[variantIndex] ?? "Gói",
-                              "price",
-                            );
-                          }}
-                          className="ml-2 align-middle text-slate-400 hover:text-[#0b7b74]"
-                          aria-label={`Sửa giá ${item.model}`}
-                        >
-                          <Edit3 className="inline h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </td>
-                  ))}
+                  {memoryLabels.map((label, variantIndex) => {
+                    const variant = item.variants[variantIndex];
+                    return (
+                      <td
+                        key={label}
+                        className="border border-slate-300 px-3 py-3 text-right font-extrabold text-[#14344d]"
+                      >
+                        {variant && <>
+                          <span>{formatCurrency(variant.price)}</span>
+                          {canEdit && (
+                            <button
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openPriceEditor(item, variant, label, "price");
+                              }}
+                              className="ml-2 align-middle text-slate-400 hover:text-[#0b7b74]"
+                              aria-label={`Sửa giá ${item.model}`}
+                            >
+                              <Edit3 className="inline h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </>}
+                      </td>
+                    );
+                  })}
                   <td className="border border-slate-300 px-2 text-center">
                     <button
                       onClick={(event) => {
@@ -669,12 +669,12 @@ export function CameraPriceListClient({
                         <th className="border border-white/40 px-3 py-2 text-left">
                           Hạng mục
                         </th>
-                        {memoryLabels.map((label) => (
+                        {item.variants.map((_, variantIndex) => (
                           <th
-                            key={label}
+                            key={memoryLabels[variantIndex] ?? variantIndex}
                             className="border border-white/40 px-3 py-2 text-right"
                           >
-                            {label}
+                            {memoryLabels[variantIndex] ?? `Thẻ nhớ ${variantIndex + 1}`}
                           </th>
                         ))}
                       </tr>
