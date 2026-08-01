@@ -1,9 +1,29 @@
+import type { Metadata } from "next";
 import { getRole } from "@/lib/actions/common";
 import { BrandPriceListClient } from "../(app)/brand-price-list/brand-price-list-client";
 import { getBrandPriceListProducts } from "@/lib/data/brand-price-lists";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Bảng giá Rạng Đông Smart | Hải Đăng Tech",
+  description:
+    "Bảng giá thiết bị chiếu sáng và nhà thông minh Rạng Đông Smart chính hãng.",
+  openGraph: {
+    title: "Bảng giá Rạng Đông Smart | Hải Đăng Tech",
+    description:
+      "Thiết bị chiếu sáng tiết kiệm năng lượng và giải pháp nhà thông minh Rạng Đông Smart chính hãng.",
+    type: "website",
+    locale: "vi_VN",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Bảng giá Rạng Đông Smart | Hải Đăng Tech",
+    description:
+      "Thiết bị chiếu sáng tiết kiệm năng lượng và giải pháp nhà thông minh Rạng Đông Smart chính hãng.",
+  },
+};
 
 export default async function RangDongSmartPriceListPage() {
   const [products, supabase] = await Promise.all([

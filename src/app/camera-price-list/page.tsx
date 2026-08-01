@@ -1,9 +1,29 @@
+import type { Metadata } from "next";
 import { getRole } from "@/lib/actions/common";
 import { getCameraQuoteFormOptions } from "@/lib/data/camera-quotes";
 import { createClient } from "@/lib/supabase/server";
 import { CameraPriceListClient } from "../(app)/camera-price-list/camera-price-list-client";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Bảng giá lắp đặt camera | Hải Đăng Tech",
+  description:
+    "Bảng giá camera chính hãng, thông số chi tiết và các lựa chọn thẻ nhớ từ 32GB đến 512GB.",
+  openGraph: {
+    title: "Bảng giá lắp đặt camera | Hải Đăng Tech",
+    description:
+      "Camera chính hãng, thông số chi tiết và các lựa chọn thẻ nhớ từ 32GB đến 512GB.",
+    type: "website",
+    locale: "vi_VN",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Bảng giá lắp đặt camera | Hải Đăng Tech",
+    description:
+      "Camera chính hãng, thông số chi tiết và các lựa chọn thẻ nhớ từ 32GB đến 512GB.",
+  },
+};
 
 export default async function CameraPriceListPage() {
   const [options, supabase] = await Promise.all([getCameraQuoteFormOptions(), createClient()]);
