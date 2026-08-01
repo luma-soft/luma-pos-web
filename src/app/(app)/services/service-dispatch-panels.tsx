@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { Pagination } from "@/components/pagination";
 import { Section } from "@/components/ui/section";
 import { Text } from "@/components/ui/text";
@@ -13,7 +14,7 @@ type DispatchData = Awaited<ReturnType<typeof getServiceDispatchPage>>;
 type ReportData = Awaited<ReturnType<typeof getServiceManagerReport>>;
 type Technician = { id: string; name: string };
 
-export function ServiceDispatchPanel({
+export async function ServiceDispatchPanel({
   data,
   technicians,
   params,
@@ -22,6 +23,10 @@ export function ServiceDispatchPanel({
   technicians: Technician[];
   params: Record<string, string | undefined>;
 }) {
+  const [t, priorities] = await Promise.all([
+    getTranslations("services.dispatch"),
+    getTranslations("services.priorities"),
+  ]);
   const days = data.rows.reduce((groups, row) => {
     const day = row.scheduledAt
       ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(row.scheduledAt)
@@ -37,47 +42,47 @@ export function ServiceDispatchPanel({
         <form className="flex flex-wrap gap-2" method="get">
           <input type="hidden" name="tab" value="dispatch" />
           <select name="scope" defaultValue={params.scope ?? "week"} className="min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm">
-            <option value="today">Hôm nay</option>
-            <option value="week">7 ngày</option>
+            <option value="today">{t("today")}</option>
+            <option value="week">{t("sevenDays")}</option>
           </select>
           <select name="status" defaultValue={params.status ?? ""} className="min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm">
-            <option value="">Tất cả trạng thái</option>
-            <option value="new,scheduled">Mới / đã lên lịch</option>
-            <option value="in_progress">Đang làm</option>
-            <option value="waiting_materials,waiting_customer">Đang chờ</option>
-            <option value="completed">Hoàn tất</option>
+            <option value="">{t("allStatuses")}</option>
+            <option value="new,scheduled">{t("newScheduled")}</option>
+            <option value="in_progress">{t("inProgress")}</option>
+            <option value="waiting_materials,waiting_customer">{t("waiting")}</option>
+            <option value="completed">{t("completed")}</option>
           </select>
           <select name="priority" defaultValue={params.priority ?? ""} className="min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm">
-            <option value="">Tất cả ưu tiên</option>
-            <option value="urgent">Khẩn</option>
-            <option value="high">Cao</option>
-            <option value="normal">Bình thường</option>
-            <option value="low">Thấp</option>
+            <option value="">{t("allPriorities")}</option>
+            <option value="urgent">{priorities("urgent")}</option>
+            <option value="high">{priorities("high")}</option>
+            <option value="normal">{priorities("normal")}</option>
+            <option value="low">{priorities("low")}</option>
           </select>
           <select name="technicianId" defaultValue={params.technicianId ?? ""} className="min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm">
-            <option value="">Tất cả kỹ thuật viên</option>
+            <option value="">{t("allTechnicians")}</option>
             {technicians.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
           <label className="inline-flex min-h-11 min-w-11 items-center gap-2 rounded-lg border border-border px-3 text-sm">
             <input type="checkbox" name="unassigned" value="true" defaultChecked={params.unassigned === "true"} />
-            Chưa phân công
+            {t("unassigned")}
           </label>
           <label className="inline-flex min-h-11 min-w-11 items-center gap-2 rounded-lg border border-border px-3 text-sm">
             <input type="checkbox" name="slaOverdue" value="true" defaultChecked={params.slaOverdue === "true"} />
-            Quá hạn SLA
+            {t("slaOverdue")}
           </label>
           <label className="inline-flex min-h-11 min-w-11 items-center gap-2 rounded-lg border border-border px-3 text-sm">
             <input type="checkbox" name="maintenanceOverdue" value="true" defaultChecked={params.maintenanceOverdue === "true"} />
-            Trễ bảo trì
+            {t("maintenanceOverdue")}
           </label>
           <button className="min-h-11 min-w-11 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white" type="submit">
-            Lọc lịch
+            {t("filterSchedule")}
           </button>
         </form>
       </Section>
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         {[...days.entries()].map(([day, rows]) => (
-          <Section key={day} title={day === "unscheduled" ? "Chưa xếp lịch" : day} collapsible={false}>
+          <Section key={day} title={day === "unscheduled" ? t("unscheduled") : day} collapsible={false}>
             <div className="space-y-2">
               {rows.map((row) => (
                 <article key={row.id} className="rounded-lg border border-border-soft p-3">
@@ -85,15 +90,15 @@ export function ServiceDispatchPanel({
                     <div>
                       <p className="font-mono text-xs font-semibold">{row.code}</p>
                       <p className="mt-1 text-sm font-semibold">{row.title}</p>
-                      <p className="mt-1 text-xs text-slate-500">{row.projectName} · {row.assignedToName ?? "Chưa phân công"}</p>
+                      <p className="mt-1 text-xs text-slate-500">{row.projectName} · {row.assignedToName ?? t("unassigned")}</p>
                     </div>
                     <span className="rounded-full bg-surface-2 px-2 py-1 text-xs">{row.status}</span>
                   </div>
                   <p className="mt-2 text-xs text-slate-500">{row.scheduledAt ? formatDate(row.scheduledAt) : "—"}</p>
                   {(row.slaOverdue || row.maintenanceOverdue) && (
                     <div className="mt-2 flex gap-2 text-xs font-semibold text-red-600">
-                      {row.slaOverdue && <span>Quá hạn SLA</span>}
-                      {row.maintenanceOverdue && <span>Trễ bảo trì</span>}
+                      {row.slaOverdue && <span>{t("slaOverdue")}</span>}
+                      {row.maintenanceOverdue && <span>{t("maintenanceOverdue")}</span>}
                     </div>
                   )}
                 </article>
@@ -102,26 +107,27 @@ export function ServiceDispatchPanel({
           </Section>
         ))}
       </div>
-      {data.rows.length === 0 && <Section collapsible={false}><Text variant="muted" size="sm" text="Không có lệnh việc phù hợp." /></Section>}
-      <Pagination page={data.page} pageCount={data.pageCount} total={data.total} pageSize={data.limit} pageSizes={SERVICE_PAGE_SIZES} unitLabel="lệnh việc" />
+      {data.rows.length === 0 && <Section collapsible={false}><Text variant="muted" size="sm" text={t("noMatchingJobs")} /></Section>}
+      <Pagination page={data.page} pageCount={data.pageCount} total={data.total} pageSize={data.limit} pageSizes={SERVICE_PAGE_SIZES} unitLabel={t("workOrderUnit")} />
     </div>
   );
 }
 
-export function ServiceReportPanel({ data }: { data: ReportData }) {
+export async function ServiceReportPanel({ data }: { data: ReportData }) {
+  const t = await getTranslations("services.dispatch");
   const { metrics } = data;
   const cards = [
-    ["Tổng lệnh", metrics.total],
-    ["Hoàn tất", `${metrics.completed} (${metrics.completionRate}%)`],
-    ["Quá hạn SLA", metrics.overdueSla],
-    ["Trễ bảo trì", metrics.overdueMaintenance],
-    ["Thời gian làm", `${metrics.workMinutes} phút`],
-    ["Lượt làm việc", metrics.visits],
+    [t("totalJobs"), metrics.total],
+    [t("completedJobs"), `${metrics.completed} (${metrics.completionRate}%)`],
+    [t("slaOverdue"), metrics.overdueSla],
+    [t("maintenanceOverdue"), metrics.overdueMaintenance],
+    [t("workTime"), `${metrics.workMinutes} ${t("minutes")}`],
+    [t("visits"), metrics.visits],
     [
-      "Hoàn tất lần đầu",
+      t("firstTimeCompletion"),
       metrics.firstTimeCompletion.available
         ? `${metrics.firstTimeCompletion.numerator}/${metrics.firstTimeCompletion.denominator} (${metrics.firstTimeCompletion.rate}%)`
-        : "Chưa đủ dữ liệu",
+        : t("insufficientData"),
     ],
   ] as const;
   return (
@@ -129,9 +135,9 @@ export function ServiceReportPanel({ data }: { data: ReportData }) {
       <Section collapsible={false}>
         <form className="flex flex-wrap items-end gap-2" method="get">
           <input type="hidden" name="tab" value="reporting" />
-          <label className="text-xs text-slate-500">Từ ngày<input className="ml-2 min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm" type="date" name="from" /></label>
-          <label className="text-xs text-slate-500">Đến trước ngày<input className="ml-2 min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm" type="date" name="to" /></label>
-          <button className="min-h-11 min-w-11 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white" type="submit">Xem báo cáo</button>
+          <label className="text-xs text-slate-500">{t("fromDate")}<input className="ml-2 min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm" type="date" name="from" /></label>
+          <label className="text-xs text-slate-500">{t("beforeDate")}<input className="ml-2 min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm" type="date" name="to" /></label>
+          <button className="min-h-11 min-w-11 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white" type="submit">{t("viewReport")}</button>
         </form>
       </Section>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -142,18 +148,18 @@ export function ServiceReportPanel({ data }: { data: ReportData }) {
           </Section>
         ))}
       </div>
-      <Section title="Chi tiết lệnh việc" collapsible={false}>
+      <Section title={t("details")} collapsible={false}>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[780px] text-sm">
             <thead><tr className="border-b border-border text-left text-xs text-slate-500">
-              <th className="p-2">Mã</th><th className="p-2">Công trình</th><th className="p-2">Phụ trách</th>
-              <th className="p-2">Trạng thái</th><th className="p-2 text-right">Lượt</th><th className="p-2 text-right">Phút</th>
+              <th className="p-2">{t("code")}</th><th className="p-2">{t("project")}</th><th className="p-2">{t("assignee")}</th>
+              <th className="p-2">{t("status")}</th><th className="p-2 text-right">{t("visitCount")}</th><th className="p-2 text-right">{t("minutesShort")}</th>
             </tr></thead>
             <tbody>{data.rows.map((row) => (
               <tr key={row.id} className="border-b border-border-soft">
                 <td className="p-2 font-mono text-xs">{row.code}</td>
                 <td className="p-2">{row.projectName}<div className="text-xs text-slate-500">{row.title}</div></td>
-                <td className="p-2">{row.assignedToName ?? "Chưa phân công"}</td>
+                <td className="p-2">{row.assignedToName ?? t("unassigned")}</td>
                 <td className="p-2">{row.status}</td>
                 <td className="p-2 text-right tabular-nums">{row.visitCount}</td>
                 <td className="p-2 text-right tabular-nums">{row.workMinutes}</td>
@@ -162,11 +168,11 @@ export function ServiceReportPanel({ data }: { data: ReportData }) {
           </table>
         </div>
         <p className="mt-3 text-xs text-slate-500">
-          Hoàn tất lần đầu = lệnh hoàn tất có đúng một lượt làm việc / lệnh hoàn tất có ít nhất một lượt làm việc.
+          {t("firstTimeCompletionHint")}
         </p>
       </Section>
-      <Pagination page={data.page} pageCount={data.pageCount} total={data.total} pageSize={data.limit} pageSizes={SERVICE_PAGE_SIZES} unitLabel="lệnh việc" />
-      <Link href="/services?tab=reporting" className="inline-flex min-h-11 min-w-11 items-center text-sm font-semibold text-primary-600">Đặt lại khoảng báo cáo</Link>
+      <Pagination page={data.page} pageCount={data.pageCount} total={data.total} pageSize={data.limit} pageSizes={SERVICE_PAGE_SIZES} unitLabel={t("workOrderUnit")} />
+      <Link href="/services?tab=reporting" className="inline-flex min-h-11 min-w-11 items-center text-sm font-semibold text-primary-600">{t("resetReportRange")}</Link>
     </div>
   );
 }

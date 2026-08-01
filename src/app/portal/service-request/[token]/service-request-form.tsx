@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 
 export function ServiceRequestForm({
   token,
@@ -21,6 +22,8 @@ export function ServiceRequestForm({
   };
   canSubmit: boolean;
 }) {
+  const t = useTranslations("serviceRequestPortal");
+  const locale = useLocale();
   const [sent, setSent] = useState(!canSubmit);
   const [statusView, setStatusView] = useState(initialStatus);
   const [busy, setBusy] = useState(false);
@@ -29,14 +32,14 @@ export function ServiceRequestForm({
   if (sent) {
     return (
       <div className="mt-6 space-y-3 rounded-2xl bg-emerald-50 p-5 text-sm text-emerald-900">
-        <p className="font-bold">Đã nhận yêu cầu của bạn.</p>
+        <p className="font-bold">{t("received")}</p>
         <dl className="grid gap-2 sm:grid-cols-2">
-          <div><dt className="text-xs font-semibold uppercase text-emerald-700">Trạng thái</dt><dd className="font-semibold">{statusView.status}</dd></div>
-          {statusView.title && <div><dt className="text-xs font-semibold uppercase text-emerald-700">Yêu cầu</dt><dd className="font-semibold">{statusView.title}</dd></div>}
-          {statusView.responseDueAt && <div><dt className="text-xs font-semibold uppercase text-emerald-700">Phản hồi dự kiến</dt><dd>{new Date(statusView.responseDueAt).toLocaleString("vi-VN")}</dd></div>}
-          {statusView.resolutionDueAt && <div><dt className="text-xs font-semibold uppercase text-emerald-700">Xử lý dự kiến</dt><dd>{new Date(statusView.resolutionDueAt).toLocaleString("vi-VN")}</dd></div>}
+          <div><dt className="text-xs font-semibold uppercase text-emerald-700">{t("status")}</dt><dd className="font-semibold">{statusView.status}</dd></div>
+          {statusView.title && <div><dt className="text-xs font-semibold uppercase text-emerald-700">{t("request")}</dt><dd className="font-semibold">{statusView.title}</dd></div>}
+          {statusView.responseDueAt && <div><dt className="text-xs font-semibold uppercase text-emerald-700">{t("estimatedResponse")}</dt><dd>{new Date(statusView.responseDueAt).toLocaleString(locale)}</dd></div>}
+          {statusView.resolutionDueAt && <div><dt className="text-xs font-semibold uppercase text-emerald-700">{t("estimatedResolution")}</dt><dd>{new Date(statusView.resolutionDueAt).toLocaleString(locale)}</dd></div>}
         </dl>
-        <p>Bạn có thể mở lại liên kết này để theo dõi cho đến khi liên kết hết hạn.</p>
+        <p>{t("followUp")}</p>
       </div>
     );
   }
@@ -53,7 +56,7 @@ export function ServiceRequestForm({
           value instanceof File && value.size > 0);
         if (files.length > 3) {
           setBusy(false);
-          setError("Chỉ được chọn tối đa 3 tệp.");
+          setError(t("maxFiles"));
           return;
         }
         const response = await fetch(`/api/portal/service-request/${token}`, {
@@ -79,15 +82,15 @@ export function ServiceRequestForm({
             resolutionDueAt: body.data?.resolutionDueAt ?? null,
           }));
           setSent(true);
-        } else setError("Không thể gửi yêu cầu. Liên kết có thể đã hết hạn.");
+        } else setError(t("submitFailed"));
       }}
     >
       <label className="block text-sm font-semibold">
-        Tiêu đề
+        {t("subject")}
         <input name="title" required minLength={3} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
       </label>
       <label className="block text-sm font-semibold">
-        Ảnh hiện trạng (không bắt buộc, JPEG/PNG/WebP, tối đa 3 ảnh, mỗi ảnh 8 MB)
+        {t("evidence")}
         <input
           name="evidence"
           type="file"
@@ -97,31 +100,31 @@ export function ServiceRequestForm({
         />
       </label>
       <label className="block text-sm font-semibold">
-        Mô tả tình trạng
+        {t("description")}
         <textarea name="description" required minLength={5} rows={5} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
       </label>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block text-sm font-semibold">
-          Người liên hệ
+          {t("contactName")}
           <input name="contactName" required autoComplete="name" className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
         </label>
         <label className="block text-sm font-semibold">
-          Số điện thoại
+          {t("phone")}
           <input name="contactPhone" required autoComplete="tel" className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
         </label>
       </div>
       <label className="block text-sm font-semibold">
-        Mức độ
+        {t("priority")}
         <select name="priority" defaultValue="normal" className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2">
-          <option value="low">Thấp</option>
-          <option value="normal">Bình thường</option>
-          <option value="high">Cao</option>
-          <option value="urgent">Khẩn cấp</option>
+          <option value="low">{t("priorities.low")}</option>
+          <option value="normal">{t("priorities.normal")}</option>
+          <option value="high">{t("priorities.high")}</option>
+          <option value="urgent">{t("priorities.urgent")}</option>
         </select>
       </label>
       {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
       <button disabled={busy} className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">
-        {busy ? "Đang gửi…" : "Gửi yêu cầu"}
+        {busy ? t("sending") : t("submit")}
       </button>
     </form>
   );

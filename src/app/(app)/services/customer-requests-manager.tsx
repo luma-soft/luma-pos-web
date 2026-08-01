@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/input";
@@ -49,6 +50,8 @@ export function CustomerRequestsManager({
   rows: RequestRow[];
   jobs: { id: string; projectId: string; code: string; title: string }[];
 }) {
+  const t = useTranslations("services.requests");
+  const locale = useLocale();
   const router = useRouter();
   const [selected, setSelected] = useState<RequestRow | null>(null);
   const [busy, setBusy] = useState(false);
@@ -65,7 +68,7 @@ export function CustomerRequestsManager({
     });
     setBusy(false);
     if (!response.ok) {
-      setError("Không thể cập nhật yêu cầu. Kiểm tra trạng thái và công việc liên kết.");
+      setError(t("updateFailed"));
       return;
     }
     setSelected(null);
@@ -76,23 +79,23 @@ export function CustomerRequestsManager({
     const response = await fetch(`/api/mobile/services/customer-requests/${requestId}/attachments/${attachmentId}`);
     const body = await response.json() as { data?: { url?: string } };
     if (response.ok && body.data?.url) window.open(body.data.url, "_blank", "noopener,noreferrer");
-    else setError("Không thể mở tệp evidence.");
+    else setError(t("openEvidenceFailed"));
   }
 
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-base font-bold">Yêu cầu khách hàng & SLA</h2>
-        <p className="text-sm text-slate-500">Triage, liên kết công việc và theo dõi hạn phản hồi/xử lý.</p>
+        <h2 className="text-base font-bold">{t("title")}</h2>
+        <p className="text-sm text-slate-500">{t("subtitle")}</p>
       </div>
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
         <table className="min-w-[980px] w-full text-sm">
           <thead className="bg-surface-2 text-left text-xs font-semibold text-slate-500">
             <tr>
-              <th className="px-3 py-2">Mã</th><th className="px-3 py-2">Công trình</th>
-              <th className="px-3 py-2">Yêu cầu</th><th className="px-3 py-2">Trạng thái</th>
-              <th className="px-3 py-2">SLA phản hồi</th><th className="px-3 py-2">SLA xử lý</th>
-              <th className="px-3 py-2">Công việc</th><th className="px-3 py-2" />
+              <th className="px-3 py-2">{t("code")}</th><th className="px-3 py-2">{t("project")}</th>
+              <th className="px-3 py-2">{t("request")}</th><th className="px-3 py-2">{t("status")}</th>
+              <th className="px-3 py-2">{t("responseSla")}</th><th className="px-3 py-2">{t("resolutionSla")}</th>
+              <th className="px-3 py-2">{t("workOrder")}</th><th className="px-3 py-2" />
             </tr>
           </thead>
           <tbody>
@@ -103,29 +106,29 @@ export function CustomerRequestsManager({
                 <td className="max-w-64 px-3 py-3"><p className="truncate font-semibold">{row.title}</p><p className="text-xs text-slate-500">{row.contactName}</p></td>
                 <td className="px-3 py-3">{row.status}</td>
                 <td className={`px-3 py-3 ${row.responseOverdue ? "font-bold text-red-600" : ""}`}>
-                  {row.respondedAt ? "Đã phản hồi" : row.responseDueAt ? new Date(row.responseDueAt).toLocaleString("vi-VN") : "Chưa cấu hình"}
+                  {row.respondedAt ? t("responded") : row.responseDueAt ? new Date(row.responseDueAt).toLocaleString(locale) : t("notConfigured")}
                 </td>
                 <td className={`px-3 py-3 ${row.resolutionOverdue ? "font-bold text-red-600" : ""}`}>
-                  {row.resolvedAt ? "Đã xử lý" : row.resolutionDueAt ? new Date(row.resolutionDueAt).toLocaleString("vi-VN") : "Chưa cấu hình"}
+                  {row.resolvedAt ? t("resolved") : row.resolutionDueAt ? new Date(row.resolutionDueAt).toLocaleString(locale) : t("notConfigured")}
                 </td>
                 <td className="px-3 py-3">{row.linkedJobCode ?? "—"}</td>
-                <td className="px-3 py-3 text-right"><Button size="sm" variant="outline" onClick={() => { setSelected(row); setNote(row.internalNote ?? ""); }}>Chi tiết</Button></td>
+                <td className="px-3 py-3 text-right"><Button size="sm" variant="outline" onClick={() => { setSelected(row); setNote(row.internalNote ?? ""); }}>{t("details")}</Button></td>
               </tr>
             ))}
           </tbody>
         </table>
-        {rows.length === 0 && <p className="p-6 text-center text-sm text-slate-500">Chưa có yêu cầu.</p>}
+        {rows.length === 0 && <p className="p-6 text-center text-sm text-slate-500">{t("empty")}</p>}
       </div>
       {selected && (
         <div className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/45 p-4" onMouseDown={() => setSelected(null)}>
           <div className="w-full max-w-2xl rounded-2xl bg-surface p-5 shadow-xl" onMouseDown={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-3">
               <div><p className="font-mono text-xs text-slate-500">{selected.code}</p><h3 className="text-lg font-bold">{selected.title}</h3><p className="mt-1 text-sm text-slate-600">{selected.description}</p></div>
-              <Button size="sm" variant="ghost" onClick={() => setSelected(null)}>Đóng</Button>
+              <Button size="sm" variant="ghost" onClick={() => setSelected(null)}>{t("close")}</Button>
             </div>
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-              <div><dt className="text-xs text-slate-500">Liên hệ</dt><dd className="font-semibold">{selected.contactName} · {selected.contactPhone ?? "—"}</dd></div>
-              <div><dt className="text-xs text-slate-500">Evidence</dt><dd className="font-semibold">{selected.attachmentCount} tệp private</dd></div>
+              <div><dt className="text-xs text-slate-500">{t("contact")}</dt><dd className="font-semibold">{selected.contactName} · {selected.contactPhone ?? "—"}</dd></div>
+              <div><dt className="text-xs text-slate-500">{t("evidence")}</dt><dd className="font-semibold">{t("privateFiles", { count: selected.attachmentCount })}</dd></div>
             </dl>
             {selected.attachments.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">
@@ -137,7 +140,7 @@ export function CustomerRequestsManager({
               </div>
             )}
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="text-xs font-semibold text-slate-500">Công việc liên kết
+              <label className="text-xs font-semibold text-slate-500">{t("linkedWorkOrder")}
                 <Select
                   className="mt-1 w-full"
                   value={selected.linkedJobId ?? ""}
@@ -145,12 +148,12 @@ export function CustomerRequestsManager({
                   options={[
                     ...(["scheduled", "in_progress", "resolved", "closed"].includes(selected.status)
                       ? []
-                      : [{ value: "", label: "Chưa liên kết" }]),
+                      : [{ value: "", label: t("notLinked") }]),
                     ...jobs.filter((job) => job.projectId === selected.projectId).map((job) => ({ value: job.id, label: `${job.code} · ${job.title}` })),
                   ]}
                 />
               </label>
-              <label className="text-xs font-semibold text-slate-500">Trạng thái
+              <label className="text-xs font-semibold text-slate-500">{t("status")}
                 <Select
                   className="mt-1 w-full"
                   value={selected.status}
@@ -159,11 +162,11 @@ export function CustomerRequestsManager({
                 />
               </label>
             </div>
-            <label className="mt-4 block text-xs font-semibold text-slate-500">Ghi chú nội bộ
+            <label className="mt-4 block text-xs font-semibold text-slate-500">{t("internalNote")}
               <Textarea value={note} onChange={(event) => setNote(event.target.value)} rows={4} className="mt-1" />
             </label>
             {error && <p className="mt-3 text-sm font-semibold text-red-600">{error}</p>}
-            <div className="mt-4 flex justify-end"><Button disabled={busy} onClick={() => update(selected.id, { internalNote: note || null })}>{busy ? "Đang lưu…" : "Lưu ghi chú"}</Button></div>
+            <div className="mt-4 flex justify-end"><Button disabled={busy} onClick={() => update(selected.id, { internalNote: note || null })}>{busy ? t("saving") : t("saveNote")}</Button></div>
           </div>
         </div>
       )}

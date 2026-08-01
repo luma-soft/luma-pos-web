@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import { db } from "@/db";
 import { projects, serviceCustomerRequests } from "@/db/schema";
 import {
@@ -17,6 +18,7 @@ export default async function ServiceRequestPage({
 }: {
   params: Promise<{ token: string }>;
 }) {
+  const t = await getTranslations("serviceRequestPortal");
   const { token } = await params;
   if (token.length < 40) notFound();
   const tokenHash = hashCustomerRequestToken(token);
@@ -58,7 +60,7 @@ export default async function ServiceRequestPage({
     <main className="min-h-screen bg-slate-50 px-4 py-10 text-slate-950">
       <div className="mx-auto max-w-xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">LumaPOS Service</p>
-        <h1 className="mt-2 text-2xl font-black">Yêu cầu hỗ trợ công trình</h1>
+        <h1 className="mt-2 text-2xl font-black">{t("title")}</h1>
         <p className="mt-2 text-sm text-slate-600">{request.projectName}</p>
         <ServiceRequestForm
           token={token}
