@@ -126,7 +126,8 @@ function estimateStorageDays(capacityGb: number | null, megapixels: number) {
 
 function cameraGuidance(name: string, specs: Record<string, string[]>) {
   const text = `${name} ${Object.values(specs).flat().join(" ")}`.toLocaleLowerCase("vi");
-  const suitableFor = /4g|sim/.test(text)
+  const isFourG = /\bsim\s*4g\b|\b4g\b|không dùng wi-fi/.test(text);
+  const suitableFor = isFourG
     ? ["Trang trại, công trình hoặc nơi không có Wi-Fi", "Vị trí cần giám sát từ xa qua mạng di động"]
     : /poe/.test(text)
       ? ["Cửa hàng, văn phòng cần kết nối ổn định", "Vị trí đã có hoặc có thể đi dây mạng"]
@@ -137,7 +138,7 @@ function cameraGuidance(name: string, specs: Record<string, string[]>) {
           : /xoay|theo dõi|tuần tra/.test(text)
             ? ["Phòng khách, cửa hàng nhỏ", "Gia đình có trẻ nhỏ hoặc người lớn tuổi"]
             : ["Phòng ngủ, phòng khách hoặc cửa hàng nhỏ", "Quầy thu ngân và khu vực trong nhà"];
-  const installationNotes = /4g|sim/.test(text)
+  const installationNotes = isFourG
     ? ["Cần SIM 4G có gói data", "Cần nguồn điện gần vị trí lắp"]
     : /poe/.test(text)
       ? ["Cần dây mạng PoE hoặc bộ cấp nguồn PoE", "Có thể dùng nguồn 12V khi không dùng PoE"]
