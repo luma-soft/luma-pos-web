@@ -251,11 +251,11 @@ export function CameraPriceListClient({
         y += rowHeight;
       });
     ctx.fillStyle = "#14344d";
-    ctx.font = "700 21px Arial";
+    ctx.font = "17px Arial";
     y += 42;
     const description = item.description;
-    const descriptionLines = canvasWrap(ctx, description, 540, y, 790, 28);
-    y = Math.max(900, y + descriptionLines * 28 + 42);
+    const descriptionLines = canvasWrap(ctx, description, 540, y, 790, 24);
+    y = Math.max(900, y + descriptionLines * 24 + 42);
     ctx.fillStyle = "#07817a";
     ctx.fillRect(540, y, 815, 42);
     ctx.fillStyle = "#ffffff";
