@@ -358,11 +358,10 @@ export function CameraPriceListClient({
         <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-black uppercase text-[#14344d]">
-              Tổng quan {filtered.length} gói lựa chọn
+              Tổng quan {filtered.length} camera lựa chọn
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              Mỗi gói có trang chi tiết gồm ảnh sản phẩm, thông số và giá trọn
-              gói như file báo giá.
+              Mỗi camera có thông số, ảnh sản phẩm và các lựa chọn thẻ nhớ.
             </p>
           </div>
           <label className="relative">
@@ -384,12 +383,12 @@ export function CameraPriceListClient({
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-xs font-bold text-[#078a82]">
-                    GÓI {String(index + 1).padStart(2, "0")}
-                  </p>
-                  <h3 className="mt-1 text-base font-black leading-5 text-[#14344d]">
+                  <h3 className="text-base font-black leading-5 text-[#14344d]">
                     {item.model}
                   </h3>
+                  <p className="mt-1 text-xs font-bold text-[#078a82]">
+                    Lắp đặt: {item.installationLocation}
+                  </p>
                 </div>
                 <button
                   onClick={(event) => {
