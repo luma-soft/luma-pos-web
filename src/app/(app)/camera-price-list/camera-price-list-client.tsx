@@ -323,7 +323,7 @@ export function CameraPriceListClient({
           new ClipboardItem({ "image/png": blob }),
         ]);
         setNotice(
-          `Đã sao chép ảnh chi tiết gói ${String(index + 1).padStart(2, "0")}.`,
+          `Đã sao chép ảnh ${item.model}.`,
         );
       } catch {
         downloadImage();
