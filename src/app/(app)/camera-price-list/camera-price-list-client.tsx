@@ -29,7 +29,6 @@ type Model = {
   specs: Record<string, string[]>;
   installationLocation: "Trong nhà" | "Ngoài trời";
   suitableFor: string[];
-  installationNotes: string[];
   variants: Variant[];
 };
 
@@ -637,17 +636,11 @@ export function CameraPriceListClient({
                       </div>
                     ))}
                   </dl>
-                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                  <div className="mt-5">
                     <section className="rounded-xl border border-teal-100 bg-teal-50/50 p-4">
                       <h4 className="text-sm font-black text-[#0b7b74]">PHÙ HỢP CHO</h4>
                       <ul className="mt-2 space-y-1 text-sm leading-5 text-slate-700">
                         {item.suitableFor.map((recommendation) => <li key={recommendation}>• {recommendation}</li>)}
-                      </ul>
-                    </section>
-                    <section className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <h4 className="text-sm font-black text-[#14344d]">LƯU Ý LẮP ĐẶT</h4>
-                      <ul className="mt-2 space-y-1 text-sm leading-5 text-slate-700">
-                        {item.installationNotes.map((note) => <li key={note}>• {note}</li>)}
                       </ul>
                     </section>
                   </div>

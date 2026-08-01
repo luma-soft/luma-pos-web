@@ -59,7 +59,6 @@ export default async function CameraPriceListPage() {
         specs: camera.specs,
         installationLocation: cameraInstallationLocation(camera.name, camera.specs),
         suitableFor: guidance.suitableFor,
-        installationNotes: guidance.installationNotes,
         variants: compatibleCards.map((card) => ({
           id: `${camera.id}:${card.id}`,
           cameraId: camera.id,
@@ -138,13 +137,5 @@ function cameraGuidance(name: string, specs: Record<string, string[]>) {
           : /xoay|theo dõi|tuần tra/.test(text)
             ? ["Phòng khách, cửa hàng nhỏ", "Gia đình có trẻ nhỏ hoặc người lớn tuổi"]
             : ["Phòng ngủ, phòng khách hoặc cửa hàng nhỏ", "Quầy thu ngân và khu vực trong nhà"];
-  const installationNotes = isFourG
-    ? ["Cần SIM 4G có gói data", "Cần nguồn điện gần vị trí lắp"]
-    : /poe/.test(text)
-      ? ["Cần dây mạng PoE hoặc bộ cấp nguồn PoE", "Có thể dùng nguồn 12V khi không dùng PoE"]
-      : [
-        text.includes("5ghz") ? "Hỗ trợ Wi-Fi 2.4GHz và 5GHz" : "Cần Wi-Fi 2.4GHz tại vị trí lắp",
-        text.includes("rj45") ? "Có thể dùng dây mạng RJ45 khi cần" : "Cần nguồn điện gần vị trí lắp",
-      ];
-  return { suitableFor, installationNotes };
+  return { suitableFor };
 }
