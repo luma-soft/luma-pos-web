@@ -39,6 +39,8 @@ export async function updateSession(request: NextRequest) {
     isPortalPath ||
     path === Routes.Home ||
     path === Routes.CameraQuote ||
+    path.startsWith(`${Routes.CameraQuote}/`) ||
+    path === "/camera-price-list" ||
     path === Routes.HunonicPriceList ||
     path === Routes.RangDongSmartPriceList;
 

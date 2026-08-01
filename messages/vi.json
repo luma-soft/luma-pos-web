@@ -3054,6 +3054,26 @@
     },
     "body": "Mở LumaPOS để xem chi tiết."
   },
+  "cameraQuotePage": {
+    "title": "Báo giá camera",
+    "metaDescription": "Chọn hãng camera để xem báo giá chi tiết, cấu hình và giải pháp lắp đặt phù hợp.",
+    "intro": "Chọn hãng để xem báo giá và cấu hình phù hợp với nhu cầu lắp đặt.",
+    "viewQuote": "Xem báo giá",
+    "brandPriceTitle": "Báo giá camera {brand}",
+    "brandPriceDescription": "Báo giá camera {brand}, thông số chi tiết và các lựa chọn thẻ nhớ.",
+    "brands": {
+      "ezviz": { "description": "Camera Wi-Fi, PoE và 4G cho gia đình, cửa hàng nhỏ." },
+      "imou": { "description": "Camera trong nhà, ngoài trời và các lựa chọn thẻ nhớ." },
+      "hikvision": { "description": "Giải pháp hệ thống gồm camera, đầu ghi, ổ cứng và PoE." }
+    },
+    "hikvision": {
+      "title": "Hệ thống Hikvision",
+      "metaDescription": "Báo giá giải pháp Hikvision gồm camera, đầu ghi, ổ cứng, switch PoE và thi công.",
+      "description": "Báo giá Hikvision sẽ được cấu hình theo số lượng camera, đầu ghi NVR, ổ cứng lưu trữ, switch PoE, vật tư và công lắp đặt thực tế.",
+      "status": "Danh mục sản phẩm Hikvision và giá thiết bị hệ thống đang được hoàn thiện để bảo đảm cấu hình và giá trọn gói chính xác.",
+      "back": "Chọn hãng khác"
+    }
+  },
   "pagination": {
     "show": "Hiển thị",
     "rows": "{n} dòng",

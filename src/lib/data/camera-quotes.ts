@@ -1,6 +1,6 @@
 import { asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { categories, customers, products, warehouses } from "@/db/schema";
+import { brands, categories, customers, products, warehouses } from "@/db/schema";
 import {
   CAMERA_QUOTE_CARD_SKUS,
   CAMERA_QUOTE_DETAIL_MATERIAL_SKUS,
@@ -34,6 +34,7 @@ export type CameraQuoteProductOption = {
   sku: string;
   name: string;
   baseUnit: string;
+  brand: string | null;
   retailPrice: number;
   description: string | null;
   imageUrl: string | null;
@@ -48,6 +49,7 @@ export async function getCameraQuoteFormOptions() {
         sku: products.sku,
         name: products.name,
         baseUnit: products.baseUnit,
+        brand: brands.name,
         retailPrice: products.retailPrice,
         description: products.description,
         imageUrls: products.imageUrls,
@@ -55,6 +57,7 @@ export async function getCameraQuoteFormOptions() {
       })
       .from(products)
       .innerJoin(categories, eq(products.categoryId, categories.id))
+      .leftJoin(brands, eq(products.brandId, brands.id))
       .where(eq(categories.name, "Camera giám sát"))
       .orderBy(asc(products.name)),
     db
@@ -63,12 +66,14 @@ export async function getCameraQuoteFormOptions() {
         sku: products.sku,
         name: products.name,
         baseUnit: products.baseUnit,
+        brand: brands.name,
         retailPrice: products.retailPrice,
         description: products.description,
         imageUrls: products.imageUrls,
         specs: products.specs,
       })
       .from(products)
+      .leftJoin(brands, eq(products.brandId, brands.id))
       .where(inArray(products.sku, [...requiredSkus, ...optionalMaterialSkus])),
     db
       .select({
@@ -93,6 +98,7 @@ export async function getCameraQuoteFormOptions() {
     sku: row.sku,
     name: row.name,
     baseUnit: row.baseUnit,
+    brand: row.brand,
     retailPrice: Number(row.retailPrice),
     description: row.description,
     imageUrl: firstImage(row.imageUrls),

@@ -3054,6 +3054,26 @@
     },
     "body": "Open LumaPOS to view details."
   },
+  "cameraQuotePage": {
+    "title": "Camera quote",
+    "metaDescription": "Choose a camera brand to view detailed pricing, configurations, and suitable installation solutions.",
+    "intro": "Choose a brand to view pricing and a configuration that fits your installation needs.",
+    "viewQuote": "View quote",
+    "brandPriceTitle": "{brand} camera quote",
+    "brandPriceDescription": "{brand} camera pricing, detailed specifications, and memory-card options.",
+    "brands": {
+      "ezviz": { "description": "Wi-Fi, PoE, and 4G cameras for homes and small shops." },
+      "imou": { "description": "Indoor and outdoor cameras with memory-card options." },
+      "hikvision": { "description": "System solutions with cameras, recorders, storage, and PoE." }
+    },
+    "hikvision": {
+      "title": "Hikvision systems",
+      "metaDescription": "Hikvision solution quote with cameras, recorders, storage, PoE switches, and installation.",
+      "description": "Hikvision quotes will be configured by camera count, NVR recorder, storage, PoE switch, materials, and actual installation work.",
+      "status": "The Hikvision product catalog and system pricing are being finalized to ensure accurate configurations and package prices.",
+      "back": "Choose another brand"
+    }
+  },
   "pagination": {
     "show": "Show",
     "rows": "{n} rows",

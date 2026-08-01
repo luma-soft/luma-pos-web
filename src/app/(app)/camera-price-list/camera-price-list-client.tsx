@@ -95,10 +95,12 @@ export function CameraPriceListClient({
   models: initialModels,
   memoryLabels,
   canEdit,
+  brandName,
 }: {
   models: Model[];
   memoryLabels: string[];
   canEdit: boolean;
+  brandName: "EZVIZ" | "IMOU";
 }) {
   const [models, setModels] = useState(initialModels);
   const [query, setQuery] = useState("");
@@ -369,9 +371,9 @@ export function CameraPriceListClient({
         </div>
         <header className="pt-14">
           <h1 className="text-4xl font-black leading-[1.08] tracking-tight text-[#14344d] sm:text-5xl">
-            BẢNG GIÁ CHI TIẾT
+            BẢNG GIÁ CAMERA
             <br />
-            LẮP ĐẶT CAMERA
+            {brandName}
           </h1>
           <div className="mt-8 flex flex-col gap-2 bg-[#14344d] px-5 py-4 font-bold text-white sm:flex-row sm:items-center sm:justify-between">
             <span className="text-xl">HẢI ĐĂNG TECH</span>

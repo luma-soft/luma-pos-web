@@ -11,7 +11,7 @@ export const Routes = {
   Home: "/",
   Dashboard: "/dashboard",
   POS: "/pos",
-  CameraQuote: "/camera-price-list",
+  CameraQuote: "/camera-quote",
   HunonicPriceList: "/hunonic-price-list",
   RangDongSmartPriceList: "/rang-dong-smart-price-list",
   More: "/more",
