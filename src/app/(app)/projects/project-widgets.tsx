@@ -153,7 +153,7 @@ export function ProjectQuickCreate({
           </Field>
           {serviceMode && (
             <>
-              <Field label={t("services.fields.type")}><Select value={serviceType} onChange={(e) => chooseServiceType(e.target.value)} options={[{ value: "camera", label: t("services.types.camera") }, { value: "electrical", label: t("services.types.electrical") }, { value: "plumbing", label: t("services.types.plumbing") }, { value: "mixed", label: t("services.types.mixed") }]} /></Field>
+              <Field label={t("services.fields.type")}><Select value={serviceType} onChange={(e) => chooseServiceType(e.target.value)} options={[{ value: "camera", label: t("services.types.camera") }, { value: "electrical", label: t("services.types.electrical") }, { value: "plumbing", label: t("services.types.plumbing") }, { value: "mixed", label: t("services.types.mixed") }]} rootClassName="w-full" /></Field>
               <Field label={t("services.fields.targetEndsOn")}><Input type="date" value={targetEndsOn} onChange={(e) => setTargetEndsOn(e.target.value)} /></Field>
               <Field label={t("services.fields.siteContactName")}><Input value={siteContactName} onChange={(e) => setSiteContactName(e.target.value)} /></Field>
               <Field label={t("services.fields.siteContactPhone")}><Input value={siteContactPhone} onChange={(e) => setSiteContactPhone(e.target.value)} /></Field>
@@ -325,8 +325,8 @@ export function ProjectEdit({
           <Field label={t("customers.fields.address")} className="sm:col-span-2"><Input value={address} onChange={(e) => setAddress(e.target.value)} /></Field>
           {isServiceProject ? (
             <>
-              <Field label={t("services.fields.type")}><Select value={serviceType} onChange={(e) => setServiceType(e.target.value)} options={[{ value: "camera", label: t("services.types.camera") }, { value: "electrical", label: t("services.types.electrical") }, { value: "plumbing", label: t("services.types.plumbing") }, { value: "mixed", label: t("services.types.mixed") }]} /></Field>
-              <Field label={t("services.fields.stage")}><Select value={serviceStage} onChange={(e) => setServiceStage(e.target.value)} options={["planning", "quoted", "active", "paused", "completed", "warranty", "cancelled"].map((value) => ({ value, label: t(`services.stages.${value}` as never) }))} /></Field>
+              <Field label={t("services.fields.type")}><Select value={serviceType} onChange={(e) => setServiceType(e.target.value)} options={[{ value: "camera", label: t("services.types.camera") }, { value: "electrical", label: t("services.types.electrical") }, { value: "plumbing", label: t("services.types.plumbing") }, { value: "mixed", label: t("services.types.mixed") }]} rootClassName="w-full" /></Field>
+              <Field label={t("services.fields.stage")}><Select value={serviceStage} onChange={(e) => setServiceStage(e.target.value)} options={["planning", "quoted", "active", "paused", "completed", "warranty", "cancelled"].map((value) => ({ value, label: t(`services.stages.${value}` as never) }))} rootClassName="w-full" /></Field>
               <Field label={t("services.fields.startsOn")}><Input type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} /></Field>
               <Field label={t("services.fields.targetEndsOn")}><Input type="date" value={targetEndsOn} onChange={(e) => setTargetEndsOn(e.target.value)} /></Field>
               <Field label={t("services.fields.siteContactName")}><Input value={siteContactName} onChange={(e) => setSiteContactName(e.target.value)} /></Field>
