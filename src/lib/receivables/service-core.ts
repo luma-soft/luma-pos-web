@@ -83,7 +83,7 @@ export async function collectCustomerReceivable(
     !["cash", "bank_transfer", "card"].includes(input.method) ||
     ids.length === 0 || new Set(ids).size !== ids.length ||
     allocations.some((row) => !row.orderId || row.amount <= 0) ||
-    Math.abs(amount - allocationTotal) > 1e-9
+    allocationTotal - amount > 1e-9
   ) return { ok: false, error: "errors.invalidData" };
 
   try {
@@ -114,7 +114,6 @@ export async function collectCustomerReceivable(
           throw new Error("ALLOCATION_EXCEEDS_REMAINING");
         }
       }
-      if (amount > Number(customer.currentDebt) + 1e-9) throw new Error("DEBT_EXCEEDS_CURRENT");
 
       const [receipt] = await tx.insert(customerReceivableReceipts).values({
         code: generateCode("PTN"), customerId: input.customerId, amount: amount.toFixed(2),
@@ -145,7 +144,7 @@ export async function collectCustomerReceivable(
         note: `Thu nợ khách hàng ${input.reference?.trim() || receipt.id}`,
         createdBy: actor.profileId, shiftId: actor.shiftId,
       });
-      await tx.update(customers).set({ currentDebt: sql`greatest(${customers.currentDebt} - ${amount.toFixed(2)}, 0)` })
+      await tx.update(customers).set({ currentDebt: sql`${customers.currentDebt} - ${amount.toFixed(2)}` })
         .where(eq(customers.id, input.customerId));
       const notification = await createDebtChangedEventInTx(tx, {
         entityType: "customer", entityId: input.customerId, operationType: "receivable_collection",
@@ -181,14 +180,13 @@ export async function createCustomerReceivableEntry(
         if (existing.customerId !== input.customerId || Math.abs(Number(existing.amount) - amount) > 1e-9) throw new Error("RECEIPT_CONFLICT");
         return { ok: true as const, data: { entryId: existing.id, replayed: true } };
       }
-      if (amount < 0 && -amount > Number(customer.currentDebt) + 1e-9) throw new Error("DEBT_EXCEEDS_CURRENT");
       const [entry] = await tx.insert(customerReceivableEntries).values({
         code: generateCode(input.type === "settlement_discount" ? "CKTT" : "DCN"), customerId: input.customerId,
         orderId: input.orderId || null, type: input.type, amount: amount.toFixed(2), reason: input.reason.trim(),
         reference: input.reference?.trim() || null, note: input.note?.trim() || null,
         clientRequestId: input.clientRequestId.trim(), createdBy: actor.profileId, approvedBy: actor.profileId,
       }).returning({ id: customerReceivableEntries.id });
-      await tx.update(customers).set({ currentDebt: sql`greatest(${customers.currentDebt} + ${amount.toFixed(2)}, 0)` })
+      await tx.update(customers).set({ currentDebt: sql`${customers.currentDebt} + ${amount.toFixed(2)}` })
         .where(eq(customers.id, input.customerId));
       const notification = await createDebtChangedEventInTx(tx, {
         entityType: "customer", entityId: input.customerId, operationType: input.type,

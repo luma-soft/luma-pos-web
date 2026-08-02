@@ -5,12 +5,13 @@ import { cn } from "@/lib/utils";
 
 const nf = new Intl.NumberFormat("vi-VN");
 
-/** Lấy số nguyên từ chuỗi (bỏ mọi ký tự không phải chữ số). Tiền VND = số nguyên. */
-function parse(s: string): number | null {
+/** Lấy số nguyên từ chuỗi. Khi min âm, giữ dấu trừ để nhập số dư có dấu. */
+function parse(s: string, allowNegative = false): number | null {
   const digits = s.replace(/[^\d]/g, "");
   if (digits === "") return null;
   const n = parseInt(digits, 10);
-  return Number.isNaN(n) ? null : n;
+  if (Number.isNaN(n)) return null;
+  return allowNegative && s.trim().startsWith("-") ? -n : n;
 }
 
 function toNum(v: number | string | null | undefined): number | null {
@@ -52,7 +53,7 @@ export const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
       <input
         ref={ref}
         type="text"
-        inputMode="numeric"
+        inputMode={min < 0 ? "text" : "numeric"}
         className={cn(
           "min-h-11 min-w-11 lg:min-h-0 lg:min-w-0",
           className,
@@ -64,7 +65,12 @@ export const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
           onFocus?.(e);
         }}
         onChange={(e) => {
-          let n = parse(e.target.value);
+          if (min < 0 && e.target.value.trim() === "-") {
+            setText("-");
+            onChange?.(null);
+            return;
+          }
+          let n = parse(e.target.value, min < 0);
           if (n != null) {
             if (min != null && n < min) n = min;
             if (max != null && n > max) n = max;
@@ -74,7 +80,7 @@ export const MoneyInput = React.forwardRef<HTMLInputElement, MoneyInputProps>(
         }}
         onBlur={(e) => {
           editing.current = false;
-          setText(format(parse(text)));
+          setText(format(parse(text, min < 0)));
           onBlur?.(e);
         }}
         {...props}
