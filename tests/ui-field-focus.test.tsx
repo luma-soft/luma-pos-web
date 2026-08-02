@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
 import { Input, Textarea } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/combobox";
 
 function renderField(field: React.ReactNode) {
   return renderToStaticMarkup(
@@ -58,5 +59,18 @@ describe("shared form field focus treatment", () => {
       expect(html).not.toContain("focus:ring-2");
       expect(html).not.toContain("focus:ring-red-500");
     }
+  });
+
+  test("identifies searchable selectors as dropdown triggers", () => {
+    const html = renderField(
+      createElement(SearchableSelect, {
+        value: "active",
+        onChange: () => undefined,
+        options: [{ value: "active", label: "Đang sử dụng" }],
+      }),
+    );
+
+    expect(html).toContain('aria-haspopup="listbox"');
+    expect(html).toContain('aria-expanded="false"');
   });
 });

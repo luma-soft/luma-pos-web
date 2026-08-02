@@ -100,6 +100,8 @@ export function SearchableSelect({
         variant="outline"
         block
         disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={open}
         onClick={() => { setOpen((v) => !v); setQ(""); }}
         className="relative h-11 justify-start rounded-[10px] pl-3 pr-9 text-left lg:h-10"
       >
