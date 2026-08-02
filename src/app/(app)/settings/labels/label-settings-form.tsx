@@ -163,7 +163,7 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
               <div className="mb-3 flex flex-wrap gap-2">
                 {BUILT_IN_LABEL_TEMPLATES.map((preset) => (
                   <button
-                    key={preset.key}
+                    key={preset.id}
                     type="button"
                     onClick={() => patch({
                       widthMm: preset.widthMm,
