@@ -3232,6 +3232,21 @@
       },
       "print": {
         "button": "In / Lưu PDF"
+      },
+      "temporaryPrice": {
+        "editAria": "Chỉnh giá tạm thời cho {item}",
+        "title": "Chỉnh giá tạm thời",
+        "description": "Giá này chỉ áp dụng cho báo giá đang mở và không thay đổi giá trong catalog.",
+        "unitPrice": "Đơn giá (₫)",
+        "quantity": "Số lượng: {count}",
+        "lineTotal": "Thành tiền tạm tính: {total}",
+        "cancel": "Hủy",
+        "save": "Áp dụng giá",
+        "saved": "Đã áp dụng giá tạm thời.",
+        "invalid": "Đơn giá tạm thời chưa hợp lệ.",
+        "active": "Đang dùng giá tạm thời",
+        "reset": "Khôi phục giá catalog",
+        "resetDone": "Đã khôi phục giá catalog."
       }
     }
   },

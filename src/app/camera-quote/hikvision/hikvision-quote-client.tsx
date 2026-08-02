@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { useTranslations } from "next-intl";
-import { ArrowLeft, Check, CircleAlert, Copy, Database, Network, Printer, Server, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Check, CircleAlert, Copy, Database, Network, Pencil, Printer, RotateCcw, Server, ShieldCheck, X } from "lucide-react";
 import type { HikvisionQuoteProduct } from "@/lib/data/hikvision-quote";
 import { formatCurrency } from "@/lib/utils";
 
@@ -13,6 +13,7 @@ type SystemSize = "4" | "8" | "16";
 type CameraType = "bullet2" | "bullet4" | "dome4" | "ptz4";
 type PoeMethod = "nvr" | "switch";
 type StorageDays = "7" | "15" | "30";
+type QuoteLineItem = { id: string; sku?: string; label: string; model: string; quantity: number; total: number; unitPrice: number; unavailable: boolean };
 
 const SKU = {
   camera: { bullet2: "HK-IP-DS2CD1023G2-LIUF", bullet4: "HK-IP-DS2CD1043G2-LIUF", dome4: "HK-IP-DS2CD1143G2-LIUF", ptz4: "HK-PTZ-DS2DE2A404IW-DE3" },
@@ -71,6 +72,9 @@ export function HikvisionQuoteClient({ backLabel, catalogReady, products }: { ba
   const [includeSurge, setIncludeSurge] = useState(false);
   const [cableMeters, setCableMeters] = useState(60);
   const [notice, setNotice] = useState("");
+  const [temporaryPrices, setTemporaryPrices] = useState<Record<string, number>>({});
+  const [editingPrice, setEditingPrice] = useState<QuoteLineItem | null>(null);
+  const [temporaryPriceValue, setTemporaryPriceValue] = useState<number | null>(null);
   const printReady = useSyncExternalStore(subscribeToNothing, () => true, () => false);
   const bySku = useMemo(() => new Map(products.map((product) => [product.sku, product])), [products]);
   const product = useCallback((sku: string) => bySku.get(sku), [bySku]);
@@ -89,9 +93,10 @@ export function HikvisionQuoteClient({ backLabel, catalogReady, products }: { ba
   }, [notice]);
 
   const lineItems = useMemo(() => {
-    const fromProduct = (label: string, sku: string, quantity = 1) => {
+    const fromProduct = (label: string, sku: string, quantity = 1): QuoteLineItem => {
       const item = product(sku);
-      return { label, model: item?.name ?? sku, total: (item?.retailPrice ?? 0) * quantity, unavailable: !item };
+      const unitPrice = temporaryPrices[sku] ?? item?.retailPrice ?? 0;
+      return { id: sku, sku, label, model: item?.name ?? sku, quantity, unitPrice, total: unitPrice * quantity, unavailable: !item };
     };
     const items = [
       fromProduct(t("items.camera", { count: cameraCount }), SKU.camera[cameraType], cameraCount),
@@ -99,7 +104,7 @@ export function HikvisionQuoteClient({ backLabel, catalogReady, products }: { ba
       fromProduct(t("items.storage"), SKU.storage[selectedStorage]),
       poeMethod === "switch"
         ? fromProduct(t("items.poeSwitch"), SKU.switch[systemSize])
-        : { label: t("items.poeIntegrated"), model: product(SKU.nvr[systemSize].nvr)?.name ?? SKU.nvr[systemSize].nvr, total: 0, unavailable: false },
+        : { id: "poe-integrated", label: t("items.poeIntegrated"), model: product(SKU.nvr[systemSize].nvr)?.name ?? SKU.nvr[systemSize].nvr, quantity: 1, unitPrice: 0, total: 0, unavailable: false },
       fromProduct(t("items.materials"), SKU.materials, cameraCount),
       fromProduct(t("items.cable", { meters: cableMeters }), SKU.cable, cableMeters),
       fromProduct(t("items.installation"), SKU.installation, cameraCount),
@@ -109,11 +114,31 @@ export function HikvisionQuoteClient({ backLabel, catalogReady, products }: { ba
     if (includeMonitor) items.push(fromProduct(t("items.monitor"), SKU.monitor));
     if (includeSurge) items.push(fromProduct(t("items.surge"), SKU.surge, cameraCount));
     return items;
-  }, [cableMeters, cameraCount, cameraType, includeMonitor, includeRack, includeSurge, includeUps, poeMethod, product, selectedStorage, systemSize, t]);
+  }, [cableMeters, cameraCount, cameraType, includeMonitor, includeRack, includeSurge, includeUps, poeMethod, product, selectedStorage, systemSize, t, temporaryPrices]);
 
   const hasUnavailableItem = lineItems.some((item) => item.unavailable);
   const total = lineItems.reduce((sum, item) => sum + item.total, 0);
   const optionClass = (selected: boolean) => `rounded-xl border px-3 py-3 text-left text-sm font-bold transition ${selected ? "border-[#078a82] bg-teal-50 text-[#06766f]" : "border-slate-200 bg-white text-slate-700 hover:border-teal-300"}`;
+
+  function openTemporaryPrice(item: QuoteLineItem) {
+    if (!item.sku || item.unavailable) return;
+    setEditingPrice(item);
+    setTemporaryPriceValue(item.unitPrice);
+  }
+
+  function saveTemporaryPrice() {
+    if (!editingPrice?.sku || temporaryPriceValue === null || !Number.isFinite(temporaryPriceValue) || temporaryPriceValue < 0) {
+      return setNotice(t("temporaryPrice.invalid"));
+    }
+    setTemporaryPrices((current) => ({ ...current, [editingPrice.sku!]: temporaryPriceValue }));
+    setEditingPrice(null);
+    setNotice(t("temporaryPrice.saved"));
+  }
+
+  function resetTemporaryPrices() {
+    setTemporaryPrices({});
+    setNotice(t("temporaryPrice.resetDone"));
+  }
 
   async function copyQuoteImage() {
     if (hasUnavailableItem) return setNotice(t("copy.unavailable"));
@@ -243,7 +268,7 @@ export function HikvisionQuoteClient({ backLabel, catalogReady, products }: { ba
             <div className="mt-4 grid gap-2"><label className="flex cursor-pointer gap-2 text-sm text-slate-700"><input type="checkbox" checked={includeRack} onChange={(event) => setIncludeRack(event.target.checked)} className="accent-[#078a82]" />{t("accessories.rack")}</label><label className="flex cursor-pointer gap-2 text-sm text-slate-700"><input type="checkbox" checked={includeMonitor} onChange={(event) => setIncludeMonitor(event.target.checked)} className="accent-[#078a82]" />{t("accessories.monitor")}</label><label className="flex cursor-pointer gap-2 text-sm text-slate-700"><input type="checkbox" checked={includeSurge} onChange={(event) => setIncludeSurge(event.target.checked)} className="accent-[#078a82]" />{t("accessories.surge")}</label></div>
           </aside>
 
-          <section className="overflow-hidden rounded-2xl border border-slate-200"><div className="flex items-center gap-3 bg-[#12364f] px-5 py-4 text-white"><Server className="h-5 w-5" /><h2 className="font-extrabold">{t("summaryTitle")}</h2></div><div className="divide-y divide-slate-200">{lineItems.map((item) => <div key={item.label} className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 px-5 py-3.5"><div><p className="font-semibold text-[#14344d]">{item.label}</p><p className="mt-0.5 text-sm text-slate-500">{item.model}</p></div><p className={`self-center text-right font-bold tabular-nums ${item.unavailable ? "text-amber-700" : "text-[#14344d]"}`}>{item.unavailable ? t("unavailable") : item.total ? formatCurrency(item.total) : t("included")}</p></div>)}</div><div className="flex items-center justify-between gap-4 bg-teal-50 px-5 py-4"><div><p className="font-extrabold text-[#14344d]">{t("total")}</p><p className="mt-0.5 text-xs text-slate-500">{t("vatExcluded")}</p></div><p className="text-xl font-black tabular-nums text-[#078a82]">{hasUnavailableItem ? "—" : formatCurrency(total)}</p></div></section>
+          <section className="overflow-hidden rounded-2xl border border-slate-200"><div className="flex items-center justify-between gap-3 bg-[#12364f] px-5 py-4 text-white"><div className="flex items-center gap-3"><Server className="h-5 w-5" /><h2 className="font-extrabold">{t("summaryTitle")}</h2></div>{Object.keys(temporaryPrices).length > 0 && <button type="button" onClick={resetTemporaryPrices} className="inline-flex items-center gap-1.5 rounded-lg border border-white/30 px-2.5 py-1.5 text-xs font-bold transition hover:bg-white/10"><RotateCcw className="h-3.5 w-3.5" />{t("temporaryPrice.reset")}</button>}</div><div className="divide-y divide-slate-200">{lineItems.map((item) => <div key={item.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 px-5 py-3.5"><div><p className="font-semibold text-[#14344d]">{item.label}</p><p className="mt-0.5 text-sm text-slate-500">{item.model}</p>{item.sku && temporaryPrices[item.sku] !== undefined && <p className="mt-1 text-xs font-semibold text-[#078a82]">{t("temporaryPrice.active")}</p>}</div><div className="flex self-center items-center gap-2"><p className={`text-right font-bold tabular-nums ${item.unavailable ? "text-amber-700" : "text-[#14344d]"}`}>{item.unavailable ? t("unavailable") : item.total ? formatCurrency(item.total) : t("included")}</p>{item.sku && !item.unavailable && <button type="button" onClick={() => openTemporaryPrice(item)} className="rounded-md p-1.5 text-slate-400 transition hover:bg-teal-50 hover:text-[#078a82]" title={t("temporaryPrice.editAria", { item: item.label })} aria-label={t("temporaryPrice.editAria", { item: item.label })}><Pencil className="h-4 w-4" /></button>}</div></div>)}</div><div className="flex items-center justify-between gap-4 bg-teal-50 px-5 py-4"><div><p className="font-extrabold text-[#14344d]">{t("total")}</p><p className="mt-0.5 text-xs text-slate-500">{t("vatExcluded")}</p></div><p className="text-xl font-black tabular-nums text-[#078a82]">{hasUnavailableItem ? "—" : formatCurrency(total)}</p></div></section>
         </section>
 
         <section className="mt-5 grid gap-4 sm:grid-cols-2"><div className="rounded-xl border border-slate-200 p-4"><Network className="h-5 w-5 text-[#078a82]" /><h2 className="mt-2 font-extrabold text-[#14344d]">{t("includedTitle")}</h2><p className="mt-1 text-sm leading-6 text-slate-600">{t("includedDescription")}</p></div><div className="rounded-xl border border-amber-200 bg-amber-50 p-4"><Database className="h-5 w-5 text-amber-700" /><h2 className="mt-2 font-extrabold text-amber-900">{t("actualCostTitle")}</h2><p className="mt-1 text-sm leading-6 text-amber-900/80">{t("actualCostDescription")}</p></div></section>
@@ -252,6 +277,7 @@ export function HikvisionQuoteClient({ backLabel, catalogReady, products }: { ba
         <Link href="/camera-quote" className="mt-8 inline-flex items-center gap-2 text-sm font-bold text-[#078a82]"><ArrowLeft className="h-4 w-4" /> {backLabel}</Link>
       </div>
       {notice && <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-2xl bg-[#12364f] px-5 py-3 text-sm font-bold text-white shadow-xl" role="status">{notice}</div>}
+      {editingPrice && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" role="presentation"><div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="temporary-price-title"><div className="flex items-start justify-between gap-4"><div><h2 id="temporary-price-title" className="text-lg font-extrabold text-[#14344d]">{t("temporaryPrice.title")}</h2><p className="mt-1 text-sm leading-6 text-slate-500">{t("temporaryPrice.description")}</p></div><button type="button" onClick={() => setEditingPrice(null)} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label={t("temporaryPrice.cancel")}><X className="h-5 w-5" /></button></div><div className="mt-5 rounded-xl bg-slate-50 p-4"><p className="font-bold text-[#14344d]">{editingPrice.label}</p><p className="mt-1 text-sm text-slate-500">{editingPrice.model}</p><p className="mt-2 text-xs font-semibold text-slate-500">{t("temporaryPrice.quantity", { count: editingPrice.quantity })}</p></div><label className="mt-5 block text-sm font-bold text-slate-700">{t("temporaryPrice.unitPrice")}<input type="number" min="0" step="1000" value={temporaryPriceValue ?? ""} onChange={(event) => setTemporaryPriceValue(event.target.value === "" ? null : Number(event.target.value))} className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-base font-bold tabular-nums text-[#14344d] outline-none focus:border-[#078a82] focus:ring-2 focus:ring-teal-100" autoFocus /></label><p className="mt-3 text-sm text-slate-600">{t("temporaryPrice.lineTotal", { total: formatCurrency((temporaryPriceValue ?? 0) * editingPrice.quantity) })}</p><div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => setEditingPrice(null)} className="rounded-lg px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-slate-100">{t("temporaryPrice.cancel")}</button><button type="button" onClick={saveTemporaryPrice} className="rounded-lg bg-[#078a82] px-4 py-2.5 text-sm font-bold text-white transition hover:bg-[#06766f]">{t("temporaryPrice.save")}</button></div></div></div>}
       {printReady && createPortal(<article className="hikvision-quote-print-root bg-white p-10 text-slate-900"><div className="h-6 bg-[#12364f]"><div className="h-full w-1/5 bg-[#078a82]" /></div><header className="border-b border-slate-200 px-2 py-8"><p className="text-lg font-bold tracking-[0.2em] text-[#078a82]">{t("copy.company")}</p><h1 className="mt-3 text-3xl font-black text-[#14344d]">{t("copy.title")}</h1><p className="mt-2 text-base text-slate-600">{t("copy.configuration", { count: cameraCount, type: t(`cameraTypes.${cameraType}`) })}</p></header><table className="mt-7 w-full border-collapse text-sm"><thead><tr className="bg-[#12364f] text-left text-white"><th className="p-3">{t("copy.item")}</th><th className="p-3 text-right">{t("copy.amount")}</th></tr></thead><tbody>{lineItems.map((item) => <tr key={item.label} className="border-b border-slate-200"><td className="p-3"><p className="font-bold">{item.label}</p><p className="mt-1 text-slate-500">{item.model}</p></td><td className="p-3 text-right font-bold">{item.total ? formatCurrency(item.total) : t("included")}</td></tr>)}</tbody><tfoot><tr className="bg-teal-50"><td className="p-4 text-base font-black">{t("total")}</td><td className="p-4 text-right text-lg font-black text-[#078a82]">{formatCurrency(total)}</td></tr></tfoot></table><footer className="mt-8 border-t border-slate-200 pt-4 text-xs leading-5 text-slate-500"><p>{t("copy.note")}</p><p className="mt-3 font-semibold">{t("copy.contact")}</p></footer></article>, document.body)}
     </div>
   );

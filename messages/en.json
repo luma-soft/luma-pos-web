@@ -3232,6 +3232,21 @@
       },
       "print": {
         "button": "Print / Save PDF"
+      },
+      "temporaryPrice": {
+        "editAria": "Temporarily edit the price for {item}",
+        "title": "Temporary price override",
+        "description": "This price applies only to the open quote and does not change the catalog price.",
+        "unitPrice": "Unit price (₫)",
+        "quantity": "Quantity: {count}",
+        "lineTotal": "Estimated line total: {total}",
+        "cancel": "Cancel",
+        "save": "Apply price",
+        "saved": "Temporary price applied.",
+        "invalid": "The temporary unit price is invalid.",
+        "active": "Temporary price in use",
+        "reset": "Restore catalog prices",
+        "resetDone": "Catalog prices restored."
       }
     }
   },
