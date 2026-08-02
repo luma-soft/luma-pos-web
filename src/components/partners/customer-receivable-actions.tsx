@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { Pencil, QrCode, WalletCards, X } from "lucide-react";
 import { collectCustomerReceivable, createCustomerReceivableEntry } from "@/lib/actions/receivables";
 import { MoneyInput } from "@/components/ui/money-input";
+import { Select } from "@/components/ui/select";
 import { cn, formatCurrency } from "@/lib/utils";
 
 type Invoice = { id: string; code: string; createdAt: string; remaining: number };
@@ -107,7 +108,7 @@ function QrCreateDialog({ invoices, error, onCreate, onClose }: { invoices: Invo
   }
   return <Dialog title="Tạo QR thanh toán" onClose={onClose}>
     {!invoice ? <p className="text-sm text-er">Không có hóa đơn còn nợ.</p> : <div className="space-y-4">
-      <label className="block text-sm font-medium">Hóa đơn<select value={invoice.id} onChange={(event) => { const next = invoices.find((row) => row.id === event.target.value); setInvoiceId(event.target.value); setAmount(next?.remaining ?? 0); }} className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2">{invoices.map((row) => <option key={row.id} value={row.id}>{row.code} · còn {formatCurrency(row.remaining)}</option>)}</select></label>
+      <label className="block text-sm font-medium">Hóa đơn<Select value={invoice.id} onValueChange={(value) => { const next = invoices.find((row) => row.id === value); setInvoiceId(value); setAmount(next?.remaining ?? 0); }} options={invoices.map((row) => ({ value: row.id, label: `${row.code} · còn ${formatCurrency(row.remaining)}` }))} searchable searchPlaceholder="Tìm mã hóa đơn" rootClassName="mt-1 w-full" menuMinWidth={440} /></label>
       <label className="block text-sm font-medium">Số tiền QR<MoneyInput value={amount} min={0} max={invoice.remaining} onChange={(value) => setAmount(value ?? 0)} className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-right" /></label>
       <p className="text-xs text-slate-500">Có thể thu một phần, tối đa {formatCurrency(invoice.remaining)} cho hóa đơn này.</p>
       {error && <p className="text-sm text-er">{error}</p>}<button type="button" disabled={amount <= 0 || amount > invoice.remaining || pending} onClick={submit} className="w-full rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Đang tạo QR..." : "Tạo QR"}</button>
