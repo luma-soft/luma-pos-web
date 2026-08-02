@@ -261,6 +261,8 @@ input[type="number"] {
 .hikvision-quote-print-root { display: none; }
 @media print {
   @page { margin: 0; }
+  @page print-a4 { size: A4 portrait; margin: 0; }
+  @page print-a5 { size: A5 portrait; margin: 0; }
 
   /* Bản xem trước chứng từ chạy trong layout app: chỉ cho phép nội dung phiếu đi vào máy in. */
   body:has(.print-document-root) .app-sidebar,
@@ -301,6 +303,15 @@ input[type="number"] {
   .print-document-root .print-document {
     min-height: 0 !important;
     box-shadow: none !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+  .print-document--a4 { page: print-a4; }
+  .print-document--a5 { page: print-a5; }
+  .print-document-root .print-line-items thead { display: table-header-group; }
+  .print-document-root .print-line-items tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   body.pos-printing > *:not(.pos-print-root) { display: none !important; }

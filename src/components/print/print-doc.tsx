@@ -64,6 +64,7 @@ export function PrintDoc(p: PrintDocProps) {
   if (p.size === "k80") return <K80Doc {...p} />;
 
   const isA4 = p.size === "a4";
+  const signatures = p.signatures && (isA4 ? p.signatures : [p.signatures[0], p.signatures[2]]);
   const showLineDiscount = t.options.showLineDiscount && p.items.some((item) => Number(item.discount ?? 0) > 0);
   const visibleTotals = p.totals.filter((row) => {
     if (row.kind === "discount") return t.options.showDiscount;
@@ -74,15 +75,15 @@ export function PrintDoc(p: PrintDocProps) {
     <div
       className={
         isA4
-          ? "print-document bg-white text-black w-[794px] min-h-[1000px] p-12 text-[13px] shadow-lg print:shadow-none"
-          : "print-document bg-white text-black w-[559px] min-h-[794px] p-10 text-[12.5px] shadow-lg print:shadow-none"
+          ? "print-document print-document--a4 bg-white text-black w-[794px] min-h-[1000px] p-12 text-[13px] shadow-lg print:shadow-none"
+          : "print-document print-document--a5 bg-white text-black w-[559px] min-h-[794px] p-10 text-[13px] shadow-lg print:shadow-none"
       }
     >
       {/* header */}
       <div className="flex justify-between border-b-2 border-black pb-3">
         <div>
           <div className={isA4 ? "font-bold text-[18px]" : "font-bold text-[16px]"}>{t.storeName || "—"}</div>
-          <div className="text-[11px] text-slate-600">
+          <div className="text-[12px] text-slate-600">
             {t.storeAddress}
             {t.storePhone && <><br />ĐT: {t.storePhone}</>}
             {t.storeTaxCode && <> · MST: {t.storeTaxCode}</>}
@@ -90,7 +91,7 @@ export function PrintDoc(p: PrintDocProps) {
         </div>
         <div className="text-right">
           <div className={isA4 ? "font-bold text-[17px]" : "font-bold text-[15px]"}>{p.title}</div>
-          <div className="text-[11px] text-slate-600">
+          <div className="text-[12px] text-slate-600">
             Số: <b>{p.code}</b><br />
             Ngày: {formatDate(p.date)}
           </div>
@@ -98,7 +99,7 @@ export function PrintDoc(p: PrintDocProps) {
       </div>
 
       {/* party */}
-      <div className="flex justify-between my-3 text-[12px]">
+      <div className="my-3 flex justify-between text-[12.5px]">
         <div>
           <b>{p.partyLabel}:</b> {p.partyName}
           {p.partyPhone && <> — {p.partyPhone}</>}
@@ -111,7 +112,7 @@ export function PrintDoc(p: PrintDocProps) {
       </div>
 
       {/* items */}
-      <table className="w-full border-collapse text-[12px]">
+      <table className="print-line-items w-full border-collapse text-[13.5px]">
         <thead>
           <tr className="bg-slate-100">
             <th className="border border-slate-400 px-2 py-1.5 text-left">{p.cols.product}</th>
@@ -124,7 +125,7 @@ export function PrintDoc(p: PrintDocProps) {
         </thead>
         <tbody>
           {p.items.map((i) => (
-            <tr key={i.id}>
+          <tr key={i.id} className="break-inside-avoid">
               <td className="border border-slate-400 px-2 py-1.5">
                 {i.name}
                 {t.options.showSku && i.sku && <span className="text-slate-500 text-[10px]"> ({i.sku})</span>}
@@ -140,7 +141,7 @@ export function PrintDoc(p: PrintDocProps) {
       </table>
 
       {/* totals */}
-      <div className="flex justify-end mt-3 text-[12px]">
+      <div className="mt-3 flex justify-end text-[12.5px] break-inside-avoid">
         <table className={isA4 ? "w-[300px]" : "w-[260px]"}>
           <tbody>
             {visibleTotals.map((r) => (
@@ -164,15 +165,15 @@ export function PrintDoc(p: PrintDocProps) {
       </div>
 
       {t.options.showInWords && (
-        <div className="text-[11px] text-slate-600 mt-2 italic">
+        <div className="mt-2 text-[12px] italic text-slate-600 break-inside-avoid">
           {p.inWordsLabel}: {moneyToWords(p.grandTotal)}.
         </div>
       )}
 
       {t.options.showPaymentQr && p.paymentQr && (
-        <div className="mt-3 flex gap-3 rounded border border-slate-300 p-2 text-[11px]">
+        <div className="mt-3 flex gap-3 rounded border border-slate-300 p-2 text-[12px] break-inside-avoid">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={p.paymentQr.qrImageUrl} alt={p.paymentQr.title} className="h-24 w-24 object-contain" />
+          <img src={p.paymentQr.qrImageUrl} alt={p.paymentQr.title} className={isA4 ? "h-24 w-24 object-contain" : "h-20 w-20 object-contain"} />
           <div className="min-w-0 flex-1">
             <div className="font-bold">{p.paymentQr.title}</div>
             <div>{p.paymentQr.bankLabel}: <b>{p.paymentQr.bankName}</b></div>
@@ -183,18 +184,18 @@ export function PrintDoc(p: PrintDocProps) {
         </div>
       )}
 
-      {p.note && <div className="text-[11px] mt-2"><b>Ghi chú:</b> {p.note}</div>}
+      {p.note && <div className="mt-2 text-[12px] break-inside-avoid"><b>Ghi chú:</b> {p.note}</div>}
 
-      {t.options.showSignatures && p.signatures && (
-        <div className={`flex justify-between text-center text-[12px] ${isA4 ? "mt-14" : "mt-10"}`}>
-          {p.signatures.map((s) => (
+      {t.options.showSignatures && signatures && (
+        <div className={`flex justify-between text-center text-[12px] break-inside-avoid ${isA4 ? "mt-14" : "mt-8"}`}>
+          {signatures.map((s) => (
             <div key={s}><b>{s}</b><br /><i className="text-[10px] text-slate-500">{p.signHint ?? "(ký, họ tên)"}</i></div>
           ))}
         </div>
       )}
 
       {t.footerNote && (
-        <div className="border-t border-dashed border-slate-400 mt-8 pt-2 text-[10px] text-slate-500 text-center">
+        <div className={`mt-6 border-t border-dashed border-slate-400 pt-2 text-center text-[10.5px] text-slate-500 break-inside-avoid ${isA4 ? "" : "mt-5"}`}>
           {t.footerNote}
         </div>
       )}
