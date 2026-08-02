@@ -19,7 +19,7 @@ export default async function PrintServiceDocumentPage({
   return (
     <PrintPreviewModal closeHref={Routes.project(id)}>
       <PrintToolbar backHref={Routes.project(id)} baseHref={`/projects/${id}/documents/${documentId}/print`} size="a4" />
-      <div className="print-document-root flex min-h-0 flex-1 justify-center overflow-auto py-8 print:py-0">
+      <div className="print-document-root flex min-h-0 flex-1 items-start justify-center overflow-auto py-8 print:py-0">
         <article className="print-document min-h-[1000px] w-[794px] bg-white p-12 text-[13px] text-black shadow-lg print:shadow-none">
           <header className="border-b-2 border-black pb-4 text-center">
             <h1 className="text-xl font-bold">{document.title}</h1>

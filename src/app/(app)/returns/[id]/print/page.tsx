@@ -36,7 +36,7 @@ export default async function PrintReturnPage({ params, searchParams }: Props) {
         templates={templates}
         selectedTemplateId={template.id}
       />
-      <div className="print-document-root flex min-h-0 flex-1 justify-center overflow-auto py-8 print:py-0">
+      <div className="print-document-root flex min-h-0 flex-1 items-start justify-center overflow-auto py-8 print:py-0">
         <PrintDoc
           template={template}
           size={size}

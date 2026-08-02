@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useCallback, useEffect } from "react";
+import { type ReactNode, useCallback, useEffect, useLayoutEffect } from "react";
 import { useRouter } from "next/navigation";
 
 export function PrintPreviewModal({
@@ -20,6 +20,10 @@ export function PrintPreviewModal({
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [close]);
+
+  useLayoutEffect(() => {
+    document.querySelector<HTMLElement>(".print-document-root")?.scrollTo({ top: 0 });
+  }, []);
 
   return (
     <div
