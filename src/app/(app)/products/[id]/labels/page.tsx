@@ -165,19 +165,19 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
           {showLabelLineControls && (
             <div className="overflow-hidden rounded-lg border border-border-soft sm:col-span-2">
               <div className="border-b border-border-soft px-3 py-2 text-sm font-semibold">Số lượng từng tem</div>
-              <div className="max-h-64 overflow-auto">
-                <table className="w-full min-w-[720px] text-sm">
+              <div className="max-h-64 overflow-y-auto">
+                <table className="w-full table-fixed text-sm">
                   <thead className="sticky top-0 z-10 border-b border-border-soft bg-canvas text-left text-xs font-semibold text-slate-500 shadow-sm [&_th]:bg-canvas">
-                    <tr><th className="w-11 px-3 py-2" aria-label="Thao tác" /><th className="px-3 py-2">Mã hàng</th><th className="px-3 py-2">Tên hàng</th><th className="px-3 py-2">Đơn vị tính</th><th className="w-32 px-3 py-2 text-right">{t("products.labels.quantity")}</th></tr>
+                    <tr><th className="w-11 px-3 py-2" aria-label="Thao tác" /><th className="w-28 px-3 py-2 2xl:w-40">Mã hàng</th><th className="px-3 py-2">Tên hàng</th><th className="w-28 px-3 py-2 2xl:w-36">Đơn vị tính</th><th className="w-24 px-3 py-2 text-right 2xl:w-28">{t("products.labels.quantity")}</th></tr>
                   </thead>
                   <tbody className="divide-y divide-border-soft">
                     {labelProducts.map((labelProduct) => (
                       <tr key={labelProduct.key}>
                         <td className="px-3 py-2"><Link href={removeLabelHref(labelProduct.key)} aria-label={`Bỏ ${labelProduct.name} (${labelProduct.baseUnit})`} className="grid h-9 w-9 place-items-center rounded-md text-slate-400 hover:bg-er-soft hover:text-er"><Trash2 className="h-4 w-4" /></Link></td>
-                        <td className="px-3 py-2 font-mono text-xs text-slate-500">{labelProduct.sku}</td>
-                        <td className="px-3 py-2 font-medium">{labelProduct.name}</td>
-                        <td className="px-3 py-2 text-slate-500"><span>{labelProduct.baseUnit}</span><span className="ml-1 text-xs text-slate-400">· Tồn: {formatNumber(labelProduct.availableQuantity)}</span></td>
-                        <td className="px-3 py-2"><NumberInput name={`qty_${labelProduct.key}`} min={1} max={5000} defaultValue={labelProduct.quantity} thousandSeparator={false} className="h-10 w-24 bg-canvas" /></td>
+                        <td className="truncate px-3 py-2 font-mono text-xs text-slate-500" title={labelProduct.sku}>{labelProduct.sku}</td>
+                        <td className="truncate px-3 py-2 font-medium" title={labelProduct.name}>{labelProduct.name}</td>
+                        <td className="truncate px-3 py-2 text-slate-500" title={`${labelProduct.baseUnit} · Tồn: ${formatNumber(labelProduct.availableQuantity)}`}><span>{labelProduct.baseUnit}</span><span className="ml-1 text-xs text-slate-400">· Tồn: {formatNumber(labelProduct.availableQuantity)}</span></td>
+                        <td className="px-3 py-2"><NumberInput name={`qty_${labelProduct.key}`} min={1} max={5000} defaultValue={labelProduct.quantity} thousandSeparator={false} className="h-10 w-full min-w-0 bg-canvas" /></td>
                       </tr>
                     ))}
                   </tbody>
