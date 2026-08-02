@@ -3,11 +3,10 @@ import { getTranslations } from "next-intl/server";
 import { Routes } from "@/lib/routes";
 import { getOrder } from "@/lib/data/orders";
 import { getDefaultSepayBankAccount } from "@/lib/data/payment-bank-accounts";
-import { getPrintTemplate, getPrintTemplatesForDoc, type PaperSize } from "@/lib/print/template";
+import { getPrintTemplate, type PaperSize } from "@/lib/print/template";
 import { buildSepayVietQrImageUrl } from "@/lib/payments/sepay";
 import { PrintDoc } from "@/components/print/print-doc";
-import { PrintToolbar } from "@/components/print/print-toolbar";
-import { PrintPreviewModal } from "@/components/print/print-preview-modal";
+import { AutoPrint } from "@/components/print/auto-print";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -23,9 +22,8 @@ export default async function PrintOrderPage({ params, searchParams }: Props) {
   const isQuote = order.status === "quote";
   const isBooking = order.status === "confirmed";
   const docType = isQuote ? "quote" : isBooking ? "booking" : "order";
-  const [template, templates, defaultBankAccount] = await Promise.all([
+  const [template, defaultBankAccount] = await Promise.all([
     getPrintTemplate(docType, templateId),
-    getPrintTemplatesForDoc(docType),
     getDefaultSepayBankAccount(),
   ]);
 
@@ -68,9 +66,9 @@ export default async function PrintOrderPage({ params, searchParams }: Props) {
     : null;
 
   return (
-    <PrintPreviewModal closeHref={Routes.salesOrder(order.id, order.status)}>
-      <PrintToolbar backHref={Routes.salesOrder(order.id, order.status)} baseHref={`${Routes.order(order.id)}/print`} size={size} templates={templates} selectedTemplateId={template.id} />
-      <div className="print-document-root flex min-h-0 flex-1 items-start justify-center overflow-auto py-8 print:py-0">
+    <>
+      <AutoPrint closeHref={Routes.salesOrder(order.id, order.status)} />
+      <div className="print-document-root flex min-h-screen items-start justify-center overflow-auto py-8 print:py-0">
         <PrintDoc
           template={template}
           size={size}
@@ -113,6 +111,6 @@ export default async function PrintOrderPage({ params, searchParams }: Props) {
           }}
         />
       </div>
-    </PrintPreviewModal>
+    </>
   );
 }

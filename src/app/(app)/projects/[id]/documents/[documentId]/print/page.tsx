@@ -3,8 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { Routes } from "@/lib/routes";
 import { formatDate } from "@/lib/utils";
 import { getProjectDetail } from "@/lib/data/projects";
-import { PrintToolbar } from "@/components/print/print-toolbar";
-import { PrintPreviewModal } from "@/components/print/print-preview-modal";
+import { AutoPrint } from "@/components/print/auto-print";
 
 export default async function PrintServiceDocumentPage({
   params,
@@ -17,9 +16,9 @@ export default async function PrintServiceDocumentPage({
   if (!detail || !document) notFound();
   const t = await getTranslations();
   return (
-    <PrintPreviewModal closeHref={Routes.project(id)}>
-      <PrintToolbar backHref={Routes.project(id)} baseHref={`/projects/${id}/documents/${documentId}/print`} size="a4" />
-      <div className="print-document-root flex min-h-0 flex-1 items-start justify-center overflow-auto py-8 print:py-0">
+    <>
+      <AutoPrint closeHref={Routes.project(id)} />
+      <div className="print-document-root flex min-h-screen items-start justify-center overflow-auto py-8 print:py-0">
         <article className="print-document min-h-[1000px] w-[794px] bg-white p-12 text-[13px] text-black shadow-lg print:shadow-none">
           <header className="border-b-2 border-black pb-4 text-center">
             <h1 className="text-xl font-bold">{document.title}</h1>
@@ -34,6 +33,6 @@ export default async function PrintServiceDocumentPage({
           </section>
         </article>
       </div>
-    </PrintPreviewModal>
+    </>
   );
 }

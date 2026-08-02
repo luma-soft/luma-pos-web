@@ -2,10 +2,9 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { Routes } from "@/lib/routes";
 import { getPurchase } from "@/lib/data/inventory";
-import { getPrintTemplate, getPrintTemplatesForDoc, type PaperSize } from "@/lib/print/template";
+import { getPrintTemplate, type PaperSize } from "@/lib/print/template";
 import { PrintDoc } from "@/components/print/print-doc";
-import { PrintToolbar } from "@/components/print/print-toolbar";
-import { PrintPreviewModal } from "@/components/print/print-preview-modal";
+import { AutoPrint } from "@/components/print/auto-print";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -20,7 +19,6 @@ export default async function PrintPurchasePage({ params, searchParams }: Props)
     getPurchase(id).catch(() => null),
     getPrintTemplate("purchase", templateId),
   ]);
-  const templates = await getPrintTemplatesForDoc("purchase");
   if (!po) notFound();
 
   const size: PaperSize = (["a4", "a5", "k80"] as const).includes(sizeParam as PaperSize)
@@ -32,9 +30,9 @@ export default async function PrintPurchasePage({ params, searchParams }: Props)
   const owed = Math.max(0, total - paid);
 
   return (
-    <PrintPreviewModal closeHref={Routes.purchase(po.id)}>
-      <PrintToolbar backHref={Routes.purchase(po.id)} baseHref={`${Routes.purchase(po.id)}/print`} size={size} templates={templates} selectedTemplateId={template.id} />
-      <div className="print-document-root flex min-h-0 flex-1 items-start justify-center overflow-auto py-8 print:py-0">
+    <>
+      <AutoPrint closeHref={Routes.purchase(po.id)} />
+      <div className="print-document-root flex min-h-screen items-start justify-center overflow-auto py-8 print:py-0">
         <PrintDoc
           template={template}
           size={size}
@@ -83,6 +81,6 @@ export default async function PrintPurchasePage({ params, searchParams }: Props)
           }}
         />
       </div>
-    </PrintPreviewModal>
+    </>
   );
 }

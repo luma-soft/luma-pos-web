@@ -1,15 +1,17 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { getTranslations } from "next-intl/server";
 import type { getReturn } from "@/lib/data/returns";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { OrderDetailLink } from "@/components/order-detail-link";
+import { getPrintTemplatesForDoc } from "@/lib/print/template";
+import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 
 type ReturnDetail = NonNullable<Awaited<ReturnType<typeof getReturn>>>;
 
 export async function ReturnDetailPanel({ ret, compact = false }: { ret: ReturnDetail; compact?: boolean }) {
   const t = await getTranslations();
+  const printTemplates = await getPrintTemplatesForDoc("return");
 
   return (
     <div className={cn("bg-surface", compact ? "px-4 py-4" : "space-y-4")}>
@@ -104,9 +106,7 @@ export async function ReturnDetailPanel({ ret, compact = false }: { ret: ReturnD
       </div>
 
       <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-border-soft pt-4">
-        <Link href={`/returns/${ret.id}/print`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0")}>
-          {t("returns.print")}
-        </Link>
+        <PrintTemplateMenu baseHref={`/returns/${ret.id}/print`} templates={printTemplates} label={t("returns.print")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0")} />
       </div>
     </div>
   );

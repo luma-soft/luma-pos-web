@@ -3,11 +3,10 @@ import { getTranslations } from "next-intl/server";
 import { Routes } from "@/lib/routes";
 import { getOrder } from "@/lib/data/orders";
 import { getDefaultSepayBankAccount } from "@/lib/data/payment-bank-accounts";
-import { getPrintTemplate, getPrintTemplatesForDoc, type PaperSize } from "@/lib/print/template";
+import { getPrintTemplate, type PaperSize } from "@/lib/print/template";
 import { buildSepayVietQrImageUrl } from "@/lib/payments/sepay";
 import { PrintDoc } from "@/components/print/print-doc";
-import { PrintToolbar } from "@/components/print/print-toolbar";
-import { PrintPreviewModal } from "@/components/print/print-preview-modal";
+import { AutoPrint } from "@/components/print/auto-print";
 
 interface Props {
   searchParams: Promise<{ ids?: string | string[]; size?: string; templateId?: string }>;
@@ -20,9 +19,8 @@ export default async function PrintBatchPage({ searchParams }: Props) {
   const ids = (Array.isArray(params.ids) ? params.ids : params.ids ? [params.ids] : [])
     .filter(Boolean);
 
-  const [template, templates, defaultBankAccount] = await Promise.all([
+  const [template, defaultBankAccount] = await Promise.all([
     getPrintTemplate("order", params.templateId),
-    getPrintTemplatesForDoc("order"),
     getDefaultSepayBankAccount(),
   ]);
   const size: PaperSize = (["a4", "a5", "k80"] as const).includes(params.size as PaperSize)
@@ -45,15 +43,10 @@ export default async function PrintBatchPage({ searchParams }: Props) {
     );
   }
 
-  const baseHref = `/orders/print-batch?${ids.map((id) => `ids=${id}`).join("&")}`;
-
   return (
-    <PrintPreviewModal closeHref={Routes.Orders}>
-      <PrintToolbar backHref={Routes.Orders} baseHref={baseHref} size={size} templates={templates} selectedTemplateId={template.id} />
-      <div className="px-4 py-2 text-xs text-slate-500 text-center print:hidden">
-        {t("orders.batchCount", { count: orders.length })}
-      </div>
-      <div className="print-document-root flex min-h-0 flex-1 flex-col items-center gap-8 overflow-auto py-4 print:gap-0 print:py-0">
+    <>
+      <AutoPrint closeHref={Routes.Orders} />
+      <div className="print-document-root flex min-h-screen flex-col items-center gap-8 overflow-auto py-4 print:gap-0 print:py-0">
         {orders.map((order) => {
           const total = Number(order.total);
           const paid = Number(order.amountPaid);
@@ -132,6 +125,6 @@ export default async function PrintBatchPage({ searchParams }: Props) {
           );
         })}
       </div>
-    </PrintPreviewModal>
+    </>
   );
 }

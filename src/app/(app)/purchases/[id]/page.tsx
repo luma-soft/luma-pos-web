@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
-import { Copy, FilePenLine, Printer, ReceiptText } from "lucide-react";
+import { Copy, FilePenLine, ReceiptText } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { MobileRecordCard, MobileRecordField } from "@/components/mobile-ui";
@@ -11,6 +11,8 @@ import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Text } from "@/components/ui/text";
 import { PurchaseCancelButton } from "./purchase-actions";
+import { getPrintTemplatesForDoc } from "@/lib/print/template";
+import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 
 function statusClass(status: string) {
   if (status === "cancelled") return "bg-er-soft text-er";
@@ -29,6 +31,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
   const paid = Number(purchase.amountPaid);
   const owed = purchase.status === "cancelled" ? 0 : Math.max(0, total - paid);
   const canChange = purchase.status === "received" || purchase.status === "draft";
+  const printTemplates = await getPrintTemplatesForDoc("purchase");
 
   const printHref = `${Routes.purchase(purchase.id)}/print`;
   const copyHref = Routes.purchaseCopy(purchase.id);
@@ -44,10 +47,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
         badge={<span className={cn("inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium", statusClass(purchase.status))}>{t(`purchases.status.${purchase.status}` as never)}</span>}
       />
       <PurchaseDetailActionGroup label={t("common.actions")} className="-mt-3 mb-5">
-          <Link href={printHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11")}>
-            <Printer className="h-4 w-4" />
-            {t("print.printBtn")}
-          </Link>
+          <PrintTemplateMenu baseHref={printHref} templates={printTemplates} label={t("print.printBtn")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11")} />
           {canChange && (
             <>
               <Link href={copyHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11")}>
@@ -159,10 +159,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
                   <Copy className="h-4 w-4" />
                   {t("purchases.copy")}
                 </Link>
-                <Link href={printHref} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11")}>
-                  <Printer className="h-4 w-4" />
-                  {t("print.printBtn")}
-                </Link>
+                <PrintTemplateMenu baseHref={printHref} templates={printTemplates} label={t("print.printBtn")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11")} />
                 <Link href={editHref} className={cn(buttonVariants({ variant: "default", size: "sm" }), "min-h-11")}>
                   <FilePenLine className="h-4 w-4" />
                   {t("purchases.edit")}

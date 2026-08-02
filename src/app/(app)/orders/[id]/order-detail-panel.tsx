@@ -6,7 +6,7 @@ import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import type { OrderDetail } from "@/lib/data/orders";
 import { getStoreSettings } from "@/lib/data/settings";
-import { getPrintTemplate } from "@/lib/print/template";
+import { getPrintTemplate, getPrintTemplatesForDoc } from "@/lib/print/template";
 import type { ShareablePrintDocType } from "@/lib/print/share-document";
 import { OrderStatusBadge, PaymentStatusBadge } from "../status-badges";
 import { OrderActions, PaymentForm, SendOrderZaloButton } from "./order-actions";
@@ -16,6 +16,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { OrderDetailActionGroup } from "@/components/order-detail-action-group";
 import { OrderProductLink } from "@/components/order-product-link";
 import { BookingCreateOrderButton, QuoteDeleteButton } from "../../quotes/quote-actions";
+import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 
 type EInvoiceSummary = {
   id: string;
@@ -56,7 +57,9 @@ export async function OrderDetailPanel({
         : isBooking
           ? "booking"
           : null;
+  const printDocType = isQuote ? "quote" : isBooking ? "booking" : "order";
   const shareTemplate = shareDocType ? await getPrintTemplate(shareDocType) : null;
+  const printTemplates = await getPrintTemplatesForDoc(printDocType);
   const shareHref = shareTemplate
     ? `${Routes.order(order.id)}/print?${new URLSearchParams({ templateId: shareTemplate.id, size: shareTemplate.paperDefault }).toString()}`
     : null;
@@ -328,9 +331,12 @@ export async function OrderDetailPanel({
           )}
           {isBooking && !cancelled && <BookingCreateOrderButton bookingId={order.id} />}
           {shareDocType && shareHref && <SharePrintDocButton href={shareHref} code={order.code} docType={shareDocType} />}
-          <Link href={`${Routes.order(order.id)}/print`} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-11 lg:h-9")}>
-            {t("print.printBtn")}
-          </Link>
+          <PrintTemplateMenu
+            baseHref={`${Routes.order(order.id)}/print`}
+            templates={printTemplates}
+            label={t("print.printBtn")}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-11 lg:h-9")}
+          />
           {(order.status === "completed" || order.status === "quote" || order.status === "confirmed") && order.returns.length === 0 && (
             <Link href={posSourceHref("edit")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-11 bg-white dark:bg-surface lg:h-9")}>
               {isQuote ? t("quotes.edit") : isBooking ? t("bookings.edit") : t("orderEdit.action")}
