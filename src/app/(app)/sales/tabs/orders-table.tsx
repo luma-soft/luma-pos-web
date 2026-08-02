@@ -7,6 +7,8 @@ import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/component
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { OrderListRow } from "@/lib/data/orders";
 import { OrderStatusBadge, PaymentStatusBadge } from "../../orders/status-badges";
+import { PrintTemplateMenu } from "@/components/print/print-template-menu";
+import type { PrintTemplate } from "@/lib/print/template-shared";
 
 export function normalizeOrderBatchSelection(
   selectedIds: Set<string>,
@@ -89,14 +91,19 @@ export function OrderSelectionCheckbox({
 
 export function OrderBatchToolbar({
   selectedCount,
+  selectedIds,
+  templates,
   labels,
 }: {
   selectedCount: number;
+  selectedIds: string[];
+  templates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[];
   labels: {
     merge: string;
     print: string;
   };
 }) {
+  const batchHref = `/orders/print-batch?${selectedIds.map((id) => `ids=${encodeURIComponent(id)}`).join("&")}`;
   return (
     <div className="flex w-full items-center justify-end gap-2 text-sm">
       <span className="rounded-full bg-primary-100 px-2 py-1 text-xs font-bold text-primary-700" aria-live="polite">
@@ -111,14 +118,9 @@ export function OrderBatchToolbar({
         >
           {labels.merge}
         </button>
-        <button
-          type="submit"
-          formAction="/orders/print-batch"
-          disabled={selectedCount === 0}
-          className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:min-w-0"
-        >
-          {labels.print}
-        </button>
+        {selectedCount > 0
+          ? <PrintTemplateMenu baseHref={batchHref} templates={templates} label={labels.print} className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2 lg:min-h-0 lg:min-w-0" />
+          : <button type="button" disabled className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold opacity-50 lg:min-h-0 lg:min-w-0">{labels.print}</button>}
       </div>
     </div>
   );
@@ -175,9 +177,11 @@ export function OrderMobileRow({
 
 export function OrdersTable({
   rows,
+  printTemplates,
   selection,
 }: {
   rows: OrderListRow[];
+  printTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[];
   selection?: {
     selectedIds: Set<string>;
     onChange: (next: Set<string>) => void;
@@ -343,6 +347,8 @@ export function OrdersTable({
         toolbar={(
           <OrderBatchToolbar
             selectedCount={selectedVisibleIds.length}
+            selectedIds={selectedVisibleIds}
+            templates={printTemplates}
             labels={{
               merge: t("merge.title"),
               print: t("orders.printSelected"),

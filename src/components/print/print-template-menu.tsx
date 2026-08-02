@@ -36,7 +36,10 @@ export function PrintTemplateMenu({
   }, []);
 
   const print = (template: Pick<PrintTemplate, "id" | "paperDefault">) => {
-    const params = new URLSearchParams({ templateId: template.id, size: template.paperDefault, embedded: "1" });
+    const url = new URL(baseHref, window.location.origin);
+    url.searchParams.set("templateId", template.id);
+    url.searchParams.set("size", template.paperDefault);
+    url.searchParams.set("embedded", "1");
     const frame = document.createElement("iframe");
     frame.setAttribute("aria-hidden", "true");
     frame.className = "fixed h-px w-px opacity-0 pointer-events-none";
@@ -53,7 +56,7 @@ export function PrintTemplateMenu({
       printFrame();
     };
     window.addEventListener("message", onMessage);
-    frame.src = `${baseHref}?${params.toString()}`;
+    frame.src = url.toString();
     document.body.appendChild(frame);
     setOpen(false);
   };

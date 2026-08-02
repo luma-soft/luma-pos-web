@@ -11,6 +11,7 @@ import { parsePageSize } from "@/lib/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { OrdersTable } from "./orders-table";
 import { InstantFilterForm } from "@/components/instant-filter-form";
+import { getPrintTemplatesForDoc } from "@/lib/print/template";
 
 type SP = Record<string, string | undefined>;
 
@@ -120,7 +121,10 @@ async function OrdersContent({ searchParams }: { searchParams: SP }) {
   const page = Number(params.page) || 1;
   const pageSize = parsePageSize(params.size);
 
-  const { rows, total, pageCount } = await getOrders({ orderId: params.orderId, q: params.q, status, payment, source, from, to, page, pageSize });
+  const [{ rows, total, pageCount }, printTemplates] = await Promise.all([
+    getOrders({ orderId: params.orderId, q: params.q, status, payment, source, from, to, page, pageSize }),
+    getPrintTemplatesForDoc("order"),
+  ]);
 
   return (
     <>
@@ -131,7 +135,7 @@ async function OrdersContent({ searchParams }: { searchParams: SP }) {
         </div>
       ) : (
         <>
-          <OrdersTable rows={rows} />
+          <OrdersTable rows={rows} printTemplates={printTemplates} />
         </>
       )}
 
