@@ -3,12 +3,12 @@ import { getTranslations } from "next-intl/server";
 import bwipjs from "bwip-js/node";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { X } from "lucide-react";
+import { Trash2, X } from "lucide-react";
 import { getProduct } from "@/lib/data/products";
 import { getLabelTemplate, getLabelTemplates } from "@/lib/labels/template";
 import type { LabelTemplate } from "@/lib/labels/template-shared";
 import { Routes } from "@/lib/routes";
-import { cn, formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatNumber } from "@/lib/utils";
 import { LabelPrintButton } from "./label-print-button";
 import { getStoreSettings } from "@/lib/data/settings";
 import { NumberInput } from "@/components/ui/number-input";
@@ -21,18 +21,21 @@ interface Props {
 }
 
 type LabelProduct = {
+  key: string;
   id: string;
   name: string;
   sku: string;
   barcode?: string | null;
   retailPrice: string;
   baseUnit: string;
+  multiplier: number;
+  availableQuantity: number;
   quantity: number;
 };
 
-function clampQty(value: string | undefined) {
+function clampQty(value: string | undefined, fallback = 1) {
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? Math.min(Math.max(Math.round(parsed), 1), 500) : 12;
+  return Number.isFinite(parsed) ? Math.min(Math.max(Math.round(parsed), 1), 5000) : fallback;
 }
 
 function pickCode(product: LabelProduct) {
@@ -44,8 +47,8 @@ function selectedProductIds(primaryId: string, idsParam?: string) {
   return [...new Set(ids)].slice(0, 100);
 }
 
-function quantityForProduct(query: Record<string, string | undefined>, productId: string) {
-  return clampQty(query[`qty_${productId}`] ?? "1");
+function defaultQuantity(totalStock: string, multiplier: number) {
+  return Math.max(1, Math.floor(Math.max(0, Number(totalStock) || 0) / Math.max(1, multiplier)));
 }
 
 function barcodeSvg(value: string, template: LabelTemplate) {
@@ -75,31 +78,51 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
   if (!product) notFound();
 
   const template = await getLabelTemplate(query.templateId);
-  const qty = clampQty(query.qty);
   const isBatch = products.length > 1;
   const hasPriceOverride = query.price !== undefined && query.price !== "" && Number.isFinite(Number(query.price));
-  const labelProducts: LabelProduct[] = products.flatMap((selectedProduct) => {
-    const selectedQuantity = isBatch ? quantityForProduct(query, selectedProduct.id) : qty;
-    return selectedProduct.isVariantParent && selectedProduct.children.length > 0
-    ? selectedProduct.children.map((child) => ({
-        id: child.id,
-        name: child.name,
-        sku: child.sku,
-        barcode: child.barcode,
-        retailPrice: child.retailPrice,
-        baseUnit: child.baseUnit,
-        quantity: selectedQuantity,
-      }))
-    : [{
-        id: selectedProduct.id,
-        name: selectedProduct.name,
-        sku: selectedProduct.sku,
-        barcode: selectedProduct.barcode,
-        retailPrice: selectedProduct.retailPrice,
-        baseUnit: selectedProduct.baseUnit,
-        quantity: selectedQuantity,
-      }];
+  const excludedLabelKeys = new Set((query.exclude ?? "").split(",").filter(Boolean));
+  const allLabelProducts: LabelProduct[] = products.flatMap((selectedProduct) => {
+    const printableProducts = selectedProduct.isVariantParent && selectedProduct.children.length > 0
+      ? selectedProduct.children
+      : [selectedProduct];
+    return printableProducts.flatMap((printableProduct) => {
+      const units = [
+        {
+          unitName: printableProduct.baseUnit,
+          multiplier: "1",
+          barcode: printableProduct.barcode,
+          priceOverride: null,
+        },
+        ...printableProduct.units,
+      ];
+      return units.map((unit, index) => {
+        const key = `${printableProduct.id}:${index}`;
+        const multiplier = Number(unit.multiplier) || 1;
+        const retailPrice = unit.priceOverride ?? printableProduct.retailPrice;
+        return {
+          key,
+          id: printableProduct.id,
+          name: printableProduct.name,
+          sku: printableProduct.sku,
+          barcode: unit.barcode ?? printableProduct.barcode,
+          retailPrice,
+          baseUnit: unit.unitName,
+          multiplier,
+          availableQuantity: defaultQuantity(printableProduct.totalStock, multiplier),
+          quantity: clampQty(query[`qty_${key}`], defaultQuantity(printableProduct.totalStock, multiplier)),
+        };
+      });
+    });
   });
+  const labelProducts = allLabelProducts.filter((labelProduct) => !excludedLabelKeys.has(labelProduct.key));
+  const showLabelLineControls = isBatch || allLabelProducts.length > 1;
+
+  function removeLabelHref(key: string) {
+    const next = new URLSearchParams();
+    for (const [paramKey, value] of Object.entries(query)) if (value) next.set(paramKey, value);
+    next.set("exclude", [...excludedLabelKeys, key].join(","));
+    return `${Routes.productLabels(product.id)}?${next.toString()}`;
+  }
   const labels = labelProducts.flatMap((item) => Array.from({ length: item.quantity }, () => {
     const code = pickCode(item);
     return {
@@ -132,35 +155,29 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
 
         <div className="flex min-h-0 flex-1 flex-col p-4 sm:p-5 print:block print:overflow-visible print:p-0">
 
-        <InstantFilterForm className={cn(
-          "mb-4 shrink-0 grid gap-3 rounded-card border border-border bg-surface p-4 print:hidden",
-          isBatch
-            ? "sm:grid-cols-[minmax(0,1fr)_280px]"
-            : "sm:grid-cols-[minmax(0,1fr)_150px_280px]",
-        )}>
+        <InstantFilterForm className="mb-4 shrink-0 grid gap-3 rounded-card border border-border bg-surface p-4 print:hidden sm:grid-cols-[minmax(0,1fr)_280px]">
           {query.ids && <input type="hidden" name="ids" value={query.ids} />}
           {query.from && <input type="hidden" name="from" value={query.from} />}
           <Field label={t("products.labels.template")}><Select name="templateId" defaultValue={template.id} options={templates.map((item) => ({ value: item.id, label: item.name }))} rootClassName="w-full" searchable /></Field>
-          {!isBatch && <Field label={t("products.labels.quantity")}>
-            <NumberInput name="qty" min={1} max={500} defaultValue={qty} thousandSeparator={false} className="h-11 bg-canvas lg:h-10" />
-          </Field>}
           <Field label={t("products.labels.price")}>
             <NumberInput name="price" min={0} step={1000} defaultValue={hasPriceOverride ? Number(query.price) : isBatch ? undefined : Number(product.retailPrice)} placeholder={isBatch ? "Giá riêng theo sản phẩm" : undefined} suffix="đ" thousandSeparator formatOnChange className="h-11 bg-canvas lg:h-10" />
           </Field>
-          {isBatch && (
+          {showLabelLineControls && (
             <div className="overflow-hidden rounded-lg border border-border-soft sm:col-span-2">
-              <div className="border-b border-border-soft px-3 py-2 text-sm font-semibold">Số lượng từng sản phẩm</div>
+              <div className="border-b border-border-soft px-3 py-2 text-sm font-semibold">Số lượng từng tem</div>
               <div className="max-h-64 overflow-auto">
-                <table className="w-full min-w-[520px] text-sm">
+                <table className="w-full min-w-[720px] text-sm">
                   <thead className="sticky top-0 bg-canvas text-left text-xs font-semibold text-slate-500">
-                    <tr><th className="px-3 py-2">Mã hàng</th><th className="px-3 py-2">Tên hàng</th><th className="w-32 px-3 py-2 text-right">{t("products.labels.quantity")}</th></tr>
+                    <tr><th className="w-11 px-3 py-2" aria-label="Thao tác" /><th className="px-3 py-2">Mã hàng</th><th className="px-3 py-2">Tên hàng</th><th className="px-3 py-2">Đơn vị tính</th><th className="w-32 px-3 py-2 text-right">{t("products.labels.quantity")}</th></tr>
                   </thead>
                   <tbody className="divide-y divide-border-soft">
-                    {products.map((selectedProduct) => (
-                      <tr key={selectedProduct.id}>
-                        <td className="px-3 py-2 font-mono text-xs text-slate-500">{selectedProduct.sku}</td>
-                        <td className="px-3 py-2 font-medium">{selectedProduct.name}</td>
-                        <td className="px-3 py-2"><NumberInput name={`qty_${selectedProduct.id}`} min={1} max={500} defaultValue={quantityForProduct(query, selectedProduct.id)} thousandSeparator={false} className="h-10 w-24 bg-canvas" /></td>
+                    {labelProducts.map((labelProduct) => (
+                      <tr key={labelProduct.key}>
+                        <td className="px-3 py-2"><Link href={removeLabelHref(labelProduct.key)} aria-label={`Bỏ ${labelProduct.name} (${labelProduct.baseUnit})`} className="grid h-9 w-9 place-items-center rounded-md text-slate-400 hover:bg-er-soft hover:text-er"><Trash2 className="h-4 w-4" /></Link></td>
+                        <td className="px-3 py-2 font-mono text-xs text-slate-500">{labelProduct.sku}</td>
+                        <td className="px-3 py-2 font-medium">{labelProduct.name}</td>
+                        <td className="px-3 py-2 text-slate-500"><span>{labelProduct.baseUnit}</span><span className="ml-1 text-xs text-slate-400">· Tồn: {formatNumber(labelProduct.availableQuantity)}</span></td>
+                        <td className="px-3 py-2"><NumberInput name={`qty_${labelProduct.key}`} min={1} max={5000} defaultValue={labelProduct.quantity} thousandSeparator={false} className="h-10 w-24 bg-canvas" /></td>
                       </tr>
                     ))}
                   </tbody>

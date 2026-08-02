@@ -862,7 +862,38 @@ export async function getProduct(id: string) {
         .orderBy(asc(products.name))
     : [];
 
-  return { ...p, units, comboItems, suppliers: supplierRows, siblings, children };
+  const childUnits = children.length > 0
+    ? await db
+        .select({
+          productId: productUnits.productId,
+          unitName: productUnits.unitName,
+          multiplier: productUnits.multiplier,
+          barcode: productUnits.barcode,
+          priceOverride: productUnits.priceOverride,
+        })
+        .from(productUnits)
+        .where(inArray(productUnits.productId, children.map((child) => child.id)))
+        .orderBy(asc(productUnits.sortOrder))
+    : [];
+  const childUnitsByProduct = new Map<string, typeof childUnits>();
+  for (const unit of childUnits) {
+    childUnitsByProduct.set(unit.productId, [
+      ...(childUnitsByProduct.get(unit.productId) ?? []),
+      unit,
+    ]);
+  }
+
+  return {
+    ...p,
+    units,
+    comboItems,
+    suppliers: supplierRows,
+    siblings,
+    children: children.map((child) => ({
+      ...child,
+      units: childUnitsByProduct.get(child.id) ?? [],
+    })),
+  };
 }
 export type ProductDetail = NonNullable<Awaited<ReturnType<typeof getProduct>>>;
 
