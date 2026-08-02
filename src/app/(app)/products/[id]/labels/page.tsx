@@ -17,7 +17,7 @@ import { InstantFilterForm } from "@/components/instant-filter-form";
 
 interface Props {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ templateId?: string; qty?: string; codeSource?: string; price?: string; ids?: string; from?: string }>;
+  searchParams: Promise<Record<string, string | undefined>>;
 }
 
 type CodeSource = "barcode" | "sku";
@@ -28,6 +28,7 @@ type LabelProduct = {
   barcode?: string | null;
   retailPrice: string;
   baseUnit: string;
+  quantity: number;
 };
 
 function clampQty(value: string | undefined) {
@@ -43,6 +44,10 @@ function pickCode(product: LabelProduct, source: CodeSource) {
 function selectedProductIds(primaryId: string, idsParam?: string) {
   const ids = [primaryId, ...(idsParam?.split(",") ?? [])].filter(Boolean);
   return [...new Set(ids)].slice(0, 100);
+}
+
+function quantityForProduct(query: Record<string, string | undefined>, productId: string) {
+  return clampQty(query[`qty_${productId}`] ?? "1");
 }
 
 function barcodeSvg(value: string, template: LabelTemplate) {
@@ -76,7 +81,9 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
   const codeSource: CodeSource = query.codeSource === "sku" ? "sku" : "barcode";
   const isBatch = products.length > 1;
   const hasPriceOverride = query.price !== undefined && query.price !== "" && Number.isFinite(Number(query.price));
-  const labelProducts: LabelProduct[] = products.flatMap((selectedProduct) => selectedProduct.isVariantParent && selectedProduct.children.length > 0
+  const labelProducts: LabelProduct[] = products.flatMap((selectedProduct) => {
+    const selectedQuantity = isBatch ? quantityForProduct(query, selectedProduct.id) : qty;
+    return selectedProduct.isVariantParent && selectedProduct.children.length > 0
     ? selectedProduct.children.map((child) => ({
         id: child.id,
         name: child.name,
@@ -84,6 +91,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
         barcode: child.barcode,
         retailPrice: child.retailPrice,
         baseUnit: child.baseUnit,
+        quantity: selectedQuantity,
       }))
     : [{
         id: selectedProduct.id,
@@ -92,8 +100,10 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
         barcode: selectedProduct.barcode,
         retailPrice: selectedProduct.retailPrice,
         baseUnit: selectedProduct.baseUnit,
-      }]);
-  const labels = labelProducts.flatMap((item) => Array.from({ length: qty }, () => {
+        quantity: selectedQuantity,
+      }];
+  });
+  const labels = labelProducts.flatMap((item) => Array.from({ length: item.quantity }, () => {
     const code = pickCode(item, codeSource);
     return {
       product: item,
@@ -125,17 +135,38 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
 
         <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-5 print:overflow-visible print:p-0">
 
-        <InstantFilterForm className="mb-4 grid gap-3 rounded-card border border-border bg-surface p-4 print:hidden sm:grid-cols-[minmax(0,1fr)_120px_150px_150px]">
+        <InstantFilterForm className="mb-4 grid gap-3 rounded-card border border-border bg-surface p-4 print:hidden sm:grid-cols-[minmax(0,1fr)_150px_150px]">
           {query.ids && <input type="hidden" name="ids" value={query.ids} />}
           {query.from && <input type="hidden" name="from" value={query.from} />}
           <Field label={t("products.labels.template")}><Select name="templateId" defaultValue={template.id} options={templates.map((item) => ({ value: item.id, label: item.name }))} rootClassName="w-full" searchable /></Field>
-          <Field label={t("products.labels.quantity")}>
+          {!isBatch && <Field label={t("products.labels.quantity")}>
             <NumberInput name="qty" min={1} max={500} defaultValue={qty} thousandSeparator={false} className="h-11 bg-canvas lg:h-10" />
-          </Field>
+          </Field>}
           <Field label={t("products.labels.codeSource")}><Select name="codeSource" defaultValue={codeSource} options={[{ value: "barcode", label: t("products.labels.codeSourceBarcode") }, { value: "sku", label: t("products.labels.codeSourceSku") }]} rootClassName="w-full" /></Field>
           <Field label={t("products.labels.price")}>
             <NumberInput name="price" min={0} step={1000} defaultValue={hasPriceOverride ? Number(query.price) : isBatch ? undefined : Number(product.retailPrice)} placeholder={isBatch ? "Giá riêng theo sản phẩm" : undefined} suffix="đ" className="h-11 bg-canvas lg:h-10" />
           </Field>
+          {isBatch && (
+            <div className="overflow-hidden rounded-lg border border-border-soft sm:col-span-3">
+              <div className="border-b border-border-soft px-3 py-2 text-sm font-semibold">Số lượng từng sản phẩm</div>
+              <div className="max-h-64 overflow-auto">
+                <table className="w-full min-w-[520px] text-sm">
+                  <thead className="sticky top-0 bg-canvas text-left text-xs font-semibold text-slate-500">
+                    <tr><th className="px-3 py-2">Mã hàng</th><th className="px-3 py-2">Tên hàng</th><th className="w-32 px-3 py-2 text-right">{t("products.labels.quantity")}</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-soft">
+                    {products.map((selectedProduct) => (
+                      <tr key={selectedProduct.id}>
+                        <td className="px-3 py-2 font-mono text-xs text-slate-500">{selectedProduct.sku}</td>
+                        <td className="px-3 py-2 font-medium">{selectedProduct.name}</td>
+                        <td className="px-3 py-2"><NumberInput name={`qty_${selectedProduct.id}`} min={1} max={500} defaultValue={quantityForProduct(query, selectedProduct.id)} thousandSeparator={false} className="h-10 w-24 bg-canvas" /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </InstantFilterForm>
 
         <section className="rounded-card border border-border bg-surface p-4 print:border-0 print:bg-white print:p-0">
