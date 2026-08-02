@@ -34,7 +34,7 @@ export function PrintPreviewModal({
         role="dialog"
         aria-modal="true"
         aria-label="Xem trước bản in"
-        className="print-preview-panel flex h-dvh w-full flex-col overflow-hidden bg-slate-200 shadow-2xl dark:bg-slate-950 sm:h-[min(94dvh,1100px)] sm:max-w-[1100px] sm:rounded-2xl"
+        className="print-preview-panel flex h-dvh w-full max-w-7xl flex-col overflow-hidden bg-slate-200 shadow-2xl dark:bg-slate-950 sm:h-[min(92dvh,920px)] sm:rounded-2xl"
         onMouseDown={(event) => event.stopPropagation()}
       >
         {children}

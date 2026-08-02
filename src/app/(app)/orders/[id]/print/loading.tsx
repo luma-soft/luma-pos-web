@@ -7,7 +7,7 @@ export default function PrintOrderLoading() {
         role="status"
         aria-live="polite"
         aria-label="Đang tạo bản xem trước để in"
-        className="flex h-dvh w-full flex-col overflow-hidden bg-slate-200 shadow-2xl dark:bg-slate-950 sm:h-[min(94dvh,1100px)] sm:max-w-[1100px] sm:rounded-2xl"
+        className="flex h-dvh w-full max-w-7xl flex-col overflow-hidden bg-slate-200 shadow-2xl dark:bg-slate-950 sm:h-[min(92dvh,920px)] sm:rounded-2xl"
       >
         <div className="flex shrink-0 items-center justify-between border-b border-border bg-surface px-4 py-3 sm:px-5">
           <div className="h-8 w-44 animate-pulse rounded-lg bg-surface-2" />
