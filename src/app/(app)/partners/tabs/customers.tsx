@@ -1,6 +1,7 @@
 import { getCustomers, type CustomerFilters } from "@/lib/data/partners";
 import { parsePageSize } from "@/lib/pagination";
 import { CustomersTable } from "./customers-table";
+import { getPrintTemplatesForDoc } from "@/lib/print/template";
 
 type SP = Record<string, string | undefined>;
 const FILTER_KEYS = [
@@ -22,9 +23,9 @@ export async function CustomersTab({ searchParams }: { searchParams: SP }) {
   const page = Number(params.page) || 1;
   const pageSize = parsePageSize(params.size);
   const filters = normalizeFilters(params, page, pageSize);
-  const data = await getCustomers(filters);
+  const [data, returnPrintTemplates] = await Promise.all([getCustomers(filters), getPrintTemplatesForDoc("return")]);
 
-  return <CustomersTable data={data} filters={filters} aiPreview={params.source === "ai-preview"} />;
+  return <CustomersTable data={data} filters={filters} returnPrintTemplates={returnPrintTemplates} aiPreview={params.source === "ai-preview"} />;
 }
 
 function normalizeFilters(params: SP, page: number, pageSize: number): CustomerFilters {

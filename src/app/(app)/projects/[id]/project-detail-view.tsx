@@ -27,6 +27,7 @@ import {
 import { ProjectEdit } from "../project-widgets";
 import { ProjectServiceTab, ProjectServiceTabs } from "./project-service-tabs";
 import { MobileRecordCard, MobileRecordField } from "@/components/mobile-ui";
+import { DirectPrintButton } from "@/components/print/direct-print-button";
 
 type ServiceOptions = Awaited<ReturnType<typeof getServiceFormOptions>> | null;
 type Translator = Awaited<ReturnType<typeof getTranslations>>;
@@ -216,7 +217,7 @@ function ProjectDetailBody({
                       {document.photoUrls.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{document.photoUrls.map((url) => <a key={url} href={url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 min-w-11 items-center text-xs font-semibold text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">{t("services.documents.photoLink")}</a>)}</div>}
                     </div>
                     <div className="flex items-center gap-2">
-                      <Link href={`/projects/${project.id}/documents/${document.id}/print`} className="inline-flex min-h-11 min-w-11 items-center text-xs font-semibold text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">{t("services.documents.print")}</Link>
+                      <DirectPrintButton href={`/projects/${project.id}/documents/${document.id}/print`} className="inline-flex min-h-11 min-w-11 items-center text-xs font-semibold text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">{t("services.documents.print")}</DirectPrintButton>
                       <ServiceHandoverEditor projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} initial={document} />
                     </div>
                   </div>

@@ -58,8 +58,11 @@ export async function OrderDetailPanel({
           ? "booking"
           : null;
   const printDocType = isQuote ? "quote" : isBooking ? "booking" : "order";
-  const shareTemplate = shareDocType ? await getPrintTemplate(shareDocType) : null;
-  const printTemplates = await getPrintTemplatesForDoc(printDocType);
+  const [shareTemplate, printTemplates, returnPrintTemplates] = await Promise.all([
+    shareDocType ? getPrintTemplate(shareDocType) : Promise.resolve(null),
+    getPrintTemplatesForDoc(printDocType),
+    getPrintTemplatesForDoc("return"),
+  ]);
   const shareHref = shareTemplate
     ? `${Routes.order(order.id)}/print?${new URLSearchParams({ templateId: shareTemplate.id, size: shareTemplate.paperDefault }).toString()}`
     : null;
@@ -234,12 +237,12 @@ export async function OrderDetailPanel({
                       <span className="break-words">{t(`returns.reasons.${row.reason}` as never)}</span>
                       <span className="break-words text-right">{t(`returns.refundMethods.${row.refundMethod}` as never)}</span>
                     </div>
-                    <Link
-                      href={`/returns/${row.id}/print`}
-                      className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-xs font-semibold text-primary-600 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                    >
-                      {t("print.printBtn")}
-                    </Link>
+                    <PrintTemplateMenu
+                      baseHref={`/returns/${row.id}/print`}
+                      templates={returnPrintTemplates}
+                      label={t("print.printBtn")}
+                      className="min-h-11 min-w-11 justify-center rounded-lg px-2 text-xs font-semibold text-primary-600 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                    />
                   </div>
                 ))}
               </div>
@@ -254,7 +257,7 @@ export async function OrderDetailPanel({
                         <td className="px-3 py-3">{t(`returns.refundMethods.${row.refundMethod}` as never)}</td>
                         <td className="px-3 py-3 text-right tabular-nums font-semibold text-er">- {formatCurrency(Number(row.totalRefund))}</td>
                         <td className="px-3 py-3 text-right">
-                          <Link href={`/returns/${row.id}/print`} className="text-xs font-medium text-primary-600 hover:underline">{t("print.printBtn")}</Link>
+                          <PrintTemplateMenu baseHref={`/returns/${row.id}/print`} templates={returnPrintTemplates} label={t("print.printBtn")} className="text-xs font-medium text-primary-600 hover:underline" />
                         </td>
                       </tr>
                     ))}

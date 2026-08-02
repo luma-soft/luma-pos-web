@@ -10,6 +10,7 @@ import { Select } from "@/components/ui/select";
 import { InstantFilterForm } from "@/components/instant-filter-form";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { PurchasesTable } from "./purchases-table";
+import { getPrintTemplatesForDoc } from "@/lib/print/template";
 
 type SP = Record<string, string | undefined>;
 const PSTATUS = ["", "draft", "received", "returned", "cancelled"] as const;
@@ -30,7 +31,10 @@ async function PurchasesContent({ searchParams }: { searchParams: SP }) {
   const page = Number(params.page) || 1;
   const pageSize = parsePageSize(params.size);
   const status = PSTATUS.includes(params.status as typeof PSTATUS[number]) ? (params.status ?? "") : "";
-  const { rows, total, pageCount } = await getPurchases({ q: params.q, status: status || undefined, page, pageSize });
+  const [{ rows, total, pageCount }, printTemplates] = await Promise.all([
+    getPurchases({ q: params.q, status: status || undefined, page, pageSize }),
+    getPrintTemplatesForDoc("purchase"),
+  ]);
 
   return (
     <>
@@ -60,7 +64,7 @@ async function PurchasesContent({ searchParams }: { searchParams: SP }) {
         </div>
       ) : (
         <>
-          <PurchasesTable rows={rows} />
+          <PurchasesTable rows={rows} printTemplates={printTemplates} />
         </>
       )}
 

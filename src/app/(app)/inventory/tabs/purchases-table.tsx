@@ -3,12 +3,14 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Copy, FilePenLine, Printer, ReceiptText } from "lucide-react";
+import { Copy, FilePenLine, ReceiptText } from "lucide-react";
 import { PurchaseCancelButton } from "../../purchases/purchase-cancel-button";
 import { DataTableShell, RowPreviewModal, type DataTableColumn } from "@/components/data-table";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import type { getPurchases } from "@/lib/data/inventory";
+import type { PrintTemplate } from "@/lib/print/template-shared";
+import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 
 type PurchaseRow = Awaited<ReturnType<typeof getPurchases>>["rows"][number];
 
@@ -23,7 +25,7 @@ function purchaseOwed(purchase: PurchaseRow) {
   return Math.max(0, Number(purchase.total) - Number(purchase.amountPaid));
 }
 
-export function PurchasesTable({ rows }: { rows: PurchaseRow[] }) {
+export function PurchasesTable({ rows, printTemplates }: { rows: PurchaseRow[]; printTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[] }) {
   const t = useTranslations();
   const [selectedPurchase, setSelectedPurchase] = useState<PurchaseRow | null>(null);
   const columns: DataTableColumn<PurchaseRow>[] = [
@@ -75,7 +77,7 @@ export function PurchasesTable({ rows }: { rows: PurchaseRow[] }) {
           </span>
         )}
         bodyClassName="flex flex-col !overflow-hidden"
-        footer={selectedPurchase && <PurchaseDetailFooter purchase={selectedPurchase} />}
+        footer={selectedPurchase && <PurchaseDetailFooter purchase={selectedPurchase} printTemplates={printTemplates} />}
       >
         {selectedPurchase && <PurchaseDetailContent purchase={selectedPurchase} />}
       </RowPreviewModal>
@@ -215,7 +217,7 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
   );
 }
 
-function PurchaseDetailFooter({ purchase }: { purchase: PurchaseRow }) {
+function PurchaseDetailFooter({ purchase, printTemplates }: { purchase: PurchaseRow; printTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[] }) {
   const t = useTranslations();
   const canChange = purchase.status === "received" || purchase.status === "draft";
   const printHref = `${Routes.purchase(purchase.id)}/print`;
@@ -232,10 +234,7 @@ function PurchaseDetailFooter({ purchase }: { purchase: PurchaseRow }) {
         )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Link href={printHref} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-semibold text-primary-600 hover:bg-surface-2 lg:min-h-8 min-w-11 lg:min-w-0">
-          <Printer className="h-3.5 w-3.5" />
-          {t("print.printBtn")}
-        </Link>
+        <PrintTemplateMenu baseHref={printHref} templates={printTemplates} label={t("print.printBtn")} className="min-h-11 min-w-11 rounded-lg border border-border px-3 text-xs font-semibold text-primary-600 hover:bg-surface-2 lg:min-h-8 lg:min-w-0" />
         {canChange && (
           <Link href={Routes.purchaseEdit(purchase.id)} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-3 text-xs font-semibold text-white hover:brightness-110 lg:min-h-8 min-w-11 lg:min-w-0">
             <FilePenLine className="h-3.5 w-3.5" />

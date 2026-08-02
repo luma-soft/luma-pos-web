@@ -38,6 +38,8 @@ import { setCustomerActive } from "@/lib/actions/partners";
 import type { CustomerFilters, CustomerListResult } from "@/lib/data/partners";
 import { CustomerEdit } from "../../customers/[id]/customer-edit";
 import { OrderStatusBadge } from "../../orders/status-badges";
+import type { PrintTemplate } from "@/lib/print/template-shared";
+import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 
 type CustomerRow = CustomerListResult["rows"][number];
 type CustomerExpandTab = "info" | "sales" | "debt";
@@ -75,10 +77,12 @@ const FILTER_KEYS: Array<keyof CustomerFilters> = [
 export function CustomersTable({
   data,
   filters,
+  returnPrintTemplates,
   aiPreview = false,
 }: {
   data: CustomerListResult;
   filters: CustomerFilters;
+  returnPrintTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[];
   aiPreview?: boolean;
 }) {
   const t = useTranslations();
@@ -88,7 +92,7 @@ export function CustomersTable({
   return (
     <div className="min-w-0">
       <section className="min-w-0">
-        <CustomerRows data={data} filters={filters} aiPreview={aiPreview} onOpenFilters={() => setFilterOpen(true)} activeFilterCount={activeFilterCount} />
+        <CustomerRows data={data} filters={filters} returnPrintTemplates={returnPrintTemplates} aiPreview={aiPreview} onOpenFilters={() => setFilterOpen(true)} activeFilterCount={activeFilterCount} />
 
         <Pagination
           page={data.page}
@@ -168,12 +172,14 @@ function CustomerSearch({
 function CustomerRows({
   data,
   filters,
+  returnPrintTemplates,
   aiPreview,
   onOpenFilters,
   activeFilterCount,
 }: {
   data: CustomerListResult;
   filters: CustomerFilters;
+  returnPrintTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[];
   aiPreview: boolean;
   onOpenFilters: () => void;
   activeFilterCount: number;
@@ -276,7 +282,7 @@ function CustomerRows({
         bodyClassName="flex flex-col !overflow-hidden"
         footer={selectedCustomer && <CustomerDetailFooter customer={selectedCustomer} tab={detailTab} />}
       >
-        {selectedCustomer && <CustomerDetail customer={selectedCustomer} tab={detailTab} onTabChange={setDetailTab} />}
+        {selectedCustomer && <CustomerDetail customer={selectedCustomer} tab={detailTab} returnPrintTemplates={returnPrintTemplates} onTabChange={setDetailTab} />}
       </RowPreviewModal>
     </>
   );
@@ -285,10 +291,12 @@ function CustomerRows({
 function CustomerDetail({
   customer,
   tab,
+  returnPrintTemplates,
   onTabChange,
 }: {
   customer: CustomerRow;
   tab: CustomerExpandTab;
+  returnPrintTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[];
   onTabChange: (tab: CustomerExpandTab) => void;
 }) {
   const t = useTranslations();
@@ -313,7 +321,7 @@ function CustomerDetail({
 
       <div className="min-h-0 flex-1 overflow-hidden pt-4">
         {tab === "info" && <CustomerInfoPanel customer={customer} />}
-        {tab === "sales" && <CustomerSalesPanel customer={customer} />}
+        {tab === "sales" && <CustomerSalesPanel customer={customer} returnPrintTemplates={returnPrintTemplates} />}
         {tab === "debt" && <CustomerDebtPanel customer={customer} />}
       </div>
     </div>
@@ -372,7 +380,7 @@ function CustomerInfoPanel({ customer }: { customer: CustomerRow }) {
   );
 }
 
-function CustomerSalesPanel({ customer }: { customer: CustomerRow }) {
+function CustomerSalesPanel({ customer, returnPrintTemplates }: { customer: CustomerRow; returnPrintTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[] }) {
   const t = useTranslations();
   const [preview, setPreview] = useState<{ loading: boolean; error?: string; order?: OrderPreview } | null>(null);
 
@@ -404,7 +412,7 @@ function CustomerSalesPanel({ customer }: { customer: CustomerRow }) {
                 {row.kind === "order" && row.orderId ? (
                   <button type="button" onClick={() => openOrderPreview(row.orderId!)} className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{row.code}</button>
                 ) : (
-                  <Link href={`/returns/${row.id}/print`} className="inline-flex min-h-11 min-w-11 items-center font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{row.code}</Link>
+                  <PrintTemplateMenu baseHref={`/returns/${row.id}/print`} templates={returnPrintTemplates} label={row.code} className="min-h-11 min-w-11 font-semibold text-primary-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" />
                 )}
                 <OrderStatusBadge status={row.status} />
               </div>
@@ -431,7 +439,7 @@ function CustomerSalesPanel({ customer }: { customer: CustomerRow }) {
                     {row.kind === "order" && row.orderId ? (
                       <button type="button" onClick={() => openOrderPreview(row.orderId!)} className="text-primary-600 hover:underline">{row.code}</button>
                     ) : (
-                      <Link href={`/returns/${row.id}/print`} className="text-primary-600 hover:underline">{row.code}</Link>
+                      <PrintTemplateMenu baseHref={`/returns/${row.id}/print`} templates={returnPrintTemplates} label={row.code} className="text-primary-600 hover:underline" />
                     )}
                   </td>
                   <td className="px-3 py-3 whitespace-nowrap text-slate-700 dark:text-slate-200">{formatDate(row.createdAt)}</td>
