@@ -167,7 +167,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
               <div className="border-b border-border-soft px-3 py-2 text-sm font-semibold">Số lượng từng tem</div>
               <div className="max-h-64 overflow-auto">
                 <table className="w-full min-w-[720px] text-sm">
-                  <thead className="sticky top-0 bg-canvas text-left text-xs font-semibold text-slate-500">
+                  <thead className="sticky top-0 z-10 border-b border-border-soft bg-canvas text-left text-xs font-semibold text-slate-500 shadow-sm [&_th]:bg-canvas">
                     <tr><th className="w-11 px-3 py-2" aria-label="Thao tác" /><th className="px-3 py-2">Mã hàng</th><th className="px-3 py-2">Tên hàng</th><th className="px-3 py-2">Đơn vị tính</th><th className="w-32 px-3 py-2 text-right">{t("products.labels.quantity")}</th></tr>
                   </thead>
                   <tbody className="divide-y divide-border-soft">
