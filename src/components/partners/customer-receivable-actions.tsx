@@ -9,7 +9,7 @@ import { cn, formatCurrency } from "@/lib/utils";
 
 type Invoice = { id: string; code: string; createdAt: string; remaining: number };
 type Overview = { currentDebt: number; invoices: Invoice[] };
-type Mode = "collect" | "adjust" | "discount";
+type Mode = "collect" | "adjust" | "discount" | "qr";
 
 const requestId = (prefix: string) => `${prefix}:${crypto.randomUUID()}`;
 
@@ -38,7 +38,7 @@ export function CustomerReceivableActions({
   async function open(next: Mode) {
     setMode(next);
     setError("");
-    if (next !== "collect") return;
+    if (next !== "collect" && next !== "qr") return;
     setLoading(true);
     try {
       const response = await fetch(`/api/mobile/customers/${encodeURIComponent(customerId)}/receivables`, { cache: "no-store" });
@@ -52,23 +52,19 @@ export function CustomerReceivableActions({
     }
   }
 
-  async function createQr() {
+  async function createQr(invoice: Invoice, amount: number) {
     setError("");
     setLoading(true);
     try {
-      const overviewResponse = await fetch(`/api/mobile/customers/${encodeURIComponent(customerId)}/receivables`, { cache: "no-store" });
-      const overviewJson = await overviewResponse.json();
-      const invoice = (overviewJson?.data as Overview | undefined)?.invoices?.[0];
-      if (!overviewResponse.ok || !invoice) throw new Error();
       const response = await fetch("/api/payments/sepay", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ orderId: invoice.id, amount: invoice.remaining, reference: requestId("debt-qr").slice(0, 40) }),
+        body: JSON.stringify({ orderId: invoice.id, amount, reference: requestId("debt-qr").slice(0, 40) }),
       });
       const json = await response.json();
       if (!response.ok || !json.ok || !json.data?.qrImageUrl) throw new Error();
-      setQr({ imageUrl: json.data.qrImageUrl, reference: json.data.reference, amount: json.data.amount });
+      setQr({ imageUrl: json.data.qrImageUrl, reference: json.data.reference, amount: json.data.amount }); setMode(null);
     } catch {
-      setError("Không tạo được QR cho hóa đơn còn nợ đầu tiên.");
+      setError("Không tạo được QR. Vui lòng kiểm tra số tiền.");
     } finally {
       setLoading(false);
     }
@@ -85,9 +81,11 @@ export function CustomerReceivableActions({
       <button type="button" onClick={() => open("discount")} disabled={currentDebt <= 0} className="inline-flex h-10 min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-slate-700 hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-50 dark:text-slate-200 lg:min-h-0 lg:min-w-0">
         <WalletCards className="h-4 w-4" />Chiết khấu thanh toán
       </button>
-      <button type="button" onClick={createQr} disabled={currentDebt <= 0 || loading} className="inline-flex h-10 min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-slate-700 hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-50 dark:text-slate-200 lg:min-h-0 lg:min-w-0"><QrCode className="h-4 w-4" />Tạo QR</button>
+      <button type="button" onClick={() => open("qr")} disabled={currentDebt <= 0 || loading} className="inline-flex h-10 min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-border bg-surface px-3 text-sm font-semibold text-slate-700 hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-50 dark:text-slate-200 lg:min-h-0 lg:min-w-0"><QrCode className="h-4 w-4" />Tạo QR</button>
       {mode === "collect" && loading && <Dialog title="Thu công nợ" onClose={() => setMode(null)}><p className="text-sm text-slate-500">Đang tải hóa đơn...</p></Dialog>}
       {mode === "collect" && !loading && <CollectDialog customerId={customerId} overview={overview} error={error} onError={setError} onClose={() => setMode(null)} />}
+      {mode === "qr" && loading && <Dialog title="Tạo QR thanh toán" onClose={() => setMode(null)}><p className="text-sm text-slate-500">Đang tải hóa đơn...</p></Dialog>}
+      {mode === "qr" && !loading && <QrCreateDialog invoices={overview?.invoices ?? []} error={error} onCreate={createQr} onClose={() => setMode(null)} />}
       {(mode === "adjust" || mode === "discount") && <EntryDialog customerId={customerId} mode={mode} error={error} onError={setError} onClose={() => setMode(null)} />}
       {qr && <Dialog title="QR thanh toán" onClose={() => setQr(null)}><div className="space-y-3 text-center">
         {/* eslint-disable-next-line @next/next/no-img-element -- provider-returned VietQR URL is not a Next image asset. */}
@@ -96,6 +94,25 @@ export function CustomerReceivableActions({
       </div></Dialog>}
     </>
   );
+}
+
+function QrCreateDialog({ invoices, error, onCreate, onClose }: { invoices: Invoice[]; error: string; onCreate: (invoice: Invoice, amount: number) => Promise<void>; onClose: () => void }) {
+  const [invoiceId, setInvoiceId] = useState(() => invoices[0]?.id ?? "");
+  const invoice = invoices.find((row) => row.id === invoiceId) ?? invoices[0];
+  const [amount, setAmount] = useState(() => invoice?.remaining ?? 0);
+  const [pending, startTransition] = useTransition();
+  function submit() {
+    if (!invoice || amount <= 0 || amount > invoice.remaining || pending) return;
+    startTransition(() => { void onCreate(invoice, amount); });
+  }
+  return <Dialog title="Tạo QR thanh toán" onClose={onClose}>
+    {!invoice ? <p className="text-sm text-er">Không có hóa đơn còn nợ.</p> : <div className="space-y-4">
+      <label className="block text-sm font-medium">Hóa đơn<select value={invoice.id} onChange={(event) => { const next = invoices.find((row) => row.id === event.target.value); setInvoiceId(event.target.value); setAmount(next?.remaining ?? 0); }} className="mt-1 w-full rounded-lg border border-border bg-surface px-3 py-2">{invoices.map((row) => <option key={row.id} value={row.id}>{row.code} · còn {formatCurrency(row.remaining)}</option>)}</select></label>
+      <label className="block text-sm font-medium">Số tiền QR<MoneyInput value={amount} min={0} max={invoice.remaining} onChange={(value) => setAmount(value ?? 0)} className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-right" /></label>
+      <p className="text-xs text-slate-500">Có thể thu một phần, tối đa {formatCurrency(invoice.remaining)} cho hóa đơn này.</p>
+      {error && <p className="text-sm text-er">{error}</p>}<button type="button" disabled={amount <= 0 || amount > invoice.remaining || pending} onClick={submit} className="w-full rounded-lg bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Đang tạo QR..." : "Tạo QR"}</button>
+    </div>}
+  </Dialog>;
 }
 
 function Dialog({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
