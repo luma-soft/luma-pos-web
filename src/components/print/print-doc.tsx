@@ -210,56 +210,89 @@ function K80Doc(p: PrintDocProps) {
     return true;
   });
   return (
-    <div className="print-document bg-white text-black w-[302px] p-4 font-mono text-[12px] leading-relaxed shadow-lg print:shadow-none">
-      <div className="text-center">
-        <div className="font-bold text-[14px]">{t.storeName || "—"}</div>
-        {(t.storeAddress || t.storePhone) && (
-          <div className="text-[10.5px]">{t.storeAddress}{t.storePhone ? ` · ${t.storePhone}` : ""}</div>
-        )}
-        <div className="border-t border-dashed border-slate-400 my-2" />
-        <div className="font-bold">{p.title}</div>
-        <div className="text-[11px]">{p.code} · {formatDate(p.date)}{t.options.showSeller && p.sellerName ? ` · ${p.sellerName}` : ""}</div>
+    <div className="print-document w-[302px] bg-white px-3 py-4 font-mono text-[11px] leading-[1.45] text-black shadow-lg print:shadow-none">
+      <header className="text-center">
+        <div className="text-[15px] font-black uppercase tracking-tight">{t.storeName || "—"}</div>
+        {t.storeAddress && <div className="mt-1 text-[10px] leading-snug">{t.storeAddress}</div>}
+        {t.storePhone && <div className="text-[10px]">ĐT: {t.storePhone}</div>}
+        {t.storeTaxCode && <div className="text-[10px]">MST: {t.storeTaxCode}</div>}
+      </header>
+
+      <div className="my-3 border-y-2 border-black py-1.5 text-center">
+        <div className="text-[12px] font-black uppercase tracking-wide">{p.title}</div>
+        <div className="mt-0.5 text-[10px] font-bold">{p.code}</div>
       </div>
-      <div className="border-t border-dashed border-slate-400 my-2" />
-      <div className="text-[11px]">
-        {p.partyLabel}: {p.partyName}
-        {t.options.showProject && p.projectName && <><br />CT: {p.projectName}</>}
+
+      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
+        <div><span className="text-slate-600">Ngày:</span> {formatDate(p.date)}</div>
+        {t.options.showSeller && p.sellerName && <div className="truncate text-right"><span className="text-slate-600">NV:</span> {p.sellerName}</div>}
+        <div className="col-span-2 truncate"><span className="text-slate-600">{p.partyLabel}:</span> <span className="font-bold">{p.partyName}</span>{p.partyPhone ? ` · ${p.partyPhone}` : ""}</div>
+        {t.options.showProject && p.projectName && <div className="col-span-2 truncate"><span className="text-slate-600">Công trình:</span> {p.projectName}</div>}
+        {p.deliveryAddress && <div className="col-span-2"><span className="text-slate-600">{p.deliverToLabel ?? "Giao đến"}:</span> {p.deliveryAddress}</div>}
       </div>
-      <div className="border-t border-dashed border-slate-400 my-2" />
-      {p.items.map((i) => (
-        <div key={i.id} className="mb-1.5">
-          {i.name}<br />
-          {formatNumber(i.quantity)} {i.unitName} × {formatNumber(i.unitPrice)}
-          {t.options.showLineDiscount && Number(i.discount ?? 0) > 0 && <><br />{p.cols.discount ?? "Giảm giá"}: −{formatNumber(Number(i.discount))}</>}
-          <span className="float-right">{formatNumber(i.total)}</span>
+
+      <div className="mt-3 border-y border-dashed border-black py-1 text-[10px] font-bold uppercase tracking-wide">
+        <span>{p.cols.product}</span>
+        <span className="float-right">{p.cols.lineTotal}</span>
+      </div>
+      <div className="divide-y divide-dashed divide-slate-400">
+        {p.items.map((i) => (
+          <div key={i.id} className="py-2">
+            <div className="pr-1 text-[11px] font-bold leading-snug">
+              {i.name}
+              {t.options.showSku && i.sku && <span className="ml-1 font-normal text-[9px] text-slate-600">[{i.sku}]</span>}
+            </div>
+            <div className="mt-0.5 flex items-end justify-between gap-3 text-[10px]">
+              <span className="text-slate-700">{formatNumber(i.quantity)} {i.unitName} × {formatNumber(i.unitPrice)}</span>
+              <span className="shrink-0 text-[11px] font-bold">{formatNumber(i.total)}</span>
+            </div>
+            {t.options.showLineDiscount && Number(i.discount ?? 0) > 0 && (
+              <div className="text-[9.5px] text-slate-700">{p.cols.discount ?? "Giảm giá"}: −{formatNumber(Number(i.discount))}</div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <section className="mt-2 border-y-2 border-black py-1.5">
+        {visibleTotals.map((r) => (
+          <div key={r.label} className="flex justify-between gap-3 py-0.5">
+            <span className="text-slate-700">{r.label}</span>
+            <span>{r.negative ? "−" : ""}{formatNumber(r.value)}</span>
+          </div>
+        ))}
+        <div className="mt-1 flex items-baseline justify-between gap-3 border-t border-black pt-1.5 text-[14px] font-black">
+          <span>{p.grandTotalLabel}</span>
+          <span className="shrink-0">{formatCurrency(p.grandTotal)}</span>
         </div>
-      ))}
-      <div className="border-t border-dashed border-slate-400 my-2" />
-      {visibleTotals.map((r) => (
-        <div key={r.label}>{r.label}<span className="float-right">{r.negative ? "−" : ""}{formatNumber(r.value)}</span></div>
-      ))}
-      <div className="font-bold text-[14px] mt-1">{p.grandTotalLabel}<span className="float-right">{formatNumber(p.grandTotal)}</span></div>
-      {(p.afterTotals ?? []).map((r) => (
-        <div key={r.label} className={r.bold ? "font-bold" : ""}>{r.label}<span className="float-right">{formatNumber(r.value)}</span></div>
-      ))}
+        {(p.afterTotals ?? []).map((r) => (
+          <div key={r.label} className={`flex justify-between gap-3 py-0.5 ${r.bold ? "font-bold" : ""}`}>
+            <span className="text-slate-700">{r.label}</span>
+            <span>{formatNumber(r.value)}</span>
+          </div>
+        ))}
+      </section>
+
+      {t.options.showInWords && (
+        <div className="mt-2 text-[9.5px] italic leading-snug"><span className="not-italic font-bold">{p.inWordsLabel}:</span> {moneyToWords(p.grandTotal)}.</div>
+      )}
+      {p.note && <div className="mt-2 border-t border-dashed border-slate-400 pt-2 text-[9.5px]"><span className="font-bold">Ghi chú:</span> {p.note}</div>}
       {t.options.showPaymentQr && p.paymentQr && (
         <>
-          <div className="border-t border-dashed border-slate-400 my-2" />
-          <div className="text-center font-bold">{p.paymentQr.title}</div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={p.paymentQr.qrImageUrl} alt={p.paymentQr.title} className="mx-auto my-1 h-36 w-36 object-contain" />
-          <div>{p.paymentQr.bankLabel}: {p.paymentQr.bankName}</div>
-          <div>{p.paymentQr.accountLabel}: {p.paymentQr.accountNumber}</div>
-          <div>{p.paymentQr.nameLabel}: {p.paymentQr.accountName}</div>
-          <div>{p.paymentQr.referenceLabel}: {p.paymentQr.reference}</div>
+          <div className="mt-3 border-t-2 border-dashed border-black pt-2 text-center">
+            <div className="font-bold uppercase">{p.paymentQr.title}</div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={p.paymentQr.qrImageUrl} alt={p.paymentQr.title} className="mx-auto my-1 h-32 w-32 object-contain" />
+            <div className="text-[10px]">{p.paymentQr.bankLabel}: <b>{p.paymentQr.bankName}</b></div>
+            <div className="text-[10px]">{p.paymentQr.accountLabel}: <b>{p.paymentQr.accountNumber}</b></div>
+            <div className="text-[10px]">{p.paymentQr.nameLabel}: <b>{p.paymentQr.accountName}</b></div>
+            <div className="text-[9px] text-slate-700">{p.paymentQr.referenceLabel}: {p.paymentQr.reference}</div>
+          </div>
         </>
       )}
       {t.footerNote && (
-        <>
-          <div className="border-t border-dashed border-slate-400 my-2" />
-          <div className="text-center text-[10.5px]">{t.footerNote}</div>
-        </>
+        <div className="mt-3 border-t border-dashed border-slate-400 pt-2 text-center text-[9.5px] leading-snug">{t.footerNote}</div>
       )}
+      <div className="mt-3 text-center text-[10px] font-bold uppercase tracking-wide">Cảm ơn quý khách!</div>
     </div>
   );
 }
