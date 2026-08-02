@@ -103,7 +103,9 @@ export async function collectCustomerReceivable(
 
       const invoiceRows = await tx.select().from(orders).where(inArray(orders.id, ids)).for("update");
       if (invoiceRows.length !== ids.length) throw new Error("ORDER_NOT_PAYABLE");
-      const invoices = new Map(invoiceRows.map((order: typeof orders.$inferSelect) => [order.id, order]));
+      const invoices = new Map<string, typeof orders.$inferSelect>(
+        invoiceRows.map((order: typeof orders.$inferSelect) => [order.id, order]),
+      );
       for (const allocation of allocations) {
         const order = invoices.get(allocation.orderId);
         if (!order || order.customerId !== input.customerId) throw new Error("ORDER_NOT_CUSTOMER");
