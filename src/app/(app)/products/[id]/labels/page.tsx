@@ -114,14 +114,14 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
   }));
 
   return (
-    <div className="label-print-root fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-6 print:static print:block print:bg-white print:p-0">
+    <div className="label-print-root fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-5 print:static print:block print:bg-white print:p-0">
       <style>{`
         @media print {
           @page { margin: 6mm; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       `}</style>
-      <section role="dialog" aria-modal="true" aria-labelledby="label-print-title" className="flex h-full w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-surface shadow-2xl sm:h-[min(900px,calc(100dvh-48px))] sm:max-w-6xl sm:rounded-card print:h-auto print:max-w-none print:overflow-visible print:border-0 print:shadow-none">
+      <section role="dialog" aria-modal="true" aria-labelledby="label-print-title" className="flex h-dvh w-full max-w-7xl flex-col overflow-hidden bg-surface shadow-2xl sm:h-[min(92dvh,920px)] sm:rounded-2xl print:h-auto print:max-w-none print:overflow-visible print:border-0 print:shadow-none">
         <header className="flex shrink-0 items-start justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-5 print:hidden">
           <div className="min-w-0">
             <h1 id="label-print-title" className="truncate text-lg font-bold">{t("products.labels.title")}</h1>
@@ -129,7 +129,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
           </div>
           <div className="flex items-center gap-2">
             <LabelPrintButton label={t("products.labels.print")} />
-            <Link href={query.from === "inventory" ? `${Routes.Inventory}?tab=products` : Routes.product(product.id)} className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-700 lg:h-9 lg:w-9" aria-label={t("common.close")}><X className="h-5 w-5" /></Link>
+            <Link href={`${Routes.Inventory}?tab=products`} className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-700 lg:h-9 lg:w-9" aria-label={t("common.close")}><X className="h-5 w-5" /></Link>
           </div>
         </header>
 
