@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { Search, Plus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, MoreVertical, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw } from "lucide-react";
+import { Search, Plus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw } from "lucide-react";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
 import { normalizeSearch } from "@/lib/normalize";
 import { createPortal } from "react-dom";
@@ -1600,10 +1600,16 @@ export function PosClient({
               <div className="p-3 lg:hidden">
                 <div className="flex items-start gap-2">
                   <span className="mt-0.5 w-5 shrink-0 text-center text-xs tabular-nums text-slate-400">{idx + 1}</span>
-                  <div className="min-w-0 flex-1">
+                  <button
+                    type="button"
+                    disabled={isCameraQuoteDraft}
+                    onClick={() => setEditKey(editKey === l.key ? null : l.key)}
+                    title={t("pos.priceEditor.editHint")}
+                    className="min-h-11 min-w-0 flex-1 text-left disabled:cursor-not-allowed disabled:opacity-40"
+                  >
                     <p className={cn("text-sm font-semibold leading-5", stockInsufficient && "text-er")}>{l.product.name}</p>
                     <p className="mt-0.5 truncate text-xs text-slate-400">{l.product.sku ?? ""}</p>
-                  </div>
+                  </button>
                   <button
                     type="button"
                     disabled={isCameraQuoteDraft}
@@ -1688,7 +1694,18 @@ export function PosClient({
                   >
                     <GripVertical className="w-3.5 h-3.5" />
                   </button>
-                  <span className={cn("font-medium text-sm whitespace-normal break-words", stockInsufficient && "text-er")}>{l.product.name}</span>
+                  <button
+                    type="button"
+                    disabled={isCameraQuoteDraft}
+                    onClick={() => setEditKey(editKey === l.key ? null : l.key)}
+                    title={t("pos.priceEditor.editHint")}
+                    className={cn(
+                      "min-h-11 min-w-11 text-left font-medium text-sm whitespace-normal break-words hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-40",
+                      stockInsufficient && "text-er",
+                    )}
+                  >
+                    {l.product.name}
+                  </button>
                   {eff.pct > 0 && (
                     <span className={cn(
                       "shrink-0 text-xs font-bold rounded px-1",
@@ -1744,9 +1761,6 @@ export function PosClient({
                   )}
                 </div>
                 <span className="w-28 text-right text-base font-bold tabular-nums shrink-0">{formatCurrency(eff.price * l.quantity)}</span>
-                <button disabled={isCameraQuoteDraft} onClick={() => setEditKey(editKey === l.key ? null : l.key)} className="w-7 h-7 rounded-md hover:bg-surface-2 grid place-items-center shrink-0 text-slate-400 disabled:cursor-not-allowed disabled:opacity-40">
-                  <MoreVertical className="w-4 h-4" />
-                </button>
               </div>
               <div className="-mt-1 hidden items-start gap-2 px-3 pb-1 lg:flex">
                 <span className="w-5 shrink-0" />

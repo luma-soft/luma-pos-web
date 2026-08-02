@@ -117,6 +117,17 @@ describe("POS mobile checkout", () => {
     );
   });
 
+  test("opens the line detail from the product item instead of a separate edit button", () => {
+    const source = readFileSync(
+      "src/app/(pos)/pos/pos-client.tsx",
+      "utf8",
+    );
+
+    expect(source).toContain('title={t("pos.priceEditor.editHint")}');
+    expect(source).toContain('disabled={isCameraQuoteDraft}');
+    expect(source).not.toContain("MoreVertical");
+  });
+
   test("keeps POS search and nested modal controls touch-safe on mobile", () => {
     const source = readFileSync(
       "src/app/(pos)/pos/pos-client.tsx",
