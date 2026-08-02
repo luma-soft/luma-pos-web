@@ -15,12 +15,10 @@ import {
   Loader2,
   Pencil,
   Plus,
-  QrCode,
   Search,
   SlidersHorizontal,
   Trash2,
   User,
-  WalletCards,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -40,6 +38,7 @@ import { CustomerEdit } from "../../customers/[id]/customer-edit";
 import { OrderStatusBadge } from "../../orders/status-badges";
 import type { PrintTemplate } from "@/lib/print/template-shared";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
+import { CustomerReceivableActions } from "@/components/partners/customer-receivable-actions";
 
 type CustomerRow = CustomerListResult["rows"][number];
 type CustomerExpandTab = "info" | "sales" | "debt";
@@ -680,17 +679,35 @@ function CustomerDetailFooter({ customer, tab }: { customer: CustomerRow; tab: C
   return (
     <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
       <div className="flex flex-wrap gap-2">
-        <ActionButton icon={FileDown} label={t("customers.actions.exportDebtFile")} disabled />
-        <ActionButton icon={Download} label={t("customers.actions.exportFile")} disabled />
+        <ActionButton icon={FileDown} label={t("customers.actions.exportDebtFile")} onClick={() => exportCustomerDebtCsv(customer)} />
+        <ActionButton icon={Download} label={t("customers.actions.exportFile")} onClick={() => exportCustomerDebtCsv(customer)} />
       </div>
       <div className="flex flex-wrap gap-2 xl:justify-end">
-        <ActionButton icon={WalletCards} label={t("customers.actions.payment")} tone="primary" disabled />
-        <ActionButton icon={Pencil} label={t("customers.actions.adjust")} disabled />
-        <ActionButton icon={WalletCards} label={t("customers.actions.paymentDiscount")} disabled />
-        <ActionButton icon={QrCode} label={t("customers.actions.createQr")} disabled />
+        <CustomerReceivableActions customerId={customer.id} currentDebt={Number(customer.currentDebt)} />
       </div>
     </div>
   );
+}
+
+function exportCustomerDebtCsv(customer: CustomerRow) {
+  const quote = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+  const rows = [
+    ["Mã phiếu", "Thời gian", "Loại", "Giá trị", "Dư nợ khách hàng"],
+    ...customer.debtLedger.map((row) => [
+      row.code,
+      formatDate(row.createdAt),
+      row.typeLabel,
+      row.value,
+      row.balance,
+    ]),
+  ];
+  const blob = new Blob([`\ufeff${rows.map((row) => row.map(quote).join(",")).join("\n")}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `cong-no-${customer.code || customer.id}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 function CustomerActionBar({ customer }: { customer: CustomerRow }) {

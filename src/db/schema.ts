@@ -31,6 +31,12 @@ export const productKindEnum = pgEnum("product_kind", [
 export const customerConsentStatusEnum = pgEnum("customer_consent_status", [
   "pending", "granted", "withdrawn",
 ]);
+export const customerReceivableReceiptStatusEnum = pgEnum("customer_receivable_receipt_status", [
+  "confirmed", "pending_qr", "expired", "cancelled",
+]);
+export const customerReceivableEntryTypeEnum = pgEnum("customer_receivable_entry_type", [
+  "adjustment_debit", "adjustment_credit", "settlement_discount",
+]);
 export const serviceTypeEnum = pgEnum("service_type", [
   "camera", "electrical", "plumbing", "mixed",
 ]);
@@ -686,6 +692,60 @@ export const payments = pgTable("payments", {
     .where(sql`${t.provider} is null and ${t.clientRequestId} is not null`),
   index("payments_provider_expiry_idx").on(t.provider, t.status, t.expiresAt),
   index("payments_provider_query_idx").on(t.provider, t.status, t.lastProviderCheckedAt),
+]);
+
+// ============= Customer receivables =============
+
+/** One debt-collection receipt may be allocated across several invoices. */
+export const customerReceivableReceipts = pgTable("customer_receivable_receipts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: varchar("code", { length: 40 }).notNull().unique(),
+  customerId: uuid("customer_id").notNull().references(() => customers.id),
+  status: customerReceivableReceiptStatusEnum("status").notNull().default("confirmed"),
+  amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
+  method: paymentMethodEnum("method").notNull(),
+  reference: text("reference"),
+  note: text("note"),
+  clientRequestId: varchar("client_request_id", { length: 80 }).notNull().unique(),
+  createdBy: uuid("created_by").references(() => profiles.id),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("customer_receivable_receipts_customer_idx").on(t.customerId, t.createdAt),
+  index("customer_receivable_receipts_status_idx").on(t.status, t.createdAt),
+]);
+
+export const customerReceivableAllocations = pgTable("customer_receivable_allocations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  receiptId: uuid("receipt_id").notNull().references(() => customerReceivableReceipts.id, { onDelete: "cascade" }),
+  orderId: uuid("order_id").notNull().references(() => orders.id),
+  paymentId: uuid("payment_id").references(() => payments.id),
+  amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("customer_receivable_allocations_receipt_order_idx").on(t.receiptId, t.orderId),
+  index("customer_receivable_allocations_order_idx").on(t.orderId),
+]);
+
+/** Adjustment and settlement-discount entries: positive raises debt, negative lowers it. */
+export const customerReceivableEntries = pgTable("customer_receivable_entries", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: varchar("code", { length: 40 }).notNull().unique(),
+  customerId: uuid("customer_id").notNull().references(() => customers.id),
+  orderId: uuid("order_id").references(() => orders.id),
+  type: customerReceivableEntryTypeEnum("type").notNull(),
+  amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
+  reason: text("reason").notNull(),
+  reference: text("reference"),
+  note: text("note"),
+  clientRequestId: varchar("client_request_id", { length: 80 }).notNull().unique(),
+  createdBy: uuid("created_by").references(() => profiles.id),
+  approvedBy: uuid("approved_by").references(() => profiles.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("customer_receivable_entries_customer_idx").on(t.customerId, t.createdAt),
+  index("customer_receivable_entries_order_idx").on(t.orderId),
 ]);
 
 export const paymentWebhookEvents = pgTable("payment_webhook_events", {

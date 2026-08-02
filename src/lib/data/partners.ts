@@ -2,6 +2,7 @@ import { and, count, desc, eq, gte, inArray, lte, or, sql, type SQL } from "driz
 import { db } from "@/db";
 import {
   customerConsents,
+  customerReceivableEntries,
   customers,
   orders,
   payments,
@@ -46,7 +47,7 @@ export type CustomerSalesHistoryRow = {
 
 export type CustomerDebtLedgerRow = {
   id: string;
-  kind: "sale" | "payment" | "return";
+  kind: "sale" | "payment" | "return" | "adjustment" | "discount";
   code: string;
   orderId: string | null;
   createdAt: Date;
@@ -187,7 +188,7 @@ export async function getCustomers(filters: CustomerFilters = {}) {
   }));
 
   if (customerIds.length > 0) {
-    const [grossRows, orderRows, returnRows, paymentRows] = await Promise.all([
+    const [grossRows, orderRows, returnRows, paymentRows, receivableEntryRows] = await Promise.all([
       db
         .select({
           customerId: orders.customerId,
@@ -242,6 +243,20 @@ export async function getCustomers(filters: CustomerFilters = {}) {
         .where(inArray(orders.customerId, customerIds))
         .orderBy(desc(payments.createdAt))
         .limit(customerIds.length * 60),
+      db
+        .select({
+          customerId: customerReceivableEntries.customerId,
+          id: customerReceivableEntries.id,
+          code: customerReceivableEntries.code,
+          orderId: customerReceivableEntries.orderId,
+          type: customerReceivableEntries.type,
+          amount: customerReceivableEntries.amount,
+          createdAt: customerReceivableEntries.createdAt,
+        })
+        .from(customerReceivableEntries)
+        .where(inArray(customerReceivableEntries.customerId, customerIds))
+        .orderBy(desc(customerReceivableEntries.createdAt))
+        .limit(customerIds.length * 30),
     ]);
 
     const grossByCustomer = new Map(grossRows.map((row) => [row.customerId, row.grossSales]));
@@ -323,16 +338,32 @@ export async function getCustomers(filters: CustomerFilters = {}) {
       });
     }
 
+    for (const entry of receivableEntryRows) {
+      const isDiscount = entry.type === "settlement_discount";
+      addLedger(entry.customerId, {
+        id: entry.id,
+        kind: isDiscount ? "discount" : "adjustment",
+        code: entry.code,
+        orderId: entry.orderId,
+        createdAt: entry.createdAt,
+        typeLabel: isDiscount ? "Chiết khấu thanh toán" : "Điều chỉnh công nợ",
+        value: Number(entry.amount),
+        sort: 40,
+      });
+    }
+
     const ledgerByCustomer = new Map<string, CustomerDebtLedgerRow[]>();
+    const currentDebtByCustomer = new Map(baseRows.map((row) => [row.id, Number(row.currentDebt)]));
     for (const [customerId, events] of ledgerEventsByCustomer.entries()) {
       events.sort((a, b) => {
-        const byDate = a.createdAt.getTime() - b.createdAt.getTime();
-        return byDate || a.sort - b.sort;
+        const byDate = b.createdAt.getTime() - a.createdAt.getTime();
+        return byDate || b.sort - a.sort;
       });
-      let balance = 0;
+      // The query is deliberately capped, so anchor the newest visible event to
+      // the authoritative customer balance and walk backwards through history.
+      let balance = currentDebtByCustomer.get(customerId) ?? 0;
       const ledger = events.map((event) => {
-        balance += event.value;
-        return {
+        const row = {
           id: event.id,
           kind: event.kind,
           code: event.code,
@@ -342,8 +373,10 @@ export async function getCustomers(filters: CustomerFilters = {}) {
           value: event.value,
           balance,
         };
+        balance -= event.value;
+        return row;
       });
-      ledgerByCustomer.set(customerId, ledger.reverse().slice(0, 50));
+      ledgerByCustomer.set(customerId, ledger.slice(0, 50));
     }
 
     rows = baseRows.map((row) => ({
