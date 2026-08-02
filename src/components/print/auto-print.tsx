@@ -8,7 +8,12 @@ export function AutoPrint({ closeHref }: { closeHref: string }) {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    if (searchParams.get("embedded") === "1") return;
+    if (searchParams.get("embedded") === "1") {
+      const id = window.setTimeout(() => {
+        window.parent.postMessage({ type: "luma-print-ready" }, window.location.origin);
+      }, 0);
+      return () => window.clearTimeout(id);
+    }
     const close = () => {
       if (searchParams.get("autoclose") === "1") {
         window.close();
