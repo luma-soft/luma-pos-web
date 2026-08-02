@@ -18,6 +18,14 @@ export function PrintTemplateMenu({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
+  const customTemplates = templates.filter((template) => !template.name.toLocaleLowerCase("vi").includes("mặc định"));
+  const menuTemplates = customTemplates.length > 0
+    ? customTemplates
+    : (["a4", "a5", "k80"] as const).map((size) => ({
+        id: templates[0]?.id ?? "default-order",
+        name: `Mẫu ${size.toUpperCase()}`,
+        paperDefault: size,
+      }));
 
   useEffect(() => {
     const close = (event: MouseEvent) => {
@@ -59,17 +67,11 @@ export function PrintTemplateMenu({
       </button>
       {open && (
         <div className="absolute bottom-full right-0 z-[80] mb-2 min-w-52 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-e2">
-          {templates.some((template) => !template.id.startsWith("default-"))
-            ? templates.filter((template) => !template.id.startsWith("default-")).map((template) => (
-                <button key={template.id} type="button" onClick={() => print(template)} className="flex min-h-11 w-full items-center px-3 py-2 text-left text-sm font-medium hover:bg-surface-2">
-                  {template.name}
-                </button>
-              ))
-            : (["a4", "a5", "k80"] as const).map((size) => (
-                <button key={size} type="button" onClick={() => print({ id: templates[0]?.id ?? "default-order", paperDefault: size })} className="flex min-h-11 w-full items-center px-3 py-2 text-left text-sm font-medium hover:bg-surface-2">
-                  Mẫu {size.toUpperCase()}
-                </button>
-              ))}
+          {menuTemplates.map((template) => (
+            <button key={`${template.id}-${template.paperDefault}`} type="button" onClick={() => print(template)} className="flex min-h-11 w-full items-center px-3 py-2 text-left text-sm font-medium hover:bg-surface-2">
+              {template.name}
+            </button>
+          ))}
         </div>
       )}
     </div>
