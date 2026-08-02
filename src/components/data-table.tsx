@@ -349,7 +349,7 @@ export function DataTableShell<T>({
 
   return (
     <div className="relative flex min-h-0 w-full min-w-0 flex-col">
-      {toolbar && <div className={cn("mb-2 flex flex-wrap items-center justify-end gap-2", toolbarFloating && "lg:absolute lg:-top-[36px] lg:right-0 lg:mb-0")}>{toolbar}</div>}
+      {toolbar && <div className={cn("mb-2 flex flex-wrap items-center justify-end gap-2", toolbarFloating && "lg:absolute lg:-top-[65px] lg:right-0 lg:mb-0")}>{toolbar}</div>}
 
       {rows.length === 0 && empty ? (
         <div
