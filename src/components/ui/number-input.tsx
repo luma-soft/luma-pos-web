@@ -12,6 +12,8 @@ export interface NumberInputProps
   onChange?: (value: number | null) => void;
   /** Show thousand separators (1,000,000) */
   thousandSeparator?: boolean;
+  /** Format the display value as the user types, not only on blur. */
+  formatOnChange?: boolean;
   /** Suffix text (e.g. "đ", "%", "kg") */
   suffix?: string;
   /** Prefix text */
@@ -41,7 +43,7 @@ const parseNumber = (str: string): number | null => {
 };
 
 export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
-  ({ value, defaultValue, onChange, thousandSeparator = true, suffix, prefix, min, max, decimals = 0, className, name, ...props }, ref) => {
+  ({ value, defaultValue, onChange, thousandSeparator = true, formatOnChange = false, suffix, prefix, min, max, decimals = 0, className, name, ...props }, ref) => {
     const initialValue = value ?? defaultValue ?? null;
     const [text, setText] = React.useState<string>(
       value != null ? formatNumber(value, thousandSeparator, decimals) :
@@ -71,7 +73,7 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
           Math.max(min ?? Number.NEGATIVE_INFINITY, parsed),
         );
         setText(
-          clamped === parsed
+          clamped === parsed && !formatOnChange
             ? raw
             : formatNumber(clamped, thousandSeparator, decimals),
         );

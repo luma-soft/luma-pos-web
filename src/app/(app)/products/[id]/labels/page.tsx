@@ -8,7 +8,7 @@ import { getProduct } from "@/lib/data/products";
 import { getLabelTemplate, getLabelTemplates } from "@/lib/labels/template";
 import type { LabelTemplate } from "@/lib/labels/template-shared";
 import { Routes } from "@/lib/routes";
-import { formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { LabelPrintButton } from "./label-print-button";
 import { getStoreSettings } from "@/lib/data/settings";
 import { NumberInput } from "@/components/ui/number-input";
@@ -135,7 +135,12 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
 
         <div className="flex min-h-0 flex-1 flex-col p-4 sm:p-5 print:block print:overflow-visible print:p-0">
 
-        <InstantFilterForm className="mb-4 shrink-0 grid gap-3 rounded-card border border-border bg-surface p-4 print:hidden sm:grid-cols-[minmax(0,1fr)_150px_150px]">
+        <InstantFilterForm className={cn(
+          "mb-4 shrink-0 grid gap-3 rounded-card border border-border bg-surface p-4 print:hidden",
+          isBatch
+            ? "sm:grid-cols-[minmax(0,1fr)_220px_280px]"
+            : "sm:grid-cols-[minmax(0,1fr)_150px_220px_280px]",
+        )}>
           {query.ids && <input type="hidden" name="ids" value={query.ids} />}
           {query.from && <input type="hidden" name="from" value={query.from} />}
           <Field label={t("products.labels.template")}><Select name="templateId" defaultValue={template.id} options={templates.map((item) => ({ value: item.id, label: item.name }))} rootClassName="w-full" searchable /></Field>
@@ -144,7 +149,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
           </Field>}
           <Field label={t("products.labels.codeSource")}><Select name="codeSource" defaultValue={codeSource} options={[{ value: "barcode", label: t("products.labels.codeSourceBarcode") }, { value: "sku", label: t("products.labels.codeSourceSku") }]} rootClassName="w-full" /></Field>
           <Field label={t("products.labels.price")}>
-            <NumberInput name="price" min={0} step={1000} defaultValue={hasPriceOverride ? Number(query.price) : isBatch ? undefined : Number(product.retailPrice)} placeholder={isBatch ? "Giá riêng theo sản phẩm" : undefined} suffix="đ" className="h-11 bg-canvas lg:h-10" />
+            <NumberInput name="price" min={0} step={1000} defaultValue={hasPriceOverride ? Number(query.price) : isBatch ? undefined : Number(product.retailPrice)} placeholder={isBatch ? "Giá riêng theo sản phẩm" : undefined} suffix="đ" thousandSeparator formatOnChange className="h-11 bg-canvas lg:h-10" />
           </Field>
           {isBatch && (
             <div className="overflow-hidden rounded-lg border border-border-soft sm:col-span-3">
