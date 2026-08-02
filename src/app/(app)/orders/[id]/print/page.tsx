@@ -7,6 +7,7 @@ import { getPrintTemplate, getPrintTemplatesForDoc, type PaperSize } from "@/lib
 import { buildSepayVietQrImageUrl } from "@/lib/payments/sepay";
 import { PrintDoc } from "@/components/print/print-doc";
 import { PrintToolbar } from "@/components/print/print-toolbar";
+import { PrintPreviewModal } from "@/components/print/print-preview-modal";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -67,9 +68,9 @@ export default async function PrintOrderPage({ params, searchParams }: Props) {
     : null;
 
   return (
-    <div className="min-h-screen bg-slate-200 dark:bg-slate-950 print:bg-white">
+    <PrintPreviewModal closeHref={Routes.salesOrder(order.id, order.status)}>
       <PrintToolbar backHref={Routes.salesOrder(order.id, order.status)} baseHref={`${Routes.order(order.id)}/print`} size={size} templates={templates} selectedTemplateId={template.id} />
-      <div className="py-8 print:py-0 flex justify-center">
+      <div className="print-document-root flex min-h-0 flex-1 justify-center overflow-auto py-8 print:py-0">
         <PrintDoc
           template={template}
           size={size}
@@ -112,6 +113,6 @@ export default async function PrintOrderPage({ params, searchParams }: Props) {
           }}
         />
       </div>
-    </div>
+    </PrintPreviewModal>
   );
 }

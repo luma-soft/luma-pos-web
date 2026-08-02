@@ -260,6 +260,49 @@ input[type="number"] {
 .electrical-labels-print-root { display: none; }
 .hikvision-quote-print-root { display: none; }
 @media print {
+  @page { margin: 0; }
+
+  /* Bản xem trước chứng từ chạy trong layout app: chỉ cho phép nội dung phiếu đi vào máy in. */
+  body:has(.print-document-root) .app-sidebar,
+  body:has(.print-document-root) main > :not(:has(.print-document-root)) {
+    display: none !important;
+  }
+  body:has(.print-document-root) main {
+    display: block !important;
+    overflow: visible !important;
+  }
+  body:has(.print-document-root) main > div:has(.print-document-root) {
+    padding-bottom: 0 !important;
+  }
+  .print-preview-modal {
+    position: static !important;
+    display: block !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  .print-preview-panel {
+    display: block !important;
+    width: auto !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+  }
+  .print-document-root {
+    display: flex !important;
+    min-height: 0 !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+  .print-document-root .print-document {
+    min-height: 0 !important;
+    box-shadow: none !important;
+  }
+
   body.pos-printing > *:not(.pos-print-root) { display: none !important; }
   body.pos-printing .pos-print-root { display: flex !important; justify-content: center; }
   body.electrical-labels-printing {

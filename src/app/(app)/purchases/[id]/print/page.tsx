@@ -5,6 +5,7 @@ import { getPurchase } from "@/lib/data/inventory";
 import { getPrintTemplate, getPrintTemplatesForDoc, type PaperSize } from "@/lib/print/template";
 import { PrintDoc } from "@/components/print/print-doc";
 import { PrintToolbar } from "@/components/print/print-toolbar";
+import { PrintPreviewModal } from "@/components/print/print-preview-modal";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -31,9 +32,9 @@ export default async function PrintPurchasePage({ params, searchParams }: Props)
   const owed = Math.max(0, total - paid);
 
   return (
-    <div className="min-h-screen bg-slate-200 dark:bg-slate-950 print:bg-white">
+    <PrintPreviewModal closeHref={Routes.purchase(po.id)}>
       <PrintToolbar backHref={Routes.purchase(po.id)} baseHref={`${Routes.purchase(po.id)}/print`} size={size} templates={templates} selectedTemplateId={template.id} />
-      <div className="py-8 print:py-0 flex justify-center">
+      <div className="print-document-root flex min-h-0 flex-1 justify-center overflow-auto py-8 print:py-0">
         <PrintDoc
           template={template}
           size={size}
@@ -82,6 +83,6 @@ export default async function PrintPurchasePage({ params, searchParams }: Props)
           }}
         />
       </div>
-    </div>
+    </PrintPreviewModal>
   );
 }

@@ -74,8 +74,8 @@ export function PrintDoc(p: PrintDocProps) {
     <div
       className={
         isA4
-          ? "bg-white text-black w-[794px] min-h-[1000px] p-12 text-[13px] shadow-lg print:shadow-none"
-          : "bg-white text-black w-[559px] min-h-[794px] p-10 text-[12.5px] shadow-lg print:shadow-none"
+          ? "print-document bg-white text-black w-[794px] min-h-[1000px] p-12 text-[13px] shadow-lg print:shadow-none"
+          : "print-document bg-white text-black w-[559px] min-h-[794px] p-10 text-[12.5px] shadow-lg print:shadow-none"
       }
     >
       {/* header */}
@@ -210,7 +210,7 @@ function K80Doc(p: PrintDocProps) {
     return true;
   });
   return (
-    <div className="bg-white text-black w-[302px] p-4 font-mono text-[12px] leading-relaxed shadow-lg print:shadow-none">
+    <div className="print-document bg-white text-black w-[302px] p-4 font-mono text-[12px] leading-relaxed shadow-lg print:shadow-none">
       <div className="text-center">
         <div className="font-bold text-[14px]">{t.storeName || "—"}</div>
         {(t.storeAddress || t.storePhone) && (

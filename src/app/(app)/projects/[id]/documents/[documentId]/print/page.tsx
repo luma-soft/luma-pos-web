@@ -4,6 +4,7 @@ import { Routes } from "@/lib/routes";
 import { formatDate } from "@/lib/utils";
 import { getProjectDetail } from "@/lib/data/projects";
 import { PrintToolbar } from "@/components/print/print-toolbar";
+import { PrintPreviewModal } from "@/components/print/print-preview-modal";
 
 export default async function PrintServiceDocumentPage({
   params,
@@ -16,10 +17,10 @@ export default async function PrintServiceDocumentPage({
   if (!detail || !document) notFound();
   const t = await getTranslations();
   return (
-    <div className="min-h-screen bg-slate-200 dark:bg-slate-950 print:bg-white">
+    <PrintPreviewModal closeHref={Routes.project(id)}>
       <PrintToolbar backHref={Routes.project(id)} baseHref={`/projects/${id}/documents/${documentId}/print`} size="a4" />
-      <div className="flex justify-center py-8 print:py-0">
-        <article className="min-h-[1000px] w-[794px] bg-white p-12 text-[13px] text-black shadow-lg print:shadow-none">
+      <div className="print-document-root flex min-h-0 flex-1 justify-center overflow-auto py-8 print:py-0">
+        <article className="print-document min-h-[1000px] w-[794px] bg-white p-12 text-[13px] text-black shadow-lg print:shadow-none">
           <header className="border-b-2 border-black pb-4 text-center">
             <h1 className="text-xl font-bold">{document.title}</h1>
             <p className="mt-1 text-sm">{t(`services.documents.${document.type}` as never)} · {detail.project.name}</p>
@@ -33,6 +34,6 @@ export default async function PrintServiceDocumentPage({
           </section>
         </article>
       </div>
-    </div>
+    </PrintPreviewModal>
   );
 }
