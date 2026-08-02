@@ -1482,6 +1482,7 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
   } | null>(null);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
+  const moreCloseTimer = useRef<number | null>(null);
   const effectiveActive = product.isVariantParent
     ? product.children.some((child) => child.isActive)
     : product.isActive;
@@ -1536,6 +1537,26 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
       window.removeEventListener("scroll", updateMorePosition, true);
     };
   }, [moreOpen, updateMorePosition]);
+
+  useEffect(() => () => {
+    if (moreCloseTimer.current !== null) window.clearTimeout(moreCloseTimer.current);
+  }, []);
+
+  function supportsHover() {
+    return typeof window !== "undefined" && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+  }
+
+  function openMoreOnHover() {
+    if (!supportsHover()) return;
+    if (moreCloseTimer.current !== null) window.clearTimeout(moreCloseTimer.current);
+    setMoreOpen(true);
+  }
+
+  function closeMoreAfterHover() {
+    if (!supportsHover()) return;
+    if (moreCloseTimer.current !== null) window.clearTimeout(moreCloseTimer.current);
+    moreCloseTimer.current = window.setTimeout(() => setMoreOpen(false), 120);
+  }
 
   function toggleCameraMaterial() {
     if (pending) return;
@@ -1672,6 +1693,8 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
               aria-haspopup="menu"
               aria-expanded={moreOpen}
               onClick={() => setMoreOpen((value) => !value)}
+              onMouseEnter={openMoreOnHover}
+              onMouseLeave={closeMoreAfterHover}
               className={cn(actionClassName, "w-11 border-border bg-surface px-0 text-slate-700 hover:bg-surface-2 dark:text-slate-200")}
             >
               <MoreHorizontal className="h-4 w-4" />
@@ -1680,6 +1703,8 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
               <div
                 ref={moreMenuRef}
                 role="menu"
+                onMouseEnter={openMoreOnHover}
+                onMouseLeave={closeMoreAfterHover}
                 style={
                   morePosition
                     ? {

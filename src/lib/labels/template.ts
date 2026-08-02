@@ -28,8 +28,8 @@ function mapRow(row: typeof labelTemplates.$inferSelect): LabelTemplate {
 }
 
 function withBuiltInTemplates(templates: LabelTemplate[]) {
-  const savedSizes = new Set(templates.map((template) => `${template.widthMm}x${template.heightMm}`));
-  return [...templates, ...BUILT_IN_LABEL_TEMPLATES.filter((template) => !savedSizes.has(`${template.widthMm}x${template.heightMm}`))]
+  const savedLayouts = new Set(templates.map((template) => `${template.widthMm}x${template.heightMm}x${template.columns}`));
+  return [...templates, ...BUILT_IN_LABEL_TEMPLATES.filter((template) => !savedLayouts.has(`${template.widthMm}x${template.heightMm}x${template.columns}`))]
     .sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "vi"));
 }
 
