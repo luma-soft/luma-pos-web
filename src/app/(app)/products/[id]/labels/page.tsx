@@ -20,7 +20,6 @@ interface Props {
   searchParams: Promise<Record<string, string | undefined>>;
 }
 
-type CodeSource = "barcode" | "sku";
 type LabelProduct = {
   id: string;
   name: string;
@@ -36,9 +35,8 @@ function clampQty(value: string | undefined) {
   return Number.isFinite(parsed) ? Math.min(Math.max(Math.round(parsed), 1), 500) : 12;
 }
 
-function pickCode(product: LabelProduct, source: CodeSource) {
-  if (source === "barcode") return product.barcode || product.sku;
-  return product.sku || product.barcode || "";
+function pickCode(product: LabelProduct) {
+  return product.barcode || product.sku;
 }
 
 function selectedProductIds(primaryId: string, idsParam?: string) {
@@ -78,7 +76,6 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
 
   const template = await getLabelTemplate(query.templateId);
   const qty = clampQty(query.qty);
-  const codeSource: CodeSource = query.codeSource === "sku" ? "sku" : "barcode";
   const isBatch = products.length > 1;
   const hasPriceOverride = query.price !== undefined && query.price !== "" && Number.isFinite(Number(query.price));
   const labelProducts: LabelProduct[] = products.flatMap((selectedProduct) => {
@@ -104,7 +101,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
       }];
   });
   const labels = labelProducts.flatMap((item) => Array.from({ length: item.quantity }, () => {
-    const code = pickCode(item, codeSource);
+    const code = pickCode(item);
     return {
       product: item,
       code,
@@ -138,8 +135,8 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
         <InstantFilterForm className={cn(
           "mb-4 shrink-0 grid gap-3 rounded-card border border-border bg-surface p-4 print:hidden",
           isBatch
-            ? "sm:grid-cols-[minmax(0,1fr)_220px_280px]"
-            : "sm:grid-cols-[minmax(0,1fr)_150px_220px_280px]",
+            ? "sm:grid-cols-[minmax(0,1fr)_280px]"
+            : "sm:grid-cols-[minmax(0,1fr)_150px_280px]",
         )}>
           {query.ids && <input type="hidden" name="ids" value={query.ids} />}
           {query.from && <input type="hidden" name="from" value={query.from} />}
@@ -147,12 +144,11 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
           {!isBatch && <Field label={t("products.labels.quantity")}>
             <NumberInput name="qty" min={1} max={500} defaultValue={qty} thousandSeparator={false} className="h-11 bg-canvas lg:h-10" />
           </Field>}
-          <Field label={t("products.labels.codeSource")}><Select name="codeSource" defaultValue={codeSource} options={[{ value: "barcode", label: t("products.labels.codeSourceBarcode") }, { value: "sku", label: t("products.labels.codeSourceSku") }]} rootClassName="w-full" /></Field>
           <Field label={t("products.labels.price")}>
             <NumberInput name="price" min={0} step={1000} defaultValue={hasPriceOverride ? Number(query.price) : isBatch ? undefined : Number(product.retailPrice)} placeholder={isBatch ? "Giá riêng theo sản phẩm" : undefined} suffix="đ" thousandSeparator formatOnChange className="h-11 bg-canvas lg:h-10" />
           </Field>
           {isBatch && (
-            <div className="overflow-hidden rounded-lg border border-border-soft sm:col-span-3">
+            <div className="overflow-hidden rounded-lg border border-border-soft sm:col-span-2">
               <div className="border-b border-border-soft px-3 py-2 text-sm font-semibold">Số lượng từng sản phẩm</div>
               <div className="max-h-64 overflow-auto">
                 <table className="w-full min-w-[520px] text-sm">
