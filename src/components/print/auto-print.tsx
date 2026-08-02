@@ -8,6 +8,7 @@ export function AutoPrint({ closeHref }: { closeHref: string }) {
   const searchParams = useSearchParams();
 
   useEffect(() => {
+    if (searchParams.get("embedded") === "1") return;
     const close = () => {
       if (searchParams.get("autoclose") === "1") {
         window.close();
