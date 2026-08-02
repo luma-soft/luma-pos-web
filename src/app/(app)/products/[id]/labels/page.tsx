@@ -13,6 +13,7 @@ import { LabelPrintButton } from "./label-print-button";
 import { getStoreSettings } from "@/lib/data/settings";
 import { NumberInput } from "@/components/ui/number-input";
 import { Select } from "@/components/ui/select";
+import { InstantFilterForm } from "@/components/instant-filter-form";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -124,7 +125,9 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
 
         <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-5 print:overflow-visible print:p-0">
 
-        <form className="mb-4 grid gap-3 rounded-card border border-border bg-surface p-4 print:hidden sm:grid-cols-[minmax(0,1fr)_120px_150px_150px_auto]">
+        <InstantFilterForm className="mb-4 grid gap-3 rounded-card border border-border bg-surface p-4 print:hidden sm:grid-cols-[minmax(0,1fr)_120px_150px_150px]">
+          {query.ids && <input type="hidden" name="ids" value={query.ids} />}
+          {query.from && <input type="hidden" name="from" value={query.from} />}
           <Field label={t("products.labels.template")}><Select name="templateId" defaultValue={template.id} options={templates.map((item) => ({ value: item.id, label: item.name }))} rootClassName="w-full" searchable /></Field>
           <Field label={t("products.labels.quantity")}>
             <NumberInput name="qty" min={1} max={500} defaultValue={qty} thousandSeparator={false} className="h-11 bg-canvas lg:h-10" />
@@ -133,12 +136,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
           <Field label={t("products.labels.price")}>
             <NumberInput name="price" min={0} step={1000} defaultValue={hasPriceOverride ? Number(query.price) : isBatch ? undefined : Number(product.retailPrice)} placeholder={isBatch ? "Giá riêng theo sản phẩm" : undefined} suffix="đ" className="h-11 bg-canvas lg:h-10" />
           </Field>
-          <div className="flex items-end">
-            <button type="submit" className="h-10 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
-              {t("common.apply")}
-            </button>
-          </div>
-        </form>
+        </InstantFilterForm>
 
         <section className="rounded-card border border-border bg-surface p-4 print:border-0 print:bg-white print:p-0">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2 print:hidden">
@@ -148,7 +146,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
             </p>
           </div>
           <div
-            className="grid justify-start"
+            className="grid justify-center"
             style={{
               gridTemplateColumns: `repeat(${template.columns}, ${template.widthMm}mm)`,
               gap: `${template.gapMm}mm`,
