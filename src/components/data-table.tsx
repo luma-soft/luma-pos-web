@@ -174,6 +174,7 @@ export function DataTableShell<T>({
   rowClassName,
   onRowClick,
   toolbar,
+  toolbarFloating = false,
   visibleColumnKeys,
   onColumnVisibilityChange,
   maxHeight = "calc(100dvh - 250px)",
@@ -204,6 +205,8 @@ export function DataTableShell<T>({
   rowClassName?: (row: T, expanded: boolean) => string | undefined;
   onRowClick?: (row: T) => void;
   toolbar?: ReactNode;
+  /** Đặt toolbar ở góc trên bảng mà không chiếm chiều cao dòng (desktop). */
+  toolbarFloating?: boolean;
   /** Điều khiển hiển thị cột từ UI bên ngoài bảng (ví dụ chip bảng giá). */
   visibleColumnKeys?: Set<string>;
   /** Đồng bộ thay đổi từ menu chọn cột về UI bên ngoài. */
@@ -345,8 +348,8 @@ export function DataTableShell<T>({
   );
 
   return (
-    <div className="flex min-h-0 w-full min-w-0 flex-col">
-      {toolbar && <div className="mb-2 flex flex-wrap items-center justify-end gap-2">{toolbar}</div>}
+    <div className="relative flex min-h-0 w-full min-w-0 flex-col">
+      {toolbar && <div className={cn("mb-2 flex flex-wrap items-center justify-end gap-2", toolbarFloating && "lg:absolute lg:-top-[88px] lg:right-0 lg:mb-0")}>{toolbar}</div>}
 
       {rows.length === 0 && empty ? (
         <div
