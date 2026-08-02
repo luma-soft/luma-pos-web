@@ -16,7 +16,7 @@ import { Select } from "@/components/ui/select";
 
 interface Props {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ templateId?: string; qty?: string; codeSource?: string; price?: string }>;
+  searchParams: Promise<{ templateId?: string; qty?: string; codeSource?: string; price?: string; ids?: string; from?: string }>;
 }
 
 type CodeSource = "barcode" | "sku";
@@ -39,6 +39,11 @@ function pickCode(product: LabelProduct, source: CodeSource) {
   return product.sku || product.barcode || "";
 }
 
+function selectedProductIds(primaryId: string, idsParam?: string) {
+  const ids = [primaryId, ...(idsParam?.split(",") ?? [])].filter(Boolean);
+  return [...new Set(ids)].slice(0, 100);
+}
+
 function barcodeSvg(value: string, template: LabelTemplate) {
   try {
     return bwipjs.toSVG({
@@ -58,14 +63,20 @@ function barcodeSvg(value: string, template: LabelTemplate) {
 export default async function ProductLabelsPage({ params, searchParams }: Props) {
   const { id } = await params;
   const query = await searchParams;
-  const [t, product, templates, store] = await Promise.all([getTranslations(), getProduct(id), getLabelTemplates(), getStoreSettings()]);
+  const [t, templates, store] = await Promise.all([getTranslations(), getLabelTemplates(), getStoreSettings()]);
+  const products = (await Promise.all(selectedProductIds(id, query.ids).map((productId) => getProduct(productId)))).filter(
+    (candidate): candidate is NonNullable<Awaited<ReturnType<typeof getProduct>>> => Boolean(candidate),
+  );
+  const product = products[0];
   if (!product) notFound();
 
   const template = await getLabelTemplate(query.templateId);
   const qty = clampQty(query.qty);
   const codeSource: CodeSource = query.codeSource === "sku" ? "sku" : "barcode";
-  const labelProducts: LabelProduct[] = product.isVariantParent && product.children.length > 0
-    ? product.children.map((child) => ({
+  const isBatch = products.length > 1;
+  const hasPriceOverride = query.price !== undefined && query.price !== "" && Number.isFinite(Number(query.price));
+  const labelProducts: LabelProduct[] = products.flatMap((selectedProduct) => selectedProduct.isVariantParent && selectedProduct.children.length > 0
+    ? selectedProduct.children.map((child) => ({
         id: child.id,
         name: child.name,
         sku: child.sku,
@@ -74,19 +85,19 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
         baseUnit: child.baseUnit,
       }))
     : [{
-        id: product.id,
-        name: product.name,
-        sku: product.sku,
-        barcode: product.barcode,
-        retailPrice: product.retailPrice,
-        baseUnit: product.baseUnit,
-      }];
+        id: selectedProduct.id,
+        name: selectedProduct.name,
+        sku: selectedProduct.sku,
+        barcode: selectedProduct.barcode,
+        retailPrice: selectedProduct.retailPrice,
+        baseUnit: selectedProduct.baseUnit,
+      }]);
   const labels = labelProducts.flatMap((item) => Array.from({ length: qty }, () => {
     const code = pickCode(item, codeSource);
     return {
       product: item,
       code,
-      price: formatCurrency(Number(query.price || item.retailPrice)),
+      price: formatCurrency(hasPriceOverride ? Number(query.price) : Number(item.retailPrice)),
       svg: barcodeSvg(code, template),
     };
   }));
@@ -103,11 +114,11 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
         <header className="flex shrink-0 items-start justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-5 print:hidden">
           <div className="min-w-0">
             <h1 id="label-print-title" className="truncate text-lg font-bold">{t("products.labels.title")}</h1>
-            <p className="mt-0.5 truncate text-sm text-slate-500">{product.name}</p>
+            <p className="mt-0.5 truncate text-sm text-slate-500">{isBatch ? `${products.length} sản phẩm đã chọn` : product.name}</p>
           </div>
           <div className="flex items-center gap-2">
             <LabelPrintButton label={t("products.labels.print")} />
-            <Link href={Routes.product(product.id)} className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-700 lg:h-9 lg:w-9" aria-label={t("common.close")}><X className="h-5 w-5" /></Link>
+            <Link href={query.from === "inventory" ? `${Routes.Inventory}?tab=products` : Routes.product(product.id)} className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-700 lg:h-9 lg:w-9" aria-label={t("common.close")}><X className="h-5 w-5" /></Link>
           </div>
         </header>
 
@@ -120,7 +131,7 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
           </Field>
           <Field label={t("products.labels.codeSource")}><Select name="codeSource" defaultValue={codeSource} options={[{ value: "barcode", label: t("products.labels.codeSourceBarcode") }, { value: "sku", label: t("products.labels.codeSourceSku") }]} rootClassName="w-full" /></Field>
           <Field label={t("products.labels.price")}>
-            <NumberInput name="price" min={0} step={1000} defaultValue={Number(query.price || product.retailPrice)} suffix="đ" className="h-11 bg-canvas lg:h-10" />
+            <NumberInput name="price" min={0} step={1000} defaultValue={hasPriceOverride ? Number(query.price) : isBatch ? undefined : Number(product.retailPrice)} placeholder={isBatch ? "Giá riêng theo sản phẩm" : undefined} suffix="đ" className="h-11 bg-canvas lg:h-10" />
           </Field>
           <div className="flex items-end">
             <button type="submit" className="h-10 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">

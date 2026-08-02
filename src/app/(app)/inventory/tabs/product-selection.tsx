@@ -12,7 +12,8 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Ban, Loader2, MoreHorizontal, Trash2 } from "lucide-react";
+import { Ban, Barcode, Loader2, MoreHorizontal, Trash2 } from "lucide-react";
+import { Routes } from "@/lib/routes";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import {
   bulkDeleteProducts,
@@ -186,6 +187,12 @@ export function ProductBulkActions() {
     });
   }
 
+  function printLabels() {
+    setOpen(false);
+    const params = new URLSearchParams({ ids: ids.join(","), from: "inventory" });
+    router.push(`${Routes.productLabels(ids[0])}?${params.toString()}`, { scroll: false });
+  }
+
   return (
     <div ref={rootRef} className="relative shrink-0">
       <button
@@ -213,6 +220,15 @@ export function ProductBulkActions() {
       </button>
       {open && (
         <div className="absolute right-0 top-full z-50 mt-2 min-w-56 rounded-xl border border-border bg-surface p-1 shadow-xl">
+          <button
+            type="button"
+            onClick={printLabels}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
+          >
+            <Barcode className="h-4 w-4 text-primary-600" />
+            {t("products.actions.printLabels")}
+          </button>
+          <div className="my-1 border-t border-border-soft" />
           <button
             type="button"
             onClick={stopSelling}
