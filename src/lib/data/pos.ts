@@ -178,6 +178,7 @@ export async function getPosData(options?: {
   includeProductSkus?: readonly string[];
   includeProductCategories?: readonly string[];
   role?: Role;
+  sort?: "recent_sales" | "created";
 }) {
   const hasComplianceColumns = await hasProductComplianceColumns();
   const [defaultWh] = await db
@@ -195,7 +196,9 @@ export async function getPosData(options?: {
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(activeRootCondition())
-      .orderBy(...recentSaleOrder())
+      .orderBy(...(options?.sort === "created"
+        ? [desc(products.createdAt), desc(products.id)] as const
+        : recentSaleOrder()))
       .limit(200),
     includeProductIds.length || includeProductSkus.length || includeProductCategories.length
       ? db
@@ -300,9 +303,9 @@ export async function getPosData(options?: {
 }
 
 export async function getMobilePosData(role: Role) {
-  // Reuse the POS dataset so mobile gets the same recent-sales ranking,
+  // Reuse the POS dataset so mobile gets the same POS projection,
   // manager-only price books, stock reservations, and product image data.
-  const data = await getPosData({ role });
+  const data = await getPosData({ role, sort: "created" });
   return {
     ...data,
     products: data.products.slice(0, 30),
