@@ -106,6 +106,23 @@ export async function getProducts(filters: ProductListFilters = {}) {
         : eq(products.categoryId, filters.categoryId),
     );
   }
+  if (!exactProductId && filters.updatedSince) {
+    const since = new Date(filters.updatedSince);
+    if (!Number.isNaN(since.getTime())) {
+      conditions.push(
+        view === "grouped"
+          ? or(
+              gte(products.updatedAt, since),
+              sql`exists (
+                select 1 from products child
+                where child.parent_product_id = ${products.id}
+                  and child.updated_at >= ${since}
+              )`,
+            )!
+          : gte(products.updatedAt, since),
+      );
+    }
+  }
   if (!exactProductId && filters.productSkus?.length && !filters.cameraMaterial) {
     conditions.push(inArray(products.sku, filters.productSkus));
   }
@@ -609,103 +626,8 @@ export async function getProductListItem(id: string) {
 }
 
 export async function getMobileProducts(filters: ProductListFilters = {}) {
-  const page = Math.max(1, filters.page ?? 1);
-  const size = coercePageSize(filters.pageSize, 15);
-  const status: ProductStatusFilter = filters.status ?? "active";
-  const complianceFields = productComplianceFields(
-    await hasProductComplianceColumns(),
-  );
-  const conditions: SQL[] = [sql`${products.parentProductId} is null`];
-
-  if (filters.q?.trim()) {
-    const q = filters.q.trim();
-    const search = or(
-      accentInsensitiveLike(products.name, q),
-      accentInsensitiveLike(products.sku, q),
-      accentInsensitiveLike(products.barcode, q),
-    );
-    if (search) conditions.push(search);
-  }
-  if (filters.categoryId) {
-    conditions.push(eq(products.categoryId, filters.categoryId));
-  }
-  if (filters.updatedSince) {
-    const since = new Date(filters.updatedSince);
-    if (!Number.isNaN(since.getTime())) {
-      conditions.push(gte(products.updatedAt, since));
-    }
-  }
-  if (status === "active") {
-    conditions.push(eq(products.isActive, true));
-  } else if (status === "inactive") {
-    conditions.push(eq(products.isActive, false));
-  }
-
-  const where = and(...conditions);
-
-  const [rows, [{ total }]] = await Promise.all([
-    db
-      .select({
-        id: products.id,
-        sku: products.sku,
-        barcode: products.barcode,
-        name: products.name,
-        description: products.description,
-        categoryId: products.categoryId,
-        brandId: products.brandId,
-        supplierId: products.supplierId,
-        baseUnit: products.baseUnit,
-        costPrice: products.costPrice,
-        retailPrice: products.retailPrice,
-        wholesalePrice: products.wholesalePrice,
-        contractorPrice: products.contractorPrice,
-        agentPrice: products.agentPrice,
-        vatRate: complianceFields.vatRate,
-        priceByWeight: complianceFields.priceByWeight,
-        trackBatches: complianceFields.trackBatches,
-        shelfLifeDays: complianceFields.shelfLifeDays,
-        lifecycleStatus: complianceFields.lifecycleStatus,
-        parentProductId: products.parentProductId,
-        variantName: products.variantName,
-        isVariantParent: products.isVariantParent,
-        isActive: products.isActive,
-        updatedAt: products.updatedAt,
-        categoryName: categories.name,
-        brandName: brands.name,
-        supplierName: suppliers.name,
-        totalStock: products.totalStock,
-        minLevel: products.minStock,
-        childCount: sql<number>`(
-          select count(*)::int from products child where child.parent_product_id = ${products.id}
-        )`,
-        minRetailPrice: products.retailPrice,
-        maxRetailPrice: products.retailPrice,
-        units: sql<
-          { unitName: string; multiplier: string; barcode: string | null }[]
-        >`coalesce((
-          select json_agg(json_build_object('unitName', pu.unit_name, 'multiplier', pu.multiplier, 'barcode', pu.barcode) order by pu.sort_order)
-          from product_units pu where pu.product_id = ${products.id}
-        ), '[]')`,
-        children: sql<unknown[]>`'[]'::json`,
-      })
-      .from(products)
-      .leftJoin(categories, eq(products.categoryId, categories.id))
-      .leftJoin(brands, eq(products.brandId, brands.id))
-      .leftJoin(suppliers, eq(products.supplierId, suppliers.id))
-      .where(where)
-      .orderBy(asc(products.name))
-      .limit(size)
-      .offset((page - 1) * size),
-    db.select({ total: count() }).from(products).where(where),
-  ]);
-
-  return {
-    rows,
-    total,
-    page,
-    pageSize: size,
-    pageCount: Math.max(1, Math.ceil(total / size)),
-  };
+  // Keep mobile and web on the same grouped variant projection.
+  return getProducts({ ...filters, view: "grouped" });
 }
 
 export async function getMobileProductOptions() {
