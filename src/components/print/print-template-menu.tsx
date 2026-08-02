@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Printer } from "lucide-react";
-import { useRouter } from "next/navigation";
 import type { PrintTemplate } from "@/lib/print/template-shared";
 import { cn } from "@/lib/utils";
 
@@ -17,7 +16,6 @@ export function PrintTemplateMenu({
   label: string;
   className?: string;
 }) {
-  const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
 
@@ -29,9 +27,9 @@ export function PrintTemplateMenu({
     return () => document.removeEventListener("mousedown", close);
   }, []);
 
-  const print = (template: Pick<PrintTemplate, "id" | "paperDefault">) => {
-    const params = new URLSearchParams({ templateId: template.id, size: template.paperDefault });
-    router.push(`${baseHref}?${params.toString()}`, { scroll: false });
+  const print = (template: Pick<PrintTemplate, "id">, size: PrintTemplate["paperDefault"]) => {
+    const params = new URLSearchParams({ templateId: template.id, size, autoclose: "1" });
+    window.open(`${baseHref}?${params.toString()}`, "_blank", "noopener,noreferrer");
     setOpen(false);
   };
 
@@ -43,13 +41,13 @@ export function PrintTemplateMenu({
         <ChevronDown className="h-3.5 w-3.5" />
       </button>
       {open && (
-        <div className="absolute bottom-full right-0 z-[80] mb-2 min-w-52 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-e2">
-          {templates.map((template) => (
-            <button key={template.id} type="button" onClick={() => print(template)} className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-surface-2">
+        <div className="absolute bottom-full right-0 z-[80] mb-2 min-w-64 overflow-hidden rounded-lg border border-border bg-surface py-1 shadow-e2">
+          {templates.flatMap((template) => (["a4", "a5", "k80"] as const).map((size) => (
+            <button key={`${template.id}-${size}`} type="button" onClick={() => print(template, size)} className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm hover:bg-surface-2">
               <span className="font-medium">{template.name}</span>
-              <span className="text-xs text-slate-400 uppercase">{template.paperDefault}</span>
+              <span className="rounded bg-surface-2 px-1.5 py-0.5 text-xs font-bold uppercase text-slate-500">{size}</span>
             </button>
-          ))}
+          )))}
         </div>
       )}
     </div>
