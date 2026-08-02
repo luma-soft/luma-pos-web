@@ -153,9 +153,9 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
           </div>
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col p-4 sm:p-5 print:block print:overflow-visible print:p-0">
-
-        <InstantFilterForm className="mb-4 shrink-0 grid gap-3 rounded-card border border-border bg-surface p-4 print:hidden sm:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 p-4 sm:p-5 lg:grid lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-5 lg:overflow-hidden print:block print:overflow-visible print:p-0">
+        <div className="min-h-0 lg:overflow-y-auto lg:pr-1 print:hidden">
+        <InstantFilterForm className="grid gap-3 rounded-card border border-border bg-surface p-4 sm:grid-cols-[minmax(0,1fr)_280px]">
           {query.ids && <input type="hidden" name="ids" value={query.ids} />}
           {query.from && <input type="hidden" name="from" value={query.from} />}
           <Field label={t("products.labels.template")}><Select name="templateId" defaultValue={template.id} options={templates.map((item) => ({ value: item.id, label: item.name }))} rootClassName="w-full" searchable /></Field>
@@ -186,8 +186,9 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
             </div>
           )}
         </InstantFilterForm>
+        </div>
 
-        <section className="flex min-h-0 flex-1 flex-col rounded-card border border-border bg-surface p-4 print:block print:border-0 print:bg-white print:p-0">
+        <section className="flex min-h-[22rem] flex-1 flex-col rounded-card border border-border bg-surface p-4 lg:min-h-0 print:block print:border-0 print:bg-white print:p-0">
           <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-2 print:hidden">
             <h2 className="text-sm font-semibold text-slate-500">{t("products.labels.preview")}</h2>
             <p className="text-xs text-slate-500">
