@@ -2196,13 +2196,15 @@ export function PosClient({
                   onModeChange={setDiscountMode}
                 />
               </PosSummaryAdjustRow>
-              <PosSummaryAdjustRow
-                label={t("pos.tax")}
-                hint={`+ ${formatCurrency(taxAmount)}`}
-                hintVisible={taxRate > 0}
-              >
-                <PosAmountModeInput value={taxRate} mode="pct" onValueChange={setTaxRate} />
-              </PosSummaryAdjustRow>
+              {taxRate > 0 && (
+                <PosSummaryAdjustRow
+                  label={t("pos.tax")}
+                  hint={`+ ${formatCurrency(taxAmount)}`}
+                  hintVisible
+                >
+                  <PosAmountModeInput value={taxRate} mode="pct" onValueChange={setTaxRate} />
+                </PosSummaryAdjustRow>
+              )}
               <PosSummaryAdjustRow label={t("pos.shipping")}>
                 <PosAmountModeInput value={shippingFee} mode="vnd" onValueChange={setShippingFee} />
               </PosSummaryAdjustRow>

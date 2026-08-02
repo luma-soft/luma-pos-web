@@ -128,6 +128,15 @@ describe("POS mobile checkout", () => {
     expect(source).not.toContain("MoreVertical");
   });
 
+  test("hides VAT from a new sale until that invoice has a tax rate", () => {
+    const source = readFileSync(
+      "src/app/(pos)/pos/pos-client.tsx",
+      "utf8",
+    );
+
+    expect(source).toContain("{taxRate > 0 && (");
+  });
+
   test("keeps POS search and nested modal controls touch-safe on mobile", () => {
     const source = readFileSync(
       "src/app/(pos)/pos/pos-client.tsx",
