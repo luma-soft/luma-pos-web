@@ -20,7 +20,6 @@ import {
   Cpu,
   Lightbulb,
   Utensils,
-  ReceiptText,
   Printer,
 } from "lucide-react";
 import { getTranslations } from "next-intl/server";
@@ -96,7 +95,6 @@ export default async function MorePage() {
             {manager && <MobileSettingsRow href={Routes.Finance} icon={Wallet} label={t("nav.groups.finance")} subtitle={t("mobile.more.financeHint")} />}
             {sales && <MobileSettingsRow href={`${Routes.Sales}?tab=returns`} icon={RotateCcw} label={t("nav.returns")} subtitle={t("mobile.more.returnsHint")} tone="red" />}
             {sales && <MobileSettingsRow href={`${Routes.Finance}?tab=shifts`} icon={Clock3} label={t("nav.shifts")} subtitle={t("mobile.more.shiftHint")} tone="orange" />}
-            {manager && <MobileSettingsRow href={`${Routes.Sales}?tab=einvoices`} icon={ReceiptText} label={t("nav.einvoices")} subtitle={t("mobile.more.eInvoicesHint")} tone="blue" />}
             {store.prefs.ai.openaiApiKeySet && <MobileSettingsRow href="/ai" icon={Sparkles} label={t("nav.ai")} subtitle={t("mobile.more.aiHint")} tone="purple" />}
           </MoreSection>
         )}

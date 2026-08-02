@@ -10,7 +10,6 @@ import { getPrintTemplate, getPrintTemplatesForDoc } from "@/lib/print/template"
 import type { ShareablePrintDocType } from "@/lib/print/share-document";
 import { OrderStatusBadge, PaymentStatusBadge } from "../status-badges";
 import { OrderActions, PaymentForm, SendOrderZaloButton } from "./order-actions";
-import { EInvoiceForm } from "./einvoice-form";
 import { SharePrintDocButton } from "./share-print-doc-button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { OrderDetailActionGroup } from "@/components/order-detail-action-group";
@@ -18,24 +17,12 @@ import { OrderProductLink } from "@/components/order-product-link";
 import { BookingCreateOrderButton, QuoteDeleteButton } from "../../quotes/quote-actions";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 
-type EInvoiceSummary = {
-  id: string;
-  status: string;
-  number: string | null;
-  serial: string | null;
-  buyerName: string;
-  vatRate: string | number;
-  vatAmount: string | number;
-} | null | undefined;
-
 export async function OrderDetailPanel({
   order,
-  einvoice,
   compact = false,
   showOpenAction = false,
 }: {
   order: OrderDetail;
-  einvoice?: EInvoiceSummary;
   compact?: boolean;
   showOpenAction?: boolean;
 }) {
@@ -296,20 +283,6 @@ export async function OrderDetailPanel({
             {!isQuote && <InfoLine label={t("orders.detail.remaining")} value={formatCurrency(remaining)} valueClassName={remaining > 0 ? "text-er" : "text-ok"} strong />}
           </div>
 
-          {order.status === "completed" && (
-            <div className="space-y-2 rounded-lg border border-border-soft p-3">
-              <div className="font-semibold">{t("einvoice.title")}</div>
-              {einvoice ? (
-                <>
-                  <InfoLine label={t("einvoice.cols.number")} value={einvoice.number ? `${einvoice.serial ? `${einvoice.serial} · ` : ""}${einvoice.number}` : "—"} strong />
-                  <InfoLine label={t("einvoice.cols.buyer")} value={einvoice.buyerName} />
-                  <InfoLine label={`VAT ${Number(einvoice.vatRate)}%`} value={formatCurrency(Number(einvoice.vatAmount))} />
-                </>
-              ) : (
-                <EInvoiceForm orderId={order.id} defaultBuyer={order.customerName ?? ""} />
-              )}
-            </div>
-          )}
         </div>
       </div>
 

@@ -680,7 +680,6 @@ function HardwareSection({ L, prefs, canManage }: { L: boolean; prefs: StorePref
             <span className={FL}>{L ? "Khổ giấy mặc định" : "Default paper size"}</span>
             <SearchableSelect options={PAPER_SIZES.map((s) => ({ value: s, label: s }))} value={form.paperSize} onChange={(v) => set("paperSize", v as typeof form.paperSize)} allowClear={false} disabled={!canManage} className={searchableTouch} />
           </div>
-          <CtrlRow title={L ? "In QR hóa đơn điện tử" : "Print e-invoice QR"} desc={L ? "Mã xác thực theo Nghị định 70" : "Decree 70 verification code"} checked={form.printEinvoiceQr} onChange={canManage ? (v) => set("printEinvoiceQr", v) : undefined} />
           <CtrlRow title={L ? "In tự động sau mỗi đơn" : "Auto-print after each order"} checked={form.autoPrint} onChange={canManage ? (v) => set("autoPrint", v) : undefined} />
           <CtrlRow title={L ? "Mở ngăn kéo khi thu tiền mặt" : "Open cash drawer on cash payment"} checked={form.openDrawer} onChange={canManage ? (v) => set("openDrawer", v) : undefined} />
           <div className="flex items-center gap-2"><Link href="/settings/print" className={btnS}><Printer className="w-3 h-3" />{L ? "Mở thiết kế mẫu in →" : "Open template designer →"}</Link></div>
@@ -1182,7 +1181,6 @@ function TaxSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["ta
   const [pending, start] = useTransition();
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => { setForm((p) => ({ ...p, [k]: v })); setDirty(true); setSaved(false); };
   function save() { start(async () => { const r = await updateStorePrefs({ tax: form }); if (r.ok) { setDirty(false); setSaved(true); } }); }
-  const providerOpts = ["VNPT e-Invoice", "Viettel-S", "MISA meInvoice", "FPT Invoice", "Bkav eHóa đơn", "CyberLotus", "EasyInvoice"].map((p) => ({ value: p.split(" ")[0], label: p }));
   const pctColor = (r: number) => r === 0 ? "text-slate-400" : r === 5 ? "text-ok" : r === 8 ? "text-warn" : "text-er";
   return (
     <>
@@ -1199,19 +1197,6 @@ function TaxSection({ L, prefs, canManage }: { L: boolean; prefs: StorePrefs["ta
             );
           })}
           <CtrlRow title={L ? "Giá đã bao gồm thuế" : "Prices include tax"} desc={L ? "Giá niêm yết đã gồm GTGT" : "Listed prices are tax-inclusive"} checked={form.priceIncludesTax} onChange={canManage ? (v) => set("priceIncludesTax", v) : undefined} />
-        </div>
-      </Card>
-      <Card title={L ? "Hóa đơn điện tử (Nghị định 70/2025)" : "E-Invoice — Decree 70/2025"} vi={L ? "Cấu hình nhà cung cấp HĐĐT" : "E-invoice provider config"} action={<TouchTargetToggle checked={form.einvoiceEnabled} onChange={canManage ? (v) => set("einvoiceEnabled", v) : () => {}} aria-label="einvoice" />}>
-        <div className="p-4.5 flex flex-col gap-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="flex flex-col gap-1"><span className={FL}>{L ? "Mã số thuế (MST)" : "Tax ID (MST)"}</span><input className={cn(FI, "font-mono")} value={form.einvoiceTaxId} disabled={!canManage} placeholder="0123456789" onChange={(e) => set("einvoiceTaxId", e.target.value)} /></div>
-            <div className="flex flex-col gap-1"><span className={FL}>{L ? "Nhà cung cấp HĐĐT" : "E-Invoice Provider"}</span>
-              <SearchableSelect options={providerOpts} value={form.einvoiceProvider} onChange={(v) => set("einvoiceProvider", v)} allowClear={false} disabled={!canManage} className={searchableTouch} />
-            </div>
-          </div>
-          <div className="px-3.5 py-2.5 bg-in-soft border border-in/20 rounded-[10px] text-[11px] text-in leading-relaxed">
-            <strong>Circular 32/2025:</strong> {L ? "Mã xác thực cơ quan thuế bắt buộc trên mọi hóa đơn từ 01/07/2025." : "Tax-authority verification code mandatory on all invoices from 01/07/2025."}
-          </div>
         </div>
       </Card>
       <SaveBar L={L} dirty={dirty} saved={saved} pending={pending} canManage={canManage} onSave={save} />

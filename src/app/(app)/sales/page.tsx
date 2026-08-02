@@ -7,6 +7,7 @@ import { QuotesTab } from "./tabs/quotes";
 import { BookingsTab } from "./tabs/bookings";
 import { EInvoicesTab } from "./tabs/einvoices";
 import { ReturnsTab } from "./tabs/returns";
+import { EINVOICE_UI_ENABLED } from "@/lib/features";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ const TABS = [
   { tab: "returns", labelKey: "nav.returns" },
   { tab: "quotes", labelKey: "nav.quotes" },
   { tab: "bookings", labelKey: "nav.bookings" },
-  { tab: "einvoices", labelKey: "nav.einvoices" },
+  ...(EINVOICE_UI_ENABLED ? [{ tab: "einvoices", labelKey: "nav.einvoices" }] : []),
 ];
 
 export default async function SalesPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
@@ -38,7 +39,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
       {tab === "quotes" ? <QuotesTab searchParams={params} />
         : tab === "returns" ? <ReturnsTab searchParams={params} />
         : tab === "bookings" ? <BookingsTab searchParams={params} />
-        : tab === "einvoices" ? <EInvoicesTab />
+        : tab === "einvoices" && EINVOICE_UI_ENABLED ? <EInvoicesTab />
         : <OrdersTab searchParams={params} />}
     </div>
   );
