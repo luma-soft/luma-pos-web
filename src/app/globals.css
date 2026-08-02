@@ -276,6 +276,22 @@ input[type="number"] {
   body:has(.print-document-root) main > div:has(.print-document-root) {
     padding-bottom: 0 !important;
   }
+  body:has(.label-print-root) .app-sidebar,
+  body:has(.label-print-root) main > :not(:has(.label-print-root)) {
+    display: none !important;
+  }
+  body:has(.label-print-root) main {
+    display: block !important;
+    overflow: visible !important;
+  }
+  body:has(.label-print-root) main > div:has(.label-print-root),
+  .label-print-root {
+    position: static !important;
+    display: block !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
   .print-preview-modal {
     position: static !important;
     display: block !important;

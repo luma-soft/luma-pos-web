@@ -10,19 +10,13 @@ import {
   saveLabelTemplate,
   setDefaultLabelTemplate,
 } from "@/lib/actions/label-templates";
-import { DEFAULT_LABEL_TEMPLATE, type LabelTemplate } from "@/lib/labels/template-shared";
+import { BUILT_IN_LABEL_TEMPLATES, DEFAULT_LABEL_TEMPLATE, type LabelTemplate } from "@/lib/labels/template-shared";
 import { Routes } from "@/lib/routes";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { cn } from "@/lib/utils";
 import { NumberInput } from "@/components/ui/number-input";
 
 const TOGGLES = ["showName", "showSku", "showPrice", "showUnit", "showBarcodeText", "showStoreName"] as const;
-
-const LABEL_PRESETS = [
-  { key: "40x30", widthMm: 40, heightMm: 30, columns: 3, gapMm: 2, barcodeHeightMm: 10, barcodeQuietMm: 2, fontScale: 1 },
-  { key: "50x30", widthMm: 50, heightMm: 30, columns: 2, gapMm: 3, barcodeHeightMm: 11, barcodeQuietMm: 2, fontScale: 1 },
-  { key: "35x22", widthMm: 35, heightMm: 22, columns: 4, gapMm: 2, barcodeHeightMm: 8, barcodeQuietMm: 1.5, fontScale: 0.9 },
-] as const;
 
 export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] }) {
   const t = useTranslations();
@@ -167,11 +161,19 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
 
             <Panel title={t("labelSettings.sizeSection")}>
               <div className="mb-3 flex flex-wrap gap-2">
-                {LABEL_PRESETS.map((preset) => (
+                {BUILT_IN_LABEL_TEMPLATES.map((preset) => (
                   <button
                     key={preset.key}
                     type="button"
-                    onClick={() => patch(preset)}
+                    onClick={() => patch({
+                      widthMm: preset.widthMm,
+                      heightMm: preset.heightMm,
+                      columns: preset.columns,
+                      gapMm: preset.gapMm,
+                      barcodeHeightMm: preset.barcodeHeightMm,
+                      barcodeQuietMm: preset.barcodeQuietMm,
+                      fontScale: preset.fontScale,
+                    })}
                     className="min-h-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2 min-w-11"
                   >
                     {preset.widthMm}x{preset.heightMm}mm

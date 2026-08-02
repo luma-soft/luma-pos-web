@@ -2,15 +2,17 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import bwipjs from "bwip-js/node";
 import type { ReactNode } from "react";
+import Link from "next/link";
+import { X } from "lucide-react";
 import { getProduct } from "@/lib/data/products";
 import { getLabelTemplate, getLabelTemplates } from "@/lib/labels/template";
 import type { LabelTemplate } from "@/lib/labels/template-shared";
 import { Routes } from "@/lib/routes";
-import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { formatCurrency } from "@/lib/utils";
 import { LabelPrintButton } from "./label-print-button";
 import { getStoreSettings } from "@/lib/data/settings";
 import { NumberInput } from "@/components/ui/number-input";
+import { Select } from "@/components/ui/select";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -90,40 +92,33 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
   }));
 
   return (
-    <div className="min-h-dvh bg-canvas p-4 sm:p-6 print:bg-white print:p-0">
+    <div className="label-print-root fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-6 print:static print:block print:bg-white print:p-0">
       <style>{`
         @media print {
           @page { margin: 6mm; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       `}</style>
-      <div className="mx-auto max-w-5xl print:max-w-none">
-        <MobileDetailHeader
-          backHref={Routes.product(product.id)}
-          backLabel={t("common.back")}
-          title={t("products.labels.title")}
-          subtitle={product.name}
-          actions={<LabelPrintButton label={t("products.labels.print")} />}
-          className="print:hidden"
-        />
+      <section role="dialog" aria-modal="true" aria-labelledby="label-print-title" className="flex h-full w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-surface shadow-2xl sm:h-[min(900px,calc(100dvh-48px))] sm:max-w-6xl sm:rounded-card print:h-auto print:max-w-none print:overflow-visible print:border-0 print:shadow-none">
+        <header className="flex shrink-0 items-start justify-between gap-4 border-b border-border-soft px-4 py-3 sm:px-5 print:hidden">
+          <div className="min-w-0">
+            <h1 id="label-print-title" className="truncate text-lg font-bold">{t("products.labels.title")}</h1>
+            <p className="mt-0.5 truncate text-sm text-slate-500">{product.name}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <LabelPrintButton label={t("products.labels.print")} />
+            <Link href={Routes.product(product.id)} className="grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-surface-2 hover:text-slate-700 lg:h-9 lg:w-9" aria-label={t("common.close")}><X className="h-5 w-5" /></Link>
+          </div>
+        </header>
+
+        <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-5 print:overflow-visible print:p-0">
 
         <form className="mb-4 grid gap-3 rounded-card border border-border bg-surface p-4 print:hidden sm:grid-cols-[minmax(0,1fr)_120px_150px_150px_auto]">
-          <Field label={t("products.labels.template")}>
-            <select name="templateId" defaultValue={template.id} className="h-10 w-full rounded-lg border border-border bg-canvas px-3 text-sm min-h-11 lg:min-h-0">
-              {templates.map((item) => (
-                <option key={item.id} value={item.id}>{item.name}</option>
-              ))}
-            </select>
-          </Field>
+          <Field label={t("products.labels.template")}><Select name="templateId" defaultValue={template.id} options={templates.map((item) => ({ value: item.id, label: item.name }))} rootClassName="w-full" searchable /></Field>
           <Field label={t("products.labels.quantity")}>
             <NumberInput name="qty" min={1} max={500} defaultValue={qty} thousandSeparator={false} className="h-11 bg-canvas lg:h-10" />
           </Field>
-          <Field label={t("products.labels.codeSource")}>
-            <select name="codeSource" defaultValue={codeSource} className="h-10 w-full rounded-lg border border-border bg-canvas px-3 text-sm min-h-11 lg:min-h-0">
-              <option value="barcode">{t("products.labels.codeSourceBarcode")}</option>
-              <option value="sku">{t("products.labels.codeSourceSku")}</option>
-            </select>
-          </Field>
+          <Field label={t("products.labels.codeSource")}><Select name="codeSource" defaultValue={codeSource} options={[{ value: "barcode", label: t("products.labels.codeSourceBarcode") }, { value: "sku", label: t("products.labels.codeSourceSku") }]} rootClassName="w-full" /></Field>
           <Field label={t("products.labels.price")}>
             <NumberInput name="price" min={0} step={1000} defaultValue={Number(query.price || product.retailPrice)} suffix="đ" className="h-11 bg-canvas lg:h-10" />
           </Field>
@@ -165,7 +160,8 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
             ))}
           </div>
         </section>
-      </div>
+        </div>
+      </section>
     </div>
   );
 }

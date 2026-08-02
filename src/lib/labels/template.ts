@@ -1,7 +1,7 @@
 import { asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { labelTemplates } from "@/db/schema";
-import { DEFAULT_LABEL_TEMPLATE, type LabelTemplate } from "./template-shared";
+import { BUILT_IN_LABEL_TEMPLATES, DEFAULT_LABEL_TEMPLATE, type LabelTemplate } from "./template-shared";
 
 function mapRow(row: typeof labelTemplates.$inferSelect): LabelTemplate {
   return {
@@ -27,13 +27,19 @@ function mapRow(row: typeof labelTemplates.$inferSelect): LabelTemplate {
   };
 }
 
+function withBuiltInTemplates(templates: LabelTemplate[]) {
+  const savedSizes = new Set(templates.map((template) => `${template.widthMm}x${template.heightMm}`));
+  return [...templates, ...BUILT_IN_LABEL_TEMPLATES.filter((template) => !savedSizes.has(`${template.widthMm}x${template.heightMm}`))]
+    .sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "vi"));
+}
+
 export async function getLabelTemplates(): Promise<LabelTemplate[]> {
   const rows = await db
     .select()
     .from(labelTemplates)
     .where(eq(labelTemplates.isActive, true))
     .orderBy(desc(labelTemplates.isDefault), asc(labelTemplates.sortOrder), asc(labelTemplates.name));
-  return rows.length > 0 ? rows.map(mapRow) : [DEFAULT_LABEL_TEMPLATE];
+  return withBuiltInTemplates(rows.map(mapRow));
 }
 
 export async function getAllLabelTemplates(): Promise<LabelTemplate[]> {
@@ -41,7 +47,7 @@ export async function getAllLabelTemplates(): Promise<LabelTemplate[]> {
     .select()
     .from(labelTemplates)
     .orderBy(desc(labelTemplates.isDefault), asc(labelTemplates.sortOrder), asc(labelTemplates.name));
-  return rows.length > 0 ? rows.map(mapRow) : [DEFAULT_LABEL_TEMPLATE];
+  return withBuiltInTemplates(rows.map(mapRow));
 }
 
 export async function getLabelTemplate(templateId?: string | null): Promise<LabelTemplate> {
