@@ -133,9 +133,9 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-5 print:overflow-visible print:p-0">
+        <div className="flex min-h-0 flex-1 flex-col p-4 sm:p-5 print:block print:overflow-visible print:p-0">
 
-        <InstantFilterForm className="mb-4 grid gap-3 rounded-card border border-border bg-surface p-4 print:hidden sm:grid-cols-[minmax(0,1fr)_150px_150px]">
+        <InstantFilterForm className="mb-4 shrink-0 grid gap-3 rounded-card border border-border bg-surface p-4 print:hidden sm:grid-cols-[minmax(0,1fr)_150px_150px]">
           {query.ids && <input type="hidden" name="ids" value={query.ids} />}
           {query.from && <input type="hidden" name="from" value={query.from} />}
           <Field label={t("products.labels.template")}><Select name="templateId" defaultValue={template.id} options={templates.map((item) => ({ value: item.id, label: item.name }))} rootClassName="w-full" searchable /></Field>
@@ -169,35 +169,37 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
           )}
         </InstantFilterForm>
 
-        <section className="rounded-card border border-border bg-surface p-4 print:border-0 print:bg-white print:p-0">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 print:hidden">
+        <section className="flex min-h-0 flex-1 flex-col rounded-card border border-border bg-surface p-4 print:block print:border-0 print:bg-white print:p-0">
+          <div className="mb-4 flex shrink-0 flex-wrap items-center justify-between gap-2 print:hidden">
             <h2 className="text-sm font-semibold text-slate-500">{t("products.labels.preview")}</h2>
             <p className="text-xs text-slate-500">
               {template.name} · {template.widthMm}x{template.heightMm}mm · {labels.length} {t("products.labels.labelsUnit")}
             </p>
           </div>
-          <div
-            className="grid justify-center"
-            style={{
-              gridTemplateColumns: `repeat(${template.columns}, ${template.widthMm}mm)`,
-              gap: `${template.gapMm}mm`,
-            }}
-          >
-            {labels.map((label, index) => (
-              <ProductLabel
-                key={`${label.product.id}-${index}`}
-                template={template}
-                name={label.product.name}
-                sku={label.product.sku}
-                unitName={label.product.baseUnit}
-                code={label.code}
-                price={label.price}
-                codeLabel={t("products.labels.barcodeValue")}
-                priceLabel={t("products.labels.price")}
-                storeName={store.name}
-                barcodeSvg={label.svg}
-              />
-            ))}
+          <div className="min-h-0 flex-1 overflow-auto print:overflow-visible">
+            <div
+              className="grid justify-center"
+              style={{
+                gridTemplateColumns: `repeat(${template.columns}, ${template.widthMm}mm)`,
+                gap: `${template.gapMm}mm`,
+              }}
+            >
+              {labels.map((label, index) => (
+                <ProductLabel
+                  key={`${label.product.id}-${index}`}
+                  template={template}
+                  name={label.product.name}
+                  sku={label.product.sku}
+                  unitName={label.product.baseUnit}
+                  code={label.code}
+                  price={label.price}
+                  codeLabel={t("products.labels.barcodeValue")}
+                  priceLabel={t("products.labels.price")}
+                  storeName={store.name}
+                  barcodeSvg={label.svg}
+                />
+              ))}
+            </div>
           </div>
         </section>
         </div>
