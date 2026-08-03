@@ -35,6 +35,18 @@ export async function getDashboard(requestedRange?: DashboardRange) {
   // chỉ đơn bán thật: loại quote/merged/cancelled/draft
   const realSale = inArray(orders.status, ["completed", "returned"]);
   const inRange = and(realSale, gte(orders.createdAt, since));
+  const orderBucketKey = range === "today"
+    ? sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD-HH24')`
+    : sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD')`;
+  const orderBucketLabel = range === "today"
+    ? sql<string>`to_char(${orders.createdAt}, 'HH24"h"')`
+    : sql<string>`to_char(${orders.createdAt}, 'DD/MM')`;
+  const returnBucketKey = range === "today"
+    ? sql<string>`to_char(${returns.createdAt}, 'YYYY-MM-DD-HH24')`
+    : sql<string>`to_char(${returns.createdAt}, 'YYYY-MM-DD')`;
+  const returnBucketLabel = range === "today"
+    ? sql<string>`to_char(${returns.createdAt}, 'HH24"h"')`
+    : sql<string>`to_char(${returns.createdAt}, 'DD/MM')`;
 
   const [
     [agg],
@@ -48,8 +60,10 @@ export async function getDashboard(requestedRange?: DashboardRange) {
     lowStock,
     recentOrders,
     topDebtors,
-    grossRevenueByDay,
-    refundsByDay,
+    grossRevenueSeries,
+    refundsSeries,
+    grossProfitSeries,
+    returnedProfitSeries,
   ] = await Promise.all([
     db.select({
       revenue: sql<string>`coalesce(sum(${orders.total}), 0)`,
@@ -145,24 +159,48 @@ export async function getDashboard(requestedRange?: DashboardRange) {
       .limit(3),
 
     db.select({
-      day: sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD')`,
-      dow: sql<number>`extract(isodow from ${orders.createdAt})::int`,
+      key: orderBucketKey,
+      label: orderBucketLabel,
       revenue: sql<string>`coalesce(sum(${orders.total}), 0)`,
     })
       .from(orders)
       .where(inRange)
-      .groupBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`, sql`extract(isodow from ${orders.createdAt})`)
-      .orderBy(sql`to_char(${orders.createdAt}, 'YYYY-MM-DD')`),
+      .groupBy(orderBucketKey, orderBucketLabel)
+      .orderBy(orderBucketKey),
 
     db.select({
-      day: sql<string>`to_char(${returns.createdAt}, 'YYYY-MM-DD')`,
-      dow: sql<number>`extract(isodow from ${returns.createdAt})::int`,
+      key: returnBucketKey,
+      label: returnBucketLabel,
       refund: sql<string>`coalesce(sum(${returns.totalRefund}), 0)`,
     })
       .from(returns)
       .where(gte(returns.createdAt, since))
-      .groupBy(sql`to_char(${returns.createdAt}, 'YYYY-MM-DD')`, sql`extract(isodow from ${returns.createdAt})`)
-      .orderBy(sql`to_char(${returns.createdAt}, 'YYYY-MM-DD')`),
+      .groupBy(returnBucketKey, returnBucketLabel)
+      .orderBy(returnBucketKey),
+
+    db.select({
+      key: orderBucketKey,
+      label: orderBucketLabel,
+      grossProfit: sql<string>`coalesce(sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})), 0)`,
+    })
+      .from(orderItems)
+      .innerJoin(orders, eq(orderItems.orderId, orders.id))
+      .innerJoin(products, eq(orderItems.productId, products.id))
+      .where(inRange)
+      .groupBy(orderBucketKey, orderBucketLabel)
+      .orderBy(orderBucketKey),
+
+    db.select({
+      key: returnBucketKey,
+      label: returnBucketLabel,
+      returnedProfit: sql<string>`coalesce(sum(${returnItems.total} - (${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice})), 0)`,
+    })
+      .from(returnItems)
+      .innerJoin(returns, eq(returnItems.returnId, returns.id))
+      .innerJoin(products, eq(returnItems.productId, products.id))
+      .where(gte(returns.createdAt, since))
+      .groupBy(returnBucketKey, returnBucketLabel)
+      .orderBy(returnBucketKey),
   ]);
 
   const financials = calculateDashboardFinancials({
@@ -179,6 +217,7 @@ export async function getDashboard(requestedRange?: DashboardRange) {
     orderCount: agg.orderCount,
     avgOrder: financials.avgOrder,
     grossProfit: financials.grossProfit,
+    costOfGoods: financials.costOfGoods,
     marginPct: financials.marginPct,
     debt: { total: Number(debtAgg.totalDebt), debtors: debtAgg.debtors },
     openOrderCount: openOrderAgg.count,
@@ -187,8 +226,83 @@ export async function getDashboard(requestedRange?: DashboardRange) {
     lowStock,
     recentOrders,
     topDebtors,
-    revenueByDay: mergeNetRevenueByDay(grossRevenueByDay, refundsByDay),
+    revenueByDay: collapseRevenueByDay(grossRevenueSeries, refundsSeries),
+    analyticsSeries: mergeAnalyticsSeries(
+      grossRevenueSeries,
+      refundsSeries,
+      grossProfitSeries,
+      returnedProfitSeries,
+    ),
+    recentActivity: recentOrders.map((order) => ({
+      id: `order:${order.id}`,
+      kind: "order",
+      occurredAt: order.createdAt.toISOString(),
+      title: order.code,
+      description: String(order.total),
+      entityId: order.id,
+    })),
   };
+}
+
+type SeriesRow = { key: string; label: string };
+
+function mergeAnalyticsSeries(
+  sales: Array<SeriesRow & { revenue: string | number }>,
+  refunds: Array<SeriesRow & { refund: string | number }>,
+  profits: Array<SeriesRow & { grossProfit: string | number }>,
+  returnedProfits: Array<SeriesRow & { returnedProfit: string | number }>,
+) {
+  const rows = new Map<string, {
+    key: string;
+    label: string;
+    revenue: number;
+    grossProfit: number;
+  }>();
+  const rowFor = (row: SeriesRow) => {
+    const current = rows.get(row.key) ?? {
+      key: row.key,
+      label: row.label,
+      revenue: 0,
+      grossProfit: 0,
+    };
+    rows.set(row.key, current);
+    return current;
+  };
+  for (const row of sales) rowFor(row).revenue += Number(row.revenue);
+  for (const row of refunds) rowFor(row).revenue -= Number(row.refund);
+  for (const row of profits) rowFor(row).grossProfit += Number(row.grossProfit);
+  for (const row of returnedProfits) {
+    rowFor(row).grossProfit -= Number(row.returnedProfit);
+  }
+  return [...rows.values()].sort((left, right) => left.key.localeCompare(right.key));
+}
+
+function collapseRevenueByDay(
+  sales: Array<SeriesRow & { revenue: string | number }>,
+  refunds: Array<SeriesRow & { refund: string | number }>,
+) {
+  const grossByDay = new Map<string, number>();
+  const refundsByDay = new Map<string, number>();
+  for (const row of sales) {
+    const day = row.key.slice(0, 10);
+    grossByDay.set(day, (grossByDay.get(day) ?? 0) + Number(row.revenue));
+  }
+  for (const row of refunds) {
+    const day = row.key.slice(0, 10);
+    refundsByDay.set(day, (refundsByDay.get(day) ?? 0) + Number(row.refund));
+  }
+  return mergeNetRevenueByDay(
+    [...grossByDay].map(([day, revenue]) => ({
+      day,
+      dow: ((new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7) + 1,
+      revenue,
+    })),
+    [...refundsByDay].map(([day, refund]) => ({
+      day,
+      dow: ((new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7) + 1,
+      refund,
+    })),
+  );
 }
 
 export type DashboardData = Awaited<ReturnType<typeof getDashboard>>;

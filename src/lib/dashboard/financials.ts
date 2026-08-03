@@ -9,6 +9,7 @@ export type DashboardFinancialInput = {
 export type DashboardFinancials = {
   revenue: number;
   grossProfit: number;
+  costOfGoods: number;
   avgOrder: number;
   marginPct: number;
 };
@@ -22,6 +23,7 @@ export function calculateDashboardFinancials(
   return {
     revenue,
     grossProfit,
+    costOfGoods: revenue - grossProfit,
     avgOrder: input.orderCount > 0 ? revenue / input.orderCount : 0,
     marginPct: revenue > 0 ? (grossProfit / revenue) * 100 : 0,
   };

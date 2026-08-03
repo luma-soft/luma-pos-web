@@ -15,6 +15,7 @@ describe("dashboard financials", () => {
     })).toEqual({
       revenue: 380_000,
       grossProfit: 135_000,
+      costOfGoods: 245_000,
       avgOrder: 190_000,
       marginPct: 35.526315789473685,
     });

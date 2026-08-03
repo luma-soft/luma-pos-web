@@ -8,7 +8,15 @@ import { coercePageSize } from "@/lib/pagination";
 
 export const ORDERS_PAGE_SIZE = 20;
 
-export type OrderStatusFilter = "all" | "completed" | "cancelled" | "owing" | "returned";
+export type OrderStatusFilter =
+  | "all"
+  | "completed"
+  | "cancelled"
+  | "owing"
+  | "returned"
+  | "draft"
+  | "quote"
+  | "confirmed";
 export type OrderPaymentFilter = "all" | "paid" | "unpaid" | "partial";
 export type OrderSourceFilter = "all" | "pos" | "shopee" | "tiktok_shop" | "lazada" | "tiki";
 
@@ -27,7 +35,13 @@ export interface OrderListFilters {
 export async function getOrders(filters: OrderListFilters = {}) {
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize);
-  const conditions: SQL[] = [ne(orders.status, "quote"), ne(orders.status, "confirmed")]; // báo giá / đặt hàng có trang riêng
+  const conditions: SQL[] = [];
+  if (filters.status === "quote") conditions.push(eq(orders.status, "quote"));
+  else if (filters.status === "confirmed") conditions.push(eq(orders.status, "confirmed"));
+  else {
+    // Báo giá / đặt hàng chỉ xuất hiện khi mobile yêu cầu đúng tab.
+    conditions.push(ne(orders.status, "quote"), ne(orders.status, "confirmed"));
+  }
   if (filters.orderId) conditions.push(eq(orders.id, filters.orderId));
 
   if (filters.q?.trim()) {
@@ -42,6 +56,7 @@ export async function getOrders(filters: OrderListFilters = {}) {
   if (filters.status === "completed") conditions.push(eq(orders.status, "completed"));
   if (filters.status === "cancelled") conditions.push(eq(orders.status, "cancelled"));
   if (filters.status === "returned") conditions.push(eq(orders.status, "returned"));
+  if (filters.status === "draft") conditions.push(eq(orders.status, "draft"));
   if (filters.status === "owing") {
     const c = and(
       or(eq(orders.paymentStatus, "unpaid"), eq(orders.paymentStatus, "deposit"), eq(orders.paymentStatus, "partial")),
