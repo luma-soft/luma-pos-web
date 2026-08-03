@@ -1,7 +1,13 @@
 import { createProduct } from "@/lib/actions/products";
-import { getMobileProductOptions, getMobileProducts } from "@/lib/data/products";
+import {
+  getMobileProductOptions,
+  getMobileProducts,
+} from "@/lib/data/products";
 import type { ProductListView, ProductStatusFilter } from "@/lib/data/products";
-import { requireMobileStockAccess } from "@/lib/mobile/auth";
+import {
+  requireMobileStockAccess,
+  requireMobileStockReadAccess,
+} from "@/lib/mobile/auth";
 import {
   mobileAction,
   mobileGate,
@@ -12,7 +18,7 @@ import {
 } from "@/lib/mobile/response";
 
 export async function GET(request: Request) {
-  const gate = await requireMobileStockAccess();
+  const gate = await requireMobileStockReadAccess();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
 

@@ -11,6 +11,7 @@ import {
   SALES_ACCESS_ROLES,
   STAFF_ROLES,
   STOCK_ACCESS_ROLES,
+  STOCK_READ_ROLES,
 } from "@/lib/auth/roles";
 import {
   cashierContextSecret,
@@ -19,7 +20,9 @@ import {
 
 export type MobileGate = Gate & { principalId?: string };
 
-export async function requireMobileRole(roles: readonly Role[]): Promise<MobileGate> {
+export async function requireMobileRole(
+  roles: readonly Role[],
+): Promise<MobileGate> {
   const headerStore = await headers();
   const authorization = headerStore.get("authorization");
   const token = authorization?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
@@ -37,7 +40,7 @@ export async function requireMobileRole(roles: readonly Role[]): Promise<MobileG
         persistSession: false,
         autoRefreshToken: false,
       },
-    }
+    },
   );
 
   const { data, error } = await supabase.auth.getUser(token);
@@ -95,14 +98,14 @@ export const requireMobileSalesAccess = () =>
 export const requireMobileStockAccess = () =>
   requireMobileRole(STOCK_ACCESS_ROLES);
 
-export const requireMobileManager = () =>
-  requireMobileRole(MANAGER_ROLES);
+export const requireMobileStockReadAccess = () =>
+  requireMobileRole(STOCK_READ_ROLES);
 
-export const requireMobileOwner = () =>
-  requireMobileRole(OWNER_ROLES);
+export const requireMobileManager = () => requireMobileRole(MANAGER_ROLES);
 
-export const requireMobileUser = () =>
-  requireMobileRole(STAFF_ROLES);
+export const requireMobileOwner = () => requireMobileRole(OWNER_ROLES);
+
+export const requireMobileUser = () => requireMobileRole(STAFF_ROLES);
 
 export const requireMobileServiceAccess = () =>
   requireMobileRole(["owner", "manager", "technician"]);

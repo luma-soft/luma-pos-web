@@ -23,3 +23,10 @@ export const STOCK_ACCESS_ROLES = [
   "manager",
   "warehouse",
 ] as const satisfies readonly Role[];
+
+// Cashiers need a current stock snapshot to sell safely, but must not be able
+// to mutate stock, create receipts, or balance a count.
+export const STOCK_READ_ROLES = [
+  ...STOCK_ACCESS_ROLES,
+  "cashier",
+] as const satisfies readonly Role[];

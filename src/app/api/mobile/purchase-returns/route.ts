@@ -1,10 +1,23 @@
 import { createPurchaseReturn } from "@/lib/actions/purchase-returns";
-import { getPurchaseReturnFormOptions, getPurchaseReturns } from "@/lib/data/purchase-returns";
-import { requireMobileStockAccess } from "@/lib/mobile/auth";
-import { mobileAction, mobileGate, mobileOk, numberParam, readJson, searchParam } from "@/lib/mobile/response";
+import {
+  getPurchaseReturnFormOptions,
+  getPurchaseReturns,
+} from "@/lib/data/purchase-returns";
+import {
+  requireMobileStockAccess,
+  requireMobileStockReadAccess,
+} from "@/lib/mobile/auth";
+import {
+  mobileAction,
+  mobileGate,
+  mobileOk,
+  numberParam,
+  readJson,
+  searchParam,
+} from "@/lib/mobile/response";
 
 export async function GET(request: Request) {
-  const gate = await requireMobileStockAccess();
+  const gate = await requireMobileStockReadAccess();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
 
@@ -30,6 +43,8 @@ export async function POST(request: Request) {
   if (!body) return mobileAction({ ok: false, error: "errors.invalidData" });
 
   return mobileAction(
-    await createPurchaseReturn(body as Parameters<typeof createPurchaseReturn>[0])
+    await createPurchaseReturn(
+      body as Parameters<typeof createPurchaseReturn>[0],
+    ),
   );
 }

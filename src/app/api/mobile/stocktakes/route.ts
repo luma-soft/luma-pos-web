@@ -2,11 +2,20 @@ import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { profiles, stocktakeItems, stocktakes, warehouses } from "@/db/schema";
 import { createStocktake } from "@/lib/actions/stocktakes";
-import { requireMobileStockAccess } from "@/lib/mobile/auth";
-import { mobileAction, mobileError, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
+import {
+  requireMobileStockAccess,
+  requireMobileStockReadAccess,
+} from "@/lib/mobile/auth";
+import {
+  mobileAction,
+  mobileError,
+  mobileGate,
+  mobileOk,
+  readJson,
+} from "@/lib/mobile/response";
 
 export async function GET() {
-  const gate = await requireMobileStockAccess();
+  const gate = await requireMobileStockReadAccess();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
 
@@ -51,6 +60,6 @@ export async function POST(request: Request) {
     await createStocktake({
       ...(body as Parameters<typeof createStocktake>[0]),
       balanceNow: false,
-    })
+    }),
   );
 }
