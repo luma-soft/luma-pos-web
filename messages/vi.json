@@ -2073,6 +2073,23 @@
     "statusOk": "Đủ hàng",
     "movementsTitle": "Lịch sử xuất nhập",
     "noMovements": "Chưa có biến động kho",
+    "actions": {
+      "startStocktakeHint": "Tạo phiếu đếm và đối chiếu tồn thực tế",
+      "viewStocktakes": "Xem các phiếu kiểm kho",
+      "viewStocktakesHint": "Theo dõi phiếu nháp, đã cân bằng và đã hủy",
+      "viewAll": "Xem toàn bộ",
+      "ledgerSubtitle": "Sổ biến động kho theo dữ liệu thực tế",
+      "searchMovements": "Tìm sản phẩm, mã giao dịch…",
+      "allTypes": "Tất cả loại",
+      "allWarehouses": "Tất cả kho",
+      "showing": "{count} giao dịch phù hợp",
+      "previous": "← Trước",
+      "next": "Sau →",
+      "stocktakeInProgress": "Đang kiểm kho",
+      "countedProducts": "{count} sản phẩm đã chọn",
+      "continue": "Tiếp tục",
+      "loadedMovements": "Giao dịch gần nhất đã tải"
+    },
     "expand": {
       "tabs": {
         "info": "Thông tin",

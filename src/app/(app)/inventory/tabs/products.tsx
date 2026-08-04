@@ -22,6 +22,9 @@ import {
   ProductBulkActions,
   ProductSelectionProvider,
 } from "./product-selection";
+import { getCategoriesWithCounts } from "@/lib/data/categories";
+import { CategoriesManager } from "../../products/categories/categories-manager";
+import { ProductCatalogSwitcher } from "./product-catalog-switcher";
 
 type SP = Record<string, string | undefined>;
 const STATUSES = ["active", "inactive", "all"] as const;
@@ -35,10 +38,26 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
   const t = await getTranslations();
   const params = searchParams;
   const cameraMaterials = params.cameraMaterials === "1";
+  const catalogView = params.catalog === "categories" ? "categories" : "products";
+
+  if (!cameraMaterials && catalogView === "categories") {
+    const page = Number(params.page) || 1;
+    const pageSize = parsePageSize(params.size);
+    const categoryData = await getCategoriesWithCounts({ page, pageSize });
+    return (
+      <>
+        <ProductCatalogSwitcher activeView="categories" categoryCount={categoryData.total} />
+        <CategoriesManager categories={categoryData.rows} parentOptions={categoryData.roots} total={categoryData.total} />
+        <Pagination page={page} pageCount={categoryData.pageCount} total={categoryData.total} pageSize={pageSize} unitLabel={t("categories.unitLabel")} />
+      </>
+    );
+  }
+
   const { categories } = await getProductFormOptions();
 
   return (
     <>
+      {!cameraMaterials && <ProductCatalogSwitcher activeView="products" />}
       {cameraMaterials && <div className="mb-4"><h2 className="text-lg font-bold">Vật tư lắp camera</h2><p className="text-sm text-slate-500">Thêm, sửa, xóa các vật tư dùng trong báo giá lắp đặt camera.</p></div>}
 
       {cameraMaterials && <CameraMaterialSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />}

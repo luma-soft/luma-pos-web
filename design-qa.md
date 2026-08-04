@@ -80,3 +80,30 @@
 - Device-specific iOS status-bar and home-indicator treatment should remain owned by the installed PWA/browser shell.
 
 final result: passed
+
+---
+
+# Inventory Action-first Redesign QA — 2026-08-04
+
+## Target
+
+- Selected web visual: `/Users/cvthien/.codex/generated_images/019fcd6b-c610-7481-9818-4204e0d4b9e7/exec-cf939be7-7b4f-427b-bb0f-11e264cf080f.png`
+- Selected movement drawer visual: `/Users/cvthien/.codex/generated_images/019fcd6b-c610-7481-9818-4204e0d4b9e7/exec-ed50b738-2cde-4047-8d39-4bc0e1c2e4a6.png`
+- Intended state: authenticated owner, Vietnamese, light theme, `Hàng hóa & kho > Tồn kho`.
+
+## Implementation result
+
+- Primary navigation is reduced to Sản phẩm, Nhập hàng, Tồn kho, and Thêm. Secondary modules remain available from Thêm.
+- Kiểm kho is a contextual action menu with create/history paths instead of a peer tab.
+- Draft stocktakes render as a thin resumable status banner when server data contains one.
+- KPIs are a compact band; the inventory table is the dominant surface.
+- Recent movements expose a functional right-side ledger with search, movement-type and warehouse filters, actual transaction IDs, and pagination.
+
+## Verification
+
+- Scoped ESLint: passed.
+- Message catalogs: valid JSON.
+- Next.js production build, TypeScript phase, and static generation: passed.
+- The local browser session reached the app and correctly redirected to `/login`; no authenticated browser session was available, so same-state live pixel comparison is blocked without using or guessing user credentials.
+
+final result: implementation passed; authenticated live visual comparison blocked

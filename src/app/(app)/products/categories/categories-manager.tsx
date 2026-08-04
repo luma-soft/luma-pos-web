@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { Check, ChevronDown, Loader2, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, ChevronDown, Loader2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,7 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Cat | null>(null);
+  const [query, setQuery] = useState("");
 
   // modal tạo mới
   const [open, setOpen] = useState(false);
@@ -72,8 +73,20 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
     } else setError(t(res.error as never));
   }
 
-  const rows = cats.filter((c) => !c.parentId);
-  const childrenOf = (id: string) => cats.filter((c) => c.parentId === id);
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const matchesQuery = (category: Cat) => category.name.toLocaleLowerCase().includes(normalizedQuery);
+  const allChildrenOf = (id: string) => cats.filter((c) => c.parentId === id);
+  const rows = cats.filter((category) => {
+    if (category.parentId) return false;
+    if (!normalizedQuery || matchesQuery(category)) return true;
+    return allChildrenOf(category.id).some(matchesQuery);
+  });
+  const childrenOf = (id: string) => {
+    const children = allChildrenOf(id);
+    if (!normalizedQuery) return children;
+    const parentMatches = cats.some((category) => category.id === id && matchesQuery(category));
+    return parentMatches ? children : children.filter(matchesQuery);
+  };
 
   function CategoryName({ c }: { c: Cat }) {
     const isEditing = editing?.id === c.id;
@@ -115,12 +128,23 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
 
   return (
     <div className="w-full min-w-0">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm text-slate-500">{t("categories.count", { n: total })}</span>
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <label className="relative min-w-0 flex-1 sm:max-w-md">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t("categories.title")}
+            aria-label={t("categories.title")}
+            className="h-11 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none transition-colors focus:border-primary-500"
+          />
+        </label>
         <button onClick={() => setOpen(true)} className="inline-flex min-h-11 items-center gap-1.5 px-3 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 min-w-11">
           <Plus className="w-4 h-4" /> {t("categories.create")}
         </button>
       </div>
+
+      <p className="mb-3 text-sm text-slate-500">{t("categories.count", { n: total })}</p>
 
       {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
 

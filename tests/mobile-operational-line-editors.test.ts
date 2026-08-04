@@ -33,4 +33,16 @@ describe("mobile operational line editors", () => {
 
     expect(source).toMatch(/min-h-full flex flex-col(?: bg-canvas)? lg:h-dvh/);
   });
+
+  it("keeps internal-use cost read-only and derived from product cost", () => {
+    const source = readFileSync(
+      "src/app/(app)/inventory/internal-use-form.tsx",
+      "utf8",
+    );
+
+    expect(source).not.toContain("<NumberInput");
+    expect(source).toContain("unitCost: cost");
+    expect(source).toContain("unitCost: Math.round(l.costPrice * u.mult)");
+    expect(source).toContain("formatCurrency(l.unitCost)");
+  });
 });

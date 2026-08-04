@@ -2073,6 +2073,23 @@
     "statusOk": "In stock",
     "movementsTitle": "Stock movements",
     "noMovements": "No movements yet",
+    "actions": {
+      "startStocktakeHint": "Create a count and compare it with system stock",
+      "viewStocktakes": "View stocktake documents",
+      "viewStocktakesHint": "Track drafts, balanced and cancelled documents",
+      "viewAll": "View all",
+      "ledgerSubtitle": "Inventory ledger backed by actual movement data",
+      "searchMovements": "Search product or transaction code…",
+      "allTypes": "All types",
+      "allWarehouses": "All warehouses",
+      "showing": "{count} matching entries",
+      "previous": "← Previous",
+      "next": "Next →",
+      "stocktakeInProgress": "Stocktake in progress",
+      "countedProducts": "{count} selected products",
+      "continue": "Continue",
+      "loadedMovements": "Latest loaded entries"
+    },
     "expand": {
       "tabs": {
         "info": "Info",

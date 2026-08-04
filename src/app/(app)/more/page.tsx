@@ -13,7 +13,6 @@ import {
   Store,
   UserRoundCog,
   PackageSearch,
-  Tags,
   ShoppingCart,
   ClipboardCheck,
   Camera,
@@ -80,7 +79,6 @@ export default async function MorePage() {
         {stock && (
           <MoreSection title={t("nav.groups.inventory")}>
             <MobileSettingsRow href={`${Routes.Inventory}?tab=products`} icon={PackageSearch} label={t("nav.products")} subtitle={t("mobile.more.productsHint")} tone="blue" />
-            <MobileSettingsRow href={`${Routes.Inventory}?tab=categories`} icon={Tags} label={t("categories.title")} subtitle={t("mobile.more.categoriesHint")} tone="purple" />
             <MobileSettingsRow href={`${Routes.Inventory}?tab=purchases`} icon={ShoppingCart} label={t("nav.purchases")} subtitle={t("mobile.more.purchasesHint")} />
             <MobileSettingsRow href={`${Routes.Inventory}?tab=stocktakes`} icon={ClipboardCheck} label={t("nav.stocktakes")} subtitle={t("mobile.more.stocktakesHint")} tone="orange" />
           </MoreSection>
