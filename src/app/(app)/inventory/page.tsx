@@ -1,5 +1,4 @@
 import { getTranslations } from "next-intl/server";
-import { Routes } from "@/lib/routes";
 import { Text } from "@/components/ui/text";
 import { StockTab } from "./tabs/stock";
 import { ProductsTab } from "./tabs/products";
@@ -8,10 +7,6 @@ import { PurchasesTab } from "./tabs/purchases";
 import { PurchaseReturnsTab } from "./tabs/purchase-returns";
 import { StocktakesTab } from "./tabs/stocktakes";
 import { InternalUseTab } from "./tabs/internal-use";
-import { getCategoriesWithCounts } from "@/lib/data/categories";
-import { Pagination } from "@/components/pagination";
-import { parsePageSize } from "@/lib/pagination";
-import { CategoriesManager } from "../products/categories/categories-manager";
 import { InventoryNavigation } from "./inventory-navigation";
 
 export const dynamic = "force-dynamic";
@@ -19,11 +14,11 @@ export const dynamic = "force-dynamic";
 export default async function InventoryPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const t = await getTranslations();
   const params = await searchParams;
-  const tab = params.tab ?? "products";
-
-  const page = Number(params.page) || 1;
-  const pageSize = parsePageSize(params.size);
-  const categoryData = tab === "categories" ? await getCategoriesWithCounts({ page, pageSize }) : null;
+  const requestedTab = params.tab ?? "products";
+  const tab = requestedTab === "categories" ? "products" : requestedTab;
+  const effectiveParams = requestedTab === "categories"
+    ? { ...params, tab: "products", catalog: "categories" }
+    : params;
 
   return (
     <div className="p-4 sm:p-6">
@@ -37,11 +32,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
         <div className="overflow-x-auto px-4 pb-2 sm:px-6"><InventoryNavigation activeTab={tab} /></div>
       </div>
 
-      {tab === "categories" && categoryData ? <>
-        <CategoriesManager categories={categoryData.rows} parentOptions={categoryData.roots} total={categoryData.total} />
-        <Pagination page={page} pageCount={categoryData.pageCount} total={categoryData.total} pageSize={pageSize} unitLabel={t("categories.unitLabel")} />
-      </>
-        : tab === "products" || tab === "camera-materials" ? <ProductsTab searchParams={tab === "camera-materials" ? { ...params, cameraMaterials: "1" } : params} />
+      {tab === "products" || tab === "camera-materials" ? <ProductsTab searchParams={tab === "camera-materials" ? { ...effectiveParams, cameraMaterials: "1" } : effectiveParams} />
         : tab === "pricing" ? <PricingTab searchParams={params} />
         : tab === "purchases" ? <PurchasesTab searchParams={params} />
         : tab === "purchase-returns" ? <PurchaseReturnsTab searchParams={params} />
