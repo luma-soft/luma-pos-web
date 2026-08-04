@@ -2,7 +2,7 @@
 
 import { type ReactNode, useMemo, useRef, useState, useTransition } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { Search, Trash2, Check, Loader2, AlertTriangle, Save } from "lucide-react";
+import { Search, Trash2, Check, Loader2, Save } from "lucide-react";
 import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
 import type { AiQuickActionApplyMode } from "@/components/ai-quick-actions/types";
@@ -23,8 +23,6 @@ import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPurchaseProduct } from "@/lib/inventory/product-catalog-adapter";
 import type { InternalUseWarehouse } from "@/lib/inventory/internal-use-warehouse";
 import type { PurchaseProductRow } from "@/lib/data/inventory";
-
-const APPROVAL_THRESHOLD = 500_000;
 
 const DEPARTMENTS = [
   ["kitchen", "Kitchen", "Bếp"], ["office", "Office", "Văn phòng"], ["marketing", "Marketing", "Tiếp thị"],
@@ -66,7 +64,6 @@ export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse
   const labelOf = (opts: { value: string; label: string }[], v: string) => opts.find((o) => o.value === v)?.label ?? v;
 
   const totalCost = useMemo(() => lines.reduce((s, l) => s + l.unitCost * l.quantity, 0), [lines]);
-  const needsApproval = totalCost > APPROVAL_THRESHOLD;
   const warehouseStock = useMemo(() => {
     if (!warehouse) return new Map<string, number>();
     return new Map(catalog.products.map((product) => [
@@ -165,7 +162,7 @@ export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse
       });
       if (res.ok) {
         void catalog.refresh();
-        setToast(res.data.status === "pending" ? t("internalUse.submittedPending") : t("internalUse.submitted"));
+        setToast(t("internalUse.submitted"));
         setLines([]); setNote(""); setReason(""); setDepartment("");
         router.push(`${Routes.Inventory}?tab=internal`);
         setTimeout(() => setToast(""), 3500);
@@ -205,18 +202,11 @@ export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse
               )}
             </div>
 
-        {needsApproval && (
-          <div className="m-4 flex items-start gap-2 rounded-card border border-warn/20 bg-warn-soft px-3.5 py-2.5 text-xs text-warn">
-            <AlertTriangle className="w-4 h-4 shrink-0 mt-px" />
-            <span>{t("internalUse.approvalBanner", { amount: formatCurrency(totalCost) })}</span>
-          </div>
-        )}
-
           <div className="grid grid-cols-2 gap-2 border-b border-border-soft bg-canvas/45 px-4 py-3 text-xs sm:grid-cols-4">
             <FormMetric label={t("internalUse.cols.items")} value={String(lines.length)} />
             <FormMetric label={t("internalUse.qty")} value={String(lines.reduce((sum, line) => sum + line.quantity, 0))} />
-            <FormMetric label={t("internalUse.totalCost")} value={formatCurrency(totalCost)} tone={needsApproval ? "warn" : "primary" } />
-            <FormMetric label={t("internalUse.status.draft")} value={needsApproval ? t("internalUse.status.pending") : t("internalUse.status.approved")} tone={needsApproval ? "warn" : "ok"} />
+            <FormMetric label={t("internalUse.totalCost")} value={formatCurrency(totalCost)} tone="primary" />
+            <FormMetric label={t("internalUse.status.draft")} value={t("internalUse.status.approved")} tone="ok" />
           </div>
 
           <div className="flex-1 min-h-[320px] overflow-visible bg-surface border border-border rounded-card lg:overflow-auto">
@@ -350,7 +340,7 @@ export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse
             <PanelRow label={t("internalUse.statusLabel")}><span className="font-semibold">{t("internalUse.status.draft")}</span></PanelRow>
             <PanelRow label={t("internalUse.reason")}><SearchableSelect options={reasonOpts} value={reason} onChange={setReason} placeholder={t("internalUse.reasonPlaceholder")} /></PanelRow>
             <PanelRow label={t("internalUse.department")}><SearchableSelect options={deptOpts} value={department} onChange={setDepartment} placeholder={t("internalUse.departmentPlaceholder")} /></PanelRow>
-            <PanelRow label={t("internalUse.totalCost")}><span className={cn("font-mono text-lg font-extrabold", needsApproval ? "text-warn" : "text-primary-700")}>{formatCurrency(totalCost)}</span></PanelRow>
+            <PanelRow label={t("internalUse.totalCost")}><span className="font-mono text-lg font-extrabold text-primary-700">{formatCurrency(totalCost)}</span></PanelRow>
           </div>
 
           <Textarea
@@ -365,9 +355,9 @@ export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse
               {!pending && <Save className="h-4 w-4" />}
               {t("stocktakes.saveDraft")}
             </Button>
-            <Button type="button" size="lg" disabled={pending || lines.length === 0} loading={pending} onClick={submit} className={needsApproval ? "bg-warn hover:bg-warn/90" : undefined} block>
+            <Button type="button" size="lg" disabled={pending || lines.length === 0} loading={pending} onClick={submit} block>
               {!pending && <Check className="w-4 h-4" />}
-              {needsApproval ? t("internalUse.submitForApproval") : t("internalUse.complete")}
+              {t("internalUse.complete")}
             </Button>
           </div>
       </aside>

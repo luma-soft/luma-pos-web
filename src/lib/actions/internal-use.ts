@@ -13,9 +13,6 @@ import { Routes } from "@/lib/routes";
 import { consumeTrackedStockLots } from "@/lib/inventory/stock-lot-service";
 import { canCreateInternalUse } from "@/lib/inventory/internal-use-policy";
 
-/** Ngưỡng phải duyệt (giá vốn). >500k & không phải owner/manager → chờ duyệt. */
-const APPROVAL_THRESHOLD = 500_000;
-
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type StockItem = { productId: string; unitMultiplier: string; quantity: string; unitCost: string };
 
@@ -77,8 +74,7 @@ export async function createInternalUse(
     if (!warehouseId) return { ok: false, error: "errors.invalidData" };
 
     const totalCost = v.items.reduce((s, i) => s + i.unitCost * i.quantity, 0);
-    const needsApproval = totalCost > APPROVAL_THRESHOLD && role !== "owner" && role !== "manager";
-    const status = needsApproval ? "pending" : "approved";
+    const status = "approved";
 
     const result = await db.transaction(async (tx) => {
       const [issue] = await tx.insert(internalUseIssues).values({

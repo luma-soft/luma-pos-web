@@ -6,6 +6,7 @@ import {
   getRecentMovements,
 } from "@/lib/data/inventory";
 import { getExpiryStockAlerts } from "@/lib/data/inventory-lots";
+import { getInternalUseIssues } from "@/lib/data/internal-use";
 import { requireMobileStockReadAccess } from "@/lib/mobile/auth";
 import {
   mobileError,
@@ -32,13 +33,14 @@ export async function GET(request: Request) {
       4000,
     );
 
-    const [movements, purchases, purchaseOptions, expiry, internalUse] =
+    const [movements, purchases, purchaseOptions, expiry, internalUse, internalUseIssues] =
       await Promise.all([
         withTimeout(getRecentMovements(15), 4000),
         withTimeout(getPurchases({ pageSize: 30 }), 4000),
         withTimeout(getPurchaseFormOptions(), 4000),
         withTimeout(getExpiryStockAlerts(30, 50), 4000),
         withTimeout(getInternalUseCostSummary(), 4000),
+        withTimeout(getInternalUseIssues({ limit: 50 }), 4000),
       ]);
 
     return mobileOk({
@@ -48,6 +50,7 @@ export async function GET(request: Request) {
       purchaseOptions,
       expiry,
       internalUse,
+      internalUseIssues,
     });
   } catch {
     return mobileError("errors.serverError", 503);
