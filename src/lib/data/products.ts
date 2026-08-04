@@ -213,6 +213,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
         isVariantParent: products.isVariantParent,
         isActive: products.isActive,
         createdAt: products.createdAt,
+        updatedAt: products.updatedAt,
         categoryName: categories.name,
         brandName: brands.name,
         location: products.location,
@@ -297,7 +298,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
       .leftJoin(stockLevels, eq(stockLevels.productId, products.id))
       .where(where)
       .groupBy(products.id, categories.name, brands.name)
-      .orderBy(desc(products.createdAt), desc(products.id))
+      .orderBy(desc(products.updatedAt), asc(products.id))
       .limit(size)
       .offset((page - 1) * size),
     db.select({ total: count() }).from(products).where(where),
@@ -337,6 +338,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
             isVariantParent: products.isVariantParent,
             isActive: products.isActive,
             createdAt: products.createdAt,
+            updatedAt: products.updatedAt,
             categoryName: categories.name,
             brandName: brands.name,
             location: products.location,
@@ -691,6 +693,7 @@ export async function getProduct(id: string) {
       imageUrls: products.imageUrls,
       isActive: products.isActive,
       createdAt: products.createdAt,
+      updatedAt: products.updatedAt,
       totalStock: sql<string>`case when ${products.isVariantParent} then (
         select coalesce(sum(sl.quantity), 0)
         from products child
