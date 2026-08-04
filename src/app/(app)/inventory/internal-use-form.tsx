@@ -10,7 +10,6 @@ import { SearchableSelect } from "@/components/combobox";
 import { MobileFormLineCard } from "@/components/mobile-ui";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
-import { NumberInput } from "@/components/ui/number-input";
 import { QuantityInput } from "@/components/ui/quantity-input";
 import { Select } from "@/components/ui/select";
 import { createInternalUse } from "@/lib/actions/internal-use";
@@ -265,7 +264,9 @@ export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse
                       </div>
                       <div className="space-y-1 text-xs font-semibold text-slate-500">
                         <span>{t("internalUse.unitCost")}</span>
-                        <NumberInput aria-label={t("internalUse.unitCost")} min={0} value={l.unitCost} onChange={(unitCost) => upd(l.key, { unitCost: unitCost ?? 0 })} className="h-11 bg-canvas text-right font-mono" />
+                        <div aria-label={t("internalUse.unitCost")} className="flex h-11 items-center justify-end rounded-md bg-canvas px-3 font-mono text-sm text-slate-700 dark:text-slate-200">
+                          {formatCurrency(l.unitCost)}
+                        </div>
                       </div>
                     </div>
                   </MobileFormLineCard>
@@ -313,7 +314,7 @@ export function InternalUseForm({ warehouse }: { warehouse: InternalUseWarehouse
                         />
                       </td>
                       <td className="px-3 py-2"><QuantityInput min={1} value={l.quantity} onChange={(quantity) => upd(l.key, { quantity })} size="sm" className="w-28" /></td>
-                      <td className="px-3 py-2"><NumberInput min={0} value={l.unitCost} onChange={(unitCost) => upd(l.key, { unitCost: unitCost ?? 0 })} size="sm" className="bg-canvas text-right font-mono" /></td>
+                      <td className="px-3 py-3 text-right font-mono text-slate-700 dark:text-slate-200">{formatCurrency(l.unitCost)}</td>
                       <td className="px-3 py-3 text-right font-mono font-bold">{formatCurrency(l.unitCost * l.quantity)}</td>
                       <td className="sticky right-0 bg-surface px-3 py-2 text-right shadow-[-10px_0_18px_rgba(15,23,42,0.04)]">
                         <button type="button" aria-label={t("common.delete")} onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-er-soft hover:text-er active:scale-[0.98]">

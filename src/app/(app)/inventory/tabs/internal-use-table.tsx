@@ -5,6 +5,7 @@ import { Copy, FileDown, LayoutList, Printer, Save } from "lucide-react";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import type { getInternalUseIssues } from "@/lib/data/internal-use";
+import { internalUseReasonLabel } from "@/lib/inventory/internal-use-reason";
 
 type InternalUseRow = Awaited<ReturnType<typeof getInternalUseIssues>>[number];
 
@@ -25,7 +26,7 @@ export function InternalUseTable({ rows }: { rows: InternalUseRow[] }) {
       key: "reason",
       label: isVi ? "Loại xuất" : t("internalUse.reason"),
       defaultVisible: true,
-      render: (row) => <span className="text-slate-700 dark:text-slate-200">{row.reason ?? "—"}</span>,
+      render: (row) => <span className="text-slate-700 dark:text-slate-200">{internalUseReasonLabel(row.reason, locale)}</span>,
     },
     {
       key: "cost",
@@ -100,7 +101,7 @@ function ExpandedIssue({ row }: { row: InternalUseRow }) {
           </div>
           <div className="mt-3 grid gap-x-8 gap-y-2 text-sm md:grid-cols-2 xl:grid-cols-4">
             <Info label={isVi ? "Người tạo" : "Created by"} value={row.createdByName ?? "—"} />
-            <Info label={isVi ? "Loại xuất" : t("internalUse.reason")} value={row.reason ?? "—"} />
+            <Info label={isVi ? "Loại xuất" : t("internalUse.reason")} value={internalUseReasonLabel(row.reason, locale)} />
             <Info label={isVi ? "Người nhận" : t("internalUse.department")} value={row.department ?? "—"} />
             <Info label={isVi ? "Ngày xuất" : t("orders.cols.date")} value={formatDate(row.createdAt)} />
           </div>
