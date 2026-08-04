@@ -44,18 +44,26 @@ export async function PATCH(
 
   const action = (body as Record<string, unknown>).action;
   if (action === "set-active") {
+    const isActive = (body as Record<string, unknown>).isActive;
+    if (typeof isActive !== "boolean") {
+      return mobileAction({ ok: false, error: "errors.invalidData" });
+    }
     return mobileAction(
       await setProductActive({
         productId: id,
-        isActive: (body as Record<string, unknown>).isActive === true,
+        isActive,
       }),
     );
   }
   if (action === "set-camera-material") {
+    const enabled = (body as Record<string, unknown>).enabled;
+    if (typeof enabled !== "boolean") {
+      return mobileAction({ ok: false, error: "errors.invalidData" });
+    }
     return mobileAction(
       await setCameraMaterial({
         productId: id,
-        enabled: (body as Record<string, unknown>).enabled === true,
+        enabled,
       }),
     );
   }
