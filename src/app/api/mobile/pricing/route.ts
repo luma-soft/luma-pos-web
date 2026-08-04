@@ -1,4 +1,8 @@
-import { getProducts } from "@/lib/data/products";
+import {
+  getPricingCategories,
+  getPricingPage,
+} from "@/lib/data/pricing";
+import { parsePricingSort } from "@/lib/pricing/pricing-policy";
 import {
   getPriceBooks,
   getPriceOverridesForProducts,
@@ -16,13 +20,20 @@ export async function GET(request: Request) {
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
 
-  const [books, products] = await Promise.all([
+  const page = numberParam(request, "page", 1);
+  const pageSize = numberParam(request, "pageSize", 50);
+  const sort = parsePricingSort(searchParam(request, "sort"));
+  const priceBookId = searchParam(request, "priceBookId");
+  const [books, categories, products] = await Promise.all([
     getPriceBooks(),
-    getProducts({
+    getPricingCategories(),
+    getPricingPage({
       q: searchParam(request, "q"),
-      view: "flat",
-      page: numberParam(request, "page", 1),
-      pageSize: numberParam(request, "pageSize", 50),
+      categoryId: searchParam(request, "categoryId"),
+      sort,
+      priceBookId: sort === "price" ? priceBookId : undefined,
+      page,
+      pageSize,
     }),
   ]);
   const ids = products.rows.map((product) => product.id);
@@ -30,27 +41,35 @@ export async function GET(request: Request) {
   const rows = products.rows.map((product) => ({
     id: product.id,
     sku: product.sku,
+    barcode: product.barcode,
     name: product.name,
-    baseUnit: product.baseUnit,
-    costPrice: Number(product.costPrice),
-    lastPurchasePrice:
-      product.lastPurchasePrice != null
-        ? Number(product.lastPurchasePrice)
-        : Number(product.costPrice),
-    prices: Object.fromEntries(
-      books.map((book) => {
-        if (book.isDefault) return [book.id, Number(product.retailPrice)];
-        const override = overrides[book.id]?.[product.id];
-        return [book.id, override != null ? Number(override) : null];
-      }),
+    categoryId: product.categoryId,
+    categoryName: product.categoryName,
+    imageUrl: product.imageUrls[0] ?? null,
+    imageUrls: product.imageUrls,
+    parentProductId: product.parentProductId,
+    variantName: product.variantName,
+    isVariantParent: product.isVariantParent,
+    baseRetailPrice: product.baseRetailPrice,
+    costPrice: product.costPrice,
+    lastPurchasePrice: product.lastPurchasePrice,
+    overridesByBookId: Object.fromEntries(
+      books
+        .filter((book) => !book.isDefault)
+        .flatMap((book) => {
+          const override = overrides[book.id]?.[product.id];
+          return override == null ? [] : [[book.id, Number(override)]];
+        }),
     ),
   }));
 
   return mobileOk({
     books,
+    categories,
     rows,
     total: products.total,
     page: products.page,
+    pageSize: products.pageSize,
     pageCount: products.pageCount,
   });
 }

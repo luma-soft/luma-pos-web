@@ -2,10 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { and, eq, sql, type SQL } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { priceBooks, productPrices, products } from "@/db/schema";
 import { type ActionResult, requireManager, toMoney } from "./common";
 import { Routes } from "@/lib/routes";
+import { pricingSellableProductCondition } from "@/lib/data/pricing";
 
 export type PriceFormulaBase = "current" | "cost" | "lastPurchase";
 
@@ -39,21 +41,53 @@ export async function applyPriceFormulaAll(input: {
       const base = input.base === "cost" ? sql`${products.costPrice}`
         : input.base === "lastPurchase" ? sql`coalesce(${products.lastPurchasePrice}, ${products.costPrice})`
         : sql`${products.retailPrice}`;
-      await db.update(products).set({ retailPrice: priceExpr(base, input.op, input.amount, input.unit), updatedAt: sql`now()` });
+      await db
+        .update(products)
+        .set({
+          retailPrice: priceExpr(base, input.op, input.amount, input.unit),
+          updatedAt: sql`now()`,
+        })
+        .where(pricingSellableProductCondition());
     } else {
-      const base = input.base === "cost" ? sql`p.cost_price`
-        : input.base === "lastPurchase" ? sql`coalesce(p.last_purchase_price, p.cost_price)`
-        : sql`coalesce(pp.price, p.retail_price)`;
-      await db.execute(sql`
-        insert into product_prices (price_book_id, product_id, price)
-        select ${input.priceBookId}, p.id, ${priceExpr(base, input.op, input.amount, input.unit)}
-        from products p
-        left join product_prices pp on pp.product_id = p.id and pp.price_book_id = ${input.priceBookId}
-        on conflict (price_book_id, product_id) do update set price = excluded.price
-      `);
+      const currentPrice = alias(productPrices, "current_price");
+      const base = input.base === "cost"
+        ? sql`${products.costPrice}`
+        : input.base === "lastPurchase"
+          ? sql`coalesce(${products.lastPurchasePrice}, ${products.costPrice})`
+          : sql`coalesce(${currentPrice.price}, ${products.retailPrice})`;
+      await db
+        .insert(productPrices)
+        .select(
+          db
+            .select({
+              priceBookId: sql<string>`${input.priceBookId}`.as(
+                "price_book_id",
+              ),
+              productId: products.id,
+              price: priceExpr(base, input.op, input.amount, input.unit).as(
+                "price",
+              ),
+            })
+            .from(products)
+            .leftJoin(
+              currentPrice,
+              and(
+                eq(currentPrice.productId, products.id),
+                eq(currentPrice.priceBookId, input.priceBookId),
+              ),
+            )
+            .where(pricingSellableProductCondition()),
+        )
+        .onConflictDoUpdate({
+          target: [productPrices.priceBookId, productPrices.productId],
+          set: { price: sql`excluded.price` },
+        });
     }
 
-    const [{ n }] = await db.select({ n: sql<number>`count(*)::int` }).from(products);
+    const [{ n }] = await db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(products)
+      .where(pricingSellableProductCondition());
     revalidatePath(Routes.Pricing);
     revalidatePath(Routes.POS);
     return { ok: true, data: { count: Number(n) } };
