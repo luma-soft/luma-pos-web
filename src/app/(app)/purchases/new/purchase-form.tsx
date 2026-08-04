@@ -26,6 +26,11 @@ import type { AiActionPreview } from "@/lib/ai/actions";
 import { AI_WORKFLOW_DRAFT_STORAGE_KEY } from "@/components/ai-assistant/utils";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPurchaseProduct } from "@/lib/inventory/product-catalog-adapter";
+import {
+  purchaseLineDiscount,
+  purchaseLineTotal,
+  purchaseUnitCostFromTotal,
+} from "@/lib/purchases/line-calculations";
 
 type PUnit = { unitName: string; multiplier: number };
 type Line = {
@@ -342,10 +347,7 @@ export function PurchaseForm({
     return () => { cancelled = true; clearTimeout(h); };
   }, [catalog, search, lines]);
 
-  const lineDiscountVnd = (l: Line) =>
-    l.discMode === "pct" ? Math.round((l.quantity * l.unitCost * l.discInput) / 100) : l.discInput;
-  const lineTotal = (l: Line) => Math.max(0, l.quantity * l.unitCost - lineDiscountVnd(l));
-  const subtotal = lines.reduce((s, l) => s + lineTotal(l), 0);
+  const subtotal = lines.reduce((s, l) => s + purchaseLineTotal(l), 0);
   const afterDiscount = Math.max(0, subtotal - discount);
   const tax = Math.round((afterDiscount * vatRate) / 100);
   const total = afterDiscount + tax;
@@ -359,6 +361,11 @@ export function PurchaseForm({
   }
   function patch(id: string, p: Partial<Line>) {
     setLines((ls) => ls.map((l) => (l.productId === id ? { ...l, ...p } : l)));
+  }
+  function patchLineTotal(id: string, desiredTotal: number) {
+    setLines((current) => current.map((line) => line.productId === id
+      ? { ...line, unitCost: purchaseUnitCostFromTotal(line, desiredTotal) }
+      : line));
   }
   /** Đổi đơn vị tính: cập nhật hệ số + giá nhập theo đơn vị mới (= giá vốn gốc × hệ số). */
   function changeUnit(id: string, unitName: string) {
@@ -383,7 +390,7 @@ export function PurchaseForm({
         productId: l.productId,
         quantity: l.quantity * l.multiplier,
         unitCost: l.multiplier > 0 ? l.unitCost / l.multiplier : l.unitCost,
-        discount: lineDiscountVnd(l),
+        discount: purchaseLineDiscount(l),
       })),
     };
 
@@ -501,7 +508,14 @@ export function PurchaseForm({
                       key={l.productId}
                       title={l.name}
                       subtitle={l.sku}
-                      amount={formatCurrency(lineTotal(l))}
+                      amount={(
+                        <MoneyInput
+                          aria-label={t("orders.cols.lineTotal")}
+                          value={purchaseLineTotal(l)}
+                          onChange={(value) => patchLineTotal(l.productId, value ?? 0)}
+                          className="h-9 w-36 rounded-md border border-border bg-surface px-2 text-right text-sm font-black tabular-nums"
+                        />
+                      )}
                       actions={(
                         <Button
                           type="button"
@@ -618,7 +632,14 @@ export function PurchaseForm({
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums font-medium">{formatCurrency(lineTotal(l))}</td>
+                      <td className="px-3 py-2">
+                        <MoneyInput
+                          aria-label={`${t("orders.cols.lineTotal")} · ${l.name}`}
+                          value={purchaseLineTotal(l)}
+                          onChange={(value) => patchLineTotal(l.productId, value ?? 0)}
+                          className={numCls}
+                        />
+                      </td>
                       <td className="px-2 py-2 text-right">
                         <Button type="button" variant="ghost" size="iconSm" onClick={() => setLines((ls) => ls.filter((x) => x.productId !== l.productId))} className="text-slate-400 hover:text-red-500">
                           <Trash2 className="w-4 h-4" />

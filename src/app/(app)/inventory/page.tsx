@@ -1,6 +1,5 @@
 import { getTranslations } from "next-intl/server";
 import { Routes } from "@/lib/routes";
-import { GroupTabs } from "@/components/group-tabs";
 import { Text } from "@/components/ui/text";
 import { StockTab } from "./tabs/stock";
 import { ProductsTab } from "./tabs/products";
@@ -13,21 +12,9 @@ import { getCategoriesWithCounts } from "@/lib/data/categories";
 import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
 import { CategoriesManager } from "../products/categories/categories-manager";
-import { ArrowDownToLine, ClipboardCheck } from "lucide-react";
-import Link from "next/link";
+import { InventoryNavigation } from "./inventory-navigation";
 
 export const dynamic = "force-dynamic";
-
-const TABS = [
-  { tab: "products", labelKey: "nav.products" },
-  { tab: "pricing", labelKey: "nav.pricing" },
-  { tab: "purchases", labelKey: "nav.purchases" },
-  { tab: "purchase-returns", labelKey: "purchaseReturns.title" },
-  { tab: "internal", labelKey: "nav.internalUse" },
-  { tab: "stock", labelKey: "inventory.title" },
-  { tab: "stocktakes", labelKey: "nav.stocktakes" },
-  { tab: "categories", labelKey: "categories.title" },
-];
 
 export default async function InventoryPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const t = await getTranslations();
@@ -46,16 +33,8 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
             <Text as="h1" weight="bold" className="text-xl tracking-[-0.01em] lg:text-[17px]" text={t("nav.groups.inventory")} />
             <Text as="p" variant="muted" className="mt-0.5 text-xs font-semibold lg:hidden" text={t("mobile.inventory.subtitle")} />
           </div>
-          <div className="flex items-center gap-1.5 lg:hidden">
-            <Link href={`${Routes.Inventory}?tab=purchases`} aria-label={t("nav.purchases")} className="grid h-11 w-11 place-items-center rounded-xl border border-border bg-surface-2 text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
-              <ArrowDownToLine className="h-5 w-5" />
-            </Link>
-            <Link href={`${Routes.Inventory}?tab=stocktakes`} aria-label={t("nav.stocktakes")} className="grid h-11 w-11 place-items-center rounded-xl border border-border bg-surface-2 text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
-              <ClipboardCheck className="h-5 w-5" />
-            </Link>
-          </div>
         </div>
-        <div className="px-4 sm:px-6 pb-1.5"><GroupTabs base={Routes.Inventory} items={TABS} /></div>
+        <div className="overflow-x-auto px-4 pb-2 sm:px-6"><InventoryNavigation activeTab={tab} /></div>
       </div>
 
       {tab === "categories" && categoryData ? <>

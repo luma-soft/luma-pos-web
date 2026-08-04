@@ -1,10 +1,11 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { useTranslations } from "next-intl";
-import { AlertTriangle, Search, Truck, Warehouse } from "lucide-react";
+import { AlertTriangle, ArrowRight, Search, Warehouse } from "lucide-react";
+import { desc, eq, sql } from "drizzle-orm";
+import { db } from "@/db";
+import { stocktakeItems, stocktakes, warehouses } from "@/db/schema";
 import { Routes } from "@/lib/routes";
-import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
+import { cn, formatCurrency, formatNumber } from "@/lib/utils";
 import { getInventory, getRecentMovements, type StockFilter } from "@/lib/data/inventory";
 import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
@@ -13,14 +14,10 @@ import { Select } from "@/components/ui/select";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { StockTable } from "./stock-table";
 import { InstantFilterForm } from "@/components/instant-filter-form";
+import { RecentMovements, StockActionMenu } from "./stock-actions";
 
 type SP = Record<string, string | undefined>;
 const STOCKS: StockFilter[] = ["all", "instock", "low", "out"];
-
-const MOVE_STYLES: Record<string, string> = {
-  purchase: "text-ok", sale: "text-er", return_in: "text-in", return_out: "text-warn",
-  transfer: "text-in", adjust: "text-warn", init: "text-slate-500", internal_use: "text-warn",
-};
 
 export async function StockTab({ searchParams }: { searchParams: SP }) {
   const t = await getTranslations();
@@ -48,9 +45,7 @@ export async function StockTab({ searchParams }: { searchParams: SP }) {
           options={[{ value: "", label: t("products.list.allCategories") }, ...categories.map((c) => ({ value: c.id, label: c.name }))]}
           className="min-w-44"
         />
-        <Link href={Routes.PurchaseNew} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98] ml-auto shrink-0 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
-          <Truck className="w-4 h-4" />{t("purchases.createNew")}
-        </Link>
+        <StockActionMenu />
       </InstantFilterForm>
 
       <Suspense fallback={<TableSkeleton cols={6} rows={10} />}>
@@ -68,36 +63,29 @@ async function StockContent({ searchParams }: { searchParams: SP }) {
   const stock: StockFilter = params.low === "1" ? "low" : (STOCKS.includes(params.stock as StockFilter) ? (params.stock as StockFilter) : "all");
   const category = params.category ?? "";
 
-  const [{ rows, total, totalValue, lowCount, pageCount }, movements] = await Promise.all([
+  const [{ rows, total, totalValue, lowCount, pageCount }, movements, activeStocktakes] = await Promise.all([
     getInventory({ q: params.q, stock, categoryId: category || undefined, page, pageSize }),
-    getRecentMovements(20),
+    getRecentMovements(100),
+    db.select({
+      id: stocktakes.id,
+      code: stocktakes.code,
+      warehouseName: warehouses.name,
+      createdAt: stocktakes.createdAt,
+      itemCount: sql<number>`(select count(*) from ${stocktakeItems} where ${stocktakeItems.stocktakeId} = ${stocktakes.id})::int`,
+    }).from(stocktakes).innerJoin(warehouses, eq(stocktakes.warehouseId, warehouses.id)).where(eq(stocktakes.status, "draft")).orderBy(desc(stocktakes.createdAt)).limit(1),
   ]);
-
-  const kpiCard = "bg-surface border border-border rounded-card shadow-e1 p-4";
+  const activeStocktake = activeStocktakes[0];
+  const movementItems = movements.map((movement) => ({ ...movement, quantity: Number(movement.quantity), createdAt: movement.createdAt.toISOString() }));
 
   return (
     <>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
-        <div className={kpiCard}>
-          <div className="text-xs font-medium text-slate-500">{t("inventory.totalValue")}</div>
-          <div className="text-[22px] font-extrabold mt-2 font-mono text-primary-600">{formatCurrency(totalValue)}</div>
-          <p className="text-xs text-slate-400 mt-1">{t("inventory.byCost")}</p>
-        </div>
-        <div className={cn(kpiCard, lowCount > 0 && "border-er/40 bg-er/5")}>
-          <div className="text-xs font-medium text-slate-500">{t("inventory.lowStock")}</div>
-          <div className={cn("text-[28px] font-extrabold mt-2 font-mono", lowCount > 0 ? "text-er" : "text-ok")}>{lowCount}</div>
-          <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">{lowCount > 0 && <AlertTriangle className="w-3 h-3 text-er" />}{t("inventory.belowMin")}</p>
-        </div>
-        <div className={kpiCard}>
-          <div className="text-xs font-medium text-slate-500">{t("inventory.skuCount")}</div>
-          <div className="text-[28px] font-extrabold mt-2 font-mono">{formatNumber(total)}</div>
-          <p className="text-xs text-slate-400 mt-1">{t("inventory.activeSkus")}</p>
-        </div>
-        <div className={kpiCard}>
-          <div className="text-xs font-medium text-slate-500">{t("inventory.recentMoves")}</div>
-          <div className="text-[28px] font-extrabold mt-2 font-mono">{movements.length}</div>
-          <p className="text-xs text-slate-400 mt-1">{t("inventory.last20")}</p>
-        </div>
+      {activeStocktake && <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-primary-200 bg-primary-50 px-4 py-2.5 text-sm text-primary-900 dark:border-primary-900 dark:bg-primary-950/40 dark:text-primary-100"><span className="font-bold">{t("inventory.actions.stocktakeInProgress")}</span><span className="text-primary-400">·</span><span>{activeStocktake.warehouseName}</span><span className="text-primary-400">·</span><span>{t("inventory.actions.countedProducts", { count: activeStocktake.itemCount })}</span><a href={`${Routes.Inventory}?tab=stocktakes&q=${encodeURIComponent(activeStocktake.code)}`} className="ml-auto inline-flex items-center gap-1 font-bold text-primary-700 hover:underline dark:text-primary-300">{t("inventory.actions.continue")}<ArrowRight className="h-4 w-4" /></a></div>}
+
+      <div className="mb-4 grid overflow-hidden rounded-card border border-border bg-surface shadow-e1 sm:grid-cols-2 xl:grid-cols-4">
+        <Metric label={t("inventory.totalValue")} value={formatCurrency(totalValue)} hint={t("inventory.byCost")} tone="primary" />
+        <Metric label={t("inventory.lowStock")} value={formatNumber(lowCount)} hint={t("inventory.belowMin")} tone={lowCount > 0 ? "danger" : "default"} alert={lowCount > 0} />
+        <Metric label={t("inventory.skuCount")} value={formatNumber(total)} hint={t("inventory.activeSkus")} />
+        <Metric label={t("inventory.recentMoves")} value={formatNumber(movements.length)} hint={t("inventory.actions.loadedMovements")} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -113,74 +101,12 @@ async function StockContent({ searchParams }: { searchParams: SP }) {
           <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("products.unitLabel")} />
         </div>
 
-        <RecentMovementsTable movements={movements} />
+        <RecentMovements movements={movementItems} />
       </div>
     </>
   );
 }
 
-function RecentMovementsTable({ movements }: { movements: Awaited<ReturnType<typeof getRecentMovements>> }) {
-  const t = useTranslations();
-  return (
-    <section className="min-w-0 overflow-hidden rounded-card border border-border bg-surface shadow-e1">
-      <div className="border-b border-border px-4 py-3 text-sm font-bold">{t("inventory.movementsTitle")}</div>
-      {movements.length === 0 ? (
-        <p className="px-4 py-8 text-center text-sm text-slate-400">{t("inventory.noMovements")}</p>
-      ) : (
-        <>
-        <div className="max-h-[min(520px,calc(100dvh-360px))] divide-y divide-border-soft overflow-auto lg:hidden" data-mobile-audit="inventory-recent-movements">
-          {movements.map((movement) => {
-            const quantity = Number(movement.quantity);
-            return (
-              <article key={movement.id} className="space-y-2 p-3 text-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 break-words font-semibold">{movement.productName}</div>
-                  <div className={cn("shrink-0 font-mono font-bold tabular-nums", MOVE_STYLES[movement.type] ?? "")}>
-                    {quantity > 0 ? "+" : ""}{formatNumber(quantity)} {movement.baseUnit}
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
-                  <span className="break-words">{t(`inventory.moveTypes.${movement.type}` as never)}</span>
-                  <span className="break-words text-right">{movement.warehouseName}</span>
-                </div>
-                <div className="text-xs text-slate-400">{formatDate(movement.createdAt)}</div>
-              </article>
-            );
-          })}
-        </div>
-        <div className="hidden max-h-[min(520px,calc(100dvh-360px))] overflow-auto lg:block">
-          <table className="w-full min-w-[520px] text-sm">
-            <thead className="sticky top-0 z-10 bg-canvas text-left text-xs font-semibold text-slate-500">
-              <tr>
-                <th className="whitespace-nowrap px-3 py-3 text-right">SL</th>
-                <th className="px-3 py-3">Sản phẩm</th>
-                <th className="px-3 py-3">Loại</th>
-                <th className="px-3 py-3">Kho</th>
-                <th className="whitespace-nowrap px-3 py-3">Thời gian</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-soft">
-              {movements.map((movement) => {
-                const quantity = Number(movement.quantity);
-                return (
-                  <tr key={movement.id} className="align-middle hover:bg-surface-2">
-                    <td className={cn("whitespace-nowrap px-3 py-3 text-right font-mono font-bold tabular-nums", MOVE_STYLES[movement.type] ?? "")}>
-                      {quantity > 0 ? "+" : ""}{formatNumber(quantity)} {movement.baseUnit}
-                    </td>
-                    <td className="max-w-[220px] px-3 py-3">
-                      <div className="truncate font-medium" title={movement.productName}>{movement.productName}</div>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-3 text-slate-500">{t(`inventory.moveTypes.${movement.type}` as never)}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-slate-500">{movement.warehouseName}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-xs text-slate-400">{formatDate(movement.createdAt)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        </>
-      )}
-    </section>
-  );
+function Metric({ label, value, hint, tone = "default", alert = false }: { label: string; value: string; hint: string; tone?: "default" | "primary" | "danger"; alert?: boolean }) {
+  return <div className="border-b border-border p-4 last:border-b-0 sm:[&:nth-child(odd)]:border-r xl:border-b-0 xl:border-r xl:last:border-r-0"><div className="text-xs font-semibold text-slate-500">{label}</div><div className={cn("mt-1.5 font-mono text-xl font-extrabold", tone === "primary" && "text-primary-700", tone === "danger" && "text-er")}>{value}</div><p className="mt-1 flex items-center gap-1 text-xs text-slate-400">{alert && <AlertTriangle className="h-3 w-3 text-er" />}{hint}</p></div>;
 }
