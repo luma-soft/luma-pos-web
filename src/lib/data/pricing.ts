@@ -4,12 +4,19 @@ import {
   count,
   desc,
   eq,
+  inArray,
   or,
   sql,
   type SQL,
 } from "drizzle-orm";
 import { db } from "@/db";
-import { categories, productPrices, products } from "@/db/schema";
+import {
+  brands,
+  categories,
+  productPrices,
+  products,
+  suppliers,
+} from "@/db/schema";
 import { coercePageSize } from "@/lib/pagination";
 import { accentInsensitiveLike } from "@/lib/search";
 import {
@@ -20,7 +27,12 @@ import {
 
 export interface PricingQuery {
   q?: string;
-  categoryId?: string;
+  categoryIds?: string[];
+  brandIds?: string[];
+  supplierIds?: string[];
+  stock?: string;
+  productKind?: string;
+  lifecycle?: string;
   sort?: PricingSort;
   priceBookId?: string;
   page?: number;
@@ -74,7 +86,8 @@ export async function getPricingPage(
 ): Promise<PricingProductPage> {
   const page = Math.max(1, Math.trunc(query.page ?? 1));
   const pageSize = coercePageSize(query.pageSize, 50);
-  const conditions: SQL[] = [pricingSellableProductCondition()];
+  const conditions: SQL[] = [eq(products.isVariantParent, false)];
+  const lifecycle = query.lifecycle ?? "active";
   const q = query.q?.trim();
   if (q) {
     conditions.push(
@@ -85,8 +98,42 @@ export async function getPricingPage(
       )!,
     );
   }
-  if (query.categoryId?.trim()) {
-    conditions.push(eq(products.categoryId, query.categoryId.trim()));
+  if (query.categoryIds?.length) {
+    conditions.push(inArray(products.categoryId, query.categoryIds));
+  }
+  if (query.brandIds?.length) {
+    conditions.push(inArray(products.brandId, query.brandIds));
+  }
+  if (query.supplierIds?.length) {
+    conditions.push(inArray(products.supplierId, query.supplierIds));
+  }
+  if (query.productKind === "variant") {
+    conditions.push(or(eq(products.isVariantParent, true), sql`${products.parentProductId} is not null`)!);
+  } else if (
+    query.productKind === "product" ||
+    query.productKind === "service" ||
+    query.productKind === "combo"
+  ) {
+    conditions.push(eq(products.productKind, query.productKind));
+  }
+  if (lifecycle === "paused") {
+    conditions.push(and(eq(products.lifecycleStatus, "active"), eq(products.isActive, false))!);
+  } else if (
+    lifecycle === "active" ||
+    lifecycle === "draft" ||
+    lifecycle === "archived"
+  ) {
+    conditions.push(eq(products.lifecycleStatus, lifecycle));
+    if (lifecycle === "active") conditions.push(eq(products.isActive, true));
+  }
+  if (query.stock === "inStock") {
+    conditions.push(sql`${products.totalStock} > ${products.minStock}`);
+  } else if (query.stock === "lowStock") {
+    conditions.push(sql`${products.totalStock} > 0 and ${products.totalStock} <= ${products.minStock}`);
+  } else if (query.stock === "outOfStock") {
+    conditions.push(sql`${products.totalStock} <= 0`);
+  } else if (query.stock === "unmanaged") {
+    conditions.push(eq(products.productKind, "service"));
   }
   const where = and(...conditions);
   const selectedPrice = query.priceBookId?.trim()
@@ -98,7 +145,7 @@ export async function getPricingPage(
         limit 1
       ), ${products.retailPrice})`
     : products.retailPrice;
-  const orderBy = pricingOrderBy(query.sort ?? "default", selectedPrice);
+  const orderBy = pricingOrderBy(query.sort ?? "updated", selectedPrice);
 
   const [rawRows, [{ total }]] = await Promise.all([
     db
@@ -162,6 +209,24 @@ export async function getPricingCategories(): Promise<PricingCategory[]> {
     .orderBy(asc(categories.name), asc(categories.id));
 }
 
+export async function getPricingBrands(): Promise<PricingCategory[]> {
+  return db
+    .select({ id: brands.id, name: brands.name })
+    .from(products)
+    .innerJoin(brands, eq(products.brandId, brands.id))
+    .groupBy(brands.id, brands.name)
+    .orderBy(asc(brands.name), asc(brands.id));
+}
+
+export async function getPricingSuppliers(): Promise<PricingCategory[]> {
+  return db
+    .select({ id: suppliers.id, name: suppliers.name })
+    .from(products)
+    .innerJoin(suppliers, eq(products.supplierId, suppliers.id))
+    .groupBy(suppliers.id, suppliers.name)
+    .orderBy(asc(suppliers.name), asc(suppliers.id));
+}
+
 function pricingOrderBy(
   sort: PricingSort,
   selectedPrice: SQL | typeof products.retailPrice,
@@ -177,6 +242,8 @@ function pricingOrderBy(
         return desc(products.costPrice);
       case "effectivePrice":
         return desc(selectedPrice);
+      case "stock":
+        return asc(products.totalStock);
       default:
         return desc(products.updatedAt);
     }

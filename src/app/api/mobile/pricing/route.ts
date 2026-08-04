@@ -1,6 +1,8 @@
 import {
   getPricingCategories,
+  getPricingBrands,
   getPricingPage,
+  getPricingSuppliers,
 } from "@/lib/data/pricing";
 import { parsePricingSort } from "@/lib/pricing/pricing-policy";
 import {
@@ -24,14 +26,21 @@ export async function GET(request: Request) {
   const pageSize = numberParam(request, "pageSize", 50);
   const sort = parsePricingSort(searchParam(request, "sort"));
   const priceBookId = searchParam(request, "priceBookId");
-  const [books, categories, products] = await Promise.all([
+  const [books, categories, brands, suppliers, products] = await Promise.all([
     getPriceBooks(),
     getPricingCategories(),
+    getPricingBrands(),
+    getPricingSuppliers(),
     getPricingPage({
       q: searchParam(request, "q"),
-      categoryId: searchParam(request, "categoryId"),
+      categoryIds: csvParam(request, "categoryIds"),
+      brandIds: csvParam(request, "brandIds"),
+      supplierIds: csvParam(request, "supplierIds"),
+      stock: searchParam(request, "stock"),
+      productKind: searchParam(request, "productKind"),
+      lifecycle: searchParam(request, "lifecycle", "active"),
       sort,
-      priceBookId: sort === "price" ? priceBookId : undefined,
+      priceBookId: sort === "retail" ? priceBookId : undefined,
       page,
       pageSize,
     }),
@@ -66,10 +75,19 @@ export async function GET(request: Request) {
   return mobileOk({
     books,
     categories,
+    brands,
+    suppliers,
     rows,
     total: products.total,
     page: products.page,
     pageSize: products.pageSize,
     pageCount: products.pageCount,
   });
+}
+
+function csvParam(request: Request, key: string): string[] | undefined {
+  const value = searchParam(request, key);
+  if (!value) return undefined;
+  const entries = value.split(",").map((entry) => entry.trim()).filter(Boolean);
+  return entries.length > 0 ? entries : undefined;
 }

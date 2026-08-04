@@ -10,6 +10,8 @@ mock.module("@/lib/data/pricing", () => ({
   getPricingCategories: async () => [
     { id: "camera", name: "Camera giám sát" },
   ],
+  getPricingBrands: async () => [{ id: "hikvision", name: "Hikvision" }],
+  getPricingSuppliers: async () => [{ id: "supplier-a", name: "NCC A" }],
   getPricingPage: async (query: Record<string, unknown>) => {
     pricingQueries.push(query);
     return {
@@ -73,10 +75,10 @@ beforeAll(async () => {
 beforeEach(() => pricingQueries.splice(0));
 
 describe("GET /api/mobile/pricing", () => {
-  test("forwards search, category, pagination, and selected-book price sort", async () => {
+  test("forwards the product-tab filters and selected-book price sort", async () => {
     const response = await getPricing(
       new Request(
-        "https://luma.test/api/mobile/pricing?q=camera&categoryId=camera&sort=price&priceBookId=vip&page=2&pageSize=50",
+        "https://luma.test/api/mobile/pricing?q=camera&categoryIds=camera&brandIds=hikvision&supplierIds=supplier-a&stock=lowStock&productKind=product&lifecycle=active&sort=retail&priceBookId=vip&page=2&pageSize=50",
       ),
     );
 
@@ -84,8 +86,13 @@ describe("GET /api/mobile/pricing", () => {
     expect(pricingQueries).toEqual([
       {
         q: "camera",
-        categoryId: "camera",
-        sort: "price",
+        categoryIds: ["camera"],
+        brandIds: ["hikvision"],
+        supplierIds: ["supplier-a"],
+        stock: "lowStock",
+        productKind: "product",
+        lifecycle: "active",
+        sort: "retail",
         priceBookId: "vip",
         page: 2,
         pageSize: 50,
@@ -105,6 +112,8 @@ describe("GET /api/mobile/pricing", () => {
       pageSize: 50,
       pageCount: 2,
       categories: [{ id: "camera", name: "Camera giám sát" }],
+      brands: [{ id: "hikvision", name: "Hikvision" }],
+      suppliers: [{ id: "supplier-a", name: "NCC A" }],
       rows: [
         {
           id: "product-child",
