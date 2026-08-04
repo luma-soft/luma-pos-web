@@ -1,4 +1,9 @@
-import { updateProduct } from "@/lib/actions/products";
+import {
+  deleteProduct,
+  setCameraMaterial,
+  setProductActive,
+  updateProduct,
+} from "@/lib/actions/products";
 import { getProduct } from "@/lib/data/products";
 import { requireMobileStockAccess } from "@/lib/mobile/auth";
 import {
@@ -37,10 +42,40 @@ export async function PATCH(
     return mobileAction({ ok: false, error: "errors.invalidData" });
   }
 
+  const action = (body as Record<string, unknown>).action;
+  if (action === "set-active") {
+    return mobileAction(
+      await setProductActive({
+        productId: id,
+        isActive: (body as Record<string, unknown>).isActive === true,
+      }),
+    );
+  }
+  if (action === "set-camera-material") {
+    return mobileAction(
+      await setCameraMaterial({
+        productId: id,
+        enabled: (body as Record<string, unknown>).enabled === true,
+      }),
+    );
+  }
+
   return mobileAction(
     await updateProduct({
       ...(body as Record<string, unknown>),
       id,
     } as Parameters<typeof updateProduct>[0])
   );
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const gate = await requireMobileStockAccess();
+  const blocked = mobileGate(gate);
+  if (blocked) return blocked;
+
+  const { id } = await params;
+  return mobileAction(await deleteProduct(id));
 }
