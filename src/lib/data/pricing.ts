@@ -14,7 +14,9 @@ import {
   brands,
   categories,
   productPrices,
+  productUnits,
   products,
+  stockLevels,
   suppliers,
 } from "@/db/schema";
 import { coercePageSize } from "@/lib/pagination";
@@ -35,6 +37,7 @@ export interface PricingQuery {
   lifecycle?: string;
   sort?: PricingSort;
   priceBookId?: string;
+  warehouseId?: string;
   page?: number;
   pageSize?: number;
 }
@@ -46,13 +49,27 @@ export interface PricingProductRow {
   name: string;
   categoryId: string | null;
   categoryName: string | null;
+  brandId: string | null;
+  supplierId: string | null;
   imageUrls: string[];
+  baseUnit: string;
+  productKind: string;
+  lifecycleStatus: string;
+  trackBatches: boolean;
+  shelfLifeDays: number | null;
+  minStock: number;
+  units: Array<{
+    unitName: string;
+    multiplier: number;
+    barcode: string | null;
+  }>;
   parentProductId: string | null;
   variantName: string | null;
   isVariantParent: boolean;
   baseRetailPrice: number;
   costPrice: number;
   lastPurchasePrice: number;
+  availableStock: number;
 }
 
 export interface PricingCategory {
@@ -87,6 +104,15 @@ export async function getPricingPage(
   const page = Math.max(1, Math.trunc(query.page ?? 1));
   const pageSize = coercePageSize(query.pageSize, 50);
   const conditions: SQL[] = [eq(products.isVariantParent, false)];
+  const availableStock = query.warehouseId?.trim()
+    ? sql<string>`coalesce((
+        select sl.quantity
+        from ${stockLevels} sl
+        where sl.product_id = ${products.id}
+          and sl.warehouse_id = ${query.warehouseId.trim()}
+        limit 1
+      ), 0)`
+    : products.totalStock;
   const lifecycle = query.lifecycle ?? "active";
   const q = query.q?.trim();
   if (q) {
@@ -108,7 +134,12 @@ export async function getPricingPage(
     conditions.push(inArray(products.supplierId, query.supplierIds));
   }
   if (query.productKind === "variant") {
-    conditions.push(or(eq(products.isVariantParent, true), sql`${products.parentProductId} is not null`)!);
+    conditions.push(
+      or(
+        eq(products.isVariantParent, true),
+        sql`${products.parentProductId} is not null`,
+      )!,
+    );
   } else if (
     query.productKind === "product" ||
     query.productKind === "service" ||
@@ -117,7 +148,12 @@ export async function getPricingPage(
     conditions.push(eq(products.productKind, query.productKind));
   }
   if (lifecycle === "paused") {
-    conditions.push(and(eq(products.lifecycleStatus, "active"), eq(products.isActive, false))!);
+    conditions.push(
+      and(
+        eq(products.lifecycleStatus, "active"),
+        eq(products.isActive, false),
+      )!,
+    );
   } else if (
     lifecycle === "active" ||
     lifecycle === "draft" ||
@@ -127,11 +163,15 @@ export async function getPricingPage(
     if (lifecycle === "active") conditions.push(eq(products.isActive, true));
   }
   if (query.stock === "inStock") {
-    conditions.push(sql`${products.totalStock} > ${products.minStock}`);
+    conditions.push(sql`${availableStock} > ${products.minStock}`);
   } else if (query.stock === "lowStock") {
-    conditions.push(sql`${products.totalStock} > 0 and ${products.totalStock} <= ${products.minStock}`);
+    conditions.push(
+      sql`${availableStock} > 0 and ${availableStock} <= ${products.minStock}`,
+    );
   } else if (query.stock === "outOfStock") {
-    conditions.push(sql`${products.totalStock} <= 0`);
+    conditions.push(sql`${availableStock} <= 0`);
+  } else if (query.stock === "available") {
+    conditions.push(sql`${availableStock} > 0`);
   } else if (query.stock === "unmanaged") {
     conditions.push(eq(products.productKind, "service"));
   }
@@ -145,7 +185,11 @@ export async function getPricingPage(
         limit 1
       ), ${products.retailPrice})`
     : products.retailPrice;
-  const orderBy = pricingOrderBy(query.sort ?? "updated", selectedPrice);
+  const orderBy = pricingOrderBy(
+    query.sort ?? "updated",
+    selectedPrice,
+    availableStock,
+  );
 
   const [rawRows, [{ total }]] = await Promise.all([
     db
@@ -156,13 +200,37 @@ export async function getPricingPage(
         name: products.name,
         categoryId: products.categoryId,
         categoryName: categories.name,
+        brandId: products.brandId,
+        supplierId: products.supplierId,
         imageUrls: products.imageUrls,
+        baseUnit: products.baseUnit,
+        productKind: products.productKind,
+        lifecycleStatus: products.lifecycleStatus,
+        trackBatches: products.trackBatches,
+        shelfLifeDays: products.shelfLifeDays,
+        minStock: products.minStock,
+        units: sql<
+          Array<{
+            unitName: string;
+            multiplier: string;
+            barcode: string | null;
+          }>
+        >`coalesce((
+          select json_agg(json_build_object(
+            'unitName', pu.unit_name,
+            'multiplier', pu.multiplier,
+            'barcode', pu.barcode
+          ) order by pu.sort_order)
+          from ${productUnits} pu
+          where pu.product_id = ${products.id}
+        ), '[]')`,
         parentProductId: products.parentProductId,
         variantName: products.variantName,
         isVariantParent: products.isVariantParent,
         baseRetailPrice: products.retailPrice,
         costPrice: products.costPrice,
         lastPurchasePrice: products.lastPurchasePrice,
+        availableStock,
       })
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
@@ -181,7 +249,20 @@ export async function getPricingPage(
       name: row.name,
       categoryId: row.categoryId,
       categoryName: row.categoryName,
+      brandId: row.brandId,
+      supplierId: row.supplierId,
       imageUrls: row.imageUrls ?? [],
+      baseUnit: row.baseUnit,
+      productKind: row.productKind,
+      lifecycleStatus: row.lifecycleStatus,
+      trackBatches: row.trackBatches,
+      shelfLifeDays: row.shelfLifeDays,
+      minStock: Number(row.minStock),
+      units: row.units.map((unit) => ({
+        unitName: unit.unitName,
+        multiplier: Number(unit.multiplier),
+        barcode: unit.barcode,
+      })),
       parentProductId: row.parentProductId,
       variantName: row.variantName,
       isVariantParent: row.isVariantParent,
@@ -191,6 +272,7 @@ export async function getPricingPage(
         row.lastPurchasePrice == null
           ? Number(row.costPrice)
           : Number(row.lastPurchasePrice),
+      availableStock: Number(row.availableStock),
     })),
     total: Number(total),
     page,
@@ -230,6 +312,7 @@ export async function getPricingSuppliers(): Promise<PricingCategory[]> {
 function pricingOrderBy(
   sort: PricingSort,
   selectedPrice: SQL | typeof products.retailPrice,
+  availableStock: SQL | typeof products.totalStock,
 ): SQL[] {
   const [primarySpec] = pricingSortSpec(sort);
   const primary = (() => {
@@ -243,7 +326,7 @@ function pricingOrderBy(
       case "effectivePrice":
         return desc(selectedPrice);
       case "stock":
-        return asc(products.totalStock);
+        return asc(availableStock);
       default:
         return desc(products.updatedAt);
     }

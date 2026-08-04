@@ -4,6 +4,7 @@ const pricingQueries: Array<Record<string, unknown>> = [];
 
 mock.module("@/lib/mobile/auth", () => ({
   requireMobileStockAccess: async () => ({ ok: true }),
+  requireMobileStockReadAccess: async () => ({ ok: true }),
 }));
 
 mock.module("@/lib/data/pricing", () => ({
