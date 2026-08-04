@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     const [movements, purchases, purchaseOptions, expiry, internalUse] =
       await Promise.all([
         withTimeout(getRecentMovements(15), 4000),
-        withTimeout(getPurchases({ pageSize: 5 }), 4000),
+        withTimeout(getPurchases({ pageSize: 30 }), 4000),
         withTimeout(getPurchaseFormOptions(), 4000),
         withTimeout(getExpiryStockAlerts(30, 50), 4000),
         withTimeout(getInternalUseCostSummary(), 4000),

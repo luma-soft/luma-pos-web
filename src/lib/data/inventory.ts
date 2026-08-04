@@ -265,6 +265,9 @@ export async function getPurchase(id: string) {
       productName: products.name,
       sku: products.sku,
       baseUnit: products.baseUnit,
+      imageUrls: products.imageUrls,
+      batchNumber: purchaseOrderItems.batchNumber,
+      expiryDate: purchaseOrderItems.expiryDate,
     })
     .from(purchaseOrderItems)
     .innerJoin(products, eq(purchaseOrderItems.productId, products.id))
