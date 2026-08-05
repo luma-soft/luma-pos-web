@@ -14,6 +14,7 @@ import { Select } from "@/components/ui/select";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { StockTable } from "./stock-table";
 import { InstantFilterForm } from "@/components/instant-filter-form";
+import { serializeMovementCreatedAt } from "@/lib/inventory/movement-serialization";
 import { RecentMovements } from "./stock-actions";
 
 type SP = Record<string, string | undefined>;
@@ -74,7 +75,11 @@ async function StockContent({ searchParams }: { searchParams: SP }) {
     }).from(stocktakes).innerJoin(warehouses, eq(stocktakes.warehouseId, warehouses.id)).where(eq(stocktakes.status, "draft")).orderBy(desc(stocktakes.createdAt)).limit(1),
   ]);
   const activeStocktake = activeStocktakes[0];
-  const movementItems = movements.map((movement) => ({ ...movement, quantity: Number(movement.quantity), createdAt: movement.createdAt.toISOString() }));
+  const movementItems = movements.map((movement) => ({
+    ...movement,
+    quantity: Number(movement.quantity),
+    createdAt: serializeMovementCreatedAt(movement.createdAt),
+  }));
 
   return (
     <>
