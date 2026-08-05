@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { Check, ChevronDown, Loader2, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { Select } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { cn } from "@/lib/utils";
 import { createCategoryNode, updateCategory, deleteCategory } from "@/lib/actions/products";
@@ -139,9 +140,9 @@ export function CategoriesManager({ categories: initial, parentOptions: initialP
             className="h-11 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none transition-colors focus:border-primary-500"
           />
         </label>
-        <button onClick={() => setOpen(true)} className="inline-flex min-h-11 items-center gap-1.5 px-3 rounded-lg bg-primary-600 text-white text-sm font-medium hover:bg-primary-700 min-w-11">
+        <Button type="button" onClick={() => setOpen(true)}>
           <Plus className="w-4 h-4" /> {t("categories.create")}
-        </button>
+        </Button>
       </div>
 
       <p className="mb-3 text-sm text-slate-500">{t("categories.count", { n: total })}</p>

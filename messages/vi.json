@@ -2049,6 +2049,7 @@
   },
   "inventory": {
     "title": "Tồn kho",
+    "warehouseTab": "Kho hàng",
     "cameraMaterials": "Vật tư lắp camera",
     "totalValue": "Giá trị tồn kho",
     "byCost": "Theo giá vốn",

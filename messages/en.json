@@ -2049,6 +2049,7 @@
   },
   "inventory": {
     "title": "Inventory",
+    "warehouseTab": "Warehouse",
     "cameraMaterials": "Camera materials",
     "totalValue": "Stock value",
     "byCost": "At cost price",

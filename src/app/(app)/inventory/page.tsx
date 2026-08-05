@@ -8,6 +8,7 @@ import { PurchaseReturnsTab } from "./tabs/purchase-returns";
 import { StocktakesTab } from "./tabs/stocktakes";
 import { InternalUseTab } from "./tabs/internal-use";
 import { InventoryNavigation } from "./inventory-navigation";
+import { StockActionMenu } from "./tabs/stock-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Pr
             <Text as="h1" weight="bold" className="text-xl tracking-[-0.01em] lg:text-[17px]" text={t("nav.groups.inventory")} />
             <Text as="p" variant="muted" className="mt-0.5 text-xs font-semibold lg:hidden" text={t("mobile.inventory.subtitle")} />
           </div>
+          {tab === "stock" && <div className="hidden lg:block"><StockActionMenu /></div>}
         </div>
         <div className="overflow-x-auto px-4 pb-2 sm:px-6"><InventoryNavigation activeTab={tab} /></div>
       </div>

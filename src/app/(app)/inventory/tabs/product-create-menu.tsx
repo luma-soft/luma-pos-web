@@ -9,6 +9,7 @@ import {
   Wrench,
   type LucideIcon,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type ProductKind = "product" | "service" | "combo";
@@ -56,7 +57,7 @@ export function ProductCreateMenu({
 
   return (
     <div ref={rootRef} className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-4 z-30 w-auto shrink-0 sm:relative sm:bottom-auto sm:right-auto sm:ml-auto sm:w-auto">
-      <button
+      <Button
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
@@ -64,7 +65,7 @@ export function ProductCreateMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? "product-create-menu" : undefined}
-        className="inline-flex h-12 w-12 items-center justify-center gap-2 rounded-2xl bg-primary-600 p-0 text-sm font-medium text-white shadow-e2 transition hover:brightness-110 active:scale-[0.98] lg:h-auto lg:min-h-0 lg:w-auto lg:rounded-full lg:px-4 lg:py-2 lg:shadow-none"
+        className="h-12 w-12 rounded-2xl p-0 shadow-e2 active:scale-[0.98] lg:h-10 lg:w-auto lg:rounded-lg lg:px-4 lg:py-2 lg:shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
       >
         <PackagePlus className="h-4 w-4" />
         <span className="hidden lg:inline">{label}</span>
@@ -74,7 +75,7 @@ export function ProductCreateMenu({
             open && "rotate-180",
           )}
         />
-      </button>
+      </Button>
       {open && (
         <div id="product-create-menu" role="menu" className="absolute bottom-full right-0 z-50 mb-2 w-72 overflow-hidden rounded-xl border border-border bg-surface p-1 shadow-e2 sm:bottom-auto sm:top-full sm:mb-0 sm:mt-2 sm:w-80">
           {items.map((item) => {

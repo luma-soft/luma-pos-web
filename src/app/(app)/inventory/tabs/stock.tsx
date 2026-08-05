@@ -14,7 +14,7 @@ import { Select } from "@/components/ui/select";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { StockTable } from "./stock-table";
 import { InstantFilterForm } from "@/components/instant-filter-form";
-import { RecentMovements, StockActionMenu } from "./stock-actions";
+import { RecentMovements } from "./stock-actions";
 
 type SP = Record<string, string | undefined>;
 const STOCKS: StockFilter[] = ["all", "instock", "low", "out"];
@@ -45,7 +45,6 @@ export async function StockTab({ searchParams }: { searchParams: SP }) {
           options={[{ value: "", label: t("products.list.allCategories") }, ...categories.map((c) => ({ value: c.id, label: c.name }))]}
           className="min-w-44"
         />
-        <StockActionMenu />
       </InstantFilterForm>
 
       <Suspense fallback={<TableSkeleton cols={6} rows={10} />}>
