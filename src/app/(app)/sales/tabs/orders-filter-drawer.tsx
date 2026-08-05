@@ -1,9 +1,18 @@
 "use client";
 
-import { useState, type InputHTMLAttributes, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type InputHTMLAttributes,
+  type ReactNode,
+} from "react";
 import {
   Barcode,
   CalendarDays,
+  Check,
+  ChevronRight,
+  Loader2,
   Search,
   SlidersHorizontal,
   X,
@@ -14,8 +23,10 @@ import { cn } from "@/lib/utils";
 
 export type OrdersFilterValues = {
   q: string;
-  customerQuery: string;
-  productQuery: string;
+  customerId: string;
+  customerLabel: string;
+  productId: string;
+  productLabel: string;
   status: string;
   payment: string;
   paymentMethod: string;
@@ -27,7 +38,16 @@ export type OrdersFilterValues = {
   includeCancelled: boolean;
 };
 
-const orderStatuses = ["all", "completed", "owing", "returned"] as const;
+const orderStatuses = [
+  "all",
+  "draft",
+  "confirmed",
+  "delivering",
+  "completed",
+  "owing",
+  "returned",
+  "cancelled",
+] as const;
 const paymentStatuses = ["all", "paid", "partial", "unpaid"] as const;
 const paymentMethods = ["all", "cash", "bank_transfer", "card"] as const;
 const sources = [
@@ -65,15 +85,21 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
 
   const hiddenFilters = (
     <>
-      {values.customerQuery && (
+      {values.customerId && (
         <input
           type="hidden"
-          name="customerQuery"
-          value={values.customerQuery}
+          name="customerId"
+          value={values.customerId}
         />
       )}
-      {values.productQuery && (
-        <input type="hidden" name="productQuery" value={values.productQuery} />
+      {values.customerLabel && (
+        <input type="hidden" name="customerLabel" value={values.customerLabel} />
+      )}
+      {values.productId && (
+        <input type="hidden" name="productId" value={values.productId} />
+      )}
+      {values.productLabel && (
+        <input type="hidden" name="productLabel" value={values.productLabel} />
       )}
       {values.status !== "all" && (
         <input type="hidden" name="status" value={values.status} />
@@ -183,19 +209,27 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
               {values.q && <input type="hidden" name="q" value={values.q} />}
               <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5">
                 <FilterSection title="Tìm theo">
-                  <LabeledInput
+                  <EntityPicker
                     label="Khách hàng"
-                    name="customerQuery"
-                    defaultValue={values.customerQuery}
+                    name="customerId"
+                    labelName="customerLabel"
+                    initialValue={values.customerId}
+                    initialLabel={values.customerLabel}
                     placeholder="Tên hoặc số điện thoại"
                     icon={<Search className="size-4" />}
+                    endpoint="/api/mobile/customers"
+                    kind="customer"
                   />
-                  <LabeledInput
+                  <EntityPicker
                     label="Sản phẩm"
-                    name="productQuery"
-                    defaultValue={values.productQuery}
+                    name="productId"
+                    labelName="productLabel"
+                    initialValue={values.productId}
+                    initialLabel={values.productLabel}
                     placeholder="Tên, SKU hoặc mã vạch"
                     icon={<Barcode className="size-4" />}
+                    endpoint="/api/mobile/pos/search"
+                    kind="product"
                   />
                 </FilterSection>
 
@@ -247,7 +281,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                   </div>
                 </FilterSection>
 
-                <ChipSection
+                <SelectSection
                   title="Trạng thái đơn"
                   name="status"
                   value={values.status}
@@ -256,14 +290,22 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                     label:
                       value === "all"
                         ? "Tất cả"
-                        : value === "completed"
-                          ? "Hoàn tất"
-                          : value === "owing"
-                            ? "Còn nợ"
-                            : "Đã trả hàng",
+                        : value === "draft"
+                          ? "Nháp"
+                          : value === "confirmed"
+                            ? "Đặt hàng"
+                            : value === "delivering"
+                              ? "Đang giao"
+                              : value === "completed"
+                                ? "Hoàn tất"
+                                : value === "owing"
+                                  ? "Còn nợ"
+                                  : value === "returned"
+                                    ? "Đã trả hàng"
+                                    : "Đã hủy",
                   }))}
                 />
-                <ChipSection
+                <SelectSection
                   title="Trạng thái thanh toán"
                   name="payment"
                   value={values.payment}
@@ -411,6 +453,238 @@ function LabeledInput({
   );
 }
 
+type EntityOption = {
+  value: string;
+  label: string;
+  hint?: string;
+};
+
+function EntityPicker({
+  label,
+  name,
+  labelName,
+  initialValue,
+  initialLabel,
+  placeholder,
+  icon,
+  endpoint,
+  kind,
+}: {
+  label: string;
+  name: "customerId" | "productId";
+  labelName: "customerLabel" | "productLabel";
+  initialValue: string;
+  initialLabel: string;
+  placeholder: string;
+  icon: ReactNode;
+  endpoint: string;
+  kind: "customer" | "product";
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [value, setValue] = useState(initialValue);
+  const [selectedLabel, setSelectedLabel] = useState(initialLabel);
+  const [selectedHint, setSelectedHint] = useState("");
+  const [options, setOptions] = useState<EntityOption[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocumentMouseDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocumentMouseDown);
+    return () => document.removeEventListener("mousedown", onDocumentMouseDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const url = new URL(endpoint, window.location.origin);
+        if (query.trim()) url.searchParams.set("q", query.trim());
+        if (kind === "customer") url.searchParams.set("pageSize", "30");
+        const response = await fetch(url, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error("request_failed");
+        const payload = (await response.json()) as {
+          ok?: boolean;
+          data?: unknown;
+        };
+        if (!payload.ok) throw new Error("request_failed");
+        setOptions(parseEntityOptions(payload.data, kind));
+      } catch (requestError) {
+        if ((requestError as Error).name !== "AbortError") {
+          setOptions([]);
+          setError("Không thể tải danh sách. Vui lòng thử lại.");
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
+    }, 220);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [endpoint, kind, open, query]);
+
+  function pick(option: EntityOption) {
+    setValue(option.value);
+    setSelectedLabel(option.label);
+    setSelectedHint(option.hint ?? "");
+    setOpen(false);
+    setQuery("");
+  }
+
+  function clear() {
+    setValue("");
+    setSelectedLabel("");
+    setSelectedHint("");
+    setQuery("");
+    setOpen(false);
+  }
+
+  return (
+    <div ref={rootRef} className="relative">
+      <input type="hidden" name={name} value={value} />
+      <input type="hidden" name={labelName} value={selectedLabel} />
+      <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
+        {label}
+      </span>
+      <button
+        type="button"
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={`${name}-options`}
+        onClick={() => setOpen((current) => !current)}
+        className="flex min-h-14 w-full items-center gap-3 rounded-xl border border-border bg-surface px-3 text-left outline-none transition hover:border-primary-300 focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-100"
+      >
+        <span className="shrink-0 text-slate-500">{icon}</span>
+        <span className="min-w-0 flex-1">
+          <span
+            className={cn(
+              "block truncate text-sm",
+              selectedLabel
+                ? "font-semibold text-slate-900 dark:text-slate-100"
+                : "text-slate-400",
+            )}
+          >
+            {selectedLabel || placeholder}
+          </span>
+          {selectedHint && (
+            <span className="mt-0.5 block truncate text-xs text-slate-500">
+              {selectedHint}
+            </span>
+          )}
+        </span>
+        <ChevronRight className="size-4 shrink-0 text-slate-400" />
+      </button>
+
+      {open && (
+        <div className="absolute inset-x-0 top-full z-20 mt-2 overflow-hidden rounded-xl border border-border bg-surface shadow-2xl">
+          <div className="relative border-b border-border p-3">
+            <Search className="absolute left-6 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+            <input
+              autoFocus
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={placeholder}
+              aria-label={`Tìm ${label.toLocaleLowerCase("vi")}`}
+              className="min-h-10 w-full rounded-lg border border-border bg-surface-2 py-2 pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+            />
+          </div>
+          <div id={`${name}-options`} role="listbox" className="max-h-72 overflow-y-auto py-1">
+            {value && (
+              <button
+                type="button"
+                onClick={clear}
+                className="flex min-h-11 w-full items-center px-4 text-left text-sm font-semibold text-slate-500 hover:bg-surface-2"
+              >
+                Bỏ lựa chọn
+              </button>
+            )}
+            {loading ? (
+              <div className="flex min-h-20 items-center justify-center gap-2 text-sm text-slate-500">
+                <Loader2 className="size-4 animate-spin" />
+                Đang tải...
+              </div>
+            ) : error ? (
+              <p className="px-4 py-5 text-center text-sm text-red-600">{error}</p>
+            ) : options.length === 0 ? (
+              <p className="px-4 py-5 text-center text-sm text-slate-500">
+                Không tìm thấy kết quả
+              </p>
+            ) : (
+              options.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="option"
+                  aria-selected={option.value === value}
+                  onClick={() => pick(option)}
+                  className={cn(
+                    "flex min-h-12 w-full items-center gap-3 px-4 py-2 text-left hover:bg-surface-2",
+                    option.value === value && "bg-primary-50 dark:bg-primary-950/30",
+                  )}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold">
+                      {option.label}
+                    </span>
+                    {option.hint && (
+                      <span className="mt-0.5 block truncate text-xs text-slate-500">
+                        {option.hint}
+                      </span>
+                    )}
+                  </span>
+                  {option.value === value && (
+                    <Check className="size-4 shrink-0 text-primary-600" />
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function parseEntityOptions(
+  data: unknown,
+  kind: "customer" | "product",
+): EntityOption[] {
+  const rows = kind === "customer"
+    ? (data as { rows?: unknown[] } | undefined)?.rows
+    : data;
+  if (!Array.isArray(rows)) return [];
+
+  return rows.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const row = entry as Record<string, unknown>;
+    const id = typeof row.id === "string" ? row.id : "";
+    const name = typeof row.name === "string" ? row.name : "";
+    if (!id || !name) return [];
+    const code = typeof row.code === "string" ? row.code : "";
+    const phone = typeof row.phone === "string" ? row.phone : "";
+    const sku = typeof row.sku === "string" ? row.sku : "";
+    const barcode = typeof row.barcode === "string" ? row.barcode : "";
+    const hint = kind === "customer"
+      ? [code, phone].filter(Boolean).join(" · ")
+      : [sku, barcode].filter(Boolean).join(" · ");
+    return [{ value: id, label: name, hint }];
+  });
+}
+
 function QuickRange({
   label,
   selected = false,
@@ -465,6 +739,35 @@ function ChipSection({
           </label>
         ))}
       </div>
+    </FilterSection>
+  );
+}
+
+function SelectSection({
+  title,
+  name,
+  value,
+  options,
+}: {
+  title: string;
+  name: string;
+  value: string;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <FilterSection title={title}>
+      <select
+        name={name}
+        defaultValue={value}
+        aria-label={title}
+        className="min-h-12 w-full rounded-xl border border-border bg-surface px-3 text-sm font-semibold outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
     </FilterSection>
   );
 }

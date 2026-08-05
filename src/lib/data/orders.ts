@@ -39,7 +39,8 @@ export type OrderStatusFilter =
   | "returned"
   | "draft"
   | "quote"
-  | "confirmed";
+  | "confirmed"
+  | "delivering";
 export type OrderPaymentFilter = "all" | "paid" | "unpaid" | "partial";
 export type OrderPaymentMethodFilter =
   "all" | "cash" | "bank_transfer" | "card";
@@ -49,6 +50,8 @@ export type OrderSourceFilter =
 export interface OrderListFilters {
   orderId?: string;
   q?: string;
+  customerId?: string;
+  productId?: string;
   customerQuery?: string;
   productQuery?: string;
   status?: OrderStatusFilter;
@@ -62,6 +65,13 @@ export interface OrderListFilters {
   includeCancelled?: boolean;
   page?: number;
   pageSize?: number;
+}
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isUuid(value?: string): value is string {
+  return Boolean(value && UUID_RE.test(value));
 }
 
 export async function getOrders(filters: OrderListFilters = {}) {
@@ -89,6 +99,24 @@ export async function getOrders(filters: OrderListFilters = {}) {
       accentInsensitiveLike(orders.projectName, q),
     );
     if (c) conditions.push(c);
+  }
+  if (isUuid(filters.customerId)) {
+    conditions.push(eq(orders.customerId, filters.customerId));
+  }
+  if (isUuid(filters.productId)) {
+    conditions.push(
+      exists(
+        db
+          .select({ value: sql`1` })
+          .from(orderItems)
+          .where(
+            and(
+              eq(orderItems.orderId, orders.id),
+              eq(orderItems.productId, filters.productId),
+            ),
+          ),
+      ),
+    );
   }
   if (filters.customerQuery?.trim()) {
     const customerQuery = filters.customerQuery.trim();
@@ -125,6 +153,8 @@ export async function getOrders(filters: OrderListFilters = {}) {
   if (filters.status === "returned")
     conditions.push(eq(orders.status, "returned"));
   if (filters.status === "draft") conditions.push(eq(orders.status, "draft"));
+  if (filters.status === "delivering")
+    conditions.push(eq(orders.status, "delivering"));
   if (filters.status === "owing") {
     const c = and(
       or(

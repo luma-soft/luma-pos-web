@@ -22,6 +22,9 @@ type SP = Record<string, string | undefined>;
 const STATUS: OrderStatusFilter[] = [
   "all",
   "completed",
+  "draft",
+  "confirmed",
+  "delivering",
   "owing",
   "returned",
   "cancelled",
@@ -80,8 +83,10 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
       <OrdersFilterDrawer
         values={{
           q: params.q ?? "",
-          customerQuery: params.customerQuery ?? "",
-          productQuery: params.productQuery ?? "",
+          customerId: params.customerId ?? "",
+          customerLabel: params.customerLabel ?? "",
+          productId: params.productId ?? "",
+          productLabel: params.productLabel ?? "",
           status,
           payment,
           paymentMethod,
@@ -132,8 +137,8 @@ async function OrdersContent({ searchParams }: { searchParams: SP }) {
     getOrders({
       orderId: params.orderId,
       q: params.q,
-      customerQuery: params.customerQuery,
-      productQuery: params.productQuery,
+      customerId: params.customerId,
+      productId: params.productId,
       status,
       payment,
       paymentMethod,
