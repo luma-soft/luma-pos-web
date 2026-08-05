@@ -75,6 +75,10 @@ const sources = [
 export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
   const t = useTranslations();
   const [open, setOpen] = useState(false);
+  const filterFormRef = useRef<HTMLFormElement>(null);
+  const [filterRevision, setFilterRevision] = useState(0);
+  const [resultCount, setResultCount] = useState<number | null>(null);
+  const [countPending, setCountPending] = useState(false);
   const initialPreset: OrderTimePreset = isOrderTimePreset(values.timePreset)
     ? values.timePreset
     : values.from || values.to
@@ -87,6 +91,52 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
   const [from, setFrom] = useState(values.from || initialRange.from);
   const [to, setTo] = useState(values.to || initialRange.to);
   const dateRangeError = timePreset !== "all" && !isOrderDateRangeValid(from, to);
+
+  useEffect(() => {
+    if (!open || dateRangeError || !filterFormRef.current) return;
+
+    const controller = new AbortController();
+    const form = filterFormRef.current;
+    setCountPending(true);
+    const timeout = window.setTimeout(async () => {
+      const query = new URLSearchParams();
+      for (const [name, value] of new FormData(form)) {
+        if (typeof value === "string" && value.trim()) query.set(name, value);
+      }
+      query.delete("tab");
+      query.delete("customerLabel");
+      query.delete("productLabel");
+      query.delete("timePreset");
+
+      try {
+        const response = await fetch(`/api/orders/count?${query}`, {
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = (await response.json()) as {
+          ok?: boolean;
+          data?: { total?: unknown };
+        };
+        if (!response.ok || !payload.ok || typeof payload.data?.total !== "number") {
+          throw new Error("request_failed");
+        }
+        setResultCount(payload.data.total);
+      } catch (error) {
+        if ((error as Error).name !== "AbortError") setResultCount(null);
+      } finally {
+        if (!controller.signal.aborted) setCountPending(false);
+      }
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [dateRangeError, filterRevision, from, open, timePreset, to]);
+
+  function refreshResultCount() {
+    setFilterRevision((revision) => revision + 1);
+  }
 
   const hiddenFilters = (
     <>
@@ -214,8 +264,10 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
             </div>
 
             <form
+              ref={filterFormRef}
               action={Routes.Sales}
               className="flex min-h-0 flex-1 flex-col"
+              onChangeCapture={refreshResultCount}
             >
               <input type="hidden" name="tab" value="orders" />
               {values.q && <input type="hidden" name="q" value={values.q} />}
@@ -231,6 +283,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                     icon={<Search className="size-4" />}
                     endpoint="/api/mobile/customers"
                     kind="customer"
+                    onSelectionChange={refreshResultCount}
                   />
                   <EntityPicker
                     label="Sản phẩm"
@@ -242,6 +295,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                     icon={<Barcode className="size-4" />}
                     endpoint="/api/mobile/pos/search"
                     kind="product"
+                    onSelectionChange={refreshResultCount}
                   />
                 </FilterSection>
 
@@ -299,6 +353,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                   title="Trạng thái đơn"
                   name="status"
                   value={values.status}
+                  onChange={refreshResultCount}
                   options={orderStatuses.map((value) => ({
                     value,
                     label:
@@ -323,6 +378,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                   title="Trạng thái thanh toán"
                   name="payment"
                   value={values.payment}
+                  onChange={refreshResultCount}
                   options={paymentStatuses.map((value) => ({
                     value,
                     label:
@@ -415,9 +471,12 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                 <button
                   type="submit"
                   disabled={dateRangeError}
+                  aria-busy={countPending}
                   className="min-h-11 rounded-xl bg-primary-600 px-4 font-bold text-white hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Xem đơn hàng
+                  <span aria-live="polite">
+                    {resultCount === null ? "Xem … đơn" : `Xem ${resultCount} đơn`}
+                  </span>
                 </button>
               </div>
             </form>
@@ -484,6 +543,7 @@ function EntityPicker({
   icon,
   endpoint,
   kind,
+  onSelectionChange,
 }: {
   label: string;
   name: "customerId" | "productId";
@@ -494,6 +554,7 @@ function EntityPicker({
   icon: ReactNode;
   endpoint: string;
   kind: "customer" | "product";
+  onSelectionChange?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -557,6 +618,7 @@ function EntityPicker({
     setSelectedHint(option.hint ?? "");
     setOpen(false);
     setQuery("");
+    onSelectionChange?.();
   }
 
   function clear() {
@@ -565,6 +627,7 @@ function EntityPicker({
     setSelectedHint("");
     setQuery("");
     setOpen(false);
+    onSelectionChange?.();
   }
 
   return (
@@ -738,11 +801,13 @@ function PickerSection({
   name,
   value,
   options,
+  onChange,
 }: {
   title: string;
   name: string;
   value: string;
   options: { value: string; label: string }[];
+  onChange?: () => void;
 }) {
   return (
     <FilterSection title={title}>
@@ -751,6 +816,7 @@ function PickerSection({
         ariaLabel={title}
         defaultValue={value}
         options={options}
+        onChange={onChange}
       />
     </FilterSection>
   );

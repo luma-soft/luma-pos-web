@@ -151,4 +151,25 @@ describe("orders filter drawer", () => {
     expect(source).not.toContain("<QuickRange");
     expect(source).not.toContain("<select");
   });
+
+  test("updates the result count while filters are being edited", () => {
+    const drawerSource = readFileSync(
+      new URL(
+        "../src/app/(app)/sales/tabs/orders-filter-drawer.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    const countRouteSource = readFileSync(
+      new URL("../src/app/api/orders/count/route.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(drawerSource).toContain('fetch(`/api/orders/count?${query}`');
+    expect(drawerSource).toContain("Xem ${resultCount} đơn");
+    expect(drawerSource).toContain('aria-live="polite"');
+    expect(countRouteSource).toContain("requireSalesAccess");
+    expect(countRouteSource).toContain("getOrders");
+    expect(countRouteSource).toContain("pageSize: 1");
+  });
 });
