@@ -46,10 +46,11 @@ export function StockOverview({
 
   return (
     <div
-      className="space-y-9"
+      className="space-y-5"
       data-layout="inventory-stock-overview"
+      data-density="compact"
     >
-      <section className="grid overflow-hidden rounded-card border border-border bg-surface shadow-e1 sm:grid-cols-2">
+      <section className="grid grid-cols-2 overflow-hidden rounded-card border border-border bg-surface shadow-e1">
         <OverviewMetric
           label={t("inventory.totalValue")}
           value={formatCurrency(totalValue)}
@@ -62,7 +63,7 @@ export function StockOverview({
       </section>
 
       <section aria-labelledby="inventory-status-heading">
-        <div className="mb-5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <h2
             id="inventory-status-heading"
             className="text-base font-bold text-slate-900 dark:text-slate-100"
@@ -102,10 +103,10 @@ function OverviewMetric({
   tone?: "default" | "primary";
 }) {
   return (
-    <div className="flex min-h-32 flex-col items-center justify-center border-b border-border px-5 py-6 text-center last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
+    <div className="flex min-h-20 flex-col items-center justify-center border-r border-border px-4 py-3 text-center last:border-r-0">
       <div
         className={cn(
-          "font-mono text-3xl font-extrabold tabular-nums",
+          "font-mono text-xl font-extrabold tabular-nums lg:text-2xl",
           tone === "primary"
             ? "text-primary-700 dark:text-primary-300"
             : "text-slate-950 dark:text-white",
@@ -113,7 +114,7 @@ function OverviewMetric({
       >
         {value}
       </div>
-      <div className="mt-1 text-sm font-medium text-slate-500">{label}</div>
+      <div className="mt-0.5 text-xs font-medium text-slate-500">{label}</div>
     </div>
   );
 }
@@ -144,26 +145,26 @@ function StatusCard({
     <Link
       href={href}
       className={cn(
-        "group min-h-52 rounded-card border p-6 transition duration-150 hover:-translate-y-0.5 hover:shadow-e2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+        "group min-h-[116px] rounded-card border p-4 transition duration-150 hover:-translate-y-0.5 hover:shadow-e2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
         toneClass,
       )}
     >
       <div className="flex items-center gap-3">
-        <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full border border-current/20 bg-surface/65">
-          <Icon className="h-8 w-8" strokeWidth={2} />
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-current/20 bg-surface/65">
+          <Icon className="h-5 w-5" strokeWidth={2} />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="text-lg font-bold text-slate-900 dark:text-slate-100">
+          <div className="text-sm font-bold text-slate-900 dark:text-slate-100">
             {t(`inventory.statusCards.${status}.label`)}
           </div>
-          <div className="mt-1 font-mono text-3xl font-extrabold tabular-nums">
+          <div className="mt-0.5 font-mono text-2xl font-extrabold tabular-nums">
             {formatNumber(count)}{" "}
-            <span className="font-sans text-base font-semibold">SKU</span>
+            <span className="font-sans text-sm font-semibold">SKU</span>
           </div>
         </div>
-        <ChevronRight className="h-5 w-5 shrink-0 text-slate-500 transition-transform group-hover:translate-x-0.5" />
+        <ChevronRight className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-hover:translate-x-0.5" />
       </div>
-      <p className="mt-4 text-sm font-medium text-slate-500">
+      <p className="mt-2 text-xs font-medium text-slate-500">
         {t(`inventory.statusCards.${status}.description`)}
       </p>
     </Link>

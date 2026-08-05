@@ -54,6 +54,14 @@ describe("inventory stock overview", () => {
     expect(html).not.toContain("SKU đang bán");
   });
 
+  test("keeps the overview summary compact on desktop", () => {
+    const html = renderOverview();
+
+    expect(html).toContain('data-density="compact"');
+    expect(html).not.toContain("min-h-52");
+    expect(html).not.toContain("min-h-32");
+  });
+
   test.each([
     "negativeStock",
     "outOfStock",
