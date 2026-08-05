@@ -32,9 +32,6 @@ export async function ReturnsTab({ searchParams }: { searchParams: SP }) {
             className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm min-h-11 lg:min-h-0"
           />
         </div>
-        <Link href={`${Routes.POS}?draft=return_quick`} className="ml-auto inline-flex items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 active:scale-[0.98] min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
-          {t("returns.create")}
-        </Link>
         {params.q && (
           <Link href={`${Routes.Sales}?tab=returns`} className="inline-flex min-h-11 min-w-11 items-center justify-center px-3 py-2 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 lg:min-h-0 lg:min-w-0">
             {t("common.clear")}

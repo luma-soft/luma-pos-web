@@ -1,8 +1,6 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { ShoppingCart, FileX2 } from "lucide-react";
-import { Routes } from "@/lib/routes";
+import { FileX2 } from "lucide-react";
 import {
   getOrders,
   type OrderStatusFilter,
@@ -52,7 +50,6 @@ const SOURCES: OrderSourceFilter[] = [
 ];
 
 export async function OrdersTab({ searchParams }: { searchParams: SP }) {
-  const t = await getTranslations();
   const params = searchParams;
   const status = (
     STATUS.includes(params.status as OrderStatusFilter) ? params.status : "all"
@@ -75,16 +72,6 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
 
   return (
     <>
-      <div className="mb-4 flex justify-end border-b border-border pb-3">
-        <Link
-          href={Routes.POS}
-          className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 active:scale-[0.98] lg:min-h-0"
-        >
-          <ShoppingCart className="w-4 h-4" />
-          {t("orders.createViaPos")}
-        </Link>
-      </div>
-
       <OrdersFilterDrawer
         values={{
           q: params.q ?? "",

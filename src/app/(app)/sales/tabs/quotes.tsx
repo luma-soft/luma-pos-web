@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { and, count, desc, eq, or } from "drizzle-orm";
 import { FileSpreadsheet, Search } from "lucide-react";
@@ -25,7 +24,6 @@ export async function QuotesTab({ searchParams }: { searchParams: SP }) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("orders.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface min-h-11 lg:min-h-0" />
         </div>
-        <Link href="/pos?draft=quote" className="ml-auto shrink-0 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white hover:bg-primary-700">{t("quotes.createQuote")}</Link>
       </InstantFilterForm>
 
       <Suspense fallback={<TableSkeleton cols={6} rows={10} />}>

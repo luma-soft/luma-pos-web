@@ -1,4 +1,6 @@
 import { getTranslations } from "next-intl/server";
+import Link from "next/link";
+import { ClipboardList, FilePlus2, RotateCcw, ShoppingCart } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { GroupTabs } from "@/components/group-tabs";
 import { Text } from "@/components/ui/text";
@@ -33,7 +35,20 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
             <Text as="p" variant="muted" className="mt-0.5 text-xs font-semibold lg:hidden" text={t("mobile.orders.subtitle")} />
           </div>
         </div>
-        <div className="px-4 sm:px-6 pb-1.5"><GroupTabs base={Routes.Sales} items={TABS} /></div>
+        <div className="flex items-center gap-3 px-4 pb-1.5 sm:px-6">
+          <div className="min-w-0 flex-1">
+            <GroupTabs base={Routes.Sales} items={TABS} edgeToEdge={false} />
+          </div>
+          <SalesPrimaryAction
+            tab={tab}
+            labels={{
+              orders: t("orders.createViaPos"),
+              returns: t("returns.create"),
+              quotes: t("quotes.createQuote"),
+              bookings: t("bookings.createViaPos"),
+            }}
+          />
+        </div>
       </div>
 
       {tab === "quotes" ? <QuotesTab searchParams={params} />
@@ -42,5 +57,53 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
         : tab === "einvoices" && EINVOICE_UI_ENABLED ? <EInvoicesTab />
         : <OrdersTab searchParams={params} />}
     </div>
+  );
+}
+
+function SalesPrimaryAction({
+  tab,
+  labels,
+}: {
+  tab: string;
+  labels: Record<"orders" | "returns" | "quotes" | "bookings", string>;
+}) {
+  const action = tab === "returns"
+    ? {
+        href: `${Routes.POS}?draft=return_quick`,
+        label: labels.returns,
+        icon: RotateCcw,
+      }
+    : tab === "quotes"
+      ? {
+          href: `${Routes.POS}?draft=quote`,
+          label: labels.quotes,
+          icon: FilePlus2,
+        }
+      : tab === "bookings"
+        ? {
+            href: Routes.POS,
+            label: labels.bookings,
+            icon: ClipboardList,
+          }
+        : tab === "orders"
+          ? {
+              href: Routes.POS,
+              label: labels.orders,
+              icon: ShoppingCart,
+            }
+          : null;
+
+  if (!action) return null;
+  const Icon = action.icon;
+
+  return (
+    <Link
+      href={action.href}
+      aria-label={action.label}
+      className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-full bg-primary-600 px-3.5 text-sm font-semibold text-white transition hover:brightness-110 active:scale-[0.98]"
+    >
+      <Icon className="size-4" />
+      <span className="hidden sm:inline">{action.label}</span>
+    </Link>
   );
 }
