@@ -1,5 +1,10 @@
 import { getOrders } from "@/lib/data/orders";
-import type { OrderPaymentFilter, OrderStatusFilter } from "@/lib/data/orders";
+import type {
+  OrderPaymentFilter,
+  OrderPaymentMethodFilter,
+  OrderSourceFilter,
+  OrderStatusFilter,
+} from "@/lib/data/orders";
 import { createOrderForUser } from "@/lib/orders/create";
 import { authorizeMobileSensitiveAction } from "@/lib/auth/mobile-approval";
 import { getRawStorePrefs } from "@/lib/data/settings";
@@ -27,16 +32,27 @@ export async function GET(request: Request) {
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
 
+  const minTotal = searchParam(request, "minTotal");
+  const maxTotal = searchParam(request, "maxTotal");
   return mobileOk(
     await getOrders({
       q: searchParam(request, "q"),
+      customerQuery: searchParam(request, "customerQuery"),
+      productQuery: searchParam(request, "productQuery"),
       status: searchParam(request, "status") as OrderStatusFilter | undefined,
-      payment: searchParam(request, "payment") as OrderPaymentFilter | undefined,
+      payment: searchParam(request, "payment") as
+        OrderPaymentFilter | undefined,
+      paymentMethod: searchParam(request, "paymentMethod") as
+        OrderPaymentMethodFilter | undefined,
+      source: searchParam(request, "source") as OrderSourceFilter | undefined,
       from: searchParam(request, "from"),
       to: searchParam(request, "to"),
+      minTotal: minTotal == null ? undefined : Number(minTotal),
+      maxTotal: maxTotal == null ? undefined : Number(maxTotal),
+      includeCancelled: searchParam(request, "includeCancelled") === "true",
       page: numberParam(request, "page", 1),
       pageSize: numberParam(request, "pageSize", 20),
-    })
+    }),
   );
 }
 
@@ -65,7 +81,9 @@ export async function POST(request: Request) {
     trustedItems = await normalizeOrderItems(value.items, value.priceBookId);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
-    if (["PRODUCT_NOT_FOUND", "UNIT_NOT_FOUND", "INVALID_ITEMS"].includes(message)) {
+    if (
+      ["PRODUCT_NOT_FOUND", "UNIT_NOT_FOUND", "INVALID_ITEMS"].includes(message)
+    ) {
       return mobileError("errors.invalidData");
     }
     throw error;

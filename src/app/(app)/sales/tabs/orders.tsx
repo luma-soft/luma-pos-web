@@ -1,107 +1,98 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { Search, ShoppingCart, FileX2, SlidersHorizontal } from "lucide-react";
+import { ShoppingCart, FileX2 } from "lucide-react";
 import { Routes } from "@/lib/routes";
-import { cn } from "@/lib/utils";
-import { getOrders, type OrderStatusFilter, type OrderPaymentFilter, type OrderSourceFilter } from "@/lib/data/orders";
+import {
+  getOrders,
+  type OrderStatusFilter,
+  type OrderPaymentFilter,
+  type OrderPaymentMethodFilter,
+  type OrderSourceFilter,
+} from "@/lib/data/orders";
 import { Pagination } from "@/components/pagination";
-import { Select } from "@/components/ui/select";
 import { parsePageSize } from "@/lib/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { OrdersTable } from "./orders-table";
-import { InstantFilterForm } from "@/components/instant-filter-form";
 import { getPrintTemplatesForDoc } from "@/lib/print/template";
+import { OrdersFilterDrawer } from "./orders-filter-drawer";
 
 type SP = Record<string, string | undefined>;
 
-const STATUS: OrderStatusFilter[] = ["all", "completed", "owing", "returned", "cancelled"];
+const STATUS: OrderStatusFilter[] = [
+  "all",
+  "completed",
+  "owing",
+  "returned",
+  "cancelled",
+];
 const PAYMENTS: OrderPaymentFilter[] = ["all", "paid", "partial", "unpaid"];
-const SOURCES: OrderSourceFilter[] = ["all", "pos", "shopee", "tiktok_shop", "lazada", "tiki"];
+const PAYMENT_METHODS: OrderPaymentMethodFilter[] = [
+  "all",
+  "cash",
+  "bank_transfer",
+  "card",
+];
+const SOURCES: OrderSourceFilter[] = [
+  "all",
+  "pos",
+  "shopee",
+  "tiktok_shop",
+  "lazada",
+  "tiki",
+];
 
 export async function OrdersTab({ searchParams }: { searchParams: SP }) {
   const t = await getTranslations();
   const params = searchParams;
-  const status = (STATUS.includes(params.status as OrderStatusFilter) ? params.status : "all") as OrderStatusFilter;
-  const payment = (PAYMENTS.includes(params.payment as OrderPaymentFilter) ? params.payment : "all") as OrderPaymentFilter;
-  const source = (SOURCES.includes(params.source as OrderSourceFilter) ? params.source : "all") as OrderSourceFilter;
+  const status = (
+    STATUS.includes(params.status as OrderStatusFilter) ? params.status : "all"
+  ) as OrderStatusFilter;
+  const payment = (
+    PAYMENTS.includes(params.payment as OrderPaymentFilter)
+      ? params.payment
+      : "all"
+  ) as OrderPaymentFilter;
+  const paymentMethod = (
+    PAYMENT_METHODS.includes(params.paymentMethod as OrderPaymentMethodFilter)
+      ? params.paymentMethod
+      : "all"
+  ) as OrderPaymentMethodFilter;
+  const source = (
+    SOURCES.includes(params.source as OrderSourceFilter) ? params.source : "all"
+  ) as OrderSourceFilter;
   const from = params.from ?? "";
   const to = params.to ?? "";
-
-  const href = (overrides: Record<string, string | undefined>) => {
-    const sp = new URLSearchParams();
-    const merged = { tab: "orders", q: params.q, status, payment, source, from, to, orderId: params.orderId, page: undefined as string | undefined, ...overrides };
-    for (const [k, v] of Object.entries(merged)) if (v && v !== "all") sp.set(k, v);
-    return `${Routes.Sales}?${sp.toString()}`;
-  };
+  const includeCancelled = params.includeCancelled === "1";
 
   return (
     <>
-      <div className="mb-4 flex flex-col gap-2 border-b border-border lg:flex-row lg:items-end lg:justify-between lg:gap-3">
-        <div className="-mx-4 flex snap-x snap-mandatory gap-1 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
-          {STATUS.map((tab) => (
-            <Link
-              key={tab}
-              href={href({ status: tab, page: undefined })}
-              className={cn(
-              "inline-flex min-h-11 shrink-0 snap-start items-center justify-center border-b-2 px-4 py-2 text-sm font-medium lg:min-h-0 min-w-11 lg:min-w-0",
-                status === tab ? "border-primary-600 text-primary-600" : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
-              )}
-            >
-              {t(`orders.tabs.${tab}`)}
-            </Link>
-          ))}
-        </div>
-        <Link href={Routes.POS} className="mb-2 inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 active:scale-[0.98] lg:mb-1.5 lg:min-h-0 lg:w-auto">
+      <div className="mb-4 flex justify-end border-b border-border pb-3">
+        <Link
+          href={Routes.POS}
+          className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 active:scale-[0.98] lg:min-h-0"
+        >
           <ShoppingCart className="w-4 h-4" />
           {t("orders.createViaPos")}
         </Link>
       </div>
 
-      <InstantFilterForm className="mb-4 grid grid-cols-2 items-center gap-2 sm:flex sm:flex-wrap" action={Routes.Sales}>
-        <input type="hidden" name="tab" value="orders" />
-        {status !== "all" && <input type="hidden" name="status" value={status} />}
-        <div className="relative col-span-2 w-full sm:w-96">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("orders.searchPlaceholder")} aria-label={t("common.search")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface min-h-11 lg:min-h-0" />
-        </div>
-        <details className="group col-span-2 lg:contents">
-          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm font-bold text-slate-600 marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 lg:hidden min-w-11">
-            <SlidersHorizontal className="h-4 w-4" />
-            {t("mobile.orders.filters")}
-          </summary>
-          <div className="mt-2 grid grid-cols-2 gap-2 lg:contents">
-            <Select
-              name="payment"
-              defaultValue={payment}
-              aria-label={t("orders.cols.payment")}
-              options={PAYMENTS.map((p) => ({ value: p, label: t(`orders.paymentFilter.${p}`) }))}
-              className="w-full min-w-0 sm:w-auto sm:min-w-32"
-            />
-            <Select
-              name="source"
-              defaultValue={source}
-              aria-label={t("orders.cols.channel")}
-              options={[
-                { value: "all", label: t("orders.sourceFilter.all") },
-                { value: "pos", label: "POS" },
-                { value: "shopee", label: "Shopee" },
-                { value: "tiktok_shop", label: "TikTok Shop" },
-                { value: "lazada", label: "Lazada" },
-                { value: "tiki", label: "Tiki" },
-              ]}
-              className="w-full min-w-0 sm:w-auto sm:min-w-36"
-            />
-            <input type="date" name="from" defaultValue={from} aria-label={t("orders.filter.from")} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" />
-            <input type="date" name="to" defaultValue={to} aria-label={t("orders.filter.to")} className="rounded-lg border border-border bg-surface px-3 py-2 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" />
-            {(params.q || payment !== "all" || source !== "all" || from || to || params.orderId) && (
-              <Link href={href({ q: undefined, payment: undefined, source: undefined, from: undefined, to: undefined, orderId: undefined })} className="col-span-2 inline-flex min-h-11 min-w-11 items-center justify-center px-3 py-2 text-center text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 sm:col-span-1 lg:min-h-0 lg:min-w-0">
-                {t("orders.filter.clear")}
-              </Link>
-            )}
-          </div>
-        </details>
-      </InstantFilterForm>
+      <OrdersFilterDrawer
+        values={{
+          q: params.q ?? "",
+          customerQuery: params.customerQuery ?? "",
+          productQuery: params.productQuery ?? "",
+          status,
+          payment,
+          paymentMethod,
+          source,
+          from,
+          to,
+          minTotal: params.minTotal ?? "",
+          maxTotal: params.maxTotal ?? "",
+          includeCancelled,
+        }}
+      />
 
       <Suspense fallback={<TableSkeleton cols={10} rows={10} />}>
         <OrdersContent searchParams={searchParams} />
@@ -113,16 +104,48 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
 async function OrdersContent({ searchParams }: { searchParams: SP }) {
   const t = await getTranslations();
   const params = searchParams;
-  const status = (STATUS.includes(params.status as OrderStatusFilter) ? params.status : "all") as OrderStatusFilter;
-  const payment = (PAYMENTS.includes(params.payment as OrderPaymentFilter) ? params.payment : "all") as OrderPaymentFilter;
-  const source = (SOURCES.includes(params.source as OrderSourceFilter) ? params.source : "all") as OrderSourceFilter;
+  const status = (
+    STATUS.includes(params.status as OrderStatusFilter) ? params.status : "all"
+  ) as OrderStatusFilter;
+  const payment = (
+    PAYMENTS.includes(params.payment as OrderPaymentFilter)
+      ? params.payment
+      : "all"
+  ) as OrderPaymentFilter;
+  const paymentMethod = (
+    PAYMENT_METHODS.includes(params.paymentMethod as OrderPaymentMethodFilter)
+      ? params.paymentMethod
+      : "all"
+  ) as OrderPaymentMethodFilter;
+  const source = (
+    SOURCES.includes(params.source as OrderSourceFilter) ? params.source : "all"
+  ) as OrderSourceFilter;
   const from = params.from ?? "";
   const to = params.to ?? "";
   const page = Number(params.page) || 1;
   const pageSize = parsePageSize(params.size);
+  const includeCancelled = params.includeCancelled === "1";
+  const minTotal = optionalNumber(params.minTotal);
+  const maxTotal = optionalNumber(params.maxTotal);
 
   const [{ rows, total, pageCount }, printTemplates] = await Promise.all([
-    getOrders({ orderId: params.orderId, q: params.q, status, payment, source, from, to, page, pageSize }),
+    getOrders({
+      orderId: params.orderId,
+      q: params.q,
+      customerQuery: params.customerQuery,
+      productQuery: params.productQuery,
+      status,
+      payment,
+      paymentMethod,
+      source,
+      from,
+      to,
+      minTotal,
+      maxTotal,
+      includeCancelled,
+      page,
+      pageSize,
+    }),
     getPrintTemplatesForDoc("order"),
   ]);
 
@@ -139,7 +162,19 @@ async function OrdersContent({ searchParams }: { searchParams: SP }) {
         </>
       )}
 
-      <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("orders.unitLabel")} />
+      <Pagination
+        page={page}
+        pageCount={pageCount}
+        total={total}
+        pageSize={pageSize}
+        unitLabel={t("orders.unitLabel")}
+      />
     </>
   );
+}
+
+function optionalNumber(value?: string) {
+  if (!value?.trim()) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }

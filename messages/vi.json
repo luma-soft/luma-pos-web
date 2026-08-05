@@ -1649,6 +1649,7 @@
   "orders": {
     "title": "Đơn hàng",
     "total": "{total} đơn",
+    "selectedCount": "{count} đơn đã chọn",
     "createViaPos": "Tạo đơn (POS)",
     "searchPlaceholder": "Tìm mã đơn, khách hàng, công trình…",
     "empty": "Chưa có đơn hàng nào",
@@ -3204,9 +3205,15 @@
     "brandPriceTitle": "Báo giá camera {brand}",
     "brandPriceDescription": "Báo giá camera {brand}, thông số chi tiết và các lựa chọn thẻ nhớ.",
     "brands": {
-      "ezviz": { "description": "Camera Wi-Fi, PoE và 4G cho gia đình, cửa hàng nhỏ." },
-      "imou": { "description": "Camera trong nhà, ngoài trời và các lựa chọn thẻ nhớ." },
-      "hikvision": { "description": "Giải pháp hệ thống gồm camera, đầu ghi, ổ cứng và PoE." }
+      "ezviz": {
+        "description": "Camera Wi-Fi, PoE và 4G cho gia đình, cửa hàng nhỏ."
+      },
+      "imou": {
+        "description": "Camera trong nhà, ngoài trời và các lựa chọn thẻ nhớ."
+      },
+      "hikvision": {
+        "description": "Giải pháp hệ thống gồm camera, đầu ghi, ổ cứng và PoE."
+      }
     },
     "hikvision": {
       "title": "Hệ thống Hikvision",
@@ -3219,14 +3226,25 @@
       "cameraCount": "Số lượng camera",
       "cameras": "{count} camera",
       "cameraType": "Loại camera",
-      "cameraTypes": { "bullet2": "Thân 2MP", "bullet4": "Thân 4MP", "dome4": "Dome 4MP", "ptz4": "PTZ 4MP · zoom 4×" },
+      "cameraTypes": {
+        "bullet2": "Thân 2MP",
+        "bullet4": "Thân 4MP",
+        "dome4": "Dome 4MP",
+        "ptz4": "PTZ 4MP · zoom 4×"
+      },
       "storageDays": "Thời gian lưu trữ dự kiến",
       "days": "{count} ngày",
       "storageHint": "Gợi ý ổ {capacity}TB cho {count} camera, ghi liên tục; thực tế thay đổi theo cảnh, chuẩn nén và thiết lập ghi.",
       "poeMethod": "Cấp nguồn PoE",
       "poe": {
-        "nvr": { "title": "PoE tích hợp đầu ghi", "description": "Cấp nguồn trực tiếp từ các cổng PoE trên NVR." },
-        "switch": { "title": "Switch PoE rời", "description": "Linh hoạt mở rộng và đặt switch gần khu vực camera." }
+        "nvr": {
+          "title": "PoE tích hợp đầu ghi",
+          "description": "Cấp nguồn trực tiếp từ các cổng PoE trên NVR."
+        },
+        "switch": {
+          "title": "Switch PoE rời",
+          "description": "Linh hoạt mở rộng và đặt switch gần khu vực camera."
+        }
       },
       "summaryTitle": "Chi tiết báo giá tham khảo",
       "items": {
@@ -3244,9 +3262,16 @@
         "monitor": "Màn hình giám sát",
         "surge": "Chống sét lan truyền"
       },
-      "ups": { "title": "Thêm UPS lưu điện", "description": "Duy trì đầu ghi, switch và modem khi mất điện ngắn hạn." },
+      "ups": {
+        "title": "Thêm UPS lưu điện",
+        "description": "Duy trì đầu ghi, switch và modem khi mất điện ngắn hạn."
+      },
       "cableMeters": "Chiều dài cáp mạng (m)",
-      "accessories": { "rack": "Thêm tủ rack 6U", "monitor": "Thêm màn hình giám sát", "surge": "Thêm chống sét cho từng camera" },
+      "accessories": {
+        "rack": "Thêm tủ rack 6U",
+        "monitor": "Thêm màn hình giám sát",
+        "surge": "Thêm chống sét cho từng camera"
+      },
       "unavailable": "Chưa có giá",
       "included": "Đã gồm",
       "total": "TỔNG DỰ KIẾN",
@@ -3263,9 +3288,18 @@
       "commercial": {
         "title": "Điều khoản báo giá",
         "vat": { "label": "VAT", "value": "Chưa bao gồm VAT." },
-        "warranty": { "label": "Bảo hành", "value": "Theo thời hạn bảo hành của từng SKU trong catalog." },
-        "validity": { "label": "Hiệu lực", "value": "07 ngày kể từ ngày báo giá." },
-        "leadTime": { "label": "Giao hàng / thi công", "value": "Xác nhận sau khi kiểm tra tồn kho và khảo sát." }
+        "warranty": {
+          "label": "Bảo hành",
+          "value": "Theo thời hạn bảo hành của từng SKU trong catalog."
+        },
+        "validity": {
+          "label": "Hiệu lực",
+          "value": "07 ngày kể từ ngày báo giá."
+        },
+        "leadTime": {
+          "label": "Giao hàng / thi công",
+          "value": "Xác nhận sau khi kiểm tra tồn kho và khảo sát."
+        }
       },
       "priceReference": "Nguồn giá: giá công khai và nhà cung cấp; kiểm tra lần gần nhất: {checkedAt}. Giá có thể thay đổi theo thời điểm.",
       "priceReferencePending": "đang cập nhật",

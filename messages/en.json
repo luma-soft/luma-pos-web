@@ -1649,6 +1649,7 @@
   "orders": {
     "title": "Orders",
     "total": "{total} orders",
+    "selectedCount": "{count} orders selected",
     "createViaPos": "New order (POS)",
     "searchPlaceholder": "Search code, customer, project…",
     "empty": "No orders yet",
@@ -3204,9 +3205,15 @@
     "brandPriceTitle": "{brand} camera quote",
     "brandPriceDescription": "{brand} camera pricing, detailed specifications, and memory-card options.",
     "brands": {
-      "ezviz": { "description": "Wi-Fi, PoE, and 4G cameras for homes and small shops." },
-      "imou": { "description": "Indoor and outdoor cameras with memory-card options." },
-      "hikvision": { "description": "System solutions with cameras, recorders, storage, and PoE." }
+      "ezviz": {
+        "description": "Wi-Fi, PoE, and 4G cameras for homes and small shops."
+      },
+      "imou": {
+        "description": "Indoor and outdoor cameras with memory-card options."
+      },
+      "hikvision": {
+        "description": "System solutions with cameras, recorders, storage, and PoE."
+      }
     },
     "hikvision": {
       "title": "Hikvision systems",
@@ -3219,14 +3226,25 @@
       "cameraCount": "Camera quantity",
       "cameras": "{count} cameras",
       "cameraType": "Camera type",
-      "cameraTypes": { "bullet2": "2MP bullet", "bullet4": "4MP bullet", "dome4": "4MP dome", "ptz4": "4MP PTZ · 4× zoom" },
+      "cameraTypes": {
+        "bullet2": "2MP bullet",
+        "bullet4": "4MP bullet",
+        "dome4": "4MP dome",
+        "ptz4": "4MP PTZ · 4× zoom"
+      },
       "storageDays": "Estimated retention",
       "days": "{count} days",
       "storageHint": "Suggested {capacity}TB drive for {count} continuous-recording cameras; actual retention varies by scene, compression, and recording settings.",
       "poeMethod": "PoE power",
       "poe": {
-        "nvr": { "title": "NVR-integrated PoE", "description": "Power cameras directly from the NVR's PoE ports." },
-        "switch": { "title": "External PoE switch", "description": "Flexible expansion and switch placement near the cameras." }
+        "nvr": {
+          "title": "NVR-integrated PoE",
+          "description": "Power cameras directly from the NVR's PoE ports."
+        },
+        "switch": {
+          "title": "External PoE switch",
+          "description": "Flexible expansion and switch placement near the cameras."
+        }
       },
       "summaryTitle": "Reference quote details",
       "items": {
@@ -3244,9 +3262,16 @@
         "monitor": "Monitoring display",
         "surge": "Surge protection"
       },
-      "ups": { "title": "Add a backup UPS", "description": "Keep the recorder, switch, and modem operating during a short outage." },
+      "ups": {
+        "title": "Add a backup UPS",
+        "description": "Keep the recorder, switch, and modem operating during a short outage."
+      },
       "cableMeters": "Network-cable length (m)",
-      "accessories": { "rack": "Add a 6U rack cabinet", "monitor": "Add a monitoring display", "surge": "Add surge protection per camera" },
+      "accessories": {
+        "rack": "Add a 6U rack cabinet",
+        "monitor": "Add a monitoring display",
+        "surge": "Add surge protection per camera"
+      },
       "unavailable": "No price yet",
       "included": "Included",
       "total": "ESTIMATED TOTAL",
@@ -3263,9 +3288,18 @@
       "commercial": {
         "title": "Quote terms",
         "vat": { "label": "VAT", "value": "VAT is excluded." },
-        "warranty": { "label": "Warranty", "value": "Subject to the warranty period of each SKU in the catalog." },
-        "validity": { "label": "Validity", "value": "Valid for 07 days from the quotation date." },
-        "leadTime": { "label": "Delivery / installation", "value": "Confirmed after stock and site-survey checks." }
+        "warranty": {
+          "label": "Warranty",
+          "value": "Subject to the warranty period of each SKU in the catalog."
+        },
+        "validity": {
+          "label": "Validity",
+          "value": "Valid for 07 days from the quotation date."
+        },
+        "leadTime": {
+          "label": "Delivery / installation",
+          "value": "Confirmed after stock and site-survey checks."
+        }
       },
       "priceReference": "Price source: public pricing and suppliers; last checked: {checkedAt}. Prices may change over time.",
       "priceReferencePending": "being updated",

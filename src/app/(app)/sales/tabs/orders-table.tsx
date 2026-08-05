@@ -3,10 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
+import {
+  DataTableShell,
+  stopRowToggle,
+  type DataTableColumn,
+} from "@/components/data-table";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { OrderListRow } from "@/lib/data/orders";
-import { OrderStatusBadge, PaymentStatusBadge } from "../../orders/status-badges";
+import {
+  OrderStatusBadge,
+  PaymentStatusBadge,
+} from "../../orders/status-badges";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import type { PrintTemplate } from "@/lib/print/template-shared";
 
@@ -15,9 +22,7 @@ export function normalizeOrderBatchSelection(
   selectableIds: string[],
 ) {
   const selectable = new Set(selectableIds);
-  return new Set(
-    [...selectedIds].filter((id) => selectable.has(id)),
-  );
+  return new Set([...selectedIds].filter((id) => selectable.has(id)));
 }
 
 export function toggleOrderBatchSelection(
@@ -44,11 +49,8 @@ export function toggleAllOrderBatchSelection(
   const current = normalizeOrderBatchSelection(selectedIds, selectableIds);
   const target = selectableIds;
   const targetFullySelected =
-    target.length > 0 &&
-    target.every((id) => current.has(id));
-  return targetFullySelected
-    ? new Set<string>()
-    : new Set(target);
+    target.length > 0 && target.every((id) => current.has(id));
+  return targetFullySelected ? new Set<string>() : new Set(target);
 }
 
 export function OrderSelectionCheckbox({
@@ -101,13 +103,17 @@ export function OrderBatchToolbar({
   labels: {
     merge: string;
     print: string;
+    selected?: string;
   };
 }) {
   const batchHref = `/orders/print-batch?${selectedIds.map((id) => `ids=${encodeURIComponent(id)}`).join("&")}`;
   return (
     <div className="flex w-full items-center justify-end gap-2 text-sm">
-      <span className="rounded-full bg-primary-100 px-2 py-1 text-xs font-bold text-primary-700" aria-live="polite">
-        {selectedCount}
+      <span
+        className="px-2 py-1 text-xs font-semibold text-slate-600"
+        aria-live="polite"
+      >
+        {labels.selected ?? selectedCount}
       </span>
       <div className="grid grid-cols-2 gap-2 lg:contents">
         <button
@@ -118,9 +124,22 @@ export function OrderBatchToolbar({
         >
           {labels.merge}
         </button>
-        {selectedCount > 0
-          ? <PrintTemplateMenu baseHref={batchHref} templates={templates} label={labels.print} className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2 lg:min-h-0 lg:min-w-0" />
-          : <button type="button" disabled className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold opacity-50 lg:min-h-0 lg:min-w-0">{labels.print}</button>}
+        {selectedCount > 0 ? (
+          <PrintTemplateMenu
+            baseHref={batchHref}
+            templates={templates}
+            label={labels.print}
+            className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-surface-2 lg:min-h-0 lg:min-w-0"
+          />
+        ) : (
+          <button
+            type="button"
+            disabled
+            className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 text-xs font-semibold opacity-50 lg:min-h-0 lg:min-w-0"
+          >
+            {labels.print}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -145,7 +164,12 @@ export function OrderMobileRow({
   const remaining = Number(order.total) - Number(order.amountPaid);
   const selectable = order.status !== "cancelled";
   return (
-    <div className={cn("flex min-w-0 items-stretch", selected && "bg-primary-50/50 dark:bg-primary-950/20")}>
+    <div
+      className={cn(
+        "flex min-w-0 items-stretch",
+        selected && "bg-primary-50/50 dark:bg-primary-950/20",
+      )}
+    >
       <div className="shrink-0 p-3 pr-0 pt-3">
         <OrderSelectionCheckbox
           checked={selected}
@@ -154,21 +178,33 @@ export function OrderMobileRow({
           label={order.code}
         />
       </div>
-      <button type="button" onClick={onOpen} className="min-h-11 min-w-11 flex-1 p-3 text-left">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="min-h-11 min-w-11 flex-1 p-3 text-left"
+      >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="font-semibold text-primary-600">{order.code}</div>
             <div className="break-words text-xs text-slate-400">
-              {formatDate(order.createdAt)} · {order.customerName ?? labels.walkIn} · {channelLabel(order.sourceMode)}
+              {formatDate(order.createdAt)} ·{" "}
+              {order.customerName ?? labels.walkIn} ·{" "}
+              {channelLabel(order.sourceMode)}
             </div>
           </div>
           <OrderStatusBadge status={order.status} />
         </div>
         <div className="mt-2 flex items-center justify-between gap-3 text-sm">
-          <span className="font-semibold tabular-nums">{formatCurrency(Number(order.total))}</span>
-          {remaining > 0 && order.status !== "cancelled"
-            ? <span className="text-right font-semibold tabular-nums text-er">{labels.remaining}: {formatCurrency(remaining)}</span>
-            : <PaymentStatusBadge status={order.paymentStatus} />}
+          <span className="font-semibold tabular-nums">
+            {formatCurrency(Number(order.total))}
+          </span>
+          {remaining > 0 && order.status !== "cancelled" ? (
+            <span className="text-right font-semibold tabular-nums text-er">
+              {labels.remaining}: {formatCurrency(remaining)}
+            </span>
+          ) : (
+            <PaymentStatusBadge status={order.paymentStatus} />
+          )}
         </div>
       </button>
     </div>
@@ -191,8 +227,9 @@ export function OrdersTable({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [internalSelectedIds, setInternalSelectedIds] =
-    useState<Set<string>>(new Set());
+  const [internalSelectedIds, setInternalSelectedIds] = useState<Set<string>>(
+    new Set(),
+  );
   const selectedIds = selection?.selectedIds ?? internalSelectedIds;
   const setSelectedIds = selection?.onChange ?? setInternalSelectedIds;
   const selectableIds = rows
@@ -210,20 +247,13 @@ export function OrdersTable({
 
   function toggle(orderId: string) {
     setSelectedIds(
-      toggleOrderBatchSelection(
-        normalizedSelection,
-        orderId,
-        selectableIds,
-      ),
+      toggleOrderBatchSelection(normalizedSelection, orderId, selectableIds),
     );
   }
 
   function toggleAll() {
     setSelectedIds(
-      toggleAllOrderBatchSelection(
-        normalizedSelection,
-        selectableIds,
-      ),
+      toggleAllOrderBatchSelection(normalizedSelection, selectableIds),
     );
   }
 
@@ -260,14 +290,18 @@ export function OrdersTable({
       label: t("orders.cols.code"),
       required: true,
       width: "132px",
-      render: (order) => <span className="font-semibold text-primary-600">{order.code}</span>,
+      render: (order) => (
+        <span className="font-semibold text-primary-600">{order.code}</span>
+      ),
     },
     {
       key: "date",
       label: t("orders.cols.date"),
       defaultVisible: true,
       width: "160px",
-      render: (order) => <span className="text-slate-500">{formatDate(order.createdAt)}</span>,
+      render: (order) => (
+        <span className="text-slate-500">{formatDate(order.createdAt)}</span>
+      ),
     },
     {
       key: "customer",
@@ -286,7 +320,9 @@ export function OrdersTable({
       key: "project",
       label: t("orders.cols.project"),
       defaultVisible: false,
-      render: (order) => <span className="text-slate-500">{order.projectName ?? "—"}</span>,
+      render: (order) => (
+        <span className="text-slate-500">{order.projectName ?? "—"}</span>
+      ),
     },
     {
       key: "total",
@@ -305,11 +341,15 @@ export function OrdersTable({
       width: "150px",
       cellClassName: (order) => {
         const remaining = Number(order.total) - Number(order.amountPaid);
-        return remaining > 0 && order.status !== "cancelled" ? "font-semibold text-er" : "text-slate-400";
+        return remaining > 0 && order.status !== "cancelled"
+          ? "font-semibold text-er"
+          : "text-slate-400";
       },
       render: (order) => {
         const remaining = Number(order.total) - Number(order.amountPaid);
-        return remaining > 0 && order.status !== "cancelled" ? formatCurrency(remaining) : "—";
+        return remaining > 0 && order.status !== "cancelled"
+          ? formatCurrency(remaining)
+          : "—";
       },
     },
     {
@@ -340,11 +380,14 @@ export function OrdersTable({
         getRowId={(order) => order.id}
         minWidth="1120px"
         onRowClick={openOrder}
-        rowClassName={(order) => cn(
-          order.status === "cancelled" && "opacity-60",
-          normalizedSelection.has(order.id) && "bg-primary-50/50 dark:bg-primary-950/20",
-        )}
-        toolbar={(
+        rowClassName={(order) =>
+          cn(
+            order.status === "cancelled" && "opacity-60",
+            normalizedSelection.has(order.id) &&
+              "bg-primary-50/50 dark:bg-primary-950/20",
+          )
+        }
+        toolbar={
           <OrderBatchToolbar
             selectedCount={selectedVisibleIds.length}
             selectedIds={selectedVisibleIds}
@@ -352,9 +395,12 @@ export function OrdersTable({
             labels={{
               merge: t("merge.title"),
               print: t("orders.printSelected"),
+              selected: t("orders.selectedCount", {
+                count: selectedVisibleIds.length,
+              }),
             }}
           />
-        )}
+        }
         toolbarFloating
         renderMobileRow={({ row: order }) => (
           <OrderMobileRow
@@ -376,10 +422,12 @@ export function OrdersTable({
 function ChannelBadge({ source }: { source?: string | null }) {
   const online = Boolean(source && source !== "pos");
   return (
-    <span className={cn(
-      "inline-flex rounded-md px-2 py-1 text-xs font-bold",
-      online ? "bg-warn-soft text-warn" : "bg-surface-2 text-slate-600",
-    )}>
+    <span
+      className={cn(
+        "inline-flex rounded-md px-2 py-1 text-xs font-bold",
+        online ? "bg-warn-soft text-warn" : "bg-surface-2 text-slate-600",
+      )}
+    >
       {channelLabel(source)}
     </span>
   );
