@@ -2,15 +2,18 @@
 
 import {
   useEffect,
+  useId,
   useRef,
   useState,
   type InputHTMLAttributes,
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
 import {
   Barcode,
   CalendarDays,
   Check,
+  ChevronDown,
   ChevronRight,
   Loader2,
   Search,
@@ -243,25 +246,16 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                 </FilterSection>
 
                 <FilterSection title="Thời gian">
-                  <label className="block">
-                    <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
-                      Khoảng thời gian
-                    </span>
-                    <select
-                      name="timePreset"
-                      value={timePreset}
-                      onChange={(event) =>
-                        selectTimePreset(event.target.value as OrderTimePreset)
-                      }
-                      className="min-h-12 w-full rounded-xl border border-border bg-surface px-3 text-sm font-semibold outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-                    >
-                      {ORDER_TIME_PRESETS.map((preset) => (
-                        <option key={preset.value} value={preset.value}>
-                          {preset.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <LumaWebPicker
+                    label="Khoảng thời gian"
+                    ariaLabel="Khoảng thời gian"
+                    name="timePreset"
+                    value={timePreset}
+                    options={[...ORDER_TIME_PRESETS]}
+                    onChange={(value) =>
+                      selectTimePreset(value as OrderTimePreset)
+                    }
+                  />
                   {timePreset !== "all" && (
                     <>
                       <div className="grid grid-cols-[auto_1fr_1fr] items-center gap-2">
@@ -301,7 +295,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                   )}
                 </FilterSection>
 
-                <SelectSection
+                <PickerSection
                   title="Trạng thái đơn"
                   name="status"
                   value={values.status}
@@ -325,7 +319,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                                     : "Đã hủy",
                   }))}
                 />
-                <SelectSection
+                <PickerSection
                   title="Trạng thái thanh toán"
                   name="payment"
                   value={values.payment}
@@ -739,7 +733,7 @@ function ChipSection({
   );
 }
 
-function SelectSection({
+function PickerSection({
   title,
   name,
   value,
@@ -752,18 +746,172 @@ function SelectSection({
 }) {
   return (
     <FilterSection title={title}>
-      <select
+      <LumaWebPicker
         name={name}
+        ariaLabel={title}
         defaultValue={value}
-        aria-label={title}
-        className="min-h-12 w-full rounded-xl border border-border bg-surface px-3 text-sm font-semibold outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
+        options={options}
+      />
     </FilterSection>
+  );
+}
+
+function LumaWebPicker({
+  label,
+  ariaLabel,
+  name,
+  value,
+  defaultValue = "",
+  options,
+  onChange,
+}: {
+  label?: string;
+  ariaLabel: string;
+  name: string;
+  value?: string;
+  defaultValue?: string;
+  options: ReadonlyArray<{ value: string; label: string }>;
+  onChange?: (value: string) => void;
+}) {
+  const listboxId = `luma-picker-${useId().replaceAll(":", "")}`;
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const [open, setOpen] = useState(false);
+  const [internalValue, setInternalValue] = useState(defaultValue);
+  const selectedValue = value ?? internalValue;
+  const selectedIndex = Math.max(
+    0,
+    options.findIndex((option) => option.value === selectedValue),
+  );
+  const selectedOption = options[selectedIndex];
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+  }, [open]);
+
+  function focusOption(index: number) {
+    const boundedIndex = (index + options.length) % options.length;
+    window.requestAnimationFrame(() => optionRefs.current[boundedIndex]?.focus());
+  }
+
+  function openAndFocus(index: number) {
+    setOpen(true);
+    focusOption(index);
+  }
+
+  function select(nextValue: string) {
+    if (value === undefined) setInternalValue(nextValue);
+    onChange?.(nextValue);
+    setOpen(false);
+    window.requestAnimationFrame(() => triggerRef.current?.focus());
+  }
+
+  function handleTriggerKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>) {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      openAndFocus(selectedIndex);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      openAndFocus(selectedIndex || options.length - 1);
+    } else if (event.key === "Escape") {
+      setOpen(false);
+    }
+  }
+
+  function handleOptionKeyDown(
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      focusOption(index + 1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      focusOption(index - 1);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      focusOption(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      focusOption(options.length - 1);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      setOpen(false);
+      triggerRef.current?.focus();
+    } else if (event.key === "Tab") {
+      setOpen(false);
+    }
+  }
+
+  return (
+    <div ref={rootRef} className="relative">
+      <input type="hidden" name={name} value={selectedValue} />
+      {label && (
+        <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
+          {label}
+        </span>
+      )}
+      <button
+        ref={triggerRef}
+        type="button"
+        role="combobox"
+        aria-label={ariaLabel}
+        aria-expanded={open}
+        aria-controls={listboxId}
+        onClick={() => setOpen((current) => !current)}
+        onKeyDown={handleTriggerKeyDown}
+        className="flex min-h-12 w-full items-center justify-between gap-3 rounded-xl border border-border bg-surface px-3 text-left text-sm font-semibold outline-none transition hover:border-primary-300 focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-100"
+      >
+        <span className="min-w-0 flex-1 truncate">
+          {selectedOption?.label ?? "Chọn"}
+        </span>
+        <ChevronDown
+          className={cn(
+            "size-4 shrink-0 text-slate-400 transition-transform",
+            open && "rotate-180 text-primary-600",
+          )}
+        />
+      </button>
+
+      {open && (
+        <div
+          id={listboxId}
+          role="listbox"
+          aria-label={ariaLabel}
+          className="absolute inset-x-0 top-full z-30 mt-2 max-h-72 overflow-y-auto rounded-xl border border-border bg-surface p-1.5 shadow-2xl"
+        >
+          {options.map((option, index) => {
+            const selected = option.value === selectedValue;
+            return (
+              <button
+                key={option.value}
+                ref={(element) => {
+                  optionRefs.current[index] = element;
+                }}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                onClick={() => select(option.value)}
+                onKeyDown={(event) => handleOptionKeyDown(event, index)}
+                className={cn(
+                  "flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-semibold outline-none transition hover:bg-surface-2 focus-visible:bg-primary-50 focus-visible:ring-2 focus-visible:ring-primary-200 dark:focus-visible:bg-primary-950/30",
+                  selected &&
+                    "bg-primary-50 text-primary-700 dark:bg-primary-950/30 dark:text-primary-300",
+                )}
+              >
+                <span className="min-w-0 flex-1">{option.label}</span>
+                {selected && <Check className="size-4 shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

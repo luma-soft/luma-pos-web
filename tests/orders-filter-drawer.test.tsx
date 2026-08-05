@@ -17,12 +17,14 @@ describe("orders filter drawer", () => {
       "utf8",
     );
 
-    expect(source).toContain('<SelectSection\n                  title="Trạng thái đơn"');
+    expect(source).toContain('<PickerSection\n                  title="Trạng thái đơn"');
     expect(source).toContain(
-      '<SelectSection\n                  title="Trạng thái thanh toán"',
+      '<PickerSection\n                  title="Trạng thái thanh toán"',
     );
-    expect(source).toContain("<select");
-    expect(source).toContain("name={name}");
+    expect(source).toContain("<LumaWebPicker");
+    expect(source).toContain('role="listbox"');
+    expect(source).toContain('role="option"');
+    expect(source).not.toContain("<select");
     for (const label of [
       "Nháp",
       "Đặt hàng",
@@ -131,6 +133,7 @@ describe("orders filter drawer", () => {
     );
 
     expect(source).toContain('name="timePreset"');
+    expect(source).toContain('ariaLabel="Khoảng thời gian"');
     expect(ORDER_TIME_PRESETS.map((preset) => preset.label)).toEqual([
       "Toàn thời gian",
       "Hôm nay",
@@ -146,5 +149,6 @@ describe("orders filter drawer", () => {
       "Tùy chỉnh",
     ]);
     expect(source).not.toContain("<QuickRange");
+    expect(source).not.toContain("<select");
   });
 });
