@@ -124,7 +124,7 @@ const pairedSurfaces: PairedSurface[] = [
     ],
   },
   {
-    path: "src/app/(app)/inventory/tabs/stock.tsx",
+    path: "src/app/(app)/inventory/tabs/stock-actions.tsx",
     marker: "inventory-recent-movements",
     fields: [
       "movement.productName",
@@ -377,6 +377,9 @@ describe("route-wide mobile responsive audit", () => {
     );
     const online = read("src/app/(app)/online-sales/page.tsx");
     const stock = read("src/app/(app)/inventory/tabs/stock.tsx");
+    const stockActions = read(
+      "src/app/(app)/inventory/tabs/stock-actions.tsx",
+    );
     const product = read("src/app/(app)/products/new/product-form.tsx");
 
     expect(customers).toMatch(
@@ -417,7 +420,7 @@ describe("route-wide mobile responsive audit", () => {
     expect(stock).toMatch(
       /name="q"[\s\S]{0,220}min-h-11/,
     );
-    expect(stock).toMatch(
+    expect(stockActions).toMatch(
       /href=\{Routes\.PurchaseNew\} className="[^"]*min-h-11/,
     );
     expect(product).toMatch(

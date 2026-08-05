@@ -40,7 +40,7 @@ describe("inventory desktop layout", () => {
     expect(html).not.toContain('href="/inventory?tab=stocktakes"');
   });
 
-  test("caps the recent movement preview so it does not exceed the stock table", () => {
+  test("renders the approved full-width history table with five preview rows", () => {
     const movements: MovementItem[] = Array.from({ length: 8 }, (_, index) => ({
       id: `movement-${index}`,
       type: "sale",
@@ -56,7 +56,9 @@ describe("inventory desktop layout", () => {
     const html = renderWithMessages(<RecentMovements movements={movements} />);
 
     expect(html).toContain("Sản phẩm 1");
-    expect(html).toContain("max-h-[520px]");
-    expect(html).toContain("overflow-auto");
+    expect(html).toContain("Sản phẩm 5");
+    expect(html).not.toContain("Sản phẩm 6");
+    expect(html).toContain('data-layout="inventory-history-table"');
+    expect(html).toContain("Người thực hiện");
   });
 });

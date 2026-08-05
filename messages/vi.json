@@ -2056,6 +2056,31 @@
     "lowStock": "Sắp hết hàng",
     "belowMin": "Dưới tồn tối thiểu",
     "recentMoves": "Biến động gần đây",
+    "transactions": "Giao dịch",
+    "statusSection": "Tình trạng tồn kho",
+    "skuTotal": "{count} SKU",
+    "backToWarehouse": "Kho hàng",
+    "productList": "Danh sách sản phẩm",
+    "warehouseLabel": "Kho",
+    "allWarehouses": "Tất cả kho",
+    "statusCards": {
+      "negativeStock": {
+        "label": "Âm kho",
+        "description": "Tồn nhỏ hơn 0"
+      },
+      "outOfStock": {
+        "label": "Hết hàng",
+        "description": "Tồn bằng 0"
+      },
+      "lowStock": {
+        "label": "Sắp hết",
+        "description": "Dưới mức tối thiểu"
+      },
+      "inStock": {
+        "label": "Đủ hàng",
+        "description": "Đạt mức tối thiểu"
+      }
+    },
     "last20": "20 giao dịch gần nhất",
     "skuCount": "SKU đang bán",
     "activeSkus": "Sản phẩm trong kho",
@@ -2072,9 +2097,19 @@
     "statusWarn": "Sắp hết",
     "statusOut": "Hết hàng",
     "statusOk": "Đủ hàng",
-    "movementsTitle": "Lịch sử xuất nhập",
+    "movementsTitle": "Lịch sử kho gần đây",
+    "historyColumns": {
+      "time": "Thời gian",
+      "product": "Sản phẩm",
+      "change": "Thay đổi",
+      "type": "Loại",
+      "warehouse": "Kho",
+      "actor": "Người thực hiện"
+    },
     "noMovements": "Chưa có biến động kho",
     "actions": {
+      "history": "Lịch sử",
+      "warehouseActions": "Thao tác kho",
       "startStocktakeHint": "Tạo phiếu đếm và đối chiếu tồn thực tế",
       "viewStocktakes": "Xem các phiếu kiểm kho",
       "viewStocktakesHint": "Theo dõi phiếu nháp, đã cân bằng và đã hủy",

@@ -5,7 +5,6 @@ const inventorySearchFiles = [
   "src/app/(app)/inventory/tabs/instant-product-search.tsx",
   "src/app/(app)/inventory/tabs/camera-material-search.tsx",
   "src/app/(app)/inventory/tabs/stock.tsx",
-  "src/app/(app)/inventory/tabs/pricing.tsx",
   "src/app/(app)/inventory/tabs/purchases.tsx",
   "src/app/(app)/inventory/tabs/purchase-returns.tsx",
 ];

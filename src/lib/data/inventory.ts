@@ -1,17 +1,31 @@
 import { and, asc, count, desc, eq, gte, inArray, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  categories, internalUseIssues, products, profiles, purchaseOrderItems, purchaseOrders, stockMovements, suppliers, warehouses,
+  categories, internalUseIssues, products, profiles, purchaseOrderItems, purchaseOrders, stockLevels, stockMovements, suppliers, warehouses,
 } from "@/db/schema";
 import { unstable_cache } from "next/cache";
 import { accentInsensitiveLike } from "@/lib/search";
 import { coercePageSize } from "@/lib/pagination";
 import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
 import { stockManagedCategoryCondition } from "@/lib/data/product-stock";
+import {
+  pricingStockCondition,
+  type PricingStockFilter,
+} from "@/lib/data/pricing-stock";
 
 export const INVENTORY_PAGE_SIZE = 30;
 
-export type StockFilter = "all" | "instock" | "low" | "out";
+export type StockFilter =
+  | "all"
+  | "instock"
+  | "low"
+  | "out"
+  | PricingStockFilter;
+
+export type InventoryStatusCounts = Record<
+  Exclude<PricingStockFilter, "available">,
+  number
+>;
 
 /**
  * Thống kê tồn kho toàn cục (tổng giá trị tồn + số SP sắp hết) — đọc thẳng cột
@@ -23,18 +37,31 @@ const getInventoryStats = unstable_cache(
     const [agg] = await db
       .select({
         totalValue: sql<string>`coalesce(sum(${products.totalStock} * ${products.costPrice}), 0)`,
-        lowCount: sql<number>`count(*) filter (where ${products.totalStock} <= ${products.minStock} and ${products.minStock} > 0)`,
+        totalSkuCount: sql<number>`count(*)::int`,
+        negativeStock: sql<number>`count(*) filter (where ${products.totalStock} < 0)::int`,
+        outOfStock: sql<number>`count(*) filter (where ${products.totalStock} = 0)::int`,
+        lowStock: sql<number>`count(*) filter (where ${products.totalStock} > 0 and ${products.totalStock} < ${products.minStock})::int`,
+        inStock: sql<number>`count(*) filter (where ${products.totalStock} > 0 and ${products.totalStock} >= ${products.minStock})::int`,
       })
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(and(eq(products.isActive, true), stockManagedCategoryCondition()));
-    return { totalValue: Number(agg.totalValue), lowCount: Number(agg.lowCount) };
+    return {
+      totalValue: Number(agg.totalValue),
+      totalSkuCount: Number(agg.totalSkuCount),
+      statusCounts: {
+        negativeStock: Number(agg.negativeStock),
+        outOfStock: Number(agg.outOfStock),
+        lowStock: Number(agg.lowStock),
+        inStock: Number(agg.inStock),
+      } satisfies InventoryStatusCounts,
+    };
   },
   ["inventory-stats"],
   { revalidate: 60 }
 );
 
-export async function getInventory(filters: { q?: string; low?: boolean; stock?: StockFilter; categoryId?: string; page?: number; pageSize?: number } = {}) {
+export async function getInventory(filters: { q?: string; low?: boolean; stock?: StockFilter; categoryId?: string; warehouseId?: string; page?: number; pageSize?: number } = {}) {
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize, INVENTORY_PAGE_SIZE);
   const hasComplianceColumns = await hasProductComplianceColumns();
@@ -42,6 +69,15 @@ export async function getInventory(filters: { q?: string; low?: boolean; stock?:
     eq(products.isActive, true),
     stockManagedCategoryCondition(),
   ];
+  const availableStock = filters.warehouseId?.trim()
+    ? sql<string>`coalesce((
+        select sl.quantity
+        from ${stockLevels} sl
+        where sl.product_id = ${products.id}
+          and sl.warehouse_id = ${filters.warehouseId.trim()}
+        limit 1
+      ), 0)`
+    : products.totalStock;
   if (filters.q?.trim()) {
     const q = filters.q.trim();
     const c = or(accentInsensitiveLike(products.name, q), accentInsensitiveLike(products.sku, q));
@@ -51,9 +87,15 @@ export async function getInventory(filters: { q?: string; low?: boolean; stock?:
 
   // Tình trạng tồn → điều kiện WHERE trên cột denormalize (KHÔNG cần GROUP BY/HAVING).
   const stock: StockFilter = filters.low ? "low" : (filters.stock ?? "all");
-  if (stock === "instock") conditions.push(sql`${products.totalStock} > 0`);
-  else if (stock === "out") conditions.push(sql`${products.totalStock} <= 0`);
-  else if (stock === "low") conditions.push(sql`${products.totalStock} <= ${products.minStock} and ${products.minStock} > 0`);
+  const statusCondition = pricingStockCondition(
+    stock,
+    availableStock,
+    products.minStock,
+  );
+  if (statusCondition) conditions.push(statusCondition);
+  else if (stock === "instock") conditions.push(sql`${availableStock} > 0`);
+  else if (stock === "out") conditions.push(sql`${availableStock} <= 0`);
+  else if (stock === "low") conditions.push(sql`${availableStock} <= ${products.minStock} and ${products.minStock} > 0`);
   const where = and(...conditions);
 
   const [rows, [{ n: total }]] = await Promise.all([
@@ -66,9 +108,9 @@ export async function getInventory(filters: { q?: string; low?: boolean; stock?:
         costPrice: products.costPrice,
         trackBatches: hasComplianceColumns ? products.trackBatches : sql<boolean>`false`,
         shelfLifeDays: hasComplianceColumns ? products.shelfLifeDays : sql<number | null>`null`,
-        totalStock: products.totalStock,
+        totalStock: availableStock,
         minLevel: products.minStock,
-        stockValue: sql<string>`${products.totalStock} * ${products.costPrice}`,
+        stockValue: sql<string>`${availableStock} * ${products.costPrice}`,
         units: sql<{ unitName: string; multiplier: string; barcode: string | null }[]>`coalesce((
           select json_agg(json_build_object('unitName', pu.unit_name, 'multiplier', pu.multiplier, 'barcode', pu.barcode) order by pu.sort_order)
           from product_units pu where pu.product_id = ${products.id}
@@ -87,14 +129,18 @@ export async function getInventory(filters: { q?: string; low?: boolean; stock?:
       .where(where),
   ]);
 
-  const { totalValue, lowCount } = await getInventoryStats();
+  const stats = await getInventoryStats();
 
   return {
     rows, total, page, pageSize: size,
     pageCount: Math.max(1, Math.ceil(total / size)),
-    totalValue,
-    lowCount,
+    totalValue: stats.totalValue,
+    lowCount: stats.statusCounts.lowStock,
   };
+}
+
+export async function getInventoryOverview() {
+  return getInventoryStats();
 }
 
 // Lịch sử xuất nhập gần đây — cache 30s, không phải truy vấn lại mỗi lần mở Tồn kho.

@@ -40,12 +40,19 @@ export function StockActionMenu() {
 
   return (
     <div ref={root} className="relative ml-auto flex items-center gap-2">
+      <Link
+        href={`${Routes.Inventory}?tab=stock#stock-history`}
+        className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-primary-700 shadow-e1 transition hover:bg-surface-2 dark:text-primary-300"
+      >
+        <History className="h-4 w-4" />
+        {t("inventory.actions.history")}
+      </Link>
       <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-slate-700 shadow-e1 transition hover:bg-surface-2 dark:text-slate-200">
         <ClipboardCheck className="h-4 w-4 text-primary-600" />
-        {t("nav.stocktakes")}
+        {t("inventory.actions.warehouseActions")}
         <ChevronDown className={cn("h-4 w-4 text-slate-400 transition", open && "rotate-180")} />
       </button>
-      <Link href={Routes.PurchaseNew} className="inline-flex min-h-10 items-center gap-2 rounded-full bg-primary-600 px-4 text-sm font-semibold text-white transition hover:bg-primary-700 active:scale-[0.98]">
+      <Link href={Routes.PurchaseNew} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary-600 px-4 text-sm font-semibold text-white transition hover:bg-primary-700 active:scale-[0.98] lg:min-h-10">
         <Plus className="h-4 w-4" />{t("purchases.createNew")}
       </Link>
       {open && (
@@ -89,12 +96,72 @@ export function RecentMovements({ movements }: { movements: MovementItem[] }) {
 
   return (
     <>
-      <section className="min-w-0 self-start overflow-hidden rounded-card border border-border bg-surface shadow-e1">
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <h2 className="text-sm font-bold">{t("inventory.movementsTitle")}</h2>
+      <section
+        id="stock-history"
+        className="min-w-0 scroll-mt-32 overflow-hidden rounded-card border border-border bg-surface shadow-e1"
+        data-layout="inventory-history-table"
+        data-mobile-audit="inventory-recent-movements"
+      >
+        <div className="flex items-center justify-between border-b border-border px-6 py-5">
+          <h2 className="text-base font-bold">{t("inventory.movementsTitle")}</h2>
           <button type="button" onClick={() => setDrawerOpen(true)} className="text-xs font-semibold text-primary-700 hover:underline">{t("inventory.actions.viewAll")}</button>
         </div>
-        {movements.length === 0 ? <p className="px-4 py-8 text-center text-sm text-slate-400">{t("inventory.noMovements")}</p> : <MovementList rows={movements.slice(0, 8)} compact />}
+        {movements.length === 0 ? (
+          <p className="px-4 py-8 text-center text-sm text-slate-400">{t("inventory.noMovements")}</p>
+        ) : (
+          <>
+            <div className="divide-y divide-border-soft lg:hidden">
+              {movements.slice(0, 5).map((movement) => (
+                <article key={movement.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 px-4 py-3.5">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold">{movement.productName}</div>
+                    <div className="mt-1 flex flex-wrap gap-x-2 text-xs text-slate-400">
+                      <span>{t(`inventory.moveTypes.${movement.type}` as never)}</span>
+                      <span>{movement.warehouseName}</span>
+                    </div>
+                  </div>
+                  <div className={cn("text-right font-mono text-sm font-bold", MOVE_STYLES[movement.type] ?? "text-slate-600")}>
+                    <div>{movement.quantity > 0 ? "+" : ""}{formatNumber(movement.quantity)} {movement.baseUnit}</div>
+                    <div className="mt-1 text-[11px] font-normal text-slate-400">{formatDate(movement.createdAt)}</div>
+                  </div>
+                </article>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto lg:block">
+              <table className="w-full min-w-[980px] text-[15px]">
+                <thead className="bg-canvas/65 text-left text-sm font-semibold text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">{t("inventory.historyColumns.time")}</th>
+                    <th className="px-4 py-3">{t("inventory.historyColumns.product")}</th>
+                    <th className="px-4 py-3">{t("inventory.historyColumns.change")}</th>
+                    <th className="px-4 py-3">{t("inventory.historyColumns.type")}</th>
+                    <th className="px-4 py-3">{t("inventory.historyColumns.warehouse")}</th>
+                    <th className="px-4 py-3">{t("inventory.historyColumns.actor")}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-soft">
+                  {movements.slice(0, 5).map((movement) => (
+                    <tr key={movement.id} className="hover:bg-surface-2">
+                      <td className="whitespace-nowrap px-4 py-4 text-slate-600 dark:text-slate-300">
+                        {formatDate(movement.createdAt)}
+                      </td>
+                      <td className="max-w-[360px] px-4 py-4">
+                        <div className="truncate font-semibold" title={movement.productName}>{movement.productName}</div>
+                        <div className="mt-0.5 font-mono text-xs text-slate-400">#{movement.id.slice(0, 8).toUpperCase()}</div>
+                      </td>
+                      <td className={cn("whitespace-nowrap px-4 py-4 font-mono font-bold tabular-nums", MOVE_STYLES[movement.type] ?? "text-slate-600")}>
+                        {movement.quantity > 0 ? "+" : ""}{formatNumber(movement.quantity)} {movement.baseUnit}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-4">{t(`inventory.moveTypes.${movement.type}` as never)}</td>
+                      <td className="whitespace-nowrap px-4 py-4">{movement.warehouseName}</td>
+                      <td className="whitespace-nowrap px-4 py-4">{movement.byName ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </section>
 
       {drawerOpen && (

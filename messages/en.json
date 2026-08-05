@@ -2056,6 +2056,31 @@
     "lowStock": "Low stock",
     "belowMin": "Below minimum",
     "recentMoves": "Recent movements",
+    "transactions": "Transactions",
+    "statusSection": "Inventory status",
+    "skuTotal": "{count} SKUs",
+    "backToWarehouse": "Warehouse",
+    "productList": "Product list",
+    "warehouseLabel": "Warehouse",
+    "allWarehouses": "All warehouses",
+    "statusCards": {
+      "negativeStock": {
+        "label": "Negative stock",
+        "description": "Stock below 0"
+      },
+      "outOfStock": {
+        "label": "Out of stock",
+        "description": "Stock equals 0"
+      },
+      "lowStock": {
+        "label": "Low stock",
+        "description": "Below minimum"
+      },
+      "inStock": {
+        "label": "In stock",
+        "description": "At or above minimum"
+      }
+    },
     "last20": "Last 20 entries",
     "skuCount": "Active SKUs",
     "activeSkus": "Products in stock",
@@ -2072,9 +2097,19 @@
     "statusWarn": "Low",
     "statusOut": "Out",
     "statusOk": "In stock",
-    "movementsTitle": "Stock movements",
+    "movementsTitle": "Recent stock history",
+    "historyColumns": {
+      "time": "Time",
+      "product": "Product",
+      "change": "Change",
+      "type": "Type",
+      "warehouse": "Warehouse",
+      "actor": "Performed by"
+    },
     "noMovements": "No movements yet",
     "actions": {
+      "history": "History",
+      "warehouseActions": "Warehouse actions",
       "startStocktakeHint": "Create a count and compare it with system stock",
       "viewStocktakes": "View stocktake documents",
       "viewStocktakesHint": "Track drafts, balanced and cancelled documents",
