@@ -19,6 +19,14 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Routes } from "@/lib/routes";
+import {
+  ORDER_TIME_PRESETS,
+  isOrderDateRangeValid,
+  isOrderTimePreset,
+  oneYearAfterDateValue,
+  resolveOrderTimePreset,
+  type OrderTimePreset,
+} from "@/lib/orders/filter-date-range";
 import { cn } from "@/lib/utils";
 
 export type OrdersFilterValues = {
@@ -31,6 +39,7 @@ export type OrdersFilterValues = {
   payment: string;
   paymentMethod: string;
   source: string;
+  timePreset: string;
   from: string;
   to: string;
   minTotal: string;
@@ -59,29 +68,21 @@ const sources = [
   "tiki",
 ] as const;
 
-function localDateValue(value: Date) {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, "0");
-  const day = String(value.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function defaultSevenDayRange() {
-  const end = new Date();
-  const start = new Date(end);
-  start.setDate(end.getDate() - 6);
-  return { from: localDateValue(start), to: localDateValue(end) };
-}
-
 export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
   const t = useTranslations();
   const [open, setOpen] = useState(false);
-  const initialRange = defaultSevenDayRange();
+  const initialPreset: OrderTimePreset = isOrderTimePreset(values.timePreset)
+    ? values.timePreset
+    : values.from || values.to
+      ? "custom"
+      : "7days";
+  const initialRange =
+    resolveOrderTimePreset(initialPreset) ??
+    resolveOrderTimePreset("7days") ?? { from: "", to: "" };
+  const [timePreset, setTimePreset] = useState(initialPreset);
   const [from, setFrom] = useState(values.from || initialRange.from);
   const [to, setTo] = useState(values.to || initialRange.to);
-  const [quickRange, setQuickRangeValue] = useState<
-    "today" | "7days" | "30days" | "custom"
-  >(values.from || values.to ? "custom" : "7days");
+  const dateRangeError = timePreset !== "all" && !isOrderDateRangeValid(from, to);
 
   const hiddenFilters = (
     <>
@@ -117,6 +118,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
       {values.source !== "all" && (
         <input type="hidden" name="source" value={values.source} />
       )}
+      <input type="hidden" name="timePreset" value={values.timePreset} />
       {values.from && <input type="hidden" name="from" value={values.from} />}
       {values.to && <input type="hidden" name="to" value={values.to} />}
       {values.minTotal && (
@@ -131,13 +133,19 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
     </>
   );
 
-  function setQuickRange(days: number, range: "today" | "7days" | "30days") {
-    const end = new Date();
-    const start = new Date(end);
-    start.setDate(end.getDate() - (days - 1));
-    setFrom(localDateValue(start));
-    setTo(localDateValue(end));
-    setQuickRangeValue(range);
+  function selectTimePreset(preset: OrderTimePreset) {
+    setTimePreset(preset);
+    if (preset === "custom") {
+      if (!from || !to) {
+        const fallback = resolveOrderTimePreset("7days");
+        setFrom(fallback?.from ?? "");
+        setTo(fallback?.to ?? "");
+      }
+      return;
+    }
+    const range = resolveOrderTimePreset(preset);
+    setFrom(range?.from ?? "");
+    setTo(range?.to ?? "");
   }
 
   return (
@@ -234,51 +242,62 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                 </FilterSection>
 
                 <FilterSection title="Thời gian">
-                  <div className="grid grid-cols-4 gap-2">
-                    <QuickRange
-                      label="Hôm nay"
-                      selected={quickRange === "today"}
-                      onClick={() => setQuickRange(1, "today")}
-                    />
-                    <QuickRange
-                      label="7 ngày"
-                      selected={quickRange === "7days"}
-                      onClick={() => setQuickRange(7, "7days")}
-                    />
-                    <QuickRange
-                      label="30 ngày"
-                      selected={quickRange === "30days"}
-                      onClick={() => setQuickRange(30, "30days")}
-                    />
-                    <QuickRange
-                      label="Tùy chọn"
-                      selected={quickRange === "custom"}
-                      onClick={() => setQuickRangeValue("custom")}
-                    />
-                  </div>
-                  <div className="grid grid-cols-[auto_1fr_1fr] items-center gap-2">
-                    <CalendarDays className="size-4 text-slate-500" />
-                    <input
-                      type="date"
-                      name="from"
-                      value={from}
-                      onChange={(event) => {
-                        setFrom(event.target.value);
-                        setQuickRangeValue("custom");
-                      }}
-                      className="min-w-0 rounded-lg border border-border bg-surface px-2 py-2 text-xs"
-                    />
-                    <input
-                      type="date"
-                      name="to"
-                      value={to}
-                      onChange={(event) => {
-                        setTo(event.target.value);
-                        setQuickRangeValue("custom");
-                      }}
-                      className="min-w-0 rounded-lg border border-border bg-surface px-2 py-2 text-xs"
-                    />
-                  </div>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      Khoảng thời gian
+                    </span>
+                    <select
+                      name="timePreset"
+                      value={timePreset}
+                      onChange={(event) =>
+                        selectTimePreset(event.target.value as OrderTimePreset)
+                      }
+                      className="min-h-12 w-full rounded-xl border border-border bg-surface px-3 text-sm font-semibold outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                    >
+                      {ORDER_TIME_PRESETS.map((preset) => (
+                        <option key={preset.value} value={preset.value}>
+                          {preset.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {timePreset !== "all" && (
+                    <>
+                      <div className="grid grid-cols-[auto_1fr_1fr] items-center gap-2">
+                        <CalendarDays className="size-4 text-slate-500" />
+                        <input
+                          type="date"
+                          name="from"
+                          aria-label="Từ ngày"
+                          value={from}
+                          max={to || undefined}
+                          onChange={(event) => {
+                            setFrom(event.target.value);
+                            setTimePreset("custom");
+                          }}
+                          className="min-w-0 rounded-lg border border-border bg-surface px-2 py-2 text-xs"
+                        />
+                        <input
+                          type="date"
+                          name="to"
+                          aria-label="Đến ngày"
+                          value={to}
+                          min={from || undefined}
+                          max={oneYearAfterDateValue(from)}
+                          onChange={(event) => {
+                            setTo(event.target.value);
+                            setTimePreset("custom");
+                          }}
+                          className="min-w-0 rounded-lg border border-border bg-surface px-2 py-2 text-xs"
+                        />
+                      </div>
+                      {dateRangeError && (
+                        <p className="text-xs font-semibold text-red-600">
+                          Khoảng ngày không hợp lệ hoặc vượt quá 1 năm.
+                        </p>
+                      )}
+                    </>
+                  )}
                 </FilterSection>
 
                 <SelectSection
@@ -400,7 +419,8 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                 </a>
                 <button
                   type="submit"
-                  className="min-h-11 rounded-xl bg-primary-600 px-4 font-bold text-white hover:brightness-105"
+                  disabled={dateRangeError}
+                  className="min-h-11 rounded-xl bg-primary-600 px-4 font-bold text-white hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Xem đơn hàng
                 </button>
@@ -683,31 +703,6 @@ function parseEntityOptions(
       : [sku, barcode].filter(Boolean).join(" · ");
     return [{ value: id, label: name, hint }];
   });
-}
-
-function QuickRange({
-  label,
-  selected = false,
-  onClick,
-}: {
-  label: string;
-  selected?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "min-h-10 rounded-lg border px-2 text-xs font-semibold",
-        selected
-          ? "border-primary-600 bg-primary-50 text-primary-700"
-          : "border-border",
-      )}
-    >
-      {label}
-    </button>
-  );
 }
 
 function ChipSection({

@@ -12,6 +12,11 @@ import {
 } from "@/lib/data/orders";
 import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
+import {
+  isOrderTimePreset,
+  resolveOrderTimePreset,
+  type OrderTimePreset,
+} from "@/lib/orders/filter-date-range";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { OrdersTable } from "./orders-table";
 import { getPrintTemplatesForDoc } from "@/lib/print/template";
@@ -64,8 +69,7 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
   const source = (
     SOURCES.includes(params.source as OrderSourceFilter) ? params.source : "all"
   ) as OrderSourceFilter;
-  const from = params.from ?? "";
-  const to = params.to ?? "";
+  const { timePreset, from, to } = resolveOrderDateFilter(params);
   const includeCancelled = params.includeCancelled === "1";
 
   return (
@@ -91,6 +95,7 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
           payment,
           paymentMethod,
           source,
+          timePreset,
           from,
           to,
           minTotal: params.minTotal ?? "",
@@ -125,8 +130,7 @@ async function OrdersContent({ searchParams }: { searchParams: SP }) {
   const source = (
     SOURCES.includes(params.source as OrderSourceFilter) ? params.source : "all"
   ) as OrderSourceFilter;
-  const from = params.from ?? "";
-  const to = params.to ?? "";
+  const { from, to } = resolveOrderDateFilter(params);
   const page = Number(params.page) || 1;
   const pageSize = parsePageSize(params.size);
   const includeCancelled = params.includeCancelled === "1";
@@ -182,4 +186,23 @@ function optionalNumber(value?: string) {
   if (!value?.trim()) return undefined;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function resolveOrderDateFilter(params: SP) {
+  const timePreset: OrderTimePreset = isOrderTimePreset(params.timePreset)
+    ? params.timePreset
+    : params.from || params.to
+      ? "custom"
+      : "7days";
+  if (timePreset === "custom") {
+    return {
+      timePreset,
+      from: params.from ?? "",
+      to: params.to ?? "",
+    };
+  }
+  return {
+    timePreset,
+    ...(resolveOrderTimePreset(timePreset) ?? { from: "", to: "" }),
+  };
 }
