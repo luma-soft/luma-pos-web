@@ -62,6 +62,7 @@ async function buildProductCatalogSnapshot(
         contractorPrice: products.contractorPrice,
         agentPrice: products.agentPrice,
         imageUrls: products.imageUrls,
+        imageUpdatedAt: products.imageUpdatedAt,
         specs: products.specs,
         parentProductId: products.parentProductId,
         variantName: products.variantName,
@@ -157,6 +158,7 @@ async function buildProductCatalogSnapshot(
         minLevel: String(stock.minLevel ?? 0),
       })),
       updatedAt: product.updatedAt.toISOString(),
+      imageUpdatedAt: product.imageUpdatedAt.toISOString(),
     })),
     warehouses: warehouseRows,
   };

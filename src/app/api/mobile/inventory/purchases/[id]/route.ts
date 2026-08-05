@@ -46,6 +46,7 @@ export async function GET(
       discount: Number(item.discount),
       total: Number(item.total),
       imageUrl: item.imageUrls?.[0] ?? null,
+      imageUpdatedAt: item.imageUpdatedAt,
       batchNumber: item.batchNumber,
       expiryDate: item.expiryDate,
     })),

@@ -44,6 +44,7 @@ function posProductSelect(warehouseId: string | null, hasComplianceColumns: bool
     name: products.name,
     productKind: products.productKind,
     imageUrls: products.imageUrls,
+    imageUpdatedAt: products.imageUpdatedAt,
     specs: products.specs,
     parentProductId: products.parentProductId,
     variantName: products.variantName,

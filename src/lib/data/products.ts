@@ -221,6 +221,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
         dimensions: products.dimensions,
         specs: products.specs,
         imageUrls: products.imageUrls,
+        imageUpdatedAt: products.imageUpdatedAt,
         comboItems: sql<Array<{
           productId: string;
           name: string;
@@ -346,6 +347,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
             dimensions: products.dimensions,
             specs: products.specs,
             imageUrls: products.imageUrls,
+            imageUpdatedAt: products.imageUpdatedAt,
             comboItems: sql<never[]>`'[]'::json`,
             childCount: sql<number>`0`,
             minCostPrice: products.costPrice,
@@ -691,6 +693,7 @@ export async function getProduct(id: string) {
       dimensions: products.dimensions,
       specs: products.specs,
       imageUrls: products.imageUrls,
+      imageUpdatedAt: products.imageUpdatedAt,
       isActive: products.isActive,
       createdAt: products.createdAt,
       updatedAt: products.updatedAt,
@@ -756,6 +759,7 @@ export async function getProduct(id: string) {
           name: products.name,
           variantName: products.variantName,
           imageUrls: products.imageUrls,
+          imageUpdatedAt: products.imageUpdatedAt,
           productKind: products.productKind,
           isActive: products.isActive,
         })
@@ -780,6 +784,7 @@ export async function getProduct(id: string) {
           baseUnit: products.baseUnit,
           totalStock: sql<string>`(select coalesce(sum(${stockLevels.quantity}),0) from ${stockLevels} where ${stockLevels.productId} = ${products.id})`,
           imageUrls: products.imageUrls,
+          imageUpdatedAt: products.imageUpdatedAt,
           isActive: products.isActive,
         })
         .from(products)
@@ -849,6 +854,7 @@ export const getProductFormOptions = unstable_cache(
           costPrice: products.costPrice,
           retailPrice: products.retailPrice,
           imageUrls: products.imageUrls,
+          imageUpdatedAt: products.imageUpdatedAt,
           totalStock: sql<string>`coalesce((
             select sum(${stockLevels.quantity})
             from ${stockLevels}

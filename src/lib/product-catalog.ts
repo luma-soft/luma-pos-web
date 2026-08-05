@@ -32,6 +32,7 @@ export type ProductCatalogItem = {
   contractorPrice: string | null;
   agentPrice: string | null;
   imageUrls: string[] | null;
+  imageUpdatedAt: string;
   specs: unknown;
   parentProductId: string | null;
   variantName: string | null;

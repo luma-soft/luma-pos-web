@@ -56,6 +56,7 @@ export async function GET(request: Request) {
     categoryName: product.categoryName,
     imageUrl: product.imageUrls[0] ?? null,
     imageUrls: product.imageUrls,
+    imageUpdatedAt: product.imageUpdatedAt,
     parentProductId: product.parentProductId,
     variantName: product.variantName,
     isVariantParent: product.isVariantParent,

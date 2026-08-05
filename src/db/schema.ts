@@ -260,6 +260,7 @@ export const products = pgTable("products", {
   location: text("location"),
 
   imageUrls: jsonb("image_urls").$type<string[]>().default([]),
+  imageUpdatedAt: timestamp("image_updated_at", { withTimezone: true }).defaultNow().notNull(),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

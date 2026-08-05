@@ -312,6 +312,7 @@ export async function getPurchase(id: string) {
       sku: products.sku,
       baseUnit: products.baseUnit,
       imageUrls: products.imageUrls,
+      imageUpdatedAt: products.imageUpdatedAt,
       batchNumber: purchaseOrderItems.batchNumber,
       expiryDate: purchaseOrderItems.expiryDate,
     })
