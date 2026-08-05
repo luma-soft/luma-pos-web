@@ -53,6 +53,7 @@ export interface PricingProductRow {
   brandId: string | null;
   supplierId: string | null;
   imageUrls: string[];
+  imageUpdatedAt: string;
   baseUnit: string;
   productKind: string;
   lifecycleStatus: string;

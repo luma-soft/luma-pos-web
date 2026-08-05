@@ -35,6 +35,7 @@ export function catalogItemToPosProduct(
     name: product.name,
     productKind: product.productKind,
     imageUrls: product.imageUrls,
+    imageUpdatedAt: new Date(product.imageUpdatedAt),
     specs: product.specs,
     parentProductId: product.parentProductId,
     variantName: product.variantName,
