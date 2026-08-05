@@ -94,7 +94,7 @@ export function RecentMovements({ movements }: { movements: MovementItem[] }) {
           <h2 className="text-sm font-bold">{t("inventory.movementsTitle")}</h2>
           <button type="button" onClick={() => setDrawerOpen(true)} className="text-xs font-semibold text-primary-700 hover:underline">{t("inventory.actions.viewAll")}</button>
         </div>
-        {movements.length === 0 ? <p className="px-4 py-8 text-center text-sm text-slate-400">{t("inventory.noMovements")}</p> : <MovementList rows={movements.slice(0, 8)} />}
+        {movements.length === 0 ? <p className="px-4 py-8 text-center text-sm text-slate-400">{t("inventory.noMovements")}</p> : <MovementList rows={movements.slice(0, 8)} compact />}
       </section>
 
       {drawerOpen && (
@@ -119,7 +119,7 @@ export function RecentMovements({ movements }: { movements: MovementItem[] }) {
   );
 }
 
-function MovementList({ rows }: { rows: MovementItem[] }) {
+function MovementList({ rows, compact = false }: { rows: MovementItem[]; compact?: boolean }) {
   const t = useTranslations();
-  return <div className="divide-y divide-border-soft">{rows.map((movement) => <article key={movement.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 px-4 py-3.5 hover:bg-surface-2"><div className="min-w-0"><div className="truncate text-sm font-semibold" title={movement.productName}>{movement.productName}</div><div className="mt-1 flex flex-wrap gap-x-2 text-xs text-slate-400"><span className="font-mono">#{movement.id.slice(0, 8).toUpperCase()}</span><span>{t(`inventory.moveTypes.${movement.type}` as never)}</span><span>{movement.warehouseName}</span></div></div><div className={cn("text-right font-mono text-sm font-bold tabular-nums", MOVE_STYLES[movement.type] ?? "text-slate-600")}><div>{movement.quantity > 0 ? "+" : ""}{formatNumber(movement.quantity)} {movement.baseUnit}</div><div className="mt-1 text-[11px] font-normal text-slate-400">{formatDate(movement.createdAt)}</div></div></article>)}</div>;
+  return <div className={cn("divide-y divide-border-soft", compact && "max-h-[520px] overflow-auto")}>{rows.map((movement) => <article key={movement.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 px-4 py-3.5 hover:bg-surface-2"><div className="min-w-0"><div className="truncate text-sm font-semibold" title={movement.productName}>{movement.productName}</div><div className="mt-1 flex flex-wrap gap-x-2 text-xs text-slate-400"><span className="font-mono">#{movement.id.slice(0, 8).toUpperCase()}</span><span>{t(`inventory.moveTypes.${movement.type}` as never)}</span><span>{movement.warehouseName}</span></div></div><div className={cn("text-right font-mono text-sm font-bold tabular-nums", MOVE_STYLES[movement.type] ?? "text-slate-600")}><div>{movement.quantity > 0 ? "+" : ""}{formatNumber(movement.quantity)} {movement.baseUnit}</div><div className="mt-1 text-[11px] font-normal text-slate-400">{formatDate(movement.createdAt)}</div></div></article>)}</div>;
 }

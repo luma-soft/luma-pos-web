@@ -40,7 +40,7 @@ describe("inventory desktop layout", () => {
     expect(html).not.toContain('href="/inventory?tab=stocktakes"');
   });
 
-  test("keeps the recent movement preview at the top of the card", () => {
+  test("caps the recent movement preview so it does not exceed the stock table", () => {
     const movements: MovementItem[] = Array.from({ length: 8 }, (_, index) => ({
       id: `movement-${index}`,
       type: "sale",
@@ -56,7 +56,7 @@ describe("inventory desktop layout", () => {
     const html = renderWithMessages(<RecentMovements movements={movements} />);
 
     expect(html).toContain("Sản phẩm 1");
-    expect(html).not.toContain("max-h-[520px]");
-    expect(html).not.toContain("overflow-auto");
+    expect(html).toContain("max-h-[520px]");
+    expect(html).toContain("overflow-auto");
   });
 });
