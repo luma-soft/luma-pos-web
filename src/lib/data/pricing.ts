@@ -26,6 +26,7 @@ import {
   pricingSortSpec,
   type PricingSort,
 } from "@/lib/pricing/pricing-policy";
+import { pricingStockCondition } from "@/lib/data/pricing-stock";
 
 export interface PricingQuery {
   q?: string;
@@ -162,16 +163,13 @@ export async function getPricingPage(
     conditions.push(eq(products.lifecycleStatus, lifecycle));
     if (lifecycle === "active") conditions.push(eq(products.isActive, true));
   }
-  if (query.stock === "inStock") {
-    conditions.push(sql`${availableStock} > ${products.minStock}`);
-  } else if (query.stock === "lowStock") {
-    conditions.push(
-      sql`${availableStock} > 0 and ${availableStock} <= ${products.minStock}`,
-    );
-  } else if (query.stock === "outOfStock") {
-    conditions.push(sql`${availableStock} <= 0`);
-  } else if (query.stock === "available") {
-    conditions.push(sql`${availableStock} > 0`);
+  const stockCondition = pricingStockCondition(
+    query.stock,
+    availableStock,
+    products.minStock,
+  );
+  if (stockCondition) {
+    conditions.push(stockCondition);
   } else if (query.stock === "unmanaged") {
     conditions.push(eq(products.productKind, "service"));
   }

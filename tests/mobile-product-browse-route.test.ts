@@ -59,6 +59,23 @@ beforeAll(async () => {
 beforeEach(() => queries.splice(0));
 
 describe("GET /api/mobile/products/browse", () => {
+  test.each([
+    "negativeStock",
+    "outOfStock",
+    "lowStock",
+    "inStock",
+  ])("forwards the %s inventory status", async (stock) => {
+    const response = await getBrowse(
+      new Request(
+        `https://luma.test/api/mobile/products/browse?stock=${stock}`,
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(queries).toHaveLength(1);
+    expect(queries[0]?.stock).toBe(stock);
+  });
+
   test("forwards common filters, pagination, and selected warehouse", async () => {
     const response = await getBrowse(
       new Request(
