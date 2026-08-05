@@ -15,6 +15,8 @@ export const ORDER_TIME_PRESETS = [
 
 export type OrderTimePreset = (typeof ORDER_TIME_PRESETS)[number]["value"];
 
+export const DEFAULT_ORDER_TIME_PRESET: OrderTimePreset = "thisMonth";
+
 export type OrderDateRange = {
   from: string;
   to: string;

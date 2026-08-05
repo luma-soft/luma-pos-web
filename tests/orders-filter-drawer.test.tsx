@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
+  DEFAULT_ORDER_TIME_PRESET,
   ORDER_TIME_PRESETS,
   isOrderDateRangeValid,
   resolveOrderTimePreset,
@@ -72,6 +73,7 @@ describe("orders filter drawer", () => {
   test("matches the mobile time presets and date boundaries", () => {
     const now = new Date(2026, 7, 6, 12);
 
+    expect(DEFAULT_ORDER_TIME_PRESET).toBe("thisMonth");
     expect(resolveOrderTimePreset("all", now)).toEqual({ from: "", to: "" });
     expect(resolveOrderTimePreset("today", now)).toEqual({
       from: "2026-08-06",

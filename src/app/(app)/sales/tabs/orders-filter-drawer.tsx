@@ -20,6 +20,7 @@ import {
 import { useTranslations } from "next-intl";
 import { Routes } from "@/lib/routes";
 import {
+  DEFAULT_ORDER_TIME_PRESET,
   ORDER_TIME_PRESETS,
   isOrderDateRangeValid,
   isOrderTimePreset,
@@ -75,10 +76,10 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
     ? values.timePreset
     : values.from || values.to
       ? "custom"
-      : "7days";
+      : DEFAULT_ORDER_TIME_PRESET;
   const initialRange =
     resolveOrderTimePreset(initialPreset) ??
-    resolveOrderTimePreset("7days") ?? { from: "", to: "" };
+    resolveOrderTimePreset(DEFAULT_ORDER_TIME_PRESET) ?? { from: "", to: "" };
   const [timePreset, setTimePreset] = useState(initialPreset);
   const [from, setFrom] = useState(values.from || initialRange.from);
   const [to, setTo] = useState(values.to || initialRange.to);
@@ -137,7 +138,7 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
     setTimePreset(preset);
     if (preset === "custom") {
       if (!from || !to) {
-        const fallback = resolveOrderTimePreset("7days");
+        const fallback = resolveOrderTimePreset(DEFAULT_ORDER_TIME_PRESET);
         setFrom(fallback?.from ?? "");
         setTo(fallback?.to ?? "");
       }

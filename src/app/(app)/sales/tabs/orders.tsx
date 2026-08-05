@@ -13,6 +13,7 @@ import {
 import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
 import {
+  DEFAULT_ORDER_TIME_PRESET,
   isOrderTimePreset,
   resolveOrderTimePreset,
   type OrderTimePreset,
@@ -193,7 +194,7 @@ function resolveOrderDateFilter(params: SP) {
     ? params.timePreset
     : params.from || params.to
       ? "custom"
-      : "7days";
+      : DEFAULT_ORDER_TIME_PRESET;
   if (timePreset === "custom") {
     return {
       timePreset,
