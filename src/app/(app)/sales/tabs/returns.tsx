@@ -7,7 +7,7 @@ import { getReturn, getReturns } from "@/lib/data/returns";
 import { parsePageSize } from "@/lib/pagination";
 import { Pagination } from "@/components/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
-import { ReturnDetailPanel } from "./return-detail-panel";
+import { ReturnDetailFooter, ReturnDetailPanel } from "./return-detail-panel";
 import { ReturnsTable } from "./returns-table";
 import { InstantFilterForm } from "@/components/instant-filter-form";
 
@@ -73,6 +73,7 @@ async function ReturnsContent({ searchParams }: { searchParams: SP }) {
           rows={rows}
           expandedId={expandedReturn?.id ?? expandedId}
           expandedContent={expandedReturn ? <ReturnDetailPanel ret={expandedReturn} compact /> : null}
+          expandedFooter={expandedReturn ? <ReturnDetailFooter ret={expandedReturn} /> : null}
         />
       )}
 

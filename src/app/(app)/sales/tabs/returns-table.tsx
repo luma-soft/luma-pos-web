@@ -11,10 +11,12 @@ export function ReturnsTable({
   rows,
   expandedId,
   expandedContent,
+  expandedFooter,
 }: {
   rows: ReturnListRow[];
   expandedId?: string | null;
   expandedContent?: ReactNode;
+  expandedFooter?: ReactNode;
 }) {
   const t = useTranslations();
   const columns: DataTableColumn<ReturnListRow>[] = [
@@ -101,6 +103,7 @@ export function ReturnsTable({
       expandedParam="expandedReturn"
       initialExpandedId={expandedId}
       detailSize="full"
+      detailFooter={(row) => expandedId === row.id ? expandedFooter : null}
       minWidth="1120px"
       renderMobileRow={({ row, toggle }) => (
         <div className="space-y-2 p-3">

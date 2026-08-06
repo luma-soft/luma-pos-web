@@ -12,7 +12,6 @@ type ReturnDetail = NonNullable<Awaited<ReturnType<typeof getReturn>>>;
 
 export async function ReturnDetailPanel({ ret, compact = false }: { ret: ReturnDetail; compact?: boolean }) {
   const t = await getTranslations();
-  const printTemplates = await getPrintTemplatesForDoc("return");
   const exchangeDifference = Number(ret.exchangeDifference ?? 0);
 
   return (
@@ -139,11 +138,26 @@ export async function ReturnDetailPanel({ ret, compact = false }: { ret: ReturnD
           </div>
         </div>
       </div>
+    </div>
+  );
+}
 
-      <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-border-soft pt-4">
-        {ret.status !== "cancelled" && <ReturnActions returnId={ret.id} reason={ret.reason} note={ret.note} />}
-        <PrintTemplateMenu baseHref={`/returns/${ret.id}/print`} templates={printTemplates} label={t("returns.print")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0")} />
-      </div>
+export async function ReturnDetailFooter({ ret }: { ret: ReturnDetail }) {
+  const t = await getTranslations();
+  const printTemplates = await getPrintTemplatesForDoc("return");
+
+  return (
+    <div className="flex flex-wrap justify-end gap-2">
+      {ret.status !== "cancelled" && <ReturnActions returnId={ret.id} reason={ret.reason} note={ret.note} />}
+      <PrintTemplateMenu
+        baseHref={`/returns/${ret.id}/print`}
+        templates={printTemplates}
+        label={t("returns.print")}
+        className={cn(
+          buttonVariants({ variant: "outline", size: "sm" }),
+          "h-9 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0",
+        )}
+      />
     </div>
   );
 }
