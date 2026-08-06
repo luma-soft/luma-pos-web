@@ -38,6 +38,9 @@ export interface ProductListFilters {
   exactProductId?: string;
   q?: string;
   categoryId?: string;
+  brandId?: string;
+  supplierId?: string;
+  productKind?: "product" | "service" | "combo";
   status?: ProductStatusFilter;
   view?: ProductListView;
   updatedSince?: string;
@@ -106,6 +109,9 @@ export async function getProducts(filters: ProductListFilters = {}) {
         : eq(products.categoryId, filters.categoryId),
     );
   }
+  if (!exactProductId && filters.brandId) conditions.push(eq(products.brandId, filters.brandId));
+  if (!exactProductId && filters.supplierId) conditions.push(eq(products.supplierId, filters.supplierId));
+  if (!exactProductId && filters.productKind) conditions.push(eq(products.productKind, filters.productKind));
   if (!exactProductId && filters.updatedSince) {
     const since = new Date(filters.updatedSince);
     if (!Number.isNaN(since.getTime())) {

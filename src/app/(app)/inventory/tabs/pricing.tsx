@@ -13,7 +13,7 @@ type SP = Record<string, string | undefined>;
 type PriceBook = Awaited<ReturnType<typeof getPriceBooks>>[number];
 
 export async function PricingTab({ searchParams }: { searchParams: SP }) {
-  const [books, { categories }] = await Promise.all([
+  const [books, options] = await Promise.all([
     getPriceBooks(),
     getProductFormOptions(),
   ]);
@@ -21,7 +21,7 @@ export async function PricingTab({ searchParams }: { searchParams: SP }) {
   return (
     <>
       <Suspense fallback={<TableSkeleton cols={4} rows={10} />}>
-        <PricingContent books={books} categories={categories} searchParams={searchParams} />
+        <PricingContent books={books} categories={options.categories} brands={options.brands} suppliers={options.suppliers} searchParams={searchParams} />
       </Suspense>
     </>
   );
@@ -30,10 +30,14 @@ export async function PricingTab({ searchParams }: { searchParams: SP }) {
 async function PricingContent({
   books,
   categories,
+  brands,
+  suppliers,
   searchParams,
 }: {
   books: PriceBook[];
   categories: Awaited<ReturnType<typeof getProductFormOptions>>["categories"];
+  brands: Awaited<ReturnType<typeof getProductFormOptions>>["brands"];
+  suppliers: Awaited<ReturnType<typeof getProductFormOptions>>["suppliers"];
   searchParams: SP;
 }) {
   const t = await getTranslations();
@@ -41,7 +45,7 @@ async function PricingContent({
   const page = Number(params.page) || 1;
   const pageSize = parsePageSize(params.size);
 
-  const { rows, total, pageCount } = await getProducts({ q: params.q, categoryId: params.category, page, pageSize });
+  const { rows, total, pageCount } = await getProducts({ q: params.q, categoryId: params.category, brandId: params.brandId, supplierId: params.supplierId, productKind: params.productKind as "product" | "service" | "combo" | undefined, status: (params.status as "active" | "inactive" | "all" | undefined) ?? "active", page, pageSize });
 
   const visibleIds = rows.map((p) => p.id);
   const overrideByBook = await getPriceOverridesForProducts(visibleIds);
@@ -64,7 +68,7 @@ async function PricingContent({
           value={params.q ?? ""}
           placeholder={t("products.list.searchPlaceholder")}
         />
-        <InventoryFilterDrawer title="Bộ lọc thiết lập giá" values={params} fields={["category", "status", "stock"]} categories={categories.map((item) => ({ value: item.id, label: item.name }))} />
+        <InventoryFilterDrawer title="Bộ lọc thiết lập giá" values={params} resultCount={total} fields={["category", "brand", "supplier", "kind", "status", "stock", "sort"]} categories={categories.map((item) => ({ value: item.id, label: item.name }))} brands={brands.map((item) => ({ value: item.id, label: item.name }))} suppliers={suppliers.map((item) => ({ value: item.id, label: item.name }))} />
       </div>
       <PricingTable
         key={[params.q ?? "", params.category ?? "", page, pageSize].join(":")}

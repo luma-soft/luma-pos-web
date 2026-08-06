@@ -53,7 +53,8 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
     );
   }
 
-  const { categories } = await getProductFormOptions();
+  const options = await getProductFormOptions();
+  const { categories } = options;
 
   return (
     <>
@@ -63,7 +64,7 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
       {cameraMaterials && <CameraMaterialSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />}
 
       <Suspense fallback={<TableSkeleton cols={8} rows={10} />}>
-        <ProductsContent searchParams={searchParams} cameraMaterials={cameraMaterials} categories={categories} />
+        <ProductsContent searchParams={searchParams} cameraMaterials={cameraMaterials} categories={categories} brands={options.brands} suppliers={options.suppliers} />
       </Suspense>
 
       <ProductEditorModal searchParams={params} />
@@ -85,15 +86,21 @@ async function ShopeeListingModalShell({ searchParams }: { searchParams: SP }) {
 async function ProductsToolbar({
   params,
   categories,
+  brands,
+  suppliers,
+  resultCount,
 }: {
   params: SP;
   categories: Awaited<ReturnType<typeof getProductFormOptions>>["categories"];
+  brands: Awaited<ReturnType<typeof getProductFormOptions>>["brands"];
+  suppliers: Awaited<ReturnType<typeof getProductFormOptions>>["suppliers"];
+  resultCount: number;
 }) {
   const t = await getTranslations();
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2 sm:gap-3">
       <InstantProductSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />
-      <InventoryFilterDrawer title="Bộ lọc sản phẩm" values={params} fields={["category", "status", "view"]} categories={categories.map((item) => ({ value: item.id, label: item.name }))} />
+      <InventoryFilterDrawer title="Bộ lọc sản phẩm" values={params} resultCount={resultCount} fields={["category", "brand", "supplier", "kind", "status", "stock", "sort", "view"]} categories={categories.map((item) => ({ value: item.id, label: item.name }))} brands={brands.map((item) => ({ value: item.id, label: item.name }))} suppliers={suppliers.map((item) => ({ value: item.id, label: item.name }))} />
       <ProductCreateMenu
         label={t("products.createNew")}
         items={[
@@ -201,7 +208,7 @@ function productModalHref(params: SP, patch: Record<string, string>) {
   return `${Routes.Inventory}?${sp.toString()}`;
 }
 
-async function ProductsContent({ searchParams, cameraMaterials = false, categories = [] }: { searchParams: SP; cameraMaterials?: boolean; categories?: Awaited<ReturnType<typeof getProductFormOptions>>["categories"] }) {
+async function ProductsContent({ searchParams, cameraMaterials = false, categories = [], brands = [], suppliers = [] }: { searchParams: SP; cameraMaterials?: boolean; categories?: Awaited<ReturnType<typeof getProductFormOptions>>["categories"]; brands?: Awaited<ReturnType<typeof getProductFormOptions>>["brands"]; suppliers?: Awaited<ReturnType<typeof getProductFormOptions>>["suppliers"] }) {
   const t = await getTranslations();
   const params = searchParams;
   const page = Number(params.page) || 1;
@@ -212,6 +219,9 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
   const { rows, total, pageCount } = await getProducts({
     q: params.q,
     categoryId: params.category,
+    brandId: params.brandId,
+    supplierId: params.supplierId,
+    productKind: params.productKind as "product" | "service" | "combo" | undefined,
     status,
     view,
     page,
@@ -228,7 +238,7 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
           <p className="mt-0.5 text-xs font-medium text-slate-500">{total.toLocaleString("vi-VN")} SKU</p>
         </div>
       )}
-      {!cameraMaterials && <ProductsToolbar params={params} categories={categories} />}
+      {!cameraMaterials && <ProductsToolbar params={params} categories={categories} brands={brands} suppliers={suppliers} resultCount={total} />}
       <ProductsTable
         rows={rows}
         selectionEnabled={!cameraMaterials}
