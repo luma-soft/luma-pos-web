@@ -384,7 +384,7 @@ export function InventoryFilterDrawer({
           setEntityLabels({});
           setOpen(true);
         }}
-        className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface px-4 text-sm font-semibold"
+        className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold lg:min-h-0"
       >
         <SlidersHorizontal className="h-4 w-4 text-primary-600" />
         Bộ lọc
