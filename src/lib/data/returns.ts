@@ -33,6 +33,7 @@ export async function getReturns({
         reason: returns.reason,
         refundMethod: returns.refundMethod,
         totalRefund: returns.totalRefund,
+        status: returns.status,
         note: returns.note,
         createdAt: returns.createdAt,
         orderId: returns.orderId,
@@ -71,6 +72,7 @@ export async function getReturn(id: string) {
       reason: returns.reason,
       refundMethod: returns.refundMethod,
       totalRefund: returns.totalRefund,
+      status: returns.status,
       note: returns.note,
       createdAt: returns.createdAt,
       orderId: returns.orderId,
@@ -83,6 +85,7 @@ export async function getReturn(id: string) {
       customerPhone: customers.phone,
       warehouseName: warehouses.name,
       createdByName: profiles.fullName,
+      cancelledAt: returns.cancelledAt,
     })
     .from(returns)
     .leftJoin(orders, eq(returns.orderId, orders.id)) // orderId nullable (trả nhanh)

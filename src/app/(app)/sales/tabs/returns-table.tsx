@@ -72,6 +72,16 @@ export function ReturnsTable({
       render: (row) => row.createdByName ?? <span className="text-slate-400">-</span>,
     },
     {
+      key: "status",
+      label: t("orders.cols.status"),
+      defaultVisible: true,
+      render: (row) => (
+        <span className={row.status === "cancelled" ? "font-semibold text-er" : "font-semibold text-ok"}>
+          {t(`returns.status.${row.status}` as never)}
+        </span>
+      ),
+    },
+    {
       key: "totalRefund",
       label: t("returns.totalRefund"),
       defaultVisible: true,

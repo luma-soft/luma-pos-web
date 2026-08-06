@@ -57,6 +57,7 @@ export default async function PrintReturnPage({ params, searchParams }: Props) {
           signatures={[t("print.buyerSign"), t("print.sellerSign"), t("print.receiverSign")]}
           signHint={t("print.signHint")}
           note={[
+            ret.status === "cancelled" ? t("returns.status.cancelled") : null,
             ret.reason ? `${t("returns.reason")}: ${t(`returns.reasons.${ret.reason}` as never)}` : null,
             `${t("returns.refundVia")}: ${t(`returns.refundMethods.${ret.refundMethod}` as never)}`,
             ret.note,

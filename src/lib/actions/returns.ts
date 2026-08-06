@@ -4,15 +4,17 @@ import { revalidatePath } from "next/cache";
 import { and, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  customers, orderItems, orders, paymentRefunds, payments, productComboItems, products, returnItems, returns, stockLevels, stockMovements,
+  cashTransactions, customers, orderItems, orders, paymentRefunds, payments, productComboItems, products, returnItems, returns, stockLevels, stockMovements,
 } from "@/db/schema";
 import {
   createPosReturnSchema,
   createExchangeSchema,
   createReturnSchema,
+  updateReturnMetadataSchema,
   type CreateExchangeOutput,
   type CreatePosReturnOutput,
   type CreateReturnOutput,
+  type UpdateReturnMetadataInput,
 } from "@/lib/schemas/returns";
 import {
   type ActionResult,
@@ -29,6 +31,10 @@ import { getCurrentShift } from "@/lib/data/shifts";
 import { normalizeOrderItems, type NormalizedOrderItem } from "@/lib/orders/normalize";
 import { accentInsensitiveLike } from "@/lib/search";
 import { calculateExchangeSettlement } from "@/lib/returns/exchange-settlement";
+import {
+  returnCancellationBlockReason,
+  returnCancellationCustomerDeltas,
+} from "@/lib/returns/cancellation";
 import {
   consumeTrackedStockLots,
   receiveUnspecifiedTrackedStockLot,
@@ -226,6 +232,7 @@ export async function createExchangeForUser(
         orderItemId: returnItems.orderItemId,
         qty: sql<string>`coalesce(sum(${returnItems.quantity}), 0)`,
       }).from(returnItems)
+        .innerJoin(returns, and(eq(returnItems.returnId, returns.id), eq(returns.status, "completed")))
         .where(inArray(returnItems.orderItemId, itemIds))
         .groupBy(returnItems.orderItemId);
       const previousById = new Map(previous.map((item) => [item.orderItemId, Number(item.qty)]));
@@ -497,6 +504,7 @@ export async function createExchangeForUser(
         orderItemId: returnItems.orderItemId,
         qty: sql<string>`coalesce(sum(${returnItems.quantity}), 0)`,
       }).from(returnItems)
+        .innerJoin(returns, and(eq(returnItems.returnId, returns.id), eq(returns.status, "completed")))
         .innerJoin(orderItems, eq(returnItems.orderItemId, orderItems.id))
         .where(eq(orderItems.orderId, order.id))
         .groupBy(returnItems.orderItemId);
@@ -643,6 +651,7 @@ export async function createReturnForUser(
           qty: sql<string>`coalesce(sum(${returnItems.quantity}), 0)`,
         })
         .from(returnItems)
+        .innerJoin(returns, and(eq(returnItems.returnId, returns.id), eq(returns.status, "completed")))
         .where(inArray(returnItems.orderItemId, itemIds))
         .groupBy(returnItems.orderItemId);
       const prevByItem = new Map(prevReturned.map((r) => [r.orderItemId, Number(r.qty)]));
@@ -795,6 +804,7 @@ export async function createReturnForUser(
           qty: sql<string>`coalesce(sum(${returnItems.quantity}), 0)`,
         })
         .from(returnItems)
+        .innerJoin(returns, and(eq(returnItems.returnId, returns.id), eq(returns.status, "completed")))
         .innerJoin(orderItems, eq(returnItems.orderItemId, orderItems.id))
         .where(eq(orderItems.orderId, order.id))
         .groupBy(returnItems.orderItemId);
@@ -860,6 +870,190 @@ export async function createReturnForUser(
   }
 }
 
+export async function updateReturnMetadata(
+  returnId: string,
+  input: UpdateReturnMetadataInput,
+): Promise<ActionResult> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const parsed = updateReturnMetadataSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+
+  const [updated] = await db.update(returns).set({
+    reason: parsed.data.reason,
+    note: parsed.data.note?.trim() || null,
+    updatedAt: sql`now()`,
+  }).where(and(eq(returns.id, returnId), eq(returns.status, "completed")))
+    .returning({ id: returns.id });
+  if (!updated) return { ok: false, error: "returns.errors.notEditable" };
+  revalidatePath(Routes.Sales);
+  revalidatePath(`/returns/${returnId}/print`);
+  return { ok: true, data: undefined };
+}
+
+export async function cancelReturn(returnId: string): Promise<ActionResult> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+
+  try {
+    const profileId = await getProfileId(gate.userId);
+    const currentShift = profileId ? await getCurrentShift(profileId) : null;
+    const result = await db.transaction(async (tx) => {
+      const [ret] = await tx.select().from(returns)
+        .where(eq(returns.id, returnId)).limit(1).for("update");
+      if (!ret) throw new Error("RETURN_NOT_FOUND");
+      const [gatewayRefund] = await tx.select({ id: paymentRefunds.id })
+        .from(paymentRefunds).where(eq(paymentRefunds.returnId, returnId)).limit(1);
+      const blocked = returnCancellationBlockReason({
+        status: ret.status,
+        exchangeOrderId: ret.exchangeOrderId,
+        hasGatewayRefund: Boolean(gatewayRefund),
+      });
+      if (blocked) throw new Error(blocked);
+
+      const items = await tx.select().from(returnItems).where(eq(returnItems.returnId, returnId));
+      if (items.some((item) => item.restock) && !ret.warehouseId) throw new Error("WAREHOUSE_REQUIRED");
+
+      for (const item of items.filter((row) => row.restock)) {
+        const targets = await stockTargetsForReturnedItem(
+          tx,
+          item.productId,
+          Number(item.quantity) * Number(item.unitMultiplier),
+        );
+        for (const target of targets) {
+          const [level] = await tx.select({ quantity: stockLevels.quantity })
+            .from(stockLevels)
+            .where(and(eq(stockLevels.productId, target.productId), eq(stockLevels.warehouseId, ret.warehouseId!)))
+            .limit(1)
+            .for("update");
+          if (!level || Number(level.quantity) < target.quantity - 1e-9) {
+            throw new Error("INSUFFICIENT_STOCK_TO_CANCEL");
+          }
+          await consumeTrackedStockLots(tx, {
+            productId: target.productId,
+            warehouseId: ret.warehouseId!,
+            quantity: target.quantity,
+            refType: "return_cancel",
+            refId: ret.id,
+            createdBy: profileId,
+          });
+          await tx.update(stockLevels).set({
+            quantity: sql`${stockLevels.quantity} - ${toQty(target.quantity)}`,
+            updatedAt: sql`now()`,
+          }).where(and(eq(stockLevels.productId, target.productId), eq(stockLevels.warehouseId, ret.warehouseId!)));
+          await tx.insert(stockMovements).values({
+            productId: target.productId,
+            warehouseId: ret.warehouseId!,
+            type: "return_out",
+            quantity: toQty(-target.quantity),
+            refType: "return_cancel",
+            refId: ret.id,
+            note: `Hủy phiếu trả ${ret.code}`,
+            createdBy: profileId,
+          });
+        }
+      }
+
+      const originalCashRows = await tx.select({
+        fund: cashTransactions.fund,
+        amount: cashTransactions.amount,
+      }).from(cashTransactions).where(and(
+        eq(cashTransactions.refType, "return"),
+        eq(cashTransactions.refId, ret.id),
+        eq(cashTransactions.type, "out"),
+      ));
+      for (const row of originalCashRows) {
+        await recordCashTx(tx, {
+          type: "in",
+          fund: row.fund,
+          amount: Number(row.amount),
+          category: "refund",
+          refType: "return_cancel",
+          refId: ret.id,
+          note: `Đảo hoàn trả ${ret.code}`,
+          createdBy: profileId,
+          shiftId: currentShift?.id ?? null,
+        });
+      }
+
+      let debtNotification = null;
+      if (ret.customerId) {
+        const refund = Number(ret.totalRefund);
+        const customerDeltas = returnCancellationCustomerDeltas({
+          refundMethod: ret.refundMethod,
+          totalRefund: refund,
+        });
+        await tx.update(customers).set({
+          currentDebt: customerDeltas.currentDebt > 0
+            ? sql`${customers.currentDebt} + ${toMoney(customerDeltas.currentDebt)}`
+            : customers.currentDebt,
+          totalSpent: sql`${customers.totalSpent} + ${toMoney(customerDeltas.totalSpent)}`,
+        }).where(eq(customers.id, ret.customerId));
+        if (ret.refundMethod === "debt_deduct") {
+          debtNotification = await createDebtChangedEventInTx(tx, {
+            entityType: "customer",
+            entityId: ret.customerId,
+            operationType: "sale_return_cancel",
+            operationId: ret.id,
+            delta: refund,
+            actorId: profileId,
+          });
+        }
+      }
+
+      await tx.update(returns).set({
+        status: "cancelled",
+        cancelledBy: profileId,
+        cancelledAt: sql`now()`,
+        updatedAt: sql`now()`,
+      }).where(eq(returns.id, ret.id));
+
+      if (ret.orderId) {
+        const allItems = await tx.select().from(orderItems).where(eq(orderItems.orderId, ret.orderId));
+        const activeReturned = await tx.select({
+          orderItemId: returnItems.orderItemId,
+          qty: sql<string>`coalesce(sum(${returnItems.quantity}), 0)`,
+        }).from(returnItems)
+          .innerJoin(returns, and(eq(returnItems.returnId, returns.id), eq(returns.status, "completed")))
+          .innerJoin(orderItems, eq(returnItems.orderItemId, orderItems.id))
+          .where(eq(orderItems.orderId, ret.orderId))
+          .groupBy(returnItems.orderItemId);
+        const returnedByItem = new Map(activeReturned.map((row) => [row.orderItemId, Number(row.qty)]));
+        const fullyReturned = allItems.length > 0 && allItems.every(
+          (item) => (returnedByItem.get(item.id) ?? 0) >= Number(item.quantity) - 1e-9,
+        );
+        await tx.update(orders).set({
+          status: fullyReturned ? "returned" : "completed",
+          updatedAt: sql`now()`,
+        }).where(eq(orders.id, ret.orderId));
+      }
+      return { debtNotification, orderId: ret.orderId };
+    });
+
+    if (result.debtNotification?.created) {
+      await publishCommittedNotification(result.debtNotification.eventId);
+    }
+    revalidatePath(Routes.Sales);
+    revalidatePath(Routes.Orders);
+    if (result.orderId) revalidatePath(Routes.order(result.orderId));
+    return { ok: true, data: undefined };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const known: Record<string, string> = {
+      RETURN_NOT_FOUND: "returns.errors.notFound",
+      RETURN_ALREADY_CANCELLED: "returns.errors.alreadyCancelled",
+      EXCHANGE_CANCEL_UNSUPPORTED: "returns.errors.exchangeCancelUnsupported",
+      GATEWAY_CANCEL_UNSUPPORTED: "returns.errors.gatewayCancelUnsupported",
+      WAREHOUSE_REQUIRED: "returns.errors.warehouseRequired",
+      INSUFFICIENT_STOCK_TO_CANCEL: "returns.errors.insufficientStockToCancel",
+      INSUFFICIENT_BATCH_STOCK: "returns.errors.insufficientStockToCancel",
+    };
+    if (known[message]) return { ok: false, error: known[message] };
+    console.error("cancelReturn failed:", error);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
 export async function createPosReturn(
   input: CreatePosReturnOutput
 ): Promise<ActionResult<{ id: string; code: string }>> {
@@ -895,6 +1089,7 @@ export async function createPosReturn(
                 qty: sql<string>`coalesce(sum(${returnItems.quantity}), 0)`,
               })
               .from(returnItems)
+              .innerJoin(returns, and(eq(returnItems.returnId, returns.id), eq(returns.status, "completed")))
               .where(inArray(returnItems.orderItemId, sourceIds))
               .groupBy(returnItems.orderItemId)
           : [];
@@ -1044,6 +1239,7 @@ export async function createPosReturn(
             qty: sql<string>`coalesce(sum(${returnItems.quantity}), 0)`,
           })
           .from(returnItems)
+          .innerJoin(returns, and(eq(returnItems.returnId, returns.id), eq(returns.status, "completed")))
           .innerJoin(orderItems, eq(returnItems.orderItemId, orderItems.id))
           .where(eq(orderItems.orderId, order.id))
           .groupBy(returnItems.orderItemId);

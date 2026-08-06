@@ -2235,13 +2235,6 @@
     "currentDebtOf": "{name} owes {debt}",
     "totalRefund": "Total refund",
     "submit": "Create return",
-    "errors": {
-      "emptyItems": "Select at least 1 item to return.",
-      "qtyExceeds": "Return quantity exceeds purchased quantity.",
-      "orderCancelled": "Order is cancelled — cannot return.",
-      "debtNeedsCustomer": "Debt deduction requires a customer on the order.",
-      "debtTooSmall": "Current debt is less than the refund — use cash/bank instead."
-    },
     "title": "Returns",
     "create": "Create return",
     "total": "{total} returns",
@@ -2255,7 +2248,31 @@
     "exchangeCollect": "Collect {amount}",
     "exchangeRefund": "Refund {amount}",
     "exchangeEven": "No difference",
-    "exchangeSettlement": "Difference settlement"
+    "exchangeSettlement": "Difference settlement",
+    "status": {
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "edit": "Edit return",
+    "editTitle": "Edit return information",
+    "note": "Note",
+    "cancel": "Cancel return",
+    "cancelTitle": "Cancel return",
+    "cancelConfirm": "The system will reverse inventory, customer debt, and refund ledger entries for this return. This action cannot be undone.",
+    "errors": {
+      "emptyItems": "Select at least 1 item to return.",
+      "qtyExceeds": "Return quantity exceeds purchased quantity.",
+      "orderCancelled": "Order is cancelled — cannot return.",
+      "debtNeedsCustomer": "Debt deduction requires a customer on the order.",
+      "debtTooSmall": "Current debt is less than the refund — use cash/bank instead.",
+      "notFound": "Return not found.",
+      "alreadyCancelled": "This return has already been cancelled.",
+      "notEditable": "Only active returns can be edited.",
+      "exchangeCancelUnsupported": "An exchange return must be reversed together with its replacement invoice and cannot be cancelled separately.",
+      "gatewayCancelUnsupported": "Gateway refunds must be reversed with the payment provider.",
+      "warehouseRequired": "The return has no valid warehouse for inventory reversal.",
+      "insufficientStockToCancel": "Current stock is insufficient to withdraw the restocked quantity."
+    }
   },
   "print": {
     "title": "Print invoice",

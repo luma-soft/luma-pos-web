@@ -226,7 +226,7 @@ export async function getCustomers(filters: CustomerFilters = {}) {
         })
         .from(returns)
         .leftJoin(profiles, eq(returns.createdBy, profiles.id))
-        .where(inArray(returns.customerId, customerIds))
+        .where(and(inArray(returns.customerId, customerIds), eq(returns.status, "completed")))
         .orderBy(desc(returns.createdAt))
         .limit(customerIds.length * 30),
       db

@@ -42,6 +42,13 @@ export const createReturnSchema = z.object({
 export type CreateReturnInput = z.input<typeof createReturnSchema>;
 export type CreateReturnOutput = z.output<typeof createReturnSchema>;
 
+export const updateReturnMetadataSchema = z.object({
+  reason: z.enum(["defective", "wrong_item", "changed_mind", "other"]),
+  note: z.string().max(1000).optional(),
+});
+
+export type UpdateReturnMetadataInput = z.input<typeof updateReturnMetadataSchema>;
+
 export const createExchangeSchema = z.object({
   orderId: z.uuid(),
   clientId: z.string().min(8).max(40),

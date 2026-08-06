@@ -902,15 +902,20 @@ export const returns = pgTable("returns", {
   reason: text("reason"),
   refundMethod: refundMethodEnum("refund_method").notNull().default("cash"),
   totalRefund: decimal("total_refund", { precision: 14, scale: 2 }).notNull().default("0"),
+  status: text("status").notNull().default("completed"), // completed, cancelled
   exchangeOrderId: uuid("exchange_order_id").references(() => orders.id),
   exchangeDifference: decimal("exchange_difference", { precision: 14, scale: 2 }),
   exchangeSettlementMethod: text("exchange_settlement_method"),
   note: text("note"),
   createdBy: uuid("created_by").references(() => profiles.id),
+  cancelledBy: uuid("cancelled_by").references(() => profiles.id),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("returns_order_idx").on(t.orderId),
   index("returns_exchange_order_idx").on(t.exchangeOrderId),
+  index("returns_status_created_idx").on(t.status, t.createdAt),
   uniqueIndex("returns_client_id_idx").on(t.clientId),
 ]);
 

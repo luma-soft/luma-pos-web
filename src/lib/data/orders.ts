@@ -352,6 +352,7 @@ export async function getOrder(id: string) {
           qty: sql<string>`coalesce(sum(${returnItems.quantity}), 0)`,
         })
         .from(returnItems)
+        .innerJoin(returns, and(eq(returnItems.returnId, returns.id), eq(returns.status, "completed")))
         .where(inArray(returnItems.orderItemId, itemIds))
         .groupBy(returnItems.orderItemId)
     : [];

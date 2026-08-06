@@ -51,8 +51,8 @@ function reportConditions(rangeDays: number, filters: ReportFilters) {
       ? or(ilike(customers.name, `%${customerTerm}%`), ilike(customers.phone, `%${customerTerm}%`), ilike(customers.code, `%${customerTerm}%`))
       : undefined;
   const returnWhere = returnCustomerFilter
-    ? and(returnDateFilter, returnCustomerFilter)
-    : returnDateFilter;
+    ? and(eq(returns.status, "completed"), returnDateFilter, returnCustomerFilter)
+    : and(eq(returns.status, "completed"), returnDateFilter);
 
   return { where, returnWhere };
 }

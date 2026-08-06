@@ -2235,13 +2235,6 @@
     "currentDebtOf": "{name} đang nợ {debt}",
     "totalRefund": "Tổng hoàn trả",
     "submit": "Lập phiếu trả hàng",
-    "errors": {
-      "emptyItems": "Chọn ít nhất 1 sản phẩm để trả.",
-      "qtyExceeds": "Số lượng trả vượt quá số đã mua.",
-      "orderCancelled": "Đơn đã hủy — không thể trả hàng.",
-      "debtNeedsCustomer": "Trừ công nợ cần đơn có khách hàng.",
-      "debtTooSmall": "Công nợ hiện tại nhỏ hơn số tiền hoàn — chọn hoàn tiền mặt/CK."
-    },
     "title": "Trả hàng",
     "create": "Tạo phiếu trả hàng",
     "total": "{total} phiếu trả hàng",
@@ -2255,7 +2248,31 @@
     "exchangeCollect": "Thu thêm {amount}",
     "exchangeRefund": "Hoàn lại {amount}",
     "exchangeEven": "Không chênh lệch",
-    "exchangeSettlement": "Quyết toán chênh lệch"
+    "exchangeSettlement": "Quyết toán chênh lệch",
+    "status": {
+      "completed": "Đã hoàn tất",
+      "cancelled": "Đã hủy"
+    },
+    "edit": "Sửa phiếu",
+    "editTitle": "Sửa thông tin phiếu trả hàng",
+    "note": "Ghi chú",
+    "cancel": "Hủy phiếu",
+    "cancelTitle": "Hủy phiếu trả hàng",
+    "cancelConfirm": "Hệ thống sẽ đảo tồn kho, công nợ và các bút toán hoàn tiền của phiếu này. Thao tác không thể hoàn tác.",
+    "errors": {
+      "emptyItems": "Chọn ít nhất 1 sản phẩm để trả.",
+      "qtyExceeds": "Số lượng trả vượt quá số đã mua.",
+      "orderCancelled": "Đơn đã hủy — không thể trả hàng.",
+      "debtNeedsCustomer": "Trừ công nợ cần đơn có khách hàng.",
+      "debtTooSmall": "Công nợ hiện tại nhỏ hơn số tiền hoàn — chọn hoàn tiền mặt/CK.",
+      "notFound": "Không tìm thấy phiếu trả hàng.",
+      "alreadyCancelled": "Phiếu trả hàng đã được hủy trước đó.",
+      "notEditable": "Chỉ có thể sửa phiếu trả hàng đang hoạt động.",
+      "exchangeCancelUnsupported": "Phiếu đổi hàng phải được xử lý hoàn ngược cùng hóa đơn đổi; chưa thể hủy riêng phiếu này.",
+      "gatewayCancelUnsupported": "Phiếu hoàn qua cổng thanh toán phải được xử lý hoàn ngược với nhà cung cấp thanh toán.",
+      "warehouseRequired": "Phiếu không có kho hợp lệ để đảo tồn.",
+      "insufficientStockToCancel": "Tồn kho hiện tại không đủ để thu hồi lượng hàng đã nhập lại."
+    }
   },
   "print": {
     "title": "In hóa đơn",

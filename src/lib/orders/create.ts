@@ -142,7 +142,8 @@ export async function createOrderForUser(
         const sourceMatchesMode = (isQuote && sourceIsQuote) || (isBooking && sourceIsBooking) || (!isQuote && !isBooking && sourceIsSale);
         if (!sourceMatchesMode) throw new Error("SOURCE_NOT_EDITABLE");
         if (sourceOrder.replacedByOrderId) throw new Error("SOURCE_ALREADY_REPLACED");
-        const [hasReturn] = await tx.select({ id: returns.id }).from(returns).where(eq(returns.orderId, sourceOrder.id)).limit(1);
+        const [hasReturn] = await tx.select({ id: returns.id }).from(returns)
+          .where(and(eq(returns.orderId, sourceOrder.id), eq(returns.status, "completed"))).limit(1);
         if (hasReturn) throw new Error("SOURCE_HAS_RETURNS");
         const [hasEInvoice] = await tx.select({ id: einvoices.id }).from(einvoices).where(eq(einvoices.orderId, sourceOrder.id)).limit(1);
         if (hasEInvoice) throw new Error("SOURCE_HAS_EINVOICE");

@@ -45,7 +45,7 @@ export async function createPendingGatewayRefund(
       const [payment] = await tx.select().from(payments)
         .where(eq(payments.id, input.paymentId)).limit(1).for("update");
       const [ret] = await tx.select().from(returns)
-        .where(eq(returns.id, input.returnId)).limit(1).for("update");
+        .where(and(eq(returns.id, input.returnId), eq(returns.status, "completed"))).limit(1).for("update");
       if (!payment || !ret || !payment.provider || !GATEWAY_PROVIDERS.includes(payment.provider as GatewayProvider)) {
         throw new Error("REFUND_SOURCE_NOT_FOUND");
       }

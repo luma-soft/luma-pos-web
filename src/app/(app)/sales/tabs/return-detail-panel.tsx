@@ -6,6 +6,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { OrderDetailLink } from "@/components/order-detail-link";
 import { getPrintTemplatesForDoc } from "@/lib/print/template";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
+import { ReturnActions } from "./return-actions";
 
 type ReturnDetail = NonNullable<Awaited<ReturnType<typeof getReturn>>>;
 
@@ -21,6 +22,10 @@ export async function ReturnDetailPanel({ ret, compact = false }: { ret: ReturnD
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="truncate text-xl font-bold text-slate-900 dark:text-slate-100">{ret.customerName ?? t("orders.walkIn")}</h2>
             <span className="text-sm font-semibold text-slate-500">{ret.code}</span>
+            <span className={cn(
+              "inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold",
+              ret.status === "cancelled" ? "bg-er-soft text-er" : "bg-ok-soft text-ok",
+            )}>{t(`returns.status.${ret.status}` as never)}</span>
             {ret.orderId && ret.orderCode && (
               <OrderDetailLink orderId={ret.orderId} className="inline-flex min-h-11 min-w-11 items-center text-sm font-semibold text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">
                 {ret.orderCode}
@@ -136,6 +141,7 @@ export async function ReturnDetailPanel({ ret, compact = false }: { ret: ReturnD
       </div>
 
       <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-border-soft pt-4">
+        {ret.status !== "cancelled" && <ReturnActions returnId={ret.id} reason={ret.reason} note={ret.note} />}
         <PrintTemplateMenu baseHref={`/returns/${ret.id}/print`} templates={printTemplates} label={t("returns.print")} className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-9 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0")} />
       </div>
     </div>

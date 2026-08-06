@@ -215,10 +215,13 @@ export async function OrderDetailPanel({
                   <div key={row.id} className="space-y-2 p-3 text-sm">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="font-semibold">{row.code}</div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold">{row.code}</span>
+                          {row.status === "cancelled" && <span className="rounded-full bg-er-soft px-2 py-0.5 text-[11px] font-semibold text-er">{t("returns.status.cancelled")}</span>}
+                        </div>
                         <div className="mt-0.5 text-xs text-slate-500">{formatDate(row.createdAt)}</div>
                       </div>
-                      <div className="shrink-0 font-semibold tabular-nums text-er">- {formatCurrency(Number(row.totalRefund))}</div>
+                      <div className={cn("shrink-0 font-semibold tabular-nums", row.status === "cancelled" ? "text-slate-400 line-through" : "text-er")}>- {formatCurrency(Number(row.totalRefund))}</div>
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
                       <span className="break-words">{t(`returns.reasons.${row.reason}` as never)}</span>
@@ -238,11 +241,14 @@ export async function OrderDetailPanel({
                   <tbody className="divide-y divide-border-soft">
                     {order.returns.map((row) => (
                       <tr key={row.id}>
-                        <td className="px-3 py-3 font-medium">{row.code}</td>
+                        <td className="px-3 py-3 font-medium">
+                          <span>{row.code}</span>
+                          {row.status === "cancelled" && <span className="ml-2 rounded-full bg-er-soft px-2 py-0.5 text-[11px] font-semibold text-er">{t("returns.status.cancelled")}</span>}
+                        </td>
                         <td className="px-3 py-3 whitespace-nowrap text-slate-500">{formatDate(row.createdAt)}</td>
                         <td className="px-3 py-3 text-slate-500">{t(`returns.reasons.${row.reason}` as never)}</td>
                         <td className="px-3 py-3">{t(`returns.refundMethods.${row.refundMethod}` as never)}</td>
-                        <td className="px-3 py-3 text-right tabular-nums font-semibold text-er">- {formatCurrency(Number(row.totalRefund))}</td>
+                        <td className={cn("px-3 py-3 text-right tabular-nums font-semibold", row.status === "cancelled" ? "text-slate-400 line-through" : "text-er")}>- {formatCurrency(Number(row.totalRefund))}</td>
                         <td className="px-3 py-3 text-right">
                           <PrintTemplateMenu baseHref={`/returns/${row.id}/print`} templates={returnPrintTemplates} label={t("print.printBtn")} className="text-xs font-medium text-primary-600 hover:underline" />
                         </td>

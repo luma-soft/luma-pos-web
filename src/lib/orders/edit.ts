@@ -25,7 +25,8 @@ export async function updateOrderForUser(userId: string, input: UpdateOrderInput
       const [order] = await tx.select().from(orders).where(eq(orders.id, v.orderId)).limit(1);
       if (!order) throw new Error("ORDER_NOT_FOUND");
       if (order.status !== "completed" && order.status !== "quote") throw new Error("NOT_EDITABLE");
-      const [hasReturn] = await tx.select({ id: returns.id }).from(returns).where(eq(returns.orderId, v.orderId)).limit(1);
+      const [hasReturn] = await tx.select({ id: returns.id }).from(returns)
+        .where(and(eq(returns.orderId, v.orderId), eq(returns.status, "completed"))).limit(1);
       if (hasReturn) throw new Error("HAS_RETURNS");
       const [hasEInvoice] = await tx.select({ id: einvoices.id }).from(einvoices).where(and(eq(einvoices.orderId, v.orderId), eq(einvoices.status, "issued"))).limit(1);
       if (hasEInvoice) throw new Error("HAS_EINVOICE");
@@ -145,7 +146,8 @@ export async function mergeOrdersForUser(userId: string, orderIds: string[]): Pr
       if (sources.some((o) => o.status !== "completed")) throw new Error("ONLY_COMPLETED");
       const customerIds = new Set(sources.map((o) => o.customerId ?? ""));
       if (customerIds.size !== 1 || !sources[0].customerId) throw new Error("SAME_CUSTOMER");
-      const [hasReturn] = await tx.select({ id: returns.id }).from(returns).where(inArray(returns.orderId, orderIds)).limit(1);
+      const [hasReturn] = await tx.select({ id: returns.id }).from(returns)
+        .where(and(inArray(returns.orderId, orderIds), eq(returns.status, "completed"))).limit(1);
       if (hasReturn) throw new Error("HAS_RETURNS");
       const [hasEInvoice] = await tx.select({ id: einvoices.id }).from(einvoices).where(and(inArray(einvoices.orderId, orderIds), eq(einvoices.status, "issued"))).limit(1);
       if (hasEInvoice) throw new Error("HAS_EINVOICE");

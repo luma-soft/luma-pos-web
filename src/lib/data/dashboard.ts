@@ -81,7 +81,7 @@ export async function getDashboard(requestedRange?: DashboardRange) {
 
     db.select({
       refundTotal: sql<string>`coalesce(sum(${returns.totalRefund}), 0)`,
-    }).from(returns).where(gte(returns.createdAt, since)),
+    }).from(returns).where(and(gte(returns.createdAt, since), eq(returns.status, "completed"))),
 
     db.select({
       returnedProfit: sql<string>`coalesce(sum(${returnItems.total} - (${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice})), 0)`,
@@ -89,7 +89,7 @@ export async function getDashboard(requestedRange?: DashboardRange) {
       .from(returnItems)
       .innerJoin(returns, eq(returnItems.returnId, returns.id))
       .innerJoin(products, eq(returnItems.productId, products.id))
-      .where(gte(returns.createdAt, since)),
+      .where(and(gte(returns.createdAt, since), eq(returns.status, "completed"))),
 
     db.select({
       totalDebt: sql<string>`coalesce(sum(${customers.currentDebt}), 0)`,
@@ -174,7 +174,7 @@ export async function getDashboard(requestedRange?: DashboardRange) {
       refund: sql<string>`coalesce(sum(${returns.totalRefund}), 0)`,
     })
       .from(returns)
-      .where(gte(returns.createdAt, since))
+      .where(and(gte(returns.createdAt, since), eq(returns.status, "completed")))
       .groupBy(returnBucketKey, returnBucketLabel)
       .orderBy(returnBucketKey),
 
@@ -198,7 +198,7 @@ export async function getDashboard(requestedRange?: DashboardRange) {
       .from(returnItems)
       .innerJoin(returns, eq(returnItems.returnId, returns.id))
       .innerJoin(products, eq(returnItems.productId, products.id))
-      .where(gte(returns.createdAt, since))
+      .where(and(gte(returns.createdAt, since), eq(returns.status, "completed")))
       .groupBy(returnBucketKey, returnBucketLabel)
       .orderBy(returnBucketKey),
   ]);
