@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
-import { FileX2 } from "lucide-react";
 import { Pagination } from "@/components/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { getReturn, getReturns } from "@/lib/data/returns";
@@ -90,20 +89,12 @@ async function ReturnsContent({ searchParams }: { searchParams: SP }) {
 
   return (
     <>
-      {rows.length === 0 ? (
-        <div className="rounded-card border border-dashed border-border bg-surface p-12 text-center text-slate-400">
-          <FileX2 className="mx-auto mb-3 h-10 w-10 opacity-60" />
-          <p className="font-medium">{t("returns.empty")}</p>
-          <p className="mt-1 text-sm">{t("returns.emptyHint")}</p>
-        </div>
-      ) : (
-        <ReturnsTable
-          rows={rows}
-          expandedId={expandedReturn?.id ?? expandedId}
-          expandedContent={expandedReturn ? <ReturnDetailPanel ret={expandedReturn} compact /> : null}
-          expandedFooter={expandedReturn ? <ReturnDetailFooter ret={expandedReturn} /> : null}
-        />
-      )}
+      <ReturnsTable
+        rows={rows}
+        expandedId={expandedReturn?.id ?? expandedId}
+        expandedContent={expandedReturn ? <ReturnDetailPanel ret={expandedReturn} compact /> : null}
+        expandedFooter={expandedReturn ? <ReturnDetailFooter ret={expandedReturn} /> : null}
+      />
       <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("returns.title")} />
     </>
   );

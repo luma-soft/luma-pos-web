@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
-import { FileX2 } from "lucide-react";
 import {
   getOrders,
   type OrderStatusFilter,
@@ -148,16 +147,7 @@ async function OrdersContent({ searchParams }: { searchParams: SP }) {
 
   return (
     <>
-      {rows.length === 0 ? (
-        <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">
-          <FileX2 className="w-10 h-10 mx-auto mb-3 opacity-60" />
-          <p className="font-medium">{t("orders.empty")}</p>
-        </div>
-      ) : (
-        <>
-          <OrdersTable rows={rows} printTemplates={printTemplates} />
-        </>
-      )}
+      <OrdersTable rows={rows} printTemplates={printTemplates} />
 
       <Pagination
         page={page}

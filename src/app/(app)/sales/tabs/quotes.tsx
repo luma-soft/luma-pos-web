@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
-import { FileSpreadsheet } from "lucide-react";
 import { Pagination } from "@/components/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
 import {
@@ -77,15 +76,7 @@ async function QuotesContent({ searchParams }: { searchParams: SP }) {
 
   return (
     <>
-      {rows.length === 0 ? (
-        <div className="rounded-card border border-dashed border-border bg-surface p-12 text-center text-slate-400">
-          <FileSpreadsheet className="mx-auto mb-3 h-10 w-10 opacity-60" />
-          <p className="font-medium">{t("quotes.empty")}</p>
-          <p className="mt-1 text-sm">{t("quotes.emptyHint")}</p>
-        </div>
-      ) : (
-        <QuotesTable rows={rows} />
-      )}
+      <QuotesTable rows={rows} />
       <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("quotes.title")} />
     </>
   );

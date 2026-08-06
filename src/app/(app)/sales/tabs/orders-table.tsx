@@ -14,8 +14,10 @@ import {
   OrderStatusBadge,
   PaymentStatusBadge,
 } from "../../orders/status-badges";
+import { FileX2 } from "lucide-react";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import type { PrintTemplate } from "@/lib/print/template-shared";
+import { SalesTableEmptyState } from "./sales-table-empty-state";
 
 export function normalizeOrderBatchSelection(
   selectedIds: Set<string>,
@@ -402,6 +404,12 @@ export function OrdersTable({
           />
         }
         toolbarFloating
+        empty={(
+          <SalesTableEmptyState
+            icon={FileX2}
+            title={t("orders.empty")}
+          />
+        )}
         renderMobileRow={({ row: order }) => (
           <OrderMobileRow
             order={order}

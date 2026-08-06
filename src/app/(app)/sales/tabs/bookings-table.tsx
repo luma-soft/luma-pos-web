@@ -2,8 +2,10 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { ClipboardList } from "lucide-react";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { SalesTableEmptyState } from "./sales-table-empty-state";
 
 type BookingRow = {
   id: string;
@@ -46,6 +48,13 @@ export function BookingsTable({
       getRowId={(row) => row.id}
       minWidth="960px"
       onRowClick={openOrder}
+      empty={(
+        <SalesTableEmptyState
+          icon={ClipboardList}
+          title={t("bookings.empty")}
+          description={t("bookings.emptyHint")}
+        />
+      )}
     />
   );
 }

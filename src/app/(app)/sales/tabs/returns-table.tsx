@@ -1,11 +1,13 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { FileX2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { OrderDetailLink } from "@/components/order-detail-link";
 import type { ReturnListRow } from "@/lib/data/returns";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { SalesTableEmptyState } from "./sales-table-empty-state";
 
 export function ReturnsTable({
   rows,
@@ -105,6 +107,13 @@ export function ReturnsTable({
       detailSize="full"
       detailFooter={(row) => expandedId === row.id ? expandedFooter : null}
       minWidth="1120px"
+      empty={(
+        <SalesTableEmptyState
+          icon={FileX2}
+          title={t("returns.empty")}
+          description={t("returns.emptyHint")}
+        />
+      )}
       renderMobileRow={({ row, toggle }) => (
         <div className="space-y-2 p-3">
           <button

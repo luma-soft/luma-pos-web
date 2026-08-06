@@ -2,8 +2,10 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { FileSpreadsheet } from "lucide-react";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { SalesTableEmptyState } from "./sales-table-empty-state";
 
 type QuoteRow = {
   id: string;
@@ -44,6 +46,13 @@ export function QuotesTable({
       getRowId={(row) => row.id}
       minWidth="880px"
       onRowClick={openOrder}
+      empty={(
+        <SalesTableEmptyState
+          icon={FileSpreadsheet}
+          title={t("quotes.empty")}
+          description={t("quotes.emptyHint")}
+        />
+      )}
     />
   );
 }
