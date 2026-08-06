@@ -1,31 +1,51 @@
 import { Suspense } from "react";
 import { getTranslations } from "next-intl/server";
-import { and, count, desc, eq, or } from "drizzle-orm";
-import { FileSpreadsheet, Search } from "lucide-react";
-import { db } from "@/db";
-import { customers, orders } from "@/db/schema";
-import { Routes } from "@/lib/routes";
-import { accentInsensitiveLike } from "@/lib/search";
+import { FileSpreadsheet } from "lucide-react";
+import { Pagination } from "@/components/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
+import {
+  getOrders,
+  type OrderStatusFilter,
+} from "@/lib/data/orders";
+import {
+  DEFAULT_ORDER_TIME_PRESET,
+  isOrderTimePreset,
+  resolveOrderTimePreset,
+  type OrderTimePreset,
+} from "@/lib/orders/filter-date-range";
+import { parsePageSize } from "@/lib/pagination";
+import { DocumentFilterDrawer } from "./document-filter-drawer";
 import { QuotesTable } from "./quotes-table";
-import { InstantFilterForm } from "@/components/instant-filter-form";
 
 type SP = Record<string, string | undefined>;
+const QUOTE_STATUSES: OrderStatusFilter[] = ["quote", "all", "cancelled"];
 
 export async function QuotesTab({ searchParams }: { searchParams: SP }) {
-  const t = await getTranslations();
-  const params = searchParams;
+  const status = validValue(searchParams.status, QUOTE_STATUSES, "quote");
+  const { timePreset, from, to } = resolveDateFilter(searchParams);
 
   return (
     <>
-      <InstantFilterForm className="flex items-center gap-3 mb-4" action={Routes.Sales}>
-        <input type="hidden" name="tab" value="quotes" />
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("orders.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface min-h-11 lg:min-h-0" />
-        </div>
-      </InstantFilterForm>
-
+      <DocumentFilterDrawer
+        key={searchParamsKey(searchParams)}
+        kind="quotes"
+        values={{
+          q: searchParams.q ?? "",
+          customerId: searchParams.customerId ?? "",
+          customerLabel: searchParams.customerLabel ?? "",
+          productId: searchParams.productId ?? "",
+          productLabel: searchParams.productLabel ?? "",
+          projectId: searchParams.projectId ?? "",
+          projectLabel: searchParams.projectLabel ?? "",
+          projectQuery: searchParams.projectQuery ?? "",
+          timePreset,
+          from,
+          to,
+          status,
+          minTotal: searchParams.minTotal ?? "",
+          maxTotal: searchParams.maxTotal ?? "",
+        }}
+      />
       <Suspense fallback={<TableSkeleton cols={6} rows={10} />}>
         <QuotesContent searchParams={searchParams} />
       </Suspense>
@@ -35,37 +55,70 @@ export async function QuotesTab({ searchParams }: { searchParams: SP }) {
 
 async function QuotesContent({ searchParams }: { searchParams: SP }) {
   const t = await getTranslations();
-  const params = searchParams;
-  const page = Number(params.page) || 1;
-  const q = params.q?.trim();
+  const status = validValue(searchParams.status, QUOTE_STATUSES, "quote");
+  const { from, to } = resolveDateFilter(searchParams);
+  const page = positiveInteger(searchParams.page);
+  const pageSize = parsePageSize(searchParams.size);
+  const { rows, total, pageCount } = await getOrders({
+    documentType: "quote",
+    q: searchParams.q,
+    customerId: searchParams.customerId,
+    productId: searchParams.productId,
+    projectId: searchParams.projectId,
+    projectQuery: searchParams.projectQuery,
+    status,
+    from,
+    to,
+    minTotal: optionalNumber(searchParams.minTotal),
+    maxTotal: optionalNumber(searchParams.maxTotal),
+    page,
+    pageSize,
+  });
 
-  const where = q
-    ? and(eq(orders.status, "quote"), or(accentInsensitiveLike(orders.code, q), accentInsensitiveLike(customers.name, q), accentInsensitiveLike(orders.projectName, q)))
-    : and(eq(orders.status, "quote"));
-  const [rows, [{ total }]] = await Promise.all([
-    db.select({
-      id: orders.id, code: orders.code, total: orders.total, projectName: orders.projectName,
-      createdAt: orders.createdAt, customerName: customers.name,
-    })
-      .from(orders).leftJoin(customers, eq(orders.customerId, customers.id))
-      .where(where).orderBy(desc(orders.createdAt)).limit(20).offset((page - 1) * 20),
-    db.select({ total: count() }).from(orders).leftJoin(customers, eq(orders.customerId, customers.id)).where(where),
-  ]);
   return (
     <>
-      <div className="mb-2">
-        <span className="text-sm text-slate-500">{t("quotes.total", { total })}</span>
-      </div>
-
       {rows.length === 0 ? (
-        <div className="bg-surface border border-dashed border-border rounded-card p-12 text-center text-slate-400">
-          <FileSpreadsheet className="w-10 h-10 mx-auto mb-3 opacity-60" />
+        <div className="rounded-card border border-dashed border-border bg-surface p-12 text-center text-slate-400">
+          <FileSpreadsheet className="mx-auto mb-3 h-10 w-10 opacity-60" />
           <p className="font-medium">{t("quotes.empty")}</p>
-          <p className="text-sm mt-1">{t("quotes.emptyHint")}</p>
+          <p className="mt-1 text-sm">{t("quotes.emptyHint")}</p>
         </div>
       ) : (
         <QuotesTable rows={rows} />
       )}
+      <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("quotes.title")} />
     </>
   );
+}
+
+function resolveDateFilter(params: SP) {
+  const timePreset: OrderTimePreset = isOrderTimePreset(params.timePreset)
+    ? params.timePreset
+    : params.from || params.to
+      ? "custom"
+      : DEFAULT_ORDER_TIME_PRESET;
+  if (timePreset === "custom") {
+    return { timePreset, from: params.from ?? "", to: params.to ?? "" };
+  }
+  return { timePreset, ...(resolveOrderTimePreset(timePreset) ?? { from: "", to: "" }) };
+}
+
+function validValue<T extends string>(value: string | undefined, values: readonly T[], fallback: T) {
+  return values.includes(value as T) ? value as T : fallback;
+}
+
+function optionalNumber(value?: string) {
+  if (!value?.trim()) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+function positiveInteger(value?: string) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function searchParamsKey(params: SP) {
+  return Object.entries(params).sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `${key}=${value ?? ""}`).join("&");
 }

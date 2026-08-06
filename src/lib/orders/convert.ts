@@ -31,6 +31,7 @@ export async function convertQuoteToOrderForUser(
       const sourceLabel = order.status === "quote" ? "báo giá" : "đặt hàng";
       await tx.update(orders).set({
         code: newCode,
+        documentType: "sale",
         status: "completed",
         note: order.note ? `${order.note} · từ ${sourceLabel} ${order.code}` : `Từ ${sourceLabel} ${order.code}`,
         updatedAt: sql`now()`,

@@ -314,6 +314,7 @@ export async function createExchangeForUser(
       const [exchangeOrder] = await tx.insert(orders).values({
         code: generateCode("DH"),
         clientId: v.clientId,
+        documentType: "sale",
         status: "completed",
         paymentStatus,
         shiftId: currentShift?.id ?? null,

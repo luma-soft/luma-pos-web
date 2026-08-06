@@ -1,44 +1,58 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { FileX2, Search } from "lucide-react";
-import { Routes } from "@/lib/routes";
-import { getReturn, getReturns } from "@/lib/data/returns";
-import { parsePageSize } from "@/lib/pagination";
+import { FileX2 } from "lucide-react";
 import { Pagination } from "@/components/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
+import { getReturn, getReturns } from "@/lib/data/returns";
+import {
+  DEFAULT_ORDER_TIME_PRESET,
+  isOrderTimePreset,
+  resolveOrderTimePreset,
+  type OrderTimePreset,
+} from "@/lib/orders/filter-date-range";
+import { parsePageSize } from "@/lib/pagination";
+import {
+  returnReasons,
+  returnRefundMethods,
+  type ReturnReasonFilter,
+} from "@/lib/returns/list-filter-schema";
+import { DocumentFilterDrawer } from "./document-filter-drawer";
 import { ReturnDetailFooter, ReturnDetailPanel } from "./return-detail-panel";
 import { ReturnsTable } from "./returns-table";
-import { InstantFilterForm } from "@/components/instant-filter-form";
 
 type SP = Record<string, string | undefined>;
+type RefundMethod = (typeof returnRefundMethods)[number];
 
 export async function ReturnsTab({ searchParams }: { searchParams: SP }) {
-  const t = await getTranslations();
-  const params = searchParams;
+  const reason = validValue(searchParams.reason, returnReasons, "all");
+  const refundMethod = validValue(searchParams.refundMethod, returnRefundMethods, "all");
+  const { timePreset, from, to } = resolveDateFilter(searchParams);
 
   return (
     <>
-      <InstantFilterForm className="mb-4 flex flex-wrap items-center gap-2" action={Routes.Sales}>
-        <input type="hidden" name="tab" value="returns" />
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            name="q"
-            defaultValue={params.q ?? ""}
-            placeholder={t("returns.searchPlaceholder")}
-            aria-label={t("common.search")}
-            className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm min-h-11 lg:min-h-0"
-          />
-        </div>
-        {params.q && (
-          <Link href={`${Routes.Sales}?tab=returns`} className="inline-flex min-h-11 min-w-11 items-center justify-center px-3 py-2 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 lg:min-h-0 lg:min-w-0">
-            {t("common.clear")}
-          </Link>
-        )}
-      </InstantFilterForm>
-
+      <DocumentFilterDrawer
+        key={searchParamsKey(searchParams)}
+        kind="returns"
+        values={{
+          q: searchParams.q ?? "",
+          customerId: searchParams.customerId ?? "",
+          customerLabel: searchParams.customerLabel ?? "",
+          productId: searchParams.productId ?? "",
+          productLabel: searchParams.productLabel ?? "",
+          orderId: searchParams.orderId ?? "",
+          orderLabel: searchParams.orderLabel ?? "",
+          warehouseId: searchParams.warehouseId ?? "",
+          warehouseLabel: searchParams.warehouseLabel ?? "",
+          timePreset,
+          from,
+          to,
+          reason,
+          refundMethod,
+          minTotal: searchParams.minTotal ?? "",
+          maxTotal: searchParams.maxTotal ?? "",
+          includeCancelled: searchParams.includeCancelled === "1",
+        }}
+      />
       <Suspense fallback={<TableSkeleton cols={8} rows={10} />}>
         <ReturnsContent searchParams={searchParams} />
       </Suspense>
@@ -48,20 +62,34 @@ export async function ReturnsTab({ searchParams }: { searchParams: SP }) {
 
 async function ReturnsContent({ searchParams }: { searchParams: SP }) {
   const t = await getTranslations();
-  const page = Number(searchParams.page) || 1;
+  const page = positiveInteger(searchParams.page);
   const pageSize = parsePageSize(searchParams.size);
   const expandedId = searchParams.expandedReturn ?? null;
+  const reason: ReturnReasonFilter = validValue(searchParams.reason, returnReasons, "all");
+  const refundMethod: RefundMethod = validValue(searchParams.refundMethod, returnRefundMethods, "all");
+  const { from, to } = resolveDateFilter(searchParams);
   const [{ rows, total, pageCount }, expandedReturn] = await Promise.all([
-    getReturns({ q: searchParams.q, page, pageSize }),
+    getReturns({
+      q: searchParams.q,
+      customerId: searchParams.customerId,
+      productId: searchParams.productId,
+      orderId: searchParams.orderId,
+      warehouseId: searchParams.warehouseId,
+      reason,
+      refundMethod,
+      from,
+      to,
+      minTotal: optionalNumber(searchParams.minTotal),
+      maxTotal: optionalNumber(searchParams.maxTotal),
+      includeCancelled: searchParams.includeCancelled === "1",
+      page,
+      pageSize,
+    }),
     expandedId ? getReturn(expandedId).catch(() => null) : Promise.resolve(null),
   ]);
 
   return (
     <>
-      <div className="mb-2">
-        <span className="text-sm text-slate-500">{t("returns.total", { total })}</span>
-      </div>
-
       {rows.length === 0 ? (
         <div className="rounded-card border border-dashed border-border bg-surface p-12 text-center text-slate-400">
           <FileX2 className="mx-auto mb-3 h-10 w-10 opacity-60" />
@@ -76,8 +104,39 @@ async function ReturnsContent({ searchParams }: { searchParams: SP }) {
           expandedFooter={expandedReturn ? <ReturnDetailFooter ret={expandedReturn} /> : null}
         />
       )}
-
       <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("returns.title")} />
     </>
   );
+}
+
+function resolveDateFilter(params: SP) {
+  const timePreset: OrderTimePreset = isOrderTimePreset(params.timePreset)
+    ? params.timePreset
+    : params.from || params.to
+      ? "custom"
+      : DEFAULT_ORDER_TIME_PRESET;
+  if (timePreset === "custom") {
+    return { timePreset, from: params.from ?? "", to: params.to ?? "" };
+  }
+  return { timePreset, ...(resolveOrderTimePreset(timePreset) ?? { from: "", to: "" }) };
+}
+
+function validValue<T extends string>(value: string | undefined, values: readonly T[], fallback: T) {
+  return values.includes(value as T) ? value as T : fallback;
+}
+
+function optionalNumber(value?: string) {
+  if (!value?.trim()) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+}
+
+function positiveInteger(value?: string) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function searchParamsKey(params: SP) {
+  return Object.entries(params).sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `${key}=${value ?? ""}`).join("&");
 }

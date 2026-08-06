@@ -59,6 +59,7 @@ export async function createPortalOrder(input: PortalOrderInput): Promise<Action
     const result = await db.transaction(async (tx) => {
       const [order] = await tx.insert(orders).values({
         code: generateCode("DO"), // đơn online chờ xác nhận
+        documentType: "quote",
         status: "quote",
         paymentStatus: "unpaid",
         customerId: customer.id,

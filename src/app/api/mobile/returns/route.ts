@@ -7,39 +7,23 @@ import {
   mobileError,
   mobileGate,
   mobileOk,
-  numberParam,
   readJson,
-  searchParam,
 } from "@/lib/mobile/response";
 import { paymentRequestIp } from "@/lib/payments/request-ip";
 import { submitGatewayRefund } from "@/lib/payments/refund-service";
+import { parseReturnListSearchParams } from "@/lib/returns/list-filter-schema";
 
 export async function GET(request: Request) {
   const gate = await requireMobileSalesAccess();
   if (!gate.ok) return mobileGate(gate);
 
-  const page = Math.max(1, numberParam(request, "page", 1));
-  const pageSize = Math.min(
-    100,
-    Math.max(1, numberParam(request, "pageSize", 20)),
-  );
-  const result = await getReturns({
-    q: searchParam(request, "q"),
-    customerQuery: searchParam(request, "customerQuery"),
-    productQuery: searchParam(request, "productQuery"),
-    orderQuery: searchParam(request, "orderQuery"),
-    reason: searchParam(request, "reason"),
-    refundMethod: searchParam(request, "refundMethod"),
-    warehouseId: searchParam(request, "warehouseId"),
-    warehouseQuery: searchParam(request, "warehouseQuery"),
-    from: searchParam(request, "from"),
-    to: searchParam(request, "to"),
-    minTotal: numberParam(request, "minTotal", Number.NaN),
-    maxTotal: numberParam(request, "maxTotal", Number.NaN),
-    includeCancelled: searchParam(request, "includeCancelled") === "true",
-    page,
-    pageSize,
-  });
+  const parsed = parseReturnListSearchParams(new URL(request.url).searchParams);
+  if (!parsed.success) {
+    const invalidReason = parsed.error.issues.some((issue) => issue.path[0] === "reason");
+    return mobileError(invalidReason ? "returns.errors.invalidReason" : "errors.invalidData", 400);
+  }
+  const { page, pageSize } = parsed.data;
+  const result = await getReturns(parsed.data);
   return mobileOk({
     returns: result.rows,
     total: result.total,

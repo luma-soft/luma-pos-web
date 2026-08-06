@@ -573,6 +573,7 @@ export async function importShopeeOrder(input: ImportShopeeOrderInput): Promise<
       const isCancelled = v.status.toLowerCase().includes("cancel");
       const [order] = await tx.insert(orders).values({
         code: generateCode("SHP"),
+        documentType: "sale",
         status: isCancelled ? "cancelled" : "completed",
         paymentStatus: "paid",
         customerId,

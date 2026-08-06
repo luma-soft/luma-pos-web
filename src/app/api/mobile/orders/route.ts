@@ -1,10 +1,4 @@
 import { getOrders } from "@/lib/data/orders";
-import type {
-  OrderPaymentFilter,
-  OrderPaymentMethodFilter,
-  OrderSourceFilter,
-  OrderStatusFilter,
-} from "@/lib/data/orders";
 import { createOrderForUser } from "@/lib/orders/create";
 import { authorizeMobileSensitiveAction } from "@/lib/auth/mobile-approval";
 import { getRawStorePrefs } from "@/lib/data/settings";
@@ -18,45 +12,22 @@ import {
   mobileError,
   mobileGate,
   mobileOk,
-  numberParam,
   readJson,
-  searchParam,
 } from "@/lib/mobile/response";
 import type { CreateOrderInput } from "@/lib/schemas/order";
 import { createOrderSchema } from "@/lib/schemas/order";
 import { normalizeOrderItems } from "@/lib/orders/normalize";
 import { evaluateOrderApprovalRequirement } from "@/lib/orders/sensitive-approval";
+import { parseOrderListSearchParams } from "@/lib/orders/list-filter-schema";
 
 export async function GET(request: Request) {
   const gate = await requireMobileSalesAccess();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
 
-  const minTotal = searchParam(request, "minTotal");
-  const maxTotal = searchParam(request, "maxTotal");
-  return mobileOk(
-    await getOrders({
-      q: searchParam(request, "q"),
-      customerQuery: searchParam(request, "customerQuery"),
-      productQuery: searchParam(request, "productQuery"),
-      projectQuery: searchParam(request, "projectQuery"),
-      status: searchParam(request, "status") as OrderStatusFilter | undefined,
-      payment: searchParam(request, "payment") as
-        OrderPaymentFilter | undefined,
-      paymentMethod: searchParam(request, "paymentMethod") as
-        OrderPaymentMethodFilter | undefined,
-      source: searchParam(request, "source") as OrderSourceFilter | undefined,
-      from: searchParam(request, "from"),
-      to: searchParam(request, "to"),
-      deliveryFrom: searchParam(request, "deliveryFrom"),
-      deliveryTo: searchParam(request, "deliveryTo"),
-      minTotal: minTotal == null ? undefined : Number(minTotal),
-      maxTotal: maxTotal == null ? undefined : Number(maxTotal),
-      includeCancelled: searchParam(request, "includeCancelled") === "true",
-      page: numberParam(request, "page", 1),
-      pageSize: numberParam(request, "pageSize", 20),
-    }),
-  );
+  const parsed = parseOrderListSearchParams(new URL(request.url).searchParams);
+  if (!parsed.success) return mobileError("errors.invalidData", 400);
+  return mobileOk(await getOrders(parsed.data));
 }
 
 export async function POST(request: Request) {

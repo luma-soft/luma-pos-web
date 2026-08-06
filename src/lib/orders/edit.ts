@@ -160,6 +160,7 @@ export async function mergeOrdersForUser(userId: string, orderIds: string[]): Pr
 
       const [merged] = await tx.insert(orders).values({
         code: generateCode("DHG"),
+        documentType: "sale",
         status: "completed",
         paymentStatus: paid >= total ? "paid" : paid > 0 ? "partial" : "unpaid",
         customerId: sources[0].customerId,

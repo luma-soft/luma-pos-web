@@ -17,6 +17,46 @@ export type OrderTimePreset = (typeof ORDER_TIME_PRESETS)[number]["value"];
 
 export const DEFAULT_ORDER_TIME_PRESET: OrderTimePreset = "thisMonth";
 
+export const BOOKING_DELIVERY_PRESETS = [
+  { value: "all", label: "Tất cả ngày giao" },
+  { value: "today", label: "Giao hôm nay" },
+  { value: "tomorrow", label: "Giao ngày mai" },
+  { value: "thisWeek", label: "Tuần này" },
+  { value: "overdue", label: "Quá hạn" },
+  { value: "custom", label: "Tùy chỉnh" },
+] as const;
+export type BookingDeliveryPreset = (typeof BOOKING_DELIVERY_PRESETS)[number]["value"];
+
+export function isBookingDeliveryPreset(value?: string): value is BookingDeliveryPreset {
+  return BOOKING_DELIVERY_PRESETS.some((preset) => preset.value === value);
+}
+
+export function resolveBookingDeliveryPreset(
+  preset: BookingDeliveryPreset,
+  now = new Date(),
+): OrderDateRange | null {
+  if (preset === "custom") return null;
+  if (preset === "all") return { from: "", to: "" };
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const mondayOffset = today.getDay() === 0 ? 6 : today.getDay() - 1;
+  const endOfWeek = addDays(today, 6 - mondayOffset);
+  if (preset === "today") {
+    const value = localDateValue(today);
+    return { from: value, to: value };
+  }
+  if (preset === "tomorrow") {
+    const value = localDateValue(addDays(today, 1));
+    return { from: value, to: value };
+  }
+  if (preset === "thisWeek") {
+    return { from: localDateValue(today), to: localDateValue(endOfWeek) };
+  }
+  return {
+    from: "",
+    to: localDateValue(addDays(today, -1)),
+  };
+}
+
 export type OrderDateRange = {
   from: string;
   to: string;

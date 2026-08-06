@@ -230,6 +230,7 @@ export async function createOrderForUser(
       const orderInsert: typeof orders.$inferInsert = {
         code: generateCode(isQuote ? "BG" : "DH"),
         clientId: v.clientId ?? null,
+        documentType: isQuote ? "quote" : isBooking ? "booking" : "sale",
         status: isQuote
           ? "quote"
           : isBooking

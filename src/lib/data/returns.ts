@@ -3,15 +3,25 @@ import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { customers, orders, profiles, returnItems, returns, warehouses } from "@/db/schema";
 import { accentInsensitiveLike } from "@/lib/search";
+import type {
+  ReturnReasonFilter,
+} from "@/lib/returns/list-filter-schema";
+
+type ReturnRefundMethodFilter =
+  | "all"
+  | (typeof returns.refundMethod.enumValues)[number];
 
 export type ReturnListRow = Awaited<ReturnType<typeof getReturns>>["rows"][number];
 
 export async function getReturns({
   q,
+  customerId,
+  productId,
+  orderId,
   customerQuery,
   productQuery,
   orderQuery,
-  reason,
+  reason = "all",
   refundMethod,
   warehouseId,
   warehouseQuery,
@@ -24,11 +34,14 @@ export async function getReturns({
   pageSize = 20,
 }: {
   q?: string;
+  customerId?: string;
+  productId?: string;
+  orderId?: string;
   customerQuery?: string;
   productQuery?: string;
   orderQuery?: string;
-  reason?: string;
-  refundMethod?: string;
+  reason?: ReturnReasonFilter;
+  refundMethod?: ReturnRefundMethodFilter;
   warehouseId?: string;
   warehouseQuery?: string;
   from?: string;
@@ -60,6 +73,23 @@ export async function getReturns({
       );
     if (match) conditions.push(match);
   }
+  if (customerId?.trim()) conditions.push(eq(returns.customerId, customerId.trim()));
+  if (productId?.trim()) {
+    conditions.push(
+      exists(
+        db
+          .select({ value: sql`1` })
+          .from(returnItems)
+          .where(
+            and(
+              eq(returnItems.returnId, returns.id),
+              eq(returnItems.productId, productId.trim()),
+            ),
+          ),
+      ),
+    );
+  }
+  if (orderId?.trim()) conditions.push(eq(returns.orderId, orderId.trim()));
   if (customerQuery?.trim()) {
     const customerMatch = or(
       accentInsensitiveLike(customers.name, customerQuery.trim()),
@@ -85,11 +115,11 @@ export async function getReturns({
   if (orderQuery?.trim()) {
     conditions.push(accentInsensitiveLike(orders.code, orderQuery.trim()));
   }
-  if (reason?.trim() && reason !== "all") {
-    conditions.push(accentInsensitiveLike(returns.reason, reason.trim()));
+  if (reason !== "all") {
+    conditions.push(eq(returns.reason, reason));
   }
-  if (refundMethod?.trim() && refundMethod !== "all") {
-    conditions.push(eq(returns.refundMethod, refundMethod as typeof returns.refundMethod.enumValues[number]));
+  if (refundMethod && refundMethod !== "all") {
+    conditions.push(eq(returns.refundMethod, refundMethod));
   }
   if (warehouseId?.trim()) conditions.push(eq(returns.warehouseId, warehouseId.trim()));
   if (warehouseQuery?.trim()) {

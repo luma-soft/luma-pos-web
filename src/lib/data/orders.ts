@@ -46,12 +46,15 @@ export type OrderPaymentMethodFilter =
   "all" | "cash" | "bank_transfer" | "card";
 export type OrderSourceFilter =
   "all" | "pos" | "shopee" | "tiktok_shop" | "lazada" | "tiki";
+export type OrderDocumentTypeFilter = "sale" | "quote" | "booking";
 
 export interface OrderListFilters {
+  documentType?: OrderDocumentTypeFilter;
   orderId?: string;
   q?: string;
   customerId?: string;
   productId?: string;
+  projectId?: string;
   customerQuery?: string;
   productQuery?: string;
   projectQuery?: string;
@@ -79,18 +82,22 @@ function isUuid(value?: string): value is string {
 
 export async function getOrders(filters: OrderListFilters = {}) {
   const page = Math.max(1, filters.page ?? 1);
-  const size = coercePageSize(filters.pageSize);
+  // Count-preview routes intentionally request a single row while reusing this
+  // exact condition set. Interactive lists still use the supported page sizes.
+  const size = filters.pageSize === 1 ? 1 : coercePageSize(filters.pageSize);
   const conditions: SQL[] = [];
-  if (filters.status === "quote") conditions.push(eq(orders.status, "quote"));
-  else if (filters.status === "confirmed")
-    conditions.push(eq(orders.status, "confirmed"));
-  else {
-    // Báo giá / đặt hàng chỉ xuất hiện khi mobile yêu cầu đúng tab.
-    conditions.push(ne(orders.status, "quote"), ne(orders.status, "confirmed"));
-  }
+  const documentType = filters.documentType ??
+    (filters.status === "quote"
+      ? "quote"
+      : filters.status === "confirmed"
+        ? "booking"
+        : "sale");
+  conditions.push(eq(orders.documentType, documentType));
   if (filters.orderId) conditions.push(eq(orders.id, filters.orderId));
 
-  if (filters.status !== "cancelled" && !filters.includeCancelled) {
+  const includeCancelled = filters.includeCancelled ||
+    (documentType !== "sale" && filters.status === "all");
+  if (filters.status !== "cancelled" && !includeCancelled) {
     conditions.push(ne(orders.status, "cancelled"));
   }
 
@@ -120,6 +127,9 @@ export async function getOrders(filters: OrderListFilters = {}) {
           ),
       ),
     );
+  }
+  if (isUuid(filters.projectId)) {
+    conditions.push(eq(orders.projectId, filters.projectId));
   }
   if (filters.customerQuery?.trim()) {
     const customerQuery = filters.customerQuery.trim();
@@ -159,6 +169,9 @@ export async function getOrders(filters: OrderListFilters = {}) {
   if (filters.status === "returned")
     conditions.push(eq(orders.status, "returned"));
   if (filters.status === "draft") conditions.push(eq(orders.status, "draft"));
+  if (filters.status === "quote") conditions.push(eq(orders.status, "quote"));
+  if (filters.status === "confirmed")
+    conditions.push(eq(orders.status, "confirmed"));
   if (filters.status === "delivering")
     conditions.push(eq(orders.status, "delivering"));
   if (filters.status === "owing") {
@@ -232,6 +245,7 @@ export async function getOrders(filters: OrderListFilters = {}) {
     .select({
       id: orders.id,
       code: orders.code,
+      documentType: orders.documentType,
       status: orders.status,
       paymentStatus: orders.paymentStatus,
       projectName: orders.projectName,
@@ -300,6 +314,7 @@ export async function getOrder(id: string) {
     .select({
       id: orders.id,
       code: orders.code,
+      documentType: orders.documentType,
       status: orders.status,
       paymentStatus: orders.paymentStatus,
       projectName: orders.projectName,

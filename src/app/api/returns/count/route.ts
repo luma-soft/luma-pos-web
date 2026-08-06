@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireSalesAccess } from "@/lib/actions/common";
-import {
-  getOrders,
-} from "@/lib/data/orders";
-import { parseOrderListSearchParams } from "@/lib/orders/list-filter-schema";
+import { getReturns } from "@/lib/data/returns";
+import { parseReturnListSearchParams } from "@/lib/returns/list-filter-schema";
 
 export async function GET(request: Request) {
   const gate = await requireSalesAccess();
@@ -14,20 +12,24 @@ export async function GET(request: Request) {
     );
   }
 
-  const params = new URL(request.url).searchParams;
-  const parsed = parseOrderListSearchParams(params);
+  const parsed = parseReturnListSearchParams(new URL(request.url).searchParams);
   if (!parsed.success) {
+    const invalidReason = parsed.error.issues.some((issue) => issue.path[0] === "reason");
     return NextResponse.json(
-      { ok: false, error: "Bộ lọc không hợp lệ", details: parsed.error.flatten() },
+      {
+        ok: false,
+        error: invalidReason ? "Lý do trả hàng không hợp lệ" : "Bộ lọc không hợp lệ",
+        details: parsed.error.flatten(),
+      },
       { status: 400 },
     );
   }
-  const { total } = await getOrders({
+
+  const { total } = await getReturns({
     ...parsed.data,
     page: 1,
     pageSize: 1,
   });
-
   return NextResponse.json(
     { ok: true, data: { total } },
     { headers: { "Cache-Control": "private, no-store" } },

@@ -13,6 +13,9 @@ export const userRoleEnum = pgEnum("user_role", ["owner", "manager", "cashier", 
 export const orderStatusEnum = pgEnum("order_status", [
   "draft", "quote", "confirmed", "delivering", "completed", "cancelled", "returned", "merged",
 ]);
+export const orderDocumentTypeEnum = pgEnum("order_document_type", [
+  "sale", "quote", "booking",
+]);
 export const paymentStatusEnum = pgEnum("payment_status", [
   "unpaid", "deposit", "partial", "paid", "refunded",
 ]);
@@ -596,6 +599,7 @@ export const orders = pgTable("orders", {
   // không tạo đơn trùng (unique). Xem supabase/order-client-id.sql.
   clientId: varchar("client_id", { length: 40 }).unique(),
   status: orderStatusEnum("status").notNull().default("draft"),
+  documentType: orderDocumentTypeEnum("document_type").notNull().default("sale"),
   paymentStatus: paymentStatusEnum("payment_status").notNull().default("unpaid"),
   shiftId: uuid("shift_id").references(() => shifts.id, { onDelete: "set null" }),
 
@@ -627,6 +631,7 @@ export const orders = pgTable("orders", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("orders_status_idx").on(t.status),
+  index("orders_document_type_status_idx").on(t.documentType, t.status),
   index("orders_customer_idx").on(t.customerId),
   index("orders_created_idx").on(t.createdAt),
   index("orders_shift_idx").on(t.shiftId),
