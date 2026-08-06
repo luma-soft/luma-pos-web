@@ -11,7 +11,6 @@ import {
   ExternalLink,
   FileDown,
   FileInput,
-  Lock,
   Loader2,
   Pencil,
   Plus,
@@ -740,6 +739,13 @@ function CustomerActionBar({ customer }: { customer: CustomerRow }) {
           <ActionButton icon={Trash2} label={t("common.delete")} tone="danger" disabled title={t("customers.actions.deleteDisabled")} />
         </div>
         <div className="flex flex-wrap gap-2 xl:justify-end">
+          <Link
+            href={`${Routes.Customers}/${customer.id}`}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11 min-w-11 lg:min-h-0 lg:min-w-0")}
+          >
+            <ExternalLink className="h-4 w-4" />
+            {t("customers.actions.viewDetails")}
+          </Link>
           <CustomerEdit customer={{
             id: customer.id,
             name: customer.name,
@@ -772,19 +778,6 @@ function CustomerFilterForm({ filters, pageSize }: { filters: CustomerFilters; p
       <input type="hidden" name="size" value={pageSize} />
       {filters.q && <input type="hidden" name="q" value={filters.q} />}
 
-      <div>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-bold">{t("customers.filters.group")}</h3>
-          <span className="text-xs font-semibold text-primary-600">{t("customers.filters.createNew")}</span>
-        </div>
-        <Select
-          disabled
-          value="all"
-          options={[{ value: "all", label: t("customers.filters.allGroups") }]}
-          className="w-full bg-surface-2 text-slate-400"
-        />
-      </div>
-
       <DateRangeFilter title={t("customers.filters.createdAt")} fromName="createdFrom" toName="createdTo" fromValue={filters.createdFrom} toValue={filters.createdTo} />
 
       <div>
@@ -805,8 +798,6 @@ function CustomerFilterForm({ filters, pageSize }: { filters: CustomerFilters; p
         </div>
       </div>
 
-      <DisabledFilter title={t("customers.filters.gender")} />
-      <DisabledFilter title={t("customers.filters.birthday")} />
       <DateRangeFilter title={t("customers.filters.lastTransaction")} fromName="lastTxFrom" toName="lastTxTo" fromValue={filters.lastTxFrom} toValue={filters.lastTxTo} />
       <MoneyRangeFilter title={t("customers.filters.totalSales")} fromName="totalFrom" toName="totalTo" fromValue={filters.totalFrom} toValue={filters.totalTo} />
       <MoneyRangeFilter title={t("customers.filters.currentDebt")} fromName="debtFrom" toName="debtTo" fromValue={filters.debtFrom} toValue={filters.debtTo} />
@@ -867,19 +858,6 @@ function MoneyRangeFilter({
       <div className="grid grid-cols-2 gap-2">
         <input name={fromName} inputMode="numeric" defaultValue={fromValue ?? ""} placeholder={t("customers.filters.fromValue")} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" />
         <input name={toName} inputMode="numeric" defaultValue={toValue ?? ""} placeholder={t("customers.filters.toValue")} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" />
-      </div>
-    </div>
-  );
-}
-
-function DisabledFilter({ title }: { title: string }) {
-  const t = useTranslations();
-  return (
-    <div>
-      <h3 className="mb-3 text-sm font-bold text-slate-500">{title}</h3>
-      <div className="flex items-center gap-2 rounded-lg border border-dashed border-border bg-surface-2 px-3 py-2 text-sm text-slate-400">
-        <Lock className="h-4 w-4" />
-        {t("customers.filters.noData")}
       </div>
     </div>
   );

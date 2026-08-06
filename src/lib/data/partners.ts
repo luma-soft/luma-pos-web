@@ -19,6 +19,7 @@ const CUSTOMER_TYPES = ["retail", "wholesale", "contractor", "agent"] as const;
 type CustomerType = (typeof CUSTOMER_TYPES)[number];
 
 export type CustomerFilters = {
+  customerId?: string;
   q?: string;
   type?: string;
   owing?: boolean;
@@ -76,6 +77,8 @@ function parseMoneyBound(value?: string) {
 function buildCustomerConditions(filters: CustomerFilters) {
   const conditions: SQL[] = [eq(customers.isActive, true)];
 
+  if (filters.customerId) conditions.push(eq(customers.id, filters.customerId));
+
   if (filters.q?.trim()) {
     const q = filters.q.trim();
     const c = or(accentInsensitiveLike(customers.name, q), accentInsensitiveLike(customers.phone, q), accentInsensitiveLike(customers.code, q));
@@ -117,7 +120,10 @@ function buildCustomerConditions(filters: CustomerFilters) {
 
 const saleOrderStatus = sql`${orders.status} in ('completed', 'returned')`;
 
-export async function getCustomers(filters: CustomerFilters = {}) {
+export async function getCustomers(
+  filters: CustomerFilters = {},
+  options: { includeHistory?: boolean } = {},
+) {
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize);
   const conditions = buildCustomerConditions(filters);
@@ -153,6 +159,11 @@ export async function getCustomers(filters: CustomerFilters = {}) {
           where ${orders.customerId} = ${customers.id}
             and ${orders.status} in ('completed', 'returned')
         )`,
+        orderCount: sql<number>`(
+          select count(*)::int
+          from ${orders}
+          where ${orders.customerId} = ${customers.id}
+        )`,
         consentStatus: customerConsents.status,
         consentPurposes: customerConsents.purposes,
         consentUpdatedAt: customerConsents.updatedAt,
@@ -167,8 +178,15 @@ export async function getCustomers(filters: CustomerFilters = {}) {
       .select({
         totalDebt: sql<string>`coalesce(sum(${customers.currentDebt}), 0)`,
         totalNetSales: sql<string>`coalesce(sum(${customers.totalSpent}), 0)`,
+        retailCount: sql<number>`sum(case when ${customers.type} = 'retail' then 1 else 0 end)::int`,
+        wholesaleCount: sql<number>`sum(case when ${customers.type} = 'wholesale' then 1 else 0 end)::int`,
+        contractorCount: sql<number>`sum(case when ${customers.type} = 'contractor' then 1 else 0 end)::int`,
+        agentCount: sql<number>`sum(case when ${customers.type} = 'agent' then 1 else 0 end)::int`,
+        owingCount: sql<number>`sum(case when ${customers.currentDebt} > 0 then 1 else 0 end)::int`,
+        consentGrantedCount: sql<number>`sum(case when ${customerConsents.status} = 'granted' then 1 else 0 end)::int`,
       })
       .from(customers)
+      .leftJoin(customerConsents, eq(customerConsents.customerId, customers.id))
       .where(where),
     db
       .select({
@@ -186,6 +204,29 @@ export async function getCustomers(filters: CustomerFilters = {}) {
     salesHistory: [] as CustomerSalesHistoryRow[],
     debtLedger: [] as CustomerDebtLedgerRow[],
   }));
+
+  const summary = {
+    rows,
+    total,
+    page,
+    pageSize: size,
+    pageCount: Math.max(1, Math.ceil(total / size)),
+    totalDebt: Number(moneyAgg.totalDebt),
+    totalGrossSales: Number(grossAgg.totalGrossSales),
+    totalNetSales: Number(moneyAgg.totalNetSales),
+    stats: {
+      retail: Number(moneyAgg.retailCount),
+      wholesale: Number(moneyAgg.wholesaleCount),
+      contractor: Number(moneyAgg.contractorCount),
+      agent: Number(moneyAgg.agentCount),
+      owing: Number(moneyAgg.owingCount),
+      consentGranted: Number(moneyAgg.consentGrantedCount),
+    },
+  };
+
+  if (options.includeHistory === false || customerIds.length === 0) {
+    return summary;
+  }
 
   if (customerIds.length > 0) {
     const [grossRows, orderRows, returnRows, paymentRows, receivableEntryRows] = await Promise.all([
@@ -390,12 +431,17 @@ export async function getCustomers(filters: CustomerFilters = {}) {
   }
 
   return {
-    rows, total, page, pageSize: size,
-    pageCount: Math.max(1, Math.ceil(total / size)),
-    totalDebt: Number(moneyAgg.totalDebt),
-    totalGrossSales: Number(grossAgg.totalGrossSales),
-    totalNetSales: Number(moneyAgg.totalNetSales),
+    ...summary,
+    rows,
   };
+}
+
+export async function getCustomerPartnerDetail(id: string) {
+  const result = await getCustomers(
+    { customerId: id, page: 1, pageSize: 1 },
+    { includeHistory: true },
+  );
+  return result.rows[0] ?? null;
 }
 
 export async function getCustomer(id: string) {

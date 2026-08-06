@@ -1781,11 +1781,16 @@
       "namePlaceholder": "VD: Anh Tuấn (thầu)",
       "email": "Email",
       "zaloUserId": "Zalo user ID",
+      "consentStatus": "Đồng ý xử lý dữ liệu cá nhân",
       "address": "Địa chỉ",
       "taxCode": "Mã số thuế",
       "debtLimit": "Hạn mức công nợ",
       "debtLimitHint": "0 = không cho ghi nợ",
       "note": "Ghi chú"
+    },
+    "consent": {
+      "pending": "Chưa xác nhận",
+      "granted": "Đã đồng ý"
     },
     "debtOfLimit": "{pct}% hạn mức {limit}",
     "orderCount": "{count} đơn gần nhất",
@@ -1807,6 +1812,7 @@
       "adjust": "Điều chỉnh",
       "paymentDiscount": "Chiết khấu thanh toán",
       "createQr": "Tạo QR",
+      "viewDetails": "Xem hồ sơ đầy đủ",
       "stop": "Ngừng hoạt động",
       "deleteDisabled": "Chưa hỗ trợ xóa khách đã có chứng từ; dùng Ngừng hoạt động để ẩn khách khỏi danh sách."
     },

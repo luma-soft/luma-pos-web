@@ -25,6 +25,11 @@ export async function GET(request: Request) {
     getPurchaseReturns({
       q: searchParam(request, "q"),
       status: searchParam(request, "status"),
+      settlement: searchParam(request, "settlement"),
+      supplierId: searchParam(request, "supplierId"),
+      warehouseId: searchParam(request, "warehouseId"),
+      from: searchParam(request, "from"),
+      to: searchParam(request, "to"),
       page: numberParam(request, "page", 1),
       pageSize: numberParam(request, "pageSize", 30),
     }),

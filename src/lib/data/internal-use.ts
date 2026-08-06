@@ -1,4 +1,4 @@
-import { desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, inArray, lte, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { internalUseIssues, internalUseItems, products, profiles, warehouses } from "@/db/schema";
@@ -15,7 +15,7 @@ export async function getAuthoritativeInternalUseWarehouse(): Promise<InternalUs
 }
 
 /** Lịch sử phiếu xuất nội bộ (audit) — mới nhất trước. */
-export async function getInternalUseIssues({ limit = 50, q }: { limit?: number; q?: string } = {}) {
+export async function getInternalUseIssues({ limit = 50, q, status, warehouseId, reason, department, from, to }: { limit?: number; q?: string; status?: string; warehouseId?: string; reason?: string; department?: string; from?: string; to?: string } = {}) {
   const creator = alias(profiles, "iu_creator");
   const search = q?.trim();
   const searchCondition = search
@@ -27,6 +27,7 @@ export async function getInternalUseIssues({ limit = 50, q }: { limit?: number; 
       ilike(warehouses.name, `%${search}%`),
     )
     : undefined;
+  const filters: SQL[] = [searchCondition, status ? eq(internalUseIssues.status, status) : undefined, warehouseId ? eq(internalUseIssues.warehouseId, warehouseId) : undefined, reason ? eq(internalUseIssues.reason, reason) : undefined, department ? eq(internalUseIssues.department, department) : undefined, from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? gte(internalUseIssues.createdAt, new Date(`${from}T00:00:00`)) : undefined, to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? lte(internalUseIssues.createdAt, new Date(`${to}T23:59:59.999`)) : undefined].filter((value): value is SQL => Boolean(value));
 
   const rows = await db
     .select({
@@ -45,7 +46,7 @@ export async function getInternalUseIssues({ limit = 50, q }: { limit?: number; 
     .from(internalUseIssues)
     .leftJoin(warehouses, eq(internalUseIssues.warehouseId, warehouses.id))
     .leftJoin(creator, eq(internalUseIssues.createdBy, creator.id))
-    .where(searchCondition)
+    .where(filters.length ? and(...filters) : undefined)
     .orderBy(desc(internalUseIssues.createdAt))
     .limit(limit);
 

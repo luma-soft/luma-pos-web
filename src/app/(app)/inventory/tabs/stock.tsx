@@ -14,12 +14,12 @@ import {
 import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
 import { getProductFormOptions } from "@/lib/data/products";
-import { Select } from "@/components/ui/select";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { StockTable } from "./stock-table";
 import { InstantFilterForm } from "@/components/instant-filter-form";
 import { serializeMovementCreatedAt } from "@/lib/inventory/movement-serialization";
 import { StockOverview } from "./stock-overview";
+import { InventoryFilterDrawer } from "./inventory-filter-drawer";
 
 type SP = Record<string, string | undefined>;
 type InventoryStockStatus = keyof InventoryStatusCounts;
@@ -136,29 +136,8 @@ async function StockStatusDetail({
             className="min-h-11 w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none"
           />
         </label>
-        <Select
-          name="warehouse"
-          defaultValue={warehouse}
-          options={[
-            { value: "", label: t("inventory.allWarehouses") },
-            ...purchaseOptions.warehouses.map((item) => ({
-              value: item.id,
-              label: item.name,
-            })),
-          ]}
-        />
-        <Select
-          name="category"
-          defaultValue={category}
-          options={[
-            { value: "", label: t("products.list.allCategories") },
-            ...productOptions.categories.map((item) => ({
-              value: item.id,
-              label: item.name,
-            })),
-          ]}
-        />
       </InstantFilterForm>
+      <div className="mt-3"><InventoryFilterDrawer title="Bộ lọc kho hàng" values={searchParams} fields={["warehouse", "category", "stock"]} warehouses={purchaseOptions.warehouses.map((item) => ({ value: item.id, label: item.name }))} categories={productOptions.categories.map((item) => ({ value: item.id, label: item.name }))} /></div>
 
       <section aria-labelledby="inventory-product-list-heading">
         <div className="mb-3 flex items-center justify-between gap-3">

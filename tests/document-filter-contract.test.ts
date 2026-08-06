@@ -140,13 +140,21 @@ describe("document filter UI contract", () => {
   );
 
   test("uses one responsive drawer and custom opened pickers", () => {
+    const shared = readFileSync(
+      new URL(
+        "../src/app/(app)/sales/tabs/filter-drawer-shared.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    const haystack = `${drawer}\n${shared}`;
     expect(drawer).toContain('role="dialog"');
-    expect(drawer).toContain('role="combobox"');
-    expect(drawer).toContain('role="listbox"');
-    expect(drawer).toContain('role="option"');
-    expect(drawer).toContain('aria-expanded={open}');
-    expect(drawer).toContain('event.key === "ArrowDown"');
-    expect(drawer).toContain('document.addEventListener("mousedown", close)');
+    expect(haystack).toContain('role="combobox"');
+    expect(haystack).toContain('role="listbox"');
+    expect(haystack).toContain('role="option"');
+    expect(haystack).toContain('aria-expanded={open}');
+    expect(haystack).toContain('event.key === "ArrowDown"');
+    expect(haystack).toContain('document.addEventListener("mousedown", onOutsideClick)');
     expect(drawer).not.toContain("<select");
     expect(drawer).not.toContain("<datalist");
     expect(drawer).not.toContain('type="date"');

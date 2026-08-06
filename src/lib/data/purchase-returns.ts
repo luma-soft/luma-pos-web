@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, or, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, lte, or, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
   categories,
@@ -14,7 +14,7 @@ import { accentInsensitiveLike } from "@/lib/search";
 import { coercePageSize } from "@/lib/pagination";
 import { stockManagedCategoryCondition } from "@/lib/data/product-stock";
 
-export async function getPurchaseReturns(filters: { q?: string; status?: string; page?: number; pageSize?: number } = {}) {
+export async function getPurchaseReturns(filters: { q?: string; status?: string; settlement?: string; supplierId?: string; warehouseId?: string; from?: string; to?: string; page?: number; pageSize?: number } = {}) {
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize);
   const conditions: SQL[] = [];
@@ -24,6 +24,11 @@ export async function getPurchaseReturns(filters: { q?: string; status?: string;
     if (c) conditions.push(c);
   }
   if (filters.status && ["completed", "draft"].includes(filters.status)) conditions.push(eq(purchaseReturns.status, filters.status));
+  if (filters.settlement && ["unsettled", "partial", "settled"].includes(filters.settlement)) conditions.push(eq(purchaseReturns.settlementStatus, filters.settlement));
+  if (filters.supplierId) conditions.push(eq(purchaseReturns.supplierId, filters.supplierId));
+  if (filters.warehouseId) conditions.push(eq(purchaseReturns.warehouseId, filters.warehouseId));
+  if (filters.from && /^\d{4}-\d{2}-\d{2}$/.test(filters.from)) conditions.push(gte(purchaseReturns.createdAt, new Date(`${filters.from}T00:00:00`)));
+  if (filters.to && /^\d{4}-\d{2}-\d{2}$/.test(filters.to)) conditions.push(lte(purchaseReturns.createdAt, new Date(`${filters.to}T23:59:59.999`)));
   const where = conditions.length ? and(...conditions) : undefined;
 
   const [rows, [{ total }]] = await Promise.all([
@@ -58,7 +63,7 @@ export async function getPurchaseReturns(filters: { q?: string; status?: string;
       .orderBy(desc(purchaseReturns.createdAt))
       .limit(size)
       .offset((page - 1) * size),
-    db.select({ total: count() }).from(purchaseReturns).innerJoin(suppliers, eq(purchaseReturns.supplierId, suppliers.id)).where(where),
+    db.select({ total: count() }).from(purchaseReturns).innerJoin(suppliers, eq(purchaseReturns.supplierId, suppliers.id)).innerJoin(warehouses, eq(purchaseReturns.warehouseId, warehouses.id)).where(where),
   ]);
 
   const ids = rows.map((row) => row.id);

@@ -25,7 +25,11 @@ export type CustomerCreateResult = {
 };
 
 function defaultCustomerValues(): CreateCustomerInput {
-  return { name: "", phone: "", address: "", type: "retail", taxCode: "", debtLimit: 0, note: "" };
+  return {
+    name: "", phone: "", email: "", zaloUserId: "", address: "", type: "retail",
+    taxCode: "", debtLimit: 0, note: "", consentStatus: "pending",
+    consentPurposes: {}, consentSource: "web",
+  };
 }
 
 function readAiCustomerDraft(): CreateCustomerInput | null {
@@ -39,11 +43,16 @@ function readAiCustomerDraft(): CreateCustomerInput | null {
     return {
       name: typeof payload.name === "string" ? payload.name : "",
       phone: typeof payload.phone === "string" ? payload.phone : "",
+      email: typeof payload.email === "string" ? payload.email : "",
+      zaloUserId: typeof payload.zaloUserId === "string" ? payload.zaloUserId : "",
       address: typeof payload.address === "string" ? payload.address : "",
       type,
       taxCode: typeof payload.taxCode === "string" ? payload.taxCode : "",
       debtLimit: typeof payload.debtLimit === "number" ? payload.debtLimit : 0,
       note: typeof payload.note === "string" ? payload.note : "",
+      consentStatus: "pending",
+      consentPurposes: {},
+      consentSource: "web",
     };
   } catch {
     return null;
@@ -74,7 +83,10 @@ export function CustomerCreateForm({
   }, [aiPreview, form]);
 
   async function onSubmit(values: CreateCustomerOutput) {
-    const res = await createCustomer(values);
+    const consentPurposes: Record<string, boolean> = values.consentStatus === "granted"
+      ? { sales: true, loyalty: false, marketing: false, analytics: false }
+      : {};
+    const res = await createCustomer({ ...values, consentPurposes });
     if (res.ok) {
       onCreated({
         id: res.data.id,
@@ -110,6 +122,14 @@ export function CustomerCreateForm({
           )}
         </FormField>
       </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FormField name="email" labelTx="customers.fields.email">
+          {(field) => <Input {...field} type="email" />}
+        </FormField>
+        <FormField name="zaloUserId" labelTx="customers.fields.zaloUserId">
+          {(field) => <Input {...field} />}
+        </FormField>
+      </div>
       <FormField name="address" labelTx="customers.fields.address">
         {(field) => <Input {...field} />}
       </FormField>
@@ -125,6 +145,17 @@ export function CustomerCreateForm({
       </div>
       <FormField name="note" labelTx="customers.fields.note">
         {(field) => <Textarea {...field} rows={2} />}
+      </FormField>
+      <FormField name="consentStatus" labelTx="customers.fields.consentStatus">
+        {(field) => (
+          <Select
+            {...field}
+            options={[
+              { value: "pending", label: t("customers.consent.pending") },
+              { value: "granted", label: t("customers.consent.granted") },
+            ]}
+          />
+        )}
       </FormField>
 
       {form.formState.errors.root && (

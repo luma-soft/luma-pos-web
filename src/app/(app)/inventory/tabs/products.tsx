@@ -16,7 +16,7 @@ import { ShopeeListingModal } from "./shopee-listing-modal";
 import { CAMERA_QUOTE_DETAIL_MATERIAL_SKUS, CAMERA_QUOTE_MATERIAL_SKUS } from "@/lib/data/camera-quote-constants";
 import { CameraMaterialSearch } from "./camera-material-search";
 import { InstantProductSearch } from "./instant-product-search";
-import { InstantProductFilters } from "./instant-product-filters";
+import { InventoryFilterDrawer } from "./inventory-filter-drawer";
 import { ProductCreateMenu } from "./product-create-menu";
 import {
   ProductBulkActions,
@@ -85,19 +85,15 @@ async function ShopeeListingModalShell({ searchParams }: { searchParams: SP }) {
 async function ProductsToolbar({
   params,
   categories,
-  status,
-  view,
 }: {
   params: SP;
   categories: Awaited<ReturnType<typeof getProductFormOptions>>["categories"];
-  status: Status;
-  view: View;
 }) {
   const t = await getTranslations();
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2 sm:gap-3">
       <InstantProductSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />
-      <InstantProductFilters category={params.category ?? ""} status={status} view={view} categories={categories} labels={{ filters: t("products.list.filters"), allCategories: t("products.list.allCategories"), searchCategories: t("products.list.searchCategories"), active: t("products.list.statusActive"), inactive: t("products.list.statusInactive"), all: t("products.list.statusAll"), grouped: t("products.list.viewGrouped"), flat: t("products.list.viewFlat") }} />
+      <InventoryFilterDrawer title="Bộ lọc sản phẩm" values={params} fields={["category", "status", "view"]} categories={categories.map((item) => ({ value: item.id, label: item.name }))} />
       <ProductCreateMenu
         label={t("products.createNew")}
         items={[
@@ -232,7 +228,7 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
           <p className="mt-0.5 text-xs font-medium text-slate-500">{total.toLocaleString("vi-VN")} SKU</p>
         </div>
       )}
-      {!cameraMaterials && <ProductsToolbar params={params} categories={categories} status={status} view={view} />}
+      {!cameraMaterials && <ProductsToolbar params={params} categories={categories} />}
       <ProductsTable
         rows={rows}
         selectionEnabled={!cameraMaterials}

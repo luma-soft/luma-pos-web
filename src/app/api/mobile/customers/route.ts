@@ -16,13 +16,24 @@ export async function GET(request: Request) {
   if (blocked) return blocked;
 
   return mobileOk(
-    await getCustomers({
-      q: searchParam(request, "q"),
-      type: searchParam(request, "type"),
-      owing: searchParam(request, "owing") === "true",
-      page: numberParam(request, "page", 1),
-      pageSize: numberParam(request, "pageSize", 50),
-    })
+    await getCustomers(
+      {
+        q: searchParam(request, "q"),
+        type: searchParam(request, "type"),
+        owing: searchParam(request, "owing") === "true",
+        createdFrom: searchParam(request, "createdFrom"),
+        createdTo: searchParam(request, "createdTo"),
+        lastTxFrom: searchParam(request, "lastTxFrom"),
+        lastTxTo: searchParam(request, "lastTxTo"),
+        totalFrom: searchParam(request, "totalFrom"),
+        totalTo: searchParam(request, "totalTo"),
+        debtFrom: searchParam(request, "debtFrom"),
+        debtTo: searchParam(request, "debtTo"),
+        page: numberParam(request, "page", 1),
+        pageSize: numberParam(request, "pageSize", 50),
+      },
+      { includeHistory: false },
+    )
   );
 }
 

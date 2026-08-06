@@ -7,7 +7,7 @@ import { parsePageSize } from "@/lib/pagination";
 import { PricingTable } from "../../pricing/pricing-table";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { InstantProductSearch } from "./instant-product-search";
-import { InstantProductFilters } from "./instant-product-filters";
+import { InventoryFilterDrawer } from "./inventory-filter-drawer";
 
 type SP = Record<string, string | undefined>;
 type PriceBook = Awaited<ReturnType<typeof getPriceBooks>>[number];
@@ -64,23 +64,7 @@ async function PricingContent({
           value={params.q ?? ""}
           placeholder={t("products.list.searchPlaceholder")}
         />
-        <InstantProductFilters
-          category={params.category ?? ""}
-          status="active"
-          view="grouped"
-          categories={categories}
-          labels={{
-            filters: t("products.list.filters"),
-            allCategories: t("products.list.allCategories"),
-            searchCategories: t("products.list.searchCategories"),
-            active: t("products.list.statusActive"),
-            inactive: t("products.list.statusInactive"),
-            all: t("products.list.statusAll"),
-            grouped: t("products.list.viewGrouped"),
-            flat: t("products.list.viewFlat"),
-          }}
-          showAdditionalFilters={false}
-        />
+        <InventoryFilterDrawer title="Bộ lọc thiết lập giá" values={params} fields={["category", "status", "stock"]} categories={categories.map((item) => ({ value: item.id, label: item.name }))} />
       </div>
       <PricingTable
         key={[params.q ?? "", params.category ?? "", page, pageSize].join(":")}

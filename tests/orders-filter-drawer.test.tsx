@@ -9,13 +9,21 @@ import {
 
 describe("orders filter drawer", () => {
   test("renders order and payment statuses as dropdowns with complete options", () => {
-    const source = readFileSync(
+    const drawerSource = readFileSync(
       new URL(
         "../src/app/(app)/sales/tabs/orders-filter-drawer.tsx",
         import.meta.url,
       ),
       "utf8",
     );
+    const shared = readFileSync(
+      new URL(
+        "../src/app/(app)/sales/tabs/filter-drawer-shared.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    const source = `${drawerSource}\n${shared}`;
 
     expect(source).toContain('<PickerSection\n                  title="Trạng thái đơn"');
     expect(source).toContain(
@@ -50,6 +58,14 @@ describe("orders filter drawer", () => {
       ),
       "utf8",
     );
+    const shared = readFileSync(
+      new URL(
+        "../src/app/(app)/sales/tabs/filter-drawer-shared.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    const source = `${drawerSource}\n${shared}`;
     const tabSource = readFileSync(
       new URL("../src/app/(app)/sales/tabs/orders.tsx", import.meta.url),
       "utf8",
@@ -61,8 +77,7 @@ describe("orders filter drawer", () => {
 
     expect(drawerSource).toContain('name="customerId"');
     expect(drawerSource).toContain('name="productId"');
-    expect(drawerSource).toContain('endpoint="/api/mobile/customers"');
-    expect(drawerSource).toContain('endpoint="/api/mobile/pos/search"');
+    expect(source).toContain('/api/sales/filter-options');
     expect(drawerSource).not.toContain('name="customerQuery"');
     expect(drawerSource).not.toContain('name="productQuery"');
 
@@ -166,7 +181,7 @@ describe("orders filter drawer", () => {
     );
 
     expect(drawerSource).toContain('fetch(`/api/orders/count?${query}`');
-    expect(drawerSource).toContain("Xem ${resultCount} đơn");
+    expect(drawerSource).toContain("Xem ${count} đơn");
     expect(drawerSource).toContain('aria-live="polite"');
     expect(countRouteSource).toContain("requireSalesAccess");
     expect(countRouteSource).toContain("getOrders");

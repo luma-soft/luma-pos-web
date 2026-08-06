@@ -1781,11 +1781,16 @@
       "namePlaceholder": "e.g. Mr. Tuan (contractor)",
       "email": "Email",
       "zaloUserId": "Zalo user ID",
+      "consentStatus": "Personal data processing consent",
       "address": "Address",
       "taxCode": "Tax code",
       "debtLimit": "Credit limit",
       "debtLimitHint": "0 = no credit allowed",
       "note": "Note"
+    },
+    "consent": {
+      "pending": "Not confirmed",
+      "granted": "Granted"
     },
     "debtOfLimit": "{pct}% of {limit} limit",
     "orderCount": "{count} recent orders",
@@ -1807,6 +1812,7 @@
       "adjust": "Adjustment",
       "paymentDiscount": "Payment discount",
       "createQr": "Create QR",
+      "viewDetails": "View full profile",
       "stop": "Stop activity",
       "deleteDisabled": "Deleting customers with documents is not supported yet; stop activity to hide them from the active list."
     },

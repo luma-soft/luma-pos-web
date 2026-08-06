@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, inArray, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, lte, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
   categories, internalUseIssues, products, profiles, purchaseOrderItems, purchaseOrders, stockLevels, stockMovements, suppliers, warehouses,
@@ -188,7 +188,7 @@ export async function getInternalUseCostSummary() {
   };
 }
 
-export async function getPurchases(filters: { q?: string; status?: string; page?: number; pageSize?: number } = {}) {
+export async function getPurchases(filters: { q?: string; status?: string; supplierId?: string; warehouseId?: string; from?: string; to?: string; debtOnly?: boolean; page?: number; pageSize?: number } = {}) {
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize);
   const conds: SQL[] = [];
@@ -200,6 +200,11 @@ export async function getPurchases(filters: { q?: string; status?: string; page?
   if (filters.status && ["received", "returned", "cancelled", "draft"].includes(filters.status)) {
     conds.push(eq(purchaseOrders.status, filters.status));
   }
+  if (filters.supplierId) conds.push(eq(purchaseOrders.supplierId, filters.supplierId));
+  if (filters.warehouseId) conds.push(eq(purchaseOrders.warehouseId, filters.warehouseId));
+  if (filters.from && /^\d{4}-\d{2}-\d{2}$/.test(filters.from)) conds.push(gte(purchaseOrders.createdAt, new Date(`${filters.from}T00:00:00`)));
+  if (filters.to && /^\d{4}-\d{2}-\d{2}$/.test(filters.to)) conds.push(lte(purchaseOrders.createdAt, new Date(`${filters.to}T23:59:59.999`)));
+  if (filters.debtOnly) conds.push(sql`${purchaseOrders.total} > ${purchaseOrders.amountPaid}`);
   const where = conds.length > 0 ? and(...conds) : undefined;
 
   const [rows, [{ total }]] = await Promise.all([

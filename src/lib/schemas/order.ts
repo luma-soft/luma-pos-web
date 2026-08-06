@@ -80,11 +80,16 @@ export type AddPaymentInput = z.infer<typeof addPaymentSchema>;
 export const createCustomerSchema = z.object({
   name: z.string().min(1, { error: "validation.required" }),
   phone: z.string().optional(),
+  zaloUserId: z.string().trim().optional(),
+  email: z.string().trim().optional(),
   address: z.string().optional(),
   type: z.enum(["retail", "wholesale", "contractor", "agent"]).default("retail"),
   taxCode: z.string().optional(),
   debtLimit: z.number().min(0).default(0),
   note: z.string().optional(),
+  consentStatus: z.enum(["pending", "granted", "withdrawn"]).default("pending"),
+  consentPurposes: z.record(z.string(), z.boolean()).default({}),
+  consentSource: z.string().trim().max(40).default("web"),
 });
 export type CreateCustomerInput = z.input<typeof createCustomerSchema>;
 export type CreateCustomerOutput = z.output<typeof createCustomerSchema>;

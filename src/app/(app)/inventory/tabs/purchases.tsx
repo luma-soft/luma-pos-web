@@ -3,14 +3,14 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Plus, Truck, Search } from "lucide-react";
 import { Routes } from "@/lib/routes";
-import { getPurchases } from "@/lib/data/inventory";
+import { getPurchaseFormOptions, getPurchases } from "@/lib/data/inventory";
 import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
-import { Select } from "@/components/ui/select";
 import { InstantFilterForm } from "@/components/instant-filter-form";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { PurchasesTable } from "./purchases-table";
 import { getPrintTemplatesForDoc } from "@/lib/print/template";
+import { InventoryFilterDrawer } from "./inventory-filter-drawer";
 
 type SP = Record<string, string | undefined>;
 const PSTATUS = ["", "draft", "received", "returned", "cancelled"] as const;
@@ -31,9 +31,10 @@ async function PurchasesContent({ searchParams }: { searchParams: SP }) {
   const page = Number(params.page) || 1;
   const pageSize = parsePageSize(params.size);
   const status = PSTATUS.includes(params.status as typeof PSTATUS[number]) ? (params.status ?? "") : "";
-  const [{ rows, total, pageCount }, printTemplates] = await Promise.all([
-    getPurchases({ q: params.q, status: status || undefined, page, pageSize }),
+  const [{ rows, total, pageCount }, printTemplates, options] = await Promise.all([
+    getPurchases({ q: params.q, status: status || undefined, supplierId: params.supplierId, warehouseId: params.warehouseId, from: params.from, to: params.to, debtOnly: params.debtOnly === "1", page, pageSize }),
     getPrintTemplatesForDoc("purchase"),
+    getPurchaseFormOptions(),
   ]);
 
   return (
@@ -45,13 +46,7 @@ async function PurchasesContent({ searchParams }: { searchParams: SP }) {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("purchases.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface focus:border-primary-500 focus:outline-none min-h-11 lg:min-h-0" />
           </div>
-          <Select
-            name="status"
-            defaultValue={status}
-            options={[{ value: "", label: t("orders.tabs.all") }, { value: "draft", label: t("purchases.status.draft") }, { value: "received", label: t("purchases.status.received") }, { value: "returned", label: t("purchases.status.returned") }, { value: "cancelled", label: t("purchases.status.cancelled") }]}
-            rootClassName="w-full sm:w-56"
-            menuMinWidth={224}
-          />
+          <InventoryFilterDrawer title="Bộ lọc phiếu nhập" values={params} fields={["status", "supplier", "warehouse", "time", "debt"]} suppliers={options.suppliers.map((item) => ({ value: item.id, label: item.name }))} warehouses={options.warehouses.map((item) => ({ value: item.id, label: item.name }))} />
           <Link href={Routes.PurchaseNew} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98] ml-auto shrink-0 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"><Plus className="w-4 h-4" />{t("purchases.createNew")}</Link>
         </InstantFilterForm>
       </div>

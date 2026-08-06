@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { customers } from "@/db/schema";
+import { customerConsentEvents, customerConsents, customers } from "@/db/schema";
 import {
   createCustomerSchema, updateCustomerSchema,
   type CreateCustomerInput, type UpdateCustomerInput,
@@ -16,16 +16,37 @@ export async function createCustomerCore(input: CreateCustomerInput): Promise<Ac
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
   try {
-    const [row] = await db.insert(customers).values({
-      code: generateCode("KH"),
-      name: v.name.trim(),
-      phone: v.phone?.trim() || null,
-      address: v.address?.trim() || null,
-      type: v.type,
-      taxCode: v.taxCode?.trim() || null,
-      debtLimit: toMoney(v.debtLimit),
-      note: v.note || null,
-    }).returning({ id: customers.id });
+    const row = await db.transaction(async (tx) => {
+      const [created] = await tx.insert(customers).values({
+        code: generateCode("KH"),
+        name: v.name.trim(),
+        phone: v.phone?.trim() || null,
+        zaloUserId: v.zaloUserId || null,
+        email: v.email || null,
+        address: v.address?.trim() || null,
+        type: v.type,
+        taxCode: v.taxCode?.trim() || null,
+        debtLimit: toMoney(v.debtLimit),
+        note: v.note || null,
+      }).returning({ id: customers.id });
+
+      const purposes = v.consentStatus === "withdrawn"
+        ? Object.fromEntries(Object.keys(v.consentPurposes).map((key) => [key, false]))
+        : v.consentPurposes;
+      await tx.insert(customerConsents).values({
+        customerId: created.id,
+        status: v.consentStatus,
+        purposes,
+        source: v.consentSource,
+      });
+      await tx.insert(customerConsentEvents).values({
+        customerId: created.id,
+        status: v.consentStatus,
+        purposes,
+        source: v.consentSource,
+      });
+      return created;
+    });
     return { ok: true, data: { id: row.id } };
   } catch (e) {
     console.error("createCustomerCore failed:", e);

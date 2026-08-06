@@ -1,5 +1,10 @@
 import { z } from "zod";
 import { isOrderDateRangeValid } from "@/lib/orders/filter-date-range";
+import {
+  DEFAULT_ORDER_TIME_PRESET,
+  ORDER_TIME_PRESETS,
+  isOrderTimePreset,
+} from "@/lib/orders/filter-date-range";
 
 export const orderDocumentTypes = ["sale", "quote", "booking"] as const;
 export const orderStatuses = [
@@ -40,6 +45,13 @@ const optionalDate = z.preprocess(
   (value) => typeof value === "string" && value.trim() ? value.trim() : undefined,
   z.iso.date().optional(),
 );
+const optionalOrderTimePreset = z.preprocess(
+  (value) =>
+    typeof value === "string" && isOrderTimePreset(value)
+      ? value
+      : undefined,
+  z.enum(ORDER_TIME_PRESETS.map((preset) => preset.value) as [string, ...string[]]),
+);
 const booleanParam = z.preprocess(
   (value) => value === true || value === "1" || value === "true",
   z.boolean(),
@@ -65,6 +77,7 @@ export const orderListFilterSchema = z.object({
   payment: z.enum(orderPaymentStatuses).default("all"),
   paymentMethod: z.enum(orderPaymentMethods).default("all"),
   source: z.enum(orderSources).default("all"),
+  timePreset: optionalOrderTimePreset.default(DEFAULT_ORDER_TIME_PRESET),
   from: optionalDate,
   to: optionalDate,
   deliveryFrom: optionalDate,
