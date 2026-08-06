@@ -42,12 +42,12 @@ export async function GET(
       hasReturns: order.returns.length > 0,
       hasEInvoice: eInvoice?.status === "issued",
       canEdit:
-        (order.status === "completed" || order.status === "quote") &&
+        (order.status === "completed" || order.status === "quote" || order.status === "confirmed") &&
         order.returns.length === 0 &&
         eInvoice?.status !== "issued",
       canCancel: order.status !== "cancelled" && order.status !== "merged" && eInvoice?.status !== "issued",
       canAddPayment:
-        (order.status === "completed" || order.status === "returned") &&
+        (order.status === "completed" || order.status === "returned" || order.status === "confirmed") &&
         Number(order.amountPaid) < Number(order.total),
       canConvertQuote: order.status === "quote",
       canCancelQuote: order.status === "quote",

@@ -54,12 +54,15 @@ export interface OrderListFilters {
   productId?: string;
   customerQuery?: string;
   productQuery?: string;
+  projectQuery?: string;
   status?: OrderStatusFilter;
   payment?: OrderPaymentFilter;
   paymentMethod?: OrderPaymentMethodFilter;
   source?: OrderSourceFilter;
   from?: string; // YYYY-MM-DD
   to?: string; // YYYY-MM-DD
+  deliveryFrom?: string; // YYYY-MM-DD
+  deliveryTo?: string; // YYYY-MM-DD
   minTotal?: number;
   maxTotal?: number;
   includeCancelled?: boolean;
@@ -146,6 +149,9 @@ export async function getOrders(filters: OrderListFilters = {}) {
       );
     }
   }
+  if (filters.projectQuery?.trim()) {
+    conditions.push(accentInsensitiveLike(orders.projectName, filters.projectQuery.trim()));
+  }
   if (filters.status === "completed")
     conditions.push(eq(orders.status, "completed"));
   if (filters.status === "cancelled")
@@ -206,6 +212,14 @@ export async function getOrders(filters: OrderListFilters = {}) {
     const d = new Date(`${filters.to}T23:59:59.999`);
     if (!Number.isNaN(d.getTime())) conditions.push(lte(orders.createdAt, d));
   }
+  if (filters.deliveryFrom) {
+    const d = new Date(`${filters.deliveryFrom}T00:00:00`);
+    if (!Number.isNaN(d.getTime())) conditions.push(gte(orders.deliveryDate, d));
+  }
+  if (filters.deliveryTo) {
+    const d = new Date(`${filters.deliveryTo}T23:59:59.999`);
+    if (!Number.isNaN(d.getTime())) conditions.push(lte(orders.deliveryDate, d));
+  }
   if (Number.isFinite(filters.minTotal)) {
     conditions.push(gte(orders.total, String(filters.minTotal)));
   }
@@ -221,6 +235,8 @@ export async function getOrders(filters: OrderListFilters = {}) {
       status: orders.status,
       paymentStatus: orders.paymentStatus,
       projectName: orders.projectName,
+      deliveryAddress: orders.deliveryAddress,
+      deliveryDate: orders.deliveryDate,
       total: orders.total,
       amountPaid: orders.amountPaid,
       sourceMode: orders.sourceMode,
@@ -253,11 +269,14 @@ export async function getOrders(filters: OrderListFilters = {}) {
     .leftJoin(einvoices, eq(orders.id, einvoices.orderId));
 
   const countQ = db
-    .select({ total: count() })
+    .select({
+      total: count(),
+      totalValue: sql<string>`coalesce(sum(${orders.total}), 0)`,
+    })
     .from(orders)
     .leftJoin(customers, eq(orders.customerId, customers.id));
 
-  const [rows, [{ total }]] = await Promise.all([
+  const [rows, [{ total, totalValue }]] = await Promise.all([
     base
       .where(where)
       .orderBy(desc(orders.createdAt))
@@ -269,6 +288,7 @@ export async function getOrders(filters: OrderListFilters = {}) {
   return {
     rows,
     total,
+    totalValue: Number(totalValue),
     page,
     pageSize: size,
     pageCount: Math.max(1, Math.ceil(total / size)),

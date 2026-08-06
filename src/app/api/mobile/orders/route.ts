@@ -39,6 +39,7 @@ export async function GET(request: Request) {
       q: searchParam(request, "q"),
       customerQuery: searchParam(request, "customerQuery"),
       productQuery: searchParam(request, "productQuery"),
+      projectQuery: searchParam(request, "projectQuery"),
       status: searchParam(request, "status") as OrderStatusFilter | undefined,
       payment: searchParam(request, "payment") as
         OrderPaymentFilter | undefined,
@@ -47,6 +48,8 @@ export async function GET(request: Request) {
       source: searchParam(request, "source") as OrderSourceFilter | undefined,
       from: searchParam(request, "from"),
       to: searchParam(request, "to"),
+      deliveryFrom: searchParam(request, "deliveryFrom"),
+      deliveryTo: searchParam(request, "deliveryTo"),
       minTotal: minTotal == null ? undefined : Number(minTotal),
       maxTotal: maxTotal == null ? undefined : Number(maxTotal),
       includeCancelled: searchParam(request, "includeCancelled") === "true",
