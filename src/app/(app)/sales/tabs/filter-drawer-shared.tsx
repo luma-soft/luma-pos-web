@@ -443,6 +443,7 @@ export function LumaEntityPicker({
   labelValue,
   placeholder,
   icon,
+  showLabel = true,
   onChange,
 }: {
   label: string;
@@ -455,6 +456,7 @@ export function LumaEntityPicker({
   labelValue: string;
   placeholder: string;
   icon?: ReactNode;
+  showLabel?: boolean;
   onChange: (next: { value: string; label: string }) => void;
 }) {
   const id = useId().replaceAll(":", "");
@@ -544,9 +546,11 @@ export function LumaEntityPicker({
       <input type="hidden" name={labelName} value={labelValue} />
       {queryName && <input type="hidden" name={queryName} value={labelValue} />}
 
-      <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
-        {label}
-      </span>
+      {showLabel ? (
+        <span className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">
+          {label}
+        </span>
+      ) : null}
       <button
         type="button"
         role="combobox"

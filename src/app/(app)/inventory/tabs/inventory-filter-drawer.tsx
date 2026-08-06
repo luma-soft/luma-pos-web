@@ -273,6 +273,7 @@ export function InventoryFilterDrawer({
         value={draft[field]}
         labelValue={optionLabel(field, options)}
         placeholder={`Tìm ${label.toLocaleLowerCase("vi")}`}
+        showLabel={isPurchaseFilter}
         onChange={(next) => {
           update(field, next.value);
           setEntityLabels((current) => ({ ...current, [field]: next.label }));
