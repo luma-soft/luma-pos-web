@@ -26,7 +26,10 @@ export type EntityPickerKind =
   | "product"
   | "project"
   | "order"
-  | "warehouse";
+  | "warehouse"
+  | "supplier"
+  | "category"
+  | "brand";
 export type EntityPickerOption = {
   value: string;
   label: string;
@@ -83,7 +86,7 @@ export function collectFocusableElements(
   if (!container) return [];
   return Array.from(container.querySelectorAll<HTMLElement>(focusableSelectors)).filter(
     (node) => {
-      if (!node.tabIndex || node.tabIndex < 0) return false;
+      if (node.tabIndex < 0) return false;
       if (node.hasAttribute("disabled")) return false;
       const style = window.getComputedStyle(node);
       return style.display !== "none" && style.visibility !== "hidden";
@@ -98,6 +101,8 @@ export function LumaWebPicker({
   value,
   defaultValue = "",
   options,
+  searchable = false,
+  searchPlaceholder = "Tìm kiếm",
   onChange,
 }: {
   label?: string;
@@ -106,6 +111,8 @@ export function LumaWebPicker({
   value?: string;
   defaultValue?: string;
   options: ReadonlyArray<PickerOption>;
+  searchable?: boolean;
+  searchPlaceholder?: string;
   onChange?: (value: string) => void;
 }) {
   const listboxId = `luma-picker-${useId().replaceAll(":", "")}`;
@@ -113,6 +120,7 @@ export function LumaWebPicker({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const [internalValue, setInternalValue] = useState(defaultValue);
   const selectedValue = value ?? internalValue;
   const selectedIndex = Math.max(
@@ -120,6 +128,9 @@ export function LumaWebPicker({
     options.findIndex((option) => option.value === selectedValue),
   );
   const selectedOption = options[selectedIndex];
+  const visibleOptions = search.trim()
+    ? options.filter((option) => option.label.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()))
+    : options;
 
   useEffect(() => {
     if (!open) return;
@@ -133,7 +144,8 @@ export function LumaWebPicker({
   }, [open]);
 
   function focusOption(index: number) {
-    const bounded = (index + options.length) % options.length;
+    if (visibleOptions.length === 0) return;
+    const bounded = (index + visibleOptions.length) % visibleOptions.length;
     window.requestAnimationFrame(() => {
       optionRefs.current[bounded]?.focus();
     });
@@ -150,6 +162,7 @@ export function LumaWebPicker({
     }
     onChange?.(nextValue);
     setOpen(false);
+    setSearch("");
     window.requestAnimationFrame(() => triggerRef.current?.focus());
   }
 
@@ -172,10 +185,10 @@ export function LumaWebPicker({
         onKeyDown={(event) => {
           if (event.key === "ArrowDown") {
             event.preventDefault();
-            openAndFocus(selectedIndex);
+            openAndFocus(Math.max(0, visibleOptions.findIndex((option) => option.value === selectedValue)));
           } else if (event.key === "ArrowUp") {
             event.preventDefault();
-            openAndFocus(selectedIndex || options.length - 1);
+            openAndFocus(Math.max(0, visibleOptions.findIndex((option) => option.value === selectedValue)) || visibleOptions.length - 1);
           } else if (event.key === "Escape") {
             event.preventDefault();
             setOpen(false);
@@ -201,7 +214,21 @@ export function LumaWebPicker({
           aria-label={ariaLabel}
           className="absolute inset-x-0 top-full z-40 mt-2 max-h-72 overflow-y-auto rounded-xl border border-border bg-surface p-1.5 shadow-2xl"
         >
-          {options.map((option, index) => {
+          {searchable && (
+            <div className="sticky top-0 z-10 bg-surface p-1.5">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  autoFocus
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder={searchPlaceholder}
+                  className="min-h-11 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                />
+              </div>
+            </div>
+          )}
+          {visibleOptions.map((option, index) => {
             const selected = option.value === selectedValue;
             return (
               <button
@@ -225,7 +252,7 @@ export function LumaWebPicker({
                     focusOption(0);
                   } else if (event.key === "End") {
                     event.preventDefault();
-                    focusOption(options.length - 1);
+                    focusOption(visibleOptions.length - 1);
                   } else if (event.key === "Escape") {
                     event.preventDefault();
                     setOpen(false);
@@ -245,6 +272,9 @@ export function LumaWebPicker({
               </button>
             );
           })}
+          {visibleOptions.length === 0 && (
+            <p className="px-3 py-4 text-center text-sm text-slate-500">Không tìm thấy kết quả</p>
+          )}
         </div>
       )}
     </div>
@@ -424,7 +454,7 @@ export function LumaEntityPicker({
   value: string;
   labelValue: string;
   placeholder: string;
-  icon: ReactNode;
+  icon?: ReactNode;
   onChange: (next: { value: string; label: string }) => void;
 }) {
   const id = useId().replaceAll(":", "");
@@ -530,7 +560,7 @@ export function LumaEntityPicker({
         }
         className="flex min-h-14 w-full items-center gap-3 rounded-xl border border-border bg-surface px-3 text-left outline-none transition hover:border-primary-300 focus-visible:border-primary-500 focus-visible:ring-2 focus-visible:ring-primary-100"
       >
-        <span className="shrink-0 text-slate-500">{icon}</span>
+        {icon ? <span className="shrink-0 text-slate-500">{icon}</span> : null}
         <span
           className={cn(
             "min-w-0 flex-1 truncate text-sm",

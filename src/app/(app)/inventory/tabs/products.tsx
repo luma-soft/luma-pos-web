@@ -222,6 +222,8 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
     brandId: params.brandId,
     supplierId: params.supplierId,
     productKind: params.productKind as "product" | "service" | "combo" | undefined,
+    stock: params.stock as "instock" | "low" | "out" | undefined,
+    sort: params.sort as "name" | "stock" | "updated" | undefined,
     status,
     view,
     page,

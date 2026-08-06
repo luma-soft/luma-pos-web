@@ -45,7 +45,7 @@ async function PricingContent({
   const page = Number(params.page) || 1;
   const pageSize = parsePageSize(params.size);
 
-  const { rows, total, pageCount } = await getProducts({ q: params.q, categoryId: params.category, brandId: params.brandId, supplierId: params.supplierId, productKind: params.productKind as "product" | "service" | "combo" | undefined, status: (params.status as "active" | "inactive" | "all" | undefined) ?? "active", page, pageSize });
+  const { rows, total, pageCount } = await getProducts({ q: params.q, categoryId: params.category, brandId: params.brandId, supplierId: params.supplierId, productKind: params.productKind as "product" | "service" | "combo" | undefined, stock: params.stock as "instock" | "low" | "out" | undefined, sort: params.sort as "name" | "stock" | "updated" | undefined, status: (params.status as "active" | "inactive" | "all" | undefined) ?? "active", page, pageSize });
 
   const visibleIds = rows.map((p) => p.id);
   const overrideByBook = await getPriceOverridesForProducts(visibleIds);

@@ -46,7 +46,7 @@ async function PurchasesContent({ searchParams }: { searchParams: SP }) {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input type="text" name="q" defaultValue={params.q ?? ""} placeholder={t("purchases.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface focus:border-primary-500 focus:outline-none min-h-11 lg:min-h-0" />
           </div>
-          <InventoryFilterDrawer title="Bộ lọc phiếu nhập" values={params} fields={["status", "supplier", "warehouse", "time", "debt"]} suppliers={options.suppliers.map((item) => ({ value: item.id, label: item.name }))} warehouses={options.warehouses.map((item) => ({ value: item.id, label: item.name }))} />
+          <InventoryFilterDrawer title="Bộ lọc phiếu nhập" values={params} resultCount={total} resultLabel="phiếu nhập" countEndpoint="/api/inventory/purchases/count" fields={["status", "supplier", "warehouse", "time", "debt"]} suppliers={options.suppliers.map((item) => ({ value: item.id, label: item.name }))} warehouses={options.warehouses.map((item) => ({ value: item.id, label: item.name }))} />
           <Link href={Routes.PurchaseNew} className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-600 hover:brightness-110 text-white text-sm font-medium transition active:scale-[0.98] ml-auto shrink-0 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"><Plus className="w-4 h-4" />{t("purchases.createNew")}</Link>
         </InstantFilterForm>
       </div>

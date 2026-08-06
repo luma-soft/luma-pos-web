@@ -26,6 +26,9 @@ export async function GET(request: Request) {
     getMobileProducts({
       q: searchParam(request, "q"),
       categoryId: searchParam(request, "categoryId"),
+      brandId: searchParam(request, "brandId"),
+      supplierId: searchParam(request, "supplierId"),
+      productKind: searchParam(request, "productKind") as "product" | "service" | "combo" | undefined,
       status: searchParam(request, "status") as ProductStatusFilter | undefined,
       view: searchParam(request, "view") as ProductListView | undefined,
       updatedSince: searchParam(request, "updatedSince"),

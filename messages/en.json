@@ -1599,6 +1599,8 @@
     }
   },
   "internalUse": {
+    "filterTitle": "Internal-use filters",
+    "filterUnit": "issues",
     "formTitle": "Internal-Use Issue",
     "formSub": "Cost-valued · stock deducted · audit-logged",
     "department": "Department",

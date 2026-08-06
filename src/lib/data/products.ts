@@ -41,6 +41,8 @@ export interface ProductListFilters {
   brandId?: string;
   supplierId?: string;
   productKind?: "product" | "service" | "combo";
+  stock?: "instock" | "low" | "out";
+  sort?: "name" | "stock" | "updated";
   status?: ProductStatusFilter;
   view?: ProductListView;
   updatedSince?: string;
@@ -112,6 +114,9 @@ export async function getProducts(filters: ProductListFilters = {}) {
   if (!exactProductId && filters.brandId) conditions.push(eq(products.brandId, filters.brandId));
   if (!exactProductId && filters.supplierId) conditions.push(eq(products.supplierId, filters.supplierId));
   if (!exactProductId && filters.productKind) conditions.push(eq(products.productKind, filters.productKind));
+  if (!exactProductId && filters.stock === "instock") conditions.push(sql`${products.totalStock} > 0`);
+  if (!exactProductId && filters.stock === "out") conditions.push(sql`${products.totalStock} <= 0`);
+  if (!exactProductId && filters.stock === "low") conditions.push(sql`${products.totalStock} > 0 and ${products.totalStock} <= ${products.minStock}`);
   if (!exactProductId && filters.updatedSince) {
     const since = new Date(filters.updatedSince);
     if (!Number.isNaN(since.getTime())) {
@@ -305,7 +310,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
       .leftJoin(stockLevels, eq(stockLevels.productId, products.id))
       .where(where)
       .groupBy(products.id, categories.name, brands.name)
-      .orderBy(desc(products.updatedAt), asc(products.id))
+      .orderBy(filters.sort === "stock" ? desc(products.totalStock) : filters.sort === "updated" ? desc(products.updatedAt) : asc(products.name), asc(products.id))
       .limit(size)
       .offset((page - 1) * size),
     db.select({ total: count() }).from(products).where(where),
@@ -387,7 +392,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
           .leftJoin(stockLevels, eq(stockLevels.productId, products.id))
           .where(inArray(products.parentProductId, parentIds))
           .groupBy(products.id, categories.name, brands.name)
-          .orderBy(asc(products.name))
+          .orderBy(filters.sort === "stock" ? desc(products.totalStock) : filters.sort === "updated" ? desc(products.updatedAt) : asc(products.name), asc(products.id))
       : [];
 
   const childrenByParent = new Map<string, typeof children>();

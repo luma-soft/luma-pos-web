@@ -7,16 +7,17 @@ import {
   type InternalUseWarehouse,
 } from "@/lib/inventory/internal-use-warehouse";
 
-export async function getAuthoritativeInternalUseWarehouse(): Promise<InternalUseWarehouse | null> {
-  const rows = await db
-    .select({ id: warehouses.id, name: warehouses.name, isDefault: warehouses.isDefault })
-    .from(warehouses);
-  return resolveAuthoritativeInternalUseWarehouse(rows);
-}
+type InternalUseFilters = {
+  q?: string;
+  status?: string;
+  warehouseId?: string;
+  reason?: string;
+  department?: string;
+  from?: string;
+  to?: string;
+};
 
-/** Lịch sử phiếu xuất nội bộ (audit) — mới nhất trước. */
-export async function getInternalUseIssues({ limit = 50, q, status, warehouseId, reason, department, from, to }: { limit?: number; q?: string; status?: string; warehouseId?: string; reason?: string; department?: string; from?: string; to?: string } = {}) {
-  const creator = alias(profiles, "iu_creator");
+function internalUseFilterConditions({ q, status, warehouseId, reason, department, from, to }: InternalUseFilters) {
   const search = q?.trim();
   const searchCondition = search
     ? or(
@@ -27,7 +28,28 @@ export async function getInternalUseIssues({ limit = 50, q, status, warehouseId,
       ilike(warehouses.name, `%${search}%`),
     )
     : undefined;
-  const filters: SQL[] = [searchCondition, status ? eq(internalUseIssues.status, status) : undefined, warehouseId ? eq(internalUseIssues.warehouseId, warehouseId) : undefined, reason ? eq(internalUseIssues.reason, reason) : undefined, department ? eq(internalUseIssues.department, department) : undefined, from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? gte(internalUseIssues.createdAt, new Date(`${from}T00:00:00`)) : undefined, to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? lte(internalUseIssues.createdAt, new Date(`${to}T23:59:59.999`)) : undefined].filter((value): value is SQL => Boolean(value));
+  return [
+    searchCondition,
+    status ? eq(internalUseIssues.status, status) : undefined,
+    warehouseId ? eq(internalUseIssues.warehouseId, warehouseId) : undefined,
+    reason ? eq(internalUseIssues.reason, reason) : undefined,
+    department ? eq(internalUseIssues.department, department) : undefined,
+    from && /^\d{4}-\d{2}-\d{2}$/.test(from) ? gte(internalUseIssues.createdAt, new Date(`${from}T00:00:00`)) : undefined,
+    to && /^\d{4}-\d{2}-\d{2}$/.test(to) ? lte(internalUseIssues.createdAt, new Date(`${to}T23:59:59.999`)) : undefined,
+  ].filter((value): value is SQL => Boolean(value));
+}
+
+export async function getAuthoritativeInternalUseWarehouse(): Promise<InternalUseWarehouse | null> {
+  const rows = await db
+    .select({ id: warehouses.id, name: warehouses.name, isDefault: warehouses.isDefault })
+    .from(warehouses);
+  return resolveAuthoritativeInternalUseWarehouse(rows);
+}
+
+/** Lịch sử phiếu xuất nội bộ (audit) — mới nhất trước. */
+export async function getInternalUseIssues({ limit = 50, ...filters }: InternalUseFilters & { limit?: number } = {}) {
+  const creator = alias(profiles, "iu_creator");
+  const conditions = internalUseFilterConditions(filters);
 
   const rows = await db
     .select({
@@ -46,7 +68,7 @@ export async function getInternalUseIssues({ limit = 50, q, status, warehouseId,
     .from(internalUseIssues)
     .leftJoin(warehouses, eq(internalUseIssues.warehouseId, warehouses.id))
     .leftJoin(creator, eq(internalUseIssues.createdBy, creator.id))
-    .where(filters.length ? and(...filters) : undefined)
+    .where(conditions.length ? and(...conditions) : undefined)
     .orderBy(desc(internalUseIssues.createdAt))
     .limit(limit);
 
@@ -77,6 +99,16 @@ export async function getInternalUseIssues({ limit = 50, q, status, warehouseId,
   }
 
   return rows.map((row) => ({ ...row, items: itemsByIssue.get(row.id) ?? [] }));
+}
+
+export async function getInternalUseIssueCount(filters: InternalUseFilters = {}) {
+  const conditions = internalUseFilterConditions(filters);
+  const [row] = await db
+    .select({ total: sql<number>`count(*)::int` })
+    .from(internalUseIssues)
+    .leftJoin(warehouses, eq(internalUseIssues.warehouseId, warehouses.id))
+    .where(conditions.length ? and(...conditions) : undefined);
+  return row?.total ?? 0;
 }
 
 export type InternalUseIssueRow = Awaited<ReturnType<typeof getInternalUseIssues>>[number];

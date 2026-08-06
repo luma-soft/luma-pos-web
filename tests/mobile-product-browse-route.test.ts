@@ -101,6 +101,18 @@ describe("GET /api/mobile/products/browse", () => {
     ]);
   });
 
+  test("forwards every selected category for live count previews", async () => {
+    const response = await getBrowse(
+      new Request(
+        "https://luma.test/api/mobile/products/browse?categoryIds=lights,cameras,services&page=1&pageSize=1",
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(queries[0]?.categoryIds).toEqual(["lights", "cameras", "services"]);
+    expect(queries[0]?.pageSize).toBe(1);
+  });
+
   test("returns the browse projection and filter options", async () => {
     const response = await getBrowse(
       new Request("https://luma.test/api/mobile/products/browse"),

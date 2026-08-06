@@ -1599,6 +1599,8 @@
     }
   },
   "internalUse": {
+    "filterTitle": "Bộ lọc xuất nội bộ",
+    "filterUnit": "phiếu",
     "formTitle": "Phiếu xuất dùng nội bộ",
     "formSub": "Ghi giá vốn · trừ kho · nhật ký kiểm toán",
     "department": "Bộ phận nhận",
