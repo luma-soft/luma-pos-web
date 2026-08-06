@@ -2227,7 +2227,10 @@
     "refundMethods": {
       "cash": "Cash",
       "bank_transfer": "Bank transfer",
-      "debt_deduct": "Deduct from debt"
+      "debt_deduct": "Deduct from debt",
+      "momo": "MoMo",
+      "zalopay": "ZaloPay",
+      "vnpay": "VNPay"
     },
     "currentDebtOf": "{name} owes {debt}",
     "totalRefund": "Total refund",
@@ -2246,7 +2249,13 @@
     "empty": "No returns yet",
     "emptyHint": "Open a completed invoice and use Return items to create a return.",
     "print": "Print return",
-    "sourceOrder": "Source invoice"
+    "sourceOrder": "Source invoice",
+    "exchangeOrder": "Exchange invoice",
+    "exchangeDifference": "Exchange difference",
+    "exchangeCollect": "Collect {amount}",
+    "exchangeRefund": "Refund {amount}",
+    "exchangeEven": "No difference",
+    "exchangeSettlement": "Difference settlement"
   },
   "print": {
     "title": "Print invoice",

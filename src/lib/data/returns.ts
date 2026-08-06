@@ -1,4 +1,5 @@
 import { count, desc, eq, or } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { customers, orders, profiles, returnItems, returns, warehouses } from "@/db/schema";
 import { accentInsensitiveLike } from "@/lib/search";
@@ -62,6 +63,7 @@ export async function getReturns({
 
 /** Chi tiết phiếu trả hàng (cho trang in). */
 export async function getReturn(id: string) {
+  const exchangeOrders = alias(orders, "exchange_orders");
   const [ret] = await db
     .select({
       id: returns.id,
@@ -73,6 +75,10 @@ export async function getReturn(id: string) {
       createdAt: returns.createdAt,
       orderId: returns.orderId,
       orderCode: orders.code,
+      exchangeOrderId: returns.exchangeOrderId,
+      exchangeOrderCode: exchangeOrders.code,
+      exchangeDifference: returns.exchangeDifference,
+      exchangeSettlementMethod: returns.exchangeSettlementMethod,
       customerName: customers.name,
       customerPhone: customers.phone,
       warehouseName: warehouses.name,
@@ -80,6 +86,7 @@ export async function getReturn(id: string) {
     })
     .from(returns)
     .leftJoin(orders, eq(returns.orderId, orders.id)) // orderId nullable (trả nhanh)
+    .leftJoin(exchangeOrders, eq(returns.exchangeOrderId, exchangeOrders.id))
     .leftJoin(customers, eq(returns.customerId, customers.id))
     .leftJoin(warehouses, eq(returns.warehouseId, warehouses.id))
     .leftJoin(profiles, eq(returns.createdBy, profiles.id))

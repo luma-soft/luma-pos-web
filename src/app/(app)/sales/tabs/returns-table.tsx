@@ -90,6 +90,7 @@ export function ReturnsTable({
       getRowId={(row) => row.id}
       expandedParam="expandedReturn"
       initialExpandedId={expandedId}
+      detailSize="full"
       minWidth="1120px"
       renderMobileRow={({ row, toggle }) => (
         <div className="space-y-2 p-3">

@@ -12,6 +12,7 @@ type ReturnDetail = NonNullable<Awaited<ReturnType<typeof getReturn>>>;
 export async function ReturnDetailPanel({ ret, compact = false }: { ret: ReturnDetail; compact?: boolean }) {
   const t = await getTranslations();
   const printTemplates = await getPrintTemplatesForDoc("return");
+  const exchangeDifference = Number(ret.exchangeDifference ?? 0);
 
   return (
     <div className={cn("bg-surface", compact ? "px-4 py-4" : "space-y-4")}>
@@ -99,8 +100,37 @@ export async function ReturnDetailPanel({ ret, compact = false }: { ret: ReturnD
           <div className="space-y-2 rounded-lg border border-border-soft p-3">
             <div className="font-semibold">{t("orders.detail.info")}</div>
             <InfoLine label={t("returns.sourceOrder")} value={ret.orderCode ?? "—"} />
+            {ret.exchangeOrderId && ret.exchangeOrderCode && (
+              <InfoLine label={t("returns.exchangeOrder")}>
+                <OrderDetailLink orderId={ret.exchangeOrderId} className="font-semibold text-primary-600 hover:underline">
+                  {ret.exchangeOrderCode}
+                </OrderDetailLink>
+              </InfoLine>
+            )}
             <InfoLine label={t("returns.refundVia")} value={t(`returns.refundMethods.${ret.refundMethod}`)} />
             <InfoLine label={t("returns.totalRefund")} value={formatCurrency(Number(ret.totalRefund))} valueClassName="text-base text-er" strong />
+            {ret.exchangeOrderId && (
+              <>
+                <InfoLine
+                  label={t("returns.exchangeDifference")}
+                  value={t(
+                    exchangeDifference > 0
+                      ? "returns.exchangeCollect"
+                      : exchangeDifference < 0
+                        ? "returns.exchangeRefund"
+                        : "returns.exchangeEven",
+                    { amount: formatCurrency(Math.abs(exchangeDifference)) },
+                  )}
+                  strong
+                />
+                {ret.exchangeSettlementMethod && exchangeDifference !== 0 && (
+                  <InfoLine
+                    label={t("returns.exchangeSettlement")}
+                    value={t(`returns.refundMethods.${ret.exchangeSettlementMethod}` as never)}
+                  />
+                )}
+              </>
+            )}
           </div>
         </div>
       </div>

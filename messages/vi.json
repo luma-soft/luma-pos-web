@@ -2227,7 +2227,10 @@
     "refundMethods": {
       "cash": "Tiền mặt",
       "bank_transfer": "Chuyển khoản",
-      "debt_deduct": "Trừ công nợ"
+      "debt_deduct": "Trừ công nợ",
+      "momo": "MoMo",
+      "zalopay": "ZaloPay",
+      "vnpay": "VNPay"
     },
     "currentDebtOf": "{name} đang nợ {debt}",
     "totalRefund": "Tổng hoàn trả",
@@ -2246,7 +2249,13 @@
     "empty": "Chưa có phiếu trả hàng nào",
     "emptyHint": "Mở hóa đơn đã hoàn tất rồi bấm Trả hàng để lập phiếu.",
     "print": "In phiếu",
-    "sourceOrder": "Hóa đơn gốc"
+    "sourceOrder": "Hóa đơn gốc",
+    "exchangeOrder": "Hóa đơn đổi",
+    "exchangeDifference": "Chênh lệch đổi hàng",
+    "exchangeCollect": "Thu thêm {amount}",
+    "exchangeRefund": "Hoàn lại {amount}",
+    "exchangeEven": "Không chênh lệch",
+    "exchangeSettlement": "Quyết toán chênh lệch"
   },
   "print": {
     "title": "In hóa đơn",
