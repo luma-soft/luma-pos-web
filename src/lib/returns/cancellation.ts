@@ -23,3 +23,21 @@ export function returnCancellationCustomerDeltas(input: {
     currentDebt: input.refundMethod === "debt_deduct" ? input.totalRefund : 0,
   };
 }
+
+export function returnCancellationStockTargets(
+  movements: Array<{ productId: string; warehouseId: string; quantity: string | number }>,
+) {
+  const totals = new Map<string, { productId: string; warehouseId: string; quantity: number }>();
+  for (const movement of movements) {
+    const quantity = Number(movement.quantity);
+    if (quantity <= 0) continue;
+    const key = `${movement.productId}:${movement.warehouseId}`;
+    const current = totals.get(key);
+    totals.set(key, {
+      productId: movement.productId,
+      warehouseId: movement.warehouseId,
+      quantity: (current?.quantity ?? 0) + quantity,
+    });
+  }
+  return [...totals.values()];
+}

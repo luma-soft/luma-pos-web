@@ -1,4 +1,4 @@
-import { count, desc, eq, or } from "drizzle-orm";
+import { and, count, desc, eq, exists, gte, lte, ne, or, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db";
 import { customers, orders, profiles, returnItems, returns, warehouses } from "@/db/schema";
@@ -8,24 +8,108 @@ export type ReturnListRow = Awaited<ReturnType<typeof getReturns>>["rows"][numbe
 
 export async function getReturns({
   q,
+  customerQuery,
+  productQuery,
+  orderQuery,
+  reason,
+  refundMethod,
+  warehouseId,
+  warehouseQuery,
+  from,
+  to,
+  minTotal,
+  maxTotal,
+  includeCancelled = false,
   page = 1,
   pageSize = 20,
 }: {
   q?: string;
+  customerQuery?: string;
+  productQuery?: string;
+  orderQuery?: string;
+  reason?: string;
+  refundMethod?: string;
+  warehouseId?: string;
+  warehouseQuery?: string;
+  from?: string;
+  to?: string;
+  minTotal?: number;
+  maxTotal?: number;
+  includeCancelled?: boolean;
   page?: number;
   pageSize?: number;
 } = {}) {
   const query = q?.trim();
-  const where = query
-    ? or(
+  const conditions: SQL[] = [];
+  if (query) {
+    const match = or(
         accentInsensitiveLike(returns.code, query),
         accentInsensitiveLike(orders.code, query),
         accentInsensitiveLike(customers.name, query),
-      )
-    : undefined;
+        exists(
+          db
+            .select({ value: sql`1` })
+            .from(returnItems)
+            .where(
+              and(
+                eq(returnItems.returnId, returns.id),
+                accentInsensitiveLike(returnItems.productName, query),
+              ),
+            ),
+        ),
+      );
+    if (match) conditions.push(match);
+  }
+  if (customerQuery?.trim()) {
+    const customerMatch = or(
+      accentInsensitiveLike(customers.name, customerQuery.trim()),
+      accentInsensitiveLike(customers.phone, customerQuery.trim()),
+    );
+    if (customerMatch) conditions.push(customerMatch);
+  }
+  if (productQuery?.trim()) {
+    conditions.push(
+      exists(
+        db
+          .select({ value: sql`1` })
+          .from(returnItems)
+          .where(
+            and(
+              eq(returnItems.returnId, returns.id),
+              accentInsensitiveLike(returnItems.productName, productQuery.trim()),
+            ),
+          ),
+      ),
+    );
+  }
+  if (orderQuery?.trim()) {
+    conditions.push(accentInsensitiveLike(orders.code, orderQuery.trim()));
+  }
+  if (reason?.trim() && reason !== "all") {
+    conditions.push(accentInsensitiveLike(returns.reason, reason.trim()));
+  }
+  if (refundMethod?.trim() && refundMethod !== "all") {
+    conditions.push(eq(returns.refundMethod, refundMethod as typeof returns.refundMethod.enumValues[number]));
+  }
+  if (warehouseId?.trim()) conditions.push(eq(returns.warehouseId, warehouseId.trim()));
+  if (warehouseQuery?.trim()) {
+    conditions.push(accentInsensitiveLike(warehouses.name, warehouseQuery.trim()));
+  }
+  if (!includeCancelled) conditions.push(ne(returns.status, "cancelled"));
+  if (from) {
+    const date = new Date(`${from}T00:00:00`);
+    if (!Number.isNaN(date.getTime())) conditions.push(gte(returns.createdAt, date));
+  }
+  if (to) {
+    const date = new Date(`${to}T23:59:59.999`);
+    if (!Number.isNaN(date.getTime())) conditions.push(lte(returns.createdAt, date));
+  }
+  if (Number.isFinite(minTotal)) conditions.push(gte(returns.totalRefund, String(minTotal)));
+  if (Number.isFinite(maxTotal)) conditions.push(lte(returns.totalRefund, String(maxTotal)));
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
   const offset = Math.max(0, page - 1) * pageSize;
 
-  const [rows, [{ total }]] = await Promise.all([
+  const [rows, [{ total, totalRefund }]] = await Promise.all([
     db
       .select({
         id: returns.id,
@@ -39,8 +123,13 @@ export async function getReturns({
         orderId: returns.orderId,
         orderCode: orders.code,
         customerName: customers.name,
+        customerPhone: customers.phone,
         warehouseName: warehouses.name,
         createdByName: profiles.fullName,
+        itemCount: sql<number>`(
+          select count(*)::int from ${returnItems}
+          where ${returnItems.returnId} = ${returns.id}
+        )`,
       })
       .from(returns)
       .leftJoin(orders, eq(returns.orderId, orders.id))
@@ -52,14 +141,23 @@ export async function getReturns({
       .limit(pageSize)
       .offset(offset),
     db
-      .select({ total: count() })
+      .select({
+        total: count(),
+        totalRefund: sql<string>`coalesce(sum(${returns.totalRefund}), 0)`,
+      })
       .from(returns)
       .leftJoin(orders, eq(returns.orderId, orders.id))
       .leftJoin(customers, eq(returns.customerId, customers.id))
+      .leftJoin(warehouses, eq(returns.warehouseId, warehouses.id))
       .where(where),
   ]);
 
-  return { rows, total, pageCount: Math.max(1, Math.ceil(total / pageSize)) };
+  return {
+    rows,
+    total,
+    totalRefund,
+    pageCount: Math.max(1, Math.ceil(total / pageSize)),
+  };
 }
 
 /** Chi tiết phiếu trả hàng (cho trang in). */

@@ -34,6 +34,7 @@ import { calculateExchangeSettlement } from "@/lib/returns/exchange-settlement";
 import {
   returnCancellationBlockReason,
   returnCancellationCustomerDeltas,
+  returnCancellationStockTargets,
 } from "@/lib/returns/cancellation";
 import {
   consumeTrackedStockLots,
@@ -911,19 +912,21 @@ export async function cancelReturn(returnId: string): Promise<ActionResult> {
       });
       if (blocked) throw new Error(blocked);
 
-      const items = await tx.select().from(returnItems).where(eq(returnItems.returnId, returnId));
-      if (items.some((item) => item.restock) && !ret.warehouseId) throw new Error("WAREHOUSE_REQUIRED");
+      const originalStockMovements = await tx.select({
+        productId: stockMovements.productId,
+        warehouseId: stockMovements.warehouseId,
+        quantity: stockMovements.quantity,
+      }).from(stockMovements).where(and(
+        eq(stockMovements.refType, "return"),
+        eq(stockMovements.refId, ret.id),
+        eq(stockMovements.type, "return_in"),
+      ));
+      const stockTargets = returnCancellationStockTargets(originalStockMovements);
 
-      for (const item of items.filter((row) => row.restock)) {
-        const targets = await stockTargetsForReturnedItem(
-          tx,
-          item.productId,
-          Number(item.quantity) * Number(item.unitMultiplier),
-        );
-        for (const target of targets) {
+      for (const target of stockTargets) {
           const [level] = await tx.select({ quantity: stockLevels.quantity })
             .from(stockLevels)
-            .where(and(eq(stockLevels.productId, target.productId), eq(stockLevels.warehouseId, ret.warehouseId!)))
+            .where(and(eq(stockLevels.productId, target.productId), eq(stockLevels.warehouseId, target.warehouseId)))
             .limit(1)
             .for("update");
           if (!level || Number(level.quantity) < target.quantity - 1e-9) {
@@ -931,7 +934,7 @@ export async function cancelReturn(returnId: string): Promise<ActionResult> {
           }
           await consumeTrackedStockLots(tx, {
             productId: target.productId,
-            warehouseId: ret.warehouseId!,
+            warehouseId: target.warehouseId,
             quantity: target.quantity,
             refType: "return_cancel",
             refId: ret.id,
@@ -940,10 +943,10 @@ export async function cancelReturn(returnId: string): Promise<ActionResult> {
           await tx.update(stockLevels).set({
             quantity: sql`${stockLevels.quantity} - ${toQty(target.quantity)}`,
             updatedAt: sql`now()`,
-          }).where(and(eq(stockLevels.productId, target.productId), eq(stockLevels.warehouseId, ret.warehouseId!)));
+          }).where(and(eq(stockLevels.productId, target.productId), eq(stockLevels.warehouseId, target.warehouseId)));
           await tx.insert(stockMovements).values({
             productId: target.productId,
-            warehouseId: ret.warehouseId!,
+            warehouseId: target.warehouseId,
             type: "return_out",
             quantity: toQty(-target.quantity),
             refType: "return_cancel",
@@ -951,7 +954,6 @@ export async function cancelReturn(returnId: string): Promise<ActionResult> {
             note: `Hủy phiếu trả ${ret.code}`,
             createdBy: profileId,
           });
-        }
       }
 
       const originalCashRows = await tx.select({

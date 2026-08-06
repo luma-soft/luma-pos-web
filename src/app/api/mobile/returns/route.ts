@@ -25,12 +25,25 @@ export async function GET(request: Request) {
   );
   const result = await getReturns({
     q: searchParam(request, "q"),
+    customerQuery: searchParam(request, "customerQuery"),
+    productQuery: searchParam(request, "productQuery"),
+    orderQuery: searchParam(request, "orderQuery"),
+    reason: searchParam(request, "reason"),
+    refundMethod: searchParam(request, "refundMethod"),
+    warehouseId: searchParam(request, "warehouseId"),
+    warehouseQuery: searchParam(request, "warehouseQuery"),
+    from: searchParam(request, "from"),
+    to: searchParam(request, "to"),
+    minTotal: numberParam(request, "minTotal", Number.NaN),
+    maxTotal: numberParam(request, "maxTotal", Number.NaN),
+    includeCancelled: searchParam(request, "includeCancelled") === "true",
     page,
     pageSize,
   });
   return mobileOk({
     returns: result.rows,
     total: result.total,
+    totalRefund: result.totalRefund,
     pageCount: result.pageCount,
     page,
     pageSize,

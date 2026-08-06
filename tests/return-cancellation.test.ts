@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   returnCancellationBlockReason,
   returnCancellationCustomerDeltas,
+  returnCancellationStockTargets,
 } from "@/lib/returns/cancellation";
 
 describe("return cancellation policy", () => {
@@ -27,5 +28,17 @@ describe("return cancellation policy", () => {
       .toEqual({ totalSpent: 120_000, currentDebt: 120_000 });
     expect(returnCancellationCustomerDeltas({ refundMethod: "cash", totalRefund: 120_000 }))
       .toEqual({ totalSpent: 120_000, currentDebt: 0 });
+  });
+
+  test("reverses the recorded stock snapshot instead of current combo composition", () => {
+    expect(returnCancellationStockTargets([
+      { productId: "component-a", warehouseId: "main", quantity: "2.0000" },
+      { productId: "component-a", warehouseId: "main", quantity: "1.0000" },
+      { productId: "component-b", warehouseId: "main", quantity: "4.0000" },
+      { productId: "ignored-negative", warehouseId: "main", quantity: "-1.0000" },
+    ])).toEqual([
+      { productId: "component-a", warehouseId: "main", quantity: 3 },
+      { productId: "component-b", warehouseId: "main", quantity: 4 },
+    ]);
   });
 });
