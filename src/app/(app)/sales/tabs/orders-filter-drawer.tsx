@@ -380,7 +380,6 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                     labelName="customerLabel"
                     value={draft.customerId}
                     labelValue={draft.customerLabel}
-                    queryName="customerLabel"
                     kind="customer"
                     placeholder="Tên hoặc số điện thoại"
                     icon={<Search className="size-4" />}
@@ -395,7 +394,6 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                     value={draft.productId}
                     labelValue={draft.productLabel}
                     kind="product"
-                    queryName="productLabel"
                     placeholder="Tên, SKU hoặc mã vạch"
                     icon={<Barcode className="size-4" />}
                     onChange={({ value, label }) =>
@@ -588,27 +586,6 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
                 </button>
               </div>
 
-              <input type="hidden" name="tab" value="orders" />
-              <input type="hidden" name="customerId" value={draft.customerId} />
-              <input type="hidden" name="customerLabel" value={draft.customerLabel} />
-              <input type="hidden" name="productId" value={draft.productId} />
-              <input type="hidden" name="productLabel" value={draft.productLabel} />
-              <input type="hidden" name="status" value={draft.status} />
-              <input type="hidden" name="payment" value={draft.payment} />
-              <input
-                type="hidden"
-                name="paymentMethod"
-                value={draft.paymentMethod}
-              />
-              <input type="hidden" name="source" value={draft.source} />
-              <input type="hidden" name="timePreset" value={draft.timePreset} />
-              <input type="hidden" name="from" value={draft.from} />
-              <input type="hidden" name="to" value={draft.to} />
-              <input type="hidden" name="minTotal" value={draft.minTotal} />
-              <input type="hidden" name="maxTotal" value={draft.maxTotal} />
-              {draft.includeCancelled && (
-                <input type="hidden" name="includeCancelled" value="1" />
-              )}
             </form>
           </aside>
         </div>

@@ -192,6 +192,41 @@ describe("orders filter drawer", () => {
     expect(countRouteSource).toContain("pageSize: 1");
   });
 
+  test("submits each selected filter once so applied values are not reset", () => {
+    const source = readFileSync(
+      new URL(
+        "../src/app/(app)/sales/tabs/orders-filter-drawer.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    const filterForm = source
+      .split('ref={formRef}')[1]
+      ?.split("</form>")[0] ?? "";
+
+    expect(filterForm.match(/name="tab"/g)).toHaveLength(1);
+    for (const name of [
+      "customerId",
+      "customerLabel",
+      "productId",
+      "productLabel",
+      "status",
+      "payment",
+      "paymentMethod",
+      "source",
+      "timePreset",
+      "minTotal",
+      "maxTotal",
+      "includeCancelled",
+    ]) {
+      expect(filterForm).not.toContain(
+        `<input type="hidden" name="${name}"`,
+      );
+    }
+    expect(filterForm).not.toContain('queryName="customerLabel"');
+    expect(filterForm).not.toContain('queryName="productLabel"');
+  });
+
   test("does not render a numeric badge on the filter button", () => {
     const source = readFileSync(
       new URL(
