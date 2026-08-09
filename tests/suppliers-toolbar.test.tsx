@@ -14,12 +14,13 @@ describe("suppliers toolbar", () => {
     "utf8",
   );
 
-  test("keeps the total, search, filter and create action in one responsive toolbar", () => {
+  test("keeps the shared filter beside search without the supplier total label", () => {
     const toolbar = tableSource.slice(tableSource.indexOf("toolbar={("));
 
-    expect(toolbar).toContain('t("suppliers.total", { total })');
+    expect(toolbar).not.toContain('t("suppliers.total", { total })');
     expect(toolbar).toContain("<InstantFilterForm");
-    expect(toolbar).toContain("<SlidersHorizontal");
+    expect(toolbar).toContain('className="min-w-0 flex-1 lg:max-w-xl"');
+    expect(toolbar).toContain("<FilterTriggerButton");
     expect(toolbar).toContain("<SupplierQuickCreate />");
     expect(toolbar).toContain("sm:flex-row");
   });
@@ -34,7 +35,12 @@ describe("suppliers toolbar", () => {
   });
 
   test("passes supplier list state into the client toolbar", () => {
-    expect(tabSource).toContain("total={total}");
+    const tableProps = tabSource.slice(
+      tabSource.indexOf("<SuppliersTable"),
+      tabSource.indexOf("/>", tabSource.indexOf("<SuppliersTable")),
+    );
+
+    expect(tableProps).not.toContain("total={total}");
     expect(tabSource).toContain('query={params.q ?? ""}');
     expect(tabSource).toContain("owing={owing}");
     expect(tabSource).toContain("pageSize={pageSize}");

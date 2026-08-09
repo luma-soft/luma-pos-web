@@ -4,8 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Loader2, Pencil, Search, SlidersHorizontal, Truck, X } from "lucide-react";
+import { Loader2, Pencil, Search, Truck, X } from "lucide-react";
 import { DataTableShell, RowPreviewModal, type DataTableColumn } from "@/components/data-table";
+import { FilterTriggerButton } from "@/components/filter-trigger-button";
 import { InstantFilterForm } from "@/components/instant-filter-form";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
@@ -95,13 +96,11 @@ type SupplierDebtFilter = "" | "owing" | "clear";
 
 export function SuppliersTable({
   rows,
-  total,
   query,
   owing,
   pageSize,
 }: {
   rows: SupplierRow[];
-  total: number;
   query: string;
   owing: SupplierDebtFilter;
   pageSize: number;
@@ -284,18 +283,15 @@ export function SuppliersTable({
         )}
         toolbar={(
           <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
-            <span className="shrink-0 text-sm font-semibold text-slate-500">
-              {t("suppliers.total", { total })}
-            </span>
             <div className="flex min-w-0 flex-1 items-center gap-2">
               <InstantFilterForm
                 action={Routes.Partners}
-                className="min-w-0 flex-1"
+                className="min-w-0 flex-1 lg:max-w-xl"
               >
                 <input type="hidden" name="tab" value="suppliers" />
                 <input type="hidden" name="size" value={pageSize} />
                 {owing && <input type="hidden" name="owing" value={owing} />}
-                <div className="relative w-full lg:max-w-xl">
+                <div className="relative w-full">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input
                     type="search"
@@ -307,23 +303,12 @@ export function SuppliersTable({
                   />
                 </div>
               </InstantFilterForm>
-              <button
-                type="button"
+              <FilterTriggerButton
                 onClick={openFilters}
-                aria-label={t("suppliers.filter.title")}
-                className={cn(
-                  "relative inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border bg-surface px-4 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
-                  owing
-                    ? "border-primary-600 text-primary-700 hover:bg-primary-50"
-                    : "border-border text-slate-600 hover:border-primary-300 hover:bg-surface-2",
-                )}
-              >
-                <SlidersHorizontal className="h-4 w-4" />
-                <span className="hidden md:inline">{t("suppliers.filter.button")}</span>
-                {owing && (
-                  <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-surface bg-primary-600" />
-                )}
-              </button>
+                label={t("suppliers.filter.button")}
+                active={Boolean(owing)}
+                hideLabelOnSmallScreens
+              />
             </div>
             <div className="shrink-0">
               <SupplierQuickCreate />

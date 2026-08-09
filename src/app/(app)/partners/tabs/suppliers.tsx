@@ -20,7 +20,6 @@ export async function SuppliersTab({ searchParams }: { searchParams: SP }) {
     <>
       <SuppliersTable
         rows={rows}
-        total={total}
         query={params.q ?? ""}
         owing={owing}
         pageSize={pageSize}

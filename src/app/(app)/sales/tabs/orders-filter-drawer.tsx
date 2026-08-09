@@ -8,8 +8,9 @@ import {
   type InputHTMLAttributes,
   type ReactNode,
 } from "react";
-import { Barcode, Search, SlidersHorizontal, X } from "lucide-react";
+import { Barcode, Search, X } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { FilterTriggerButton } from "@/components/filter-trigger-button";
 import { Routes } from "@/lib/routes";
 import {
   DEFAULT_TIME_FILTER_PRESET,
@@ -317,15 +318,11 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
           />
         </form>
 
-        <button
+        <FilterTriggerButton
           ref={openButtonRef}
-          type="button"
           onClick={openDrawer}
-          className="relative inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-primary-600 bg-surface px-4 text-sm font-bold text-primary-700 transition hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-        >
-          <SlidersHorizontal className="size-4" />
-          Lọc
-        </button>
+          label="Lọc"
+        />
       </div>
 
       {open && (
