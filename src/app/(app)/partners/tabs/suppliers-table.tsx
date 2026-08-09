@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -10,6 +10,12 @@ import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { getSuppliers } from "@/lib/data/partners";
 import { updateSupplier } from "@/lib/actions/partners";
+import { SupplierPayableActions } from "@/components/partners/supplier-payable-actions";
+import {
+  DEFAULT_PARTNER_DEBT_FILTER,
+  PartnerDebtFilterControl,
+  matchesPartnerDebtFilter,
+} from "@/components/partners/partner-debt-filter";
 
 type SupplierRow = Awaited<ReturnType<typeof getSuppliers>>["rows"][number];
 type SupplierDetailTab = "info" | "history" | "debt";
@@ -45,6 +51,12 @@ type SupplierPreview = {
     debtAmount: string;
     createdAt: string;
   }>;
+  payables: {
+    currentDebt: number;
+    lastReconciledAt: string | null;
+    invoices: Array<{ id: string; code: string; createdAt: string; total: number; amountPaid: number; remaining: number }>;
+    ledger: SupplierDebtRow[];
+  } | null;
 };
 type SupplierHistoryRow = {
   id: string;
@@ -63,6 +75,17 @@ type SupplierDraft = {
   address: string;
   taxCode: string;
   note: string;
+};
+type SupplierDebtRow = {
+  id: string;
+  kind: "purchase" | "return" | "payment" | "adjustment";
+  code: string;
+  purchaseOrderId: string | null;
+  createdAt: string;
+  typeLabel: string;
+  value: number;
+  balance: number;
+  reason: string | null;
 };
 
 const DETAIL_TABS: SupplierDetailTab[] = ["info", "history", "debt"];
@@ -190,6 +213,18 @@ export function SuppliersTable({ rows }: { rows: SupplierRow[] }) {
     router.refresh();
   }
 
+  async function refreshSelectedSupplier() {
+    const supplierId = preview?.data?.supplier.id;
+    if (!supplierId) return;
+    const response = await fetch(`/api/suppliers/${encodeURIComponent(supplierId)}/preview`, { cache: "no-store" });
+    const json = await response.json();
+    if (!response.ok || !json.ok) return;
+    const data = json.data as SupplierPreview;
+    setPreview({ loading: false, data });
+    setSelectedSupplier((current) => current ? { ...current, currentDebt: String(data.supplier.currentDebt) } : current);
+    router.refresh();
+  }
+
   return (
     <>
       <DataTableShell
@@ -257,6 +292,7 @@ export function SuppliersTable({ rows }: { rows: SupplierRow[] }) {
               draft={draft ?? toSupplierDraft(preview.data.supplier)}
               editing={editing}
               onDraftChange={(field, value) => setDraft((current) => current ? { ...current, [field]: value } : current)}
+              onPayablesChanged={refreshSelectedSupplier}
             />
           </div>
         ) : null}
@@ -270,11 +306,13 @@ function SupplierDetailTabs({
   draft,
   editing,
   onDraftChange,
+  onPayablesChanged,
 }: {
   preview: SupplierPreview;
   draft: SupplierDraft;
   editing: boolean;
   onDraftChange: (field: keyof SupplierDraft, value: string) => void;
+  onPayablesChanged: () => void | Promise<void>;
 }) {
   const t = useTranslations();
   const [tab, setTab] = useState<SupplierDetailTab>("info");
@@ -302,12 +340,22 @@ function SupplierDetailTabs({
     })),
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  const debtRows = history
+  const debtRows: SupplierDebtRow[] = preview.payables?.ledger ?? history
     .filter((row) => row.debtChange !== 0)
-    .reduce<{ balance: number; rows: Array<SupplierHistoryRow & { balanceAfter: number }> }>(
+    .reduce<{ balance: number; rows: SupplierDebtRow[] }>(
       (state, row) => ({
         balance: state.balance - row.debtChange,
-        rows: [...state.rows, { ...row, balanceAfter: state.balance }],
+        rows: [...state.rows, {
+          id: row.id,
+          kind: row.kind,
+          code: row.code,
+          purchaseOrderId: row.kind === "purchase" ? row.id : null,
+          createdAt: row.createdAt,
+          typeLabel: row.kind === "purchase" ? "Nhập hàng" : "Trả hàng",
+          value: row.debtChange,
+          balance: state.balance,
+          reason: null,
+        }],
       }),
       { balance: Number(preview.supplier.currentDebt), rows: [] },
     ).rows;
@@ -335,7 +383,7 @@ function SupplierDetailTabs({
       <div className="min-h-0 flex-1 overflow-hidden pt-4">
         {visibleTab === "info" && <SupplierInfoPanel supplier={preview.supplier} draft={draft} editing={editing} onDraftChange={onDraftChange} />}
         {visibleTab === "history" && <SupplierHistoryPanel rows={history} />}
-        {visibleTab === "debt" && <SupplierDebtPanel rows={debtRows} currentDebt={Number(preview.supplier.currentDebt)} />}
+        {visibleTab === "debt" && <SupplierDebtPanel preview={preview} rows={debtRows} onPayablesChanged={onPayablesChanged} />}
       </div>
     </div>
   );
@@ -478,35 +526,51 @@ function SupplierHistoryPanel({ rows }: { rows: SupplierHistoryRow[] }) {
   );
 }
 
-function SupplierDebtPanel({ rows, currentDebt }: { rows: Array<SupplierHistoryRow & { balanceAfter: number }>; currentDebt: number }) {
+function SupplierDebtPanel({ preview, rows, onPayablesChanged }: { preview: SupplierPreview; rows: SupplierDebtRow[]; onPayablesChanged: () => void | Promise<void> }) {
   const t = useTranslations();
+  const [filter, setFilter] = useState(DEFAULT_PARTNER_DEBT_FILTER);
+  const visibleRows = useMemo(
+    () => rows.filter((row) => matchesPartnerDebtFilter(row, filter)),
+    [filter, rows],
+  );
+  const currentDebt = preview.payables?.currentDebt ?? Number(preview.supplier.currentDebt);
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
-      <div className="flex shrink-0 justify-end">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
+        {preview.payables && (
+          <div className="flex flex-wrap gap-2">
+            <SupplierPayableActions
+              supplierId={preview.supplier.id}
+              overview={preview.payables}
+              onChanged={onPayablesChanged}
+            />
+          </div>
+        )}
         <div className="rounded-lg bg-warn-soft px-4 py-2 text-right">
           <div className="text-xs font-semibold text-warn">{t("suppliers.details.currentDebt")}</div>
           <div className="font-bold tabular-nums text-warn">{formatCurrency(currentDebt)}</div>
         </div>
       </div>
-      {rows.length === 0 ? (
+      <PartnerDebtFilterControl value={filter} onChange={setFilter} />
+      {visibleRows.length === 0 ? (
         <div className="min-h-0 flex-1 overflow-auto"><EmptyPanel message={t("suppliers.details.emptyDebt")} /></div>
       ) : (
         <>
         <div className="min-h-0 flex-1 divide-y divide-border-soft overflow-auto rounded-card border border-border-soft lg:hidden" data-mobile-audit="supplier-debt">
-          {rows.map((row) => (
+          {visibleRows.map((row) => (
             <article key={`${row.kind}-${row.id}`} className="space-y-2 p-3 text-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="font-semibold text-primary-600">{row.code}</div>
-                  <div className="mt-0.5 text-xs text-slate-500">{formatDate(row.createdAt)} · {t(`suppliers.details.debtTypes.${row.kind}`)}</div>
+                  {row.purchaseOrderId ? <Link href={Routes.purchase(row.purchaseOrderId)} className="font-semibold text-primary-600 hover:underline">{row.code}</Link> : <div className="font-semibold text-primary-600">{row.code}</div>}
+                  <div className="mt-0.5 text-xs text-slate-500">{formatDate(row.createdAt)} · {row.typeLabel}{row.reason ? ` · ${row.reason}` : ""}</div>
                 </div>
-                <div className={cn("shrink-0 font-semibold tabular-nums", row.debtChange < 0 ? "text-ok" : "text-warn")}>
-                  {row.debtChange > 0 ? "+" : "−"}{formatCurrency(Math.abs(row.debtChange))}
+                <div className={cn("shrink-0 font-semibold tabular-nums", row.value < 0 ? "text-ok" : "text-warn")}>
+                  {row.value > 0 ? "+" : "−"}{formatCurrency(Math.abs(row.value))}
                 </div>
               </div>
               <div className="flex items-center justify-between gap-3 border-t border-border-soft pt-2 text-xs">
                 <span className="text-slate-500">{t("suppliers.details.debtCols.balance")}</span>
-                <span className="font-semibold tabular-nums">{formatCurrency(row.balanceAfter)}</span>
+                <span className="font-semibold tabular-nums">{formatCurrency(row.balance)}</span>
               </div>
             </article>
           ))}
@@ -523,15 +587,15 @@ function SupplierDebtPanel({ rows, currentDebt }: { rows: Array<SupplierHistoryR
               </tr>
             </thead>
             <tbody className="divide-y divide-border-soft">
-              {rows.map((row) => (
+              {visibleRows.map((row) => (
                 <tr key={`${row.kind}-${row.id}`}>
-                  <td className="px-3 py-3 font-semibold text-primary-600">{row.code}</td>
+                  <td className="px-3 py-3 font-semibold text-primary-600">{row.purchaseOrderId ? <Link href={Routes.purchase(row.purchaseOrderId)} className="hover:underline">{row.code}</Link> : row.code}</td>
                   <td className="whitespace-nowrap px-3 py-3 text-slate-500">{formatDate(row.createdAt)}</td>
-                  <td className="px-3 py-3">{t(`suppliers.details.debtTypes.${row.kind}`)}</td>
-                  <td className={cn("px-3 py-3 text-right font-semibold tabular-nums", row.debtChange < 0 ? "text-ok" : "text-warn")}>
-                    {row.debtChange > 0 ? "+" : "−"}{formatCurrency(Math.abs(row.debtChange))}
+                  <td className="px-3 py-3">{row.typeLabel}{row.reason ? <div className="text-xs text-slate-500">{row.reason}</div> : null}</td>
+                  <td className={cn("px-3 py-3 text-right font-semibold tabular-nums", row.value < 0 ? "text-ok" : "text-warn")}>
+                    {row.value > 0 ? "+" : "−"}{formatCurrency(Math.abs(row.value))}
                   </td>
-                  <td className="px-3 py-3 text-right font-semibold tabular-nums">{formatCurrency(row.balanceAfter)}</td>
+                  <td className="px-3 py-3 text-right font-semibold tabular-nums">{formatCurrency(row.balance)}</td>
                 </tr>
               ))}
             </tbody>

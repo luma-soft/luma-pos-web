@@ -27,7 +27,6 @@ import { InstantFilterForm } from "@/components/instant-filter-form";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { CustomerCreateDialog } from "@/components/partners/customer-create-dialog";
 import { buttonVariants } from "@/components/ui/button-variants";
-import { Select } from "@/components/ui/select";
 import { Routes } from "@/lib/routes";
 import { OrderDetailLink } from "@/components/order-detail-link";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
@@ -38,10 +37,14 @@ import { OrderStatusBadge } from "../../orders/status-badges";
 import type { PrintTemplate } from "@/lib/print/template-shared";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import { CustomerReceivableActions } from "@/components/partners/customer-receivable-actions";
+import {
+  DEFAULT_PARTNER_DEBT_FILTER,
+  PartnerDebtFilterControl,
+  matchesPartnerDebtFilter,
+} from "@/components/partners/partner-debt-filter";
 
 type CustomerRow = CustomerListResult["rows"][number];
 type CustomerExpandTab = "info" | "sales" | "debt";
-type DebtFilter = "all" | "sale" | "payment" | "return";
 type OrderPreview = {
   id: string;
   code: string;
@@ -459,10 +462,10 @@ function CustomerSalesPanel({ customer, returnPrintTemplates }: { customer: Cust
 
 function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
   const t = useTranslations();
-  const [filter, setFilter] = useState<DebtFilter>("all");
+  const [filter, setFilter] = useState(DEFAULT_PARTNER_DEBT_FILTER);
   const [preview, setPreview] = useState<{ loading: boolean; error?: string; order?: OrderPreview } | null>(null);
   const rows = useMemo(
-    () => customer.debtLedger.filter((row) => filter === "all" || row.kind === filter),
+    () => customer.debtLedger.filter((row) => matchesPartnerDebtFilter(row, filter)),
     [customer.debtLedger, filter],
   );
 
@@ -483,19 +486,7 @@ function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
-      <div className="flex shrink-0 justify-end">
-        <Select
-          value={filter}
-          onChange={(event) => setFilter(event.target.value as DebtFilter)}
-          options={[
-            { value: "all", label: t("customers.debtFilter.all") },
-            { value: "sale", label: t("customers.debtFilter.sale") },
-            { value: "payment", label: t("customers.debtFilter.payment") },
-            { value: "return", label: t("customers.debtFilter.return") },
-          ]}
-          className="font-medium"
-        />
-      </div>
+      <PartnerDebtFilterControl value={filter} onChange={setFilter} />
 
       {rows.length === 0 ? (
         <div className="min-h-0 flex-1 overflow-auto"><EmptyPanel message={t("customers.expand.emptyDebt")} /></div>
@@ -739,13 +730,6 @@ function CustomerActionBar({ customer }: { customer: CustomerRow }) {
           <ActionButton icon={Trash2} label={t("common.delete")} tone="danger" disabled title={t("customers.actions.deleteDisabled")} />
         </div>
         <div className="flex flex-wrap gap-2 xl:justify-end">
-          <Link
-            href={`${Routes.Customers}/${customer.id}`}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "min-h-11 min-w-11 lg:min-h-0 lg:min-w-0")}
-          >
-            <ExternalLink className="h-4 w-4" />
-            {t("customers.actions.viewDetails")}
-          </Link>
           <CustomerEdit customer={{
             id: customer.id,
             name: customer.name,

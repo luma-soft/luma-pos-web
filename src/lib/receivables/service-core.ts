@@ -81,7 +81,7 @@ export async function collectCustomerReceivable(
   if (
     !input.customerId || !validRequestId(input.clientRequestId) || amount <= 0 ||
     !["cash", "bank_transfer", "card"].includes(input.method) ||
-    ids.length === 0 || new Set(ids).size !== ids.length ||
+    new Set(ids).size !== ids.length ||
     allocations.some((row) => !row.orderId || row.amount <= 0) ||
     allocationTotal - amount > 1e-9
   ) return { ok: false, error: "errors.invalidData" };
@@ -137,7 +137,9 @@ export async function collectCustomerReceivable(
         }).where(eq(orders.id, order.id));
         allocationRows.push({ receiptId: receipt.id, orderId: order.id, paymentId: payment.id, amount: allocation.amount.toFixed(2) });
       }
-      await tx.insert(customerReceivableAllocations).values(allocationRows);
+      if (allocationRows.length > 0) {
+        await tx.insert(customerReceivableAllocations).values(allocationRows);
+      }
       await recordCashTx(tx, {
         type: "in", fund: fundForMethod(input.method), amount, category: "debt_collect",
         refType: "customer_receivable_receipt", refId: receipt.id,

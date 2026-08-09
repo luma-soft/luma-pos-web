@@ -4,14 +4,17 @@ import {
   customerConsents,
   customerReceivableEntries,
   customers,
+  orderItems,
   orders,
   payments,
   profiles,
+  returnItems,
   returns,
   suppliers,
 } from "@/db/schema";
 import { accentInsensitiveLike } from "@/lib/search";
 import { coercePageSize } from "@/lib/pagination";
+import { getSupplierPayableOverview } from "@/lib/data/supplier-payables";
 
 export const PARTNERS_PAGE_SIZE = 20;
 
@@ -44,6 +47,8 @@ export type CustomerSalesHistoryRow = {
   sellerName: string | null;
   total: string;
   status: string;
+  itemCount: number;
+  paymentStatus: string;
 };
 
 export type CustomerDebtLedgerRow = {
@@ -246,6 +251,12 @@ export async function getCustomers(
           status: orders.status,
           total: orders.total,
           amountPaid: orders.amountPaid,
+          paymentStatus: orders.paymentStatus,
+          itemCount: sql<number>`(
+            select count(*)::int
+            from ${orderItems}
+            where ${orderItems.orderId} = ${orders.id}
+          )`,
           createdAt: orders.createdAt,
           sellerName: profiles.fullName,
         })
@@ -262,6 +273,11 @@ export async function getCustomers(
           orderId: returns.orderId,
           totalRefund: returns.totalRefund,
           refundMethod: returns.refundMethod,
+          itemCount: sql<number>`(
+            select count(*)::int
+            from ${returnItems}
+            where ${returnItems.returnId} = ${returns.id}
+          )`,
           createdAt: returns.createdAt,
           sellerName: profiles.fullName,
         })
@@ -328,6 +344,8 @@ export async function getCustomers(
         sellerName: order.sellerName,
         total: order.total,
         status: order.status,
+        itemCount: Number(order.itemCount),
+        paymentStatus: order.paymentStatus,
       });
       addLedger(order.customerId, {
         id: order.id,
@@ -351,6 +369,8 @@ export async function getCustomers(
         sellerName: ret.sellerName,
         total: String(-Number(ret.totalRefund)),
         status: "returned",
+        itemCount: Number(ret.itemCount),
+        paymentStatus: "refunded",
       });
       if (ret.refundMethod === "debt_deduct") {
         addLedger(ret.customerId, {
@@ -519,7 +539,7 @@ export async function getSupplierPurchases(id: string) {
 }
 
 export async function getSupplierPurchaseReturns(id: string) {
-  const { purchaseReturns } = await import("@/db/schema");
+  const { purchaseReturnItems, purchaseReturns } = await import("@/db/schema");
   return db
     .select({
       id: purchaseReturns.id,
@@ -530,6 +550,7 @@ export async function getSupplierPurchaseReturns(id: string) {
       refundAmount: purchaseReturns.refundAmount,
       debtAmount: purchaseReturns.debtAmount,
       createdAt: purchaseReturns.createdAt,
+      itemCount: sql<number>`(select count(*)::int from ${purchaseReturnItems} where ${purchaseReturnItems.purchaseReturnId} = ${purchaseReturns.id})`,
     })
     .from(purchaseReturns)
     .where(eq(purchaseReturns.supplierId, id))
@@ -538,13 +559,14 @@ export async function getSupplierPurchaseReturns(id: string) {
 }
 
 export async function getSupplierPreview(id: string) {
-  const [supplier, purchases, purchaseReturns] = await Promise.all([
+  const [supplier, purchases, purchaseReturns, payables] = await Promise.all([
     getSupplier(id),
     getSupplierPurchases(id),
     getSupplierPurchaseReturns(id),
+    getSupplierPayableOverview(id),
   ]);
   if (!supplier) return null;
-  return { supplier, purchases, purchaseReturns };
+  return { supplier, purchases, purchaseReturns, payables };
 }
 
 export type SupplierDetail = NonNullable<Awaited<ReturnType<typeof getSupplier>>>;

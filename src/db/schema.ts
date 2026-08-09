@@ -40,6 +40,12 @@ export const customerReceivableReceiptStatusEnum = pgEnum("customer_receivable_r
 export const customerReceivableEntryTypeEnum = pgEnum("customer_receivable_entry_type", [
   "adjustment_debit", "adjustment_credit", "settlement_discount",
 ]);
+export const supplierPayableReceiptStatusEnum = pgEnum("supplier_payable_receipt_status", [
+  "confirmed", "cancelled",
+]);
+export const supplierPayableEntryTypeEnum = pgEnum("supplier_payable_entry_type", [
+  "adjustment_debit", "adjustment_credit",
+]);
 export const serviceTypeEnum = pgEnum("service_type", [
   "camera", "electrical", "plumbing", "mixed",
 ]);
@@ -812,6 +818,61 @@ export const purchaseOrderItems = pgTable("purchase_order_items", {
   batchNumber: varchar("batch_number", { length: 80 }),
   expiryDate: date("expiry_date"),
 });
+
+// ============= Supplier payables =============
+
+/** One supplier payment may be allocated across several purchase receipts. */
+export const supplierPayableReceipts = pgTable("supplier_payable_receipts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: varchar("code", { length: 40 }).notNull().unique(),
+  supplierId: uuid("supplier_id").notNull().references(() => suppliers.id),
+  status: supplierPayableReceiptStatusEnum("status").notNull().default("confirmed"),
+  amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
+  method: paymentMethodEnum("method").notNull(),
+  reference: text("reference"),
+  note: text("note"),
+  clientRequestId: varchar("client_request_id", { length: 80 }).notNull().unique(),
+  createdBy: uuid("created_by").references(() => profiles.id),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("supplier_payable_receipts_supplier_idx").on(t.supplierId, t.createdAt),
+  index("supplier_payable_receipts_status_idx").on(t.status, t.createdAt),
+  check("supplier_payable_receipts_amount_check", sql`${t.amount} > 0`),
+]);
+
+export const supplierPayableAllocations = pgTable("supplier_payable_allocations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  receiptId: uuid("receipt_id").notNull().references(() => supplierPayableReceipts.id, { onDelete: "cascade" }),
+  purchaseOrderId: uuid("purchase_order_id").notNull().references(() => purchaseOrders.id),
+  amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("supplier_payable_allocations_receipt_purchase_idx").on(t.receiptId, t.purchaseOrderId),
+  index("supplier_payable_allocations_purchase_idx").on(t.purchaseOrderId),
+  check("supplier_payable_allocations_amount_check", sql`${t.amount} > 0`),
+]);
+
+/** Manual debt movement: positive raises payable debt, negative lowers it. */
+export const supplierPayableEntries = pgTable("supplier_payable_entries", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  code: varchar("code", { length: 40 }).notNull().unique(),
+  supplierId: uuid("supplier_id").notNull().references(() => suppliers.id),
+  purchaseOrderId: uuid("purchase_order_id").references(() => purchaseOrders.id),
+  type: supplierPayableEntryTypeEnum("type").notNull(),
+  amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
+  reason: text("reason").notNull(),
+  reference: text("reference"),
+  note: text("note"),
+  clientRequestId: varchar("client_request_id", { length: 80 }).notNull().unique(),
+  createdBy: uuid("created_by").references(() => profiles.id),
+  approvedBy: uuid("approved_by").references(() => profiles.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("supplier_payable_entries_supplier_idx").on(t.supplierId, t.createdAt),
+  index("supplier_payable_entries_purchase_idx").on(t.purchaseOrderId),
+  check("supplier_payable_entries_amount_check", sql`${t.amount} <> 0`),
+]);
 
 // ============= Stock lots (batch / expiry ledger) =============
 
