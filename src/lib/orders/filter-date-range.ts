@@ -15,7 +15,9 @@ export const ORDER_TIME_PRESETS = [
 
 export type OrderTimePreset = (typeof ORDER_TIME_PRESETS)[number]["value"];
 
-export const DEFAULT_ORDER_TIME_PRESET: OrderTimePreset = "thisMonth";
+// Central default for list time filters. Keep this as the single seam for a
+// future store setting that lets each merchant choose their preferred range.
+export const DEFAULT_TIME_FILTER_PRESET = "all" satisfies OrderTimePreset;
 
 export const BOOKING_DELIVERY_PRESETS = [
   { value: "all", label: "Tất cả ngày giao" },

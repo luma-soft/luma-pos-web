@@ -3,7 +3,10 @@
 import { CalendarDays } from "lucide-react";
 import { Select } from "@/components/ui/select";
 import { LumaDateRangePicker } from "@/app/(app)/sales/tabs/filter-drawer-shared";
-import { isOrderDateRangeValid } from "@/lib/orders/filter-date-range";
+import {
+  DEFAULT_TIME_FILTER_PRESET,
+  isOrderDateRangeValid,
+} from "@/lib/orders/filter-date-range";
 
 export type PartnerDebtTime = "all" | "today" | "7d" | "30d" | "custom";
 export type PartnerDebtKind = "all" | "debt" | "payment" | "adjustment";
@@ -15,7 +18,7 @@ export type PartnerDebtFilterValue = {
 };
 
 export const DEFAULT_PARTNER_DEBT_FILTER: PartnerDebtFilterValue = {
-  time: "all",
+  time: DEFAULT_TIME_FILTER_PRESET,
   kind: "all",
   from: "",
   to: "",

@@ -4,7 +4,7 @@ import { Pagination } from "@/components/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { getReturn, getReturns } from "@/lib/data/returns";
 import {
-  DEFAULT_ORDER_TIME_PRESET,
+  DEFAULT_TIME_FILTER_PRESET,
   isOrderTimePreset,
   resolveOrderTimePreset,
   type OrderTimePreset,
@@ -105,7 +105,7 @@ function resolveDateFilter(params: SP) {
     ? params.timePreset
     : params.from || params.to
       ? "custom"
-      : DEFAULT_ORDER_TIME_PRESET;
+      : DEFAULT_TIME_FILTER_PRESET;
   if (timePreset === "custom") {
     return { timePreset, from: params.from ?? "", to: params.to ?? "" };
   }

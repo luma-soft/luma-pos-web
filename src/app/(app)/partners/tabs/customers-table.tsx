@@ -88,12 +88,10 @@ export function CustomersTable({
 }) {
   const t = useTranslations();
   const [filterOpen, setFilterOpen] = useState(false);
-  const activeFilterCount = FILTER_KEYS.filter((key) => Boolean(filters[key])).length + (filters.owing ? 1 : 0);
-
   return (
     <div className="min-w-0">
       <section className="min-w-0">
-        <CustomerRows data={data} filters={filters} returnPrintTemplates={returnPrintTemplates} aiPreview={aiPreview} onOpenFilters={() => setFilterOpen(true)} activeFilterCount={activeFilterCount} />
+        <CustomerRows data={data} filters={filters} returnPrintTemplates={returnPrintTemplates} aiPreview={aiPreview} onOpenFilters={() => setFilterOpen(true)} />
 
         <Pagination
           page={data.page}
@@ -128,12 +126,10 @@ function CustomerSearch({
   filters,
   pageSize,
   onOpenFilters,
-  activeFilterCount,
 }: {
   filters: CustomerFilters;
   pageSize: number;
   onOpenFilters: () => void;
-  activeFilterCount: number;
 }) {
   const t = useTranslations();
 
@@ -159,11 +155,6 @@ function CustomerSearch({
           title={t("customers.filters.title")}
         >
           <SlidersHorizontal className="h-4 w-4" />
-          {activeFilterCount > 0 && (
-            <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-primary-600 px-1 text-[10px] font-bold text-white">
-              {activeFilterCount}
-            </span>
-          )}
         </button>
       </div>
     </InstantFilterForm>
@@ -176,14 +167,12 @@ function CustomerRows({
   returnPrintTemplates,
   aiPreview,
   onOpenFilters,
-  activeFilterCount,
 }: {
   data: CustomerListResult;
   filters: CustomerFilters;
   returnPrintTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[];
   aiPreview: boolean;
   onOpenFilters: () => void;
-  activeFilterCount: number;
 }) {
   const t = useTranslations();
   const router = useRouter();
@@ -229,7 +218,7 @@ function CustomerRows({
         ]}
         toolbar={(
           <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <CustomerSearch filters={filters} pageSize={data.pageSize} onOpenFilters={onOpenFilters} activeFilterCount={activeFilterCount} />
+            <CustomerSearch filters={filters} pageSize={data.pageSize} onOpenFilters={onOpenFilters} />
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               <button type="button" onClick={() => setCreateOpen(true)} className={cn(buttonVariants({ variant: "default", size: "sm" }), "h-10 shrink-0 rounded-lg min-h-11 min-w-11 lg:min-h-0 lg:min-w-0")}>
                 <Plus className="h-4 w-4" />

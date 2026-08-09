@@ -12,7 +12,7 @@ import { Barcode, Search, SlidersHorizontal, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Routes } from "@/lib/routes";
 import {
-  DEFAULT_ORDER_TIME_PRESET,
+  DEFAULT_TIME_FILTER_PRESET,
   ORDER_TIME_PRESETS,
   isOrderDateRangeValid,
   isOrderTimePreset,
@@ -73,9 +73,9 @@ function createDraftFromValues(values: OrdersFilterValues): OrdersFilterDraft {
       ? values.timePreset
       : values.from || values.to
         ? "custom"
-        : DEFAULT_ORDER_TIME_PRESET;
+        : DEFAULT_TIME_FILTER_PRESET;
   const range = resolveOrderTimePreset(timePreset) ??
-    resolveOrderTimePreset(DEFAULT_ORDER_TIME_PRESET)!;
+    resolveOrderTimePreset(DEFAULT_TIME_FILTER_PRESET)!;
   return {
     customerId: values.customerId,
     customerLabel: values.customerLabel,
@@ -109,7 +109,7 @@ function createFilterCountQuery(
   if (draft.payment !== "all") query.set("payment", draft.payment);
   if (draft.paymentMethod !== "all") query.set("paymentMethod", draft.paymentMethod);
   if (draft.source !== "all") query.set("source", draft.source);
-  if (draft.timePreset !== DEFAULT_ORDER_TIME_PRESET || draft.from || draft.to) {
+  if (draft.timePreset !== DEFAULT_TIME_FILTER_PRESET || draft.from || draft.to) {
     query.set("timePreset", draft.timePreset);
   }
   if (draft.from) query.set("from", draft.from);
@@ -127,24 +127,6 @@ function amountRangeInvalid(draft: OrdersFilterDraft) {
   const maxSet = draft.maxTotal.trim().length > 0;
   if ((!minSet && !maxSet) || Number.isNaN(min) || Number.isNaN(max)) return false;
   return minSet && maxSet && min > max;
-}
-
-function countAppliedOrderFilters(values: OrdersFilterValues) {
-  const applied = [
-    values.customerId,
-    values.productId,
-    values.status !== "all" ? values.status : "",
-    values.payment !== "all" ? values.payment : "",
-    values.paymentMethod !== "all" ? values.paymentMethod : "",
-    values.source !== "all" ? values.source : "",
-    values.timePreset !== DEFAULT_ORDER_TIME_PRESET ? values.timePreset : "",
-    values.from,
-    values.to,
-    values.minTotal,
-    values.maxTotal,
-    values.includeCancelled ? "1" : "",
-  ];
-  return applied.filter(Boolean).length;
 }
 
 export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
@@ -169,8 +151,6 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
     setDraft(createDraftFromValues(values));
     setOpen(false);
   }, [values]);
-
-  const activeFilters = countAppliedOrderFilters(values);
 
   const dateRangeError = draft.timePreset !== "all" &&
     !isOrderDateRangeValid(draft.from, draft.to);
@@ -345,14 +325,6 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
         >
           <SlidersHorizontal className="size-4" />
           Lọc
-          {activeFilters > 0 && (
-            <span
-              className="grid min-h-5 min-w-5 place-items-center rounded-full bg-primary-600 px-1 text-[11px] text-white"
-              aria-label={`${activeFilters} điều kiện lọc`}
-            >
-              {activeFilters}
-            </span>
-          )}
         </button>
       </div>
 

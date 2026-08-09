@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
-  DEFAULT_ORDER_TIME_PRESET,
+  DEFAULT_TIME_FILTER_PRESET,
   ORDER_TIME_PRESETS,
   isOrderDateRangeValid,
   resolveOrderTimePreset,
@@ -90,7 +90,11 @@ describe("orders filter drawer", () => {
   test("matches the mobile time presets and date boundaries", () => {
     const now = new Date(2026, 7, 6, 12);
 
-    expect(DEFAULT_ORDER_TIME_PRESET).toBe("thisMonth");
+    expect(DEFAULT_TIME_FILTER_PRESET).toBe("all");
+    expect(resolveOrderTimePreset(DEFAULT_TIME_FILTER_PRESET, now)).toEqual({
+      from: "",
+      to: "",
+    });
     expect(resolveOrderTimePreset("all", now)).toEqual({ from: "", to: "" });
     expect(resolveOrderTimePreset("today", now)).toEqual({
       from: "2026-08-06",
@@ -186,5 +190,18 @@ describe("orders filter drawer", () => {
     expect(countRouteSource).toContain("requireSalesAccess");
     expect(countRouteSource).toContain("getOrders");
     expect(countRouteSource).toContain("pageSize: 1");
+  });
+
+  test("does not render a numeric badge on the filter button", () => {
+    const source = readFileSync(
+      new URL(
+        "../src/app/(app)/sales/tabs/orders-filter-drawer.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+
+    expect(source).not.toContain("điều kiện lọc");
+    expect(source).not.toContain("activeFilters");
   });
 });

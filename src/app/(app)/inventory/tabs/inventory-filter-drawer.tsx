@@ -16,6 +16,7 @@ import {
   type EntityPickerKind,
 } from "../../sales/tabs/filter-drawer-shared";
 import {
+  DEFAULT_TIME_FILTER_PRESET,
   ORDER_TIME_PRESETS,
   isOrderDateRangeValid,
   resolveOrderTimePreset,
@@ -112,7 +113,7 @@ export function InventoryFilterDrawer({
       warehouse: values.warehouseId ?? values.warehouse ?? "",
       supplier: values.supplierId ?? "",
       stock: values.stock ?? "",
-      time: values.timePreset ?? "all",
+      time: values.timePreset ?? DEFAULT_TIME_FILTER_PRESET,
       from: values.from ?? "",
       to: values.to ?? "",
       debt: values.debtOnly ?? "",
@@ -304,7 +305,7 @@ export function InventoryFilterDrawer({
       warehouse: "",
       supplier: "",
       stock: "",
-      time: "all",
+      time: DEFAULT_TIME_FILTER_PRESET,
       from: "",
       to: "",
       debt: "",
@@ -388,11 +389,6 @@ export function InventoryFilterDrawer({
       >
         <SlidersHorizontal className="h-4 w-4 text-primary-600" />
         Bộ lọc
-        {active > 0 && (
-          <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-600 px-1.5 text-xs text-white" aria-label={`${active} điều kiện lọc`}>
-            {active}
-          </span>
-        )}
       </button>
 
       {open && (

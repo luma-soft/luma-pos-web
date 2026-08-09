@@ -8,7 +8,7 @@ import {
   type OrderStatusFilter,
 } from "@/lib/data/orders";
 import {
-  DEFAULT_ORDER_TIME_PRESET,
+  DEFAULT_TIME_FILTER_PRESET,
   isBookingDeliveryPreset,
   isOrderTimePreset,
   resolveBookingDeliveryPreset,
@@ -103,7 +103,7 @@ function resolveDateFilter(params: SP) {
     ? params.timePreset
     : params.from || params.to
       ? "custom"
-      : DEFAULT_ORDER_TIME_PRESET;
+      : DEFAULT_TIME_FILTER_PRESET;
   if (timePreset === "custom") {
     return { timePreset, from: params.from ?? "", to: params.to ?? "" };
   }

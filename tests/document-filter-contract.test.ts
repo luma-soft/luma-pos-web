@@ -5,7 +5,7 @@ import {
 } from "../src/lib/orders/list-filter-schema";
 import {
   BOOKING_DELIVERY_PRESETS,
-  DEFAULT_ORDER_TIME_PRESET,
+  DEFAULT_TIME_FILTER_PRESET,
   resolveBookingDeliveryPreset,
   resolveOrderTimePreset,
 } from "../src/lib/orders/filter-date-range";
@@ -70,12 +70,12 @@ describe("document filter query contract", () => {
     expect(parseOrderListSearchParams(new URLSearchParams({ minTotal: "200", maxTotal: "100" })).success).toBe(false);
   });
 
-  test("uses this month by default and supports one-sided overdue delivery", () => {
+  test("uses all time by default and supports one-sided overdue delivery", () => {
     const now = new Date(2026, 7, 6, 12);
-    expect(DEFAULT_ORDER_TIME_PRESET).toBe("thisMonth");
-    expect(resolveOrderTimePreset(DEFAULT_ORDER_TIME_PRESET, now)).toEqual({
-      from: "2026-08-01",
-      to: "2026-08-06",
+    expect(DEFAULT_TIME_FILTER_PRESET).toBe("all");
+    expect(resolveOrderTimePreset(DEFAULT_TIME_FILTER_PRESET, now)).toEqual({
+      from: "",
+      to: "",
     });
     expect(resolveBookingDeliveryPreset("overdue", now)).toEqual({
       from: "",
@@ -160,8 +160,9 @@ describe("document filter UI contract", () => {
     expect(drawer).not.toContain('type="date"');
   });
 
-  test("supports preview count, filter badge, apply and clear", () => {
-    expect(drawer).toContain("countAppliedDocumentFilters");
+  test("supports preview count, applies and clears without a numeric badge", () => {
+    expect(drawer).not.toContain("countAppliedDocumentFilters");
+    expect(drawer).not.toContain("điều kiện lọc");
     expect(drawer).toContain("/api/returns/count");
     expect(drawer).toContain("/api/orders/count");
     expect(drawer).toContain("Xóa lọc");

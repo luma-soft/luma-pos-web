@@ -20,7 +20,7 @@ import {
 import { Routes } from "@/lib/routes";
 import {
   BOOKING_DELIVERY_PRESETS,
-  DEFAULT_ORDER_TIME_PRESET,
+  DEFAULT_TIME_FILTER_PRESET,
   ORDER_TIME_PRESETS,
   isBookingDeliveryPreset,
   isOrderDateRangeValid,
@@ -152,9 +152,9 @@ const refundMethodLabels: Record<string, string> = {
 function createDraftFromValues(kind: DocumentFilterKind, values: DocumentFilterValues): DocumentFilterDraft {
   const basePreset = isOrderTimePreset(values.timePreset)
     ? values.timePreset
-    : DEFAULT_ORDER_TIME_PRESET;
+    : DEFAULT_TIME_FILTER_PRESET;
   const range = resolveOrderTimePreset(basePreset) ??
-    resolveOrderTimePreset(DEFAULT_ORDER_TIME_PRESET)!;
+    resolveOrderTimePreset(DEFAULT_TIME_FILTER_PRESET)!;
 
   const draft: DocumentFilterDraft = {
     customerId: values.customerId ?? "",
@@ -174,7 +174,7 @@ function createDraftFromValues(kind: DocumentFilterKind, values: DocumentFilterV
         ? "all"
         : values.from || values.to
           ? "custom"
-          : DEFAULT_ORDER_TIME_PRESET,
+          : DEFAULT_TIME_FILTER_PRESET,
     from: values.from || range.from,
     to: values.to || range.to,
     deliveryPreset: "all",
@@ -265,7 +265,7 @@ function createFilterCountQuery(kind: DocumentFilterKind, draft: DocumentFilterD
   } else if (kind === "quotes" && draft.status && draft.status !== "quote") {
     query.set("status", draft.status);
   }
-  if (draft.timePreset !== DEFAULT_ORDER_TIME_PRESET || draft.from || draft.to) {
+  if (draft.timePreset !== DEFAULT_TIME_FILTER_PRESET || draft.from || draft.to) {
     query.set("timePreset", draft.timePreset);
   }
   if (draft.from) query.set("from", draft.from);
@@ -292,49 +292,6 @@ function amountRangeInvalid(draft: DocumentFilterDraft) {
   return hasMin && hasMax && min > max;
 }
 
-function countAppliedDocumentFilters(kind: DocumentFilterKind, values: DocumentFilterValues) {
-  const candidates = [
-    values.customerId,
-    values.productId,
-    values.timePreset !== DEFAULT_ORDER_TIME_PRESET ? values.timePreset : "",
-    values.from,
-    values.to,
-    values.minTotal,
-    values.maxTotal,
-    values.includeCancelled ? "1" : "",
-  ];
-  if (kind === "returns") {
-    return [
-      ...candidates,
-      values.reason && values.reason !== "all" ? values.reason : "",
-      values.refundMethod && values.refundMethod !== "all" ? values.refundMethod : "",
-      values.orderId,
-      values.warehouseId,
-    ];
-  }
-  if (kind === "quotes") {
-    return [
-      ...candidates,
-      values.status && values.status !== "quote" ? values.status : "",
-      values.projectId,
-      values.projectQuery,
-    ];
-  }
-  if (kind === "bookings") {
-    return [
-      ...candidates,
-      values.status && values.status !== "confirmed" ? values.status : "",
-      values.payment && values.payment !== "all" ? values.payment : "",
-      values.deliveryPreset && values.deliveryPreset !== "all"
-        ? values.deliveryPreset
-        : "",
-      values.projectId,
-      values.projectQuery,
-    ];
-  }
-  return candidates;
-}
-
 export function DocumentFilterDrawer({
   kind,
   values,
@@ -353,9 +310,6 @@ export function DocumentFilterDrawer({
   );
   const [count, setCount] = useState<number | null>(null);
   const [countPending, setCountPending] = useState(false);
-  const appliedFilterCount = countAppliedDocumentFilters(kind, values);
-  const activeFilterCount = appliedFilterCount.filter(Boolean).length;
-
   const timeRangeError = draft.timePreset !== "all" &&
     !isOrderDateRangeValid(draft.from, draft.to);
 
@@ -595,14 +549,6 @@ export function DocumentFilterDrawer({
         >
           <SlidersHorizontal className="size-4" />
           <span className="hidden sm:inline">Lọc</span>
-          {activeFilterCount > 0 && (
-            <span
-              className="grid min-h-5 min-w-5 place-items-center rounded-full bg-primary-600 px-1 text-[11px] text-white"
-              aria-label={`${activeFilterCount} điều kiện lọc`}
-            >
-              {activeFilterCount}
-            </span>
-          )}
         </button>
       </div>
 
@@ -1065,5 +1011,3 @@ function ChipSection({
     </FilterSection>
   );
 }
-
-export { countAppliedDocumentFilters };

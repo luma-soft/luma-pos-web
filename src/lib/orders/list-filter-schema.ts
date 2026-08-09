@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { isOrderDateRangeValid } from "@/lib/orders/filter-date-range";
 import {
-  DEFAULT_ORDER_TIME_PRESET,
+  DEFAULT_TIME_FILTER_PRESET,
   ORDER_TIME_PRESETS,
   isOrderTimePreset,
 } from "@/lib/orders/filter-date-range";
@@ -77,7 +77,7 @@ export const orderListFilterSchema = z.object({
   payment: z.enum(orderPaymentStatuses).default("all"),
   paymentMethod: z.enum(orderPaymentMethods).default("all"),
   source: z.enum(orderSources).default("all"),
-  timePreset: optionalOrderTimePreset.default(DEFAULT_ORDER_TIME_PRESET),
+  timePreset: optionalOrderTimePreset.default(DEFAULT_TIME_FILTER_PRESET),
   from: optionalDate,
   to: optionalDate,
   deliveryFrom: optionalDate,

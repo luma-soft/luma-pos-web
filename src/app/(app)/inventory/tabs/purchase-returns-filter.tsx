@@ -10,6 +10,7 @@ import {
   LumaWebPicker,
 } from "../../sales/tabs/filter-drawer-shared";
 import {
+  DEFAULT_TIME_FILTER_PRESET,
   ORDER_TIME_PRESETS,
   isOrderDateRangeValid,
   resolveOrderTimePreset,
@@ -55,7 +56,7 @@ export function PurchaseReturnsFilter({ suppliers, warehouses, values, resultCou
       warehouseId: values.warehouseId ?? "",
       status: values.status ?? "all",
       settlement: values.settlement ?? "all",
-      timePreset: values.timePreset ?? "all",
+      timePreset: values.timePreset ?? DEFAULT_TIME_FILTER_PRESET,
       from: values.from ?? "",
       to: values.to ?? "",
     }),
@@ -154,7 +155,7 @@ export function PurchaseReturnsFilter({ suppliers, warehouses, values, resultCou
   }
 
   function reset() {
-    setDraft({ supplierId: "", warehouseId: "", status: "all", settlement: "all", timePreset: "all", from: "", to: "" });
+    setDraft({ supplierId: "", warehouseId: "", status: "all", settlement: "all", timePreset: DEFAULT_TIME_FILTER_PRESET, from: "", to: "" });
     setEntityLabels({ supplier: "", warehouse: "" });
   }
 
@@ -178,7 +179,6 @@ export function PurchaseReturnsFilter({ suppliers, warehouses, values, resultCou
       <button ref={triggerRef} type="button" onClick={openDrawer} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-slate-700 hover:border-primary-400 lg:min-h-0">
         <SlidersHorizontal className="h-4 w-4 text-primary-600" />
         Bộ lọc
-        {activeCount > 0 && <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary-600 px-1.5 text-xs text-white" aria-label={`${activeCount} điều kiện lọc`}>{activeCount}</span>}
       </button>
 
       {open && (
