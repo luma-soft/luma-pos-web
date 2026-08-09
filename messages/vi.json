@@ -135,7 +135,93 @@
     "relatedRecords": "Bản ghi liên quan",
     "recordFallback": "Bản ghi",
     "processing": "Đang xử lý...",
-    "processed": "Đã xử lý"
+    "processed": "Đã xử lý",
+    "inbox": {
+      "title": "Thông báo",
+      "needsActionCount": "{count} việc cần xử lý",
+      "filter": "Bộ lọc",
+      "settings": "Cài đặt thông báo",
+      "tabs": {
+        "label": "Chế độ xem thông báo",
+        "action": "Cần xử lý",
+        "all": "Tất cả",
+        "activity": "Hoạt động"
+      },
+      "highPriority": "Ưu tiên cao",
+      "impact": "Nếu không xử lý sớm, hoạt động kinh doanh có thể bị ảnh hưởng.",
+      "processed": "Đánh dấu đã xử lý",
+      "next": "Tiếp theo",
+      "information": "Thông tin",
+      "allTitle": "Tất cả thông báo",
+      "allRead": "Đã xem hết",
+      "unreadCount": "{count} chưa đọc",
+      "loading": "Đang tải thông báo...",
+      "loadError": "Không thể tải thông báo lúc này.",
+      "retry": "Thử lại",
+      "empty": "Không có thông báo nào",
+      "emptyFiltered": "Không có thông báo phù hợp bộ lọc",
+      "actions": {
+        "restock": "Tạo phiếu nhập",
+        "retry": "Thử lại",
+        "customer": "Xem khách hàng",
+        "purchase": "Xem phiếu nhập",
+        "report": "Xem báo cáo",
+        "open": "Xem chi tiết"
+      },
+      "categories": {
+        "inventory": "Kho hàng",
+        "einvoice": "HĐ điện tử",
+        "debt": "Công nợ",
+        "sales": "Báo cáo",
+        "system": "Hệ thống"
+      }
+    },
+    "filter": {
+      "title": "Bộ lọc thông báo",
+      "selectedCount": "{count} điều kiện đang chọn",
+      "close": "Đóng bộ lọc",
+      "clear": "Xóa lọc",
+      "view": "Xem {count} thông báo",
+      "time": {
+        "title": "Thời gian",
+        "all": "Tất cả",
+        "today": "Hôm nay",
+        "7d": "7 ngày",
+        "30d": "30 ngày",
+        "custom": "Tùy chọn"
+      },
+      "status": {
+        "title": "Trạng thái",
+        "all": "Tất cả",
+        "action": "Cần xử lý",
+        "unread": "Chưa đọc",
+        "processed": "Đã xử lý"
+      },
+      "level": {
+        "title": "Mức độ",
+        "all": "Tất cả",
+        "high": "Ưu tiên cao",
+        "warning": "Cảnh báo",
+        "info": "Thông tin"
+      },
+      "category": {
+        "title": "Danh mục",
+        "all": "Tất cả danh mục",
+        "inventory": "Kho hàng",
+        "einvoice": "Hóa đơn điện tử",
+        "debt": "Công nợ",
+        "sales": "Báo cáo",
+        "system": "Hệ thống"
+      },
+      "source": {
+        "title": "Nguồn phát sinh",
+        "all": "Tất cả nguồn",
+        "ai": "AI",
+        "mobile": "Di động",
+        "pos": "POS",
+        "system": "Hệ thống"
+      }
+    }
   },
   "mobile": {
     "dashboard": {

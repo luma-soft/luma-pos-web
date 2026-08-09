@@ -177,7 +177,7 @@ describe("notification mobile records", () => {
     expect(vi.sources.system).not.toBe(en.sources.system);
   });
 
-  test("source identifiers remain query values while both locales render translated labels", () => {
+  test("activity rows stay translated while the inbox uses the shared custom filter drawer", () => {
     const row = {
       id: "audit-mobile",
       actorId: "staff-1",
@@ -198,11 +198,16 @@ describe("notification mobile records", () => {
     const viHtml = renderWithMessages(<NotificationMobileRow row={row} expanded={false} toggle={() => undefined} />);
     const enHtml = renderWithMessages(<NotificationMobileRow row={row} expanded={false} toggle={() => undefined} />, "en");
     const pageSource = readFileSync("src/app/(app)/notifications/page.tsx", "utf8");
+    const inboxSource = readFileSync("src/app/(app)/notifications/notifications-client.tsx", "utf8");
+    const drawerSource = readFileSync("src/app/(app)/notifications/notifications-filter-drawer.tsx", "utf8");
 
     expect(viHtml).toContain(">Di động<");
     expect(enHtml).toContain(">Mobile<");
-    expect(pageSource).toContain("paramsWith(params, { source: item })");
-    expect(pageSource).toContain("notifications.sources.");
-    expect(pageSource).toContain("min-w-11");
+    expect(pageSource).toContain("<NotificationsClient activities={activities} />");
+    expect(inboxSource).toContain('fetch("/api/mobile/notifications?locale=vi"');
+    expect(inboxSource).toContain("<NotificationsFilterDrawer");
+    expect(drawerSource.match(/<LumaWebPicker/g)).toHaveLength(2);
+    expect(drawerSource).not.toContain("<select");
+    expect(drawerSource).toContain('role="dialog"');
   });
 });

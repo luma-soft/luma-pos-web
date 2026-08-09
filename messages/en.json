@@ -135,7 +135,93 @@
     "relatedRecords": "Related records",
     "recordFallback": "Record",
     "processing": "Processing...",
-    "processed": "Processed"
+    "processed": "Processed",
+    "inbox": {
+      "title": "Notifications",
+      "needsActionCount": "{count} items need attention",
+      "filter": "Filters",
+      "settings": "Notification settings",
+      "tabs": {
+        "label": "Notification view",
+        "action": "Needs attention",
+        "all": "All",
+        "activity": "Activity"
+      },
+      "highPriority": "High priority",
+      "impact": "If this is not handled soon, business operations may be affected.",
+      "processed": "Mark as resolved",
+      "next": "Up next",
+      "information": "Information",
+      "allTitle": "All notifications",
+      "allRead": "All caught up",
+      "unreadCount": "{count} unread",
+      "loading": "Loading notifications...",
+      "loadError": "Notifications could not be loaded right now.",
+      "retry": "Try again",
+      "empty": "No notifications",
+      "emptyFiltered": "No notifications match these filters",
+      "actions": {
+        "restock": "Create purchase",
+        "retry": "Try again",
+        "customer": "View customer",
+        "purchase": "View purchase",
+        "report": "View report",
+        "open": "View details"
+      },
+      "categories": {
+        "inventory": "Inventory",
+        "einvoice": "E-invoice",
+        "debt": "Receivables",
+        "sales": "Reports",
+        "system": "System"
+      }
+    },
+    "filter": {
+      "title": "Notification filters",
+      "selectedCount": "{count} filters selected",
+      "close": "Close filters",
+      "clear": "Clear filters",
+      "view": "View {count} notifications",
+      "time": {
+        "title": "Time",
+        "all": "All",
+        "today": "Today",
+        "7d": "7 days",
+        "30d": "30 days",
+        "custom": "Custom"
+      },
+      "status": {
+        "title": "Status",
+        "all": "All",
+        "action": "Needs attention",
+        "unread": "Unread",
+        "processed": "Resolved"
+      },
+      "level": {
+        "title": "Level",
+        "all": "All",
+        "high": "High priority",
+        "warning": "Warning",
+        "info": "Information"
+      },
+      "category": {
+        "title": "Category",
+        "all": "All categories",
+        "inventory": "Inventory",
+        "einvoice": "E-invoice",
+        "debt": "Receivables",
+        "sales": "Reports",
+        "system": "System"
+      },
+      "source": {
+        "title": "Source",
+        "all": "All sources",
+        "ai": "AI",
+        "mobile": "Mobile",
+        "pos": "POS",
+        "system": "System"
+      }
+    }
   },
   "mobile": {
     "dashboard": {
