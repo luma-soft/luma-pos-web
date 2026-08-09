@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { ArrowLeft, Search, Warehouse } from "lucide-react";
+import { ArrowLeft, Warehouse } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { formatNumber } from "@/lib/utils";
 import {
@@ -20,6 +20,7 @@ import { InstantFilterForm } from "@/components/instant-filter-form";
 import { serializeMovementCreatedAt } from "@/lib/inventory/movement-serialization";
 import { StockOverview } from "./stock-overview";
 import { InventoryFilterDrawer } from "./inventory-filter-drawer";
+import { ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
 
 type SP = Record<string, string | undefined>;
 type InventoryStockStatus = keyof InventoryStatusCounts;
@@ -120,24 +121,16 @@ async function StockStatusDetail({
         </p>
       </header>
 
-      <InstantFilterForm
-        className="grid gap-3 lg:grid-cols-[minmax(280px,1.4fr)_minmax(220px,0.9fr)_minmax(240px,0.9fr)]"
-        action={Routes.Inventory}
-      >
-        <input type="hidden" name="tab" value="stock" />
-        <input type="hidden" name="stockStatus" value={status} />
-        <label className="relative block">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            name="q"
-            defaultValue={searchParams.q ?? ""}
-            placeholder={t("inventory.searchPlaceholder")}
-            className="min-h-11 w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none"
-          />
-        </label>
-      </InstantFilterForm>
-      <div className="mt-3"><InventoryFilterDrawer title="Bộ lọc kho hàng" values={searchParams} fields={["warehouse", "category", "stock"]} warehouses={purchaseOptions.warehouses.map((item) => ({ value: item.id, label: item.name }))} categories={productOptions.categories.map((item) => ({ value: item.id, label: item.name }))} /></div>
+      <ListSearchFilterBar
+        search={(
+          <InstantFilterForm action={Routes.Inventory}>
+            <input type="hidden" name="tab" value="stock" />
+            <input type="hidden" name="stockStatus" value={status} />
+            <ListSearchInput name="q" defaultValue={searchParams.q ?? ""} placeholder={t("inventory.searchPlaceholder")} />
+          </InstantFilterForm>
+        )}
+        filter={<InventoryFilterDrawer title="Bộ lọc kho hàng" values={searchParams} fields={["warehouse", "category", "stock"]} warehouses={purchaseOptions.warehouses.map((item) => ({ value: item.id, label: item.name }))} categories={productOptions.categories.map((item) => ({ value: item.id, label: item.name }))} />}
+      />
 
       <section aria-labelledby="inventory-product-list-heading">
         <div className="mb-3 flex items-center justify-between gap-3">

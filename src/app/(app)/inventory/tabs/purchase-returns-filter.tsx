@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Building2, CalendarDays, SlidersHorizontal, Warehouse, X } from "lucide-react";
+import { Building2, CalendarDays, Warehouse, X } from "lucide-react";
+import { FilterTriggerButton } from "@/components/list-search-filter";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   collectFocusableElements,
@@ -176,10 +177,7 @@ export function PurchaseReturnsFilter({ suppliers, warehouses, values, resultCou
 
   return (
     <>
-      <button ref={triggerRef} type="button" onClick={openDrawer} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold text-slate-700 hover:border-primary-400 lg:min-h-0">
-        <SlidersHorizontal className="h-4 w-4 text-primary-600" />
-        Bộ lọc
-      </button>
+      <FilterTriggerButton ref={triggerRef} onClick={openDrawer} label="Lọc" active={activeCount > 0} />
 
       {open && (
         <div className="fixed inset-0 z-50 bg-black/30" role="presentation" onMouseDown={closeDrawer}>

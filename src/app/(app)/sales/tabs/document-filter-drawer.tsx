@@ -11,12 +11,11 @@ import {
   Barcode,
   Building2,
   FileText,
-  Search,
   UserRound,
   Warehouse,
   X,
 } from "lucide-react";
-import { FilterTriggerButton } from "@/components/filter-trigger-button";
+import { FilterTriggerButton, ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
 import { Routes } from "@/lib/routes";
 import {
   BOOKING_DELIVERY_PRESETS,
@@ -464,8 +463,9 @@ export function DocumentFilterDrawer({
 
   return (
     <>
-      <div className="mb-4 flex items-center gap-2">
-        <form action={Routes.Sales} className="relative w-full max-w-md">
+      <ListSearchFilterBar
+        className="mb-4"
+        search={<form action={Routes.Sales}>
           <input type="hidden" name="tab" value={kind} />
           {values.customerId && (
             <input type="hidden" name="customerId" value={values.customerId} />
@@ -531,23 +531,20 @@ export function DocumentFilterDrawer({
           {values.includeCancelled && (
             <input type="hidden" name="includeCancelled" value="1" />
           )}
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="search"
+          <ListSearchInput
             name="q"
             defaultValue={values.q}
             placeholder={labels.search}
             aria-label="Tìm kiếm"
-            className="min-h-11 w-full rounded-xl border border-border bg-surface py-2 pl-9 pr-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
           />
-        </form>
-        <FilterTriggerButton
+        </form>}
+        filter={<FilterTriggerButton
           ref={openButtonRef}
           onClick={openDrawer}
           label="Lọc"
           hideLabelOnSmallScreens
-        />
-      </div>
+        />}
+      />
 
       {open && (
         <div

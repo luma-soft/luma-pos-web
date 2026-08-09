@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FileDown, Plus, Search } from "lucide-react";
+import { FileDown, Plus } from "lucide-react";
 import { getInternalUseIssueCount, getInternalUseIssues } from "@/lib/data/internal-use";
 import { getPurchaseFormOptions } from "@/lib/data/inventory";
 import { Routes } from "@/lib/routes";
@@ -7,6 +7,7 @@ import { InternalUseTable } from "./internal-use-table";
 import { InstantFilterForm } from "@/components/instant-filter-form";
 import { InventoryFilterDrawer } from "./inventory-filter-drawer";
 import { getTranslations } from "next-intl/server";
+import { ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
 
 type SP = Record<string, string | undefined>;
 
@@ -34,17 +35,10 @@ export async function InternalUseTab({ searchParams }: { searchParams: SP }) {
     <>
       <InstantFilterForm className="mb-4 flex flex-wrap items-center gap-3" action={Routes.Inventory}>
         <input type="hidden" name="tab" value="internal" />
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            name="q"
-            defaultValue={searchParams.q ?? ""}
-            placeholder="Theo mã xuất dùng nội bộ"
-            className="w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-3 text-sm min-h-11 lg:min-h-0"
-          />
-        </div>
-        <InventoryFilterDrawer title={t("internalUse.filterTitle")} values={searchParams} fields={["status", "warehouse", "reason", "department", "time"]} resultCount={total} resultLabel={t("internalUse.filterUnit")} countEndpoint="/api/inventory/internal-use/count" warehouses={options.warehouses.map((item) => ({ value: item.id, label: item.name }))} reasons={[{ value: "materials", label: "Vật tư" }, { value: "damaged", label: "Hư hỏng" }, { value: "internal", label: "Sử dụng nội bộ" }]} departments={departments} />
+        <ListSearchFilterBar
+          search={<ListSearchInput name="q" defaultValue={searchParams.q ?? ""} placeholder="Theo mã xuất dùng nội bộ" />}
+          filter={<InventoryFilterDrawer title={t("internalUse.filterTitle")} values={searchParams} fields={["status", "warehouse", "reason", "department", "time"]} resultCount={total} resultLabel={t("internalUse.filterUnit")} countEndpoint="/api/inventory/internal-use/count" warehouses={options.warehouses.map((item) => ({ value: item.id, label: item.name }))} reasons={[{ value: "materials", label: "Vật tư" }, { value: "damaged", label: "Hư hỏng" }, { value: "internal", label: "Sử dụng nội bộ" }]} departments={departments} />}
+        />
         <Link href={Routes.InternalUseNew} className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-full bg-primary-600 px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 active:scale-[0.98] min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
           <Plus className="h-4 w-4" />
           Xuất nội bộ

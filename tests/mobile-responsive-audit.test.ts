@@ -377,6 +377,7 @@ describe("route-wide mobile responsive audit", () => {
     );
     const online = read("src/app/(app)/online-sales/page.tsx");
     const stock = read("src/app/(app)/inventory/tabs/stock.tsx");
+    const listSearchFilter = read("src/components/list-search-filter.tsx");
     const stockActions = read(
       "src/app/(app)/inventory/tabs/stock-actions.tsx",
     );
@@ -417,9 +418,8 @@ describe("route-wide mobile responsive audit", () => {
       /href="\/api\/shopee\/connect" className="[^"]*min-h-11/,
     );
 
-    expect(stock).toMatch(
-      /name="q"[\s\S]{0,220}min-h-11/,
-    );
+    expect(stock).toContain("<ListSearchInput");
+    expect(listSearchFilter).toContain("min-h-11 w-full rounded-xl");
     expect(stockActions).toMatch(
       /href=\{Routes\.PurchaseNew\} className="[^"]*min-h-11/,
     );

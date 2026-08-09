@@ -14,8 +14,6 @@ import {
   Loader2,
   Pencil,
   Plus,
-  Search,
-  SlidersHorizontal,
   Trash2,
   User,
   X,
@@ -24,6 +22,7 @@ import {
 import { Pagination } from "@/components/pagination";
 import { DataTableShell, RowPreviewModal, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { InstantFilterForm } from "@/components/instant-filter-form";
+import { FilterTriggerButton, ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { CustomerCreateDialog } from "@/components/partners/customer-create-dialog";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -134,30 +133,28 @@ function CustomerSearch({
   const t = useTranslations();
 
   return (
-    <InstantFilterForm action={Routes.Partners} className="flex min-w-0 flex-1 items-center gap-2">
-      <input type="hidden" name="tab" value="customers" />
-      <input type="hidden" name="size" value={pageSize} />
-      <HiddenFilterInputs filters={filters} includeQ={false} />
-      <div className="relative min-w-0 flex-1 lg:max-w-xl">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <input
-          type="text"
-          name="q"
-          defaultValue={filters.q ?? ""}
-          placeholder={t("customers.searchPlaceholder")}
-          className="h-11 w-full rounded-lg border border-border bg-surface py-2 pl-9 pr-14 text-sm focus:border-primary-500 focus:outline-none"
-        />
-        <button
-          type="button"
+    <ListSearchFilterBar
+      search={(
+        <InstantFilterForm action={Routes.Partners}>
+          <input type="hidden" name="tab" value="customers" />
+          <input type="hidden" name="size" value={pageSize} />
+          <HiddenFilterInputs filters={filters} includeQ={false} />
+          <ListSearchInput
+            name="q"
+            defaultValue={filters.q ?? ""}
+            placeholder={t("customers.searchPlaceholder")}
+          />
+        </InstantFilterForm>
+      )}
+      filter={(
+        <FilterTriggerButton
           onClick={onOpenFilters}
-          className="absolute right-0.5 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-slate-500 hover:bg-surface-2 hover:text-slate-800"
-          aria-label={t("customers.filters.title")}
-          title={t("customers.filters.title")}
-        >
-          <SlidersHorizontal className="h-4 w-4" />
-        </button>
-      </div>
-    </InstantFilterForm>
+          label={t("suppliers.filter.button")}
+          active={FILTER_KEYS.some((key) => Boolean(filters[key]))}
+          hideLabelOnSmallScreens
+        />
+      )}
+    />
   );
 }
 

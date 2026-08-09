@@ -10,7 +10,7 @@ import {
 } from "react";
 import { Barcode, Search, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { FilterTriggerButton } from "@/components/filter-trigger-button";
+import { FilterTriggerButton, ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
 import { Routes } from "@/lib/routes";
 import {
   DEFAULT_TIME_FILTER_PRESET,
@@ -270,8 +270,9 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
 
   return (
     <>
-      <div className="mb-4 flex items-center gap-2">
-        <form action={Routes.Sales} className="relative w-full max-w-md">
+      <ListSearchFilterBar
+        className="mb-4"
+        search={<form action={Routes.Sales}>
           <input type="hidden" name="tab" value="orders" />
           {values.customerId && (
             <input type="hidden" name="customerId" value={values.customerId} />
@@ -307,23 +308,19 @@ export function OrdersFilterDrawer({ values }: { values: OrdersFilterValues }) {
           {values.includeCancelled && (
             <input type="hidden" name="includeCancelled" value="1" />
           )}
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="search"
+          <ListSearchInput
             name="q"
             defaultValue={values.q}
             placeholder={t("orders.searchPlaceholder")}
             aria-label={t("common.search")}
-            className="min-h-11 w-full rounded-xl border border-border bg-surface py-2 pl-9 pr-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
           />
-        </form>
-
-        <FilterTriggerButton
+        </form>}
+        filter={<FilterTriggerButton
           ref={openButtonRef}
           onClick={openDrawer}
           label="Lọc"
-        />
-      </div>
+        />}
+      />
 
       {open && (
         <div

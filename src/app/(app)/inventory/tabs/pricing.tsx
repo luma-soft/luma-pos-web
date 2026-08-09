@@ -8,6 +8,7 @@ import { PricingTable } from "../../pricing/pricing-table";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { InstantProductSearch } from "./instant-product-search";
 import { InventoryFilterDrawer } from "./inventory-filter-drawer";
+import { ListSearchFilterBar } from "@/components/list-search-filter";
 
 type SP = Record<string, string | undefined>;
 type PriceBook = Awaited<ReturnType<typeof getPriceBooks>>[number];
@@ -64,11 +65,10 @@ async function PricingContent({
     <>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <h2 className="shrink-0 text-sm font-bold">{t("pricing.booksCount", { n: books.length })}</h2>
-        <InstantProductSearch
-          value={params.q ?? ""}
-          placeholder={t("products.list.searchPlaceholder")}
+        <ListSearchFilterBar
+          search={<InstantProductSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />}
+          filter={<InventoryFilterDrawer title="Bộ lọc thiết lập giá" values={params} resultCount={total} fields={["category", "brand", "supplier", "kind", "status", "stock", "sort"]} categories={categories.map((item) => ({ value: item.id, label: item.name }))} brands={brands.map((item) => ({ value: item.id, label: item.name }))} suppliers={suppliers.map((item) => ({ value: item.id, label: item.name }))} />}
         />
-        <InventoryFilterDrawer title="Bộ lọc thiết lập giá" values={params} resultCount={total} fields={["category", "brand", "supplier", "kind", "status", "stock", "sort"]} categories={categories.map((item) => ({ value: item.id, label: item.name }))} brands={brands.map((item) => ({ value: item.id, label: item.name }))} suppliers={suppliers.map((item) => ({ value: item.id, label: item.name }))} />
       </div>
       <PricingTable
         key={[params.q ?? "", params.category ?? "", page, pageSize].join(":")}

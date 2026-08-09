@@ -25,6 +25,7 @@ import {
 import { getCategoriesWithCounts } from "@/lib/data/categories";
 import { CategoriesManager } from "../../products/categories/categories-manager";
 import { ProductCatalogSwitcher } from "./product-catalog-switcher";
+import { ListSearchFilterBar } from "@/components/list-search-filter";
 
 type SP = Record<string, string | undefined>;
 const STATUSES = ["active", "inactive", "all"] as const;
@@ -99,8 +100,10 @@ async function ProductsToolbar({
   const t = await getTranslations();
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2 sm:gap-3">
-      <InstantProductSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />
-      <InventoryFilterDrawer title="Bộ lọc sản phẩm" values={params} resultCount={resultCount} fields={["category", "brand", "supplier", "kind", "status", "stock", "sort", "view"]} categories={categories.map((item) => ({ value: item.id, label: item.name }))} brands={brands.map((item) => ({ value: item.id, label: item.name }))} suppliers={suppliers.map((item) => ({ value: item.id, label: item.name }))} />
+      <ListSearchFilterBar
+        search={<InstantProductSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />}
+        filter={<InventoryFilterDrawer title="Bộ lọc sản phẩm" values={params} resultCount={resultCount} fields={["category", "brand", "supplier", "kind", "status", "stock", "sort", "view"]} categories={categories.map((item) => ({ value: item.id, label: item.name }))} brands={brands.map((item) => ({ value: item.id, label: item.name }))} suppliers={suppliers.map((item) => ({ value: item.id, label: item.name }))} />}
+      />
       <ProductCreateMenu
         label={t("products.createNew")}
         items={[

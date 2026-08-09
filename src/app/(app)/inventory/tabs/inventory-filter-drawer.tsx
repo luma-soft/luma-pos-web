@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
-  SlidersHorizontal,
   X,
 } from "lucide-react";
+import { FilterTriggerButton } from "@/components/list-search-filter";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -377,19 +377,16 @@ export function InventoryFilterDrawer({
 
   return (
     <>
-      <button
+      <FilterTriggerButton
         ref={triggerRef}
-        type="button"
         onClick={() => {
           setDraft(initial);
           setEntityLabels({});
           setOpen(true);
         }}
-        className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface px-4 py-2 text-sm font-semibold lg:min-h-0"
-      >
-        <SlidersHorizontal className="h-4 w-4 text-primary-600" />
-        Bộ lọc
-      </button>
+        label="Lọc"
+        active={active > 0}
+      />
 
       {open && (
         <div className="fixed inset-0 z-50 bg-black/30" role="presentation" onMouseDown={close}>

@@ -4,9 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Loader2, Pencil, Search, Truck, X } from "lucide-react";
+import { Loader2, Pencil, Truck, X } from "lucide-react";
 import { DataTableShell, RowPreviewModal, type DataTableColumn } from "@/components/data-table";
-import { FilterTriggerButton } from "@/components/filter-trigger-button";
+import { FilterTriggerButton, ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
 import { InstantFilterForm } from "@/components/instant-filter-form";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
@@ -283,33 +283,29 @@ export function SuppliersTable({
         )}
         toolbar={(
           <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              <InstantFilterForm
-                action={Routes.Partners}
-                className="min-w-0 flex-1 lg:max-w-xl"
-              >
-                <input type="hidden" name="tab" value="suppliers" />
-                <input type="hidden" name="size" value={pageSize} />
-                {owing && <input type="hidden" name="owing" value={owing} />}
-                <div className="relative w-full">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="search"
+            <ListSearchFilterBar
+              search={(
+                <InstantFilterForm action={Routes.Partners}>
+                  <input type="hidden" name="tab" value="suppliers" />
+                  <input type="hidden" name="size" value={pageSize} />
+                  {owing && <input type="hidden" name="owing" value={owing} />}
+                  <ListSearchInput
                     name="q"
                     defaultValue={query}
                     placeholder={t("suppliers.searchPlaceholder")}
                     aria-label={t("common.search")}
-                    className="min-h-11 w-full rounded-xl border border-border bg-surface py-2 pl-9 pr-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
                   />
-                </div>
-              </InstantFilterForm>
-              <FilterTriggerButton
-                onClick={openFilters}
-                label={t("suppliers.filter.button")}
-                active={Boolean(owing)}
-                hideLabelOnSmallScreens
-              />
-            </div>
+                </InstantFilterForm>
+              )}
+              filter={(
+                <FilterTriggerButton
+                  onClick={openFilters}
+                  label={t("suppliers.filter.button")}
+                  active={Boolean(owing)}
+                  hideLabelOnSmallScreens
+                />
+              )}
+            />
             <div className="shrink-0">
               <SupplierQuickCreate />
             </div>

@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { PackageX, Plus, Search } from "lucide-react";
+import { PackageX, Plus } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { getPurchaseReturnFormOptions, getPurchaseReturns } from "@/lib/data/purchase-returns";
 import { parsePageSize } from "@/lib/pagination";
@@ -10,6 +10,7 @@ import { TableSkeleton } from "@/components/table-skeleton";
 import { PurchaseReturnsTable } from "./purchase-returns-table";
 import { InstantFilterForm } from "@/components/instant-filter-form";
 import { PurchaseReturnsFilter } from "./purchase-returns-filter";
+import { ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
 
 type SP = Record<string, string | undefined>;
 
@@ -37,11 +38,10 @@ async function PurchaseReturnsContent({ searchParams }: { searchParams: SP }) {
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <InstantFilterForm className="flex min-w-0 flex-1 flex-wrap items-center gap-3" action={Routes.Inventory}>
           <input type="hidden" name="tab" value="purchase-returns" />
-          <div className="relative min-w-[240px] flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input type="text" name="q" defaultValue={searchParams.q ?? ""} placeholder={t("purchaseReturns.searchPlaceholder")} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-surface focus:border-primary-500 focus:outline-none min-h-11 lg:min-h-0" />
-          </div>
-          <PurchaseReturnsFilter suppliers={options.suppliers} warehouses={options.warehouses} values={searchParams} resultCount={total} />
+          <ListSearchFilterBar
+            search={<ListSearchInput name="q" defaultValue={searchParams.q ?? ""} placeholder={t("purchaseReturns.searchPlaceholder")} />}
+            filter={<PurchaseReturnsFilter suppliers={options.suppliers} warehouses={options.warehouses} values={searchParams} resultCount={total} />}
+          />
           <Link href={Routes.PurchaseReturnNew} className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-primary-600 text-primary-600 bg-surface hover:bg-primary-50 text-sm font-semibold transition active:scale-[0.98] ml-auto shrink-0 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0">
             <Plus className="w-4 h-4" />
             {t("purchaseReturns.createNew")}
