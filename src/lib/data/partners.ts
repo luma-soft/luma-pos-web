@@ -11,6 +11,7 @@ import {
   returnItems,
   returns,
   suppliers,
+  warehouses,
 } from "@/db/schema";
 import { accentInsensitiveLike } from "@/lib/search";
 import { coercePageSize } from "@/lib/pagination";
@@ -49,6 +50,8 @@ export type CustomerSalesHistoryRow = {
   status: string;
   itemCount: number;
   paymentStatus: string;
+  paymentMethod: string;
+  productNames: string;
 };
 
 export type CustomerDebtLedgerRow = {
@@ -60,6 +63,7 @@ export type CustomerDebtLedgerRow = {
   typeLabel: string;
   value: number;
   balance: number;
+  reason: string | null;
 };
 
 function isCustomerType(value?: string): value is CustomerType {
@@ -124,6 +128,7 @@ function buildCustomerConditions(filters: CustomerFilters) {
 }
 
 const saleOrderStatus = sql`${orders.status} in ('completed', 'returned')`;
+const customerHistoryOrderStatus = sql`${orders.status} in ('completed', 'returned', 'cancelled')`;
 
 export async function getCustomers(
   filters: CustomerFilters = {},
@@ -252,6 +257,18 @@ export async function getCustomers(
           total: orders.total,
           amountPaid: orders.amountPaid,
           paymentStatus: orders.paymentStatus,
+          paymentMethod: sql<string>`coalesce((
+            select ${payments.method}::text
+            from ${payments}
+            where ${payments.orderId} = ${orders.id}
+            order by ${payments.createdAt} desc
+            limit 1
+          ), '')`,
+          productNames: sql<string>`coalesce((
+            select string_agg(distinct ${orderItems.productName}, ' | ')
+            from ${orderItems}
+            where ${orderItems.orderId} = ${orders.id}
+          ), '')`,
           itemCount: sql<number>`(
             select count(*)::int
             from ${orderItems}
@@ -262,7 +279,7 @@ export async function getCustomers(
         })
         .from(orders)
         .leftJoin(profiles, eq(orders.createdBy, profiles.id))
-        .where(and(inArray(orders.customerId, customerIds), saleOrderStatus))
+        .where(and(inArray(orders.customerId, customerIds), customerHistoryOrderStatus))
         .orderBy(desc(orders.createdAt))
         .limit(customerIds.length * 30),
       db
@@ -273,6 +290,11 @@ export async function getCustomers(
           orderId: returns.orderId,
           totalRefund: returns.totalRefund,
           refundMethod: returns.refundMethod,
+          productNames: sql<string>`coalesce((
+            select string_agg(distinct ${returnItems.productName}, ' | ')
+            from ${returnItems}
+            where ${returnItems.returnId} = ${returns.id}
+          ), '')`,
           itemCount: sql<number>`(
             select count(*)::int
             from ${returnItems}
@@ -293,6 +315,9 @@ export async function getCustomers(
           orderId: orders.id,
           orderCode: orders.code,
           amount: payments.amount,
+          method: payments.method,
+          reference: payments.reference,
+          note: payments.note,
           createdAt: payments.createdAt,
         })
         .from(payments)
@@ -308,6 +333,7 @@ export async function getCustomers(
           orderId: customerReceivableEntries.orderId,
           type: customerReceivableEntries.type,
           amount: customerReceivableEntries.amount,
+          reason: customerReceivableEntries.reason,
           createdAt: customerReceivableEntries.createdAt,
         })
         .from(customerReceivableEntries)
@@ -346,6 +372,8 @@ export async function getCustomers(
         status: order.status,
         itemCount: Number(order.itemCount),
         paymentStatus: order.paymentStatus,
+        paymentMethod: order.paymentMethod,
+        productNames: order.productNames,
       });
       addLedger(order.customerId, {
         id: order.id,
@@ -355,6 +383,7 @@ export async function getCustomers(
         createdAt: order.createdAt,
         typeLabel: "Bán hàng",
         value: Number(order.total),
+        reason: null,
         sort: 10,
       });
     }
@@ -371,6 +400,8 @@ export async function getCustomers(
         status: "returned",
         itemCount: Number(ret.itemCount),
         paymentStatus: "refunded",
+        paymentMethod: ret.refundMethod ?? '',
+        productNames: ret.productNames,
       });
       if (ret.refundMethod === "debt_deduct") {
         addLedger(ret.customerId, {
@@ -381,6 +412,7 @@ export async function getCustomers(
           createdAt: ret.createdAt,
           typeLabel: "Trả hàng",
           value: -Number(ret.totalRefund),
+          reason: null,
           sort: 30,
         });
       }
@@ -395,6 +427,7 @@ export async function getCustomers(
         createdAt: payment.createdAt,
         typeLabel: "Thanh toán",
         value: -Number(payment.amount),
+        reason: payment.note || payment.reference || payment.method,
         sort: 20,
       });
     }
@@ -409,6 +442,7 @@ export async function getCustomers(
         createdAt: entry.createdAt,
         typeLabel: isDiscount ? "Chiết khấu thanh toán" : "Điều chỉnh công nợ",
         value: Number(entry.amount),
+        reason: entry.reason,
         sort: 40,
       });
     }
@@ -432,6 +466,7 @@ export async function getCustomers(
           createdAt: event.createdAt,
           typeLabel: event.typeLabel,
           value: event.value,
+          reason: event.reason,
           balance,
         };
         balance -= event.value;
@@ -529,10 +564,13 @@ export async function getSupplierPurchases(id: string) {
       status: purchaseOrders.status,
       total: purchaseOrders.total,
       amountPaid: purchaseOrders.amountPaid,
+      warehouseId: purchaseOrders.warehouseId,
+      warehouseName: warehouses.name,
       createdAt: purchaseOrders.createdAt,
       itemCount: sql<number>`(select count(*)::int from ${purchaseOrderItems} where ${purchaseOrderItems.purchaseOrderId} = ${purchaseOrders.id})`,
     })
     .from(purchaseOrders)
+    .innerJoin(warehouses, eq(purchaseOrders.warehouseId, warehouses.id))
     .where(eq(purchaseOrders.supplierId, id))
     .orderBy(desc(purchaseOrders.createdAt))
     .limit(50);
@@ -549,10 +587,13 @@ export async function getSupplierPurchaseReturns(id: string) {
       totalRefund: purchaseReturns.totalRefund,
       refundAmount: purchaseReturns.refundAmount,
       debtAmount: purchaseReturns.debtAmount,
+      warehouseId: purchaseReturns.warehouseId,
+      warehouseName: warehouses.name,
       createdAt: purchaseReturns.createdAt,
       itemCount: sql<number>`(select count(*)::int from ${purchaseReturnItems} where ${purchaseReturnItems.purchaseReturnId} = ${purchaseReturns.id})`,
     })
     .from(purchaseReturns)
+    .innerJoin(warehouses, eq(purchaseReturns.warehouseId, warehouses.id))
     .where(eq(purchaseReturns.supplierId, id))
     .orderBy(desc(purchaseReturns.createdAt))
     .limit(50);

@@ -19,15 +19,6 @@ type Mode = "collect" | "adjust" | "discount" | "qr";
 
 const requestId = (prefix: string) => `${prefix}:${crypto.randomUUID()}`;
 
-function allocate(invoices: Invoice[], amount: number) {
-  let remaining = amount;
-  return invoices.map((invoice) => {
-    const value = Math.min(invoice.remaining, remaining);
-    remaining -= value;
-    return { orderId: invoice.id, amount: value };
-  });
-}
-
 export function CustomerReceivableActions({
   customerId,
   currentDebt,
@@ -128,14 +119,14 @@ function QrCreateDialog({ invoices, error, onCreate, onClose }: { invoices: Invo
 }
 
 function CollectDialog({ customerId, overview, error, onError, onClose }: { customerId: string; overview: Overview | null; error: string; onError: (value: string) => void; onClose: () => void }) {
-  const [amount, setAmount] = useState(() => overview?.currentDebt ?? 0);
+  const [amount, setAmount] = useState(0);
   const [method, setMethod] = useState<"cash" | "bank_transfer" | "card">("cash");
-  const [allocations, setAllocations] = useState<Array<{ orderId: string; amount: number }>>(() => allocate(overview?.invoices ?? [], overview?.currentDebt ?? 0));
+  const [allocations, setAllocations] = useState<Array<{ orderId: string; amount: number }>>(() => (overview?.invoices ?? []).map((invoice) => ({ orderId: invoice.id, amount: 0 })));
   const [pending, startTransition] = useTransition();
   const [clientRequestId] = useState(() => requestId("web-receivable"));
   const allocationTotal = useMemo(() => allocations.reduce((sum, row) => sum + row.amount, 0), [allocations]);
   const valid = Boolean(overview && amount > 0 && allocationTotal <= amount + 0.01);
-  function setPaymentAmount(value: number) { setAmount(value); setAllocations(allocate(overview?.invoices ?? [], value)); }
+  function setPaymentAmount(value: number) { setAmount(value); }
   function submit() {
     if (!valid || pending) return;
     startTransition(async () => {

@@ -19,15 +19,6 @@ export type SupplierPayableOverview = {
 
 const requestId = (prefix: string) => `${prefix}:${crypto.randomUUID()}`;
 
-function allocate(invoices: Invoice[], amount: number) {
-  let remaining = amount;
-  return invoices.map((invoice) => {
-    const value = Math.min(invoice.remaining, remaining);
-    remaining -= value;
-    return { purchaseOrderId: invoice.id, amount: value };
-  });
-}
-
 export function SupplierPayableActions({
   supplierId,
   overview,
@@ -77,9 +68,9 @@ function SupplierPaymentDialog({
   onClose: () => void;
   onChanged: () => void | Promise<void>;
 }) {
-  const [amount, setAmount] = useState(overview.currentDebt);
+  const [amount, setAmount] = useState(0);
   const [method, setMethod] = useState<"cash" | "bank_transfer">("cash");
-  const [allocations, setAllocations] = useState(() => allocate(overview.invoices, overview.currentDebt));
+  const [allocations, setAllocations] = useState(() => overview.invoices.map((invoice) => ({ purchaseOrderId: invoice.id, amount: 0 })));
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
   const [clientRequestId] = useState(() => requestId("web-supplier-payable"));
@@ -92,7 +83,6 @@ function SupplierPaymentDialog({
 
   function setPaymentAmount(value: number) {
     setAmount(value);
-    setAllocations(allocate(overview.invoices, value));
   }
 
   function submit() {

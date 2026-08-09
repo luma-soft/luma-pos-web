@@ -79,6 +79,7 @@ export async function getInternalUseIssues({ limit = 50, ...filters }: InternalU
     .select({
       id: internalUseItems.id,
       issueId: internalUseItems.issueId,
+      productId: internalUseItems.productId,
       sku: products.sku,
       productName: internalUseItems.productName,
       unitName: internalUseItems.unitName,

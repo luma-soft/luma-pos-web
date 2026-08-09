@@ -1894,9 +1894,15 @@
       "namePlaceholder": "Example: Minh Anh Co."
     },
     "filter": {
+      "title": "Supplier filters",
+      "button": "Filter",
+      "description": "Filter suppliers by debt status",
+      "debtStatus": "Debt status",
       "allDebt": "All debt",
       "owing": "Owing",
-      "clear": "Cleared"
+      "clear": "Cleared",
+      "reset": "Reset",
+      "apply": "Apply"
     },
     "purchaseHistory": "Purchase history",
     "noPurchases": "No purchases yet",

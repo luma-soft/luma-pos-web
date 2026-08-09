@@ -1,15 +1,17 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Loader2, Pencil } from "lucide-react";
+import { Loader2, Pencil, Search, SlidersHorizontal, Truck, X } from "lucide-react";
 import { DataTableShell, RowPreviewModal, type DataTableColumn } from "@/components/data-table";
+import { InstantFilterForm } from "@/components/instant-filter-form";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { getSuppliers } from "@/lib/data/partners";
 import { updateSupplier } from "@/lib/actions/partners";
+import { SupplierQuickCreate } from "../../suppliers/supplier-form";
 import { SupplierPayableActions } from "@/components/partners/supplier-payable-actions";
 import {
   DEFAULT_PARTNER_DEBT_FILTER,
@@ -89,17 +91,58 @@ type SupplierDebtRow = {
 };
 
 const DETAIL_TABS: SupplierDetailTab[] = ["info", "history", "debt"];
+type SupplierDebtFilter = "" | "owing" | "clear";
 
-export function SuppliersTable({ rows }: { rows: SupplierRow[] }) {
+export function SuppliersTable({
+  rows,
+  total,
+  query,
+  owing,
+  pageSize,
+}: {
+  rows: SupplierRow[];
+  total: number;
+  query: string;
+  owing: SupplierDebtFilter;
+  pageSize: number;
+}) {
   const t = useTranslations();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const requestId = useRef(0);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [draftDebtFilter, setDraftDebtFilter] = useState<SupplierDebtFilter>(owing);
   const [selectedSupplier, setSelectedSupplier] = useState<SupplierRow | null>(null);
   const [preview, setPreview] = useState<{ loading: boolean; data?: SupplierPreview; error?: string } | null>(null);
   const [draft, setDraft] = useState<SupplierDraft | null>(null);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+
+  useEffect(() => {
+    if (!filterOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFilterOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [filterOpen]);
+
+  function openFilters() {
+    setDraftDebtFilter(owing);
+    setFilterOpen(true);
+  }
+
+  function applyDebtFilter(value: SupplierDebtFilter) {
+    const next = new URLSearchParams(searchParams.toString());
+    next.set("tab", "suppliers");
+    next.set("size", String(pageSize));
+    next.delete("page");
+    if (value) next.set("owing", value);
+    else next.delete("owing");
+    router.replace(`${Routes.Partners}?${next.toString()}`, { scroll: false });
+    setFilterOpen(false);
+  }
   const columns: DataTableColumn<SupplierRow>[] = [
     { key: "name", label: t("suppliers.cols.name"), required: true, render: (row) => <span className="font-semibold text-primary-600">{row.name}</span> },
     { key: "code", label: t("customers.cols.code"), defaultVisible: true, render: (row) => <span className="text-slate-500">{row.code}</span> },
@@ -233,6 +276,60 @@ export function SuppliersTable({ rows }: { rows: SupplierRow[] }) {
         columns={columns}
         getRowId={(row) => row.id}
         minWidth="860px"
+        empty={(
+          <div className="rounded-card border border-dashed border-border bg-surface p-12 text-center text-slate-400">
+            <Truck className="mx-auto mb-3 h-10 w-10 opacity-60" />
+            <p className="font-medium">{t("suppliers.empty")}</p>
+          </div>
+        )}
+        toolbar={(
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
+            <span className="shrink-0 text-sm font-semibold text-slate-500">
+              {t("suppliers.total", { total })}
+            </span>
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <InstantFilterForm
+                action={Routes.Partners}
+                className="min-w-0 flex-1"
+              >
+                <input type="hidden" name="tab" value="suppliers" />
+                <input type="hidden" name="size" value={pageSize} />
+                {owing && <input type="hidden" name="owing" value={owing} />}
+                <div className="relative w-full lg:max-w-xl">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="search"
+                    name="q"
+                    defaultValue={query}
+                    placeholder={t("suppliers.searchPlaceholder")}
+                    aria-label={t("common.search")}
+                    className="min-h-11 w-full rounded-xl border border-border bg-surface py-2 pl-9 pr-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                  />
+                </div>
+              </InstantFilterForm>
+              <button
+                type="button"
+                onClick={openFilters}
+                aria-label={t("suppliers.filter.title")}
+                className={cn(
+                  "relative inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border bg-surface px-4 text-sm font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+                  owing
+                    ? "border-primary-600 text-primary-700 hover:bg-primary-50"
+                    : "border-border text-slate-600 hover:border-primary-300 hover:bg-surface-2",
+                )}
+              >
+                <SlidersHorizontal className="h-4 w-4" />
+                <span className="hidden md:inline">{t("suppliers.filter.button")}</span>
+                {owing && (
+                  <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-surface bg-primary-600" />
+                )}
+              </button>
+            </div>
+            <div className="shrink-0">
+              <SupplierQuickCreate />
+            </div>
+          </div>
+        )}
         onRowClick={openSupplier}
         renderMobileRow={({ row }) => {
           const debt = Number(row.currentDebt);
@@ -249,6 +346,89 @@ export function SuppliersTable({ rows }: { rows: SupplierRow[] }) {
           );
         }}
       />
+
+      {filterOpen && (
+        <div
+          className="fixed inset-0 z-[80] bg-slate-950/40"
+          role="presentation"
+          onMouseDown={() => setFilterOpen(false)}
+        >
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="supplier-filter-title"
+            className="ml-auto flex h-full w-full max-w-md flex-col bg-surface shadow-2xl"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start border-b border-border px-6 py-5">
+              <div className="min-w-0 flex-1">
+                <h2
+                  id="supplier-filter-title"
+                  className="text-lg font-extrabold text-slate-900 dark:text-slate-100"
+                >
+                  {t("suppliers.filter.title")}
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {t("suppliers.filter.description")}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFilterOpen(false)}
+                aria-label={t("common.close")}
+                className="ml-3 inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl text-slate-400 transition hover:bg-surface-2 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-6">
+              <h3 className="mb-3 text-sm font-bold text-slate-800 dark:text-slate-100">
+                {t("suppliers.filter.debtStatus")}
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  ["", t("suppliers.filter.allDebt")],
+                  ["owing", t("suppliers.filter.owing")],
+                  ["clear", t("suppliers.filter.clear")],
+                ] as const).map(([value, label]) => (
+                  <button
+                    key={value || "all"}
+                    type="button"
+                    aria-pressed={draftDebtFilter === value}
+                    onClick={() => setDraftDebtFilter(value)}
+                    className={cn(
+                      "inline-flex min-h-11 min-w-11 items-center rounded-full border px-4 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+                      draftDebtFilter === value
+                        ? "border-primary-600 bg-primary-600 text-white"
+                        : "border-border bg-surface text-slate-600 hover:bg-surface-2",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-2 border-t border-border px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setDraftDebtFilter("")}
+                className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl border border-border px-4 text-sm font-bold text-slate-600 transition hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                {t("suppliers.filter.reset")}
+              </button>
+              <button
+                type="button"
+                onClick={() => applyDebtFilter(draftDebtFilter)}
+                className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-primary-600 px-4 text-sm font-bold text-white transition hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+              >
+                {t("suppliers.filter.apply")}
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
 
       <RowPreviewModal
         open={Boolean(selectedSupplier)}

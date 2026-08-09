@@ -1894,9 +1894,15 @@
       "namePlaceholder": "VD: Công ty Minh Anh"
     },
     "filter": {
+      "title": "Bộ lọc nhà cung cấp",
+      "button": "Lọc",
+      "description": "Lọc danh sách theo trạng thái công nợ",
+      "debtStatus": "Trạng thái công nợ",
       "allDebt": "Tất cả công nợ",
       "owing": "Còn nợ",
-      "clear": "Hết nợ"
+      "clear": "Hết nợ",
+      "reset": "Đặt lại",
+      "apply": "Áp dụng"
     },
     "purchaseHistory": "Lịch sử nhập hàng",
     "noPurchases": "Chưa có phiếu nhập",
