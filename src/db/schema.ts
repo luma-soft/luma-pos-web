@@ -6,10 +6,12 @@ import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import type { StorePrefs } from "@/lib/schemas/settings";
 import type { ServiceChecklistItem } from "@/lib/services/domain";
+import { CURRENT_STORE_ID } from "@/lib/tenancy/constants";
 
 // ============= Enums =============
 
 export const userRoleEnum = pgEnum("user_role", ["owner", "manager", "cashier", "warehouse", "technician"]);
+export const storeStatusEnum = pgEnum("store_status", ["active", "suspended", "archived"]);
 export const orderStatusEnum = pgEnum("order_status", [
   "draft", "quote", "confirmed", "delivering", "completed", "cancelled", "returned", "merged",
 ]);
@@ -72,10 +74,21 @@ export const auditLogStatusEnum = pgEnum("audit_log_status", [
   "previewed", "confirmed", "succeeded", "failed", "cancelled", "unauthorized",
 ]);
 
+// ============= Stores =============
+
+export const stores = pgTable("stores", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  slug: text("slug").notNull().unique(),
+  status: storeStatusEnum("status").notNull().default("active"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 // ============= Users (linked to Supabase auth.users) =============
 
 export const profiles = pgTable("profiles", {
   id: uuid("id").primaryKey(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   fullName: text("full_name").notNull(),
   phone: varchar("phone", { length: 20 }),
   role: userRoleEnum("role").notNull().default("cashier"),
@@ -85,7 +98,40 @@ export const profiles = pgTable("profiles", {
   cashierPinLockedUntil: timestamp("cashier_pin_locked_until", { withTimezone: true }),
   cashierPinUpdatedAt: timestamp("cashier_pin_updated_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  index("profiles_store_active_role_idx").on(t.storeId, t.isActive, t.role),
+]);
+
+export const storeFeatures = pgTable("store_features", {
+  storeId: uuid("store_id").notNull().references(() => stores.id, { onDelete: "cascade" }),
+  featureKey: text("feature_key").notNull(),
+  enabled: boolean("enabled").notNull().default(false),
+  config: jsonb("config").$type<Record<string, unknown>>().notNull().default({}),
+  updatedBy: uuid("updated_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.storeId, t.featureKey] }),
+  index("store_features_enabled_idx").on(t.storeId, t.enabled),
+]);
+
+export const staffInvitations = pgTable("staff_invitations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().references(() => stores.id, { onDelete: "cascade" }),
+  email: text("email"),
+  phoneNormalized: text("phone_normalized"),
+  role: userRoleEnum("role").notNull(),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+  invitedBy: uuid("invited_by").notNull().references(() => profiles.id),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  index("staff_invitations_store_created_idx").on(t.storeId, t.createdAt),
+  index("staff_invitations_store_email_idx").on(t.storeId, t.email),
+  check("staff_invitations_contact_check", sql`${t.email} is not null or ${t.phoneNormalized} is not null`),
+]);
 
 export const mobileApprovals = pgTable("mobile_approvals", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -345,10 +391,12 @@ export const stockLevels = pgTable("stock_levels", {
 // Catalog projection changes. Clients poll this lightweight value before
 // replacing their IndexedDB snapshot.
 export const catalogSyncState = pgTable("catalog_sync_state", {
-  id: integer("id").primaryKey(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id, { onDelete: "cascade" }),
+  id: integer("id").notNull(),
   revision: bigint("revision", { mode: "number" }).notNull().default(1),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
+  primaryKey({ columns: [t.storeId, t.id] }),
   check("catalog_sync_state_singleton_check", sql`${t.id} = 1`),
 ]);
 
@@ -1865,10 +1913,11 @@ export const kitchenTicketItems = pgTable("kitchen_ticket_items", {
   index("kitchen_ticket_items_fire_at_idx").on(t.fireAt, t.status),
 ]);
 
-// ============= Store settings (singleton) =============
+// ============= Store settings =============
 
 export const storeSettings = pgTable("store_settings", {
   id: text("id").primaryKey().default("default"),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id, { onDelete: "cascade" }),
   name: text("name").notNull().default(""),
   address: text("address").notNull().default(""),
   phone: text("phone").notNull().default(""),
@@ -1879,7 +1928,9 @@ export const storeSettings = pgTable("store_settings", {
   onboarded: boolean("onboarded").notNull().default(false),
   prefs: jsonb("prefs").$type<StorePrefs>().notNull().default({} as StorePrefs),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  uniqueIndex("store_settings_store_idx").on(t.storeId),
+]);
 
 // ============= AI Usage (monthly quota) =============
 

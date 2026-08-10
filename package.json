@@ -25,7 +25,8 @@
     "db:round-smart-device-prices-2026-07": "bun run src/scripts/round-smart-device-retail-prices-2026-07-30.ts",
     "db:import-lam-hieu-2026-07-25": "bun run src/scripts/import-lam-hieu-receipts-2026-07-25.ts",
     "import:kiotviet-history": "bun run src/scripts/import-kiotviet-history.ts",
-    "ai:eval": "bun run src/scripts/run-ai-evals.ts"
+    "ai:eval": "bun run src/scripts/run-ai-evals.ts",
+    "audit:tenant-foundation": "bun run src/scripts/audit-tenant-foundation.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

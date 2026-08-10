@@ -1,0 +1,2 @@
+export const CURRENT_STORE_ID = "00000000-0000-4000-8000-000000000001";
+export const CURRENT_STORE_SLUG = "hai-dang";
