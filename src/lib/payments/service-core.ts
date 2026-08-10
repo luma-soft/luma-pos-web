@@ -226,6 +226,7 @@ async function confirmPaymentInTx(
   });
 
   const notification = await createNotificationEventInTx(tx, {
+    storeId: order.storeId,
     eventKey: `qr-payment-confirmed:${payment.id}`,
     category: "qrPaymentConfirmed",
     entityType: "order",
@@ -268,6 +269,7 @@ async function createSepayExceptionInTx(
 ) {
   if (event.status !== "verified" || event.transferType !== "in") return null;
   return createNotificationEventInTx(tx, {
+    storeId: event.storeId,
     eventKey: `qr-payment-exception:${event.id}:${reason}`,
     category: "qrPaymentException",
     entityType: "payment",
@@ -660,11 +662,19 @@ export async function recordGatewayCallbackAndMatch(
   const callbackAmount = input.amount;
   try {
     return await db.transaction(async (tx: DbLike) => {
+      if (!input.reference) return { ok: false as const, error: "errors.invalidData" };
+      const ownerRows = await tx.select({ storeId: payments.storeId }).from(payments).where(and(
+        eq(payments.provider, input.provider),
+        eq(payments.reference, input.reference),
+      )).limit(2);
+      if (ownerRows.length !== 1) return { ok: false as const, error: "errors.invalidData" };
+      const storeId = ownerRows[0].storeId;
       const [existing] = await tx
         .select()
         .from(paymentWebhookEvents)
         .where(and(
           eq(paymentWebhookEvents.provider, input.provider),
+          eq(paymentWebhookEvents.storeId, storeId),
           eq(paymentWebhookEvents.providerEventId, providerEventId),
         ))
         .limit(1);
@@ -680,6 +690,7 @@ export async function recordGatewayCallbackAndMatch(
       }
 
       const [event] = await tx.insert(paymentWebhookEvents).values({
+        storeId,
         provider: input.provider,
         providerEventId,
         referenceCode: input.reference,
@@ -712,6 +723,7 @@ export async function recordGatewayCallbackAndMatch(
         .from(payments)
         .where(and(
           eq(payments.provider, input.provider),
+          eq(payments.storeId, storeId),
           eq(payments.reference, input.reference),
         ))
         .limit(1)
@@ -1245,7 +1257,7 @@ export async function getPaymentReconciliationEvent(
 export async function recordSepayWebhookEvent(
   db: DbLike,
   input: SepayWebhookInput,
-  options: { verified?: boolean } = {},
+  options: { storeId: string; verified?: boolean },
 ): Promise<PaymentActionResult<{ eventId: string; duplicate: boolean }>> {
   try {
     const [existing] = await db
@@ -1253,12 +1265,14 @@ export async function recordSepayWebhookEvent(
       .from(paymentWebhookEvents)
       .where(and(
         eq(paymentWebhookEvents.provider, "sepay"),
+        eq(paymentWebhookEvents.storeId, options.storeId),
         eq(paymentWebhookEvents.providerEventId, input.providerEventId),
       ))
       .limit(1);
     if (existing) return { ok: true, data: { eventId: existing.id, duplicate: true } };
 
     const [event] = await db.insert(paymentWebhookEvents).values({
+      storeId: options.storeId,
       provider: "sepay",
       providerEventId: input.providerEventId,
       referenceCode: input.referenceCode,
@@ -1456,6 +1470,7 @@ export async function matchSepayWebhookEvent(
         .from(paymentBankAccounts)
         .where(and(
           eq(paymentBankAccounts.provider, "sepay"),
+          eq(paymentBankAccounts.storeId, event.storeId),
           eq(paymentBankAccounts.accountNumber, event.accountNumber ?? ""),
           eq(paymentBankAccounts.enabled, true),
         ))
@@ -1485,6 +1500,7 @@ export async function matchSepayWebhookEvent(
         .from(payments)
         .where(and(
           eq(payments.provider, "sepay"),
+          eq(payments.storeId, event.storeId),
           eq(payments.status, "pending"),
           eq(payments.reference, reference),
           eq(payments.bankAccountId, bankAccount.id),

@@ -14,7 +14,7 @@ export default async function KdsPage() {
   const store = await getStoreSettings(context.storeId);
   if (!FNB.has(store.industry)) redirect("/dashboard");
   const t = await getTranslations();
-  const tickets = await getActiveTickets();
+  const tickets = await getActiveTickets(context.storeId);
   const data = tickets.map((tk) => ({
     id: tk.id, tableName: tk.tableName, round: tk.round, createdAtMs: new Date(tk.createdAt).getTime(),
     items: tk.items,

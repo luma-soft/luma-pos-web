@@ -14,6 +14,7 @@ export async function GET() {
   const gate = await requireMobileSalesAccess();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const [tripRows, eligibleOrders] = await Promise.all([
     db
@@ -28,6 +29,7 @@ export async function GET() {
         createdAt: trips.createdAt,
       })
       .from(trips)
+      .where(eq(trips.storeId, gate.storeId))
       .orderBy(desc(trips.createdAt))
       .limit(20),
     db
@@ -43,9 +45,10 @@ export async function GET() {
       .leftJoin(customers, eq(orders.customerId, customers.id))
       .where(
         and(
+          eq(orders.storeId, gate.storeId),
           inArray(orders.status, ["completed"]),
           sql`${orders.deliveryAddress} is not null and ${orders.deliveryAddress} <> ''`,
-          sql`not exists (select 1 from trip_stops ts where ts.order_id = ${orders.id})`,
+          sql`not exists (select 1 from trip_stops ts where ts.store_id = ${gate.storeId} and ts.order_id = ${orders.id})`,
         ),
       )
       .orderBy(asc(orders.deliveryDate), desc(orders.createdAt))
@@ -71,12 +74,13 @@ export async function GET() {
           .from(tripStops)
           .innerJoin(orders, eq(tripStops.orderId, orders.id))
           .leftJoin(customers, eq(orders.customerId, customers.id))
-          .where(
+          .where(and(
+            eq(tripStops.storeId, gate.storeId),
             inArray(
               tripStops.tripId,
               tripRows.map((trip) => trip.id),
             ),
-          )
+          ))
           .orderBy(asc(tripStops.sortOrder));
 
   const stopsByTrip = stops.reduce<Record<string, typeof stops>>(

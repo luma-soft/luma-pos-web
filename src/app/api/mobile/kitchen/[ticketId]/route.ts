@@ -9,6 +9,7 @@ export async function PATCH(
   const gate = await requireMobileSalesAccess();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const { ticketId } = await params;
   const body = await readJson(request);
@@ -22,7 +23,7 @@ export async function PATCH(
     status?: unknown;
   };
   if (payload.scope === "ticket" || payload.status === "servedAll") {
-    return mobileAction(await serveTicketForUser(ticketId));
+    return mobileAction(await serveTicketForUser(gate.storeId, ticketId));
   }
 
   const status =
@@ -36,5 +37,5 @@ export async function PATCH(
   const itemId =
     typeof payload.itemId === "string" ? payload.itemId : ticketId;
 
-  return mobileAction(await setTicketItemStatusForUser(itemId, status));
+  return mobileAction(await setTicketItemStatusForUser(gate.storeId, itemId, status));
 }

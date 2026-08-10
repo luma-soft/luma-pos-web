@@ -7,7 +7,8 @@ export async function GET() {
   const gate = await requireMobileSalesAccess();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
-  return mobileOk({ rows: (await getServiceDashboard()).projects });
+  if (!gate.ok) return mobileGate(gate)!;
+  return mobileOk({ rows: (await getServiceDashboard(gate.storeId)).projects });
 }
 
 export async function POST(request: Request) {

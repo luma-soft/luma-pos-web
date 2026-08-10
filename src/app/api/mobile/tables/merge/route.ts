@@ -10,5 +10,5 @@ export async function POST(request: Request) {
   const input = body as Record<string, unknown>;
   const targetId = typeof input.targetId === "string" ? input.targetId : "";
   const sourceIds = Array.isArray(input.sourceIds) ? input.sourceIds : [];
-  return mobileAction(await mergeTablesForUser(targetId, sourceIds));
+  return mobileAction(await mergeTablesForUser(gate.storeId, targetId, sourceIds));
 }

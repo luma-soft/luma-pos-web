@@ -10,9 +10,10 @@ export async function GET(
   const gate = await requireMobileSalesAccess();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const { id } = await params;
-  const detail = await getProjectDetail(id);
+  const detail = await getProjectDetail(gate.storeId, id);
   if (!detail) return mobileError("errors.notFound", 404);
   return mobileOk(detail);
 }

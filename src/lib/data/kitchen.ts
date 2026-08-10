@@ -24,11 +24,11 @@ export type KdsTicket = {
 };
 
 /** Phiếu bếp đang hoạt động (còn món chưa phục vụ), kèm món, theo thứ tự cũ → mới. */
-export async function getActiveTickets(): Promise<KdsTicket[]> {
+export async function getActiveTickets(storeId: string): Promise<KdsTicket[]> {
   const tickets = await db
     .select()
     .from(kitchenTickets)
-    .where(eq(kitchenTickets.status, "active"))
+    .where(and(eq(kitchenTickets.storeId, storeId), eq(kitchenTickets.status, "active")))
     .orderBy(asc(kitchenTickets.createdAt));
   if (tickets.length === 0) return [];
 
@@ -36,7 +36,7 @@ export async function getActiveTickets(): Promise<KdsTicket[]> {
   const items = await db
     .select()
     .from(kitchenTicketItems)
-    .where(and(inArray(kitchenTicketItems.ticketId, ids), ne(kitchenTicketItems.status, "served")))
+    .where(and(eq(kitchenTicketItems.storeId, storeId), inArray(kitchenTicketItems.ticketId, ids), ne(kitchenTicketItems.status, "served")))
     .orderBy(asc(kitchenTicketItems.createdAt));
 
   const byTicket = new Map<string, KdsItem[]>();

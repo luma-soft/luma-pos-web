@@ -2,7 +2,6 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { aiUsageCounters, aiUsageEvents } from "@/db/schema";
 import { getAiProviderSettings } from "@/lib/data/settings";
-import { CURRENT_STORE_ID } from "@/lib/tenancy/constants";
 
 export type AiUsageStatus = {
   period: string;
@@ -64,7 +63,7 @@ export function estimateAiCostMicrousd(usage: AiTokenUsage) {
   return Math.max(0, Math.round(usd * 1_000_000));
 }
 
-export async function recordAiUsageEvent(input: AiUsageEventInput) {
+export async function recordAiUsageEvent(storeId: string, input: AiUsageEventInput) {
   const inputTokens = Math.max(0, Math.trunc(Number(input.inputTokens ?? 0)));
   const outputTokens = Math.max(0, Math.trunc(Number(input.outputTokens ?? 0)));
   const totalTokens = Math.max(inputTokens + outputTokens, Math.trunc(Number(input.totalTokens ?? 0)));
@@ -76,6 +75,7 @@ export async function recordAiUsageEvent(input: AiUsageEventInput) {
     totalTokens,
   });
   await db.insert(aiUsageEvents).values({
+    storeId,
     period: input.period ?? currentPeriod(),
     provider: input.provider,
     model,
@@ -117,14 +117,14 @@ function toStatus(row: {
   };
 }
 
-export async function getAiUsageStatus(period = currentPeriod()): Promise<AiUsageStatus> {
-  const ai = await getAiProviderSettings(CURRENT_STORE_ID);
+export async function getAiUsageStatus(storeId: string, period = currentPeriod()): Promise<AiUsageStatus> {
+  const ai = await getAiProviderSettings(storeId);
   const limit = normalizeLimit(ai.monthlyUsageLimit);
   const [row] = await db
     .insert(aiUsageCounters)
-    .values({ period, usedUnits: 0, limitUnits: limit })
+    .values({ storeId, period, usedUnits: 0, limitUnits: limit })
     .onConflictDoUpdate({
-      target: aiUsageCounters.period,
+      target: [aiUsageCounters.storeId, aiUsageCounters.period],
       set: { limitUnits: limit, updatedAt: sql`now()` },
     })
     .returning({
@@ -139,9 +139,9 @@ export async function getAiUsageStatus(period = currentPeriod()): Promise<AiUsag
   return toStatus(row);
 }
 
-export async function consumeAiUsage(units: number, period = currentPeriod()) {
+export async function consumeAiUsage(storeId: string, units: number, period = currentPeriod()) {
   const charge = Math.max(1, Math.trunc(units));
-  await getAiUsageStatus(period);
+  await getAiUsageStatus(storeId, period);
 
   const [row] = await db
     .update(aiUsageCounters)
@@ -151,6 +151,7 @@ export async function consumeAiUsage(units: number, period = currentPeriod()) {
     })
     .where(and(
       eq(aiUsageCounters.period, period),
+      eq(aiUsageCounters.storeId, storeId),
       sql`${aiUsageCounters.usedUnits} + ${charge} <= ${aiUsageCounters.limitUnits}`,
     ))
     .returning({
@@ -164,12 +165,13 @@ export async function consumeAiUsage(units: number, period = currentPeriod()) {
     });
 
   if (!row) {
-    return { ok: false as const, usage: await getAiUsageStatus(period), required: charge };
+    return { ok: false as const, usage: await getAiUsageStatus(storeId, period), required: charge };
   }
   return { ok: true as const, usage: toStatus(row), charged: charge };
 }
 
 export async function recordAiTokenUsage(
+  storeId: string,
   usage: AiTokenUsage,
   period = currentPeriod(),
   event?: Omit<AiUsageEventInput, "period" | "inputTokens" | "outputTokens" | "totalTokens" | "estimatedCostMicrousd" | "model">,
@@ -179,7 +181,7 @@ export async function recordAiTokenUsage(
   const totalTokens = Math.max(inputTokens + outputTokens, Math.trunc(usage.totalTokens));
   const estimatedCostMicrousd = estimateAiCostMicrousd({ ...usage, inputTokens, outputTokens, totalTokens });
 
-  await getAiUsageStatus(period);
+  await getAiUsageStatus(storeId, period);
   const [row] = await db
     .update(aiUsageCounters)
     .set({
@@ -189,7 +191,7 @@ export async function recordAiTokenUsage(
       estimatedCostMicrousd: sql`${aiUsageCounters.estimatedCostMicrousd} + ${estimatedCostMicrousd}`,
       updatedAt: sql`now()`,
     })
-    .where(eq(aiUsageCounters.period, period))
+    .where(and(eq(aiUsageCounters.storeId, storeId), eq(aiUsageCounters.period, period)))
     .returning({
       period: aiUsageCounters.period,
       usedUnits: aiUsageCounters.usedUnits,
@@ -199,7 +201,7 @@ export async function recordAiTokenUsage(
       totalTokens: aiUsageCounters.totalTokens,
       estimatedCostMicrousd: aiUsageCounters.estimatedCostMicrousd,
     });
-  await recordAiUsageEvent({
+  await recordAiUsageEvent(storeId, {
     ...event,
     period,
     model: usage.model,

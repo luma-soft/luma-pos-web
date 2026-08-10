@@ -13,6 +13,7 @@ export async function POST(request: Request) {
 
   const event = parsed.data;
   await db.insert(mobileTelemetryEvents).values({
+    storeId: gate.storeId,
     userId: gate.userId,
     eventType: event.eventType,
     platform: event.platform,

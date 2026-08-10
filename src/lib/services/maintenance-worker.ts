@@ -27,6 +27,7 @@ export async function markOverdueMaintenanceOccurrencesCore(
 ) {
   const today = now.toISOString().slice(0, 10);
   const overdue = await tx.select({
+    storeId: serviceMaintenanceOccurrences.storeId,
     id: serviceMaintenanceOccurrences.id,
     jobId: serviceMaintenanceOccurrences.jobId,
     assignedTo: serviceJobs.assignedTo,
@@ -47,13 +48,6 @@ export async function markOverdueMaintenanceOccurrencesCore(
       ));
   }
 
-  const managerRows = await tx.select({ id: profiles.id })
-    .from(profiles)
-    .where(and(
-      eq(profiles.isActive, true),
-      inArray(profiles.role, ["owner", "manager"]),
-    ));
-  const managerIds = managerRows.map((item) => item.id);
   const alerts = [];
   for (const occurrence of overdue) {
     if (!occurrence.jobId) continue;
@@ -62,6 +56,7 @@ export async function markOverdueMaintenanceOccurrencesCore(
       .innerJoin(profiles, eq(serviceJobAssignments.profileId, profiles.id))
       .where(and(
         eq(serviceJobAssignments.jobId, occurrence.jobId),
+        eq(serviceJobAssignments.storeId, occurrence.storeId),
         eq(serviceJobAssignments.assignmentRole, "crew"),
         isNull(serviceJobAssignments.removedAt),
         eq(profiles.role, "technician"),
@@ -70,10 +65,19 @@ export async function markOverdueMaintenanceOccurrencesCore(
     const canonicalAssignee = occurrence.assignedTo
       ? await tx.select({ id: profiles.id }).from(profiles).where(and(
           eq(profiles.id, occurrence.assignedTo),
+          eq(profiles.storeId, occurrence.storeId),
           eq(profiles.role, "technician"),
           eq(profiles.isActive, true),
         )).limit(1)
       : [];
+    const managerRows = await tx.select({ id: profiles.id })
+      .from(profiles)
+      .where(and(
+        eq(profiles.storeId, occurrence.storeId),
+        eq(profiles.isActive, true),
+        inArray(profiles.role, ["owner", "manager"]),
+      ));
+    const managerIds = managerRows.map((item) => item.id);
     alerts.push({
       occurrenceId: occurrence.id,
       jobId: occurrence.jobId,
@@ -94,6 +98,7 @@ export async function generateMaintenanceOccurrenceCore(
   now = new Date(),
 ) {
   const [plan] = await tx.select({
+    storeId: serviceMaintenancePlans.storeId,
     id: serviceMaintenancePlans.id,
     projectId: serviceMaintenancePlans.projectId,
     title: serviceMaintenancePlans.title,
@@ -109,13 +114,14 @@ export async function generateMaintenanceOccurrenceCore(
   if (plan.serviceType === "mixed") {
     throw new Error("SERVICE_MAINTENANCE_SERVICE_TYPE_REQUIRED");
   }
-  await requireActiveTechnicianCore(tx, plan.assignedTo);
+  await requireActiveTechnicianCore(tx, plan.storeId, plan.assignedTo);
   const [outstanding] = await tx.select({
     jobId: serviceMaintenanceOccurrences.jobId,
     dueOn: serviceMaintenanceOccurrences.dueOn,
   }).from(serviceMaintenanceOccurrences)
     .where(and(
       eq(serviceMaintenanceOccurrences.planId, plan.id),
+      eq(serviceMaintenanceOccurrences.storeId, plan.storeId),
       inArray(serviceMaintenanceOccurrences.status, ["scheduled", "overdue"]),
     ))
     .limit(1);
@@ -132,6 +138,7 @@ export async function generateMaintenanceOccurrenceCore(
   }
 
   const [occurrence] = await tx.insert(serviceMaintenanceOccurrences).values({
+    storeId: plan.storeId,
     planId: plan.id,
     projectId: plan.projectId,
     dueOn: plan.nextDueOn,
@@ -149,6 +156,7 @@ export async function generateMaintenanceOccurrenceCore(
       .from(serviceMaintenanceOccurrences)
       .where(and(
         eq(serviceMaintenanceOccurrences.planId, plan.id),
+        eq(serviceMaintenanceOccurrences.storeId, plan.storeId),
         eq(serviceMaintenanceOccurrences.dueOn, plan.nextDueOn),
       ))
       .limit(1);
@@ -162,6 +170,7 @@ export async function generateMaintenanceOccurrenceCore(
 
   const serviceType = plan.serviceType;
   const [job] = await tx.insert(serviceJobs).values({
+    storeId: plan.storeId,
     projectId: plan.projectId,
     code: maintenanceJobCode(plan.id, plan.nextDueOn),
     serviceType,
@@ -177,9 +186,10 @@ export async function generateMaintenanceOccurrenceCore(
     updatedAt: now,
   }).returning({ id: serviceJobs.id });
   await tx.update(serviceMaintenanceOccurrences).set({ jobId: job.id })
-    .where(eq(serviceMaintenanceOccurrences.id, occurrence.id));
+    .where(and(eq(serviceMaintenanceOccurrences.storeId, plan.storeId), eq(serviceMaintenanceOccurrences.id, occurrence.id)));
   if (plan.assignedTo) {
     await tx.insert(serviceJobAssignments).values({
+      storeId: plan.storeId,
       jobId: job.id,
       profileId: plan.assignedTo,
       assignmentRole: "primary",
@@ -188,6 +198,7 @@ export async function generateMaintenanceOccurrenceCore(
     });
   }
   await tx.insert(serviceJobEvents).values({
+    storeId: plan.storeId,
     jobId: job.id,
     eventType: "maintenance.generated",
     actorId: null,

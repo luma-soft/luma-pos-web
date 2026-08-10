@@ -1,18 +1,19 @@
 import { getTranslations } from "next-intl/server";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { Percent } from "lucide-react";
 import { db } from "@/db";
 import { products, promotions } from "@/db/schema";
 import { PromoQuickCreate } from "../../promotions/promo-widgets";
 import { PromotionsTable } from "./promotions-table";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 export async function PromotionsTab() {
-  const t = await getTranslations();
+  const [t, context] = await Promise.all([getTranslations(), requireStoreContext()]);
 
   const rows = await db.select({
     id: promotions.id, name: promotions.name, tiers: promotions.tiers, isActive: promotions.isActive,
     startsAt: promotions.startsAt, endsAt: promotions.endsAt, productName: products.name, baseUnit: products.baseUnit,
-  }).from(promotions).innerJoin(products, eq(promotions.productId, products.id)).orderBy(desc(promotions.createdAt));
+  }).from(promotions).innerJoin(products, and(eq(promotions.productId, products.id), eq(products.storeId, context.storeId))).where(eq(promotions.storeId, context.storeId)).orderBy(desc(promotions.createdAt));
 
   return (
     <>

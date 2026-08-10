@@ -111,7 +111,7 @@ export async function getPaymentReconciliationEvent(eventId: string) {
 
 export async function recordSepayWebhookEvent(
   input: Parameters<typeof recordSepayWebhookEventCore>[1],
-  options?: Parameters<typeof recordSepayWebhookEventCore>[2],
+  options: Parameters<typeof recordSepayWebhookEventCore>[2],
 ) {
   return recordSepayWebhookEventCore(db, input, options);
 }

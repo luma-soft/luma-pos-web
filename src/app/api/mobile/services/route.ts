@@ -6,5 +6,6 @@ export async function GET() {
   const gate = await requireMobileSalesAccess();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
-  return mobileOk(await getServiceDashboard());
+  if (!gate.ok) return mobileGate(gate)!;
+  return mobileOk(await getServiceDashboard(gate.storeId));
 }

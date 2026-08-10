@@ -394,6 +394,7 @@ export async function createOrderForUser(
       const notification = v.source?.mode === "edit"
         ? null
         : await createNotificationEventInTx(tx, {
+            storeId,
             eventKey: `invoice-created:${order.id}`,
             category: "invoiceCreated",
             entityType: "order",

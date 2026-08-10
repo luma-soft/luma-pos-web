@@ -15,6 +15,7 @@ type ServiceTransaction = Parameters<
 
 export async function requireActiveTechnicianCore(
   tx: ServiceTransaction,
+  storeId: string,
   profileId: string | null | undefined,
 ) {
   if (!profileId) return null;
@@ -23,7 +24,7 @@ export async function requireActiveTechnicianCore(
     role: profiles.role,
     isActive: profiles.isActive,
   }).from(profiles)
-    .where(eq(profiles.id, profileId))
+    .where(and(eq(profiles.storeId, storeId), eq(profiles.id, profileId)))
     .limit(1);
   if (!profile?.isActive || profile.role !== "technician") {
     throw new Error("SERVICE_MAINTENANCE_ASSIGNEE_INVALID");
@@ -33,6 +34,7 @@ export async function requireActiveTechnicianCore(
 
 export async function syncServiceJobPrimaryAssigneeCore(
   tx: ServiceTransaction,
+  storeId: string,
   jobId: string,
   profileId: string | null | undefined,
   actorId: string | null,
@@ -41,14 +43,15 @@ export async function syncServiceJobPrimaryAssigneeCore(
 ) {
   const [job] = await tx.select({ id: serviceJobs.id })
     .from(serviceJobs)
-    .where(eq(serviceJobs.id, jobId))
+    .where(and(eq(serviceJobs.storeId, storeId), eq(serviceJobs.id, jobId)))
     .limit(1)
     .for("update");
   if (!job) throw new Error("SERVICE_JOB_NOT_FOUND");
-  const assigneeId = await requireActiveTechnicianCore(tx, profileId);
+  const assigneeId = await requireActiveTechnicianCore(tx, storeId, profileId);
   await tx.update(serviceJobAssignments).set({ removedAt: now })
     .where(and(
       eq(serviceJobAssignments.jobId, jobId),
+      eq(serviceJobAssignments.storeId, storeId),
       eq(serviceJobAssignments.assignmentRole, "primary"),
       isNull(serviceJobAssignments.removedAt),
     ));
@@ -56,10 +59,11 @@ export async function syncServiceJobPrimaryAssigneeCore(
     await tx.update(serviceJobs).set({
       assignedTo: assigneeId,
       updatedAt: now,
-    }).where(eq(serviceJobs.id, jobId));
+    }).where(and(eq(serviceJobs.storeId, storeId), eq(serviceJobs.id, jobId)));
   }
   if (assigneeId) {
     await tx.insert(serviceJobAssignments).values({
+      storeId,
       jobId,
       profileId: assigneeId,
       assignmentRole: "primary",
@@ -84,6 +88,7 @@ export async function syncServiceJobPrimaryAssigneeCore(
 export async function assignServiceJobCore(
   tx: ServiceTransaction,
   input: {
+    storeId: string;
     jobId: string;
     profileId: string;
     assignmentRole: "primary" | "crew";
@@ -96,11 +101,11 @@ export async function assignServiceJobCore(
     id: serviceJobs.id,
     assignedTo: serviceJobs.assignedTo,
   }).from(serviceJobs)
-    .where(eq(serviceJobs.id, input.jobId))
+    .where(and(eq(serviceJobs.storeId, input.storeId), eq(serviceJobs.id, input.jobId)))
     .limit(1)
     .for("update");
   if (!job) throw new Error("SERVICE_JOB_NOT_FOUND");
-  await requireActiveTechnicianCore(tx, input.profileId);
+  await requireActiveTechnicianCore(tx, input.storeId, input.profileId);
   if (input.assignmentRole === "crew" && job.assignedTo === input.profileId) {
     throw new Error("SERVICE_ASSIGNMENT_PRIMARY_CONFLICT");
   }
@@ -108,6 +113,7 @@ export async function assignServiceJobCore(
   if (input.assignmentRole === "primary") {
     await syncServiceJobPrimaryAssigneeCore(
       tx,
+      input.storeId,
       input.jobId,
       input.profileId,
       input.actorId,
@@ -115,6 +121,7 @@ export async function assignServiceJobCore(
     );
   } else {
     await tx.insert(serviceJobAssignments).values({
+      storeId: input.storeId,
       jobId: input.jobId,
       profileId: input.profileId,
       assignmentRole: "crew",
@@ -131,6 +138,7 @@ export async function assignServiceJobCore(
     });
   }
   await tx.insert(serviceJobEvents).values({
+    storeId: input.storeId,
     jobId: input.jobId,
     eventType: "job.assigned",
     actorId: input.actorId,
@@ -140,6 +148,7 @@ export async function assignServiceJobCore(
     },
   });
   await tx.insert(auditLogs).values({
+    storeId: input.storeId,
     actorId: input.actorId,
     source: "manual",
     action: "service_job.assignment.upsert",
@@ -157,6 +166,7 @@ export async function assignServiceJobCore(
   const [assignment] = await tx.select().from(serviceJobAssignments)
     .where(and(
       eq(serviceJobAssignments.jobId, input.jobId),
+      eq(serviceJobAssignments.storeId, input.storeId),
       eq(serviceJobAssignments.profileId, input.profileId),
       isNull(serviceJobAssignments.removedAt),
     ))
@@ -168,6 +178,7 @@ export async function assignServiceJobCore(
 export async function unassignServiceJobCore(
   tx: ServiceTransaction,
   input: {
+    storeId: string;
     jobId: string;
     profileId: string;
     actorId: string;
@@ -179,7 +190,7 @@ export async function unassignServiceJobCore(
     id: serviceJobs.id,
     assignedTo: serviceJobs.assignedTo,
   }).from(serviceJobs)
-    .where(eq(serviceJobs.id, input.jobId))
+    .where(and(eq(serviceJobs.storeId, input.storeId), eq(serviceJobs.id, input.jobId)))
     .limit(1)
     .for("update");
   if (!job) throw new Error("SERVICE_JOB_NOT_FOUND");
@@ -187,6 +198,7 @@ export async function unassignServiceJobCore(
     .set({ removedAt: now })
     .where(and(
       eq(serviceJobAssignments.jobId, input.jobId),
+      eq(serviceJobAssignments.storeId, input.storeId),
       eq(serviceJobAssignments.profileId, input.profileId),
       isNull(serviceJobAssignments.removedAt),
     ))
@@ -196,10 +208,12 @@ export async function unassignServiceJobCore(
     await tx.update(serviceJobs).set({ assignedTo: null, updatedAt: now })
       .where(and(
         eq(serviceJobs.id, input.jobId),
+        eq(serviceJobs.storeId, input.storeId),
         eq(serviceJobs.assignedTo, input.profileId),
       ));
   }
   await tx.insert(serviceJobEvents).values({
+    storeId: input.storeId,
     jobId: input.jobId,
     eventType: "job.unassigned",
     actorId: input.actorId,
@@ -209,6 +223,7 @@ export async function unassignServiceJobCore(
     },
   });
   await tx.insert(auditLogs).values({
+    storeId: input.storeId,
     actorId: input.actorId,
     source: "manual",
     action: "service_job.assignment.remove",

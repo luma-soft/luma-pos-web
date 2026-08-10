@@ -63,6 +63,7 @@ async function runBindingMutation(
 async function lockBindingFence(
   tx: DatabaseLike,
   input: {
+    storeId: string;
     principalId: string;
     deviceId: string;
     bindingGeneration: number;
@@ -73,6 +74,7 @@ async function lockBindingFence(
   await tx
     .insert(mobilePushDeviceBindingFences)
     .values({
+      storeId: input.storeId,
       userId: input.principalId,
       deviceId: input.deviceId,
       bindingGeneration: input.bindingGeneration,
@@ -86,6 +88,7 @@ async function lockBindingFence(
     .from(mobilePushDeviceBindingFences)
     .where(and(
       eq(mobilePushDeviceBindingFences.userId, input.principalId),
+      eq(mobilePushDeviceBindingFences.storeId, input.storeId),
       eq(mobilePushDeviceBindingFences.deviceId, input.deviceId),
     ))
     .limit(1)
@@ -114,6 +117,7 @@ async function lockBindingFence(
       })
       .where(and(
         eq(mobilePushDeviceBindingFences.userId, input.principalId),
+        eq(mobilePushDeviceBindingFences.storeId, input.storeId),
         eq(mobilePushDeviceBindingFences.deviceId, input.deviceId),
       ));
   }
@@ -150,6 +154,7 @@ function busyResult(
 export async function registerPushDeviceBinding(
   database: DatabaseLike,
   input: {
+    storeId: string;
     principalId: string;
     effectiveUserId: string;
     device: BindingDevice;
@@ -159,6 +164,7 @@ export async function registerPushDeviceBinding(
   const mutationAt = input.now ?? new Date();
   return runBindingMutation(database, async (tx: DatabaseLike) => {
     const fence = await lockBindingFence(tx, {
+      storeId: input.storeId,
       principalId: input.principalId,
       deviceId: input.device.deviceId,
       bindingGeneration: input.device.bindingGeneration,
@@ -172,6 +178,7 @@ export async function registerPushDeviceBinding(
       .from(mobilePushDevices)
       .where(and(
         eq(mobilePushDevices.userId, input.principalId),
+        eq(mobilePushDevices.storeId, input.storeId),
         eq(mobilePushDevices.deviceId, input.device.deviceId),
       ))
       .limit(1)
@@ -231,9 +238,10 @@ export async function registerPushDeviceBinding(
           lastSeenAt: mutationAt,
           updatedAt: mutationAt,
         })
-        .where(eq(mobilePushDevices.id, existing.id));
+        .where(and(eq(mobilePushDevices.storeId, input.storeId), eq(mobilePushDevices.id, existing.id)));
     } else {
       await tx.insert(mobilePushDevices).values({
+        storeId: input.storeId,
         userId: input.principalId,
         effectiveUserId: input.effectiveUserId,
         ...input.device,
@@ -249,6 +257,7 @@ export async function registerPushDeviceBinding(
 export async function deactivatePushDeviceBinding(
   database: DatabaseLike,
   input: {
+    storeId: string;
     principalId: string;
     deviceId: string;
     bindingGeneration: number;
@@ -258,6 +267,7 @@ export async function deactivatePushDeviceBinding(
   const mutationAt = input.now ?? new Date();
   return runBindingMutation(database, async (tx: DatabaseLike) => {
     const fence = await lockBindingFence(tx, {
+      storeId: input.storeId,
       principalId: input.principalId,
       deviceId: input.deviceId,
       bindingGeneration: input.bindingGeneration,
@@ -271,6 +281,7 @@ export async function deactivatePushDeviceBinding(
       .from(mobilePushDevices)
       .where(and(
         eq(mobilePushDevices.userId, input.principalId),
+        eq(mobilePushDevices.storeId, input.storeId),
         eq(mobilePushDevices.deviceId, input.deviceId),
       ))
       .limit(1)
@@ -295,6 +306,7 @@ export async function deactivatePushDeviceBinding(
       })
       .where(and(
         eq(mobilePushDevices.id, existing.id),
+        eq(mobilePushDevices.storeId, input.storeId),
         or(
           eq(mobilePushDevices.bindingGeneration, existing.bindingGeneration),
           sql`${mobilePushDevices.bindingGeneration} < ${input.bindingGeneration}`,

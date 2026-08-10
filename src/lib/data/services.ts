@@ -10,7 +10,7 @@ import {
   warrantyClaims,
 } from "@/db/schema";
 
-export async function getServiceDashboard() {
+export async function getServiceDashboard(storeId: string) {
   const [projectRows, jobRows, claimRows] = await Promise.all([
     db.select({
       id: projects.id,
@@ -27,14 +27,14 @@ export async function getServiceDashboard() {
       targetEndsOn: projects.targetEndsOn,
       siteContactName: projects.siteContactName,
       siteContactPhone: projects.siteContactPhone,
-      jobCount: sql<number>`(select count(*) from ${serviceJobs} where ${serviceJobs.projectId} = ${projects.id})::int`,
-      openJobCount: sql<number>`(select count(*) from ${serviceJobs} where ${serviceJobs.projectId} = ${projects.id} and ${serviceJobs.status} not in ('completed','cancelled'))::int`,
-      assetCount: sql<number>`(select count(*) from ${installedAssets} where ${installedAssets.projectId} = ${projects.id} and ${installedAssets.status} != 'removed')::int`,
-      openClaimCount: sql<number>`(select count(*) from ${warrantyClaims} where ${warrantyClaims.projectId} = ${projects.id} and ${warrantyClaims.status} not in ('closed','void'))::int`,
+      jobCount: sql<number>`(select count(*) from ${serviceJobs} where ${serviceJobs.storeId} = ${storeId} and ${serviceJobs.projectId} = ${projects.id})::int`,
+      openJobCount: sql<number>`(select count(*) from ${serviceJobs} where ${serviceJobs.storeId} = ${storeId} and ${serviceJobs.projectId} = ${projects.id} and ${serviceJobs.status} not in ('completed','cancelled'))::int`,
+      assetCount: sql<number>`(select count(*) from ${installedAssets} where ${installedAssets.storeId} = ${storeId} and ${installedAssets.projectId} = ${projects.id} and ${installedAssets.status} != 'removed')::int`,
+      openClaimCount: sql<number>`(select count(*) from ${warrantyClaims} where ${warrantyClaims.storeId} = ${storeId} and ${warrantyClaims.projectId} = ${projects.id} and ${warrantyClaims.status} not in ('closed','void'))::int`,
       createdAt: projects.createdAt,
     }).from(projects)
       .leftJoin(customers, eq(projects.customerId, customers.id))
-      .where(isNotNull(projects.serviceType))
+      .where(and(eq(projects.storeId, storeId), isNotNull(projects.serviceType)))
       .orderBy(desc(projects.createdAt)),
     db.select({
       id: serviceJobs.id,
@@ -52,6 +52,7 @@ export async function getServiceDashboard() {
     }).from(serviceJobs)
       .innerJoin(projects, eq(serviceJobs.projectId, projects.id))
       .leftJoin(profiles, eq(serviceJobs.assignedTo, profiles.id))
+      .where(eq(serviceJobs.storeId, storeId))
       .orderBy(desc(serviceJobs.createdAt))
       .limit(200),
     db.select({
@@ -69,6 +70,7 @@ export async function getServiceDashboard() {
     }).from(warrantyClaims)
       .innerJoin(projects, eq(warrantyClaims.projectId, projects.id))
       .leftJoin(installedAssets, eq(warrantyClaims.assetId, installedAssets.id))
+      .where(eq(warrantyClaims.storeId, storeId))
       .orderBy(desc(warrantyClaims.reportedAt))
       .limit(200),
   ]);
@@ -93,22 +95,23 @@ export type ServiceProjectRow = ServiceDashboard["projects"][number];
 export type ServiceJobRow = ServiceDashboard["jobs"][number];
 export type WarrantyClaimRow = ServiceDashboard["claims"][number];
 
-export async function getServiceFormOptions() {
+export async function getServiceFormOptions(storeId: string) {
   const [customerOptions, projectOptions, assigneeOptions, jobOptions, assetOptions, warehouseOptions] = await Promise.all([
     db.select({ id: customers.id, name: customers.name })
       .from(customers)
-      .where(eq(customers.isActive, true))
+      .where(and(eq(customers.storeId, storeId), eq(customers.isActive, true)))
       .orderBy(asc(customers.name))
       .limit(300),
     db.select({ id: projects.id, name: projects.name, serviceType: projects.serviceType })
       .from(projects)
-      .where(and(isNotNull(projects.serviceType), ne(projects.status, "done")))
+      .where(and(eq(projects.storeId, storeId), isNotNull(projects.serviceType), ne(projects.status, "done")))
       .orderBy(asc(projects.name))
       .limit(300),
     db.select({ id: profiles.id, name: profiles.fullName })
       .from(profiles)
       .where(and(
         eq(profiles.isActive, true),
+        eq(profiles.storeId, storeId),
         eq(profiles.role, "technician"),
       ))
       .orderBy(asc(profiles.fullName)),
@@ -118,6 +121,7 @@ export async function getServiceFormOptions() {
       code: serviceJobs.code,
       title: serviceJobs.title,
     }).from(serviceJobs)
+      .where(eq(serviceJobs.storeId, storeId))
       .orderBy(desc(serviceJobs.createdAt))
       .limit(500),
     db.select({
@@ -127,11 +131,12 @@ export async function getServiceFormOptions() {
       name: installedAssets.name,
       serialNumber: installedAssets.serialNumber,
     }).from(installedAssets)
-      .where(ne(installedAssets.status, "removed"))
+      .where(and(eq(installedAssets.storeId, storeId), ne(installedAssets.status, "removed")))
       .orderBy(asc(installedAssets.name))
       .limit(500),
     db.select({ id: warehouses.id, name: warehouses.name, isDefault: warehouses.isDefault })
       .from(warehouses)
+      .where(eq(warehouses.storeId, storeId))
       .orderBy(desc(warehouses.isDefault), asc(warehouses.name)),
   ]);
 

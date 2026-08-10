@@ -2,11 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { trips, tripStops } from "@/db/schema";
-import { type ActionResult, requireUser, getProfileId, generateCode } from "./common";
+import { orders, trips, tripStops } from "@/db/schema";
+import { type ActionResult, getProfileId, generateCode } from "./common";
 import { Routes } from "@/lib/routes";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 const createTripSchema = z.object({
   vehicle: z.string().min(1, { error: "validation.required" }),
@@ -17,9 +18,9 @@ const createTripSchema = z.object({
 export type CreateTripInput = z.input<typeof createTripSchema>;
 
 export async function createTrip(input: CreateTripInput): Promise<ActionResult<{ id: string }>> {
-  let userId: string;
+  let context;
   try {
-    userId = (await requireUser()).id;
+    context = await requireStoreContext();
   } catch {
     return { ok: false, error: "errors.unauthorized" };
   }
@@ -28,9 +29,15 @@ export async function createTrip(input: CreateTripInput): Promise<ActionResult<{
   const v = parsed.data;
 
   try {
-    const profileId = await getProfileId(userId);
+    const profileId = await getProfileId(context.userId);
     const result = await db.transaction(async (tx) => {
+      const ownedOrders = await tx.select({ id: orders.id }).from(orders).where(and(
+        eq(orders.storeId, context.storeId),
+        inArray(orders.id, v.orderIds),
+      ));
+      if (ownedOrders.length !== new Set(v.orderIds).size) throw new Error("ORDER_NOT_FOUND");
       const [trip] = await tx.insert(trips).values({
+        storeId: context.storeId,
         code: generateCode("CX"),
         vehicle: v.vehicle,
         driver: v.driver,
@@ -40,7 +47,7 @@ export async function createTrip(input: CreateTripInput): Promise<ActionResult<{
       }).returning({ id: trips.id });
 
       await tx.insert(tripStops).values(
-        v.orderIds.map((orderId, i) => ({ tripId: trip.id, orderId, sortOrder: i }))
+        v.orderIds.map((orderId, i) => ({ storeId: context.storeId, tripId: trip.id, orderId, sortOrder: i }))
       );
       return trip;
     });
@@ -53,13 +60,15 @@ export async function createTrip(input: CreateTripInput): Promise<ActionResult<{
 }
 
 export async function startTrip(tripId: string): Promise<ActionResult> {
+  let context;
   try {
-    await requireUser();
+    context = await requireStoreContext();
   } catch {
     return { ok: false, error: "errors.unauthorized" };
   }
   try {
-    await db.update(trips).set({ status: "ongoing", departAt: sql`now()` }).where(eq(trips.id, tripId));
+    const [updated] = await db.update(trips).set({ status: "ongoing", departAt: sql`now()` }).where(and(eq(trips.id, tripId), eq(trips.storeId, context.storeId))).returning({ id: trips.id });
+    if (!updated) return { ok: false, error: "errors.notFound" };
     revalidatePath(Routes.Delivery);
     return { ok: true, data: undefined };
   } catch (e) {
@@ -69,8 +78,9 @@ export async function startTrip(tripId: string): Promise<ActionResult> {
 }
 
 export async function markStopDelivered(stopId: string): Promise<ActionResult> {
+  let context;
   try {
-    await requireUser();
+    context = await requireStoreContext();
   } catch {
     return { ok: false, error: "errors.unauthorized" };
   }
@@ -78,7 +88,7 @@ export async function markStopDelivered(stopId: string): Promise<ActionResult> {
     await db.transaction(async (tx) => {
       const [stop] = await tx.update(tripStops)
         .set({ status: "delivered", deliveredAt: sql`now()` })
-        .where(eq(tripStops.id, stopId))
+        .where(and(eq(tripStops.id, stopId), eq(tripStops.storeId, context.storeId)))
         .returning({ tripId: tripStops.tripId });
       if (!stop) throw new Error("STOP_NOT_FOUND");
 
@@ -86,11 +96,11 @@ export async function markStopDelivered(stopId: string): Promise<ActionResult> {
       const [pending] = await tx
         .select({ c: sql<number>`count(*)::int` })
         .from(tripStops)
-        .where(sql`${tripStops.tripId} = ${stop.tripId} and ${tripStops.status} != 'delivered'`);
+        .where(and(eq(tripStops.storeId, context.storeId), sql`${tripStops.tripId} = ${stop.tripId} and ${tripStops.status} != 'delivered'`));
       if (pending.c === 0) {
-        await tx.update(trips).set({ status: "done" }).where(eq(trips.id, stop.tripId));
+        await tx.update(trips).set({ status: "done" }).where(and(eq(trips.id, stop.tripId), eq(trips.storeId, context.storeId)));
       } else {
-        await tx.update(trips).set({ status: "ongoing" }).where(eq(trips.id, stop.tripId));
+        await tx.update(trips).set({ status: "ongoing" }).where(and(eq(trips.id, stop.tripId), eq(trips.storeId, context.storeId)));
       }
     });
     revalidatePath(Routes.Delivery);

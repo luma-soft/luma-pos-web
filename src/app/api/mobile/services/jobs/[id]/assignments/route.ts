@@ -25,6 +25,7 @@ export async function POST(
   const value = parsed.data;
   try {
     const assignment = await db.transaction((tx) => assignServiceJobCore(tx, {
+      storeId: gate.storeId,
       jobId: id,
       profileId: value.profileId,
       assignmentRole: value.assignmentRole,
@@ -59,6 +60,7 @@ export async function DELETE(
   if (!profileId) return mobileError("errors.invalidData", 400);
   try {
     await db.transaction((tx) => unassignServiceJobCore(tx, {
+      storeId: gate.storeId,
       jobId: id,
       profileId,
       actorId: gate.userId,

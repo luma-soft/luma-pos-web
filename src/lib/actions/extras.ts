@@ -2,12 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { customers, projects, promotions } from "@/db/schema";
-import { type ActionResult, requireUser, requireManager } from "./common";
+import { customers, products, projects, promotions } from "@/db/schema";
+import { type ActionResult, requireManager } from "./common";
 import { Routes } from "@/lib/routes";
 import { isServiceSnapshotJobLocked } from "@/lib/services/field-api";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 // ============ Công trình ============
 
@@ -32,8 +33,9 @@ const projectUpdateSchema = projectSchema.extend({
 export type UpdateProjectInput = z.input<typeof projectUpdateSchema>;
 
 export async function createProject(input: CreateProjectInput): Promise<ActionResult<{ id: string }>> {
+  let context;
   try {
-    await requireUser();
+    context = await requireStoreContext();
   } catch {
     return { ok: false, error: "errors.unauthorized" };
   }
@@ -41,7 +43,12 @@ export async function createProject(input: CreateProjectInput): Promise<ActionRe
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
   try {
+    if (v.customerId) {
+      const [customer] = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.storeId, context.storeId), eq(customers.id, v.customerId))).limit(1);
+      if (!customer) return { ok: false, error: "errors.invalidData" };
+    }
     const [row] = await db.insert(projects).values({
+      storeId: context.storeId,
       name: v.name.trim(),
       customerId: v.customerId ?? null,
       address: v.address?.trim() || null,
@@ -58,8 +65,9 @@ export async function createProject(input: CreateProjectInput): Promise<ActionRe
 }
 
 export async function toggleProjectStatus(id: string): Promise<ActionResult> {
+  let context;
   try {
-    await requireUser();
+    context = await requireStoreContext();
   } catch {
     return { ok: false, error: "errors.unauthorized" };
   }
@@ -76,7 +84,7 @@ export async function toggleProjectStatus(id: string): Promise<ActionResult> {
         when ${projects.status} = 'active' then 100
         else ${projects.progressPercent}
       end`,
-    }).where(eq(projects.id, id));
+    }).where(and(eq(projects.storeId, context.storeId), eq(projects.id, id)));
     revalidatePath(Routes.Partners);
     revalidatePath(Routes.Services);
     revalidatePath(Routes.Projects);
@@ -103,12 +111,15 @@ const promoSchema = z.object({
 export type CreatePromotionInput = z.input<typeof promoSchema>;
 
 export async function createPromotion(input: CreatePromotionInput): Promise<ActionResult> {
-  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const gate = await requireManager(); if (!gate.ok) return gate;
   const parsed = promoSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
   try {
+    const [product] = await db.select({ id: products.id }).from(products).where(and(eq(products.storeId, gate.storeId), eq(products.id, v.productId))).limit(1);
+    if (!product) return { ok: false, error: "errors.invalidData" };
     await db.insert(promotions).values({
+      storeId: gate.storeId,
       name: v.name.trim(),
       productId: v.productId,
       tiers: v.tiers.sort((a, b) => a.minQty - b.minQty),
@@ -125,9 +136,9 @@ export async function createPromotion(input: CreatePromotionInput): Promise<Acti
 }
 
 export async function togglePromotion(id: string): Promise<ActionResult> {
-  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const gate = await requireManager(); if (!gate.ok) return gate;
   try {
-    await db.update(promotions).set({ isActive: sql`not ${promotions.isActive}` }).where(eq(promotions.id, id));
+    await db.update(promotions).set({ isActive: sql`not ${promotions.isActive}` }).where(and(eq(promotions.storeId, gate.storeId), eq(promotions.id, id)));
     revalidatePath(Routes.Promotions);
     revalidatePath(Routes.POS);
     return { ok: true, data: undefined };
@@ -140,12 +151,13 @@ export async function togglePromotion(id: string): Promise<ActionResult> {
 // ============ Portal token ============
 
 export async function generatePortalToken(customerId: string): Promise<ActionResult<{ token: string }>> {
-  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const gate = await requireManager(); if (!gate.ok) return gate;
   try {
     const token = Array.from(crypto.getRandomValues(new Uint8Array(20)))
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
-    await db.update(customers).set({ portalToken: token }).where(eq(customers.id, customerId));
+    const [updated] = await db.update(customers).set({ portalToken: token }).where(and(eq(customers.storeId, gate.storeId), eq(customers.id, customerId))).returning({ id: customers.id });
+    if (!updated) return { ok: false, error: "errors.notFound" };
     revalidatePath(Routes.customer(customerId));
     return { ok: true, data: { token } };
   } catch (e) {
@@ -155,11 +167,15 @@ export async function generatePortalToken(customerId: string): Promise<ActionRes
 }
 
 export async function updateProject(input: UpdateProjectInput): Promise<ActionResult> {
-  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const gate = await requireManager(); if (!gate.ok) return gate;
   const parsed = projectUpdateSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
   try {
+    if (v.customerId) {
+      const [customer] = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.storeId, gate.storeId), eq(customers.id, v.customerId))).limit(1);
+      if (!customer) return { ok: false, error: "errors.invalidData" };
+    }
     const isServiceProject = Boolean(v.serviceType);
     const serviceStage = v.status === "done" ? "completed" : v.serviceStage;
     await db.update(projects).set({
@@ -177,7 +193,7 @@ export async function updateProject(input: UpdateProjectInput): Promise<ActionRe
         siteContactPhone: v.siteContactPhone || null,
         ...(v.status === "done" ? { progressPercent: 100 } : {}),
       } : {}),
-    }).where(eq(projects.id, v.id));
+    }).where(and(eq(projects.storeId, gate.storeId), eq(projects.id, v.id)));
     revalidatePath(Routes.Partners);
     revalidatePath(Routes.Projects);
     revalidatePath(Routes.Services);

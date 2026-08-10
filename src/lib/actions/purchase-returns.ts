@@ -194,6 +194,7 @@ export async function createPurchaseReturn(
       }
 
       const debtNotification = await createDebtChangedEventInTx(tx, {
+        storeId: gate.storeId,
         entityType: "supplier",
         entityId: v.supplierId,
         operationType: "purchase_return",

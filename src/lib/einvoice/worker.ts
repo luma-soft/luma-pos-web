@@ -32,6 +32,7 @@ export async function processEInvoiceRequest(
   options: {
     now?: Date;
     resolveAdapter?: AdapterResolver;
+    storeId?: string;
   } = {},
 ): Promise<EInvoiceProcessingResult> {
   const now = options.now ?? new Date();
@@ -46,6 +47,7 @@ export async function processEInvoiceRequest(
     })
     .where(and(
       eq(einvoices.id, invoiceId),
+      ...(options.storeId ? [eq(einvoices.storeId, options.storeId)] : []),
       eq(einvoices.status, "queued"),
       or(isNull(einvoices.nextAttemptAt), lte(einvoices.nextAttemptAt, now)),
     ))
@@ -60,8 +62,8 @@ export async function processEInvoiceRequest(
 
   try {
     const [order, settings, lines] = await Promise.all([
-      db.select().from(orders).where(eq(orders.id, claimed.orderId)).limit(1),
-      db.select().from(storeSettings).where(eq(storeSettings.id, "default")).limit(1),
+      db.select().from(orders).where(and(eq(orders.storeId, claimed.storeId), eq(orders.id, claimed.orderId))).limit(1),
+      db.select().from(storeSettings).where(eq(storeSettings.storeId, claimed.storeId)).limit(1),
       db
         .select({
           name: orderItems.productName,
@@ -73,7 +75,7 @@ export async function processEInvoiceRequest(
         })
         .from(orderItems)
         .innerJoin(products, eq(orderItems.productId, products.id))
-        .where(eq(orderItems.orderId, claimed.orderId)),
+        .where(and(eq(orderItems.storeId, claimed.storeId), eq(orderItems.orderId, claimed.orderId))),
     ]);
     const orderRow = order[0];
     const store = settings[0];
@@ -149,7 +151,7 @@ export async function processEInvoiceRequest(
         lockToken: null,
         updatedAt: new Date(),
       })
-      .where(and(eq(einvoices.id, claimed.id), eq(einvoices.lockToken, lockToken)));
+      .where(and(eq(einvoices.storeId, claimed.storeId), eq(einvoices.id, claimed.id), eq(einvoices.lockToken, lockToken)));
 
     if (result.status === "issued" && result.number) {
       return { ok: true, status: "issued", number: result.number };
@@ -183,7 +185,7 @@ export async function processEInvoiceRequest(
         lockToken: null,
         updatedAt: new Date(),
       })
-      .where(and(eq(einvoices.id, claimed.id), eq(einvoices.lockToken, lockToken)));
+      .where(and(eq(einvoices.storeId, claimed.storeId), eq(einvoices.id, claimed.id), eq(einvoices.lockToken, lockToken)));
     return { ok: false, status: "error", error: message };
   }
 }

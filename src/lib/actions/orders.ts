@@ -73,7 +73,7 @@ export async function convertQuoteToOrder(quoteId: string): Promise<ActionResult
   const gate = await requireSalesAccess();
   if (!gate.ok) return gate;
   // Lõi tách riêng. Xem src/lib/orders/convert.ts.
-  const result = await convertQuoteToOrderForUser(gate.userId, quoteId);
+  const result = await convertQuoteToOrderForUser(gate.userId, gate.storeId, quoteId);
   if (result.ok) {
     revalidatePath(Routes.Orders);
     revalidatePath(Routes.Quotes);

@@ -1,7 +1,7 @@
 import { getOrder } from "@/lib/data/orders";
 import { db } from "@/db";
 import { einvoices } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { updateOrderForUser } from "@/lib/orders/edit";
 import { requireMobileManager, requireMobileSalesAccess } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
@@ -33,7 +33,7 @@ export async function GET(
       issuedAt: einvoices.issuedAt,
     })
     .from(einvoices)
-    .where(eq(einvoices.orderId, id))
+    .where(and(eq(einvoices.storeId, gate.storeId), eq(einvoices.orderId, id)))
     .limit(1);
   return mobileOk({
     ...order,

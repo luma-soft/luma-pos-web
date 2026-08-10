@@ -1,10 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { einvoices, orders, storeSettings } from "@/db/schema";
-import { type ActionResult, requireUser, toMoney } from "./common";
+import { type ActionResult, toMoney } from "./common";
 import { Routes } from "@/lib/routes";
 import { issueEInvoiceSchema, type IssueEInvoiceInput } from "@/lib/schemas/einvoice";
 import { processEInvoiceRequest } from "@/lib/einvoice/worker";
@@ -13,6 +13,7 @@ import {
   selectEInvoiceIssuanceProvider,
 } from "@/lib/einvoice/provider";
 import { deriveEInvoiceFallbackVatRate } from "@/lib/einvoice/tax";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 type EInvoiceRequestResult = {
   status: "issued" | "queued" | "processing";
@@ -21,11 +22,6 @@ type EInvoiceRequestResult = {
 };
 
 export async function issueEInvoice(input: IssueEInvoiceInput): Promise<ActionResult<EInvoiceRequestResult>> {
-  try {
-    await requireUser();
-  } catch {
-    return { ok: false, error: "errors.unauthorized" };
-  }
   return issueEInvoiceForUser(input);
 }
 
@@ -35,11 +31,12 @@ export async function issueEInvoiceForUser(input: IssueEInvoiceInput): Promise<A
   const v = parsed.data;
 
   try {
-    const [order] = await db.select().from(orders).where(eq(orders.id, v.orderId)).limit(1);
+    const context = await requireStoreContext();
+    const [order] = await db.select().from(orders).where(and(eq(orders.storeId, context.storeId), eq(orders.id, v.orderId))).limit(1);
     if (!order) return { ok: false, error: "errors.invalidData" };
     if (order.status !== "completed") return { ok: false, error: "einvoice.errors.onlyCompleted" };
 
-    const [existing] = await db.select().from(einvoices).where(eq(einvoices.orderId, v.orderId)).limit(1);
+    const [existing] = await db.select().from(einvoices).where(and(eq(einvoices.storeId, context.storeId), eq(einvoices.orderId, v.orderId))).limit(1);
     if (existing?.status === "issued") return { ok: false, error: "einvoice.errors.alreadyIssued" };
     if (existing?.status === "processing") {
       return { ok: true, data: { status: "processing", number: null } };
@@ -48,7 +45,7 @@ export async function issueEInvoiceForUser(input: IssueEInvoiceInput): Promise<A
     const [requestOwner] = await db
       .select({ orderId: einvoices.orderId })
       .from(einvoices)
-      .where(eq(einvoices.requestId, v.requestId))
+      .where(and(eq(einvoices.storeId, context.storeId), eq(einvoices.requestId, v.requestId)))
       .limit(1);
     if (requestOwner && requestOwner.orderId !== v.orderId) {
       return { ok: false, error: "einvoice.errors.requestConflict" };
@@ -65,7 +62,7 @@ export async function issueEInvoiceForUser(input: IssueEInvoiceInput): Promise<A
     const vatAmount = total - totalBeforeVat;
 
     const [settings] = await db.select({ prefs: storeSettings.prefs })
-      .from(storeSettings).where(eq(storeSettings.id, "default")).limit(1);
+      .from(storeSettings).where(eq(storeSettings.storeId, context.storeId)).limit(1);
     const taxPrefs = settings?.prefs?.tax;
     const providerSelection = selectEInvoiceIssuanceProvider({
       einvoiceEnabled: taxPrefs?.einvoiceEnabled,
@@ -80,6 +77,7 @@ export async function issueEInvoiceForUser(input: IssueEInvoiceInput): Promise<A
       ? resetEInvoiceRetryBudgetForManualSubmission(existing)
       : { attemptCount: 0, lastAttemptAt: null, lastError: null };
     const values = {
+      storeId: context.storeId,
       orderId: v.orderId,
       status: "queued" as const,
       serial: null,
@@ -107,7 +105,7 @@ export async function issueEInvoiceForUser(input: IssueEInvoiceInput): Promise<A
     };
     let invoiceId: string;
     if (existing) {
-      await db.update(einvoices).set(values).where(eq(einvoices.id, existing.id));
+      await db.update(einvoices).set(values).where(and(eq(einvoices.storeId, context.storeId), eq(einvoices.id, existing.id)));
       invoiceId = existing.id;
     } else {
       const [created] = await db
@@ -117,7 +115,7 @@ export async function issueEInvoiceForUser(input: IssueEInvoiceInput): Promise<A
       invoiceId = created.id;
     }
 
-    const processed = await processEInvoiceRequest(invoiceId);
+    const processed = await processEInvoiceRequest(invoiceId, { storeId: context.storeId });
     revalidatePath(Routes.Sales);
     revalidatePath(Routes.EInvoices);
     revalidatePath(Routes.order(v.orderId));

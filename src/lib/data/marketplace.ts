@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   aiListingSuggestions,
@@ -34,7 +34,7 @@ function isMissingMarketplaceTable(e: unknown) {
   return pgErrorCode(e) === "42P01" || (e instanceof Error && e.message.includes("marketplace_"));
 }
 
-export async function getShopeeConnectionSummary() {
+export async function getShopeeConnectionSummary(storeId: string) {
   try {
     const shops = await db
       .select({
@@ -50,7 +50,7 @@ export async function getShopeeConnectionSummary() {
         metadata: marketplaceShops.metadata,
       })
       .from(marketplaceShops)
-      .where(eq(marketplaceShops.provider, "shopee"))
+      .where(and(eq(marketplaceShops.storeId, storeId), eq(marketplaceShops.provider, "shopee")))
       .orderBy(desc(marketplaceShops.updatedAt))
       .limit(20);
 
@@ -58,10 +58,11 @@ export async function getShopeeConnectionSummary() {
       .select({
         listings: sql<number>`count(*) filter (where ${marketplaceProductMappings.provider} = 'shopee')::int`,
         publishedListings: sql<number>`count(*) filter (where ${marketplaceProductMappings.provider} = 'shopee' and ${marketplaceProductMappings.status} = 'published')::int`,
-        failedJobs: sql<number>`(select count(*)::int from marketplace_sync_jobs where provider = 'shopee' and status = 'failed')`,
-        pendingJobs: sql<number>`(select count(*)::int from marketplace_sync_jobs where provider = 'shopee' and status in ('pending','retrying'))`,
+        failedJobs: sql<number>`(select count(*)::int from marketplace_sync_jobs where store_id = ${storeId} and provider = 'shopee' and status = 'failed')`,
+        pendingJobs: sql<number>`(select count(*)::int from marketplace_sync_jobs where store_id = ${storeId} and provider = 'shopee' and status in ('pending','retrying'))`,
       })
-      .from(marketplaceProductMappings);
+      .from(marketplaceProductMappings)
+      .where(eq(marketplaceProductMappings.storeId, storeId));
 
     return { shop: shops[0] ?? null, shops, metrics };
   } catch (e) {
@@ -70,23 +71,23 @@ export async function getShopeeConnectionSummary() {
   }
 }
 
-export async function getProductShopeeMapping(productId: string) {
+export async function getProductShopeeMapping(storeId: string, productId: string) {
   const [row] = await db
     .select()
     .from(marketplaceProductMappings)
-    .where(eq(marketplaceProductMappings.productId, productId))
+    .where(and(eq(marketplaceProductMappings.storeId, storeId), eq(marketplaceProductMappings.productId, productId)))
     .limit(1);
   return row ?? null;
 }
 
-export async function getShopeeDashboard() {
+export async function getShopeeDashboard(storeId: string) {
   try {
     const [summary, jobs, mappings, orderMappings, warehouseRows] = await Promise.all([
-      getShopeeConnectionSummary(),
+      getShopeeConnectionSummary(storeId),
       db
         .select()
         .from(marketplaceSyncJobs)
-        .where(eq(marketplaceSyncJobs.provider, "shopee"))
+        .where(and(eq(marketplaceSyncJobs.storeId, storeId), eq(marketplaceSyncJobs.provider, "shopee")))
         .orderBy(desc(marketplaceSyncJobs.updatedAt))
         .limit(20),
       db
@@ -105,7 +106,7 @@ export async function getShopeeDashboard() {
         })
         .from(marketplaceProductMappings)
         .leftJoin(products, eq(products.id, marketplaceProductMappings.productId))
-        .where(eq(marketplaceProductMappings.provider, "shopee"))
+        .where(and(eq(marketplaceProductMappings.storeId, storeId), eq(marketplaceProductMappings.provider, "shopee")))
         .orderBy(desc(marketplaceProductMappings.updatedAt))
         .limit(50),
       db
@@ -122,12 +123,13 @@ export async function getShopeeDashboard() {
         .from(marketplaceOrderMappings)
         .leftJoin(orders, eq(orders.id, marketplaceOrderMappings.orderId))
         .leftJoin(customers, eq(customers.id, orders.customerId))
-        .where(eq(marketplaceOrderMappings.provider, "shopee"))
+        .where(and(eq(marketplaceOrderMappings.storeId, storeId), eq(marketplaceOrderMappings.provider, "shopee")))
         .orderBy(desc(marketplaceOrderMappings.importedAt))
         .limit(30),
       db
         .select({ id: warehouses.id, name: warehouses.name, isDefault: warehouses.isDefault })
         .from(warehouses)
+        .where(eq(warehouses.storeId, storeId))
         .orderBy(desc(warehouses.isDefault), warehouses.name)
         .limit(80),
     ]);
@@ -138,7 +140,7 @@ export async function getShopeeDashboard() {
   }
 }
 
-export async function getShopeeInbox() {
+export async function getShopeeInbox(storeId: string) {
   try {
     const threads = await db
       .select({
@@ -153,13 +155,14 @@ export async function getShopeeInbox() {
       .from(marketplaceMessageThreads)
       .leftJoin(customers, eq(customers.id, marketplaceMessageThreads.customerId))
       .leftJoin(orders, eq(orders.id, marketplaceMessageThreads.orderId))
-      .where(eq(marketplaceMessageThreads.provider, "shopee"))
+      .where(and(eq(marketplaceMessageThreads.storeId, storeId), eq(marketplaceMessageThreads.provider, "shopee")))
       .orderBy(desc(marketplaceMessageThreads.lastMessageAt))
       .limit(30);
 
     const messages = await db
       .select()
       .from(marketplaceMessages)
+      .where(eq(marketplaceMessages.storeId, storeId))
       .orderBy(desc(marketplaceMessages.sentAt))
       .limit(120);
 
@@ -177,11 +180,11 @@ export async function getShopeeInbox() {
   }
 }
 
-export async function getLatestAiListingSuggestion(productId: string) {
+export async function getLatestAiListingSuggestion(storeId: string, productId: string) {
   const [row] = await db
     .select()
     .from(aiListingSuggestions)
-    .where(eq(aiListingSuggestions.productId, productId))
+    .where(and(eq(aiListingSuggestions.storeId, storeId), eq(aiListingSuggestions.productId, productId)))
     .orderBy(desc(aiListingSuggestions.createdAt))
     .limit(1);
   return row ?? null;

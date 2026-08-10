@@ -21,7 +21,7 @@ import {
 import { calculateServiceProjectProfitability } from "@/lib/services/domain";
 import { coercePageSize } from "@/lib/pagination";
 
-const projectRowSelection = {
+const projectRowSelection = (storeId: string) => ({
   id: projects.id,
   name: projects.name,
   customerId: projects.customerId,
@@ -36,27 +36,28 @@ const projectRowSelection = {
   siteContactName: projects.siteContactName,
   siteContactPhone: projects.siteContactPhone,
   customerName: customers.name,
-  orderCount: sql<number>`(select count(*) from ${orders} where ${orders.projectId} = ${projects.id} and ${orders.status} != 'cancelled')::int`,
-  totalValue: sql<string>`coalesce((select sum(${orders.total}) from ${orders} where ${orders.projectId} = ${projects.id} and ${orders.status} not in ('cancelled','quote','merged')), 0)`,
-  remaining: sql<string>`coalesce((select sum(${orders.total} - ${orders.amountPaid}) from ${orders} where ${orders.projectId} = ${projects.id} and ${orders.status} = 'completed'), 0)`,
+  orderCount: sql<number>`(select count(*) from ${orders} where ${orders.storeId} = ${storeId} and ${orders.projectId} = ${projects.id} and ${orders.status} != 'cancelled')::int`,
+  totalValue: sql<string>`coalesce((select sum(${orders.total}) from ${orders} where ${orders.storeId} = ${storeId} and ${orders.projectId} = ${projects.id} and ${orders.status} not in ('cancelled','quote','merged')), 0)`,
+  remaining: sql<string>`coalesce((select sum(${orders.total} - ${orders.amountPaid}) from ${orders} where ${orders.storeId} = ${storeId} and ${orders.projectId} = ${projects.id} and ${orders.status} = 'completed'), 0)`,
   createdAt: projects.createdAt,
-};
+});
 
-export async function getProjectRows() {
-  return db.select(projectRowSelection).from(projects).leftJoin(customers, eq(projects.customerId, customers.id)).orderBy(desc(projects.createdAt));
+export async function getProjectRows(storeId: string) {
+  return db.select(projectRowSelection(storeId)).from(projects).leftJoin(customers, and(eq(projects.customerId, customers.id), eq(customers.storeId, storeId))).where(eq(projects.storeId, storeId)).orderBy(desc(projects.createdAt));
 }
 
-export async function getProjectPage(page = 1, pageSize?: number) {
+export async function getProjectPage(storeId: string, page = 1, pageSize?: number) {
   const safePage = Math.max(1, page);
   const size = coercePageSize(pageSize);
   const [rows, countRows] = await Promise.all([
-    db.select(projectRowSelection)
+    db.select(projectRowSelection(storeId))
       .from(projects)
-      .leftJoin(customers, eq(projects.customerId, customers.id))
+      .leftJoin(customers, and(eq(projects.customerId, customers.id), eq(customers.storeId, storeId)))
+      .where(eq(projects.storeId, storeId))
       .orderBy(desc(projects.createdAt))
       .limit(size)
       .offset((safePage - 1) * size),
-    db.select({ total: count() }).from(projects),
+    db.select({ total: count() }).from(projects).where(eq(projects.storeId, storeId)),
   ]);
   const total = countRows[0]?.total ?? 0;
   return { rows, total, page: safePage, pageSize: size, pageCount: Math.max(1, Math.ceil(total / size)) };
@@ -64,7 +65,7 @@ export async function getProjectPage(page = 1, pageSize?: number) {
 
 export type ProjectRow = Awaited<ReturnType<typeof getProjectRows>>[number];
 
-export async function getProjectDetail(id: string) {
+export async function getProjectDetail(storeId: string, id: string) {
   const [project] = await db.select({
     id: projects.id,
     name: projects.name,
@@ -84,7 +85,7 @@ export async function getProjectDetail(id: string) {
     totalValue: sql<string>`coalesce((select sum(${orders.total}) from ${orders} where ${orders.projectId} = ${projects.id} and ${orders.status} not in ('cancelled','quote','merged')), 0)`,
     remaining: sql<string>`coalesce((select sum(${orders.total} - ${orders.amountPaid}) from ${orders} where ${orders.projectId} = ${projects.id} and ${orders.status} = 'completed'), 0)`,
     createdAt: projects.createdAt,
-  }).from(projects).leftJoin(customers, eq(projects.customerId, customers.id)).where(eq(projects.id, id)).limit(1);
+  }).from(projects).leftJoin(customers, and(eq(projects.customerId, customers.id), eq(customers.storeId, storeId))).where(and(eq(projects.id, id), eq(projects.storeId, storeId))).limit(1);
   if (!project) return null;
 
   const [relatedOrders, jobs, assets, claims, materials, statusLogs, costEntries, costSummary, plannedMaterialSummary, handoverDocuments, maintenancePlans] = await Promise.all([
@@ -101,7 +102,7 @@ export async function getProjectDetail(id: string) {
     })
       .from(orders)
       .leftJoin(customers, eq(orders.customerId, customers.id))
-      .where(eq(orders.projectId, id))
+      .where(and(eq(orders.projectId, id), eq(orders.storeId, storeId)))
       .orderBy(desc(orders.createdAt))
       .limit(50),
     db.select({
@@ -122,7 +123,7 @@ export async function getProjectDetail(id: string) {
       createdAt: serviceJobs.createdAt,
     }).from(serviceJobs)
       .leftJoin(profiles, eq(serviceJobs.assignedTo, profiles.id))
-      .where(eq(serviceJobs.projectId, id))
+      .where(and(eq(serviceJobs.projectId, id), eq(serviceJobs.storeId, storeId)))
       .orderBy(desc(serviceJobs.createdAt)),
     db.select({
       id: installedAssets.id,
@@ -143,7 +144,7 @@ export async function getProjectDetail(id: string) {
       status: installedAssets.status,
       note: installedAssets.note,
     }).from(installedAssets)
-      .where(eq(installedAssets.projectId, id))
+      .where(and(eq(installedAssets.projectId, id), eq(installedAssets.storeId, storeId)))
       .orderBy(desc(installedAssets.createdAt)),
     db.select({
       id: warrantyClaims.id,
@@ -165,7 +166,7 @@ export async function getProjectDetail(id: string) {
       createdAt: warrantyClaims.createdAt,
     }).from(warrantyClaims)
       .leftJoin(installedAssets, eq(warrantyClaims.assetId, installedAssets.id))
-      .where(eq(warrantyClaims.projectId, id))
+      .where(and(eq(warrantyClaims.projectId, id), eq(warrantyClaims.storeId, storeId)))
       .orderBy(desc(warrantyClaims.reportedAt)),
     db.select({
       id: serviceJobMaterials.id,
@@ -191,7 +192,7 @@ export async function getProjectDetail(id: string) {
     }).from(serviceJobMaterials)
       .innerJoin(serviceJobs, eq(serviceJobMaterials.jobId, serviceJobs.id))
       .innerJoin(products, eq(serviceJobMaterials.productId, products.id))
-      .where(eq(serviceJobs.projectId, id))
+      .where(and(eq(serviceJobs.projectId, id), eq(serviceJobs.storeId, storeId)))
       .orderBy(desc(serviceJobMaterials.createdAt)),
     db.select({
       id: serviceStatusLogs.id,
@@ -204,7 +205,7 @@ export async function getProjectDetail(id: string) {
     }).from(serviceStatusLogs)
       .innerJoin(serviceJobs, eq(serviceStatusLogs.jobId, serviceJobs.id))
       .leftJoin(profiles, eq(serviceStatusLogs.createdBy, profiles.id))
-      .where(eq(serviceJobs.projectId, id))
+      .where(and(eq(serviceJobs.projectId, id), eq(serviceJobs.storeId, storeId)))
       .orderBy(desc(serviceStatusLogs.createdAt)),
     db.select({
       id: serviceCostEntries.id,
@@ -221,18 +222,18 @@ export async function getProjectDetail(id: string) {
       createdAt: serviceCostEntries.createdAt,
     }).from(serviceCostEntries)
       .leftJoin(profiles, eq(serviceCostEntries.staffId, profiles.id))
-      .where(eq(serviceCostEntries.projectId, id))
+      .where(and(eq(serviceCostEntries.projectId, id), eq(serviceCostEntries.storeId, storeId)))
       .orderBy(desc(serviceCostEntries.incurredOn), desc(serviceCostEntries.createdAt)),
     db.select({
       laborCost: sql<string>`coalesce(sum(case when ${serviceCostEntries.type} = 'labor' then ${serviceCostEntries.amount} else 0 end), 0)`,
       otherCost: sql<string>`coalesce(sum(case when ${serviceCostEntries.type} <> 'labor' then ${serviceCostEntries.amount} else 0 end), 0)`,
-    }).from(serviceCostEntries).where(eq(serviceCostEntries.projectId, id)),
+    }).from(serviceCostEntries).where(and(eq(serviceCostEntries.projectId, id), eq(serviceCostEntries.storeId, storeId))),
     db.select({
       plannedCost: sql<string>`coalesce(sum(${serviceJobMaterials.plannedQuantity} * case when ${serviceJobMaterials.unitName} = ${products.baseUnit} then 1 else coalesce((select ${productUnits.multiplier} from ${productUnits} where ${productUnits.productId} = ${serviceJobMaterials.productId} and ${productUnits.unitName} = ${serviceJobMaterials.unitName} limit 1), 0) end * ${products.costPrice}), 0)`,
     }).from(serviceJobMaterials)
       .innerJoin(serviceJobs, eq(serviceJobMaterials.jobId, serviceJobs.id))
       .innerJoin(products, eq(serviceJobMaterials.productId, products.id))
-      .where(eq(serviceJobs.projectId, id)),
+      .where(and(eq(serviceJobs.projectId, id), eq(serviceJobs.storeId, storeId))),
     db.select({
       id: serviceHandoverDocuments.id,
       jobId: serviceHandoverDocuments.jobId,
@@ -245,7 +246,7 @@ export async function getProjectDetail(id: string) {
       status: serviceHandoverDocuments.status,
       createdAt: serviceHandoverDocuments.createdAt,
     }).from(serviceHandoverDocuments)
-      .where(eq(serviceHandoverDocuments.projectId, id))
+      .where(and(eq(serviceHandoverDocuments.projectId, id), eq(serviceHandoverDocuments.storeId, storeId)))
       .orderBy(desc(serviceHandoverDocuments.createdAt)),
     db.select({
       id: serviceMaintenancePlans.id,
@@ -264,7 +265,7 @@ export async function getProjectDetail(id: string) {
     }).from(serviceMaintenancePlans)
       .leftJoin(installedAssets, eq(serviceMaintenancePlans.assetId, installedAssets.id))
       .leftJoin(profiles, eq(serviceMaintenancePlans.assignedTo, profiles.id))
-      .where(eq(serviceMaintenancePlans.projectId, id))
+      .where(and(eq(serviceMaintenancePlans.projectId, id), eq(serviceMaintenancePlans.storeId, storeId)))
       .orderBy(serviceMaintenancePlans.nextDueOn),
   ]);
 
@@ -273,7 +274,7 @@ export async function getProjectDetail(id: string) {
   }).from(stockMovements)
     .innerJoin(serviceJobMaterials, and(eq(stockMovements.refType, "service_material"), eq(stockMovements.refId, serviceJobMaterials.id)))
     .innerJoin(serviceJobs, eq(serviceJobMaterials.jobId, serviceJobs.id))
-    .where(and(eq(serviceJobs.projectId, id), sql`${stockMovements.quantity} < 0`));
+    .where(and(eq(serviceJobs.projectId, id), eq(serviceJobs.storeId, storeId), eq(stockMovements.storeId, storeId), sql`${stockMovements.quantity} < 0`));
   const revenue = Number(project.totalValue);
   const materialCost = Number(actualMaterialSummary?.materialCost ?? 0);
   const laborCost = Number(costSummary[0]?.laborCost ?? 0);

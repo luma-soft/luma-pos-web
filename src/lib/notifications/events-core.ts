@@ -21,6 +21,7 @@ import { parseStorePrefs } from "@/lib/schemas/settings";
 export type DbLike = any;
 
 export type CreateNotificationEventInput = {
+  storeId: string;
   eventKey: string;
   category: NotificationCategory;
   entityType: "order" | "purchase" | "customer" | "supplier" | "payment";
@@ -59,7 +60,7 @@ export async function createNotificationEventInTx(
   const [settings] = await tx
     .select({ prefs: storeSettings.prefs })
     .from(storeSettings)
-    .where(eq(storeSettings.id, "default"))
+    .where(eq(storeSettings.storeId, input.storeId))
     .limit(1);
   const prefs = parseStorePrefs(settings?.prefs);
 
@@ -68,6 +69,7 @@ export async function createNotificationEventInTx(
   const [inserted] = await tx
     .insert(notificationEvents)
     .values({
+      storeId: input.storeId,
       eventKey: input.eventKey,
       category: input.category,
       entityType: input.entityType,
@@ -79,14 +81,14 @@ export async function createNotificationEventInTx(
       metadata: input.metadata ?? {},
       occurredAt: input.occurredAt,
     })
-    .onConflictDoNothing({ target: notificationEvents.eventKey })
+    .onConflictDoNothing({ target: [notificationEvents.storeId, notificationEvents.eventKey] })
     .returning({ id: notificationEvents.id });
 
   if (!inserted) {
     const [existing] = await tx
       .select({ id: notificationEvents.id })
       .from(notificationEvents)
-      .where(eq(notificationEvents.eventKey, input.eventKey))
+      .where(and(eq(notificationEvents.storeId, input.storeId), eq(notificationEvents.eventKey, input.eventKey)))
       .limit(1);
     if (!existing) throw new Error("NOTIFICATION_EVENT_CONFLICT_UNRESOLVED");
     return { eventId: existing.id, created: false };
@@ -107,6 +109,7 @@ export async function createNotificationEventInTx(
       .from(profiles)
       .where(and(
         eq(profiles.isActive, true),
+        eq(profiles.storeId, input.storeId),
         inArray(profiles.role, routedRoles),
       ));
   const directRecipients = directUserIds.length === 0
@@ -114,7 +117,7 @@ export async function createNotificationEventInTx(
     : await tx
       .select({ id: profiles.id })
       .from(profiles)
-      .where(and(eq(profiles.isActive, true), inArray(profiles.id, directUserIds)));
+      .where(and(eq(profiles.storeId, input.storeId), eq(profiles.isActive, true), inArray(profiles.id, directUserIds)));
 
   const directRecipientIds = new Set(
     (directRecipients as Array<{ id: string }>).map((profile) => profile.id),
@@ -131,12 +134,13 @@ export async function createNotificationEventInTx(
   }
 
   const recipientRows = [...recipientReasons].map(([userId, reason]) => ({
+    storeId: input.storeId,
     eventId: inserted.id,
     userId,
     reason,
   }));
   if (recipientRows.length > 0) await tx.insert(notificationRecipients).values(recipientRows);
-  await tx.insert(notificationOutbox).values({ eventId: inserted.id });
+  await tx.insert(notificationOutbox).values({ storeId: input.storeId, eventId: inserted.id });
 
   return { eventId: inserted.id, created: true };
 }
@@ -148,6 +152,7 @@ function roundMoney(value: number) {
 export async function createDebtChangedEventInTx(
   tx: DbLike,
   input: {
+    storeId: string;
     entityType: "customer" | "supplier";
     entityId: string;
     operationType: string;
@@ -179,6 +184,7 @@ export async function createDebtChangedEventInTx(
   if (relatedAdjustments.length > 0) metadata.relatedAdjustments = relatedAdjustments;
 
   return createNotificationEventInTx(tx, {
+    storeId: input.storeId,
     eventKey: debtEventKey(input),
     category: "debtChanged",
     entityType: input.entityType,

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { modifierGroups } from "@/db/schema";
 import { modifierGroupSchema, type ModifierGroupInput } from "@/lib/schemas/table";
@@ -16,9 +16,10 @@ export async function saveModifierGroup(id: string | null, input: ModifierGroupI
     if (id) {
       await db.update(modifierGroups).set({
         name: v.name, multi: v.multi, required: v.required, options: v.options, categoryIds: v.categoryIds, sortOrder: v.sortOrder,
-      }).where(eq(modifierGroups.id, id));
+      }).where(and(eq(modifierGroups.storeId, gate.storeId), eq(modifierGroups.id, id)));
     } else {
       await db.insert(modifierGroups).values({
+        storeId: gate.storeId,
         name: v.name, multi: v.multi, required: v.required, options: v.options, categoryIds: v.categoryIds, sortOrder: v.sortOrder,
       });
     }
@@ -29,7 +30,7 @@ export async function saveModifierGroup(id: string | null, input: ModifierGroupI
 export async function setModifierGroupActive(id: string, isActive: boolean): Promise<ActionResult> {
   const gate = await requireManager(); if (!gate.ok) return gate;
   try {
-    await db.update(modifierGroups).set({ isActive }).where(eq(modifierGroups.id, id));
+    await db.update(modifierGroups).set({ isActive }).where(and(eq(modifierGroups.storeId, gate.storeId), eq(modifierGroups.id, id)));
     revalidatePath("/tables"); return { ok: true, data: undefined };
   } catch (e) { console.error("setModifierGroupActive failed:", e); return { ok: false, error: "errors.serverError" }; }
 }
@@ -37,7 +38,7 @@ export async function setModifierGroupActive(id: string, isActive: boolean): Pro
 export async function deleteModifierGroup(id: string): Promise<ActionResult> {
   const gate = await requireManager(); if (!gate.ok) return gate;
   try {
-    await db.delete(modifierGroups).where(eq(modifierGroups.id, id));
+    await db.delete(modifierGroups).where(and(eq(modifierGroups.storeId, gate.storeId), eq(modifierGroups.id, id)));
     revalidatePath("/tables"); return { ok: true, data: undefined };
   } catch (e) { console.error("deleteModifierGroup failed:", e); return { ok: false, error: "errors.serverError" }; }
 }

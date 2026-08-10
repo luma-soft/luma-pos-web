@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { diningTables } from "@/db/schema";
 import type { TableCartItem } from "@/lib/schemas/table";
@@ -36,8 +36,8 @@ function cartTotal(cart: TableCartItem[]): number {
   return cart.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
 }
 
-export async function getTables() {
-  const rows = await db.select().from(diningTables).orderBy(asc(diningTables.zone), asc(diningTables.sortOrder), asc(diningTables.name));
+export async function getTables(storeId: string) {
+  const rows = await db.select().from(diningTables).where(eq(diningTables.storeId, storeId)).orderBy(asc(diningTables.zone), asc(diningTables.sortOrder), asc(diningTables.name));
   return rows.map((r) => {
     const cart = normalizeCart(r.currentCart);
     return {
@@ -49,8 +49,8 @@ export async function getTables() {
 }
 export type TableRow = Awaited<ReturnType<typeof getTables>>[number];
 
-export async function getTable(id: string) {
-  const [r] = await db.select().from(diningTables).where(eq(diningTables.id, id)).limit(1);
+export async function getTable(storeId: string, id: string) {
+  const [r] = await db.select().from(diningTables).where(and(eq(diningTables.storeId, storeId), eq(diningTables.id, id))).limit(1);
   if (!r) return null;
   return { id: r.id, name: r.name, zone: r.zone, status: r.status, openedAt: r.openedAt, cart: normalizeCart(r.currentCart) };
 }

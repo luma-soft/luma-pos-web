@@ -251,6 +251,7 @@ export async function paySupplierPayable(
         },
       });
       const notification = await createDebtChangedEventInTx(tx, {
+        storeId: actor.storeId,
         entityType: "supplier",
         entityId: input.supplierId,
         operationType: "supplier_payment",
@@ -384,6 +385,7 @@ export async function createSupplierPayableEntry(
         },
       });
       const notification = await createDebtChangedEventInTx(tx, {
+        storeId: actor.storeId,
         entityType: "supplier",
         entityId: input.supplierId,
         operationType: type,

@@ -15,9 +15,9 @@ export default async function TablePage({ params }: { params: Promise<{ id: stri
   if (!FNB.has(store.industry)) redirect("/dashboard");
   const { id } = await params;
   const [table, tables, modifierGroups] = await Promise.all([
-    getTable(id),
-    getTables(),
-    getActiveModifierGroups(),
+    getTable(context.storeId, id),
+    getTables(context.storeId),
+    getActiveModifierGroups(context.storeId),
   ]);
   if (!table) notFound();
   const moveTargets = eligibleTableMoveTargets(table.id, tables);

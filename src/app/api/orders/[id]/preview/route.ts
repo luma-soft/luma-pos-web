@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { einvoices } from "@/db/schema";
 import { requireSalesAccess } from "@/lib/actions/common";
@@ -24,7 +24,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       issuedAt: einvoices.issuedAt,
     })
     .from(einvoices)
-    .where(eq(einvoices.orderId, id))
+    .where(and(eq(einvoices.storeId, gate.storeId), eq(einvoices.orderId, id)))
     .limit(1);
 
   return NextResponse.json({ ok: true, data: { order, einvoice: einvoice ?? null } });

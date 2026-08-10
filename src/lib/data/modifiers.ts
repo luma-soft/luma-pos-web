@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { modifierGroups } from "@/db/schema";
 
@@ -22,13 +22,13 @@ function map(r: typeof modifierGroups.$inferSelect): ModifierGroup {
 }
 
 /** Tất cả nhóm (cho màn quản lý). */
-export async function getModifierGroups(): Promise<ModifierGroup[]> {
-  const rows = await db.select().from(modifierGroups).orderBy(asc(modifierGroups.sortOrder), asc(modifierGroups.createdAt));
+export async function getModifierGroups(storeId: string): Promise<ModifierGroup[]> {
+  const rows = await db.select().from(modifierGroups).where(eq(modifierGroups.storeId, storeId)).orderBy(asc(modifierGroups.sortOrder), asc(modifierGroups.createdAt));
   return rows.map(map);
 }
 
 /** Chỉ nhóm đang bật (cho picker khi gọi món). */
-export async function getActiveModifierGroups(): Promise<ModifierGroup[]> {
-  const rows = await db.select().from(modifierGroups).where(eq(modifierGroups.isActive, true)).orderBy(asc(modifierGroups.sortOrder), asc(modifierGroups.createdAt));
+export async function getActiveModifierGroups(storeId: string): Promise<ModifierGroup[]> {
+  const rows = await db.select().from(modifierGroups).where(and(eq(modifierGroups.storeId, storeId), eq(modifierGroups.isActive, true))).orderBy(asc(modifierGroups.sortOrder), asc(modifierGroups.createdAt));
   return rows.map(map);
 }

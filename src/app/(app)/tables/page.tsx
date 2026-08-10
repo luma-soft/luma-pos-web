@@ -40,8 +40,8 @@ export default async function TablesPage({ searchParams }: { searchParams: Promi
       </div>
 
       {tab === "modifiers"
-        ? <ModifiersManage groups={await getModifierGroups()} categories={(await getProductFormOptions(context.storeId)).categories} />
-        : <TablesFloor tables={await getTables()} canManage={canManage} />}
+        ? <ModifiersManage groups={await getModifierGroups(context.storeId)} categories={(await getProductFormOptions(context.storeId)).categories} />
+        : <TablesFloor tables={await getTables(context.storeId)} canManage={canManage} />}
     </div>
   );
 }

@@ -121,7 +121,7 @@ function buildCategoryTree(categories: ShopeeApiCategory[]): CategoryTreeNode[] 
   return roots;
 }
 
-async function getProductForListing(productId: string) {
+async function getProductForListing(storeId: string, productId: string) {
   const [product] = await db
     .select({
       id: products.id,
@@ -138,12 +138,13 @@ async function getProductForListing(productId: string) {
       brandName: sql<string | null>`(select name from brands where id = ${products.brandId} limit 1)`,
     })
     .from(products)
-    .where(eq(products.id, productId))
+    .where(and(eq(products.id, productId), eq(products.storeId, storeId)))
     .limit(1);
   return product ?? null;
 }
 
 async function enqueueShopeeJob(input: {
+  storeId: string;
   type: string;
   idempotencyKey: string;
   payload: Record<string, unknown>;
@@ -152,6 +153,7 @@ async function enqueueShopeeJob(input: {
 }) {
   await db.insert(marketplaceSyncJobs)
     .values({
+      storeId: input.storeId,
       provider: "shopee",
       shopId: input.shopId ?? null,
       jobType: input.type,
@@ -160,7 +162,7 @@ async function enqueueShopeeJob(input: {
       createdBy: input.userId,
     })
     .onConflictDoUpdate({
-      target: [marketplaceSyncJobs.provider, marketplaceSyncJobs.idempotencyKey],
+      target: [marketplaceSyncJobs.storeId, marketplaceSyncJobs.provider, marketplaceSyncJobs.idempotencyKey],
       set: {
         payload: input.payload,
         status: "pending",
@@ -175,6 +177,7 @@ export async function connectShopeeDemoShop(): Promise<ActionResult<{ shopId: st
   try {
     const [shop] = await db.insert(marketplaceShops)
       .values({
+        storeId: gate.storeId,
         provider: "shopee",
         shopId: `demo-${Date.now()}`,
         shopName: "Shopee Demo Shop",
@@ -187,6 +190,7 @@ export async function connectShopeeDemoShop(): Promise<ActionResult<{ shopId: st
       })
       .returning({ id: marketplaceShops.id });
     await db.insert(marketplaceTokens).values({
+      storeId: gate.storeId,
       shopId: shop.id,
       accessToken: "demo-access-token",
       refreshToken: "demo-refresh-token",
@@ -219,7 +223,7 @@ export async function disconnectShopeeShop(shopId: string): Promise<ActionResult
       status: "disconnected",
       disconnectedAt: new Date(),
       updatedAt: sql`now()`,
-    }).where(and(eq(marketplaceShops.id, shopId), eq(marketplaceShops.provider, "shopee")));
+    }).where(and(eq(marketplaceShops.id, shopId), eq(marketplaceShops.provider, "shopee"), eq(marketplaceShops.storeId, gate.storeId)));
     await writeAuditLog({
       actorUserId: gate.userId,
       source: "manual",
@@ -247,7 +251,7 @@ export async function updateMarketplaceShopSyncPolicy(input: MarketplaceShopSync
     const [shop] = await db
       .select({ id: marketplaceShops.id, provider: marketplaceShops.provider, metadata: marketplaceShops.metadata })
       .from(marketplaceShops)
-      .where(eq(marketplaceShops.id, v.shopId))
+      .where(and(eq(marketplaceShops.id, v.shopId), eq(marketplaceShops.storeId, gate.storeId)))
       .limit(1);
     if (!shop) return { ok: false, error: "marketplace.errors.shopNotFound" };
 
@@ -268,7 +272,7 @@ export async function updateMarketplaceShopSyncPolicy(input: MarketplaceShopSync
     await db.update(marketplaceShops).set({
       metadata: { ...currentMetadata, syncPolicy },
       updatedAt: sql`now()`,
-    }).where(eq(marketplaceShops.id, v.shopId));
+    }).where(and(eq(marketplaceShops.id, v.shopId), eq(marketplaceShops.storeId, gate.storeId)));
     await writeAuditLog({
       actorUserId: gate.userId,
       source: "manual",
@@ -292,7 +296,7 @@ export async function loadShopeeCategoryTree(): Promise<ActionResult<{ tree: Cat
   const gate = await requireManager();
   if (!gate.ok) return gate;
   try {
-    const categories = await getShopeeCategories();
+    const categories = await getShopeeCategories(gate.storeId);
     return { ok: true, data: { tree: buildCategoryTree(categories) } };
   } catch (e) {
     console.error("loadShopeeCategoryTree failed:", e);
@@ -306,7 +310,7 @@ export async function loadShopeeCategoryAttributes(categoryId: string): Promise<
   const id = categoryId.trim();
   if (!id) return { ok: false, error: "errors.invalidData" };
   try {
-    const attributes = await getShopeeAttributes(id);
+    const attributes = await getShopeeAttributes(gate.storeId, id);
     return { ok: true, data: { attributes } };
   } catch (e) {
     console.error("loadShopeeCategoryAttributes failed:", e);
@@ -318,7 +322,7 @@ export async function loadShopeeLogisticsChannels(): Promise<ActionResult<{ chan
   const gate = await requireManager();
   if (!gate.ok) return gate;
   try {
-    const channels = await getShopeeLogisticsChannels();
+    const channels = await getShopeeLogisticsChannels(gate.storeId);
     return { ok: true, data: { channels } };
   } catch (e) {
     console.error("loadShopeeLogisticsChannels failed:", e);
@@ -331,12 +335,12 @@ export async function generateShopeeListingAiFill(input: AiListingFillInput): Pr
   if (!gate.ok) return gate;
   const parsed = aiListingFillSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
-  const product = await getProductForListing(parsed.data.productId);
+  const product = await getProductForListing(gate.storeId, parsed.data.productId);
   if (!product) return { ok: false, error: "products.errors.notFound" };
 
   const fallback = fallbackListingSuggestion(product);
   try {
-    const charge = await consumeAiUsage(1);
+    const charge = await consumeAiUsage(gate.storeId, 1);
     if (!charge.ok) return { ok: false, error: "ai.errors.usageLimitExceeded" };
     const config = await loadAiProviderConfig();
     const response = await completeAiText({
@@ -370,7 +374,7 @@ export async function generateShopeeListingAiFill(input: AiListingFillInput): Pr
       ],
     });
     if (response.tokenUsage) {
-      await recordAiTokenUsage(response.tokenUsage, undefined, {
+      await recordAiTokenUsage(gate.storeId, response.tokenUsage, undefined, {
         provider: config.provider,
         actionType: "shopee_listing_autofill",
         surface: "web",
@@ -381,6 +385,7 @@ export async function generateShopeeListingAiFill(input: AiListingFillInput): Pr
     const parsedJson = parseJsonText(response.text);
     const suggestion = parsedJson && typeof parsedJson === "object" ? parsedJson as Record<string, unknown> : fallback;
     const [row] = await db.insert(aiListingSuggestions).values({
+      storeId: gate.storeId,
       provider: "shopee",
       productId: product.id,
       mappingId: parsed.data.mappingId,
@@ -393,6 +398,7 @@ export async function generateShopeeListingAiFill(input: AiListingFillInput): Pr
   } catch (e) {
     console.error("generateShopeeListingAiFill failed:", e);
     const [row] = await db.insert(aiListingSuggestions).values({
+      storeId: gate.storeId,
       provider: "shopee",
       productId: product.id,
       mappingId: parsed.data.mappingId,
@@ -415,6 +421,7 @@ export async function saveShopeeListingDraft(input: ShopeeListingDraftInput): Pr
     const payload = { ...v, provider: "shopee", updatedBy: gate.userId };
     const [row] = await db.insert(marketplaceProductMappings)
       .values({
+        storeId: gate.storeId,
         provider: "shopee",
         shopId: v.shopId ?? null,
         productId: v.productId,
@@ -432,7 +439,7 @@ export async function saveShopeeListingDraft(input: ShopeeListingDraftInput): Pr
         createdBy: gate.userId,
       })
       .onConflictDoUpdate({
-        target: [marketplaceProductMappings.provider, marketplaceProductMappings.productId],
+        target: [marketplaceProductMappings.storeId, marketplaceProductMappings.provider, marketplaceProductMappings.productId],
         set: {
           shopId: v.shopId ?? null,
           externalSku: v.sku,
@@ -451,9 +458,10 @@ export async function saveShopeeListingDraft(input: ShopeeListingDraftInput): Pr
       })
       .returning({ id: marketplaceProductMappings.id });
     if (v.aiSuggestionId) {
-      await db.update(aiListingSuggestions).set({ mappingId: row.id, editedFields: v.editedFields }).where(eq(aiListingSuggestions.id, v.aiSuggestionId));
+      await db.update(aiListingSuggestions).set({ mappingId: row.id, editedFields: v.editedFields }).where(and(eq(aiListingSuggestions.id, v.aiSuggestionId), eq(aiListingSuggestions.storeId, gate.storeId)));
     }
     await enqueueShopeeJob({
+      storeId: gate.storeId,
       type: v.action === "draft" ? "listing_draft_saved" : "listing_validate",
       idempotencyKey: `shopee:listing:${v.productId}:${v.action}`,
       payload,
@@ -487,8 +495,9 @@ export async function publishShopeeListing(input: ShopeeListingDraftInput): Prom
       lastSyncAt: new Date(),
       lastError: null,
       updatedAt: sql`now()`,
-    }).where(eq(marketplaceProductMappings.id, saved.data.mappingId));
+    }).where(and(eq(marketplaceProductMappings.id, saved.data.mappingId), eq(marketplaceProductMappings.storeId, gate.storeId)));
     await enqueueShopeeJob({
+      storeId: gate.storeId,
       type: "listing_publish",
       idempotencyKey: `shopee:publish:${saved.data.mappingId}`,
       payload: { ...v, mappingId: saved.data.mappingId, externalItemId },
@@ -517,8 +526,9 @@ export async function unpublishShopeeListing(mappingId: string): Promise<ActionR
   const gate = await requireManager();
   if (!gate.ok) return gate;
   try {
-    await db.update(marketplaceProductMappings).set({ status: "unlisted", updatedAt: sql`now()` }).where(eq(marketplaceProductMappings.id, mappingId));
+    await db.update(marketplaceProductMappings).set({ status: "unlisted", updatedAt: sql`now()` }).where(and(eq(marketplaceProductMappings.id, mappingId), eq(marketplaceProductMappings.storeId, gate.storeId)));
     await enqueueShopeeJob({
+      storeId: gate.storeId,
       type: "listing_unpublish",
       idempotencyKey: `shopee:unpublish:${mappingId}`,
       payload: { mappingId },
@@ -544,11 +554,11 @@ export async function importShopeeOrder(input: ImportShopeeOrderInput): Promise<
       .select({ orderId: marketplaceOrderMappings.orderId, code: orders.code })
       .from(marketplaceOrderMappings)
       .leftJoin(orders, eq(orders.id, marketplaceOrderMappings.orderId))
-      .where(and(eq(marketplaceOrderMappings.provider, "shopee"), eq(marketplaceOrderMappings.externalOrderSn, v.orderSn)))
+      .where(and(eq(marketplaceOrderMappings.storeId, gate.storeId), eq(marketplaceOrderMappings.provider, "shopee"), eq(marketplaceOrderMappings.externalOrderSn, v.orderSn)))
       .limit(1);
     if (existing?.orderId && existing.code) return { ok: true, data: { orderId: existing.orderId, code: existing.code, duplicate: true } };
 
-    const [warehouse] = await db.select({ id: warehouses.id }).from(warehouses).orderBy(sql`${warehouses.isDefault} desc`, warehouses.createdAt).limit(1);
+    const [warehouse] = await db.select({ id: warehouses.id }).from(warehouses).where(eq(warehouses.storeId, gate.storeId)).orderBy(sql`${warehouses.isDefault} desc`, warehouses.createdAt).limit(1);
     if (!warehouse) return { ok: false, error: "warehouse.errors.notFound" };
 
     const subtotal = v.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
@@ -556,11 +566,12 @@ export async function importShopeeOrder(input: ImportShopeeOrderInput): Promise<
     const result = await db.transaction(async (tx) => {
       let customerId: string | null = null;
       if (v.buyerPhone) {
-        const [existingCustomer] = await tx.select({ id: customers.id }).from(customers).where(eq(customers.phone, v.buyerPhone)).limit(1);
+        const [existingCustomer] = await tx.select({ id: customers.id }).from(customers).where(and(eq(customers.storeId, gate.storeId), eq(customers.phone, v.buyerPhone))).limit(1);
         if (existingCustomer) customerId = existingCustomer.id;
       }
       if (!customerId) {
         const [customer] = await tx.insert(customers).values({
+          storeId: gate.storeId,
           code: generateCode("KH"),
           name: v.buyerName || "Shopee customer",
           phone: v.buyerPhone || null,
@@ -572,6 +583,7 @@ export async function importShopeeOrder(input: ImportShopeeOrderInput): Promise<
       }
       const isCancelled = v.status.toLowerCase().includes("cancel");
       const [order] = await tx.insert(orders).values({
+        storeId: gate.storeId,
         code: generateCode("SHP"),
         documentType: "sale",
         status: isCancelled ? "cancelled" : "completed",
@@ -588,6 +600,7 @@ export async function importShopeeOrder(input: ImportShopeeOrderInput): Promise<
         createdBy: gate.userId,
       }).returning({ id: orders.id, code: orders.code });
       await tx.insert(orderItems).values(v.items.map((item) => ({
+        storeId: gate.storeId,
         orderId: order.id,
         productId: item.productId,
         productName: item.name,
@@ -608,14 +621,16 @@ export async function importShopeeOrder(input: ImportShopeeOrderInput): Promise<
           createdBy: gate.userId,
         });
         await tx.insert(stockLevels).values({
+          storeId: gate.storeId,
           productId: item.productId,
           warehouseId: warehouse.id,
           quantity: toQty(-item.quantity),
         }).onConflictDoUpdate({
-          target: [stockLevels.productId, stockLevels.warehouseId],
+          target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
           set: { quantity: sql`${stockLevels.quantity} - ${toQty(item.quantity)}`, updatedAt: sql`now()` },
         });
         await tx.insert(stockMovements).values({
+          storeId: gate.storeId,
           productId: item.productId,
           warehouseId: warehouse.id,
           type: "sale",
@@ -627,6 +642,7 @@ export async function importShopeeOrder(input: ImportShopeeOrderInput): Promise<
         });
       }
       await tx.insert(marketplaceOrderMappings).values({
+        storeId: gate.storeId,
         provider: "shopee",
         shopId: v.shopId ?? null,
         orderId: order.id,
@@ -637,6 +653,7 @@ export async function importShopeeOrder(input: ImportShopeeOrderInput): Promise<
       const notification = isCancelled
         ? null
         : await createNotificationEventInTx(tx, {
+            storeId: gate.storeId,
             eventKey: `invoice-created:${order.id}`,
             category: "invoiceCreated",
             entityType: "order",
@@ -676,14 +693,16 @@ export async function sendMarketplaceMessage(input: SendMarketplaceMessageInput)
   const v = parsed.data;
   try {
     await db.insert(marketplaceMessages).values({
+      storeId: gate.storeId,
       threadId: v.threadId,
       direction: "out",
       body: v.body,
       sentBy: gate.userId,
       rawPayload: { status: "queued" },
     });
-    await db.update(marketplaceMessageThreads).set({ lastMessageAt: new Date(), updatedAt: sql`now()` }).where(eq(marketplaceMessageThreads.id, v.threadId));
+    await db.update(marketplaceMessageThreads).set({ lastMessageAt: new Date(), updatedAt: sql`now()` }).where(and(eq(marketplaceMessageThreads.id, v.threadId), eq(marketplaceMessageThreads.storeId, gate.storeId)));
     await enqueueShopeeJob({
+      storeId: gate.storeId,
       type: "message_send",
       idempotencyKey: `shopee:message:${v.threadId}:${Date.now()}`,
       payload: { threadId: v.threadId, body: v.body },

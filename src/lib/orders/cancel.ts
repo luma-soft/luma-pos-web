@@ -134,6 +134,7 @@ export async function cancelOrderForUser(
           })
           .where(eq(customers.id, order.customerId));
         debtNotification = await createDebtChangedEventInTx(tx, {
+          storeId: order.storeId,
           entityType: "customer",
           entityId: order.customerId,
           operationType: "order_cancel",

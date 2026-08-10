@@ -10,5 +10,5 @@ export async function POST(request: Request) {
   const input = body as Record<string, unknown>;
   const sourceId = typeof input.sourceId === "string" ? input.sourceId : "";
   const targetId = typeof input.targetId === "string" ? input.targetId : "";
-  return mobileAction(await moveTableForUser(sourceId, targetId));
+  return mobileAction(await moveTableForUser(gate.storeId, sourceId, targetId));
 }

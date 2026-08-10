@@ -266,7 +266,7 @@ export async function getPosData(storeId: string, options?: {
         endsAt: promotions.endsAt,
       })
       .from(promotions)
-      .where(eq(promotions.isActive, true)),
+      .where(and(eq(promotions.storeId, storeId), eq(promotions.isActive, true))),
     db
       .select({ id: projects.id, name: projects.name, customerId: projects.customerId })
       .from(projects)

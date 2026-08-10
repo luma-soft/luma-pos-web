@@ -152,6 +152,7 @@ export async function collectCustomerReceivable(
       await tx.update(customers).set({ currentDebt: sql`${customers.currentDebt} - ${amount.toFixed(2)}` })
         .where(and(eq(customers.storeId, actor.storeId), eq(customers.id, input.customerId)));
       const notification = await createDebtChangedEventInTx(tx, {
+        storeId: actor.storeId,
         entityType: "customer", entityId: input.customerId, operationType: "receivable_collection",
         operationId: receipt.id, delta: -amount, actorId: actor.profileId,
       });
@@ -195,6 +196,7 @@ export async function createCustomerReceivableEntry(
       await tx.update(customers).set({ currentDebt: sql`${customers.currentDebt} + ${amount.toFixed(2)}` })
         .where(and(eq(customers.storeId, actor.storeId), eq(customers.id, input.customerId)));
       const notification = await createDebtChangedEventInTx(tx, {
+        storeId: actor.storeId,
         entityType: "customer", entityId: input.customerId, operationType: input.type,
         operationId: entry.id, delta: amount, actorId: actor.profileId,
       });

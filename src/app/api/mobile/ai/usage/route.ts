@@ -8,7 +8,8 @@ export async function GET() {
   const gate = await requireMobileRole(MOBILE_AI_ADMIN_ROLES);
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
   const aiBlocked = await requireAiProviderConfigured();
   if (aiBlocked) return aiBlocked;
-  return mobileOk(await getAiUsageStatus());
+  return mobileOk(await getAiUsageStatus(gate.storeId));
 }

@@ -113,7 +113,7 @@ export async function POST(request: Request) {
     body && typeof body === "object" && Array.isArray((body as { attachments?: unknown }).attachments)
       ? ((body as { attachments: unknown[] }).attachments.filter((item): item is AiAttachmentMetadata => Boolean(item && typeof item === "object")))
       : [];
-  const usage = await consumeAiUsage(1 + attachments.slice(0, 4).length);
+  const usage = await consumeAiUsage(gate.storeId, 1 + attachments.slice(0, 4).length);
   if (!usage.ok) {
     await writeAuditLog({
       actorUserId: gate.userId,
@@ -132,7 +132,7 @@ export async function POST(request: Request) {
     return mobileError("ai.usage.exhausted", 402);
   }
   const providerConfig = await loadAiProviderConfig(gate.storeId).catch(() => null);
-  await recordAiUsageEvent({
+  await recordAiUsageEvent(gate.storeId, {
     provider: providerConfig?.provider,
     model: providerConfig?.textModel,
     actionType: "assistant_request",
@@ -154,7 +154,7 @@ export async function POST(request: Request) {
     : [];
   for (const item of parsedAttachments) {
     if (item.tokenUsage) {
-      usage.usage = await recordAiTokenUsage(item.tokenUsage, undefined, {
+      usage.usage = await recordAiTokenUsage(gate.storeId, item.tokenUsage, undefined, {
         provider: item.provider,
         surface,
         actionType: "attachment_parse",
@@ -165,7 +165,7 @@ export async function POST(request: Request) {
         },
       });
     } else if (item.provider !== "none") {
-      await recordAiUsageEvent({
+      await recordAiUsageEvent(gate.storeId, {
         provider: item.provider,
         actionType: "attachment_parse",
         eventType: "token_usage",
@@ -228,14 +228,14 @@ export async function POST(request: Request) {
         },
       });
   if (toolLoop.tokenUsage) {
-    usage.usage = await recordAiTokenUsage(toolLoop.tokenUsage, undefined, {
+    usage.usage = await recordAiTokenUsage(gate.storeId, toolLoop.tokenUsage, undefined, {
       provider: providerConfig?.provider,
       surface,
       actionType: "tool_loop",
       metadata: { traceCount: toolLoop.trace.length },
     });
   } else if (providerConfig?.apiKey) {
-    await recordAiUsageEvent({
+    await recordAiUsageEvent(gate.storeId, {
       provider: providerConfig.provider,
       model: providerConfig.textModel,
       actionType: "tool_loop",
@@ -261,6 +261,7 @@ export async function POST(request: Request) {
     };
   } else {
     response = await buildAiAssistantResponse({
+      storeId: gate.storeId,
       prompt: enrichedPrompt,
       revenue: reports.summary.revenue,
       collected: reports.summary.collected,

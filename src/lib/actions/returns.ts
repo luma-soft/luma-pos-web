@@ -543,6 +543,7 @@ export async function createExchangeForUser(
       }
 
       const notification = await createNotificationEventInTx(tx, {
+        storeId,
         eventKey: `invoice-created:${exchangeOrder.id}`,
         category: "invoiceCreated",
         entityType: "order",
@@ -855,6 +856,7 @@ export async function createReturnForUser(
 
       const debtNotification = order.customerId && v.refundMethod === "debt_deduct"
         ? await createDebtChangedEventInTx(tx, {
+            storeId,
             entityType: "customer",
             entityId: order.customerId,
             operationType: "sale_return",
@@ -1034,6 +1036,7 @@ export async function cancelReturn(returnId: string): Promise<ActionResult> {
         }).where(and(eq(customers.storeId, gate.storeId), eq(customers.id, ret.customerId)));
         if (ret.refundMethod === "debt_deduct") {
           debtNotification = await createDebtChangedEventInTx(tx, {
+            storeId: gate.storeId,
             entityType: "customer",
             entityId: ret.customerId,
             operationType: "sale_return_cancel",
@@ -1303,6 +1306,7 @@ export async function createPosReturn(
 
       const debtNotification = customerId && v.refundMethod === "debt_deduct"
         ? await createDebtChangedEventInTx(tx, {
+            storeId: gate.storeId,
             entityType: "customer",
             entityId: customerId,
             operationType: "sale_return",

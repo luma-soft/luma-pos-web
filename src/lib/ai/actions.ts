@@ -2502,6 +2502,7 @@ function stripActionPresetMarker(prompt: string) {
 }
 
 export async function buildAiAssistantResponse(input: {
+  storeId: string;
   prompt: string;
   revenue: unknown;
   collected: unknown;
@@ -2522,7 +2523,7 @@ export async function buildAiAssistantResponse(input: {
     hasAttachments: Boolean(input.parsedAttachments?.length),
   });
   if (planner.ok && planner.tokenUsage) {
-    await recordAiTokenUsage(planner.tokenUsage, undefined, {
+    await recordAiTokenUsage(input.storeId, planner.tokenUsage, undefined, {
       surface: input.surface ?? "web",
       actionType: "planner",
       metadata: {

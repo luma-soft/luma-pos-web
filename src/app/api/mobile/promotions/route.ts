@@ -1,4 +1,4 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { products, promotions } from "@/db/schema";
 import { createPromotion } from "@/lib/actions/extras";
@@ -17,6 +17,7 @@ export async function GET() {
   const gate = await requireMobileSalesAccess();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const [rows, productOptions] = await Promise.all([
     db
@@ -32,7 +33,8 @@ export async function GET() {
         baseUnit: products.baseUnit,
       })
       .from(promotions)
-      .innerJoin(products, eq(promotions.productId, products.id))
+      .innerJoin(products, and(eq(promotions.productId, products.id), eq(products.storeId, gate.storeId)))
+      .where(eq(promotions.storeId, gate.storeId))
       .orderBy(desc(promotions.createdAt)),
     db
       .select({
@@ -42,7 +44,7 @@ export async function GET() {
         baseUnit: products.baseUnit,
       })
       .from(products)
-      .where(eq(products.isActive, true))
+      .where(and(eq(products.storeId, gate.storeId), eq(products.isActive, true)))
       .orderBy(asc(products.name))
       .limit(500),
   ]);

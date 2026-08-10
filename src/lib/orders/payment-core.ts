@@ -124,6 +124,7 @@ export async function addManualPaymentCore(
           })
           .where(and(eq(customers.storeId, actor.storeId), eq(customers.id, order.customerId)));
         notification = await createDebtChangedEventInTx(tx, {
+          storeId: actor.storeId,
           entityType: "customer",
           entityId: order.customerId,
           operationType: "manual_payment",

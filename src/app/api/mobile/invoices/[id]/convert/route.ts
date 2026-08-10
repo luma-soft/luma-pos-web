@@ -10,5 +10,5 @@ export async function POST(
   if (!gate.ok) return mobileGate(gate)!;
 
   const { id } = await params;
-  return mobileAction(await convertQuoteToOrderForUser(gate.userId, id));
+  return mobileAction(await convertQuoteToOrderForUser(gate.userId, gate.storeId, id));
 }

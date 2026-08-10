@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getShopeeSettings } from "@/lib/data/settings";
 import { Routes } from "@/lib/routes";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { createShopeeCallbackState } from "@/lib/shopee/callback-state";
 
 function baseUrl(environment: string) {
   return environment === "production" ? "https://partner.shopeemobile.com" : "https://partner.test-stable.shopeemobile.com";
@@ -26,7 +27,9 @@ export async function GET(req: Request) {
     return NextResponse.redirect(target);
   }
   const origin = `${url.protocol}//${url.host}`;
-  const redirect = `${origin}${settings.redirectPath || "/api/shopee/callback"}`;
+  const callback = new URL(settings.redirectPath || "/api/shopee/callback", origin);
+  callback.searchParams.set("state", createShopeeCallbackState(context.storeId, settings.partnerKey));
+  const redirect = callback.toString();
   const timestamp = Math.floor(Date.now() / 1000);
   const path = "/api/v2/shop/auth_partner";
   const base = `${partnerId}${path}${timestamp}`;

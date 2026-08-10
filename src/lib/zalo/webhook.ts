@@ -56,9 +56,10 @@ function summarizeWebhookEvent(event: ZaloWebhookEvent) {
   };
 }
 
-export async function logZaloWebhookEvent(event: ZaloWebhookEvent) {
+export async function logZaloWebhookEvent(storeId: string, event: ZaloWebhookEvent) {
   const summary = summarizeWebhookEvent(event);
   await db.insert(zaloMessageEvents).values({
+    storeId,
     kind: summary.eventName,
     status: "received",
     zaloMessageId: summary.messageId,

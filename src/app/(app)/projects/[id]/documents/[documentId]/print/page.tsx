@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { Routes } from "@/lib/routes";
 import { formatDate } from "@/lib/utils";
 import { getProjectDetail } from "@/lib/data/projects";
+import { requireStoreContext } from "@/lib/auth/store-context";
 import { AutoPrint } from "@/components/print/auto-print";
 
 export default async function PrintServiceDocumentPage({
@@ -11,7 +12,8 @@ export default async function PrintServiceDocumentPage({
   params: Promise<{ id: string; documentId: string }>;
 }) {
   const { id, documentId } = await params;
-  const detail = await getProjectDetail(id);
+  const context = await requireStoreContext();
+  const detail = await getProjectDetail(context.storeId, id);
   const document = detail?.handoverDocuments.find((item) => item.id === documentId);
   if (!detail || !document) notFound();
   const t = await getTranslations();

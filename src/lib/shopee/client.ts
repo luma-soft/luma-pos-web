@@ -1,9 +1,8 @@
 import { createHmac } from "crypto";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { marketplaceShops, marketplaceTokens } from "@/db/schema";
 import { getShopeeSettings } from "@/lib/data/settings";
-import { CURRENT_STORE_ID } from "@/lib/tenancy/constants";
 
 type ShopeeSettings = Awaited<ReturnType<typeof getShopeeSettings>>;
 
@@ -107,7 +106,7 @@ async function shopeeFetch(settings: ShopeeSettings, path: string, params: URLSe
   return data;
 }
 
-async function getAuthorizedShop(shopUuid?: string): Promise<AuthorizedShop | null> {
+async function getAuthorizedShop(storeId: string, shopUuid?: string): Promise<AuthorizedShop | null> {
   const rows = await db
     .select({
       id: marketplaceShops.id,
@@ -119,7 +118,7 @@ async function getAuthorizedShop(shopUuid?: string): Promise<AuthorizedShop | nu
     })
     .from(marketplaceShops)
     .leftJoin(marketplaceTokens, eq(marketplaceTokens.shopId, marketplaceShops.id))
-    .where(eq(marketplaceShops.provider, "shopee"))
+    .where(and(eq(marketplaceShops.storeId, storeId), eq(marketplaceShops.provider, "shopee")))
     .orderBy(sql`${marketplaceShops.updatedAt} desc`)
     .limit(20);
 
@@ -139,8 +138,8 @@ function isDemoShop(shop: AuthorizedShop) {
   return shop.accessToken.startsWith("demo-") || shop.metadata?.mode === "demo";
 }
 
-export async function exchangeShopeeAuthorizationCode(input: { code: string; shopId: string }): Promise<ShopeeTokenResponse> {
-  const settings = await getShopeeSettings(CURRENT_STORE_ID);
+export async function exchangeShopeeAuthorizationCode(storeId: string, input: { code: string; shopId: string }): Promise<ShopeeTokenResponse> {
+  const settings = await getShopeeSettings(storeId);
   const path = "/api/v2/auth/token/get";
   const timestamp = Math.floor(Date.now() / 1000);
   const params = commonParams(settings, path, timestamp);
@@ -166,15 +165,15 @@ export async function exchangeShopeeAuthorizationCode(input: { code: string; sho
   };
 }
 
-async function getShopeeShopContext(shopUuid?: string) {
-  const settings = await getShopeeSettings(CURRENT_STORE_ID);
-  const shop = await getAuthorizedShop(shopUuid);
+async function getShopeeShopContext(storeId: string, shopUuid?: string) {
+  const settings = await getShopeeSettings(storeId);
+  const shop = await getAuthorizedShop(storeId, shopUuid);
   if (!shop) throw new Error("missing_shopee_shop_token");
   return { settings, shop };
 }
 
-async function getShopApi(path: string, requestParams: Record<string, string>, shopUuid?: string) {
-  const { settings, shop } = await getShopeeShopContext(shopUuid);
+async function getShopApi(storeId: string, path: string, requestParams: Record<string, string>, shopUuid?: string) {
+  const { settings, shop } = await getShopeeShopContext(storeId, shopUuid);
   const timestamp = Math.floor(Date.now() / 1000);
   const params = commonParams(settings, path, timestamp, shop.accessToken, shop.shopId);
   Object.entries(requestParams).forEach(([key, value]) => {
@@ -183,10 +182,10 @@ async function getShopApi(path: string, requestParams: Record<string, string>, s
   return shopeeFetch(settings, path, params);
 }
 
-export async function getShopeeCategories(shopUuid?: string): Promise<ShopeeApiCategory[]> {
-  const context = await getShopeeShopContext(shopUuid);
+export async function getShopeeCategories(storeId: string, shopUuid?: string): Promise<ShopeeApiCategory[]> {
+  const context = await getShopeeShopContext(storeId, shopUuid);
   if (isDemoShop(context.shop)) return DEMO_SHOPEE_CATEGORIES;
-  const data = await getShopApi("/api/v2/product/get_category", { language: "vi" }, shopUuid);
+  const data = await getShopApi(storeId, "/api/v2/product/get_category", { language: "vi" }, shopUuid);
   const response = data.response && typeof data.response === "object" ? data.response as Record<string, unknown> : data;
   const list = Array.isArray(response.category_list) ? response.category_list : [];
   return list.map((item) => {
@@ -201,10 +200,10 @@ export async function getShopeeCategories(shopUuid?: string): Promise<ShopeeApiC
   }).filter((category) => category.id && category.name);
 }
 
-export async function getShopeeAttributes(categoryId: string, shopUuid?: string): Promise<ShopeeApiAttribute[]> {
-  const context = await getShopeeShopContext(shopUuid);
+export async function getShopeeAttributes(storeId: string, categoryId: string, shopUuid?: string): Promise<ShopeeApiAttribute[]> {
+  const context = await getShopeeShopContext(storeId, shopUuid);
   if (isDemoShop(context.shop)) return DEMO_SHOPEE_ATTRIBUTES[categoryId] ?? DEMO_SHOPEE_ATTRIBUTES.default;
-  const data = await getShopApi("/api/v2/product/get_attribute_tree", { category_id: categoryId, language: "vi" }, shopUuid);
+  const data = await getShopApi(storeId, "/api/v2/product/get_attribute_tree", { category_id: categoryId, language: "vi" }, shopUuid);
   const response = data.response && typeof data.response === "object" ? data.response as Record<string, unknown> : data;
   const list = Array.isArray(response.attribute_list) ? response.attribute_list : [];
   return list.map((item) => {
@@ -225,10 +224,10 @@ export async function getShopeeAttributes(categoryId: string, shopUuid?: string)
   }).filter((attribute) => attribute.id && attribute.name);
 }
 
-export async function getShopeeLogisticsChannels(shopUuid?: string): Promise<ShopeeApiLogisticsChannel[]> {
-  const context = await getShopeeShopContext(shopUuid);
+export async function getShopeeLogisticsChannels(storeId: string, shopUuid?: string): Promise<ShopeeApiLogisticsChannel[]> {
+  const context = await getShopeeShopContext(storeId, shopUuid);
   if (isDemoShop(context.shop)) return DEMO_SHOPEE_LOGISTICS;
-  const data = await getShopApi("/api/v2/logistics/get_channel_list", {}, shopUuid);
+  const data = await getShopApi(storeId, "/api/v2/logistics/get_channel_list", {}, shopUuid);
   const response = data.response && typeof data.response === "object" ? data.response as Record<string, unknown> : data;
   const list = Array.isArray(response.logistics_channel_list) ? response.logistics_channel_list : [];
   return list.map((item) => {

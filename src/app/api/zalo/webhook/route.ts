@@ -1,7 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
-import { getZaloConfig } from "@/lib/zalo/config";
-import { CURRENT_STORE_ID } from "@/lib/tenancy/constants";
+import { getZaloConfig, resolveZaloWebhookStore } from "@/lib/zalo/config";
 import { logZaloWebhookEvent } from "@/lib/zalo/webhook";
 
 function safeCompareHex(expected: string, signature: string | null) {
@@ -40,13 +39,19 @@ function verifyLegacyHmacSignature(secret: string, body: string, signature: stri
 
 export async function POST(request: Request) {
   const body = await request.text();
-  const config = await getZaloConfig(CURRENT_STORE_ID);
   let event: Record<string, unknown>;
   try {
     event = JSON.parse(body || "{}") as Record<string, unknown>;
   } catch {
     return NextResponse.json({ ok: false, error: "errors.invalidData" }, { status: 400 });
   }
+  const storeId = await resolveZaloWebhookStore({
+    appId: readString(event.app_id) ?? readString(event.appId),
+    oaId: readString(event.oa_id) ?? readString(event.oaid)
+      ?? (event.recipient && typeof event.recipient === "object" ? readString((event.recipient as Record<string, unknown>).id) : null),
+  });
+  if (!storeId) return NextResponse.json({ ok: false, error: "errors.notFound" }, { status: 404 });
+  const config = await getZaloConfig(storeId);
   if (config.webhookSecret) {
     const zEventSignature = request.headers.get("x-zevent-signature");
     const zEventTimestamp = request.headers.get("x-zevent-timestamp");
@@ -56,7 +61,7 @@ export async function POST(request: Request) {
     if (!verified) return NextResponse.json({ ok: false, error: "errors.forbidden" }, { status: 403 });
   }
   try {
-    const summary = await logZaloWebhookEvent(event);
+    const summary = await logZaloWebhookEvent(storeId, event);
     return NextResponse.json({ ok: true, received: true, logged: true, event: summary.eventName });
   } catch (error) {
     console.error("logZaloWebhookEvent failed:", error);

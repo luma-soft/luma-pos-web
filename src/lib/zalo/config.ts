@@ -1,4 +1,8 @@
 import { getZaloSettings } from "@/lib/data/settings";
+import { db } from "@/db";
+import { storeSettings, stores } from "@/db/schema";
+import { and, eq, sql } from "drizzle-orm";
+import { parseStorePrefs } from "@/lib/schemas/settings";
 
 export type ZaloConfig = Awaited<ReturnType<typeof getZaloConfig>>;
 
@@ -14,6 +18,22 @@ export async function getZaloConfig(storeId: string) {
     oaReady,
     znsReady,
   };
+}
+
+export async function resolveZaloWebhookStore(input: { appId?: string | null; oaId?: string | null }) {
+  const appId = input.appId?.trim();
+  const oaId = input.oaId?.trim();
+  if (!appId && !oaId) return null;
+  const rows = await db.select({ storeId: storeSettings.storeId, prefs: storeSettings.prefs })
+    .from(storeSettings)
+    .innerJoin(stores, and(eq(stores.id, storeSettings.storeId), eq(stores.status, "active")))
+    .where(sql`(${storeSettings.prefs}->'zalo'->>'appId' = ${appId ?? ""} or ${storeSettings.prefs}->'zalo'->>'oaId' = ${oaId ?? ""})`)
+    .limit(2);
+  const matched = rows.filter((row) => {
+    const zalo = parseStorePrefs(row.prefs).zalo;
+    return Boolean((appId && zalo.appId === appId) || (oaId && zalo.oaId === oaId));
+  });
+  return matched.length === 1 ? matched[0].storeId : null;
 }
 
 export function publicZaloStatus(config: Awaited<ReturnType<typeof getZaloConfig>>) {

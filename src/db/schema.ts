@@ -176,6 +176,7 @@ export const mobileApprovals = pgTable("mobile_approvals", {
 // ============= General Audit Log =============
 
 export const auditLogs = pgTable("audit_logs", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   actorId: uuid("actor_id").references(() => profiles.id),
   actorNameSnapshot: text("actor_name_snapshot"),
@@ -201,6 +202,7 @@ export const auditLogs = pgTable("audit_logs", {
 // ============= AI Chat Sessions =============
 
 export const aiChatSessions = pgTable("ai_chat_sessions", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   ownerId: uuid("owner_id").references(() => profiles.id),
   surface: text("surface").notNull().default("web"),
@@ -215,6 +217,7 @@ export const aiChatSessions = pgTable("ai_chat_sessions", {
 ]);
 
 export const aiChatMessages = pgTable("ai_chat_messages", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   sessionId: uuid("session_id").notNull().references(() => aiChatSessions.id, { onDelete: "cascade" }),
   role: text("role").notNull(),
@@ -374,6 +377,7 @@ export const products = pgTable("products", {
 //   → 2 rows: { unit: "hộp", multiplier: 11 }, { unit: "m²", multiplier: 2.78 }
 
 export const productUnits = pgTable("product_units", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
   unitName: varchar("unit_name", { length: 30 }).notNull(), // hộp, m², thùng, pallet
@@ -491,6 +495,7 @@ export const customers = pgTable("customers", {
 // ============= Customer PDPL Consent =============
 
 export const customerConsents = pgTable("customer_consents", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   customerId: uuid("customer_id").primaryKey().references(() => customers.id, { onDelete: "cascade" }),
   status: customerConsentStatusEnum("status").notNull().default("pending"),
   purposes: jsonb("purposes").$type<Record<string, boolean>>().notNull().default({}),
@@ -502,6 +507,7 @@ export const customerConsents = pgTable("customer_consents", {
 });
 
 export const customerConsentEvents = pgTable("customer_consent_events", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   customerId: uuid("customer_id").notNull().references(() => customers.id, { onDelete: "cascade" }),
   status: customerConsentStatusEnum("status").notNull(),
@@ -515,6 +521,7 @@ export const customerConsentEvents = pgTable("customer_consent_events", {
 ]);
 
 export const mobileNotificationStates = pgTable("mobile_notification_states", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   notificationId: text("notification_id").notNull(),
@@ -526,6 +533,7 @@ export const mobileNotificationStates = pgTable("mobile_notification_states", {
 ]);
 
 export const mobilePushDevices = pgTable("mobile_push_devices", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   effectiveUserId: uuid("effective_user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
@@ -549,6 +557,7 @@ export const mobilePushDevices = pgTable("mobile_push_devices", {
 ]);
 
 export const mobilePushDeviceBindingFences = pgTable("mobile_push_device_binding_fences", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   deviceId: varchar("device_id", { length: 120 }).notNull(),
   bindingGeneration: bigint("binding_generation", { mode: "number" }).notNull().default(0),
@@ -559,6 +568,7 @@ export const mobilePushDeviceBindingFences = pgTable("mobile_push_device_binding
 ]);
 
 export const mobilePushDeliveries = pgTable("mobile_push_deliveries", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   deviceId: uuid("device_id").notNull().references(() => mobilePushDevices.id, { onDelete: "cascade" }),
   notificationKey: varchar("notification_key", { length: 180 }).notNull(),
@@ -577,8 +587,9 @@ export const mobilePushDeliveries = pgTable("mobile_push_deliveries", {
 ]);
 
 export const notificationEvents = pgTable("notification_events", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
-  eventKey: varchar("event_key", { length: 200 }).notNull().unique(),
+  eventKey: varchar("event_key", { length: 200 }).notNull(),
   category: varchar("category", { length: 40 }).notNull(),
   entityType: varchar("entity_type", { length: 40 }).notNull(),
   entityId: uuid("entity_id").notNull(),
@@ -591,10 +602,12 @@ export const notificationEvents = pgTable("notification_events", {
   occurredAt: timestamp("occurred_at", { withTimezone: true }).defaultNow().notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
+  uniqueIndex("notification_events_store_event_key_unique").on(t.storeId, t.eventKey),
   index("notification_events_category_created_idx").on(t.category, t.createdAt),
 ]);
 
 export const notificationRecipients = pgTable("notification_recipients", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   eventId: uuid("event_id").notNull().references(() => notificationEvents.id, { onDelete: "cascade" }),
   userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
@@ -608,6 +621,7 @@ export const notificationRecipients = pgTable("notification_recipients", {
 ]);
 
 export const notificationOutbox = pgTable("notification_outbox", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   eventId: uuid("event_id").notNull().unique().references(() => notificationEvents.id, { onDelete: "cascade" }),
   status: varchar("status", { length: 20 }).notNull().default("pending"),
@@ -627,6 +641,7 @@ export const notificationOutbox = pgTable("notification_outbox", {
 ]);
 
 export const mobileTelemetryEvents = pgTable("mobile_telemetry_events", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   eventType: varchar("event_type", { length: 32 }).notNull(),
@@ -868,6 +883,7 @@ export const customerReceivableEntries = pgTable("customer_receivable_entries", 
 ]);
 
 export const paymentWebhookEvents = pgTable("payment_webhook_events", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   provider: text("provider").notNull().default("sepay"),
   providerEventId: text("provider_event_id").notNull(),
@@ -1012,6 +1028,7 @@ export const stockLots = pgTable("stock_lots", {
 ]);
 
 export const stockLotMovements = pgTable("stock_lot_movements", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   stockLotId: uuid("stock_lot_id").notNull().references(() => stockLots.id, { onDelete: "cascade" }),
   quantity: decimal("quantity", { precision: 14, scale: 4 }).notNull(),
@@ -1181,6 +1198,7 @@ export const cashTransactions = pgTable("cash_transactions", {
 // ============= Công trình / dự án =============
 
 export const projects = pgTable("projects", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   customerId: uuid("customer_id").references(() => customers.id),
@@ -1200,9 +1218,10 @@ export const projects = pgTable("projects", {
 // ============= Thi công & dịch vụ =============
 
 export const serviceJobs = pgTable("service_jobs", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
-  code: varchar("code", { length: 30 }).notNull().unique(),
+  code: varchar("code", { length: 30 }).notNull(),
   serviceType: serviceTypeEnum("service_type").notNull(),
   title: text("title").notNull(),
   status: serviceJobStatusEnum("status").notNull().default("new"),
@@ -1222,6 +1241,7 @@ export const serviceJobs = pgTable("service_jobs", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
+  uniqueIndex("service_jobs_store_code_unique").on(t.storeId, t.code),
   check("service_jobs_version_check", sql`${t.version} > 0 and ${t.checklistVersion} > 0 and ${t.assetsVersion} > 0`),
   index("service_jobs_project_idx").on(t.projectId, t.createdAt),
   index("service_jobs_status_schedule_idx").on(t.status, t.scheduledAt),
@@ -1229,6 +1249,7 @@ export const serviceJobs = pgTable("service_jobs", {
 ]);
 
 export const serviceJobMaterials = pgTable("service_job_materials", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   jobId: uuid("job_id").notNull().references(() => serviceJobs.id, { onDelete: "cascade" }),
   productId: uuid("product_id").notNull().references(() => products.id),
@@ -1246,6 +1267,7 @@ export const serviceJobMaterials = pgTable("service_job_materials", {
 ]);
 
 export const serviceCostEntries = pgTable("service_cost_entries", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   jobId: uuid("job_id").references(() => serviceJobs.id, { onDelete: "set null" }),
@@ -1268,6 +1290,7 @@ export const serviceCostEntries = pgTable("service_cost_entries", {
 ]);
 
 export const serviceMaterialAllocations = pgTable("service_material_allocations", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   materialId: uuid("material_id").notNull().references(() => serviceJobMaterials.id, { onDelete: "cascade" }),
   warehouseId: uuid("warehouse_id").notNull().references(() => warehouses.id, { onDelete: "restrict" }),
@@ -1285,6 +1308,7 @@ export const serviceMaterialAllocations = pgTable("service_material_allocations"
 ]);
 
 export const serviceHandoverDocuments = pgTable("service_handover_documents", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   jobId: uuid("job_id").references(() => serviceJobs.id, { onDelete: "set null" }),
@@ -1305,6 +1329,7 @@ export const serviceHandoverDocuments = pgTable("service_handover_documents", {
 ]);
 
 export const serviceMaintenancePlans = pgTable("service_maintenance_plans", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   assetId: uuid("asset_id").references(() => installedAssets.id, { onDelete: "set null" }),
@@ -1327,6 +1352,7 @@ export const serviceMaintenancePlans = pgTable("service_maintenance_plans", {
 ]);
 
 export const installedAssets = pgTable("installed_assets", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   jobId: uuid("job_id").references(() => serviceJobs.id, { onDelete: "set null" }),
@@ -1356,6 +1382,7 @@ export const installedAssets = pgTable("installed_assets", {
 ]);
 
 export const warrantyClaims = pgTable("warranty_claims", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   jobId: uuid("job_id").references(() => serviceJobs.id, { onDelete: "set null" }),
@@ -1382,6 +1409,7 @@ export const warrantyClaims = pgTable("warranty_claims", {
 ]);
 
 export const warrantyClaimNotifications = pgTable("warranty_claim_notifications", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   claimId: uuid("claim_id").notNull().references(() => warrantyClaims.id, { onDelete: "cascade" }),
   recipientId: uuid("recipient_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
@@ -1405,6 +1433,7 @@ export const warrantyClaimNotifications = pgTable("warranty_claim_notifications"
 ]);
 
 export const serviceStatusLogs = pgTable("service_status_logs", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   jobId: uuid("job_id").notNull().references(() => serviceJobs.id, { onDelete: "cascade" }),
   fromStatus: serviceJobStatusEnum("from_status"),
@@ -1415,6 +1444,7 @@ export const serviceStatusLogs = pgTable("service_status_logs", {
 }, (t) => [index("service_status_logs_job_idx").on(t.jobId, t.createdAt)]);
 
 export const serviceJobAssignments = pgTable("service_job_assignments", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   jobId: uuid("job_id").notNull().references(() => serviceJobs.id, { onDelete: "cascade" }),
   profileId: uuid("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
@@ -1429,6 +1459,7 @@ export const serviceJobAssignments = pgTable("service_job_assignments", {
 ]);
 
 export const serviceVisits = pgTable("service_visits", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   jobId: uuid("job_id").notNull().references(() => serviceJobs.id, { onDelete: "cascade" }),
   profileId: uuid("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
@@ -1450,6 +1481,7 @@ export const serviceVisits = pgTable("service_visits", {
 ]);
 
 export const serviceTimeEntries = pgTable("service_time_entries", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   jobId: uuid("job_id").notNull().references(() => serviceJobs.id, { onDelete: "cascade" }),
   visitId: uuid("visit_id").references(() => serviceVisits.id, { onDelete: "set null" }),
@@ -1467,6 +1499,7 @@ export const serviceTimeEntries = pgTable("service_time_entries", {
 ]);
 
 export const serviceAttachments = pgTable("service_attachments", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   jobId: uuid("job_id").references(() => serviceJobs.id, { onDelete: "cascade" }),
@@ -1501,6 +1534,7 @@ export const serviceAttachments = pgTable("service_attachments", {
 ]);
 
 export const serviceSignatures = pgTable("service_signatures", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
   jobId: uuid("job_id").notNull().references(() => serviceJobs.id, { onDelete: "cascade" }),
@@ -1526,6 +1560,7 @@ export const serviceSignatures = pgTable("service_signatures", {
 ]);
 
 export const serviceJobEvents = pgTable("service_job_events", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   jobId: uuid("job_id").notNull().references(() => serviceJobs.id, { onDelete: "cascade" }),
   eventType: text("event_type").notNull(),
@@ -1535,6 +1570,7 @@ export const serviceJobEvents = pgTable("service_job_events", {
 }, (t) => [index("service_job_events_job_idx").on(t.jobId, t.createdAt)]);
 
 export const serviceFieldMutations = pgTable("service_field_mutations", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   clientMutationId: varchar("client_mutation_id", { length: 100 }).notNull(),
   actorId: uuid("actor_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
@@ -1549,6 +1585,7 @@ export const serviceFieldMutations = pgTable("service_field_mutations", {
 ]);
 
 export const serviceMaintenanceOccurrences = pgTable("service_maintenance_occurrences", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   planId: uuid("plan_id").notNull().references(() => serviceMaintenancePlans.id, { onDelete: "restrict" }),
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
@@ -1567,6 +1604,7 @@ export const serviceMaintenanceOccurrences = pgTable("service_maintenance_occurr
 ]);
 
 export const serviceSlaPolicies = pgTable("service_sla_policies", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   priority: serviceJobPriorityEnum("priority").notNull(),
@@ -1582,6 +1620,7 @@ export const serviceSlaPolicies = pgTable("service_sla_policies", {
 ]);
 
 export const serviceCustomerRequests = pgTable("service_customer_requests", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   code: varchar("code", { length: 30 }).notNull().unique(),
   projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
@@ -1613,6 +1652,7 @@ export const serviceCustomerRequests = pgTable("service_customer_requests", {
 ]);
 
 export const serviceCustomerRequestAttachments = pgTable("service_customer_request_attachments", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   requestId: uuid("request_id").notNull().references(() => serviceCustomerRequests.id, { onDelete: "cascade" }),
   bucket: text("bucket").notNull(),
@@ -1633,6 +1673,7 @@ export const serviceCustomerRequestAttachments = pgTable("service_customer_reque
 ]);
 
 export const serviceCustomerRequestStorageCleanup = pgTable("service_customer_request_storage_cleanup", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   requestId: uuid("request_id").references(() => serviceCustomerRequests.id, { onDelete: "set null" }),
   bucket: text("bucket").notNull(),
@@ -1650,6 +1691,7 @@ export const serviceCustomerRequestStorageCleanup = pgTable("service_customer_re
 ]);
 
 export const serviceCustomerRequestNotifications = pgTable("service_customer_request_notifications", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   requestId: uuid("request_id").notNull().references(() => serviceCustomerRequests.id, { onDelete: "cascade" }),
   recipientId: uuid("recipient_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
@@ -1662,6 +1704,7 @@ export const serviceCustomerRequestNotifications = pgTable("service_customer_req
 ]);
 
 export const servicePublicRateLimits = pgTable("service_public_rate_limits", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   bucketKey: varchar("bucket_key", { length: 160 }).notNull(),
   windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
   requestCount: integer("request_count").notNull().default(1),
@@ -1673,6 +1716,7 @@ export const servicePublicRateLimits = pgTable("service_public_rate_limits", {
 ]);
 
 export const cameraVendorConnections = pgTable("camera_vendor_connections", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   vendor: text("vendor").notNull(),
   name: text("name").notNull(),
@@ -1689,6 +1733,7 @@ export const cameraVendorConnections = pgTable("camera_vendor_connections", {
 ]);
 
 export const cameraDeviceLinks = pgTable("camera_device_links", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   connectionId: uuid("connection_id").notNull().references(() => cameraVendorConnections.id, { onDelete: "cascade" }),
   assetId: uuid("asset_id").notNull().references(() => installedAssets.id, { onDelete: "cascade" }),
@@ -1703,6 +1748,7 @@ export const cameraDeviceLinks = pgTable("camera_device_links", {
 ]);
 
 export const cameraHealthSnapshots = pgTable("camera_health_snapshots", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   deviceLinkId: uuid("device_link_id").notNull().references(() => cameraDeviceLinks.id, { onDelete: "cascade" }),
   online: boolean("online"),
@@ -1719,6 +1765,7 @@ export const cameraHealthSnapshots = pgTable("camera_health_snapshots", {
 ]);
 
 export const cameraDeviceAlerts = pgTable("camera_device_alerts", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   deviceLinkId: uuid("device_link_id").notNull().references(() => cameraDeviceLinks.id, { onDelete: "cascade" }),
   externalAlertId: text("external_alert_id").notNull(),
@@ -1735,6 +1782,7 @@ export const cameraDeviceAlerts = pgTable("camera_device_alerts", {
 ]);
 
 export const cameraSyncRuns = pgTable("camera_sync_runs", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   connectionId: uuid("connection_id").notNull().references(() => cameraVendorConnections.id, { onDelete: "cascade" }),
   status: text("status").notNull().default("running"),
@@ -1752,6 +1800,7 @@ export const cameraSyncRuns = pgTable("camera_sync_runs", {
 // ============= Khuyến mãi (bậc thang theo SL) =============
 
 export const promotions = pgTable("promotions", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
@@ -1768,8 +1817,9 @@ export const promotions = pgTable("promotions", {
 export const tripStatusEnum = pgEnum("trip_status", ["planned", "ongoing", "done"]);
 
 export const trips = pgTable("trips", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
-  code: varchar("code", { length: 30 }).notNull().unique(), // CX-
+  code: varchar("code", { length: 30 }).notNull(), // CX-
   vehicle: text("vehicle"),
   driver: text("driver"),
   status: tripStatusEnum("status").notNull().default("planned"),
@@ -1777,9 +1827,10 @@ export const trips = pgTable("trips", {
   note: text("note"),
   createdBy: uuid("created_by").references(() => profiles.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [uniqueIndex("trips_store_code_unique").on(t.storeId, t.code)]);
 
 export const tripStops = pgTable("trip_stops", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   tripId: uuid("trip_id").notNull().references(() => trips.id, { onDelete: "cascade" }),
   orderId: uuid("order_id").notNull().references(() => orders.id),
@@ -1800,6 +1851,7 @@ export const einvoiceStatusEnum = pgEnum("einvoice_status", [
 ]);
 
 export const einvoices = pgTable("einvoices", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   orderId: uuid("order_id").notNull().references(() => orders.id).unique(),
   status: einvoiceStatusEnum("status").notNull().default("draft"),
@@ -1945,6 +1997,7 @@ export const shifts = pgTable("shifts", {
 // ============= F&B dining tables (Part 18) =============
 
 export const diningTables = pgTable("dining_tables", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   zone: text("zone").notNull().default(""),
@@ -1958,6 +2011,7 @@ export const diningTables = pgTable("dining_tables", {
 // ============= F&B deep: modifiers + kitchen tickets (Part 18.2) =============
 
 export const modifierGroups = pgTable("modifier_groups", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(),
   multi: boolean("multi").notNull().default(false),
@@ -1970,6 +2024,7 @@ export const modifierGroups = pgTable("modifier_groups", {
 });
 
 export const kitchenTickets = pgTable("kitchen_tickets", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   tableId: uuid("table_id").references(() => diningTables.id, { onDelete: "set null" }),
   tableName: text("table_name").notNull().default(""),
@@ -1980,6 +2035,7 @@ export const kitchenTickets = pgTable("kitchen_tickets", {
 }, (t) => [index("kitchen_tickets_status_idx").on(t.status, t.createdAt)]);
 
 export const kitchenTicketItems = pgTable("kitchen_ticket_items", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   ticketId: uuid("ticket_id").notNull().references(() => kitchenTickets.id, { onDelete: "cascade" }),
   productId: uuid("product_id"),
@@ -2019,7 +2075,8 @@ export const storeSettings = pgTable("store_settings", {
 // ============= AI Usage (monthly quota) =============
 
 export const aiUsageCounters = pgTable("ai_usage_counters", {
-  period: varchar("period", { length: 7 }).primaryKey(), // YYYY-MM
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
+  period: varchar("period", { length: 7 }).notNull(), // YYYY-MM
   usedUnits: integer("used_units").notNull().default(0),
   limitUnits: integer("limit_units").notNull().default(1000),
   inputTokens: integer("input_tokens").notNull().default(0),
@@ -2027,9 +2084,10 @@ export const aiUsageCounters = pgTable("ai_usage_counters", {
   totalTokens: integer("total_tokens").notNull().default(0),
   estimatedCostMicrousd: integer("estimated_cost_microusd").notNull().default(0),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [primaryKey({ columns: [t.storeId, t.period] })]);
 
 export const aiUsageEvents = pgTable("ai_usage_events", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   period: varchar("period", { length: 7 }).notNull(),
   provider: text("provider"),
@@ -2053,6 +2111,7 @@ export const aiUsageEvents = pgTable("ai_usage_events", {
 // ============= Zalo OA / ZNS message log =============
 
 export const zaloMessageEvents = pgTable("zalo_message_events", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   kind: text("kind").notNull(),
   status: text("status").notNull().default("pending"),
@@ -2076,6 +2135,7 @@ export const zaloMessageEvents = pgTable("zalo_message_events", {
 // ============= Marketplace integrations (Shopee first) =============
 
 export const marketplaceShops = pgTable("marketplace_shops", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   provider: text("provider").notNull().default("shopee"),
   shopId: text("shop_id").notNull(),
@@ -2092,11 +2152,12 @@ export const marketplaceShops = pgTable("marketplace_shops", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
-  uniqueIndex("marketplace_shops_provider_shop_idx").on(t.provider, t.shopId),
-  index("marketplace_shops_provider_status_idx").on(t.provider, t.status),
+  uniqueIndex("marketplace_shops_store_provider_shop_idx").on(t.storeId, t.provider, t.shopId),
+  index("marketplace_shops_store_provider_status_idx").on(t.storeId, t.provider, t.status),
 ]);
 
 export const marketplaceTokens = pgTable("marketplace_tokens", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   shopId: uuid("shop_id").notNull().references(() => marketplaceShops.id, { onDelete: "cascade" }),
   accessToken: text("access_token"),
@@ -2110,6 +2171,7 @@ export const marketplaceTokens = pgTable("marketplace_tokens", {
 ]);
 
 export const marketplaceProductMappings = pgTable("marketplace_product_mappings", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   provider: text("provider").notNull().default("shopee"),
   shopId: uuid("shop_id").references(() => marketplaceShops.id, { onDelete: "set null" }),
@@ -2135,12 +2197,13 @@ export const marketplaceProductMappings = pgTable("marketplace_product_mappings"
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
-  uniqueIndex("marketplace_product_mappings_provider_product_idx").on(t.provider, t.productId),
-  uniqueIndex("marketplace_product_mappings_external_idx").on(t.provider, t.externalItemId),
-  index("marketplace_product_mappings_status_idx").on(t.provider, t.status),
+  uniqueIndex("marketplace_product_mappings_store_product_idx").on(t.storeId, t.provider, t.productId),
+  uniqueIndex("marketplace_product_mappings_store_external_idx").on(t.storeId, t.provider, t.externalItemId),
+  index("marketplace_product_mappings_store_status_idx").on(t.storeId, t.provider, t.status),
 ]);
 
 export const marketplaceOrderMappings = pgTable("marketplace_order_mappings", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   provider: text("provider").notNull().default("shopee"),
   shopId: uuid("shop_id").references(() => marketplaceShops.id, { onDelete: "set null" }),
@@ -2151,11 +2214,12 @@ export const marketplaceOrderMappings = pgTable("marketplace_order_mappings", {
   importedAt: timestamp("imported_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
-  uniqueIndex("marketplace_order_mappings_provider_order_idx").on(t.provider, t.externalOrderSn),
-  index("marketplace_order_mappings_luma_order_idx").on(t.orderId),
+  uniqueIndex("marketplace_order_mappings_store_order_idx").on(t.storeId, t.provider, t.externalOrderSn),
+  index("marketplace_order_mappings_store_luma_order_idx").on(t.storeId, t.orderId),
 ]);
 
 export const marketplaceMessageThreads = pgTable("marketplace_message_threads", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   provider: text("provider").notNull().default("shopee"),
   shopId: uuid("shop_id").references(() => marketplaceShops.id, { onDelete: "set null" }),
@@ -2170,11 +2234,12 @@ export const marketplaceMessageThreads = pgTable("marketplace_message_threads", 
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
-  uniqueIndex("marketplace_message_threads_provider_thread_idx").on(t.provider, t.externalThreadId),
-  index("marketplace_message_threads_last_idx").on(t.provider, t.lastMessageAt),
+  uniqueIndex("marketplace_message_threads_store_thread_idx").on(t.storeId, t.provider, t.externalThreadId),
+  index("marketplace_message_threads_store_last_idx").on(t.storeId, t.provider, t.lastMessageAt),
 ]);
 
 export const marketplaceMessages = pgTable("marketplace_messages", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   threadId: uuid("thread_id").notNull().references(() => marketplaceMessageThreads.id, { onDelete: "cascade" }),
   externalMessageId: text("external_message_id"),
@@ -2190,6 +2255,7 @@ export const marketplaceMessages = pgTable("marketplace_messages", {
 ]);
 
 export const marketplaceSyncJobs = pgTable("marketplace_sync_jobs", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   provider: text("provider").notNull().default("shopee"),
   shopId: uuid("shop_id").references(() => marketplaceShops.id, { onDelete: "set null" }),
@@ -2205,11 +2271,12 @@ export const marketplaceSyncJobs = pgTable("marketplace_sync_jobs", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
-  uniqueIndex("marketplace_sync_jobs_idempotency_idx").on(t.provider, t.idempotencyKey),
-  index("marketplace_sync_jobs_status_idx").on(t.provider, t.status, t.nextRunAt),
+  uniqueIndex("marketplace_sync_jobs_store_idempotency_idx").on(t.storeId, t.provider, t.idempotencyKey),
+  index("marketplace_sync_jobs_store_status_idx").on(t.storeId, t.provider, t.status, t.nextRunAt),
 ]);
 
 export const aiListingSuggestions = pgTable("ai_listing_suggestions", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   provider: text("provider").notNull().default("shopee"),
   productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),

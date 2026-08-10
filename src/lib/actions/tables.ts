@@ -20,6 +20,7 @@ import {
   tableCheckoutClientId,
 } from "@/lib/tables/authoritative-cart";
 import { type ActionResult, requireUser, requireManager, getProfileId, toQty } from "./common";
+import { requireStoreContext, resolveStoreContextForUser } from "@/lib/auth/store-context";
 
 type Method = "cash" | "bank_transfer" | "credit";
 
@@ -40,6 +41,7 @@ function isTableCartDataError(error: unknown) {
 }
 
 async function authoritativeTableCart(
+  storeId: string,
   items: TableCartItem[],
   lockedSentLineIds: ReadonlySet<string>,
 ) {
@@ -57,7 +59,7 @@ async function authoritativeTableCart(
             categoryId: products.categoryId,
           })
           .from(products)
-          .where(inArray(products.id, productIds))
+          .where(and(eq(products.storeId, storeId), inArray(products.id, productIds)))
       : Promise.resolve([]),
     db
       .select({
@@ -65,7 +67,7 @@ async function authoritativeTableCart(
         categoryIds: modifierGroups.categoryIds,
       })
       .from(modifierGroups)
-      .where(eq(modifierGroups.isActive, true)),
+      .where(and(eq(modifierGroups.storeId, storeId), eq(modifierGroups.isActive, true))),
   ]);
   return resolveAuthoritativeTableCart({
     items,
@@ -82,15 +84,15 @@ async function authoritativeTableCart(
 }
 
 /** Đóng các phiếu bếp đang mở của 1 bàn (khi thanh toán xong / đóng bàn). */
-async function closeTickets(tableId: string) {
-  await db.update(kitchenTickets).set({ status: "done" }).where(and(eq(kitchenTickets.tableId, tableId), eq(kitchenTickets.status, "active")));
+async function closeTickets(storeId: string, tableId: string) {
+  await db.update(kitchenTickets).set({ status: "done" }).where(and(eq(kitchenTickets.storeId, storeId), eq(kitchenTickets.tableId, tableId), eq(kitchenTickets.status, "active")));
 }
 
 export async function createTable(name: string, zone: string): Promise<ActionResult> {
   const gate = await requireManager(); if (!gate.ok) return gate;
   if (!name.trim()) return { ok: false, error: "errors.invalidData" };
   try {
-    await db.insert(diningTables).values({ name: name.trim(), zone: zone.trim() });
+    await db.insert(diningTables).values({ storeId: gate.storeId, name: name.trim(), zone: zone.trim() });
     revalidatePath("/tables"); return { ok: true, data: undefined };
   } catch (e) { console.error("createTable failed:", e); return { ok: false, error: "errors.serverError" }; }
 }
@@ -98,7 +100,7 @@ export async function createTable(name: string, zone: string): Promise<ActionRes
 export async function renameTable(id: string, name: string, zone: string): Promise<ActionResult> {
   const gate = await requireManager(); if (!gate.ok) return gate;
   try {
-    await db.update(diningTables).set({ name: name.trim(), zone: zone.trim() }).where(eq(diningTables.id, id));
+    await db.update(diningTables).set({ name: name.trim(), zone: zone.trim() }).where(and(eq(diningTables.storeId, gate.storeId), eq(diningTables.id, id)));
     revalidatePath("/tables"); return { ok: true, data: undefined };
   } catch (e) { console.error("renameTable failed:", e); return { ok: false, error: "errors.serverError" }; }
 }
@@ -106,34 +108,34 @@ export async function renameTable(id: string, name: string, zone: string): Promi
 export async function deleteTable(id: string): Promise<ActionResult> {
   const gate = await requireManager(); if (!gate.ok) return gate;
   try {
-    const [t] = await db.select({ status: diningTables.status }).from(diningTables).where(eq(diningTables.id, id)).limit(1);
+    const [t] = await db.select({ status: diningTables.status }).from(diningTables).where(and(eq(diningTables.storeId, gate.storeId), eq(diningTables.id, id))).limit(1);
     if (t?.status === "occupied") return { ok: false, error: "tables.errors.occupied" };
-    await db.delete(diningTables).where(eq(diningTables.id, id));
+    await db.delete(diningTables).where(and(eq(diningTables.storeId, gate.storeId), eq(diningTables.id, id)));
     revalidatePath("/tables"); return { ok: true, data: undefined };
   } catch (e) { console.error("deleteTable failed:", e); return { ok: false, error: "errors.serverError" }; }
 }
 
 export async function openTable(id: string): Promise<ActionResult> {
-  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  let context; try { context = await requireStoreContext(); } catch { return { ok: false, error: "errors.unauthorized" }; }
   try {
-    await db.update(diningTables).set({ status: "occupied", openedAt: new Date() }).where(eq(diningTables.id, id));
+    await db.update(diningTables).set({ status: "occupied", openedAt: new Date() }).where(and(eq(diningTables.storeId, context.storeId), eq(diningTables.id, id)));
     revalidatePath("/tables"); return { ok: true, data: undefined };
   } catch (e) { console.error("openTable failed:", e); return { ok: false, error: "errors.serverError" }; }
 }
 
 export async function setTableCart(id: string, items: unknown): Promise<ActionResult> {
-  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
-  return setTableCartForUser(id, items);
+  let context; try { context = await requireStoreContext(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  return setTableCartForUser(context.storeId, id, items);
 }
 
-export async function setTableCartForUser(id: string, items: unknown): Promise<ActionResult> {
+export async function setTableCartForUser(storeId: string, id: string, items: unknown): Promise<ActionResult> {
   const parsed = tableCartSchema.safeParse(items);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   try {
     const [table] = await db
       .select({ currentCart: diningTables.currentCart })
       .from(diningTables)
-      .where(eq(diningTables.id, id))
+      .where(and(eq(diningTables.storeId, storeId), eq(diningTables.id, id)))
       .limit(1);
     if (!table) return { ok: false, error: "errors.invalidData" };
     const merged = mergeLockedTableCart({
@@ -141,10 +143,11 @@ export async function setTableCartForUser(id: string, items: unknown): Promise<A
       requested: parsed.data,
     });
     const cart = await authoritativeTableCart(
+      storeId,
       merged.items,
       merged.lockedSentLineIds,
     );
-    await db.update(diningTables).set({ currentCart: cart, status: "occupied" }).where(eq(diningTables.id, id));
+    await db.update(diningTables).set({ currentCart: cart, status: "occupied" }).where(and(eq(diningTables.storeId, storeId), eq(diningTables.id, id)));
     revalidatePath("/tables"); return { ok: true, data: undefined };
   } catch (e) {
     if (isTableCartDataError(e)) return { ok: false, error: "errors.invalidData" };
@@ -153,10 +156,10 @@ export async function setTableCartForUser(id: string, items: unknown): Promise<A
 }
 
 export async function closeTable(id: string): Promise<ActionResult> {
-  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  let context; try { context = await requireStoreContext(); } catch { return { ok: false, error: "errors.unauthorized" }; }
   try {
-    await closeTickets(id);
-    await db.update(diningTables).set({ status: "free", currentCart: [], openedAt: null }).where(eq(diningTables.id, id));
+    await closeTickets(context.storeId, id);
+    await db.update(diningTables).set({ status: "free", currentCart: [], openedAt: null }).where(and(eq(diningTables.storeId, context.storeId), eq(diningTables.id, id)));
     revalidatePath("/tables"); return { ok: true, data: undefined };
   } catch (e) { console.error("closeTable failed:", e); return { ok: false, error: "errors.serverError" }; }
 }
@@ -170,7 +173,9 @@ export async function sendToKitchen(id: string): Promise<ActionResult<{ ticketId
 
 export async function sendToKitchenForUser(userId: string, id: string): Promise<ActionResult<{ ticketId: string }>> {
   try {
-    const [t] = await db.select().from(diningTables).where(eq(diningTables.id, id)).limit(1);
+    const context = await resolveStoreContextForUser(userId);
+    if (!context) return { ok: false, error: "errors.unauthorized" };
+    const [t] = await db.select().from(diningTables).where(and(eq(diningTables.storeId, context.storeId), eq(diningTables.id, id))).limit(1);
     if (!t) return { ok: false, error: "errors.invalidData" };
     const cart = readCart(t.currentCart);
     const fresh = cart.filter((i) => !i.sent);
@@ -178,14 +183,16 @@ export async function sendToKitchenForUser(userId: string, id: string): Promise<
 
     const profileId = await getProfileId(userId);
     const [{ round }] = await db.select({ round: kitchenTickets.round }).from(kitchenTickets)
-      .where(eq(kitchenTickets.tableId, id)).orderBy(desc(kitchenTickets.round)).limit(1)
+      .where(and(eq(kitchenTickets.storeId, context.storeId), eq(kitchenTickets.tableId, id))).orderBy(desc(kitchenTickets.round)).limit(1)
       .then((r) => (r.length ? r : [{ round: 0 }]));
 
     const ticketId = await db.transaction(async (tx) => {
       const [ticket] = await tx.insert(kitchenTickets).values({
+        storeId: context.storeId,
         tableId: id, tableName: t.name, round: round + 1, createdBy: profileId,
       }).returning({ id: kitchenTickets.id });
       await tx.insert(kitchenTicketItems).values(fresh.map((i) => ({
+        storeId: context.storeId,
         ticketId: ticket.id, productId: i.productId, productName: i.productName,
         quantity: toQty(i.quantity), modifiers: i.modifiers, note: i.note ?? null,
         course: i.course,
@@ -195,7 +202,7 @@ export async function sendToKitchenForUser(userId: string, id: string): Promise<
     });
 
     const next = cart.map((i) => (i.sent ? i : { ...i, sent: true }));
-    await db.update(diningTables).set({ currentCart: next }).where(eq(diningTables.id, id));
+    await db.update(diningTables).set({ currentCart: next }).where(and(eq(diningTables.storeId, context.storeId), eq(diningTables.id, id)));
     revalidatePath("/tables"); revalidatePath("/kds");
     return { ok: true, data: { ticketId } };
   } catch (e) { console.error("sendToKitchen failed:", e); return { ok: false, error: "errors.serverError" }; }
@@ -214,7 +221,9 @@ export async function checkoutTableForUser(userId: string, id: string, method: M
   const ids = lineIdsSchema.safeParse(lineIds);
   if (!ids.success) return { ok: false, error: "errors.invalidData" };
   try {
-    const [t] = await db.select().from(diningTables).where(eq(diningTables.id, id)).limit(1);
+    const context = await resolveStoreContextForUser(userId);
+    if (!context) return { ok: false, error: "errors.unauthorized" };
+    const [t] = await db.select().from(diningTables).where(and(eq(diningTables.storeId, context.storeId), eq(diningTables.id, id))).limit(1);
     if (!t) return { ok: false, error: "errors.invalidData" };
     const cart = readCart(t.currentCart);
     if (cart.length === 0) return { ok: false, error: "pos.errors.emptyCart" };
@@ -222,11 +231,12 @@ export async function checkoutTableForUser(userId: string, id: string, method: M
     const selectedRaw = ids.data && ids.data.length > 0 ? cart.filter((i) => ids.data!.includes(i.lineId)) : cart;
     if (selectedRaw.length === 0) return { ok: false, error: "pos.errors.emptyCart" };
     const selected = await authoritativeTableCart(
+      context.storeId,
       selectedRaw,
       new Set(selectedRaw.filter((item) => item.sent).map((item) => item.lineId)),
     );
 
-    const [wh] = await db.select({ id: warehouses.id }).from(warehouses).orderBy(desc(warehouses.isDefault)).limit(1);
+    const [wh] = await db.select({ id: warehouses.id }).from(warehouses).where(eq(warehouses.storeId, context.storeId)).orderBy(desc(warehouses.isDefault)).limit(1);
     if (!wh) return { ok: false, error: "errors.invalidData" };
     const total = selected.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
 
@@ -254,10 +264,10 @@ export async function checkoutTableForUser(userId: string, id: string, method: M
 
     const remaining = cart.filter((i) => !selected.some((s) => s.lineId === i.lineId));
     if (remaining.length === 0) {
-      await closeTickets(id);
-      await db.update(diningTables).set({ status: "free", currentCart: [], openedAt: null }).where(eq(diningTables.id, id));
+      await closeTickets(context.storeId, id);
+      await db.update(diningTables).set({ status: "free", currentCart: [], openedAt: null }).where(and(eq(diningTables.storeId, context.storeId), eq(diningTables.id, id)));
     } else {
-      await db.update(diningTables).set({ currentCart: remaining }).where(eq(diningTables.id, id));
+      await db.update(diningTables).set({ currentCart: remaining }).where(and(eq(diningTables.storeId, context.storeId), eq(diningTables.id, id)));
     }
     revalidatePath("/tables");
     return { ok: true, data: { code: res.data.code } };
@@ -269,11 +279,11 @@ export async function checkoutTableForUser(userId: string, id: string, method: M
 
 /** Gộp bàn: dồn giỏ + phiếu bếp của các bàn nguồn về bàn đích, giải phóng bàn nguồn. */
 export async function mergeTables(targetId: string, sourceIds: unknown): Promise<ActionResult> {
-  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
-  return mergeTablesForUser(targetId, sourceIds);
+  let context; try { context = await requireStoreContext(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  return mergeTablesForUser(context.storeId, targetId, sourceIds);
 }
 
-export async function mergeTablesForUser(targetId: string, sourceIds: unknown): Promise<ActionResult> {
+export async function mergeTablesForUser(storeId: string, targetId: string, sourceIds: unknown): Promise<ActionResult> {
   const parsed = z.array(z.uuid()).min(1).safeParse(sourceIds);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const sources = parsed.data.filter((s) => s !== targetId);
@@ -281,7 +291,7 @@ export async function mergeTablesForUser(targetId: string, sourceIds: unknown): 
   try {
     const result = await db.transaction(async (tx): Promise<ActionResult> => {
       const rows = await tx.select().from(diningTables)
-        .where(inArray(diningTables.id, [targetId, ...sources]))
+        .where(and(eq(diningTables.storeId, storeId), inArray(diningTables.id, [targetId, ...sources])))
         .for("update");
       const target = rows.find((r) => r.id === targetId);
       if (!target || rows.length !== sources.length + 1) {
@@ -291,9 +301,9 @@ export async function mergeTablesForUser(targetId: string, sourceIds: unknown): 
       for (const sourceId of sources) {
         merged.push(...readCart(rows.find((row) => row.id === sourceId)?.currentCart));
       }
-      await tx.update(diningTables).set({ currentCart: merged, status: "occupied", openedAt: target.openedAt ?? new Date() }).where(eq(diningTables.id, targetId));
-      await tx.update(kitchenTickets).set({ tableId: targetId, tableName: target.name }).where(and(inArray(kitchenTickets.tableId, sources), eq(kitchenTickets.status, "active")));
-      await tx.update(diningTables).set({ status: "free", currentCart: [], openedAt: null }).where(inArray(diningTables.id, sources));
+      await tx.update(diningTables).set({ currentCart: merged, status: "occupied", openedAt: target.openedAt ?? new Date() }).where(and(eq(diningTables.storeId, storeId), eq(diningTables.id, targetId)));
+      await tx.update(kitchenTickets).set({ tableId: targetId, tableName: target.name }).where(and(eq(kitchenTickets.storeId, storeId), inArray(kitchenTickets.tableId, sources), eq(kitchenTickets.status, "active")));
+      await tx.update(diningTables).set({ status: "free", currentCart: [], openedAt: null }).where(and(eq(diningTables.storeId, storeId), inArray(diningTables.id, sources)));
       return { ok: true, data: undefined };
     });
     if (!result.ok) return result;
@@ -304,11 +314,11 @@ export async function mergeTablesForUser(targetId: string, sourceIds: unknown): 
 
 /** Chuyển toàn bộ giỏ + phiếu bếp sang một bàn trống trong cùng transaction. */
 export async function moveTable(sourceId: string, targetId: string): Promise<ActionResult> {
-  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
-  return moveTableForUser(sourceId, targetId);
+  let context; try { context = await requireStoreContext(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  return moveTableForUser(context.storeId, sourceId, targetId);
 }
 
-export async function moveTableForUser(sourceId: string, targetId: string): Promise<ActionResult> {
+export async function moveTableForUser(storeId: string, sourceId: string, targetId: string): Promise<ActionResult> {
   if (!sourceId || !targetId || sourceId === targetId) {
     return { ok: false, error: "errors.invalidData" };
   }
@@ -317,7 +327,7 @@ export async function moveTableForUser(sourceId: string, targetId: string): Prom
       const rows = await tx
         .select()
         .from(diningTables)
-        .where(inArray(diningTables.id, [sourceId, targetId]))
+        .where(and(eq(diningTables.storeId, storeId), inArray(diningTables.id, [sourceId, targetId])))
         .for("update");
       const source = rows.find((row) => row.id === sourceId);
       const target = rows.find((row) => row.id === targetId);
@@ -332,16 +342,16 @@ export async function moveTableForUser(sourceId: string, targetId: string): Prom
         currentCart: sourceCart,
         status: "occupied",
         openedAt: source.openedAt ?? new Date(),
-      }).where(eq(diningTables.id, targetId));
+      }).where(and(eq(diningTables.storeId, storeId), eq(diningTables.id, targetId)));
       await tx.update(kitchenTickets).set({
         tableId: targetId,
         tableName: target.name,
-      }).where(and(eq(kitchenTickets.tableId, sourceId), eq(kitchenTickets.status, "active")));
+      }).where(and(eq(kitchenTickets.storeId, storeId), eq(kitchenTickets.tableId, sourceId), eq(kitchenTickets.status, "active")));
       await tx.update(diningTables).set({
         status: "free",
         currentCart: [],
         openedAt: null,
-      }).where(eq(diningTables.id, sourceId));
+      }).where(and(eq(diningTables.storeId, storeId), eq(diningTables.id, sourceId)));
       return { ok: true, data: undefined };
     });
     if (!result.ok) return result;

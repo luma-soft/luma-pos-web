@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { mobilePushDevices } from "@/db/schema";
@@ -31,7 +31,7 @@ export async function GET() {
     enabled: mobilePushDevices.enabled,
     lastSeenAt: mobilePushDevices.lastSeenAt,
   }).from(mobilePushDevices)
-    .where(eq(mobilePushDevices.userId, binding.principalId));
+    .where(and(eq(mobilePushDevices.storeId, gate.storeId), eq(mobilePushDevices.userId, binding.principalId)));
   return mobileOk({ rows });
 }
 
@@ -44,6 +44,7 @@ export async function POST(request: Request) {
   const binding = pushDeviceBinding(gate);
 
   const result = await registerPushDeviceBinding(db, {
+    storeId: gate.storeId,
     principalId: binding.principalId,
     effectiveUserId: binding.effectiveUserId,
     device,
@@ -80,6 +81,7 @@ export async function DELETE(request: Request) {
   }
   const binding = pushDeviceBinding(gate);
   const result = await deactivatePushDeviceBinding(db, {
+    storeId: gate.storeId,
     principalId: binding.principalId,
     deviceId,
     bindingGeneration,

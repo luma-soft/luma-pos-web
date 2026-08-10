@@ -26,6 +26,7 @@ import {
   parseServiceReportQuery,
 } from "@/lib/services/dispatch-reporting";
 import { ServiceDispatchPanel, ServiceReportPanel } from "./service-dispatch-panels";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 export const dynamic = "force-dynamic";
 
@@ -44,14 +45,14 @@ export default async function ServicesPage({
 }: {
   searchParams: Promise<Record<string, string | undefined>>;
 }) {
-  const [t, params] = await Promise.all([getTranslations(), searchParams]);
+  const [t, params, context] = await Promise.all([getTranslations(), searchParams, requireStoreContext()]);
   const tab = params.tab ?? "projects";
   const managerGate = ["dispatch", "reporting"].includes(tab)
     ? await requireManager()
     : null;
   const [dashboard, options, customerRequests] = await Promise.all([
-    getServiceDashboard(),
-    getServiceFormOptions(),
+    getServiceDashboard(context.storeId),
+    getServiceFormOptions(context.storeId),
     getManagerServiceCustomerRequests(),
   ]);
   const queryParams = new URLSearchParams(

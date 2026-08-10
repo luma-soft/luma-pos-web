@@ -81,9 +81,10 @@ export async function loadSettingsPaymentBankAccounts(): Promise<ActionResult<Aw
 }
 
 export async function loadSettingsAiUsage(): Promise<ActionResult<Awaited<ReturnType<typeof getAiUsageStatus>>>> {
-  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  let context; try { context = await resolveStoreContextForUser((await requireUser()).id); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  if (!context) return { ok: false, error: "errors.unauthorized" };
   try {
-    return { ok: true, data: await getAiUsageStatus() };
+    return { ok: true, data: await getAiUsageStatus(context.storeId) };
   } catch (e) {
     console.error("loadSettingsAiUsage failed:", e);
     return { ok: false, error: "errors.serverError" };

@@ -192,6 +192,7 @@ export async function createPurchase(
       }
 
       const notification = await createNotificationEventInTx(tx, {
+        storeId: gate.storeId,
         eventKey: `purchase-received:${po.id}`,
         category: "purchaseReceived",
         entityType: "purchase",
@@ -480,6 +481,7 @@ export async function updatePurchase(
 
       const notification = po.status === "draft"
         ? await createNotificationEventInTx(tx, {
+            storeId: gate.storeId,
             eventKey: `purchase-received:${po.id}`,
             category: "purchaseReceived",
             entityType: "purchase",
@@ -494,6 +496,7 @@ export async function updatePurchase(
             },
           })
         : await createDebtChangedEventInTx(tx, {
+            storeId: gate.storeId,
             entityType: "supplier",
             entityId: v.supplierId,
             operationType: "purchase_edit",
@@ -602,6 +605,7 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
           });
         }
         debtNotification = await createDebtChangedEventInTx(tx, {
+          storeId: gate.storeId,
           entityType: "supplier",
           entityId: po.supplierId,
           operationType: "purchase_cancel",

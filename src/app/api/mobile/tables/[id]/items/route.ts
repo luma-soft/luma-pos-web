@@ -16,5 +16,5 @@ export async function POST(
       ? (body as { items?: unknown }).items
       : body;
 
-  return mobileAction(await setTableCartForUser(id, items));
+  return mobileAction(await setTableCartForUser(gate.storeId, id, items));
 }

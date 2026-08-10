@@ -36,7 +36,7 @@ export default async function OnlineSalesPage({ searchParams }: { searchParams: 
   const L = locale === "vi";
   const params = await searchParams;
   const tab = TABS.includes(params.tab as OnlineSalesTab) ? params.tab as OnlineSalesTab : "overview";
-  const [data, inbox] = await Promise.all([getShopeeDashboard(), getShopeeInbox()]);
+  const [data, inbox] = await Promise.all([getShopeeDashboard(context.storeId), getShopeeInbox(context.storeId)]);
   const shop = data.shop;
   const connectedChannels = shop && ["connected", "authorized"].includes(shop.status) ? 1 : 0;
   const onlineOrderCount = data.orderMappings.length;

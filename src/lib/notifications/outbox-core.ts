@@ -159,6 +159,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
       ))
       .returning({
         id: notificationOutbox.id,
+        storeId: notificationOutbox.storeId,
         leaseExpiresAt: notificationOutbox.leaseExpiresAt,
       });
 
@@ -376,13 +377,13 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
           quietHoursPolicy: notificationEvents.quietHoursPolicy,
         })
         .from(notificationEvents)
-        .where(eq(notificationEvents.id, message.eventId))
+        .where(and(eq(notificationEvents.storeId, claim.storeId), eq(notificationEvents.id, message.eventId)))
         .limit(1)
         .then((rows: unknown[]) => rows[0]),
       database
         .select({ prefs: storeSettings.prefs })
         .from(storeSettings)
-        .where(eq(storeSettings.id, "default"))
+        .where(eq(storeSettings.storeId, claim.storeId))
         .limit(1)
         .then((rows: unknown[]) => rows[0]),
     ]) as [
@@ -485,8 +486,8 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
         isActive: profiles.isActive,
       })
       .from(notificationRecipients)
-      .innerJoin(profiles, eq(profiles.id, notificationRecipients.userId))
-      .where(eq(notificationRecipients.eventId, message.eventId));
+      .innerJoin(profiles, and(eq(profiles.id, notificationRecipients.userId), eq(profiles.storeId, claim.storeId)))
+      .where(and(eq(notificationRecipients.storeId, claim.storeId), eq(notificationRecipients.eventId, message.eventId)));
     const targetRoles = allowedRolesForNotificationTarget({
       category,
       target: event.target as NotificationTarget,
@@ -530,6 +531,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
         eq(effectiveProfiles.id, mobilePushDevices.effectiveUserId),
       )
       .where(and(
+        eq(mobilePushDevices.storeId, claim.storeId),
         inArray(mobilePushDevices.effectiveUserId, [...new Set(eligibleUserIds)]),
         eq(mobilePushDevices.enabled, true),
         eq(mobilePushDevices.permission, "authorized"),
@@ -566,6 +568,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
           .select({ id: notificationOutbox.id })
           .from(notificationOutbox)
           .where(and(
+            eq(notificationOutbox.storeId, claim.storeId),
             eq(notificationOutbox.id, claim.id),
             eq(notificationOutbox.status, "processing"),
             eq(notificationOutbox.leaseExpiresAt, claim.leaseExpiresAt),
@@ -583,6 +586,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
         const [insertedClaim] = await tx
           .insert(mobilePushDeliveries)
           .values({
+            storeId: claim.storeId,
             deviceId: device.id,
             notificationKey,
             status: "sending",
@@ -609,6 +613,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
           })
           .from(mobilePushDeliveries)
           .where(and(
+            eq(mobilePushDeliveries.storeId, claim.storeId),
             eq(mobilePushDeliveries.deviceId, device.id),
             eq(mobilePushDeliveries.notificationKey, notificationKey),
           ))
@@ -629,6 +634,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
               attemptedAt: deviceClaimAt,
             })
             .where(and(
+              eq(mobilePushDeliveries.storeId, claim.storeId),
               eq(mobilePushDeliveries.id, previous.id),
               eq(mobilePushDeliveries.status, previous.status),
               eq(mobilePushDeliveries.attemptedAt, previous.attemptedAt),
@@ -1013,7 +1019,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
     const resetAt = now();
     const reset = await database.transaction(async (tx: DatabaseLike) => {
       const [actor] = await tx
-        .select({ role: profiles.role, isActive: profiles.isActive })
+        .select({ role: profiles.role, isActive: profiles.isActive, storeId: profiles.storeId })
         .from(profiles)
         .where(eq(profiles.id, userId))
         .limit(1)
@@ -1041,6 +1047,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
           updatedAt: resetAt,
         })
         .where(and(
+          eq(notificationOutbox.storeId, actor.storeId),
           eq(notificationOutbox.eventId, eventId),
           eq(notificationOutbox.status, "dead"),
         ))

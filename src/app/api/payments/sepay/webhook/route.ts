@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "errors.invalidData" }, { status: 400 });
   }
 
-  const [account] = await db
+  const accounts = await db
     .select()
     .from(paymentBankAccounts)
     .where(and(
@@ -49,7 +49,11 @@ export async function POST(request: Request) {
       eq(paymentBankAccounts.accountNumber, event.accountNumber),
       eq(paymentBankAccounts.enabled, true),
     ))
-    .limit(1);
+    .limit(2);
+  if (accounts.length !== 1) {
+    return NextResponse.json({ ok: false, error: "errors.notFound" }, { status: 404 });
+  }
+  const account = accounts[0];
 
   const configuredSecret = process.env.SEPAY_WEBHOOK_SECRET?.trim() || account?.webhookSecret?.trim() || null;
   const configuredApiKey = process.env.SEPAY_API_KEY?.trim() || account?.apiKey?.trim();
@@ -76,7 +80,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "errors.unauthorized" }, { status: 401 });
   }
 
-  const recorded = await recordSepayWebhookEvent(event, { verified: true });
+  const recorded = await recordSepayWebhookEvent(event, { storeId: account.storeId, verified: true });
   if (!recorded.ok) {
     return NextResponse.json({ ok: false, error: recorded.error }, { status: 500 });
   }

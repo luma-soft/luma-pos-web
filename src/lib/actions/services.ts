@@ -96,28 +96,29 @@ function isInvalidServiceAssignee(error: unknown) {
     && error.message === "SERVICE_MAINTENANCE_ASSIGNEE_INVALID";
 }
 
-async function loadJobProject(jobId?: string | null) {
+async function loadJobProject(storeId: string, jobId?: string | null) {
   if (!jobId) return undefined;
   const [job] = await db.select({ projectId: serviceJobs.projectId })
     .from(serviceJobs)
-    .where(eq(serviceJobs.id, jobId))
+    .where(and(eq(serviceJobs.storeId, storeId), eq(serviceJobs.id, jobId)))
     .limit(1);
   return job ?? null;
 }
 
-async function loadAssetProject(assetId?: string | null) {
+async function loadAssetProject(storeId: string, assetId?: string | null) {
   if (!assetId) return undefined;
   const [asset] = await db.select({
     projectId: installedAssets.projectId,
     jobId: installedAssets.jobId,
   })
     .from(installedAssets)
-    .where(eq(installedAssets.id, assetId))
+    .where(and(eq(installedAssets.storeId, storeId), eq(installedAssets.id, assetId)))
     .limit(1);
   return asset ?? null;
 }
 
 async function warrantyLinksAreValid(
+  storeId: string,
   projectId: string,
   jobId?: string | null,
   assetId?: string | null,
@@ -125,8 +126,8 @@ async function warrantyLinksAreValid(
   if (!jobId && !assetId) return true;
   if (!jobId || !assetId) return false;
   const [job, asset] = await Promise.all([
-    loadJobProject(jobId),
-    loadAssetProject(assetId),
+    loadJobProject(storeId, jobId),
+    loadAssetProject(storeId, assetId),
   ]);
   return Boolean(
     job
@@ -148,16 +149,16 @@ function hasServiceWarrantyError(error: unknown, code: string) {
   return false;
 }
 
-async function loadOrderProject(orderId?: string | null) {
+async function loadOrderProject(storeId: string, orderId?: string | null) {
   if (!orderId) return undefined;
   const [order] = await db.select({ projectId: orders.projectId, status: orders.status })
     .from(orders)
-    .where(eq(orders.id, orderId))
+    .where(and(eq(orders.storeId, storeId), eq(orders.id, orderId)))
     .limit(1);
   return order ?? null;
 }
 
-async function serviceLinksAreValid(projectId: string, links: {
+async function serviceLinksAreValid(storeId: string, projectId: string, links: {
   jobId?: string | null;
   assetId?: string | null;
   record?: { projectId: string | null } | null;
@@ -165,10 +166,10 @@ async function serviceLinksAreValid(projectId: string, links: {
   materialOrderId?: string | null;
 }) {
   const [job, asset, quoteOrder, materialOrder] = await Promise.all([
-    loadJobProject(links.jobId),
-    loadAssetProject(links.assetId),
-    loadOrderProject(links.quoteOrderId),
-    loadOrderProject(links.materialOrderId),
+    loadJobProject(storeId, links.jobId),
+    loadAssetProject(storeId, links.assetId),
+    loadOrderProject(storeId, links.quoteOrderId),
+    loadOrderProject(storeId, links.materialOrderId),
   ]);
   return validateServiceLinks({
     projectId,
@@ -180,10 +181,10 @@ async function serviceLinksAreValid(projectId: string, links: {
   });
 }
 
-async function isServiceProject(projectId: string) {
+async function isServiceProject(storeId: string, projectId: string) {
   const [project] = await db.select({ serviceType: projects.serviceType })
     .from(projects)
-    .where(eq(projects.id, projectId))
+    .where(and(eq(projects.storeId, storeId), eq(projects.id, projectId)))
     .limit(1);
   return Boolean(project?.serviceType);
 }
@@ -199,6 +200,7 @@ export async function createServiceProject(
 
   try {
     const [project] = await db.insert(projects).values({
+      storeId: gate.storeId,
       name: value.name,
       customerId: value.customerId ?? null,
       address: value.address || null,
@@ -230,21 +232,22 @@ export async function createServiceJob(
   try {
     const [project] = await db.select({ id: projects.id, serviceType: projects.serviceType })
       .from(projects)
-      .where(eq(projects.id, value.projectId))
+      .where(and(eq(projects.storeId, gate.storeId), eq(projects.id, value.projectId)))
       .limit(1);
     if (!project?.serviceType) return { ok: false, error: "services.errors.projectRequired" };
     if (!isServiceTypeAllowedForProject(project.serviceType, value.serviceType)) {
       return { ok: false, error: "services.errors.tradeMismatch" };
     }
-    if (!await serviceLinksAreValid(value.projectId, {
+    if (!await serviceLinksAreValid(gate.storeId, value.projectId, {
       quoteOrderId: value.quoteOrderId,
       materialOrderId: value.materialOrderId,
     })) return { ok: false, error: "services.errors.relationMismatch" };
 
     const code = generateCode("DV");
     const job = await db.transaction(async (tx) => {
-      await requireActiveTechnicianCore(tx, value.assignedTo);
+      await requireActiveTechnicianCore(tx, gate.storeId, value.assignedTo);
       const [created] = await tx.insert(serviceJobs).values({
+        storeId: gate.storeId,
         projectId: value.projectId,
         code,
         serviceType: value.serviceType,
@@ -259,12 +262,12 @@ export async function createServiceJob(
         createdBy: gate.userId,
       }).returning({ id: serviceJobs.id, code: serviceJobs.code });
       await syncServiceJobPrimaryAssigneeCore(
-        tx, created.id, value.assignedTo, gate.userId,
+        tx, gate.storeId, created.id, value.assignedTo, gate.userId,
       );
       return created;
     });
 
-    await db.update(projects).set({ serviceStage: "active" }).where(eq(projects.id, value.projectId));
+    await db.update(projects).set({ serviceStage: "active" }).where(and(eq(projects.storeId, gate.storeId), eq(projects.id, value.projectId)));
     revalidateServiceProject(value.projectId);
     return { ok: true, data: job };
   } catch (error) {
@@ -296,13 +299,13 @@ export async function updateServiceJob(
       projectType: projects.serviceType,
     }).from(serviceJobs)
       .innerJoin(projects, eq(serviceJobs.projectId, projects.id))
-      .where(eq(serviceJobs.id, value.jobId))
+      .where(and(eq(serviceJobs.storeId, gate.storeId), eq(serviceJobs.id, value.jobId)))
       .limit(1);
     if (!current?.projectType) return { ok: false, error: "errors.notFound" };
     if (!isServiceTypeAllowedForProject(current.projectType, value.serviceType)) {
       return { ok: false, error: "services.errors.tradeMismatch" };
     }
-    if (!await serviceLinksAreValid(current.projectId, {
+    if (!await serviceLinksAreValid(gate.storeId, current.projectId, {
       quoteOrderId: value.quoteOrderId,
       materialOrderId: value.materialOrderId,
     })) return { ok: false, error: "services.errors.relationMismatch" };
@@ -310,7 +313,7 @@ export async function updateServiceJob(
     await db.transaction(async (tx) => {
       const now = new Date();
       const assigneeId = await syncServiceJobPrimaryAssigneeCore(
-        tx, value.jobId, value.assignedTo, gate.userId, now, false,
+        tx, gate.storeId, value.jobId, value.assignedTo, gate.userId, now, false,
       );
       await tx.update(serviceJobs).set({
         serviceType: value.serviceType,
@@ -322,7 +325,7 @@ export async function updateServiceJob(
         quoteOrderId: value.quoteOrderId ?? null,
         materialOrderId: value.materialOrderId ?? null,
         updatedAt: now,
-      }).where(eq(serviceJobs.id, value.jobId));
+      }).where(and(eq(serviceJobs.storeId, gate.storeId), eq(serviceJobs.id, value.jobId)));
     });
     revalidateServiceProject(current.projectId);
     return { ok: true, data: undefined };
@@ -358,7 +361,7 @@ export async function transitionServiceJob(
         projectStage: projects.serviceStage,
       }).from(serviceJobs)
         .innerJoin(projects, eq(serviceJobs.projectId, projects.id))
-        .where(eq(serviceJobs.id, value.jobId))
+        .where(and(eq(serviceJobs.storeId, gate.storeId), eq(serviceJobs.id, value.jobId)))
         .limit(1)
         .for("update", { of: serviceJobs });
       if (!current) return { ok: false as const, error: "errors.notFound" };
@@ -376,11 +379,12 @@ export async function transitionServiceJob(
         status: value.status,
         completedAt: value.status === "completed" ? now : null,
         updatedAt: now,
-      }).where(eq(serviceJobs.id, value.jobId));
+      }).where(and(eq(serviceJobs.storeId, gate.storeId), eq(serviceJobs.id, value.jobId)));
       if (value.status === "completed") {
         await completeMaintenanceOccurrenceForJobCore(tx, value.jobId, now);
       }
       await tx.insert(serviceStatusLogs).values({
+        storeId: gate.storeId,
         jobId: value.jobId,
         fromStatus: current.status,
         toStatus: value.status,
@@ -390,10 +394,10 @@ export async function transitionServiceJob(
 
       const rows = await tx.select({ status: serviceJobs.status })
         .from(serviceJobs)
-        .where(eq(serviceJobs.projectId, current.projectId));
+        .where(and(eq(serviceJobs.storeId, gate.storeId), eq(serviceJobs.projectId, current.projectId)));
       const claimRows = await tx.select({ status: warrantyClaims.status })
         .from(warrantyClaims)
-        .where(eq(warrantyClaims.projectId, current.projectId));
+        .where(and(eq(warrantyClaims.storeId, gate.storeId), eq(warrantyClaims.projectId, current.projectId)));
       const countable = rows.filter((row) => row.status !== "cancelled");
       const completed = countable.filter((row) => row.status === "completed").length;
       const progressPercent = countable.length === 0
@@ -405,7 +409,7 @@ export async function transitionServiceJob(
         warrantyClaimStatuses: claimRows.map((row) => row.status),
       });
       await tx.update(projects).set({ progressPercent, serviceStage })
-        .where(eq(projects.id, current.projectId));
+        .where(and(eq(projects.storeId, gate.storeId), eq(projects.id, current.projectId)));
       return { ok: true as const, projectId: current.projectId };
     });
 
@@ -430,7 +434,7 @@ export async function updateServiceChecklist(
 
   try {
     const [job] = await db.update(serviceJobs).set({ checklist, updatedAt: new Date() })
-      .where(eq(serviceJobs.id, jobId))
+      .where(and(eq(serviceJobs.storeId, gate.storeId), eq(serviceJobs.id, jobId)))
       .returning({ projectId: serviceJobs.projectId });
     if (!job) return { ok: false, error: "errors.notFound" };
     revalidateServiceProject(job.projectId);
@@ -452,6 +456,7 @@ export async function saveServiceJobMaterial(
 
   try {
     await db.insert(serviceJobMaterials).values({
+      storeId: gate.storeId,
       jobId: value.jobId,
       productId: value.productId,
       unitName: value.unitName,
@@ -468,7 +473,7 @@ export async function saveServiceJobMaterial(
       },
     });
     const [job] = await db.select({ projectId: serviceJobs.projectId })
-      .from(serviceJobs).where(eq(serviceJobs.id, value.jobId)).limit(1);
+      .from(serviceJobs).where(and(eq(serviceJobs.storeId, gate.storeId), eq(serviceJobs.id, value.jobId))).limit(1);
     revalidateServiceProject(job?.projectId);
     return { ok: true, data: undefined };
   } catch (error) {
@@ -518,7 +523,7 @@ export async function reserveServiceJobMaterial(
   const parsed = serviceMaterialReservationSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   try {
-    const result = await db.transaction((tx) => reserveServiceJobMaterialStockCore(tx, { ...parsed.data, createdBy: gate.userId }));
+    const result = await db.transaction((tx) => reserveServiceJobMaterialStockCore(tx, { ...parsed.data, storeId: gate.storeId, createdBy: gate.userId }));
     revalidateServiceProject(result.projectId);
     revalidatePath(Routes.Inventory);
     await auditServiceMutation(gate.userId, "reserve_material", "service_material", parsed.data.materialId, { warehouseId: parsed.data.warehouseId, quantity: parsed.data.quantity });
@@ -538,7 +543,7 @@ export async function releaseServiceJobMaterialReservations(materialId: string):
   const gate = await requireStockAccess();
   if (!gate.ok) return gate;
   try {
-    const result = await db.transaction((tx) => releaseServiceJobMaterialReservationsCore(tx, { materialId }));
+    const result = await db.transaction((tx) => releaseServiceJobMaterialReservationsCore(tx, { storeId: gate.storeId, materialId }));
     revalidateServiceProject(result.projectId);
     revalidatePath(Routes.Inventory);
     await auditServiceMutation(gate.userId, "release_material_reservation", "service_material", materialId);
@@ -559,8 +564,8 @@ export async function saveServiceHandoverDocument(
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const value = parsed.data;
   try {
-    if (!await isServiceProject(value.projectId)) return { ok: false, error: "services.errors.projectRequired" };
-    if (value.jobId && !await serviceLinksAreValid(value.projectId, { jobId: value.jobId })) {
+    if (!await isServiceProject(gate.storeId, value.projectId)) return { ok: false, error: "services.errors.projectRequired" };
+    if (value.jobId && !await serviceLinksAreValid(gate.storeId, value.projectId, { jobId: value.jobId })) {
       return { ok: false, error: "services.errors.relationMismatch" };
     }
     const values = {
@@ -578,20 +583,20 @@ export async function saveServiceHandoverDocument(
     if (value.id) {
       const [current] = await db.select({ projectId: serviceHandoverDocuments.projectId })
         .from(serviceHandoverDocuments)
-        .where(eq(serviceHandoverDocuments.id, value.id))
+        .where(and(eq(serviceHandoverDocuments.storeId, gate.storeId), eq(serviceHandoverDocuments.id, value.id)))
         .limit(1);
       if (!current) return { ok: false, error: "errors.notFound" };
-      if (!await serviceLinksAreValid(value.projectId, {
+      if (!await serviceLinksAreValid(gate.storeId, value.projectId, {
         record: current,
         jobId: value.jobId,
       })) return { ok: false, error: "services.errors.relationMismatch" };
       const [document] = await db.update(serviceHandoverDocuments).set(values)
-        .where(eq(serviceHandoverDocuments.id, value.id)).returning({ id: serviceHandoverDocuments.id });
+        .where(and(eq(serviceHandoverDocuments.storeId, gate.storeId), eq(serviceHandoverDocuments.id, value.id))).returning({ id: serviceHandoverDocuments.id });
       revalidateServiceProject(value.projectId);
       await auditServiceMutation(gate.userId, "update_service_handover", "service_handover_document", value.id);
       return { ok: true, data: document };
     }
-    const [document] = await db.insert(serviceHandoverDocuments).values({ ...values, createdBy: gate.userId })
+    const [document] = await db.insert(serviceHandoverDocuments).values({ storeId: gate.storeId, ...values, createdBy: gate.userId })
       .returning({ id: serviceHandoverDocuments.id });
     revalidateServiceProject(value.projectId);
     await auditServiceMutation(gate.userId, "create_service_handover", "service_handover_document", document.id);
@@ -606,7 +611,7 @@ export async function deleteServiceHandoverDocument(id: string): Promise<ActionR
   const gate = await requireManager();
   if (!gate.ok) return gate;
   try {
-    const [document] = await db.delete(serviceHandoverDocuments).where(eq(serviceHandoverDocuments.id, id))
+    const [document] = await db.delete(serviceHandoverDocuments).where(and(eq(serviceHandoverDocuments.storeId, gate.storeId), eq(serviceHandoverDocuments.id, id)))
       .returning({ projectId: serviceHandoverDocuments.projectId });
     if (!document) return { ok: false, error: "errors.notFound" };
     revalidateServiceProject(document.projectId);
@@ -628,13 +633,13 @@ export async function saveServiceMaintenancePlan(
   try {
     const [project] = await db.select({ serviceType: projects.serviceType })
       .from(projects)
-      .where(eq(projects.id, value.projectId))
+      .where(and(eq(projects.storeId, gate.storeId), eq(projects.id, value.projectId)))
       .limit(1);
     if (!project?.serviceType) return { ok: false, error: "services.errors.projectRequired" };
     if (!isServiceTypeAllowedForProject(project.serviceType, value.serviceType)) {
       return { ok: false, error: "services.errors.tradeMismatch" };
     }
-    if (value.assetId && !await serviceLinksAreValid(value.projectId, { assetId: value.assetId })) return { ok: false, error: "services.errors.relationMismatch" };
+    if (value.assetId && !await serviceLinksAreValid(gate.storeId, value.projectId, { assetId: value.assetId })) return { ok: false, error: "services.errors.relationMismatch" };
     const values = {
       projectId: value.projectId,
       assetId: value.assetId ?? null,
@@ -648,12 +653,12 @@ export async function saveServiceMaintenancePlan(
       updatedAt: new Date(),
     };
     const mutation = await db.transaction(async (tx) => {
-      await requireActiveTechnicianCore(tx, value.assignedTo);
+      await requireActiveTechnicianCore(tx, gate.storeId, value.assignedTo);
       if (value.id) {
         const [current] = await tx.select({
           projectId: serviceMaintenancePlans.projectId,
         }).from(serviceMaintenancePlans)
-          .where(eq(serviceMaintenancePlans.id, value.id))
+          .where(and(eq(serviceMaintenancePlans.storeId, gate.storeId), eq(serviceMaintenancePlans.id, value.id)))
           .limit(1)
           .for("update");
         if (!current) return { outcome: "notFound" as const };
@@ -664,6 +669,7 @@ export async function saveServiceMaintenancePlan(
           dueOn: serviceMaintenanceOccurrences.dueOn,
         }).from(serviceMaintenanceOccurrences)
           .where(and(
+            eq(serviceMaintenanceOccurrences.storeId, gate.storeId),
             eq(serviceMaintenanceOccurrences.planId, value.id),
             inArray(serviceMaintenanceOccurrences.status, ["scheduled", "overdue"]),
           ))
@@ -672,12 +678,12 @@ export async function saveServiceMaintenancePlan(
           return { outcome: "outstanding" as const };
         }
         const [plan] = await tx.update(serviceMaintenancePlans).set(values)
-          .where(eq(serviceMaintenancePlans.id, value.id))
+          .where(and(eq(serviceMaintenancePlans.storeId, gate.storeId), eq(serviceMaintenancePlans.id, value.id)))
           .returning({ id: serviceMaintenancePlans.id });
         return { outcome: "saved" as const, plan };
       }
       const [plan] = await tx.insert(serviceMaintenancePlans)
-        .values({ ...values, createdBy: gate.userId })
+        .values({ storeId: gate.storeId, ...values, createdBy: gate.userId })
         .returning({ id: serviceMaintenancePlans.id });
       return { outcome: "saved" as const, plan };
     });
@@ -719,12 +725,12 @@ export async function deleteServiceMaintenancePlan(id: string): Promise<ActionRe
   try {
     const [history] = await db.select({ id: serviceMaintenanceOccurrences.id })
       .from(serviceMaintenanceOccurrences)
-      .where(eq(serviceMaintenanceOccurrences.planId, id))
+      .where(and(eq(serviceMaintenanceOccurrences.storeId, gate.storeId), eq(serviceMaintenanceOccurrences.planId, id)))
       .limit(1);
     if (history) {
       return { ok: false, error: "services.errors.maintenanceHistoryExists" };
     }
-    const [plan] = await db.delete(serviceMaintenancePlans).where(eq(serviceMaintenancePlans.id, id)).returning({ projectId: serviceMaintenancePlans.projectId });
+    const [plan] = await db.delete(serviceMaintenancePlans).where(and(eq(serviceMaintenancePlans.storeId, gate.storeId), eq(serviceMaintenancePlans.id, id))).returning({ projectId: serviceMaintenancePlans.projectId });
     if (!plan) return { ok: false, error: "errors.notFound" };
     revalidateServiceProject(plan.projectId);
     return { ok: true, data: undefined };
@@ -749,17 +755,17 @@ export async function saveServiceCostEntry(
 
   try {
     const [project] = await db.select({ id: projects.id }).from(projects)
-      .where(eq(projects.id, value.projectId)).limit(1);
+      .where(and(eq(projects.storeId, gate.storeId), eq(projects.id, value.projectId))).limit(1);
     if (!project) return { ok: false, error: "errors.notFound" };
     if (value.jobId) {
       const [job] = await db.select({ projectId: serviceJobs.projectId }).from(serviceJobs)
-        .where(eq(serviceJobs.id, value.jobId)).limit(1);
+        .where(and(eq(serviceJobs.storeId, gate.storeId), eq(serviceJobs.id, value.jobId))).limit(1);
       if (!job || job.projectId !== value.projectId) return { ok: false, error: "services.errors.relationMismatch" };
     }
     if (value.id) {
       const [current] = await db.select({ projectId: serviceCostEntries.projectId })
         .from(serviceCostEntries)
-        .where(eq(serviceCostEntries.id, value.id))
+        .where(and(eq(serviceCostEntries.storeId, gate.storeId), eq(serviceCostEntries.id, value.id)))
         .limit(1);
       if (!current) return { ok: false, error: "errors.notFound" };
       if (!validateServiceLinks({
@@ -777,12 +783,13 @@ export async function saveServiceCostEntry(
         incurredOn: value.incurredOn,
         note: value.note || null,
         updatedAt: new Date(),
-      }).where(eq(serviceCostEntries.id, value.id)).returning({ id: serviceCostEntries.id });
+      }).where(and(eq(serviceCostEntries.storeId, gate.storeId), eq(serviceCostEntries.id, value.id))).returning({ id: serviceCostEntries.id });
       revalidateServiceProject(value.projectId);
       await auditServiceMutation(gate.userId, "update_service_cost", "service_cost_entry", value.id);
       return { ok: true, data: entry };
     }
     const [entry] = await db.insert(serviceCostEntries).values({
+      storeId: gate.storeId,
       projectId: value.projectId,
       jobId: value.jobId ?? null,
       type: value.type,
@@ -808,7 +815,7 @@ export async function deleteServiceCostEntry(id: string): Promise<ActionResult> 
   const gate = await requireManager();
   if (!gate.ok) return gate;
   try {
-    const [entry] = await db.delete(serviceCostEntries).where(eq(serviceCostEntries.id, id))
+    const [entry] = await db.delete(serviceCostEntries).where(and(eq(serviceCostEntries.storeId, gate.storeId), eq(serviceCostEntries.id, id)))
       .returning({ projectId: serviceCostEntries.projectId });
     if (!entry) return { ok: false, error: "errors.notFound" };
     revalidateServiceProject(entry.projectId);
@@ -829,13 +836,14 @@ export async function createInstalledAsset(
   const value = parsed.data;
 
   try {
-    if (!await isServiceProject(value.projectId)) {
+    if (!await isServiceProject(gate.storeId, value.projectId)) {
       return { ok: false, error: "services.errors.projectRequired" };
     }
-    if (!await serviceLinksAreValid(value.projectId, { jobId: value.jobId })) {
+    if (!await serviceLinksAreValid(gate.storeId, value.projectId, { jobId: value.jobId })) {
       return { ok: false, error: "services.errors.relationMismatch" };
     }
     const [asset] = await db.insert(installedAssets).values({
+      storeId: gate.storeId,
       projectId: value.projectId,
       jobId: value.jobId ?? null,
       productId: value.productId ?? null,
@@ -880,10 +888,10 @@ export async function updateInstalledAsset(
   try {
     const [current] = await db.select({ projectId: installedAssets.projectId })
       .from(installedAssets)
-      .where(eq(installedAssets.id, value.assetId))
+      .where(and(eq(installedAssets.storeId, gate.storeId), eq(installedAssets.id, value.assetId)))
       .limit(1);
     if (!current) return { ok: false, error: "errors.notFound" };
-    if (!await serviceLinksAreValid(current.projectId, { jobId: value.jobId })) {
+    if (!await serviceLinksAreValid(gate.storeId, current.projectId, { jobId: value.jobId })) {
       return { ok: false, error: "services.errors.relationMismatch" };
     }
 
@@ -904,7 +912,7 @@ export async function updateInstalledAsset(
       status: value.status,
       note: value.note || null,
       updatedAt: new Date(),
-    }).where(eq(installedAssets.id, value.assetId));
+    }).where(and(eq(installedAssets.storeId, gate.storeId), eq(installedAssets.id, value.assetId)));
     revalidateServiceProject(current.projectId);
     return { ok: true, data: undefined };
   } catch (error) {
@@ -930,14 +938,15 @@ export async function createWarrantyClaim(
   const value = parsed.data;
 
   try {
-    if (!await isServiceProject(value.projectId)) {
+    if (!await isServiceProject(gate.storeId, value.projectId)) {
       return { ok: false, error: "services.errors.projectRequired" };
     }
-    if (!await warrantyLinksAreValid(value.projectId, value.jobId, value.assetId)) {
+    if (!await warrantyLinksAreValid(gate.storeId, value.projectId, value.jobId, value.assetId)) {
       return { ok: false, error: "services.errors.relationMismatch" };
     }
     const code = generateCode("BH");
     const [claim] = await db.insert(warrantyClaims).values({
+      storeId: gate.storeId,
       projectId: value.projectId,
       jobId: value.jobId ?? null,
       assetId: value.assetId ?? null,
@@ -980,7 +989,7 @@ export async function updateWarrantyClaim(
         projectId: warrantyClaims.projectId,
         jobId: warrantyClaims.jobId,
       }).from(warrantyClaims)
-        .where(eq(warrantyClaims.id, value.claimId))
+        .where(and(eq(warrantyClaims.storeId, gate.storeId), eq(warrantyClaims.id, value.claimId)))
         .limit(1)
         .for("update");
       if (!current) return { outcome: "notFound" as const };
@@ -991,7 +1000,7 @@ export async function updateWarrantyClaim(
       ].filter((id): id is string => Boolean(id)))].sort();
       for (const jobId of jobIds) {
         await tx.select({ id: serviceJobs.id }).from(serviceJobs)
-          .where(eq(serviceJobs.id, jobId))
+          .where(and(eq(serviceJobs.storeId, gate.storeId), eq(serviceJobs.id, jobId)))
           .limit(1)
           .for("update");
       }
@@ -1003,13 +1012,13 @@ export async function updateWarrantyClaim(
         const [[job], [asset]] = await Promise.all([
           tx.select({ projectId: serviceJobs.projectId })
             .from(serviceJobs)
-            .where(eq(serviceJobs.id, value.jobId))
+            .where(and(eq(serviceJobs.storeId, gate.storeId), eq(serviceJobs.id, value.jobId)))
             .limit(1),
           tx.select({
             projectId: installedAssets.projectId,
             jobId: installedAssets.jobId,
           }).from(installedAssets)
-            .where(eq(installedAssets.id, value.assetId))
+            .where(and(eq(installedAssets.storeId, gate.storeId), eq(installedAssets.id, value.assetId)))
             .limit(1),
         ]);
         if (
@@ -1031,7 +1040,7 @@ export async function updateWarrantyClaim(
         laborCharge: toMoney(value.laborCharge),
         materialCharge: toMoney(value.materialCharge),
         updatedAt: new Date(),
-      }).where(eq(warrantyClaims.id, value.claimId));
+      }).where(and(eq(warrantyClaims.storeId, gate.storeId), eq(warrantyClaims.id, value.claimId)));
       return {
         outcome: "updated" as const,
         projectId: current.projectId,
@@ -1075,7 +1084,7 @@ export async function transitionWarrantyClaim(
         projectStage: projects.serviceStage,
       }).from(warrantyClaims)
         .innerJoin(projects, eq(warrantyClaims.projectId, projects.id))
-        .where(eq(warrantyClaims.id, value.claimId))
+        .where(and(eq(warrantyClaims.storeId, gate.storeId), eq(warrantyClaims.id, value.claimId)))
         .limit(1);
       if (!current) return { ok: false as const, error: "errors.notFound" };
       if (!canTransitionWarrantyClaim(current.status, value.status)) {
@@ -1088,15 +1097,15 @@ export async function transitionWarrantyClaim(
         resolution: value.resolution || undefined,
         resolvedAt: value.status === "resolved" || value.status === "closed" ? new Date() : null,
         updatedAt: new Date(),
-      }).where(eq(warrantyClaims.id, value.claimId));
+      }).where(and(eq(warrantyClaims.storeId, gate.storeId), eq(warrantyClaims.id, value.claimId)));
 
       const [jobRows, claimRows] = await Promise.all([
         tx.select({ status: serviceJobs.status })
           .from(serviceJobs)
-          .where(eq(serviceJobs.projectId, current.projectId)),
+          .where(and(eq(serviceJobs.storeId, gate.storeId), eq(serviceJobs.projectId, current.projectId))),
         tx.select({ status: warrantyClaims.status })
           .from(warrantyClaims)
-          .where(eq(warrantyClaims.projectId, current.projectId)),
+          .where(and(eq(warrantyClaims.storeId, gate.storeId), eq(warrantyClaims.projectId, current.projectId))),
       ]);
       const serviceStage = deriveServiceProjectStage({
         fallbackStage: current.projectStage ?? "active",
@@ -1104,7 +1113,7 @@ export async function transitionWarrantyClaim(
         warrantyClaimStatuses: claimRows.map((row) => row.status),
       });
       await tx.update(projects).set({ serviceStage })
-        .where(eq(projects.id, current.projectId));
+        .where(and(eq(projects.storeId, gate.storeId), eq(projects.id, current.projectId)));
       return { ok: true as const, projectId: current.projectId };
     });
 

@@ -22,11 +22,12 @@ function normalizeSurface(value: unknown) {
   return surface === "pos" ? "pos" : "web";
 }
 
-function messageRows(sessionId: string, messages: unknown[]) {
+function messageRows(storeId: string, sessionId: string, messages: unknown[]) {
   return messages.slice(-MAX_MESSAGES).map((item, index) => {
     const msg = asObject(item);
     const role = asString(msg.role) === "assistant" ? "assistant" : "user";
     return {
+      storeId,
       sessionId,
       role,
       content: asString(msg.text ?? msg.content).slice(0, 8000),
@@ -40,11 +41,11 @@ function messageRows(sessionId: string, messages: unknown[]) {
   }).filter((item) => item.content);
 }
 
-async function getOwnedSession(sessionId: string, userId: string) {
+async function getOwnedSession(storeId: string, sessionId: string, userId: string) {
   const [session] = await db
     .select()
     .from(aiChatSessions)
-    .where(and(eq(aiChatSessions.id, sessionId), eq(aiChatSessions.ownerId, userId), isNull(aiChatSessions.deletedAt)))
+    .where(and(eq(aiChatSessions.storeId, storeId), eq(aiChatSessions.id, sessionId), eq(aiChatSessions.ownerId, userId), isNull(aiChatSessions.deletedAt)))
     .limit(1);
   return session ?? null;
 }
@@ -62,12 +63,12 @@ export async function GET(request: Request) {
   const surface = normalizeSurface(url.searchParams.get("surface"));
 
   if (sessionId) {
-    const session = await getOwnedSession(sessionId, gate.userId);
+    const session = await getOwnedSession(gate.storeId, sessionId, gate.userId);
     if (!session) return mobileError("ai.session.notFound", 404);
     const messages = await db
       .select()
       .from(aiChatMessages)
-      .where(eq(aiChatMessages.sessionId, session.id))
+      .where(and(eq(aiChatMessages.storeId, gate.storeId), eq(aiChatMessages.sessionId, session.id)))
       .orderBy(asc(aiChatMessages.createdAt))
       .limit(MAX_MESSAGES);
     return mobileOk({ session, messages });
@@ -87,7 +88,7 @@ export async function GET(request: Request) {
       )`,
     })
     .from(aiChatSessions)
-    .where(and(eq(aiChatSessions.ownerId, gate.userId), eq(aiChatSessions.surface, surface), isNull(aiChatSessions.deletedAt)))
+    .where(and(eq(aiChatSessions.storeId, gate.storeId), eq(aiChatSessions.ownerId, gate.userId), eq(aiChatSessions.surface, surface), isNull(aiChatSessions.deletedAt)))
     .orderBy(desc(aiChatSessions.updatedAt))
     .limit(MAX_SESSIONS);
   return mobileOk({ sessions });
@@ -106,7 +107,7 @@ export async function POST(request: Request) {
   const title = asString(body.title, "AI Assistant").slice(0, 120) || "AI Assistant";
   const [session] = await db
     .insert(aiChatSessions)
-    .values({ ownerId: gate.userId, surface, title })
+    .values({ storeId: gate.storeId, ownerId: gate.userId, surface, title })
     .returning();
   return mobileOk({ session });
 }
@@ -124,18 +125,18 @@ export async function PUT(request: Request) {
   const sessionId = asString(body.sessionId);
   const title = asString(body.title, "AI Assistant").slice(0, 120) || "AI Assistant";
   const messages = Array.isArray(body.messages) ? body.messages : [];
-  const session = sessionId ? await getOwnedSession(sessionId, gate.userId) : null;
+  const session = sessionId ? await getOwnedSession(gate.storeId, sessionId, gate.userId) : null;
 
   const saved = await db.transaction(async (tx) => {
     const current = session ?? (await tx
       .insert(aiChatSessions)
-      .values({ ownerId: gate.userId, surface, title })
+      .values({ storeId: gate.storeId, ownerId: gate.userId, surface, title })
       .returning())[0];
     await tx.update(aiChatSessions)
       .set({ title, surface, updatedAt: sql`now()` })
-      .where(eq(aiChatSessions.id, current.id));
-    await tx.delete(aiChatMessages).where(eq(aiChatMessages.sessionId, current.id));
-    const rows = messageRows(current.id, messages);
+      .where(and(eq(aiChatSessions.storeId, gate.storeId), eq(aiChatSessions.id, current.id)));
+    await tx.delete(aiChatMessages).where(and(eq(aiChatMessages.storeId, gate.storeId), eq(aiChatMessages.sessionId, current.id)));
+    const rows = messageRows(gate.storeId, current.id, messages);
     if (rows.length) await tx.insert(aiChatMessages).values(rows);
     return { ...current, title, surface, updatedAt: new Date() };
   });
@@ -154,10 +155,10 @@ export async function DELETE(request: Request) {
   const url = new URL(request.url);
   const sessionId = url.searchParams.get("sessionId");
   if (!sessionId) return mobileError("ai.session.missing", 400);
-  const session = await getOwnedSession(sessionId, gate.userId);
+  const session = await getOwnedSession(gate.storeId, sessionId, gate.userId);
   if (!session) return mobileError("ai.session.notFound", 404);
   await db.update(aiChatSessions)
     .set({ deletedAt: sql`now()`, updatedAt: sql`now()` })
-    .where(eq(aiChatSessions.id, session.id));
+    .where(and(eq(aiChatSessions.storeId, gate.storeId), eq(aiChatSessions.id, session.id)));
   return mobileOk({ ok: true });
 }
