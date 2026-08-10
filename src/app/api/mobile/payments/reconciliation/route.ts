@@ -90,6 +90,7 @@ export async function POST(request: Request) {
   }
   const authorization = await authorizeMobileSensitiveAction({
     request,
+    storeId: gate.storeId,
     requesterId: gate.userId,
     requesterRole: gate.role,
     permission: "payment.reconcile",

@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   const pin = body && typeof body === "object" && "pin" in body
     ? String(body.pin).trim()
     : "";
-  const verification = await verifyStaffPin(staffId, pin);
+  const verification = await verifyStaffPin(staffId, pin, gate.storeId);
   if (!verification.ok) {
     if (verification.staff) {
       await db.insert(auditLogs).values({
@@ -54,7 +54,12 @@ export async function POST(request: Request) {
     const principalId = gate.principalId ?? gate.userId;
     const issuedAt = Date.now();
     const token = createCashierContextToken(
-      { principalId, cashierId: staff.id, role: staff.role },
+      {
+        principalId,
+        cashierId: staff.id,
+        storeId: gate.storeId,
+        role: staff.role,
+      },
       {
         secret: cashierContextSecret(),
         nowMs: issuedAt,

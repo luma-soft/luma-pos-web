@@ -28,6 +28,7 @@ export async function POST(
   if (!gate.ok) return mobileGate(gate)!;
   const authorization = await authorizeMobileSensitiveAction({
     request,
+    storeId: gate.storeId,
     requesterId: gate.userId,
     requesterRole: gate.role,
     permission: "order.void",

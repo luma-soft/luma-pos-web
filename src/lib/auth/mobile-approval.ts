@@ -12,10 +12,13 @@ export type MobileApprovalMode = "reauth" | "manager";
 export function approvalModeFor(input: {
   requesterRole: Role;
   requesterId: string;
+  requesterStoreId: string;
   approverRole: Role;
   approverId: string;
+  approverStoreId: string;
   permission: MobilePermission;
 }): MobileApprovalMode | null {
+  if (input.requesterStoreId !== input.approverStoreId) return null;
   const grant = permissionMatrixForRole(input.requesterRole)[input.permission];
   if (grant.allowed && grant.reauthRequired) {
     return input.requesterId === input.approverId &&
@@ -47,6 +50,7 @@ export function hashApprovalToken(token: string): string {
 }
 
 export async function issueMobileApproval(input: {
+  storeId: string;
   requesterId: string;
   approverId: string;
   permission: MobilePermission;
@@ -59,6 +63,7 @@ export async function issueMobileApproval(input: {
   const credential = createApprovalCredential();
   const expiresAt = new Date(Date.now() + (input.ttlMs ?? 2 * 60 * 1000));
   await db.insert(mobileApprovals).values({
+    storeId: input.storeId,
     tokenHash: credential.tokenHash,
     requesterId: input.requesterId,
     approverId: input.approverId,
@@ -73,6 +78,7 @@ export async function issueMobileApproval(input: {
 
 export async function consumeMobileApproval(input: {
   request: Request;
+  storeId: string;
   requesterId: string;
   permission: MobilePermission;
   scope?: string | null;
@@ -86,6 +92,7 @@ export async function consumeMobileApproval(input: {
     .set({ consumedAt: new Date() })
     .where(and(
       eq(mobileApprovals.tokenHash, hashApprovalToken(token)),
+      eq(mobileApprovals.storeId, input.storeId),
       eq(mobileApprovals.requesterId, input.requesterId),
       eq(mobileApprovals.permission, input.permission),
       scope === null
@@ -100,6 +107,7 @@ export async function consumeMobileApproval(input: {
 
 export async function authorizeMobileSensitiveAction(input: {
   request: Request;
+  storeId: string;
   requesterId: string;
   requesterRole: Role;
   permission: MobilePermission;
@@ -112,6 +120,7 @@ export async function authorizeMobileSensitiveAction(input: {
   }
   const approved = await consumeMobileApproval({
     request: input.request,
+    storeId: input.storeId,
     requesterId: input.requesterId,
     permission: input.permission,
     scope: input.scope,

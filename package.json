@@ -26,7 +26,8 @@
     "db:import-lam-hieu-2026-07-25": "bun run src/scripts/import-lam-hieu-receipts-2026-07-25.ts",
     "import:kiotviet-history": "bun run src/scripts/import-kiotviet-history.ts",
     "ai:eval": "bun run src/scripts/run-ai-evals.ts",
-    "audit:tenant-foundation": "bun run src/scripts/audit-tenant-foundation.ts"
+    "audit:tenant-foundation": "bun run src/scripts/audit-tenant-foundation.ts",
+    "audit:tenant-auth": "bun run src/scripts/audit-tenant-auth.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

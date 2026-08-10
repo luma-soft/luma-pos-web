@@ -84,10 +84,11 @@ export async function getStoreSettings(): Promise<StoreSettings> {
 }
 
 /** Danh sách nhân viên (profiles). */
-export async function getStaff() {
+export async function getStaff(storeId: string) {
   return db
     .select({ id: profiles.id, fullName: profiles.fullName, phone: profiles.phone, role: profiles.role, isActive: profiles.isActive, cashierPinUpdatedAt: profiles.cashierPinUpdatedAt, createdAt: profiles.createdAt })
     .from(profiles)
+    .where(eq(profiles.storeId, storeId))
     .orderBy(asc(profiles.fullName));
 }
 export type StaffRow = Awaited<ReturnType<typeof getStaff>>[number];

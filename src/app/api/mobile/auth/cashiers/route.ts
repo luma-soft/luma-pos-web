@@ -6,8 +6,7 @@ import { mobileGate, mobileOk } from "@/lib/mobile/response";
 
 export async function GET() {
   const gate = await requireMobileSalesAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate);
 
   const rows = await db
     .select({
@@ -20,6 +19,7 @@ export async function GET() {
     .where(
       and(
         eq(profiles.isActive, true),
+        eq(profiles.storeId, gate.storeId),
         inArray(profiles.role, ["owner", "manager", "cashier"]),
       ),
     )

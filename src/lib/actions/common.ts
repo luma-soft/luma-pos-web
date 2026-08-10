@@ -1,11 +1,13 @@
 import { eq } from "drizzle-orm";
-import { headers } from "next/headers";
-import { createClient as createBearerClient } from "@supabase/supabase-js";
-import type { User } from "@supabase/supabase-js";
 import { db } from "@/db";
 import { profiles } from "@/db/schema";
-import { createClient as createCookieClient } from "@/lib/supabase/server";
-import { activeProfile } from "@/lib/auth/profile-access";
+import {
+  getAuthenticatedUser,
+  requireStoreContext,
+  resolveStoreContextForUser,
+  UnauthorizedError,
+} from "@/lib/auth/store-context";
+import type { StoreFeatureSet } from "@/lib/tenancy/store-features";
 import {
   MANAGER_ROLES,
   OWNER_ROLES,
@@ -20,42 +22,13 @@ export type ActionResult<T = undefined> =
   | { ok: true; data: T }
   | { ok: false; error: string };
 
-export class UnauthorizedError extends Error {
-  constructor() { super("UNAUTHORIZED"); }
-}
+export { UnauthorizedError } from "@/lib/auth/store-context";
 
 /** Lấy user đang đăng nhập, throw nếu chưa login. */
 export async function requireUser() {
-  let user: User | null = null;
-  const authorization = (await headers()).get("authorization");
-  const bearer = authorization?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
-
-  if (bearer) {
-    const supabase = createBearerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-        },
-      }
-    );
-    const result = await supabase.auth.getUser(bearer);
-    user = result.data.user;
-  } else {
-    const supabase = await createCookieClient();
-    const result = await supabase.auth.getUser();
-    user = result.data.user;
-  }
-
+  const user = await getAuthenticatedUser();
   if (!user) throw new UnauthorizedError();
-  const [p] = await db
-    .select({ isActive: profiles.isActive })
-    .from(profiles)
-    .where(eq(profiles.id, user.id))
-    .limit(1);
-  if (!p?.isActive) throw new UnauthorizedError();
+  if (!await resolveStoreContextForUser(user.id)) throw new UnauthorizedError();
   return user;
 }
 
@@ -67,22 +40,31 @@ export async function getProfileId(userId: string): Promise<string | null> {
 
 /** Vai trò của user (profiles.role). User không có profile active bị từ chối. */
 export async function getRole(userId: string): Promise<Role> {
-  const [p] = await db.select({ role: profiles.role, isActive: profiles.isActive }).from(profiles).where(eq(profiles.id, userId)).limit(1);
-  const profile = activeProfile(p);
-  if (!profile) throw new UnauthorizedError();
-  return profile.role as Role;
+  const context = await resolveStoreContextForUser(userId);
+  if (!context) throw new UnauthorizedError();
+  return context.role;
 }
 
-export type Gate = { ok: true; userId: string; role: Role } | { ok: false; error: string };
+export type Gate = {
+  ok: true;
+  userId: string;
+  storeId: string;
+  role: Role;
+  features: StoreFeatureSet;
+} | { ok: false; error: string };
 
 /** Cổng RBAC: yêu cầu login + vai trò nằm trong `roles`. Trả userId+role nếu hợp lệ. */
 export async function requireRole(roles: Role[]): Promise<Gate> {
-  let userId: string;
-  try { userId = (await requireUser()).id; } catch { return { ok: false, error: "errors.unauthorized" }; }
-  let role: Role;
-  try { role = (await getRole(userId)) as Role; } catch { return { ok: false, error: "errors.unauthorized" }; }
-  if (!roles.includes(role)) return { ok: false, error: "errors.forbidden" };
-  return { ok: true, userId, role };
+  let context;
+  try { context = await requireStoreContext(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  if (!roles.includes(context.role)) return { ok: false, error: "errors.forbidden" };
+  return {
+    ok: true,
+    userId: context.userId,
+    storeId: context.storeId,
+    role: context.role,
+    features: context.features,
+  };
 }
 
 /** Chủ/Quản lý — nghiệp vụ quản trị (giá, hủy/sửa đơn, hoàn tiền, KM, sổ quỹ...). */

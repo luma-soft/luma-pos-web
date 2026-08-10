@@ -27,6 +27,7 @@ describe("cashier PIN security", () => {
       {
         principalId: "11111111-1111-4111-8111-111111111111",
         cashierId: "22222222-2222-4222-8222-222222222222",
+        storeId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         role: "cashier",
       },
       { secret, nowMs: 1_000, ttlMs: 60_000 },
@@ -36,6 +37,7 @@ describe("cashier PIN security", () => {
       verifyCashierContextToken(token, {
         secret,
         principalId: "11111111-1111-4111-8111-111111111111",
+        storeId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         nowMs: 30_000,
       })?.cashierId,
     ).toBe("22222222-2222-4222-8222-222222222222");
@@ -43,6 +45,7 @@ describe("cashier PIN security", () => {
       verifyCashierContextToken(token, {
         secret,
         principalId: "33333333-3333-4333-8333-333333333333",
+        storeId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         nowMs: 30_000,
       }),
     ).toBeNull();
@@ -50,6 +53,15 @@ describe("cashier PIN security", () => {
       verifyCashierContextToken(token, {
         secret,
         principalId: "11111111-1111-4111-8111-111111111111",
+        storeId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        nowMs: 30_000,
+      }),
+    ).toBeNull();
+    expect(
+      verifyCashierContextToken(token, {
+        secret,
+        principalId: "11111111-1111-4111-8111-111111111111",
+        storeId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         nowMs: 61_001,
       }),
     ).toBeNull();
@@ -57,6 +69,7 @@ describe("cashier PIN security", () => {
       verifyCashierContextToken(`${token}tampered`, {
         secret,
         principalId: "11111111-1111-4111-8111-111111111111",
+        storeId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         nowMs: 30_000,
       }),
     ).toBeNull();

@@ -1,9 +1,12 @@
-import { or, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { Session } from "@supabase/supabase-js";
 import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import { createMobileAuthClient } from "@/lib/mobile/auth-session";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { normalizePhone } from "@/lib/auth/phone";
+
+export { normalizePhone } from "@/lib/auth/phone";
 
 /**
  * Signs in an existing email/password account using the staff phone stored in
@@ -16,12 +19,10 @@ export async function signInWithInternalPhonePassword(input: {
   const normalizedPhone = normalizePhone(input.phone);
   if (!normalizedPhone) return null;
 
-  const phoneKeys = lookupPhoneKeys(normalizedPhone);
-  const phoneDigits = sql<string>`regexp_replace(coalesce(${profiles.phone}, ''), '[^0-9]', '', 'g')`;
   const matches = await db
     .select({ id: profiles.id })
     .from(profiles)
-    .where(or(...phoneKeys.map((key) => sql`${phoneDigits} = ${key}`)))
+    .where(eq(profiles.phoneNormalized, normalizedPhone))
     .limit(2);
 
   // A phone number must identify exactly one staff account. Failing closed
@@ -38,18 +39,4 @@ export async function signInWithInternalPhonePassword(input: {
     password: input.password,
   });
   return error ? null : data.session;
-}
-
-export function normalizePhone(value: string) {
-  const compact = value.trim().replace(/[\s().-]/g, "");
-  if (/^0\d{9,10}$/.test(compact)) return `+84${compact.slice(1)}`;
-  if (/^84\d{9,10}$/.test(compact)) return `+${compact}`;
-  return /^\+[1-9]\d{7,14}$/.test(compact) ? compact : null;
-}
-
-function lookupPhoneKeys(normalizedPhone: string) {
-  const international = normalizedPhone.slice(1);
-  return international.startsWith("84")
-    ? [international, `0${international.slice(2)}`]
-    : [international];
 }

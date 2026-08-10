@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLogs, profiles } from "@/db/schema";
 import { authorizeMobileSensitiveAction } from "@/lib/auth/mobile-approval";
@@ -25,7 +25,7 @@ export async function PATCH(
   const [target] = await db
     .select({ role: profiles.role })
     .from(profiles)
-    .where(eq(profiles.id, id))
+    .where(and(eq(profiles.id, id), eq(profiles.storeId, gate.storeId)))
     .limit(1);
   if (!target) return mobileError("errors.notFound", 404);
   if (!canResetStaffPin({ actorRole: gate.role, targetRole: target.role })) {
@@ -34,6 +34,7 @@ export async function PATCH(
 
   const authorization = await authorizeMobileSensitiveAction({
     request,
+    storeId: gate.storeId,
     requesterId: gate.userId,
     requesterRole: gate.role,
     permission: "settings.sensitive",
@@ -49,7 +50,7 @@ export async function PATCH(
       cashierPinLockedUntil: null,
       cashierPinUpdatedAt: new Date(),
     })
-    .where(eq(profiles.id, id))
+    .where(and(eq(profiles.id, id), eq(profiles.storeId, gate.storeId)))
     .returning({ id: profiles.id, fullName: profiles.fullName });
   if (!updated) return mobileError("errors.notFound", 404);
 

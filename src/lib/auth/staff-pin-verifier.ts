@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import type { Role } from "@/lib/actions/common";
@@ -33,6 +33,7 @@ export type StaffPinVerification =
 export async function verifyStaffPin(
   staffId: string,
   pin: string,
+  storeId: string,
 ): Promise<StaffPinVerification> {
   if (!staffId || !isValidCashierPin(pin)) {
     return { ok: false, error: "errors.invalidData", status: 400 };
@@ -50,7 +51,7 @@ export async function verifyStaffPin(
         lockedUntil: profiles.cashierPinLockedUntil,
       })
       .from(profiles)
-      .where(eq(profiles.id, staffId))
+      .where(and(eq(profiles.id, staffId), eq(profiles.storeId, storeId)))
       .limit(1)
       .for("update");
 
@@ -93,7 +94,7 @@ export async function verifyStaffPin(
           cashierPinFailedAttempts: failedAttempts,
           cashierPinLockedUntil: lockedUntil,
         })
-        .where(eq(profiles.id, row.id));
+        .where(and(eq(profiles.id, row.id), eq(profiles.storeId, storeId)));
       return {
         ok: false,
         error: lockedUntil ? "errors.tooManyAttempts" : "errors.unauthorized",
@@ -106,7 +107,7 @@ export async function verifyStaffPin(
     await tx
       .update(profiles)
       .set({ cashierPinFailedAttempts: 0, cashierPinLockedUntil: null })
-      .where(eq(profiles.id, row.id));
+      .where(and(eq(profiles.id, row.id), eq(profiles.storeId, storeId)));
     return { ok: true, staff };
   });
 }

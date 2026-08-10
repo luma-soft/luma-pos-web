@@ -13,10 +13,9 @@ import { parseStaffSettingsMutation } from "@/lib/settings/staff-settings-mutati
 
 export async function GET() {
   const gate = await requireMobileManager();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate);
 
-  return mobileOk(await getStaff());
+  return mobileOk(await getStaff(gate.storeId));
 }
 
 export async function PATCH(request: Request) {
@@ -31,6 +30,7 @@ export async function PATCH(request: Request) {
 
   const authorization = await authorizeMobileSensitiveAction({
     request,
+    storeId: gate.storeId,
     requesterId: gate.userId,
     requesterRole: gate.role,
     permission: "settings.sensitive",
@@ -40,6 +40,7 @@ export async function PATCH(request: Request) {
 
   return mobileAction(await applyStaffSettingsMutation({
     actorId: gate.userId,
+    storeId: gate.storeId,
     actorRole: gate.role,
     mutation,
     source: "mobile",

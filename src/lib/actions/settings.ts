@@ -57,9 +57,10 @@ type AiProviderTestResult = {
 };
 
 export async function loadSettingsStaff(): Promise<ActionResult<Awaited<ReturnType<typeof getStaff>>>> {
-  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
   try {
-    return { ok: true, data: await getStaff() };
+    return { ok: true, data: await getStaff(gate.storeId) };
   } catch (e) {
     console.error("loadSettingsStaff failed:", e);
     return { ok: false, error: "errors.serverError" };
@@ -509,6 +510,7 @@ export async function updateStaffRole(id: string, role: StaffRole): Promise<Acti
   if (!mutation) return { ok: false, error: "errors.invalidData" };
   const result = await applyStaffSettingsMutation({
     actorId: gate.userId,
+    storeId: gate.storeId,
     actorRole: gate.role,
     mutation,
     source: "manual",
@@ -525,6 +527,7 @@ export async function setStaffActive(id: string, active: boolean): Promise<Actio
   if (!mutation) return { ok: false, error: "errors.invalidData" };
   const result = await applyStaffSettingsMutation({
     actorId: gate.userId,
+    storeId: gate.storeId,
     actorRole: gate.role,
     mutation,
     source: "manual",

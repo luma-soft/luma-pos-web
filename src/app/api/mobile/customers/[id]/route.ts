@@ -55,6 +55,7 @@ export async function DELETE(
   const { id } = await params;
   const authorization = await authorizeMobileSensitiveAction({
     request,
+    storeId: gate.storeId,
     requesterId: gate.userId,
     requesterRole: gate.role,
     permission: "customer.erase",

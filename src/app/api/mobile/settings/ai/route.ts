@@ -19,6 +19,7 @@ export async function PATCH(request: Request) {
   if (!body) return mobileError("errors.invalidData");
   const authorization = await authorizeMobileSensitiveAction({
     request,
+    storeId: gate.storeId,
     requesterId: gate.userId,
     requesterRole: gate.role,
     permission: "settings.sensitive",

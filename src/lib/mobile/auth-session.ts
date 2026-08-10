@@ -1,7 +1,6 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import type { Session } from "@supabase/supabase-js";
-import { eq } from "drizzle-orm";
-import { activeProfile } from "@/lib/auth/profile-access";
+import { resolveStoreContextForUser } from "@/lib/auth/store-context";
 
 export function createMobileAuthClient() {
   return createSupabaseClient(
@@ -17,36 +16,15 @@ export function createMobileAuthClient() {
 }
 
 export async function mobileAuthPayload(session: Session) {
-  let profile:
-    | {
-        fullName: string | null;
-        role: string;
-        isActive: boolean;
-      }
-    | undefined;
-
+  let context;
   try {
-    const [{ db }, { profiles }] = await Promise.all([
-      import("@/db"),
-      import("@/db/schema"),
-    ]);
-
-    [profile] = await db
-      .select({
-        fullName: profiles.fullName,
-        role: profiles.role,
-        isActive: profiles.isActive,
-      })
-      .from(profiles)
-      .where(eq(profiles.id, session.user.id))
-      .limit(1);
+    context = await resolveStoreContextForUser(session.user.id);
   } catch (error) {
     console.error("mobileAuthPayload failed:", error);
     return { ok: false as const, error: "errors.serverError" };
   }
 
-  const active = activeProfile(profile);
-  if (!active) {
+  if (!context) {
     return { ok: false as const, error: "errors.unauthorized" };
   }
 
@@ -61,8 +39,14 @@ export async function mobileAuthPayload(session: Session) {
       user: {
         id: session.user.id,
         email: session.user.email ?? "",
-        role: active.role,
-        fullName: active.fullName ?? session.user.email ?? "",
+        role: context.role,
+        fullName: context.fullName,
+      },
+      store: {
+        id: context.storeId,
+        name: context.storeName,
+        slug: context.storeSlug,
+        features: context.features,
       },
     },
   };

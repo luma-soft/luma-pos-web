@@ -17,6 +17,7 @@ export type CashierContextRole = "owner" | "manager" | "cashier" | "warehouse" |
 export type CashierContextClaims = {
   principalId: string;
   cashierId: string;
+  storeId: string;
   role: CashierContextRole;
   expiresAtMs: number;
 };
@@ -85,6 +86,7 @@ export function createCashierContextToken(
       v: 1,
       principalId: claims.principalId,
       cashierId: claims.cashierId,
+      storeId: claims.storeId,
       role: claims.role,
       expiresAtMs: nowMs + ttlMs,
       nonce: randomBytes(12).toString("base64url"),
@@ -95,7 +97,7 @@ export function createCashierContextToken(
 
 export function verifyCashierContextToken(
   token: string,
-  options: { secret: string; principalId: string; nowMs?: number },
+  options: { secret: string; principalId: string; storeId: string; nowMs?: number },
 ): CashierContextClaims | null {
   try {
     assertContextSecret(options.secret);
@@ -110,6 +112,7 @@ export function verifyCashierContextToken(
       v?: unknown;
       principalId?: unknown;
       cashierId?: unknown;
+      storeId?: unknown;
       role?: unknown;
       expiresAtMs?: unknown;
     };
@@ -118,6 +121,7 @@ export function verifyCashierContextToken(
     if (
       value.v !== 1 ||
       value.principalId !== options.principalId ||
+      value.storeId !== options.storeId ||
       typeof value.cashierId !== "string" ||
       !isCashierContextRole(role) ||
       !Number.isSafeInteger(expiresAtMs) ||
@@ -128,6 +132,7 @@ export function verifyCashierContextToken(
     return {
       principalId: options.principalId,
       cashierId: value.cashierId,
+      storeId: options.storeId,
       role,
       expiresAtMs,
     };

@@ -1,6 +1,7 @@
 import {
   pgTable, uuid, text, varchar, integer, decimal, timestamp, date,
   boolean, bigint, jsonb, primaryKey, index, uniqueIndex, pgEnum, check,
+  foreignKey, unique,
 } from "drizzle-orm/pg-core";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
@@ -91,6 +92,7 @@ export const profiles = pgTable("profiles", {
   storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   fullName: text("full_name").notNull(),
   phone: varchar("phone", { length: 20 }),
+  phoneNormalized: text("phone_normalized"),
   role: userRoleEnum("role").notNull().default("cashier"),
   isActive: boolean("is_active").notNull().default(true),
   cashierPinHash: text("cashier_pin_hash"),
@@ -100,6 +102,10 @@ export const profiles = pgTable("profiles", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("profiles_store_active_role_idx").on(t.storeId, t.isActive, t.role),
+  uniqueIndex("profiles_phone_normalized_unique")
+    .on(t.phoneNormalized)
+    .where(sql`${t.phoneNormalized} is not null`),
+  unique("profiles_store_id_id_unique").on(t.storeId, t.id),
 ]);
 
 export const storeFeatures = pgTable("store_features", {
@@ -130,11 +136,17 @@ export const staffInvitations = pgTable("staff_invitations", {
 }, (t) => [
   index("staff_invitations_store_created_idx").on(t.storeId, t.createdAt),
   index("staff_invitations_store_email_idx").on(t.storeId, t.email),
+  foreignKey({
+    columns: [t.storeId, t.invitedBy],
+    foreignColumns: [profiles.storeId, profiles.id],
+    name: "staff_invitations_store_inviter_fk",
+  }),
   check("staff_invitations_contact_check", sql`${t.email} is not null or ${t.phoneNormalized} is not null`),
 ]);
 
 export const mobileApprovals = pgTable("mobile_approvals", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().references(() => stores.id, { onDelete: "cascade" }),
   tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
   requesterId: uuid("requester_id").notNull().references(() => profiles.id),
   approverId: uuid("approver_id").notNull().references(() => profiles.id),
@@ -147,7 +159,18 @@ export const mobileApprovals = pgTable("mobile_approvals", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("mobile_approvals_requester_idx").on(t.requesterId, t.createdAt),
+  index("mobile_approvals_store_requester_idx").on(t.storeId, t.requesterId, t.createdAt),
   index("mobile_approvals_expiry_idx").on(t.expiresAt),
+  foreignKey({
+    columns: [t.storeId, t.requesterId],
+    foreignColumns: [profiles.storeId, profiles.id],
+    name: "mobile_approvals_store_requester_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [t.storeId, t.approverId],
+    foreignColumns: [profiles.storeId, profiles.id],
+    name: "mobile_approvals_store_approver_fk",
+  }).onDelete("cascade"),
 ]);
 
 // ============= General Audit Log =============

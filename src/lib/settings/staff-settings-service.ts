@@ -12,6 +12,7 @@ type StaffMutationResult = ActionResult<{ id: string }>;
 
 export async function applyStaffSettingsMutation(input: {
   actorId: string;
+  storeId: string;
   actorRole: Role;
   mutation: StaffSettingsMutation;
   source: Extract<AuditSource, "manual" | "mobile">;
@@ -23,7 +24,11 @@ export async function applyStaffSettingsMutation(input: {
       const activeOwners = await tx
         .select({ id: profiles.id })
         .from(profiles)
-        .where(and(eq(profiles.role, "owner"), eq(profiles.isActive, true)))
+        .where(and(
+          eq(profiles.storeId, input.storeId),
+          eq(profiles.role, "owner"),
+          eq(profiles.isActive, true),
+        ))
         .orderBy(profiles.id)
         .for("update");
       const [target] = await tx
@@ -33,7 +38,10 @@ export async function applyStaffSettingsMutation(input: {
           isActive: profiles.isActive,
         })
         .from(profiles)
-        .where(eq(profiles.id, input.mutation.id))
+        .where(and(
+          eq(profiles.id, input.mutation.id),
+          eq(profiles.storeId, input.storeId),
+        ))
         .limit(1);
       if (!target) return { status: "not_found" } as const;
 
@@ -57,12 +65,12 @@ export async function applyStaffSettingsMutation(input: {
         await tx
           .update(profiles)
           .set({ role: input.mutation.role })
-          .where(eq(profiles.id, target.id));
+          .where(and(eq(profiles.id, target.id), eq(profiles.storeId, input.storeId)));
       } else {
         await tx
           .update(profiles)
           .set({ isActive: input.mutation.active })
-          .where(eq(profiles.id, target.id));
+          .where(and(eq(profiles.id, target.id), eq(profiles.storeId, input.storeId)));
       }
       return {
         status: "updated",

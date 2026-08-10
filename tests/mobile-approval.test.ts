@@ -10,16 +10,20 @@ describe("mobile approval credentials", () => {
     expect(approvalModeFor({
       requesterRole: "manager",
       requesterId: "manager-1",
+      requesterStoreId: "store-a",
       approverRole: "manager",
       approverId: "manager-1",
+      approverStoreId: "store-a",
       permission: "refund.create",
     })).toBe("reauth");
 
     expect(approvalModeFor({
       requesterRole: "manager",
       requesterId: "manager-1",
+      requesterStoreId: "store-a",
       approverRole: "owner",
       approverId: "owner-1",
+      approverStoreId: "store-a",
       permission: "refund.create",
     })).toBeNull();
   });
@@ -28,16 +32,20 @@ describe("mobile approval credentials", () => {
     expect(approvalModeFor({
       requesterRole: "cashier",
       requesterId: "cashier-1",
+      requesterStoreId: "store-a",
       approverRole: "manager",
       approverId: "manager-1",
+      approverStoreId: "store-a",
       permission: "order.void",
     })).toBe("manager");
 
     expect(approvalModeFor({
       requesterRole: "cashier",
       requesterId: "cashier-1",
+      requesterStoreId: "store-a",
       approverRole: "cashier",
       approverId: "cashier-2",
+      approverStoreId: "store-a",
       permission: "order.void",
     })).toBeNull();
   });
@@ -46,9 +54,23 @@ describe("mobile approval credentials", () => {
     expect(approvalModeFor({
       requesterRole: "warehouse",
       requesterId: "warehouse-1",
+      requesterStoreId: "store-a",
       approverRole: "owner",
       approverId: "owner-1",
+      approverStoreId: "store-a",
       permission: "refund.create",
+    })).toBeNull();
+  });
+
+  test("never issues approval across stores", () => {
+    expect(approvalModeFor({
+      requesterRole: "cashier",
+      requesterId: "cashier-a",
+      requesterStoreId: "store-a",
+      approverRole: "owner",
+      approverId: "owner-b",
+      approverStoreId: "store-b",
+      permission: "order.void",
     })).toBeNull();
   });
 

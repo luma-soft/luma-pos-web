@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   }
   const permission = permissionValue as MobilePermission;
 
-  const verification = await verifyStaffPin(approverId, pin);
+  const verification = await verifyStaffPin(approverId, pin, gate.storeId);
   if (!verification.ok) {
     await db.insert(auditLogs).values({
       actorId: gate.userId,
@@ -59,8 +59,10 @@ export async function POST(request: Request) {
   const mode = approvalModeFor({
     requesterRole: gate.role,
     requesterId: gate.userId,
+    requesterStoreId: gate.storeId,
     approverRole: verification.staff.role,
     approverId: verification.staff.id,
+    approverStoreId: gate.storeId,
     permission,
   });
   if (!mode) {
@@ -77,6 +79,7 @@ export async function POST(request: Request) {
   }
 
   const credential = await issueMobileApproval({
+    storeId: gate.storeId,
     requesterId: gate.userId,
     approverId: verification.staff.id,
     permission,

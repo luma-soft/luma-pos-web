@@ -46,6 +46,7 @@ export async function POST(request: Request) {
   if (!orderId) return mobileError("errors.invalidData");
   const authorization = await authorizeMobileSensitiveAction({
     request,
+    storeId: gate.storeId,
     requesterId: gate.userId,
     requesterRole: gate.role,
     permission: "refund.create",
