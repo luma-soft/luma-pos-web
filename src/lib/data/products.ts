@@ -66,14 +66,14 @@ function productComplianceFields(hasColumns: boolean) {
   };
 }
 
-export async function getProducts(filters: ProductListFilters = {}) {
+export async function getProducts(storeId: string, filters: ProductListFilters = {}) {
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize, DEFAULT_PAGE_SIZE);
   const status: ProductStatusFilter = filters.status ?? "active";
   const view: ProductListView = filters.view ?? "grouped";
   const hasComplianceColumns = await hasProductComplianceColumns();
   const complianceFields = productComplianceFields(hasComplianceColumns);
-  const conditions: SQL[] = [];
+  const conditions: SQL[] = [eq(products.storeId, storeId)];
   const exactProductId = filters.exactProductId;
 
   if (exactProductId) {
@@ -83,6 +83,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
     const childSearch = sql`exists (
       select 1 from products child
       where child.parent_product_id = ${products.id}
+        and child.store_id = ${storeId}
         and (
           ${accentInsensitiveLike(sql`child.name`, q)}
           or ${accentInsensitiveLike(sql`child.sku`, q)}
@@ -105,6 +106,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
             sql`exists (
               select 1 from products child
               where child.parent_product_id = ${products.id}
+                and child.store_id = ${storeId}
                 and child.category_id = ${filters.categoryId}
             )`,
           )!
@@ -127,6 +129,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
               sql`exists (
                 select 1 from products child
                 where child.parent_product_id = ${products.id}
+                  and child.store_id = ${storeId}
                   and child.updated_at >= ${since}
               )`,
             )!
@@ -157,6 +160,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
           sql`exists (
           select 1 from products child
           where child.parent_product_id = ${products.id}
+            and child.store_id = ${storeId}
             and child.is_active = true
         )`,
         )!,
@@ -168,6 +172,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
           sql`not exists (
           select 1 from products child
           where child.parent_product_id = ${products.id}
+            and child.store_id = ${storeId}
             and child.is_active = true
         )`,
         )!,
@@ -179,6 +184,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
           sql`exists (
             select 1 from products child
             where child.parent_product_id = ${products.id}
+              and child.store_id = ${storeId}
               and child.lifecycle_status = ${status}
           )`,
         )!,
@@ -252,39 +258,43 @@ export async function getProducts(filters: ProductListFilters = {}) {
           from product_combo_items pci
           join products component on component.id = pci.component_product_id
           where pci.combo_product_id = ${products.id}
+            and pci.store_id = ${storeId}
         ), '[]')`,
         childCount: sql<number>`(
-          select count(*)::int from products child where child.parent_product_id = ${products.id}
+          select count(*)::int from products child where child.store_id = ${storeId} and child.parent_product_id = ${products.id}
         )`,
         minCostPrice: sql<string>`case when ${products.isVariantParent} then coalesce((
-          select min(child.cost_price) from products child where child.parent_product_id = ${products.id}
+          select min(child.cost_price) from products child where child.store_id = ${storeId} and child.parent_product_id = ${products.id}
         ), ${products.costPrice}) else ${products.costPrice} end`,
         maxCostPrice: sql<string>`case when ${products.isVariantParent} then coalesce((
-          select max(child.cost_price) from products child where child.parent_product_id = ${products.id}
+          select max(child.cost_price) from products child where child.store_id = ${storeId} and child.parent_product_id = ${products.id}
         ), ${products.costPrice}) else ${products.costPrice} end`,
         minRetailPrice: sql<string>`case when ${products.isVariantParent} then coalesce((
-          select min(child.retail_price) from products child where child.parent_product_id = ${products.id}
+          select min(child.retail_price) from products child where child.store_id = ${storeId} and child.parent_product_id = ${products.id}
         ), ${products.retailPrice}) else ${products.retailPrice} end`,
         maxRetailPrice: sql<string>`case when ${products.isVariantParent} then coalesce((
-          select max(child.retail_price) from products child where child.parent_product_id = ${products.id}
+          select max(child.retail_price) from products child where child.store_id = ${storeId} and child.parent_product_id = ${products.id}
         ), ${products.retailPrice}) else ${products.retailPrice} end`,
         totalStock: sql<string>`case when ${products.isVariantParent} then (
           select coalesce(sum(sl.quantity), 0)
           from products child
           left join stock_levels sl on sl.product_id = child.id
           where child.parent_product_id = ${products.id}
+            and child.store_id = ${storeId}
         ) else coalesce(sum(${stockLevels.quantity}), 0) end`,
         reservedStock: sql<string>`case when ${products.isVariantParent} then (
           select coalesce(sum(sl.reserved), 0)
           from products child
           left join stock_levels sl on sl.product_id = child.id
           where child.parent_product_id = ${products.id}
+            and child.store_id = ${storeId}
         ) else coalesce(sum(${stockLevels.reserved}), 0) end`,
         minLevel: sql<string>`case when ${products.isVariantParent} then (
           select coalesce(max(sl.min_level), 0)
           from products child
           left join stock_levels sl on sl.product_id = child.id
           where child.parent_product_id = ${products.id}
+            and child.store_id = ${storeId}
         ) else coalesce(max(${stockLevels.minLevel}), 0) end`,
         unitNames: sql<string | null>`(
           select string_agg(${productUnits.unitName}, ', ' order by ${productUnits.sortOrder})
@@ -390,7 +400,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
           .leftJoin(categories, eq(products.categoryId, categories.id))
           .leftJoin(brands, eq(products.brandId, brands.id))
           .leftJoin(stockLevels, eq(stockLevels.productId, products.id))
-          .where(inArray(products.parentProductId, parentIds))
+          .where(and(eq(products.storeId, storeId), inArray(products.parentProductId, parentIds)))
           .groupBy(products.id, categories.name, brands.name)
           .orderBy(filters.sort === "stock" ? desc(products.totalStock) : filters.sort === "updated" ? desc(products.updatedAt) : asc(products.name), asc(products.id))
       : [];
@@ -434,7 +444,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
           })
           .from(stockLevels)
           .innerJoin(warehouses, eq(stockLevels.warehouseId, warehouses.id))
-          .where(inArray(stockLevels.productId, physicalProductIds))
+          .where(and(eq(stockLevels.storeId, storeId), inArray(stockLevels.productId, physicalProductIds)))
           .orderBy(desc(warehouses.isDefault), asc(warehouses.name))
       : [];
 
@@ -521,7 +531,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
           end`,
           })
           .from(stockMovements)
-          .where(inArray(stockMovements.productId, physicalProductIds))
+          .where(and(eq(stockMovements.storeId, storeId), inArray(stockMovements.productId, physicalProductIds)))
           .orderBy(desc(stockMovements.createdAt))
           .limit(300)
       : [];
@@ -593,7 +603,7 @@ export async function getProducts(filters: ProductListFilters = {}) {
         })
         .from(products)
         .leftJoin(stockLevels, eq(stockLevels.productId, products.id))
-        .where(relatedWhere)
+        .where(and(eq(products.storeId, storeId), relatedWhere))
         .groupBy(products.id)
         .orderBy(asc(products.name))
         .limit(240)
@@ -629,8 +639,8 @@ export async function getProducts(filters: ProductListFilters = {}) {
   };
 }
 
-export async function getProductListItem(id: string) {
-  const result = await getProducts({
+export async function getProductListItem(storeId: string, id: string) {
+  const result = await getProducts(storeId, {
     exactProductId: id,
     status: "all",
     view: "flat",
@@ -640,26 +650,29 @@ export async function getProductListItem(id: string) {
   return result.rows[0] ?? null;
 }
 
-export async function getMobileProducts(filters: ProductListFilters = {}) {
+export async function getMobileProducts(storeId: string, filters: ProductListFilters = {}) {
   // Keep mobile and web on the same grouped variant projection.
-  return getProducts({ ...filters, view: "grouped" });
+  return getProducts(storeId, { ...filters, view: "grouped" });
 }
 
-export async function getMobileProductOptions() {
+export async function getMobileProductOptions(storeId: string) {
   const [cats, brandRows, supplierRows] = await Promise.all([
     db
       .select({ id: categories.id, name: categories.name })
       .from(categories)
+      .where(eq(categories.storeId, storeId))
       .orderBy(asc(categories.sortOrder), asc(categories.name))
       .limit(80),
     db
       .select({ id: brands.id, name: brands.name })
       .from(brands)
+      .where(eq(brands.storeId, storeId))
       .orderBy(asc(brands.name))
       .limit(80),
     db
       .select({ id: suppliers.id, name: suppliers.name })
       .from(suppliers)
+      .where(eq(suppliers.storeId, storeId))
       .orderBy(asc(suppliers.name))
       .limit(80),
   ]);
@@ -667,7 +680,7 @@ export async function getMobileProductOptions() {
 }
 
 /** Chi tiết 1 SP cho trang xem/sửa (gồm đơn vị quy đổi + tồn kho). */
-export async function getProduct(id: string) {
+export async function getProduct(storeId: string, id: string) {
   const complianceFields = productComplianceFields(
     await hasProductComplianceColumns(),
   );
@@ -721,7 +734,7 @@ export async function getProduct(id: string) {
     .leftJoin(categories, eq(products.categoryId, categories.id))
     .leftJoin(brands, eq(products.brandId, brands.id))
     .leftJoin(suppliers, eq(products.supplierId, suppliers.id))
-    .where(eq(products.id, id))
+    .where(and(eq(products.storeId, storeId), eq(products.id, id)))
     .limit(1);
   if (!p) return null;
 
@@ -747,7 +760,7 @@ export async function getProduct(id: string) {
     })
     .from(productComboItems)
     .innerJoin(products, eq(productComboItems.componentProductId, products.id))
-    .where(eq(productComboItems.comboProductId, id))
+    .where(and(eq(productComboItems.storeId, storeId), eq(productComboItems.comboProductId, id)))
     .orderBy(asc(productComboItems.sortOrder));
 
   // nhiều NCC (chính trước)
@@ -759,7 +772,7 @@ export async function getProduct(id: string) {
     })
     .from(productSuppliers)
     .leftJoin(suppliers, eq(productSuppliers.supplierId, suppliers.id))
-    .where(eq(productSuppliers.productId, id))
+    .where(and(eq(productSuppliers.storeId, storeId), eq(productSuppliers.productId, id)))
     .orderBy(desc(productSuppliers.isPrimary));
 
   const siblings = p.parentProductId
@@ -778,6 +791,7 @@ export async function getProduct(id: string) {
         .where(
           and(
             eq(products.parentProductId, p.parentProductId),
+            eq(products.storeId, storeId),
             sql`${products.id} <> ${id}`,
           ),
         )
@@ -799,7 +813,7 @@ export async function getProduct(id: string) {
           isActive: products.isActive,
         })
         .from(products)
-        .where(eq(products.parentProductId, p.id))
+        .where(and(eq(products.storeId, storeId), eq(products.parentProductId, p.id)))
         .orderBy(asc(products.name))
     : [];
 
@@ -841,19 +855,22 @@ export type ProductDetail = NonNullable<Awaited<ReturnType<typeof getProduct>>>;
 // Danh mục/thương hiệu/NCC cho dropdown — cache 60s (ít thay đổi), dùng chung
 // nhiều trang (Sản phẩm, Thiết lập giá, Tồn kho) → đỡ query lặp.
 export const getProductFormOptions = unstable_cache(
-  async () => {
+  async (storeId: string) => {
     const [cats, brandRows, supplierRows, comboProductRows] = await Promise.all([
       db
         .select({ id: categories.id, name: categories.name })
         .from(categories)
+        .where(eq(categories.storeId, storeId))
         .orderBy(asc(categories.sortOrder), asc(categories.name)),
       db
         .select({ id: brands.id, name: brands.name })
         .from(brands)
+        .where(eq(brands.storeId, storeId))
         .orderBy(asc(brands.name)),
       db
         .select({ id: suppliers.id, name: suppliers.name })
         .from(suppliers)
+        .where(eq(suppliers.storeId, storeId))
         .orderBy(asc(suppliers.name)),
       db
         .select({
@@ -875,6 +892,7 @@ export const getProductFormOptions = unstable_cache(
         })
         .from(products)
         .where(and(
+          eq(products.storeId, storeId),
           eq(products.isVariantParent, false),
           sql`${products.productKind} <> 'combo'`,
         ))

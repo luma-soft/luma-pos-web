@@ -16,8 +16,7 @@ import {
 
 export async function GET() {
   const gate = await requireMobileStockReadAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const rows = await db
     .select({
@@ -35,6 +34,7 @@ export async function GET() {
     .from(stocktakes)
     .innerJoin(warehouses, eq(stocktakes.warehouseId, warehouses.id))
     .leftJoin(profiles, eq(stocktakes.createdBy, profiles.id))
+    .where(eq(stocktakes.storeId, gate.storeId))
     .orderBy(desc(stocktakes.createdAt))
     .limit(50);
 

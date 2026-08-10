@@ -14,7 +14,7 @@ export async function GET(
   const gate = await requireMobileSalesAccess();
   if (!gate.ok) return mobileGate(gate)!;
   const { id: customerId } = await params;
-  const overview = await getCustomerReceivableOverview(customerId);
+  const overview = await getCustomerReceivableOverview(gate.storeId, customerId);
   return overview ? mobileOk(overview) : mobileError("errors.notFound", 404);
 }
 

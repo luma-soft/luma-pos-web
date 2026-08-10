@@ -16,16 +16,12 @@ type DatabaseLike = any;
 
 export async function persistStorePrefsMutation<T>(
   database: DatabaseLike,
+  storeId: string,
   mutate: (current: StorePrefs) => {
     next: StorePrefs;
     value: T;
   },
 ): Promise<{ before: StorePrefs; after: StorePrefs; value: T }> {
-  await database
-    .insert(storeSettings)
-    .values({ id: "default" })
-    .onConflictDoNothing({ target: storeSettings.id });
-
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const [row] = await database
       .select({
@@ -34,7 +30,7 @@ export async function persistStorePrefsMutation<T>(
         version: sql<string>`"store_settings"."xmin"::text`,
       })
       .from(storeSettings)
-      .where(eq(storeSettings.id, "default"))
+      .where(eq(storeSettings.storeId, storeId))
       .limit(1);
     if (!row) throw new Error("STORE_SETTINGS_NOT_FOUND");
 
@@ -51,7 +47,7 @@ export async function persistStorePrefsMutation<T>(
         updatedAt: nextUpdatedAt,
       })
       .where(and(
-        eq(storeSettings.id, "default"),
+        eq(storeSettings.storeId, storeId),
         sql`"store_settings"."xmin"::text = ${row.version}`,
       ))
       .returning({ id: storeSettings.id });
@@ -69,9 +65,10 @@ export async function persistStorePrefsMutation<T>(
 
 export async function persistStorePrefsPatch(
   database: DatabaseLike,
+  storeId: string,
   patch: StorePrefsPatch,
 ): Promise<StorePrefs> {
-  const persisted = await persistStorePrefsMutation(database, (current) => {
+  const persisted = await persistStorePrefsMutation(database, storeId, (current) => {
     const next = { ...current, ...patch };
     return { next, value: next };
   });
@@ -80,9 +77,10 @@ export async function persistStorePrefsPatch(
 
 export async function persistNotificationSettingsPatch(
   database: DatabaseLike,
+  storeId: string,
   patch: MobileNotificationSettingsPatch,
 ): Promise<StorePrefs["notifications"]> {
-  const persisted = await persistStorePrefsMutation(database, (current) => {
+  const persisted = await persistStorePrefsMutation(database, storeId, (current) => {
     const notifications = mergeMobileNotificationSettings(
       current.notifications,
       patch,

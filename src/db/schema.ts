@@ -234,19 +234,24 @@ export const aiChatMessages = pgTable("ai_chat_messages", {
 
 export const categories = pgTable("categories", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   name: text("name").notNull(),
   parentId: uuid("parent_id"),
   sortOrder: integer("sort_order").default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => [index("categories_parent_idx").on(t.parentId)]);
+}, (t) => [
+  uniqueIndex("categories_store_name_unique").on(t.storeId, t.name),
+  index("categories_parent_idx").on(t.parentId),
+]);
 
 // ============= Brands =============
 
 export const brands = pgTable("brands", {
   id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull().unique(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
+  name: text("name").notNull(),
   logoUrl: text("logo_url"),
-});
+}, (t) => [uniqueIndex("brands_store_name_unique").on(t.storeId, t.name)]);
 
 // ============= Price books (bảng giá động) =============
 // Bảng giá mặc định (isDefault) đọc products.retailPrice. Bảng khác lưu override
@@ -254,6 +259,7 @@ export const brands = pgTable("brands", {
 
 export const priceBooks = pgTable("price_books", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   name: text("name").notNull(),
   isDefault: boolean("is_default").notNull().default(false),
   // Bảng giá nội bộ (ví dụ giá nhập) chỉ owner/manager được chọn khi bán hàng.
@@ -262,10 +268,13 @@ export const priceBooks = pgTable("price_books", {
   costBased: boolean("cost_based").notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  uniqueIndex("price_books_store_default_unique").on(t.storeId).where(sql`${t.isDefault} = true`),
+]);
 
 export const productPrices = pgTable("product_prices", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   priceBookId: uuid("price_book_id").notNull().references(() => priceBooks.id, { onDelete: "cascade" }),
   productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
   price: decimal("price", { precision: 14, scale: 2 }).notNull(),
@@ -278,11 +287,14 @@ export const productPrices = pgTable("product_prices", {
 
 export const warehouses = pgTable("warehouses", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   name: text("name").notNull(),
   address: text("address"),
   isDefault: boolean("is_default").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  uniqueIndex("warehouses_store_default_unique").on(t.storeId).where(sql`${t.isDefault} = true`),
+]);
 
 // ============= Products =============
 // 1 product = 1 SKU. Variants are separate products linked by parent_id
@@ -290,7 +302,8 @@ export const warehouses = pgTable("warehouses", {
 
 export const products = pgTable("products", {
   id: uuid("id").primaryKey().defaultRandom(),
-  sku: varchar("sku", { length: 50 }).notNull().unique(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
+  sku: varchar("sku", { length: 50 }).notNull(),
   barcode: varchar("barcode", { length: 50 }),
   name: text("name").notNull(),
   productKind: productKindEnum("product_kind").notNull().default("product"),
@@ -343,6 +356,7 @@ export const products = pgTable("products", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
+  uniqueIndex("products_store_sku_unique").on(t.storeId, t.sku),
   index("products_sku_idx").on(t.sku),
   index("products_barcode_idx").on(t.barcode),
   index("products_name_idx").on(t.name),
@@ -372,6 +386,7 @@ export const productUnits = pgTable("product_units", {
 // Thành phần của combo. quantity luôn tính theo đơn vị cơ bản của sản phẩm con.
 export const productComboItems = pgTable("product_combo_items", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   comboProductId: uuid("combo_product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
   componentProductId: uuid("component_product_id").notNull().references(() => products.id, { onDelete: "restrict" }),
   quantity: decimal("quantity", { precision: 14, scale: 4 }).notNull().default("1"),
@@ -388,6 +403,7 @@ export const productComboItems = pgTable("product_combo_items", {
 // 1 sản phẩm mua được từ NHIỀU nhà cung cấp (products.supplierId = NCC chính)
 export const productSuppliers = pgTable("product_suppliers", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
   supplierId: uuid("supplier_id").notNull().references(() => suppliers.id, { onDelete: "cascade" }),
   isPrimary: boolean("is_primary").notNull().default(false),
@@ -402,13 +418,14 @@ export const productSuppliers = pgTable("product_suppliers", {
 // ============= Stock Levels =============
 
 export const stockLevels = pgTable("stock_levels", {
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
   warehouseId: uuid("warehouse_id").notNull().references(() => warehouses.id, { onDelete: "cascade" }),
   quantity: decimal("quantity", { precision: 14, scale: 4 }).notNull().default("0"), // base unit
   reserved: decimal("reserved", { precision: 14, scale: 4 }).notNull().default("0"), // đã đặt cọc
   minLevel: decimal("min_level", { precision: 14, scale: 4 }).default("0"),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => [primaryKey({ columns: [t.productId, t.warehouseId] })]);
+}, (t) => [primaryKey({ columns: [t.storeId, t.productId, t.warehouseId] })]);
 
 // Singleton revision advanced by DB triggers whenever the offline Product
 // Catalog projection changes. Clients poll this lightweight value before
@@ -427,6 +444,7 @@ export const catalogSyncState = pgTable("catalog_sync_state", {
 
 export const stockMovements = pgTable("stock_movements", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   productId: uuid("product_id").notNull().references(() => products.id),
   warehouseId: uuid("warehouse_id").notNull().references(() => warehouses.id),
   type: stockMovementTypeEnum("type").notNull(),
@@ -446,7 +464,8 @@ export const stockMovements = pgTable("stock_movements", {
 
 export const customers = pgTable("customers", {
   id: uuid("id").primaryKey().defaultRandom(),
-  code: varchar("code", { length: 30 }).unique(), // KH001
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
+  code: varchar("code", { length: 30 }), // KH001
   name: text("name").notNull(),
   phone: varchar("phone", { length: 20 }),
   zaloUserId: text("zalo_user_id"),
@@ -463,6 +482,7 @@ export const customers = pgTable("customers", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
+  uniqueIndex("customers_store_code_unique").on(t.storeId, t.code).where(sql`${t.code} is not null`),
   index("customers_phone_idx").on(t.phone),
   index("customers_zalo_user_id_idx").on(t.zaloUserId),
   index("customers_name_idx").on(t.name),
@@ -631,7 +651,8 @@ export const mobileTelemetryEvents = pgTable("mobile_telemetry_events", {
 
 export const suppliers = pgTable("suppliers", {
   id: uuid("id").primaryKey().defaultRandom(),
-  code: varchar("code", { length: 30 }).unique(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
+  code: varchar("code", { length: 30 }),
   name: text("name").notNull(),
   phone: varchar("phone", { length: 20 }),
   email: text("email"),
@@ -640,12 +661,15 @@ export const suppliers = pgTable("suppliers", {
   currentDebt: decimal("current_debt", { precision: 14, scale: 2 }).notNull().default("0"),
   note: text("note"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [
+  uniqueIndex("suppliers_store_code_unique").on(t.storeId, t.code).where(sql`${t.code} is not null`),
+]);
 
 // ============= Payment providers / bank accounts =============
 
 export const paymentBankAccounts = pgTable("payment_bank_accounts", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   provider: text("provider").notNull().default("sepay"),
   bankCode: varchar("bank_code", { length: 40 }).notNull(),
   gateway: varchar("gateway", { length: 80 }),
@@ -671,10 +695,11 @@ export const paymentBankAccounts = pgTable("payment_bank_accounts", {
 
 export const orders = pgTable("orders", {
   id: uuid("id").primaryKey().defaultRandom(),
-  code: varchar("code", { length: 30 }).notNull().unique(), // HD20260506-001
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
+  code: varchar("code", { length: 30 }).notNull(), // HD20260506-001
   // Khử trùng đơn khi đồng bộ offline: mỗi đơn từ POS có 1 clientId; sync lại
   // không tạo đơn trùng (unique). Xem supabase/order-client-id.sql.
-  clientId: varchar("client_id", { length: 40 }).unique(),
+  clientId: varchar("client_id", { length: 40 }),
   status: orderStatusEnum("status").notNull().default("draft"),
   documentType: orderDocumentTypeEnum("document_type").notNull().default("sale"),
   paymentStatus: paymentStatusEnum("payment_status").notNull().default("unpaid"),
@@ -707,6 +732,8 @@ export const orders = pgTable("orders", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
+  uniqueIndex("orders_store_code_unique").on(t.storeId, t.code),
+  uniqueIndex("orders_store_client_id_unique").on(t.storeId, t.clientId).where(sql`${t.clientId} is not null`),
   index("orders_status_idx").on(t.status),
   index("orders_document_type_status_idx").on(t.documentType, t.status),
   index("orders_customer_idx").on(t.customerId),
@@ -718,6 +745,7 @@ export const orders = pgTable("orders", {
 
 export const orderItems = pgTable("order_items", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
   productId: uuid("product_id").notNull().references(() => products.id),
   productName: text("product_name").notNull(), // snapshot
@@ -737,6 +765,7 @@ export const orderItems = pgTable("order_items", {
 
 export const payments = pgTable("payments", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   orderId: uuid("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
   shiftId: uuid("shift_id").references(() => shifts.id, { onDelete: "set null" }),
   status: text("status").notNull().default("manual_confirmed"),
@@ -782,25 +811,29 @@ export const payments = pgTable("payments", {
 /** One debt-collection receipt may be allocated across several invoices. */
 export const customerReceivableReceipts = pgTable("customer_receivable_receipts", {
   id: uuid("id").primaryKey().defaultRandom(),
-  code: varchar("code", { length: 40 }).notNull().unique(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
+  code: varchar("code", { length: 40 }).notNull(),
   customerId: uuid("customer_id").notNull().references(() => customers.id),
   status: customerReceivableReceiptStatusEnum("status").notNull().default("confirmed"),
   amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
   method: paymentMethodEnum("method").notNull(),
   reference: text("reference"),
   note: text("note"),
-  clientRequestId: varchar("client_request_id", { length: 80 }).notNull().unique(),
+  clientRequestId: varchar("client_request_id", { length: 80 }).notNull(),
   createdBy: uuid("created_by").references(() => profiles.id),
   confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
   expiresAt: timestamp("expires_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
+  uniqueIndex("customer_receivable_receipts_store_code_unique").on(t.storeId, t.code),
+  uniqueIndex("customer_receivable_receipts_store_client_unique").on(t.storeId, t.clientRequestId),
   index("customer_receivable_receipts_customer_idx").on(t.customerId, t.createdAt),
   index("customer_receivable_receipts_status_idx").on(t.status, t.createdAt),
 ]);
 
 export const customerReceivableAllocations = pgTable("customer_receivable_allocations", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   receiptId: uuid("receipt_id").notNull().references(() => customerReceivableReceipts.id, { onDelete: "cascade" }),
   orderId: uuid("order_id").notNull().references(() => orders.id),
   paymentId: uuid("payment_id").references(() => payments.id),
@@ -814,7 +847,8 @@ export const customerReceivableAllocations = pgTable("customer_receivable_alloca
 /** Adjustment and settlement-discount entries: positive raises debt, negative lowers it. */
 export const customerReceivableEntries = pgTable("customer_receivable_entries", {
   id: uuid("id").primaryKey().defaultRandom(),
-  code: varchar("code", { length: 40 }).notNull().unique(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
+  code: varchar("code", { length: 40 }).notNull(),
   customerId: uuid("customer_id").notNull().references(() => customers.id),
   orderId: uuid("order_id").references(() => orders.id),
   type: customerReceivableEntryTypeEnum("type").notNull(),
@@ -822,11 +856,13 @@ export const customerReceivableEntries = pgTable("customer_receivable_entries", 
   reason: text("reason").notNull(),
   reference: text("reference"),
   note: text("note"),
-  clientRequestId: varchar("client_request_id", { length: 80 }).notNull().unique(),
+  clientRequestId: varchar("client_request_id", { length: 80 }).notNull(),
   createdBy: uuid("created_by").references(() => profiles.id),
   approvedBy: uuid("approved_by").references(() => profiles.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
+  uniqueIndex("customer_receivable_entries_store_code_unique").on(t.storeId, t.code),
+  uniqueIndex("customer_receivable_entries_store_client_unique").on(t.storeId, t.clientRequestId),
   index("customer_receivable_entries_customer_idx").on(t.customerId, t.createdAt),
   index("customer_receivable_entries_order_idx").on(t.orderId),
 ]);
@@ -862,7 +898,8 @@ export const paymentWebhookEvents = pgTable("payment_webhook_events", {
 
 export const purchaseOrders = pgTable("purchase_orders", {
   id: uuid("id").primaryKey().defaultRandom(),
-  code: varchar("code", { length: 30 }).notNull().unique(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
+  code: varchar("code", { length: 30 }).notNull(),
   supplierId: uuid("supplier_id").notNull().references(() => suppliers.id),
   warehouseId: uuid("warehouse_id").notNull().references(() => warehouses.id),
   status: text("status").notNull().default("draft"), // draft, received, cancelled
@@ -876,10 +913,11 @@ export const purchaseOrders = pgTable("purchase_orders", {
   note: text("note"),
   createdBy: uuid("created_by").references(() => profiles.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [uniqueIndex("purchase_orders_store_code_unique").on(t.storeId, t.code)]);
 
 export const purchaseOrderItems = pgTable("purchase_order_items", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   purchaseOrderId: uuid("purchase_order_id").notNull().references(() => purchaseOrders.id, { onDelete: "cascade" }),
   productId: uuid("product_id").notNull().references(() => products.id),
   quantity: decimal("quantity", { precision: 14, scale: 4 }).notNull(),
@@ -895,18 +933,21 @@ export const purchaseOrderItems = pgTable("purchase_order_items", {
 /** One supplier payment may be allocated across several purchase receipts. */
 export const supplierPayableReceipts = pgTable("supplier_payable_receipts", {
   id: uuid("id").primaryKey().defaultRandom(),
-  code: varchar("code", { length: 40 }).notNull().unique(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
+  code: varchar("code", { length: 40 }).notNull(),
   supplierId: uuid("supplier_id").notNull().references(() => suppliers.id),
   status: supplierPayableReceiptStatusEnum("status").notNull().default("confirmed"),
   amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
   method: paymentMethodEnum("method").notNull(),
   reference: text("reference"),
   note: text("note"),
-  clientRequestId: varchar("client_request_id", { length: 80 }).notNull().unique(),
+  clientRequestId: varchar("client_request_id", { length: 80 }).notNull(),
   createdBy: uuid("created_by").references(() => profiles.id),
   confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
+  uniqueIndex("supplier_payable_receipts_store_code_unique").on(t.storeId, t.code),
+  uniqueIndex("supplier_payable_receipts_store_client_unique").on(t.storeId, t.clientRequestId),
   index("supplier_payable_receipts_supplier_idx").on(t.supplierId, t.createdAt),
   index("supplier_payable_receipts_status_idx").on(t.status, t.createdAt),
   check("supplier_payable_receipts_amount_check", sql`${t.amount} > 0`),
@@ -914,6 +955,7 @@ export const supplierPayableReceipts = pgTable("supplier_payable_receipts", {
 
 export const supplierPayableAllocations = pgTable("supplier_payable_allocations", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   receiptId: uuid("receipt_id").notNull().references(() => supplierPayableReceipts.id, { onDelete: "cascade" }),
   purchaseOrderId: uuid("purchase_order_id").notNull().references(() => purchaseOrders.id),
   amount: decimal("amount", { precision: 14, scale: 2 }).notNull(),
@@ -927,7 +969,8 @@ export const supplierPayableAllocations = pgTable("supplier_payable_allocations"
 /** Manual debt movement: positive raises payable debt, negative lowers it. */
 export const supplierPayableEntries = pgTable("supplier_payable_entries", {
   id: uuid("id").primaryKey().defaultRandom(),
-  code: varchar("code", { length: 40 }).notNull().unique(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
+  code: varchar("code", { length: 40 }).notNull(),
   supplierId: uuid("supplier_id").notNull().references(() => suppliers.id),
   purchaseOrderId: uuid("purchase_order_id").references(() => purchaseOrders.id),
   type: supplierPayableEntryTypeEnum("type").notNull(),
@@ -935,11 +978,13 @@ export const supplierPayableEntries = pgTable("supplier_payable_entries", {
   reason: text("reason").notNull(),
   reference: text("reference"),
   note: text("note"),
-  clientRequestId: varchar("client_request_id", { length: 80 }).notNull().unique(),
+  clientRequestId: varchar("client_request_id", { length: 80 }).notNull(),
   createdBy: uuid("created_by").references(() => profiles.id),
   approvedBy: uuid("approved_by").references(() => profiles.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
+  uniqueIndex("supplier_payable_entries_store_code_unique").on(t.storeId, t.code),
+  uniqueIndex("supplier_payable_entries_store_client_unique").on(t.storeId, t.clientRequestId),
   index("supplier_payable_entries_supplier_idx").on(t.supplierId, t.createdAt),
   index("supplier_payable_entries_purchase_idx").on(t.purchaseOrderId),
   check("supplier_payable_entries_amount_check", sql`${t.amount} <> 0`),
@@ -949,6 +994,7 @@ export const supplierPayableEntries = pgTable("supplier_payable_entries", {
 
 export const stockLots = pgTable("stock_lots", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "restrict" }),
   warehouseId: uuid("warehouse_id").notNull().references(() => warehouses.id, { onDelete: "restrict" }),
   purchaseOrderItemId: uuid("purchase_order_item_id").references(() => purchaseOrderItems.id, { onDelete: "set null" }),
@@ -982,7 +1028,8 @@ export const stockLotMovements = pgTable("stock_lot_movements", {
 
 export const purchaseReturns = pgTable("purchase_returns", {
   id: uuid("id").primaryKey().defaultRandom(),
-  code: varchar("code", { length: 30 }).notNull().unique(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
+  code: varchar("code", { length: 30 }).notNull(),
   purchaseOrderId: uuid("purchase_order_id").references(() => purchaseOrders.id),
   supplierId: uuid("supplier_id").notNull().references(() => suppliers.id),
   warehouseId: uuid("warehouse_id").notNull().references(() => warehouses.id),
@@ -1000,6 +1047,7 @@ export const purchaseReturns = pgTable("purchase_returns", {
   createdBy: uuid("created_by").references(() => profiles.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
+  uniqueIndex("purchase_returns_store_code_unique").on(t.storeId, t.code),
   index("purchase_returns_purchase_idx").on(t.purchaseOrderId),
   index("purchase_returns_supplier_idx").on(t.supplierId, t.createdAt),
   index("purchase_returns_created_idx").on(t.createdAt),
@@ -1007,6 +1055,7 @@ export const purchaseReturns = pgTable("purchase_returns", {
 
 export const purchaseReturnItems = pgTable("purchase_return_items", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   purchaseReturnId: uuid("purchase_return_id").notNull().references(() => purchaseReturns.id, { onDelete: "cascade" }),
   purchaseOrderItemId: uuid("purchase_order_item_id").references(() => purchaseOrderItems.id),
   productId: uuid("product_id").notNull().references(() => products.id),
@@ -1030,7 +1079,8 @@ export const refundMethodEnum = pgEnum("refund_method", [
 
 export const returns = pgTable("returns", {
   id: uuid("id").primaryKey().defaultRandom(),
-  code: varchar("code", { length: 30 }).notNull().unique(), // TH-...
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
+  code: varchar("code", { length: 30 }).notNull(), // TH-...
   clientId: varchar("client_id", { length: 80 }),
   // nullable: trả hàng nhanh không gắn hóa đơn (vd lịch sử KiotViet)
   orderId: uuid("order_id").references(() => orders.id),
@@ -1050,14 +1100,16 @@ export const returns = pgTable("returns", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
+  uniqueIndex("returns_store_code_unique").on(t.storeId, t.code),
   index("returns_order_idx").on(t.orderId),
   index("returns_exchange_order_idx").on(t.exchangeOrderId),
   index("returns_status_created_idx").on(t.status, t.createdAt),
-  uniqueIndex("returns_client_id_idx").on(t.clientId),
+  uniqueIndex("returns_store_client_id_unique").on(t.storeId, t.clientId).where(sql`${t.clientId} is not null`),
 ]);
 
 export const returnItems = pgTable("return_items", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   returnId: uuid("return_id").notNull().references(() => returns.id, { onDelete: "cascade" }),
   orderItemId: uuid("order_item_id").references(() => orderItems.id), // null = trả nhanh
   productId: uuid("product_id").notNull().references(() => products.id),
@@ -1072,6 +1124,7 @@ export const returnItems = pgTable("return_items", {
 
 export const paymentRefunds = pgTable("payment_refunds", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   returnId: uuid("return_id").notNull().references(() => returns.id, { onDelete: "restrict" }),
   paymentId: uuid("payment_id").notNull().references(() => payments.id, { onDelete: "restrict" }),
   status: text("status").notNull().default("pending"),
@@ -1106,7 +1159,8 @@ export const cashFundEnum = pgEnum("cash_fund", ["cash", "bank"]);
 
 export const cashTransactions = pgTable("cash_transactions", {
   id: uuid("id").primaryKey().defaultRandom(),
-  code: varchar("code", { length: 30 }).notNull().unique(), // PT-/PC-
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
+  code: varchar("code", { length: 30 }).notNull(), // PT-/PC-
   shiftId: uuid("shift_id").references(() => shifts.id, { onDelete: "set null" }),
   type: cashTxTypeEnum("type").notNull(),
   fund: cashFundEnum("fund").notNull().default("cash"),
@@ -1119,6 +1173,7 @@ export const cashTransactions = pgTable("cash_transactions", {
   createdBy: uuid("created_by").references(() => profiles.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
+  uniqueIndex("cash_transactions_store_code_unique").on(t.storeId, t.code),
   index("cash_tx_created_idx").on(t.createdAt),
   index("cash_tx_shift_idx").on(t.shiftId),
 ]);
@@ -1782,17 +1837,19 @@ export const stocktakeStatusEnum = pgEnum("stocktake_status", ["draft", "balance
 
 export const stocktakes = pgTable("stocktakes", {
   id: uuid("id").primaryKey().defaultRandom(),
-  code: varchar("code", { length: 30 }).notNull().unique(), // KK-
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
+  code: varchar("code", { length: 30 }).notNull(), // KK-
   warehouseId: uuid("warehouse_id").notNull().references(() => warehouses.id),
   status: stocktakeStatusEnum("status").notNull().default("draft"),
   note: text("note"),
   balancedAt: timestamp("balanced_at", { withTimezone: true }),
   createdBy: uuid("created_by").references(() => profiles.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [uniqueIndex("stocktakes_store_code_unique").on(t.storeId, t.code)]);
 
 export const stocktakeItems = pgTable("stocktake_items", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   stocktakeId: uuid("stocktake_id").notNull().references(() => stocktakes.id, { onDelete: "cascade" }),
   productId: uuid("product_id").notNull().references(() => products.id),
   systemQty: decimal("system_qty", { precision: 14, scale: 4 }).notNull(), // tồn hệ thống lúc kiểm
@@ -1808,6 +1865,7 @@ export const paperSizeEnum = pgEnum("paper_size", ["a4", "a5", "k80"]);
 
 export const printTemplates = pgTable("print_templates", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   name: text("name").notNull(),
   docType: printDocTypeEnum("doc_type").notNull(),
   paperDefault: paperSizeEnum("paper_default").notNull().default("a5"),
@@ -1825,13 +1883,14 @@ export const printTemplates = pgTable("print_templates", {
 }, (t) => [
   index("print_templates_doc_type_idx").on(t.docType),
   index("print_templates_active_idx").on(t.isActive),
-  uniqueIndex("print_templates_default_doc_type_idx").on(t.docType).where(sql`${t.isDefault} = true and ${t.isActive} = true`),
+  uniqueIndex("print_templates_store_default_doc_type_idx").on(t.storeId, t.docType).where(sql`${t.isDefault} = true and ${t.isActive} = true`),
 ]);
 
 // ============= Barcode label templates (mẫu in tem mã sản phẩm) =============
 
 export const labelTemplates = pgTable("label_templates", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   name: text("name").notNull(),
   widthMm: decimal("width_mm", { precision: 8, scale: 2 }).notNull().default("40"),
   heightMm: decimal("height_mm", { precision: 8, scale: 2 }).notNull().default("30"),
@@ -1853,14 +1912,15 @@ export const labelTemplates = pgTable("label_templates", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   index("label_templates_active_idx").on(t.isActive),
-  uniqueIndex("label_templates_default_idx").on(t.isDefault).where(sql`${t.isDefault} = true and ${t.isActive} = true`),
+  uniqueIndex("label_templates_store_default_idx").on(t.storeId).where(sql`${t.isDefault} = true and ${t.isActive} = true`),
 ]);
 
 // ============= Shifts (Quản lý ca — Part 17) =============
 
 export const shifts = pgTable("shifts", {
   id: uuid("id").primaryKey().defaultRandom(),
-  code: varchar("code", { length: 30 }).notNull().unique(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
+  code: varchar("code", { length: 30 }).notNull(),
   userId: uuid("user_id").references(() => profiles.id),
   openingFloat: decimal("opening_float", { precision: 14, scale: 2 }).notNull().default("0"),
   openedAt: timestamp("opened_at", { withTimezone: true }).defaultNow().notNull(),
@@ -1874,11 +1934,12 @@ export const shifts = pgTable("shifts", {
   handoverFromShiftId: uuid("handover_from_shift_id"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
+  uniqueIndex("shifts_store_code_unique").on(t.storeId, t.code),
   index("shifts_status_idx").on(t.status),
   index("shifts_user_idx").on(t.userId),
   index("shifts_handover_to_user_idx").on(t.handoverToUserId),
   index("shifts_handover_from_shift_idx").on(t.handoverFromShiftId),
-  uniqueIndex("shifts_open_user_unique_idx").on(t.userId).where(sql`${t.status} = 'open'`),
+  uniqueIndex("shifts_store_open_user_unique_idx").on(t.storeId, t.userId).where(sql`${t.status} = 'open'`),
 ]);
 
 // ============= F&B dining tables (Part 18) =============
@@ -2169,7 +2230,8 @@ export const aiListingSuggestions = pgTable("ai_listing_suggestions", {
 
 export const internalUseIssues = pgTable("internal_use_issues", {
   id: uuid("id").primaryKey().defaultRandom(),
-  code: varchar("code", { length: 30 }).notNull().unique(), // XNB-...
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
+  code: varchar("code", { length: 30 }).notNull(), // XNB-...
   warehouseId: uuid("warehouse_id").references(() => warehouses.id),
   department: text("department"),       // bộ phận nhận
   reason: text("reason"),               // lý do (reason code, text)
@@ -2180,10 +2242,11 @@ export const internalUseIssues = pgTable("internal_use_issues", {
   approvedBy: uuid("approved_by").references(() => profiles.id),
   approvedAt: timestamp("approved_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (t) => [uniqueIndex("internal_use_issues_store_code_unique").on(t.storeId, t.code)]);
 
 export const internalUseItems = pgTable("internal_use_items", {
   id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().default(CURRENT_STORE_ID).references(() => stores.id),
   issueId: uuid("issue_id").notNull().references(() => internalUseIssues.id, { onDelete: "cascade" }),
   productId: uuid("product_id").notNull().references(() => products.id),
   productName: text("product_name").notNull(),

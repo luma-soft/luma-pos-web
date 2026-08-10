@@ -6,19 +6,19 @@ import { cashTransactions, orders, payments, profiles, shifts } from "@/db/schem
 export type Shift = typeof shifts.$inferSelect;
 
 /** Ca đang mở của user (hoặc null). */
-export async function getCurrentShift(profileId: string): Promise<Shift | null> {
+export async function getCurrentShift(storeId: string, profileId: string): Promise<Shift | null> {
   const [row] = await db.select().from(shifts)
-    .where(and(eq(shifts.userId, profileId), eq(shifts.status, "open")))
+    .where(and(eq(shifts.storeId, storeId), eq(shifts.userId, profileId), eq(shifts.status, "open")))
     .orderBy(desc(shifts.openedAt)).limit(1);
   return row ?? null;
 }
 
 /** Tiền mặt dự kiến = quỹ đầu ca + (thu − chi) quỹ tiền mặt thuộc ca. */
-export async function shiftExpectedCash(opening: number, shiftId: string): Promise<number> {
+export async function shiftExpectedCash(storeId: string, opening: number, shiftId: string): Promise<number> {
   const [agg] = await db
     .select({ net: sql<string>`coalesce(sum(case when ${cashTransactions.type} = 'in' then ${cashTransactions.amount} else -${cashTransactions.amount} end), 0)` })
     .from(cashTransactions)
-    .where(and(eq(cashTransactions.shiftId, shiftId), eq(cashTransactions.fund, "cash")));
+    .where(and(eq(cashTransactions.storeId, storeId), eq(cashTransactions.shiftId, shiftId), eq(cashTransactions.fund, "cash")));
   return opening + Number(agg.net);
 }
 
@@ -37,14 +37,14 @@ export async function getShiftSummary(shift: Shift | null) {
   }
 
   const [expectedCash, tenderRows, orderRows, cashRows] = await Promise.all([
-    shiftExpectedCash(Number(shift.openingFloat), shift.id),
+    shiftExpectedCash(shift.storeId, Number(shift.openingFloat), shift.id),
     db
       .select({
         method: payments.method,
         total: sql<string>`coalesce(sum(${payments.amount}), 0)`,
       })
       .from(payments)
-      .where(and(eq(payments.shiftId, shift.id), notInArray(payments.status, ["pending", "expired"])))
+      .where(and(eq(payments.storeId, shift.storeId), eq(payments.shiftId, shift.id), notInArray(payments.status, ["pending", "expired"])))
       .groupBy(payments.method),
     db
       .select({
@@ -52,7 +52,7 @@ export async function getShiftSummary(shift: Shift | null) {
         revenue: sql<string>`coalesce(sum(${orders.total}), 0)`,
       })
       .from(orders)
-      .where(eq(orders.shiftId, shift.id)),
+      .where(and(eq(orders.storeId, shift.storeId), eq(orders.shiftId, shift.id))),
     db
       .select({
         cashIn: sql<string>`coalesce(sum(${cashTransactions.amount}) filter (where ${cashTransactions.type} = 'in' and ${cashTransactions.fund} = 'cash'), 0)`,
@@ -60,7 +60,7 @@ export async function getShiftSummary(shift: Shift | null) {
         refundTotal: sql<string>`coalesce(sum(${cashTransactions.amount}) filter (where ${cashTransactions.category} = 'refund'), 0)`,
       })
       .from(cashTransactions)
-      .where(eq(cashTransactions.shiftId, shift.id)),
+      .where(and(eq(cashTransactions.storeId, shift.storeId), eq(cashTransactions.shiftId, shift.id))),
   ]);
 
   const tenderTotals = { cash: 0, bank_transfer: 0, card: 0 };
@@ -83,7 +83,7 @@ export async function getShiftSummary(shift: Shift | null) {
 }
 
 /** Lịch sử ca — mới nhất trước. */
-export async function getShifts(limit = 50) {
+export async function getShifts(storeId: string, limit = 50) {
   const u = alias(profiles, "shift_user");
   return db
     .select({
@@ -94,18 +94,19 @@ export async function getShifts(limit = 50) {
     })
     .from(shifts)
     .leftJoin(u, eq(shifts.userId, u.id))
+    .where(eq(shifts.storeId, storeId))
     .orderBy(desc(shifts.openedAt)).limit(limit);
 }
 export type ShiftRow = Awaited<ReturnType<typeof getShifts>>[number];
 
-export async function getShiftHistoryWithSummaries(limit = 30) {
-  const rows = await getShifts(limit);
+export async function getShiftHistoryWithSummaries(storeId: string, limit = 30) {
+  const rows = await getShifts(storeId, limit);
   return Promise.all(
     rows.map(async (row) => {
       const [shift] = await db
         .select()
         .from(shifts)
-        .where(eq(shifts.id, row.id))
+        .where(and(eq(shifts.storeId, storeId), eq(shifts.id, row.id)))
         .limit(1);
       const summary = await getShiftSummary(shift ?? null);
       return { ...row, summary };

@@ -17,6 +17,7 @@ export async function POST(request: Request) {
   return mobileAction(
     await sendZaloMessage({
       kind: "invoice",
+      storeId: gate.storeId,
       orderId: value.orderId,
       url: typeof value.url === "string" ? value.url : undefined,
       actorId: gate.userId,

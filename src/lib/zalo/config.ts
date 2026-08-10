@@ -2,8 +2,8 @@ import { getZaloSettings } from "@/lib/data/settings";
 
 export type ZaloConfig = Awaited<ReturnType<typeof getZaloConfig>>;
 
-export async function getZaloConfig() {
-  const settings = await getZaloSettings();
+export async function getZaloConfig(storeId: string) {
+  const settings = await getZaloSettings(storeId);
   const connected = Boolean(settings.enabled && settings.oaId && settings.appId && settings.accessToken);
   const znsReady = Boolean(connected && (settings.portalTemplateId || settings.invoiceTemplateId || settings.debtTemplateId));
   const oaReady = Boolean(connected);

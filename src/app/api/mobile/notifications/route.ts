@@ -33,9 +33,9 @@ export async function GET(request: Request) {
   const profileId = await getProfileId(gate.userId);
   const stateUserId = profileId ?? gate.userId;
   const [store, restock, shift, failedEinvoices, warrantyNotifications] = await Promise.all([
-    getStoreSettings(),
+    getStoreSettings(gate.storeId),
     getRestockSuggestions(30),
-    getCurrentShift(profileId ?? gate.userId),
+    getCurrentShift(gate.storeId, profileId ?? gate.userId),
     db.select({
       id: einvoices.id,
       orderCode: orders.code,

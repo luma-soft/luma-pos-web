@@ -13,10 +13,9 @@ import {
 
 export async function GET() {
   const gate = await requireMobileRole(MOBILE_SETTINGS_ADMIN_ROLES);
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
-  const store = await getStoreSettings();
+  const store = await getStoreSettings(gate.storeId);
   return mobileOk(store.prefs);
 }
 

@@ -4,12 +4,14 @@ import { getStoreSettings } from "@/lib/data/settings";
 import { getActiveTickets } from "@/lib/data/kitchen";
 import { Text } from "@/components/ui/text";
 import { KdsBoard } from "./kds-board";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 export const dynamic = "force-dynamic";
 const FNB = new Set(["restaurant", "cafe"]);
 
 export default async function KdsPage() {
-  const store = await getStoreSettings();
+  const context = await requireStoreContext();
+  const store = await getStoreSettings(context.storeId);
   if (!FNB.has(store.industry)) redirect("/dashboard");
   const t = await getTranslations();
   const tickets = await getActiveTickets();

@@ -48,6 +48,7 @@ import {
   createNotificationEventInTx,
 } from "@/lib/notifications/events-core";
 import { publishCommittedNotification } from "@/lib/notifications/outbox";
+import { resolveStoreContextForUser } from "@/lib/auth/store-context";
 
 const GATEWAY_REFUND_METHODS = new Set<GatewayProvider>(["momo", "zalopay", "vnpay"]);
 const isGatewayRefundMethod = (value: string): value is GatewayProvider =>
@@ -57,13 +58,14 @@ type ReturnTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 async function stockTargetsForReturnedItem(
   tx: ReturnTransaction,
+  storeId: string,
   productId: string,
   baseQuantity: number,
 ) {
   const [product] = await tx
     .select({ productKind: products.productKind })
     .from(products)
-    .where(eq(products.id, productId))
+    .where(and(eq(products.storeId, storeId), eq(products.id, productId)))
     .limit(1);
   if (!product || product.productKind === "service") return [];
   if (product.productKind === "product") {
@@ -77,7 +79,7 @@ async function stockTargetsForReturnedItem(
     })
     .from(productComboItems)
     .innerJoin(products, eq(productComboItems.componentProductId, products.id))
-    .where(eq(productComboItems.comboProductId, productId));
+    .where(and(eq(products.storeId, storeId), eq(productComboItems.comboProductId, productId)));
   return components
     .filter((component) => component.productKind === "product")
     .map((component) => ({
@@ -88,11 +90,13 @@ async function stockTargetsForReturnedItem(
 
 async function selectRefundableGatewayPayment(
   tx: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  storeId: string,
   orderId: string,
   provider: GatewayProvider,
   amount: number,
 ) {
   const candidates = await tx.select().from(payments).where(and(
+    eq(payments.storeId, storeId),
     eq(payments.orderId, orderId),
     eq(payments.provider, provider),
     inArray(payments.status, ["confirmed", "reconciled", "manual_confirmed"]),
@@ -101,7 +105,7 @@ async function selectRefundableGatewayPayment(
     if (!payment.providerTransactionId || !payment.reference) continue;
     const [reserved] = await tx.select({ total: sql<string>`coalesce(sum(${paymentRefunds.amount}), 0)` })
       .from(paymentRefunds)
-      .where(and(eq(paymentRefunds.paymentId, payment.id), ne(paymentRefunds.status, "failed")));
+      .where(and(eq(paymentRefunds.storeId, storeId), eq(paymentRefunds.paymentId, payment.id), ne(paymentRefunds.status, "failed")));
     if (Number(payment.amount) - Number(reserved?.total ?? 0) >= amount - 1e-9) return payment;
   }
   throw new Error("REFUND_SOURCE_NOT_FOUND");
@@ -133,6 +137,7 @@ export async function searchReturnableOrders(q: string): Promise<ReturnableOrder
     .from(orders)
     .leftJoin(customers, eq(orders.customerId, customers.id))
     .where(and(
+      eq(orders.storeId, gate.storeId),
       eq(orders.status, "completed"),
       or(
         accentInsensitiveLike(orders.code, query),
@@ -159,6 +164,7 @@ type ExchangeTransactionResult = ExchangeResult & {
 };
 
 async function exchangeResultForClientId(
+  storeId: string,
   clientId: string,
 ): Promise<ExchangeResult | null> {
   const [row] = await db.select({
@@ -171,7 +177,7 @@ async function exchangeResultForClientId(
   }).from(orders)
     .innerJoin(returns, eq(returns.exchangeOrderId, orders.id))
     .leftJoin(paymentRefunds, eq(paymentRefunds.returnId, returns.id))
-    .where(eq(orders.clientId, clientId))
+    .where(and(eq(orders.storeId, storeId), eq(orders.clientId, clientId)))
     .limit(1);
   if (!row) return null;
   const difference = Number(row.difference ?? 0);
@@ -195,13 +201,16 @@ export async function createExchangeForUser(
   const parsed = createExchangeSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
+  const context = await resolveStoreContextForUser(userId);
+  if (!context) return { ok: false, error: "errors.unauthorized" };
+  const { storeId } = context;
 
-  const existing = await exchangeResultForClientId(v.clientId);
+  const existing = await exchangeResultForClientId(storeId, v.clientId);
   if (existing) return { ok: true, data: existing };
 
   let replacementItems: NormalizedOrderItem[];
   try {
-    replacementItems = await normalizeOrderItems(v.exchangeItems);
+    replacementItems = await normalizeOrderItems(storeId, v.exchangeItems);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (["PRODUCT_NOT_FOUND", "UNIT_NOT_FOUND", "INVALID_ITEMS"].includes(message)) {
@@ -212,10 +221,10 @@ export async function createExchangeForUser(
 
   try {
     const profileId = await getProfileId(userId);
-    const currentShift = profileId ? await getCurrentShift(profileId) : null;
+    const currentShift = profileId ? await getCurrentShift(storeId, profileId) : null;
     const result = await db.transaction(async (tx): Promise<ExchangeTransactionResult> => {
       const [order] = await tx.select().from(orders)
-        .where(eq(orders.id, v.orderId)).limit(1).for("update");
+        .where(and(eq(orders.storeId, storeId), eq(orders.id, v.orderId))).limit(1).for("update");
       if (!order) throw new Error("ORDER_NOT_FOUND");
       if (order.status !== "completed" && order.status !== "returned") {
         throw new Error("ORDER_CANCELLED");
@@ -227,14 +236,14 @@ export async function createExchangeForUser(
 
       const itemIds = v.items.map((item) => item.orderItemId);
       const sourceItems = await tx.select().from(orderItems)
-        .where(inArray(orderItems.id, itemIds)).for("update");
+        .where(and(eq(orderItems.storeId, storeId), inArray(orderItems.id, itemIds))).for("update");
       const sourceById = new Map(sourceItems.map((item) => [item.id, item]));
       const previous = await tx.select({
         orderItemId: returnItems.orderItemId,
         qty: sql<string>`coalesce(sum(${returnItems.quantity}), 0)`,
       }).from(returnItems)
         .innerJoin(returns, and(eq(returnItems.returnId, returns.id), eq(returns.status, "completed")))
-        .where(inArray(returnItems.orderItemId, itemIds))
+        .where(and(eq(returnItems.storeId, storeId), inArray(returnItems.orderItemId, itemIds)))
         .groupBy(returnItems.orderItemId);
       const previousById = new Map(previous.map((item) => [item.orderItemId, Number(item.qty)]));
       const returnedRows: (typeof returnItems.$inferInsert)[] = [];
@@ -272,7 +281,7 @@ export async function createExchangeForUser(
       const { difference, exchangeCredit, paymentStatus } = settlement;
       const paid = settlement.amountPaid;
       const gatewayPayment = difference < -1e-9 && isGatewayRefundMethod(v.refundMethod)
-        ? await selectRefundableGatewayPayment(tx, order.id, v.refundMethod, -difference)
+        ? await selectRefundableGatewayPayment(tx, storeId, order.id, v.refundMethod, -difference)
         : null;
       const gatewayReference = gatewayPayment
         ? gatewayRefundReference(v.refundMethod as GatewayProvider, v.clientId)
@@ -284,6 +293,7 @@ export async function createExchangeForUser(
         ? []
         : await tx.select().from(stockLevels)
             .where(and(
+              eq(stockLevels.storeId, storeId),
               eq(stockLevels.warehouseId, order.warehouseId),
               inArray(stockLevels.productId, replacementProductIds),
             )).for("update");
@@ -305,13 +315,14 @@ export async function createExchangeForUser(
       if (difference < -1e-9 && v.refundMethod === "debt_deduct") {
         if (!order.customerId) throw new Error("DEBT_NEEDS_CUSTOMER");
         const [customer] = await tx.select({ debt: customers.currentDebt })
-          .from(customers).where(eq(customers.id, order.customerId)).limit(1).for("update");
+          .from(customers).where(and(eq(customers.storeId, storeId), eq(customers.id, order.customerId))).limit(1).for("update");
         if (!customer || Number(customer.debt) + 1e-9 < -difference) {
           throw new Error("DEBT_TOO_SMALL");
         }
       }
 
       const [exchangeOrder] = await tx.insert(orders).values({
+        storeId,
         code: generateCode("DH"),
         clientId: v.clientId,
         documentType: "sale",
@@ -329,6 +340,7 @@ export async function createExchangeForUser(
         createdBy: profileId,
       }).returning({ id: orders.id, code: orders.code });
       await tx.insert(orderItems).values(replacementItems.map((item) => ({
+        storeId,
         orderId: exchangeOrder.id,
         productId: item.productId,
         productName: item.productName,
@@ -340,6 +352,7 @@ export async function createExchangeForUser(
       })));
 
       const [returned] = await tx.insert(returns).values({
+        storeId,
         code: generateCode("TH"),
         clientId: v.clientId,
         orderId: order.id,
@@ -356,10 +369,12 @@ export async function createExchangeForUser(
       }).returning({ id: returns.id, code: returns.code });
       await tx.insert(returnItems).values(returnedRows.map((row) => ({
         ...row,
+        storeId,
         returnId: returned.id,
       })));
       const [gatewayRefund] = gatewayPayment && gatewayReference
         ? await tx.insert(paymentRefunds).values({
+            storeId,
             returnId: returned.id,
             paymentId: gatewayPayment.id,
             provider: gatewayPayment.provider!,
@@ -373,11 +388,13 @@ export async function createExchangeForUser(
       for (const row of returnedRows.filter((item) => item.restock)) {
         const targets = await stockTargetsForReturnedItem(
           tx,
+          storeId,
           row.productId,
           Number(row.quantity) * Number(row.unitMultiplier),
         );
         for (const target of targets) {
           await restoreOrReceiveTrackedStockLots(tx, {
+            storeId,
             productId: target.productId,
             warehouseId: order.warehouseId,
             quantity: target.quantity,
@@ -389,17 +406,19 @@ export async function createExchangeForUser(
             createdBy: profileId,
           });
           await tx.insert(stockLevels).values({
+            storeId,
             productId: target.productId,
             warehouseId: order.warehouseId,
             quantity: toQty(target.quantity),
           }).onConflictDoUpdate({
-            target: [stockLevels.productId, stockLevels.warehouseId],
+            target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
             set: {
               quantity: sql`${stockLevels.quantity} + ${toQty(target.quantity)}`,
               updatedAt: sql`now()`,
             },
           });
           await tx.insert(stockMovements).values({
+            storeId,
             productId: target.productId,
             warehouseId: order.warehouseId,
             type: "return_in",
@@ -414,6 +433,7 @@ export async function createExchangeForUser(
       for (const item of replacementItems) {
         for (const target of item.stockItems) {
           await consumeTrackedStockLots(tx, {
+            storeId,
             productId: target.productId,
             warehouseId: order.warehouseId,
             quantity: target.quantity,
@@ -422,17 +442,19 @@ export async function createExchangeForUser(
             createdBy: profileId,
           });
           await tx.insert(stockLevels).values({
+            storeId,
             productId: target.productId,
             warehouseId: order.warehouseId,
             quantity: toQty(-target.quantity),
           }).onConflictDoUpdate({
-            target: [stockLevels.productId, stockLevels.warehouseId],
+            target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
             set: {
               quantity: sql`${stockLevels.quantity} - ${toQty(target.quantity)}`,
               updatedAt: sql`now()`,
             },
           });
           await tx.insert(stockMovements).values({
+            storeId,
             productId: target.productId,
             warehouseId: order.warehouseId,
             type: "sale",
@@ -447,6 +469,7 @@ export async function createExchangeForUser(
 
       if (exchangeCredit > 0) {
         await tx.insert(payments).values({
+          storeId,
           orderId: exchangeOrder.id,
           shiftId: currentShift?.id ?? null,
           amount: toMoney(exchangeCredit),
@@ -458,6 +481,7 @@ export async function createExchangeForUser(
       }
       if (difference > 1e-9 && v.settlementMethod !== "credit") {
         await tx.insert(payments).values({
+          storeId,
           orderId: exchangeOrder.id,
           shiftId: currentShift?.id ?? null,
           amount: toMoney(difference),
@@ -466,6 +490,7 @@ export async function createExchangeForUser(
           createdBy: profileId,
         });
         await recordCashTx(tx, {
+          storeId,
           type: "in",
           fund: fundForMethod(v.settlementMethod),
           amount: difference,
@@ -482,6 +507,7 @@ export async function createExchangeForUser(
         !isGatewayRefundMethod(v.refundMethod)
       ) {
         await recordCashTx(tx, {
+          storeId,
           type: "out",
           fund: fundForMethod(v.refundMethod),
           amount: -difference,
@@ -498,22 +524,22 @@ export async function createExchangeForUser(
         await tx.update(customers).set({
           currentDebt: sql`greatest(${customers.currentDebt} + ${toMoney(settlement.debtDelta)}, 0)`,
           totalSpent: sql`greatest(${customers.totalSpent} - ${toMoney(returnTotal)} + ${toMoney(replacementTotal)}, 0)`,
-        }).where(eq(customers.id, order.customerId));
+        }).where(and(eq(customers.storeId, storeId), eq(customers.id, order.customerId)));
       }
 
-      const allItems = await tx.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+      const allItems = await tx.select().from(orderItems).where(and(eq(orderItems.storeId, storeId), eq(orderItems.orderId, order.id)));
       const allReturned = await tx.select({
         orderItemId: returnItems.orderItemId,
         qty: sql<string>`coalesce(sum(${returnItems.quantity}), 0)`,
       }).from(returnItems)
         .innerJoin(returns, and(eq(returnItems.returnId, returns.id), eq(returns.status, "completed")))
         .innerJoin(orderItems, eq(returnItems.orderItemId, orderItems.id))
-        .where(eq(orderItems.orderId, order.id))
+        .where(and(eq(returnItems.storeId, storeId), eq(orderItems.storeId, storeId), eq(orderItems.orderId, order.id)))
         .groupBy(returnItems.orderItemId);
       const returnedByItem = new Map(allReturned.map((item) => [item.orderItemId, Number(item.qty)]));
       if (allItems.every((item) => (returnedByItem.get(item.id) ?? 0) >= Number(item.quantity) - 1e-9)) {
         await tx.update(orders).set({ status: "returned", updatedAt: sql`now()` })
-          .where(eq(orders.id, order.id));
+          .where(and(eq(orders.storeId, storeId), eq(orders.id, order.id)));
       }
 
       const notification = await createNotificationEventInTx(tx, {
@@ -569,7 +595,7 @@ export async function createExchangeForUser(
     };
   } catch (error) {
     if (isUniqueViolation(error)) {
-      const existing = await exchangeResultForClientId(v.clientId);
+      const existing = await exchangeResultForClientId(storeId, v.clientId);
       if (existing) return { ok: true, data: existing };
     }
     const message = error instanceof Error ? error.message : "";
@@ -616,6 +642,9 @@ export async function createReturnForUser(
   const parsed = createReturnSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
+  const context = await resolveStoreContextForUser(userId);
+  if (!context) return { ok: false, error: "errors.unauthorized" };
+  const { storeId } = context;
 
   if (v.clientId) {
     const [existing] = await db.select({
@@ -624,7 +653,7 @@ export async function createReturnForUser(
       gatewayRefundId: paymentRefunds.id,
     }).from(returns)
       .leftJoin(paymentRefunds, eq(paymentRefunds.returnId, returns.id))
-      .where(eq(returns.clientId, v.clientId)).limit(1);
+      .where(and(eq(returns.storeId, storeId), eq(returns.clientId, v.clientId))).limit(1);
     if (existing) return { ok: true, data: {
       id: existing.id,
       code: existing.code,
@@ -634,16 +663,16 @@ export async function createReturnForUser(
 
   try {
     const profileId = await getProfileId(userId);
-    const currentShift = profileId ? await getCurrentShift(profileId) : null;
+    const currentShift = profileId ? await getCurrentShift(storeId, profileId) : null;
 
     const result = await db.transaction(async (tx) => {
-      const [order] = await tx.select().from(orders).where(eq(orders.id, v.orderId)).limit(1);
+      const [order] = await tx.select().from(orders).where(and(eq(orders.storeId, storeId), eq(orders.id, v.orderId))).limit(1);
       if (!order) throw new Error("ORDER_NOT_FOUND");
       // chỉ trả hàng trên đơn bán thật (không quote/merged/cancelled/draft)
       if (order.status !== "completed" && order.status !== "returned") throw new Error("ORDER_CANCELLED");
 
       const itemIds = v.items.map((i) => i.orderItemId);
-      const sourceItems = await tx.select().from(orderItems).where(inArray(orderItems.id, itemIds));
+      const sourceItems = await tx.select().from(orderItems).where(and(eq(orderItems.storeId, storeId), inArray(orderItems.id, itemIds)));
       const sourceById = new Map(sourceItems.map((i) => [i.id, i]));
 
       // SL đã trả trước đó theo từng orderItem
@@ -654,7 +683,7 @@ export async function createReturnForUser(
         })
         .from(returnItems)
         .innerJoin(returns, and(eq(returnItems.returnId, returns.id), eq(returns.status, "completed")))
-        .where(inArray(returnItems.orderItemId, itemIds))
+        .where(and(eq(returnItems.storeId, storeId), inArray(returnItems.orderItemId, itemIds)))
         .groupBy(returnItems.orderItemId);
       const prevByItem = new Map(prevReturned.map((r) => [r.orderItemId, Number(r.qty)]));
 
@@ -684,7 +713,7 @@ export async function createReturnForUser(
       }
 
       const gatewayPayment = isGatewayRefundMethod(v.refundMethod)
-        ? await selectRefundableGatewayPayment(tx, order.id, v.refundMethod, totalRefund)
+        ? await selectRefundableGatewayPayment(tx, storeId, order.id, v.refundMethod, totalRefund)
         : null;
       const gatewayReference = gatewayPayment && v.clientId
         ? gatewayRefundReference(v.refundMethod as GatewayProvider, v.clientId)
@@ -698,7 +727,7 @@ export async function createReturnForUser(
         const [cust] = await tx
           .select({ debt: customers.currentDebt })
           .from(customers)
-          .where(eq(customers.id, order.customerId))
+          .where(and(eq(customers.storeId, storeId), eq(customers.id, order.customerId)))
           .limit(1)
           .for("update");
         if (Number(cust.debt) < totalRefund - 1e-9) throw new Error("DEBT_TOO_SMALL");
@@ -706,6 +735,7 @@ export async function createReturnForUser(
       }
 
       const [ret] = await tx.insert(returns).values({
+        storeId,
         code: generateCode("TH"),
         clientId: v.clientId ?? null,
         orderId: order.id,
@@ -718,9 +748,10 @@ export async function createReturnForUser(
         createdBy: profileId,
       }).returning({ id: returns.id, code: returns.code });
 
-      await tx.insert(returnItems).values(rows.map((r) => ({ ...r, returnId: ret.id })));
+      await tx.insert(returnItems).values(rows.map((r) => ({ ...r, storeId, returnId: ret.id })));
       const [gatewayRefund] = gatewayPayment && gatewayReference && v.clientId
         ? await tx.insert(paymentRefunds).values({
+            storeId,
             returnId: ret.id,
             paymentId: gatewayPayment.id,
             provider: gatewayPayment.provider!,
@@ -736,11 +767,13 @@ export async function createReturnForUser(
         for (const r of rows.filter((x) => x.restock)) {
           const targets = await stockTargetsForReturnedItem(
             tx,
+            storeId,
             r.productId,
             Number(r.quantity) * Number(r.unitMultiplier),
           );
           for (const target of targets) {
             await restoreOrReceiveTrackedStockLots(tx, {
+              storeId,
               productId: target.productId,
               warehouseId: order.warehouseId,
               quantity: target.quantity,
@@ -753,15 +786,16 @@ export async function createReturnForUser(
             });
             await tx
               .insert(stockLevels)
-              .values({ productId: target.productId, warehouseId: order.warehouseId, quantity: toQty(target.quantity) })
+              .values({ storeId, productId: target.productId, warehouseId: order.warehouseId, quantity: toQty(target.quantity) })
               .onConflictDoUpdate({
-                target: [stockLevels.productId, stockLevels.warehouseId],
+                target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
                 set: {
                   quantity: sql`${stockLevels.quantity} + ${toQty(target.quantity)}`,
                   updatedAt: sql`now()`,
                 },
               });
             await tx.insert(stockMovements).values({
+              storeId,
               productId: target.productId,
               warehouseId: order.warehouseId,
               type: "return_in",
@@ -778,6 +812,7 @@ export async function createReturnForUser(
       // Hoàn tiền mặt/CK → ghi phiếu chi
       if (v.refundMethod !== "debt_deduct" && !isGatewayRefundMethod(v.refundMethod)) {
         await recordCashTx(tx, {
+          storeId,
           type: "out", fund: fundForMethod(v.refundMethod), amount: totalRefund,
           category: "refund", refType: "return", refId: ret.id,
           note: `Hoàn trả ${ret.code}`, createdBy: profileId, shiftId: currentShift?.id ?? null,
@@ -790,16 +825,16 @@ export async function createReturnForUser(
           await tx.update(customers).set({
             currentDebt: sql`greatest(${customers.currentDebt} - ${toMoney(totalRefund)}, 0)`,
             totalSpent: sql`greatest(${customers.totalSpent} - ${toMoney(totalRefund)}, 0)`,
-          }).where(eq(customers.id, order.customerId));
+          }).where(and(eq(customers.storeId, storeId), eq(customers.id, order.customerId)));
         } else {
           await tx.update(customers).set({
             totalSpent: sql`greatest(${customers.totalSpent} - ${toMoney(totalRefund)}, 0)`,
-          }).where(eq(customers.id, order.customerId));
+          }).where(and(eq(customers.storeId, storeId), eq(customers.id, order.customerId)));
         }
       }
 
       // Đánh dấu đơn nếu trả toàn bộ
-      const allItems = await tx.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+      const allItems = await tx.select().from(orderItems).where(and(eq(orderItems.storeId, storeId), eq(orderItems.orderId, order.id)));
       const allReturned = await tx
         .select({
           orderItemId: returnItems.orderItemId,
@@ -808,14 +843,14 @@ export async function createReturnForUser(
         .from(returnItems)
         .innerJoin(returns, and(eq(returnItems.returnId, returns.id), eq(returns.status, "completed")))
         .innerJoin(orderItems, eq(returnItems.orderItemId, orderItems.id))
-        .where(eq(orderItems.orderId, order.id))
+        .where(and(eq(returnItems.storeId, storeId), eq(orderItems.storeId, storeId), eq(orderItems.orderId, order.id)))
         .groupBy(returnItems.orderItemId);
       const returnedByItem = new Map(allReturned.map((r) => [r.orderItemId, Number(r.qty)]));
       const fullyReturned = allItems.every(
         (i) => (returnedByItem.get(i.id) ?? 0) >= Number(i.quantity) - 1e-9
       );
       if (fullyReturned) {
-        await tx.update(orders).set({ status: "returned", updatedAt: sql`now()` }).where(eq(orders.id, order.id));
+        await tx.update(orders).set({ status: "returned", updatedAt: sql`now()` }).where(and(eq(orders.storeId, storeId), eq(orders.id, order.id)));
       }
 
       const debtNotification = order.customerId && v.refundMethod === "debt_deduct"
@@ -885,7 +920,7 @@ export async function updateReturnMetadata(
     reason: parsed.data.reason,
     note: parsed.data.note?.trim() || null,
     updatedAt: sql`now()`,
-  }).where(and(eq(returns.id, returnId), eq(returns.status, "completed")))
+  }).where(and(eq(returns.storeId, gate.storeId), eq(returns.id, returnId), eq(returns.status, "completed")))
     .returning({ id: returns.id });
   if (!updated) return { ok: false, error: "returns.errors.notEditable" };
   revalidatePath(Routes.Sales);
@@ -899,13 +934,13 @@ export async function cancelReturn(returnId: string): Promise<ActionResult> {
 
   try {
     const profileId = await getProfileId(gate.userId);
-    const currentShift = profileId ? await getCurrentShift(profileId) : null;
+    const currentShift = profileId ? await getCurrentShift(gate.storeId, profileId) : null;
     const result = await db.transaction(async (tx) => {
       const [ret] = await tx.select().from(returns)
-        .where(eq(returns.id, returnId)).limit(1).for("update");
+        .where(and(eq(returns.storeId, gate.storeId), eq(returns.id, returnId))).limit(1).for("update");
       if (!ret) throw new Error("RETURN_NOT_FOUND");
       const [gatewayRefund] = await tx.select({ id: paymentRefunds.id })
-        .from(paymentRefunds).where(eq(paymentRefunds.returnId, returnId)).limit(1);
+        .from(paymentRefunds).where(and(eq(paymentRefunds.storeId, gate.storeId), eq(paymentRefunds.returnId, returnId))).limit(1);
       const blocked = returnCancellationBlockReason({
         status: ret.status,
         exchangeOrderId: ret.exchangeOrderId,
@@ -918,6 +953,7 @@ export async function cancelReturn(returnId: string): Promise<ActionResult> {
         warehouseId: stockMovements.warehouseId,
         quantity: stockMovements.quantity,
       }).from(stockMovements).where(and(
+        eq(stockMovements.storeId, gate.storeId),
         eq(stockMovements.refType, "return"),
         eq(stockMovements.refId, ret.id),
         eq(stockMovements.type, "return_in"),
@@ -927,13 +963,14 @@ export async function cancelReturn(returnId: string): Promise<ActionResult> {
       for (const target of stockTargets) {
           const [level] = await tx.select({ quantity: stockLevels.quantity })
             .from(stockLevels)
-            .where(and(eq(stockLevels.productId, target.productId), eq(stockLevels.warehouseId, target.warehouseId)))
+            .where(and(eq(stockLevels.storeId, gate.storeId), eq(stockLevels.productId, target.productId), eq(stockLevels.warehouseId, target.warehouseId)))
             .limit(1)
             .for("update");
           if (!level || Number(level.quantity) < target.quantity - 1e-9) {
             throw new Error("INSUFFICIENT_STOCK_TO_CANCEL");
           }
           await consumeTrackedStockLots(tx, {
+            storeId: gate.storeId,
             productId: target.productId,
             warehouseId: target.warehouseId,
             quantity: target.quantity,
@@ -944,8 +981,9 @@ export async function cancelReturn(returnId: string): Promise<ActionResult> {
           await tx.update(stockLevels).set({
             quantity: sql`${stockLevels.quantity} - ${toQty(target.quantity)}`,
             updatedAt: sql`now()`,
-          }).where(and(eq(stockLevels.productId, target.productId), eq(stockLevels.warehouseId, target.warehouseId)));
+          }).where(and(eq(stockLevels.storeId, gate.storeId), eq(stockLevels.productId, target.productId), eq(stockLevels.warehouseId, target.warehouseId)));
           await tx.insert(stockMovements).values({
+            storeId: gate.storeId,
             productId: target.productId,
             warehouseId: target.warehouseId,
             type: "return_out",
@@ -961,12 +999,14 @@ export async function cancelReturn(returnId: string): Promise<ActionResult> {
         fund: cashTransactions.fund,
         amount: cashTransactions.amount,
       }).from(cashTransactions).where(and(
+        eq(cashTransactions.storeId, gate.storeId),
         eq(cashTransactions.refType, "return"),
         eq(cashTransactions.refId, ret.id),
         eq(cashTransactions.type, "out"),
       ));
       for (const row of originalCashRows) {
         await recordCashTx(tx, {
+          storeId: gate.storeId,
           type: "in",
           fund: row.fund,
           amount: Number(row.amount),
@@ -991,7 +1031,7 @@ export async function cancelReturn(returnId: string): Promise<ActionResult> {
             ? sql`${customers.currentDebt} + ${toMoney(customerDeltas.currentDebt)}`
             : customers.currentDebt,
           totalSpent: sql`${customers.totalSpent} + ${toMoney(customerDeltas.totalSpent)}`,
-        }).where(eq(customers.id, ret.customerId));
+        }).where(and(eq(customers.storeId, gate.storeId), eq(customers.id, ret.customerId)));
         if (ret.refundMethod === "debt_deduct") {
           debtNotification = await createDebtChangedEventInTx(tx, {
             entityType: "customer",
@@ -1009,17 +1049,17 @@ export async function cancelReturn(returnId: string): Promise<ActionResult> {
         cancelledBy: profileId,
         cancelledAt: sql`now()`,
         updatedAt: sql`now()`,
-      }).where(eq(returns.id, ret.id));
+      }).where(and(eq(returns.storeId, gate.storeId), eq(returns.id, ret.id)));
 
       if (ret.orderId) {
-        const allItems = await tx.select().from(orderItems).where(eq(orderItems.orderId, ret.orderId));
+        const allItems = await tx.select().from(orderItems).where(and(eq(orderItems.storeId, gate.storeId), eq(orderItems.orderId, ret.orderId)));
         const activeReturned = await tx.select({
           orderItemId: returnItems.orderItemId,
           qty: sql<string>`coalesce(sum(${returnItems.quantity}), 0)`,
         }).from(returnItems)
           .innerJoin(returns, and(eq(returnItems.returnId, returns.id), eq(returns.status, "completed")))
           .innerJoin(orderItems, eq(returnItems.orderItemId, orderItems.id))
-          .where(eq(orderItems.orderId, ret.orderId))
+          .where(and(eq(returnItems.storeId, gate.storeId), eq(orderItems.storeId, gate.storeId), eq(orderItems.orderId, ret.orderId)))
           .groupBy(returnItems.orderItemId);
         const returnedByItem = new Map(activeReturned.map((row) => [row.orderItemId, Number(row.qty)]));
         const fullyReturned = allItems.length > 0 && allItems.every(
@@ -1028,7 +1068,7 @@ export async function cancelReturn(returnId: string): Promise<ActionResult> {
         await tx.update(orders).set({
           status: fullyReturned ? "returned" : "completed",
           updatedAt: sql`now()`,
-        }).where(eq(orders.id, ret.orderId));
+        }).where(and(eq(orders.storeId, gate.storeId), eq(orders.id, ret.orderId)));
       }
       return { debtNotification, orderId: ret.orderId };
     });
@@ -1068,12 +1108,12 @@ export async function createPosReturn(
 
   try {
     const profileId = await getProfileId(gate.userId);
-    const currentShift = profileId ? await getCurrentShift(profileId) : null;
-    const trustedItems = await normalizeOrderItems(v.items, v.priceBookId);
+    const currentShift = profileId ? await getCurrentShift(gate.storeId, profileId) : null;
+    const trustedItems = await normalizeOrderItems(gate.storeId, v.items, v.priceBookId);
 
     const result = await db.transaction(async (tx) => {
       const [order] = v.orderId
-        ? await tx.select().from(orders).where(eq(orders.id, v.orderId)).limit(1)
+        ? await tx.select().from(orders).where(and(eq(orders.storeId, gate.storeId), eq(orders.id, v.orderId))).limit(1)
         : [];
       if (v.orderId && !order) throw new Error("ORDER_NOT_FOUND");
       if (order && order.status !== "completed" && order.status !== "returned") throw new Error("ORDER_CANCELLED");
@@ -1083,7 +1123,7 @@ export async function createPosReturn(
       const rows: (typeof returnItems.$inferInsert)[] = [];
 
       if (order) {
-        const sourceItems = await tx.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+        const sourceItems = await tx.select().from(orderItems).where(and(eq(orderItems.storeId, gate.storeId), eq(orderItems.orderId, order.id)));
         const sourceIds = sourceItems.map((item) => item.id);
         const prevReturned = sourceIds.length > 0
           ? await tx
@@ -1093,7 +1133,7 @@ export async function createPosReturn(
               })
               .from(returnItems)
               .innerJoin(returns, and(eq(returnItems.returnId, returns.id), eq(returns.status, "completed")))
-              .where(inArray(returnItems.orderItemId, sourceIds))
+              .where(and(eq(returnItems.storeId, gate.storeId), inArray(returnItems.orderItemId, sourceIds)))
               .groupBy(returnItems.orderItemId)
           : [];
         const prevByItem = new Map(prevReturned.map((r) => [r.orderItemId, Number(r.qty)]));
@@ -1137,7 +1177,7 @@ export async function createPosReturn(
         const [cust] = await tx
           .select({ debt: customers.currentDebt })
           .from(customers)
-          .where(eq(customers.id, customerId))
+          .where(and(eq(customers.storeId, gate.storeId), eq(customers.id, customerId)))
           .limit(1)
           .for("update");
         if (!cust || Number(cust.debt) < totalRefund - 1e-9) throw new Error("DEBT_TOO_SMALL");
@@ -1145,6 +1185,7 @@ export async function createPosReturn(
       }
 
       const [ret] = await tx.insert(returns).values({
+        storeId: gate.storeId,
         code: generateCode("TH"),
         orderId: order?.id ?? null,
         customerId,
@@ -1156,17 +1197,19 @@ export async function createPosReturn(
         createdBy: profileId,
       }).returning({ id: returns.id, code: returns.code });
 
-      await tx.insert(returnItems).values(rows.map((r) => ({ ...r, returnId: ret.id })));
+      await tx.insert(returnItems).values(rows.map((r) => ({ ...r, storeId: gate.storeId, returnId: ret.id })));
 
       for (const r of rows.filter((row) => row.restock)) {
         const targets = await stockTargetsForReturnedItem(
           tx,
+          gate.storeId,
           r.productId,
           Number(r.quantity) * Number(r.unitMultiplier),
         );
         for (const target of targets) {
           if (order) {
             await restoreOrReceiveTrackedStockLots(tx, {
+              storeId: gate.storeId,
               productId: target.productId,
               warehouseId,
               quantity: target.quantity,
@@ -1179,6 +1222,7 @@ export async function createPosReturn(
             });
           } else {
             await receiveUnspecifiedTrackedStockLot(tx, {
+              storeId: gate.storeId,
               productId: target.productId,
               warehouseId,
               quantity: target.quantity,
@@ -1190,15 +1234,16 @@ export async function createPosReturn(
           }
           await tx
             .insert(stockLevels)
-            .values({ productId: target.productId, warehouseId, quantity: toQty(target.quantity) })
+            .values({ storeId: gate.storeId, productId: target.productId, warehouseId, quantity: toQty(target.quantity) })
             .onConflictDoUpdate({
-              target: [stockLevels.productId, stockLevels.warehouseId],
+              target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
               set: {
                 quantity: sql`${stockLevels.quantity} + ${toQty(target.quantity)}`,
                 updatedAt: sql`now()`,
               },
             });
           await tx.insert(stockMovements).values({
+            storeId: gate.storeId,
             productId: target.productId,
             warehouseId,
             type: "return_in",
@@ -1213,6 +1258,7 @@ export async function createPosReturn(
 
       if (v.refundMethod !== "debt_deduct") {
         await recordCashTx(tx, {
+          storeId: gate.storeId,
           type: "out",
           fund: fundForMethod(v.refundMethod),
           amount: totalRefund,
@@ -1231,11 +1277,11 @@ export async function createPosReturn(
             ? sql`greatest(${customers.currentDebt} - ${toMoney(totalRefund)}, 0)`
             : customers.currentDebt,
           totalSpent: sql`greatest(${customers.totalSpent} - ${toMoney(totalRefund)}, 0)`,
-        }).where(eq(customers.id, customerId));
+        }).where(and(eq(customers.storeId, gate.storeId), eq(customers.id, customerId)));
       }
 
       if (order) {
-        const allItems = await tx.select().from(orderItems).where(eq(orderItems.orderId, order.id));
+        const allItems = await tx.select().from(orderItems).where(and(eq(orderItems.storeId, gate.storeId), eq(orderItems.orderId, order.id)));
         const allReturned = await tx
           .select({
             orderItemId: returnItems.orderItemId,
@@ -1244,14 +1290,14 @@ export async function createPosReturn(
           .from(returnItems)
           .innerJoin(returns, and(eq(returnItems.returnId, returns.id), eq(returns.status, "completed")))
           .innerJoin(orderItems, eq(returnItems.orderItemId, orderItems.id))
-          .where(eq(orderItems.orderId, order.id))
+          .where(and(eq(returnItems.storeId, gate.storeId), eq(orderItems.storeId, gate.storeId), eq(orderItems.orderId, order.id)))
           .groupBy(returnItems.orderItemId);
         const returnedByItem = new Map(allReturned.map((r) => [r.orderItemId, Number(r.qty)]));
         const fullyReturned = allItems.every(
           (i) => (returnedByItem.get(i.id) ?? 0) >= Number(i.quantity) - 1e-9
         );
         if (fullyReturned) {
-          await tx.update(orders).set({ status: "returned", updatedAt: sql`now()` }).where(eq(orders.id, order.id));
+          await tx.update(orders).set({ status: "returned", updatedAt: sql`now()` }).where(and(eq(orders.storeId, gate.storeId), eq(orders.id, order.id)));
         }
       }
 

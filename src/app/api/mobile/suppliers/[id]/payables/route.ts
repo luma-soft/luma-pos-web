@@ -22,11 +22,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const gate = await requireMobileStockAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
   const { id } = await params;
   if (!isMobileEntityId(id)) return mobileError("errors.notFound", 404);
-  const overview = await getSupplierPayableOverview(id);
+  const overview = await getSupplierPayableOverview(gate.storeId, id);
   return overview ? mobileOk(overview) : mobileError("errors.notFound", 404);
 }
 

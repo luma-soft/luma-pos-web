@@ -6,7 +6,7 @@ export async function GET(request: Request) {
   const gate = await requireStockAccess();
   if (!gate.ok) return NextResponse.json({ ok: false, error: gate.error }, { status: gate.error === "errors.forbidden" ? 403 : 401 });
   const params = new URL(request.url).searchParams;
-  const result = await getProducts({
+  const result = await getProducts(gate.storeId, {
     q: params.get("q") ?? undefined,
     categoryId: params.get("categoryId") ?? undefined,
     brandId: params.get("brandId") ?? undefined,

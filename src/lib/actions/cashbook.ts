@@ -8,6 +8,7 @@ import { type ActionResult, requireManager, getProfileId, generateCode } from ".
 import { Routes } from "@/lib/routes";
 import { writeAuditLog } from "@/lib/audit";
 import { getCurrentShift } from "@/lib/data/shifts";
+import { resolveStoreContextForUser } from "@/lib/auth/store-context";
 
 const schema = z.object({
   type: z.enum(["in", "out"]),
@@ -31,9 +32,12 @@ export async function createCashTxForUser(userId: string, input: CreateCashTxInp
   const v = parsed.data;
 
   try {
+    const context = await resolveStoreContextForUser(userId);
+    if (!context) return { ok: false, error: "errors.unauthorized" };
     const profileId = await getProfileId(userId);
-    const currentShift = profileId ? await getCurrentShift(profileId) : null;
+    const currentShift = profileId ? await getCurrentShift(context.storeId, profileId) : null;
     await db.insert(cashTransactions).values({
+      storeId: context.storeId,
       code: generateCode(v.type === "in" ? "PT" : "PC"),
       shiftId: currentShift?.id ?? null,
       type: v.type,

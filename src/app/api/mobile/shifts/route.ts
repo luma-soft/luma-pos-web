@@ -7,5 +7,5 @@ export async function GET(request: Request) {
   if (!gate.ok) return mobileGate(gate)!;
 
   const limit = Math.min(50, Math.max(1, numberParam(request, "limit", 30)));
-  return mobileOk({ rows: await getShiftHistoryWithSummaries(limit) });
+  return mobileOk({ rows: await getShiftHistoryWithSummaries(gate.storeId, limit) });
 }

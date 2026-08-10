@@ -9,13 +9,15 @@ import { GroupTabs } from "@/components/group-tabs";
 import { Text } from "@/components/ui/text";
 import { TablesFloor } from "./tables-floor";
 import { ModifiersManage } from "./modifiers-manage";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 export const dynamic = "force-dynamic";
 
 const FNB = new Set(["restaurant", "cafe"]);
 
 export default async function TablesPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const store = await getStoreSettings();
+  const context = await requireStoreContext();
+  const store = await getStoreSettings(context.storeId);
   if (!FNB.has(store.industry)) redirect("/dashboard");
   const t = await getTranslations();
   const params = await searchParams;
@@ -38,7 +40,7 @@ export default async function TablesPage({ searchParams }: { searchParams: Promi
       </div>
 
       {tab === "modifiers"
-        ? <ModifiersManage groups={await getModifierGroups()} categories={(await getProductFormOptions()).categories} />
+        ? <ModifiersManage groups={await getModifierGroups()} categories={(await getProductFormOptions(context.storeId)).categories} />
         : <TablesFloor tables={await getTables()} canManage={canManage} />}
     </div>
   );

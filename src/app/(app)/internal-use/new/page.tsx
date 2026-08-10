@@ -3,13 +3,15 @@ import { Routes } from "@/lib/routes";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { getAuthoritativeInternalUseWarehouse } from "@/lib/data/internal-use";
 import { InternalUseForm } from "../../inventory/internal-use-form";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewInternalUsePage() {
+  const context = await requireStoreContext();
   const [t, warehouse] = await Promise.all([
     getTranslations(),
-    getAuthoritativeInternalUseWarehouse(),
+    getAuthoritativeInternalUseWarehouse(context.storeId),
   ]);
 
   return (

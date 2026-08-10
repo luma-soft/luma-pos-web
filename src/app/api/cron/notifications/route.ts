@@ -12,6 +12,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   dispatchPendingWarrantyNotificationsCore,
 } from "@/lib/services/technician-warranty";
+import { CURRENT_STORE_ID } from "@/lib/tenancy/constants";
 
 function dateKey(timezone: string) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -142,7 +143,7 @@ export async function GET(request: Request) {
   if (!isNotificationCronAuthorized(request)) {
     return mobileError("errors.unauthorized", 401);
   }
-  const prefs = (await getRawStorePrefs()).notifications;
+  const prefs = (await getRawStorePrefs(CURRENT_STORE_ID)).notifications;
   const day = dateKey(prefs.quietHours.timezone);
   const results = [];
   const maintenance = await runMaintenanceWorker();

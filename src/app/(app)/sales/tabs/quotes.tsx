@@ -15,6 +15,7 @@ import {
 import { parsePageSize } from "@/lib/pagination";
 import { DocumentFilterDrawer } from "./document-filter-drawer";
 import { QuotesTable } from "./quotes-table";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 type SP = Record<string, string | undefined>;
 const QUOTE_STATUSES: OrderStatusFilter[] = ["quote", "all", "cancelled"];
@@ -53,12 +54,13 @@ export async function QuotesTab({ searchParams }: { searchParams: SP }) {
 }
 
 async function QuotesContent({ searchParams }: { searchParams: SP }) {
+  const context = await requireStoreContext();
   const t = await getTranslations();
   const status = validValue(searchParams.status, QUOTE_STATUSES, "quote");
   const { from, to } = resolveDateFilter(searchParams);
   const page = positiveInteger(searchParams.page);
   const pageSize = parsePageSize(searchParams.size);
-  const { rows, total, pageCount } = await getOrders({
+  const { rows, total, pageCount } = await getOrders(context.storeId, {
     documentType: "quote",
     q: searchParams.q,
     customerId: searchParams.customerId,

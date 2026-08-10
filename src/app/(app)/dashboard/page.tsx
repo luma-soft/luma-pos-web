@@ -10,6 +10,7 @@ import { Text } from "@/components/ui/text";
 import { OrderDetailLink } from "@/components/order-detail-link";
 import { Bell, FileText, Package, Search } from "lucide-react";
 import { MobileActionRow, MobileMetricTile, MobileSectionLabel, MobileTopBar } from "@/components/mobile-ui";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 export const dynamic = "force-dynamic";
 
@@ -21,11 +22,12 @@ interface PageProps {
 }
 
 export default async function DashboardPage({ searchParams }: PageProps) {
+  const context = await requireStoreContext();
   const [t, locale] = await Promise.all([getTranslations(), getLocale()]);
   const params = await searchParams;
   const range = resolveDashboardRange(params.range);
-  const data = await getDashboard(range);
-  const mobileData = range === "today" ? data : await getDashboard("today");
+  const data = await getDashboard(context.storeId, range);
+  const mobileData = range === "today" ? data : await getDashboard(context.storeId, "today");
   const mobileDayFormatter = new Intl.DateTimeFormat(locale, {
     day: "2-digit",
     month: "2-digit",

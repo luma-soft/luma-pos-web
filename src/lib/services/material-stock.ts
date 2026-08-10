@@ -19,7 +19,7 @@ const toQty = (quantity: number) => quantity.toFixed(4);
 
 export async function syncServiceJobMaterialStockCore(
   tx: InventoryTransaction,
-  input: { materialId: string; warehouseId: string; createdBy: string | null },
+  input: { storeId: string; materialId: string; warehouseId: string; createdBy: string | null },
 ) {
   const [material] = await tx.select({
     id: serviceJobMaterials.id,
@@ -101,6 +101,7 @@ export async function syncServiceJobMaterialStockCore(
       throw new Error("INSUFFICIENT_SERVICE_MATERIAL_STOCK");
     }
     await consumeTrackedStockLots(tx, {
+      storeId: input.storeId,
       productId: material.productId,
       warehouseId,
       quantity: delta,
@@ -130,6 +131,7 @@ export async function syncServiceJobMaterialStockCore(
   } else {
     const restoreQuantity = Math.abs(delta);
     await restoreOrReceiveTrackedStockLots(tx, {
+      storeId: input.storeId,
       productId: material.productId,
       warehouseId,
       quantity: restoreQuantity,

@@ -26,6 +26,7 @@ import { getCategoriesWithCounts } from "@/lib/data/categories";
 import { CategoriesManager } from "../../products/categories/categories-manager";
 import { ProductCatalogSwitcher } from "./product-catalog-switcher";
 import { ListSearchFilterBar } from "@/components/list-search-filter";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 type SP = Record<string, string | undefined>;
 const STATUSES = ["active", "inactive", "all"] as const;
@@ -36,6 +37,7 @@ const PRODUCT_MODAL_KEYS = ["productModal", "productId", "copyFrom", "sameTypeAs
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function ProductsTab({ searchParams }: { searchParams: SP }) {
+  const context = await requireStoreContext();
   const t = await getTranslations();
   const params = searchParams;
   const cameraMaterials = params.cameraMaterials === "1";
@@ -44,7 +46,7 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
   if (!cameraMaterials && catalogView === "categories") {
     const page = Number(params.page) || 1;
     const pageSize = parsePageSize(params.size);
-    const categoryData = await getCategoriesWithCounts({ page, pageSize });
+    const categoryData = await getCategoriesWithCounts(context.storeId, { page, pageSize });
     return (
       <>
         <ProductCatalogSwitcher activeView="categories" categoryCount={categoryData.total} />
@@ -54,7 +56,7 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
     );
   }
 
-  const options = await getProductFormOptions();
+  const options = await getProductFormOptions(context.storeId);
   const { categories } = options;
 
   return (
@@ -75,11 +77,12 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
 }
 
 async function ShopeeListingModalShell({ searchParams }: { searchParams: SP }) {
+  const context = await requireStoreContext();
   const productId = searchParams.onlineProductId ?? searchParams.shopeeProductId;
   if (!productId && searchParams.onlineListing !== "1") return null;
   if (!productId) return <ShopeeListingModal key="new-online-listing" product={null} closeHref={productModalHref(searchParams, {})} />;
   if (!UUID_RE.test(productId)) notFound();
-  const product = await getProduct(productId);
+  const product = await getProduct(context.storeId, productId);
   if (!product) notFound();
   return <ShopeeListingModal key={product.id} product={product} closeHref={productModalHref(searchParams, {})} />;
 }
@@ -141,6 +144,7 @@ export async function ProductEditorModal({
   closeHrefOverride?: string;
   closeNavigation?: "push" | "replace";
 }) {
+  const context = await requireStoreContext();
   const modal = searchParams.productModal;
   if (!modal) return null;
   if (!["create", "edit", "copy", "sameType"].includes(modal)) return null;
@@ -152,13 +156,13 @@ export async function ProductEditorModal({
   if (seedId && !UUID_RE.test(seedId)) notFound();
 
   const [options, priceBooks, seedProduct] = await Promise.all([
-    getProductFormOptions(),
-    getPriceBooks(),
-    seedId ? getProduct(seedId) : Promise.resolve(null),
+    getProductFormOptions(context.storeId),
+    getPriceBooks(context.storeId),
+    seedId ? getProduct(context.storeId, seedId) : Promise.resolve(null),
   ]);
   if (seedId && !seedProduct) notFound();
 
-  const priceOverridesByBook = seedProduct ? await getPriceOverridesForProducts([seedProduct.id]) : {};
+  const priceOverridesByBook = seedProduct ? await getPriceOverridesForProducts(context.storeId, [seedProduct.id]) : {};
   const priceBookPrices = seedProduct
     ? Object.fromEntries(Object.entries(priceOverridesByBook).map(([bookId, prices]) => [bookId, prices[seedProduct.id]]))
     : {};
@@ -212,6 +216,7 @@ function productModalHref(params: SP, patch: Record<string, string>) {
 }
 
 async function ProductsContent({ searchParams, cameraMaterials = false, categories = [], brands = [], suppliers = [] }: { searchParams: SP; cameraMaterials?: boolean; categories?: Awaited<ReturnType<typeof getProductFormOptions>>["categories"]; brands?: Awaited<ReturnType<typeof getProductFormOptions>>["brands"]; suppliers?: Awaited<ReturnType<typeof getProductFormOptions>>["suppliers"] }) {
+  const context = await requireStoreContext();
   const t = await getTranslations();
   const params = searchParams;
   const page = Number(params.page) || 1;
@@ -219,7 +224,7 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
   const status: Status = STATUSES.includes(params.status as Status) ? (params.status as Status) : "active";
   const view: View = VIEWS.includes(params.view as View) ? (params.view as View) : "grouped";
 
-  const { rows, total, pageCount } = await getProducts({
+  const { rows, total, pageCount } = await getProducts(context.storeId, {
     q: params.q,
     categoryId: params.category,
     brandId: params.brandId,

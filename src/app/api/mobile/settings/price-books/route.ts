@@ -17,10 +17,9 @@ import {
 
 export async function GET() {
   const gate = await requireMobileManager();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
-  return mobileOk(await getPriceBooks());
+  return mobileOk(await getPriceBooks(gate.storeId));
 }
 
 export async function POST(request: Request) {

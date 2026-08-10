@@ -6,6 +6,7 @@ import {
 import { updateOrderSchema, type UpdateOrderInput } from "@/lib/schemas/order";
 import { type ActionResult, getProfileId, generateCode, toMoney, toQty } from "@/lib/actions/common";
 import { normalizeOrderItems } from "@/lib/orders/normalize";
+import { resolveStoreContextForUser } from "@/lib/auth/store-context";
 
 /**
  * Lõi sửa đơn — KHÔNG phải server action (nhận userId đã xác thực).
@@ -16,23 +17,26 @@ export async function updateOrderForUser(userId: string, input: UpdateOrderInput
   const parsed = updateOrderSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
+  const context = await resolveStoreContextForUser(userId);
+  if (!context) return { ok: false, error: "errors.unauthorized" };
+  const { storeId } = context;
 
   try {
     const profileId = await getProfileId(userId);
-    const trustedItems = await normalizeOrderItems(v.items);
+    const trustedItems = await normalizeOrderItems(storeId, v.items);
 
     await db.transaction(async (tx) => {
-      const [order] = await tx.select().from(orders).where(eq(orders.id, v.orderId)).limit(1);
+      const [order] = await tx.select().from(orders).where(and(eq(orders.storeId, storeId), eq(orders.id, v.orderId))).limit(1);
       if (!order) throw new Error("ORDER_NOT_FOUND");
       if (order.status !== "completed" && order.status !== "quote") throw new Error("NOT_EDITABLE");
       const [hasReturn] = await tx.select({ id: returns.id }).from(returns)
-        .where(and(eq(returns.orderId, v.orderId), eq(returns.status, "completed"))).limit(1);
+        .where(and(eq(returns.storeId, storeId), eq(returns.orderId, v.orderId), eq(returns.status, "completed"))).limit(1);
       if (hasReturn) throw new Error("HAS_RETURNS");
       const [hasEInvoice] = await tx.select({ id: einvoices.id }).from(einvoices).where(and(eq(einvoices.orderId, v.orderId), eq(einvoices.status, "issued"))).limit(1);
       if (hasEInvoice) throw new Error("HAS_EINVOICE");
 
       const isQuote = order.status === "quote";
-      const oldItems = await tx.select().from(orderItems).where(eq(orderItems.orderId, v.orderId));
+      const oldItems = await tx.select().from(orderItems).where(and(eq(orderItems.storeId, storeId), eq(orderItems.orderId, v.orderId)));
 
       // 1. Hoàn kho dòng cũ (đơn thật mới đụng kho)
       if (!isQuote && order.warehouseId) {
@@ -41,10 +45,10 @@ export async function updateOrderForUser(userId: string, input: UpdateOrderInput
           await tx.update(stockLevels).set({
             quantity: sql`${stockLevels.quantity} + ${toQty(baseQty)}`,
             updatedAt: sql`now()`,
-          }).where(sql`${stockLevels.productId} = ${i.productId} and ${stockLevels.warehouseId} = ${order.warehouseId}`);
+          }).where(and(eq(stockLevels.storeId, storeId), eq(stockLevels.productId, i.productId), eq(stockLevels.warehouseId, order.warehouseId)));
         }
       }
-      await tx.delete(orderItems).where(eq(orderItems.orderId, v.orderId));
+      await tx.delete(orderItems).where(and(eq(orderItems.storeId, storeId), eq(orderItems.orderId, v.orderId)));
 
       // 2. Dòng mới
       const subtotal = trustedItems.reduce((s, i) => s + i.total, 0);
@@ -52,6 +56,7 @@ export async function updateOrderForUser(userId: string, input: UpdateOrderInput
 
       await tx.insert(orderItems).values(
         trustedItems.map((i) => ({
+          storeId,
           orderId: v.orderId,
           productId: i.productId,
           productName: i.productName,
@@ -68,13 +73,14 @@ export async function updateOrderForUser(userId: string, input: UpdateOrderInput
           const baseQty = i.quantity * i.unitMultiplier;
           await tx
             .insert(stockLevels)
-            .values({ productId: i.productId, warehouseId: order.warehouseId, quantity: toQty(-baseQty) })
+            .values({ storeId, productId: i.productId, warehouseId: order.warehouseId, quantity: toQty(-baseQty) })
             .onConflictDoUpdate({
-              target: [stockLevels.productId, stockLevels.warehouseId],
+              target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
               set: { quantity: sql`${stockLevels.quantity} - ${toQty(baseQty)}`, updatedAt: sql`now()` },
             });
         }
         await tx.insert(stockMovements).values({
+          storeId,
           productId: trustedItems[0].productId,
           warehouseId: order.warehouseId,
           type: "adjust",
@@ -98,7 +104,7 @@ export async function updateOrderForUser(userId: string, input: UpdateOrderInput
         await tx.update(customers).set({
           currentDebt: sql`greatest(${customers.currentDebt} + ${toMoney(deltaTotal)}, 0)`,
           totalSpent: sql`greatest(${customers.totalSpent} + ${toMoney(deltaTotal)}, 0)`,
-        }).where(eq(customers.id, order.customerId));
+        }).where(and(eq(customers.storeId, storeId), eq(customers.id, order.customerId)));
       }
 
       await tx.update(orders).set({
@@ -110,7 +116,7 @@ export async function updateOrderForUser(userId: string, input: UpdateOrderInput
         projectName: v.projectName || null,
         note: v.note || null,
         updatedAt: sql`now()`,
-      }).where(eq(orders.id, v.orderId));
+      }).where(and(eq(orders.storeId, storeId), eq(orders.id, v.orderId)));
     });
 
     return { ok: true, data: undefined };
@@ -138,16 +144,19 @@ export async function mergeOrdersForUser(userId: string, orderIds: string[]): Pr
   if (orderIds.length < 2 || orderIds.length > 20) return { ok: false, error: "merge.errors.needTwo" };
 
   try {
+    const context = await resolveStoreContextForUser(userId);
+    if (!context) return { ok: false, error: "errors.unauthorized" };
+    const { storeId } = context;
     const profileId = await getProfileId(userId);
 
     const result = await db.transaction(async (tx) => {
-      const sources = await tx.select().from(orders).where(inArray(orders.id, orderIds));
+      const sources = await tx.select().from(orders).where(and(eq(orders.storeId, storeId), inArray(orders.id, orderIds)));
       if (sources.length !== orderIds.length) throw new Error("ORDER_NOT_FOUND");
       if (sources.some((o) => o.status !== "completed")) throw new Error("ONLY_COMPLETED");
       const customerIds = new Set(sources.map((o) => o.customerId ?? ""));
       if (customerIds.size !== 1 || !sources[0].customerId) throw new Error("SAME_CUSTOMER");
       const [hasReturn] = await tx.select({ id: returns.id }).from(returns)
-        .where(and(inArray(returns.orderId, orderIds), eq(returns.status, "completed"))).limit(1);
+        .where(and(eq(returns.storeId, storeId), inArray(returns.orderId, orderIds), eq(returns.status, "completed"))).limit(1);
       if (hasReturn) throw new Error("HAS_RETURNS");
       const [hasEInvoice] = await tx.select({ id: einvoices.id }).from(einvoices).where(and(inArray(einvoices.orderId, orderIds), eq(einvoices.status, "issued"))).limit(1);
       if (hasEInvoice) throw new Error("HAS_EINVOICE");
@@ -159,6 +168,7 @@ export async function mergeOrdersForUser(userId: string, orderIds: string[]): Pr
       const paid = sources.reduce((s, o) => s + Number(o.amountPaid), 0);
 
       const [merged] = await tx.insert(orders).values({
+        storeId,
         code: generateCode("DHG"),
         documentType: "sale",
         status: "completed",
@@ -176,15 +186,15 @@ export async function mergeOrdersForUser(userId: string, orderIds: string[]): Pr
         createdBy: profileId,
       }).returning({ id: orders.id, code: orders.code });
 
-      await tx.update(orderItems).set({ orderId: merged.id }).where(inArray(orderItems.orderId, orderIds));
-      await tx.update(payments).set({ orderId: merged.id }).where(inArray(payments.orderId, orderIds));
+      await tx.update(orderItems).set({ orderId: merged.id }).where(and(eq(orderItems.storeId, storeId), inArray(orderItems.orderId, orderIds)));
+      await tx.update(payments).set({ orderId: merged.id }).where(and(eq(payments.storeId, storeId), inArray(payments.orderId, orderIds)));
       void returnItems;
 
       await tx.update(orders).set({
         status: "merged",
         note: sql`coalesce(${orders.note} || ' · ', '') || ${"Đã gộp vào " + merged.code}`,
         updatedAt: sql`now()`,
-      }).where(inArray(orders.id, orderIds));
+      }).where(and(eq(orders.storeId, storeId), inArray(orders.id, orderIds)));
 
       return merged;
     });

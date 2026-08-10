@@ -43,6 +43,7 @@ export async function createStocktake(
 
     const result = await db.transaction(async (tx) => {
       const [st] = await tx.insert(stocktakes).values({
+        storeId: gate.storeId,
         code: generateCode("KK"),
         warehouseId: v.warehouseId,
         status: "draft",
@@ -54,11 +55,16 @@ export async function createStocktake(
       const levels = await tx
         .select({ productId: stockLevels.productId, quantity: stockLevels.quantity })
         .from(stockLevels)
-        .where(and(eq(stockLevels.warehouseId, v.warehouseId), inArray(stockLevels.productId, ids)));
+        .where(and(
+          eq(stockLevels.storeId, gate.storeId),
+          eq(stockLevels.warehouseId, v.warehouseId),
+          inArray(stockLevels.productId, ids),
+        ));
       const sysByProduct = new Map(levels.map((l) => [l.productId, Number(l.quantity)]));
 
       await tx.insert(stocktakeItems).values(
         v.items.map((i) => ({
+          storeId: gate.storeId,
           stocktakeId: st.id,
           productId: i.productId,
           systemQty: toQty(sysByProduct.get(i.productId) ?? 0),
@@ -95,17 +101,21 @@ export async function balanceStocktake(id: string): Promise<ActionResult> {
     const profileId = await getProfileId(userId);
 
     await db.transaction(async (tx) => {
-      const [st] = await tx.select().from(stocktakes).where(eq(stocktakes.id, id)).limit(1);
+      const [st] = await tx.select().from(stocktakes).where(and(eq(stocktakes.storeId, gate.storeId), eq(stocktakes.id, id))).limit(1);
       if (!st) throw new Error("NOT_FOUND");
       if (st.status !== "draft") throw new Error("NOT_DRAFT");
 
-      const items = await tx.select().from(stocktakeItems).where(eq(stocktakeItems.stocktakeId, id));
+      const items = await tx.select().from(stocktakeItems).where(and(eq(stocktakeItems.storeId, gate.storeId), eq(stocktakeItems.stocktakeId, id)));
 
       for (const i of items) {
         const [level] = await tx
           .select({ quantity: stockLevels.quantity })
           .from(stockLevels)
-          .where(and(eq(stockLevels.productId, i.productId), eq(stockLevels.warehouseId, st.warehouseId)))
+          .where(and(
+            eq(stockLevels.storeId, gate.storeId),
+            eq(stockLevels.productId, i.productId),
+            eq(stockLevels.warehouseId, st.warehouseId),
+          ))
           .limit(1);
         const current = Number(level?.quantity ?? 0);
         const actual = Number(i.actualQty);
@@ -113,6 +123,7 @@ export async function balanceStocktake(id: string): Promise<ActionResult> {
 
         if (diff < -1e-9) {
           await consumeTrackedStockLots(tx, {
+            storeId: gate.storeId,
             productId: i.productId,
             warehouseId: st.warehouseId,
             quantity: Math.abs(diff),
@@ -122,6 +133,7 @@ export async function balanceStocktake(id: string): Promise<ActionResult> {
           });
         } else if (diff > 1e-9) {
           await receiveUnspecifiedTrackedStockLot(tx, {
+            storeId: gate.storeId,
             productId: i.productId,
             warehouseId: st.warehouseId,
             quantity: diff,
@@ -135,14 +147,15 @@ export async function balanceStocktake(id: string): Promise<ActionResult> {
         // set tồn = thực tế
         await tx
           .insert(stockLevels)
-          .values({ productId: i.productId, warehouseId: st.warehouseId, quantity: toQty(actual) })
+          .values({ storeId: gate.storeId, productId: i.productId, warehouseId: st.warehouseId, quantity: toQty(actual) })
           .onConflictDoUpdate({
-            target: [stockLevels.productId, stockLevels.warehouseId],
+            target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
             set: { quantity: toQty(actual), updatedAt: sql`now()` },
           });
 
         if (Math.abs(diff) > 1e-9) {
           await tx.insert(stockMovements).values({
+            storeId: gate.storeId,
             productId: i.productId,
             warehouseId: st.warehouseId,
             type: "adjust",
@@ -158,7 +171,7 @@ export async function balanceStocktake(id: string): Promise<ActionResult> {
       await tx.update(stocktakes).set({
         status: "balanced",
         balancedAt: sql`now()`,
-      }).where(eq(stocktakes.id, id));
+      }).where(and(eq(stocktakes.storeId, gate.storeId), eq(stocktakes.id, id)));
     });
 
     revalidatePath(Routes.Stocktakes);
@@ -177,12 +190,13 @@ export async function balanceStocktake(id: string): Promise<ActionResult> {
 
 /** Hủy phiếu tạm (chưa cân bằng — không ảnh hưởng kho). */
 export async function cancelStocktake(id: string): Promise<ActionResult> {
-  { const gate = await requireStockAccess(); if (!gate.ok) return gate; }
+  const gate = await requireStockAccess();
+  if (!gate.ok) return gate;
   try {
     await db.transaction(async (tx) => {
-      const [st] = await tx.select().from(stocktakes).where(eq(stocktakes.id, id)).limit(1);
+      const [st] = await tx.select().from(stocktakes).where(and(eq(stocktakes.storeId, gate.storeId), eq(stocktakes.id, id))).limit(1);
       if (!st || st.status !== "draft") throw new Error("NOT_DRAFT");
-      await tx.update(stocktakes).set({ status: "cancelled" }).where(eq(stocktakes.id, id));
+      await tx.update(stocktakes).set({ status: "cancelled" }).where(and(eq(stocktakes.storeId, gate.storeId), eq(stocktakes.id, id)));
     });
     revalidatePath(Routes.Stocktakes);
     return { ok: true, data: undefined };

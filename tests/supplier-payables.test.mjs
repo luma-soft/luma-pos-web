@@ -5,6 +5,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 
 const project = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const STORE_ID = "00000000-0000-4000-8000-000000000001";
 const schema = await import(`${project}/src/db/schema.ts`);
 const {
   createSupplierPayableEntry,
@@ -45,7 +46,7 @@ const [purchase] = await database
   })
   .returning({ id: schema.purchaseOrders.id });
 
-const actor = { profileId: null, shiftId: null };
+const actor = { storeId: STORE_ID, profileId: null, shiftId: null };
 const paymentInput = {
   supplierId: supplier.id,
   amount: 300,
@@ -151,7 +152,7 @@ const replayedUnallocatedPayment = await paySupplierPayable(
 assert.equal(replayedUnallocatedPayment.ok, true);
 assert.equal(replayedUnallocatedPayment.data.replayed, true);
 
-const overview = await getSupplierPayableOverview(supplier.id, database);
+const overview = await getSupplierPayableOverview(STORE_ID, supplier.id, database);
 assert.ok(overview);
 assert.equal(overview.currentDebt, 300);
 assert.equal(overview.invoices[0].remaining, 400);

@@ -31,14 +31,16 @@ import { ThemeSwitcher } from "@/components/theme-switcher";
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { LogoutButton } from "@/components/logout-button";
 import { getMode, getTheme } from "@/lib/theme/cookie";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 export const dynamic = "force-dynamic";
 
 export default async function MorePage() {
   const user = await requireUser();
+  const context = await requireStoreContext();
   const [role, store, t, mode, theme] = await Promise.all([
     getRole(user.id),
-    getStoreSettings(),
+    getStoreSettings(context.storeId),
     getTranslations(),
     getMode(),
     getTheme(),

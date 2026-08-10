@@ -12,7 +12,7 @@ export interface PriceBookRow {
 }
 
 /** Danh sách bảng giá — mặc định lên đầu. */
-export async function getPriceBooks(options?: { includeManagerOnly?: boolean }): Promise<PriceBookRow[]> {
+export async function getPriceBooks(storeId: string, options?: { includeManagerOnly?: boolean }): Promise<PriceBookRow[]> {
   return db
     .select({
       id: priceBooks.id,
@@ -23,7 +23,9 @@ export async function getPriceBooks(options?: { includeManagerOnly?: boolean }):
       sortOrder: priceBooks.sortOrder,
     })
     .from(priceBooks)
-    .where(options?.includeManagerOnly === false ? eq(priceBooks.managerOnly, false) : undefined)
+    .where(options?.includeManagerOnly === false
+      ? and(eq(priceBooks.storeId, storeId), eq(priceBooks.managerOnly, false))
+      : eq(priceBooks.storeId, storeId))
     .orderBy(desc(priceBooks.isDefault), asc(priceBooks.sortOrder), asc(priceBooks.name));
 }
 
@@ -33,6 +35,7 @@ export async function getPriceBooks(options?: { includeManagerOnly?: boolean }):
  * chỉ render 20 SP) → tránh load toàn bộ bảng productPrices mỗi book.
  */
 export async function getPriceOverrides(
+  storeId: string,
   priceBookId: string,
   productIds?: string[]
 ): Promise<Record<string, string>> {
@@ -40,8 +43,15 @@ export async function getPriceOverrides(
   if (productIds && productIds.length === 0) return {};
 
   const where = productIds
-    ? and(eq(productPrices.priceBookId, priceBookId), inArray(productPrices.productId, productIds))
-    : eq(productPrices.priceBookId, priceBookId);
+    ? and(
+      eq(productPrices.storeId, storeId),
+      eq(productPrices.priceBookId, priceBookId),
+      inArray(productPrices.productId, productIds),
+    )
+    : and(
+      eq(productPrices.storeId, storeId),
+      eq(productPrices.priceBookId, priceBookId),
+    );
 
   const rows = await db
     .select({ pid: productPrices.productId, price: productPrices.price })
@@ -57,13 +67,17 @@ export async function getPriceOverrides(
  * Trả về: { [priceBookId]: { [productId]: price } }
  */
 export async function getPriceOverridesForProducts(
+  storeId: string,
   productIds: string[]
 ): Promise<Record<string, Record<string, string>>> {
   if (productIds.length === 0) return {};
   const rows = await db
     .select({ book: productPrices.priceBookId, pid: productPrices.productId, price: productPrices.price })
     .from(productPrices)
-    .where(inArray(productPrices.productId, productIds));
+    .where(and(
+      eq(productPrices.storeId, storeId),
+      inArray(productPrices.productId, productIds),
+    ));
   const m: Record<string, Record<string, string>> = {};
   for (const r of rows) (m[r.book] ??= {})[r.pid] = r.price;
   return m;

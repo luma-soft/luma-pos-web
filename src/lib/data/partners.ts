@@ -83,8 +83,11 @@ function parseMoneyBound(value?: string) {
   return Number.isFinite(n) && n >= 0 ? n : undefined;
 }
 
-function buildCustomerConditions(filters: CustomerFilters) {
-  const conditions: SQL[] = [eq(customers.isActive, true)];
+function buildCustomerConditions(storeId: string, filters: CustomerFilters) {
+  const conditions: SQL[] = [
+    eq(customers.storeId, storeId),
+    eq(customers.isActive, true),
+  ];
 
   if (filters.customerId) conditions.push(eq(customers.id, filters.customerId));
 
@@ -118,6 +121,7 @@ function buildCustomerConditions(filters: CustomerFilters) {
       select max(${orders.createdAt})
       from ${orders}
       where ${orders.customerId} = ${customers.id}
+        and ${orders.storeId} = ${storeId}
         and ${orders.status} in ('completed', 'returned')
     )`;
     if (lastTxFrom) conditions.push(sql`${lastTx} >= ${lastTxFrom}`);
@@ -131,12 +135,13 @@ const saleOrderStatus = sql`${orders.status} in ('completed', 'returned')`;
 const customerHistoryOrderStatus = sql`${orders.status} in ('completed', 'returned', 'cancelled')`;
 
 export async function getCustomers(
+  storeId: string,
   filters: CustomerFilters = {},
   options: { includeHistory?: boolean } = {},
 ) {
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize);
-  const conditions = buildCustomerConditions(filters);
+  const conditions = buildCustomerConditions(storeId, filters);
   const where = and(...conditions);
 
   const [baseRows, [{ total }], [moneyAgg], [grossAgg]] = await Promise.all([
@@ -167,12 +172,14 @@ export async function getCustomers(
           select max(${orders.createdAt})
           from ${orders}
           where ${orders.customerId} = ${customers.id}
+            and ${orders.storeId} = ${storeId}
             and ${orders.status} in ('completed', 'returned')
         )`,
         orderCount: sql<number>`(
           select count(*)::int
           from ${orders}
           where ${orders.customerId} = ${customers.id}
+            and ${orders.storeId} = ${storeId}
         )`,
         consentStatus: customerConsents.status,
         consentPurposes: customerConsents.purposes,
@@ -204,7 +211,7 @@ export async function getCustomers(
       })
       .from(orders)
       .innerJoin(customers, eq(orders.customerId, customers.id))
-      .where(and(where, saleOrderStatus)),
+      .where(and(eq(orders.storeId, storeId), where, saleOrderStatus)),
   ]);
 
   const customerIds = baseRows.map((row) => row.id);
@@ -491,15 +498,16 @@ export async function getCustomers(
   };
 }
 
-export async function getCustomerPartnerDetail(id: string) {
+export async function getCustomerPartnerDetail(storeId: string, id: string) {
   const result = await getCustomers(
+    storeId,
     { customerId: id, page: 1, pageSize: 1 },
     { includeHistory: true },
   );
   return result.rows[0] ?? null;
 }
 
-export async function getCustomer(id: string) {
+export async function getCustomer(storeId: string, id: string) {
   const [customer] = await db
     .select({
       id: customers.id,
@@ -524,7 +532,7 @@ export async function getCustomer(id: string) {
     })
     .from(customers)
     .leftJoin(customerConsents, eq(customerConsents.customerId, customers.id))
-    .where(eq(customers.id, id))
+    .where(and(eq(customers.id, id), eq(customers.storeId, storeId)))
     .limit(1);
   if (!customer) return null;
 
@@ -540,7 +548,7 @@ export async function getCustomer(id: string) {
       createdAt: orders.createdAt,
     })
     .from(orders)
-    .where(eq(orders.customerId, id))
+    .where(and(eq(orders.customerId, id), eq(orders.storeId, storeId)))
     .orderBy(desc(orders.createdAt))
     .limit(50);
 
@@ -549,13 +557,16 @@ export async function getCustomer(id: string) {
 
 export type CustomerListResult = Awaited<ReturnType<typeof getCustomers>>;
 
-export async function getSupplier(id: string) {
-  const [supplier] = await db.select().from(suppliers).where(eq(suppliers.id, id)).limit(1);
+export async function getSupplier(storeId: string, id: string) {
+  const [supplier] = await db.select().from(suppliers).where(and(
+    eq(suppliers.id, id),
+    eq(suppliers.storeId, storeId),
+  )).limit(1);
   if (!supplier) return null;
   return supplier;
 }
 
-export async function getSupplierPurchases(id: string) {
+export async function getSupplierPurchases(storeId: string, id: string) {
   const { purchaseOrders, purchaseOrderItems } = await import("@/db/schema");
   return db
     .select({
@@ -571,12 +582,15 @@ export async function getSupplierPurchases(id: string) {
     })
     .from(purchaseOrders)
     .innerJoin(warehouses, eq(purchaseOrders.warehouseId, warehouses.id))
-    .where(eq(purchaseOrders.supplierId, id))
+    .where(and(
+      eq(purchaseOrders.supplierId, id),
+      eq(purchaseOrders.storeId, storeId),
+    ))
     .orderBy(desc(purchaseOrders.createdAt))
     .limit(50);
 }
 
-export async function getSupplierPurchaseReturns(id: string) {
+export async function getSupplierPurchaseReturns(storeId: string, id: string) {
   const { purchaseReturnItems, purchaseReturns } = await import("@/db/schema");
   return db
     .select({
@@ -594,17 +608,20 @@ export async function getSupplierPurchaseReturns(id: string) {
     })
     .from(purchaseReturns)
     .innerJoin(warehouses, eq(purchaseReturns.warehouseId, warehouses.id))
-    .where(eq(purchaseReturns.supplierId, id))
+    .where(and(
+      eq(purchaseReturns.supplierId, id),
+      eq(purchaseReturns.storeId, storeId),
+    ))
     .orderBy(desc(purchaseReturns.createdAt))
     .limit(50);
 }
 
-export async function getSupplierPreview(id: string) {
+export async function getSupplierPreview(storeId: string, id: string) {
   const [supplier, purchases, purchaseReturns, payables] = await Promise.all([
-    getSupplier(id),
-    getSupplierPurchases(id),
-    getSupplierPurchaseReturns(id),
-    getSupplierPayableOverview(id),
+    getSupplier(storeId, id),
+    getSupplierPurchases(storeId, id),
+    getSupplierPurchaseReturns(storeId, id),
+    getSupplierPayableOverview(storeId, id),
   ]);
   if (!supplier) return null;
   return { supplier, purchases, purchaseReturns, payables };
@@ -612,10 +629,10 @@ export async function getSupplierPreview(id: string) {
 
 export type SupplierDetail = NonNullable<Awaited<ReturnType<typeof getSupplier>>>;
 
-export async function getSuppliers(filters: { q?: string; owing?: "owing" | "clear"; page?: number; pageSize?: number } = {}) {
+export async function getSuppliers(storeId: string, filters: { q?: string; owing?: "owing" | "clear"; page?: number; pageSize?: number } = {}) {
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize);
-  const conditions: SQL[] = [];
+  const conditions: SQL[] = [eq(suppliers.storeId, storeId)];
   if (filters.q?.trim()) {
     const q = filters.q.trim();
     const c = or(accentInsensitiveLike(suppliers.name, q), accentInsensitiveLike(suppliers.phone, q), accentInsensitiveLike(suppliers.code, q));

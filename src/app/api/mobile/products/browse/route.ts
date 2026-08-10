@@ -15,14 +15,13 @@ import {
 
 export async function GET(request: Request) {
   const gate = await requireMobileStockReadAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const [categories, brands, suppliers, products] = await Promise.all([
-    getPricingCategories(),
-    getPricingBrands(),
-    getPricingSuppliers(),
-    getPricingPage({
+    getPricingCategories(gate.storeId),
+    getPricingBrands(gate.storeId),
+    getPricingSuppliers(gate.storeId),
+    getPricingPage(gate.storeId, {
       q: searchParam(request, "q"),
       categoryIds: csvParam(request, "categoryIds"),
       brandIds: csvParam(request, "brandIds"),

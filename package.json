@@ -27,7 +27,8 @@
     "import:kiotviet-history": "bun run src/scripts/import-kiotviet-history.ts",
     "ai:eval": "bun run src/scripts/run-ai-evals.ts",
     "audit:tenant-foundation": "bun run src/scripts/audit-tenant-foundation.ts",
-    "audit:tenant-auth": "bun run src/scripts/audit-tenant-auth.ts"
+    "audit:tenant-auth": "bun run src/scripts/audit-tenant-auth.ts",
+    "audit:core-tenancy": "bun run src/scripts/audit-core-tenancy.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

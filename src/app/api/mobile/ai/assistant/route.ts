@@ -131,7 +131,7 @@ export async function POST(request: Request) {
     });
     return mobileError("ai.usage.exhausted", 402);
   }
-  const providerConfig = await loadAiProviderConfig().catch(() => null);
+  const providerConfig = await loadAiProviderConfig(gate.storeId).catch(() => null);
   await recordAiUsageEvent({
     provider: providerConfig?.provider,
     model: providerConfig?.textModel,
@@ -147,6 +147,7 @@ export async function POST(request: Request) {
   const parsedAttachments = attachments.length
     ? await Promise.all(attachments.slice(0, 4).map((attachment) => parseAiAttachment({
         attachment,
+        storeId: gate.storeId,
         userId: gate.userId,
         prompt,
       })))
@@ -210,7 +211,7 @@ export async function POST(request: Request) {
     : prompt;
   const enrichedPrompt = `${basePrompt}${attachmentPromptBlock(parsedAttachments)}`;
   const [reports, restock] = await Promise.all([
-    getReports(30),
+    getReports(gate.storeId, 30),
     getRestockSuggestions(30),
   ]);
   const toolLoop = hasForcedActionPreset(enrichedPrompt)

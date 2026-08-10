@@ -39,17 +39,18 @@ function internalUseFilterConditions({ q, status, warehouseId, reason, departmen
   ].filter((value): value is SQL => Boolean(value));
 }
 
-export async function getAuthoritativeInternalUseWarehouse(): Promise<InternalUseWarehouse | null> {
+export async function getAuthoritativeInternalUseWarehouse(storeId: string): Promise<InternalUseWarehouse | null> {
   const rows = await db
     .select({ id: warehouses.id, name: warehouses.name, isDefault: warehouses.isDefault })
-    .from(warehouses);
+    .from(warehouses)
+    .where(eq(warehouses.storeId, storeId));
   return resolveAuthoritativeInternalUseWarehouse(rows);
 }
 
 /** Lịch sử phiếu xuất nội bộ (audit) — mới nhất trước. */
-export async function getInternalUseIssues({ limit = 50, ...filters }: InternalUseFilters & { limit?: number } = {}) {
+export async function getInternalUseIssues(storeId: string, { limit = 50, ...filters }: InternalUseFilters & { limit?: number } = {}) {
   const creator = alias(profiles, "iu_creator");
-  const conditions = internalUseFilterConditions(filters);
+  const conditions = [eq(internalUseIssues.storeId, storeId), ...internalUseFilterConditions(filters)];
 
   const rows = await db
     .select({
@@ -63,7 +64,7 @@ export async function getInternalUseIssues({ limit = 50, ...filters }: InternalU
       note: internalUseIssues.note,
       createdAt: internalUseIssues.createdAt,
       createdByName: creator.fullName,
-      itemCount: sql<number>`(select count(*) from ${internalUseItems} where ${internalUseItems.issueId} = ${internalUseIssues.id})::int`,
+      itemCount: sql<number>`(select count(*) from ${internalUseItems} where ${internalUseItems.storeId} = ${storeId} and ${internalUseItems.issueId} = ${internalUseIssues.id})::int`,
     })
     .from(internalUseIssues)
     .leftJoin(warehouses, eq(internalUseIssues.warehouseId, warehouses.id))
@@ -89,7 +90,7 @@ export async function getInternalUseIssues({ limit = 50, ...filters }: InternalU
     })
     .from(internalUseItems)
     .leftJoin(products, eq(internalUseItems.productId, products.id))
-    .where(inArray(internalUseItems.issueId, ids))
+    .where(and(eq(internalUseItems.storeId, storeId), inArray(internalUseItems.issueId, ids)))
     .orderBy(internalUseItems.productName);
 
   const itemsByIssue = new Map<string, typeof itemRows>();
@@ -102,8 +103,8 @@ export async function getInternalUseIssues({ limit = 50, ...filters }: InternalU
   return rows.map((row) => ({ ...row, items: itemsByIssue.get(row.id) ?? [] }));
 }
 
-export async function getInternalUseIssueCount(filters: InternalUseFilters = {}) {
-  const conditions = internalUseFilterConditions(filters);
+export async function getInternalUseIssueCount(storeId: string, filters: InternalUseFilters = {}) {
+  const conditions = [eq(internalUseIssues.storeId, storeId), ...internalUseFilterConditions(filters)];
   const [row] = await db
     .select({ total: sql<number>`count(*)::int` })
     .from(internalUseIssues)

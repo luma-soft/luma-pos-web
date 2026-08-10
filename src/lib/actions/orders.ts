@@ -28,10 +28,11 @@ export async function createOrder(
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   try {
     const trustedItems = await normalizeOrderItems(
+      gate.storeId,
       parsed.data.items,
       parsed.data.priceBookId,
     );
-    const prefs = await getRawStorePrefs();
+    const prefs = await getRawStorePrefs(gate.storeId);
     const requirement = evaluateOrderApprovalRequirement({
       clientId: parsed.data.clientId,
       rawItems: parsed.data.items,

@@ -101,16 +101,21 @@ export function pricingSellableProductCondition(): SQL {
 }
 
 export async function getPricingPage(
+  storeId: string,
   query: PricingQuery = {},
 ): Promise<PricingProductPage> {
   const page = Math.max(1, Math.trunc(query.page ?? 1));
   const pageSize = coercePageSize(query.pageSize, 50);
-  const conditions: SQL[] = [eq(products.isVariantParent, false)];
+  const conditions: SQL[] = [
+    eq(products.storeId, storeId),
+    eq(products.isVariantParent, false),
+  ];
   const availableStock = query.warehouseId?.trim()
     ? sql<string>`coalesce((
         select sl.quantity
         from ${stockLevels} sl
         where sl.product_id = ${products.id}
+          and sl.store_id = ${storeId}
           and sl.warehouse_id = ${query.warehouseId.trim()}
         limit 1
       ), 0)`
@@ -180,6 +185,7 @@ export async function getPricingPage(
         select pp.price
         from ${productPrices} pp
         where pp.product_id = ${products.id}
+          and pp.store_id = ${storeId}
           and pp.price_book_id = ${query.priceBookId.trim()}
         limit 1
       ), ${products.retailPrice})`
@@ -282,30 +288,32 @@ export async function getPricingPage(
   };
 }
 
-export async function getPricingCategories(): Promise<PricingCategory[]> {
+export async function getPricingCategories(storeId: string): Promise<PricingCategory[]> {
   return db
     .select({ id: categories.id, name: categories.name })
     .from(products)
     .innerJoin(categories, eq(products.categoryId, categories.id))
-    .where(pricingSellableProductCondition())
+    .where(and(eq(products.storeId, storeId), pricingSellableProductCondition()))
     .groupBy(categories.id, categories.name)
     .orderBy(asc(categories.name), asc(categories.id));
 }
 
-export async function getPricingBrands(): Promise<PricingCategory[]> {
+export async function getPricingBrands(storeId: string): Promise<PricingCategory[]> {
   return db
     .select({ id: brands.id, name: brands.name })
     .from(products)
     .innerJoin(brands, eq(products.brandId, brands.id))
+    .where(eq(products.storeId, storeId))
     .groupBy(brands.id, brands.name)
     .orderBy(asc(brands.name), asc(brands.id));
 }
 
-export async function getPricingSuppliers(): Promise<PricingCategory[]> {
+export async function getPricingSuppliers(storeId: string): Promise<PricingCategory[]> {
   return db
     .select({ id: suppliers.id, name: suppliers.name })
     .from(products)
     .innerJoin(suppliers, eq(products.supplierId, suppliers.id))
+    .where(eq(products.storeId, storeId))
     .groupBy(suppliers.id, suppliers.name)
     .orderBy(asc(suppliers.name), asc(suppliers.id));
 }

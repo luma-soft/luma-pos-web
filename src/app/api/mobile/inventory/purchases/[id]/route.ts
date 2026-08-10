@@ -13,7 +13,7 @@ export async function GET(
     return mobileError("errors.notFound", 404);
   }
 
-  const purchase = await getPurchase(id);
+  const purchase = await getPurchase(gate.storeId, id);
   if (!purchase) return mobileError("errors.notFound", 404);
   return mobileOk({
     id: purchase.id,

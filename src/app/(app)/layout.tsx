@@ -15,6 +15,7 @@ import { getTheme, getMode } from "@/lib/theme/cookie";
 import { getStoreSettings } from "@/lib/data/settings";
 import { getAttentionNotificationCount } from "@/lib/audit";
 import { ProductCatalogProvider } from "@/components/product-catalog-provider";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 export const dynamic = "force-dynamic";
 
@@ -36,8 +37,9 @@ export default async function AppLayout({
     redirect(Routes.Login);
   }
 
+  const context = await requireStoreContext();
   const [store, notificationCount] = await Promise.all([
-    getStoreSettings(),
+    getStoreSettings(context.storeId),
     getAttentionNotificationCount(user.id),
   ]);
   if (!store.onboarded) redirect("/onboarding");
@@ -46,7 +48,7 @@ export default async function AppLayout({
   const theme = await getTheme();
   const mode = await getMode();
   const role = await getRole(user.id);
-  const catalogScopeId = `${user.id}:${role}`;
+  const catalogScopeId = `${context.storeId}:${user.id}:${role}`;
 
   return (
     <ProductCatalogProvider userId={user.id} scopeId={catalogScopeId}>

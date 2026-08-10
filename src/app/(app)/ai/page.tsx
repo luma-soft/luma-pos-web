@@ -5,14 +5,16 @@ import { getStoreSettings } from "@/lib/data/settings";
 import { Text } from "@/components/ui/text";
 import { Assistant } from "./assistant";
 import { AiHelpButton } from "./ai-help-button";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 export const dynamic = "force-dynamic";
 
 export default async function AiPage() {
+  const context = await requireStoreContext();
   const [t, user, store] = await Promise.all([
     getTranslations(),
     requireUser(),
-    getStoreSettings(),
+    getStoreSettings(context.storeId),
   ]);
   if (!store.prefs.ai.openaiApiKeySet) {
     const role = await getRole(user.id);

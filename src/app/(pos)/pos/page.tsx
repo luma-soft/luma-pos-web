@@ -8,7 +8,7 @@ import { getOrder } from "@/lib/data/orders";
 import { getPrintTemplate } from "@/lib/print/template";
 import { Routes } from "@/lib/routes";
 import { formatDate } from "@/lib/utils";
-import { getRole, requireUser } from "@/lib/actions/common";
+import { requireStoreContext } from "@/lib/auth/store-context";
 import { PosClient, type PosSourceInvoice } from "./pos-client";
 import type { PosInitialContext } from "./pos-client";
 
@@ -28,12 +28,12 @@ function csvUuids(value: string | string[] | undefined) {
   return raw.split(",").map((item) => item.trim()).filter((item) => UUID_RE.test(item));
 }
 
-async function sourceInvoiceFromParams(params: PosSearchParams): Promise<PosSourceInvoice | null> {
+async function sourceInvoiceFromParams(storeId: string, params: PosSearchParams): Promise<PosSourceInvoice | null> {
   const mode = one(params.sourceMode);
   const kind = one(params.sourceKind);
   const orderId = one(params.sourceOrderId);
   if ((mode !== "edit" && mode !== "copy" && mode !== "return") || !orderId || !UUID_RE.test(orderId)) return null;
-  const order = await getOrder(orderId);
+  const order = await getOrder(storeId, orderId);
   if (!order) return null;
   const sourceKind = mode === "return"
     ? "return_invoice"
@@ -87,9 +87,8 @@ function initialContextFromParams(params: PosSearchParams): PosInitialContext | 
 
 export default async function POSPage({ searchParams }: { searchParams: Promise<PosSearchParams> }) {
   const params = await searchParams;
-  const user = await requireUser();
-  const role = await getRole(user.id);
-  const sourceInvoice = await sourceInvoiceFromParams(params);
+  const context = await requireStoreContext();
+  const sourceInvoice = await sourceInvoiceFromParams(context.storeId, params);
   const initialContext = initialContextFromParams(params);
   const aiProductIds = csvUuids(params.aiProducts);
   const includeProductIds = [
@@ -97,18 +96,18 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
     ...aiProductIds,
   ];
   const [data, settings, t, orderPrintTemplate, quotePrintTemplate, bookingPrintTemplate, returnPrintTemplate] = await Promise.all([
-    getPosData({
+    getPosData(context.storeId, {
       includeProductIds,
       includeProductSkus: CAMERA_QUOTE_UTILITY_SKUS,
       includeProductCategories: ["Camera giám sát"],
-      role,
+      role: context.role,
     }),
-    getStoreSettings(),
+    getStoreSettings(context.storeId),
     getTranslations(),
-    getPrintTemplate("order"),
-    getPrintTemplate("quote"),
-    getPrintTemplate("booking"),
-    getPrintTemplate("return"),
+    getPrintTemplate(context.storeId, "order"),
+    getPrintTemplate(context.storeId, "quote"),
+    getPrintTemplate(context.storeId, "booking"),
+    getPrintTemplate(context.storeId, "return"),
   ]);
   return (
     <div className="h-full flex flex-col">

@@ -12,8 +12,7 @@ function daysForRange(request: Request) {
 
 export async function GET(request: Request) {
   const gate = await requireMobileManager();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
-  return mobileOk(await getReports(daysForRange(request)));
+  return mobileOk(await getReports(gate.storeId, daysForRange(request)));
 }

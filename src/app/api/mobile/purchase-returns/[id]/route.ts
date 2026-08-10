@@ -7,11 +7,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const gate = await requireMobileStockReadAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const { id } = await params;
-  const purchaseReturn = await getPurchaseReturn(id);
+  const purchaseReturn = await getPurchaseReturn(gate.storeId, id);
   return purchaseReturn
     ? mobileOk(purchaseReturn)
     : mobileError("errors.notFound", 404);

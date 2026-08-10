@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     );
   }
   const params = new URL(request.url).searchParams;
-  const total = await getInternalUseIssueCount({
+  const total = await getInternalUseIssueCount(gate.storeId, {
     q: params.get("q") ?? undefined,
     status: params.get("status") ?? undefined,
     warehouseId: params.get("warehouseId") ?? undefined,

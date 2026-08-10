@@ -7,8 +7,7 @@ const ranges = new Set<DashboardRange>(["today", "7d", "30d", "month"]);
 
 export async function GET(request: Request) {
   const gate = await requireMobileUser();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const requestedRange = searchParam(request, "range", "today");
   const range = ranges.has(requestedRange as DashboardRange)
@@ -16,8 +15,8 @@ export async function GET(request: Request) {
     : "today";
 
   const [dashboard, expiry] = await Promise.all([
-    getDashboard(range),
-    getExpiryStockAlerts(30, 8),
+    getDashboard(gate.storeId, range),
+    getExpiryStockAlerts(gate.storeId, 30, 8),
   ]);
   return mobileOk({
     ...dashboard,

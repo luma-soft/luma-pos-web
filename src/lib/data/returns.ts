@@ -13,7 +13,7 @@ type ReturnRefundMethodFilter =
 
 export type ReturnListRow = Awaited<ReturnType<typeof getReturns>>["rows"][number];
 
-export async function getReturns({
+export async function getReturns(storeId: string, {
   q,
   customerId,
   productId,
@@ -53,7 +53,7 @@ export async function getReturns({
   pageSize?: number;
 } = {}) {
   const query = q?.trim();
-  const conditions: SQL[] = [];
+  const conditions: SQL[] = [eq(returns.storeId, storeId)];
   if (query) {
     const match = or(
         accentInsensitiveLike(returns.code, query),
@@ -66,6 +66,7 @@ export async function getReturns({
             .where(
               and(
                 eq(returnItems.returnId, returns.id),
+                eq(returnItems.storeId, storeId),
                 accentInsensitiveLike(returnItems.productName, query),
               ),
             ),
@@ -83,6 +84,7 @@ export async function getReturns({
           .where(
             and(
               eq(returnItems.returnId, returns.id),
+              eq(returnItems.storeId, storeId),
               eq(returnItems.productId, productId.trim()),
             ),
           ),
@@ -106,6 +108,7 @@ export async function getReturns({
           .where(
             and(
               eq(returnItems.returnId, returns.id),
+              eq(returnItems.storeId, storeId),
               accentInsensitiveLike(returnItems.productName, productQuery.trim()),
             ),
           ),
@@ -159,6 +162,7 @@ export async function getReturns({
         itemCount: sql<number>`(
           select count(*)::int from ${returnItems}
           where ${returnItems.returnId} = ${returns.id}
+            and ${returnItems.storeId} = ${storeId}
         )`,
       })
       .from(returns)
@@ -191,7 +195,7 @@ export async function getReturns({
 }
 
 /** Chi tiết phiếu trả hàng (cho trang in). */
-export async function getReturn(id: string) {
+export async function getReturn(storeId: string, id: string) {
   const exchangeOrders = alias(orders, "exchange_orders");
   const [ret] = await db
     .select({
@@ -221,10 +225,13 @@ export async function getReturn(id: string) {
     .leftJoin(customers, eq(returns.customerId, customers.id))
     .leftJoin(warehouses, eq(returns.warehouseId, warehouses.id))
     .leftJoin(profiles, eq(returns.createdBy, profiles.id))
-    .where(eq(returns.id, id))
+    .where(and(eq(returns.id, id), eq(returns.storeId, storeId)))
     .limit(1);
   if (!ret) return null;
 
-  const items = await db.select().from(returnItems).where(eq(returnItems.returnId, id));
+  const items = await db.select().from(returnItems).where(and(
+    eq(returnItems.returnId, id),
+    eq(returnItems.storeId, storeId),
+  ));
   return { ...ret, items };
 }

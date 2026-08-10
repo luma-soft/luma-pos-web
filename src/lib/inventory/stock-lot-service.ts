@@ -11,6 +11,7 @@ export type InventoryTransaction = Parameters<Parameters<NodePgDatabase<typeof s
 export async function consumeTrackedStockLots(
   tx: InventoryTransaction,
   input: {
+    storeId: string;
     productId: string;
     warehouseId: string;
     quantity: number;
@@ -22,7 +23,7 @@ export async function consumeTrackedStockLots(
   const [product] = await tx
     .select({ trackBatches: products.trackBatches })
     .from(products)
-    .where(eq(products.id, input.productId))
+    .where(and(eq(products.storeId, input.storeId), eq(products.id, input.productId)))
     .limit(1);
   if (!product?.trackBatches) return [];
 
@@ -35,6 +36,7 @@ export async function consumeTrackedStockLots(
     })
     .from(stockLots)
     .where(and(
+      eq(stockLots.storeId, input.storeId),
       eq(stockLots.productId, input.productId),
       eq(stockLots.warehouseId, input.warehouseId),
       gt(stockLots.availableQuantity, "0"),
@@ -50,6 +52,7 @@ export async function consumeTrackedStockLots(
         availableQuantity: sql`${stockLots.availableQuantity} - ${toQty(allocation.quantity)}`,
       })
       .where(and(
+        eq(stockLots.storeId, input.storeId),
         eq(stockLots.id, allocation.lotId),
         sql`${stockLots.availableQuantity} >= ${toQty(allocation.quantity)}`,
       ));
@@ -86,6 +89,7 @@ export async function recordStockLotReceipt(
 export async function restoreTrackedStockLots(
   tx: InventoryTransaction,
   input: {
+    storeId: string;
     productId: string;
     quantity: number;
     sourceRefType: string;
@@ -98,7 +102,7 @@ export async function restoreTrackedStockLots(
   const [product] = await tx
     .select({ trackBatches: products.trackBatches })
     .from(products)
-    .where(eq(products.id, input.productId))
+    .where(and(eq(products.storeId, input.storeId), eq(products.id, input.productId)))
     .limit(1);
   if (!product?.trackBatches) return [];
 
@@ -113,6 +117,7 @@ export async function restoreTrackedStockLots(
     .from(stockLotMovements)
     .innerJoin(stockLots, eq(stockLots.id, stockLotMovements.stockLotId))
     .where(and(
+      eq(stockLots.storeId, input.storeId),
       eq(stockLots.productId, input.productId),
       eq(stockLotMovements.refType, input.sourceRefType),
       eq(stockLotMovements.refId, input.sourceRefId),
@@ -156,7 +161,7 @@ export async function restoreTrackedStockLots(
       .set({
         availableQuantity: sql`${stockLots.availableQuantity} + ${toQty(restoration.quantity)}`,
       })
-      .where(eq(stockLots.id, restoration.lotId));
+      .where(and(eq(stockLots.storeId, input.storeId), eq(stockLots.id, restoration.lotId)));
     await tx.insert(stockLotMovements).values({
       stockLotId: restoration.lotId,
       quantity: toQty(restoration.quantity),
@@ -171,6 +176,7 @@ export async function restoreTrackedStockLots(
 export async function receiveUnspecifiedTrackedStockLot(
   tx: InventoryTransaction,
   input: {
+    storeId: string;
     productId: string;
     warehouseId: string;
     quantity: number;
@@ -186,11 +192,12 @@ export async function receiveUnspecifiedTrackedStockLot(
       costPrice: products.costPrice,
     })
     .from(products)
-    .where(eq(products.id, input.productId))
+    .where(and(eq(products.storeId, input.storeId), eq(products.id, input.productId)))
     .limit(1);
   if (!product?.trackBatches) return null;
 
   const [lot] = await tx.insert(stockLots).values({
+    storeId: input.storeId,
     productId: input.productId,
     warehouseId: input.warehouseId,
     batchNumber: input.batchNumber.slice(0, 80),
@@ -213,6 +220,7 @@ export async function receiveUnspecifiedTrackedStockLot(
 export async function restoreOrReceiveTrackedStockLots(
   tx: InventoryTransaction,
   input: {
+    storeId: string;
     productId: string;
     warehouseId: string;
     quantity: number;
@@ -229,6 +237,7 @@ export async function restoreOrReceiveTrackedStockLots(
   const remainder = input.quantity - restoredQuantity;
   if (remainder > 1e-9) {
     await receiveUnspecifiedTrackedStockLot(tx, {
+      storeId: input.storeId,
       productId: input.productId,
       warehouseId: input.warehouseId,
       quantity: remainder,

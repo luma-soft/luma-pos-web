@@ -24,7 +24,7 @@ export async function GET() {
   const gate = await requireMobileRole(MOBILE_SETTINGS_ADMIN_ROLES);
   if (!gate.ok) return mobileGate(gate)!;
 
-  const store = await getStoreSettings();
+  const store = await getStoreSettings(gate.storeId);
   const settings = mobileNotificationSettingsForRole(
     store.prefs.notifications,
     gate.role,

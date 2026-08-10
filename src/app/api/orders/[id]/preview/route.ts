@@ -10,7 +10,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!gate.ok) return NextResponse.json({ ok: false, error: gate.error }, { status: gate.error === "errors.forbidden" ? 403 : 401 });
 
   const { id } = await params;
-  const order = await getOrder(id);
+  const order = await getOrder(gate.storeId, id);
   if (!order) return NextResponse.json({ ok: false, error: "errors.notFound" }, { status: 404 });
   const [einvoice] = await db
     .select({

@@ -7,6 +7,7 @@ import { getPrintTemplate, type PaperSize } from "@/lib/print/template";
 import { buildSepayVietQrImageUrl } from "@/lib/payments/sepay";
 import { PrintDoc } from "@/components/print/print-doc";
 import { AutoPrint } from "@/components/print/auto-print";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -15,15 +16,16 @@ interface Props {
 
 export default async function PrintOrderPage({ params, searchParams }: Props) {
   const { id } = await params;
+  const context = await requireStoreContext();
   const { size: sizeParam, templateId } = await searchParams;
   const t = await getTranslations();
-  const order = await getOrder(id).catch(() => null);
+  const order = await getOrder(context.storeId, id).catch(() => null);
   if (!order) notFound();
   const isQuote = order.status === "quote";
   const isBooking = order.status === "confirmed";
   const docType = isQuote ? "quote" : isBooking ? "booking" : "order";
   const [template, defaultBankAccount] = await Promise.all([
-    getPrintTemplate(docType, templateId),
+    getPrintTemplate(context.storeId, docType, templateId),
     getDefaultSepayBankAccount(),
   ]);
 

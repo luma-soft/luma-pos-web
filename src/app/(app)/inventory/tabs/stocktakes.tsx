@@ -1,16 +1,18 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
-import { desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { ClipboardCheck, Plus, Search } from "lucide-react";
 import { db } from "@/db";
 import { profiles, stocktakeItems, stocktakes, warehouses } from "@/db/schema";
 import { Routes } from "@/lib/routes";
 import { StocktakesTable } from "./stocktakes-table";
 import { InstantFilterForm } from "@/components/instant-filter-form";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 type SP = Record<string, string | undefined>;
 
 export async function StocktakesTab({ searchParams }: { searchParams: SP }) {
+  const context = await requireStoreContext();
   const t = await getTranslations();
   const q = searchParams.q?.trim();
   const searchCondition = q
@@ -32,7 +34,7 @@ export async function StocktakesTab({ searchParams }: { searchParams: SP }) {
     .from(stocktakes)
     .innerJoin(warehouses, eq(stocktakes.warehouseId, warehouses.id))
     .leftJoin(profiles, eq(stocktakes.createdBy, profiles.id))
-    .where(searchCondition)
+    .where(and(eq(stocktakes.storeId, context.storeId), searchCondition))
     .orderBy(desc(stocktakes.createdAt)).limit(50);
 
   return (

@@ -7,6 +7,7 @@ import { getPrintTemplate, type PaperSize } from "@/lib/print/template";
 import { buildSepayVietQrImageUrl } from "@/lib/payments/sepay";
 import { PrintDoc } from "@/components/print/print-doc";
 import { AutoPrint } from "@/components/print/auto-print";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 interface Props {
   searchParams: Promise<{ ids?: string | string[]; size?: string; templateId?: string }>;
@@ -14,20 +15,21 @@ interface Props {
 
 export default async function PrintBatchPage({ searchParams }: Props) {
   const params = await searchParams;
+  const context = await requireStoreContext();
   const t = await getTranslations();
 
   const ids = (Array.isArray(params.ids) ? params.ids : params.ids ? [params.ids] : [])
     .filter(Boolean);
 
   const [template, defaultBankAccount] = await Promise.all([
-    getPrintTemplate("order", params.templateId),
+    getPrintTemplate(context.storeId, "order", params.templateId),
     getDefaultSepayBankAccount(),
   ]);
   const size: PaperSize = (["a4", "a5", "k80"] as const).includes(params.size as PaperSize)
     ? (params.size as PaperSize)
     : template.paperDefault;
 
-  const orders = (await Promise.all(ids.map((id) => getOrder(id).catch(() => null))))
+  const orders = (await Promise.all(ids.map((id) => getOrder(context.storeId, id).catch(() => null))))
     .filter((o): o is NonNullable<typeof o> => o !== null && o.status !== "cancelled");
 
   if (orders.length === 0) {

@@ -74,6 +74,7 @@ async function finalizeDraftOrderInTx(
       throw new Error("DRAFT_ORDER_INVALID");
     }
     await consumeTrackedStockLots(tx, {
+      storeId: order.storeId,
       productId: item.productId,
       warehouseId: order.warehouseId,
       quantity: baseQty,
@@ -84,18 +85,20 @@ async function finalizeDraftOrderInTx(
     await tx
       .insert(stockLevels)
       .values({
+        storeId: order.storeId,
         productId: item.productId,
         warehouseId: order.warehouseId,
         quantity: (-baseQty).toFixed(3),
       })
       .onConflictDoUpdate({
-        target: [stockLevels.productId, stockLevels.warehouseId],
+        target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
         set: {
           quantity: sql`${stockLevels.quantity} - ${baseQty.toFixed(3)}`,
           updatedAt: sql`now()`,
         },
       });
     await tx.insert(stockMovements).values({
+      storeId: order.storeId,
       productId: item.productId,
       warehouseId: order.warehouseId,
       type: "sale",

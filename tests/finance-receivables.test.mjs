@@ -14,7 +14,7 @@ await client.exec("create role anon; create role authenticated;");
 for (const file of readdirSync(`${project}/drizzle`).filter((name) => name.endsWith(".sql")).sort()) {
   for (const statement of readFileSync(`${project}/drizzle/${file}`, "utf8").split("--> statement-breakpoint")) {
     const sql = statement.trim();
-    if (sql && !/create extension/i.test(sql)) await client.exec(sql);
+    if (sql && !/create extension|gin_trgm_ops/i.test(sql)) await client.exec(sql);
   }
 }
 

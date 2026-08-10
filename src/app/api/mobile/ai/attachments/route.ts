@@ -60,8 +60,7 @@ async function ensureBucket(bucketName: string) {
 
 export async function POST(request: Request) {
   const gate = await requireMobileManager();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
   if (!gate.ok) return mobileError("errors.unauthorized", 401);
   const aiBlocked = await requireAiProviderConfigured();
   if (aiBlocked) return aiBlocked;
@@ -108,8 +107,8 @@ export async function POST(request: Request) {
   }
 
   const name = safeFileName(file.name);
-  const path = `${gate.userId}/${Date.now()}-${randomUUID()}-${name}`;
-  const bucketName = await getAiAttachmentsBucket();
+  const path = `stores/${gate.storeId}/users/${gate.userId}/${Date.now()}-${randomUUID()}-${name}`;
+  const bucketName = await getAiAttachmentsBucket(gate.storeId);
 
   try {
     const supabase = await ensureBucket(bucketName);
@@ -179,7 +178,7 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const bucket = url.searchParams.get("bucket")?.trim();
   const path = url.searchParams.get("path")?.trim();
-  const configuredBucket = await getAiAttachmentsBucket();
+  const configuredBucket = await getAiAttachmentsBucket(gate.storeId);
 
   if (!bucket || !path || bucket !== configuredBucket || !path.startsWith(`${gate.userId}/`)) {
     return mobileError("errors.forbidden", 403);

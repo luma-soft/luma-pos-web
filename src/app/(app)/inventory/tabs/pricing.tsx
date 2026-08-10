@@ -9,14 +9,16 @@ import { TableSkeleton } from "@/components/table-skeleton";
 import { InstantProductSearch } from "./instant-product-search";
 import { InventoryFilterDrawer } from "./inventory-filter-drawer";
 import { ListSearchFilterBar } from "@/components/list-search-filter";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 type SP = Record<string, string | undefined>;
 type PriceBook = Awaited<ReturnType<typeof getPriceBooks>>[number];
 
 export async function PricingTab({ searchParams }: { searchParams: SP }) {
+  const context = await requireStoreContext();
   const [books, options] = await Promise.all([
-    getPriceBooks(),
-    getProductFormOptions(),
+    getPriceBooks(context.storeId),
+    getProductFormOptions(context.storeId),
   ]);
 
   return (
@@ -41,15 +43,16 @@ async function PricingContent({
   suppliers: Awaited<ReturnType<typeof getProductFormOptions>>["suppliers"];
   searchParams: SP;
 }) {
+  const context = await requireStoreContext();
   const t = await getTranslations();
   const params = searchParams;
   const page = Number(params.page) || 1;
   const pageSize = parsePageSize(params.size);
 
-  const { rows, total, pageCount } = await getProducts({ q: params.q, categoryId: params.category, brandId: params.brandId, supplierId: params.supplierId, productKind: params.productKind as "product" | "service" | "combo" | undefined, stock: params.stock as "instock" | "low" | "out" | undefined, sort: params.sort as "name" | "stock" | "updated" | undefined, status: (params.status as "active" | "inactive" | "all" | undefined) ?? "active", page, pageSize });
+  const { rows, total, pageCount } = await getProducts(context.storeId, { q: params.q, categoryId: params.category, brandId: params.brandId, supplierId: params.supplierId, productKind: params.productKind as "product" | "service" | "combo" | undefined, stock: params.stock as "instock" | "low" | "out" | undefined, sort: params.sort as "name" | "stock" | "updated" | undefined, status: (params.status as "active" | "inactive" | "all" | undefined) ?? "active", page, pageSize });
 
   const visibleIds = rows.map((p) => p.id);
-  const overrideByBook = await getPriceOverridesForProducts(visibleIds);
+  const overrideByBook = await getPriceOverridesForProducts(context.storeId, visibleIds);
   const tableRows = rows.map((p) => ({
     id: p.id, sku: p.sku, name: p.name, baseUnit: p.baseUnit,
     costPrice: Number(p.costPrice),

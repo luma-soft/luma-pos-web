@@ -2,9 +2,9 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { customerReceivableEntries, customerReceivableReceipts, customers, orders } from "@/db/schema";
 
-export async function getCustomerReceivableOverview(customerId: string) {
+export async function getCustomerReceivableOverview(storeId: string, customerId: string) {
   const [customer] = await db.select({ id: customers.id, currentDebt: customers.currentDebt })
-    .from(customers).where(eq(customers.id, customerId)).limit(1);
+    .from(customers).where(and(eq(customers.storeId, storeId), eq(customers.id, customerId))).limit(1);
   if (!customer) return null;
   const [invoices, entries, receipts] = await Promise.all([
     db.select({
@@ -12,6 +12,7 @@ export async function getCustomerReceivableOverview(customerId: string) {
       total: orders.total, amountPaid: orders.amountPaid, paymentStatus: orders.paymentStatus,
     }).from(orders).where(and(
       eq(orders.customerId, customerId),
+      eq(orders.storeId, storeId),
       sql`${orders.status} in ('completed', 'returned')`,
       sql`${orders.amountPaid} < ${orders.total}`,
     )).orderBy(orders.createdAt),
@@ -20,14 +21,14 @@ export async function getCustomerReceivableOverview(customerId: string) {
       type: customerReceivableEntries.type, amount: customerReceivableEntries.amount,
       reason: customerReceivableEntries.reason, orderId: customerReceivableEntries.orderId,
       createdAt: customerReceivableEntries.createdAt,
-    }).from(customerReceivableEntries).where(eq(customerReceivableEntries.customerId, customerId))
+    }).from(customerReceivableEntries).where(and(eq(customerReceivableEntries.storeId, storeId), eq(customerReceivableEntries.customerId, customerId)))
       .orderBy(desc(customerReceivableEntries.createdAt)).limit(50),
     db.select({
       id: customerReceivableReceipts.id, code: customerReceivableReceipts.code,
       status: customerReceivableReceipts.status, amount: customerReceivableReceipts.amount,
       method: customerReceivableReceipts.method, reference: customerReceivableReceipts.reference,
       createdAt: customerReceivableReceipts.createdAt,
-    }).from(customerReceivableReceipts).where(eq(customerReceivableReceipts.customerId, customerId))
+    }).from(customerReceivableReceipts).where(and(eq(customerReceivableReceipts.storeId, storeId), eq(customerReceivableReceipts.customerId, customerId)))
       .orderBy(desc(customerReceivableReceipts.createdAt)).limit(50),
   ]);
   return {

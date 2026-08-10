@@ -14,6 +14,7 @@ import { ShopeeListingModal } from "../inventory/tabs/shopee-listing-modal";
 import { Select } from "@/components/ui/select";
 import { NumberInput } from "@/components/ui/number-input";
 import { OnlineSalesListingButton } from "./online-sales-product-search";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 type SP = Record<string, string | undefined>;
 type OnlineSalesTab = "overview" | "channels" | "listings" | "orders" | "inbox" | "sync";
@@ -30,6 +31,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 export default async function OnlineSalesPage({ searchParams }: { searchParams: Promise<SP> }) {
   if (!ONLINE_SALES_ENABLED) redirect(Routes.Dashboard);
 
+  const context = await requireStoreContext();
   const locale = await getLocale();
   const L = locale === "vi";
   const params = await searchParams;
@@ -38,7 +40,7 @@ export default async function OnlineSalesPage({ searchParams }: { searchParams: 
   const shop = data.shop;
   const connectedChannels = shop && ["connected", "authorized"].includes(shop.status) ? 1 : 0;
   const onlineOrderCount = data.orderMappings.length;
-  const listingProduct = params.onlineProductId && UUID_RE.test(params.onlineProductId) ? await getProduct(params.onlineProductId) : null;
+  const listingProduct = params.onlineProductId && UUID_RE.test(params.onlineProductId) ? await getProduct(context.storeId, params.onlineProductId) : null;
 
   return (
     <div className="p-4 sm:p-6 space-y-5">

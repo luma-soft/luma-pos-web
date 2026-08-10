@@ -16,7 +16,7 @@ export async function GET() {
   const gate = await requireMobileUser();
   if (!gate.ok) return mobileGate(gate)!;
 
-  const settings = await getStoreSettings();
+  const settings = await getStoreSettings(gate.storeId);
   const visibleSettings = mobileStoreSettingsForRole(settings, gate.role);
   if (gate.role !== "owner" && gate.role !== "manager") {
     return mobileOk(visibleSettings);

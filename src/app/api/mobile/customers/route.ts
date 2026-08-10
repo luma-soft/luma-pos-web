@@ -12,11 +12,11 @@ import {
 
 export async function GET(request: Request) {
   const gate = await requireMobileSalesAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   return mobileOk(
     await getCustomers(
+      gate.storeId,
       {
         q: searchParam(request, "q"),
         type: searchParam(request, "type"),
@@ -39,13 +39,12 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const gate = await requireMobileSalesAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const body = await readJson(request);
   if (!body) return mobileAction({ ok: false, error: "errors.invalidData" });
 
   return mobileAction(
-    await createCustomerCore(body as Parameters<typeof createCustomerCore>[0])
+    await createCustomerCore(gate.storeId, body as Parameters<typeof createCustomerCore>[1])
   );
 }

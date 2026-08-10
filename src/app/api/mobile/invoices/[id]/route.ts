@@ -15,7 +15,7 @@ export async function GET(
   if (!gate.ok) return mobileGate(gate)!;
 
   const { id } = await params;
-  const order = await getOrder(id);
+  const order = await getOrder(gate.storeId, id);
   if (!order) return mobileError("errors.notFound", 404);
   const [eInvoice] = await db
     .select({

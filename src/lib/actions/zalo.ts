@@ -13,6 +13,7 @@ export async function sendCustomerPortalZalo(input: {
   if (!gate.ok) return gate;
   const result = await sendZaloMessage({
     kind: "portal_link",
+    storeId: gate.storeId,
     customerId: input.customerId,
     url: input.url,
     actorId: gate.userId,
@@ -30,6 +31,7 @@ export async function sendOrderInvoiceZalo(input: {
   if (!gate.ok) return gate;
   const result = await sendZaloMessage({
     kind: "invoice",
+    storeId: gate.storeId,
     orderId: input.orderId,
     url: input.url,
     actorId: gate.userId,

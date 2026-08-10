@@ -8,7 +8,7 @@ import { mobileAiSettingsForRole } from "@/lib/settings/mobile-settings-access";
 export async function GET() {
   const gate = await requireMobileUser();
   if (!gate.ok) return mobileGate(gate)!;
-  const settings = await getStoreSettings();
+  const settings = await getStoreSettings(gate.storeId);
   return mobileOk(mobileAiSettingsForRole(settings.prefs.ai, gate.role));
 }
 

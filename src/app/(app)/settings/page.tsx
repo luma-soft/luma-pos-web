@@ -3,11 +3,13 @@ import { PromotionsTab } from "../sales/tabs/promotions";
 import { getStoreSettings } from "@/lib/data/settings";
 import { requireUser, getRole } from "@/lib/actions/common";
 import { resolveNotificationChannels } from "@/lib/notifications/channels";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const storePromise = getStoreSettings();
+  const context = await requireStoreContext();
+  const storePromise = getStoreSettings(context.storeId);
   const params = await searchParams;
   let canManage = false;
   let canEditAi = false;

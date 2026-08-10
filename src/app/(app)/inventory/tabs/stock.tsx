@@ -21,6 +21,7 @@ import { serializeMovementCreatedAt } from "@/lib/inventory/movement-serializati
 import { StockOverview } from "./stock-overview";
 import { InventoryFilterDrawer } from "./inventory-filter-drawer";
 import { ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 type SP = Record<string, string | undefined>;
 type InventoryStockStatus = keyof InventoryStatusCounts;
@@ -53,9 +54,10 @@ export async function StockTab({ searchParams }: { searchParams: SP }) {
 }
 
 async function StockOverviewContent() {
+  const context = await requireStoreContext();
   const [overview, movements] = await Promise.all([
-    getInventoryOverview(),
-    getRecentMovements(100),
+    getInventoryOverview(context.storeId),
+    getRecentMovements(context.storeId, 100),
   ]);
   const movementItems = movements.map((movement) => ({
     ...movement,
@@ -81,6 +83,7 @@ async function StockStatusDetail({
   searchParams: SP;
   status: InventoryStockStatus;
 }) {
+  const context = await requireStoreContext();
   const t = await getTranslations();
   const page = Number(searchParams.page) || 1;
   const pageSize = parsePageSize(searchParams.size);
@@ -88,7 +91,7 @@ async function StockStatusDetail({
   const warehouse = searchParams.warehouse ?? "";
   const [{ rows, total, pageCount }, productOptions, purchaseOptions] =
     await Promise.all([
-      getInventory({
+      getInventory(context.storeId, {
         q: searchParams.q,
         stock: status,
         categoryId: category || undefined,
@@ -96,8 +99,8 @@ async function StockStatusDetail({
         page,
         pageSize,
       }),
-      getProductFormOptions(),
-      getPurchaseFormOptions(),
+      getProductFormOptions(context.storeId),
+      getPurchaseFormOptions(context.storeId),
     ]);
 
   return (

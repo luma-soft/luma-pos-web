@@ -3,6 +3,7 @@ import { getProduct, getProductFormOptions } from "@/lib/data/products";
 import { getPriceBooks, getPriceOverridesForProducts } from "@/lib/data/price-books";
 import { NewProductForm } from "../../new/product-form";
 import { productToFormInitialValues } from "../../product-form-values";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -12,11 +13,12 @@ interface Props {
 export default async function EditProductPage({ params, searchParams }: Props) {
   const { id } = await params;
   const sp = await searchParams;
+  const context = await requireStoreContext();
   const [product, options, priceBooks, priceOverridesByBook] = await Promise.all([
-    getProduct(id),
-    getProductFormOptions(),
-    getPriceBooks(),
-    getPriceOverridesForProducts([id]),
+    getProduct(context.storeId, id),
+    getProductFormOptions(context.storeId),
+    getPriceBooks(context.storeId),
+    getPriceOverridesForProducts(context.storeId, [id]),
   ]);
   if (!product) notFound();
   const priceBookPrices = Object.fromEntries(

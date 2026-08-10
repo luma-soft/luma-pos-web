@@ -2,6 +2,7 @@ import { getCustomers, type CustomerFilters } from "@/lib/data/partners";
 import { parsePageSize } from "@/lib/pagination";
 import { CustomersTable } from "./customers-table";
 import { getPrintTemplatesForDoc } from "@/lib/print/template";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 type SP = Record<string, string | undefined>;
 const FILTER_KEYS = [
@@ -19,11 +20,12 @@ const FILTER_KEYS = [
 ] as const;
 
 export async function CustomersTab({ searchParams }: { searchParams: SP }) {
+  const context = await requireStoreContext();
   const params = searchParams;
   const page = Number(params.page) || 1;
   const pageSize = parsePageSize(params.size);
   const filters = normalizeFilters(params, page, pageSize);
-  const [data, returnPrintTemplates] = await Promise.all([getCustomers(filters), getPrintTemplatesForDoc("return")]);
+  const [data, returnPrintTemplates] = await Promise.all([getCustomers(context.storeId, filters), getPrintTemplatesForDoc(context.storeId, "return")]);
 
   return <CustomersTable data={data} filters={filters} returnPrintTemplates={returnPrintTemplates} aiPreview={params.source === "ai-preview"} />;
 }

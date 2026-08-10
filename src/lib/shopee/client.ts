@@ -3,6 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { marketplaceShops, marketplaceTokens } from "@/db/schema";
 import { getShopeeSettings } from "@/lib/data/settings";
+import { CURRENT_STORE_ID } from "@/lib/tenancy/constants";
 
 type ShopeeSettings = Awaited<ReturnType<typeof getShopeeSettings>>;
 
@@ -139,7 +140,7 @@ function isDemoShop(shop: AuthorizedShop) {
 }
 
 export async function exchangeShopeeAuthorizationCode(input: { code: string; shopId: string }): Promise<ShopeeTokenResponse> {
-  const settings = await getShopeeSettings();
+  const settings = await getShopeeSettings(CURRENT_STORE_ID);
   const path = "/api/v2/auth/token/get";
   const timestamp = Math.floor(Date.now() / 1000);
   const params = commonParams(settings, path, timestamp);
@@ -166,7 +167,7 @@ export async function exchangeShopeeAuthorizationCode(input: { code: string; sho
 }
 
 async function getShopeeShopContext(shopUuid?: string) {
-  const settings = await getShopeeSettings();
+  const settings = await getShopeeSettings(CURRENT_STORE_ID);
   const shop = await getAuthorizedShop(shopUuid);
   if (!shop) throw new Error("missing_shopee_shop_token");
   return { settings, shop };

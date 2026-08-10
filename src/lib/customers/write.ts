@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { customerConsentEvents, customerConsents, customers } from "@/db/schema";
 import {
@@ -11,13 +11,14 @@ import { type ActionResult, generateCode, toMoney } from "@/lib/actions/common";
  * Lõi tạo/sửa khách hàng — KHÔNG phải server action.
  * Dùng bởi server action (web). Không revalidate.
  */
-export async function createCustomerCore(input: CreateCustomerInput): Promise<ActionResult<{ id: string }>> {
+export async function createCustomerCore(storeId: string, input: CreateCustomerInput): Promise<ActionResult<{ id: string }>> {
   const parsed = createCustomerSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
   try {
     const row = await db.transaction(async (tx) => {
       const [created] = await tx.insert(customers).values({
+        storeId,
         code: generateCode("KH"),
         name: v.name.trim(),
         phone: v.phone?.trim() || null,
@@ -54,7 +55,7 @@ export async function createCustomerCore(input: CreateCustomerInput): Promise<Ac
   }
 }
 
-export async function updateCustomerCore(input: UpdateCustomerInput): Promise<ActionResult> {
+export async function updateCustomerCore(storeId: string, input: UpdateCustomerInput): Promise<ActionResult> {
   const parsed = updateCustomerSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
@@ -69,7 +70,7 @@ export async function updateCustomerCore(input: UpdateCustomerInput): Promise<Ac
       taxCode: v.taxCode?.slice(0, 30) || null,
       debtLimit: toMoney(v.debtLimit) ?? 0,
       note: v.note || null,
-    }).where(eq(customers.id, v.id));
+    }).where(and(eq(customers.storeId, storeId), eq(customers.id, v.id)));
     return { ok: true, data: undefined };
   } catch (e) {
     console.error("updateCustomerCore failed:", e);

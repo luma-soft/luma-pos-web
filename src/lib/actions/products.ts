@@ -35,16 +35,14 @@ import {
 export async function createCategory(
   name: string,
 ): Promise<ActionResult<{ id: string; name: string }>> {
-  {
-    const gate = await requireStockAccess();
-    if (!gate.ok) return gate;
-  }
+  const gate = await requireStockAccess();
+  if (!gate.ok) return gate;
   const n = name.trim();
   if (!n) return { ok: false, error: "errors.invalidData" };
   try {
     const [row] = await db
       .insert(categories)
-      .values({ name: n })
+      .values({ storeId: gate.storeId, name: n })
       .returning({ id: categories.id, name: categories.name });
     revalidatePath(Routes.Products);
     return { ok: true, data: row };
@@ -59,16 +57,14 @@ export async function createCategoryNode(input: {
   name: string;
   parentId?: string | null;
 }): Promise<ActionResult<{ id: string }>> {
-  {
-    const gate = await requireStockAccess();
-    if (!gate.ok) return gate;
-  }
+  const gate = await requireStockAccess();
+  if (!gate.ok) return gate;
   const n = input.name.trim();
   if (!n) return { ok: false, error: "errors.invalidData" };
   try {
     const [row] = await db
       .insert(categories)
-      .values({ name: n, parentId: input.parentId || null })
+      .values({ storeId: gate.storeId, name: n, parentId: input.parentId || null })
       .returning({ id: categories.id });
     revalidatePath(Routes.Categories);
     revalidatePath(Routes.Products);
@@ -84,10 +80,8 @@ export async function updateCategory(
   id: string,
   input: { name?: string; parentId?: string | null },
 ): Promise<ActionResult> {
-  {
-    const gate = await requireStockAccess();
-    if (!gate.ok) return gate;
-  }
+  const gate = await requireStockAccess();
+  if (!gate.ok) return gate;
   const patch: { name?: string; parentId?: string | null } = {};
   if (input.name !== undefined) {
     const n = input.name.trim();
@@ -97,7 +91,7 @@ export async function updateCategory(
   if (input.parentId !== undefined)
     patch.parentId = input.parentId === id ? null : input.parentId || null;
   try {
-    await db.update(categories).set(patch).where(eq(categories.id, id));
+    await db.update(categories).set(patch).where(and(eq(categories.storeId, gate.storeId), eq(categories.id, id)));
     revalidatePath(Routes.Categories);
     revalidatePath(Routes.Products);
     return { ok: true, data: undefined };
@@ -109,20 +103,18 @@ export async function updateCategory(
 
 /** Xóa danh mục: SP về "chưa phân loại", nhóm con lên cấp gốc. */
 export async function deleteCategory(id: string): Promise<ActionResult> {
-  {
-    const gate = await requireStockAccess();
-    if (!gate.ok) return gate;
-  }
+  const gate = await requireStockAccess();
+  if (!gate.ok) return gate;
   try {
     await db
       .update(products)
       .set({ categoryId: null })
-      .where(eq(products.categoryId, id));
+      .where(and(eq(products.storeId, gate.storeId), eq(products.categoryId, id)));
     await db
       .update(categories)
       .set({ parentId: null })
-      .where(eq(categories.parentId, id));
-    await db.delete(categories).where(eq(categories.id, id));
+      .where(and(eq(categories.storeId, gate.storeId), eq(categories.parentId, id)));
+    await db.delete(categories).where(and(eq(categories.storeId, gate.storeId), eq(categories.id, id)));
     revalidatePath(Routes.Categories);
     revalidatePath(Routes.Products);
     return { ok: true, data: undefined };
@@ -136,22 +128,20 @@ export async function deleteCategory(id: string): Promise<ActionResult> {
 export async function createBrand(
   name: string,
 ): Promise<ActionResult<{ id: string; name: string }>> {
-  {
-    const gate = await requireStockAccess();
-    if (!gate.ok) return gate;
-  }
+  const gate = await requireStockAccess();
+  if (!gate.ok) return gate;
   const n = name.trim();
   if (!n) return { ok: false, error: "errors.invalidData" };
   try {
     const [existing] = await db
       .select({ id: brands.id, name: brands.name })
       .from(brands)
-      .where(eq(brands.name, n))
+      .where(and(eq(brands.storeId, gate.storeId), eq(brands.name, n)))
       .limit(1);
     if (existing) return { ok: true, data: existing };
     const [row] = await db
       .insert(brands)
-      .values({ name: n })
+      .values({ storeId: gate.storeId, name: n })
       .returning({ id: brands.id, name: brands.name });
     revalidatePath(Routes.Products);
     return { ok: true, data: row };
@@ -230,6 +220,7 @@ function buildDimensions(v: CreateProductOutput): string | null {
 }
 
 async function syncProductPriceBookPrices(
+  storeId: string,
   productId: string,
   input: Record<string, number | null | undefined> | undefined,
 ) {
@@ -242,7 +233,7 @@ async function syncProductPriceBookPrices(
   const validBooks = await db
     .select({ id: priceBooks.id, isDefault: priceBooks.isDefault })
     .from(priceBooks)
-    .where(inArray(priceBooks.id, bookIds));
+    .where(and(eq(priceBooks.storeId, storeId), inArray(priceBooks.id, bookIds)));
   const nonDefaultIds = new Set(
     validBooks.filter((book) => !book.isDefault).map((book) => book.id),
   );
@@ -256,6 +247,7 @@ async function syncProductPriceBookPrices(
       .where(
         and(
           eq(productPrices.productId, productId),
+          eq(productPrices.storeId, storeId),
           inArray(productPrices.priceBookId, toDelete),
         ),
       );
@@ -264,6 +256,7 @@ async function syncProductPriceBookPrices(
   const toUpsert = entries
     .filter(([bookId, price]) => nonDefaultIds.has(bookId) && price != null)
     .map(([bookId, price]) => ({
+      storeId,
       priceBookId: bookId,
       productId,
       price: toMoney(Math.max(0, Number(price))),
@@ -301,10 +294,8 @@ export type UpdatePricesInput = z.input<typeof updatePricesSchema>;
 export async function updateProductPrices(
   input: UpdatePricesInput,
 ): Promise<ActionResult> {
-  {
-    const gate = await requireManager();
-    if (!gate.ok) return gate;
-  }
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
   try {
   } catch {
     return { ok: false, error: "errors.unauthorized" };
@@ -325,7 +316,7 @@ export async function updateProductPrices(
         agentPrice: v.agentPrice != null ? String(v.agentPrice) : null,
         updatedAt: sql`now()`,
       })
-      .where(eq(products.id, v.productId));
+      .where(and(eq(products.storeId, gate.storeId), eq(products.id, v.productId)));
 
     revalidatePath("/pricing");
     revalidatePath(Routes.Products);
@@ -403,10 +394,8 @@ const productIdSchema = z.uuid();
 
 /** Xóa hàng hóa nếu chưa phát sinh chứng từ/thẻ kho liên quan. */
 export async function deleteProduct(id: string): Promise<ActionResult> {
-  {
-    const gate = await requireStockAccess();
-    if (!gate.ok) return gate;
-  }
+  const gate = await requireStockAccess();
+  if (!gate.ok) return gate;
   const parsed = productIdSchema.safeParse(id);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
 
@@ -415,16 +404,16 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
       const [target] = await tx
         .select({ id: products.id, isVariantParent: products.isVariantParent })
         .from(products)
-        .where(eq(products.id, parsed.data))
+        .where(and(eq(products.storeId, gate.storeId), eq(products.id, parsed.data)))
         .limit(1);
       if (!target) return;
 
       if (target.isVariantParent) {
         await tx
           .delete(products)
-          .where(eq(products.parentProductId, target.id));
+          .where(and(eq(products.storeId, gate.storeId), eq(products.parentProductId, target.id)));
       }
-      await tx.delete(products).where(eq(products.id, target.id));
+      await tx.delete(products).where(and(eq(products.storeId, gate.storeId), eq(products.id, target.id)));
     });
     revalidatePath(Routes.Products);
     revalidatePath(Routes.Inventory);
@@ -452,10 +441,8 @@ const bulkProductIdsSchema = z
 export async function setProductActive(
   input: z.input<typeof setProductActiveSchema>,
 ): Promise<ActionResult> {
-  {
-    const gate = await requireStockAccess();
-    if (!gate.ok) return gate;
-  }
+  const gate = await requireStockAccess();
+  if (!gate.ok) return gate;
   const parsed = setProductActiveSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
@@ -464,7 +451,7 @@ export async function setProductActive(
     const [target] = await db
       .select({ id: products.id, isVariantParent: products.isVariantParent })
       .from(products)
-      .where(eq(products.id, v.productId))
+      .where(and(eq(products.storeId, gate.storeId), eq(products.id, v.productId)))
       .limit(1);
     if (!target) return { ok: false, error: "errors.invalidData" };
 
@@ -475,14 +462,15 @@ export async function setProductActive(
         lifecycleStatus: v.isActive ? "active" : "archived",
         updatedAt: sql`now()`,
       })
-      .where(
+      .where(and(
+        eq(products.storeId, gate.storeId),
         target.isVariantParent
           ? or(
               eq(products.id, target.id),
               eq(products.parentProductId, target.id),
             )
           : eq(products.id, target.id),
-      );
+      ));
 
     revalidatePath(Routes.Products);
     revalidatePath(Routes.Inventory);
@@ -508,7 +496,7 @@ export async function bulkStopSellingProducts(
     const targets = await db
       .select({ id: products.id, isVariantParent: products.isVariantParent })
       .from(products)
-      .where(inArray(products.id, parsed.data));
+      .where(and(eq(products.storeId, gate.storeId), inArray(products.id, parsed.data)));
     const parentIds = targets
       .filter((target) => target.isVariantParent)
       .map((target) => target.id);
@@ -523,7 +511,7 @@ export async function bulkStopSellingProducts(
         lifecycleStatus: "archived",
         updatedAt: sql`now()`,
       })
-      .where(or(...conditions))
+      .where(and(eq(products.storeId, gate.storeId), or(...conditions)))
       .returning({ id: products.id });
 
     revalidatePath(Routes.Products);
@@ -558,13 +546,13 @@ export async function bulkDeleteProducts(
         const [target] = await tx
           .select({ id: products.id, isVariantParent: products.isVariantParent })
           .from(products)
-          .where(eq(products.id, id))
+          .where(and(eq(products.storeId, gate.storeId), eq(products.id, id)))
           .limit(1);
         if (!target) return false;
         if (target.isVariantParent) {
-          await tx.delete(products).where(eq(products.parentProductId, id));
+          await tx.delete(products).where(and(eq(products.storeId, gate.storeId), eq(products.parentProductId, id)));
         }
-        await tx.delete(products).where(eq(products.id, id));
+        await tx.delete(products).where(and(eq(products.storeId, gate.storeId), eq(products.id, id)));
         return true;
       });
       if (removed) deleted += 1;
@@ -595,7 +583,7 @@ export async function setCameraMaterial(input: {
     const [current] = await db
       .select({ specs: products.specs })
       .from(products)
-      .where(eq(products.id, input.productId))
+      .where(and(eq(products.storeId, gate.storeId), eq(products.id, input.productId)))
       .limit(1);
     if (!current) return { ok: false, error: "errors.invalidData" };
     const specs = current.specs && typeof current.specs === "object" && !Array.isArray(current.specs)
@@ -603,7 +591,7 @@ export async function setCameraMaterial(input: {
       : {};
     if (input.enabled) specs.__cameraQuoteMaterial = true;
     else delete specs.__cameraQuoteMaterial;
-    await db.update(products).set({ specs: Object.keys(specs).length > 0 ? specs : null }).where(eq(products.id, input.productId));
+    await db.update(products).set({ specs: Object.keys(specs).length > 0 ? specs : null }).where(and(eq(products.storeId, gate.storeId), eq(products.id, input.productId)));
     revalidatePath(Routes.Inventory);
     revalidatePath(Routes.POS);
     return { ok: true, data: undefined };
@@ -617,10 +605,8 @@ export async function setCameraMaterial(input: {
 export async function updateProduct(
   input: UpdateProductInput,
 ): Promise<ActionResult> {
-  {
-    const gate = await requireStockAccess();
-    if (!gate.ok) return gate;
-  }
+  const gate = await requireStockAccess();
+  if (!gate.ok) return gate;
   try {
   } catch {
     return { ok: false, error: "errors.unauthorized" };
@@ -638,7 +624,7 @@ export async function updateProduct(
           productKind: products.productKind,
         })
         .from(products)
-        .where(eq(products.id, v.id))
+        .where(and(eq(products.storeId, gate.storeId), eq(products.id, v.id)))
         .limit(1);
 
       if (!current) throw new Error("PRODUCT_NOT_FOUND");
@@ -684,7 +670,7 @@ export async function updateProduct(
           specs: v.specs && Object.keys(v.specs).length > 0 ? v.specs : null,
           updatedAt: sql`now()`,
         })
-        .where(eq(products.id, v.id));
+        .where(and(eq(products.storeId, gate.storeId), eq(products.id, v.id)));
 
       // thay toàn bộ đơn vị quy đổi
       await tx.delete(productUnits).where(eq(productUnits.productId, v.id));
@@ -708,7 +694,7 @@ export async function updateProduct(
       ) {
         await tx
           .delete(productComboItems)
-          .where(eq(productComboItems.comboProductId, v.id));
+          .where(and(eq(productComboItems.storeId, gate.storeId), eq(productComboItems.comboProductId, v.id)));
         if (
           current.productKind === "combo" &&
           v.comboItems &&
@@ -716,6 +702,7 @@ export async function updateProduct(
         ) {
           await tx.insert(productComboItems).values(
             v.comboItems.map((item, index) => ({
+              storeId: gate.storeId,
               comboProductId: v.id,
               componentProductId: item.productId,
               quantity: String(item.quantity),
@@ -729,13 +716,14 @@ export async function updateProduct(
       if (v.supplierIds) {
         await tx
           .delete(productSuppliers)
-          .where(eq(productSuppliers.productId, v.id));
+          .where(and(eq(productSuppliers.storeId, gate.storeId), eq(productSuppliers.productId, v.id)));
         const sids = [...new Set(v.supplierIds.filter(Boolean))];
         if (sids.length > 0) {
           await tx
             .insert(productSuppliers)
             .values(
               sids.map((sid, i) => ({
+                storeId: gate.storeId,
                 productId: v.id,
                 supplierId: sid,
                 isPrimary: i === 0,
@@ -757,6 +745,7 @@ export async function updateProduct(
           .where(
             and(
               eq(products.parentProductId, current.parentProductId),
+              eq(products.storeId, gate.storeId),
               ne(products.id, v.id),
             ),
           );
@@ -792,7 +781,7 @@ export async function updateProduct(
           await tx
             .update(products)
             .set({ name: baseName, updatedAt: sql`now()` })
-            .where(eq(products.id, current.parentProductId));
+            .where(and(eq(products.storeId, gate.storeId), eq(products.id, current.parentProductId)));
           await tx
             .update(products)
             .set({
@@ -801,7 +790,7 @@ export async function updateProduct(
                 : baseName,
               updatedAt: sql`now()`,
             })
-            .where(eq(products.id, v.id));
+            .where(and(eq(products.storeId, gate.storeId), eq(products.id, v.id)));
         }
 
         const hasPatch = Object.keys(patch).length > 1;
@@ -820,7 +809,7 @@ export async function updateProduct(
           await tx
             .update(products)
             .set(nextPatch)
-            .where(eq(products.id, sibling.id));
+            .where(and(eq(products.storeId, gate.storeId), eq(products.id, sibling.id)));
 
           if (fields.has("units")) {
             await tx
@@ -843,7 +832,7 @@ export async function updateProduct(
         }
       }
     });
-    await syncProductPriceBookPrices(v.id, v.priceBookPrices);
+    await syncProductPriceBookPrices(gate.storeId, v.id, v.priceBookPrices);
 
     revalidatePath(Routes.Products);
     revalidatePath(Routes.Inventory);
@@ -872,6 +861,7 @@ export async function createProduct(
   const gate = await requireStockAccess();
   if (!gate.ok) return gate;
   const userId = gate.userId;
+  const storeId = gate.storeId;
 
   const parsed = createProductSchema.safeParse(input);
   if (!parsed.success) {
@@ -925,6 +915,7 @@ export async function createProduct(
           .insert(productSuppliers)
           .values(
             supplierIds.map((sid, i) => ({
+              storeId,
               productId,
               supplierId: sid,
               isPrimary: i === 0,
@@ -935,13 +926,13 @@ export async function createProduct(
       const [defaultWh] = await tx
         .select({ id: warehouses.id })
         .from(warehouses)
-        .where(eq(warehouses.isDefault, true))
+        .where(and(eq(warehouses.storeId, storeId), eq(warehouses.isDefault, true)))
         .limit(1);
       const [profile] = defaultWh
         ? await tx
             .select({ id: profiles.id })
             .from(profiles)
-            .where(eq(profiles.id, userId))
+            .where(and(eq(profiles.storeId, storeId), eq(profiles.id, userId)))
             .limit(1)
         : [null];
 
@@ -953,6 +944,7 @@ export async function createProduct(
       ) {
         if (!defaultWh) return;
         await tx.insert(stockLevels).values({
+          storeId,
           productId,
           warehouseId: defaultWh.id,
           quantity: String(quantity),
@@ -961,6 +953,7 @@ export async function createProduct(
 
         if (quantity > 0) {
           await tx.insert(stockMovements).values({
+            storeId,
             productId,
             warehouseId: defaultWh.id,
             type: "init",
@@ -978,6 +971,7 @@ export async function createProduct(
         const [product] = await tx
           .insert(products)
           .values({
+            storeId,
             sku,
             productKind: v.productKind,
             barcode: v.barcode?.trim() || null,
@@ -1022,6 +1016,7 @@ export async function createProduct(
         if (v.productKind === "combo") {
           await tx.insert(productComboItems).values(
             v.comboItems.map((item, index) => ({
+              storeId,
               comboProductId: product.id,
               componentProductId: item.productId,
               quantity: String(item.quantity),
@@ -1035,6 +1030,7 @@ export async function createProduct(
       const [parent] = await tx
         .insert(products)
         .values({
+          storeId,
           sku,
           productKind: "product",
           barcode: v.barcode?.trim() || null,
@@ -1084,6 +1080,7 @@ export async function createProduct(
         const [childProduct] = await tx
           .insert(products)
           .values({
+            storeId,
             sku: child.sku?.trim() || generateVariantSku(sku, index),
             productKind: "product",
             barcode: child.barcode?.trim() || null,
@@ -1131,7 +1128,7 @@ export async function createProduct(
       return parent;
     });
 
-    await syncProductPriceBookPrices(result.id, v.priceBookPrices);
+    await syncProductPriceBookPrices(storeId, result.id, v.priceBookPrices);
 
     revalidatePath(Routes.Products);
     revalidatePath(Routes.Inventory);

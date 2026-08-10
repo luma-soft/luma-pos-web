@@ -32,9 +32,9 @@ export async function applyPriceFormulaAll(input: {
   amount: number;
   unit: "vnd" | "pct";
 }): Promise<ActionResult<{ count: number }>> {
-  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const gate = await requireManager(); if (!gate.ok) return gate;
   try {
-    const [book] = await db.select({ isDefault: priceBooks.isDefault }).from(priceBooks).where(eq(priceBooks.id, input.priceBookId)).limit(1);
+    const [book] = await db.select({ isDefault: priceBooks.isDefault }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, input.priceBookId))).limit(1);
     if (!book) return { ok: false, error: "errors.invalidData" };
 
     if (book.isDefault) {
@@ -47,7 +47,7 @@ export async function applyPriceFormulaAll(input: {
           retailPrice: priceExpr(base, input.op, input.amount, input.unit),
           updatedAt: sql`now()`,
         })
-        .where(pricingSellableProductCondition());
+        .where(and(eq(products.storeId, gate.storeId), pricingSellableProductCondition()));
     } else {
       const currentPrice = alias(productPrices, "current_price");
       const base = input.base === "cost"
@@ -60,6 +60,7 @@ export async function applyPriceFormulaAll(input: {
         .select(
           db
             .select({
+              storeId: sql<string>`${gate.storeId}`.as("store_id"),
               priceBookId: sql<string>`${input.priceBookId}`.as(
                 "price_book_id",
               ),
@@ -76,7 +77,7 @@ export async function applyPriceFormulaAll(input: {
                 eq(currentPrice.priceBookId, input.priceBookId),
               ),
             )
-            .where(pricingSellableProductCondition()),
+            .where(and(eq(products.storeId, gate.storeId), pricingSellableProductCondition())),
         )
         .onConflictDoUpdate({
           target: [productPrices.priceBookId, productPrices.productId],
@@ -87,7 +88,7 @@ export async function applyPriceFormulaAll(input: {
     const [{ n }] = await db
       .select({ n: sql<number>`count(*)::int` })
       .from(products)
-      .where(pricingSellableProductCondition());
+      .where(and(eq(products.storeId, gate.storeId), pricingSellableProductCondition()));
     revalidatePath(Routes.Pricing);
     revalidatePath(Routes.POS);
     return { ok: true, data: { count: Number(n) } };
@@ -96,12 +97,12 @@ export async function applyPriceFormulaAll(input: {
 
 /** Tạo bảng giá mới. */
 export async function createPriceBook(name: string): Promise<ActionResult<{ id: string; name: string }>> {
-  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const gate = await requireManager(); if (!gate.ok) return gate;
   const n = name.trim();
   if (!n) return { ok: false, error: "errors.invalidData" };
   try {
-    const [{ max }] = await db.select({ max: sql<number>`coalesce(max(${priceBooks.sortOrder}), 0)` }).from(priceBooks);
-    const [row] = await db.insert(priceBooks).values({ name: n, sortOrder: Number(max) + 1 }).returning({ id: priceBooks.id, name: priceBooks.name });
+    const [{ max }] = await db.select({ max: sql<number>`coalesce(max(${priceBooks.sortOrder}), 0)` }).from(priceBooks).where(eq(priceBooks.storeId, gate.storeId));
+    const [row] = await db.insert(priceBooks).values({ storeId: gate.storeId, name: n, sortOrder: Number(max) + 1 }).returning({ id: priceBooks.id, name: priceBooks.name });
     revalidatePath(Routes.Pricing);
     return { ok: true, data: row };
   } catch (e) { console.error("createPriceBook failed:", e); return { ok: false, error: "errors.serverError" }; }
@@ -109,11 +110,11 @@ export async function createPriceBook(name: string): Promise<ActionResult<{ id: 
 
 /** Đổi tên bảng giá. */
 export async function renamePriceBook(id: string, name: string): Promise<ActionResult> {
-  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const gate = await requireManager(); if (!gate.ok) return gate;
   const n = name.trim();
   if (!n) return { ok: false, error: "errors.invalidData" };
   try {
-    await db.update(priceBooks).set({ name: n }).where(eq(priceBooks.id, id));
+    await db.update(priceBooks).set({ name: n }).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, id)));
     revalidatePath(Routes.Pricing);
     return { ok: true, data: undefined };
   } catch (e) { console.error("renamePriceBook failed:", e); return { ok: false, error: "errors.serverError" }; }
@@ -121,12 +122,12 @@ export async function renamePriceBook(id: string, name: string): Promise<ActionR
 
 /** Xóa bảng giá (không xóa bảng mặc định). Override theo bảng tự xóa (cascade). */
 export async function deletePriceBook(id: string): Promise<ActionResult> {
-  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const gate = await requireManager(); if (!gate.ok) return gate;
   try {
-    const [book] = await db.select({ isDefault: priceBooks.isDefault }).from(priceBooks).where(eq(priceBooks.id, id)).limit(1);
+    const [book] = await db.select({ isDefault: priceBooks.isDefault }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, id))).limit(1);
     if (!book) return { ok: false, error: "errors.invalidData" };
     if (book.isDefault) return { ok: false, error: "pricing.errors.cannotDeleteDefault" };
-    await db.delete(priceBooks).where(eq(priceBooks.id, id));
+    await db.delete(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, id)));
     revalidatePath(Routes.Pricing);
     return { ok: true, data: undefined };
   } catch (e) { console.error("deletePriceBook failed:", e); return { ok: false, error: "errors.serverError" }; }
@@ -142,18 +143,18 @@ export async function setProductPrice(input: {
   productId: string;
   price: number | null;
 }): Promise<ActionResult> {
-  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const gate = await requireManager(); if (!gate.ok) return gate;
   try {
-    const [book] = await db.select({ isDefault: priceBooks.isDefault }).from(priceBooks).where(eq(priceBooks.id, input.priceBookId)).limit(1);
+    const [book] = await db.select({ isDefault: priceBooks.isDefault }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, input.priceBookId))).limit(1);
     if (!book) return { ok: false, error: "errors.invalidData" };
 
     if (book.isDefault) {
-      await db.update(products).set({ retailPrice: toMoney(Math.max(0, input.price ?? 0)), updatedAt: sql`now()` }).where(eq(products.id, input.productId));
+      await db.update(products).set({ retailPrice: toMoney(Math.max(0, input.price ?? 0)), updatedAt: sql`now()` }).where(and(eq(products.storeId, gate.storeId), eq(products.id, input.productId)));
     } else if (input.price == null) {
-      await db.delete(productPrices).where(and(eq(productPrices.priceBookId, input.priceBookId), eq(productPrices.productId, input.productId)));
+      await db.delete(productPrices).where(and(eq(productPrices.storeId, gate.storeId), eq(productPrices.priceBookId, input.priceBookId), eq(productPrices.productId, input.productId)));
     } else {
       await db.insert(productPrices)
-        .values({ priceBookId: input.priceBookId, productId: input.productId, price: toMoney(Math.max(0, input.price)) })
+        .values({ storeId: gate.storeId, priceBookId: input.priceBookId, productId: input.productId, price: toMoney(Math.max(0, input.price)) })
         .onConflictDoUpdate({
           target: [productPrices.priceBookId, productPrices.productId],
           set: { price: toMoney(Math.max(0, input.price)) },

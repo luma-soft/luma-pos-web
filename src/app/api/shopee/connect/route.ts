@@ -2,13 +2,15 @@ import { createHmac } from "crypto";
 import { NextResponse } from "next/server";
 import { getShopeeSettings } from "@/lib/data/settings";
 import { Routes } from "@/lib/routes";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 function baseUrl(environment: string) {
   return environment === "production" ? "https://partner.shopeemobile.com" : "https://partner.test-stable.shopeemobile.com";
 }
 
 export async function GET(req: Request) {
-  const settings = await getShopeeSettings();
+  const context = await requireStoreContext();
+  const settings = await getShopeeSettings(context.storeId);
   const url = new URL(req.url);
   if (!settings.partnerId || !settings.partnerKey) {
     const target = new URL(Routes.OnlineSales, url.origin);

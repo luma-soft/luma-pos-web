@@ -19,6 +19,7 @@ import { TableSkeleton } from "@/components/table-skeleton";
 import { OrdersTable } from "./orders-table";
 import { getPrintTemplatesForDoc } from "@/lib/print/template";
 import { OrdersFilterDrawer } from "./orders-filter-drawer";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 type SP = Record<string, string | undefined>;
 
@@ -99,6 +100,7 @@ export async function OrdersTab({ searchParams }: { searchParams: SP }) {
 }
 
 async function OrdersContent({ searchParams }: { searchParams: SP }) {
+  const context = await requireStoreContext();
   const t = await getTranslations();
   const params = searchParams;
   const status = (
@@ -125,7 +127,7 @@ async function OrdersContent({ searchParams }: { searchParams: SP }) {
   const maxTotal = optionalNumber(params.maxTotal);
 
   const [{ rows, total, pageCount }, printTemplates] = await Promise.all([
-    getOrders({
+    getOrders(context.storeId, {
       orderId: params.orderId,
       q: params.q,
       customerId: params.customerId,
@@ -142,7 +144,7 @@ async function OrdersContent({ searchParams }: { searchParams: SP }) {
       page,
       pageSize,
     }),
-    getPrintTemplatesForDoc("order"),
+    getPrintTemplatesForDoc(context.storeId, "order"),
   ]);
 
   return (

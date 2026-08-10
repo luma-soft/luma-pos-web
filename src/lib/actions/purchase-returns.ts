@@ -24,7 +24,7 @@ import { publishCommittedNotification } from "@/lib/notifications/outbox";
 export async function searchPurchaseReturnProducts(q: string, warehouseId: string): Promise<PurchaseReturnProductRow[]> {
   const gate = await requireStockAccess();
   if (!gate.ok) return [];
-  return searchPurchaseReturnProductRows(q, warehouseId);
+  return searchPurchaseReturnProductRows(gate.storeId, q, warehouseId);
 }
 
 function lineTotal(i: { quantity: number; returnUnitCost: number }) {
@@ -66,7 +66,7 @@ export async function createPurchaseReturn(
 
   try {
     const profileId = await getProfileId(userId);
-    const currentShift = profileId ? await getCurrentShift(profileId) : null;
+    const currentShift = profileId ? await getCurrentShift(gate.storeId, profileId) : null;
 
     const result = await db.transaction(async (tx) => {
       const ids = v.items.map((item) => item.productId);
@@ -78,7 +78,7 @@ export async function createPurchaseReturn(
           baseUnit: products.baseUnit,
         })
         .from(products)
-        .where(inArray(products.id, ids));
+        .where(and(eq(products.storeId, gate.storeId), inArray(products.id, ids)));
       if (productRows.length !== new Set(ids).size) throw new Error("PRODUCT_NOT_FOUND");
       const productsById = new Map(productRows.map((product) => [product.id, product]));
 
@@ -88,7 +88,7 @@ export async function createPurchaseReturn(
           quantity: stockLevels.quantity,
         })
         .from(stockLevels)
-        .where(and(eq(stockLevels.warehouseId, v.warehouseId), inArray(stockLevels.productId, ids)));
+        .where(and(eq(stockLevels.storeId, gate.storeId), eq(stockLevels.warehouseId, v.warehouseId), inArray(stockLevels.productId, ids)));
       const stockByProduct = new Map(stockRows.map((row) => [row.productId, Number(row.quantity)]));
       for (const item of v.items) {
         const available = stockByProduct.get(item.productId) ?? 0;
@@ -96,6 +96,7 @@ export async function createPurchaseReturn(
       }
 
       const [ret] = await tx.insert(purchaseReturns).values({
+        storeId: gate.storeId,
         code: generateCode("THN"),
         purchaseOrderId: v.purchaseOrderId ?? null,
         supplierId: v.supplierId,
@@ -117,6 +118,7 @@ export async function createPurchaseReturn(
       await tx.insert(purchaseReturnItems).values(v.items.map((item) => {
         const product = productsById.get(item.productId)!;
         return {
+          storeId: gate.storeId,
           purchaseReturnId: ret.id,
           purchaseOrderItemId: null,
           productId: item.productId,
@@ -132,6 +134,7 @@ export async function createPurchaseReturn(
 
       for (const item of v.items) {
         await consumeTrackedStockLots(tx, {
+          storeId: gate.storeId,
           productId: item.productId,
           warehouseId: v.warehouseId,
           quantity: item.quantity,
@@ -142,9 +145,10 @@ export async function createPurchaseReturn(
         await tx.update(stockLevels).set({
           quantity: sql`${stockLevels.quantity} - ${toQty(item.quantity)}`,
           updatedAt: sql`now()`,
-        }).where(and(eq(stockLevels.productId, item.productId), eq(stockLevels.warehouseId, v.warehouseId)));
+        }).where(and(eq(stockLevels.storeId, gate.storeId), eq(stockLevels.productId, item.productId), eq(stockLevels.warehouseId, v.warehouseId)));
 
         await tx.insert(stockMovements).values({
+          storeId: gate.storeId,
           productId: item.productId,
           warehouseId: v.warehouseId,
           type: "return_out",
@@ -159,6 +163,7 @@ export async function createPurchaseReturn(
 
       if (totals.refundAmount > 0) {
         await recordCashTx(tx, {
+          storeId: gate.storeId,
           type: "in",
           fund: v.refundMethod === "bank_transfer" ? "bank" : "cash",
           amount: totals.refundAmount,
@@ -176,7 +181,7 @@ export async function createPurchaseReturn(
         const [supplier] = await tx
           .select({ currentDebt: suppliers.currentDebt })
           .from(suppliers)
-          .where(eq(suppliers.id, v.supplierId))
+          .where(and(eq(suppliers.storeId, gate.storeId), eq(suppliers.id, v.supplierId)))
           .limit(1)
           .for("update");
         debtDelta = -Math.min(
@@ -185,7 +190,7 @@ export async function createPurchaseReturn(
         );
         await tx.update(suppliers).set({
           currentDebt: sql`greatest(${suppliers.currentDebt} - ${toMoney(totals.debtAmount)}, 0)`,
-        }).where(eq(suppliers.id, v.supplierId));
+        }).where(and(eq(suppliers.storeId, gate.storeId), eq(suppliers.id, v.supplierId)));
       }
 
       const debtNotification = await createDebtChangedEventInTx(tx, {

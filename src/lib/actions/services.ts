@@ -488,6 +488,7 @@ export async function syncServiceJobMaterialStock(
 
   try {
     const result = await db.transaction((tx) => syncServiceJobMaterialStockCore(tx, {
+      storeId: gate.storeId,
       materialId: value.materialId,
       warehouseId: value.warehouseId,
       createdBy: gate.userId,

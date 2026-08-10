@@ -19,11 +19,10 @@ import {
 
 export async function GET(request: Request) {
   const gate = await requireMobileStockReadAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const [products, options] = await Promise.all([
-    getMobileProducts({
+    getMobileProducts(gate.storeId, {
       q: searchParam(request, "q"),
       categoryId: searchParam(request, "categoryId"),
       brandId: searchParam(request, "brandId"),
@@ -35,7 +34,7 @@ export async function GET(request: Request) {
       page: numberParam(request, "page", 1),
       pageSize: numberParam(request, "pageSize", 50),
     }),
-    getMobileProductOptions(),
+    getMobileProductOptions(gate.storeId),
   ]);
 
   return mobileOk({ products, options });

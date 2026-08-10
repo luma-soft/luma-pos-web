@@ -12,11 +12,10 @@ import {
 
 export async function GET(request: Request) {
   const gate = await requireMobileStockAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   return mobileOk(
-    await getSuppliers({
+    await getSuppliers(gate.storeId, {
       q: searchParam(request, "q"),
       owing: searchParam(request, "owing") as "owing" | "clear" | undefined,
       page: numberParam(request, "page", 1),

@@ -49,6 +49,7 @@ function listedUnitPrice(
  * are all resolved from the database here.
  */
 export async function normalizeOrderItems(
+  storeId: string,
   rawItems: RawOrderItem[],
   invoicePriceBookId?: string | null,
 ): Promise<NormalizedOrderItem[]> {
@@ -70,7 +71,7 @@ export async function normalizeOrderItems(
         productKind: products.productKind,
       })
       .from(products)
-      .where(inArray(products.id, productIds)),
+      .where(and(eq(products.storeId, storeId), inArray(products.id, productIds))),
     db
       .select({
         productId: productUnits.productId,
@@ -84,13 +85,13 @@ export async function normalizeOrderItems(
       ? db
           .select({ priceBookId: productPrices.priceBookId, productId: productPrices.productId, price: productPrices.price })
           .from(productPrices)
-          .where(and(inArray(productPrices.priceBookId, requestedPriceBookIds), inArray(productPrices.productId, productIds)))
+          .where(and(eq(productPrices.storeId, storeId), inArray(productPrices.priceBookId, requestedPriceBookIds), inArray(productPrices.productId, productIds)))
       : Promise.resolve([]),
     requestedPriceBookIds.length > 0
       ? db
           .select({ id: priceBooks.id, costBased: priceBooks.costBased })
           .from(priceBooks)
-          .where(inArray(priceBooks.id, requestedPriceBookIds))
+          .where(and(eq(priceBooks.storeId, storeId), inArray(priceBooks.id, requestedPriceBookIds)))
       : Promise.resolve([]),
     db
       .select({
@@ -111,7 +112,7 @@ export async function normalizeOrderItems(
       })
       .from(productComboItems)
       .innerJoin(products, eq(productComboItems.componentProductId, products.id))
-      .where(inArray(productComboItems.comboProductId, productIds)),
+      .where(and(eq(productComboItems.storeId, storeId), inArray(productComboItems.comboProductId, productIds))),
   ]);
 
   const productById = new Map(productRows.map((p) => [p.id, p]));

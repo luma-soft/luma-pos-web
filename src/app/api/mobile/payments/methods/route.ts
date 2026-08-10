@@ -12,12 +12,13 @@ export async function GET() {
   if (!gate.ok) return mobileGate(gate)!;
 
   const [prefs, account] = await Promise.all([
-    getRawStorePrefs(),
+    getRawStorePrefs(gate.storeId),
     db
       .select({ id: paymentBankAccounts.id })
       .from(paymentBankAccounts)
       .where(
         and(
+          eq(paymentBankAccounts.storeId, gate.storeId),
           eq(paymentBankAccounts.provider, "sepay"),
           eq(paymentBankAccounts.enabled, true),
         ),

@@ -27,7 +27,7 @@ export type ReportFilters = {
   to?: Date;
 };
 
-function reportConditions(rangeDays: number, filters: ReportFilters) {
+function reportConditions(storeId: string, rangeDays: number, filters: ReportFilters) {
   const since = filters.from ?? daysAgo(rangeDays - 1);
   const orderDateFilter = filters.to
     ? and(gte(orders.createdAt, since), lt(orders.createdAt, filters.to))
@@ -43,25 +43,26 @@ function reportConditions(rangeDays: number, filters: ReportFilters) {
       ? or(ilike(customers.name, `%${customerTerm}%`), ilike(customers.phone, `%${customerTerm}%`), ilike(customers.code, `%${customerTerm}%`))
       : undefined;
   const where = customerFilter
-    ? and(notCancelled, orderDateFilter, customerFilter)
-    : and(notCancelled, orderDateFilter);
+    ? and(eq(orders.storeId, storeId), notCancelled, orderDateFilter, customerFilter)
+    : and(eq(orders.storeId, storeId), notCancelled, orderDateFilter);
   const returnCustomerFilter = filters.customerId
     ? eq(returns.customerId, filters.customerId)
     : customerTerm
       ? or(ilike(customers.name, `%${customerTerm}%`), ilike(customers.phone, `%${customerTerm}%`), ilike(customers.code, `%${customerTerm}%`))
       : undefined;
   const returnWhere = returnCustomerFilter
-    ? and(eq(returns.status, "completed"), returnDateFilter, returnCustomerFilter)
-    : and(eq(returns.status, "completed"), returnDateFilter);
+    ? and(eq(returns.storeId, storeId), eq(returns.status, "completed"), returnDateFilter, returnCustomerFilter)
+    : and(eq(returns.storeId, storeId), eq(returns.status, "completed"), returnDateFilter);
 
   return { where, returnWhere };
 }
 
-export async function getReports(rangeDays = 30, filters: ReportFilters = {}) {
-  return getReportsForDatabase(db, rangeDays, filters);
+export async function getReports(storeId: string, rangeDays = 30, filters: ReportFilters = {}) {
+  return getReportsForDatabase(db, storeId, rangeDays, filters);
 }
 
 export async function getReportInvoices(
+  storeId: string,
   rangeDays = 30,
   filters: ReportFilters = {},
   page = 1,
@@ -69,7 +70,7 @@ export async function getReportInvoices(
 ) {
   const safePage = Math.max(1, Math.floor(page));
   const safePageSize = Math.max(1, Math.floor(pageSize));
-  const { where } = reportConditions(rangeDays, filters);
+  const { where } = reportConditions(storeId, rangeDays, filters);
   const [rows, [countRow]] = await Promise.all([
     db.select({
       id: orders.id,
@@ -108,6 +109,7 @@ export async function getReportInvoices(
 export type ReportInvoiceRow = Awaited<ReturnType<typeof getReportInvoices>>["rows"][number];
 
 export async function getReportProducts(
+  storeId: string,
   rangeDays = 30,
   filters: ReportFilters = {},
   page = 1,
@@ -115,7 +117,7 @@ export async function getReportProducts(
 ) {
   const safePage = Math.max(1, Math.floor(page));
   const safePageSize = Math.max(1, Math.floor(pageSize));
-  const { where } = reportConditions(rangeDays, filters);
+  const { where } = reportConditions(storeId, rangeDays, filters);
   const [rows, [countRow]] = await Promise.all([
     db.select({
       productId: orderItems.productId,
@@ -144,6 +146,7 @@ export async function getReportProducts(
 }
 
 export async function getReportCustomers(
+  storeId: string,
   rangeDays = 30,
   filters: ReportFilters = {},
   page = 1,
@@ -151,7 +154,7 @@ export async function getReportCustomers(
 ) {
   const safePage = Math.max(1, Math.floor(page));
   const safePageSize = Math.max(1, Math.floor(pageSize));
-  const { where } = reportConditions(rangeDays, filters);
+  const { where } = reportConditions(storeId, rangeDays, filters);
   const [rows, [countRow]] = await Promise.all([
     db.select({
       customerId: orders.customerId,
@@ -177,6 +180,7 @@ export async function getReportCustomers(
 }
 
 export async function getReportEmployees(
+  storeId: string,
   rangeDays = 30,
   filters: ReportFilters = {},
   page = 1,
@@ -184,7 +188,7 @@ export async function getReportEmployees(
 ) {
   const safePage = Math.max(1, Math.floor(page));
   const safePageSize = Math.max(1, Math.floor(pageSize));
-  const { where } = reportConditions(rangeDays, filters);
+  const { where } = reportConditions(storeId, rangeDays, filters);
   const [rows, [countRow]] = await Promise.all([
     db.select({
       sellerId: orders.createdBy,
@@ -225,11 +229,12 @@ export type ReportEmployeeRow = Awaited<ReturnType<typeof getReportEmployees>>["
 
 export async function getReportsForDatabase(
   database: typeof db,
+  storeId: string,
   rangeDays = 30,
   filters: ReportFilters = {},
 ) {
   // chỉ đơn bán thật: loại quote/merged/cancelled/draft
-  const { where, returnWhere } = reportConditions(rangeDays, filters);
+  const { where, returnWhere } = reportConditions(storeId, rangeDays, filters);
 
   const [
     summaryRows,

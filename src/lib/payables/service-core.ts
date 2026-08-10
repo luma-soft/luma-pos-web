@@ -1,4 +1,4 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   auditLogs,
   purchaseOrders,
@@ -16,6 +16,7 @@ import { createDebtChangedEventInTx } from "@/lib/notifications/events-core";
 type DbLike = any;
 
 type Actor = {
+  storeId: string;
   profileId: string | null;
   shiftId: string | null;
   source?: "manual" | "mobile";
@@ -101,7 +102,7 @@ export async function paySupplierPayable(
       const [supplier] = await tx
         .select({ id: suppliers.id, currentDebt: suppliers.currentDebt })
         .from(suppliers)
-        .where(eq(suppliers.id, input.supplierId))
+        .where(and(eq(suppliers.storeId, actor.storeId), eq(suppliers.id, input.supplierId)))
         .limit(1)
         .for("update");
       if (!supplier) throw new Error("SUPPLIER_NOT_FOUND");
@@ -116,7 +117,7 @@ export async function paySupplierPayable(
           note: supplierPayableReceipts.note,
         })
         .from(supplierPayableReceipts)
-        .where(eq(supplierPayableReceipts.clientRequestId, input.clientRequestId.trim()))
+        .where(and(eq(supplierPayableReceipts.storeId, actor.storeId), eq(supplierPayableReceipts.clientRequestId, input.clientRequestId.trim())))
         .limit(1)
         .for("update");
       if (existing) {
@@ -126,7 +127,7 @@ export async function paySupplierPayable(
             amount: supplierPayableAllocations.amount,
           })
           .from(supplierPayableAllocations)
-          .where(eq(supplierPayableAllocations.receiptId, existing.id));
+          .where(and(eq(supplierPayableAllocations.storeId, actor.storeId), eq(supplierPayableAllocations.receiptId, existing.id)));
         const allocationMatches = existingAllocations.length === allocations.length &&
           existingAllocations.every((row: { purchaseOrderId: string; amount: string }) => {
             const requested = allocations.find(
@@ -152,7 +153,7 @@ export async function paySupplierPayable(
       const purchaseRows = await tx
         .select()
         .from(purchaseOrders)
-        .where(inArray(purchaseOrders.id, ids))
+        .where(and(eq(purchaseOrders.storeId, actor.storeId), inArray(purchaseOrders.id, ids)))
         .for("update");
       if (purchaseRows.length !== ids.length) throw new Error("PURCHASE_NOT_PAYABLE");
       const purchases = new Map<string, typeof purchaseOrders.$inferSelect>(
@@ -175,6 +176,7 @@ export async function paySupplierPayable(
       const [receipt] = await tx
         .insert(supplierPayableReceipts)
         .values({
+          storeId: actor.storeId,
           code: generateCode("PCN"),
           supplierId: input.supplierId,
           amount: amount.toFixed(2),
@@ -190,6 +192,7 @@ export async function paySupplierPayable(
       if (allocations.length > 0) {
         await tx.insert(supplierPayableAllocations).values(
           allocations.map((allocation) => ({
+            storeId: actor.storeId,
             receiptId: receipt.id,
             purchaseOrderId: allocation.purchaseOrderId,
             amount: allocation.amount.toFixed(2),
@@ -201,10 +204,11 @@ export async function paySupplierPayable(
         await tx
           .update(purchaseOrders)
           .set({ amountPaid: money(Number(purchase.amountPaid) + allocation.amount).toFixed(2) })
-          .where(eq(purchaseOrders.id, purchase.id));
+          .where(and(eq(purchaseOrders.storeId, actor.storeId), eq(purchaseOrders.id, purchase.id)));
       }
 
       await recordCashTx(tx, {
+        storeId: actor.storeId,
         type: "out",
         fund: fundForMethod(input.method),
         amount,
@@ -218,8 +222,9 @@ export async function paySupplierPayable(
       await tx
         .update(suppliers)
         .set({ currentDebt: sql`${suppliers.currentDebt} - ${amount.toFixed(2)}` })
-        .where(eq(suppliers.id, input.supplierId));
+        .where(and(eq(suppliers.storeId, actor.storeId), eq(suppliers.id, input.supplierId)));
       await tx.insert(auditLogs).values({
+        storeId: actor.storeId,
         actorId: actor.profileId,
         source: actor.source ?? "manual",
         action: "supplier_payable.payment.create",
@@ -284,7 +289,7 @@ export async function createSupplierPayableEntry(
       const [supplier] = await tx
         .select({ id: suppliers.id, currentDebt: suppliers.currentDebt })
         .from(suppliers)
-        .where(eq(suppliers.id, input.supplierId))
+        .where(and(eq(suppliers.storeId, actor.storeId), eq(suppliers.id, input.supplierId)))
         .limit(1)
         .for("update");
       if (!supplier) throw new Error("SUPPLIER_NOT_FOUND");
@@ -300,7 +305,7 @@ export async function createSupplierPayableEntry(
           note: supplierPayableEntries.note,
         })
         .from(supplierPayableEntries)
-        .where(eq(supplierPayableEntries.clientRequestId, input.clientRequestId.trim()))
+        .where(and(eq(supplierPayableEntries.storeId, actor.storeId), eq(supplierPayableEntries.clientRequestId, input.clientRequestId.trim())))
         .limit(1)
         .for("update");
       if (existing) {
@@ -322,7 +327,7 @@ export async function createSupplierPayableEntry(
         const [purchase] = await tx
           .select({ supplierId: purchaseOrders.supplierId })
           .from(purchaseOrders)
-          .where(eq(purchaseOrders.id, input.purchaseOrderId))
+          .where(and(eq(purchaseOrders.storeId, actor.storeId), eq(purchaseOrders.id, input.purchaseOrderId)))
           .limit(1)
           .for("update");
         if (!purchase || purchase.supplierId !== input.supplierId) {
@@ -334,6 +339,7 @@ export async function createSupplierPayableEntry(
       const [entry] = await tx
         .insert(supplierPayableEntries)
         .values({
+          storeId: actor.storeId,
           code: generateCode("DCN"),
           supplierId: input.supplierId,
           purchaseOrderId: input.purchaseOrderId || null,
@@ -350,8 +356,9 @@ export async function createSupplierPayableEntry(
       await tx
         .update(suppliers)
         .set({ currentDebt: sql`${suppliers.currentDebt} + ${amount.toFixed(2)}` })
-        .where(eq(suppliers.id, input.supplierId));
+        .where(and(eq(suppliers.storeId, actor.storeId), eq(suppliers.id, input.supplierId)));
       await tx.insert(auditLogs).values({
+        storeId: actor.storeId,
         actorId: actor.profileId,
         source: actor.source ?? "manual",
         action: "supplier_payable.adjustment.create",

@@ -19,12 +19,11 @@ import { withTimeout } from "@/lib/mobile/timeout";
 
 export async function GET(request: Request) {
   const gate = await requireMobileStockReadAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   try {
     const products = await withTimeout(
-      getInventory({
+      getInventory(gate.storeId, {
         q: searchParam(request, "q"),
         categoryId: searchParam(request, "categoryId"),
         warehouseId: searchParam(request, "warehouseId"),
@@ -37,12 +36,12 @@ export async function GET(request: Request) {
 
     const [movements, purchases, purchaseOptions, expiry, internalUse, internalUseIssues] =
       await Promise.all([
-        withTimeout(getRecentMovements(15), 4000),
-        withTimeout(getPurchases({ q: searchParam(request, "purchaseQ"), status: searchParam(request, "purchaseStatus") ?? undefined, supplierId: searchParam(request, "supplierId") ?? undefined, warehouseId: searchParam(request, "purchaseWarehouseId") ?? undefined, from: searchParam(request, "from") ?? undefined, to: searchParam(request, "to") ?? undefined, debtOnly: searchParam(request, "debtOnly") === "1", pageSize: 30 }), 4000),
-        withTimeout(getPurchaseFormOptions(), 4000),
-        withTimeout(getExpiryStockAlerts(30, 50), 4000),
-        withTimeout(getInternalUseCostSummary(), 4000),
-        withTimeout(getInternalUseIssues({ limit: 50 }), 4000),
+        withTimeout(getRecentMovements(gate.storeId, 15), 4000),
+        withTimeout(getPurchases(gate.storeId, { q: searchParam(request, "purchaseQ"), status: searchParam(request, "purchaseStatus") ?? undefined, supplierId: searchParam(request, "supplierId") ?? undefined, warehouseId: searchParam(request, "purchaseWarehouseId") ?? undefined, from: searchParam(request, "from") ?? undefined, to: searchParam(request, "to") ?? undefined, debtOnly: searchParam(request, "debtOnly") === "1", pageSize: 30 }), 4000),
+        withTimeout(getPurchaseFormOptions(gate.storeId), 4000),
+        withTimeout(getExpiryStockAlerts(gate.storeId, 30, 50), 4000),
+        withTimeout(getInternalUseCostSummary(gate.storeId), 4000),
+        withTimeout(getInternalUseIssues(gate.storeId, { limit: 50 }), 4000),
       ]);
 
     return mobileOk({

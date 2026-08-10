@@ -12,10 +12,9 @@ import {
 
 export async function GET(request: Request) {
   const gate = await requireMobileManager();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
-  const data = await getCashbook({
+  const data = await getCashbook(gate.storeId, {
     fund: searchParam(request, "fund"),
     type: searchParam(request, "type"),
     page: numberParam(request, "page", 1),

@@ -3,6 +3,7 @@ import { getProduct, getProductFormOptions } from "@/lib/data/products";
 import { getPriceBooks, getPriceOverridesForProducts } from "@/lib/data/price-books";
 import { NewProductForm } from "./product-form";
 import { productToFormInitialValues } from "../product-form-values";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 interface Props {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -11,6 +12,7 @@ interface Props {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export default async function NewProductPage({ searchParams }: Props) {
+  const context = await requireStoreContext();
   const sp = await searchParams;
   const copyFrom = typeof sp.copyFrom === "string" ? sp.copyFrom : undefined;
   const sameTypeAs = typeof sp.sameTypeAs === "string" ? sp.sameTypeAs : undefined;
@@ -23,12 +25,12 @@ export default async function NewProductPage({ searchParams }: Props) {
   if (seedId && !UUID_RE.test(seedId)) notFound();
 
   const [options, priceBooks, seedProduct] = await Promise.all([
-    getProductFormOptions(),
-    getPriceBooks(),
-    seedId ? getProduct(seedId) : Promise.resolve(null),
+    getProductFormOptions(context.storeId),
+    getPriceBooks(context.storeId),
+    seedId ? getProduct(context.storeId, seedId) : Promise.resolve(null),
   ]);
   if (seedId && !seedProduct) notFound();
-  const priceOverridesByBook = seedProduct ? await getPriceOverridesForProducts([seedProduct.id]) : {};
+  const priceOverridesByBook = seedProduct ? await getPriceOverridesForProducts(context.storeId, [seedProduct.id]) : {};
   const priceBookPrices = Object.fromEntries(
     Object.entries(priceOverridesByBook).map(([bookId, prices]) => [bookId, prices[seedProduct!.id]])
   );

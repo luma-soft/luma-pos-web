@@ -6,6 +6,7 @@ import { Routes } from "@/lib/routes";
 import { getCurrentShift } from "@/lib/data/shifts";
 import { addManualPaymentCore } from "@/lib/orders/payment-core";
 import { publishCommittedNotification } from "@/lib/notifications/outbox";
+import { resolveStoreContextForUser } from "@/lib/auth/store-context";
 
 /**
  * Lõi THU NỢ / thu tiền theo đơn — KHÔNG phải server action (nhận userId đã xác thực).
@@ -18,9 +19,12 @@ export async function addPaymentForUser(userId: string, input: AddPaymentInput):
   const v = parsed.data;
 
   try {
+    const context = await resolveStoreContextForUser(userId);
+    if (!context) return { ok: false, error: "errors.unauthorized" };
     const profileId = await getProfileId(userId);
-    const currentShift = profileId ? await getCurrentShift(profileId) : null;
+    const currentShift = profileId ? await getCurrentShift(context.storeId, profileId) : null;
     const result = await addManualPaymentCore(db, v, {
+      storeId: context.storeId,
       profileId,
       shiftId: currentShift?.id ?? null,
     });

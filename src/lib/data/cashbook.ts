@@ -3,10 +3,10 @@ import { db } from "@/db";
 import { cashTransactions, profiles } from "@/db/schema";
 import { coercePageSize } from "@/lib/pagination";
 
-export async function getCashbook(filters: { fund?: string; type?: string; page?: number; pageSize?: number } = {}) {
+export async function getCashbook(storeId: string, filters: { fund?: string; type?: string; page?: number; pageSize?: number } = {}) {
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize, 30);
-  const conditions: SQL[] = [];
+  const conditions: SQL[] = [eq(cashTransactions.storeId, storeId)];
   if (filters.fund === "cash" || filters.fund === "bank") conditions.push(eq(cashTransactions.fund, filters.fund));
   if (filters.type === "in" || filters.type === "out") conditions.push(eq(cashTransactions.type, filters.type));
   const where = conditions.length > 0 ? and(...conditions) : undefined;
@@ -41,6 +41,7 @@ export async function getCashbook(filters: { fund?: string; type?: string; page?
         totalOut: sql<string>`coalesce(sum(${cashTransactions.amount}) filter (where ${cashTransactions.type} = 'out'), 0)`,
       })
       .from(cashTransactions)
+      .where(eq(cashTransactions.storeId, storeId))
       .groupBy(cashTransactions.fund),
   ]);
 

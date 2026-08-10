@@ -4,15 +4,17 @@ import { requireUser, getProfileId } from "@/lib/actions/common";
 import { getCurrentShift, getShiftSummary, getShifts } from "@/lib/data/shifts";
 import { ShiftPanel } from "../shift-panel";
 import { ShiftsTable } from "./shifts-table";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 export async function ShiftsTab() {
+  const context = await requireStoreContext();
   const t = await getTranslations();
   let openProps: { open: boolean; openingFloat?: number; expected?: number; openedAt?: string } = { open: false };
   try {
     const userId = (await requireUser()).id;
     const profileId = await getProfileId(userId);
     if (profileId) {
-      const cur = await getCurrentShift(profileId);
+      const cur = await getCurrentShift(context.storeId, profileId);
       if (cur) {
         const summary = await getShiftSummary(cur);
         openProps = { open: true, openingFloat: Number(cur.openingFloat), expected: summary.expectedCash ?? 0, openedAt: formatDate(cur.openedAt) };
@@ -20,7 +22,7 @@ export async function ShiftsTab() {
     }
   } catch { /* layout handles auth */ }
 
-  const rows = await getShifts(50);
+  const rows = await getShifts(context.storeId, 50);
 
   return (
     <>

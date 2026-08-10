@@ -599,6 +599,7 @@ export async function importShopeeOrder(input: ImportShopeeOrderInput): Promise<
       })));
       for (const item of isCancelled ? [] : v.items) {
         await consumeTrackedStockLots(tx, {
+          storeId: gate.storeId,
           productId: item.productId,
           warehouseId: warehouse.id,
           quantity: item.quantity,

@@ -4,16 +4,15 @@ import { mobileGate, mobileOk, searchParam } from "@/lib/mobile/response";
 
 export async function GET(request: Request) {
   const gate = await requireMobileSalesAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
-  const list = await getOrders({
+  const list = await getOrders(gate.storeId, {
     q: searchParam(request, "q"),
     status: "completed",
     page: 1,
     pageSize: 10,
   });
-  const details = await Promise.all(list.rows.map((row) => getOrder(row.id)));
+  const details = await Promise.all(list.rows.map((row) => getOrder(gate.storeId, row.id)));
 
   return mobileOk({
     ...list,

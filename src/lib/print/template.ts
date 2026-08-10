@@ -32,8 +32,8 @@ function mapTemplateRow(row: typeof printTemplates.$inferSelect): PrintTemplate 
   };
 }
 
-const getCurrentStoreInfo = cache(async (): Promise<PrintTemplateStoreInfo> => {
-  const store = await getStoreSettings();
+const getCurrentStoreInfo = cache(async (storeId: string): Promise<PrintTemplateStoreInfo> => {
+  const store = await getStoreSettings(storeId);
   return {
     storeName: store.name,
     storeAddress: store.address,
@@ -42,8 +42,8 @@ const getCurrentStoreInfo = cache(async (): Promise<PrintTemplateStoreInfo> => {
   };
 });
 
-export async function getPrintTemplateStoreInfo(): Promise<PrintTemplateStoreInfo> {
-  return getCurrentStoreInfo();
+export async function getPrintTemplateStoreInfo(storeId: string): Promise<PrintTemplateStoreInfo> {
+  return getCurrentStoreInfo(storeId);
 }
 
 function withStoreDefaults(template: PrintTemplate, store: PrintTemplateStoreInfo): PrintTemplate {
@@ -56,13 +56,13 @@ function withStoreDefaults(template: PrintTemplate, store: PrintTemplateStoreInf
   };
 }
 
-export async function getPrintTemplate(docType: PrintDocType, templateId?: string | null): Promise<PrintTemplate> {
-  const store = await getCurrentStoreInfo();
+export async function getPrintTemplate(storeId: string, docType: PrintDocType, templateId?: string | null): Promise<PrintTemplate> {
+  const store = await getCurrentStoreInfo(storeId);
   if (templateId && !templateId.startsWith("default-")) {
     const [selected] = await db
       .select()
       .from(printTemplates)
-      .where(and(eq(printTemplates.id, templateId), eq(printTemplates.docType, docType), eq(printTemplates.isActive, true)))
+      .where(and(eq(printTemplates.storeId, storeId), eq(printTemplates.id, templateId), eq(printTemplates.docType, docType), eq(printTemplates.isActive, true)))
       .limit(1);
     if (selected) return withStoreDefaults(mapTemplateRow(selected), store);
   }
@@ -70,27 +70,28 @@ export async function getPrintTemplate(docType: PrintDocType, templateId?: strin
   const [row] = await db
     .select()
     .from(printTemplates)
-    .where(and(eq(printTemplates.docType, docType), eq(printTemplates.isActive, true)))
+    .where(and(eq(printTemplates.storeId, storeId), eq(printTemplates.docType, docType), eq(printTemplates.isActive, true)))
     .orderBy(desc(printTemplates.isDefault), asc(printTemplates.sortOrder), asc(printTemplates.name))
     .limit(1);
   return row ? withStoreDefaults(mapTemplateRow(row), store) : defaultTemplate(docType, store);
 }
 
-export async function getPrintTemplatesForDoc(docType: PrintDocType): Promise<PrintTemplate[]> {
-  const store = await getCurrentStoreInfo();
+export async function getPrintTemplatesForDoc(storeId: string, docType: PrintDocType): Promise<PrintTemplate[]> {
+  const store = await getCurrentStoreInfo(storeId);
   const rows = await db
     .select()
     .from(printTemplates)
-    .where(and(eq(printTemplates.docType, docType), eq(printTemplates.isActive, true)))
+    .where(and(eq(printTemplates.storeId, storeId), eq(printTemplates.docType, docType), eq(printTemplates.isActive, true)))
     .orderBy(desc(printTemplates.isDefault), asc(printTemplates.sortOrder), asc(printTemplates.name));
   return rows.length > 0 ? rows.map((row) => withStoreDefaults(mapTemplateRow(row), store)) : [defaultTemplate(docType, store)];
 }
 
-export async function getAllPrintTemplates(): Promise<PrintTemplate[]> {
-  const store = await getCurrentStoreInfo();
+export async function getAllPrintTemplates(storeId: string): Promise<PrintTemplate[]> {
+  const store = await getCurrentStoreInfo(storeId);
   const rows = await db
     .select()
     .from(printTemplates)
+    .where(eq(printTemplates.storeId, storeId))
     .orderBy(asc(printTemplates.docType), desc(printTemplates.isDefault), asc(printTemplates.sortOrder), asc(printTemplates.name));
   const templates = rows.map((row) => withStoreDefaults(mapTemplateRow(row), store));
   const hasDocType = new Set(templates.map((template) => template.docType));

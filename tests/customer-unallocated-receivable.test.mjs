@@ -5,6 +5,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 
 const project = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const STORE_ID = "00000000-0000-4000-8000-000000000001";
 const schema = await import(`${project}/src/db/schema.ts`);
 const { collectCustomerReceivable } = await import(
   `${project}/src/lib/receivables/service-core.ts`
@@ -33,7 +34,7 @@ const result = await collectCustomerReceivable(database, {
   method: "cash",
   allocations: [],
   clientRequestId: "customer-unallocated-001",
-}, { profileId: null, shiftId: null });
+}, { storeId: STORE_ID, profileId: null, shiftId: null });
 
 assert.equal(result.ok, true);
 const [updated] = await database
@@ -56,7 +57,7 @@ const advance = await collectCustomerReceivable(database, {
   method: "bank_transfer",
   allocations: [],
   clientRequestId: "customer-unallocated-advance-002",
-}, { profileId: null, shiftId: null });
+}, { storeId: STORE_ID, profileId: null, shiftId: null });
 assert.equal(advance.ok, true);
 const [afterAdvance] = await database
   .select({ currentDebt: schema.customers.currentDebt })

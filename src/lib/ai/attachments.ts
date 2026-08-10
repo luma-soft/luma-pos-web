@@ -64,10 +64,10 @@ function unsupportedResult(message: string): AiAttachmentParseResult {
   };
 }
 
-async function downloadAttachment(input: AiAttachmentMetadata, userId: string) {
-  const bucket = input.bucket || await getAiAttachmentsBucket();
+async function downloadAttachment(input: AiAttachmentMetadata, storeId: string, userId: string) {
+  const bucket = input.bucket || await getAiAttachmentsBucket(storeId);
   const path = input.path || input.id;
-  if (!path || !path.startsWith(`${userId}/`)) {
+  if (!path || !path.startsWith(`stores/${storeId}/users/${userId}/`)) {
     throw new Error("ATTACHMENT_FORBIDDEN");
   }
   const supabase = createSupabaseAdminClient();
@@ -78,14 +78,15 @@ async function downloadAttachment(input: AiAttachmentMetadata, userId: string) {
 
 export async function parseAiAttachment(input: {
   attachment: AiAttachmentMetadata;
+  storeId: string;
   userId: string;
   prompt?: string;
 }): Promise<ParsedAiAttachment> {
-  const { attachment, userId, prompt } = input;
+  const { attachment, storeId, userId, prompt } = input;
   const mimeType = attachment.mimeType || "";
   let result: AiAttachmentParseResult;
   try {
-    const bytes = await downloadAttachment(attachment, userId);
+    const bytes = await downloadAttachment(attachment, storeId, userId);
     if (mimeType.startsWith("image/")) {
       result = await parseAiAttachmentWithProvider({
         name: attachment.name || "image",

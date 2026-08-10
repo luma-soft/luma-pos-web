@@ -57,7 +57,7 @@ export async function createPurchase(
 
   try {
     const profileId = await getProfileId(userId);
-    const currentShift = profileId ? await getCurrentShift(profileId) : null;
+    const currentShift = profileId ? await getCurrentShift(gate.storeId, profileId) : null;
 
     const result = await db.transaction(async (tx) => {
       // validate product ids tồn tại
@@ -66,12 +66,13 @@ export async function createPurchase(
         id: products.id,
         trackBatches: products.trackBatches,
         shelfLifeDays: products.shelfLifeDays,
-      }).from(products).where(inArray(products.id, ids));
+      }).from(products).where(and(eq(products.storeId, gate.storeId), inArray(products.id, ids)));
       if (found.length !== new Set(ids).size) throw new Error("PRODUCT_NOT_FOUND");
       const batchValidation = validateReceiptBatchLines({ products: found, items: v.items });
       if (!batchValidation.ok) throw new Error(batchValidation.error);
 
       const [po] = await tx.insert(purchaseOrders).values({
+        storeId: gate.storeId,
         code: generateCode("PN"),
         supplierId: v.supplierId,
         warehouseId: v.warehouseId,
@@ -90,6 +91,7 @@ export async function createPurchase(
       const receiptItems: { id: string }[] = [];
       for (const i of v.items) {
         const [receiptItem] = await tx.insert(purchaseOrderItems).values({
+          storeId: gate.storeId,
           purchaseOrderId: po.id,
           productId: i.productId,
           quantity: toQty(i.quantity),
@@ -106,12 +108,13 @@ export async function createPurchase(
         await tx
           .insert(stockLevels)
           .values({
+            storeId: gate.storeId,
             productId: i.productId,
             warehouseId: v.warehouseId,
             quantity: toQty(i.quantity),
           })
           .onConflictDoUpdate({
-            target: [stockLevels.productId, stockLevels.warehouseId],
+            target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
             set: {
               quantity: sql`${stockLevels.quantity} + ${toQty(i.quantity)}`,
               updatedAt: sql`now()`,
@@ -119,6 +122,7 @@ export async function createPurchase(
           });
 
         await tx.insert(stockMovements).values({
+          storeId: gate.storeId,
           productId: i.productId,
           warehouseId: v.warehouseId,
           type: "purchase",
@@ -133,6 +137,7 @@ export async function createPurchase(
         const productPolicy = found.find((product) => product.id === i.productId);
         if (productPolicy?.trackBatches) {
           const [lot] = await tx.insert(stockLots).values({
+            storeId: gate.storeId,
             productId: i.productId,
             warehouseId: v.warehouseId,
             purchaseOrderItemId: receiptItems[index].id,
@@ -158,27 +163,28 @@ export async function createPurchase(
           costPrice: toMoney(netUnit),
           lastPurchasePrice: toMoney(i.unitCost),
           updatedAt: sql`now()`,
-        }).where(eq(products.id, i.productId));
+        }).where(and(eq(products.storeId, gate.storeId), eq(products.id, i.productId)));
 
         // tự gắn NCC vào SP (import từ nhập hàng) — không trùng
         await tx.insert(productSuppliers)
-          .values({ productId: i.productId, supplierId: v.supplierId, costPrice: toMoney(i.unitCost) })
+          .values({ storeId: gate.storeId, productId: i.productId, supplierId: v.supplierId, costPrice: toMoney(i.unitCost) })
           .onConflictDoNothing();
       }
 
       // đặt NCC chính cho SP chưa có NCC chính
       await tx.update(products)
         .set({ supplierId: v.supplierId })
-        .where(and(inArray(products.id, v.items.map((i) => i.productId)), isNull(products.supplierId)));
+        .where(and(eq(products.storeId, gate.storeId), inArray(products.id, v.items.map((i) => i.productId)), isNull(products.supplierId)));
 
       if (totals.owed > 0) {
         await tx.update(suppliers).set({
           currentDebt: sql`${suppliers.currentDebt} + ${toMoney(totals.owed)}`,
-        }).where(eq(suppliers.id, v.supplierId));
+        }).where(and(eq(suppliers.storeId, gate.storeId), eq(suppliers.id, v.supplierId)));
       }
 
       if (totals.paid > 0) {
         await recordCashTx(tx, {
+          storeId: gate.storeId,
           type: "out", fund: "cash", amount: totals.paid,
           category: "supplier_payment", refType: "purchase", refId: po.id,
           note: `Trả NCC ${po.code}`, createdBy: profileId, shiftId: currentShift?.id ?? null,
@@ -232,10 +238,10 @@ export async function updatePurchase(
 
   try {
     const profileId = await getProfileId(userId);
-    const currentShift = profileId ? await getCurrentShift(profileId) : null;
+    const currentShift = profileId ? await getCurrentShift(gate.storeId, profileId) : null;
 
     const result = await db.transaction(async (tx) => {
-      const [po] = await tx.select().from(purchaseOrders).where(eq(purchaseOrders.id, v.id)).limit(1);
+      const [po] = await tx.select().from(purchaseOrders).where(and(eq(purchaseOrders.storeId, gate.storeId), eq(purchaseOrders.id, v.id))).limit(1);
       if (!po) throw new Error("PURCHASE_NOT_FOUND");
       if (po.status !== "received" && po.status !== "draft") throw new Error("NOT_EDITABLE");
 
@@ -244,14 +250,14 @@ export async function updatePurchase(
         id: products.id,
         trackBatches: products.trackBatches,
         shelfLifeDays: products.shelfLifeDays,
-      }).from(products).where(inArray(products.id, ids));
+      }).from(products).where(and(eq(products.storeId, gate.storeId), inArray(products.id, ids)));
       if (found.length !== new Set(ids).size) throw new Error("PRODUCT_NOT_FOUND");
       const batchValidation = validateReceiptBatchLines({ products: found, items: v.items });
       if (!batchValidation.ok) throw new Error(batchValidation.error);
 
-      const oldItems = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, po.id));
+      const oldItems = await tx.select().from(purchaseOrderItems).where(and(eq(purchaseOrderItems.storeId, gate.storeId), eq(purchaseOrderItems.purchaseOrderId, po.id)));
       const oldLots = oldItems.length > 0
-        ? await tx.select().from(stockLots).where(inArray(stockLots.purchaseOrderItemId, oldItems.map((item) => item.id)))
+        ? await tx.select().from(stockLots).where(and(eq(stockLots.storeId, gate.storeId), inArray(stockLots.purchaseOrderItemId, oldItems.map((item) => item.id))))
         : [];
       if (oldLots.some((lot) => Number(lot.availableQuantity) < Number(lot.receivedQuantity))) {
         throw new Error("BATCH_ALREADY_CONSUMED");
@@ -265,9 +271,10 @@ export async function updatePurchase(
           await tx.update(stockLevels).set({
             quantity: sql`${stockLevels.quantity} - ${toQty(qty)}`,
             updatedAt: sql`now()`,
-          }).where(and(eq(stockLevels.productId, i.productId), eq(stockLevels.warehouseId, po.warehouseId)));
+          }).where(and(eq(stockLevels.storeId, gate.storeId), eq(stockLevels.productId, i.productId), eq(stockLevels.warehouseId, po.warehouseId)));
 
           await tx.insert(stockMovements).values({
+            storeId: gate.storeId,
             productId: i.productId,
             warehouseId: po.warehouseId,
             type: "return_out",
@@ -282,12 +289,13 @@ export async function updatePurchase(
       }
 
       if (oldLots.length > 0) {
-        await tx.delete(stockLots).where(inArray(stockLots.id, oldLots.map((lot) => lot.id)));
+        await tx.delete(stockLots).where(and(eq(stockLots.storeId, gate.storeId), inArray(stockLots.id, oldLots.map((lot) => lot.id))));
       }
-      await tx.delete(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, po.id));
+      await tx.delete(purchaseOrderItems).where(and(eq(purchaseOrderItems.storeId, gate.storeId), eq(purchaseOrderItems.purchaseOrderId, po.id)));
       const receiptItems: { id: string }[] = [];
       for (const i of v.items) {
         const [receiptItem] = await tx.insert(purchaseOrderItems).values({
+          storeId: gate.storeId,
           purchaseOrderId: po.id,
           productId: i.productId,
           quantity: toQty(i.quantity),
@@ -304,12 +312,13 @@ export async function updatePurchase(
         await tx
           .insert(stockLevels)
           .values({
+            storeId: gate.storeId,
             productId: i.productId,
             warehouseId: v.warehouseId,
             quantity: toQty(i.quantity),
           })
           .onConflictDoUpdate({
-            target: [stockLevels.productId, stockLevels.warehouseId],
+            target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
             set: {
               quantity: sql`${stockLevels.quantity} + ${toQty(i.quantity)}`,
               updatedAt: sql`now()`,
@@ -317,6 +326,7 @@ export async function updatePurchase(
           });
 
         await tx.insert(stockMovements).values({
+          storeId: gate.storeId,
           productId: i.productId,
           warehouseId: v.warehouseId,
           type: "purchase",
@@ -331,6 +341,7 @@ export async function updatePurchase(
         const productPolicy = found.find((product) => product.id === i.productId);
         if (productPolicy?.trackBatches) {
           const [lot] = await tx.insert(stockLots).values({
+            storeId: gate.storeId,
             productId: i.productId,
             warehouseId: v.warehouseId,
             purchaseOrderItemId: receiptItems[index].id,
@@ -355,16 +366,16 @@ export async function updatePurchase(
           costPrice: toMoney(netUnit),
           lastPurchasePrice: toMoney(i.unitCost),
           updatedAt: sql`now()`,
-        }).where(eq(products.id, i.productId));
+        }).where(and(eq(products.storeId, gate.storeId), eq(products.id, i.productId)));
 
         await tx.insert(productSuppliers)
-          .values({ productId: i.productId, supplierId: v.supplierId, costPrice: toMoney(i.unitCost) })
+          .values({ storeId: gate.storeId, productId: i.productId, supplierId: v.supplierId, costPrice: toMoney(i.unitCost) })
           .onConflictDoNothing();
       }
 
       await tx.update(products)
         .set({ supplierId: v.supplierId })
-        .where(and(inArray(products.id, v.items.map((i) => i.productId)), isNull(products.supplierId)));
+        .where(and(eq(products.storeId, gate.storeId), inArray(products.id, v.items.map((i) => i.productId)), isNull(products.supplierId)));
 
       let debtDelta = 0;
       let relatedAdjustments:
@@ -376,7 +387,7 @@ export async function updatePurchase(
           const [supplier] = await tx
             .select({ currentDebt: suppliers.currentDebt })
             .from(suppliers)
-            .where(eq(suppliers.id, v.supplierId))
+            .where(and(eq(suppliers.storeId, gate.storeId), eq(suppliers.id, v.supplierId)))
             .limit(1)
             .for("update");
           debtDelta = debtDiff < 0
@@ -384,13 +395,13 @@ export async function updatePurchase(
             : debtDiff;
           await tx.update(suppliers).set({
             currentDebt: sql`greatest(${suppliers.currentDebt} + ${toMoney(debtDiff)}, 0)`,
-          }).where(eq(suppliers.id, v.supplierId));
+          }).where(and(eq(suppliers.storeId, gate.storeId), eq(suppliers.id, v.supplierId)));
         }
       } else {
         const supplierDebts = await tx
           .select({ id: suppliers.id, currentDebt: suppliers.currentDebt })
           .from(suppliers)
-          .where(inArray(suppliers.id, [po.supplierId, v.supplierId]))
+          .where(and(eq(suppliers.storeId, gate.storeId), inArray(suppliers.id, [po.supplierId, v.supplierId])))
           .for("update");
         const debtBySupplier = new Map(
           supplierDebts.map((supplier) => [supplier.id, Number(supplier.currentDebt)]),
@@ -416,24 +427,26 @@ export async function updatePurchase(
         if (oldOwed > 0) {
           await tx.update(suppliers).set({
             currentDebt: sql`greatest(${suppliers.currentDebt} - ${toMoney(oldOwed)}, 0)`,
-          }).where(eq(suppliers.id, po.supplierId));
+          }).where(and(eq(suppliers.storeId, gate.storeId), eq(suppliers.id, po.supplierId)));
         }
         if (totals.owed > 0) {
           await tx.update(suppliers).set({
             currentDebt: sql`${suppliers.currentDebt} + ${toMoney(totals.owed)}`,
-          }).where(eq(suppliers.id, v.supplierId));
+          }).where(and(eq(suppliers.storeId, gate.storeId), eq(suppliers.id, v.supplierId)));
         }
       }
 
       const paidDiff = totals.paid - oldPaid;
       if (paidDiff > 1e-9) {
         await recordCashTx(tx, {
+          storeId: gate.storeId,
           type: "out", fund: "cash", amount: paidDiff,
           category: "supplier_payment", refType: "purchase_edit", refId: po.id,
           note: `Trả thêm NCC ${po.code}`, createdBy: profileId, shiftId: currentShift?.id ?? null,
         });
       } else if (paidDiff < -1e-9) {
         await recordCashTx(tx, {
+          storeId: gate.storeId,
           type: "in", fund: "cash", amount: Math.abs(paidDiff),
           category: "supplier_payment", refType: "purchase_edit", refId: po.id,
           note: `Giảm tiền đã trả NCC ${po.code}`, createdBy: profileId, shiftId: currentShift?.id ?? null,
@@ -455,7 +468,7 @@ export async function updatePurchase(
           invoiceNumber: v.invoiceNumber?.trim()?.slice(0, 50) || null,
           note: v.note || null,
         })
-        .where(eq(purchaseOrders.id, po.id))
+        .where(and(eq(purchaseOrders.storeId, gate.storeId), eq(purchaseOrders.id, po.id)))
         .returning({
           committedAt: sql<string>`
             to_char(
@@ -525,34 +538,35 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
 
   try {
     const profileId = await getProfileId(userId);
-    const currentShift = profileId ? await getCurrentShift(profileId) : null;
+    const currentShift = profileId ? await getCurrentShift(gate.storeId, profileId) : null;
 
     const result = await db.transaction(async (tx) => {
-      const [po] = await tx.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)).limit(1);
+      const [po] = await tx.select().from(purchaseOrders).where(and(eq(purchaseOrders.storeId, gate.storeId), eq(purchaseOrders.id, id))).limit(1);
       if (!po) throw new Error("PURCHASE_NOT_FOUND");
       if (po.status === "cancelled") throw new Error("ALREADY_CANCELLED");
       if (po.status === "returned") throw new Error("NOT_EDITABLE");
 
       let debtNotification = null;
       if (po.status === "received") {
-        const items = await tx.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, po.id));
+        const items = await tx.select().from(purchaseOrderItems).where(and(eq(purchaseOrderItems.storeId, gate.storeId), eq(purchaseOrderItems.purchaseOrderId, po.id)));
         const receiptLots = items.length > 0
-          ? await tx.select().from(stockLots).where(inArray(stockLots.purchaseOrderItemId, items.map((item) => item.id)))
+          ? await tx.select().from(stockLots).where(and(eq(stockLots.storeId, gate.storeId), inArray(stockLots.purchaseOrderItemId, items.map((item) => item.id))))
           : [];
         if (receiptLots.some((lot) => Number(lot.availableQuantity) < Number(lot.receivedQuantity))) {
           throw new Error("BATCH_ALREADY_CONSUMED");
         }
         if (receiptLots.length > 0) {
-          await tx.delete(stockLots).where(inArray(stockLots.id, receiptLots.map((lot) => lot.id)));
+          await tx.delete(stockLots).where(and(eq(stockLots.storeId, gate.storeId), inArray(stockLots.id, receiptLots.map((lot) => lot.id))));
         }
         for (const i of items) {
           const qty = Number(i.quantity);
           await tx.update(stockLevels).set({
             quantity: sql`${stockLevels.quantity} - ${toQty(qty)}`,
             updatedAt: sql`now()`,
-          }).where(and(eq(stockLevels.productId, i.productId), eq(stockLevels.warehouseId, po.warehouseId)));
+          }).where(and(eq(stockLevels.storeId, gate.storeId), eq(stockLevels.productId, i.productId), eq(stockLevels.warehouseId, po.warehouseId)));
 
           await tx.insert(stockMovements).values({
+            storeId: gate.storeId,
             productId: i.productId,
             warehouseId: po.warehouseId,
             type: "return_out",
@@ -570,17 +584,18 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
         const [supplier] = await tx
           .select({ currentDebt: suppliers.currentDebt })
           .from(suppliers)
-          .where(eq(suppliers.id, po.supplierId))
+          .where(and(eq(suppliers.storeId, gate.storeId), eq(suppliers.id, po.supplierId)))
           .limit(1)
           .for("update");
         const debtDelta = -Math.min(Number(supplier?.currentDebt ?? 0), owed);
         if (owed > 0) {
           await tx.update(suppliers).set({
             currentDebt: sql`greatest(${suppliers.currentDebt} - ${toMoney(owed)}, 0)`,
-          }).where(eq(suppliers.id, po.supplierId));
+          }).where(and(eq(suppliers.storeId, gate.storeId), eq(suppliers.id, po.supplierId)));
         }
         if (paid > 0) {
           await recordCashTx(tx, {
+            storeId: gate.storeId,
             type: "in", fund: "cash", amount: paid,
             category: "supplier_payment", refType: "purchase_cancel", refId: po.id,
             note: `Hoàn tiền đã trả do hủy ${po.code}`, createdBy: profileId, shiftId: currentShift?.id ?? null,
@@ -596,7 +611,7 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
         });
       }
 
-      await tx.update(purchaseOrders).set({ status: "cancelled" }).where(eq(purchaseOrders.id, po.id));
+      await tx.update(purchaseOrders).set({ status: "cancelled" }).where(and(eq(purchaseOrders.storeId, gate.storeId), eq(purchaseOrders.id, po.id)));
       return { debtNotification };
     });
 

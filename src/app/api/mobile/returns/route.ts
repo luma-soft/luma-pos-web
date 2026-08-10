@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     return mobileError(invalidReason ? "returns.errors.invalidReason" : "errors.invalidData", 400);
   }
   const { page, pageSize } = parsed.data;
-  const result = await getReturns(parsed.data);
+  const result = await getReturns(gate.storeId, parsed.data);
   return mobileOk({
     returns: result.rows,
     total: result.total,

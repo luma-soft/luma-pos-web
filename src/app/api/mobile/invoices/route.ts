@@ -10,11 +10,10 @@ import {
 
 export async function GET(request: Request) {
   const gate = await requireMobileSalesAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   return mobileOk(
-    await getOrders({
+    await getOrders(gate.storeId, {
       q: searchParam(request, "q"),
       status: searchParam(request, "status") as OrderStatusFilter | undefined,
       payment: searchParam(request, "payment") as

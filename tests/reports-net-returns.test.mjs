@@ -6,6 +6,7 @@ import { drizzle } from "drizzle-orm/pglite";
 const project = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const schema = await import(`${project}/src/db/schema.ts`);
 const { getReportsForDatabase } = await import(`${project}/src/lib/data/reports.ts`);
+const STORE_ID = "00000000-0000-4000-8000-000000000001";
 
 const client = new PGlite();
 const database = drizzle(client, { schema });
@@ -14,7 +15,7 @@ await client.exec("create role anon; create role authenticated;");
 for (const file of readdirSync(`${project}/drizzle`).filter((name) => name.endsWith(".sql")).sort()) {
   for (const statement of readFileSync(`${project}/drizzle/${file}`, "utf8").split("--> statement-breakpoint")) {
     const sql = statement.trim();
-    if (sql && !/create extension/i.test(sql)) await client.exec(sql);
+    if (sql && !/create extension|gin_trgm_ops/i.test(sql)) await client.exec(sql);
   }
 }
 
@@ -69,7 +70,7 @@ await database.insert(schema.returnItems).values({
   total: "100.00",
 });
 
-const report = await getReportsForDatabase(database, 1);
+const report = await getReportsForDatabase(database, STORE_ID, 1);
 const today = new Date().toISOString().slice(0, 10);
 
 assert.equal(report.summary.revenue, -100);

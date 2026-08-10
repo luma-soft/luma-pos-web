@@ -12,7 +12,7 @@ function businessDate() {
   }).format(new Date());
 }
 
-export async function getExpiryStockAlerts(warningDays = 30, limit = 50) {
+export async function getExpiryStockAlerts(storeId: string, warningDays = 30, limit = 50) {
   const safeWarningDays = Math.max(1, Math.min(365, Math.round(warningDays)));
   const safeLimit = Math.max(1, Math.min(200, Math.round(limit)));
   const rows = await db
@@ -33,6 +33,7 @@ export async function getExpiryStockAlerts(warningDays = 30, limit = 50) {
     .innerJoin(products, eq(products.id, stockLots.productId))
     .innerJoin(warehouses, eq(warehouses.id, stockLots.warehouseId))
     .where(and(
+      eq(stockLots.storeId, storeId),
       gt(stockLots.availableQuantity, "0"),
       eq(products.isActive, true),
       or(

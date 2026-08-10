@@ -17,6 +17,7 @@ import { Text } from "@/components/ui/text";
 import { ReportCustomersTable, ReportEmployeesTable, ReportProductsTable } from "./report-detail-tables";
 import { ReportInvoicesTable } from "./report-invoices-table";
 import { ReportPeriodFilter, type ReportPeriod } from "./report-period-filter";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 interface PageProps {
   searchParams: Promise<{
@@ -45,6 +46,7 @@ const REPORT_TABS = [
 const REPORT_FILTER_PARAMS = ["period", "range", "from", "to", "customerId", "customer", "q", "source"] as const;
 
 export default async function ReportsPage({ searchParams }: PageProps) {
+  const context = await requireStoreContext();
   const t = await getTranslations();
   const params = await searchParams;
   const activeTab = REPORT_TABS.find((item) => item.tab === params.tab)?.tab ?? "overview";
@@ -62,18 +64,18 @@ export default async function ReportsPage({ searchParams }: PageProps) {
     to: dateRange.toExclusive,
   };
   const [data, invoiceResult, productResult, customerResult, employeeResult] = await Promise.all([
-    getReports(dateRange.rangeDays, filters),
+    getReports(context.storeId, dateRange.rangeDays, filters),
     activeTab === "invoices"
-      ? getReportInvoices(dateRange.rangeDays, filters, page, pageSize)
+      ? getReportInvoices(context.storeId, dateRange.rangeDays, filters, page, pageSize)
       : Promise.resolve(null),
     activeTab === "products"
-      ? getReportProducts(dateRange.rangeDays, filters, page, pageSize)
+      ? getReportProducts(context.storeId, dateRange.rangeDays, filters, page, pageSize)
       : Promise.resolve(null),
     activeTab === "customers"
-      ? getReportCustomers(dateRange.rangeDays, filters, page, pageSize)
+      ? getReportCustomers(context.storeId, dateRange.rangeDays, filters, page, pageSize)
       : Promise.resolve(null),
     activeTab === "employees"
-      ? getReportEmployees(dateRange.rangeDays, filters, page, pageSize)
+      ? getReportEmployees(context.storeId, dateRange.rangeDays, filters, page, pageSize)
       : Promise.resolve(null),
   ]);
   const filterLabel = filters.customer || filters.q || (filters.customerId ? `ID ${filters.customerId.slice(0, 8)}` : "");

@@ -29,12 +29,12 @@ function rangeStart(range: DashboardRange): Date {
   return d;
 }
 
-export async function getDashboard(requestedRange?: DashboardRange) {
+export async function getDashboard(storeId: string, requestedRange?: DashboardRange) {
   const range = resolveDashboardRange(requestedRange);
   const since = rangeStart(range);
   // chỉ đơn bán thật: loại quote/merged/cancelled/draft
   const realSale = inArray(orders.status, ["completed", "returned"]);
-  const inRange = and(realSale, gte(orders.createdAt, since));
+  const inRange = and(eq(orders.storeId, storeId), realSale, gte(orders.createdAt, since));
   const orderBucketKey = range === "today"
     ? sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD-HH24')`
     : sql<string>`to_char(${orders.createdAt}, 'YYYY-MM-DD')`;
@@ -81,7 +81,7 @@ export async function getDashboard(requestedRange?: DashboardRange) {
 
     db.select({
       refundTotal: sql<string>`coalesce(sum(${returns.totalRefund}), 0)`,
-    }).from(returns).where(and(gte(returns.createdAt, since), eq(returns.status, "completed"))),
+    }).from(returns).where(and(eq(returns.storeId, storeId), gte(returns.createdAt, since), eq(returns.status, "completed"))),
 
     db.select({
       returnedProfit: sql<string>`coalesce(sum(${returnItems.total} - (${returnItems.quantity} * ${returnItems.unitMultiplier} * ${products.costPrice})), 0)`,
@@ -89,22 +89,22 @@ export async function getDashboard(requestedRange?: DashboardRange) {
       .from(returnItems)
       .innerJoin(returns, eq(returnItems.returnId, returns.id))
       .innerJoin(products, eq(returnItems.productId, products.id))
-      .where(and(gte(returns.createdAt, since), eq(returns.status, "completed"))),
+      .where(and(eq(returns.storeId, storeId), gte(returns.createdAt, since), eq(returns.status, "completed"))),
 
     db.select({
       totalDebt: sql<string>`coalesce(sum(${customers.currentDebt}), 0)`,
       debtors: sql<number>`count(*) filter (where ${customers.currentDebt} > 0)::int`,
-    }).from(customers).where(eq(customers.isActive, true)),
+    }).from(customers).where(and(eq(customers.storeId, storeId), eq(customers.isActive, true))),
 
     db.select({
       count: sql<number>`count(*)::int`,
-    }).from(orders).where(inArray(orders.status, ["draft", "quote", "confirmed", "delivering"])),
+    }).from(orders).where(and(eq(orders.storeId, storeId), inArray(orders.status, ["draft", "quote", "confirmed", "delivering"]))),
 
     db.select({ id: products.id })
       .from(products)
       .leftJoin(stockLevels, eq(stockLevels.productId, products.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
-      .where(and(eq(products.isActive, true), stockManagedCategoryCondition()))
+      .where(and(eq(products.storeId, storeId), eq(products.isActive, true), stockManagedCategoryCondition()))
       .groupBy(products.id)
       .having(sql`coalesce(sum(${stockLevels.quantity}), 0) <= coalesce(max(${stockLevels.minLevel}), 0) and coalesce(max(${stockLevels.minLevel}), 0) > 0`),
 
@@ -123,7 +123,7 @@ export async function getDashboard(requestedRange?: DashboardRange) {
       .from(products)
       .leftJoin(stockLevels, eq(stockLevels.productId, products.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
-      .where(and(eq(products.isActive, true), stockManagedCategoryCondition()))
+      .where(and(eq(products.storeId, storeId), eq(products.isActive, true), stockManagedCategoryCondition()))
       .groupBy(products.id, categories.name)
       .having(sql`coalesce(sum(${stockLevels.quantity}), 0) <= coalesce(max(${stockLevels.minLevel}), 0) and coalesce(max(${stockLevels.minLevel}), 0) > 0`)
       .orderBy(sql`coalesce(sum(${stockLevels.quantity}), 0) / nullif(coalesce(max(${stockLevels.minLevel}), 0), 0)`)
@@ -143,7 +143,7 @@ export async function getDashboard(requestedRange?: DashboardRange) {
     })
       .from(orders)
       .leftJoin(customers, eq(orders.customerId, customers.id))
-      .where(realSale)
+      .where(and(eq(orders.storeId, storeId), realSale))
       .orderBy(desc(orders.createdAt))
       .limit(4),
 
@@ -154,7 +154,7 @@ export async function getDashboard(requestedRange?: DashboardRange) {
       debtLimit: customers.debtLimit,
     })
       .from(customers)
-      .where(sql`${customers.currentDebt} > 0`)
+      .where(and(eq(customers.storeId, storeId), sql`${customers.currentDebt} > 0`))
       .orderBy(desc(customers.currentDebt))
       .limit(3),
 
@@ -174,7 +174,7 @@ export async function getDashboard(requestedRange?: DashboardRange) {
       refund: sql<string>`coalesce(sum(${returns.totalRefund}), 0)`,
     })
       .from(returns)
-      .where(and(gte(returns.createdAt, since), eq(returns.status, "completed")))
+      .where(and(eq(returns.storeId, storeId), gte(returns.createdAt, since), eq(returns.status, "completed")))
       .groupBy(returnBucketKey, returnBucketLabel)
       .orderBy(returnBucketKey),
 
@@ -198,7 +198,7 @@ export async function getDashboard(requestedRange?: DashboardRange) {
       .from(returnItems)
       .innerJoin(returns, eq(returnItems.returnId, returns.id))
       .innerJoin(products, eq(returnItems.productId, products.id))
-      .where(and(gte(returns.createdAt, since), eq(returns.status, "completed")))
+      .where(and(eq(returns.storeId, storeId), gte(returns.createdAt, since), eq(returns.status, "completed")))
       .groupBy(returnBucketKey, returnBucketLabel)
       .orderBy(returnBucketKey),
   ]);

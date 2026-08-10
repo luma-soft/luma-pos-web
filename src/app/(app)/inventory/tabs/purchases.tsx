@@ -12,6 +12,7 @@ import { PurchasesTable } from "./purchases-table";
 import { getPrintTemplatesForDoc } from "@/lib/print/template";
 import { InventoryFilterDrawer } from "./inventory-filter-drawer";
 import { ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 type SP = Record<string, string | undefined>;
 const PSTATUS = ["", "draft", "received", "returned", "cancelled"] as const;
@@ -27,15 +28,16 @@ export async function PurchasesTab({ searchParams }: { searchParams: SP }) {
 }
 
 async function PurchasesContent({ searchParams }: { searchParams: SP }) {
+  const context = await requireStoreContext();
   const t = await getTranslations();
   const params = searchParams;
   const page = Number(params.page) || 1;
   const pageSize = parsePageSize(params.size);
   const status = PSTATUS.includes(params.status as typeof PSTATUS[number]) ? (params.status ?? "") : "";
   const [{ rows, total, pageCount }, printTemplates, options] = await Promise.all([
-    getPurchases({ q: params.q, status: status || undefined, supplierId: params.supplierId, warehouseId: params.warehouseId, from: params.from, to: params.to, debtOnly: params.debtOnly === "1", page, pageSize }),
-    getPrintTemplatesForDoc("purchase"),
-    getPurchaseFormOptions(),
+    getPurchases(context.storeId, { q: params.q, status: status || undefined, supplierId: params.supplierId, warehouseId: params.warehouseId, from: params.from, to: params.to, debtOnly: params.debtOnly === "1", page, pageSize }),
+    getPrintTemplatesForDoc(context.storeId, "purchase"),
+    getPurchaseFormOptions(context.storeId),
   ]);
 
   return (

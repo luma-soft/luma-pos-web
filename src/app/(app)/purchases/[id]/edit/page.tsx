@@ -1,17 +1,20 @@
 import { notFound } from "next/navigation";
 import { getPurchase, getPurchaseFormOptions, getPurchaseProductRowsByIds } from "@/lib/data/inventory";
 import { PurchaseForm } from "../../new/purchase-form";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 export const dynamic = "force-dynamic";
 
 export default async function EditPurchasePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const purchase = await getPurchase(id).catch(() => null);
+  const context = await requireStoreContext();
+  const purchase = await getPurchase(context.storeId, id).catch(() => null);
   if (!purchase || (purchase.status !== "received" && purchase.status !== "draft")) notFound();
 
   const [options, initialProducts] = await Promise.all([
-    getPurchaseFormOptions(),
+    getPurchaseFormOptions(context.storeId),
     getPurchaseProductRowsByIds(
+      context.storeId,
       purchase.items.map((i) => i.productId),
       { includeInactive: true },
     ),

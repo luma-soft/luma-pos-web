@@ -18,11 +18,10 @@ import {
 
 export async function GET(request: Request) {
   const gate = await requireMobileStockReadAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const [purchaseReturns, options] = await Promise.all([
-    getPurchaseReturns({
+    getPurchaseReturns(gate.storeId, {
       q: searchParam(request, "q"),
       status: searchParam(request, "status"),
       settlement: searchParam(request, "settlement"),
@@ -33,7 +32,7 @@ export async function GET(request: Request) {
       page: numberParam(request, "page", 1),
       pageSize: numberParam(request, "pageSize", 30),
     }),
-    getPurchaseReturnFormOptions(),
+    getPurchaseReturnFormOptions(gate.storeId),
   ]);
 
   return mobileOk({ purchaseReturns, options });

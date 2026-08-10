@@ -15,12 +15,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const gate = await requireMobileStockAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const { id } = await params;
   if (!isMobileEntityId(id)) return mobileError("errors.notFound", 404);
-  const preview = await getSupplierPreview(id);
+  const preview = await getSupplierPreview(gate.storeId, id);
   if (!preview) return mobileError("errors.notFound", 404);
   return mobileOk(preview);
 }

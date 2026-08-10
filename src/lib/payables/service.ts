@@ -10,11 +10,14 @@ import {
   type SupplierPayableEntryInput,
 } from "@/lib/payables/service-core";
 import { Routes } from "@/lib/routes";
+import { resolveStoreContextForUser } from "@/lib/auth/store-context";
 
 async function actorForUser(userId: string, source: "manual" | "mobile") {
+  const context = await resolveStoreContextForUser(userId);
+  if (!context) throw new Error("UNAUTHORIZED");
   const profileId = await getProfileId(userId);
-  const shift = profileId ? await getCurrentShift(profileId) : null;
-  return { profileId, shiftId: shift?.id ?? null, source };
+  const shift = profileId ? await getCurrentShift(context.storeId, profileId) : null;
+  return { storeId: context.storeId, profileId, shiftId: shift?.id ?? null, source };
 }
 
 export async function paySupplierPayableForUser(

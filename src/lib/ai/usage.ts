@@ -2,6 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { aiUsageCounters, aiUsageEvents } from "@/db/schema";
 import { getAiProviderSettings } from "@/lib/data/settings";
+import { CURRENT_STORE_ID } from "@/lib/tenancy/constants";
 
 export type AiUsageStatus = {
   period: string;
@@ -117,7 +118,7 @@ function toStatus(row: {
 }
 
 export async function getAiUsageStatus(period = currentPeriod()): Promise<AiUsageStatus> {
-  const ai = await getAiProviderSettings();
+  const ai = await getAiProviderSettings(CURRENT_STORE_ID);
   const limit = normalizeLimit(ai.monthlyUsageLimit);
   const [row] = await db
     .insert(aiUsageCounters)

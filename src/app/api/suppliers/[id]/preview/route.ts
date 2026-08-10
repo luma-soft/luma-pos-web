@@ -12,7 +12,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const { id } = await params;
-  const preview = await getSupplierPreview(id);
+  const preview = await getSupplierPreview(gate.storeId, id);
   if (!preview) {
     return NextResponse.json({ ok: false, error: "errors.notFound" }, { status: 404 });
   }

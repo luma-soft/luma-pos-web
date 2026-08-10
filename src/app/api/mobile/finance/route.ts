@@ -1,4 +1,4 @@
-import { and, gte, inArray, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { cashTransactions, purchaseOrders } from "@/db/schema";
 import { getReports } from "@/lib/data/reports";
@@ -17,15 +17,14 @@ function sinceForRange(range?: string) {
 
 export async function GET(request: Request) {
   const gate = await requireMobileManager();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const range = searchParam(request, "range", "month");
   const since = sinceForRange(range);
   const payableStatus = inArray(purchaseOrders.status, ["received", "returned"]);
 
   const [reports, receivables, payableRows, cashRows] = await Promise.all([
-    getReports(range === "today" ? 1 : range === "week" ? 7 : 30),
+    getReports(gate.storeId, range === "today" ? 1 : range === "week" ? 7 : 30),
     getReceivablesSnapshot(),
     db
       .select({
@@ -35,7 +34,7 @@ export async function GET(request: Request) {
         count: sql<number>`count(*)::int`,
       })
       .from(purchaseOrders)
-      .where(and(payableStatus, gte(purchaseOrders.createdAt, since))),
+      .where(and(eq(purchaseOrders.storeId, gate.storeId), payableStatus, gte(purchaseOrders.createdAt, since))),
     db
       .select({
         fund: cashTransactions.fund,
@@ -43,7 +42,7 @@ export async function GET(request: Request) {
         totalOut: sql<string>`coalesce(sum(${cashTransactions.amount}) filter (where ${cashTransactions.type} = 'out'), 0)`,
       })
       .from(cashTransactions)
-      .where(gte(cashTransactions.createdAt, since))
+      .where(and(eq(cashTransactions.storeId, gate.storeId), gte(cashTransactions.createdAt, since)))
       .groupBy(cashTransactions.fund),
   ]);
 

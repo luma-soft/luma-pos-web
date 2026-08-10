@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const { total } = await getReturns({
+  const { total } = await getReturns(gate.storeId, {
     ...parsed.data,
     page: 1,
     pageSize: 1,

@@ -10,11 +10,14 @@ import {
   type ReceivableEntryInput,
 } from "@/lib/receivables/service-core";
 import { Routes } from "@/lib/routes";
+import { resolveStoreContextForUser } from "@/lib/auth/store-context";
 
 async function actorForUser(userId: string) {
+  const context = await resolveStoreContextForUser(userId);
+  if (!context) throw new Error("UNAUTHORIZED");
   const profileId = await getProfileId(userId);
-  const shift = profileId ? await getCurrentShift(profileId) : null;
-  return { profileId, shiftId: shift?.id ?? null };
+  const shift = profileId ? await getCurrentShift(context.storeId, profileId) : null;
+  return { storeId: context.storeId, profileId, shiftId: shift?.id ?? null };
 }
 
 export async function collectCustomerReceivableForUser(userId: string, input: CollectReceivableInput) {

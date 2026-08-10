@@ -159,8 +159,9 @@ function applyCostPriceBooks(rows: CostPriceBookProduct[], costBookIds: string[]
   }
 }
 
-function activeRootCondition() {
+function activeRootCondition(storeId: string) {
   return and(
+    eq(products.storeId, storeId),
     sql`${products.parentProductId} is null`,
     or(
       eq(products.isActive, true),
@@ -174,7 +175,7 @@ function activeRootCondition() {
 }
 
 /** Toàn bộ data POS cần khi mở trang: SP active + đơn vị + tồn kho mặc định, KH, kho. */
-export async function getPosData(options?: {
+export async function getPosData(storeId: string, options?: {
   includeProductIds?: readonly string[];
   includeProductSkus?: readonly string[];
   includeProductCategories?: readonly string[];
@@ -185,6 +186,7 @@ export async function getPosData(options?: {
   const [defaultWh] = await db
     .select({ id: warehouses.id, name: warehouses.name })
     .from(warehouses)
+    .where(eq(warehouses.storeId, storeId))
     .orderBy(desc(warehouses.isDefault))
     .limit(1);
 
@@ -196,7 +198,7 @@ export async function getPosData(options?: {
       .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
-      .where(activeRootCondition())
+      .where(activeRootCondition(storeId))
       .orderBy(...(options?.sort === "created"
         ? [desc(products.createdAt), desc(products.id)] as const
         : recentSaleOrder()))
@@ -207,6 +209,7 @@ export async function getPosData(options?: {
           .from(products)
           .leftJoin(categories, eq(products.categoryId, categories.id))
           .where(and(
+            eq(products.storeId, storeId),
             eq(products.isActive, true),
             or(
               includeProductIds.length ? inArray(products.id, includeProductIds) : undefined,
@@ -225,7 +228,7 @@ export async function getPosData(options?: {
         debtLimit: customers.debtLimit,
       })
       .from(customers)
-      .where(and(eq(customers.isActive, true)))
+      .where(and(eq(customers.storeId, storeId), eq(customers.isActive, true)))
       .orderBy(asc(customers.name))
       .limit(500),
   ]);
@@ -236,7 +239,11 @@ export async function getPosData(options?: {
         .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
         .from(products)
         .leftJoin(categories, eq(products.categoryId, categories.id))
-        .where(and(eq(products.isActive, true), inArray(products.parentProductId, parentIds)))
+        .where(and(
+          eq(products.storeId, storeId),
+          eq(products.isActive, true),
+          inArray(products.parentProductId, parentIds),
+        ))
         .orderBy(...recentSaleOrder())
     : [];
 
@@ -245,7 +252,7 @@ export async function getPosData(options?: {
   for (const p of sourceProductRows) byId.set(p.id, p);
   const productsForPos = [...byId.values()];
 
-  const priceBookRows = await getPriceBooks({
+  const priceBookRows = await getPriceBooks(storeId, {
     includeManagerOnly: options?.role === "owner" || options?.role === "manager",
   });
 
@@ -276,7 +283,11 @@ export async function getPosData(options?: {
         accountName: paymentBankAccounts.accountName,
       })
       .from(paymentBankAccounts)
-      .where(and(eq(paymentBankAccounts.provider, "sepay"), eq(paymentBankAccounts.enabled, true)))
+      .where(and(
+        eq(paymentBankAccounts.storeId, storeId),
+        eq(paymentBankAccounts.provider, "sepay"),
+        eq(paymentBankAccounts.enabled, true),
+      ))
       .orderBy(sql`${paymentBankAccounts.isDefault} desc`, asc(paymentBankAccounts.createdAt))
       .limit(1),
   ]);
@@ -303,10 +314,10 @@ export async function getPosData(options?: {
   };
 }
 
-export async function getMobilePosData(role: Role) {
+export async function getMobilePosData(storeId: string, role: Role) {
   // Reuse the POS dataset so mobile gets the same POS projection,
   // manager-only price books, stock reservations, and product image data.
-  const data = await getPosData({ role, sort: "created" });
+  const data = await getPosData(storeId, { role, sort: "created" });
   return {
     ...data,
     products: data.products.slice(0, 30),
@@ -320,11 +331,12 @@ export async function getMobilePosData(role: Role) {
  * toàn bộ SP active để khớp đúng kết quả như trang Sản phẩm, không bị giới hạn
  * 200 SP của lưới mặc định.
  */
-export async function searchPosProductRows(q: string): Promise<PosProduct[]> {
+export async function searchPosProductRows(storeId: string, q: string): Promise<PosProduct[]> {
   const hasComplianceColumns = await hasProductComplianceColumns();
   const [defaultWh] = await db
     .select({ id: warehouses.id })
     .from(warehouses)
+    .where(eq(warehouses.storeId, storeId))
     .orderBy(desc(warehouses.isDefault))
     .limit(1);
 
@@ -339,14 +351,19 @@ export async function searchPosProductRows(q: string): Promise<PosProduct[]> {
       .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
-      .where(and(eq(products.isActive, true), eq(products.isVariantParent, false), match))
+      .where(and(
+        eq(products.storeId, storeId),
+        eq(products.isActive, true),
+        eq(products.isVariantParent, false),
+        match,
+      ))
       .orderBy(...recentSaleOrder())
       .limit(40),
     db
       .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
-      .where(and(activeRootCondition(), match))
+      .where(and(activeRootCondition(storeId), match))
       .orderBy(...recentSaleOrder())
       .limit(20),
   ]);
@@ -357,7 +374,11 @@ export async function searchPosProductRows(q: string): Promise<PosProduct[]> {
         .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
         .from(products)
         .leftJoin(categories, eq(products.categoryId, categories.id))
-        .where(and(eq(products.isActive, true), inArray(products.parentProductId, parentIds)))
+        .where(and(
+          eq(products.storeId, storeId),
+          eq(products.isActive, true),
+          inArray(products.parentProductId, parentIds),
+        ))
       .orderBy(...recentSaleOrder())
     : [];
 

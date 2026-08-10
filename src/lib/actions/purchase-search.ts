@@ -1,7 +1,7 @@
 "use server";
 
 import { getPurchaseProductRowsByIds, searchPurchaseProductRows, type PurchaseProductRow } from "@/lib/data/inventory";
-import { createClient } from "@/lib/supabase/server";
+import { requireStockAccess } from "./common";
 
 export type PurchaseDraftProductLookup = {
   productId?: string | null;
@@ -63,38 +63,36 @@ function productNameQueries(label: string) {
 /** Tìm sản phẩm cho phiếu nhập (server-side, bỏ dấu, quét toàn bộ). */
 export async function searchPurchaseProducts(q: string): Promise<PurchaseProductRow[]> {
   if (!q.trim()) return [];
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
-  return searchPurchaseProductRows(q.trim());
+  const gate = await requireStockAccess();
+  if (!gate.ok) return [];
+  return searchPurchaseProductRows(gate.storeId, q.trim());
 }
 
 export async function getPurchaseProductsByIds(ids: string[]): Promise<PurchaseProductRow[]> {
   const safeIds = ids.filter((id) => UUID_RE.test(id));
   if (safeIds.length === 0) return [];
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
-  return getPurchaseProductRowsByIds(safeIds);
+  const gate = await requireStockAccess();
+  if (!gate.ok) return [];
+  return getPurchaseProductRowsByIds(gate.storeId, safeIds);
 }
 
 export async function resolvePurchaseDraftProducts(
   items: PurchaseDraftProductLookup[]
 ): Promise<PurchaseDraftProductResolution[]> {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user || items.length === 0) return [];
+  const gate = await requireStockAccess();
+  if (!gate.ok || items.length === 0) return [];
+  const { storeId } = gate;
 
   const ids = items
     .map((item) => textValue(item.productId))
     .filter((id) => UUID_RE.test(id));
-  const byId = new Map((await getPurchaseProductRowsByIds(ids)).map((product) => [product.id, product]));
+  const byId = new Map((await getPurchaseProductRowsByIds(storeId, ids)).map((product) => [product.id, product]));
 
   const resolvedByQuery = new Map<string, PurchaseProductRow | null>();
   async function resolveByQuery(query: string, mode: "sku" | "name") {
     const key = `${mode}:${normalize(query)}`;
     if (resolvedByQuery.has(key)) return resolvedByQuery.get(key) ?? null;
-    const rows = await searchPurchaseProductRows(query);
+    const rows = await searchPurchaseProductRows(storeId, query);
     const normalized = normalize(query);
     const exact = rows.find((product) =>
       mode === "sku"

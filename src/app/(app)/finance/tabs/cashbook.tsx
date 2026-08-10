@@ -7,6 +7,7 @@ import { Pagination } from "@/components/pagination";
 import { parsePageSize } from "@/lib/pagination";
 import { CashTxForm } from "../../cashbook/cash-tx-form";
 import { CashbookTable } from "./cashbook-table";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 type SP = Record<string, string | undefined>;
 
@@ -15,7 +16,8 @@ export async function CashbookTab({ searchParams }: { searchParams: SP }) {
   const params = searchParams;
   const page = Number(params.page) || 1;
   const pageSize = parsePageSize(params.size);
-  const data = await getCashbook({ fund: params.fund, type: params.type, page, pageSize });
+  const context = await requireStoreContext();
+  const data = await getCashbook(context.storeId, { fund: params.fund, type: params.type, page, pageSize });
 
   const href = (overrides: Record<string, string | undefined>) => {
     const sp = new URLSearchParams();

@@ -11,6 +11,7 @@ import { PurchaseReturnsTable } from "./purchase-returns-table";
 import { InstantFilterForm } from "@/components/instant-filter-form";
 import { PurchaseReturnsFilter } from "./purchase-returns-filter";
 import { ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 type SP = Record<string, string | undefined>;
 
@@ -25,12 +26,13 @@ export async function PurchaseReturnsTab({ searchParams }: { searchParams: SP })
 }
 
 async function PurchaseReturnsContent({ searchParams }: { searchParams: SP }) {
+  const context = await requireStoreContext();
   const t = await getTranslations();
   const page = Number(searchParams.page) || 1;
   const pageSize = parsePageSize(searchParams.size);
   const [{ rows, total, pageCount }, options] = await Promise.all([
-    getPurchaseReturns({ q: searchParams.q, status: searchParams.status, settlement: searchParams.settlement, supplierId: searchParams.supplierId, warehouseId: searchParams.warehouseId, from: searchParams.from, to: searchParams.to, page, pageSize }),
-    getPurchaseReturnFormOptions(),
+    getPurchaseReturns(context.storeId, { q: searchParams.q, status: searchParams.status, settlement: searchParams.settlement, supplierId: searchParams.supplierId, warehouseId: searchParams.warehouseId, from: searchParams.from, to: searchParams.to, page, pageSize }),
+    getPurchaseReturnFormOptions(context.storeId),
   ]);
 
   return (

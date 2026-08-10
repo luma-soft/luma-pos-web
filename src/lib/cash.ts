@@ -9,6 +9,7 @@ export type CashCategory = "sale" | "debt_collect" | "supplier_payment" | "refun
 export async function recordCashTx(
   tx: Tx,
   params: {
+    storeId: string;
     type: "in" | "out";
     fund: "cash" | "bank";
     amount: number;
@@ -22,6 +23,7 @@ export async function recordCashTx(
 ) {
   if (params.amount <= 0) return;
   await tx.insert(cashTransactions).values({
+    storeId: params.storeId,
     code: generateCode(params.type === "in" ? "PT" : "PC"),
     shiftId: params.shiftId ?? null,
     type: params.type,

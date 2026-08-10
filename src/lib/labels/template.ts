@@ -1,4 +1,4 @@
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { labelTemplates } from "@/db/schema";
 import { BUILT_IN_LABEL_TEMPLATES, DEFAULT_LABEL_TEMPLATE, type LabelTemplate } from "./template-shared";
@@ -53,24 +53,25 @@ function withBuiltInTemplates(templates: LabelTemplate[]) {
     .sort((a, b) => Number(b.isDefault) - Number(a.isDefault) || a.sortOrder - b.sortOrder || a.name.localeCompare(b.name, "vi"));
 }
 
-export async function getLabelTemplates(): Promise<LabelTemplate[]> {
+export async function getLabelTemplates(storeId: string): Promise<LabelTemplate[]> {
   const rows = await db
     .select()
     .from(labelTemplates)
-    .where(eq(labelTemplates.isActive, true))
+    .where(and(eq(labelTemplates.storeId, storeId), eq(labelTemplates.isActive, true)))
     .orderBy(desc(labelTemplates.isDefault), asc(labelTemplates.sortOrder), asc(labelTemplates.name));
   return withBuiltInTemplates(rows.map(mapRow));
 }
 
-export async function getAllLabelTemplates(): Promise<LabelTemplate[]> {
+export async function getAllLabelTemplates(storeId: string): Promise<LabelTemplate[]> {
   const rows = await db
     .select()
     .from(labelTemplates)
+    .where(eq(labelTemplates.storeId, storeId))
     .orderBy(desc(labelTemplates.isDefault), asc(labelTemplates.sortOrder), asc(labelTemplates.name));
   return withBuiltInTemplates(rows.map(mapRow));
 }
 
-export async function getLabelTemplate(templateId?: string | null): Promise<LabelTemplate> {
-  const templates = await getLabelTemplates();
+export async function getLabelTemplate(storeId: string, templateId?: string | null): Promise<LabelTemplate> {
+  const templates = await getLabelTemplates(storeId);
   return templates.find((template) => template.id === templateId) ?? templates[0] ?? DEFAULT_LABEL_TEMPLATE;
 }

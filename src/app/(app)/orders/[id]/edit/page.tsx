@@ -1,10 +1,12 @@
 import { notFound } from "next/navigation";
 import { getOrder } from "@/lib/data/orders";
 import { OrderEditForm } from "./order-edit-form";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 export default async function OrderEditPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const order = await getOrder(id).catch(() => null);
+  const context = await requireStoreContext();
+  const order = await getOrder(context.storeId, id).catch(() => null);
   if (!order || (order.status !== "completed" && order.status !== "quote") || order.returns.length > 0) notFound();
 
   return (

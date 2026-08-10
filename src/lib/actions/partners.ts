@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { customers, suppliers } from "@/db/schema";
@@ -10,20 +10,17 @@ import {
   type UpdateCustomerInput,
   type CreateCustomerOutput, type CreateSupplierOutput,
 } from "@/lib/schemas/order";
-import { type ActionResult, generateCode, requireUser, requireManager, requireStockAccess } from "./common";
+import { type ActionResult, generateCode, requireManager, requireStockAccess } from "./common";
 import { createCustomerCore, updateCustomerCore } from "@/lib/customers/write";
 import { Routes } from "@/lib/routes";
 
 export async function createCustomer(
   input: CreateCustomerOutput
 ): Promise<ActionResult<{ id: string }>> {
-  try {
-    await requireUser();
-  } catch {
-    return { ok: false, error: "errors.unauthorized" };
-  }
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
   // Lõi tách riêng. Xem src/lib/customers/write.ts.
-  const result = await createCustomerCore(input);
+  const result = await createCustomerCore(gate.storeId, input);
   if (result.ok) revalidatePath(Routes.Customers);
   return result;
 }
@@ -40,7 +37,7 @@ const updateSupplierSchema = z.object({
 export type UpdateSupplierInput = z.input<typeof updateSupplierSchema>;
 
 export async function updateSupplier(input: UpdateSupplierInput): Promise<ActionResult> {
-  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const gate = await requireManager(); if (!gate.ok) return gate;
   const parsed = updateSupplierSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
@@ -52,7 +49,7 @@ export async function updateSupplier(input: UpdateSupplierInput): Promise<Action
       address: v.address || null,
       taxCode: v.taxCode?.slice(0, 30) || null,
       note: v.note || null,
-    }).where(eq(suppliers.id, v.id));
+    }).where(and(eq(suppliers.storeId, gate.storeId), eq(suppliers.id, v.id)));
     revalidatePath(Routes.Suppliers);
     revalidatePath(Routes.Partners);
     revalidatePath(`/suppliers/${v.id}`);
@@ -66,9 +63,9 @@ export async function updateSupplier(input: UpdateSupplierInput): Promise<Action
 export type { UpdateCustomerInput } from "@/lib/schemas/order";
 
 export async function updateCustomer(input: UpdateCustomerInput): Promise<ActionResult> {
-  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const gate = await requireManager(); if (!gate.ok) return gate;
   // Lõi tách riêng. Xem src/lib/customers/write.ts.
-  const result = await updateCustomerCore(input);
+  const result = await updateCustomerCore(gate.storeId, input);
   if (result.ok) {
     revalidatePath(Routes.Customers);
     revalidatePath(Routes.Partners);
@@ -83,13 +80,13 @@ const setCustomerActiveSchema = z.object({
 });
 
 export async function setCustomerActive(input: z.input<typeof setCustomerActiveSchema>): Promise<ActionResult> {
-  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const gate = await requireManager(); if (!gate.ok) return gate;
   const parsed = setCustomerActiveSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
 
   try {
-    await db.update(customers).set({ isActive: v.isActive }).where(eq(customers.id, v.id));
+    await db.update(customers).set({ isActive: v.isActive }).where(and(eq(customers.storeId, gate.storeId), eq(customers.id, v.id)));
     revalidatePath(Routes.Customers);
     revalidatePath(Routes.Partners);
     revalidatePath(`/customers/${v.id}`);
@@ -103,13 +100,14 @@ export async function setCustomerActive(input: z.input<typeof setCustomerActiveS
 export async function createSupplier(
   input: CreateSupplierOutput
 ): Promise<ActionResult<{ id: string }>> {
-  { const gate = await requireStockAccess(); if (!gate.ok) return gate; }
+  const gate = await requireStockAccess(); if (!gate.ok) return gate;
   const parsed = createSupplierSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
 
   try {
     const [row] = await db.insert(suppliers).values({
+      storeId: gate.storeId,
       code: generateCode("NCC"),
       name: v.name.trim(),
       phone: v.phone?.trim() || null,

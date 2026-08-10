@@ -1,4 +1,4 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import {
   customerReceivableAllocations,
   customerReceivableEntries,
@@ -15,7 +15,7 @@ import { createDebtChangedEventInTx } from "@/lib/notifications/events-core";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type DbLike = any;
 
-type Actor = { profileId: string | null; shiftId: string | null };
+type Actor = { storeId: string; profileId: string | null; shiftId: string | null };
 type PaymentMethod = "cash" | "bank_transfer" | "card";
 
 export type ReceivableAllocationInput = { orderId: string; amount: number };
@@ -89,19 +89,19 @@ export async function collectCustomerReceivable(
   try {
     return await database.transaction(async (tx: DbLike) => {
       const [customer] = await tx.select({ id: customers.id, currentDebt: customers.currentDebt })
-        .from(customers).where(eq(customers.id, input.customerId)).limit(1).for("update");
+        .from(customers).where(and(eq(customers.storeId, actor.storeId), eq(customers.id, input.customerId))).limit(1).for("update");
       if (!customer) throw new Error("CUSTOMER_NOT_FOUND");
 
       const [existing] = await tx.select({ id: customerReceivableReceipts.id, customerId: customerReceivableReceipts.customerId, amount: customerReceivableReceipts.amount })
         .from(customerReceivableReceipts)
-        .where(eq(customerReceivableReceipts.clientRequestId, input.clientRequestId.trim()))
+        .where(and(eq(customerReceivableReceipts.storeId, actor.storeId), eq(customerReceivableReceipts.clientRequestId, input.clientRequestId.trim())))
         .limit(1).for("update");
       if (existing) {
         if (existing.customerId !== input.customerId || Math.abs(Number(existing.amount) - amount) > 1e-9) throw new Error("RECEIPT_CONFLICT");
         return { ok: true as const, data: { receiptId: existing.id, replayed: true } };
       }
 
-      const invoiceRows = await tx.select().from(orders).where(inArray(orders.id, ids)).for("update");
+      const invoiceRows = await tx.select().from(orders).where(and(eq(orders.storeId, actor.storeId), inArray(orders.id, ids))).for("update");
       if (invoiceRows.length !== ids.length) throw new Error("ORDER_NOT_PAYABLE");
       const invoices = new Map<string, typeof orders.$inferSelect>(
         invoiceRows.map((order: typeof orders.$inferSelect) => [order.id, order]),
@@ -116,6 +116,7 @@ export async function collectCustomerReceivable(
       }
 
       const [receipt] = await tx.insert(customerReceivableReceipts).values({
+        storeId: actor.storeId,
         code: generateCode("PTN"), customerId: input.customerId, amount: amount.toFixed(2),
         method: input.method, reference: input.reference?.trim() || null, note: input.note?.trim() || null,
         clientRequestId: input.clientRequestId.trim(), createdBy: actor.profileId, confirmedAt: new Date(),
@@ -127,6 +128,7 @@ export async function collectCustomerReceivable(
         const order = invoices.get(allocation.orderId)!;
         const newPaid = money(Number(order.amountPaid) + allocation.amount);
         const [payment] = await tx.insert(payments).values({
+          storeId: actor.storeId,
           orderId: order.id, shiftId: actor.shiftId, amount: allocation.amount.toFixed(2), method: input.method,
           status: "manual_confirmed", clientRequestId: `${input.clientRequestId.trim()}:${index}`,
           reference: input.reference?.trim() || null, note: input.note?.trim() || null, createdBy: actor.profileId,
@@ -134,20 +136,21 @@ export async function collectCustomerReceivable(
         await tx.update(orders).set({
           amountPaid: newPaid.toFixed(2), paymentStatus: newPaid >= Number(order.total) - 1e-9 ? "paid" : "partial",
           updatedAt: sql`now()`,
-        }).where(eq(orders.id, order.id));
-        allocationRows.push({ receiptId: receipt.id, orderId: order.id, paymentId: payment.id, amount: allocation.amount.toFixed(2) });
+        }).where(and(eq(orders.storeId, actor.storeId), eq(orders.id, order.id)));
+        allocationRows.push({ storeId: actor.storeId, receiptId: receipt.id, orderId: order.id, paymentId: payment.id, amount: allocation.amount.toFixed(2) });
       }
       if (allocationRows.length > 0) {
         await tx.insert(customerReceivableAllocations).values(allocationRows);
       }
       await recordCashTx(tx, {
+        storeId: actor.storeId,
         type: "in", fund: fundForMethod(input.method), amount, category: "debt_collect",
         refType: "customer_receivable_receipt", refId: receipt.id,
         note: `Thu nợ khách hàng ${input.reference?.trim() || receipt.id}`,
         createdBy: actor.profileId, shiftId: actor.shiftId,
       });
       await tx.update(customers).set({ currentDebt: sql`${customers.currentDebt} - ${amount.toFixed(2)}` })
-        .where(eq(customers.id, input.customerId));
+        .where(and(eq(customers.storeId, actor.storeId), eq(customers.id, input.customerId)));
       const notification = await createDebtChangedEventInTx(tx, {
         entityType: "customer", entityId: input.customerId, operationType: "receivable_collection",
         operationId: receipt.id, delta: -amount, actorId: actor.profileId,
@@ -174,22 +177,23 @@ export async function createCustomerReceivableEntry(
   try {
     return await database.transaction(async (tx: DbLike) => {
       const [customer] = await tx.select({ id: customers.id, currentDebt: customers.currentDebt })
-        .from(customers).where(eq(customers.id, input.customerId)).limit(1).for("update");
+        .from(customers).where(and(eq(customers.storeId, actor.storeId), eq(customers.id, input.customerId))).limit(1).for("update");
       if (!customer) throw new Error("CUSTOMER_NOT_FOUND");
       const [existing] = await tx.select({ id: customerReceivableEntries.id, customerId: customerReceivableEntries.customerId, amount: customerReceivableEntries.amount })
-        .from(customerReceivableEntries).where(eq(customerReceivableEntries.clientRequestId, input.clientRequestId.trim())).limit(1);
+        .from(customerReceivableEntries).where(and(eq(customerReceivableEntries.storeId, actor.storeId), eq(customerReceivableEntries.clientRequestId, input.clientRequestId.trim()))).limit(1);
       if (existing) {
         if (existing.customerId !== input.customerId || Math.abs(Number(existing.amount) - amount) > 1e-9) throw new Error("RECEIPT_CONFLICT");
         return { ok: true as const, data: { entryId: existing.id, replayed: true } };
       }
       const [entry] = await tx.insert(customerReceivableEntries).values({
+        storeId: actor.storeId,
         code: generateCode(input.type === "settlement_discount" ? "CKTT" : "DCN"), customerId: input.customerId,
         orderId: input.orderId || null, type: input.type, amount: amount.toFixed(2), reason: input.reason.trim(),
         reference: input.reference?.trim() || null, note: input.note?.trim() || null,
         clientRequestId: input.clientRequestId.trim(), createdBy: actor.profileId, approvedBy: actor.profileId,
       }).returning({ id: customerReceivableEntries.id });
       await tx.update(customers).set({ currentDebt: sql`${customers.currentDebt} + ${amount.toFixed(2)}` })
-        .where(eq(customers.id, input.customerId));
+        .where(and(eq(customers.storeId, actor.storeId), eq(customers.id, input.customerId)));
       const notification = await createDebtChangedEventInTx(tx, {
         entityType: "customer", entityId: input.customerId, operationType: input.type,
         operationId: entry.id, delta: amount, actorId: actor.profileId,

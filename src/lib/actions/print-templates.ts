@@ -38,7 +38,7 @@ const saveSchema = z.object({
 export type SavePrintTemplateInput = z.input<typeof saveSchema>;
 
 export async function savePrintTemplate(input: SavePrintTemplateInput): Promise<ActionResult<{ id?: string }>> {
-  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const gate = await requireManager(); if (!gate.ok) return gate;
   const parsed = saveSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
@@ -49,7 +49,7 @@ export async function savePrintTemplate(input: SavePrintTemplateInput): Promise<
         await tx
           .update(printTemplates)
           .set({ isDefault: false, updatedAt: sql`now()` })
-          .where(eq(printTemplates.docType, v.docType));
+          .where(and(eq(printTemplates.storeId, gate.storeId), eq(printTemplates.docType, v.docType)));
       }
 
       if (isPersistedTemplateId(v.id)) {
@@ -70,7 +70,7 @@ export async function savePrintTemplate(input: SavePrintTemplateInput): Promise<
             options: v.options,
             updatedAt: sql`now()`,
           })
-          .where(eq(printTemplates.id, v.id!))
+          .where(and(eq(printTemplates.storeId, gate.storeId), eq(printTemplates.id, v.id!)))
           .returning({ id: printTemplates.id });
         return row;
       }
@@ -78,6 +78,7 @@ export async function savePrintTemplate(input: SavePrintTemplateInput): Promise<
       const [row] = await tx
         .insert(printTemplates)
         .values({
+          storeId: gate.storeId,
           name: v.name,
           docType: v.docType,
           paperDefault: v.paperDefault,
@@ -104,13 +105,14 @@ export async function savePrintTemplate(input: SavePrintTemplateInput): Promise<
 }
 
 export async function duplicatePrintTemplate(id: string): Promise<ActionResult<{ id: string }>> {
-  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const gate = await requireManager(); if (!gate.ok) return gate;
   if (!isPersistedTemplateId(id)) return { ok: false, error: "errors.invalidData" };
 
   try {
-    const [source] = await db.select().from(printTemplates).where(eq(printTemplates.id, id)).limit(1);
+    const [source] = await db.select().from(printTemplates).where(and(eq(printTemplates.storeId, gate.storeId), eq(printTemplates.id, id))).limit(1);
     if (!source) return { ok: false, error: "errors.notFound" };
     const [row] = await db.insert(printTemplates).values({
+      storeId: gate.storeId,
       name: `${source.name} copy`,
       docType: source.docType,
       paperDefault: source.paperDefault,
@@ -133,15 +135,15 @@ export async function duplicatePrintTemplate(id: string): Promise<ActionResult<{
 }
 
 export async function setDefaultPrintTemplate(id: string): Promise<ActionResult> {
-  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const gate = await requireManager(); if (!gate.ok) return gate;
   if (!isPersistedTemplateId(id)) return { ok: false, error: "errors.invalidData" };
 
   try {
     await db.transaction(async (tx) => {
-      const [source] = await tx.select({ docType: printTemplates.docType }).from(printTemplates).where(eq(printTemplates.id, id)).limit(1);
+      const [source] = await tx.select({ docType: printTemplates.docType }).from(printTemplates).where(and(eq(printTemplates.storeId, gate.storeId), eq(printTemplates.id, id))).limit(1);
       if (!source) throw new Error("not-found");
-      await tx.update(printTemplates).set({ isDefault: false, updatedAt: sql`now()` }).where(eq(printTemplates.docType, source.docType));
-      await tx.update(printTemplates).set({ isDefault: true, isActive: true, updatedAt: sql`now()` }).where(eq(printTemplates.id, id));
+      await tx.update(printTemplates).set({ isDefault: false, updatedAt: sql`now()` }).where(and(eq(printTemplates.storeId, gate.storeId), eq(printTemplates.docType, source.docType)));
+      await tx.update(printTemplates).set({ isDefault: true, isActive: true, updatedAt: sql`now()` }).where(and(eq(printTemplates.storeId, gate.storeId), eq(printTemplates.id, id)));
     });
     revalidatePath("/settings/print");
     return { ok: true, data: undefined };
@@ -153,21 +155,21 @@ export async function setDefaultPrintTemplate(id: string): Promise<ActionResult>
 }
 
 export async function deactivatePrintTemplate(id: string): Promise<ActionResult> {
-  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const gate = await requireManager(); if (!gate.ok) return gate;
   if (!isPersistedTemplateId(id)) return { ok: false, error: "errors.invalidData" };
 
   try {
-    const [row] = await db.select({ docType: printTemplates.docType, isDefault: printTemplates.isDefault }).from(printTemplates).where(eq(printTemplates.id, id)).limit(1);
+    const [row] = await db.select({ docType: printTemplates.docType, isDefault: printTemplates.isDefault }).from(printTemplates).where(and(eq(printTemplates.storeId, gate.storeId), eq(printTemplates.id, id))).limit(1);
     if (!row) return { ok: false, error: "errors.notFound" };
     if (row.isDefault) {
       const [replacement] = await db
         .select({ id: printTemplates.id })
         .from(printTemplates)
-        .where(and(eq(printTemplates.docType, row.docType), eq(printTemplates.isActive, true), ne(printTemplates.id, id)))
+        .where(and(eq(printTemplates.storeId, gate.storeId), eq(printTemplates.docType, row.docType), eq(printTemplates.isActive, true), ne(printTemplates.id, id)))
         .limit(1);
       if (!replacement) return { ok: false, error: "printSettings.errors.defaultRequired" };
     }
-    await db.update(printTemplates).set({ isActive: false, isDefault: false, updatedAt: sql`now()` }).where(eq(printTemplates.id, id));
+    await db.update(printTemplates).set({ isActive: false, isDefault: false, updatedAt: sql`now()` }).where(and(eq(printTemplates.storeId, gate.storeId), eq(printTemplates.id, id)));
     revalidatePath("/settings/print");
     return { ok: true, data: undefined };
   } catch (e) {

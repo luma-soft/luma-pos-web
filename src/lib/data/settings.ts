@@ -9,11 +9,6 @@ export type StoreSettings = {
   prefs: StorePrefs;
 };
 
-const DEFAULTS: StoreSettings = {
-  name: "", address: "", phone: "", taxCode: "", industry: "grocery", currency: "VND", locale: "vi-VN", onboarded: false,
-  prefs: parseStorePrefs({}),
-};
-
 export function sanitizeStorePrefsForClient(prefs: StorePrefs): StorePrefs {
   const hasOpenaiApiKey = Boolean(prefs.ai.openaiApiKey);
   const hasZaloAppSecret = Boolean(prefs.zalo.appSecret);
@@ -47,35 +42,36 @@ export function sanitizeStorePrefsForClient(prefs: StorePrefs): StorePrefs {
   };
 }
 
-export async function getRawStorePrefs(): Promise<StorePrefs> {
-  const [row] = await db.select({ prefs: storeSettings.prefs }).from(storeSettings).where(eq(storeSettings.id, "default")).limit(1);
-  return parseStorePrefs(row?.prefs);
+export async function getRawStorePrefs(storeId: string): Promise<StorePrefs> {
+  const [row] = await db.select({ prefs: storeSettings.prefs }).from(storeSettings).where(eq(storeSettings.storeId, storeId)).limit(1);
+  if (!row) throw new Error("Store settings not found");
+  return parseStorePrefs(row.prefs);
 }
 
-export async function getAiProviderSettings() {
-  const prefs = await getRawStorePrefs();
+export async function getAiProviderSettings(storeId: string) {
+  const prefs = await getRawStorePrefs(storeId);
   return prefs.ai;
 }
 
-export async function getAiAttachmentsBucket() {
-  const ai = await getAiProviderSettings();
+export async function getAiAttachmentsBucket(storeId: string) {
+  const ai = await getAiProviderSettings(storeId);
   return ai.attachmentsBucket || "ai-attachments";
 }
 
-export async function getZaloSettings() {
-  const prefs = await getRawStorePrefs();
+export async function getZaloSettings(storeId: string) {
+  const prefs = await getRawStorePrefs(storeId);
   return prefs.zalo;
 }
 
-export async function getShopeeSettings() {
-  const prefs = await getRawStorePrefs();
+export async function getShopeeSettings(storeId: string) {
+  const prefs = await getRawStorePrefs(storeId);
   return prefs.shopee;
 }
 
-/** Cấu hình cửa hàng (1 dòng id='default'). Trả mặc định nếu chưa có. */
-export async function getStoreSettings(): Promise<StoreSettings> {
-  const [row] = await db.select().from(storeSettings).where(eq(storeSettings.id, "default")).limit(1);
-  if (!row) return { ...DEFAULTS, prefs: sanitizeStorePrefsForClient(DEFAULTS.prefs) };
+/** Cấu hình của đúng cửa hàng; không fallback sang tenant khác. */
+export async function getStoreSettings(storeId: string): Promise<StoreSettings> {
+  const [row] = await db.select().from(storeSettings).where(eq(storeSettings.storeId, storeId)).limit(1);
+  if (!row) throw new Error("Store settings not found");
   return {
     name: row.name, address: row.address, phone: row.phone, taxCode: row.taxCode,
     industry: row.industry, currency: row.currency, locale: row.locale, onboarded: row.onboarded,
@@ -93,10 +89,11 @@ export async function getStaff(storeId: string) {
 }
 export type StaffRow = Awaited<ReturnType<typeof getStaff>>[number];
 
-export async function getPaymentBankAccounts() {
+export async function getPaymentBankAccounts(storeId: string) {
   const rows = await db
     .select()
     .from(paymentBankAccounts)
+    .where(eq(paymentBankAccounts.storeId, storeId))
     .orderBy(asc(paymentBankAccounts.provider), asc(paymentBankAccounts.bankCode), asc(paymentBankAccounts.accountNumber));
   return rows.map(({ webhookSecret, apiKey, ...row }) => ({
     ...row,

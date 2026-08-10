@@ -10,6 +10,7 @@ import {
 } from "../src/lib/settings/notification-settings-core.ts";
 
 const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const STORE_ID = "00000000-0000-4000-8000-000000000001";
 const client = new PGlite();
 const database = drizzle(client, { schema });
 await client.exec("create role anon; create role authenticated;");
@@ -74,10 +75,10 @@ const synchronizedDatabase = new Proxy(database, {
 });
 
 await Promise.all([
-  persistNotificationSettingsPatch(synchronizedDatabase, {
+  persistNotificationSettingsPatch(synchronizedDatabase, STORE_ID, {
     invoiceCreated: false,
   }),
-  persistStorePrefsPatch(synchronizedDatabase, {
+  persistStorePrefsPatch(synchronizedDatabase, STORE_ID, {
     hardware: {
       paperSize: "A4",
       autoPrint: true,
@@ -90,7 +91,7 @@ await Promise.all([
 const [saved] = await database
   .select({ prefs: schema.storeSettings.prefs })
   .from(schema.storeSettings)
-  .where(eq(schema.storeSettings.id, "default"));
+  .where(eq(schema.storeSettings.storeId, STORE_ID));
 
 assert.equal(saved.prefs.notifications.invoiceCreated, false);
 assert.equal(saved.prefs.notifications.purchaseReceived, true);

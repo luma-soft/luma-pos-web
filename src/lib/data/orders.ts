@@ -80,12 +80,12 @@ function isUuid(value?: string): value is string {
   return Boolean(value && UUID_RE.test(value));
 }
 
-export async function getOrders(filters: OrderListFilters = {}) {
+export async function getOrders(storeId: string, filters: OrderListFilters = {}) {
   const page = Math.max(1, filters.page ?? 1);
   // Count-preview routes intentionally request a single row while reusing this
   // exact condition set. Interactive lists still use the supported page sizes.
   const size = filters.pageSize === 1 ? 1 : coercePageSize(filters.pageSize);
-  const conditions: SQL[] = [];
+  const conditions: SQL[] = [eq(orders.storeId, storeId)];
   const documentType = filters.documentType ??
     (filters.status === "quote"
       ? "quote"
@@ -122,6 +122,7 @@ export async function getOrders(filters: OrderListFilters = {}) {
           .where(
             and(
               eq(orderItems.orderId, orders.id),
+              eq(orderItems.storeId, storeId),
               eq(orderItems.productId, filters.productId),
             ),
           ),
@@ -154,7 +155,11 @@ export async function getOrders(filters: OrderListFilters = {}) {
             .select({ value: sql`1` })
             .from(orderItems)
             .leftJoin(products, eq(orderItems.productId, products.id))
-            .where(and(eq(orderItems.orderId, orders.id), productMatch)),
+            .where(and(
+              eq(orderItems.storeId, storeId),
+              eq(orderItems.orderId, orders.id),
+              productMatch,
+            )),
         ),
       );
     }
@@ -206,6 +211,7 @@ export async function getOrders(filters: OrderListFilters = {}) {
           .where(
             and(
               eq(payments.orderId, orders.id),
+              eq(payments.storeId, storeId),
               eq(payments.method, filters.paymentMethod),
             ),
           ),
@@ -260,10 +266,12 @@ export async function getOrders(filters: OrderListFilters = {}) {
       itemCount: sql<number>`(
         select count(*)::int from ${orderItems}
         where ${orderItems.orderId} = ${orders.id}
+          and ${orderItems.storeId} = ${storeId}
       )`,
       paymentMethod: sql<string | null>`(
         select ${payments.method} from ${payments}
         where ${payments.orderId} = ${orders.id}
+          and ${payments.storeId} = ${storeId}
         order by ${payments.createdAt} desc
         limit 1
       )`,
@@ -309,7 +317,7 @@ export async function getOrders(filters: OrderListFilters = {}) {
   };
 }
 
-export async function getOrder(id: string) {
+export async function getOrder(storeId: string, id: string) {
   const [order] = await db
     .select({
       id: orders.id,
@@ -332,6 +340,7 @@ export async function getOrder(id: string) {
       hasCreatedOrder: sql<boolean>`exists (
         select 1 from orders converted
         where converted.source_order_id = ${orders.id}
+          and converted.store_id = ${storeId}
           and converted.source_mode = 'copy'
           and converted.status not in ('quote', 'confirmed', 'cancelled')
       )`,
@@ -350,6 +359,7 @@ export async function getOrder(id: string) {
         select ${priceBooks.name} from ${orderItems}
         left join ${priceBooks} on ${orderItems.priceBookId} = ${priceBooks.id}
         where ${orderItems.orderId} = ${orders.id}
+          and ${orderItems.storeId} = ${storeId}
           and ${orderItems.priceBookId} is not null
         limit 1
       )`,
@@ -359,22 +369,25 @@ export async function getOrder(id: string) {
     .leftJoin(customers, eq(orders.customerId, customers.id))
     .leftJoin(warehouses, eq(orders.warehouseId, warehouses.id))
     .leftJoin(profiles, eq(orders.createdBy, profiles.id))
-    .where(eq(orders.id, id))
+    .where(and(eq(orders.id, id), eq(orders.storeId, storeId)))
     .limit(1);
 
   if (!order) return null;
 
   const [items, paymentRows, returnRows] = await Promise.all([
-    db.select().from(orderItems).where(eq(orderItems.orderId, id)),
+    db.select().from(orderItems).where(and(
+      eq(orderItems.orderId, id),
+      eq(orderItems.storeId, storeId),
+    )),
     db
       .select()
       .from(payments)
-      .where(eq(payments.orderId, id))
+      .where(and(eq(payments.orderId, id), eq(payments.storeId, storeId)))
       .orderBy(desc(payments.createdAt)),
     db
       .select()
       .from(returns)
-      .where(eq(returns.orderId, id))
+      .where(and(eq(returns.orderId, id), eq(returns.storeId, storeId)))
       .orderBy(desc(returns.createdAt)),
   ]);
 
@@ -388,7 +401,10 @@ export async function getOrder(id: string) {
         })
         .from(returnItems)
         .innerJoin(returns, and(eq(returnItems.returnId, returns.id), eq(returns.status, "completed")))
-        .where(inArray(returnItems.orderItemId, itemIds))
+        .where(and(
+          eq(returnItems.storeId, storeId),
+          inArray(returnItems.orderItemId, itemIds),
+        ))
         .groupBy(returnItems.orderItemId)
     : [];
   const returnedByItem = Object.fromEntries(

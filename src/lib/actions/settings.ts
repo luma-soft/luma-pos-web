@@ -32,6 +32,7 @@ import {
 import { writeAuditLog } from "@/lib/audit";
 import { buildAiProviderConfig, completeAiText, completeAiVision } from "@/lib/ai/provider-adapter";
 import { type ActionResult, requireManager, requireOwner, requireUser } from "./common";
+import { resolveStoreContextForUser } from "@/lib/auth/store-context";
 import { Routes } from "@/lib/routes";
 import { applyStaffSettingsMutation } from "@/lib/settings/staff-settings-service";
 import { parseStaffSettingsMutation } from "@/lib/settings/staff-settings-mutation";
@@ -68,9 +69,11 @@ export async function loadSettingsStaff(): Promise<ActionResult<Awaited<ReturnTy
 }
 
 export async function loadSettingsPaymentBankAccounts(): Promise<ActionResult<Awaited<ReturnType<typeof getPaymentBankAccounts>>>> {
-  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  let context;
+  try { context = await resolveStoreContextForUser((await requireUser()).id); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  if (!context) return { ok: false, error: "errors.unauthorized" };
   try {
-    return { ok: true, data: await getPaymentBankAccounts() };
+    return { ok: true, data: await getPaymentBankAccounts(context.storeId) };
   } catch (e) {
     console.error("loadSettingsPaymentBankAccounts failed:", e);
     return { ok: false, error: "errors.serverError" };
@@ -112,8 +115,8 @@ export async function updateStoreSettings(input: StoreSettingsInput): Promise<Ac
   const v = parsed.data;
   try {
     await db.insert(storeSettings)
-      .values({ id: "default", ...v })
-      .onConflictDoUpdate({ target: storeSettings.id, set: { ...v, updatedAt: sql`now()` } });
+      .values({ id: gate.storeId, storeId: gate.storeId, ...v })
+      .onConflictDoUpdate({ target: storeSettings.storeId, set: { ...v, updatedAt: sql`now()` } });
     revalidatePath(Routes.Settings);
     return { ok: true, data: undefined };
   } catch (e) {
@@ -130,13 +133,15 @@ export async function updateStorePrefs(patch: StorePrefsPatch): Promise<ActionRe
 }
 
 export async function updateStorePrefsForUser(
-  _userId: string,
+  userId: string,
   patch: StorePrefsPatch,
 ): Promise<ActionResult> {
   const parsed = storePrefsPatchSchema.safeParse(patch);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   try {
-    await persistStorePrefsPatch(db, parsed.data);
+    const context = await resolveStoreContextForUser(userId);
+    if (!context) return { ok: false, error: "errors.unauthorized" };
+    await persistStorePrefsPatch(db, context.storeId, parsed.data);
     revalidatePath(Routes.Settings);
     revalidatePath(Routes.POS);
     return { ok: true, data: undefined };
@@ -147,7 +152,7 @@ export async function updateStorePrefsForUser(
 }
 
 export async function updateNotificationSettingsForUser(
-  _userId: string,
+  userId: string,
   patch: MobileNotificationSettingsPatch,
 ): Promise<ActionResult> {
   const parsed = mobileNotificationSettingsPatchSchema.safeParse(patch);
@@ -155,7 +160,9 @@ export async function updateNotificationSettingsForUser(
     return { ok: false, error: "errors.invalidData" };
   }
   try {
-    await persistNotificationSettingsPatch(db, parsed.data);
+    const context = await resolveStoreContextForUser(userId);
+    if (!context) return { ok: false, error: "errors.unauthorized" };
+    await persistNotificationSettingsPatch(db, context.storeId, parsed.data);
     revalidatePath(Routes.Settings);
     revalidatePath(Routes.POS);
     return { ok: true, data: undefined };
@@ -173,7 +180,7 @@ export async function updateAiSettings(input: AiSettingsInput): Promise<ActionRe
   const v = parsed.data;
   try {
     const requested = input && typeof input === "object" ? input as Record<string, unknown> : {};
-    const persisted = await persistStorePrefsMutation(db, (current) => {
+    const persisted = await persistStorePrefsMutation(db, gate.storeId, (current) => {
       const nextKey = v.clearOpenaiApiKey
         ? ""
         : (v.openaiApiKey?.trim() || current.ai.openaiApiKey);
@@ -204,7 +211,7 @@ export async function updateAiSettings(input: AiSettingsInput): Promise<ActionRe
       source: "manual",
       action: "update_ai_settings",
       entityType: "store_settings",
-      entityId: "default",
+      entityId: gate.storeId,
       status: "succeeded",
       before: {
         provider: currentAi.provider,
@@ -243,7 +250,7 @@ export async function updateZaloSettings(input: ZaloSettingsInput): Promise<Acti
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
   try {
-    const persisted = await persistStorePrefsMutation(db, (current) => {
+    const persisted = await persistStorePrefsMutation(db, gate.storeId, (current) => {
       const nextAppSecret = v.clearAppSecret
         ? ""
         : (v.appSecret?.trim() || current.zalo.appSecret);
@@ -285,7 +292,7 @@ export async function updateZaloSettings(input: ZaloSettingsInput): Promise<Acti
       source: "manual",
       action: "update_zalo_settings",
       entityType: "store_settings",
-      entityId: "default",
+      entityId: gate.storeId,
       status: "succeeded",
       before: {
         enabled: currentZalo.enabled,
@@ -337,7 +344,7 @@ export async function updateShopeeSettings(input: ShopeeSettingsInput): Promise<
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
   try {
-    const persisted = await persistStorePrefsMutation(db, (current) => {
+    const persisted = await persistStorePrefsMutation(db, gate.storeId, (current) => {
       const nextPartnerKey = v.clearPartnerKey
         ? ""
         : (v.partnerKey?.trim() || current.shopee.partnerKey);
@@ -368,7 +375,7 @@ export async function updateShopeeSettings(input: ShopeeSettingsInput): Promise<
       source: "manual",
       action: "update_shopee_settings",
       entityType: "store_settings",
-      entityId: "default",
+      entityId: gate.storeId,
       status: "succeeded",
       before: {
         enabled: currentShopee.enabled,
@@ -410,8 +417,9 @@ export async function testAiProvider(input: AiSettingsInput, kind: AiProviderTes
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
   try {
-    const [row] = await db.select({ prefs: storeSettings.prefs }).from(storeSettings).where(eq(storeSettings.id, "default")).limit(1);
-    const current = parseStorePrefs(row?.prefs);
+    const [row] = await db.select({ prefs: storeSettings.prefs }).from(storeSettings).where(eq(storeSettings.storeId, gate.storeId)).limit(1);
+    if (!row) throw new Error("STORE_SETTINGS_NOT_FOUND");
+    const current = parseStorePrefs(row.prefs);
     const nextKey = v.clearOpenaiApiKey
       ? ""
       : (v.openaiApiKey?.trim() || current.ai.openaiApiKey);
@@ -549,13 +557,13 @@ export async function savePaymentBankAccount(input: PaymentBankAccountInput): Pr
         await tx
           .update(paymentBankAccounts)
           .set({ isDefault: false, updatedAt: sql`now()` })
-          .where(eq(paymentBankAccounts.provider, v.provider));
+          .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.provider, v.provider)));
       }
       if (v.id) {
         const [current] = await tx
           .select({ webhookSecret: paymentBankAccounts.webhookSecret, apiKey: paymentBankAccounts.apiKey })
           .from(paymentBankAccounts)
-          .where(eq(paymentBankAccounts.id, v.id))
+          .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, v.id)))
           .limit(1);
         await tx.update(paymentBankAccounts)
           .set({
@@ -573,9 +581,10 @@ export async function savePaymentBankAccount(input: PaymentBankAccountInput): Pr
             note: blankToNull(v.note),
             updatedAt: sql`now()`,
           })
-          .where(eq(paymentBankAccounts.id, v.id));
+          .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, v.id)));
       } else {
         await tx.insert(paymentBankAccounts).values({
+          storeId: gate.storeId,
           provider: v.provider,
           bankCode: v.bankCode,
           gateway: blankToNull(v.gateway),
@@ -594,20 +603,20 @@ export async function savePaymentBankAccount(input: PaymentBankAccountInput): Pr
       const [defaultAccount] = await tx
         .select({ id: paymentBankAccounts.id })
         .from(paymentBankAccounts)
-        .where(and(eq(paymentBankAccounts.provider, v.provider), eq(paymentBankAccounts.isDefault, true)))
+        .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.provider, v.provider), eq(paymentBankAccounts.isDefault, true)))
         .limit(1);
       if (!defaultAccount) {
         const [firstEnabled] = await tx
           .select({ id: paymentBankAccounts.id })
           .from(paymentBankAccounts)
-          .where(and(eq(paymentBankAccounts.provider, v.provider), eq(paymentBankAccounts.enabled, true)))
+          .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.provider, v.provider), eq(paymentBankAccounts.enabled, true)))
           .orderBy(asc(paymentBankAccounts.createdAt))
           .limit(1);
         if (firstEnabled) {
           await tx
             .update(paymentBankAccounts)
             .set({ isDefault: true, updatedAt: sql`now()` })
-            .where(eq(paymentBankAccounts.id, firstEnabled.id));
+            .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, firstEnabled.id)));
         }
       }
     });
@@ -627,23 +636,23 @@ export async function setPaymentBankAccountEnabled(id: string, enabled: boolean)
       const [current] = await tx
         .select({ provider: paymentBankAccounts.provider, isDefault: paymentBankAccounts.isDefault })
         .from(paymentBankAccounts)
-        .where(eq(paymentBankAccounts.id, id))
+        .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, id)))
         .limit(1);
       await tx.update(paymentBankAccounts)
         .set({ enabled, ...(enabled ? {} : { isDefault: false }), updatedAt: sql`now()` })
-        .where(eq(paymentBankAccounts.id, id));
+        .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, id)));
       if (current?.isDefault && !enabled) {
         const [next] = await tx
           .select({ id: paymentBankAccounts.id })
           .from(paymentBankAccounts)
-          .where(and(eq(paymentBankAccounts.provider, current.provider), eq(paymentBankAccounts.enabled, true)))
+          .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.provider, current.provider), eq(paymentBankAccounts.enabled, true)))
           .orderBy(asc(paymentBankAccounts.createdAt))
           .limit(1);
         if (next) {
           await tx
             .update(paymentBankAccounts)
             .set({ isDefault: true, updatedAt: sql`now()` })
-            .where(eq(paymentBankAccounts.id, next.id));
+            .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, next.id)));
         }
       }
     });
@@ -663,15 +672,15 @@ export async function setDefaultPaymentBankAccount(id: string): Promise<ActionRe
       const [target] = await tx
         .select({ provider: paymentBankAccounts.provider })
         .from(paymentBankAccounts)
-        .where(eq(paymentBankAccounts.id, id))
+        .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, id)))
         .limit(1);
       if (!target) return;
       await tx.update(paymentBankAccounts)
         .set({ isDefault: false, updatedAt: sql`now()` })
-        .where(eq(paymentBankAccounts.provider, target.provider));
+        .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.provider, target.provider)));
       await tx.update(paymentBankAccounts)
         .set({ isDefault: true, enabled: true, updatedAt: sql`now()` })
-        .where(eq(paymentBankAccounts.id, id));
+        .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, id)));
     });
     revalidatePath(Routes.Settings);
     return { ok: true, data: undefined };
@@ -689,22 +698,22 @@ export async function deletePaymentBankAccount(id: string): Promise<ActionResult
       const [current] = await tx
         .select({ provider: paymentBankAccounts.provider, isDefault: paymentBankAccounts.isDefault })
         .from(paymentBankAccounts)
-        .where(eq(paymentBankAccounts.id, id))
+        .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, id)))
         .limit(1);
       if (!current) return;
-      await tx.delete(paymentBankAccounts).where(eq(paymentBankAccounts.id, id));
+      await tx.delete(paymentBankAccounts).where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, id)));
       if (current.isDefault) {
         const [next] = await tx
           .select({ id: paymentBankAccounts.id })
           .from(paymentBankAccounts)
-          .where(and(eq(paymentBankAccounts.provider, current.provider), eq(paymentBankAccounts.enabled, true)))
+          .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.provider, current.provider), eq(paymentBankAccounts.enabled, true)))
           .orderBy(asc(paymentBankAccounts.createdAt))
           .limit(1);
         if (next) {
           await tx
             .update(paymentBankAccounts)
             .set({ isDefault: true, updatedAt: sql`now()` })
-            .where(eq(paymentBankAccounts.id, next.id));
+            .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, next.id)));
         }
       }
     });

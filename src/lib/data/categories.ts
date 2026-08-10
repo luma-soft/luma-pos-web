@@ -1,4 +1,4 @@
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { categories, products } from "@/db/schema";
 import { coercePageSize } from "@/lib/pagination";
@@ -12,17 +12,18 @@ export interface CategoryNode {
 }
 
 /** Danh mục kèm số SP (đếm trực tiếp theo categoryId, không gộp con). */
-export async function getCategoriesWithCounts({ page = 1, pageSize }: { page?: number; pageSize?: number } = {}) {
+export async function getCategoriesWithCounts(storeId: string, { page = 1, pageSize }: { page?: number; pageSize?: number } = {}) {
   const rows = await db
     .select({
       id: categories.id,
       name: categories.name,
       parentId: categories.parentId,
-      parentName: sql<string | null>`(select parent.name from categories parent where parent.id = ${categories.parentId})`,
+      parentName: sql<string | null>`(select parent.name from categories parent where parent.store_id = ${storeId} and parent.id = ${categories.parentId})`,
       productCount: sql<number>`count(${products.id})::int`,
     })
     .from(categories)
-    .leftJoin(products, eq(products.categoryId, categories.id))
+    .leftJoin(products, and(eq(products.storeId, storeId), eq(products.categoryId, categories.id)))
+    .where(eq(categories.storeId, storeId))
     .groupBy(categories.id)
     .orderBy(asc(categories.sortOrder), asc(categories.name));
 

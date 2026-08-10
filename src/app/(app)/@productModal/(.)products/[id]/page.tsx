@@ -4,6 +4,7 @@ import { getProductListItem } from "@/lib/data/products";
 import { ProductDetailView } from "@/app/(app)/inventory/tabs/products-table";
 import { ProductEditorModal } from "@/app/(app)/inventory/tabs/products";
 import { productEditorCloseHref } from "@/lib/product-editor-navigation";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -13,7 +14,8 @@ interface Props {
 export default async function ProductDetailModalPage({ params, searchParams }: Props) {
   const { id } = await params;
   const query = await searchParams;
-  const product = await getProductListItem(id);
+  const context = await requireStoreContext();
+  const product = await getProductListItem(context.storeId, id);
   if (!product) notFound();
 
   return (

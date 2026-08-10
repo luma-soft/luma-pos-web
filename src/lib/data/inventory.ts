@@ -33,7 +33,7 @@ export type InventoryStatusCounts = Record<
  * Cache 60s vì không phụ thuộc bộ lọc/trang.
  */
 const getInventoryStats = unstable_cache(
-  async () => {
+  async (storeId: string) => {
     const [agg] = await db
       .select({
         totalValue: sql<string>`coalesce(sum(${products.totalStock} * ${products.costPrice}), 0)`,
@@ -45,7 +45,11 @@ const getInventoryStats = unstable_cache(
       })
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
-      .where(and(eq(products.isActive, true), stockManagedCategoryCondition()));
+      .where(and(
+        eq(products.storeId, storeId),
+        eq(products.isActive, true),
+        stockManagedCategoryCondition(),
+      ));
     return {
       totalValue: Number(agg.totalValue),
       totalSkuCount: Number(agg.totalSkuCount),
@@ -61,11 +65,12 @@ const getInventoryStats = unstable_cache(
   { revalidate: 60 }
 );
 
-export async function getInventory(filters: { q?: string; low?: boolean; stock?: StockFilter; categoryId?: string; warehouseId?: string; page?: number; pageSize?: number } = {}) {
+export async function getInventory(storeId: string, filters: { q?: string; low?: boolean; stock?: StockFilter; categoryId?: string; warehouseId?: string; page?: number; pageSize?: number } = {}) {
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize, INVENTORY_PAGE_SIZE);
   const hasComplianceColumns = await hasProductComplianceColumns();
   const conditions: SQL[] = [
+    eq(products.storeId, storeId),
     eq(products.isActive, true),
     stockManagedCategoryCondition(),
   ];
@@ -74,6 +79,7 @@ export async function getInventory(filters: { q?: string; low?: boolean; stock?:
         select sl.quantity
         from ${stockLevels} sl
         where sl.product_id = ${products.id}
+          and sl.store_id = ${storeId}
           and sl.warehouse_id = ${filters.warehouseId.trim()}
         limit 1
       ), 0)`
@@ -129,7 +135,7 @@ export async function getInventory(filters: { q?: string; low?: boolean; stock?:
       .where(where),
   ]);
 
-  const stats = await getInventoryStats();
+  const stats = await getInventoryStats(storeId);
 
   return {
     rows, total, page, pageSize: size,
@@ -139,13 +145,13 @@ export async function getInventory(filters: { q?: string; low?: boolean; stock?:
   };
 }
 
-export async function getInventoryOverview() {
-  return getInventoryStats();
+export async function getInventoryOverview(storeId: string) {
+  return getInventoryStats(storeId);
 }
 
 // Lịch sử xuất nhập gần đây — cache 30s, không phải truy vấn lại mỗi lần mở Tồn kho.
 export const getRecentMovements = unstable_cache(
-  async (limit = 30) => db
+  async (storeId: string, limit = 30) => db
     .select({
       id: stockMovements.id,
       productId: stockMovements.productId,
@@ -163,14 +169,17 @@ export const getRecentMovements = unstable_cache(
     .leftJoin(categories, eq(products.categoryId, categories.id))
     .innerJoin(warehouses, eq(stockMovements.warehouseId, warehouses.id))
     .leftJoin(profiles, eq(stockMovements.createdBy, profiles.id))
-    .where(stockManagedCategoryCondition())
+    .where(and(
+      eq(stockMovements.storeId, storeId),
+      stockManagedCategoryCondition(),
+    ))
     .orderBy(desc(stockMovements.createdAt))
     .limit(limit),
   ["recent-movements"],
   { revalidate: 30 }
 );
 
-export async function getInternalUseCostSummary() {
+export async function getInternalUseCostSummary(storeId: string) {
   const periodStart = new Date();
   periodStart.setHours(0, 0, 0, 0);
   periodStart.setDate(1);
@@ -180,7 +189,10 @@ export async function getInternalUseCostSummary() {
       count: sql<number>`count(*)::int`,
     })
     .from(internalUseIssues)
-    .where(gte(internalUseIssues.createdAt, periodStart));
+    .where(and(
+      eq(internalUseIssues.storeId, storeId),
+      gte(internalUseIssues.createdAt, periodStart),
+    ));
   return {
     total: Number(summary.total),
     count: summary.count,
@@ -188,10 +200,10 @@ export async function getInternalUseCostSummary() {
   };
 }
 
-export async function getPurchases(filters: { q?: string; status?: string; supplierId?: string; warehouseId?: string; from?: string; to?: string; debtOnly?: boolean; page?: number; pageSize?: number } = {}) {
+export async function getPurchases(storeId: string, filters: { q?: string; status?: string; supplierId?: string; warehouseId?: string; from?: string; to?: string; debtOnly?: boolean; page?: number; pageSize?: number } = {}) {
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize);
-  const conds: SQL[] = [];
+  const conds: SQL[] = [eq(purchaseOrders.storeId, storeId)];
   if (filters.q?.trim()) {
     const q = filters.q.trim();
     const c = or(accentInsensitiveLike(purchaseOrders.code, q), accentInsensitiveLike(suppliers.name, q));
@@ -256,7 +268,10 @@ export async function getPurchases(filters: { q?: string; status?: string; suppl
         })
         .from(purchaseOrderItems)
         .innerJoin(products, eq(purchaseOrderItems.productId, products.id))
-        .where(inArray(purchaseOrderItems.purchaseOrderId, ids))
+        .where(and(
+          eq(purchaseOrderItems.storeId, storeId),
+          inArray(purchaseOrderItems.purchaseOrderId, ids),
+        ))
         .orderBy(asc(products.name))
     : [];
   const itemsByPurchase = new Map<string, typeof itemRows>();
@@ -275,7 +290,7 @@ export async function getPurchases(filters: { q?: string; status?: string; suppl
 }
 
 /** Chi tiết phiếu nhập (cho trang in). */
-export async function getPurchase(id: string) {
+export async function getPurchase(storeId: string, id: string) {
   const [po] = await db
     .select({
       id: purchaseOrders.id,
@@ -301,7 +316,7 @@ export async function getPurchase(id: string) {
     .innerJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
     .innerJoin(warehouses, eq(purchaseOrders.warehouseId, warehouses.id))
     .leftJoin(profiles, eq(purchaseOrders.createdBy, profiles.id))
-    .where(eq(purchaseOrders.id, id))
+    .where(and(eq(purchaseOrders.id, id), eq(purchaseOrders.storeId, storeId)))
     .limit(1);
   if (!po) return null;
 
@@ -323,16 +338,19 @@ export async function getPurchase(id: string) {
     })
     .from(purchaseOrderItems)
     .innerJoin(products, eq(purchaseOrderItems.productId, products.id))
-    .where(eq(purchaseOrderItems.purchaseOrderId, id));
+    .where(and(
+      eq(purchaseOrderItems.purchaseOrderId, id),
+      eq(purchaseOrderItems.storeId, storeId),
+    ));
 
   return { ...po, items };
 }
 
 /** Options cho form tạo phiếu nhập. */
-export async function getPurchaseFormOptions() {
+export async function getPurchaseFormOptions(storeId: string) {
   const [supplierRows, warehouseRows] = await Promise.all([
-    db.select({ id: suppliers.id, name: suppliers.name }).from(suppliers).orderBy(asc(suppliers.name)),
-    db.select({ id: warehouses.id, name: warehouses.name, isDefault: warehouses.isDefault }).from(warehouses).orderBy(desc(warehouses.isDefault)),
+    db.select({ id: suppliers.id, name: suppliers.name }).from(suppliers).where(eq(suppliers.storeId, storeId)).orderBy(asc(suppliers.name)),
+    db.select({ id: warehouses.id, name: warehouses.name, isDefault: warehouses.isDefault }).from(warehouses).where(eq(warehouses.storeId, storeId)).orderBy(desc(warehouses.isDefault)),
   ]);
   return { suppliers: supplierRows, warehouses: warehouseRows };
 }
@@ -354,6 +372,7 @@ const purchaseProductSelection = {
 };
 
 export async function getPurchaseProductRowsByIds(
+  storeId: string,
   ids: string[],
   { includeInactive = false }: { includeInactive?: boolean } = {},
 ) {
@@ -364,19 +383,24 @@ export async function getPurchaseProductRowsByIds(
     .from(products)
     .where(
       includeInactive
-        ? inArray(products.id, uniqueIds)
-        : and(eq(products.isActive, true), inArray(products.id, uniqueIds)),
+        ? and(eq(products.storeId, storeId), inArray(products.id, uniqueIds))
+        : and(
+          eq(products.storeId, storeId),
+          eq(products.isActive, true),
+          inArray(products.id, uniqueIds),
+        ),
     )
     .orderBy(asc(products.name));
 }
 
-export async function searchPurchaseProductRows(q: string) {
+export async function searchPurchaseProductRows(storeId: string, q: string) {
   if (!q.trim()) return [];
   const term = q.trim();
   return db
     .select(purchaseProductSelection)
     .from(products)
     .where(and(
+      eq(products.storeId, storeId),
       eq(products.isActive, true),
       or(accentInsensitiveLike(products.name, term), accentInsensitiveLike(products.sku, term), accentInsensitiveLike(products.barcode, term)),
     ))

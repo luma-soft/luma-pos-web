@@ -14,6 +14,7 @@ import { getStoreSettings } from "@/lib/data/settings";
 import { NumberInput } from "@/components/ui/number-input";
 import { Select } from "@/components/ui/select";
 import { InstantFilterForm } from "@/components/instant-filter-form";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -70,14 +71,15 @@ function barcodeSvg(value: string, template: LabelTemplate) {
 export default async function ProductLabelsPage({ params, searchParams }: Props) {
   const { id } = await params;
   const query = await searchParams;
-  const [t, templates, store] = await Promise.all([getTranslations(), getLabelTemplates(), getStoreSettings()]);
-  const products = (await Promise.all(selectedProductIds(id, query.ids).map((productId) => getProduct(productId)))).filter(
+  const context = await requireStoreContext();
+  const [t, templates, store] = await Promise.all([getTranslations(), getLabelTemplates(context.storeId), getStoreSettings(context.storeId)]);
+  const products = (await Promise.all(selectedProductIds(id, query.ids).map((productId) => getProduct(context.storeId, productId)))).filter(
     (candidate): candidate is NonNullable<Awaited<ReturnType<typeof getProduct>>> => Boolean(candidate),
   );
   const product = products[0];
   if (!product) notFound();
 
-  const template = await getLabelTemplate(query.templateId);
+  const template = await getLabelTemplate(context.storeId, query.templateId);
   const isBatch = products.length > 1;
   const hasPriceOverride = query.price !== undefined && query.price !== "" && Number.isFinite(Number(query.price));
   const excludedLabelKeys = new Set((query.exclude ?? "").split(",").filter(Boolean));

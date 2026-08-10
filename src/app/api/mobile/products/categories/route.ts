@@ -5,12 +5,11 @@ import { mobileAction, mobileGate, readJson } from "@/lib/mobile/response";
 
 export async function GET(request: Request) {
   const gate = await requireMobileStockAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
   const url = new URL(request.url);
   const page = Number(url.searchParams.get("page")) || 1;
   const pageSize = Number(url.searchParams.get("pageSize")) || 100;
-  return Response.json({ ok: true, data: await getCategoriesWithCounts({ page, pageSize }) });
+  return Response.json({ ok: true, data: await getCategoriesWithCounts(gate.storeId, { page, pageSize }) });
 }
 
 export async function POST(request: Request) {

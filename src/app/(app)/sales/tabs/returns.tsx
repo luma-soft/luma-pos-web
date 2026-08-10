@@ -18,6 +18,7 @@ import {
 import { DocumentFilterDrawer } from "./document-filter-drawer";
 import { ReturnDetailFooter, ReturnDetailPanel } from "./return-detail-panel";
 import { ReturnsTable } from "./returns-table";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 type SP = Record<string, string | undefined>;
 type RefundMethod = (typeof returnRefundMethods)[number];
@@ -60,6 +61,7 @@ export async function ReturnsTab({ searchParams }: { searchParams: SP }) {
 }
 
 async function ReturnsContent({ searchParams }: { searchParams: SP }) {
+  const context = await requireStoreContext();
   const t = await getTranslations();
   const page = positiveInteger(searchParams.page);
   const pageSize = parsePageSize(searchParams.size);
@@ -68,7 +70,7 @@ async function ReturnsContent({ searchParams }: { searchParams: SP }) {
   const refundMethod: RefundMethod = validValue(searchParams.refundMethod, returnRefundMethods, "all");
   const { from, to } = resolveDateFilter(searchParams);
   const [{ rows, total, pageCount }, expandedReturn] = await Promise.all([
-    getReturns({
+    getReturns(context.storeId, {
       q: searchParams.q,
       customerId: searchParams.customerId,
       productId: searchParams.productId,
@@ -84,7 +86,7 @@ async function ReturnsContent({ searchParams }: { searchParams: SP }) {
       page,
       pageSize,
     }),
-    expandedId ? getReturn(expandedId).catch(() => null) : Promise.resolve(null),
+    expandedId ? getReturn(context.storeId, expandedId).catch(() => null) : Promise.resolve(null),
   ]);
 
   return (

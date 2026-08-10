@@ -19,6 +19,7 @@ import {
 import { parsePageSize } from "@/lib/pagination";
 import { BookingsTable } from "./bookings-table";
 import { DocumentFilterDrawer } from "./document-filter-drawer";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 type SP = Record<string, string | undefined>;
 const BOOKING_STATUSES: OrderStatusFilter[] = ["confirmed", "all", "cancelled"];
@@ -64,6 +65,7 @@ export async function BookingsTab({ searchParams }: { searchParams: SP }) {
 }
 
 async function BookingsContent({ searchParams }: { searchParams: SP }) {
+  const context = await requireStoreContext();
   const t = await getTranslations();
   const status = validValue(searchParams.status, BOOKING_STATUSES, "confirmed");
   const payment = validValue(searchParams.payment, PAYMENT_STATUSES, "all");
@@ -71,7 +73,7 @@ async function BookingsContent({ searchParams }: { searchParams: SP }) {
   const delivery = resolveDeliveryFilter(searchParams);
   const page = positiveInteger(searchParams.page);
   const pageSize = parsePageSize(searchParams.size);
-  const { rows, total, pageCount } = await getOrders({
+  const { rows, total, pageCount } = await getOrders(context.storeId, {
     documentType: "booking",
     q: searchParams.q,
     customerId: searchParams.customerId,

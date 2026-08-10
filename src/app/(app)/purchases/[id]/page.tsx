@@ -13,6 +13,7 @@ import { Text } from "@/components/ui/text";
 import { PurchaseCancelButton } from "./purchase-actions";
 import { getPrintTemplatesForDoc } from "@/lib/print/template";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 function statusClass(status: string) {
   if (status === "cancelled") return "bg-er-soft text-er";
@@ -23,15 +24,16 @@ function statusClass(status: string) {
 
 export default async function PurchaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const context = await requireStoreContext();
   const t = await getTranslations();
-  const purchase = await getPurchase(id).catch(() => null);
+  const purchase = await getPurchase(context.storeId, id).catch(() => null);
   if (!purchase) notFound();
 
   const total = Number(purchase.total);
   const paid = Number(purchase.amountPaid);
   const owed = purchase.status === "cancelled" ? 0 : Math.max(0, total - paid);
   const canChange = purchase.status === "received" || purchase.status === "draft";
-  const printTemplates = await getPrintTemplatesForDoc("purchase");
+  const printTemplates = await getPrintTemplatesForDoc(context.storeId, "purchase");
 
   const printHref = `${Routes.purchase(purchase.id)}/print`;
   const copyHref = Routes.purchaseCopy(purchase.id);

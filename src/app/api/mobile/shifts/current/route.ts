@@ -8,7 +8,7 @@ export async function GET() {
   if (!gate.ok) return mobileGate(gate)!;
 
   const profileId = await getProfileId(gate.userId);
-  const shift = await getCurrentShift(profileId ?? gate.userId);
+  const shift = await getCurrentShift(gate.storeId, profileId ?? gate.userId);
   const summary = await getShiftSummary(shift);
 
   return mobileOk({

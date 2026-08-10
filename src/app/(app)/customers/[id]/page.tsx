@@ -12,13 +12,15 @@ import { CustomerTypeBadge } from "../type-badge";
 import { OrderStatusBadge, PaymentStatusBadge } from "../../orders/status-badges";
 import { PortalLink } from "./portal-link";
 import { CustomerEdit } from "./customer-edit";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 export default async function CustomerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const context = await requireStoreContext();
   const t = await getTranslations();
   const [customer, store] = await Promise.all([
-    getCustomer(id).catch(() => null),
-    getStoreSettings(),
+    getCustomer(context.storeId, id).catch(() => null),
+    getStoreSettings(context.storeId),
   ]);
   if (!customer) notFound();
 

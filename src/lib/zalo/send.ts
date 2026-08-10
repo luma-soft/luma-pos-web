@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { customers, einvoices, zaloMessageEvents } from "@/db/schema";
 import { formatCurrency } from "@/lib/utils";
@@ -9,8 +9,8 @@ import { sendOaTextMessage, sendZnsTemplate } from "./client";
 export type ZaloSendKind = "portal_link" | "invoice";
 
 export type ZaloSendInput =
-  | { kind: "portal_link"; customerId: string; url: string; actorId?: string | null }
-  | { kind: "invoice"; orderId: string; url?: string; actorId?: string | null };
+  | { kind: "portal_link"; storeId: string; customerId: string; url: string; actorId?: string | null }
+  | { kind: "invoice"; storeId: string; orderId: string; url?: string; actorId?: string | null };
 
 type ZaloSendPrepared = {
   kind: ZaloSendKind;
@@ -54,7 +54,7 @@ async function preparePortalLink(input: Extract<ZaloSendInput, { kind: "portal_l
   const [customer] = await db
     .select({ id: customers.id, name: customers.name, phone: customers.phone, zaloUserId: customers.zaloUserId })
     .from(customers)
-    .where(eq(customers.id, input.customerId))
+    .where(and(eq(customers.storeId, input.storeId), eq(customers.id, input.customerId)))
     .limit(1);
   if (!customer) return { error: "errors.notFound" };
   const phone = normalizePhone(customer.phone);
@@ -77,7 +77,7 @@ async function preparePortalLink(input: Extract<ZaloSendInput, { kind: "portal_l
 }
 
 async function prepareInvoice(input: Extract<ZaloSendInput, { kind: "invoice" }>, templateId: string): Promise<ZaloSendPrepared | { error: string }> {
-  const order = await getOrder(input.orderId);
+  const order = await getOrder(input.storeId, input.orderId);
   if (!order) return { error: "errors.notFound" };
   const phone = normalizePhone(order.customerPhone);
   if (!order.customerId) return { error: "zalo.errors.missingPhone" };
@@ -117,7 +117,7 @@ async function prepareInvoice(input: Extract<ZaloSendInput, { kind: "invoice" }>
 }
 
 export async function sendZaloMessage(input: ZaloSendInput) {
-  const config = await getZaloConfig();
+  const config = await getZaloConfig(input.storeId);
   if (!config.enabled) return { ok: false as const, error: "zalo.errors.notEnabled" };
   if (!config.accessToken) return { ok: false as const, error: "zalo.errors.missingAccessToken" };
   const templateId = input.kind === "portal_link" ? config.portalTemplateId : config.invoiceTemplateId;

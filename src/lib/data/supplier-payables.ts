@@ -23,11 +23,11 @@ export type SupplierPayableLedgerRow = {
 
 type PayableEvent = Omit<SupplierPayableLedgerRow, "balance"> & { sort: number };
 
-export async function getSupplierPayableOverview(supplierId: string, database: typeof db = db) {
+export async function getSupplierPayableOverview(storeId: string, supplierId: string, database: typeof db = db) {
   const [supplier] = await database
     .select({ id: suppliers.id, currentDebt: suppliers.currentDebt })
     .from(suppliers)
-    .where(eq(suppliers.id, supplierId))
+    .where(and(eq(suppliers.storeId, storeId), eq(suppliers.id, supplierId)))
     .limit(1);
   if (!supplier) return null;
 
@@ -44,6 +44,7 @@ export async function getSupplierPayableOverview(supplierId: string, database: t
       .from(purchaseOrders)
       .where(and(
         eq(purchaseOrders.supplierId, supplierId),
+        eq(purchaseOrders.storeId, storeId),
         sql`${purchaseOrders.status} in ('received', 'returned')`,
       ))
       .orderBy(desc(purchaseOrders.createdAt))
@@ -59,6 +60,7 @@ export async function getSupplierPayableOverview(supplierId: string, database: t
       .from(purchaseReturns)
       .where(and(
         eq(purchaseReturns.supplierId, supplierId),
+        eq(purchaseReturns.storeId, storeId),
         eq(purchaseReturns.status, "completed"),
         sql`${purchaseReturns.debtAmount} > 0`,
       ))
@@ -77,6 +79,7 @@ export async function getSupplierPayableOverview(supplierId: string, database: t
       .from(supplierPayableReceipts)
       .where(and(
         eq(supplierPayableReceipts.supplierId, supplierId),
+        eq(supplierPayableReceipts.storeId, storeId),
         eq(supplierPayableReceipts.status, "confirmed"),
       ))
       .orderBy(desc(supplierPayableReceipts.createdAt))
@@ -94,7 +97,7 @@ export async function getSupplierPayableOverview(supplierId: string, database: t
         createdAt: supplierPayableEntries.createdAt,
       })
       .from(supplierPayableEntries)
-      .where(eq(supplierPayableEntries.supplierId, supplierId))
+      .where(and(eq(supplierPayableEntries.storeId, storeId), eq(supplierPayableEntries.supplierId, supplierId)))
       .orderBy(desc(supplierPayableEntries.createdAt))
       .limit(100),
   ]);
@@ -104,9 +107,9 @@ export async function getSupplierPayableOverview(supplierId: string, database: t
       amount: sql<string>`coalesce(sum(${supplierPayableAllocations.amount}), 0)`,
     })
     .from(supplierPayableAllocations)
-    .where(inArray(
-      supplierPayableAllocations.purchaseOrderId,
-      purchases.map((purchase) => purchase.id),
+    .where(and(
+      eq(supplierPayableAllocations.storeId, storeId),
+      inArray(supplierPayableAllocations.purchaseOrderId, purchases.map((purchase) => purchase.id)),
     ))
     .groupBy(supplierPayableAllocations.purchaseOrderId);
   const allocatedPayments = new Map(

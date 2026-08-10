@@ -15,7 +15,7 @@ export type ManualPaymentCoreResult =
 export async function addManualPaymentCore(
   database: DbLike,
   input: AddPaymentInput,
-  actor: { profileId: string | null; shiftId: string | null },
+  actor: { storeId: string; profileId: string | null; shiftId: string | null },
 ): Promise<ManualPaymentCoreResult> {
   const parsed = addPaymentSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
@@ -26,7 +26,7 @@ export async function addManualPaymentCore(
       const [order] = await tx
         .select()
         .from(orders)
-        .where(eq(orders.id, value.orderId))
+        .where(and(eq(orders.storeId, actor.storeId), eq(orders.id, value.orderId)))
         .limit(1)
         .for("update");
       if (!order) throw new Error("ORDER_NOT_FOUND");
@@ -45,6 +45,7 @@ export async function addManualPaymentCore(
           .where(
             and(
               isNull(payments.provider),
+              eq(payments.storeId, actor.storeId),
               eq(payments.clientRequestId, value.clientRequestId),
             ),
           )
@@ -70,6 +71,7 @@ export async function addManualPaymentCore(
       }
 
       const [payment] = await tx.insert(payments).values({
+        storeId: actor.storeId,
         orderId: order.id,
         shiftId: actor.shiftId,
         amount: value.amount.toFixed(2),
@@ -81,6 +83,7 @@ export async function addManualPaymentCore(
         createdBy: actor.profileId,
       }).returning({ id: payments.id });
       await recordCashTx(tx, {
+        storeId: actor.storeId,
         type: "in",
         fund: fundForMethod(value.method),
         amount: value.amount,
@@ -100,14 +103,14 @@ export async function addManualPaymentCore(
           paymentStatus: newPaid >= total - 1e-9 ? "paid" : "partial",
           updatedAt: sql`now()`,
         })
-        .where(eq(orders.id, order.id));
+        .where(and(eq(orders.storeId, actor.storeId), eq(orders.id, order.id)));
 
       let notification = null;
       if (order.customerId) {
         const [customer] = await tx
           .select({ currentDebt: customers.currentDebt })
           .from(customers)
-          .where(eq(customers.id, order.customerId))
+          .where(and(eq(customers.storeId, actor.storeId), eq(customers.id, order.customerId)))
           .limit(1)
           .for("update");
         const debtDelta = -Math.min(
@@ -119,7 +122,7 @@ export async function addManualPaymentCore(
           .set({
             currentDebt: sql`greatest(${customers.currentDebt} - ${value.amount.toFixed(2)}, 0)`,
           })
-          .where(eq(customers.id, order.customerId));
+          .where(and(eq(customers.storeId, actor.storeId), eq(customers.id, order.customerId)));
         notification = await createDebtChangedEventInTx(tx, {
           entityType: "customer",
           entityId: order.customerId,

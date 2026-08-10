@@ -13,7 +13,7 @@ export async function GET(
     return mobileError("errors.notFound", 404);
   }
 
-  const supplier = await getSupplier(id);
+  const supplier = await getSupplier(gate.storeId, id);
   if (!supplier) return mobileError("errors.notFound", 404);
   return mobileOk({
     id: supplier.id,

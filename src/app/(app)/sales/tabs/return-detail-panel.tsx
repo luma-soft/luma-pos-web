@@ -6,6 +6,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { OrderDetailLink } from "@/components/order-detail-link";
 import { getPrintTemplatesForDoc } from "@/lib/print/template";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
+import { requireStoreContext } from "@/lib/auth/store-context";
 import { ReturnActions } from "./return-actions";
 
 type ReturnDetail = NonNullable<Awaited<ReturnType<typeof getReturn>>>;
@@ -144,7 +145,8 @@ export async function ReturnDetailPanel({ ret, compact = false }: { ret: ReturnD
 
 export async function ReturnDetailFooter({ ret }: { ret: ReturnDetail }) {
   const t = await getTranslations();
-  const printTemplates = await getPrintTemplatesForDoc("return");
+  const context = await requireStoreContext();
+  const printTemplates = await getPrintTemplatesForDoc(context.storeId, "return");
 
   return (
     <div className="flex flex-wrap justify-end gap-2">

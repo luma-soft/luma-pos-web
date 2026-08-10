@@ -16,6 +16,7 @@ import { OrderDetailActionGroup } from "@/components/order-detail-action-group";
 import { OrderProductLink } from "@/components/order-product-link";
 import { BookingCreateOrderButton, QuoteDeleteButton } from "../../quotes/quote-actions";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 export async function OrderDetailPanel({
   order,
@@ -27,7 +28,8 @@ export async function OrderDetailPanel({
   showOpenAction?: boolean;
 }) {
   const t = await getTranslations();
-  const store = await getStoreSettings();
+  const context = await requireStoreContext();
+  const store = await getStoreSettings(context.storeId);
   const total = Number(order.total);
   const paid = Number(order.amountPaid);
   const remaining = Math.max(0, total - paid);
@@ -46,9 +48,9 @@ export async function OrderDetailPanel({
           : null;
   const printDocType = isQuote ? "quote" : isBooking ? "booking" : "order";
   const [shareTemplate, printTemplates, returnPrintTemplates] = await Promise.all([
-    shareDocType ? getPrintTemplate(shareDocType) : Promise.resolve(null),
-    getPrintTemplatesForDoc(printDocType),
-    getPrintTemplatesForDoc("return"),
+    shareDocType ? getPrintTemplate(context.storeId, shareDocType) : Promise.resolve(null),
+    getPrintTemplatesForDoc(context.storeId, printDocType),
+    getPrintTemplatesForDoc(context.storeId, "return"),
   ]);
   const shareHref = shareTemplate
     ? `${Routes.order(order.id)}/print?${new URLSearchParams({ templateId: shareTemplate.id, size: shareTemplate.paperDefault }).toString()}`

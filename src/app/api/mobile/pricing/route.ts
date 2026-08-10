@@ -19,19 +19,18 @@ import {
 
 export async function GET(request: Request) {
   const gate = await requireMobileStockAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const page = numberParam(request, "page", 1);
   const pageSize = numberParam(request, "pageSize", 50);
   const sort = parsePricingSort(searchParam(request, "sort"));
   const priceBookId = searchParam(request, "priceBookId");
   const [books, categories, brands, suppliers, products] = await Promise.all([
-    getPriceBooks(),
-    getPricingCategories(),
-    getPricingBrands(),
-    getPricingSuppliers(),
-    getPricingPage({
+    getPriceBooks(gate.storeId),
+    getPricingCategories(gate.storeId),
+    getPricingBrands(gate.storeId),
+    getPricingSuppliers(gate.storeId),
+    getPricingPage(gate.storeId, {
       q: searchParam(request, "q"),
       categoryIds: csvParam(request, "categoryIds"),
       brandIds: csvParam(request, "brandIds"),
@@ -46,7 +45,7 @@ export async function GET(request: Request) {
     }),
   ]);
   const ids = products.rows.map((product) => product.id);
-  const overrides = await getPriceOverridesForProducts(ids);
+  const overrides = await getPriceOverridesForProducts(gate.storeId, ids);
   const rows = products.rows.map((product) => ({
     id: product.id,
     sku: product.sku,

@@ -5,6 +5,7 @@ import { getReturn } from "@/lib/data/returns";
 import { getPrintTemplate, type PaperSize } from "@/lib/print/template";
 import { PrintDoc } from "@/components/print/print-doc";
 import { AutoPrint } from "@/components/print/auto-print";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -14,10 +15,11 @@ interface Props {
 export default async function PrintReturnPage({ params, searchParams }: Props) {
   const { id } = await params;
   const { size: sizeParam, templateId } = await searchParams;
+  const context = await requireStoreContext();
   const t = await getTranslations();
   const [ret, template] = await Promise.all([
-    getReturn(id).catch(() => null),
-    getPrintTemplate("return", templateId),
+    getReturn(context.storeId, id).catch(() => null),
+    getPrintTemplate(context.storeId, "return", templateId),
   ]);
   if (!ret) notFound();
 

@@ -8,10 +8,12 @@ import { InstantFilterForm } from "@/components/instant-filter-form";
 import { InventoryFilterDrawer } from "./inventory-filter-drawer";
 import { getTranslations } from "next-intl/server";
 import { ListSearchFilterBar, ListSearchInput } from "@/components/list-search-filter";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 type SP = Record<string, string | undefined>;
 
 export async function InternalUseTab({ searchParams }: { searchParams: SP }) {
+  const context = await requireStoreContext();
   const t = await getTranslations();
   const filters = {
     q: searchParams.q,
@@ -23,9 +25,9 @@ export async function InternalUseTab({ searchParams }: { searchParams: SP }) {
     to: searchParams.to,
   };
   const [rows, options, total] = await Promise.all([
-    getInternalUseIssues({ limit: 50, ...filters }),
-    getPurchaseFormOptions(),
-    getInternalUseIssueCount(filters),
+    getInternalUseIssues(context.storeId, { limit: 50, ...filters }),
+    getPurchaseFormOptions(context.storeId),
+    getInternalUseIssueCount(context.storeId, filters),
   ]);
   const departments = Array.from(
     new Set(rows.map((row) => row.department?.trim()).filter(Boolean)),

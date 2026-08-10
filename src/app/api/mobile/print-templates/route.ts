@@ -6,11 +6,10 @@ import { PRINT_DOC_TYPES, type PrintDocType } from "@/lib/print/template-shared"
 
 export async function GET(request: Request) {
   const gate = await requireMobileUser();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const docTypeParam = searchParam(request, "docType") as PrintDocType | undefined;
-  const templates = await getAllPrintTemplates();
+  const templates = await getAllPrintTemplates(gate.storeId);
   const filtered = docTypeParam && PRINT_DOC_TYPES.includes(docTypeParam)
     ? templates.filter((template) => template.docType === docTypeParam)
     : templates;

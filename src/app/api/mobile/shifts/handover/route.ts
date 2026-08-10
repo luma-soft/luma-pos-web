@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   if (!gate.ok) return mobileGate(gate)!;
   const profileId = await getProfileId(gate.userId);
   if (!profileId) return mobileError("errors.invalidData");
-  const shift = await getCurrentShift(profileId);
+  const shift = await getCurrentShift(gate.storeId, profileId);
   if (!shift) return mobileError("shifts.errors.noOpen", 409);
 
   const body = await readJson(request);

@@ -7,10 +7,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const gate = await requireMobileSalesAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const { id } = await params;
-  const detail = await getReturn(id);
+  const detail = await getReturn(gate.storeId, id);
   return detail ? mobileOk(detail) : mobileError("errors.notFound", 404);
 }

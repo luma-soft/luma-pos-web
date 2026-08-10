@@ -7,7 +7,7 @@ export async function GET() {
   if (gate.ok === false) return mobileGate(gate);
 
   try {
-    return mobileOk(await getMobilePosData(gate.role));
+    return mobileOk(await getMobilePosData(gate.storeId, gate.role));
   } catch {
     return mobileError("errors.serverError", 503);
   }

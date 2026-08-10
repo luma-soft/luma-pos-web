@@ -16,6 +16,7 @@ import { calculateProductTax } from "@/lib/orders/product-tax";
 import { consumeTrackedStockLots, restoreTrackedStockLots } from "@/lib/inventory/stock-lot-service";
 import { createNotificationEventInTx } from "@/lib/notifications/events-core";
 import { publishCommittedNotification } from "@/lib/notifications/outbox";
+import { resolveStoreContextForUser } from "@/lib/auth/store-context";
 
 function revalidateOrderPaths(sourceOrderId?: string) {
   try {
@@ -44,6 +45,9 @@ export async function createOrderForUser(
   const parsed = createOrderSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
+  const context = await resolveStoreContextForUser(userId);
+  if (!context) return { ok: false, error: "errors.unauthorized" };
+  const { storeId } = context;
 
   const requestedPriceBookIds = [...new Set(v.items
     .map((item) => item.priceBookId === undefined ? v.priceBookId : item.priceBookId)
@@ -52,7 +56,7 @@ export async function createOrderForUser(
     const selectedPriceBooks = await db
       .select({ id: priceBooks.id, managerOnly: priceBooks.managerOnly })
       .from(priceBooks)
-      .where(inArray(priceBooks.id, requestedPriceBookIds));
+      .where(and(eq(priceBooks.storeId, storeId), inArray(priceBooks.id, requestedPriceBookIds)));
     if (selectedPriceBooks.length !== requestedPriceBookIds.length) return { ok: false, error: "errors.invalidData" };
     if (selectedPriceBooks.some((priceBook) => priceBook.managerOnly)) {
       const role = await getRole(userId);
@@ -73,7 +77,7 @@ export async function createOrderForUser(
 
   // Khử trùng: nếu đơn với clientId này đã tạo (đồng bộ lại) → trả về đơn cũ, không tạo trùng.
   if (v.clientId) {
-    const [existing] = await db.select({ id: orders.id, code: orders.code }).from(orders).where(eq(orders.clientId, v.clientId)).limit(1);
+    const [existing] = await db.select({ id: orders.id, code: orders.code }).from(orders).where(and(eq(orders.storeId, storeId), eq(orders.clientId, v.clientId))).limit(1);
     if (existing) return { ok: true, data: existing };
   }
 
@@ -82,7 +86,7 @@ export async function createOrderForUser(
   const isBooking = v.mode === "booking";
   let trustedItems;
   try {
-    trustedItems = await normalizeOrderItems(v.items, v.priceBookId);
+    trustedItems = await normalizeOrderItems(storeId, v.items, v.priceBookId);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
     if (["PRODUCT_NOT_FOUND", "UNIT_NOT_FOUND", "INVALID_ITEMS"].includes(msg)) {
@@ -95,7 +99,7 @@ export async function createOrderForUser(
   const productTaxRows = await db
     .select({ id: products.id, vatRate: products.vatRate })
     .from(products)
-    .where(inArray(products.id, [...new Set(trustedItems.map((item) => item.productId))]));
+    .where(and(eq(products.storeId, storeId), inArray(products.id, [...new Set(trustedItems.map((item) => item.productId))])));
   const vatRateByProduct = new Map(
     productTaxRows.map((product) => [
       product.id,
@@ -123,11 +127,11 @@ export async function createOrderForUser(
 
   try {
     const profileId = await getProfileId(userId);
-    const currentShift = profileId ? await getCurrentShift(profileId) : null;
+    const currentShift = profileId ? await getCurrentShift(storeId, profileId) : null;
 
     const result = await db.transaction(async (tx) => {
       const [sourceOrder] = v.source
-        ? await tx.select().from(orders).where(eq(orders.id, v.source.orderId)).limit(1)
+        ? await tx.select().from(orders).where(and(eq(orders.storeId, storeId), eq(orders.id, v.source.orderId))).limit(1)
         : [];
       if (v.source && !sourceOrder) throw new Error("SOURCE_NOT_FOUND");
       const sourceIsSale = sourceOrder?.status === "completed";
@@ -143,7 +147,7 @@ export async function createOrderForUser(
         if (!sourceMatchesMode) throw new Error("SOURCE_NOT_EDITABLE");
         if (sourceOrder.replacedByOrderId) throw new Error("SOURCE_ALREADY_REPLACED");
         const [hasReturn] = await tx.select({ id: returns.id }).from(returns)
-          .where(and(eq(returns.orderId, sourceOrder.id), eq(returns.status, "completed"))).limit(1);
+          .where(and(eq(returns.storeId, storeId), eq(returns.orderId, sourceOrder.id), eq(returns.status, "completed"))).limit(1);
         if (hasReturn) throw new Error("SOURCE_HAS_RETURNS");
         const [hasEInvoice] = await tx.select({ id: einvoices.id }).from(einvoices).where(eq(einvoices.orderId, sourceOrder.id)).limit(1);
         if (hasEInvoice) throw new Error("SOURCE_HAS_EINVOICE");
@@ -156,6 +160,7 @@ export async function createOrderForUser(
             })
             .from(stockMovements)
             .where(and(
+              eq(stockMovements.storeId, storeId),
               eq(stockMovements.refType, "order"),
               eq(stockMovements.refId, sourceOrder.id),
               eq(stockMovements.type, "sale"),
@@ -163,6 +168,7 @@ export async function createOrderForUser(
           for (const movement of sourceStockMovements) {
             const baseQty = Math.abs(Number(movement.quantity));
             await restoreTrackedStockLots(tx, {
+              storeId,
               productId: movement.productId,
               quantity: baseQty,
               sourceRefType: "order",
@@ -174,8 +180,9 @@ export async function createOrderForUser(
             await tx.update(stockLevels).set({
               quantity: sql`${stockLevels.quantity} + ${toQty(baseQty)}`,
               updatedAt: sql`now()`,
-            }).where(sql`${stockLevels.productId} = ${movement.productId} and ${stockLevels.warehouseId} = ${sourceOrder.warehouseId}`);
+            }).where(and(eq(stockLevels.storeId, storeId), eq(stockLevels.productId, movement.productId), eq(stockLevels.warehouseId, sourceOrder.warehouseId)));
             await tx.insert(stockMovements).values({
+              storeId,
               productId: movement.productId,
               warehouseId: sourceOrder.warehouseId,
               type: "return_in",
@@ -190,13 +197,13 @@ export async function createOrderForUser(
 
         // Phiếu đặt cũ đã giữ tồn nhưng chưa xuất kho: giải phóng trước khi tạo phiếu thay thế.
         if (sourceIsBooking && sourceOrder.warehouseId) {
-          const sourceItems = await tx.select().from(orderItems).where(eq(orderItems.orderId, sourceOrder.id));
+          const sourceItems = await tx.select().from(orderItems).where(and(eq(orderItems.storeId, storeId), eq(orderItems.orderId, sourceOrder.id)));
           for (const item of sourceItems) {
             const baseQty = Number(item.quantity) * Number(item.unitMultiplier);
             await tx.update(stockLevels).set({
               reserved: sql`greatest(0, ${stockLevels.reserved} - ${toQty(baseQty)})`,
               updatedAt: sql`now()`,
-            }).where(sql`${stockLevels.productId} = ${item.productId} and ${stockLevels.warehouseId} = ${sourceOrder.warehouseId}`);
+            }).where(and(eq(stockLevels.storeId, storeId), eq(stockLevels.productId, item.productId), eq(stockLevels.warehouseId, sourceOrder.warehouseId)));
           }
         }
 
@@ -205,14 +212,15 @@ export async function createOrderForUser(
           await tx.update(customers).set({
             currentDebt: sql`greatest(${customers.currentDebt} - ${toMoney(Math.max(0, sourceRemaining))}, 0)`,
             totalSpent: sql`greatest(${customers.totalSpent} - ${sourceOrder.total}, 0)`,
-          }).where(eq(customers.id, sourceOrder.customerId));
+          }).where(and(eq(customers.storeId, storeId), eq(customers.id, sourceOrder.customerId)));
         }
 
         if (sourceIsSale) {
-          const sourcePayments = await tx.select().from(payments).where(eq(payments.orderId, sourceOrder.id));
+          const sourcePayments = await tx.select().from(payments).where(and(eq(payments.storeId, storeId), eq(payments.orderId, sourceOrder.id)));
           for (const p of sourcePayments) {
             if (p.method === "credit") continue;
             await recordCashTx(tx, {
+              storeId,
               type: "out",
               fund: fundForMethod(p.method),
               amount: Number(p.amount),
@@ -228,6 +236,7 @@ export async function createOrderForUser(
       }
 
       const orderInsert: typeof orders.$inferInsert = {
+        storeId,
         code: generateCode(isQuote ? "BG" : "DH"),
         clientId: v.clientId ?? null,
         documentType: isQuote ? "quote" : isBooking ? "booking" : "sale",
@@ -268,11 +277,12 @@ export async function createOrderForUser(
           replacedByOrderId: order.id,
           note: `${sourceOrder.note ? `${sourceOrder.note} · ` : ""}Đã hủy để sửa, thay bằng ${order.code}`,
           updatedAt: sql`now()`,
-        }).where(eq(orders.id, sourceOrder.id));
+        }).where(and(eq(orders.storeId, storeId), eq(orders.id, sourceOrder.id)));
       }
 
       await tx.insert(orderItems).values(
         trustedItems.map((i) => ({
+          storeId,
           orderId: order.id,
           productId: i.productId,
           productName: i.productName,
@@ -287,6 +297,7 @@ export async function createOrderForUser(
 
       if (paid > 0) {
         await tx.insert(payments).values({
+          storeId,
           orderId: order.id,
           shiftId: currentShift?.id ?? null,
           amount: toMoney(paid),
@@ -295,6 +306,7 @@ export async function createOrderForUser(
           createdBy: profileId,
         });
         await recordCashTx(tx, {
+          storeId,
           type: "in", fund: fundForMethod(v.payment.method), amount: paid,
           category: "sale", refType: "order", refId: order.id,
           note: order.code, createdBy: profileId, shiftId: currentShift?.id ?? null,
@@ -307,12 +319,13 @@ export async function createOrderForUser(
           for (const stockItem of item.stockItems) {
             const baseQty = stockItem.quantity;
             await tx.insert(stockLevels).values({
+              storeId,
               productId: stockItem.productId,
               warehouseId: v.warehouseId,
               quantity: "0",
               reserved: toQty(baseQty),
             }).onConflictDoUpdate({
-              target: [stockLevels.productId, stockLevels.warehouseId],
+              target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
               set: {
                 reserved: sql`${stockLevels.reserved} + ${toQty(baseQty)}`,
                 updatedAt: sql`now()`,
@@ -333,6 +346,7 @@ export async function createOrderForUser(
         for (const stockItem of i.stockItems) {
           const baseQty = stockItem.quantity;
           await consumeTrackedStockLots(tx, {
+            storeId,
             productId: stockItem.productId,
             warehouseId: v.warehouseId,
             quantity: baseQty,
@@ -343,18 +357,20 @@ export async function createOrderForUser(
           await tx
             .insert(stockLevels)
             .values({
+              storeId,
               productId: stockItem.productId,
               warehouseId: v.warehouseId,
               quantity: toQty(-baseQty),
             })
             .onConflictDoUpdate({
-              target: [stockLevels.productId, stockLevels.warehouseId],
+              target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
               set: {
                 quantity: sql`${stockLevels.quantity} - ${toQty(baseQty)}`,
                 updatedAt: sql`now()`,
               },
             });
           await tx.insert(stockMovements).values({
+            storeId,
             productId: stockItem.productId,
             warehouseId: v.warehouseId,
             type: "sale",
@@ -372,7 +388,7 @@ export async function createOrderForUser(
         await tx.update(customers).set({
           currentDebt: sql`${customers.currentDebt} + ${toMoney(remaining)}`,
           totalSpent: sql`${customers.totalSpent} + ${toMoney(total)}`,
-        }).where(eq(customers.id, v.customerId));
+        }).where(and(eq(customers.storeId, storeId), eq(customers.id, v.customerId)));
       }
 
       const notification = v.source?.mode === "edit"
@@ -404,7 +420,7 @@ export async function createOrderForUser(
   } catch (e) {
     // Trùng clientId (đua khi đồng bộ song song) → đơn đã tồn tại, trả về đơn cũ.
     if (v.clientId && isUniqueViolation(e)) {
-      const [existing] = await db.select({ id: orders.id, code: orders.code }).from(orders).where(eq(orders.clientId, v.clientId)).limit(1);
+      const [existing] = await db.select({ id: orders.id, code: orders.code }).from(orders).where(and(eq(orders.storeId, storeId), eq(orders.clientId, v.clientId))).limit(1);
       if (existing) return { ok: true, data: existing };
     }
     const known: Record<string, string> = {

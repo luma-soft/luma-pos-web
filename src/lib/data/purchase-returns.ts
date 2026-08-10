@@ -14,10 +14,10 @@ import { accentInsensitiveLike } from "@/lib/search";
 import { coercePageSize } from "@/lib/pagination";
 import { stockManagedCategoryCondition } from "@/lib/data/product-stock";
 
-export async function getPurchaseReturns(filters: { q?: string; status?: string; settlement?: string; supplierId?: string; warehouseId?: string; from?: string; to?: string; page?: number; pageSize?: number } = {}) {
+export async function getPurchaseReturns(storeId: string, filters: { q?: string; status?: string; settlement?: string; supplierId?: string; warehouseId?: string; from?: string; to?: string; page?: number; pageSize?: number } = {}) {
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize);
-  const conditions: SQL[] = [];
+  const conditions: SQL[] = [eq(purchaseReturns.storeId, storeId)];
   if (filters.q?.trim()) {
     const q = filters.q.trim();
     const c = or(accentInsensitiveLike(purchaseReturns.code, q), accentInsensitiveLike(suppliers.name, q));
@@ -83,7 +83,10 @@ export async function getPurchaseReturns(filters: { q?: string; status?: string;
         })
         .from(purchaseReturnItems)
         .innerJoin(products, eq(purchaseReturnItems.productId, products.id))
-        .where(inArray(purchaseReturnItems.purchaseReturnId, ids))
+        .where(and(
+          eq(purchaseReturnItems.storeId, storeId),
+          inArray(purchaseReturnItems.purchaseReturnId, ids),
+        ))
         .orderBy(asc(purchaseReturnItems.productName))
     : [];
   const itemsByReturn = new Map<string, typeof itemRows>();
@@ -102,7 +105,7 @@ export async function getPurchaseReturns(filters: { q?: string; status?: string;
   };
 }
 
-export async function getPurchaseReturn(id: string) {
+export async function getPurchaseReturn(storeId: string, id: string) {
   const rows = await db
     .select({
       id: purchaseReturns.id,
@@ -130,7 +133,10 @@ export async function getPurchaseReturn(id: string) {
     .innerJoin(suppliers, eq(purchaseReturns.supplierId, suppliers.id))
     .innerJoin(warehouses, eq(purchaseReturns.warehouseId, warehouses.id))
     .leftJoin(profiles, eq(purchaseReturns.createdBy, profiles.id))
-    .where(eq(purchaseReturns.id, id))
+    .where(and(
+      eq(purchaseReturns.id, id),
+      eq(purchaseReturns.storeId, storeId),
+    ))
     .limit(1);
   const ret = rows[0];
   if (!ret) return null;
@@ -148,14 +154,17 @@ export async function getPurchaseReturn(id: string) {
       total: purchaseReturnItems.total,
     })
     .from(purchaseReturnItems)
-    .where(eq(purchaseReturnItems.purchaseReturnId, id))
+    .where(and(
+      eq(purchaseReturnItems.purchaseReturnId, id),
+      eq(purchaseReturnItems.storeId, storeId),
+    ))
     .orderBy(asc(purchaseReturnItems.productName));
   return { ...ret, items };
 }
 
 export { getPurchaseFormOptions as getPurchaseReturnFormOptions } from "@/lib/data/inventory";
 
-export async function searchPurchaseReturnProductRows(q: string, warehouseId: string) {
+export async function searchPurchaseReturnProductRows(storeId: string, q: string, warehouseId: string) {
   const term = q.trim();
   if (!term || !warehouseId) return [];
   return db
@@ -171,6 +180,7 @@ export async function searchPurchaseReturnProductRows(q: string, warehouseId: st
     .leftJoin(categories, eq(products.categoryId, categories.id))
     .leftJoin(stockLevels, and(eq(stockLevels.productId, products.id), eq(stockLevels.warehouseId, warehouseId)))
     .where(and(
+      eq(products.storeId, storeId),
       eq(products.isActive, true),
       stockManagedCategoryCondition(),
       or(accentInsensitiveLike(products.name, term), accentInsensitiveLike(products.sku, term), accentInsensitiveLike(products.barcode, term)),

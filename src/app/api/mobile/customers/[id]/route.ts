@@ -16,11 +16,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const gate = await requireMobileSalesAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const { id } = await params;
-  const customer = await getCustomer(id);
+  const customer = await getCustomer(gate.storeId, id);
   if (!customer) return mobileError("errors.notFound", 404);
   return mobileOk(customer);
 }
@@ -39,10 +38,10 @@ export async function PATCH(
   }
 
   return mobileAction(
-    await updateCustomerCore({
+    await updateCustomerCore(gate.storeId, {
       ...(body as Record<string, unknown>),
       id,
-    } as Parameters<typeof updateCustomerCore>[0])
+    } as Parameters<typeof updateCustomerCore>[1])
   );
 }
 

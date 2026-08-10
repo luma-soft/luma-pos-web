@@ -22,12 +22,11 @@ import { parseOrderListSearchParams } from "@/lib/orders/list-filter-schema";
 
 export async function GET(request: Request) {
   const gate = await requireMobileSalesAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const parsed = parseOrderListSearchParams(new URL(request.url).searchParams);
   if (!parsed.success) return mobileError("errors.invalidData", 400);
-  return mobileOk(await getOrders(parsed.data));
+  return mobileOk(await getOrders(gate.storeId, parsed.data));
 }
 
 export async function POST(request: Request) {
@@ -52,7 +51,7 @@ export async function POST(request: Request) {
 
   let trustedItems;
   try {
-    trustedItems = await normalizeOrderItems(value.items, value.priceBookId);
+    trustedItems = await normalizeOrderItems(gate.storeId, value.items, value.priceBookId);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (
@@ -64,7 +63,7 @@ export async function POST(request: Request) {
   }
   let requirement;
   try {
-    const prefs = await getRawStorePrefs();
+    const prefs = await getRawStorePrefs(gate.storeId);
     requirement = evaluateOrderApprovalRequirement({
       clientId: value.clientId,
       rawItems: value.items,

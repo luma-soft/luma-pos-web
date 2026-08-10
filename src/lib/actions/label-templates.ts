@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { labelTemplates } from "@/db/schema";
 import { type ActionResult, requireManager } from "./common";
@@ -37,7 +37,7 @@ function revalidateLabelTemplatePaths() {
 }
 
 export async function saveLabelTemplate(input: SaveLabelTemplateInput): Promise<ActionResult<{ id?: string }>> {
-  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const gate = await requireManager(); if (!gate.ok) return gate;
   const parsed = saveSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
@@ -45,7 +45,7 @@ export async function saveLabelTemplate(input: SaveLabelTemplateInput): Promise<
   try {
     const saved = await db.transaction(async (tx) => {
       if (v.isDefault) {
-        await tx.update(labelTemplates).set({ isDefault: false, updatedAt: sql`now()` });
+        await tx.update(labelTemplates).set({ isDefault: false, updatedAt: sql`now()` }).where(eq(labelTemplates.storeId, gate.storeId));
       }
 
       if (v.id && !v.id.startsWith("default-")) {
@@ -72,7 +72,7 @@ export async function saveLabelTemplate(input: SaveLabelTemplateInput): Promise<
             sortOrder: v.sortOrder,
             updatedAt: sql`now()`,
           })
-          .where(eq(labelTemplates.id, v.id))
+          .where(and(eq(labelTemplates.storeId, gate.storeId), eq(labelTemplates.id, v.id)))
           .returning({ id: labelTemplates.id });
         return row;
       }
@@ -80,6 +80,7 @@ export async function saveLabelTemplate(input: SaveLabelTemplateInput): Promise<
       const [row] = await tx
         .insert(labelTemplates)
         .values({
+          storeId: gate.storeId,
           name: v.name,
           widthMm: String(v.widthMm),
           heightMm: String(v.heightMm),
@@ -111,11 +112,12 @@ export async function saveLabelTemplate(input: SaveLabelTemplateInput): Promise<
 }
 
 export async function duplicateLabelTemplate(id: string): Promise<ActionResult<{ id: string }>> {
-  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const gate = await requireManager(); if (!gate.ok) return gate;
   try {
-    const [source] = await db.select().from(labelTemplates).where(eq(labelTemplates.id, id)).limit(1);
+    const [source] = await db.select().from(labelTemplates).where(and(eq(labelTemplates.storeId, gate.storeId), eq(labelTemplates.id, id))).limit(1);
     if (!source) return { ok: false, error: "errors.notFound" };
     const [row] = await db.insert(labelTemplates).values({
+      storeId: gate.storeId,
       name: `${source.name} copy`,
       widthMm: source.widthMm,
       heightMm: source.heightMm,
@@ -144,11 +146,11 @@ export async function duplicateLabelTemplate(id: string): Promise<ActionResult<{
 }
 
 export async function setDefaultLabelTemplate(id: string): Promise<ActionResult> {
-  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const gate = await requireManager(); if (!gate.ok) return gate;
   try {
     await db.transaction(async (tx) => {
-      await tx.update(labelTemplates).set({ isDefault: false, updatedAt: sql`now()` });
-      await tx.update(labelTemplates).set({ isDefault: true, isActive: true, updatedAt: sql`now()` }).where(eq(labelTemplates.id, id));
+      await tx.update(labelTemplates).set({ isDefault: false, updatedAt: sql`now()` }).where(eq(labelTemplates.storeId, gate.storeId));
+      await tx.update(labelTemplates).set({ isDefault: true, isActive: true, updatedAt: sql`now()` }).where(and(eq(labelTemplates.storeId, gate.storeId), eq(labelTemplates.id, id)));
     });
     revalidateLabelTemplatePaths();
     return { ok: true, data: undefined };
@@ -159,12 +161,12 @@ export async function setDefaultLabelTemplate(id: string): Promise<ActionResult>
 }
 
 export async function deactivateLabelTemplate(id: string): Promise<ActionResult> {
-  { const gate = await requireManager(); if (!gate.ok) return gate; }
+  const gate = await requireManager(); if (!gate.ok) return gate;
   try {
-    const [row] = await db.select({ isDefault: labelTemplates.isDefault }).from(labelTemplates).where(eq(labelTemplates.id, id)).limit(1);
+    const [row] = await db.select({ isDefault: labelTemplates.isDefault }).from(labelTemplates).where(and(eq(labelTemplates.storeId, gate.storeId), eq(labelTemplates.id, id))).limit(1);
     if (!row) return { ok: false, error: "errors.notFound" };
     if (row.isDefault) return { ok: false, error: "labelSettings.errors.defaultRequired" };
-    await db.update(labelTemplates).set({ isActive: false, updatedAt: sql`now()` }).where(eq(labelTemplates.id, id));
+    await db.update(labelTemplates).set({ isActive: false, updatedAt: sql`now()` }).where(and(eq(labelTemplates.storeId, gate.storeId), eq(labelTemplates.id, id)));
     revalidateLabelTemplatePaths();
     return { ok: true, data: undefined };
   } catch (e) {
