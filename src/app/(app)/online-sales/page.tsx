@@ -15,6 +15,7 @@ import { Select } from "@/components/ui/select";
 import { NumberInput } from "@/components/ui/number-input";
 import { OnlineSalesListingButton } from "./online-sales-product-search";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { requirePageFeature } from "@/lib/tenancy/page-feature";
 
 type SP = Record<string, string | undefined>;
 type OnlineSalesTab = "overview" | "channels" | "listings" | "orders" | "inbox" | "sync";
@@ -30,6 +31,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 
 export default async function OnlineSalesPage({ searchParams }: { searchParams: Promise<SP> }) {
   if (!ONLINE_SALES_ENABLED) redirect(Routes.Dashboard);
+  await requirePageFeature("online_sales");
 
   const context = await requireStoreContext();
   const locale = await getLocale();

@@ -1,10 +1,10 @@
 import { createDraftPurchaseForUser } from "@/lib/purchases/draft";
 import { requireAiProviderConfigured } from "@/lib/ai/config";
-import { requireMobileStockAccess } from "@/lib/mobile/auth";
+import { requireMobileAiStockAccess } from "@/lib/mobile/auth";
 import { mobileAction, mobileGate, readJson } from "@/lib/mobile/response";
 
 export async function POST(request: Request) {
-  const gate = await requireMobileStockAccess();
+  const gate = await requireMobileAiStockAccess();
   if (!gate.ok) return mobileGate(gate)!;
   const aiBlocked = await requireAiProviderConfigured();
   if (aiBlocked) return aiBlocked;

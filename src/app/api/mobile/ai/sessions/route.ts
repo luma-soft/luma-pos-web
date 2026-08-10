@@ -2,7 +2,7 @@ import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { aiChatMessages, aiChatSessions } from "@/db/schema";
 import { requireAiProviderConfigured } from "@/lib/ai/config";
-import { requireMobileUser } from "@/lib/mobile/auth";
+import { requireMobileAiUser } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
 
 const MAX_MESSAGES = 120;
@@ -51,7 +51,7 @@ async function getOwnedSession(storeId: string, sessionId: string, userId: strin
 }
 
 export async function GET(request: Request) {
-  const gate = await requireMobileUser();
+  const gate = await requireMobileAiUser();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileGate(gate)!;
@@ -95,7 +95,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const gate = await requireMobileUser();
+  const gate = await requireMobileAiUser();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileGate(gate)!;
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const gate = await requireMobileUser();
+  const gate = await requireMobileAiUser();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileGate(gate)!;
@@ -145,7 +145,7 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const gate = await requireMobileUser();
+  const gate = await requireMobileAiUser();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileGate(gate)!;

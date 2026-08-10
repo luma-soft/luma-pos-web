@@ -6,10 +6,12 @@ import { Text } from "@/components/ui/text";
 import { Assistant } from "./assistant";
 import { AiHelpButton } from "./ai-help-button";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { requirePageFeature } from "@/lib/tenancy/page-feature";
 
 export const dynamic = "force-dynamic";
 
 export default async function AiPage() {
+  await requirePageFeature("ai_assistant");
   const context = await requireStoreContext();
   const [t, user, store] = await Promise.all([
     getTranslations(),

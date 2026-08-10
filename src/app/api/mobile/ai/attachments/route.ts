@@ -3,7 +3,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { writeAuditLog } from "@/lib/audit";
 import { requireAiProviderConfigured } from "@/lib/ai/config";
 import { getAiAttachmentsBucket } from "@/lib/data/settings";
-import { requireMobileManager } from "@/lib/mobile/auth";
+import { requireMobileAiManager } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
@@ -59,7 +59,7 @@ async function ensureBucket(bucketName: string) {
 }
 
 export async function POST(request: Request) {
-  const gate = await requireMobileManager();
+  const gate = await requireMobileAiManager();
   if (!gate.ok) return mobileGate(gate)!;
   if (!gate.ok) return mobileError("errors.unauthorized", 401);
   const aiBlocked = await requireAiProviderConfigured();
@@ -170,7 +170,7 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const gate = await requireMobileManager();
+  const gate = await requireMobileAiManager();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileError("errors.unauthorized", 401);

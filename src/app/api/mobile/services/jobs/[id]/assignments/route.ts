@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { requireMobileManager } from "@/lib/mobile/auth";
+import { requireMobileServiceManager } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
 import {
   assignServiceJobCore,
@@ -11,7 +11,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const gate = await requireMobileManager();
+  const gate = await requireMobileServiceManager();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileError("errors.unauthorized", 401);
@@ -51,7 +51,7 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const gate = await requireMobileManager();
+  const gate = await requireMobileServiceManager();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileError("errors.unauthorized", 401);

@@ -1,5 +1,5 @@
 import { issueEInvoiceForUser } from "@/lib/actions/einvoice";
-import { requireMobileManager } from "@/lib/mobile/auth";
+import { requireMobileEinvoiceManager } from "@/lib/mobile/auth";
 import {
   OFFLINE_ACTOR_HEADER,
   validateOfflineReplayActor,
@@ -15,7 +15,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const gate = await requireMobileManager();
+  const gate = await requireMobileEinvoiceManager();
   if (!gate.ok) return mobileGate(gate)!;
   if (
     !validateOfflineReplayActor({

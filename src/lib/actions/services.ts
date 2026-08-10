@@ -21,8 +21,7 @@ import {
   generateCode,
   isUniqueViolation,
   pgErrorCode,
-  requireManager,
-  requireStockAccess,
+  requireFeatureRole,
   toMoney,
   toQty,
 } from "@/lib/actions/common";
@@ -79,6 +78,9 @@ import {
   syncServiceJobPrimaryAssigneeCore,
 } from "@/lib/services/job-assignment";
 import { completeMaintenanceOccurrenceForJobCore } from "@/lib/services/maintenance-lifecycle";
+
+const requireServiceManager = () => requireFeatureRole("field_services", ["owner", "manager"]);
+const requireServiceStockAccess = () => requireFeatureRole("field_services", ["owner", "manager", "warehouse"]);
 
 function revalidateServiceProject(projectId?: string) {
   revalidatePath(Routes.Services);
@@ -192,7 +194,7 @@ async function isServiceProject(storeId: string, projectId: string) {
 export async function createServiceProject(
   input: ServiceProjectCreateInput,
 ): Promise<ActionResult<{ id: string }>> {
-  const gate = await requireManager();
+  const gate = await requireServiceManager();
   if (!gate.ok) return gate;
   const parsed = serviceProjectCreateSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
@@ -223,7 +225,7 @@ export async function createServiceProject(
 export async function createServiceJob(
   input: ServiceJobCreateInput,
 ): Promise<ActionResult<{ id: string; code: string }>> {
-  const gate = await requireManager();
+  const gate = await requireServiceManager();
   if (!gate.ok) return gate;
   const parsed = serviceJobCreateSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
@@ -287,7 +289,7 @@ export async function createServiceJob(
 export async function updateServiceJob(
   input: ServiceJobUpdateInput,
 ): Promise<ActionResult> {
-  const gate = await requireManager();
+  const gate = await requireServiceManager();
   if (!gate.ok) return gate;
   const parsed = serviceJobUpdateSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
@@ -346,7 +348,7 @@ export async function updateServiceJob(
 export async function transitionServiceJob(
   input: ServiceJobTransitionInput,
 ): Promise<ActionResult> {
-  const gate = await requireManager();
+  const gate = await requireServiceManager();
   if (!gate.ok) return gate;
   const parsed = serviceJobTransitionSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
@@ -426,7 +428,7 @@ export async function updateServiceChecklist(
   jobId: string,
   checklist: ServiceChecklistItem[],
 ): Promise<ActionResult> {
-  const gate = await requireManager();
+  const gate = await requireServiceManager();
   if (!gate.ok) return gate;
   if (!Array.isArray(checklist) || checklist.some((item) =>
     !item || typeof item.code !== "string" || typeof item.labelKey !== "string" || typeof item.completed !== "boolean"
@@ -448,7 +450,7 @@ export async function updateServiceChecklist(
 export async function saveServiceJobMaterial(
   input: ServiceJobMaterialInput,
 ): Promise<ActionResult> {
-  const gate = await requireManager();
+  const gate = await requireServiceManager();
   if (!gate.ok) return gate;
   const parsed = serviceJobMaterialSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
@@ -485,7 +487,7 @@ export async function saveServiceJobMaterial(
 export async function syncServiceJobMaterialStock(
   input: ServiceMaterialStockSyncInput,
 ): Promise<ActionResult<{ issuedBaseQuantity: number }>> {
-  const gate = await requireStockAccess();
+  const gate = await requireServiceStockAccess();
   if (!gate.ok) return gate;
   const parsed = serviceMaterialStockSyncSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
@@ -518,7 +520,7 @@ export async function syncServiceJobMaterialStock(
 export async function reserveServiceJobMaterial(
   input: ServiceMaterialReservationInput,
 ): Promise<ActionResult<{ quantityBase: number }>> {
-  const gate = await requireStockAccess();
+  const gate = await requireServiceStockAccess();
   if (!gate.ok) return gate;
   const parsed = serviceMaterialReservationSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
@@ -540,7 +542,7 @@ export async function reserveServiceJobMaterial(
 }
 
 export async function releaseServiceJobMaterialReservations(materialId: string): Promise<ActionResult> {
-  const gate = await requireStockAccess();
+  const gate = await requireServiceStockAccess();
   if (!gate.ok) return gate;
   try {
     const result = await db.transaction((tx) => releaseServiceJobMaterialReservationsCore(tx, { storeId: gate.storeId, materialId }));
@@ -558,7 +560,7 @@ export async function releaseServiceJobMaterialReservations(materialId: string):
 export async function saveServiceHandoverDocument(
   input: ServiceHandoverDocumentInput,
 ): Promise<ActionResult<{ id: string }>> {
-  const gate = await requireManager();
+  const gate = await requireServiceManager();
   if (!gate.ok) return gate;
   const parsed = serviceHandoverDocumentSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
@@ -608,7 +610,7 @@ export async function saveServiceHandoverDocument(
 }
 
 export async function deleteServiceHandoverDocument(id: string): Promise<ActionResult> {
-  const gate = await requireManager();
+  const gate = await requireServiceManager();
   if (!gate.ok) return gate;
   try {
     const [document] = await db.delete(serviceHandoverDocuments).where(and(eq(serviceHandoverDocuments.storeId, gate.storeId), eq(serviceHandoverDocuments.id, id)))
@@ -625,7 +627,7 @@ export async function deleteServiceHandoverDocument(id: string): Promise<ActionR
 export async function saveServiceMaintenancePlan(
   input: ServiceMaintenancePlanInput,
 ): Promise<ActionResult<{ id: string }>> {
-  const gate = await requireManager();
+  const gate = await requireServiceManager();
   if (!gate.ok) return gate;
   const parsed = serviceMaintenancePlanSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
@@ -713,14 +715,14 @@ export async function saveServiceMaintenancePlan(
 }
 
 export async function completeServiceMaintenancePlan(id: string): Promise<ActionResult> {
-  const gate = await requireManager();
+  const gate = await requireServiceManager();
   if (!gate.ok) return gate;
   void id;
   return { ok: false, error: "services.errors.completeMaintenanceThroughJob" };
 }
 
 export async function deleteServiceMaintenancePlan(id: string): Promise<ActionResult> {
-  const gate = await requireManager();
+  const gate = await requireServiceManager();
   if (!gate.ok) return gate;
   try {
     const [history] = await db.select({ id: serviceMaintenanceOccurrences.id })
@@ -746,7 +748,7 @@ export async function deleteServiceMaintenancePlan(id: string): Promise<ActionRe
 export async function saveServiceCostEntry(
   input: ServiceCostEntryInput,
 ): Promise<ActionResult<{ id: string }>> {
-  const gate = await requireManager();
+  const gate = await requireServiceManager();
   if (!gate.ok) return gate;
   const parsed = serviceCostEntrySchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
@@ -812,7 +814,7 @@ export async function saveServiceCostEntry(
 }
 
 export async function deleteServiceCostEntry(id: string): Promise<ActionResult> {
-  const gate = await requireManager();
+  const gate = await requireServiceManager();
   if (!gate.ok) return gate;
   try {
     const [entry] = await db.delete(serviceCostEntries).where(and(eq(serviceCostEntries.storeId, gate.storeId), eq(serviceCostEntries.id, id)))
@@ -829,7 +831,7 @@ export async function deleteServiceCostEntry(id: string): Promise<ActionResult> 
 export async function createInstalledAsset(
   input: InstalledAssetCreateInput,
 ): Promise<ActionResult<{ id: string }>> {
-  const gate = await requireManager();
+  const gate = await requireServiceManager();
   if (!gate.ok) return gate;
   const parsed = installedAssetCreateSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
@@ -879,7 +881,7 @@ export async function createInstalledAsset(
 export async function updateInstalledAsset(
   input: InstalledAssetUpdateInput,
 ): Promise<ActionResult> {
-  const gate = await requireManager();
+  const gate = await requireServiceManager();
   if (!gate.ok) return gate;
   const parsed = installedAssetUpdateSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
@@ -931,7 +933,7 @@ export async function updateInstalledAsset(
 export async function createWarrantyClaim(
   input: WarrantyClaimCreateInput,
 ): Promise<ActionResult<{ id: string; code: string }>> {
-  const gate = await requireManager();
+  const gate = await requireServiceManager();
   if (!gate.ok) return gate;
   const parsed = warrantyClaimCreateSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
@@ -977,7 +979,7 @@ export async function createWarrantyClaim(
 export async function updateWarrantyClaim(
   input: WarrantyClaimUpdateInput,
 ): Promise<ActionResult> {
-  const gate = await requireManager();
+  const gate = await requireServiceManager();
   if (!gate.ok) return gate;
   const parsed = warrantyClaimUpdateSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
@@ -1070,7 +1072,7 @@ export async function updateWarrantyClaim(
 export async function transitionWarrantyClaim(
   input: WarrantyClaimTransitionInput,
 ): Promise<ActionResult> {
-  const gate = await requireManager();
+  const gate = await requireServiceManager();
   if (!gate.ok) return gate;
   const parsed = warrantyClaimTransitionSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };

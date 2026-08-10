@@ -1,4 +1,4 @@
-import { asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { brands, products } from "@/db/schema";
 
@@ -37,7 +37,7 @@ export type HikvisionQuoteProduct = {
   specs: Record<string, string[]>;
 };
 
-export async function getHikvisionQuoteProducts(): Promise<HikvisionQuoteProduct[]> {
+export async function getHikvisionQuoteProducts(storeId: string): Promise<HikvisionQuoteProduct[]> {
   const rows = await db
     .select({
       sku: products.sku,
@@ -48,7 +48,7 @@ export async function getHikvisionQuoteProducts(): Promise<HikvisionQuoteProduct
     })
     .from(products)
     .leftJoin(brands, eq(products.brandId, brands.id))
-    .where(inArray(products.sku, [...HIKVISION_QUOTE_SKUS]))
+    .where(and(eq(products.storeId, storeId), inArray(products.sku, [...HIKVISION_QUOTE_SKUS])))
     .orderBy(asc(products.name));
 
   return rows.map((row) => ({

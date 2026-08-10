@@ -8,6 +8,7 @@ import {
   serviceJobs,
   serviceMaintenanceOccurrences,
   serviceMaintenancePlans,
+  storeFeatures,
 } from "@/db/schema";
 import { createDefaultChecklist } from "@/lib/services/domain";
 import { requireActiveTechnicianCore } from "@/lib/services/job-assignment";
@@ -225,6 +226,11 @@ export async function runMaintenanceWorker(input?: {
     .slice(0, 10);
   const plans = await db.select({ id: serviceMaintenancePlans.id })
     .from(serviceMaintenancePlans)
+    .innerJoin(storeFeatures, and(
+      eq(storeFeatures.storeId, serviceMaintenancePlans.storeId),
+      eq(storeFeatures.featureKey, "field_services"),
+      eq(storeFeatures.enabled, true),
+    ))
     .where(and(
       eq(serviceMaintenancePlans.isActive, true),
       lte(serviceMaintenancePlans.nextDueOn, dueThrough),

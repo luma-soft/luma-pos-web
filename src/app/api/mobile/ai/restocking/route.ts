@@ -1,11 +1,11 @@
 import { RESTOCK_COVER_DAYS } from "@/lib/ai/restock-policy";
 import { getRestockSuggestions } from "@/lib/data/ai-restock";
 import { requireAiProviderConfigured } from "@/lib/ai/config";
-import { requireMobileStockAccess } from "@/lib/mobile/auth";
+import { requireMobileAiStockAccess } from "@/lib/mobile/auth";
 import { mobileGate, mobileOk, numberParam } from "@/lib/mobile/response";
 
 export async function GET(request: Request) {
-  const gate = await requireMobileStockAccess();
+  const gate = await requireMobileAiStockAccess();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   const aiBlocked = await requireAiProviderConfigured();

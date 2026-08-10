@@ -28,6 +28,7 @@ import {
   pgErrorCode,
   requireStockAccess,
   requireManager,
+  requireFeatureRole,
   toMoney,
 } from "./common";
 
@@ -577,7 +578,7 @@ export async function setCameraMaterial(input: {
   productId: string;
   enabled: boolean;
 }): Promise<ActionResult> {
-  const gate = await requireStockAccess();
+  const gate = await requireFeatureRole("camera_quote_builder", ["owner", "manager", "warehouse"]);
   if (!gate.ok) return gate;
   try {
     const [current] = await db

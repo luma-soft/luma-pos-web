@@ -88,14 +88,14 @@ export default async function MorePage() {
 
         {(manager || sales) && (
           <MoreSection title={t("nav.groups.manage")}>
-            {sales && <MobileSettingsRow href={Routes.CameraQuote} icon={Camera} label={t("mobile.more.cameraQuote")} subtitle={t("mobile.more.cameraQuoteHint")} tone="blue" target="_blank" />}
-            {sales && <MobileSettingsRow href={Routes.HunonicPriceList} icon={Cpu} label={t("mobile.more.hunonicPriceList")} subtitle={t("mobile.more.hunonicPriceListHint")} tone="orange" target="_blank" />}
-            {sales && <MobileSettingsRow href={Routes.RangDongSmartPriceList} icon={Lightbulb} label={t("mobile.more.rangDongPriceList")} subtitle={t("mobile.more.rangDongPriceListHint")} tone="red" target="_blank" />}
+            {sales && context.features.camera_quote_builder && <MobileSettingsRow href={Routes.CameraQuote} icon={Camera} label={t("mobile.more.cameraQuote")} subtitle={t("mobile.more.cameraQuoteHint")} tone="blue" target="_blank" />}
+            {sales && context.features.hunonic_price_list && <MobileSettingsRow href={Routes.HunonicPriceList} icon={Cpu} label={t("mobile.more.hunonicPriceList")} subtitle={t("mobile.more.hunonicPriceListHint")} tone="orange" target="_blank" />}
+            {sales && context.features.rang_dong_price_list && <MobileSettingsRow href={Routes.RangDongSmartPriceList} icon={Lightbulb} label={t("mobile.more.rangDongPriceList")} subtitle={t("mobile.more.rangDongPriceListHint")} tone="red" target="_blank" />}
             {sales && fnb && <MobileSettingsRow href={Routes.Tables} icon={Utensils} label={t("nav.tables")} subtitle={t("mobile.more.tablesHint")} tone="orange" />}
             {manager && <MobileSettingsRow href={Routes.Finance} icon={Wallet} label={t("nav.groups.finance")} subtitle={t("mobile.more.financeHint")} />}
             {sales && <MobileSettingsRow href={`${Routes.Sales}?tab=returns`} icon={RotateCcw} label={t("nav.returns")} subtitle={t("mobile.more.returnsHint")} tone="red" />}
             {sales && <MobileSettingsRow href={`${Routes.Finance}?tab=shifts`} icon={Clock3} label={t("nav.shifts")} subtitle={t("mobile.more.shiftHint")} tone="orange" />}
-            {store.prefs.ai.openaiApiKeySet && <MobileSettingsRow href="/ai" icon={Sparkles} label={t("nav.ai")} subtitle={t("mobile.more.aiHint")} tone="purple" />}
+            {context.features.ai_assistant && store.prefs.ai.openaiApiKeySet && <MobileSettingsRow href="/ai" icon={Sparkles} label={t("nav.ai")} subtitle={t("mobile.more.aiHint")} tone="purple" />}
           </MoreSection>
         )}
 

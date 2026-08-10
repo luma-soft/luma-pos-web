@@ -8,6 +8,7 @@ import {
   UnauthorizedError,
 } from "@/lib/auth/store-context";
 import type { StoreFeatureSet } from "@/lib/tenancy/store-features";
+import { storeFeatureEnabled, type StoreFeatureKey } from "@/lib/tenancy/store-features";
 import {
   MANAGER_ROLES,
   OWNER_ROLES,
@@ -65,6 +66,15 @@ export async function requireRole(roles: Role[]): Promise<Gate> {
     role: context.role,
     features: context.features,
   };
+}
+
+/** Entitlement + RBAC gate. Unknown/disabled features always fail closed. */
+export async function requireFeatureRole(feature: StoreFeatureKey, roles: Role[]): Promise<Gate> {
+  const gate = await requireRole(roles);
+  if (!gate.ok) return gate;
+  return storeFeatureEnabled(gate.features, feature)
+    ? gate
+    : { ok: false, error: "FEATURE_DISABLED" };
 }
 
 /** Chủ/Quản lý — nghiệp vụ quản trị (giá, hủy/sửa đơn, hoàn tiền, KM, sổ quỹ...). */

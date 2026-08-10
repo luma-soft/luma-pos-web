@@ -3,6 +3,8 @@ import { getRole } from "@/lib/actions/common";
 import { BrandPriceListClient } from "../(app)/brand-price-list/brand-price-list-client";
 import { getBrandPriceListProducts } from "@/lib/data/brand-price-lists";
 import { createClient } from "@/lib/supabase/server";
+import { notFound } from "next/navigation";
+import { resolveLegacyCurrentPublicStore } from "@/lib/tenancy/public-store";
 
 export const dynamic = "force-dynamic";
 
@@ -26,10 +28,9 @@ export const metadata: Metadata = {
 };
 
 export default async function RangDongSmartPriceListPage() {
-  const [products, supabase] = await Promise.all([
-    getBrandPriceListProducts(["Rạng Đông Smart", "Rạng Đông"]),
-    createClient(),
-  ]);
+  const store = await resolveLegacyCurrentPublicStore("rang_dong_price_list");
+  if (!store) notFound();
+  const [products, supabase] = await Promise.all([getBrandPriceListProducts(store.id, ["Rạng Đông Smart", "Rạng Đông"]), createClient()]);
   const { data: { user } } = await supabase.auth.getUser();
   let canEdit = false;
   if (user) {

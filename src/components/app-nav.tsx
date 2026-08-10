@@ -16,6 +16,7 @@ import { Routes } from "@/lib/routes";
 import { ONLINE_SALES_ENABLED } from "@/lib/features";
 import { cn } from "@/lib/utils";
 import { Text } from "@/components/ui/text";
+import type { StoreFeatureSet } from "@/lib/tenancy/store-features";
 
 type Item = { href: string; icon: React.ComponentType<{ className?: string }>; key: string; badge?: "notifications"; newTab?: boolean };
 type Group = { labelKey: string; items: Item[] };
@@ -61,17 +62,32 @@ export function AppNav({
   industry,
   notificationCount = 0,
   aiConfigured = false,
+  features,
 }: {
   industry?: string;
   notificationCount?: number;
   aiConfigured?: boolean;
+  features: StoreFeatureSet;
 }) {
   const t = useTranslations();
   const pathname = usePathname();
   const isFnb = industry === "restaurant" || industry === "cafe";
-  const groupsBase = GROUPS.map((group) => group.labelKey === "nav.groups.system"
-    ? { ...group, items: group.items.filter((item) => aiConfigured || item.href !== "/ai") }
-    : group);
+  const featureForHref: Partial<Record<string, keyof StoreFeatureSet>> = {
+    [Routes.OnlineSales]: "online_sales",
+    [Routes.Services]: "field_services",
+    [Routes.CameraQuote]: "camera_quote_builder",
+    [Routes.HunonicPriceList]: "hunonic_price_list",
+    [Routes.RangDongSmartPriceList]: "rang_dong_price_list",
+    "/ai": "ai_assistant",
+  };
+  const groupsBase = GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => {
+      const feature = featureForHref[item.href];
+      if (feature && !features[feature]) return false;
+      return item.href !== "/ai" || aiConfigured;
+    }),
+  }));
   const groups = isFnb
     ? groupsBase.map((g) => g.labelKey === "nav.groups.manage"
         ? { ...g, items: [...g.items, { href: "/tables", icon: Utensils, key: "nav.tables" } as Item, { href: "/kds", icon: ChefHat, key: "nav.kds" } as Item] }

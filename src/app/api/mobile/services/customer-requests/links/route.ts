@@ -7,7 +7,7 @@ import {
   serviceCustomerRequests,
 } from "@/db/schema";
 import { generateCode } from "@/lib/actions/common";
-import { requireMobileManager } from "@/lib/mobile/auth";
+import { requireMobileServiceManager } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
 import {
   createCustomerRequestToken,
@@ -16,7 +16,7 @@ import {
 import { serviceCustomerRequestLinkSchema } from "@/lib/services/schemas";
 
 export async function POST(request: Request) {
-  const gate = await requireMobileManager();
+  const gate = await requireMobileServiceManager();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   const parsed = serviceCustomerRequestLinkSchema.safeParse(await readJson(request));

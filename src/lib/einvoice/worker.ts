@@ -6,6 +6,7 @@ import {
   orderItems,
   orders,
   products,
+  storeFeatures,
   storeSettings,
 } from "@/db/schema";
 import {
@@ -209,12 +210,18 @@ export async function processDueEInvoices(input: {
     })
     .where(and(
       eq(einvoices.status, "processing"),
+      sql`exists (select 1 from ${storeFeatures} sf where sf.store_id = ${einvoices.storeId} and sf.feature_key = 'einvoice' and sf.enabled = true)`,
       or(isNull(einvoices.lockedAt), lt(einvoices.lockedAt, staleLock)),
     ));
 
   const due = await db
     .select({ id: einvoices.id })
     .from(einvoices)
+    .innerJoin(storeFeatures, and(
+      eq(storeFeatures.storeId, einvoices.storeId),
+      eq(storeFeatures.featureKey, "einvoice"),
+      eq(storeFeatures.enabled, true),
+    ))
     .where(and(
       inArray(einvoices.status, ["queued"]),
       or(isNull(einvoices.nextAttemptAt), lte(einvoices.nextAttemptAt, now)),

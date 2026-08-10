@@ -1,4 +1,4 @@
-import { requireMobileManager } from "@/lib/mobile/auth";
+import { requireMobileServiceManager } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
 import {
   getServiceDispatchPage,
@@ -6,7 +6,7 @@ import {
 } from "@/lib/services/dispatch-reporting";
 
 export async function GET(request: Request) {
-  const gate = await requireMobileManager();
+  const gate = await requireMobileServiceManager();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileError("errors.unauthorized", 401);

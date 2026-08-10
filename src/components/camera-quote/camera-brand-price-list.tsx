@@ -5,8 +5,8 @@ import { CameraPriceListClient } from "@/app/(app)/camera-price-list/camera-pric
 
 type CameraBrand = "EZVIZ" | "IMOU";
 
-export async function CameraBrandPriceList({ brand }: { brand: CameraBrand }) {
-  const [options, supabase] = await Promise.all([getCameraQuoteFormOptions(), createClient()]);
+export async function CameraBrandPriceList({ brand, storeId }: { brand: CameraBrand; storeId: string }) {
+  const [options, supabase] = await Promise.all([getCameraQuoteFormOptions(storeId), createClient()]);
   const { data: { user } } = await supabase.auth.getUser();
   let canEdit = false;
   if (user) {

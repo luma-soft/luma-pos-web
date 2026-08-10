@@ -1,6 +1,6 @@
 import { createServiceJob } from "@/lib/actions/services";
 import { getFieldServiceJobs } from "@/lib/data/service-field";
-import { requireMobileManager, requireMobileServiceAccess } from "@/lib/mobile/auth";
+import { requireMobileServiceManager, requireMobileServiceAccess } from "@/lib/mobile/auth";
 import { mobileAction, mobileError, mobileGate, mobileOk, readJson, searchParam } from "@/lib/mobile/response";
 
 export async function GET(request: Request) {
@@ -20,7 +20,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const gate = await requireMobileManager();
+  const gate = await requireMobileServiceManager();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   const body = await readJson(request);

@@ -6,11 +6,11 @@ import {
   serviceCustomerRequests,
   serviceJobs,
 } from "@/db/schema";
-import { requireMobileManager } from "@/lib/mobile/auth";
+import { requireMobileServiceManager } from "@/lib/mobile/auth";
 import { mobileGate, mobileOk, numberParam, searchParam } from "@/lib/mobile/response";
 
 export async function GET(request: Request) {
-  const gate = await requireMobileManager();
+  const gate = await requireMobileServiceManager();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   const page = Math.max(1, numberParam(request, "page", 1));

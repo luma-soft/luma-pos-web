@@ -38,7 +38,7 @@ import {
 } from "@/lib/schemas/marketplace";
 import { Routes } from "@/lib/routes";
 import { getShopeeAttributes, getShopeeCategories, getShopeeLogisticsChannels, type ShopeeApiCategory } from "@/lib/shopee/client";
-import { generateCode, requireManager, requireOwner, toMoney, toQty, type ActionResult } from "./common";
+import { generateCode, requireFeatureRole, toMoney, toQty, type ActionResult } from "./common";
 import { createNotificationEventInTx } from "@/lib/notifications/events-core";
 import { publishCommittedNotification } from "@/lib/notifications/outbox";
 
@@ -46,6 +46,9 @@ function numberFrom(value: unknown, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 }
+
+const requireMarketplaceManager = () => requireFeatureRole("online_sales", ["owner", "manager"]);
+const requireMarketplaceOwner = () => requireFeatureRole("online_sales", ["owner"]);
 
 function fallbackListingSuggestion(product: {
   name: string;
@@ -172,7 +175,7 @@ async function enqueueShopeeJob(input: {
 }
 
 export async function connectShopeeDemoShop(): Promise<ActionResult<{ shopId: string }>> {
-  const gate = await requireOwner();
+  const gate = await requireMarketplaceOwner();
   if (!gate.ok) return gate;
   try {
     const [shop] = await db.insert(marketplaceShops)
@@ -216,7 +219,7 @@ export async function connectShopeeDemoShop(): Promise<ActionResult<{ shopId: st
 }
 
 export async function disconnectShopeeShop(shopId: string): Promise<ActionResult> {
-  const gate = await requireOwner();
+  const gate = await requireMarketplaceOwner();
   if (!gate.ok) return gate;
   try {
     await db.update(marketplaceShops).set({
@@ -242,7 +245,7 @@ export async function disconnectShopeeShop(shopId: string): Promise<ActionResult
 }
 
 export async function updateMarketplaceShopSyncPolicy(input: MarketplaceShopSyncPolicyInput): Promise<ActionResult> {
-  const gate = await requireManager();
+  const gate = await requireMarketplaceManager();
   if (!gate.ok) return gate;
   const parsed = marketplaceShopSyncPolicySchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
@@ -293,7 +296,7 @@ export async function updateMarketplaceShopSyncPolicy(input: MarketplaceShopSync
 }
 
 export async function loadShopeeCategoryTree(): Promise<ActionResult<{ tree: CategoryTreeNode[] }>> {
-  const gate = await requireManager();
+  const gate = await requireMarketplaceManager();
   if (!gate.ok) return gate;
   try {
     const categories = await getShopeeCategories(gate.storeId);
@@ -305,7 +308,7 @@ export async function loadShopeeCategoryTree(): Promise<ActionResult<{ tree: Cat
 }
 
 export async function loadShopeeCategoryAttributes(categoryId: string): Promise<ActionResult<{ attributes: Awaited<ReturnType<typeof getShopeeAttributes>> }>> {
-  const gate = await requireManager();
+  const gate = await requireMarketplaceManager();
   if (!gate.ok) return gate;
   const id = categoryId.trim();
   if (!id) return { ok: false, error: "errors.invalidData" };
@@ -319,7 +322,7 @@ export async function loadShopeeCategoryAttributes(categoryId: string): Promise<
 }
 
 export async function loadShopeeLogisticsChannels(): Promise<ActionResult<{ channels: Awaited<ReturnType<typeof getShopeeLogisticsChannels>> }>> {
-  const gate = await requireManager();
+  const gate = await requireMarketplaceManager();
   if (!gate.ok) return gate;
   try {
     const channels = await getShopeeLogisticsChannels(gate.storeId);
@@ -331,7 +334,7 @@ export async function loadShopeeLogisticsChannels(): Promise<ActionResult<{ chan
 }
 
 export async function generateShopeeListingAiFill(input: AiListingFillInput): Promise<ActionResult<Record<string, unknown>>> {
-  const gate = await requireManager();
+  const gate = await requireMarketplaceManager();
   if (!gate.ok) return gate;
   const parsed = aiListingFillSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
@@ -412,7 +415,7 @@ export async function generateShopeeListingAiFill(input: AiListingFillInput): Pr
 }
 
 export async function saveShopeeListingDraft(input: ShopeeListingDraftInput): Promise<ActionResult<{ mappingId: string }>> {
-  const gate = await requireManager();
+  const gate = await requireMarketplaceManager();
   if (!gate.ok) return gate;
   const parsed = shopeeListingDraftSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
@@ -478,7 +481,7 @@ export async function saveShopeeListingDraft(input: ShopeeListingDraftInput): Pr
 }
 
 export async function publishShopeeListing(input: ShopeeListingDraftInput): Promise<ActionResult<{ mappingId: string; externalItemId: string }>> {
-  const gate = await requireManager();
+  const gate = await requireMarketplaceManager();
   if (!gate.ok) return gate;
   const saved = await saveShopeeListingDraft({ ...input, action: "publish" });
   if (!saved.ok) return saved;
@@ -523,7 +526,7 @@ export async function publishShopeeListing(input: ShopeeListingDraftInput): Prom
 }
 
 export async function unpublishShopeeListing(mappingId: string): Promise<ActionResult> {
-  const gate = await requireManager();
+  const gate = await requireMarketplaceManager();
   if (!gate.ok) return gate;
   try {
     await db.update(marketplaceProductMappings).set({ status: "unlisted", updatedAt: sql`now()` }).where(and(eq(marketplaceProductMappings.id, mappingId), eq(marketplaceProductMappings.storeId, gate.storeId)));
@@ -544,7 +547,7 @@ export async function unpublishShopeeListing(mappingId: string): Promise<ActionR
 }
 
 export async function importShopeeOrder(input: ImportShopeeOrderInput): Promise<ActionResult<{ orderId: string; code: string; duplicate: boolean }>> {
-  const gate = await requireManager();
+  const gate = await requireMarketplaceManager();
   if (!gate.ok) return gate;
   const parsed = importShopeeOrderSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
@@ -686,7 +689,7 @@ export async function importShopeeOrder(input: ImportShopeeOrderInput): Promise<
 }
 
 export async function sendMarketplaceMessage(input: SendMarketplaceMessageInput): Promise<ActionResult> {
-  const gate = await requireManager();
+  const gate = await requireMarketplaceManager();
   if (!gate.ok) return gate;
   const parsed = sendMarketplaceMessageSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };

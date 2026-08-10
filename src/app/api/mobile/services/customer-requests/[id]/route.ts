@@ -1,7 +1,7 @@
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { projects, serviceCustomerRequestAttachments, serviceCustomerRequests, serviceJobs } from "@/db/schema";
-import { requireMobileManager } from "@/lib/mobile/auth";
+import { requireMobileServiceManager } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
 import { manageCustomerRequestCore } from "@/lib/services/customer-request-portal";
 import { serviceCustomerRequestManageSchema } from "@/lib/services/schemas";
@@ -10,7 +10,7 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const gate = await requireMobileManager();
+  const gate = await requireMobileServiceManager();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   const { id } = await params;
@@ -59,7 +59,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const gate = await requireMobileManager();
+  const gate = await requireMobileServiceManager();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileError("errors.unauthorized", 401);

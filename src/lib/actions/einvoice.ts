@@ -13,7 +13,7 @@ import {
   selectEInvoiceIssuanceProvider,
 } from "@/lib/einvoice/provider";
 import { deriveEInvoiceFallbackVatRate } from "@/lib/einvoice/tax";
-import { requireStoreContext } from "@/lib/auth/store-context";
+import { requireStoreFeature } from "@/lib/auth/store-context";
 
 type EInvoiceRequestResult = {
   status: "issued" | "queued" | "processing";
@@ -31,7 +31,7 @@ export async function issueEInvoiceForUser(input: IssueEInvoiceInput): Promise<A
   const v = parsed.data;
 
   try {
-    const context = await requireStoreContext();
+    const context = await requireStoreFeature("einvoice");
     const [order] = await db.select().from(orders).where(and(eq(orders.storeId, context.storeId), eq(orders.id, v.orderId))).limit(1);
     if (!order) return { ok: false, error: "errors.invalidData" };
     if (order.status !== "completed") return { ok: false, error: "einvoice.errors.onlyCompleted" };

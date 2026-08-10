@@ -1,8 +1,8 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { db } from "@/db";
-import { projects, serviceCustomerRequests } from "@/db/schema";
+import { projects, serviceCustomerRequests, storeFeatures } from "@/db/schema";
 import {
   hashCustomerRequestToken,
   isCustomerRequestTokenSubmittable,
@@ -39,6 +39,11 @@ export default async function ServiceRequestPage({
     tokenExpiresAt: serviceCustomerRequests.tokenExpiresAt,
   }).from(serviceCustomerRequests)
     .innerJoin(projects, eq(serviceCustomerRequests.projectId, projects.id))
+    .innerJoin(storeFeatures, and(
+      eq(storeFeatures.storeId, serviceCustomerRequests.storeId),
+      eq(storeFeatures.featureKey, "field_services"),
+      eq(storeFeatures.enabled, true),
+    ))
     .where(eq(serviceCustomerRequests.tokenHash, tokenHash))
     .limit(1);
   if (!request || !isCustomerRequestTokenViewable({

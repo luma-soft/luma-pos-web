@@ -1,4 +1,4 @@
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { brands, categories, customers, products, warehouses } from "@/db/schema";
 import {
@@ -41,7 +41,7 @@ export type CameraQuoteProductOption = {
   specs: Record<string, string[]>;
 };
 
-export async function getCameraQuoteFormOptions() {
+export async function getCameraQuoteFormOptions(storeId: string, includePrivate = false) {
   const [cameraRows, utilityRows, customerRows, warehouseRows] = await Promise.all([
     db
       .select({
@@ -58,7 +58,7 @@ export async function getCameraQuoteFormOptions() {
       .from(products)
       .innerJoin(categories, eq(products.categoryId, categories.id))
       .leftJoin(brands, eq(products.brandId, brands.id))
-      .where(eq(categories.name, "Camera giám sát"))
+      .where(and(eq(products.storeId, storeId), eq(categories.name, "Camera giám sát")))
       .orderBy(asc(products.name)),
     db
       .select({
@@ -74,8 +74,8 @@ export async function getCameraQuoteFormOptions() {
       })
       .from(products)
       .leftJoin(brands, eq(products.brandId, brands.id))
-      .where(inArray(products.sku, [...requiredSkus, ...optionalMaterialSkus])),
-    db
+      .where(and(eq(products.storeId, storeId), inArray(products.sku, [...requiredSkus, ...optionalMaterialSkus]))),
+    includePrivate ? db
       .select({
         id: customers.id,
         name: customers.name,
@@ -83,13 +83,14 @@ export async function getCameraQuoteFormOptions() {
         address: customers.address,
       })
       .from(customers)
-      .where(eq(customers.isActive, true))
+      .where(and(eq(customers.storeId, storeId), eq(customers.isActive, true)))
       .orderBy(desc(customers.createdAt))
-      .limit(500),
-    db
+      .limit(500) : Promise.resolve([]),
+    includePrivate ? db
       .select({ id: warehouses.id, name: warehouses.name, isDefault: warehouses.isDefault })
       .from(warehouses)
-      .orderBy(desc(warehouses.isDefault), asc(warehouses.name)),
+      .where(eq(warehouses.storeId, storeId))
+      .orderBy(desc(warehouses.isDefault), asc(warehouses.name)) : Promise.resolve([]),
   ]);
 
   const utilityBySku = new Map(utilityRows.map((row) => [row.sku, row]));

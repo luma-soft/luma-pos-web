@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { EINVOICE_UI_ENABLED } from "@/lib/features";
+import { requirePageFeature } from "@/lib/tenancy/page-feature";
 
 export default async function EInvoicesRedirect({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  await requirePageFeature("einvoice");
   if (!EINVOICE_UI_ENABLED) redirect("/sales");
   const sp = await searchParams;
   const usp = new URLSearchParams();

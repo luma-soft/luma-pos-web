@@ -10,21 +10,23 @@ import { BookingsTab } from "./tabs/bookings";
 import { EInvoicesTab } from "./tabs/einvoices";
 import { ReturnsTab } from "./tabs/returns";
 import { EINVOICE_UI_ENABLED } from "@/lib/features";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 export const dynamic = "force-dynamic";
 
-const TABS = [
+const CORE_TABS = [
   { tab: "orders", labelKey: "nav.orders" },
   { tab: "returns", labelKey: "nav.returns" },
   { tab: "quotes", labelKey: "nav.quotes" },
   { tab: "bookings", labelKey: "nav.bookings" },
-  ...(EINVOICE_UI_ENABLED ? [{ tab: "einvoices", labelKey: "nav.einvoices" }] : []),
 ];
 
 export default async function SalesPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const t = await getTranslations();
+  const [t, context] = await Promise.all([getTranslations(), requireStoreContext()]);
   const params = await searchParams;
-  const tab = params.tab ?? "orders";
+  const einvoiceEnabled = EINVOICE_UI_ENABLED && context.features.einvoice;
+  const tabs = einvoiceEnabled ? [...CORE_TABS, { tab: "einvoices", labelKey: "nav.einvoices" }] : CORE_TABS;
+  const tab = params.tab === "einvoices" && !einvoiceEnabled ? "orders" : params.tab ?? "orders";
 
   return (
     <div className="p-4 sm:p-6">
@@ -37,7 +39,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
         </div>
         <div className="flex items-center gap-3 px-4 pb-1.5 sm:px-6">
           <div className="min-w-0 flex-1">
-            <GroupTabs base={Routes.Sales} items={TABS} edgeToEdge={false} />
+            <GroupTabs base={Routes.Sales} items={tabs} edgeToEdge={false} />
           </div>
           <SalesPrimaryAction
             tab={tab}
@@ -54,7 +56,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Promis
       {tab === "quotes" ? <QuotesTab searchParams={params} />
         : tab === "returns" ? <ReturnsTab searchParams={params} />
         : tab === "bookings" ? <BookingsTab searchParams={params} />
-        : tab === "einvoices" && EINVOICE_UI_ENABLED ? <EInvoicesTab />
+        : tab === "einvoices" && einvoiceEnabled ? <EInvoicesTab />
         : <OrdersTab searchParams={params} />}
     </div>
   );

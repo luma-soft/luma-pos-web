@@ -1,4 +1,4 @@
-import { asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { brands, categories, products } from "@/db/schema";
 
@@ -29,7 +29,7 @@ export type BrandPriceListProduct = {
   specs: Record<string, string[]>;
 };
 
-export async function getBrandPriceListProducts(brandNames: string[]) {
+export async function getBrandPriceListProducts(storeId: string, brandNames: string[]) {
   if (!brandNames.length) return [];
 
   const rows = await db
@@ -49,11 +49,12 @@ export async function getBrandPriceListProducts(brandNames: string[]) {
     .from(products)
     .innerJoin(brands, eq(products.brandId, brands.id))
     .leftJoin(categories, eq(products.categoryId, categories.id))
-    .where(
+    .where(and(
+      eq(products.storeId, storeId),
       brandNames.length === 1
         ? eq(brands.name, brandNames[0])
         : inArray(brands.name, brandNames),
-    )
+    ))
     .orderBy(asc(categories.name), asc(products.name));
 
   return rows.map(

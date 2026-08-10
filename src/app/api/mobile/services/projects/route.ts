@@ -1,10 +1,10 @@
 import { createServiceProject } from "@/lib/actions/services";
 import { getServiceDashboard } from "@/lib/data/services";
-import { requireMobileManager, requireMobileSalesAccess } from "@/lib/mobile/auth";
+import { requireMobileServiceManager, requireMobileServiceSalesAccess } from "@/lib/mobile/auth";
 import { mobileAction, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
 
 export async function GET() {
-  const gate = await requireMobileSalesAccess();
+  const gate = await requireMobileServiceSalesAccess();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileGate(gate)!;
@@ -12,7 +12,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const gate = await requireMobileManager();
+  const gate = await requireMobileServiceManager();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   const body = await readJson(request);

@@ -9,7 +9,7 @@ import { loadAiProviderConfig } from "@/lib/ai/provider-adapter";
 import { runAiToolLoop } from "@/lib/ai/tool-loop";
 import { consumeAiUsage, recordAiTokenUsage, recordAiUsageEvent } from "@/lib/ai/usage";
 import { writeAuditLog } from "@/lib/audit";
-import { requireMobileUser } from "@/lib/mobile/auth";
+import { requireMobileAiUser } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
 
 function sanitizeAttachmentPreview<T>(preview: T, prompt: string, attachmentCount: number): T {
@@ -93,7 +93,7 @@ async function writeAttachmentParseAudit(input: {
 }
 
 export async function POST(request: Request) {
-  const gate = await requireMobileUser();
+  const gate = await requireMobileAiUser();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileGate(gate)!;

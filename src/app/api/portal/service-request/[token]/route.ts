@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { projects, serviceCustomerRequests, serviceSlaPolicies } from "@/db/schema";
+import { projects, serviceCustomerRequests, serviceSlaPolicies, storeFeatures } from "@/db/schema";
 import { mobileError, mobileOk } from "@/lib/mobile/response";
 import {
   consumePublicRateLimitCore,
@@ -86,6 +86,11 @@ export async function GET(
     tokenExpiresAt: serviceCustomerRequests.tokenExpiresAt,
   }).from(serviceCustomerRequests)
     .innerJoin(projects, eq(serviceCustomerRequests.projectId, projects.id))
+    .innerJoin(storeFeatures, and(
+      eq(storeFeatures.storeId, serviceCustomerRequests.storeId),
+      eq(storeFeatures.featureKey, "field_services"),
+      eq(storeFeatures.enabled, true),
+    ))
     .where(eq(serviceCustomerRequests.tokenHash, tokenHash))
     .limit(1);
   if (!row || !isCustomerRequestTokenViewable({ expiresAt: row.tokenExpiresAt })) {
@@ -132,10 +137,16 @@ export async function POST(
   const tokenHash = hashCustomerRequestToken(token);
   const [current] = await db.select({
     id: serviceCustomerRequests.id,
+    storeId: serviceCustomerRequests.storeId,
     status: serviceCustomerRequests.status,
     submittedAt: serviceCustomerRequests.submittedAt,
     tokenExpiresAt: serviceCustomerRequests.tokenExpiresAt,
   }).from(serviceCustomerRequests)
+    .innerJoin(storeFeatures, and(
+      eq(storeFeatures.storeId, serviceCustomerRequests.storeId),
+      eq(storeFeatures.featureKey, "field_services"),
+      eq(storeFeatures.enabled, true),
+    ))
     .where(eq(serviceCustomerRequests.tokenHash, tokenHash))
     .limit(1);
   if (!current || !isCustomerRequestTokenSubmittable({
@@ -179,6 +190,7 @@ export async function POST(
     responseMinutes: serviceSlaPolicies.responseMinutes,
     resolutionMinutes: serviceSlaPolicies.resolutionMinutes,
   }).from(serviceSlaPolicies).where(and(
+    eq(serviceSlaPolicies.storeId, current.storeId),
     eq(serviceSlaPolicies.priority, parsed.data.priority),
     eq(serviceSlaPolicies.isActive, true),
   )).limit(1);

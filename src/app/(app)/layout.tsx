@@ -69,6 +69,7 @@ export default async function AppLayout({
           industry={store.industry}
           notificationCount={notificationCount}
           aiConfigured={store.prefs.ai.openaiApiKeySet}
+          features={context.features}
         />
         <div className="p-3 border-t border-border space-y-2">
           <ModeSwitcher current={mode} />
@@ -81,7 +82,7 @@ export default async function AppLayout({
       <main className="min-w-0 flex-1 overflow-x-hidden">
         <div className="pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">{children}</div>
         <MobileTabBar />
-        {store.prefs.ai.openaiApiKeySet && store.prefs.ai.showFloatingLauncher && <AiAssistantLauncher />}
+        {context.features.ai_assistant && store.prefs.ai.openaiApiKeySet && store.prefs.ai.showFloatingLauncher && <AiAssistantLauncher />}
       </main>
       {orderModal}
       {productModal}

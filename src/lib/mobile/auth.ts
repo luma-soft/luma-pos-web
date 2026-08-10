@@ -16,6 +16,7 @@ import {
   cashierContextSecret,
   verifyCashierContextToken,
 } from "@/lib/auth/cashier-pin";
+import { storeFeatureEnabled, type StoreFeatureKey } from "@/lib/tenancy/store-features";
 
 export type MobileGate = Gate & { principalId?: string };
 
@@ -88,4 +89,36 @@ export const requireMobileOwner = () => requireMobileRole(OWNER_ROLES);
 export const requireMobileUser = () => requireMobileRole(STAFF_ROLES);
 
 export const requireMobileServiceAccess = () =>
-  requireMobileRole(["owner", "manager", "technician"]);
+  requireMobileFeatureRole("field_services", ["owner", "manager", "technician"]);
+
+export const requireMobileServiceManager = () =>
+  requireMobileFeatureRole("field_services", MANAGER_ROLES);
+
+export const requireMobileServiceStockAccess = () =>
+  requireMobileFeatureRole("field_services", STOCK_ACCESS_ROLES);
+
+export const requireMobileServiceSalesAccess = () =>
+  requireMobileFeatureRole("field_services", SALES_ACCESS_ROLES);
+
+export const requireMobileAiUser = () =>
+  requireMobileFeatureRole("ai_assistant", STAFF_ROLES);
+
+export const requireMobileAiManager = () =>
+  requireMobileFeatureRole("ai_assistant", MANAGER_ROLES);
+
+export const requireMobileAiStockAccess = () =>
+  requireMobileFeatureRole("ai_assistant", STOCK_ACCESS_ROLES);
+
+export const requireMobileEinvoiceManager = () =>
+  requireMobileFeatureRole("einvoice", MANAGER_ROLES);
+
+export async function requireMobileFeatureRole(
+  feature: StoreFeatureKey,
+  roles: readonly Role[],
+): Promise<MobileGate> {
+  const gate = await requireMobileRole(roles);
+  if (!gate.ok) return gate;
+  return storeFeatureEnabled(gate.features, feature)
+    ? gate
+    : { ok: false, error: "FEATURE_DISABLED" };
+}

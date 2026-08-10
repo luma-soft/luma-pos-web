@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { serviceCustomerRequestAttachments } from "@/db/schema";
-import { requireMobileManager } from "@/lib/mobile/auth";
+import { requireMobileServiceManager } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -9,7 +9,7 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string; attachmentId: string }> },
 ) {
-  const gate = await requireMobileManager();
+  const gate = await requireMobileServiceManager();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   const { id, attachmentId } = await params;
