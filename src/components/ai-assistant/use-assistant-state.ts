@@ -2,6 +2,7 @@
 
 import { type ClipboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useTenantClientScope } from "@/components/tenant-client-scope";
 import { getAssistantActionPresets } from "./action-presets";
 import { deleteJson, getJson, postJson, putJson, uploadAiAttachment } from "./api";
 import type {
@@ -31,6 +32,7 @@ import {
   sanitizeMessagesForStorage,
   storePosDraft,
   writeSessionPresetMap,
+  tenantStorageKey,
 } from "./utils";
 
 function serverMessagesToChat(messages: unknown[]): Msg[] {
@@ -67,11 +69,12 @@ function serverSessions(value: unknown, defaultTitle: string): AiSessionSummary[
 
 export function useAssistantState(surface: AssistantSurface): AssistantController {
   const t = useTranslations();
+  const storageScope = useTenantClientScope();
   const defaultSessionTitle = t("ai.defaultSessionTitle");
   const webActionPresets = useMemo(() => getAssistantActionPresets(t), [t]);
   const actionPresets = useMemo(() => surface === "web" ? webActionPresets : [], [surface, webActionPresets]);
-  const chatHistoryKey = `luma-ai-chat-history:${surface}`;
-  const sessionPresetKey = `luma-ai-session-action-preset:${surface}`;
+  const chatHistoryKey = tenantStorageKey(`luma-ai-chat-history:${surface}`, storageScope);
+  const sessionPresetKey = tenantStorageKey(`luma-ai-session-action-preset:${surface}`, storageScope);
   const [input, setInput] = useState("");
   const [msgs, setMsgs] = useState<Msg[]>(() => readChatHistory(chatHistoryKey));
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -344,7 +347,7 @@ export function useAssistantState(surface: AssistantSurface): AssistantControlle
       };
       const confirmedPosDraft = event === "confirmed" && isPosCartPreview(preview) && posDraftItems(preview).length > 0;
       if (confirmedPosDraft) {
-        storePosDraft(preview);
+        storePosDraft(preview, storageScope);
         if (surface === "pos") {
           dispatchPosDraft(preview);
         }

@@ -9,6 +9,14 @@ export const AI_WORKFLOW_DRAFT_STORAGE_KEY = "luma-ai-workflow-draft";
 export const FAB_MARGIN = 12;
 export const FAB_MOVE_THRESHOLD = 10;
 
+export function tenantStorageKey(key: string, scopeId: string) {
+  return `${key}:${scopeId}`;
+}
+
+export function tenantStoreId(scopeId: string) {
+  return scopeId.split(":", 1)[0] ?? "";
+}
+
 export const ACCEPTED_ATTACHMENT_TYPES = new Set([
   "image/png",
   "image/jpeg",
@@ -78,10 +86,10 @@ export function recordWithPosDraftHref(record: Msg["record"] | undefined, previe
   return { ...record, href: posDraftHref(preview) };
 }
 
-export function storePosDraft(preview: AiActionPreview) {
+export function storePosDraft(preview: AiActionPreview, scopeId: string) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(POS_AI_DRAFT_STORAGE_KEY, JSON.stringify({
+    window.localStorage.setItem(tenantStorageKey(POS_AI_DRAFT_STORAGE_KEY, scopeId), JSON.stringify({
       previewId: preview.id,
       intent: preview.intent,
       items: posDraftItems(preview),
@@ -93,10 +101,10 @@ export function storePosDraft(preview: AiActionPreview) {
   }
 }
 
-export function storeAiWorkflowDraft(preview: AiActionPreview) {
+export function storeAiWorkflowDraft(preview: AiActionPreview, scopeId: string) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(AI_WORKFLOW_DRAFT_STORAGE_KEY, JSON.stringify({
+    window.localStorage.setItem(tenantStorageKey(AI_WORKFLOW_DRAFT_STORAGE_KEY, scopeId), JSON.stringify({
       previewId: preview.id,
       intent: preview.intent,
       entityType: preview.entityType,

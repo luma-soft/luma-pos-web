@@ -197,7 +197,7 @@ export async function POST(
   const now = new Date();
   const objects = sanitized.map(({ image }) => ({
     bucket: CUSTOMER_REQUEST_EVIDENCE_BUCKET,
-    path: `${current.id}/${now.getTime()}-${randomUUID()}.${image.extension}`,
+    path: `stores/${current.storeId}/services/customer-requests/${current.id}/${now.getTime()}-${randomUUID()}.${image.extension}`,
   }));
   if (sanitized.length === 0) {
     try {

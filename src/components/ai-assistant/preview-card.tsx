@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTenantClientScope } from "@/components/tenant-client-scope";
 import { cn } from "@/lib/utils";
 import type { AiActionPreview } from "@/lib/ai/actions";
 import type { Msg, PreviewResolutionState } from "./types";
@@ -58,6 +59,7 @@ export function PreviewCard({
   onSelectChoice: (type: string, candidate: { label: string; code?: string; confidence?: number }) => void;
 }) {
   const t = useTranslations();
+  const storageScope = useTenantClientScope();
   const done = state === "confirmed" || state === "succeeded" || state === "cancelled";
 
   return (
@@ -112,8 +114,8 @@ export function PreviewCard({
             target="_blank"
             rel="noreferrer"
             onClick={() => {
-              storeAiWorkflowDraft(preview);
-              if (isPosCartPreview(preview) || preview.intent === "create_order") storePosDraft(preview);
+              storeAiWorkflowDraft(preview, storageScope);
+              if (isPosCartPreview(preview) || preview.intent === "create_order") storePosDraft(preview, storageScope);
             }}
             className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-xs font-bold text-primary-700 transition hover:bg-primary-100 lg:min-h-0"
           >

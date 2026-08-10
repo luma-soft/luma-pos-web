@@ -78,7 +78,7 @@ export async function POST(
   }
   const sha256 = createHash("sha256").update(bytes).digest("hex");
   const safeName = safeServiceEvidenceName(file.name);
-  const path = `${detail.projectId}/${id}/${gate.userId}/${Date.now()}-${randomUUID()}-${safeName}`;
+  const path = `stores/${gate.storeId}/services/jobs/${id}/${gate.userId}/${Date.now()}-${randomUUID()}-${safeName}`;
 
   try {
     const supabase = await ensureEvidenceBucket();

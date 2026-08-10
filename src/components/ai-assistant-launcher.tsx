@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useTenantClientScope } from "@/components/tenant-client-scope";
 import { AssistantChatSurface } from "@/components/ai-assistant/assistant-chat-surface";
 import { AssistantHeader } from "@/components/ai-assistant/assistant-header";
 import { useAssistantState } from "@/components/ai-assistant/use-assistant-state";
@@ -36,10 +37,11 @@ export function AssistantWorkspace() {
 export function AiAssistantLauncher({ surface = "web" }: { surface?: AssistantSurface }) {
   const t = useTranslations();
   const pathname = usePathname();
+  const storageScope = useTenantClientScope();
   const [open, setOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const fabSize = 56;
-  const storageKey = `luma-ai-fab-position:${surface}`;
+  const storageKey = `luma-ai-fab-position:${surface}:${storageScope}`;
   const [fabPosition, setFabPosition] = useState<FabPosition | null>(() => readFabPosition(storageKey, fabSize));
   const dragRef = useRef<FabDrag | null>(null);
   const suppressClickRef = useRef(false);

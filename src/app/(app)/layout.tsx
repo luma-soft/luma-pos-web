@@ -9,6 +9,7 @@ import { AppNav } from "@/components/app-nav";
 import { MobileNavBackdrop } from "@/components/mobile-nav";
 import { MobileTabBar } from "@/components/mobile-tabbar";
 import { AiAssistantLauncher } from "@/components/ai-assistant-launcher";
+import { TenantClientScopeProvider } from "@/components/tenant-client-scope";
 import { Text } from "@/components/ui/text";
 import { Routes } from "@/lib/routes";
 import { getTheme, getMode } from "@/lib/theme/cookie";
@@ -51,6 +52,7 @@ export default async function AppLayout({
   const catalogScopeId = `${context.storeId}:${user.id}:${role}`;
 
   return (
+    <TenantClientScopeProvider scopeId={catalogScopeId}>
     <ProductCatalogProvider userId={user.id} scopeId={catalogScopeId}>
     <div className="flex min-h-dvh bg-canvas">
       <MobileNavBackdrop />
@@ -89,5 +91,6 @@ export default async function AppLayout({
       {projectModal}
     </div>
     </ProductCatalogProvider>
+    </TenantClientScopeProvider>
   );
 }

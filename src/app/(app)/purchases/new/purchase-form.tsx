@@ -23,7 +23,8 @@ import { createPurchase, updatePurchase } from "@/lib/actions/purchases";
 import { resolvePurchaseDraftProducts } from "@/lib/actions/purchase-search";
 import type { PurchaseFormOptions, PurchaseProductRow } from "@/lib/data/inventory";
 import type { AiActionPreview } from "@/lib/ai/actions";
-import { AI_WORKFLOW_DRAFT_STORAGE_KEY } from "@/components/ai-assistant/utils";
+import { AI_WORKFLOW_DRAFT_STORAGE_KEY, tenantStorageKey } from "@/components/ai-assistant/utils";
+import { useTenantClientScope } from "@/components/tenant-client-scope";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPurchaseProduct } from "@/lib/inventory/product-catalog-adapter";
 import {
@@ -196,6 +197,7 @@ export function PurchaseForm({
   purchaseCode?: string;
   aiPreview?: boolean;
 }) {
+  const storageScope = useTenantClientScope();
   const catalog = useProductCatalog();
   const t = useTranslations();
   const router = useRouter();
@@ -230,7 +232,7 @@ export function PurchaseForm({
     let cancelled = false;
 
     async function hydrateAiDraft() {
-      const raw = window.localStorage.getItem(AI_WORKFLOW_DRAFT_STORAGE_KEY);
+      const raw = window.localStorage.getItem(tenantStorageKey(AI_WORKFLOW_DRAFT_STORAGE_KEY, storageScope));
       if (!raw) return;
       const draft = JSON.parse(raw) as AiWorkflowDraft;
       if (cancelled) return;
@@ -264,7 +266,7 @@ export function PurchaseForm({
     hydrateAiDraft().catch(() => {});
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aiPreview, mode]);
+  }, [aiPreview, mode, storageScope]);
 
   async function applyAiPreview(preview: AiActionPreview, applyMode: AiQuickActionApplyMode) {
     if (preview.intent !== "create_inventory_inbound" && preview.intent !== "create_draft_purchase_order" && preview.intent !== "create_draft_purchase_order_from_restocking") return;

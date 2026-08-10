@@ -152,7 +152,7 @@ export function ProductCatalogProvider({
           event: "UPDATE",
           schema: "public",
           table: "catalog_sync_state",
-          filter: "id=eq.1",
+          filter: `store_id=eq.${scopeId.split(":", 1)[0]}`,
         },
         (payload) => {
           const remoteRevision = String(

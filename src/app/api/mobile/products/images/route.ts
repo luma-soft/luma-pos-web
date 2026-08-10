@@ -92,7 +92,7 @@ export async function POST(request: Request) {
       : sourceBytes;
     const storedExtension = isHeif ? "jpg" : extension;
     const contentType = isHeif ? "image/jpeg" : file.type;
-    const path = `${gate.userId}/${Date.now()}-${randomUUID()}.${storedExtension}`;
+    const path = `stores/${gate.storeId}/products/drafts/${gate.userId}/${Date.now()}-${randomUUID()}.${storedExtension}`;
     const supabase = createSupabaseAdminClient();
     const { error } = await supabase.storage
       .from(PRODUCT_IMAGES_BUCKET)
@@ -118,7 +118,9 @@ export async function DELETE(request: Request) {
   if (!gate.ok) return mobileError("errors.unauthorized", 401);
 
   const path = new URL(request.url).searchParams.get("path")?.trim() ?? "";
-  if (!path.startsWith(`${gate.userId}/`) || path.includes("..")) {
+  const tenantPrefix = `stores/${gate.storeId}/products/`;
+  const legacyPrefix = `${gate.userId}/`;
+  if ((!path.startsWith(tenantPrefix) && !path.startsWith(legacyPrefix)) || path.includes("..")) {
     return mobileError("errors.forbidden", 403);
   }
   try {

@@ -145,6 +145,7 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
       </header>
       <div className="flex-1 min-h-0">
         <PosClient
+          storageScope={`${context.storeId}:${context.userId}:${context.role}`}
           data={data}
           printTemplate={orderPrintTemplate}
           quotePrintTemplate={quotePrintTemplate}

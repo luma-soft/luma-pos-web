@@ -86,7 +86,11 @@ export async function clearProductCatalogSnapshotsForUser(userId: string): Promi
     cursorRequest.onsuccess = () => {
       const cursor = cursorRequest.result;
       if (!cursor) return;
-      if (String(cursor.key).startsWith(`${userId}:`)) cursor.delete();
+      const key = String(cursor.key);
+      const segments = key.split(":");
+      // Current format is storeId:userId:role. Also clear the legacy
+      // userId:role format without ever assigning it to a new tenant.
+      if (segments[1] === userId || segments[0] === userId) cursor.delete();
       cursor.continue();
     };
     transaction.oncomplete = () => {

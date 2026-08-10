@@ -4,7 +4,7 @@
  * Mọi hàm an toàn ở client; trả về giá trị mặc định nếu IndexedDB không khả dụng.
  */
 const DB_NAME = "sales-pos-offline";
-const DB_VER = 2;
+const DB_VER = 3;
 
 function openDB(): Promise<IDBDatabase | null> {
   return new Promise((resolve) => {
@@ -15,7 +15,11 @@ function openDB(): Promise<IDBDatabase | null> {
       // Catalog v1 không tách user và chỉ chứa một phần danh mục; xóa khi
       // chuyển sang Product Catalog dùng chung đã được scope theo user/role.
       if (db.objectStoreNames.contains("catalog")) db.deleteObjectStore("catalog");
-      if (!db.objectStoreNames.contains("outbox")) db.createObjectStore("outbox", { keyPath: "localId" });
+      // v2 rows did not carry a tenant scope. They cannot be attributed safely
+      // after an account/store switch, so quarantine them by recreating the
+      // outbox instead of replaying them under the next authenticated store.
+      if (db.objectStoreNames.contains("outbox")) db.deleteObjectStore("outbox");
+      db.createObjectStore("outbox", { keyPath: "storageId" });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => resolve(null);
@@ -36,23 +40,33 @@ function run<T>(storeName: string, mode: IDBTransactionMode, fn: (store: IDBObje
 
 // ---- outbox ----
 export interface OutboxOrder {
+  storageId: string;
+  scopeId: string;
   localId: string;
   payload: unknown;   // input của createOrder
   savedAt: number;
   failed?: boolean;
   failReason?: string;
 }
-export async function enqueueOrder(rec: OutboxOrder): Promise<void> {
-  await run("outbox", "readwrite", (s) => s.put(rec));
+export async function enqueueOrder(
+  scopeId: string,
+  rec: Omit<OutboxOrder, "storageId" | "scopeId">,
+): Promise<void> {
+  await run("outbox", "readwrite", (s) => s.put({
+    ...rec,
+    scopeId,
+    storageId: `${scopeId}:${rec.localId}`,
+  }));
 }
-export async function getOutbox(): Promise<OutboxOrder[]> {
+export async function getOutbox(scopeId: string): Promise<OutboxOrder[]> {
   const all = await run<OutboxOrder[]>("outbox", "readonly", (s) => s.getAll());
-  return all ?? [];
+  return (all ?? []).filter((item) => item.scopeId === scopeId);
 }
-export async function removeOutbox(localId: string): Promise<void> {
-  await run("outbox", "readwrite", (s) => s.delete(localId));
+export async function removeOutbox(scopeId: string, localId: string): Promise<void> {
+  await run("outbox", "readwrite", (s) => s.delete(`${scopeId}:${localId}`));
 }
-export async function markFailed(localId: string, reason: string): Promise<void> {
-  const item = await run<OutboxOrder>("outbox", "readonly", (s) => s.get(localId));
+export async function markFailed(scopeId: string, localId: string, reason: string): Promise<void> {
+  const storageId = `${scopeId}:${localId}`;
+  const item = await run<OutboxOrder>("outbox", "readonly", (s) => s.get(storageId));
   if (item) await run("outbox", "readwrite", (s) => s.put({ ...item, failed: true, failReason: reason }));
 }

@@ -335,9 +335,13 @@ function isReturnKind(kind: PosDraftKind) {
   return kind === "return_quick" || kind === "return_invoice";
 }
 
-function loadInvoices(): PosDraft[] | null {
+function scopedStorageKey(key: string, scopeId: string) {
+  return `${key}:${scopeId}`;
+}
+
+function loadInvoices(scopeId: string): PosDraft[] | null {
   try {
-    const raw = JSON.parse(localStorage.getItem(INV_KEY) ?? "null") as Record<string, unknown>[] | null;
+    const raw = JSON.parse(localStorage.getItem(scopedStorageKey(INV_KEY, scopeId)) ?? "null") as Record<string, unknown>[] | null;
     if (!raw || raw.length === 0) return null;
     return ensureInvoiceFirst(raw.map(normalizeInvoice));
   } catch {
@@ -345,9 +349,9 @@ function loadInvoices(): PosDraft[] | null {
   }
 }
 
-function saveInvoices(list: PosDraft[]) {
+function saveInvoices(scopeId: string, list: PosDraft[]) {
   try {
-    localStorage.setItem(INV_KEY, JSON.stringify(list));
+    localStorage.setItem(scopedStorageKey(INV_KEY, scopeId), JSON.stringify(list));
   } catch { /* đầy quota — bỏ qua */ }
 }
 
@@ -466,6 +470,7 @@ function currentTimestamp(): number {
 }
 
 export function PosClient({
+  storageScope,
   data,
   printTemplate,
   quotePrintTemplate,
@@ -475,6 +480,7 @@ export function PosClient({
   initialContext,
   posPrefs,
 }: {
+  storageScope: string;
   data: PosData;
   printTemplate: PrintTemplate;
   quotePrintTemplate: PrintTemplate;
@@ -537,12 +543,12 @@ export function PosClient({
     queueMicrotask(() => {
       if (cancelled) return;
       try {
-        const saved = localStorage.getItem(PRINT_SIZE_KEY);
+        const saved = localStorage.getItem(scopedStorageKey(PRINT_SIZE_KEY, storageScope));
         if (saved === "a4" || saved === "a5" || saved === "k80") setPrintDefaultSize(saved);
       } catch { /* localStorage unavailable */ }
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [storageScope]);
   // In phiếu tạm: ẩn app, chỉ hiện phiếu, gọi in trình duyệt rồi khôi phục.
   useEffect(() => {
     if (!printSize) return;
@@ -584,7 +590,11 @@ export function PosClient({
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
-      const saved = loadInvoices();
+      // Legacy unscoped drafts cannot be assigned to a tenant safely.
+      localStorage.removeItem(INV_KEY);
+      localStorage.removeItem(ACT_KEY);
+      localStorage.removeItem(AI_POS_DRAFT_KEY);
+      const saved = loadInvoices(storageScope);
       if (saved) {
         const currentProducts = flattenProducts(data.products);
         const refreshed = saved.map((draft) => ({
@@ -592,27 +602,27 @@ export function PosClient({
           cart: rehydrateCartProducts(draft.cart, currentProducts),
         }));
         setInvoices(refreshed);
-        const savedActive = localStorage.getItem(ACT_KEY);
+        const savedActive = localStorage.getItem(scopedStorageKey(ACT_KEY, storageScope));
         setActiveId(savedActive && refreshed.some((i) => i.id === savedActive) ? savedActive : refreshed[0].id);
       }
     });
     return () => { cancelled = true; };
-  }, [data.products, initialContext, initialSourceInvoice]);
+  }, [data.products, initialContext, initialSourceInvoice, storageScope]);
 
   // ghi localStorage mỗi khi đơn đổi (bỏ qua lần đầu để không ghi đè bản đã lưu)
   const hydratedRef = useRef(false);
   useEffect(() => {
     if (initialSourceInvoice || initialContext) return;
     if (!hydratedRef.current) { hydratedRef.current = true; return; }
-    saveInvoices(invoices);
-  }, [initialContext, invoices, initialSourceInvoice]);
+    saveInvoices(storageScope, invoices);
+  }, [initialContext, invoices, initialSourceInvoice, storageScope]);
 
   // nhớ tab đang mở (giữ khi chuyển trang rồi quay lại)
   useEffect(() => {
     if (!initialSourceInvoice && !initialContext && hydratedRef.current) {
-      try { localStorage.setItem(ACT_KEY, activeId); } catch { /* bỏ qua */ }
+      try { localStorage.setItem(scopedStorageKey(ACT_KEY, storageScope), activeId); } catch { /* bỏ qua */ }
     }
-  }, [activeId, initialContext, initialSourceInvoice]);
+  }, [activeId, initialContext, initialSourceInvoice, storageScope]);
 
   useEffect(() => {
     if (!sepayCheckout || sepayCheckout.status !== "pending") return;
@@ -882,7 +892,7 @@ export function PosClient({
   const syncingRef = useRef(false);
   async function flushOutbox() {
     if (syncingRef.current || !navigator.onLine) return;
-    const items = (await getOutbox()).filter((x) => !x.failed);
+    const items = (await getOutbox(storageScope)).filter((x) => !x.failed);
     if (items.length === 0) return;
     syncingRef.current = true; setSyncing(true);
     for (const it of items) {
@@ -890,13 +900,13 @@ export function PosClient({
       try {
         const res = await createOrder(it.payload as Parameters<typeof createOrder>[0]);
         if (res.ok) {
-          await removeOutbox(it.localId);
+          await removeOutbox(storageScope, it.localId);
           void productCatalog.refresh();
         }
-        else await markFailed(it.localId, res.error); // lỗi nghiệp vụ → giữ lại, không lặp vô hạn
+        else await markFailed(storageScope, it.localId, res.error); // lỗi nghiệp vụ → giữ lại, không lặp vô hạn
       } catch { break; } // vẫn mất mạng → thử lại sau
     }
-    const remain = await getOutbox();
+    const remain = await getOutbox(storageScope);
     setPending(remain.filter((x) => !x.failed).length);
     setSyncing(false); syncingRef.current = false;
   }
@@ -907,7 +917,7 @@ export function PosClient({
     queueMicrotask(() => {
       if (cancelled) return;
       setOnline(navigator.onLine);
-      getOutbox().then((o) => { if (!cancelled) setPending(o.filter((x) => !x.failed).length); });
+      getOutbox(storageScope).then((o) => { if (!cancelled) setPending(o.filter((x) => !x.failed).length); });
       flushOutbox();
     });
     const on = () => { setOnline(true); flushOutbox(); };
@@ -1000,7 +1010,7 @@ export function PosClient({
   function changePrintDefaultSize(size: PaperSize) {
     setPrintDefaultSize(size);
     try {
-      localStorage.setItem(PRINT_SIZE_KEY, size);
+      localStorage.setItem(scopedStorageKey(PRINT_SIZE_KEY, storageScope), size);
     } catch { /* localStorage unavailable */ }
   }
 
@@ -1137,7 +1147,7 @@ export function PosClient({
       if (cancelled) return;
       let stored: PosAiCartDraftPayload | null = null;
       try {
-        stored = JSON.parse(localStorage.getItem(AI_POS_DRAFT_KEY) ?? "null") as PosAiCartDraftPayload | null;
+        stored = JSON.parse(localStorage.getItem(scopedStorageKey(AI_POS_DRAFT_KEY, storageScope)) ?? "null") as PosAiCartDraftPayload | null;
       } catch {
         stored = null;
       }
@@ -1147,14 +1157,14 @@ export function PosClient({
       const rawItems = storedItems.length > 0 ? [...storedItems, ...payloadUnresolvedItems] : aiProductDraftItemsFromQuery(params);
       if (rawItems.length > 0) hydratedRef.current = true;
       const consumed = applyRawAiCartItems(rawItems, payload);
-      if (consumed) localStorage.removeItem(AI_POS_DRAFT_KEY);
+      if (consumed) localStorage.removeItem(scopedStorageKey(AI_POS_DRAFT_KEY, storageScope));
       params.delete("aiDraft");
       params.delete("aiProducts");
       const query = params.toString();
       window.history.replaceState(null, "", query ? `/pos?${query}` : "/pos");
     });
     return () => { cancelled = true; };
-  }, [applyRawAiCartItems, searchableProducts]);
+  }, [applyRawAiCartItems, searchableProducts, storageScope]);
 
   function selectProduct(p: PosProduct) {
     if (p.isVariantParent && productChildren(p).length > 0) {
@@ -1423,7 +1433,7 @@ export function PosClient({
   /** Lưu đơn vào hàng đợi offline + báo người dùng. */
   async function queueOffline(payload: Parameters<typeof createOrder>[0]) {
     // localId = clientId của đơn → sync lại dùng đúng clientId, server khử trùng.
-    await enqueueOrder({ localId: payload.clientId ?? makeClientId(), payload, savedAt: currentTimestamp() });
+    await enqueueOrder(storageScope, { localId: payload.clientId ?? makeClientId(), payload, savedAt: currentTimestamp() });
     setSubmittingMode(null);
     setPending((c) => c + 1);
     closeInvoice(activeId);

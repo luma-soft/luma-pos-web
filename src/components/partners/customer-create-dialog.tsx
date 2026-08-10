@@ -9,7 +9,8 @@ import { Button, Form, FormField, Heading, Input, NumberInput, Select, Textarea 
 import { createCustomer } from "@/lib/actions/partners";
 import { createCustomerSchema, type CreateCustomerInput, type CreateCustomerOutput } from "@/lib/schemas/order";
 import { cn } from "@/lib/utils";
-import { AI_WORKFLOW_DRAFT_STORAGE_KEY } from "@/components/ai-assistant/utils";
+import { AI_WORKFLOW_DRAFT_STORAGE_KEY, tenantStorageKey } from "@/components/ai-assistant/utils";
+import { useTenantClientScope } from "@/components/tenant-client-scope";
 
 type AiWorkflowDraft = {
   intent?: string;
@@ -32,9 +33,9 @@ function defaultCustomerValues(): CreateCustomerInput {
   };
 }
 
-function readAiCustomerDraft(): CreateCustomerInput | null {
+function readAiCustomerDraft(storageScope: string): CreateCustomerInput | null {
   try {
-    const raw = window.localStorage.getItem(AI_WORKFLOW_DRAFT_STORAGE_KEY);
+    const raw = window.localStorage.getItem(tenantStorageKey(AI_WORKFLOW_DRAFT_STORAGE_KEY, storageScope));
     if (!raw) return null;
     const draft = JSON.parse(raw) as AiWorkflowDraft;
     if (draft.intent !== "create_customer") return null;
@@ -71,6 +72,7 @@ export function CustomerCreateForm({
   className?: string;
 }) {
   const t = useTranslations();
+  const storageScope = useTenantClientScope();
   const form = useForm<CreateCustomerInput, unknown, CreateCustomerOutput>({
     resolver: zodResolver(createCustomerSchema),
     defaultValues: defaultCustomerValues(),
@@ -78,9 +80,9 @@ export function CustomerCreateForm({
 
   useEffect(() => {
     if (!aiPreview) return;
-    const draft = readAiCustomerDraft();
+    const draft = readAiCustomerDraft(storageScope);
     if (draft) form.reset(draft);
-  }, [aiPreview, form]);
+  }, [aiPreview, form, storageScope]);
 
   async function onSubmit(values: CreateCustomerOutput) {
     const consentPurposes: Record<string, boolean> = values.consentStatus === "granted"

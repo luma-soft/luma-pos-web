@@ -1,4 +1,4 @@
-import { asc, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   brands,
@@ -20,30 +20,32 @@ import {
 } from "@/lib/product-catalog";
 import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
 
-export async function getProductCatalogRevision(): Promise<string> {
+export async function getProductCatalogRevision(storeId: string): Promise<string> {
   const [state] = await db
     .select({ revision: catalogSyncState.revision })
     .from(catalogSyncState)
-    .where(eq(catalogSyncState.id, 1))
+    .where(and(eq(catalogSyncState.storeId, storeId), eq(catalogSyncState.id, 1)))
     .limit(1);
   return String(state?.revision ?? 0);
 }
 
 /** Projection đầy đủ để mọi màn hình dùng chung khi online và offline. */
 export async function getProductCatalogSnapshot(
+  storeId: string,
   userId: string,
   role: string,
 ): Promise<ProductCatalogSnapshot> {
-  return buildProductCatalogSnapshot(userId, role, 0);
+  return buildProductCatalogSnapshot(storeId, userId, role, 0);
 }
 
 async function buildProductCatalogSnapshot(
+  storeId: string,
   userId: string,
   role: string,
   attempt: number,
 ): Promise<ProductCatalogSnapshot> {
   const hasComplianceColumns = await hasProductComplianceColumns();
-  const revisionBefore = await getProductCatalogRevision();
+  const revisionBefore = await getProductCatalogRevision(storeId);
   const [productRows, warehouseRows] = await Promise.all([
     db
       .select({
@@ -82,7 +84,8 @@ async function buildProductCatalogSnapshot(
             'quantity', ${productComboItems.quantity}
           ) order by ${productComboItems.sortOrder})
           from ${productComboItems}
-          where ${productComboItems.comboProductId} = ${products.id}
+          where ${productComboItems.storeId} = ${storeId}::uuid
+            and ${productComboItems.comboProductId} = ${products.id}
         ), '[]')`,
         units: sql<CatalogUnit[]>`coalesce((
           select json_agg(json_build_object(
@@ -92,12 +95,14 @@ async function buildProductCatalogSnapshot(
             'priceOverride', ${productUnits.priceOverride}
           ) order by ${productUnits.sortOrder})
           from ${productUnits}
-          where ${productUnits.productId} = ${products.id}
+          where ${productUnits.storeId} = ${storeId}::uuid
+            and ${productUnits.productId} = ${products.id}
         ), '[]')`,
         prices: sql<Record<string, string>>`coalesce((
           select json_object_agg(${productPrices.priceBookId}, ${productPrices.price})
           from ${productPrices}
-          where ${productPrices.productId} = ${products.id}
+          where ${productPrices.storeId} = ${storeId}::uuid
+            and ${productPrices.productId} = ${products.id}
         ), '{}')`,
         warehouseStock: sql<CatalogWarehouseStock[]>`coalesce((
           select json_agg(json_build_object(
@@ -107,14 +112,15 @@ async function buildProductCatalogSnapshot(
             'minLevel', ${stockLevels.minLevel}
           ))
           from ${stockLevels}
-          where ${stockLevels.productId} = ${products.id}
+          where ${stockLevels.storeId} = ${storeId}::uuid
+            and ${stockLevels.productId} = ${products.id}
         ), '[]')`,
         updatedAt: products.updatedAt,
       })
       .from(products)
       .leftJoin(brands, eq(products.brandId, brands.id))
       .leftJoin(categories, eq(products.categoryId, categories.id))
-      .where(eq(products.isActive, true))
+      .where(and(eq(products.storeId, storeId), eq(products.isActive, true)))
       .orderBy(asc(products.name)),
     db
       .select({
@@ -123,18 +129,19 @@ async function buildProductCatalogSnapshot(
         isDefault: warehouses.isDefault,
       })
       .from(warehouses)
+      .where(eq(warehouses.storeId, storeId))
       .orderBy(desc(warehouses.isDefault), asc(warehouses.name)),
   ]);
-  const revisionAfter = await getProductCatalogRevision();
+  const revisionAfter = await getProductCatalogRevision(storeId);
   if (revisionBefore !== revisionAfter) {
     if (attempt >= 2) throw new Error("PRODUCT_CATALOG_CHANGED_DURING_SNAPSHOT");
-    return buildProductCatalogSnapshot(userId, role, attempt + 1);
+    return buildProductCatalogSnapshot(storeId, userId, role, attempt + 1);
   }
 
   return {
     schemaVersion: PRODUCT_CATALOG_SCHEMA_VERSION,
     userId,
-    scopeId: `${userId}:${role}`,
+    scopeId: `${storeId}:${userId}:${role}`,
     revision: revisionAfter,
     savedAt: Date.now(),
     products: productRows.map((product) => ({

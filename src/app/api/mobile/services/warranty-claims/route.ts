@@ -151,7 +151,7 @@ export async function POST(request: Request) {
         file.fileName.replace(/\.[^.]+$/, ""),
       );
       const canonicalName = `${baseName}.${image.extension}`;
-      const path = `${parsed.data.jobId}/${gate.userId}/${claimId}/${randomUUID()}.${image.extension}`;
+      const path = `stores/${gate.storeId}/services/jobs/${parsed.data.jobId}/warranty/${claimId}/${gate.userId}/${randomUUID()}.${image.extension}`;
       const [cleanup] = await db.transaction((tx) =>
         stageServiceStorageCleanupCore(tx, {
           bucket: SERVICE_EVIDENCE_BUCKET,

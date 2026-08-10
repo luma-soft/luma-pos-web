@@ -51,7 +51,8 @@ import {
 import { Combobox } from "@/components/combobox";
 import type { ProductFormOptions } from "@/lib/data/products";
 import type { PriceBookRow } from "@/lib/data/price-books";
-import { AI_WORKFLOW_DRAFT_STORAGE_KEY } from "@/components/ai-assistant/utils";
+import { AI_WORKFLOW_DRAFT_STORAGE_KEY, tenantStorageKey, tenantStoreId } from "@/components/ai-assistant/utils";
+import { useTenantClientScope } from "@/components/tenant-client-scope";
 
 type Tab = "info" | "description" | "variants";
 
@@ -113,6 +114,7 @@ export function NewProductForm({
   aiPreview = false,
   creationKind = "product",
 }: NewProductFormProps) {
+  const storageScope = useTenantClientScope();
   const t = useTranslations();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("info");
@@ -160,7 +162,7 @@ export function NewProductForm({
   useEffect(() => {
     if (!aiPreview) return;
     try {
-      const raw = window.localStorage.getItem(AI_WORKFLOW_DRAFT_STORAGE_KEY);
+      const raw = window.localStorage.getItem(tenantStorageKey(AI_WORKFLOW_DRAFT_STORAGE_KEY, storageScope));
       if (!raw) return;
       const draft = JSON.parse(raw) as AiWorkflowDraft;
       const payload = draft.action?.payload ?? {};
@@ -187,7 +189,7 @@ export function NewProductForm({
     } catch {
       // Ignore stale or malformed AI drafts; the form remains usable.
     }
-  }, [aiPreview, categories, form, isEdit, productId]);
+  }, [aiPreview, categories, form, isEdit, productId, storageScope]);
 
   async function onSubmit(values: CreateProductOutput) {
     if (isEdit && productId) {
@@ -1137,6 +1139,7 @@ function randomImagePath(fileName: string): string {
 
 function ImageUploadGrid() {
   const t = useTranslations();
+  const storageScope = useTenantClientScope();
   const { watch, setValue } = useFormCtx();
   const urls: string[] = watch("imageUrls") ?? [];
   const [uploading, setUploading] = useState(false);
@@ -1168,7 +1171,7 @@ function ImageUploadGrid() {
       const supabase = createClient();
       const added: string[] = [];
       for (const file of Array.from(files).slice(0, MAX_IMAGES - urls.length)) {
-        const path = randomImagePath(file.name);
+        const path = `stores/${tenantStoreId(storageScope)}/products/drafts/${randomImagePath(file.name)}`;
         const { error } = await supabase.storage
           .from("products")
           .upload(path, file, { upsert: false });
