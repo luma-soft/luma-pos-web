@@ -3,10 +3,12 @@ import { Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getRestockSuggestions, type RestockPriority } from "@/lib/data/ai-restock";
 import { RestockTable } from "./restock-table";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 export async function RestockTab() {
   const t = await getTranslations();
-  const rows = await getRestockSuggestions(30);
+  const context = await requireStoreContext();
+  const rows = await getRestockSuggestions(context.storeId, 30);
   const counts = { high: 0, medium: 0, low: 0 } as Record<RestockPriority, number>;
   rows.forEach((r) => { counts[r.priority]++; });
 

@@ -1,6 +1,7 @@
 import { AI_EVALUATION_CASES, type AiEvaluationCase } from "@/lib/ai/evals";
 import { loadAiProviderConfig } from "@/lib/ai/provider-adapter";
 import { heuristicAiPlannerIntent, planAiAssistantIntent, type AiPlannerIntent } from "@/lib/ai/planner";
+import { CURRENT_STORE_ID } from "@/lib/tenancy/constants";
 
 type EvalMode = "rule" | "llm";
 
@@ -89,7 +90,7 @@ async function runRuleEvals() {
 }
 
 async function runLlmEvals() {
-  const config = await loadAiProviderConfig().catch(() => null);
+  const config = await loadAiProviderConfig(CURRENT_STORE_ID).catch(() => null);
   if (!config?.apiKey) {
     console.log("ai eval llm mode skipped: missing API key");
     return [];
@@ -100,7 +101,7 @@ async function runLlmEvals() {
   }
   const rows: EvalRow[] = [];
   for (const item of AI_EVALUATION_CASES) {
-    const result = await planAiAssistantIntent({ prompt: item.prompt, hasAttachments: item.tags.includes("ocr") });
+    const result = await planAiAssistantIntent({ storeId: CURRENT_STORE_ID, prompt: item.prompt, hasAttachments: item.tags.includes("ocr") });
     if (!result.ok) {
       rows.push(compare("llm", item, {
         intent: "unknown",

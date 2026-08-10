@@ -34,7 +34,7 @@ export async function GET(request: Request) {
   const stateUserId = profileId ?? gate.userId;
   const [store, restock, shift, failedEinvoices, warrantyNotifications] = await Promise.all([
     getStoreSettings(gate.storeId),
-    getRestockSuggestions(30),
+    getRestockSuggestions(gate.storeId, 30),
     getCurrentShift(gate.storeId, profileId ?? gate.userId),
     db.select({
       id: einvoices.id,
@@ -44,7 +44,7 @@ export async function GET(request: Request) {
     })
       .from(einvoices)
       .innerJoin(orders, eq(orders.id, einvoices.orderId))
-      .where(eq(einvoices.status, "error"))
+      .where(and(eq(einvoices.storeId, gate.storeId), eq(einvoices.status, "error")))
       .orderBy(desc(einvoices.createdAt))
       .limit(10),
     listWarrantyNotificationsForRecipientCore(db, stateUserId),

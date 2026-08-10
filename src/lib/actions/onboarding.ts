@@ -5,18 +5,20 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { storeSettings } from "@/db/schema";
 import { storeSettingsSchema, type StoreSettingsInput } from "@/lib/schemas/settings";
-import { type ActionResult, requireUser } from "./common";
+import { type ActionResult } from "./common";
+import { requireStoreContext } from "@/lib/auth/store-context";
 
 /** Hoàn tất thiết lập ban đầu — lưu thông tin cửa hàng + đánh dấu onboarded. */
 export async function completeOnboarding(input: StoreSettingsInput): Promise<ActionResult> {
-  try { await requireUser(); } catch { return { ok: false, error: "errors.unauthorized" }; }
+  let context;
+  try { context = await requireStoreContext(); } catch { return { ok: false, error: "errors.unauthorized" }; }
   const parsed = storeSettingsSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
   try {
     await db.insert(storeSettings)
-      .values({ id: "default", ...v, onboarded: true })
-      .onConflictDoUpdate({ target: storeSettings.id, set: { ...v, onboarded: true, updatedAt: sql`now()` } });
+      .values({ storeId: context.storeId, id: "default", ...v, onboarded: true })
+      .onConflictDoUpdate({ target: storeSettings.storeId, set: { ...v, onboarded: true, updatedAt: sql`now()` } });
     revalidatePath("/", "layout");
     return { ok: true, data: undefined };
   } catch (e) {

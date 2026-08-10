@@ -97,7 +97,7 @@ export async function POST(request: Request) {
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileGate(gate)!;
-  const aiBlocked = await requireAiProviderConfigured();
+  const aiBlocked = await requireAiProviderConfigured(gate.storeId);
   if (aiBlocked) return aiBlocked;
 
   const body = await readJson(request);
@@ -212,11 +212,12 @@ export async function POST(request: Request) {
   const enrichedPrompt = `${basePrompt}${attachmentPromptBlock(parsedAttachments)}`;
   const [reports, restock] = await Promise.all([
     getReports(gate.storeId, 30),
-    getRestockSuggestions(30),
+    getRestockSuggestions(gate.storeId, 30),
   ]);
   const toolLoop = hasForcedActionPreset(enrichedPrompt)
     ? { ok: false as const, reason: "forced_action_preset", trace: [] }
     : await runAiToolLoop({
+        storeId: gate.storeId,
         prompt: enrichedPrompt,
         restock,
         parsedAttachments,

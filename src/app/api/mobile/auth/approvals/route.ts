@@ -39,6 +39,7 @@ export async function POST(request: Request) {
   const verification = await verifyStaffPin(approverId, pin, gate.storeId);
   if (!verification.ok) {
     await db.insert(auditLogs).values({
+      storeId: gate.storeId,
       actorId: gate.userId,
       source: "mobile",
       action: "auth.approval_failed",
@@ -67,6 +68,7 @@ export async function POST(request: Request) {
   });
   if (!mode) {
     await db.insert(auditLogs).values({
+      storeId: gate.storeId,
       actorId: gate.userId,
       source: "mobile",
       action: "auth.approval_denied",
@@ -88,6 +90,7 @@ export async function POST(request: Request) {
     reason,
   });
   await db.insert(auditLogs).values({
+    storeId: gate.storeId,
     actorId: verification.staff.id,
     actorNameSnapshot: verification.staff.fullName,
     source: "mobile",

@@ -345,7 +345,7 @@ export async function generateShopeeListingAiFill(input: AiListingFillInput): Pr
   try {
     const charge = await consumeAiUsage(gate.storeId, 1);
     if (!charge.ok) return { ok: false, error: "ai.errors.usageLimitExceeded" };
-    const config = await loadAiProviderConfig();
+    const config = await loadAiProviderConfig(gate.storeId);
     const response = await completeAiText({
       config,
       jsonOnly: true,

@@ -2519,6 +2519,7 @@ export async function buildAiAssistantResponse(input: {
   const forcedCashbookMode = forcedCashbookActionModeFromPreset(rawPrompt);
   const forcedReportMode = forcedReportSummaryModeFromPreset(rawPrompt);
   const planner = await planAiAssistantIntent({
+    storeId: input.storeId,
     prompt: stripActionPresetMarker(rawPrompt),
     hasAttachments: Boolean(input.parsedAttachments?.length),
   });

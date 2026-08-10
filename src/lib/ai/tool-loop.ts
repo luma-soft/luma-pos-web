@@ -24,6 +24,7 @@ const toolPlanSchema = z.object({
 });
 
 export type AiToolLoopInput = {
+  storeId: string;
   prompt: string;
   restock: RestockRow[];
   parsedAttachments?: ParsedAiAttachment[];
@@ -70,7 +71,7 @@ function resultTrace(result: Awaited<ReturnType<typeof runAiTool>>) {
 }
 
 export async function runAiToolLoop(input: AiToolLoopInput): Promise<AiToolLoopResult> {
-  const config = await loadAiProviderConfig();
+  const config = await loadAiProviderConfig(input.storeId);
   const trace: AiToolTrace[] = [];
   if (!config.apiKey) return { ok: false, reason: "missing_api_key", trace };
   if (!config.capabilities.textPlanning || !config.capabilities.structuredJson) {

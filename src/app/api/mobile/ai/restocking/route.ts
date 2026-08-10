@@ -8,12 +8,13 @@ export async function GET(request: Request) {
   const gate = await requireMobileAiStockAccess();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
-  const aiBlocked = await requireAiProviderConfigured();
+  if (!gate.ok) return mobileGate(gate)!;
+  const aiBlocked = await requireAiProviderConfigured(gate.storeId);
   if (aiBlocked) return aiBlocked;
 
   const lookbackDays = Math.min(365, Math.max(7, numberParam(request, "days", 30)));
   return mobileOk({
-    rows: await getRestockSuggestions(lookbackDays),
+    rows: await getRestockSuggestions(gate.storeId, lookbackDays),
     assumptions: {
       lookbackDays,
       targetCoverDays: RESTOCK_COVER_DAYS,

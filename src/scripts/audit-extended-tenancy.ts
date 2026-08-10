@@ -69,14 +69,13 @@ try {
     const nullOrWrong: Record<string, number> = {};
     for (const table of extendedTables) {
       const [row] = await sql.unsafe<{ count: number }[]>(
-        `select count(*)::int as count from public."${table}" where store_id is null or store_id <> $1::uuid`,
-        [CURRENT_STORE_ID],
+        `select count(*)::int as count from public."${table}" row where store_id is null or not exists (select 1 from public.stores where stores.id = row.store_id)`,
       );
       nullOrWrong[table] = row.count;
     }
     assertAudit(
       Object.values(nullOrWrong).every((count) => count === 0),
-      "extended rows are missing or outside the deterministic current store",
+      "extended rows have a null or orphaned store",
     );
 
     const migrationFiles = readdirSync("drizzle").filter((name) => name.endsWith(".sql")).sort();

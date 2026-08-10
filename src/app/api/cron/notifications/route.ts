@@ -1,6 +1,6 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { einvoices } from "@/db/schema";
+import { einvoices, stores } from "@/db/schema";
 import { getRestockSuggestions } from "@/lib/data/ai-restock";
 import { getRawStorePrefs } from "@/lib/data/settings";
 import { dispatchPushNotification } from "@/lib/notifications/push";
@@ -12,7 +12,6 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   dispatchPendingWarrantyNotificationsCore,
 } from "@/lib/services/technician-warranty";
-import { CURRENT_STORE_ID } from "@/lib/tenancy/constants";
 
 function dateKey(timezone: string) {
   return new Intl.DateTimeFormat("en-CA", {
@@ -143,8 +142,11 @@ export async function GET(request: Request) {
   if (!isNotificationCronAuthorized(request)) {
     return mobileError("errors.unauthorized", 401);
   }
-  const prefs = (await getRawStorePrefs(CURRENT_STORE_ID)).notifications;
-  const day = dateKey(prefs.quietHours.timezone);
+  const activeStores = await db.select({ id: stores.id }).from(stores).where(eq(stores.status, "active"));
+  const prefsByStore = new Map(await Promise.all(activeStores.map(async (store) => [
+    store.id,
+    (await getRawStorePrefs(store.id)).notifications,
+  ] as const)));
   const results = [];
   const maintenance = await runMaintenanceWorker();
   const cleanupStorage = createSupabaseAdminClient();
@@ -157,84 +159,94 @@ export async function GET(request: Request) {
       },
     },
   });
-  const warrantyNotifications = prefs.serviceDue
-    ? await dispatchPendingWarrantyNotificationsCore({
-      database: db,
-      dispatch: (notification) => dispatchPushNotification({
+  const warrantyNotifications = await dispatchPendingWarrantyNotificationsCore({
+    database: db,
+    dispatch: (notification) => {
+      const prefs = prefsByStore.get(notification.storeId);
+      if (!prefs?.serviceDue) {
+        return Promise.resolve({ configured: true, sent: 0, failed: 0, skipped: 1, deferred: 0 });
+      }
+      return dispatchPushNotification({
+        storeId: notification.storeId,
         notificationKey: `service-warranty:${notification.id}`,
         category: "serviceDue",
         target: "services",
         entityId: notification.jobId ?? notification.claimId,
         prefs,
         userIds: [notification.recipientId],
-      }),
-    })
-    : {
-      evaluated: 0,
-      dispatched: 0,
-      deferred: 0,
-      failed: 0,
-      deliveries: [],
-    };
+      });
+    },
+  });
   results.push(...warrantyNotifications.deliveries);
 
-  if (prefs.serviceDue) {
-    for (const occurrence of maintenance.results.filter((item) => item.created && item.jobId)) {
-      results.push(await dispatchPushNotification({
-        notificationKey: `service-due:${occurrence.jobId}`,
-        category: "serviceDue",
-        target: "services",
-        entityId: occurrence.jobId!,
-        prefs,
-        userIds: occurrence.assignedTo ? [occurrence.assignedTo] : undefined,
-      }));
-    }
-    for (const occurrence of maintenance.overdue) {
-      results.push(await dispatchPushNotification({
-        notificationKey: occurrence.notificationKey,
-        category: "serviceDue",
-        target: "services",
-        entityId: occurrence.jobId,
-        prefs,
-        userIds: occurrence.userIds,
-      }));
-    }
+  for (const occurrence of maintenance.results.filter((item) => item.created && item.jobId)) {
+    if (!occurrence.storeId) continue;
+    const prefs = prefsByStore.get(occurrence.storeId);
+    if (!prefs?.serviceDue) continue;
+    results.push(await dispatchPushNotification({
+      storeId: occurrence.storeId,
+      notificationKey: `service-due:${occurrence.jobId}`,
+      category: "serviceDue",
+      target: "services",
+      entityId: occurrence.jobId!,
+      prefs,
+      userIds: occurrence.assignedTo ? [occurrence.assignedTo] : undefined,
+    }));
+  }
+  for (const occurrence of maintenance.overdue) {
+    const prefs = prefsByStore.get(occurrence.storeId);
+    if (!prefs?.serviceDue) continue;
+    results.push(await dispatchPushNotification({
+      storeId: occurrence.storeId,
+      notificationKey: occurrence.notificationKey,
+      category: "serviceDue",
+      target: "services",
+      entityId: occurrence.jobId,
+      prefs,
+      userIds: occurrence.userIds,
+    }));
   }
 
-  if (prefs.lowStock) {
-    const restock = await getRestockSuggestions(30);
-    const eligible = restock.filter((row) =>
-      row.priority === "high"
-      || (row.daysOfStock != null && row.daysOfStock <= prefs.thresholds.lowStockDays)
-    );
-    for (const row of eligible) {
-      results.push(await dispatchPushNotification({
-        notificationKey: `low-stock:${row.id}:${day}`,
-        category: "lowStock",
-        target: "inventory",
-        entityId: row.id,
-        prefs,
-      }));
+  for (const store of activeStores) {
+    const prefs = prefsByStore.get(store.id)!;
+    const day = dateKey(prefs.quietHours.timezone);
+    if (prefs.lowStock) {
+      const restock = await getRestockSuggestions(store.id, 30);
+      const eligible = restock.filter((row) =>
+        row.priority === "high"
+        || (row.daysOfStock != null && row.daysOfStock <= prefs.thresholds.lowStockDays)
+      );
+      for (const row of eligible) {
+        results.push(await dispatchPushNotification({
+          storeId: store.id,
+          notificationKey: `low-stock:${row.id}:${day}`,
+          category: "lowStock",
+          target: "inventory",
+          entityId: row.id,
+          prefs,
+        }));
+      }
     }
-  }
 
-  if (prefs.einvoiceError) {
-    const failed = await db.select({
-      id: einvoices.id,
-      attemptCount: einvoices.attemptCount,
-    })
-      .from(einvoices)
-      .where(eq(einvoices.status, "error"));
-    for (const row of failed.filter(
-      (item) => item.attemptCount >= prefs.thresholds.einvoiceFailureAttempts,
-    )) {
-      results.push(await dispatchPushNotification({
-        notificationKey: `einvoice-error:${row.id}:${day}`,
-        category: "einvoiceError",
-        target: "invoices",
-        entityId: row.id,
-        prefs,
-      }));
+    if (prefs.einvoiceError) {
+      const failed = await db.select({
+        id: einvoices.id,
+        attemptCount: einvoices.attemptCount,
+      })
+        .from(einvoices)
+        .where(and(eq(einvoices.storeId, store.id), eq(einvoices.status, "error")));
+      for (const row of failed.filter(
+        (item) => item.attemptCount >= prefs.thresholds.einvoiceFailureAttempts,
+      )) {
+        results.push(await dispatchPushNotification({
+          storeId: store.id,
+          notificationKey: `einvoice-error:${row.id}:${day}`,
+          category: "einvoiceError",
+          target: "invoices",
+          entityId: row.id,
+          prefs,
+        }));
+      }
     }
   }
 

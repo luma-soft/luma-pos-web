@@ -27,6 +27,7 @@ mock.module("sharp", () => ({
 mock.module("@/lib/mobile/auth", () => ({
   requireMobileStockAccess: async () => ({
     ok: true,
+    storeId: "store-1",
     userId: "user-1",
     role: "manager",
   }),
@@ -94,7 +95,7 @@ describe("POST /api/mobile/products/images", () => {
       bucket: "products",
       options: { contentType: "image/jpeg", upsert: false },
     });
-    expect(uploads[0]?.path).toMatch(/^user-1\/\d+-[\w-]+\.jpg$/);
+    expect(uploads[0]?.path).toMatch(/^stores\/store-1\/products\/drafts\/user-1\/\d+-[\w-]+\.jpg$/);
     expect(payload.data.url).toBe(
       `https://cdn.test/products/${uploads[0]?.path}`,
     );

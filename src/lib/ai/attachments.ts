@@ -89,6 +89,7 @@ export async function parseAiAttachment(input: {
     const bytes = await downloadAttachment(attachment, storeId, userId);
     if (mimeType.startsWith("image/")) {
       result = await parseAiAttachmentWithProvider({
+        storeId,
         name: attachment.name || "image",
         mimeType,
         bytes,

@@ -426,9 +426,11 @@ export async function claimWarrantyNotificationDeliveriesCore(
     });
     if (!row) continue;
     const [claim] = await database.select({
+      storeId: warrantyClaims.storeId,
       jobId: warrantyClaims.jobId,
     }).from(warrantyClaims).where(eq(warrantyClaims.id, row.claimId)).limit(1);
-    claimed.push({ ...row, claimToken, jobId: claim?.jobId ?? null });
+    if (!claim) continue;
+    claimed.push({ ...row, claimToken, storeId: claim.storeId, jobId: claim.jobId ?? null });
   }
   return claimed;
 }
@@ -460,6 +462,7 @@ export async function dispatchPendingWarrantyNotificationsCore(input: {
   now?: Date;
   limit?: number;
   dispatch(notification: {
+    storeId: string;
     id: string;
     recipientId: string;
     claimId: string;

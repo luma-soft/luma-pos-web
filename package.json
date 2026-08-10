@@ -29,7 +29,9 @@
     "audit:tenant-foundation": "bun run src/scripts/audit-tenant-foundation.ts",
     "audit:tenant-auth": "bun run src/scripts/audit-tenant-auth.ts",
     "audit:core-tenancy": "bun run src/scripts/audit-core-tenancy.ts",
-    "audit:extended-tenancy": "bun run src/scripts/audit-extended-tenancy.ts"
+    "audit:extended-tenancy": "bun run src/scripts/audit-extended-tenancy.ts",
+    "ops:provision-store": "bun run src/scripts/provision-store.ts",
+    "ops:archive-store": "bun run src/scripts/archive-store.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

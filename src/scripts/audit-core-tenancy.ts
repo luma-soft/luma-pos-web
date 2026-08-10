@@ -103,14 +103,13 @@ try {
     const nullOrWrong: Record<string, number> = {};
     for (const table of coreTables) {
       const [row] = await sql.unsafe<{ count: number }[]>(
-        `select count(*)::int as count from public."${table}" where store_id is null or store_id <> $1::uuid`,
-        [CURRENT_STORE_ID],
+        `select count(*)::int as count from public."${table}" row where store_id is null or not exists (select 1 from public.stores where stores.id = row.store_id)`,
       );
       nullOrWrong[table] = row.count;
     }
     assertAudit(
       Object.values(nullOrWrong).every((count) => count === 0),
-      "core rows are missing or outside the deterministic current store",
+      "core rows have a null or orphaned store",
     );
 
     const constraints = await sql<{ conname: string }[]>`

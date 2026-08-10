@@ -6,7 +6,7 @@ import { mobileAction, mobileGate, readJson } from "@/lib/mobile/response";
 export async function POST(request: Request) {
   const gate = await requireMobileAiStockAccess();
   if (!gate.ok) return mobileGate(gate)!;
-  const aiBlocked = await requireAiProviderConfigured();
+  const aiBlocked = await requireAiProviderConfigured(gate.storeId);
   if (aiBlocked) return aiBlocked;
 
   const body = await readJson(request);

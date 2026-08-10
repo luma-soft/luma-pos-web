@@ -1,5 +1,4 @@
 import { getAiProviderSettings } from "@/lib/data/settings";
-import { CURRENT_STORE_ID } from "@/lib/tenancy/constants";
 import type { AiTokenUsage } from "@/lib/ai/usage";
 import { AI_PROVIDERS, type StorePrefs } from "@/lib/schemas/settings";
 
@@ -98,7 +97,7 @@ export function buildAiProviderConfig(prefs: StorePrefs["ai"]): AiProviderConfig
   };
 }
 
-export async function loadAiProviderConfig(storeId = CURRENT_STORE_ID): Promise<AiProviderConfig> {
+export async function loadAiProviderConfig(storeId: string): Promise<AiProviderConfig> {
   const prefs = await getAiProviderSettings(storeId);
   return buildAiProviderConfig(prefs);
 }

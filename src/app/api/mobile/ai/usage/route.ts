@@ -9,7 +9,7 @@ export async function GET() {
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileGate(gate)!;
-  const aiBlocked = await requireAiProviderConfigured();
+  const aiBlocked = await requireAiProviderConfigured(gate.storeId);
   if (aiBlocked) return aiBlocked;
   return mobileOk(await getAiUsageStatus(gate.storeId));
 }

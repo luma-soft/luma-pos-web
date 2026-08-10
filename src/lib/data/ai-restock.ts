@@ -16,7 +16,7 @@ export type RestockRow = {
 };
 
 /** Gợi ý nhập hàng (deterministic) từ tốc độ bán {days} ngày gần nhất. */
-export async function getRestockSuggestions(days = 30): Promise<RestockRow[]> {
+export async function getRestockSuggestions(storeId: string, days = 30): Promise<RestockRow[]> {
   const since = new Date();
   since.setDate(since.getDate() - days);
 
@@ -27,7 +27,7 @@ export async function getRestockSuggestions(days = 30): Promise<RestockRow[]> {
     })
     .from(orderItems)
     .innerJoin(orders, eq(orderItems.orderId, orders.id))
-    .where(and(inArray(orders.status, ["completed", "returned"]), gte(orders.createdAt, since)))
+    .where(and(eq(orders.storeId, storeId), inArray(orders.status, ["completed", "returned"]), gte(orders.createdAt, since)))
     .groupBy(orderItems.productId);
   const soldMap = new Map(sold.map((r) => [r.productId, Number(r.base)]));
 
@@ -35,7 +35,7 @@ export async function getRestockSuggestions(days = 30): Promise<RestockRow[]> {
     .select({ id: products.id, name: products.name, sku: products.sku, baseUnit: products.baseUnit, totalStock: products.totalStock, minStock: products.minStock, costPrice: products.costPrice, lastPurchasePrice: products.lastPurchasePrice })
     .from(products)
     .leftJoin(categories, eq(products.categoryId, categories.id))
-    .where(and(eq(products.isActive, true), stockManagedCategoryCondition()));
+    .where(and(eq(products.storeId, storeId), eq(products.isActive, true), stockManagedCategoryCondition()));
 
   const rows: RestockRow[] = [];
   for (const p of prods) {

@@ -102,8 +102,8 @@ function normalizeProviderResult(raw: unknown, provider: AiAttachmentParseResult
   };
 }
 
-export async function aiAttachmentProviderStatus() {
-  const config = await loadAiProviderConfig();
+export async function aiAttachmentProviderStatus(storeId: string) {
+  const config = await loadAiProviderConfig(storeId);
   return {
     provider: config.provider,
     configured: Boolean(config.apiKey) && config.capabilities.visionOcr,
@@ -113,9 +113,9 @@ export async function aiAttachmentProviderStatus() {
 }
 
 export async function parseAiAttachmentWithProvider(
-  input: AiAttachmentProviderInput
+  input: AiAttachmentProviderInput & { storeId: string }
 ): Promise<AiAttachmentParseResult> {
-  const config = await loadAiProviderConfig();
+  const config = await loadAiProviderConfig(input.storeId);
   if (!config.capabilities.visionOcr) {
     return fallbackResult(`AI attachment provider "${config.provider}" does not support vision/OCR.`);
   }

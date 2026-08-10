@@ -55,7 +55,7 @@ export async function GET(request: Request) {
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileGate(gate)!;
-  const aiBlocked = await requireAiProviderConfigured();
+  const aiBlocked = await requireAiProviderConfigured(gate.storeId);
   if (aiBlocked) return aiBlocked;
 
   const url = new URL(request.url);
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileGate(gate)!;
-  const aiBlocked = await requireAiProviderConfigured();
+  const aiBlocked = await requireAiProviderConfigured(gate.storeId);
   if (aiBlocked) return aiBlocked;
 
   const body = asObject(await readJson(request));
@@ -117,7 +117,7 @@ export async function PUT(request: Request) {
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileGate(gate)!;
-  const aiBlocked = await requireAiProviderConfigured();
+  const aiBlocked = await requireAiProviderConfigured(gate.storeId);
   if (aiBlocked) return aiBlocked;
 
   const body = asObject(await readJson(request));
@@ -149,7 +149,7 @@ export async function DELETE(request: Request) {
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileGate(gate)!;
-  const aiBlocked = await requireAiProviderConfigured();
+  const aiBlocked = await requireAiProviderConfigured(gate.storeId);
   if (aiBlocked) return aiBlocked;
 
   const url = new URL(request.url);

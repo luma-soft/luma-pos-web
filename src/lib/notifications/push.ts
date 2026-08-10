@@ -243,6 +243,7 @@ export async function sendNotificationToDevice(
 }
 
 export async function dispatchPushNotification(input: {
+  storeId: string;
   notificationKey: string;
   category: PushCategory;
   target: string;
@@ -271,6 +272,9 @@ export async function dispatchPushNotification(input: {
       eq(effectiveProfiles.id, mobilePushDevices.effectiveUserId),
     )
     .where(and(
+      eq(mobilePushDevices.storeId, input.storeId),
+      eq(profiles.storeId, input.storeId),
+      eq(effectiveProfiles.storeId, input.storeId),
       eq(mobilePushDevices.enabled, true),
       userIds.length > 0
         ? inArray(effectiveProfiles.id, userIds)

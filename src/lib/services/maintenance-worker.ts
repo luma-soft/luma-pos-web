@@ -80,6 +80,7 @@ export async function markOverdueMaintenanceOccurrencesCore(
       ));
     const managerIds = managerRows.map((item) => item.id);
     alerts.push({
+      storeId: occurrence.storeId,
       occurrenceId: occurrence.id,
       jobId: occurrence.jobId,
       notificationKey: `service-maintenance-overdue:${occurrence.id}`,
@@ -207,6 +208,7 @@ export async function generateMaintenanceOccurrenceCore(
     createdAt: now,
   });
   return {
+    storeId: plan.storeId,
     created: true,
     jobId: job.id,
     dueOn: plan.nextDueOn,

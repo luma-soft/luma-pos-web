@@ -142,6 +142,7 @@ export function heuristicAiPlannerIntent(input: {
 }
 
 export async function planAiAssistantIntent(input: {
+  storeId: string;
   prompt: string;
   hasAttachments?: boolean;
 }): Promise<AiPlannerResponse> {
@@ -149,7 +150,7 @@ export async function planAiAssistantIntent(input: {
   if (!prompt) return { ok: false, reason: "empty_prompt" };
   const heuristicPlan = heuristicAiPlannerIntent({ prompt, hasAttachments: input.hasAttachments });
   if (heuristicPlan) return { ok: true, plan: heuristicPlan };
-  const config = await loadAiProviderConfig();
+  const config = await loadAiProviderConfig(input.storeId);
   if (!config.apiKey) return { ok: false, reason: "missing_api_key" };
   if (!config.capabilities.textPlanning) return { ok: false, reason: `unsupported_provider:${config.provider}` };
 

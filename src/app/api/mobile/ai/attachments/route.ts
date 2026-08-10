@@ -62,7 +62,7 @@ export async function POST(request: Request) {
   const gate = await requireMobileAiManager();
   if (!gate.ok) return mobileGate(gate)!;
   if (!gate.ok) return mobileError("errors.unauthorized", 401);
-  const aiBlocked = await requireAiProviderConfigured();
+  const aiBlocked = await requireAiProviderConfigured(gate.storeId);
   if (aiBlocked) return aiBlocked;
 
   let form: FormData;
