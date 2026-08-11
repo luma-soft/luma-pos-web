@@ -48,6 +48,7 @@ type Props = {
   resultCount?: number;
   resultLabel?: string;
   countEndpoint?: string;
+  defaultSort?: string;
   categories?: Option[];
   warehouses?: Option[];
   suppliers?: Option[];
@@ -84,6 +85,7 @@ export function InventoryFilterDrawer({
   resultCount: initialResultCount,
   resultLabel = "sản phẩm",
   countEndpoint,
+  defaultSort = "",
   categories = [],
   warehouses = [],
   suppliers = [],
@@ -121,9 +123,9 @@ export function InventoryFilterDrawer({
       department: values.department ?? "",
       brand: values.brandId ?? "",
       kind: values.productKind ?? "",
-      sort: values.sort ?? "",
+      sort: values.sort ?? defaultSort,
     }),
-    [values],
+    [defaultSort, values],
   );
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(initial);
@@ -148,7 +150,8 @@ export function InventoryFilterDrawer({
     key !== "from" &&
     key !== "to" &&
     Boolean(value) &&
-    !(key === "time" && value === "all"),
+    !(key === "time" && value === "all") &&
+    !(key === "sort" && value === defaultSort),
   ).length;
 
   const close = useCallback(() => {
@@ -313,7 +316,7 @@ export function InventoryFilterDrawer({
       department: "",
       brand: "",
       kind: "",
-      sort: "",
+      sort: defaultSort,
     });
     setEntityLabels({});
   }
@@ -357,7 +360,12 @@ export function InventoryFilterDrawer({
       sort: draft.sort,
     };
     for (const [key, value] of Object.entries(map)) {
-      if (value && !(key === "view" && value === "grouped") && !(key === "timePreset" && value === "all")) {
+      if (
+        value &&
+        !(key === "view" && value === "grouped") &&
+        !(key === "timePreset" && value === "all") &&
+        !(key === "sort" && value === defaultSort)
+      ) {
         next.set(key, value);
       }
     }

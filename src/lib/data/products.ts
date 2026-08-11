@@ -27,6 +27,10 @@ import {
 import { accentInsensitiveLike } from "@/lib/search";
 import { coercePageSize, DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
+import {
+  DEFAULT_PRODUCT_LIST_SORT,
+  type ProductListSort,
+} from "@/lib/inventory/product-list-policy";
 
 export const PRODUCTS_PAGE_SIZE = 20;
 
@@ -42,7 +46,7 @@ export interface ProductListFilters {
   supplierId?: string;
   productKind?: "product" | "service" | "combo";
   stock?: "instock" | "low" | "out";
-  sort?: "name" | "stock" | "updated";
+  sort?: ProductListSort;
   status?: ProductStatusFilter;
   view?: ProductListView;
   updatedSince?: string;
@@ -69,6 +73,7 @@ function productComplianceFields(hasColumns: boolean) {
 export async function getProducts(storeId: string, filters: ProductListFilters = {}) {
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize, DEFAULT_PAGE_SIZE);
+  const sort = filters.sort ?? "name";
   const status: ProductStatusFilter = filters.status ?? "active";
   const view: ProductListView = filters.view ?? "grouped";
   const hasComplianceColumns = await hasProductComplianceColumns();
@@ -320,7 +325,14 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
       .leftJoin(stockLevels, eq(stockLevels.productId, products.id))
       .where(where)
       .groupBy(products.id, categories.name, brands.name)
-      .orderBy(filters.sort === "stock" ? desc(products.totalStock) : filters.sort === "updated" ? desc(products.updatedAt) : asc(products.name), asc(products.id))
+      .orderBy(
+        sort === "stock"
+          ? desc(products.totalStock)
+          : sort === "updated"
+            ? desc(products.updatedAt)
+            : asc(products.name),
+        asc(products.id),
+      )
       .limit(size)
       .offset((page - 1) * size),
     db.select({ total: count() }).from(products).where(where),
@@ -402,7 +414,14 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
           .leftJoin(stockLevels, eq(stockLevels.productId, products.id))
           .where(and(eq(products.storeId, storeId), inArray(products.parentProductId, parentIds)))
           .groupBy(products.id, categories.name, brands.name)
-          .orderBy(filters.sort === "stock" ? desc(products.totalStock) : filters.sort === "updated" ? desc(products.updatedAt) : asc(products.name), asc(products.id))
+          .orderBy(
+            sort === "stock"
+              ? desc(products.totalStock)
+              : sort === "updated"
+                ? desc(products.updatedAt)
+                : asc(products.name),
+            asc(products.id),
+          )
       : [];
 
   const childrenByParent = new Map<string, typeof children>();
@@ -652,7 +671,11 @@ export async function getProductListItem(storeId: string, id: string) {
 
 export async function getMobileProducts(storeId: string, filters: ProductListFilters = {}) {
   // Keep mobile and web on the same grouped variant projection.
-  return getProducts(storeId, { ...filters, view: "grouped" });
+  return getProducts(storeId, {
+    ...filters,
+    sort: filters.sort ?? DEFAULT_PRODUCT_LIST_SORT,
+    view: "grouped",
+  });
 }
 
 export async function getMobileProductOptions(storeId: string) {

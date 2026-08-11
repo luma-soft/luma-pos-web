@@ -27,6 +27,10 @@ import { CategoriesManager } from "../../products/categories/categories-manager"
 import { ProductCatalogSwitcher } from "./product-catalog-switcher";
 import { ListSearchFilterBar } from "@/components/list-search-filter";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import {
+  DEFAULT_PRODUCT_LIST_SORT,
+  parseProductListSort,
+} from "@/lib/inventory/product-list-policy";
 
 type SP = Record<string, string | undefined>;
 const STATUSES = ["active", "inactive", "all"] as const;
@@ -105,7 +109,7 @@ async function ProductsToolbar({
     <div className="mb-4 flex flex-wrap items-center gap-2 sm:gap-3">
       <ListSearchFilterBar
         search={<InstantProductSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />}
-        filter={<InventoryFilterDrawer title="Bộ lọc sản phẩm" values={params} resultCount={resultCount} fields={["category", "brand", "supplier", "kind", "status", "stock", "sort", "view"]} categories={categories.map((item) => ({ value: item.id, label: item.name }))} brands={brands.map((item) => ({ value: item.id, label: item.name }))} suppliers={suppliers.map((item) => ({ value: item.id, label: item.name }))} />}
+        filter={<InventoryFilterDrawer title="Bộ lọc sản phẩm" values={params} resultCount={resultCount} defaultSort={DEFAULT_PRODUCT_LIST_SORT} fields={["category", "brand", "supplier", "kind", "status", "stock", "sort", "view"]} categories={categories.map((item) => ({ value: item.id, label: item.name }))} brands={brands.map((item) => ({ value: item.id, label: item.name }))} suppliers={suppliers.map((item) => ({ value: item.id, label: item.name }))} />}
       />
       <ProductCreateMenu
         label={t("products.createNew")}
@@ -231,7 +235,7 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
     supplierId: params.supplierId,
     productKind: params.productKind as "product" | "service" | "combo" | undefined,
     stock: params.stock as "instock" | "low" | "out" | undefined,
-    sort: params.sort as "name" | "stock" | "updated" | undefined,
+    sort: parseProductListSort(params.sort),
     status,
     view,
     page,
