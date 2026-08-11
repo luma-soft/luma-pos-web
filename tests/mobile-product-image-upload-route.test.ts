@@ -69,7 +69,7 @@ beforeEach(() => {
 
 function uploadRequest(bytes: number[], type = "image/jpeg") {
   const form = new FormData();
-  const extension = type === "image/heic" ? "heic" : "jpg";
+  const extension = type.split("/").at(-1) ?? "jpg";
   form.set("file", new File([Uint8Array.from(bytes)], `camera.${extension}`, { type }));
   return new Request("https://luma.test/api/mobile/products/images", {
     method: "POST",
@@ -94,6 +94,21 @@ describe("POST /api/mobile/products/images", () => {
     expect(payload.data.url).toBe(
       `https://cdn.test/products/${uploads[0]?.path}`,
     );
+  });
+
+  test("accepts a PNG selected by the web product form", async () => {
+    const response = await uploadProductImage(
+      uploadRequest(
+        [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+        "image/png",
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(uploads[0]).toMatchObject({
+      options: { contentType: "image/png", upsert: false },
+    });
+    expect(uploads[0]?.path).toEndWith(".png");
   });
 
   test("rejects a declared image whose bytes do not match", async () => {

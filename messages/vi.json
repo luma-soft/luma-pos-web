@@ -791,7 +791,7 @@
       "createNew": "Tạo mới",
       "image": "Hình ảnh",
       "addImage": "Thêm ảnh",
-      "imageHint": "Dán URL ảnh hoặc tải lên Supabase Storage; mỗi ảnh tải lên không quá 2 MB",
+      "imageHint": "Hỗ trợ JPEG, PNG, WebP, HEIC và HEIF; tối đa 10 MB mỗi ảnh",
       "imageUrl": "URL ảnh",
       "imageUrlPlaceholder": "https://...",
       "addImageUrl": "Thêm URL",

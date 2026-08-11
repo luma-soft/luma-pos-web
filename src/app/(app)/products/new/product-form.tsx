@@ -19,7 +19,6 @@ import {
   X,
 } from "lucide-react";
 import Image from "next/image";
-import { createClient } from "@/lib/supabase/client";
 import {
   Form,
   FormField,
@@ -51,8 +50,12 @@ import {
 import { Combobox } from "@/components/combobox";
 import type { ProductFormOptions } from "@/lib/data/products";
 import type { PriceBookRow } from "@/lib/data/price-books";
-import { AI_WORKFLOW_DRAFT_STORAGE_KEY, tenantStorageKey, tenantStoreId } from "@/components/ai-assistant/utils";
+import { AI_WORKFLOW_DRAFT_STORAGE_KEY, tenantStorageKey } from "@/components/ai-assistant/utils";
 import { useTenantClientScope } from "@/components/tenant-client-scope";
+import {
+  PRODUCT_IMAGE_ACCEPT,
+  uploadProductImageFile,
+} from "@/lib/images/product-image-upload";
 
 type Tab = "info" | "description" | "variants";
 
@@ -1131,15 +1134,8 @@ function BasicInfoSection({ categories, brands }: NewProductFormProps) {
 
 const MAX_IMAGES = 10;
 
-/** Tên file ngẫu nhiên cho ảnh upload (ngoài render scope — tránh lint react-compiler). */
-function randomImagePath(fileName: string): string {
-  const ext = fileName.split(".").pop() || "jpg";
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-}
-
 function ImageUploadGrid() {
   const t = useTranslations();
-  const storageScope = useTenantClientScope();
   const { watch, setValue } = useFormCtx();
   const urls: string[] = watch("imageUrls") ?? [];
   const [uploading, setUploading] = useState(false);
@@ -1167,24 +1163,18 @@ function ImageUploadGrid() {
     if (!files?.length) return;
     setErr("");
     setUploading(true);
+    const added: string[] = [];
     try {
-      const supabase = createClient();
-      const added: string[] = [];
       for (const file of Array.from(files).slice(0, MAX_IMAGES - urls.length)) {
-        const path = `stores/${tenantStoreId(storageScope)}/products/drafts/${randomImagePath(file.name)}`;
-        const { error } = await supabase.storage
-          .from("products")
-          .upload(path, file, { upsert: false });
-        if (error) throw error;
-        const { data } = supabase.storage.from("products").getPublicUrl(path);
-        added.push(data.publicUrl);
+        const uploaded = await uploadProductImageFile(file);
+        added.push(uploaded.url);
       }
-      setValue("imageUrls", [...urls, ...added], { shouldDirty: true });
-    } catch (e) {
-      setErr(
-        e instanceof Error ? e.message : t("products.fields.imageUploadError"),
-      );
+    } catch {
+      setErr(t("products.fields.imageUploadError"));
     } finally {
+      if (added.length > 0) {
+        setValue("imageUrls", [...urls, ...added], { shouldDirty: true });
+      }
       setUploading(false);
     }
   }
@@ -1270,7 +1260,7 @@ function ImageUploadGrid() {
             <span className="text-xs">{t("products.fields.addImage")}</span>
             <input
               type="file"
-              accept="image/*"
+              accept={PRODUCT_IMAGE_ACCEPT}
               multiple
               disabled={uploading}
               onChange={(e) => {

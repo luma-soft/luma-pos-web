@@ -791,7 +791,7 @@
       "createNew": "Create new",
       "image": "Image",
       "addImage": "Add image",
-      "imageHint": "Paste an image URL or upload to Supabase Storage; max 2 MB per uploaded image",
+      "imageHint": "Supports JPEG, PNG, WebP, HEIC, and HEIF; max 10 MB per image",
       "imageUrl": "Image URL",
       "imageUrlPlaceholder": "https://...",
       "addImageUrl": "Add URL",
