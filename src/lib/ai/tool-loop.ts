@@ -116,6 +116,7 @@ export async function runAiToolLoop(input: AiToolLoopInput): Promise<AiToolLoopR
       const startedAt = Date.now();
       try {
         const result = await runAiTool({
+          storeId: input.storeId,
           name: call.name,
           query: call.query,
           prompt: call.prompt || input.prompt,

@@ -1,6 +1,7 @@
 "use server";
 
 import { getPurchaseProductRowsByIds, searchPurchaseProductRows, type PurchaseProductRow } from "@/lib/data/inventory";
+import { resolveAiProductUnit } from "@/lib/ai/entity-matching";
 import { requireStockAccess } from "./common";
 
 export type PurchaseDraftProductLookup = {
@@ -8,6 +9,8 @@ export type PurchaseDraftProductLookup = {
   productName?: string | null;
   sku?: string | null;
   text?: string | null;
+  unitName?: string | null;
+  unitMultiplier?: number | null;
   quantity?: number | null;
   unitCost?: number | null;
   discount?: number | null;
@@ -17,6 +20,8 @@ export type PurchaseDraftProductResolution = {
   product: PurchaseProductRow | null;
   seed: {
     productId: string;
+    unitName: string;
+    multiplier: number;
     quantity: number;
     unitCost: number;
     discount: number;
@@ -121,20 +126,24 @@ export async function resolvePurchaseDraftProducts(
       (UUID_RE.test(productId) ? byId.get(productId) ?? null : null) ??
       (sku ? await resolveByQuery(sku, "sku") : null) ??
       (label ? await resolveByName(label) : null);
+    const sourceUnitName = textValue(item.unitName);
+    const resolvedUnit = resolveAiProductUnit(product, sourceUnitName);
     const seedProductId = product?.id ?? productId;
+    const unitName = resolvedUnit.unitName || sourceUnitName;
+    const multiplier = resolvedUnit.unitName ? resolvedUnit.multiplier : Math.max(1, Number(item.unitMultiplier) || 1);
     const quantity = Math.max(1, Number(item.quantity) || 1);
     const unitCost = Math.max(0, Number(item.unitCost) || 0);
     const discount = Math.max(0, Number(item.discount) || 0);
     out.push({
       product,
-      seed: { productId: seedProductId, quantity, unitCost, discount },
+      seed: { productId: seedProductId, unitName, multiplier, quantity, unitCost, discount },
       pending: product
         ? null
         : {
             key: `draft-${index}`,
             label,
             sku: sku || undefined,
-            meta: [sku, label, item.unitCost != null ? `Giá ${item.unitCost}` : ""].filter(Boolean).join(" · "),
+            meta: [sku, label, sourceUnitName, item.unitCost != null ? `Giá ${item.unitCost}` : ""].filter(Boolean).join(" · "),
           },
     });
   }

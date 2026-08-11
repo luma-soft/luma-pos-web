@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 const PROJ = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const {
@@ -43,6 +44,25 @@ assert.equal(previewMatchedCount(preview), 1);
 assert.equal(previewUnresolvedCount(preview), 1);
 assert.equal(isPreviewApplicable(preview, ["pos_voice_cart_draft"]), true);
 assert.equal(isPreviewApplicable({ ...preview, action: { payload: { items: [] } } }, ["pos_voice_cart_draft"]), false);
+assert.equal(isPreviewApplicable(
+  { ...preview, intent: "create_inventory_inbound", action: { payload: { items: [], unresolvedItems: [{ productName: "missing" }] } } },
+  ["create_inventory_inbound"],
+  { allowUnresolved: true },
+), true);
+assert.equal(isPreviewApplicable(
+  { ...preview, intent: "create_inventory_inbound", action: { payload: { items: [], unresolvedItems: [] } } },
+  ["create_inventory_inbound"],
+  { allowUnresolved: true },
+), false);
+assert.equal(isPreviewApplicable(
+  { ...preview, intent: "pos_voice_cart_draft", action: { payload: { items: [], unresolvedItems: [{ productName: "missing" }] } } },
+  ["create_inventory_inbound"],
+  { allowUnresolved: true },
+), false);
 assert.equal(isPreviewApplicable(preview, ["create_inventory_inbound"]), false);
+
+const modalSource = readFileSync(`${PROJ}/src/components/ai-quick-actions/ai-quick-action-modal.tsx`, "utf8");
+assert.match(modalSource, /onClick=\{submit\} loading=\{busy\}/);
+assert.doesNotMatch(modalSource, /busy\s*\?\s*<Loader2/);
 
 console.log("ai quick action tests passed");

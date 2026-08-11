@@ -57,6 +57,8 @@ type AiDraftProductLookup = {
   productName?: string | null;
   sku?: string | null;
   text?: string | null;
+  unitName?: string | null;
+  unitMultiplier?: number | null;
   quantity?: number | null;
   unitCost?: number | null;
   discount?: number | null;
@@ -125,6 +127,8 @@ function draftLookupFromRow(row: Record<string, unknown>): AiDraftProductLookup 
     productName: typeof row.productName === "string" ? row.productName : null,
     sku: typeof row.sku === "string" ? row.sku : null,
     text: typeof row.text === "string" ? row.text : null,
+    unitName: typeof row.unitName === "string" ? row.unitName : null,
+    unitMultiplier: Number(row.unitMultiplier) || null,
     quantity: Number(row.quantity) || null,
     unitCost: Number(row.unitCost) || null,
     discount: Number(row.discount) || null,
@@ -136,6 +140,8 @@ function draftLookupFromPending(line: AiPendingLine): AiDraftProductLookup {
     sku: line.sku ?? null,
     productName: line.label,
     text: line.meta ?? line.label,
+    unitName: null,
+    unitMultiplier: null,
     quantity: 1,
     unitCost: null,
     discount: 0,
@@ -285,6 +291,8 @@ export function PurchaseForm({
           productId: payload.productId,
           productName: typeof payload.productName === "string" ? payload.productName : null,
           sku: typeof payload.sku === "string" ? payload.sku : null,
+          unitName: typeof payload.unitName === "string" ? payload.unitName : null,
+          unitMultiplier: Number(payload.unitMultiplier) || null,
           quantity: Number(payload.quantity) || 1,
           unitCost: Number(payload.unitCost) || 0,
           discount: 0,
@@ -301,7 +309,12 @@ export function PurchaseForm({
     const nextLines = resolutions.flatMap((resolution) => {
       if (!resolution.product || seenProducts.has(resolution.product.id)) return [];
       seenProducts.add(resolution.product.id);
-      return [productToLine(resolution.product, resolution.seed)];
+      const line = productToLine(resolution.product, resolution.seed);
+      return [{
+        ...line,
+        unitName: resolution.seed.unitName || line.unitName,
+        multiplier: resolution.seed.multiplier || line.multiplier,
+      }];
     });
     const unresolvedPending = uniquePendingLines(resolutions.flatMap((resolution) => resolution.pending ? [resolution.pending] : []));
     const supplierIdDraft = typeof payload.supplierId === "string" ? payload.supplierId : "";
@@ -718,6 +731,7 @@ export function PurchaseForm({
           preset="create_inventory_inbound"
           surface="web"
           acceptedIntents={["create_inventory_inbound", "create_draft_purchase_order", "create_draft_purchase_order_from_restocking"]}
+          allowUnresolvedApply
           hasExistingData={hasAiMergeRisk}
           existingDataLabel={t("aiQuick.purchase.existingData")}
           onClose={() => setAiQuickOpen(false)}

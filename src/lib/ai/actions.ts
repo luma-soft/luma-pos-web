@@ -1,12 +1,20 @@
 import { randomUUID } from "node:crypto";
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
 import { db } from "@/db";
-import { brands, categories, customers, orders, priceBooks, productPrices, products, suppliers, warehouses } from "@/db/schema";
+import { brands, categories, customers, orders, priceBooks, productPrices, suppliers, warehouses } from "@/db/schema";
 import type { RestockRow } from "@/lib/data/ai-restock";
 import type { ParsedAiAttachment } from "@/lib/ai/attachments";
+import {
+  aiEntitySearchTerms,
+  getAiProductCandidates,
+  matchAiInboundProduct,
+  resolveAiProductUnit,
+  type AiProductCandidate,
+} from "@/lib/ai/entity-candidates";
 import { planAiAssistantIntent, type AiPlannerIntent, type AiPlannerResult } from "@/lib/ai/planner";
 import { recordAiTokenUsage } from "@/lib/ai/usage";
 import { Routes } from "@/lib/routes";
+import { accentInsensitiveLike } from "@/lib/search";
 
 export type AiAssistantState =
   | "idle"
@@ -349,15 +357,7 @@ function mergePlannerGuidance(preview: AiActionPreview, plan: AiPlannerResult | 
   };
 }
 
-type InboundProductOption = {
-  id: string;
-  sku: string;
-  name: string;
-  baseUnit: string;
-  costPrice: unknown;
-  lastPurchasePrice: unknown;
-  retailPrice: unknown;
-};
+type InboundProductOption = AiProductCandidate;
 
 type PriceProductOption = InboundProductOption & {
   retailPrice: unknown;
@@ -403,32 +403,19 @@ type InboundContext = {
   warehouses: NamedOption[];
 };
 
-async function getInboundContext(): Promise<InboundContext> {
+async function getInboundContext(storeId: string, productQueries: readonly string[]): Promise<InboundContext> {
   const [productRows, supplierRows, warehouseRows] = await Promise.all([
-    db
-      .select({
-        id: products.id,
-        sku: products.sku,
-        name: products.name,
-        baseUnit: products.baseUnit,
-        costPrice: products.costPrice,
-        lastPurchasePrice: products.lastPurchasePrice,
-        retailPrice: products.retailPrice,
-      })
-      .from(products)
-      .where(eq(products.isActive, true))
-      .orderBy(asc(products.name))
-      .limit(300),
+    getAiProductCandidates(storeId, productQueries),
     db
       .select({ id: suppliers.id, name: suppliers.name, code: suppliers.code })
       .from(suppliers)
-      .orderBy(asc(suppliers.name))
-      .limit(200),
+      .where(eq(suppliers.storeId, storeId))
+      .orderBy(asc(suppliers.name)),
     db
       .select({ id: warehouses.id, name: warehouses.name, isDefault: warehouses.isDefault })
       .from(warehouses)
-      .orderBy(desc(warehouses.isDefault), asc(warehouses.name))
-      .limit(50),
+      .where(eq(warehouses.storeId, storeId))
+      .orderBy(desc(warehouses.isDefault), asc(warehouses.name)),
   ]);
   return {
     products: productRows,
@@ -648,22 +635,12 @@ function inboundRowsFromAttachments(parsedAttachments: ParsedAiAttachment[]) {
   return rowsFromAttachmentText(attachmentText(parsedAttachments));
 }
 
-function matchProductForInboundRow(row: InboundAttachmentRow, productOptions: InboundProductOption[]) {
-  if (row.sku) {
-    const bySku = productOptions.find((product) => normalize(product.sku) === normalize(row.sku ?? ""));
-    if (bySku) return { product: bySku, confidence: Math.max(row.confidence, 0.95), ambiguous: [] as InboundProductOption[] };
-    return { product: null, confidence: row.confidence, ambiguous: [] as InboundProductOption[] };
-  }
-  const match = matchNamed(row.text, productOptions);
-  return { product: match.match, confidence: Math.min(row.confidence, match.confidence), ambiguous: match.ambiguous };
-}
-
 async function inboundPreviewFromAttachments(
   prompt: string,
   context: InboundContext,
   parsedAttachments: ParsedAiAttachment[],
+  rows: InboundAttachmentRow[],
 ): Promise<AiActionPreview | null> {
-  const rows = inboundRowsFromAttachments(parsedAttachments);
   if (rows.length === 0) return null;
 
   const text = attachmentText(parsedAttachments);
@@ -675,8 +652,9 @@ async function inboundPreviewFromAttachments(
   const invoiceNumber = parseInvoiceNumber(text);
 
   const matchedRows = rows.map((row) => {
-    const match = matchProductForInboundRow(row, context.products);
+    const match = matchAiInboundProduct(row, context.products);
     const product = match.product;
+    const unit = resolveAiProductUnit(product, row.unitName);
     const quantity = row.quantity ?? (row.lineTotal && row.unitCost ? row.lineTotal / row.unitCost : null);
     const usesNetUnitCost = row.unitCost != null;
     const unitCost = row.unitCost ?? row.grossUnitCost ?? defaultCost(product);
@@ -684,6 +662,8 @@ async function inboundPreviewFromAttachments(
     return {
       row,
       product,
+      unitName: unit.unitName,
+      unitMultiplier: unit.multiplier,
       quantity,
       unitCost,
       discount,
@@ -731,7 +711,7 @@ async function inboundPreviewFromAttachments(
       const total = product && quantity ? Math.max(0, quantity * row.unitCost - row.discount) : 0;
       return {
         label: product?.name ?? row.row.text,
-        value: product && quantity ? `+${quantity} ${product.baseUnit}` : "Cần chọn lại",
+        value: product && quantity ? `+${quantity} ${row.unitName ?? product.baseUnit}` : "Cần chọn lại",
         meta: product
           ? `${product.sku} · ${moneyText(row.unitCost)} · ${moneyText(total)}`
           : [row.row.sku, row.row.unitName, row.row.lineTotal ? moneyText(row.row.lineTotal) : ""].filter(Boolean).join(" · "),
@@ -757,6 +737,8 @@ async function inboundPreviewFromAttachments(
           productId: row.product!.id,
           productName: row.product!.name,
           sku: row.product!.sku,
+          unitName: row.unitName,
+          unitMultiplier: row.unitMultiplier,
           quantity: row.quantity,
           unitCost: row.unitCost,
           discount: row.discount,
@@ -788,25 +770,13 @@ async function inboundPreviewFromAttachments(
   };
 }
 
-export async function getPriceContext() {
+export async function getPriceContext(storeId: string, prompt: string) {
   const [productRows, bookRows] = await Promise.all([
-    db
-      .select({
-        id: products.id,
-        sku: products.sku,
-        name: products.name,
-        baseUnit: products.baseUnit,
-        costPrice: products.costPrice,
-        lastPurchasePrice: products.lastPurchasePrice,
-        retailPrice: products.retailPrice,
-      })
-      .from(products)
-      .where(eq(products.isActive, true))
-      .orderBy(asc(products.name))
-      .limit(300),
+    getAiProductCandidates(storeId, [prompt]),
     db
       .select({ id: priceBooks.id, name: priceBooks.name, isDefault: priceBooks.isDefault })
       .from(priceBooks)
+      .where(eq(priceBooks.storeId, storeId))
       .orderBy(desc(priceBooks.isDefault), asc(priceBooks.sortOrder), asc(priceBooks.name)),
   ]);
   const productIds = productRows.map((product) => product.id);
@@ -818,7 +788,7 @@ export async function getPriceContext() {
           price: productPrices.price,
         })
         .from(productPrices)
-        .where(inArray(productPrices.productId, productIds))
+        .where(and(eq(productPrices.storeId, storeId), inArray(productPrices.productId, productIds)))
     : [];
   const overrides = new Map(
     overrideRows.map((row) => [`${row.priceBookId}:${row.productId}`, Number(row.price)]),
@@ -852,40 +822,32 @@ function matchPriceBook(prompt: string, books: PriceBookOption[]) {
   return matchNamed(prompt, books).match ?? defaultBook;
 }
 
-async function getProductCommandContext() {
+async function getProductCommandContext(storeId: string, prompt: string) {
   const [productRows, categoryRows, brandRows] = await Promise.all([
-    db
-      .select({
-        id: products.id,
-        sku: products.sku,
-        name: products.name,
-        baseUnit: products.baseUnit,
-        costPrice: products.costPrice,
-        lastPurchasePrice: products.lastPurchasePrice,
-        retailPrice: products.retailPrice,
-        categoryId: products.categoryId,
-        brandId: products.brandId,
-        minStock: products.minStock,
-      })
-      .from(products)
-      .where(eq(products.isActive, true))
-      .orderBy(asc(products.name))
-      .limit(300),
+    getAiProductCandidates(storeId, [prompt]),
     db
       .select({ id: categories.id, name: categories.name })
       .from(categories)
-      .orderBy(asc(categories.name))
-      .limit(200),
+      .where(eq(categories.storeId, storeId))
+      .orderBy(asc(categories.name)),
     db
       .select({ id: brands.id, name: brands.name })
       .from(brands)
-      .orderBy(asc(brands.name))
-      .limit(200),
+      .where(eq(brands.storeId, storeId))
+      .orderBy(asc(brands.name)),
   ]);
   return { products: productRows, categories: categoryRows, brands: brandRows };
 }
 
-async function getCustomerContext() {
+async function getCustomerContext(storeId: string, prompt: string) {
+  const terms = aiEntitySearchTerms([prompt]);
+  const match = terms.length
+    ? or(...terms.flatMap((term) => [
+        accentInsensitiveLike(customers.name, term),
+        accentInsensitiveLike(customers.code, term),
+        accentInsensitiveLike(customers.phone, term),
+      ]))
+    : undefined;
   const rows = await db
     .select({
       id: customers.id,
@@ -897,32 +859,27 @@ async function getCustomerContext() {
       note: customers.note,
     })
     .from(customers)
-    .where(eq(customers.isActive, true))
+    .where(and(eq(customers.storeId, storeId), eq(customers.isActive, true), match))
     .orderBy(desc(customers.createdAt))
-    .limit(300);
+    .limit(200);
   return rows;
 }
 
-async function getSalesContext() {
+async function getSalesContext(storeId: string, prompt: string) {
+  const orderTerms = aiEntitySearchTerms([prompt]);
+  const orderMatch = orderTerms.length
+    ? or(...orderTerms.flatMap((term) => [
+        accentInsensitiveLike(orders.code, term),
+        accentInsensitiveLike(customers.name, term),
+      ]))
+    : undefined;
   const [productRows, customerRows, warehouseRows, orderRows] = await Promise.all([
-    db
-      .select({
-        id: products.id,
-        sku: products.sku,
-        name: products.name,
-        baseUnit: products.baseUnit,
-        costPrice: products.costPrice,
-        lastPurchasePrice: products.lastPurchasePrice,
-        retailPrice: products.retailPrice,
-      })
-      .from(products)
-      .where(eq(products.isActive, true))
-      .orderBy(asc(products.name))
-      .limit(3000),
-    getCustomerContext(),
+    getAiProductCandidates(storeId, [prompt]),
+    getCustomerContext(storeId, prompt),
     db
       .select({ id: warehouses.id, name: warehouses.name, isDefault: warehouses.isDefault })
       .from(warehouses)
+      .where(eq(warehouses.storeId, storeId))
       .orderBy(desc(warehouses.isDefault), asc(warehouses.name))
       .limit(50),
     db
@@ -936,7 +893,8 @@ async function getSalesContext() {
         customerName: customers.name,
       })
       .from(orders)
-      .leftJoin(customers, eq(orders.customerId, customers.id))
+      .leftJoin(customers, and(eq(customers.storeId, storeId), eq(orders.customerId, customers.id)))
+      .where(and(eq(orders.storeId, storeId), orderMatch))
       .orderBy(desc(orders.createdAt))
       .limit(200),
   ]);
@@ -1375,8 +1333,8 @@ export function restockPreview(prompt: string, restock: RestockRow[]): AiActionP
   };
 }
 
-export async function draftPurchaseOrderPreview(prompt: string): Promise<AiActionPreview> {
-  const context = await getInboundContext();
+export async function draftPurchaseOrderPreview(storeId: string, prompt: string): Promise<AiActionPreview> {
+  const context = await getInboundContext(storeId, [prompt]);
   const lines = parseProductLines(prompt, context.products);
   const supplierMatch = matchNamed(prompt, context.suppliers);
   const warehouseMatch = matchNamed(prompt, context.warehouses);
@@ -1444,10 +1402,14 @@ export async function draftPurchaseOrderPreview(prompt: string): Promise<AiActio
   };
 }
 
-export async function inboundPreview(prompt: string, parsedAttachments: ParsedAiAttachment[] = []): Promise<AiActionPreview> {
-  const context = await getInboundContext();
+export async function inboundPreview(storeId: string, prompt: string, parsedAttachments: ParsedAiAttachment[] = []): Promise<AiActionPreview> {
+  const attachmentRows = inboundRowsFromAttachments(parsedAttachments);
+  const context = await getInboundContext(storeId, [
+    prompt,
+    ...attachmentRows.flatMap((row) => [row.text, row.sku ?? ""]),
+  ]);
   const attachmentPreview = parsedAttachments.length
-    ? await inboundPreviewFromAttachments(prompt, context, parsedAttachments)
+    ? await inboundPreviewFromAttachments(prompt, context, parsedAttachments, attachmentRows)
     : null;
   if (attachmentPreview) return attachmentPreview;
 
@@ -1528,8 +1490,8 @@ export async function inboundPreview(prompt: string, parsedAttachments: ParsedAi
   };
 }
 
-export async function pricePreview(prompt: string): Promise<AiActionPreview> {
-  const context = await getPriceContext();
+export async function pricePreview(storeId: string, prompt: string): Promise<AiActionPreview> {
+  const context = await getPriceContext(storeId, prompt);
   const productMatch = matchNamed(prompt, context.products);
   const product = productMatch.match;
   const book = matchPriceBook(prompt, context.priceBooks);
@@ -1592,9 +1554,9 @@ export async function pricePreview(prompt: string): Promise<AiActionPreview> {
   };
 }
 
-export async function productCommandPreview(prompt: string, mode: ProductCommandMode = null): Promise<AiActionPreview> {
+export async function productCommandPreview(storeId: string, prompt: string, mode: ProductCommandMode = null): Promise<AiActionPreview> {
   const q = normalize(prompt);
-  const context = await getProductCommandContext();
+  const context = await getProductCommandContext(storeId, prompt);
   const freeMode = mode == null;
   const isCategory = freeMode && (q.includes("danh muc") || q.includes("category"));
   const isBrand = freeMode && (q.includes("thuong hieu") || q.includes("brand"));
@@ -1794,7 +1756,7 @@ function simpleCreatePreview(input: {
   };
 }
 
-export async function customerPreview(prompt: string, mode: CustomerActionMode = null): Promise<AiActionPreview> {
+export async function customerPreview(storeId: string, prompt: string, mode: CustomerActionMode = null): Promise<AiActionPreview> {
   const q = normalize(prompt);
   const freeMode = mode == null;
   const asksSupplier = mode === "create_supplier" || (freeMode && (q.includes("ncc") || q.includes("nha cung cap") || q.includes("supplier")));
@@ -1815,7 +1777,7 @@ export async function customerPreview(prompt: string, mode: CustomerActionMode =
       warning: phone ? "CTA mở danh sách nhà cung cấp; nhập/chỉnh thông tin trước khi lưu." : "CTA mở danh sách nhà cung cấp; cần bổ sung thông tin liên hệ nếu có.",
     });
   }
-  const customers = await getCustomerContext();
+  const customers = await getCustomerContext(storeId, prompt);
   const isUpdate = freeMode && (q.includes("cap nhat") || q.includes("sua "));
   if (isUpdate) {
     const match = matchNamed(prompt, customers);
@@ -1918,7 +1880,7 @@ export function cashbookPreview(prompt: string, mode: CashbookActionMode = null)
   };
 }
 
-export async function reportSummaryPreview(prompt: string, mode: ReportSummaryMode = null): Promise<AiActionPreview> {
+export async function reportSummaryPreview(storeId: string, prompt: string, mode: ReportSummaryMode = null): Promise<AiActionPreview> {
   const q = normalize(prompt);
   const freeMode = mode == null;
   const asksCreateStocktake =
@@ -1962,7 +1924,7 @@ export async function reportSummaryPreview(prompt: string, mode: ReportSummaryMo
   }
 
   if (asksStockView) {
-    const context = await getProductCommandContext();
+    const context = await getProductCommandContext(storeId, prompt);
     const product = matchNamed(prompt, context.products).match;
     return {
       id: randomUUID(),
@@ -2015,7 +1977,7 @@ export async function reportSummaryPreview(prompt: string, mode: ReportSummaryMo
     };
   }
 
-  const customers = await getCustomerContext();
+  const customers = await getCustomerContext(storeId, prompt);
   const customerMatch = matchNamed(prompt, customers);
   const customer = asksCustomerReport ? customerMatch.match : null;
   return {
@@ -2054,9 +2016,9 @@ export async function reportSummaryPreview(prompt: string, mode: ReportSummaryMo
   };
 }
 
-export async function orderActionPreview(prompt: string, mode: OrderActionMode = null): Promise<AiActionPreview> {
+export async function orderActionPreview(storeId: string, prompt: string, mode: OrderActionMode = null): Promise<AiActionPreview> {
   const q = normalize(prompt);
-  const context = await getSalesContext();
+  const context = await getSalesContext(storeId, prompt);
   const isPayment = q.includes("thanh toan") || q.includes("da tra") || q.includes("tra tien");
   const isConvert = q.includes("chuyen") && (q.includes("bao gia") || q.includes("quote"));
   const isCreateInvoiceMode = mode === "create_invoice" || mode === "create_quote";
@@ -2331,8 +2293,8 @@ function posMatchQualityText(confidence: number) {
   return "Khớp tương đối, kiểm tra kỹ";
 }
 
-export async function posCartPreview(prompt: string, source: "voice" | "image"): Promise<AiActionPreview> {
-  const context = await getSalesContext();
+export async function posCartPreview(storeId: string, prompt: string, source: "voice" | "image"): Promise<AiActionPreview> {
+  const context = await getSalesContext(storeId, prompt);
   const lines = parseProductLines(prompt, context.products);
   const unresolvedItems = parseUnresolvedProductSegments(prompt, context.products);
   const unresolvedText = source === "image" ? attachmentExtractedText(prompt) : "";
@@ -2576,27 +2538,27 @@ export async function buildAiAssistantResponse(input: {
         previewTool === "buildRestockPoPreview"
           ? restockPreview(prompt, input.restock)
         : previewTool === "buildDraftPurchaseOrderPreview"
-          ? await draftPurchaseOrderPreview(prompt)
+          ? await draftPurchaseOrderPreview(input.storeId, prompt)
         : previewTool === "buildInboundPreview"
-          ? await inboundPreview(prompt, input.parsedAttachments ?? [])
+          ? await inboundPreview(input.storeId, prompt, input.parsedAttachments ?? [])
         : previewTool === "buildPriceFormulaPreview"
-          ? formulaPreview(prompt, (await getPriceContext()).priceBooks)
+          ? formulaPreview(prompt, (await getPriceContext(input.storeId, prompt)).priceBooks)
         : previewTool === "buildProductPreview"
-          ? await productCommandPreview(prompt, forcedProductMode)
+          ? await productCommandPreview(input.storeId, prompt, forcedProductMode)
         : previewTool === "buildCustomerPreview"
-          ? await customerPreview(prompt, forcedCustomerMode)
+          ? await customerPreview(input.storeId, prompt, forcedCustomerMode)
         : previewTool === "buildCashbookPreview"
           ? cashbookPreview(prompt, forcedCashbookMode)
         : previewTool === "buildPosCartPreview:voice"
-          ? await posCartPreview(prompt, "voice")
+          ? await posCartPreview(input.storeId, prompt, "voice")
         : previewTool === "buildPosCartPreview:image"
-          ? await posCartPreview(prompt, "image")
+          ? await posCartPreview(input.storeId, prompt, "image")
         : previewTool === "buildOrderPreview"
-          ? await orderActionPreview(prompt, forcedOrderMode)
+          ? await orderActionPreview(input.storeId, prompt, forcedOrderMode)
         : previewTool === "buildReportSummaryPreview"
-          ? await reportSummaryPreview(prompt, forcedReportMode)
+          ? await reportSummaryPreview(input.storeId, prompt, forcedReportMode)
         : previewTool === "buildPriceUpdatePreview"
-          ? await pricePreview(prompt)
+          ? await pricePreview(input.storeId, prompt)
           : undefined;
       toolTrace.push({
         depth: 1,

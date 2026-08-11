@@ -32,6 +32,7 @@ export function AiQuickActionModal({
   preset,
   surface,
   acceptedIntents,
+  allowUnresolvedApply = false,
   hasExistingData,
   existingDataLabel,
   onClose,
@@ -46,6 +47,7 @@ export function AiQuickActionModal({
   preset: AiQuickActionPreset;
   surface: AssistantSurface;
   acceptedIntents: string[];
+  allowUnresolvedApply?: boolean;
   hasExistingData: boolean;
   existingDataLabel: string;
   onClose: () => void;
@@ -180,7 +182,7 @@ export function AiQuickActionModal({
   const hasUploadingAttachment = attachments.some((item) => item.status === "uploading");
   const hasFailedAttachment = attachments.some((item) => item.status === "failed");
   const canSubmit = (input.trim().length > 0 || attachments.length > 0) && !busy && !hasUploadingAttachment && !hasFailedAttachment;
-  const canApply = preview ? isPreviewApplicable(preview, acceptedIntents) : false;
+  const canApply = preview ? isPreviewApplicable(preview, acceptedIntents, { allowUnresolved: allowUnresolvedApply }) : false;
 
   return (
     <div
@@ -244,7 +246,7 @@ export function AiQuickActionModal({
               ))}
             </div>
             <Button type="button" onClick={submit} loading={busy} disabled={!canSubmit} size="sm" className="gap-1.5">
-              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+              {!busy && <Send className="h-3.5 w-3.5" />}
               {submitLabel}
             </Button>
           </div>

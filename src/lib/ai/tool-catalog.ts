@@ -50,6 +50,7 @@ export type AiToolResult =
   | { kind: "preview"; preview: AiActionPreview };
 
 export type AiToolRunInput = {
+  storeId: string;
   name: AiToolName;
   prompt?: string;
   query?: string;
@@ -83,7 +84,7 @@ function clampLimit(value: unknown, fallback = 8) {
   return Number.isFinite(n) ? Math.max(1, Math.min(20, Math.trunc(n))) : fallback;
 }
 
-async function searchProducts(query: string, limit: number): Promise<AiToolResult> {
+async function searchProducts(storeId: string, query: string, limit: number): Promise<AiToolResult> {
   const match = or(
     accentInsensitiveLike(products.name, query),
     accentInsensitiveLike(products.sku, query),
@@ -100,13 +101,13 @@ async function searchProducts(query: string, limit: number): Promise<AiToolResul
       totalStock: products.totalStock,
     })
     .from(products)
-    .where(and(eq(products.isActive, true), match))
+    .where(and(eq(products.storeId, storeId), eq(products.isActive, true), match))
     .orderBy(asc(products.name))
     .limit(limit);
   return { kind: "records", records: rows };
 }
 
-async function searchSuppliers(query: string, limit: number): Promise<AiToolResult> {
+async function searchSuppliers(storeId: string, query: string, limit: number): Promise<AiToolResult> {
   const match = or(
     accentInsensitiveLike(suppliers.name, query),
     accentInsensitiveLike(suppliers.code, query),
@@ -115,13 +116,13 @@ async function searchSuppliers(query: string, limit: number): Promise<AiToolResu
   const rows = await db
     .select({ id: suppliers.id, code: suppliers.code, name: suppliers.name, phone: suppliers.phone, currentDebt: suppliers.currentDebt })
     .from(suppliers)
-    .where(match)
+    .where(and(eq(suppliers.storeId, storeId), match))
     .orderBy(asc(suppliers.name))
     .limit(limit);
   return { kind: "records", records: rows };
 }
 
-async function searchCustomers(query: string, limit: number): Promise<AiToolResult> {
+async function searchCustomers(storeId: string, query: string, limit: number): Promise<AiToolResult> {
   const match = or(
     accentInsensitiveLike(customers.name, query),
     accentInsensitiveLike(customers.code, query),
@@ -130,17 +131,17 @@ async function searchCustomers(query: string, limit: number): Promise<AiToolResu
   const rows = await db
     .select({ id: customers.id, code: customers.code, name: customers.name, phone: customers.phone, type: customers.type, currentDebt: customers.currentDebt })
     .from(customers)
-    .where(and(eq(customers.isActive, true), match))
+    .where(and(eq(customers.storeId, storeId), eq(customers.isActive, true), match))
     .orderBy(asc(customers.name))
     .limit(limit);
   return { kind: "records", records: rows };
 }
 
-async function searchWarehouses(query: string, limit: number): Promise<AiToolResult> {
+async function searchWarehouses(storeId: string, query: string, limit: number): Promise<AiToolResult> {
   const rows = await db
     .select({ id: warehouses.id, name: warehouses.name, isDefault: warehouses.isDefault })
     .from(warehouses)
-    .where(accentInsensitiveLike(warehouses.name, query))
+    .where(and(eq(warehouses.storeId, storeId), accentInsensitiveLike(warehouses.name, query)))
     .orderBy(desc(warehouses.isDefault), asc(warehouses.name))
     .limit(limit);
   return { kind: "records", records: rows };
@@ -158,35 +159,35 @@ export async function runAiTool(input: AiToolRunInput): Promise<AiToolResult> {
     case "getReportsSummary":
       return { kind: "summary", summary: input.reportSummary ?? {} };
     case "searchProducts":
-      return searchProducts(query, limit);
+      return searchProducts(input.storeId, query, limit);
     case "searchSuppliers":
-      return searchSuppliers(query, limit);
+      return searchSuppliers(input.storeId, query, limit);
     case "searchCustomers":
-      return searchCustomers(query, limit);
+      return searchCustomers(input.storeId, query, limit);
     case "searchWarehouses":
-      return searchWarehouses(query, limit);
+      return searchWarehouses(input.storeId, query, limit);
     case "buildRestockPoPreview":
       return { kind: "preview", preview: restockPreview(prompt, input.restock ?? []) };
     case "buildDraftPurchaseOrderPreview":
-      return { kind: "preview", preview: await draftPurchaseOrderPreview(prompt) };
+      return { kind: "preview", preview: await draftPurchaseOrderPreview(input.storeId, prompt) };
     case "buildInboundPreview":
-      return { kind: "preview", preview: await inboundPreview(prompt, input.parsedAttachments ?? []) };
+      return { kind: "preview", preview: await inboundPreview(input.storeId, prompt, input.parsedAttachments ?? []) };
     case "buildPriceUpdatePreview":
-      return { kind: "preview", preview: await pricePreview(prompt) };
+      return { kind: "preview", preview: await pricePreview(input.storeId, prompt) };
     case "buildPriceFormulaPreview": {
-      const priceContext = await getPriceContext();
+      const priceContext = await getPriceContext(input.storeId, prompt);
       return { kind: "preview", preview: formulaPreview(prompt, priceContext.priceBooks) };
     }
     case "buildProductPreview":
-      return { kind: "preview", preview: await productCommandPreview(prompt) };
+      return { kind: "preview", preview: await productCommandPreview(input.storeId, prompt) };
     case "buildCustomerPreview":
-      return { kind: "preview", preview: await customerPreview(prompt) };
+      return { kind: "preview", preview: await customerPreview(input.storeId, prompt) };
     case "buildCashbookPreview":
       return { kind: "preview", preview: cashbookPreview(prompt) };
     case "buildOrderPreview":
-      return { kind: "preview", preview: await orderActionPreview(prompt) };
+      return { kind: "preview", preview: await orderActionPreview(input.storeId, prompt) };
     case "buildPosCartPreview":
-      return { kind: "preview", preview: await posCartPreview(prompt, input.source ?? "voice") };
+      return { kind: "preview", preview: await posCartPreview(input.storeId, prompt, input.source ?? "voice") };
     default: {
       const exhaustive: never = input.name;
       throw new Error(`Unsupported AI tool: ${exhaustive}`);

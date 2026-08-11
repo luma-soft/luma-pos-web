@@ -41,8 +41,12 @@ export function fieldValue(fields: AiActionLine[], labelIncludes: string) {
   return fields.find((field) => field.label.toLowerCase().includes(needle))?.value ?? "—";
 }
 
-export function isPreviewApplicable(preview: AiActionPreview, acceptedIntents: string[]) {
+export function isPreviewApplicable(
+  preview: AiActionPreview,
+  acceptedIntents: string[],
+  { allowUnresolved = false }: { allowUnresolved?: boolean } = {},
+) {
   if (!acceptedIntents.includes(preview.intent)) return false;
   if (preview.intent === "create_stocktake") return true;
-  return previewMatchedCount(preview) > 0;
+  return previewMatchedCount(preview) > 0 || (allowUnresolved && previewUnresolvedCount(preview) > 0);
 }
