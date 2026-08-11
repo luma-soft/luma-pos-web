@@ -42,4 +42,27 @@ describe("AI tenant scope contract", () => {
     expect(actions).not.toContain(".limit(300)");
     expect(actions).not.toContain(".limit(3000)");
   });
+
+  test("keeps the AI restocking purchase mutation inside the authenticated store", () => {
+    const route = read("src/app/api/mobile/ai/restocking/purchase-order/route.ts");
+    const draft = read("src/lib/purchases/draft.ts");
+
+    expect(route).toContain("createDraftPurchaseForUser(gate.storeId, gate.userId, body)");
+    expect(draft).toContain("createDraftPurchaseForUser(\n  storeId: string,");
+    expect(draft).toContain("defaultWarehouseId(storeId: string)");
+    expect(draft).toContain("defaultSupplierId(storeId: string, productIds: string[])");
+    for (const table of ["warehouses", "productSuppliers", "suppliers", "products"]) {
+      expect(draft).toContain(`eq(${table}.storeId, storeId)`);
+    }
+    expect(draft).toMatch(/insert\(purchaseOrders\)[\s\S]*?values\(\{\s*storeId,/);
+    expect(draft).toMatch(/insert\(purchaseOrderItems\)[\s\S]*?storeId,/);
+  });
+
+  test("signs only AI attachments owned by the authenticated store and user", () => {
+    const attachments = read("src/app/api/mobile/ai/attachments/route.ts");
+
+    expect(attachments).toContain("const ownerPrefix = `stores/${gate.storeId}/users/${gate.userId}/`");
+    expect(attachments).toContain("path.startsWith(ownerPrefix)");
+    expect(attachments).not.toContain("path.startsWith(`${gate.userId}/`)");
+  });
 });

@@ -12,5 +12,5 @@ export async function POST(request: Request) {
   const body = await readJson(request);
   if (!body) return mobileAction({ ok: false, error: "errors.invalidData" });
 
-  return mobileAction(await createDraftPurchaseForUser(gate.userId, body));
+  return mobileAction(await createDraftPurchaseForUser(gate.storeId, gate.userId, body));
 }

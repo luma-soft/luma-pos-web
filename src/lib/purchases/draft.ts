@@ -1,4 +1,4 @@
-import { desc, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import {
@@ -6,12 +6,12 @@ import {
   productSuppliers,
   purchaseOrderItems,
   purchaseOrders,
+  profiles,
   suppliers,
   warehouses,
 } from "@/db/schema";
 import {
   generateCode,
-  getProfileId,
   toMoney,
   toQty,
   type ActionResult,
@@ -35,20 +35,24 @@ export type CreateDraftPurchaseInput = z.input<
   typeof createDraftPurchaseSchema
 >;
 
-async function defaultWarehouseId() {
+async function defaultWarehouseId(storeId: string) {
   const [warehouse] = await db
     .select({ id: warehouses.id })
     .from(warehouses)
+    .where(eq(warehouses.storeId, storeId))
     .orderBy(desc(warehouses.isDefault))
     .limit(1);
   return warehouse?.id ?? null;
 }
 
-async function defaultSupplierId(productIds: string[]) {
+async function defaultSupplierId(storeId: string, productIds: string[]) {
   const [primary] = await db
     .select({ id: productSuppliers.supplierId })
     .from(productSuppliers)
-    .where(inArray(productSuppliers.productId, productIds))
+    .where(and(
+      eq(productSuppliers.storeId, storeId),
+      inArray(productSuppliers.productId, productIds),
+    ))
     .orderBy(desc(productSuppliers.isPrimary))
     .limit(1);
   if (primary) return primary.id;
@@ -56,12 +60,43 @@ async function defaultSupplierId(productIds: string[]) {
   const [fallback] = await db
     .select({ id: suppliers.id })
     .from(suppliers)
+    .where(eq(suppliers.storeId, storeId))
     .orderBy(desc(suppliers.createdAt))
     .limit(1);
   return fallback?.id ?? null;
 }
 
+async function requestedWarehouseId(storeId: string, warehouseId?: string) {
+  if (!warehouseId) return defaultWarehouseId(storeId);
+  const [warehouse] = await db
+    .select({ id: warehouses.id })
+    .from(warehouses)
+    .where(and(eq(warehouses.storeId, storeId), eq(warehouses.id, warehouseId)))
+    .limit(1);
+  return warehouse?.id ?? null;
+}
+
+async function requestedSupplierId(storeId: string, productIds: string[], supplierId?: string) {
+  if (!supplierId) return defaultSupplierId(storeId, productIds);
+  const [supplier] = await db
+    .select({ id: suppliers.id })
+    .from(suppliers)
+    .where(and(eq(suppliers.storeId, storeId), eq(suppliers.id, supplierId)))
+    .limit(1);
+  return supplier?.id ?? null;
+}
+
+async function storeProfileId(storeId: string, userId: string) {
+  const [profile] = await db
+    .select({ id: profiles.id })
+    .from(profiles)
+    .where(and(eq(profiles.storeId, storeId), eq(profiles.id, userId)))
+    .limit(1);
+  return profile?.id ?? null;
+}
+
 export async function createDraftPurchaseForUser(
+  storeId: string,
   userId: string,
   input: CreateDraftPurchaseInput,
 ): Promise<ActionResult<{ id: string; code: string }>> {
@@ -79,10 +114,10 @@ export async function createDraftPurchaseForUser(
           lastPurchasePrice: products.lastPurchasePrice,
         })
         .from(products)
-        .where(inArray(products.id, productIds)),
-      v.warehouseId ? Promise.resolve(v.warehouseId) : defaultWarehouseId(),
-      v.supplierId ? Promise.resolve(v.supplierId) : defaultSupplierId(productIds),
-      getProfileId(userId),
+        .where(and(eq(products.storeId, storeId), inArray(products.id, productIds))),
+      requestedWarehouseId(storeId, v.warehouseId),
+      requestedSupplierId(storeId, productIds, v.supplierId),
+      storeProfileId(storeId, userId),
     ]);
 
     if (!warehouseId || !supplierId || productRows.length !== productIds.length) {
@@ -104,6 +139,7 @@ export async function createDraftPurchaseForUser(
       const [po] = await tx
         .insert(purchaseOrders)
         .values({
+          storeId,
           code: generateCode("PN"),
           supplierId,
           warehouseId,
@@ -118,6 +154,7 @@ export async function createDraftPurchaseForUser(
 
       await tx.insert(purchaseOrderItems).values(
         lines.map((item) => ({
+          storeId,
           purchaseOrderId: po.id,
           productId: item.productId,
           quantity: toQty(item.quantity),

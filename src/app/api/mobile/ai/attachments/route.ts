@@ -179,8 +179,9 @@ export async function GET(request: Request) {
   const bucket = url.searchParams.get("bucket")?.trim();
   const path = url.searchParams.get("path")?.trim();
   const configuredBucket = await getAiAttachmentsBucket(gate.storeId);
+  const ownerPrefix = `stores/${gate.storeId}/users/${gate.userId}/`;
 
-  if (!bucket || !path || bucket !== configuredBucket || !path.startsWith(`${gate.userId}/`)) {
+  if (!bucket || !path || bucket !== configuredBucket || !path.startsWith(ownerPrefix)) {
     return mobileError("errors.forbidden", 403);
   }
 
