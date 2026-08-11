@@ -26,5 +26,5 @@ export function DirectPrintButton({
     document.body.appendChild(frame);
   };
 
-  return <button type="button" {...props} onClick={print}>{children}</button>;
+  return <button className="min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" type="button" {...props} onClick={print}>{children}</button>;
 }

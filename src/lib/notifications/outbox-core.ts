@@ -336,6 +336,7 @@ export function createNotificationOutboxCore(options: NotificationOutboxCoreOpti
       ))
       .returning({
         id: notificationOutbox.id,
+        storeId: notificationOutbox.storeId,
         attemptCount: notificationOutbox.attemptCount,
         firstAttemptAt: notificationOutbox.firstAttemptAt,
         leaseExpiresAt: notificationOutbox.leaseExpiresAt,

@@ -429,6 +429,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
                           ? "border-primary-600 bg-primary-600 text-white"
                           : "border-slate-300 bg-surface text-transparent hover:border-primary-400",
                         b.isDefault && "cursor-not-allowed opacity-70",
+                        "min-h-11 lg:min-h-0 min-w-11 lg:min-w-0",
                       )}
                     >
                       <Check className="h-3.5 w-3.5" aria-hidden="true" />
@@ -443,7 +444,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
                           if (e.key === "Enter") rename(b.id, editing.name);
                           if (e.key === "Escape") setEditing(null);
                         }}
-                        className="min-h-9 min-w-0 flex-1 rounded border border-primary-400 bg-surface px-2 text-sm"
+                        className="min-h-9 min-w-0 flex-1 rounded border border-primary-400 bg-surface px-2 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
                       />
                     ) : (
                       <>
@@ -457,6 +458,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
                           className={cn(
                             "min-w-0 flex-1 truncate text-left text-sm",
                             b.isDefault && "cursor-default font-semibold",
+                            "min-h-11 lg:min-h-0 min-w-11 lg:min-w-0",
                           )}
                         >
                           {b.name}
@@ -464,7 +466,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
                         <button
                           type="button"
                           onClick={() => setEditing({ id: b.id, name: b.name })}
-                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-surface hover:text-primary-600"
+                          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-surface hover:text-primary-600 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
                           title={t("common.edit")}
                         >
                           <Pencil className="h-3.5 w-3.5" />
@@ -476,7 +478,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
                               setBookMenuOpen(false);
                               setDeleteCandidate(b);
                             }}
-                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-surface hover:text-red-500"
+                            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-surface hover:text-red-500 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
                             title={t("common.delete")}
                           >
                             <X className="h-3.5 w-3.5" />
@@ -560,8 +562,8 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
               </button>
             </div>
             <div className="mt-5 flex justify-end gap-2">
-              <button type="button" onClick={() => setDeleteCandidate(null)} disabled={deletingBook} className="min-h-11 rounded-lg border border-border px-3 text-sm disabled:opacity-50">{t("common.cancel")}</button>
-              <button type="button" onClick={confirmRemoveBook} disabled={deletingBook} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
+              <button type="button" onClick={() => setDeleteCandidate(null)} disabled={deletingBook} className="min-h-11 rounded-lg border border-border px-3 text-sm disabled:opacity-50 min-w-11 lg:min-w-0">{t("common.cancel")}</button>
+              <button type="button" onClick={confirmRemoveBook} disabled={deletingBook} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50 min-w-11 lg:min-w-0">
                 {deletingBook && <Loader2 className="h-4 w-4 animate-spin" />} {t("pricing.deleteBook.confirm")}
               </button>
             </div>

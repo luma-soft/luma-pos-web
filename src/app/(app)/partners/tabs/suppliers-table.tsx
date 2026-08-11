@@ -395,14 +395,14 @@ export function SuppliersTable({
               <button
                 type="button"
                 onClick={() => setDraftDebtFilter("")}
-                className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl border border-border px-4 text-sm font-bold text-slate-600 transition hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl border border-border px-4 text-sm font-bold text-slate-600 transition hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0"
               >
                 {t("suppliers.filter.reset")}
               </button>
               <button
                 type="button"
                 onClick={() => applyDebtFilter(draftDebtFilter)}
-                className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-primary-600 px-4 text-sm font-bold text-white transition hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-primary-600 px-4 text-sm font-bold text-white transition hover:bg-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0"
               >
                 {t("suppliers.filter.apply")}
               </button>
@@ -722,7 +722,7 @@ function SupplierDebtPanel({ preview, rows, onPayablesChanged }: { preview: Supp
             <article key={`${row.kind}-${row.id}`} className="space-y-2 p-3 text-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  {row.purchaseOrderId ? <Link href={Routes.purchase(row.purchaseOrderId)} className="font-semibold text-primary-600 hover:underline">{row.code}</Link> : <div className="font-semibold text-primary-600">{row.code}</div>}
+                  {row.purchaseOrderId ? <Link href={Routes.purchase(row.purchaseOrderId)} className="font-semibold text-primary-600 hover:underline min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 inline-flex">{row.code}</Link> : <div className="font-semibold text-primary-600 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0">{row.code}</div>}
                   <div className="mt-0.5 text-xs text-slate-500">{formatDate(row.createdAt)} · {row.typeLabel}{row.reason ? ` · ${row.reason}` : ""}</div>
                 </div>
                 <div className={cn("shrink-0 font-semibold tabular-nums", row.value < 0 ? "text-ok" : "text-warn")}>

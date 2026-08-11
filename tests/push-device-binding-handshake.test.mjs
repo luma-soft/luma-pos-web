@@ -36,6 +36,7 @@ const ids = {
   newActor: "81000000-0000-4000-8000-000000000003",
   otherPrincipal: "81000000-0000-4000-8000-000000000004",
 };
+const STORE_ID = "00000000-0000-4000-8000-000000000001";
 await database.insert(schema.profiles).values([
   { id: ids.principal, fullName: "Principal", role: "owner" },
   { id: ids.oldActor, fullName: "Old actor", role: "cashier" },
@@ -45,6 +46,7 @@ await database.insert(schema.profiles).values([
 
 const unknownDeviceId = "unknown-device-tombstone";
 const unknownDeactivation = await deactivatePushDeviceBinding(database, {
+  storeId: STORE_ID,
   principalId: ids.principal,
   deviceId: unknownDeviceId,
   bindingGeneration: 2,
@@ -52,6 +54,7 @@ const unknownDeactivation = await deactivatePushDeviceBinding(database, {
 });
 assert.deepEqual(unknownDeactivation, { kind: "deactivated" });
 const lateUnknownRegistration = await registerPushDeviceBinding(database, {
+  storeId: STORE_ID,
   principalId: ids.principal,
   effectiveUserId: ids.newActor,
   device: {
@@ -70,6 +73,7 @@ const unknownRows = await database.select()
   .where(eq(schema.mobilePushDevices.deviceId, unknownDeviceId));
 assert.equal(unknownRows.length, 0);
 const repeatedUnknownDeactivation = await deactivatePushDeviceBinding(database, {
+  storeId: STORE_ID,
   principalId: ids.principal,
   deviceId: unknownDeviceId,
   bindingGeneration: 2,
@@ -78,6 +82,7 @@ const repeatedUnknownDeactivation = await deactivatePushDeviceBinding(database, 
 assert.deepEqual(repeatedUnknownDeactivation, { kind: "deactivated" });
 
 const isolatedRegistration = await registerPushDeviceBinding(database, {
+  storeId: STORE_ID,
   principalId: ids.otherPrincipal,
   effectiveUserId: ids.otherPrincipal,
   device: {
@@ -115,6 +120,7 @@ const replacement = {
 };
 
 const busy = await registerPushDeviceBinding(database, {
+  storeId: STORE_ID,
   principalId: ids.principal,
   effectiveUserId: ids.newActor,
   device: replacement,
@@ -127,6 +133,7 @@ assert.equal(saved.effectiveUserId, ids.oldActor);
 assert.equal(saved.token, "old-shared-terminal-token-value");
 
 const rebound = await registerPushDeviceBinding(database, {
+  storeId: STORE_ID,
   principalId: ids.principal,
   effectiveUserId: ids.newActor,
   device: replacement,
@@ -141,6 +148,7 @@ assert.equal(saved.bindingGeneration, 2);
 assert.equal(saved.sendLeaseId, null);
 
 const staleRotation = await registerPushDeviceBinding(database, {
+  storeId: STORE_ID,
   principalId: ids.principal,
   effectiveUserId: ids.oldActor,
   device: {
@@ -157,6 +165,7 @@ assert.equal(saved.effectiveUserId, ids.newActor);
 assert.equal(saved.token, "new-shared-terminal-token-value");
 
 const deactivated = await deactivatePushDeviceBinding(database, {
+  storeId: STORE_ID,
   principalId: ids.principal,
   deviceId: replacement.deviceId,
   bindingGeneration: 3,
@@ -169,6 +178,7 @@ assert.equal(saved.enabled, false);
 assert.equal(saved.bindingGeneration, 3);
 
 const lateRegistration = await registerPushDeviceBinding(database, {
+  storeId: STORE_ID,
   principalId: ids.principal,
   effectiveUserId: ids.newActor,
   device: replacement,
@@ -189,12 +199,14 @@ const duplicateRegistration = {
 };
 const duplicateResults = await Promise.all([
   registerPushDeviceBinding(database, {
+    storeId: STORE_ID,
     principalId: ids.principal,
     effectiveUserId: ids.oldActor,
     device: duplicateRegistration,
     now: new Date("2026-07-29T12:03:00.000Z"),
   }),
   registerPushDeviceBinding(database, {
+    storeId: STORE_ID,
     principalId: ids.principal,
     effectiveUserId: ids.oldActor,
     device: duplicateRegistration,
@@ -221,6 +233,7 @@ const inFlightDevice = {
   bindingGeneration: 1,
 };
 const registrationInFlight = registerPushDeviceBinding(database, {
+  storeId: STORE_ID,
   principalId: ids.principal,
   effectiveUserId: ids.newActor,
   device: inFlightDevice,
@@ -228,6 +241,7 @@ const registrationInFlight = registerPushDeviceBinding(database, {
 });
 await Promise.resolve();
 const deactivationAfterPost = deactivatePushDeviceBinding(database, {
+  storeId: STORE_ID,
   principalId: ids.principal,
   deviceId: inFlightDevice.deviceId,
   bindingGeneration: 2,
@@ -243,6 +257,7 @@ const [postThenDelete] = await database.select()
 assert.equal(postThenDelete.enabled, false);
 assert.equal(postThenDelete.bindingGeneration, 2);
 const lateAfterConcurrentDelete = await registerPushDeviceBinding(database, {
+  storeId: STORE_ID,
   principalId: ids.principal,
   effectiveUserId: ids.newActor,
   device: inFlightDevice,

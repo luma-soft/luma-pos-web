@@ -131,4 +131,6 @@ const [lookup] = await db.select().from(paymentWebhookEvents).where(eq(paymentWe
 ok("event is queryable by reference", lookup?.id === event.id);
 
 console.log(`\n${fail === 0 ? "🎉" : "⚠️"} ${pass} passed, ${fail} failed`);
-process.exit(fail === 0 ? 0 : 1);
+if (fail > 0) process.exitCode = 1;
+
+await client.close();

@@ -97,3 +97,5 @@ if (uniqueRows.rows.length !== 5) {
 }
 
 console.log("field service schema: operational tables, RLS, role, and idempotency constraints verified");
+
+await client.close();

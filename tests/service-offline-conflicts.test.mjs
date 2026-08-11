@@ -403,3 +403,5 @@ assert.equal(persistedAsset.version, assetAfterChange.version);
 console.log(
   "offline field conflicts: versions, replay, safe payload, and isolation verified",
 );
+
+await client.close();

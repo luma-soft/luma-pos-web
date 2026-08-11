@@ -1,11 +1,11 @@
-import { beforeAll, describe, expect, mock, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test";
+
+afterAll(() => mock.restore());
 
 let queryCalls = 0;
 
-mock.module("@/lib/mobile/auth", () => ({
-  requireMobileManager: async () => ({ ok: false, error: "errors.forbidden" }),
-}));
-mock.module("@/lib/services/dispatch-reporting", () => ({
+mock.module("@/app/api/mobile/services/manager-dependencies", () => ({
+  requireMobileServiceManager: async () => ({ ok: false, error: "errors.forbidden" }),
   parseServiceDispatchQuery: () => {
     queryCalls += 1;
     return {};

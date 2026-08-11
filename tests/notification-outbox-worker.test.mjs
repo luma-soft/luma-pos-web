@@ -28,6 +28,7 @@ const {
 
 const client = new PGlite();
 const db = drizzle(client, { schema });
+const STORE_ID = "00000000-0000-4000-8000-000000000001";
 await client.exec("create role anon; create role authenticated;");
 
 for (const file of readdirSync(`${projectRoot}/drizzle`).filter((name) => name.endsWith(".sql")).sort()) {
@@ -99,6 +100,7 @@ async function seedEvent({
   const suffix = String(eventSequence).padStart(12, "0");
   const entityId = `30000000-0000-4000-8000-${suffix}`;
   const created = await db.transaction((tx) => events.createNotificationEventInTx(tx, {
+    storeId: STORE_ID,
     eventKey: `outbox-test:${eventSequence}`,
     category,
     entityType,
@@ -732,6 +734,7 @@ for (const scenario of [
   await started;
 
   const busy = await registerPushDeviceBinding(db, {
+    storeId: STORE_ID,
     principalId: userIds.owner,
     effectiveUserId: userIds.cashier,
     device: {
@@ -749,6 +752,7 @@ for (const scenario of [
   assert.deepEqual(await processing, { completed: true });
 
   const rebound = await registerPushDeviceBinding(db, {
+    storeId: STORE_ID,
     principalId: userIds.owner,
     effectiveUserId: userIds.cashier,
     device: {

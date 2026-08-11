@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { buildCameraProductDescription } from "../src/scripts/camera-product-description";
 
 describe("camera product description", () => {
-  test("includes every customer-facing specification and warranty", () => {
+  test("includes every verified customer-facing specification", () => {
     const description = buildCameraProductDescription({
       name: "EZVIZ C1C-B 2MP",
       fullCode: "CS-C1C-B-E0-1E2WF",
@@ -21,8 +21,8 @@ describe("camera product description", () => {
     expect(description).toContain("• Quan sát ban đêm / bảo vệ: Hồng ngoại đến 12m.");
     expect(description).toContain("• Nguồn / lưu trữ: 5V/1A, tối đa 3W; microSD đến 256GB.");
     expect(description).toContain("• Tính năng chính: Phát hiện chuyển động");
-    expect(description).toContain("• Bảo hành: 24 tháng.");
+    expect(description).not.toContain("Bảo hành");
     expect(description).not.toContain("tích hợp..");
-    expect(description.split("\n")).toHaveLength(8);
+    expect(description.split("\n")).toHaveLength(7);
   });
 });

@@ -35,7 +35,7 @@ describe("shared form field focus treatment", () => {
     ];
 
     for (const html of fields) {
-      expect(html).toContain("focus:border-primary-500");
+      expect(html).toContain("focus:border-primary-600");
       expect(html).toContain("focus:outline-none");
       expect(html).not.toContain("focus:ring-2");
     }

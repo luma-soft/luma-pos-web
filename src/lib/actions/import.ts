@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { products, categories, stockLevels, stockMovements, warehouses } from "@/db/schema";
@@ -91,12 +91,12 @@ export async function importProducts(rows: unknown, dryRun: boolean): Promise<Ac
     // SKU đã tồn tại → cập nhật
     const skus = [...new Set(valid.map((r) => r.sku).filter(Boolean))];
     const existing = skus.length
-      ? await db.select({ id: products.id, sku: products.sku }).from(products).where(inArray(products.sku, skus))
+      ? await db.select({ id: products.id, sku: products.sku }).from(products).where(and(eq(products.storeId, gate.storeId), inArray(products.sku, skus)))
       : [];
     const skuToId = new Map(existing.map((e) => [e.sku, e.id]));
 
     // Nhóm hàng có sẵn (theo tên, không phân biệt hoa thường)
-    const allCats = await db.select({ id: categories.id, name: categories.name }).from(categories);
+    const allCats = await db.select({ id: categories.id, name: categories.name }).from(categories).where(eq(categories.storeId, gate.storeId));
     const catByName = new Map(allCats.map((c) => [norm(c.name), c.id]));
     const wantedCats = [...new Set(valid.map((r) => r.category).filter(Boolean))];
     const newCategories = wantedCats.filter((c) => !catByName.has(norm(c)));
@@ -109,13 +109,13 @@ export async function importProducts(rows: unknown, dryRun: boolean): Promise<Ac
     }
 
     const profileId = await getProfileId(gate.userId);
-    const [wh] = await db.select({ id: warehouses.id }).from(warehouses).orderBy(sql`${warehouses.isDefault} desc`).limit(1);
+    const [wh] = await db.select({ id: warehouses.id }).from(warehouses).where(eq(warehouses.storeId, gate.storeId)).orderBy(sql`${warehouses.isDefault} desc`).limit(1);
 
     let created = 0, updated = 0;
     await db.transaction(async (tx) => {
       // Tạo nhóm hàng còn thiếu
       for (const name of newCategories) {
-        const [row] = await tx.insert(categories).values({ name: name.trim() }).returning({ id: categories.id });
+        const [row] = await tx.insert(categories).values({ storeId: gate.storeId, name: name.trim() }).returning({ id: categories.id });
         catByName.set(norm(name), row.id);
       }
 
@@ -137,13 +137,13 @@ export async function importProducts(rows: unknown, dryRun: boolean): Promise<Ac
             retailPrice: String(retail),
             costPrice: String(cost),
             updatedAt: sql`now()`,
-          }).where(eq(products.id, existingId));
+          }).where(and(eq(products.storeId, gate.storeId), eq(products.id, existingId)));
           productId = existingId;
           updated++;
         } else {
           const sku = r.sku || `SP${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
           const [row] = await tx.insert(products).values({
-            sku, barcode: r.barcode || null, name: r.name, categoryId,
+            storeId: gate.storeId, sku, barcode: r.barcode || null, name: r.name, categoryId,
             baseUnit: r.unit || "cái", costPrice: String(cost), retailPrice: String(retail), isActive: true,
           }).returning({ id: products.id });
           productId = row.id;
@@ -154,14 +154,14 @@ export async function importProducts(rows: unknown, dryRun: boolean): Promise<Ac
         // Tồn kho (chỉ khi có cột stock + có kho mặc định)
         if (r.hasStock && wh) {
           const [cur] = await tx.select({ q: stockLevels.quantity }).from(stockLevels)
-            .where(sql`${stockLevels.productId} = ${productId} and ${stockLevels.warehouseId} = ${wh.id}`).limit(1);
+            .where(and(eq(stockLevels.storeId, gate.storeId), eq(stockLevels.productId, productId), eq(stockLevels.warehouseId, wh.id))).limit(1);
           const before = cur ? Number(cur.q) : 0;
           const delta = stock - before;
-          await tx.insert(stockLevels).values({ productId, warehouseId: wh.id, quantity: String(stock) })
-            .onConflictDoUpdate({ target: [stockLevels.productId, stockLevels.warehouseId], set: { quantity: String(stock), updatedAt: sql`now()` } });
+          await tx.insert(stockLevels).values({ storeId: gate.storeId, productId, warehouseId: wh.id, quantity: String(stock) })
+            .onConflictDoUpdate({ target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId], set: { quantity: String(stock), updatedAt: sql`now()` } });
           if (delta !== 0) {
             await tx.insert(stockMovements).values({
-              productId, warehouseId: wh.id,
+              storeId: gate.storeId, productId, warehouseId: wh.id,
               type: existingId ? "adjust" : "init",
               quantity: String(delta), unitCost: String(cost),
               refType: "import", refId: productId, note: "Nhập từ file", createdBy: profileId,

@@ -1,4 +1,7 @@
-import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import { createMobileAuthMock } from "./helpers/mobile-auth-mock";
+
+afterAll(() => mock.restore());
 
 const uploads: Array<{
   bucket: string;
@@ -9,22 +12,14 @@ const uploads: Array<{
 const removals: string[][] = [];
 let heicConversions = 0;
 
-mock.module("sharp", () => ({
-  default: () => ({
-    rotate() {
-      return this;
-    },
-    jpeg() {
-      return this;
-    },
-    async toBuffer() {
-      heicConversions += 1;
-      return Uint8Array.from([0xff, 0xd8, 0xff, 0x00]);
-    },
-  }),
+mock.module("@/lib/images/heif", () => ({
+  async convertHeifToJpeg() {
+    heicConversions += 1;
+    return Uint8Array.from([0xff, 0xd8, 0xff, 0x00]);
+  },
 }));
 
-mock.module("@/lib/mobile/auth", () => ({
+mock.module("@/lib/mobile/auth", () => createMobileAuthMock({
   requireMobileStockAccess: async () => ({
     ok: true,
     storeId: "store-1",

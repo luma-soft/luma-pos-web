@@ -107,7 +107,7 @@ export async function ReturnDetailPanel({ ret, compact = false }: { ret: ReturnD
             <InfoLine label={t("returns.sourceOrder")} value={ret.orderCode ?? "—"} />
             {ret.exchangeOrderId && ret.exchangeOrderCode && (
               <InfoLine label={t("returns.exchangeOrder")}>
-                <OrderDetailLink orderId={ret.exchangeOrderId} className="font-semibold text-primary-600 hover:underline">
+                <OrderDetailLink orderId={ret.exchangeOrderId} className="font-semibold text-primary-600 hover:underline min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 inline-flex">
                   {ret.exchangeOrderCode}
                 </OrderDetailLink>
               </InfoLine>

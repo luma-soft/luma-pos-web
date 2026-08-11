@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { eq } from "drizzle-orm";
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 
 const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const schema = await import(`${projectRoot}/src/db/schema.ts`);
@@ -25,9 +25,16 @@ const {
 const creatorId = "11111111-1111-4111-8111-111111111111";
 const foreignId = "22222222-2222-4222-8222-222222222222";
 const managerId = "33333333-3333-4333-8333-333333333333";
+const fixtureClients = new Set();
+
+afterEach(async () => {
+  await Promise.all([...fixtureClients].map((client) => client.close()));
+  fixtureClients.clear();
+});
 
 async function createFixture(status = "scheduled") {
   const client = new PGlite();
+  fixtureClients.add(client);
   const db = drizzle(client, { schema });
   await client.exec("create role anon; create role authenticated;");
   for (const file of readdirSync(`${projectRoot}/drizzle`).filter((name) => name.endsWith(".sql")).sort()) {

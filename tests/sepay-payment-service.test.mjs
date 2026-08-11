@@ -6,6 +6,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import { eq } from "drizzle-orm";
 
 const PROJ = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+const STORE_ID = "00000000-0000-4000-8000-000000000001";
 const schema = await import(`${PROJ}/src/db/schema.ts`);
 const service = await import(`${PROJ}/src/lib/payments/service-core.ts`);
 const sepay = await import(`${PROJ}/src/lib/payments/sepay.ts`);
@@ -386,8 +387,8 @@ const normalized = sepay.normalizeSepayWebhookPayload({
 });
 ok("webhook payload normalization extracts reference", normalized?.referenceCode === "LUMA-DH-SVC" && normalized.transferAmount === 1_000_000);
 
-const recorded = await service.recordSepayWebhookEvent(db, normalized);
-const recordedAgain = await service.recordSepayWebhookEvent(db, normalized);
+const recorded = await service.recordSepayWebhookEvent(db, normalized, { storeId: STORE_ID });
+const recordedAgain = await service.recordSepayWebhookEvent(db, normalized, { storeId: STORE_ID });
 ok("webhook event recording is idempotent", recorded.ok && recordedAgain.ok && recorded.data.eventId === recordedAgain.data.eventId && recordedAgain.data.duplicate === true);
 
 const qrUrl = sepay.buildSepayVietQrImageUrl({
@@ -461,7 +462,7 @@ const recordedMissingReference = await service.recordSepayWebhookEvent(db, {
   transactionDate: null,
   content: null,
   rawPayload: { privateBankPayload: "must-not-reach-notifications" },
-}, { verified: true });
+}, { storeId: STORE_ID, verified: true });
 const [missingReferenceEvent] = await db.select().from(paymentWebhookEvents)
   .where(eq(paymentWebhookEvents.id, recordedMissingReference.data.eventId));
 const missingReferenceMatch = await service.matchSepayWebhookEvent(db, missingReferenceEvent.id);
@@ -527,7 +528,7 @@ const recordedUnverified = await service.recordSepayWebhookEvent(db, {
   transactionDate: null,
   content: null,
   rawPayload: { privateBankPayload: "must-not-reach-notifications" },
-});
+}, { storeId: STORE_ID });
 const [unverifiedEvent] = await db.select().from(paymentWebhookEvents)
   .where(eq(paymentWebhookEvents.id, recordedUnverified.data.eventId));
 const unverifiedMatch = await service.matchSepayWebhookEvent(db, unverifiedEvent.id);
@@ -744,4 +745,6 @@ ok("reconciliation queue exposes unmatched evidence without raw payload", queue.
 ok("reconciliation summary is server-derived", queue.ok && queue.data.summary.pending >= 1 && queue.data.summary.wrongAmountEvents >= 1);
 
 console.log(`\n${fail === 0 ? "🎉" : "⚠️"} ${pass} passed, ${fail} failed`);
-process.exit(fail === 0 ? 0 : 1);
+if (fail > 0) process.exitCode = 1;
+
+await client.close();

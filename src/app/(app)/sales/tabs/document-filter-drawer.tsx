@@ -726,7 +726,7 @@ export function DocumentFilterDrawer({
                       }))}
                       onChange={(value) => updateDraft({ refundMethod: value })}
                     />
-                    <label className="flex items-center gap-4 border-y border-border py-4">
+                    <label className="flex items-center gap-4 border-y border-border py-4 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0">
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-bold">
                           Hiện phiếu đã hủy
@@ -850,7 +850,7 @@ export function DocumentFilterDrawer({
               <button
                 type="button"
                 onClick={closeDrawer}
-                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary-600 font-bold text-primary-700"
+                className="inline-flex min-h-11 items-center justify-center rounded-xl border border-primary-600 font-bold text-primary-700 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0"
               >
                   Xóa lọc
                 </button>
@@ -858,7 +858,7 @@ export function DocumentFilterDrawer({
                   type="submit"
                   disabled={invalid}
                   aria-busy={countPending && !invalid}
-                  className="min-h-11 rounded-xl bg-primary-600 px-4 font-bold text-white hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="min-h-11 rounded-xl bg-primary-600 px-4 font-bold text-white hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0"
                 >
                   <span aria-live="polite">
                     {invalid || count === null
@@ -962,7 +962,7 @@ function LabeledInput({
       <span className="flex items-center gap-2">
         <input
           {...props}
-          className="min-w-0 flex-1 bg-transparent py-1 text-sm outline-none placeholder:text-slate-400"
+          className="min-w-0 flex-1 bg-transparent py-1 text-sm outline-none placeholder:text-slate-400 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
         />
         {suffix && <span className="text-sm font-semibold">{suffix}</span>}
       </span>
@@ -987,7 +987,7 @@ function ChipSection({
     <FilterSection title={title}>
       <div className="flex flex-wrap gap-2">
         {options.map((option) => (
-          <label key={option.value} className="cursor-pointer">
+          <label key={option.value} className="cursor-pointer min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0">
             <input
               type="radio"
               name={name}

@@ -131,4 +131,4 @@ ok("non-zero debt is detected", Number(debtor.currentDebt) !== 0);
 
 await client.close();
 console.log(`\n${pass} passed, ${fail} failed`);
-if (fail > 0) process.exit(1);
+if (fail > 0) process.exitCode = 1;

@@ -1,8 +1,11 @@
 import { strict as assert } from "node:assert";
 import { readFileSync, readdirSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
-import { mock } from "bun:test";
+import { afterAll, mock } from "bun:test";
+import { createMobileAuthMock } from "./helpers/mobile-auth-mock.ts";
 import { drizzle } from "drizzle-orm/pglite";
+
+afterAll(() => mock.restore());
 import { and, eq } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 
@@ -133,7 +136,7 @@ mock.module("@/lib/actions/common", () => ({
     return userId;
   },
 }));
-mock.module("@/lib/mobile/auth", () => ({
+mock.module("@/lib/mobile/auth", () => createMobileAuthMock({
   async requireMobileUser() {
     return gate;
   },
@@ -619,4 +622,4 @@ await check("the production list query uses the ordered valid-event index withou
 
 await client.close();
 console.log(`\n${failed === 0 ? "🎉" : "⚠️"} ${passed} passed, ${failed} failed`);
-process.exit(failed === 0 ? 0 : 1);
+if (failed > 0) process.exitCode = 1;

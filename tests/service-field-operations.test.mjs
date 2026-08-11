@@ -158,3 +158,5 @@ if (completed.status !== "completed" || completed.completionNote !== "Đã bàn 
 }
 
 console.log("field operations: assignment, idempotency, visit, checklist, evidence, and completion verified");
+
+await client.close();

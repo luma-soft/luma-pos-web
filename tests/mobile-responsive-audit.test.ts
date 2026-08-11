@@ -191,8 +191,8 @@ const pairedSurfaces: PairedSurface[] = [
       "row.code",
       "row.createdAt",
       "row.kind",
-      "row.debtChange",
-      "row.balanceAfter",
+      "row.value",
+      "row.balance",
     ],
   },
   {

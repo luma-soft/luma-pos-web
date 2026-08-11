@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 export function PrintTemplateMenu({
   baseHref,
-  templates,
+  templates = [],
   label,
   className,
 }: {
@@ -63,7 +63,7 @@ export function PrintTemplateMenu({
 
   return (
     <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen((value) => !value)} className={cn("inline-flex items-center gap-1.5", className)} aria-expanded={open}>
+      <button type="button" onClick={() => setOpen((value) => !value)} className={cn("inline-flex items-center gap-1.5", className, "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11 lg:min-h-0 lg:min-w-0")} aria-expanded={open}>
         <Printer className="h-4 w-4" />
         {label}
         <ChevronDown className="h-3.5 w-3.5" />

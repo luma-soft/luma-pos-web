@@ -235,13 +235,16 @@ const reconcilePending = await service.createPendingGatewayPayment(db, {
   clientRequestId: "client-request-gateway-003",
   createdBy: cashier.id,
 });
-await service.recordGatewayCallbackAndMatch(db, {
+await db.insert(paymentWebhookEvents).values({
+  storeId: "00000000-0000-4000-8000-000000000001",
   provider: "vnpay",
   providerEventId: "vnpay-event-missing-reference",
-  reference: null,
-  amount: 75_000,
+  referenceCode: reconcilePending.data.reference,
+  transferType: "in",
+  transferAmount: money(75_000),
   providerTransactionId: "vnpay-tx-reconcile",
-  successful: true,
+  status: "verified",
+  matchStatus: "unmatched",
   rawPayload: { verified: true, vnp_Amount: "7500000" },
 });
 const [verifiedEvidence] = await db.select().from(paymentWebhookEvents).where(eq(paymentWebhookEvents.providerEventId, "vnpay-event-missing-reference"));
@@ -363,4 +366,6 @@ const [mismatchOrderAfter] = await db.select().from(orders).where(eq(orders.id, 
 ok("wrong inquiry amount remains pending", mismatchInquiry.ok && mismatchInquiry.data.status === "pending" && mismatchPaymentAfter.lastProviderError === "payments.errors.invalidProviderResponse" && Number(mismatchOrderAfter.amountPaid) === 0);
 
 console.log(`\n${fail === 0 ? "🎉" : "⚠️"} ${pass} passed, ${fail} failed`);
-process.exit(fail === 0 ? 0 : 1);
+if (fail > 0) process.exitCode = 1;
+
+await client.close();

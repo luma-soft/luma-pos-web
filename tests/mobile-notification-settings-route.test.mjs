@@ -1,5 +1,7 @@
 import { strict as assert } from "node:assert";
-import { mock } from "bun:test";
+import { afterAll, mock } from "bun:test";
+
+afterAll(() => mock.restore());
 
 const { parseStorePrefs } = await import("../src/lib/schemas/settings.ts");
 
@@ -36,21 +38,17 @@ function gateFor(roles) {
     : { ok: false, error: "errors.forbidden" };
 }
 
-mock.module("@/lib/mobile/auth", () => ({
+mock.module("@/app/api/mobile/notifications/settings/dependencies", () => ({
   async requireMobileRole(roles) {
     return gateFor(roles);
   },
   async requireMobileManager() {
     return gateFor(["owner", "manager"]);
   },
-}));
-mock.module("@/lib/auth/mobile-approval", () => ({
   async authorizeMobileSensitiveAction() {
     approvalCalls += 1;
     return authorization;
   },
-}));
-mock.module("@/lib/actions/settings", () => ({
   async updateStorePrefsForUser(userId, patch) {
     updateCalls.push({ userId, patch });
     return { ok: true, data: undefined };
@@ -59,8 +57,6 @@ mock.module("@/lib/actions/settings", () => ({
     updateCalls.push({ userId, patch });
     return { ok: true, data: undefined };
   },
-}));
-mock.module("@/lib/data/settings", () => ({
   async getStoreSettings() {
     return {
       name: "Luma",
@@ -74,8 +70,6 @@ mock.module("@/lib/data/settings", () => ({
       prefs: parseStorePrefs({ notifications: currentNotifications }),
     };
   },
-}));
-mock.module("@/lib/notifications/channels", () => ({
   resolveNotificationChannels() {
     return [
       { id: "inApp", configured: true },
@@ -259,4 +253,4 @@ await check("manager GET and approved PATCH persists only the supplied partial",
 });
 
 console.log(`\n${failed === 0 ? "🎉" : "⚠️"} ${passed} passed, ${failed} failed`);
-process.exit(failed === 0 ? 0 : 1);
+if (failed > 0) process.exitCode = 1;

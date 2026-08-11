@@ -17,6 +17,7 @@ const {
 
 const client = new PGlite();
 const db = drizzle(client, { schema });
+const STORE_ID = "00000000-0000-4000-8000-000000000001";
 await client.exec("create role anon; create role authenticated;");
 
 for (const file of readdirSync(`${projectRoot}/drizzle`).filter((name) => name.endsWith(".sql")).sort()) {
@@ -51,6 +52,7 @@ async function notificationRowCounts() {
 }
 
 const purchaseInput = {
+  storeId: STORE_ID,
   eventKey: "purchase-received:10000000-0000-0000-0000-000000000001",
   category: "purchaseReceived",
   entityType: "purchase",
@@ -73,6 +75,7 @@ assert.deepEqual(
 assert.equal(purchaseRows.outbox.length, 1, "creates exactly one provider-neutral outbox row");
 
 const createdQr = await db.transaction((tx) => events.createNotificationEventInTx(tx, {
+  storeId: STORE_ID,
   eventKey: "qr-confirmed:10000000-0000-0000-0000-000000000002",
   category: "qrPaymentConfirmed",
   entityType: "order",
@@ -210,6 +213,7 @@ const roleTargetMatrix = [
 for (const [index, route] of roleTargetMatrix.entries()) {
   const created = await db.transaction((tx) =>
     events.createNotificationEventInTx(tx, {
+      storeId: STORE_ID,
       eventKey: `role-target-matrix:${index}`,
       category: route.category,
       entityType: route.entityType,
@@ -238,6 +242,7 @@ await db.update(storeSettings).set({
 }).where(eq(storeSettings.id, "default"));
 const directQr = await db.transaction((tx) =>
   events.createNotificationEventInTx(tx, {
+    storeId: STORE_ID,
     eventKey: "qr-direct-independent-of-role-route",
     category: "qrPaymentConfirmed",
     entityType: "order",

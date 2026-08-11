@@ -1680,7 +1680,7 @@ export function PosClient({
                     e.currentTarget.style.height = `${Math.min(e.currentTarget.scrollHeight, 64)}px`;
                   }}
                   placeholder={t("pos.lineNotePlaceholder")}
-                  className="mt-2 block min-h-4 max-h-16 w-full resize-none overflow-y-auto rounded-md border border-transparent bg-transparent px-1.5 py-0.5 text-xs leading-4 text-slate-400 outline-none [scrollbar-width:none] focus:border-primary-600 focus:bg-primary-50/30 [&::-webkit-scrollbar]:hidden dark:focus:bg-primary-950/20 placeholder:text-slate-300 dark:placeholder:text-slate-600"
+                  className="mt-2 block min-h-11 max-h-16 w-full resize-none overflow-y-auto rounded-md border border-transparent bg-transparent px-1.5 py-0.5 text-xs leading-4 text-slate-400 outline-none [scrollbar-width:none] focus:border-primary-600 focus:bg-primary-50/30 [&::-webkit-scrollbar]:hidden dark:focus:bg-primary-950/20 placeholder:text-slate-300 dark:placeholder:text-slate-600 lg:min-h-4"
                 />
               </div>
               <div className="hidden items-center gap-2 px-3 py-3 lg:flex">

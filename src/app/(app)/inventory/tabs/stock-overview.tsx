@@ -147,6 +147,7 @@ function StatusCard({
       className={cn(
         "group min-h-[116px] rounded-card border p-4 transition duration-150 hover:-translate-y-0.5 hover:shadow-e2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
         toneClass,
+        "inline-flex min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11 lg:min-h-[116px] lg:min-w-0",
       )}
     >
       <div className="flex items-center gap-3">

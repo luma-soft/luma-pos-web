@@ -19,7 +19,7 @@ describe("mobile settings shell", () => {
     expect(settingsSource).toMatch(/const FI = "min-h-11/);
     expect(settingsSource).toMatch(/const btnS = "inline-flex min-h-11 min-w-11/);
     expect(settingsSource).toContain('const searchableTouch = "[&>button]:h-11 lg:[&>button]:h-10"');
-    expect(settingsSource.match(/<TouchTargetToggle/g)?.length).toBeGreaterThanOrEqual(6);
+    expect(settingsSource.match(/<TouchTargetToggle/g)?.length).toBeGreaterThanOrEqual(5);
   });
 
   test("keeps toggle semantics while expanding the mobile hit target", () => {

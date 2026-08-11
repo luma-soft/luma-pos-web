@@ -60,10 +60,10 @@ export function DebtDialogFooter({
 }) {
   return (
     <div className="grid grid-cols-2 gap-3 border-t border-border-soft pt-4">
-      <button type="button" onClick={onCancel} className="min-h-11 rounded-lg border border-border px-4 text-sm font-semibold text-primary-700 hover:bg-surface-2">
+      <button type="button" onClick={onCancel} className="min-h-11 rounded-lg border border-border px-4 text-sm font-semibold text-primary-700 hover:bg-surface-2 min-w-11 lg:min-w-0">
         Hủy
       </button>
-      <button type="button" onClick={onConfirm} disabled={disabled} className="min-h-11 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700 disabled:pointer-events-none disabled:opacity-50">
+      <button type="button" onClick={onConfirm} disabled={disabled} className="min-h-11 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:bg-primary-700 disabled:pointer-events-none disabled:opacity-50 min-w-11 lg:min-w-0">
         {confirmLabel}
       </button>
     </div>

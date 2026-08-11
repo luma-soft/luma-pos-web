@@ -73,17 +73,17 @@ describe("mobile specialist layouts", () => {
   test("tablet headers and quantity rows reserve their complete touch geometry", () => {
     const productCreate = read("src/app/(app)/inventory/tabs/product-create-menu.tsx");
     const orders = read("src/app/(app)/sales/tabs/orders.tsx");
-    const quote = read("src/app/(app)/quotes/new/camera-quote-builder.tsx");
+    const quote = read("src/components/pos/camera-quote-panel.tsx");
     const promotions = read("src/app/(app)/promotions/promo-widgets.tsx");
     const orderEditor = read("src/app/(app)/orders/[id]/edit/order-edit-form.tsx");
 
     expect(productCreate).toContain('<span className="hidden lg:inline">{label}</span>');
     expect(productCreate).toContain('"hidden h-4 w-4 transition-transform lg:block"');
-    expect(orders).toContain("lg:flex-row lg:items-end lg:justify-between");
-    expect(orders).not.toContain("sm:flex-row sm:items-end sm:justify-between");
-    expect(quote).toContain("grid-cols-[minmax(0,1fr)_132px_44px]");
-    expect(quote).toContain("lg:grid-cols-[minmax(0,1fr)_112px_32px]");
-    expect(quote).toContain('className="w-[132px] lg:w-28"');
+    expect(orders).toContain("<OrdersFilterDrawer");
+    expect(orders).toContain("<OrdersTable rows={rows}");
+    expect(quote).toContain("grid-cols-[44px_44px_44px]");
+    expect(quote).toContain("lg:grid-cols-[32px_42px_32px]");
+    expect(quote).toContain("grid-cols-[minmax(0,1fr)_120px_32px]");
     expect(promotions).toContain("grid-cols-[auto_minmax(132px,1fr)_44px]");
     expect(promotions).toContain("sm:grid-cols-[auto_minmax(132px,132px)");
     expect(promotions).toContain("lg:grid-cols-[auto_minmax(72px,96px)");

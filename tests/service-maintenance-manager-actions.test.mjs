@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { mock } from "bun:test";
 import { and, eq, isNull } from "drizzle-orm";
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.TEST_POSTGRES_DATABASE_URL;
 if (!databaseUrl) {
   console.log("maintenance manager actions: skipped because DATABASE_URL is unset");
 } else {

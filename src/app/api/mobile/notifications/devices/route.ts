@@ -1,14 +1,14 @@
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
-import { db } from "@/db";
 import { mobilePushDevices } from "@/db/schema";
-import { requireMobileUser } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
 import { pushDeviceBinding } from "@/lib/notifications/device-binding";
 import {
+  db,
   deactivatePushDeviceBinding,
   registerPushDeviceBinding,
-} from "@/lib/notifications/device-registration-core";
+  requireMobileUser,
+} from "./dependencies";
 
 const deviceSchema = z.object({
   deviceId: z.string().trim().min(8).max(120),

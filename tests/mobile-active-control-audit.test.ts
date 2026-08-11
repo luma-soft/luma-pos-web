@@ -1768,7 +1768,7 @@ describe("mobile active-control audit", () => {
       '"flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-surface-2 lg:min-h-0"',
     );
     expect(quantities).toContain(
-      '"grid shrink-0 grid-cols-[44px_minmax(44px,1fr)_44px] overflow-hidden rounded-lg border border-border bg-surface lg:grid-cols-[32px_minmax(44px,1fr)_32px]"',
+      '"grid shrink-0 grid-cols-[44px_minmax(44px,1fr)_44px] overflow-hidden rounded-lg border border-border bg-surface transition-[border-color] duration-150 focus-within:border-primary-600 lg:grid-cols-[32px_minmax(44px,1fr)_32px]"',
     );
     expect(quantities).toContain(
       'size === "sm" ? "h-11 lg:h-8" : "h-11 lg:h-10"',

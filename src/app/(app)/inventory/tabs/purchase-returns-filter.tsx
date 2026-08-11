@@ -184,7 +184,7 @@ export function PurchaseReturnsFilter({ suppliers, warehouses, values, resultCou
           <aside ref={panelRef} role="dialog" aria-modal="true" aria-labelledby="purchase-return-filter-title" className="ml-auto flex h-full w-full max-w-[460px] flex-col bg-surface shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
             <header className="flex items-start justify-between border-b border-border px-6 py-5">
               <div><h2 id="purchase-return-filter-title" className="text-xl font-bold">Bộ lọc phiếu trả hàng</h2><p className="mt-1 text-sm text-slate-500">{activeCount} điều kiện đang chọn</p></div>
-              <button type="button" aria-label="Đóng bộ lọc" onClick={closeDrawer} className="rounded-lg p-2 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"><X className="h-5 w-5" /></button>
+              <button type="button" aria-label="Đóng bộ lọc" onClick={closeDrawer} className="rounded-lg p-2 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"><X className="h-5 w-5 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" /></button>
             </header>
 
             <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5">
@@ -211,8 +211,8 @@ export function PurchaseReturnsFilter({ suppliers, warehouses, values, resultCou
             </div>
 
             <footer className="flex gap-3 border-t border-border bg-surface px-6 py-4">
-              <button type="button" onClick={reset} className="min-h-11 flex-1 rounded-lg border border-primary-600 px-4 text-sm font-bold text-primary-700">Xóa lọc</button>
-              <button type="button" disabled={Boolean(dateError)} onClick={apply} className="min-h-11 flex-1 rounded-lg bg-primary-600 px-4 text-sm font-bold text-white disabled:opacity-50">Xem {previewCount == null ? "phiếu" : `${previewCount.toLocaleString("vi-VN")} phiếu`}</button>
+              <button type="button" onClick={reset} className="min-h-11 flex-1 rounded-lg border border-primary-600 px-4 text-sm font-bold text-primary-700 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0">Xóa lọc</button>
+              <button type="button" disabled={Boolean(dateError)} onClick={apply} className="min-h-11 flex-1 rounded-lg bg-primary-600 px-4 text-sm font-bold text-white disabled:opacity-50 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0">Xem {previewCount == null ? "phiếu" : `${previewCount.toLocaleString("vi-VN")} phiếu`}</button>
             </footer>
           </aside>
         </div>

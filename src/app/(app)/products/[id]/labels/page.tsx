@@ -174,11 +174,11 @@ export default async function ProductLabelsPage({ params, searchParams }: Props)
                   <tbody className="divide-y divide-border-soft">
                     {labelProducts.map((labelProduct) => (
                       <tr key={labelProduct.key}>
-                        <td className="px-3 py-2"><Link href={removeLabelHref(labelProduct.key)} aria-label={`Bỏ ${labelProduct.name} (${labelProduct.baseUnit})`} className="grid h-9 w-9 place-items-center rounded-md text-slate-400 hover:bg-er-soft hover:text-er"><Trash2 className="h-4 w-4" /></Link></td>
+                        <td className="px-3 py-2"><Link href={removeLabelHref(labelProduct.key)} aria-label={`Bỏ ${labelProduct.name} (${labelProduct.baseUnit})`} className="grid h-9 w-9 place-items-center rounded-md text-slate-400 hover:bg-er-soft hover:text-er min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"><Trash2 className="h-4 w-4 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" /></Link></td>
                         <td className="px-3 py-2 font-mono text-xs text-slate-500">{labelProduct.sku}</td>
                         <td className="px-3 py-2 font-medium">{labelProduct.name}</td>
                         <td className="px-3 py-2 text-slate-500"><span>{labelProduct.baseUnit}</span><span className="ml-1 text-xs text-slate-400">· Tồn: {formatNumber(labelProduct.availableQuantity)}</span></td>
-                        <td className="px-3 py-2"><NumberInput name={`qty_${labelProduct.key}`} min={1} max={5000} defaultValue={labelProduct.quantity} thousandSeparator={false} className="h-10 w-24 bg-canvas" /></td>
+                        <td className="px-3 py-2"><NumberInput name={`qty_${labelProduct.key}`} min={1} max={5000} defaultValue={labelProduct.quantity} thousandSeparator={false} className="h-10 w-24 bg-canvas min-h-11 lg:min-h-0 min-h-11 lg:min-h-0" /></td>
                       </tr>
                     ))}
                   </tbody>

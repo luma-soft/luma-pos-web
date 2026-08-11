@@ -102,7 +102,7 @@ function SalesPrimaryAction({
     <Link
       href={action.href}
       aria-label={action.label}
-      className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-full bg-primary-600 px-3.5 text-sm font-semibold text-white transition hover:brightness-110 active:scale-[0.98]"
+      className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-full bg-primary-600 px-3.5 text-sm font-semibold text-white transition hover:brightness-110 active:scale-[0.98] min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
     >
       <Icon className="size-4" />
       <span className="hidden sm:inline">{action.label}</span>

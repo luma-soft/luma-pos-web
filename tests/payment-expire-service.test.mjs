@@ -173,3 +173,5 @@ if (rejectExpireConfirmed.ok || rejectExpireConfirmed.error !== "payments.errors
 }
 
 console.log("✅ expire service supports pending-only flow");
+
+await client.close();

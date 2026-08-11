@@ -1,8 +1,11 @@
 import { strict as assert } from "node:assert";
 import { readFileSync, readdirSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
-import { mock } from "bun:test";
+import { afterAll, mock } from "bun:test";
+import { createMobileAuthMock } from "./helpers/mobile-auth-mock.ts";
 import { drizzle } from "drizzle-orm/pglite";
+
+afterAll(() => mock.restore());
 
 const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const schema = await import(`${projectRoot}/src/db/schema.ts`);
@@ -117,11 +120,12 @@ await db.insert(paymentWebhookEvents).values([
   },
 ]);
 
-let stockGate = { ok: true, userId: "stock-user", role: "manager" };
-let managerGate = { ok: true, userId: "manager-user", role: "manager" };
+const storeId = "00000000-0000-4000-8000-000000000001";
+let stockGate = { ok: true, userId: "stock-user", storeId, role: "manager", features: {} };
+let managerGate = { ok: true, userId: "manager-user", storeId, role: "manager", features: {} };
 
 mock.module("@/db", () => ({ db }));
-mock.module("@/lib/mobile/auth", () => ({
+mock.module("@/lib/mobile/auth", () => createMobileAuthMock({
   async requireMobileStockAccess() {
     return stockGate;
   },
@@ -165,20 +169,49 @@ async function exact(route, path, id) {
   );
 }
 
-await check("purchase exact lookup returns only the receipt projection", async () => {
+await check("purchase exact lookup returns the mobile receipt detail", async () => {
   const response = await exact(
     purchaseRoute,
     "/api/mobile/inventory/purchases",
     ids.purchase,
   );
   assert.equal(response.status, 200);
-  assert.deepEqual((await body(response)).data, {
+  const purchaseData = (await body(response)).data;
+  assert.deepEqual(purchaseData, {
     id: ids.purchase,
     code: "PN-EXACT-001",
+    status: "received",
     createdAt: "2026-07-20T08:00:00.000Z",
+    supplierId: ids.supplier,
     supplierName: "Exact Supplier",
+    supplierPhone: "0900000001",
+    warehouseId: ids.warehouse,
+    warehouseName: "Exact Warehouse",
+    invoiceNumber: null,
+    createdByName: null,
     itemCount: 1,
+    subtotal: 100000,
+    discount: 0,
+    vatRate: 0,
+    tax: 0,
     total: 100000,
+    amountPaid: 100000,
+    note: "Private purchase note",
+    items: [{
+      id: ids.purchaseItem,
+      productId: ids.product,
+      productName: "Exact Product",
+      sku: "EXACT-001",
+      baseUnit: "cái",
+      quantity: 1,
+      unitCost: 100000,
+      discount: 0,
+      total: 100000,
+      imageUrl: null,
+      imageUpdatedAt: purchaseData.items[0].imageUpdatedAt,
+      batchNumber: null,
+      expiryDate: null,
+    }],
   });
   const serialized = JSON.stringify(await body(
     await exact(
@@ -187,8 +220,8 @@ await check("purchase exact lookup returns only the receipt projection", async (
       ids.purchase,
     ),
   ));
-  assert.equal(serialized.includes("Private purchase note"), false);
-  assert.equal(serialized.includes("0900000001"), false);
+  assert.equal(serialized.includes("private@supplier.test"), false);
+  assert.equal(serialized.includes("Private supplier address"), false);
 });
 
 await check("supplier exact lookup omits private supplier metadata", async () => {
@@ -297,4 +330,4 @@ await check("unauthorized exact lookup is indistinguishable from missing", async
 
 console.log(`\nMobile exact entity lookups: ${passed} passed, ${failed} failed`);
 await client.close();
-if (failed > 0) process.exit(1);
+if (failed > 0) process.exitCode = 1;

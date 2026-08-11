@@ -1,9 +1,9 @@
-import { requireMobileServiceManager } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
 import {
   getServiceDispatchPage,
   parseServiceDispatchQuery,
-} from "@/lib/services/dispatch-reporting";
+  requireMobileServiceManager,
+} from "../manager-dependencies";
 
 export async function GET(request: Request) {
   const gate = await requireMobileServiceManager();

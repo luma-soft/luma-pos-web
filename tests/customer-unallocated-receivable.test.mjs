@@ -66,3 +66,5 @@ const [afterAdvance] = await database
 assert.equal(Number(afterAdvance.currentDebt), -100);
 
 console.log("customer unallocated receivable test passed");
+
+await client.close();

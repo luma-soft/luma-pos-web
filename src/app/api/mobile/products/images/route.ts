@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import sharp from "sharp";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireMobileStockAccess } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
+import { convertHeifToJpeg } from "@/lib/images/heif";
 
 const PRODUCT_IMAGES_BUCKET = "products";
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
   try {
     const isHeif = extension === "heic" || extension === "heif";
     const bytes = isHeif
-      ? await sharp(sourceBytes).rotate().jpeg({ quality: 88 }).toBuffer()
+      ? await convertHeifToJpeg(sourceBytes)
       : sourceBytes;
     const storedExtension = isHeif ? "jpg" : extension;
     const contentType = isHeif ? "image/jpeg" : file.type;

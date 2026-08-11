@@ -284,7 +284,7 @@ async function main() {
           .insert(stockLevels)
           .values({ productId, warehouseId: warehouse.id, quantity })
           .onConflictDoUpdate({
-            target: [stockLevels.productId, stockLevels.warehouseId],
+            target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
             set: {
               quantity: sql`${stockLevels.quantity} + ${quantity}`,
               updatedAt: sql`now()`,

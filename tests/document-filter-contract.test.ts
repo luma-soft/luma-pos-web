@@ -172,9 +172,9 @@ describe("document filter UI contract", () => {
 
   test("resets pagination and shares getOrders for quote and booking lists", () => {
     expect(drawer).not.toContain('name="page"');
-    expect(quotes).toContain("getOrders({");
+    expect(quotes).toContain("getOrders(context.storeId, {");
     expect(quotes).toContain('documentType: "quote"');
-    expect(bookings).toContain("getOrders({");
+    expect(bookings).toContain("getOrders(context.storeId, {");
     expect(bookings).toContain('documentType: "booking"');
     expect(quotes).not.toContain("db.select");
     expect(bookings).not.toContain("db.select");

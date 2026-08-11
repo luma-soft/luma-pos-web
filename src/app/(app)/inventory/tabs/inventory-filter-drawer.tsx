@@ -403,7 +403,7 @@ export function InventoryFilterDrawer({
                 <h2 id="inventory-filter-title" className="text-xl font-bold">{title}</h2>
                 <p className="mt-1 text-sm text-slate-500">{active} điều kiện đang chọn</p>
               </div>
-              <button type="button" aria-label="Đóng bộ lọc" onClick={close} className="rounded-lg p-2 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">
+              <button type="button" aria-label="Đóng bộ lọc" onClick={close} className="rounded-lg p-2 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0">
                 <X className="h-5 w-5" />
               </button>
             </header>
@@ -462,8 +462,8 @@ export function InventoryFilterDrawer({
             </div>
 
             <footer className="flex gap-3 border-t border-border px-6 py-4">
-              <button type="button" onClick={reset} className="min-h-11 flex-1 rounded-lg border border-primary-600 font-bold text-primary-700">Xóa lọc</button>
-              <button type="button" disabled={Boolean(customDateError)} onClick={apply} className="min-h-11 flex-1 rounded-lg bg-primary-600 font-bold text-white disabled:opacity-50">
+              <button type="button" onClick={reset} className="min-h-11 flex-1 rounded-lg border border-primary-600 font-bold text-primary-700 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0">Xóa lọc</button>
+              <button type="button" disabled={Boolean(customDateError)} onClick={apply} className="min-h-11 flex-1 rounded-lg bg-primary-600 font-bold text-white disabled:opacity-50 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0">
                 Xem {resultCount == null ? "danh sách" : `${resultCount.toLocaleString("vi-VN")} ${resultLabel}`}
               </button>
             </footer>

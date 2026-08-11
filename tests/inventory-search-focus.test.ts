@@ -14,6 +14,11 @@ describe("inventory search focus treatment", () => {
     for (const file of inventorySearchFiles) {
       const source = readFileSync(file, "utf8");
 
+      if (source.includes("<ListSearchInput")) {
+        expect(source).toContain('from "@/components/list-search-filter"');
+        continue;
+      }
+
       expect(source).toContain("focus:border-primary-500");
       expect(source).toContain("focus:outline-none");
       expect(source).not.toContain("focus:ring-2");

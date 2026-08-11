@@ -41,3 +41,5 @@ assert.deepEqual(await getReceivablesSnapshot(database), {
 });
 
 console.log("finance receivables snapshot test passed");
+
+await client.close();

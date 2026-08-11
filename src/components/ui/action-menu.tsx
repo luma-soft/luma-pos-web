@@ -73,7 +73,7 @@ export function LumaActionMenu({
           setOpen(true);
           requestAnimationFrame(() => focusItem(1));
         }}
-        className={className}
+        className={`${className ?? ""} min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11 lg:min-h-0 lg:min-w-0`}
       >
         {TriggerIcon && <TriggerIcon className="h-4 w-4" />}
         {label}

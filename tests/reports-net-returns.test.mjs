@@ -79,3 +79,5 @@ assert.equal(report.summary.refundTotal, 100);
 assert.deepEqual(report.byDay, [{ day: today, revenue: -100, orderCount: 0 }]);
 
 console.log("report net-return integration test passed");
+
+await client.close();

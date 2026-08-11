@@ -35,6 +35,7 @@ export function ProductCatalogSwitcher({
             activeView === option.id
               ? "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300"
               : "text-slate-500 hover:bg-surface-2 hover:text-slate-900",
+            "min-w-11 lg:min-w-0",
           )}
         >
           <span>{option.label}</span>

@@ -231,4 +231,6 @@ ok("flat list excludes parent", flatRows.every((r) => r.sku !== "LH-ROOT"));
 ok("flat list includes child SKUs", flatRows.some((r) => r.sku === "LH-1248202") && flatRows.some((r) => r.sku === "LH-7601"));
 
 console.log(`\n${fail === 0 ? "🎉" : "⚠️"} ${pass} passed, ${fail} failed`);
-process.exit(fail === 0 ? 0 : 1);
+if (fail > 0) process.exitCode = 1;
+
+await client.close();

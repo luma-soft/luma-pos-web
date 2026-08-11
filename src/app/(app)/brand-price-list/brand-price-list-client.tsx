@@ -264,7 +264,7 @@ export function BrandPriceListClient({
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Tìm tên hoặc mã..."
-                className="w-full border border-slate-300 py-2.5 pl-9 pr-3 text-base outline-none focus:border-slate-500 sm:w-64 sm:text-sm"
+                className="w-full border border-slate-300 py-2.5 pl-9 pr-3 text-base outline-none focus:border-slate-500 sm:w-64 sm:text-sm min-h-11 lg:min-h-0 min-h-11 lg:min-h-0"
               />
             </label>
           </div>
@@ -320,7 +320,7 @@ export function BrandPriceListClient({
                             target="_blank"
                             rel="noopener noreferrer"
                             title={description.url}
-                            className="mt-0.5 flex min-w-0 items-center gap-1 font-semibold underline decoration-slate-300 underline-offset-2 transition hover:decoration-current"
+                            className="mt-0.5 flex min-w-0 items-center gap-1 font-semibold underline decoration-slate-300 underline-offset-2 transition hover:decoration-current min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
                             style={{ color: palette.accent }}
                           >
                             <span className="truncate">{description.url}</span>
@@ -342,11 +342,11 @@ export function BrandPriceListClient({
                         </div>
                         <div className="flex gap-1">
                           {canEdit && (
-                            <button onClick={() => openEditor(product)} className="grid h-9 w-9 place-items-center border border-slate-200 text-slate-500 hover:bg-slate-50" aria-label={`Sửa giá ${product.name}`}>
+                            <button onClick={() => openEditor(product)} className="grid h-9 w-9 place-items-center border border-slate-200 text-slate-500 hover:bg-slate-50 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" aria-label={`Sửa giá ${product.name}`}>
                               <Edit3 className="h-4 w-4" />
                             </button>
                           )}
-                          <button onClick={() => copyProductImage(product)} className="grid h-9 w-9 place-items-center border text-white" style={{ background: palette.accent, borderColor: palette.accent }} aria-label={`Sao chép ảnh ${product.name}`}>
+                          <button onClick={() => copyProductImage(product)} className="grid h-9 w-9 place-items-center border text-white min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" style={{ background: palette.accent, borderColor: palette.accent }} aria-label={`Sao chép ảnh ${product.name}`}>
                             <Copy className="h-4 w-4" />
                           </button>
                         </div>
@@ -369,7 +369,7 @@ export function BrandPriceListClient({
           <div className="w-full max-w-sm bg-white p-5 shadow-2xl">
             <div className="flex items-center justify-between">
               <h2 className="font-black" style={{ color: palette.ink }}>Sửa giá tạm thời</h2>
-              <button onClick={() => setEditing(null)} aria-label="Đóng"><X className="h-5 w-5" /></button>
+              <button className="min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" onClick={() => setEditing(null)} aria-label="Đóng"><X className="h-5 w-5 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" /></button>
             </div>
             <p className="mt-2 text-sm text-slate-500">{editing.name}</p>
             <div className="mt-4">
@@ -386,8 +386,8 @@ export function BrandPriceListClient({
               />
             </div>
             <div className="mt-4 flex justify-end gap-2">
-              <button onClick={() => setEditing(null)} className="px-3 py-2 text-sm font-semibold">Hủy</button>
-              <button onClick={applyPrice} className="px-4 py-2 text-sm font-bold text-white" style={{ background: palette.accent }}>Áp dụng</button>
+              <button onClick={() => setEditing(null)} className="px-3 py-2 text-sm font-semibold min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0">Hủy</button>
+              <button onClick={applyPrice} className="px-4 py-2 text-sm font-bold text-white min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" style={{ background: palette.accent }}>Áp dụng</button>
             </div>
           </div>
         </div>

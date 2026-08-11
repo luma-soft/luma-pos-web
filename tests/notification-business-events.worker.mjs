@@ -2,6 +2,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { mock } from "bun:test";
+import { createNotificationOutboxMock } from "./helpers/notification-outbox-mock.ts";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { and, eq } from "drizzle-orm";
@@ -23,6 +24,12 @@ const {
 const client = new PGlite();
 const rawDb = drizzle(client, { schema });
 await client.exec("create role anon; create role authenticated;");
+await client.exec(`
+  create schema if not exists auth;
+  create or replace function auth.uid() returns uuid
+  language sql stable
+  as $$ select null::uuid $$;
+`);
 let transactionDepth = 0;
 const db = new Proxy(rawDb, {
   get(target, property, receiver) {
@@ -42,6 +49,7 @@ const db = new Proxy(rawDb, {
 
 let codeSequence = 0;
 const actorId = "10000000-0000-4000-8000-000000000001";
+const storeId = "00000000-0000-4000-8000-000000000001";
 const publishedEventIds = [];
 const publicationDepths = [];
 
@@ -66,16 +74,19 @@ mock.module("@/lib/actions/common", () => ({
     return "owner";
   },
   async requireManager() {
-    return { ok: true, userId: actorId, role: "owner" };
+    return { ok: true, userId: actorId, storeId, role: "owner", features: {} };
   },
   async requireOwner() {
-    return { ok: true, userId: actorId, role: "owner" };
+    return { ok: true, userId: actorId, storeId, role: "owner", features: {} };
   },
   async requireStockAccess() {
-    return { ok: true, userId: actorId, role: "owner" };
+    return { ok: true, userId: actorId, storeId, role: "owner", features: {} };
   },
   async requireSalesAccess() {
-    return { ok: true, userId: actorId, role: "owner" };
+    return { ok: true, userId: actorId, storeId, role: "owner", features: {} };
+  },
+  async requireFeatureRole() {
+    return { ok: true, userId: actorId, storeId, role: "owner", features: {} };
   },
   generateCode(prefix) {
     codeSequence += 1;
@@ -91,7 +102,7 @@ mock.module("@/lib/actions/common", () => ({
     return value.toFixed(4);
   },
 }));
-mock.module("@/lib/notifications/outbox", () => ({
+mock.module("@/lib/notifications/outbox", () => createNotificationOutboxMock({
   async publishCommittedNotification(eventId) {
     publicationDepths.push(transactionDepth);
     publishedEventIds.push(eventId);
@@ -118,7 +129,7 @@ const {
 for (const file of readdirSync(`${projectRoot}/drizzle`).filter((name) => name.endsWith(".sql")).sort()) {
   for (const statement of readFileSync(`${projectRoot}/drizzle/${file}`, "utf8").split("--> statement-breakpoint")) {
     const sql = statement.trim();
-    if (sql && !/create extension|gin_trgm_ops/i.test(sql)) await client.exec(sql);
+    if (sql && !/create extension|gin_trgm_ops|storage\.objects/i.test(sql)) await client.exec(sql);
   }
 }
 const [actor] = await db.insert(profiles).values([
@@ -238,7 +249,7 @@ const bookingEvents = booking.ok ? await eventsFor("order", booking.data.id) : [
 ok("quote and booking emit no invoice event", quoteEvents.length === 0 && bookingEvents.length === 0);
 
 const converted = quote.ok
-  ? await convertQuoteToOrderForUser(actor.id, quote.data.id)
+  ? await convertQuoteToOrderForUser(actor.id, storeId, quote.data.id)
   : { ok: false, error: "quote setup failed" };
 const convertedEvents = quote.ok ? await eventsFor("order", quote.data.id) : [];
 ok("quote conversion emits invoice event", converted.ok && convertedEvents.length === 1);

@@ -372,7 +372,7 @@ export function LumaDateRangePicker({
                     setOpen(false);
                   }
                 }}
-                className="mt-1 w-full bg-transparent text-sm outline-none"
+                className="mt-1 w-full bg-transparent text-sm outline-none min-h-11 lg:min-h-0 min-h-11 lg:min-h-0"
               />
             </label>
             <label className="rounded-lg border border-border px-3 py-2 focus-within:border-primary-500">
@@ -395,7 +395,7 @@ export function LumaDateRangePicker({
                     setOpen(false);
                   }
                 }}
-                className="mt-1 w-full bg-transparent text-sm outline-none"
+                className="mt-1 w-full bg-transparent text-sm outline-none min-h-11 lg:min-h-0 min-h-11 lg:min-h-0"
               />
             </label>
           </div>
@@ -410,7 +410,7 @@ export function LumaDateRangePicker({
             <button
               type="button"
               onClick={() => setOpen(false)}
-              className="min-h-10 rounded-lg border border-border font-semibold"
+              className="min-h-10 rounded-lg border border-border font-semibold min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
             >
               Hủy
             </button>
@@ -421,7 +421,7 @@ export function LumaDateRangePicker({
                 onChange(draftFrom, draftTo);
                 setOpen(false);
               }}
-              className="min-h-10 rounded-lg bg-primary-600 font-semibold text-white disabled:opacity-50"
+              className="min-h-10 rounded-lg bg-primary-600 font-semibold text-white disabled:opacity-50 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
             >
               Áp dụng
             </button>
@@ -606,7 +606,7 @@ export function LumaEntityPicker({
               }}
               placeholder={placeholder}
               aria-label={`Tìm ${label.toLocaleLowerCase("vi")}`}
-              className="min-h-10 w-full rounded-lg border border-border bg-surface-2 py-2 pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+              className="min-h-10 w-full rounded-lg border border-border bg-surface-2 py-2 pl-9 pr-3 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 min-h-11 lg:min-h-0 min-h-11 lg:min-h-0"
             />
           </div>
           <div id={listboxId} role="listbox" className="max-h-72 overflow-y-auto py-1">

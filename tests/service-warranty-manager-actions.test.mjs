@@ -1,7 +1,10 @@
 import { readFileSync, readdirSync } from "node:fs";
-import { mock } from "bun:test";
+import { afterAll, mock } from "bun:test";
+import { createMobileAuthMock } from "./helpers/mobile-auth-mock.ts";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
+
+afterAll(() => mock.restore());
 
 const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const schema = await import(`${projectRoot}/src/db/schema.ts`);
@@ -24,14 +27,16 @@ for (const file of readdirSync(`${projectRoot}/drizzle`).filter((name) => name.e
 
 const managerId = "11111111-1111-4111-8111-111111111111";
 const technicianId = "22222222-2222-4222-8222-222222222222";
-let mobileActor = { userId: managerId, role: "manager" };
+const storeId = "00000000-0000-4000-8000-000000000001";
+const features = { field_services: true };
+let mobileActor = { userId: managerId, storeId, role: "manager", features };
 let codeSequence = 0;
 mock.module("@/db", () => ({ db, schema }));
 mock.module("next/cache", () => ({
   revalidatePath: () => undefined,
   unstable_cache: (callback) => callback,
 }));
-mock.module("@/lib/mobile/auth", () => ({
+mock.module("@/lib/mobile/auth", () => createMobileAuthMock({
   requireMobileServiceAccess: async () => ({ ok: true, ...mobileActor }),
 }));
 const common = await import(`${projectRoot}/src/lib/actions/common.ts`);
@@ -41,7 +46,8 @@ mock.module("@/lib/actions/common", () => ({
   getProfileId: async (id) => id,
   isUniqueViolation: () => false,
   pgErrorCode: () => null,
-  requireManager: async () => ({ ok: true, userId: managerId, role: "manager" }),
+  requireFeatureRole: async () => ({ ok: true, userId: managerId, storeId, role: "manager", features }),
+  requireManager: async () => ({ ok: true, userId: managerId, storeId, role: "manager", features }),
   requireUser: async () => ({ id: managerId }),
   requireStockAccess: async () => ({ ok: false, error: "errors.forbidden" }),
   toMoney: (value) => String(value ?? 0),
@@ -210,3 +216,5 @@ if (immutable.ok || immutable.error !== "services.errors.warrantyScopeImmutable"
 }
 
 console.log("manager warranty actions: null/null compatibility, exact job scope, and immutable evidence verified");
+
+await client.close();

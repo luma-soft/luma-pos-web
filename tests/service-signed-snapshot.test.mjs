@@ -375,3 +375,5 @@ const [mutationFirstJob] = await db.select().from(serviceJobs)
 assert.equal(mutationFirstJob.status, "in_progress");
 
 console.log("server-owned signed snapshots: canonical authority, integrity, freshness, and ownership verified");
+
+await client.close();

@@ -32,6 +32,7 @@ export function InventoryNavigation({ activeTab }: { activeTab: string }) {
             activeTab === item.tab
               ? "text-primary-700 after:bg-primary-600 dark:text-primary-300"
               : "text-slate-500 hover:text-slate-900",
+            "min-h-11 lg:min-h-0 min-w-11 lg:min-w-0",
           )}
         >
           {t(item.labelKey)}

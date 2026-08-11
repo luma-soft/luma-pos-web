@@ -4,8 +4,6 @@ import { renderToStaticMarkup } from "react-dom/server";
 import viMessages from "../messages/vi.json";
 import type { ProjectDetail } from "@/lib/data/projects";
 
-process.env.DATABASE_URL ??= "postgres://test:test@127.0.0.1:5432/test";
-
 mock.module("next-intl/server", () => ({
   getTranslations: async () => createTranslator({ locale: "vi", messages: viMessages }),
 }));
@@ -77,10 +75,19 @@ const detail = {
   maintenancePlans: [],
 } satisfies ProjectDetail;
 
+async function importProjectDetailView() {
+  const previousDatabaseUrl = process.env.DATABASE_URL;
+  process.env.DATABASE_URL = "postgres://test:test@127.0.0.1:5432/test";
+  try {
+    return await import("@/app/(app)/projects/[id]/project-detail-view");
+  } finally {
+    if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = previousDatabaseUrl;
+  }
+}
+
 async function renderProjectDetail(presentation: "page" | "modal") {
-  const { ProjectDetailView } = await import(
-    "@/app/(app)/projects/[id]/project-detail-view"
-  );
+  const { ProjectDetailView } = await importProjectDetailView();
   const view = await ProjectDetailView({
     detail,
     serviceOptions: null,
@@ -112,9 +119,7 @@ function expectSharedDetailContent(html: string) {
 
 describe("ProjectDetailView", () => {
   test("renders project actions as two separated buttons in the modal toolbar", async () => {
-    const { ProjectDetailActions } = await import(
-      "@/app/(app)/projects/[id]/project-detail-view"
-    );
+    const { ProjectDetailActions } = await importProjectDetailView();
     const html = renderToStaticMarkup(
       <NextIntlClientProvider
         locale="vi"

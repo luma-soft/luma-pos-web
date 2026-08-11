@@ -22,7 +22,7 @@ export function PosProductThumbnail({ product }: { product: PosProduct }) {
             event.stopPropagation();
             setPreviewOpen(true);
           }}
-          className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-md bg-surface-2 text-lg transition-opacity hover:opacity-80"
+          className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-md bg-surface-2 text-lg transition-opacity hover:opacity-80 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
           aria-label={`Xem ảnh ${product.name}`}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}

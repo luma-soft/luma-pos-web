@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.TEST_POSTGRES_DATABASE_URL;
 if (!databaseUrl) {
   console.log("customer request/job PostgreSQL concurrency: skipped because DATABASE_URL is unset");
 } else {

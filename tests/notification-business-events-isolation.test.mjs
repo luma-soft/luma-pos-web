@@ -1,9 +1,11 @@
 import { fileURLToPath } from "node:url";
 
-process.env.DATABASE_URL ??= "postgresql://test:test@127.0.0.1:1/test";
-
 const projectRoot = fileURLToPath(new URL("..", import.meta.url)).replace(/\/$/, "");
+const previousDatabaseUrl = process.env.DATABASE_URL;
+process.env.DATABASE_URL = "postgresql://test:test@127.0.0.1:1/test";
 const common = await import(`${projectRoot}/src/lib/actions/common.ts`);
+if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+else process.env.DATABASE_URL = previousDatabaseUrl;
 
 if (
   typeof common.requireRole !== "function"

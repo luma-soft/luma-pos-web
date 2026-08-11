@@ -5,10 +5,13 @@ import { and, eq } from "drizzle-orm";
 
 const PROJ = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const schema = await import(`${PROJ}/src/db/schema.ts`);
-process.env.DATABASE_URL ??= "postgresql://test:test@127.0.0.1:1/test";
+const previousDatabaseUrl = process.env.DATABASE_URL;
+process.env.DATABASE_URL = "postgresql://test:test@127.0.0.1:1/test";
 const { addManualPaymentCore } = await import(
   `${PROJ}/src/lib/orders/payment-core.ts`
 );
+if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+else process.env.DATABASE_URL = previousDatabaseUrl;
 const {
   cashTransactions,
   customers,
@@ -61,10 +64,12 @@ const request = {
   clientRequestId: `manual:${order.id}:1:card`,
 };
 const first = await addManualPaymentCore(db, request, {
+  storeId: "00000000-0000-4000-8000-000000000001",
   profileId: actor.id,
   shiftId: null,
 });
 const replay = await addManualPaymentCore(db, request, {
+  storeId: "00000000-0000-4000-8000-000000000001",
   profileId: actor.id,
   shiftId: null,
 });

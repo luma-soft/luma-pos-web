@@ -148,14 +148,14 @@ export function PosAmountModeInput({
           onChange={(nextValue) => onValueChange(nextValue ?? 0)}
           placeholder="0"
           thousandSeparator={false}
-          className="h-full min-w-0 rounded-none border-0 bg-transparent px-3 text-right text-sm tabular-nums outline-none focus:border-transparent focus-visible:border-transparent focus:ring-0"
+          className="h-full min-h-11 min-w-11 rounded-none border-0 bg-transparent px-3 text-right text-sm tabular-nums outline-none focus:border-transparent focus-visible:border-transparent focus:ring-0 lg:min-h-0"
         />
       ) : (
         <MoneyInput
           value={value || ""}
           onChange={(nextValue) => onValueChange(nextValue ?? 0)}
           placeholder="0"
-          className="no-spinner h-full min-w-0 border-0 bg-transparent px-3 text-right text-sm tabular-nums outline-none focus:border-transparent focus-visible:border-transparent"
+          className="no-spinner h-full min-h-11 min-w-11 border-0 bg-transparent px-3 text-right text-sm tabular-nums outline-none focus:border-transparent focus-visible:border-transparent lg:min-h-0"
         />
       )}
       {onModeChange ? (
@@ -164,7 +164,7 @@ export function PosAmountModeInput({
           onClick={() => onModeChange(mode === "vnd" ? "pct" : "vnd")}
           variant="ghost"
           size="default"
-          className="h-full rounded-none border-l border-border text-sm font-semibold text-slate-600 hover:bg-primary-50 hover:text-primary-700 dark:hover:bg-primary-950/30"
+          className="h-full min-h-11 min-w-11 rounded-none border-l border-border text-sm font-semibold text-slate-600 hover:bg-primary-50 hover:text-primary-700 dark:hover:bg-primary-950/30 lg:min-h-0 lg:min-w-0"
         >
           {mode === "vnd" ? "đ" : "%"}
           <ChevronDown className="h-3 w-3 text-slate-400" />

@@ -83,3 +83,5 @@ if (plan.intervalDays !== 90 || plan.isActive !== true) {
 }
 
 console.log("service schema: project, camera job, cost, handover, and maintenance persisted");
+
+await client.close();

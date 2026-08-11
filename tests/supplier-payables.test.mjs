@@ -183,3 +183,5 @@ assert.deepEqual(
 );
 
 console.log("supplier payables transaction and ledger test passed");
+
+await client.close();

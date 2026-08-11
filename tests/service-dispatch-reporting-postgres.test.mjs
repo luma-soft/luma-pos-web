@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.TEST_POSTGRES_DATABASE_URL;
 if (!databaseUrl) {
   console.log("service dispatch/reporting PostgreSQL: skipped because DATABASE_URL is unset");
 } else {

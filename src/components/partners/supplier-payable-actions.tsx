@@ -118,7 +118,7 @@ function SupplierPaymentDialog({
           <div className="mb-1.5 text-sm font-medium">Phương thức thanh toán</div>
           <div className="grid grid-cols-2">
             {(["cash", "bank_transfer"] as const).map((value) => (
-              <button key={value} type="button" onClick={() => setMethod(value)} className={cn("min-h-11 border px-3 py-2 text-sm first:rounded-l-lg last:rounded-r-lg", method === value ? "border-primary-600 bg-primary-600 text-white" : "border-border")}>
+              <button key={value} type="button" onClick={() => setMethod(value)} className={cn("min-h-11 border px-3 py-2 text-sm first:rounded-l-lg last:rounded-r-lg", method === value ? "border-primary-600 bg-primary-600 text-white" : "border-border", "min-w-11 lg:min-w-0")}>
                 {value === "cash" ? "Tiền mặt" : "Chuyển khoản"}
               </button>
             ))}

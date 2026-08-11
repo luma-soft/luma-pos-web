@@ -167,4 +167,6 @@ const reconciliation = await paymentService.getPaymentReconciliation(db, { statu
 ok("manager queue exposes pending refund without raw payload", reconciliation.ok && reconciliation.data.refunds.some((row) => row.id === pendingQuery.data.id && row.providerQueryAttempts === 2 && !("rawPayload" in row)));
 
 console.log(`\n${fail === 0 ? "🎉" : "⚠️"} ${pass} passed, ${fail} failed`);
-process.exit(fail === 0 ? 0 : 1);
+if (fail > 0) process.exitCode = 1;
+
+await client.close();

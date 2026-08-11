@@ -1,9 +1,12 @@
 import { strict as assert } from "node:assert";
-import { mock } from "bun:test";
+import { afterAll, mock } from "bun:test";
+
+afterAll(() => mock.restore());
 
 let gate = {
   ok: true,
   userId: "91000000-0000-4000-8000-000000000002",
+  storeId: "00000000-0000-4000-8000-000000000001",
   role: "cashier",
   principalId: "91000000-0000-4000-8000-000000000001",
 };
@@ -12,13 +15,11 @@ let deactivateResult = { kind: "deactivated" };
 let registerInput;
 let deactivateInput;
 
-mock.module("@/db", () => ({ db: {} }));
-mock.module("@/lib/mobile/auth", () => ({
+mock.module("@/app/api/mobile/notifications/devices/dependencies", () => ({
+  db: {},
   async requireMobileUser() {
     return gate;
   },
-}));
-mock.module("@/lib/notifications/device-registration-core", () => ({
   async registerPushDeviceBinding(_database, input) {
     registerInput = input;
     return registerResult;
@@ -93,6 +94,7 @@ await check("POST and DELETE map an active send lease to retryable 409", async (
   gate = {
     ok: true,
     userId: "91000000-0000-4000-8000-000000000002",
+    storeId: "00000000-0000-4000-8000-000000000001",
     role: "cashier",
     principalId: "91000000-0000-4000-8000-000000000001",
   };
@@ -150,6 +152,7 @@ await check("success responses echo the accepted binding generation", async () =
     data: { registered: true, bindingGeneration: 42 },
   });
   assert.equal(registerInput.principalId, gate.principalId);
+  assert.equal(registerInput.storeId, gate.storeId);
   assert.equal(registerInput.effectiveUserId, gate.userId);
   assert.equal(registerInput.device.bindingGeneration, 42);
 
@@ -163,6 +166,7 @@ await check("success responses echo the accepted binding generation", async () =
     data: { unregistered: true, bindingGeneration: 43 },
   });
   assert.equal(deactivateInput.principalId, gate.principalId);
+  assert.equal(deactivateInput.storeId, gate.storeId);
   assert.equal(deactivateInput.bindingGeneration, 43);
 });
 
@@ -188,4 +192,4 @@ await check("malformed and unknown-device-compatible deletes keep existing behav
 });
 
 console.log(`\n${failed === 0 ? "🎉" : "⚠️"} ${passed} passed, ${failed} failed`);
-process.exit(failed === 0 ? 0 : 1);
+if (failed > 0) process.exitCode = 1;

@@ -223,7 +223,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                     placeholder={searchPlaceholder ?? t("common.search")}
                     aria-label={searchPlaceholder ?? t("common.search")}
                     autoComplete="off"
-                    className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-600"
+                    className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-600 min-h-11 lg:min-h-0"
                   />
                 </div>
               </div>

@@ -110,7 +110,7 @@ describe("POS mobile checkout", () => {
       'className="flex min-h-11 items-center text-sm tabular-nums',
     );
     expect(source).toContain(
-      'className="mt-2 min-h-11 w-full bg-transparent',
+      'className="mt-2 block min-h-11 max-h-16 w-full',
     );
     expect(source).toContain(
       'className="grid h-11 w-11 place-items-center rounded',
@@ -156,7 +156,7 @@ describe("POS mobile checkout", () => {
       'className="grid h-11 w-11 place-items-center rounded-lg text-slate-400',
     );
     expect(source).toContain(
-      'className="flex-1 min-h-11 py-2 rounded-lg',
+      'className="flex-1 py-3 rounded-xl',
     );
     expect(source).toContain('aria-modal="true"');
     expect(source).toContain('aria-labelledby="pos-price-editor-title"');

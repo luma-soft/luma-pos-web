@@ -63,7 +63,7 @@ await db.transaction(async (tx) => {
     const diff = actual - current;
     await tx.insert(stockLevels).values({ productId: i.productId, warehouseId: s.warehouseId, quantity: qty(actual) })
       .onConflictDoUpdate({
-        target: [stockLevels.productId, stockLevels.warehouseId],
+        target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
         set: { quantity: qty(actual) },
       });
     if (Math.abs(diff) > 1e-9) {
@@ -108,4 +108,6 @@ ok("4 giá đã lưu đúng",
   Number(pA2.contractorPrice) === 14500 && Number(pA2.agentPrice) === 14000);
 
 console.log(`\n${fail === 0 ? "🎉" : "⚠️"} ${pass} passed, ${fail} failed`);
-process.exit(fail === 0 ? 0 : 1);
+if (fail > 0) process.exitCode = 1;
+
+await client.close();

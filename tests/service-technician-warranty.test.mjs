@@ -595,3 +595,5 @@ for (const unsafe of [
 }
 
 console.log("technician warranty: assignment, IDOR, evidence, timeline, audit, and notifications verified");
+
+await client.close();

@@ -1,8 +1,11 @@
-import { updateNotificationSettingsForUser } from "@/lib/actions/settings";
-import { authorizeMobileSensitiveAction } from "@/lib/auth/mobile-approval";
-import { getStoreSettings } from "@/lib/data/settings";
-import { requireMobileManager, requireMobileRole } from "@/lib/mobile/auth";
-import { resolveNotificationChannels } from "@/lib/notifications/channels";
+import {
+  authorizeMobileSensitiveAction,
+  getStoreSettings,
+  requireMobileManager,
+  requireMobileRole,
+  resolveNotificationChannels,
+  updateNotificationSettingsForUser,
+} from "./dependencies";
 import { notificationRoutingPolicyContract } from "@/lib/notifications/routing-policy";
 import { notificationSettingsAuthorization } from "@/lib/notifications/settings-authorization";
 import {

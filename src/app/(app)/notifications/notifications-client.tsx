@@ -224,6 +224,7 @@ export function NotificationsClient({ activities }: { activities: AuditRow[] }) 
                   activeFilterCount > 0
                     ? "border-primary-600 bg-primary-50 text-primary-700"
                     : "border-primary-600 bg-surface text-primary-700 hover:bg-primary-50",
+                  "min-w-11 lg:min-w-0",
                 )}
               >
                 <Filter className="size-4" />
@@ -341,6 +342,7 @@ function TabButton({ selected, onClick, children }: { selected: boolean; onClick
       className={cn(
         "relative inline-flex min-h-11 items-center gap-2 px-4 text-sm font-bold text-slate-500 outline-none after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:rounded-full focus-visible:ring-2 focus-visible:ring-primary-200",
         selected && "text-primary-700 after:bg-primary-600",
+        "min-w-11 lg:min-w-0",
       )}
     >
       {children}
@@ -390,10 +392,10 @@ function PriorityFocus({
           <NotificationMeta row={row} />
         </div>
         <div className="flex shrink-0 flex-col gap-2 lg:w-48">
-          <button type="button" onClick={onAction} className="min-h-11 rounded-xl bg-red-600 px-4 font-extrabold text-white hover:bg-red-700">
+          <button type="button" onClick={onAction} className="min-h-11 rounded-xl bg-red-600 px-4 font-extrabold text-white hover:bg-red-700 min-w-11 lg:min-w-0">
             {actionText}
           </button>
-          <button type="button" onClick={onProcessed} className="min-h-11 rounded-xl font-bold text-primary-700 hover:bg-primary-50">
+          <button type="button" onClick={onProcessed} className="min-h-11 rounded-xl font-bold text-primary-700 hover:bg-primary-50 min-w-11 lg:min-w-0">
             {processedText}
           </button>
         </div>
@@ -432,7 +434,7 @@ function NotificationListRow({ row, actionText, onAction }: { row: NotificationR
       <CategoryBadge category={category} />
       <span className="hidden w-32 shrink-0 text-xs text-slate-500 md:block">{formatNotificationTime(row)}</span>
       {actionText ? (
-        <button type="button" onClick={onAction} className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-bold text-primary-700 hover:bg-primary-50">
+        <button type="button" onClick={onAction} className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-bold text-primary-700 hover:bg-primary-50 min-w-11 lg:min-w-0">
           {actionText}
           <ChevronRight className="size-4" />
         </button>
@@ -489,7 +491,7 @@ function ErrorState({ label, retry, onRetry }: { label: string; retry: string; o
     <div className="flex min-h-72 flex-col items-center justify-center text-center">
       <AlertTriangle className="size-10 text-red-500" />
       <p className="mt-3 text-sm font-semibold text-slate-600">{label}</p>
-      <button type="button" onClick={onRetry} className="mt-4 min-h-11 rounded-xl border border-primary-600 px-4 font-bold text-primary-700">{retry}</button>
+      <button type="button" onClick={onRetry} className="mt-4 min-h-11 rounded-xl border border-primary-600 px-4 font-bold text-primary-700 min-w-11 lg:min-w-0">{retry}</button>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { eq } from "drizzle-orm";
 import { Pool } from "pg";
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.TEST_POSTGRES_DATABASE_URL;
 if (!databaseUrl) {
   console.log("maintenance PostgreSQL concurrency: skipped because DATABASE_URL is unset");
 } else {

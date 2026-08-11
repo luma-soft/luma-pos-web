@@ -1,4 +1,5 @@
 import { expect, mock, test } from "bun:test";
+import { createNotificationOutboxMock } from "./helpers/notification-outbox-mock";
 
 mock.module("@/lib/notifications/queue/config", () => ({
   resolveNotificationQueue() {
@@ -19,7 +20,7 @@ mock.module("@/lib/notifications/queue/config", () => ({
   },
 }));
 
-mock.module("@/lib/notifications/outbox", () => ({
+mock.module("@/lib/notifications/outbox", () => createNotificationOutboxMock({
   async processNotificationMessage() {
     return { completed: false, reason: "not_ready" as const };
   },

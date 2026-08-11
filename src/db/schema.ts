@@ -9,6 +9,9 @@ import type { StorePrefs } from "@/lib/schemas/settings";
 import type { ServiceChecklistItem } from "@/lib/services/domain";
 
 function missingStoreId(): string {
+  if (process.env.NODE_ENV === "test" && process.env.LUMA_TEST_STORE_ID) {
+    return process.env.LUMA_TEST_STORE_ID;
+  }
   throw new Error("STORE_ID_REQUIRED");
 }
 

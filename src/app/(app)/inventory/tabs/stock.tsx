@@ -108,7 +108,7 @@ async function StockStatusDetail({
       <header>
         <Link
           href={`${Routes.Inventory}?tab=stock`}
-          className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary-700 hover:underline dark:text-primary-300"
+          className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary-700 hover:underline dark:text-primary-300 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0"
         >
           <ArrowLeft className="h-4 w-4" />
           {t("inventory.backToWarehouse")}

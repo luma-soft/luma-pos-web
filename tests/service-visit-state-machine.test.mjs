@@ -512,3 +512,5 @@ assert.equal(
 );
 
 console.log("service visit state machine: terminal guards, replay, visits, checkout, and open-work completion verified");
+
+await client.close();

@@ -249,7 +249,7 @@ export function NotificationsFilterDrawer({
           <button
             type="button"
             onClick={() => setDraft(defaultNotificationFilters)}
-            className="min-h-11 rounded-xl border border-primary-600 font-bold text-primary-700 hover:bg-primary-50"
+            className="min-h-11 rounded-xl border border-primary-600 font-bold text-primary-700 hover:bg-primary-50 min-w-11 lg:min-w-0"
           >
             {t("clear")}
           </button>
@@ -259,7 +259,7 @@ export function NotificationsFilterDrawer({
               onApply(draft);
               onClose();
             }}
-            className="min-h-11 rounded-xl bg-primary-600 px-4 font-bold text-white hover:brightness-105"
+            className="min-h-11 rounded-xl bg-primary-600 px-4 font-bold text-white hover:brightness-105 min-w-11 lg:min-w-0"
           >
             {t("view", { count: resultCount })}
           </button>
@@ -297,6 +297,7 @@ function FilterChoice({
         selected
           ? "border-primary-600 bg-primary-50 text-primary-700"
           : "border-border bg-surface text-slate-600 hover:bg-surface-2",
+        "min-w-11 lg:min-w-0",
       )}
     >
       {children}

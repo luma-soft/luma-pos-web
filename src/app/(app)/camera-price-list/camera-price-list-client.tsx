@@ -395,7 +395,7 @@ export function CameraPriceListClient({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Tìm model..."
-              className="w-44 border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none focus:border-[#078a82]"
+              className="w-44 border border-slate-300 py-2 pl-9 pr-3 text-sm outline-none focus:border-[#078a82] min-h-11 lg:min-h-0 min-h-11 lg:min-h-0"
             />
           </label>
         </div>
@@ -423,7 +423,7 @@ export function CameraPriceListClient({
                     event.stopPropagation();
                     copyImage(item, index);
                   }}
-                  className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-teal-200 bg-teal-50/60 text-[#0b7b74] transition hover:bg-teal-50"
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-teal-200 bg-teal-50/60 text-[#0b7b74] transition hover:bg-teal-50 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
                   aria-label={`Sao chép ảnh ${item.model}`}
                 >
                   <Copy className="h-4 w-4" />
@@ -459,7 +459,7 @@ export function CameraPriceListClient({
                               "price",
                             );
                           }}
-                          className="text-slate-400 hover:text-[#0b7b74]"
+                          className="text-slate-400 hover:text-[#0b7b74] min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
                           aria-label={`Sửa giá ${item.model}`}
                         >
                           <Edit3 className="h-3.5 w-3.5" />
@@ -530,7 +530,7 @@ export function CameraPriceListClient({
                                 event.stopPropagation();
                                 openPriceEditor(item, variant, label, "price");
                               }}
-                              className="ml-2 align-middle text-slate-400 hover:text-[#0b7b74]"
+                              className="ml-2 align-middle text-slate-400 hover:text-[#0b7b74] min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
                               aria-label={`Sửa giá ${item.model}`}
                             >
                               <Edit3 className="inline h-3.5 w-3.5" />
@@ -546,7 +546,7 @@ export function CameraPriceListClient({
                         event.stopPropagation();
                         copyImage(item, index);
                       }}
-                      className="inline-flex h-8 w-8 items-center justify-center text-[#0b7b74] hover:bg-teal-50"
+                      className="inline-flex h-8 w-8 items-center justify-center text-[#0b7b74] hover:bg-teal-50 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
                       aria-label={`Sao chép ảnh ${item.model}`}
                       title="Sao chép ảnh chi tiết gói này"
                     >
@@ -602,7 +602,7 @@ export function CameraPriceListClient({
                     </div>
                     <button
                       onClick={() => copyImage(item, index)}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-teal-200 bg-white px-3.5 py-2.5 text-sm font-bold text-[#087b74] shadow-[0_2px_8px_rgba(8,129,122,.06)] transition hover:border-teal-300 hover:bg-teal-50"
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-teal-200 bg-white px-3.5 py-2.5 text-sm font-bold text-[#087b74] shadow-[0_2px_8px_rgba(8,129,122,.06)] transition hover:border-teal-300 hover:bg-teal-50 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
                     >
                       <Copy className="h-4 w-4" />
                       Sao chép ảnh gói
@@ -684,7 +684,7 @@ export function CameraPriceListClient({
                                 {canEdit && (
                                   <button
                                     onClick={() => openPriceEditor(item, variant, `${label} · ${memoryLabels[variantIndex] ?? "Gói"}`, key)}
-                                    className="shrink-0 text-slate-400 hover:text-[#0b7b74]"
+                                    className="shrink-0 text-slate-400 hover:text-[#0b7b74] min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
                                     aria-label={`Sửa ${label} ${item.model}`}
                                   >
                                     <Edit3 className="h-3.5 w-3.5" />
@@ -750,7 +750,7 @@ export function CameraPriceListClient({
                                       key,
                                     )
                                   }
-                                  className="ml-2 align-middle text-slate-400 hover:text-[#0b7b74]"
+                                  className="ml-2 align-middle text-slate-400 hover:text-[#0b7b74] min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
                                   aria-label={`Sửa ${label} ${item.model}`}
                                 >
                                   <Edit3 className="inline h-3.5 w-3.5" />
@@ -794,7 +794,7 @@ export function CameraPriceListClient({
           <div className="w-full max-w-sm bg-white p-5 shadow-2xl">
             <div className="flex items-center justify-between">
               <h2 className="font-black text-[#14344d]">Sửa giá tạm thời</h2>
-              <button onClick={() => setEditing(null)}>
+              <button className="min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" onClick={() => setEditing(null)}>
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -816,13 +816,13 @@ export function CameraPriceListClient({
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setEditing(null)}
-                className="px-3 py-2 text-sm font-semibold"
+                className="px-3 py-2 text-sm font-semibold min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
               >
                 Hủy
               </button>
               <button
                 onClick={applyPrice}
-                className="bg-[#0b7b74] px-3 py-2 text-sm font-semibold text-white"
+                className="bg-[#0b7b74] px-3 py-2 text-sm font-semibold text-white min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
               >
                 Áp dụng
               </button>

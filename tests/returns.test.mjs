@@ -108,7 +108,7 @@ async function createReturn(v) {
       const baseQty = Number(r.quantity) * Number(r.unitMultiplier);
       await tx.insert(stockLevels).values({ productId: r.productId, warehouseId: o.warehouseId, quantity: qty(baseQty) })
         .onConflictDoUpdate({
-          target: [stockLevels.productId, stockLevels.warehouseId],
+          target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
           set: { quantity: dsql`${stockLevels.quantity} + ${qty(baseQty)}` },
         });
       await tx.insert(stockMovements).values({
@@ -203,4 +203,6 @@ try {
 ok("DEBT_TOO_SMALL khi nợ 0", err === "DEBT_TOO_SMALL", err);
 
 console.log(`\n${fail === 0 ? "🎉" : "⚠️"} ${pass} passed, ${fail} failed`);
-process.exit(fail === 0 ? 0 : 1);
+if (fail > 0) process.exitCode = 1;
+
+await client.close();

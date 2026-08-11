@@ -21,6 +21,7 @@ const { releaseServiceJobMaterialReservationsCore, reserveServiceJobMaterialStoc
 
 const client = new PGlite();
 const db = drizzle(client, { schema });
+const STORE_ID = "00000000-0000-4000-8000-000000000001";
 await client.exec("create role anon; create role authenticated;");
 
 for (const file of readdirSync(`${projectRoot}/drizzle`).filter((name) => name.endsWith(".sql")).sort()) {
@@ -56,6 +57,7 @@ const [material] = await db.insert(serviceJobMaterials).values({
 }).returning();
 
 await db.transaction((tx) => syncServiceJobMaterialStockCore(tx, {
+  storeId: STORE_ID,
   materialId: material.id,
   warehouseId: warehouse.id,
   createdBy: null,
@@ -65,6 +67,7 @@ if (Number(level.quantity) !== 8) throw new Error(`expected stock 8 after issue,
 
 await db.update(serviceJobMaterials).set({ usedQuantity: "1" }).where(eq(serviceJobMaterials.id, material.id));
 await db.transaction((tx) => syncServiceJobMaterialStockCore(tx, {
+  storeId: STORE_ID,
   materialId: material.id,
   warehouseId: warehouse.id,
   createdBy: null,
@@ -74,6 +77,7 @@ if (Number(level.quantity) !== 16) throw new Error(`expected stock 16 after retu
 
 const before = await db.select().from(stockMovements).where(eq(stockMovements.refId, material.id));
 await db.transaction((tx) => syncServiceJobMaterialStockCore(tx, {
+  storeId: STORE_ID,
   materialId: material.id,
   warehouseId: warehouse.id,
   createdBy: null,
@@ -85,6 +89,7 @@ await db.update(serviceJobMaterials).set({ usedQuantity: "10" }).where(eq(servic
 let insufficientStockError = "";
 try {
   await db.transaction((tx) => syncServiceJobMaterialStockCore(tx, {
+    storeId: STORE_ID,
     materialId: material.id,
     warehouseId: warehouse.id,
     createdBy: null,
@@ -112,6 +117,7 @@ const [reservedMaterial] = await db.insert(serviceJobMaterials).values({
   usedQuantity: "0",
 }).returning();
 await db.transaction((tx) => reserveServiceJobMaterialStockCore(tx, {
+  storeId: STORE_ID,
   materialId: reservedMaterial.id,
   warehouseId: warehouse.id,
   quantity: 2,
@@ -121,14 +127,17 @@ await db.transaction((tx) => reserveServiceJobMaterialStockCore(tx, {
 if (Number(level.quantity) !== 16 || Number(level.reserved) !== 8) throw new Error("reservation did not hold stock");
 await db.update(serviceJobMaterials).set({ usedQuantity: "1" }).where(eq(serviceJobMaterials.id, reservedMaterial.id));
 await db.transaction((tx) => syncServiceJobMaterialStockCore(tx, {
+  storeId: STORE_ID,
   materialId: reservedMaterial.id,
   warehouseId: warehouse.id,
   createdBy: null,
 }));
 [level] = await db.select().from(stockLevels).where(eq(stockLevels.productId, product.id));
 if (Number(level.quantity) !== 12 || Number(level.reserved) !== 4) throw new Error("issued stock did not consume its reservation");
-await db.transaction((tx) => releaseServiceJobMaterialReservationsCore(tx, { materialId: reservedMaterial.id }));
+await db.transaction((tx) => releaseServiceJobMaterialReservationsCore(tx, { storeId: STORE_ID, materialId: reservedMaterial.id }));
 [level] = await db.select().from(stockLevels).where(eq(stockLevels.productId, product.id));
 if (Number(level.reserved) !== 0) throw new Error("released reservation still held stock");
 
 console.log("service material stock: issue, return, idempotent sync, and rollback passed");
+
+await client.close();

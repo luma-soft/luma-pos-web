@@ -3,10 +3,13 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 
 const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
-process.env.DATABASE_URL ??= "postgres://release-test:release-test@127.0.0.1/release-test";
+const previousDatabaseUrl = process.env.DATABASE_URL;
+process.env.DATABASE_URL = "postgres://release-test:release-test@127.0.0.1/release-test";
 const operations = await import(
   `${projectRoot}/src/app/api/cron/notifications/route.ts`
 );
+if (previousDatabaseUrl === undefined) delete process.env.DATABASE_URL;
+else process.env.DATABASE_URL = previousDatabaseUrl;
 
 assert.equal(
   typeof operations.getNotificationOperationsSummary,
@@ -80,3 +83,5 @@ const withoutSamples = await operations.getNotificationOperationsSummary(
 assert.equal(withoutSamples.qrP95FcmAcceptedMs, null);
 
 console.log("✅ notification operations summary is bounded and privacy-safe");
+
+await client.close();

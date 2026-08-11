@@ -4,7 +4,7 @@ import { eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.TEST_POSTGRES_DATABASE_URL;
 if (!databaseUrl) {
   console.log("service dispatch snapshot PostgreSQL: skipped because DATABASE_URL is unset");
 } else {

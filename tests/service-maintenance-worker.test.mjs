@@ -235,6 +235,7 @@ await db.insert(serviceJobAssignments).values({
 });
 await db.transaction((tx) => syncServiceJobPrimaryAssigneeCore(
   tx,
+  "00000000-0000-4000-8000-000000000001",
   mixedJob.id,
   secondaryTechnicianId,
   managerId,
@@ -336,3 +337,5 @@ if (!historyDeleteRestricted) {
 }
 
 console.log("maintenance worker: lifecycle, idempotency, overdue, and targets verified");
+
+await client.close();

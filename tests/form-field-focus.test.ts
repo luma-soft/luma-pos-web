@@ -26,7 +26,7 @@ describe("form field focus treatment", () => {
     const source = readFileSync("src/app/globals.css", "utf8");
 
     expect(source).toMatch(
-      /:where\(input, select, textarea\)\[class\*="focus:border-"\]:focus-visible\s*\{[^}]*outline:\s*none;/s,
+      /:where\(input, select, textarea\):focus\s*\{[^}]*outline:\s*none;/s,
     );
   });
 });

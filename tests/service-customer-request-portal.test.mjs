@@ -454,3 +454,5 @@ if (acl.rows.length !== 3 || acl.rows.some((row) => !row.relrowsecurity || row.a
 }
 
 console.log("customer request portal: one-time submit, manager notifications, durable rate limits, private evidence, and ACL verified");
+
+await client.close();

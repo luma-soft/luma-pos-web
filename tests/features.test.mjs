@@ -222,4 +222,6 @@ ok("doanh thu = 6,96tr + 2,61tr (loại quote 99tr + 2 đơn merged)",
   Number(rev.revenue) === 9_570_000 && rev.cnt === 2, `got ${rev.revenue}/${rev.cnt}`);
 
 console.log(`\n${fail === 0 ? "🎉" : "⚠️"} ${pass} passed, ${fail} failed`);
-process.exit(fail === 0 ? 0 : 1);
+if (fail > 0) process.exitCode = 1;
+
+await client.close();

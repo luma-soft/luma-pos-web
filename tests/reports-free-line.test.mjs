@@ -80,3 +80,5 @@ assert.equal(Number(free.revenue), 0);
 assert.equal(Number(free.profit), -7000);
 
 console.log("report free-line integration test passed");
+
+await client.close();

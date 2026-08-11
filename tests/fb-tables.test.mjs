@@ -134,4 +134,4 @@ ok("future course cannot start preparing", timedItem.fireAt.getTime() > Date.now
 
 await client.close();
 console.log(`\n${pass} passed, ${fail} failed`);
-if (fail > 0) process.exit(1);
+if (fail > 0) process.exitCode = 1;

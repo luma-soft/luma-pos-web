@@ -205,4 +205,4 @@ try {
 }
 
 console.log(`\n${failed === 0 ? "🎉" : "⚠️"} ${passed} passed, ${failed} failed`);
-process.exit(failed === 0 ? 0 : 1);
+if (failed > 0) process.exitCode = 1;

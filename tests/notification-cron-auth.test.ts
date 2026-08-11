@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
+import { createNotificationOutboxMock } from "./helpers/notification-outbox-mock";
 
-mock.module("@/lib/notifications/outbox", () => ({
+mock.module("@/lib/notifications/outbox", () => createNotificationOutboxMock({
   async recoverDueNotifications(limit: number) {
     return limit;
   },

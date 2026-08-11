@@ -42,26 +42,26 @@ export function StockActionMenu() {
     <div ref={root} className="relative ml-auto flex items-center gap-2">
       <Link
         href={`${Routes.Inventory}?tab=stock#stock-history`}
-        className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-primary-700 shadow-e1 transition hover:bg-surface-2 dark:text-primary-300"
+        className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-primary-700 shadow-e1 transition hover:bg-surface-2 dark:text-primary-300 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
       >
         <History className="h-4 w-4" />
         {t("inventory.actions.history")}
       </Link>
-      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-slate-700 shadow-e1 transition hover:bg-surface-2 dark:text-slate-200">
+      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-slate-700 shadow-e1 transition hover:bg-surface-2 dark:text-slate-200 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0">
         <ClipboardCheck className="h-4 w-4 text-primary-600" />
         {t("inventory.actions.warehouseActions")}
         <ChevronDown className={cn("h-4 w-4 text-slate-400 transition", open && "rotate-180")} />
       </button>
-      <Link href={Routes.PurchaseNew} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary-600 px-4 text-sm font-semibold text-white transition hover:bg-primary-700 active:scale-[0.98] lg:min-h-10">
+      <Link href={Routes.PurchaseNew} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary-600 px-4 text-sm font-semibold text-white transition hover:bg-primary-700 active:scale-[0.98] lg:min-h-10 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0">
         <Plus className="h-4 w-4" />{t("purchases.createNew")}
       </Link>
       {open && (
         <div role="menu" className="absolute right-[152px] top-[calc(100%+8px)] z-40 w-64 rounded-xl border border-border bg-surface p-1.5 shadow-e3">
-          <Link role="menuitem" href={Routes.StocktakeNew} className="flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-surface-2" onClick={() => setOpen(false)}>
+          <Link role="menuitem" href={Routes.StocktakeNew} className="flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-surface-2 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" onClick={() => setOpen(false)}>
             <ClipboardCheck className="mt-0.5 h-4 w-4 text-primary-600" />
             <span><span className="block text-sm font-semibold">{t("stocktakes.createNew")}</span><span className="mt-0.5 block text-xs text-slate-400">{t("inventory.actions.startStocktakeHint")}</span></span>
           </Link>
-          <Link role="menuitem" href={`${Routes.Inventory}?tab=stocktakes`} className="flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-surface-2" onClick={() => setOpen(false)}>
+          <Link role="menuitem" href={`${Routes.Inventory}?tab=stocktakes`} className="flex items-start gap-3 rounded-lg px-3 py-2.5 hover:bg-surface-2 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" onClick={() => setOpen(false)}>
             <History className="mt-0.5 h-4 w-4 text-slate-500" />
             <span><span className="block text-sm font-semibold">{t("inventory.actions.viewStocktakes")}</span><span className="mt-0.5 block text-xs text-slate-400">{t("inventory.actions.viewStocktakesHint")}</span></span>
           </Link>
@@ -104,7 +104,7 @@ export function RecentMovements({ movements }: { movements: MovementItem[] }) {
       >
         <div className="flex items-center justify-between border-b border-border px-6 py-5">
           <h2 className="text-base font-bold">{t("inventory.movementsTitle")}</h2>
-          <button type="button" onClick={() => setDrawerOpen(true)} className="text-xs font-semibold text-primary-700 hover:underline">{t("inventory.actions.viewAll")}</button>
+          <button type="button" onClick={() => setDrawerOpen(true)} className="text-xs font-semibold text-primary-700 hover:underline min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0">{t("inventory.actions.viewAll")}</button>
         </div>
         {movements.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-slate-400">{t("inventory.noMovements")}</p>
@@ -170,15 +170,15 @@ export function RecentMovements({ movements }: { movements: MovementItem[] }) {
             <header className="flex items-center gap-3 border-b border-border px-5 py-4">
               <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary-50 text-primary-700 dark:bg-primary-950/40"><History className="h-5 w-5" /></div>
               <div className="min-w-0 flex-1"><h2 className="text-lg font-bold">{t("inventory.movementsTitle")}</h2><p className="text-xs text-slate-400">{t("inventory.actions.ledgerSubtitle")}</p></div>
-              <button type="button" onClick={() => setDrawerOpen(false)} aria-label={t("common.close")} className="grid h-10 w-10 place-items-center rounded-xl text-slate-500 hover:bg-surface-2"><X className="h-5 w-5" /></button>
+              <button type="button" onClick={() => setDrawerOpen(false)} aria-label={t("common.close")} className="grid h-10 w-10 place-items-center rounded-xl text-slate-500 hover:bg-surface-2 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"><X className="h-5 w-5 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" /></button>
             </header>
             <div className="grid gap-2 border-b border-border bg-canvas/60 p-4 sm:grid-cols-[minmax(0,1fr)_160px_160px]">
-              <label className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder={t("inventory.actions.searchMovements")} className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-500" /></label>
-              <label className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><select value={type} onChange={(event) => { setType(event.target.value); setPage(1); }} className="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-9 pr-8 text-sm outline-none"><option value="all">{t("inventory.actions.allTypes")}</option>{types.map((value) => <option key={value} value={value}>{t(`inventory.moveTypes.${value}` as never)}</option>)}</select></label>
-              <label className="relative"><SlidersHorizontal className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><select value={warehouse} onChange={(event) => { setWarehouse(event.target.value); setPage(1); }} className="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-9 pr-8 text-sm outline-none"><option value="all">{t("inventory.actions.allWarehouses")}</option>{warehouses.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+              <label className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} placeholder={t("inventory.actions.searchMovements")} className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-500 min-h-11 lg:min-h-0 min-h-11 lg:min-h-0" /></label>
+              <label className="relative"><Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><select value={type} onChange={(event) => { setType(event.target.value); setPage(1); }} className="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-9 pr-8 text-sm outline-none min-h-11 lg:min-h-0"><option value="all">{t("inventory.actions.allTypes")}</option>{types.map((value) => <option className="min-h-11 lg:min-h-0" key={value} value={value}>{t(`inventory.moveTypes.${value}` as never)}</option>)}</select></label>
+              <label className="relative"><SlidersHorizontal className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><select value={warehouse} onChange={(event) => { setWarehouse(event.target.value); setPage(1); }} className="h-10 w-full appearance-none rounded-lg border border-border bg-surface pl-9 pr-8 text-sm outline-none min-h-11 lg:min-h-0"><option value="all">{t("inventory.actions.allWarehouses")}</option>{warehouses.map((value) => <option className="min-h-11 lg:min-h-0" key={value} value={value}>{value}</option>)}</select></label>
             </div>
             <div className="min-h-0 flex-1 overflow-auto"><MovementList rows={pageRows} /></div>
-            <footer className="flex items-center justify-between border-t border-border px-5 py-3 text-sm"><span className="text-slate-500">{t("inventory.actions.showing", { count: filtered.length })}</span><div className="flex items-center gap-2"><button type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className="rounded-lg border border-border px-3 py-1.5 font-semibold disabled:opacity-40">{t("inventory.actions.previous")}</button><span className="min-w-14 text-center font-mono text-xs">{page}/{pageCount}</span><button type="button" disabled={page >= pageCount} onClick={() => setPage((value) => value + 1)} className="rounded-lg border border-border px-3 py-1.5 font-semibold disabled:opacity-40">{t("inventory.actions.next")}</button></div></footer>
+            <footer className="flex items-center justify-between border-t border-border px-5 py-3 text-sm"><span className="text-slate-500">{t("inventory.actions.showing", { count: filtered.length })}</span><div className="flex items-center gap-2"><button type="button" disabled={page <= 1} onClick={() => setPage((value) => value - 1)} className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 font-semibold disabled:opacity-40 lg:min-h-0 lg:min-w-0">{t("inventory.actions.previous")}</button><span className="min-w-14 text-center font-mono text-xs">{page}/{pageCount}</span><button type="button" disabled={page >= pageCount} onClick={() => setPage((value) => value + 1)} className="min-h-11 min-w-11 rounded-lg border border-border px-3 py-1.5 font-semibold disabled:opacity-40 lg:min-h-0 lg:min-w-0">{t("inventory.actions.next")}</button></div></footer>
           </aside>
         </div>
       )}

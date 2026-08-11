@@ -92,7 +92,7 @@ async function createOrder(v) {
       const baseQty = i.quantity * i.unitMultiplier;
       await tx.insert(stockLevels).values({ productId: i.productId, warehouseId: v.warehouseId, quantity: qty(-baseQty) })
         .onConflictDoUpdate({
-          target: [stockLevels.productId, stockLevels.warehouseId],
+          target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
           set: { quantity: dsql`${stockLevels.quantity} - ${qty(baseQty)}`, updatedAt: dsql`now()` },
         });
       await tx.insert(stockMovements).values({
@@ -212,7 +212,7 @@ const purchase = await db.transaction(async (tx) => {
   for (const i of items) {
     await tx.insert(stockLevels).values({ productId: i.productId, warehouseId: wh.id, quantity: qty(i.quantity) })
       .onConflictDoUpdate({
-        target: [stockLevels.productId, stockLevels.warehouseId],
+        target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
         set: { quantity: dsql`${stockLevels.quantity} + ${qty(i.quantity)}` },
       });
     await tx.insert(stockMovements).values({ productId: i.productId, warehouseId: wh.id, type: "purchase", quantity: qty(i.quantity), unitCost: money(i.unitCost), refType: "purchase", refId: po.id });
@@ -289,4 +289,6 @@ const byCat = await db.select({
 ok("doanh thu theo 2 danh mục", byCat.length === 2);
 
 console.log(`\n${fail === 0 ? "🎉" : "⚠️"} ${pass} passed, ${fail} failed`);
-process.exit(fail === 0 ? 0 : 1);
+if (fail > 0) process.exitCode = 1;
+
+await client.close();

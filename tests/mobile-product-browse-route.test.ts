@@ -1,8 +1,11 @@
-import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import { createMobileAuthMock } from "./helpers/mobile-auth-mock";
+
+afterAll(() => mock.restore());
 
 const queries: Array<Record<string, unknown>> = [];
 
-mock.module("@/lib/mobile/auth", () => ({
+mock.module("@/lib/mobile/auth", () => createMobileAuthMock({
   requireMobileStockAccess: async () => ({ ok: true }),
   requireMobileStockReadAccess: async () => ({ ok: true }),
 }));
@@ -11,7 +14,7 @@ mock.module("@/lib/data/pricing", () => ({
   getPricingCategories: async () => [{ id: "lights", name: "Đèn" }],
   getPricingBrands: async () => [{ id: "brand", name: "3S" }],
   getPricingSuppliers: async () => [{ id: "supplier", name: "3S LED" }],
-  getPricingPage: async (query: Record<string, unknown>) => {
+  getPricingPage: async (_storeId: string, query: Record<string, unknown>) => {
     queries.push(query);
     return {
       rows: [

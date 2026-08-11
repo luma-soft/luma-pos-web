@@ -95,7 +95,7 @@ export function ReturnActions({
               </label>
               <label className="block text-sm font-medium">
                 {t("returns.note")}
-                <textarea value={draftNote} onChange={(event) => setDraftNote(event.target.value)} maxLength={1000} rows={5} className="mt-1 w-full resize-y rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20" />
+                <textarea value={draftNote} onChange={(event) => setDraftNote(event.target.value)} maxLength={1000} rows={5} className="mt-1 w-full resize-y rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 min-h-11 lg:min-h-0 min-h-11 lg:min-h-0" />
               </label>
             </div>
             <div className="flex justify-end gap-2 border-t border-border-soft px-4 py-3">
