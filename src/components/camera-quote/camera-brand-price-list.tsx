@@ -2,6 +2,7 @@ import { getRole } from "@/lib/actions/common";
 import { getCameraQuoteFormOptions } from "@/lib/data/camera-quotes";
 import { createClient } from "@/lib/supabase/server";
 import { CameraPriceListClient } from "@/app/(app)/camera-price-list/camera-price-list-client";
+import { estimateStorageDays } from "@/lib/camera-storage-estimate";
 
 type CameraBrand = "EZVIZ" | "IMOU";
 
@@ -93,19 +94,6 @@ function cameraMegapixels(specs: Record<string, string[]>) {
   const megapixels = (specs["Độ phân giải"]?.join(" ").match(/\d+\s*MP/gi) ?? [])
     .map((value) => Number.parseInt(value, 10));
   return megapixels.length ? megapixels.reduce((total, value) => total + value, 0) : 2;
-}
-
-function estimateStorageDays(capacityGb: number | null, megapixels: number) {
-  if (!capacityGb) return "Liên hệ để tư vấn";
-  const gigabytesPerDay = megapixels <= 2 ? [12, 20]
-    : megapixels <= 3 ? [18, 30]
-      : megapixels <= 4 ? [24, 40]
-        : megapixels <= 5 ? [30, 50]
-          : megapixels <= 6 ? [36, 60]
-            : [48, 80];
-  const shortestDays = Math.max(1, Math.round(capacityGb / gigabytesPerDay[1]));
-  const longestDays = Math.max(shortestDays, Math.round(capacityGb / gigabytesPerDay[0]));
-  return `~${shortestDays}–${longestDays} ngày`;
 }
 
 function cameraGuidance(name: string, specs: Record<string, string[]>) {
