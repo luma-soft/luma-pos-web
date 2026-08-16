@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Copy, Edit3, ImageOff, Search, X } from "lucide-react";
+import { ClipboardList, Copy, Edit3, ImageOff, Search, X } from "lucide-react";
 import Image from "next/image";
 import { NumberInput } from "@/components/ui/number-input";
 import { formatCurrency } from "@/lib/utils";
@@ -175,6 +175,141 @@ export function CameraPriceListClient({
     setNotice("Đã áp dụng giá tạm thời cho ảnh báo giá.");
   }
 
+  async function deliverCanvasImage({
+    canvas,
+    downloadName,
+    copiedMessage,
+    downloadedMessage,
+  }: {
+    canvas: HTMLCanvasElement;
+    downloadName: string;
+    copiedMessage: string;
+    downloadedMessage: string;
+  }) {
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/png"),
+    );
+    if (!blob) return setNotice("Không tạo được ảnh.");
+    const downloadImage = () => {
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = downloadName;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    };
+    if (navigator.clipboard?.write && typeof ClipboardItem !== "undefined") {
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({ "image/png": blob }),
+        ]);
+        setNotice(copiedMessage);
+        return;
+      } catch {
+        downloadImage();
+        setNotice(downloadedMessage);
+        return;
+      }
+    }
+    downloadImage();
+    setNotice(downloadedMessage);
+  }
+
+  async function copySpecsImage(item: Model, index: number) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1500;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const rows = detailsFor(item);
+    const tableX = 420;
+    const tableY = 145;
+    const tableWidth = 1030;
+    const labelWidth = 300;
+    const valueWidth = tableWidth - labelWidth;
+    ctx.font = "25px Arial";
+    const rowHeights = rows.map(([label, value]) => {
+      const labelLines = canvasLines(ctx, label, labelWidth - 40).length;
+      const valueLines = canvasLines(ctx, value, valueWidth - 40).length;
+      return Math.max(72, Math.max(labelLines, valueLines) * 32 + 30);
+    });
+    const tableHeight = rowHeights.reduce((total, height) => total + height, 0);
+    canvas.height = Math.max(820, tableY + tableHeight + 70);
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#14344d";
+    ctx.font = "800 31px Arial";
+    ctx.fillText("THÔNG SỐ KỸ THUẬT", tableX, 94);
+
+    let image: ImageBitmap | null = null;
+    try {
+      image = await loadProductImage(item.imageUrl);
+    } catch {
+      setNotice("Không tải được ảnh sản phẩm để sao chép.");
+      return;
+    }
+    if (!image) {
+      setNotice("Camera này chưa có ảnh sản phẩm để sao chép.");
+      return;
+    }
+    const imageBoxWidth = 340;
+    const imageBoxHeight = Math.max(420, Math.min(580, tableHeight - 40));
+    const imageRatio = Math.min(
+      imageBoxWidth / image.width,
+      imageBoxHeight / image.height,
+    );
+    const imageWidth = image.width * imageRatio;
+    const imageHeight = image.height * imageRatio;
+    ctx.drawImage(
+      image,
+      40 + (imageBoxWidth - imageWidth) / 2,
+      tableY + (tableHeight - imageHeight) / 2,
+      imageWidth,
+      imageHeight,
+    );
+    image.close();
+
+    let rowY = tableY;
+    rows.forEach(([label, value], rowIndex) => {
+      const rowHeight = rowHeights[rowIndex];
+      ctx.fillStyle = "#edf3f6";
+      ctx.fillRect(tableX, rowY, labelWidth, rowHeight);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(tableX + labelWidth, rowY, valueWidth, rowHeight);
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(tableX, rowY, labelWidth + valueWidth, rowHeight);
+      ctx.fillStyle = "#526675";
+      ctx.font = "700 24px Arial";
+      canvasWrap(
+        ctx,
+        label,
+        tableX + 22,
+        rowY + 43,
+        labelWidth - 40,
+        32,
+      );
+      ctx.fillStyle = "#233947";
+      ctx.font = "24px Arial";
+      canvasWrap(
+        ctx,
+        value,
+        tableX + labelWidth + 22,
+        rowY + 43,
+        valueWidth - 40,
+        32,
+      );
+      rowY += rowHeight;
+    });
+
+    await deliverCanvasImage({
+      canvas,
+      downloadName: `thong-so-camera-${String(index + 1).padStart(2, "0")}.png`,
+      copiedMessage: `Đã sao chép ảnh thông số ${item.model}.`,
+      downloadedMessage: "Không thể sao chép; ảnh thông số đã được tải xuống.",
+    });
+  }
+
   async function copyImage(item: Model, index: number) {
     const canvas = document.createElement("canvas");
     canvas.width = 1500;
@@ -331,33 +466,12 @@ export function CameraPriceListClient({
       contentBottom + 146,
     );
 
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, "image/png"),
-    );
-    if (!blob) return setNotice("Không tạo được ảnh báo giá.");
-    const downloadImage = () => {
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = `bao-gia-camera-goi-${String(index + 1).padStart(2, "0")}.png`;
-      link.click();
-      URL.revokeObjectURL(link.href);
-    };
-    if (navigator.clipboard?.write && typeof ClipboardItem !== "undefined") {
-      try {
-        await navigator.clipboard.write([
-          new ClipboardItem({ "image/png": blob }),
-        ]);
-        setNotice(
-          `Đã sao chép ảnh ${item.model}.`,
-        );
-      } catch {
-        downloadImage();
-        setNotice("Không thể sao chép ảnh; ảnh báo giá đã được tải xuống.");
-      }
-    } else {
-      downloadImage();
-      setNotice("Trình duyệt đã tải ảnh báo giá xuống.");
-    }
+    await deliverCanvasImage({
+      canvas,
+      downloadName: `bao-gia-camera-goi-${String(index + 1).padStart(2, "0")}.png`,
+      copiedMessage: `Đã sao chép ảnh ${item.model}.`,
+      downloadedMessage: "Không thể sao chép; ảnh báo giá đã được tải xuống.",
+    });
   }
 
   return (
@@ -418,16 +532,32 @@ export function CameraPriceListClient({
                     Phù hợp: {item.suitableFor[0]}
                   </p>
                 </div>
-                <button
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    copyImage(item, index);
-                  }}
-                  className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-teal-200 bg-teal-50/60 text-[#0b7b74] transition hover:bg-teal-50 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
-                  aria-label={`Sao chép ảnh ${item.model}`}
-                >
-                  <Copy className="h-4 w-4" />
-                </button>
+                <div className="flex shrink-0 gap-1">
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      copyImage(item, index);
+                    }}
+                    className="grid h-11 w-11 place-items-center rounded-lg border border-teal-200 bg-teal-50/60 text-[#0b7b74] transition hover:bg-teal-50"
+                    aria-label={`Sao chép ảnh gói ${item.model}`}
+                    title="Sao chép ảnh gói"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      copySpecsImage(item, index);
+                    }}
+                    className="grid h-11 w-11 place-items-center rounded-lg border border-slate-200 bg-white text-[#14344d] transition hover:border-teal-200 hover:bg-teal-50"
+                    aria-label={`Sao chép ảnh thông số ${item.model}`}
+                    title="Sao chép ảnh thông số"
+                  >
+                    <ClipboardList className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
               <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">
                 {item.description.split("\n")[0]}
@@ -496,7 +626,7 @@ export function CameraPriceListClient({
                     {label}
                   </th>
                 ))}
-                <th className="w-12" />
+                <th className="w-24" />
               </tr>
             </thead>
             <tbody>
@@ -540,18 +670,33 @@ export function CameraPriceListClient({
                       </td>
                     );
                   })}
-                  <td className="border border-slate-300 px-2 text-center">
-                    <button
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        copyImage(item, index);
-                      }}
-                      className="inline-flex h-8 w-8 items-center justify-center text-[#0b7b74] hover:bg-teal-50 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
-                      aria-label={`Sao chép ảnh ${item.model}`}
-                      title="Sao chép ảnh chi tiết gói này"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </button>
+                  <td className="border border-slate-300 px-1 text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          copyImage(item, index);
+                        }}
+                        className="inline-flex h-9 w-9 items-center justify-center text-[#0b7b74] transition hover:bg-teal-50"
+                        aria-label={`Sao chép ảnh gói ${item.model}`}
+                        title="Sao chép ảnh gói"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          copySpecsImage(item, index);
+                        }}
+                        className="inline-flex h-9 w-9 items-center justify-center text-[#14344d] transition hover:bg-teal-50"
+                        aria-label={`Sao chép ảnh thông số ${item.model}`}
+                        title="Sao chép ảnh thông số"
+                      >
+                        <ClipboardList className="h-4 w-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -600,13 +745,24 @@ export function CameraPriceListClient({
                         {item.model}
                       </h3>
                     </div>
-                    <button
-                      onClick={() => copyImage(item, index)}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-teal-200 bg-white px-3.5 py-2.5 text-sm font-bold text-[#087b74] shadow-[0_2px_8px_rgba(8,129,122,.06)] transition hover:border-teal-300 hover:bg-teal-50 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
-                    >
-                      <Copy className="h-4 w-4" />
-                      Sao chép ảnh gói
-                    </button>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <button
+                        type="button"
+                        onClick={() => copyImage(item, index)}
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-teal-200 bg-white px-3.5 py-2.5 text-sm font-bold text-[#087b74] shadow-[0_2px_8px_rgba(8,129,122,.06)] transition hover:border-teal-300 hover:bg-teal-50"
+                      >
+                        <Copy className="h-4 w-4" />
+                        Sao chép ảnh gói
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => copySpecsImage(item, index)}
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-bold text-[#14344d] transition hover:border-teal-200 hover:bg-teal-50"
+                      >
+                        <ClipboardList className="h-4 w-4" />
+                        Sao chép thông số
+                      </button>
+                    </div>
                   </div>
                   <div className="mt-6 grid gap-2 sm:grid-cols-2">
                     {item.variants.map((variant, variantIndex) => (
