@@ -25,9 +25,9 @@ export const ListSearchInput = forwardRef<HTMLInputElement, ListSearchInputProps
           aria-label={ariaLabel ?? (typeof placeholder === "string" ? placeholder : undefined)}
           placeholder={placeholder}
           className={cn(
-            "min-h-11 w-full rounded-xl border border-border bg-surface py-2 pl-9 pr-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100",
+            "h-11 w-full rounded-xl border border-border bg-surface py-2 pl-9 pr-3 text-sm outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100",
             className,
-            "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11 lg:min-h-0 lg:min-w-0",
+            "min-w-11 sm:min-w-11 md:min-w-11 lg:min-w-0",
           )}
           {...props}
         />
@@ -61,9 +61,9 @@ export const FilterTriggerButton = forwardRef<HTMLButtonElement, FilterTriggerBu
         type={type}
         aria-label={ariaLabel ?? label}
         className={cn(
-          "relative inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border border-primary-600 bg-surface px-4 text-sm font-bold text-primary-700 transition hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+          "relative inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border border-primary-600 bg-surface px-4 text-sm font-bold text-primary-700 transition hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
           className,
-          "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11 lg:min-h-0 lg:min-w-0",
+          "min-w-11 sm:min-w-11 md:min-w-11 lg:min-w-0",
         )}
         {...props}
       >
