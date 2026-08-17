@@ -14,7 +14,6 @@ import { Text } from "@/components/ui/text";
 import { Routes } from "@/lib/routes";
 import { getTheme, getMode } from "@/lib/theme/cookie";
 import { getStoreSettings } from "@/lib/data/settings";
-import { getAttentionNotificationCount } from "@/lib/audit";
 import { ProductCatalogProvider } from "@/components/product-catalog-provider";
 import { requireStoreContext } from "@/lib/auth/store-context";
 
@@ -39,10 +38,7 @@ export default async function AppLayout({
   }
 
   const context = await requireStoreContext();
-  const [store, notificationCount] = await Promise.all([
-    getStoreSettings(context.storeId),
-    getAttentionNotificationCount(user.id),
-  ]);
+  const store = await getStoreSettings(context.storeId);
   if (!store.onboarded) redirect("/onboarding");
 
   const t = await getTranslations();
@@ -69,7 +65,6 @@ export default async function AppLayout({
         </div>
         <AppNav
           industry={store.industry}
-          notificationCount={notificationCount}
           aiConfigured={store.prefs.ai.openaiApiKeySet}
           features={context.features}
         />

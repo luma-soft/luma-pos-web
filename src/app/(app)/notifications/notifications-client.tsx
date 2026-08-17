@@ -19,6 +19,7 @@ import {
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { Routes } from "@/lib/routes";
+import { NOTIFICATION_INBOX_CHANGED_EVENT } from "@/lib/notifications/inbox-count";
 import { NotificationsTable, type AuditRow } from "./notifications-table";
 import { NotificationsFilterDrawer } from "./notifications-filter-drawer";
 import {
@@ -188,6 +189,7 @@ export function NotificationsClient({ activities }: { activities: AuditRow[] }) 
       body: JSON.stringify({ read: true, dismissed }),
     });
     if (!response.ok) return false;
+    window.dispatchEvent(new Event(NOTIFICATION_INBOX_CHANGED_EVENT));
     setRows((current) => dismissed
       ? current.filter((item) => item.id !== row.id)
       : current.map((item) => item.id === row.id ? { ...item, unread: false } : item));

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -17,6 +18,10 @@ import { ONLINE_SALES_ENABLED } from "@/lib/features";
 import { cn } from "@/lib/utils";
 import { Text } from "@/components/ui/text";
 import type { StoreFeatureSet } from "@/lib/tenancy/store-features";
+import {
+  fetchNotificationUnreadCount,
+  NOTIFICATION_INBOX_CHANGED_EVENT,
+} from "@/lib/notifications/inbox-count";
 
 type Item = { href: string; icon: React.ComponentType<{ className?: string }>; key: string; badge?: "notifications"; newTab?: boolean };
 type Group = { labelKey: string; items: Item[] };
@@ -60,18 +65,40 @@ const GROUPS: Group[] = [
 /** Sidebar điều hướng có chữ — dùng cho cả desktop (cố định) và drawer mobile. */
 export function AppNav({
   industry,
-  notificationCount = 0,
   aiConfigured = false,
   features,
 }: {
   industry?: string;
-  notificationCount?: number;
   aiConfigured?: boolean;
   features: StoreFeatureSet;
 }) {
   const t = useTranslations();
   const pathname = usePathname();
+  const [notificationCount, setNotificationCount] = useState(0);
   const isFnb = industry === "restaurant" || industry === "cafe";
+
+  useEffect(() => {
+    let active = true;
+    let requestVersion = 0;
+    const refresh = async () => {
+      const version = ++requestVersion;
+      try {
+        const count = await fetchNotificationUnreadCount();
+        if (active && version === requestVersion) setNotificationCount(count);
+      } catch {
+        // Keep the last confirmed value when the inbox is temporarily unavailable.
+      }
+    };
+    const handleInboxChanged = () => void refresh();
+
+    void refresh();
+    window.addEventListener(NOTIFICATION_INBOX_CHANGED_EVENT, handleInboxChanged);
+    return () => {
+      active = false;
+      window.removeEventListener(NOTIFICATION_INBOX_CHANGED_EVENT, handleInboxChanged);
+    };
+  }, [pathname]);
+
   const featureForHref: Partial<Record<string, keyof StoreFeatureSet>> = {
     [Routes.OnlineSales]: "online_sales",
     [Routes.Services]: "field_services",

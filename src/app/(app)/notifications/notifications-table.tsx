@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { cn, formatDate } from "@/lib/utils";
 import { Routes } from "@/lib/routes";
+import { NOTIFICATION_INBOX_CHANGED_EVENT } from "@/lib/notifications/inbox-count";
 import { OrderDetailLink } from "@/components/order-detail-link";
 import type { AuditSource, AuditStatus, getAuditLogs } from "@/lib/audit";
 import { useTranslations } from "next-intl";
@@ -238,11 +239,14 @@ function AcknowledgeNotificationButton({ id }: { id: string }) {
       onClick={(event) => {
         stopRowToggle(event);
         startTransition(async () => {
-          await fetch(`/api/mobile/notifications/${encodeURIComponent(id)}`, {
+          const response = await fetch(`/api/mobile/notifications/${encodeURIComponent(id)}`, {
             method: "PATCH",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ read: true, dismissed: true }),
           });
+          if (response.ok) {
+            window.dispatchEvent(new Event(NOTIFICATION_INBOX_CHANGED_EVENT));
+          }
           router.refresh();
         });
       }}
