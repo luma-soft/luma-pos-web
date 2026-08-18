@@ -10,7 +10,19 @@ const STORE_ID = "00000000-0000-4000-8000-000000000001";
 
 const client = new PGlite();
 const database = drizzle(client, { schema });
-await client.exec("create role anon; create role authenticated;");
+await client.exec(`
+  create role anon;
+  create role authenticated;
+  create schema auth;
+  create function auth.uid() returns uuid
+  language sql stable
+  as $$ select null::uuid $$;
+  create schema storage;
+  create table storage.objects (name text not null);
+  create function storage.foldername(path text) returns text[]
+  language sql immutable
+  as $$ select string_to_array(path, '/') $$;
+`);
 
 for (const file of readdirSync(`${project}/drizzle`).filter((name) => name.endsWith(".sql")).sort()) {
   for (const statement of readFileSync(`${project}/drizzle/${file}`, "utf8").split("--> statement-breakpoint")) {
@@ -76,7 +88,26 @@ const today = new Date().toISOString().slice(0, 10);
 assert.equal(report.summary.revenue, -100);
 assert.equal(report.summary.grossProfit, -60);
 assert.equal(report.summary.refundTotal, 100);
-assert.deepEqual(report.byDay, [{ day: today, revenue: -100, orderCount: 0 }]);
+const returnDay = report.byDay.find((row) => row.refundTotal === 100);
+assert.deepEqual(returnDay, {
+  day: today,
+  revenue: -100,
+  grossProfit: -60,
+  costOfGoods: -40,
+  refundTotal: 100,
+  orderCount: 0,
+  returnedOrders: 1,
+  averageOrder: 0,
+});
+assert.ok(report.byDay.every((row) => row === returnDay || (
+  row.revenue === 0 &&
+  row.grossProfit === 0 &&
+  row.costOfGoods === 0 &&
+  row.refundTotal === 0 &&
+  row.orderCount === 0 &&
+  row.returnedOrders === 0 &&
+  row.averageOrder === 0
+)));
 
 console.log("report net-return integration test passed");
 

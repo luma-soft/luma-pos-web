@@ -14,7 +14,7 @@ import {
   ReportProductMobileRow,
 } from "@/app/(app)/reports/report-detail-tables";
 import { ReportInvoiceMobileRow } from "@/app/(app)/reports/report-invoices-table";
-import { ReportPeriodDisclosure } from "@/app/(app)/reports/report-period-filter";
+import { ReportPeriodChips } from "@/app/(app)/reports/report-period-filter";
 
 function renderWithMessages(node: React.ReactNode) {
   return renderToStaticMarkup(
@@ -36,10 +36,16 @@ describe("mobile report rows", () => {
         row={{
           productId: "product-1",
           productName,
-          qtySold: "12",
+          qtySold: 12,
+          qtyReturned: 0,
           baseUnit: "cái",
-          revenue: "12500000",
-          profit: "-350000",
+          imageUrls: [],
+          revenue: 12500000,
+          cost: 12850000,
+          profit: -350000,
+          margin: -2.8,
+          returnCount: 0,
+          contribution: 100,
         }}
       />,
     );
@@ -63,8 +69,14 @@ describe("mobile report rows", () => {
           customerName,
           customerType: "retail",
           orderCount: 4,
-          revenue: "4200000",
+          customerCreatedAt: new Date("2026-07-01"),
+          revenue: 4200000,
           remaining: "500000",
+          lastPurchaseAt: new Date("2026-07-28"),
+          profit: 900000,
+          margin: 21.4,
+          averageOrder: 1050000,
+          segment: "returning",
         }}
       />,
     );
@@ -97,9 +109,12 @@ describe("mobile report rows", () => {
           status: "completed",
           createdAt: new Date("2026-07-28T08:00:00+07:00"),
           customerName: "Khách lẻ",
-          total: "1500000",
+          total: 1500000,
           amountPaid: "1200000",
-          profit: "300000",
+          cost: 1200000,
+          profit: 300000,
+          refund: 0,
+          margin: 20,
         }}
       />,
     );
@@ -114,20 +129,15 @@ describe("mobile report rows", () => {
 });
 
 describe("mobile report controls", () => {
-  test("period disclosure stays compact until expanded", () => {
-    const collapsed = renderWithMessages(
-      <ReportPeriodDisclosure period="30d" open={false} onToggle={() => undefined} onSelect={() => undefined} />,
+  test("period chips expose the four approved mobile ranges", () => {
+    const html = renderWithMessages(
+      <ReportPeriodChips period="this_month" onSelect={() => undefined} />,
     );
-    const expanded = renderWithMessages(
-      <ReportPeriodDisclosure period="30d" open onToggle={() => undefined} onSelect={() => undefined} />,
-    );
-
-    expect(collapsed).toContain('aria-expanded="false"');
-    expect(collapsed).toContain("30 ngày gần nhất");
-    expect(collapsed).not.toContain('aria-label="Khoảng thời gian"');
-    expect(expanded).toContain('aria-expanded="true"');
-    expect(expanded.match(/aria-pressed="(?:true|false)"/g)).toHaveLength(7);
-    expect(expanded.match(/aria-pressed="(?:true|false)"[^>]*class="[^"]*min-h-11[^"]*"/g)).toHaveLength(7);
+    expect(html).toContain('aria-label="Khoảng thời gian"');
+    expect(html).toContain("Hôm nay");
+    expect(html).toContain("Tháng này");
+    expect(html.match(/aria-pressed="(?:true|false)"/g)).toHaveLength(4);
+    expect(html.match(/aria-pressed="(?:true|false)"[^>]*class="[^"]*min-h-11[^"]*"/g)).toHaveLength(4);
   });
 
   test("report mobile tabs opt into 44px links while retaining desktop density", () => {
@@ -210,9 +220,10 @@ describe("mobile report controls", () => {
     expect(source).toMatch(/<MobileTopBar[\s\S]*?title=\{t\("reports\.title"\)\}/);
     expect(source).toMatch(/className="[^"]*hidden[^"]*lg:block[^"]*"[\s\S]*?<GroupTabs/);
     expect(source).toContain("edgeToEdge");
-    expect(source).toContain("text-[clamp(1rem,5vw,1.35rem)]");
-    expect(source).toContain("min-w-8");
-    expect(source).toMatch(/aria-label=\{`\$\{d\.day\}[^`]*formatCurrency\(v\)/);
+    expect(source).toContain("OverviewReport");
+    expect(source).toContain("OrdersReport");
+    expect(source).toContain("ProductsReport");
+    expect(source).toContain("CustomersReport");
   });
 
   test("custom date fields retain 44px mobile touch targets", () => {

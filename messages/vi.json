@@ -2254,7 +2254,7 @@
   },
   "reports": {
     "invoiceList": "Danh sách hóa đơn",
-    "profit": "Lợi nhuận",
+    "profit": "Lãi gộp",
     "period": {
       "label": "Khoảng thời gian",
       "from": "Từ",
@@ -2263,13 +2263,14 @@
       "customTitle": "Chọn khoảng ngày",
       "customDescription": "Báo cáo sẽ bao gồm toàn bộ dữ liệu từ ngày bắt đầu đến hết ngày kết thúc.",
       "options": {
-        "7d": "7 ngày gần nhất",
+        "today": "Hôm nay",
+        "7d": "7 ngày",
         "30d": "30 ngày gần nhất",
         "90d": "90 ngày gần nhất",
         "this_month": "Tháng này",
         "last_month": "Tháng trước",
         "this_year": "Năm nay",
-        "custom": "Chọn ngày"
+        "custom": "Tùy chỉnh"
       }
     },
     "title": "Báo cáo",
@@ -2281,7 +2282,7 @@
     "orders": "Số đơn",
     "avgOrder": "TB {avg}/đơn",
     "overview": "Tổng quan",
-    "invoices": "Hóa đơn",
+    "invoices": "Đơn hàng",
     "products": "Sản phẩm",
     "customers": "Khách hàng",
     "employees": "Nhân viên",

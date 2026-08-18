@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { ChevronDown } from "lucide-react";
 import { RowPreviewModal } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 const PERIODS = [
+  "today",
   "7d",
   "30d",
   "90d",
@@ -36,7 +36,6 @@ export function ReportPeriodFilter({
   const [customFrom, setCustomFrom] = useState(from);
   const [customTo, setCustomTo] = useState(to);
   const [dateModalOpen, setDateModalOpen] = useState(false);
-  const [disclosureOpen, setDisclosureOpen] = useState(false);
 
   function navigate(nextPeriod: string, nextFrom?: string, nextTo?: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -54,7 +53,6 @@ export function ReportPeriodFilter({
   }
 
   function selectPeriod(value: string) {
-    setDisclosureOpen(false);
     if (value === "custom") {
       setCustomFrom(from);
       setCustomTo(to);
@@ -72,12 +70,7 @@ export function ReportPeriodFilter({
 
   return (
     <>
-      <ReportPeriodDisclosure
-        period={period}
-        open={disclosureOpen}
-        onToggle={() => setDisclosureOpen((open) => !open)}
-        onSelect={selectPeriod}
-      />
+      <ReportPeriodChips period={period} onSelect={selectPeriod} />
       <div className="hidden lg:block">
         <ReportPeriodSelect period={period} onSelect={selectPeriod} className="h-9 min-w-40" />
       </div>
@@ -131,70 +124,37 @@ export function ReportPeriodFilter({
   );
 }
 
-export function ReportPeriodDisclosure({
+export function ReportPeriodChips({
   period,
-  open,
-  onToggle,
   onSelect,
 }: {
   period: ReportPeriod;
-  open: boolean;
-  onToggle: () => void;
   onSelect: (value: string) => void;
 }) {
   const t = useTranslations();
-  const controlId = "report-period-mobile-control";
+  const periods = ["today", "7d", "this_month", "custom"] as const;
 
   return (
-    <div className="rounded-xl border border-border bg-surface lg:hidden">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={controlId}
-        onClick={onToggle}
-        className="flex min-h-11 w-full items-center justify-between gap-3 px-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-      >
-        <span className="min-w-0">
-          <span className="block text-[10px] font-extrabold uppercase tracking-[0.06em] text-slate-400">
-            {t("reports.period.label")}
-          </span>
-          <span className="block truncate text-sm font-bold">
-            {t(`reports.period.options.${period}` as never)}
-          </span>
-        </span>
-        <ChevronDown
-          aria-hidden="true"
-          className={cn("h-4 w-4 shrink-0 text-slate-400 transition-transform", open && "rotate-180")}
-        />
-      </button>
-      {open && (
-        <div
-          id={controlId}
-          role="group"
-          aria-label={t("reports.period.label")}
-          className="grid grid-cols-2 gap-1 border-t border-border-soft p-2"
-        >
-          {PERIODS.map((value) => {
-            const active = value === period;
-            return (
-              <button
-                key={value}
-                type="button"
-                aria-pressed={active}
-                onClick={() => onSelect(value)}
-                className={cn(
-                  "min-h-11 rounded-lg px-2 py-2 text-left text-sm font-semibold leading-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-11",
-                  active
-                    ? "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-200"
-                    : "text-slate-600 hover:bg-surface-2 dark:text-slate-300",
-                )}
-              >
-                {t(`reports.period.options.${value}` as never)}
-              </button>
-            );
-          })}
-        </div>
-      )}
+    <div role="group" aria-label={t("reports.period.label")} className="grid grid-cols-4 gap-2 lg:hidden">
+      {periods.map((value) => {
+        const active = value === period;
+        return (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onSelect(value)}
+            className={cn(
+              "min-h-11 min-w-11 rounded-xl border px-2 text-center text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+              active
+                ? "border-primary-700 bg-primary-700 text-white shadow-sm"
+                : "border-border bg-surface text-slate-600 hover:bg-surface-2 dark:text-slate-300",
+            )}
+          >
+            {t(`reports.period.options.${value}` as never)}
+          </button>
+        );
+      })}
     </div>
   );
 }

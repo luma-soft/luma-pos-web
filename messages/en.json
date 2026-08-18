@@ -2254,7 +2254,7 @@
   },
   "reports": {
     "invoiceList": "Invoice list",
-    "profit": "Profit",
+    "profit": "Gross profit",
     "period": {
       "label": "Date range",
       "from": "From",
@@ -2263,13 +2263,14 @@
       "customTitle": "Choose date range",
       "customDescription": "The report includes all data from the start date through the end date.",
       "options": {
-        "7d": "Last 7 days",
+        "today": "Today",
+        "7d": "7 days",
         "30d": "Last 30 days",
         "90d": "Last 90 days",
         "this_month": "This month",
         "last_month": "Last month",
         "this_year": "This year",
-        "custom": "Choose dates"
+        "custom": "Custom"
       }
     },
     "title": "Reports",
@@ -2281,7 +2282,7 @@
     "orders": "Orders",
     "avgOrder": "Avg {avg}/order",
     "overview": "Overview",
-    "invoices": "Invoices",
+    "invoices": "Orders",
     "products": "Products",
     "customers": "Customers",
     "employees": "Employees",

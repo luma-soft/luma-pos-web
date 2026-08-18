@@ -35,8 +35,15 @@ export function ReportInvoicesTable({ rows }: { rows: ReportInvoiceRow[] }) {
       render: (invoice) => <span className="font-medium">{invoice.customerName}</span>,
     },
     {
-      key: "total",
-      label: t("orders.cols.total"),
+      key: "status",
+      label: t("orders.cols.status"),
+      defaultVisible: true,
+      width: "140px",
+      render: (invoice) => <OrderStatus status={invoice.status} />,
+    },
+    {
+      key: "revenue",
+      label: "Doanh thu thuần",
       defaultVisible: true,
       align: "right",
       width: "160px",
@@ -44,13 +51,12 @@ export function ReportInvoicesTable({ rows }: { rows: ReportInvoiceRow[] }) {
       render: (invoice) => formatCurrency(Number(invoice.total)),
     },
     {
-      key: "collected",
-      label: t("reports.collected"),
+      key: "cost",
+      label: "Giá vốn",
       defaultVisible: true,
       align: "right",
       width: "160px",
-      cellClassName: "text-ok",
-      render: (invoice) => formatCurrency(Number(invoice.amountPaid)),
+      render: (invoice) => formatCurrency(invoice.cost),
     },
     {
       key: "profit",
@@ -60,6 +66,22 @@ export function ReportInvoicesTable({ rows }: { rows: ReportInvoiceRow[] }) {
       width: "160px",
       cellClassName: (invoice) => cn("font-semibold", Number(invoice.profit) >= 0 ? "text-ok" : "text-er"),
       render: (invoice) => formatCurrency(Number(invoice.profit)),
+    },
+    {
+      key: "margin",
+      label: "Biên lãi",
+      defaultVisible: true,
+      align: "right",
+      width: "120px",
+      render: (invoice) => `${invoice.margin.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`,
+    },
+    {
+      key: "refund",
+      label: "Hoàn trả",
+      defaultVisible: true,
+      align: "right",
+      width: "140px",
+      render: (invoice) => invoice.refund > 0 ? formatCurrency(invoice.refund) : "—",
     },
   ];
 
@@ -97,19 +119,21 @@ export function ReportInvoiceMobileRow({ row }: { row: ReportInvoiceRow }) {
           value={formatCurrency(Number(row.total))}
           className="[&_dd]:break-words [&_dd]:whitespace-normal"
         />
-        <MobileRecordField
-          label={t("reports.collected")}
-          value={formatCurrency(Number(row.amountPaid))}
-          tone="success"
-          className="[&_dd]:break-words [&_dd]:whitespace-normal"
-        />
+        <MobileRecordField label={t("orders.cols.status")} value={<OrderStatus status={row.status} />} />
+        <MobileRecordField label="Giá vốn" value={formatCurrency(row.cost)} />
         <MobileRecordField
           label={t("reports.profit")}
           value={formatCurrency(profit)}
           tone={profit >= 0 ? "success" : "danger"}
-          className="col-span-2 [&_dd]:break-words [&_dd]:whitespace-normal"
+          className="[&_dd]:break-words [&_dd]:whitespace-normal"
         />
+        <MobileRecordField label="Biên lãi" value={`${row.margin.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`} />
       </dl>
     </div>
   );
+}
+
+function OrderStatus({ status }: { status: ReportInvoiceRow["status"] }) {
+  const label = status === "completed" ? "Hoàn thành" : status === "returned" ? "Hoàn trả" : status === "cancelled" ? "Đã hủy" : "Đang xử lý";
+  return <span className={cn("inline-flex rounded-md px-2 py-1 text-[10px] font-bold", status === "completed" ? "bg-emerald-50 text-emerald-700" : status === "returned" ? "bg-teal-50 text-teal-700" : status === "cancelled" ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-700")}>{label}</span>;
 }

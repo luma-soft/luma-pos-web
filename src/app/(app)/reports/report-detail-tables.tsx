@@ -44,6 +44,31 @@ export function ReportProductsTable({ rows }: { rows: ReportProductRow[] }) {
       cellClassName: (row) => cn("font-semibold", Number(row.profit) >= 0 ? "text-ok" : "text-er"),
       render: (row) => formatCurrency(Number(row.profit)),
     },
+    {
+      key: "margin",
+      label: "Biên lãi",
+      defaultVisible: true,
+      align: "right",
+      width: "120px",
+      cellClassName: (row) => row.margin < 0 ? "font-semibold text-er" : "",
+      render: (row) => `${row.margin.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`,
+    },
+    {
+      key: "returns",
+      label: "Hoàn trả",
+      defaultVisible: true,
+      align: "right",
+      width: "110px",
+      render: (row) => formatNumber(row.returnCount),
+    },
+    {
+      key: "contribution",
+      label: "Đóng góp",
+      defaultVisible: true,
+      align: "right",
+      width: "130px",
+      render: (row) => `${row.contribution.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`,
+    },
   ];
   return (
     <ReportTable
@@ -104,6 +129,13 @@ export function ReportCustomersTable({ rows }: { rows: ReportCustomerRow[] }) {
       render: (row) => formatNumber(row.orderCount),
     },
     {
+      key: "segment",
+      label: "Loại khách",
+      defaultVisible: true,
+      width: "120px",
+      render: (row) => <span className={row.segment === "new" ? "text-info" : "text-ok"}>{row.segment === "new" ? "Khách mới" : "Quay lại"}</span>,
+    },
+    {
       key: "revenue",
       label: t("reports.revenue"),
       defaultVisible: true,
@@ -113,13 +145,29 @@ export function ReportCustomersTable({ rows }: { rows: ReportCustomerRow[] }) {
       render: (row) => formatCurrency(Number(row.revenue)),
     },
     {
-      key: "uncollected",
-      label: t("reports.uncollected"),
+      key: "profit",
+      label: t("reports.grossProfit"),
       defaultVisible: true,
       align: "right",
       width: "180px",
-      cellClassName: (row) => Number(row.remaining) > 0 ? "font-semibold text-er" : "text-slate-400",
-      render: (row) => Number(row.remaining) > 0 ? formatCurrency(Number(row.remaining)) : "—",
+      cellClassName: (row) => row.profit >= 0 ? "font-semibold text-ok" : "font-semibold text-er",
+      render: (row) => formatCurrency(row.profit),
+    },
+    {
+      key: "margin",
+      label: "Biên lãi",
+      defaultVisible: true,
+      align: "right",
+      width: "110px",
+      render: (row) => `${row.margin.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`,
+    },
+    {
+      key: "average",
+      label: "Giá trị TB",
+      defaultVisible: true,
+      align: "right",
+      width: "150px",
+      render: (row) => formatCurrency(row.averageOrder),
     },
   ];
   return (
