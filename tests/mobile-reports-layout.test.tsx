@@ -10,7 +10,6 @@ import viMessages from "../messages/vi.json";
 import { GroupTabs } from "@/components/group-tabs";
 import {
   ReportCustomerMobileRow,
-  ReportEmployeeMobileRow,
   ReportProductMobileRow,
 } from "@/app/(app)/reports/report-detail-tables";
 import { ReportInvoiceMobileRow } from "@/app/(app)/reports/report-invoices-table";
@@ -59,9 +58,8 @@ describe("mobile report rows", () => {
     expect(html).toContain("<dd");
   });
 
-  test("customer and employee rows preserve their report dimensions", () => {
+  test("customer row preserves its report dimensions", () => {
     const customerName = "Công ty TNHH Thiết bị An ninh Nguyễn An Chi nhánh Trung tâm";
-    const employeeName = "Trần Bình Nhân viên tư vấn dự án khu vực phía Nam";
     const customerHtml = renderWithMessages(
       <ReportCustomerMobileRow
         row={{
@@ -80,24 +78,10 @@ describe("mobile report rows", () => {
         }}
       />,
     );
-    const employeeHtml = renderWithMessages(
-      <ReportEmployeeMobileRow
-        row={{
-          sellerId: "employee-1",
-          sellerName: employeeName,
-          orderCount: 6,
-          revenue: "7200000",
-          collected: "6800000",
-        }}
-      />,
-    );
 
     expect(customerHtml).toContain(`<div class="break-words text-sm font-black leading-snug">${customerName}</div>`);
     expect(customerHtml).toContain("500.000");
     expect(customerHtml).toContain("text-er");
-    expect(employeeHtml).toContain(`<div class="break-words text-sm font-black leading-snug">${employeeName}</div>`);
-    expect(employeeHtml).toContain("6.800.000");
-    expect(employeeHtml).toContain("text-ok");
   });
 
   test("invoice row exposes a 44px order link and all financial values", () => {

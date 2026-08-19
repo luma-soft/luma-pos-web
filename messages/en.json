@@ -2285,19 +2285,15 @@
     "invoices": "Orders",
     "products": "Products",
     "customers": "Customers",
-    "employees": "Employees",
     "unitLabels": {
       "products": "products",
-      "customers": "customers",
-      "employees": "employees"
+      "customers": "customers"
     },
     "topProducts": "Top products by revenue",
     "qtySold": "Qty sold",
     "grossProfit": "Gross profit",
     "byCategory": "Revenue by category",
-    "topCustomers": "Top customers by revenue",
-    "byEmployee": "By employee",
-    "employee": "Employee"
+    "topCustomers": "Top customers by revenue"
   },
   "returns": {
     "action": "Return items",

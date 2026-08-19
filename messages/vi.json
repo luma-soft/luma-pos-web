@@ -2285,19 +2285,15 @@
     "invoices": "Đơn hàng",
     "products": "Sản phẩm",
     "customers": "Khách hàng",
-    "employees": "Nhân viên",
     "unitLabels": {
       "products": "sản phẩm",
-      "customers": "khách hàng",
-      "employees": "nhân viên"
+      "customers": "khách hàng"
     },
     "topProducts": "Top sản phẩm theo doanh thu",
     "qtySold": "SL bán",
     "grossProfit": "Lãi gộp",
     "byCategory": "Doanh thu theo danh mục",
-    "topCustomers": "Top khách hàng theo doanh thu",
-    "byEmployee": "Theo nhân viên",
-    "employee": "Nhân viên"
+    "topCustomers": "Top khách hàng theo doanh thu"
   },
   "returns": {
     "action": "Trả hàng",

@@ -346,13 +346,6 @@ export async function getReportCustomers(
 
 export type ReportProductRow = Awaited<ReturnType<typeof getReportProducts>>["rows"][number];
 export type ReportCustomerRow = Awaited<ReturnType<typeof getReportCustomers>>["rows"][number];
-export type ReportEmployeeRow = {
-  sellerId: string | null;
-  sellerName: string;
-  orderCount: number;
-  revenue: string;
-  collected: string;
-};
 
 async function getCoreReportsForDatabase(
   database: ReportDatabase,
