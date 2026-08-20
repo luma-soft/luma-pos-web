@@ -178,6 +178,7 @@ export function DataTableShell<T>({
   visibleColumnKeys,
   onColumnVisibilityChange,
   maxHeight = "calc(100dvh - 250px)",
+  minHeight = 280,
   fillHeight = true,
   canExpand,
 }: {
@@ -212,6 +213,8 @@ export function DataTableShell<T>({
   /** Đồng bộ thay đổi từ menu chọn cột về UI bên ngoài. */
   onColumnVisibilityChange?: (keys: Set<string>) => void;
   maxHeight?: string;
+  /** Minimum desktop scroll-region height when fillHeight is enabled. */
+  minHeight?: number;
   fillHeight?: boolean;
   canExpand?: (row: T) => boolean;
 }) {
@@ -266,12 +269,12 @@ export function DataTableShell<T>({
       // Reserve only the pagination row and a small bottom inset. The app shell
       // constrains the viewport, so a large safety gap would leave visible
       // whitespace below every table.
-      setAvailableHeight(Math.max(280, Math.floor(window.innerHeight - top - 96)));
+      setAvailableHeight(Math.max(minHeight, Math.floor(window.innerHeight - top - 96)));
     };
     updateHeight();
     window.addEventListener("resize", updateHeight);
     return () => window.removeEventListener("resize", updateHeight);
-  }, [fillHeight, maxHeight]);
+  }, [fillHeight, maxHeight, minHeight]);
 
   const defaultVisible = useMemo(
     () => new Set(columns.filter((column) => column.required || column.defaultVisible !== false).map((column) => column.key)),

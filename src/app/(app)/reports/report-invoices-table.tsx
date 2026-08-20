@@ -92,6 +92,7 @@ export function ReportInvoicesTable({ rows }: { rows: ReportInvoiceRow[] }) {
       columns={columns}
       getRowId={(invoice) => invoice.id}
       minWidth="900px"
+      minHeight={420}
       empty={<div className="rounded-card border border-dashed border-border p-12 text-center text-sm text-slate-400">{t("dashboard.noData")}</div>}
       renderMobileRow={({ row }) => <ReportInvoiceMobileRow row={row} />}
     />

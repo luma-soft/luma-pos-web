@@ -231,6 +231,7 @@ function ReportTable<T>({
       getRowId={getRowId}
       renderMobileRow={({ row }) => renderMobileRow(row)}
       minWidth="760px"
+      minHeight={420}
       empty={<div className={emptyClassName}>{t("dashboard.noData")}</div>}
     />
   );

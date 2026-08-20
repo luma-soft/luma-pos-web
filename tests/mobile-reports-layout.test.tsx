@@ -227,4 +227,12 @@ describe("mobile report controls", () => {
     expect(filterSource).toContain('rootClassName="w-56"');
     expect(filterSource).toContain("menuMinWidth={224}");
   });
+
+  test("orders, products, and customers use the taller desktop report table", () => {
+    const invoicesSource = readFileSync("src/app/(app)/reports/report-invoices-table.tsx", "utf8");
+    const detailsSource = readFileSync("src/app/(app)/reports/report-detail-tables.tsx", "utf8");
+
+    expect(invoicesSource).toContain("minHeight={420}");
+    expect(detailsSource).toContain("minHeight={420}");
+  });
 });
