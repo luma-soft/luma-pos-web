@@ -763,13 +763,14 @@ export async function getProduct(storeId: string, id: string) {
 
   const units = await db
     .select({
+      id: productUnits.id,
       unitName: productUnits.unitName,
       multiplier: productUnits.multiplier,
       barcode: productUnits.barcode,
       priceOverride: productUnits.priceOverride,
     })
     .from(productUnits)
-    .where(eq(productUnits.productId, id))
+    .where(and(eq(productUnits.storeId, storeId), eq(productUnits.productId, id)))
     .orderBy(asc(productUnits.sortOrder));
 
   const comboItems = await db
@@ -843,6 +844,7 @@ export async function getProduct(storeId: string, id: string) {
   const childUnits = children.length > 0
     ? await db
         .select({
+          id: productUnits.id,
           productId: productUnits.productId,
           unitName: productUnits.unitName,
           multiplier: productUnits.multiplier,
@@ -850,7 +852,10 @@ export async function getProduct(storeId: string, id: string) {
           priceOverride: productUnits.priceOverride,
         })
         .from(productUnits)
-        .where(inArray(productUnits.productId, children.map((child) => child.id)))
+        .where(and(
+          eq(productUnits.storeId, storeId),
+          inArray(productUnits.productId, children.map((child) => child.id)),
+        ))
         .orderBy(asc(productUnits.sortOrder))
     : [];
   const childUnitsByProduct = new Map<string, typeof childUnits>();

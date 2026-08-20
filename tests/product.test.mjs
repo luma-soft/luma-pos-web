@@ -8,6 +8,7 @@ import { and, count, desc, eq, ilike, or, sql as dsql } from "drizzle-orm";
 const PROJ = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const schema = await import(`${PROJ}/src/db/schema.ts`);
 const { products, productUnits, stockLevels, stockMovements, warehouses, categories, brands } = schema;
+const { syncProductUnits } = await import(`${PROJ}/src/lib/products/product-unit-sync.ts`);
 
 const client = new PGlite();
 const db = drizzle(client, { schema });
@@ -82,6 +83,99 @@ ok("product inserted", !!result.id);
 
 const unitRows = await db.select().from(productUnits).where(eq(productUnits.productId, result.id));
 ok("2 product_units saved", unitRows.length === 2, `got ${unitRows.length}`);
+
+const testStoreFallback = process.env.LUMA_TEST_STORE_ID;
+delete process.env.LUMA_TEST_STORE_ID;
+let unitSyncError = null;
+try {
+  await db.transaction((tx) => syncProductUnits(tx, {
+    storeId: unitRows[0].storeId,
+    productId: result.id,
+    units: unitRows.map((unit) => ({
+      id: unit.id,
+      unitName: unit.unitName,
+      multiplier: Number(unit.multiplier),
+      barcode: unit.barcode ?? undefined,
+      priceOverride: unit.priceOverride != null ? Number(unit.priceOverride) : null,
+    })),
+  }));
+} catch (error) {
+  unitSyncError = error;
+} finally {
+  process.env.LUMA_TEST_STORE_ID = testStoreFallback;
+}
+const unitRowsAfterSync = await db.select().from(productUnits).where(eq(productUnits.productId, result.id));
+ok(
+  "unchanged product units keep their ids without a store fallback",
+  unitSyncError == null &&
+    unitRowsAfterSync.length === unitRows.length &&
+    unitRowsAfterSync.every((unit) => unitRows.some((before) => before.id === unit.id)),
+  unitSyncError instanceof Error ? unitSyncError.message : "unit ids changed",
+);
+
+await db.transaction((tx) => syncProductUnits(tx, {
+  storeId: unitRows[0].storeId,
+  productId: result.id,
+  units: unitRows.map((unit) => ({
+    unitName: unit.unitName,
+    multiplier: Number(unit.multiplier),
+    barcode: unit.barcode ?? undefined,
+    priceOverride: unit.priceOverride != null ? Number(unit.priceOverride) : null,
+  })),
+}));
+const unitRowsAfterLegacySync = await db.select().from(productUnits).where(eq(productUnits.productId, result.id));
+ok(
+  "unit names preserve ids for clients that do not send unit ids",
+  unitRowsAfterLegacySync.length === unitRows.length &&
+    unitRowsAfterLegacySync.every((unit) => unitRows.some((before) => before.id === unit.id)),
+  "legacy unit payload replaced existing rows",
+);
+
+const keptUnit = unitRows[0];
+const removedUnit = unitRows[1];
+await db.transaction((tx) => syncProductUnits(tx, {
+  storeId: keptUnit.storeId,
+  productId: result.id,
+  units: [
+    {
+      id: keptUnit.id,
+      unitName: keptUnit.unitName,
+      multiplier: 12,
+      barcode: "8930000000123",
+      priceOverride: 300000,
+    },
+    {
+      unitName: "pallet",
+      multiplier: 480,
+      priceOverride: 11_500_000,
+    },
+  ],
+}));
+const unitRowsAfterChanges = await db.select().from(productUnits)
+  .where(eq(productUnits.productId, result.id))
+  .orderBy(productUnits.sortOrder);
+ok(
+  "product unit sync updates, inserts, and deletes without replacing retained rows",
+  unitRowsAfterChanges.length === 2 &&
+    unitRowsAfterChanges[0].id === keptUnit.id &&
+    Number(unitRowsAfterChanges[0].multiplier) === 12 &&
+    unitRowsAfterChanges[0].barcode === "8930000000123" &&
+    !unitRowsAfterChanges.some((unit) => unit.id === removedUnit.id) &&
+    unitRowsAfterChanges[1].unitName === "pallet" &&
+    unitRowsAfterChanges[1].storeId === keptUnit.storeId,
+  "unit reconciliation did not preserve the retained row",
+);
+await db.transaction((tx) => syncProductUnits(tx, {
+  storeId: keptUnit.storeId,
+  productId: result.id,
+  units: unitRows.map((original, index) => ({
+    id: unitRowsAfterChanges[index]?.id,
+    unitName: original.unitName,
+    multiplier: Number(original.multiplier),
+    barcode: original.barcode ?? undefined,
+    priceOverride: original.priceOverride != null ? Number(original.priceOverride) : null,
+  })),
+}));
 const [sl] = await db.select().from(stockLevels).where(eq(stockLevels.productId, result.id));
 ok("stock_levels = 48, min 200", Number(sl.quantity) === 48 && Number(sl.minLevel) === 200);
 const mv = await db.select().from(stockMovements).where(eq(stockMovements.productId, result.id));

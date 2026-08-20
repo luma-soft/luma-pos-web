@@ -15,6 +15,7 @@ export function MultiUnitField() {
   const { fields, append, remove } = useFieldArray({
     control,
     name: "units",
+    keyName: "fieldKey",
   });
 
   return (
@@ -31,7 +32,7 @@ export function MultiUnitField() {
         <div className="space-y-2">
           {fields.map((field, idx) => (
             <div
-              key={field.id}
+              key={field.fieldKey}
               className="grid grid-cols-1 md:grid-cols-[1fr_140px_1fr_1fr_auto] gap-2 items-start p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg"
             >
               <Field labelTx="products.units.unitName" className="min-w-0">

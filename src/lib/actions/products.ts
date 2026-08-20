@@ -20,6 +20,7 @@ import {
 } from "@/db/schema";
 import {
   createProductSchema,
+  productUnitSchema,
   siblingApplySchema,
   type CreateProductOutput,
 } from "@/app/(app)/products/new/schema";
@@ -31,6 +32,7 @@ import {
   requireFeatureRole,
   toMoney,
 } from "./common";
+import { syncProductUnits } from "@/lib/products/product-unit-sync";
 
 /** Tạo nhóm hàng mới từ form (combobox "+ thêm"). Trả id. */
 export async function createCategory(
@@ -362,14 +364,7 @@ const updateProductSchema = z.object({
   isActive: z.boolean(),
   specs: z.record(z.string(), z.array(z.string())).nullable(),
   applyToSiblings: siblingApplySchema.optional(),
-  units: z.array(
-    z.object({
-      unitName: z.string().trim().min(1),
-      multiplier: z.number().positive(),
-      barcode: z.string().trim().optional(),
-      priceOverride: z.number().min(0).nullable(),
-    }),
-  ),
+  units: z.array(productUnitSchema),
 }).superRefine((value, ctx) => {
   if (
     value.productKind === "combo" &&
@@ -673,22 +668,11 @@ export async function updateProduct(
         })
         .where(and(eq(products.storeId, gate.storeId), eq(products.id, v.id)));
 
-      // thay toàn bộ đơn vị quy đổi
-      await tx.delete(productUnits).where(eq(productUnits.productId, v.id));
-      const valid = v.units.filter((u) => u.unitName && u.multiplier > 0);
-      if (valid.length > 0) {
-        await tx.insert(productUnits).values(
-          valid.map((u, i) => ({
-            productId: v.id,
-            unitName: u.unitName,
-            multiplier: String(u.multiplier),
-            barcode: u.barcode || null,
-            priceOverride:
-              u.priceOverride != null ? String(u.priceOverride) : null,
-            sortOrder: i,
-          })),
-        );
-      }
+      await syncProductUnits(tx, {
+        storeId: gate.storeId,
+        productId: v.id,
+        units: v.units,
+      });
 
       if (
         v.comboItems !== undefined
@@ -813,22 +797,16 @@ export async function updateProduct(
             .where(and(eq(products.storeId, gate.storeId), eq(products.id, sibling.id)));
 
           if (fields.has("units")) {
-            await tx
-              .delete(productUnits)
-              .where(eq(productUnits.productId, sibling.id));
-            if (valid.length > 0) {
-              await tx.insert(productUnits).values(
-                valid.map((u, i) => ({
-                  productId: sibling.id,
-                  unitName: u.unitName,
-                  multiplier: String(u.multiplier),
-                  barcode: u.barcode || null,
-                  priceOverride:
-                    u.priceOverride != null ? String(u.priceOverride) : null,
-                  sortOrder: i,
-                })),
-              );
-            }
+            await syncProductUnits(tx, {
+              storeId: gate.storeId,
+              productId: sibling.id,
+              units: v.units.map((unit) => ({
+                unitName: unit.unitName,
+                multiplier: unit.multiplier,
+                barcode: unit.barcode,
+                priceOverride: unit.priceOverride,
+              })),
+            });
           }
         }
       }
@@ -845,6 +823,7 @@ export async function updateProduct(
     const known: Record<string, string> = {
       PRODUCT_NOT_FOUND: "errors.invalidData",
       PRODUCT_KIND_IMMUTABLE: "products.errors.kindImmutable",
+      PRODUCT_UNIT_NOT_FOUND: "errors.invalidData",
     };
     const message = e instanceof Error ? e.message : "";
     if (known[message]) return { ok: false, error: known[message] };
@@ -899,6 +878,7 @@ export async function createProduct(
         if (validUnits.length === 0) return;
         await tx.insert(productUnits).values(
           validUnits.map((u, i) => ({
+            storeId,
             productId,
             unitName: u.unitName.trim(),
             multiplier: String(u.multiplier),

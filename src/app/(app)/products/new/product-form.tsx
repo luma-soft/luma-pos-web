@@ -226,12 +226,7 @@ export function NewProductForm({
         isActive: values.directSale,
         specs: specsWithOrderNote(specs, values.invoiceNote),
         applyToSiblings: values.applyToSiblings,
-        units: values.units.map((u) => ({
-          unitName: u.unitName,
-          multiplier: u.multiplier,
-          barcode: u.barcode,
-          priceOverride: u.priceOverride ?? null,
-        })),
+        units: values.units,
       });
       if (res.ok) {
         const href =

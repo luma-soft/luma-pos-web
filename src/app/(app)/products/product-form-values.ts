@@ -34,6 +34,7 @@ export function productToFormInitialValues(
       ]),
     ),
     units: product.units.map((u) => ({
+      id: mode === "edit" ? u.id : undefined,
       unitName: u.unitName,
       multiplier: Number(u.multiplier),
       barcode: mode === "copy" ? "" : (u.barcode ?? ""),

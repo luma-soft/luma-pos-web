@@ -1,10 +1,11 @@
 import { z } from "zod";
 
 export const productUnitSchema = z.object({
+  id: z.uuid().optional(),
   unitName: z.string().min(1, { error: "validation.required" }),
   multiplier: z.number().positive(),
   barcode: z.string().optional(),
-  priceOverride: z.number().nullable().optional(),
+  priceOverride: z.number().min(0).nullable().optional(),
 });
 
 export const productAttributeSchema = z.object({
