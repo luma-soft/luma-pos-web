@@ -43,7 +43,6 @@ export function OverviewReport({ data }: { data: ReportsData }) {
         />
       </ReportSurface>
 
-      <CustomerMiniTable rows={data.byCustomer.slice(0, 7)} />
     </div>
   );
 }
@@ -240,8 +239,6 @@ function OrderChart({ rows }: { rows: ReportsData["byDay"] }) {
     </div>
   );
 }
-
-function CustomerMiniTable({ rows }: { rows: ReportsData["byCustomer"] }) { return <ReportSurface title="Khách hàng"><div className="space-y-2">{rows.map((row, index) => <div key={row.customerId ?? `walkin-${index}`} className="grid grid-cols-[18px_1fr_auto_auto] gap-2 text-[10px]"><span>{index + 1}</span><span className="truncate font-semibold">{row.customerName}</span><span>{row.orderCount} đơn</span><span className="text-primary-700">{compactMoney(row.profit)}</span></div>)}</div></ReportSurface>; }
 
 function StatusCard({ icon, label, value, color, delta, inverse }: { icon: React.ReactNode; label: string; value: number; color: string; delta: number | null; inverse?: boolean }) { return <div className="flex min-w-0 flex-col items-center gap-1 rounded-xl border border-border bg-surface p-2 text-center [&_.delta-context]:hidden lg:flex-row lg:gap-3 lg:p-3 lg:text-left"><span className={cn("[&>svg]:h-6 [&>svg]:w-6 lg:[&>svg]:h-9 lg:[&>svg]:w-9", color)}>{icon}</span><div className="min-w-0"><div className="truncate text-[10px] text-slate-500 lg:text-xs">{label}</div><div className="text-lg font-black lg:text-xl">{value}</div><Delta value={delta} inverse={inverse} /></div></div>; }
 

@@ -236,7 +236,7 @@ describe("mobile report controls", () => {
     expect(detailsSource).toContain("minHeight={420}");
   });
 
-  test("overview uses a full-width four-color trend and keeps only the customer summary", () => {
+  test("overview uses a full-width four-color trend without secondary summaries", () => {
     const source = readFileSync("src/app/(app)/reports/report-dashboard.tsx", "utf8");
 
     expect(source).toContain('previousColor: "#2563eb"');
@@ -245,6 +245,6 @@ describe("mobile report controls", () => {
     expect(source).not.toContain('<ReportSurface title="Cầu nối tài chính"');
     expect(source).not.toContain("<OverviewOrders data={data} />");
     expect(source).not.toContain("<ProductMiniTable rows={data.topProducts.slice(0, 7)} />");
-    expect(source).toContain("<CustomerMiniTable rows={data.byCustomer.slice(0, 7)} />");
+    expect(source).not.toContain("<CustomerMiniTable rows={data.byCustomer.slice(0, 7)} />");
   });
 });
