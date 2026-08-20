@@ -42,11 +42,22 @@ export function PosSummaryAdjustRow({
   );
 }
 
-export function PosStockQuantityTooltip({ stock, booked, unit }: { stock: number; booked: number; unit: string }) {
+export function PosStockQuantityTooltip({
+  stock,
+  ordered,
+  reserved,
+  unit,
+}: {
+  stock: number;
+  ordered: number;
+  reserved: number;
+  unit: string;
+}) {
   return (
-    <div className="pointer-events-none absolute left-1/2 top-full z-[80] mt-2 min-w-34 -translate-x-1/2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-semibold text-slate-800 opacity-0 shadow-e2 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 dark:text-slate-100">
+    <div className="pointer-events-none absolute left-1/2 top-full z-[80] mt-2 min-w-40 -translate-x-1/2 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-semibold text-slate-800 opacity-0 shadow-e2 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 dark:text-slate-100">
       <div>{`Tồn: ${formatNumber(stock)} ${unit}`}</div>
-      <div>{`Đặt: ${formatNumber(booked)} ${unit}`}</div>
+      <div>{`Trong đơn: ${formatNumber(ordered)} ${unit}`}</div>
+      <div>{`Đã giữ: ${formatNumber(reserved)} ${unit}`}</div>
     </div>
   );
 }

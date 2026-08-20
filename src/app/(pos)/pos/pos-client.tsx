@@ -40,6 +40,7 @@ import type { PosData, PosProduct, PosUnit } from "@/lib/data/pos";
 import { isProductStockManaged } from "@/lib/product-stock";
 import { rehydrateCartProducts } from "@/lib/pos/rehydrate-cart-products";
 import { buildPosOrderItemPayload } from "@/lib/pos/order-item-payload";
+import { resolvePosCartUnit } from "@/lib/pos/cart-unit";
 import {
   createLinePriceEditorState,
   resolveLinePriceEditor,
@@ -1054,14 +1055,13 @@ export function PosClient({
       if (existing) {
         return c.map((l) => (l.key === existing.key ? { ...l, quantity: l.quantity + 1 } : l));
       }
-      // mặc định: đơn vị đầu tiên nếu có, không thì đơn vị gốc
-      const unit = p.units[0] ?? null;
+      const unit = resolvePosCartUnit(p.baseUnit, p.units);
       return [...c, {
         key: `${p.id}-${Date.now()}`,
         product: p,
-        unitName: unit?.unitName ?? p.baseUnit,
-        unitMultiplier: unit ? Number(unit.multiplier) : 1,
-        unitPrice: unitPriceFor(p, unit, priceBook),
+        unitName: unit.unitName,
+        unitMultiplier: unit.unitMultiplier,
+        unitPrice: unitPriceFor(p, unit.alternateUnit, priceBook),
         quantity: 1,
       }];
     });
@@ -1074,13 +1074,13 @@ export function PosClient({
       if (existing) {
         return c.map((l) => (l.key === existing.key ? { ...l, quantity: l.quantity + safeQuantity } : l));
       }
-      const unit = p.units[0] ?? null;
+      const unit = resolvePosCartUnit(p.baseUnit, p.units);
       return [...c, {
         key: `${p.id}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
         product: p,
-        unitName: unit?.unitName ?? p.baseUnit,
-        unitMultiplier: unit ? Number(unit.multiplier) : 1,
-        unitPrice: unitPriceFor(p, unit, priceBook),
+        unitName: unit.unitName,
+        unitMultiplier: unit.unitMultiplier,
+        unitPrice: unitPriceFor(p, unit.alternateUnit, priceBook),
         quantity: safeQuantity,
       }];
     });
@@ -1190,13 +1190,13 @@ export function PosClient({
   function changeUnit(key: string, unitName: string) {
     setCart((c) => c.map((l) => {
       if (l.key !== key) return l;
-      const unit = l.product.units.find((u) => u.unitName === unitName) ?? null;
+      const unit = resolvePosCartUnit(l.product.baseUnit, l.product.units, unitName);
       // đổi đơn vị → tính lại giá niêm yết, bỏ sửa giá tay cũ
       return {
         ...l,
-        unitName: unit?.unitName ?? l.product.baseUnit,
-        unitMultiplier: unit ? Number(unit.multiplier) : 1,
-        unitPrice: unitPriceFor(l.product, unit, l.priceBook ?? priceBook),
+        unitName: unit.unitName,
+        unitMultiplier: unit.unitMultiplier,
+        unitPrice: unitPriceFor(l.product, unit.alternateUnit, l.priceBook ?? priceBook),
         lineDiscount: 0,
         manualPrice: false,
       };
@@ -1752,7 +1752,12 @@ export function PosClient({
                     </div>
                   )}
                   {stockManaged && (
-                    <PosStockQuantityTooltip stock={Number(l.product.stock)} booked={Number(l.product.booked)} unit={l.product.baseUnit} />
+                    <PosStockQuantityTooltip
+                      stock={Number(l.product.stock)}
+                      ordered={ordered}
+                      reserved={Number(l.product.booked)}
+                      unit={l.product.baseUnit}
+                    />
                   )}
                 </PosQuantitySlot>
                 <div className="relative flex h-8 w-28 shrink-0 items-start justify-end">
@@ -1965,6 +1970,9 @@ export function PosClient({
                       const ordered = orderedBaseQuantityByProduct.get(p.id) ?? 0;
                       const stockInsufficient = exceedsAvailableStock(stockManaged, stock, ordered + Number(p.booked), isReturnDraft);
                       const children = productChildren(p);
+                      const resultPriceLabel = line
+                        ? `${formatCurrency(effPrice(line).price)}${posUnitSuffix(line.unitName)}`
+                        : `${priceLabelFor(p, priceBook)}${p.isVariantParent ? "" : posUnitSuffix(p.baseUnit)}`;
                       return (
                         <PosSearchResultLayout
                           key={p.id}
@@ -1997,12 +2005,17 @@ export function PosClient({
                                   inputClassName={cn(stockInsufficient && "border-er text-er")}
                                 />
                                 {stockManaged && (
-                                  <PosStockQuantityTooltip stock={stock} booked={Number(p.booked)} unit={p.baseUnit} />
+                                  <PosStockQuantityTooltip
+                                    stock={stock}
+                                    ordered={ordered}
+                                    reserved={Number(p.booked)}
+                                    unit={p.baseUnit}
+                                  />
                                 )}
                               </PosQuantitySlot>
                             )}
                             <div className="text-sm font-semibold text-primary-600 tabular-nums text-right w-24 sm:w-32">
-                              {priceLabelFor(p, priceBook)}{p.isVariantParent ? "" : posUnitSuffix(p.baseUnit)}
+                              {resultPriceLabel}
                             </div>
                             </>
                           )}
