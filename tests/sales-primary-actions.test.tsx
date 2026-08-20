@@ -26,4 +26,11 @@ describe("sales primary actions", () => {
       expect(read(path)).not.toContain("ml-auto");
     }
   });
+
+  test("uses the shared default button height for the active tab action", () => {
+    const page = read("src/app/(app)/sales/page.tsx");
+
+    expect(page).toContain('buttonVariants({ size: "default" })');
+    expect(page).not.toContain("lg:min-h-0");
+  });
 });

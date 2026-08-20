@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ClipboardList, FilePlus2, RotateCcw, ShoppingCart } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { GroupTabs } from "@/components/group-tabs";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { Text } from "@/components/ui/text";
 import { OrdersTab } from "./tabs/orders";
 import { QuotesTab } from "./tabs/quotes";
@@ -11,6 +12,7 @@ import { EInvoicesTab } from "./tabs/einvoices";
 import { ReturnsTab } from "./tabs/returns";
 import { EINVOICE_UI_ENABLED } from "@/lib/features";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -102,7 +104,10 @@ function SalesPrimaryAction({
     <Link
       href={action.href}
       aria-label={action.label}
-      className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-full bg-primary-600 px-3.5 text-sm font-semibold text-white transition hover:brightness-110 active:scale-[0.98] min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
+      className={cn(
+        buttonVariants({ size: "default" }),
+        "min-w-11 shrink-0 rounded-full px-3.5 font-semibold lg:min-w-0",
+      )}
     >
       <Icon className="size-4" />
       <span className="hidden sm:inline">{action.label}</span>
