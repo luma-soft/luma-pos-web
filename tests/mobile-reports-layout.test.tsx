@@ -235,4 +235,16 @@ describe("mobile report controls", () => {
     expect(invoicesSource).toContain("minHeight={420}");
     expect(detailsSource).toContain("minHeight={420}");
   });
+
+  test("overview uses a full-width four-color trend and keeps only the customer summary", () => {
+    const source = readFileSync("src/app/(app)/reports/report-dashboard.tsx", "utf8");
+
+    expect(source).toContain('previousColor: "#2563eb"');
+    expect(source).toContain('previousColor: "#d97706"');
+    expect(source).toContain("lg:aspect-[1000/220]");
+    expect(source).not.toContain('<ReportSurface title="Cầu nối tài chính"');
+    expect(source).not.toContain("<OverviewOrders data={data} />");
+    expect(source).not.toContain("<ProductMiniTable rows={data.topProducts.slice(0, 7)} />");
+    expect(source).toContain("<CustomerMiniTable rows={data.byCustomer.slice(0, 7)} />");
+  });
 });

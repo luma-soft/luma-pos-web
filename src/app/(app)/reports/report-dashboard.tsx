@@ -31,31 +31,19 @@ export function OverviewReport({ data }: { data: ReportsData }) {
       </KpiGrid>
 
       <ReportSurface title="Doanh thu & lãi gộp theo ngày">
-        <ChartLegend items={[["Doanh thu thuần", "#078c87"], ["Lãi gộp", "#076c3b"], ["Doanh thu kỳ trước", "#078c87", true], ["Lãi gộp kỳ trước", "#076c3b", true]]} />
+        <ChartLegend items={[["Doanh thu thuần", "#078c87"], ["Lãi gộp", "#076c3b"], ["Doanh thu kỳ trước", "#2563eb", true], ["Lãi gộp kỳ trước", "#d97706", true]]} />
         <LineChart
           rows={data.byDay}
           previous={data.previous.byDay}
-          series={[{ key: "revenue", color: "#078c87" }, { key: "grossProfit", color: "#076c3b" }]}
+          series={[
+            { key: "revenue", color: "#078c87", previousColor: "#2563eb" },
+            { key: "grossProfit", color: "#076c3b", previousColor: "#d97706" },
+          ]}
+          fullWidth
         />
       </ReportSurface>
 
-      <ReportSurface title="Cầu nối tài chính" subtitle="Triệu đồng" compact>
-        <div className="grid items-center gap-2 text-center sm:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr]">
-          <BridgeValue label="Doanh thu gộp" value={data.summary.grossRevenue} />
-          <BridgeOperator>−</BridgeOperator>
-          <BridgeValue label="Hoàn trả" value={data.summary.refundTotal} />
-          <BridgeOperator>−</BridgeOperator>
-          <BridgeValue label="Giá vốn" value={data.summary.costOfGoods} />
-          <BridgeOperator>=</BridgeOperator>
-          <BridgeValue label="Lãi gộp" value={data.summary.grossProfit} featured />
-        </div>
-      </ReportSurface>
-
-      <div className="grid gap-4 xl:grid-cols-[0.9fr_1.2fr_1.1fr]">
-        <OverviewOrders data={data} />
-        <ProductMiniTable rows={data.topProducts.slice(0, 7)} />
-        <CustomerMiniTable rows={data.byCustomer.slice(0, 7)} />
-      </div>
+      <CustomerMiniTable rows={data.byCustomer.slice(0, 7)} />
     </div>
   );
 }
@@ -203,11 +191,11 @@ function ReportSurface({ title, subtitle, children, compact, flush }: { title: s
 
 function ChartLegend({ items }: { items: [string, string, boolean?][] }) { return <div className="mb-3 flex flex-wrap gap-x-5 gap-y-2 text-[10px] text-slate-600">{items.map(([label, color, dotted]) => <span key={label} className="inline-flex items-center gap-2"><span className={cn("h-0.5 w-4", dotted && "border-t-2 border-dotted bg-transparent")} style={{ backgroundColor: dotted ? undefined : color, borderColor: color }} />{label}</span>)}</div>; }
 
-function LineChart({ rows, previous, series }: { rows: ReportsData["byDay"]; previous?: ReportsData["byDay"]; series: { key: "revenue" | "grossProfit"; color: string }[] }) {
+function LineChart({ rows, previous, series, fullWidth }: { rows: ReportsData["byDay"]; previous?: ReportsData["byDay"]; series: { key: "revenue" | "grossProfit"; color: string; previousColor?: string }[]; fullWidth?: boolean }) {
   const all = [...rows, ...(previous ?? [])];
   const max = Math.max(1, ...all.flatMap((row) => series.map((item) => Math.abs(row[item.key]))));
   const points = (data: ReportsData["byDay"], key: "revenue" | "grossProfit") => data.map((row, index) => `${(index / Math.max(1, data.length - 1)) * 960 + 20},${190 - Math.max(0, row[key]) / max * 160}`).join(" ");
-  return <div className="overflow-x-auto"><svg viewBox="0 0 1000 220" role="img" aria-label="Biểu đồ doanh thu và lãi gộp theo ngày" className="h-48 min-w-[640px] w-full"><g stroke="#e5e7eb" strokeWidth="1">{[30,70,110,150,190].map((y) => <line key={y} x1="20" y1={y} x2="980" y2={y} />)}</g>{previous && series.map((item) => <polyline key={`p-${item.key}`} fill="none" stroke={item.color} strokeWidth="2" strokeDasharray="4 5" points={points(previous, item.key)} />)}{series.map((item) => <polyline key={item.key} fill="none" stroke={item.color} strokeWidth="2.5" points={points(rows, item.key)} />)}{rows.map((row, index) => <text key={row.day} x={(index / Math.max(1, rows.length - 1)) * 960 + 20} y="214" textAnchor="middle" fontSize="9" fill="#64748b">{row.day.slice(8)}</text>)}</svg></div>;
+  return <div className="overflow-x-auto"><svg viewBox="0 0 1000 220" role="img" aria-label="Biểu đồ doanh thu và lãi gộp theo ngày" className={cn("h-48 min-w-[640px] w-full", fullWidth && "lg:aspect-[1000/220] lg:h-auto")}><g stroke="#e5e7eb" strokeWidth="1">{[30,70,110,150,190].map((y) => <line key={y} x1="20" y1={y} x2="980" y2={y} />)}</g>{previous && series.map((item) => <polyline key={`p-${item.key}`} fill="none" stroke={item.previousColor ?? item.color} strokeWidth="2" strokeDasharray="4 5" points={points(previous, item.key)} />)}{series.map((item) => <polyline key={item.key} fill="none" stroke={item.color} strokeWidth="2.5" points={points(rows, item.key)} />)}{rows.map((row, index) => <text key={row.day} x={(index / Math.max(1, rows.length - 1)) * 960 + 20} y="214" textAnchor="middle" fontSize="9" fill="#64748b">{row.day.slice(8)}</text>)}</svg></div>;
 }
 
 function OrderChart({ rows }: { rows: ReportsData["byDay"] }) {
@@ -253,13 +241,6 @@ function OrderChart({ rows }: { rows: ReportsData["byDay"] }) {
   );
 }
 
-function BridgeValue({ label, value, featured }: { label: string; value: number; featured?: boolean }) { return <div className={cn("rounded-lg border px-3 py-2", featured ? "border-primary-500 text-primary-700" : "border-border")}><div className="font-black tabular-nums">{compactMoney(value)}</div><div className="text-[10px] text-slate-500">{label}</div></div>; }
-function BridgeOperator({ children }: { children: React.ReactNode }) { return <span className="hidden text-lg text-slate-500 sm:block">{children}</span>; }
-
-function OverviewOrders({ data }: { data: ReportsData }) { const total = Math.max(1, data.summary.operationalOrderCount); return <ReportSurface title="Đơn hàng"><div className="grid grid-cols-4 gap-2 text-center"><SmallStat value={data.summary.operationalOrderCount} label="Đơn hàng" /><SmallStat value={compactMoney(data.summary.averageOrder)} label="Giá trị TB" /><SmallStat value={data.summary.returnCount} label="Đơn hoàn" /><SmallStat value={percent(data.summary.returnRate)} label="Tỷ lệ hoàn" /></div><div className="mt-5 space-y-3">{Object.entries(data.orderStatus).map(([key, value]) => <div key={key} className="grid grid-cols-[76px_1fr_28px] items-center gap-2 text-[10px]"><span>{statusLabel(key)}</span><div className="h-2 rounded-full bg-slate-100"><div className="h-full rounded-full bg-primary-700" style={{ width: `${value / total * 100}%` }} /></div><span className="text-right">{value}</span></div>)}</div></ReportSurface>; }
-function SmallStat({ value, label }: { value: string | number; label: string }) { return <div><div className="font-black tabular-nums">{value}</div><div className="mt-1 text-[9px] text-slate-500">{label}</div></div>; }
-
-function ProductMiniTable({ rows }: { rows: ReportsData["topProducts"] }) { return <ReportSurface title="Sản phẩm"><div className="space-y-2">{rows.map((row, index) => <div key={row.productId} className="grid grid-cols-[18px_1fr_auto_auto] gap-2 text-[10px]"><span>{index + 1}</span><span className="truncate font-semibold">{row.productName}</span><span>{compactMoney(row.revenue)}</span><span className={row.profit < 0 ? "text-red-600" : "text-primary-700"}>{compactMoney(row.profit)}</span></div>)}</div></ReportSurface>; }
 function CustomerMiniTable({ rows }: { rows: ReportsData["byCustomer"] }) { return <ReportSurface title="Khách hàng"><div className="space-y-2">{rows.map((row, index) => <div key={row.customerId ?? `walkin-${index}`} className="grid grid-cols-[18px_1fr_auto_auto] gap-2 text-[10px]"><span>{index + 1}</span><span className="truncate font-semibold">{row.customerName}</span><span>{row.orderCount} đơn</span><span className="text-primary-700">{compactMoney(row.profit)}</span></div>)}</div></ReportSurface>; }
 
 function StatusCard({ icon, label, value, color, delta, inverse }: { icon: React.ReactNode; label: string; value: number; color: string; delta: number | null; inverse?: boolean }) { return <div className="flex min-w-0 flex-col items-center gap-1 rounded-xl border border-border bg-surface p-2 text-center [&_.delta-context]:hidden lg:flex-row lg:gap-3 lg:p-3 lg:text-left"><span className={cn("[&>svg]:h-6 [&>svg]:w-6 lg:[&>svg]:h-9 lg:[&>svg]:w-9", color)}>{icon}</span><div className="min-w-0"><div className="truncate text-[10px] text-slate-500 lg:text-xs">{label}</div><div className="text-lg font-black lg:text-xl">{value}</div><Delta value={delta} inverse={inverse} /></div></div>; }
@@ -277,6 +258,5 @@ function MetricComparison({ label, first, second, money }: { label: string; firs
 function average(rows: ReportCustomerRow[], key: "averageOrder") { return rows.length ? rows.reduce((sum, row) => sum + row[key], 0) / rows.length : 0; }
 function ratio(rows: ReportCustomerRow[]) { const revenue = rows.reduce((sum, row) => sum + row.revenue, 0); return revenue === 0 ? 0 : rows.reduce((sum, row) => sum + row.profit, 0) / revenue * 100; }
 function change(current: number, previous: number) { return previous === 0 ? current === 0 ? 0 : null : (current - previous) / Math.abs(previous) * 100; }
-function statusLabel(key: string) { return ({ completed: "Hoàn thành", returned: "Hoàn trả", processing: "Đang xử lý", cancelled: "Đã hủy" } as Record<string, string>)[key] ?? key; }
 function compactMoney(value: number) { const abs = Math.abs(value); const sign = value < 0 ? "−" : ""; if (abs >= 1_000_000_000) return `${sign}${(abs / 1_000_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} tỷ`; if (abs >= 1_000_000) return `${sign}${(abs / 1_000_000).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} tr`; if (abs >= 1_000) return `${sign}${Math.round(abs / 1_000).toLocaleString("vi-VN")} nghìn`; return formatCurrency(value); }
 function percent(value: number) { return `${value.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`; }
