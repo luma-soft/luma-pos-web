@@ -42,8 +42,11 @@ const parseNumber = (str: string): number | null => {
   return isNaN(n) ? null : n;
 };
 
+const affixPadding = (value: string) =>
+  `calc(1rem + ${Math.max(1, Array.from(value.trim()).length)}ch)`;
+
 export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
-  ({ value, defaultValue, onChange, thousandSeparator = true, formatOnChange = false, suffix, prefix, min, max, decimals = 0, className, name, ...props }, ref) => {
+  ({ value, defaultValue, onChange, thousandSeparator = true, formatOnChange = false, suffix, prefix, min, max, decimals = 0, className, name, style, ...props }, ref) => {
     const initialValue = value ?? defaultValue ?? null;
     const [text, setText] = React.useState<string>(
       value != null ? formatNumber(value, thousandSeparator, decimals) :
@@ -115,12 +118,14 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
           value={text}
           onChange={handleChange}
           onBlur={handleBlur}
+          style={{
+            ...style,
+            ...(prefix ? { paddingLeft: affixPadding(prefix) } : null),
+            ...(suffix ? { paddingRight: affixPadding(suffix) } : null),
+          }}
           className={cn(
             "text-right tabular-nums",
             className,
-            // Giữ vùng đệm cho nhãn ngay cả khi caller đặt px-* riêng.
-            prefix && "pl-7",
-            suffix && "pr-14",
             "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
           )}
           {...props}
