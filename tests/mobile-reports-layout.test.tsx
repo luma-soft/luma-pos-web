@@ -216,4 +216,15 @@ describe("mobile report controls", () => {
 
     expect(dateInputs).toHaveLength(2);
   });
+
+  test("reports default to today and the desktop period picker keeps full labels readable", () => {
+    const pageSource = readFileSync("src/app/(app)/reports/page.tsx", "utf8");
+    const filterSource = readFileSync("src/app/(app)/reports/report-period-filter.tsx", "utf8");
+    const mobileRouteSource = readFileSync("src/app/api/mobile/reports/route.ts", "utf8");
+
+    expect(pageSource).toMatch(/requestedPeriod[\s\S]{0,180}: "today";/);
+    expect(mobileRouteSource).toContain('searchParam(request, "range", "today")');
+    expect(filterSource).toContain('rootClassName="w-56"');
+    expect(filterSource).toContain("menuMinWidth={224}");
+  });
 });

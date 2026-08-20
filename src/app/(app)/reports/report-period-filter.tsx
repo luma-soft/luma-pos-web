@@ -72,7 +72,7 @@ export function ReportPeriodFilter({
     <>
       <ReportPeriodChips period={period} onSelect={selectPeriod} />
       <div className="hidden lg:block">
-        <ReportPeriodSelect period={period} onSelect={selectPeriod} className="h-9 min-w-40" />
+        <ReportPeriodSelect period={period} onSelect={selectPeriod} className="h-9" />
       </div>
 
       <RowPreviewModal
@@ -173,6 +173,8 @@ function ReportPeriodSelect({
     <Select
       value={period}
       aria-label={t("reports.period.label")}
+      rootClassName="w-56"
+      menuMinWidth={224}
       className={cn(
         className,
         "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",

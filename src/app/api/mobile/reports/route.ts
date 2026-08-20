@@ -3,7 +3,7 @@ import { requireMobileManager } from "@/lib/mobile/auth";
 import { mobileGate, mobileOk, numberParam, searchParam } from "@/lib/mobile/response";
 
 function reportRange(request: Request) {
-  const range = searchParam(request, "range", "month");
+  const range = searchParam(request, "range", "today");
   const today = startOfDay(new Date());
   const tomorrow = addDays(today, 1);
   let from = new Date(today.getFullYear(), today.getMonth(), 1);

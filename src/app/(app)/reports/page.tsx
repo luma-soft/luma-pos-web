@@ -37,7 +37,7 @@ export default async function ReportsPage({ searchParams }: PageProps) {
   const pageSize = parsePageSize(params.size);
   const legacyPeriod = ["7", "30", "90"].includes(params.range ?? "") ? `${params.range}d` : undefined;
   const requestedPeriod = params.period ?? legacyPeriod;
-  const period = REPORT_PERIODS.includes(requestedPeriod as ReportPeriod) ? requestedPeriod as ReportPeriod : "this_month";
+  const period = REPORT_PERIODS.includes(requestedPeriod as ReportPeriod) ? requestedPeriod as ReportPeriod : "today";
   const dateRange = resolveDateRange(period, params.from, params.to);
   const filters = {
     customerId: typeof params.customerId === "string" ? params.customerId : undefined,
