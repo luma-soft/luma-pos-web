@@ -14,6 +14,7 @@ import {
   Droplets,
 } from "lucide-react";
 import type { ProjectDetail } from "@/lib/data/projects";
+import { evaluateServiceProjectClose } from "@/lib/services/project-close";
 import type { getServiceFormOptions } from "@/lib/data/services";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import {
@@ -236,12 +237,13 @@ function AftercareTab({ detail, serviceOptions }: { detail: ProjectDetail; servi
 function FinanceTab({ detail, serviceOptions }: { detail: ProjectDetail; serviceOptions: ServiceOptions }) {
   const { project, jobs, profitability, costEntries, handoverDocuments, dependencies, coordinationPoints } = detail;
   const financials = profitability ?? { revenue: 0, materialCost: 0, laborCost: 0, otherCost: 0, grossProfit: 0 };
-  const blockers = project.serviceType === "mixed"
-    ? dependencies.filter((item) => !["completed", "waived"].includes(item.status)).length
-      + coordinationPoints.filter((item) => item.isAcceptanceRequired && !["resolved", "waived"].includes(item.status)).length
-    : 0;
-  const jobsIncomplete = jobs.filter((job) => !["completed", "cancelled"].includes(job.status)).length;
-  const canClose = jobsIncomplete === 0 && blockers === 0 && handoverDocuments.some((document) => document.type === "handover" && document.status === "signed");
+  const closeState = evaluateServiceProjectClose({
+    serviceType: project.serviceType!,
+    jobStatuses: jobs.map((job) => job.status),
+    handoverDocuments,
+    dependencies,
+    coordinationPoints,
+  });
   return (
     <div className="space-y-4">
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><FinanceMetric label="Doanh thu" value={financials.revenue} /><FinanceMetric label="Chi phí vật tư" value={financials.materialCost} /><FinanceMetric label="Chi phí nhân công & khác" value={financials.laborCost + financials.otherCost} /><FinanceMetric label="Lợi nhuận gộp" value={financials.grossProfit} success={financials.grossProfit >= 0} /></section>
@@ -250,10 +252,10 @@ function FinanceTab({ detail, serviceOptions }: { detail: ProjectDetail; service
           {costEntries.length ? <div className="space-y-2">{costEntries.map((entry) => <div key={entry.id} className="flex items-center justify-between gap-3 border-b border-border-soft py-2 last:border-0"><div><p className="text-sm font-semibold">{entry.description}</p><p className="text-xs text-slate-500">{entry.type} · {entry.incurredOn}{entry.staffName ? ` · ${entry.staffName}` : ""}</p></div><p className="font-semibold">{formatCurrency(Number(entry.amount))}</p></div>)}</div> : <Empty text="Chưa ghi nhận chi phí ngoài vật tư." />}
         </Panel>
         <Panel title="Điều kiện đóng công trình">
-          <CloseCheck ok={jobsIncomplete === 0} label={jobsIncomplete === 0 ? "Tất cả lệnh việc đã hoàn tất" : `Còn ${jobsIncomplete} lệnh việc chưa hoàn tất`} />
-          <CloseCheck ok={blockers === 0} label={blockers === 0 ? "Không còn điểm giao/phụ thuộc bắt buộc" : `Còn ${blockers} chặn điều phối`} />
-          <CloseCheck ok={handoverDocuments.some((document) => document.type === "handover" && document.status === "signed")} label="Biên bản bàn giao đã ký" />
-          <div className={canClose ? "mt-4 rounded-xl bg-ok-soft p-3 text-sm font-semibold text-ok" : "mt-4 rounded-xl bg-warn-soft p-3 text-sm font-semibold text-warn"}>{canClose ? "Sẵn sàng đóng công trình" : "Chưa đủ điều kiện đóng công trình"}</div>
+          <CloseCheck ok={closeState.incompleteJobs === 0} label={closeState.incompleteJobs === 0 ? "Tất cả lệnh việc đã hoàn tất" : `Còn ${closeState.incompleteJobs} lệnh việc chưa hoàn tất`} />
+          <CloseCheck ok={closeState.coordinationBlockers === 0} label={closeState.coordinationBlockers === 0 ? "Không còn điểm giao/phụ thuộc bắt buộc" : `Còn ${closeState.coordinationBlockers} chặn điều phối`} />
+          <CloseCheck ok={closeState.handoverSigned} label="Biên bản bàn giao đã ký" />
+          <div className={closeState.canClose ? "mt-4 rounded-xl bg-ok-soft p-3 text-sm font-semibold text-ok" : "mt-4 rounded-xl bg-warn-soft p-3 text-sm font-semibold text-warn"}>{closeState.canClose ? "Sẵn sàng đóng công trình" : "Chưa đủ điều kiện đóng công trình"}</div>
         </Panel>
       </div>
       <Panel title="Hồ sơ công trình" subtitle={`${handoverDocuments.length} tài liệu`}><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{handoverDocuments.length ? handoverDocuments.map((document) => <RecordCard key={document.id} title={document.title} meta={document.type} detail={document.status === "signed" ? `Đã ký${document.signedBy ? ` · ${document.signedBy}` : ""}` : "Bản nháp"} />) : <Empty text="Chưa có hồ sơ." />}</div></Panel>

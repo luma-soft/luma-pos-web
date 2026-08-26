@@ -12,6 +12,7 @@ import {
 import { requireMobileServiceManager, requireMobileServiceAccess } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
 import {
+  serviceCoordinationUpdateSchema,
   serviceCoordinationPointSchema,
   serviceJobDependencySchema,
 } from "@/lib/services/project-specialized-schemas";
@@ -143,6 +144,86 @@ export async function POST(request: Request, { params }: RouteContext) {
     createdBy: gate.userId,
   }).returning();
   await audit(gate.storeId, gate.userId, "service.coordination.point_created", point.id, id);
+  return mobileOk(point);
+}
+
+export async function PATCH(request: Request, { params }: RouteContext) {
+  const gate = await requireMobileServiceManager();
+  if (!gate.ok) return mobileGate(gate);
+  const { id } = await params;
+  if (!await loadMixedProject(gate.storeId, id)) return mobileError("errors.notFound", 404);
+  const body = await readJson(request);
+  const parsed = serviceCoordinationUpdateSchema.safeParse(body);
+  if (!parsed.success) return mobileError("errors.invalidData");
+
+  if (parsed.data.kind === "dependency") {
+    const [dependency] = await db.update(serviceJobDependencies).set({
+      status: parsed.data.status,
+      ...(parsed.data.dependencyType !== undefined
+        ? { dependencyType: parsed.data.dependencyType }
+        : {}),
+      ...(parsed.data.note !== undefined ? { note: parsed.data.note || null } : {}),
+      updatedAt: new Date(),
+    }).where(and(
+      eq(serviceJobDependencies.storeId, gate.storeId),
+      eq(serviceJobDependencies.projectId, id),
+      eq(serviceJobDependencies.id, parsed.data.id),
+    )).returning();
+    if (!dependency) return mobileError("errors.notFound", 404);
+    await audit(
+      gate.storeId,
+      gate.userId,
+      "service.coordination.dependency_updated",
+      dependency.id,
+      id,
+    );
+    return mobileOk(dependency);
+  }
+
+  if (parsed.data.assignedTo) {
+    const [assignee] = await db.select({ id: profiles.id }).from(profiles).where(and(
+      eq(profiles.storeId, gate.storeId),
+      eq(profiles.id, parsed.data.assignedTo),
+      eq(profiles.isActive, true),
+      inArray(profiles.role, ["owner", "manager", "technician"]),
+    )).limit(1);
+    if (!assignee) return mobileError("errors.invalidData");
+  }
+  const [point] = await db.update(serviceCoordinationPoints).set({
+    status: parsed.data.status,
+    ...(parsed.data.title !== undefined ? { title: parsed.data.title } : {}),
+    ...(parsed.data.locationLabel !== undefined
+      ? { locationLabel: parsed.data.locationLabel || null }
+      : {}),
+    ...(parsed.data.serviceTypes !== undefined
+      ? { serviceTypes: parsed.data.serviceTypes }
+      : {}),
+    ...(parsed.data.description !== undefined
+      ? { description: parsed.data.description || null }
+      : {}),
+    ...(parsed.data.assignedTo !== undefined
+      ? { assignedTo: parsed.data.assignedTo }
+      : {}),
+    ...(parsed.data.dueAt !== undefined
+      ? { dueAt: parsed.data.dueAt ? new Date(parsed.data.dueAt) : null }
+      : {}),
+    ...(parsed.data.isAcceptanceRequired !== undefined
+      ? { isAcceptanceRequired: parsed.data.isAcceptanceRequired }
+      : {}),
+    updatedAt: new Date(),
+  }).where(and(
+    eq(serviceCoordinationPoints.storeId, gate.storeId),
+    eq(serviceCoordinationPoints.projectId, id),
+    eq(serviceCoordinationPoints.id, parsed.data.id),
+  )).returning();
+  if (!point) return mobileError("errors.notFound", 404);
+  await audit(
+    gate.storeId,
+    gate.userId,
+    "service.coordination.point_updated",
+    point.id,
+    id,
+  );
   return mobileOk(point);
 }
 

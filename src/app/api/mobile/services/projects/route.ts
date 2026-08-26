@@ -1,10 +1,10 @@
 import { createServiceProject } from "@/lib/actions/services";
 import { getServiceDashboard } from "@/lib/data/services";
-import { requireMobileServiceManager, requireMobileServiceSalesAccess } from "@/lib/mobile/auth";
+import { requireMobileServiceAccess, requireMobileServiceManager } from "@/lib/mobile/auth";
 import { mobileAction, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
 
 export async function GET() {
-  const gate = await requireMobileServiceSalesAccess();
+  const gate = await requireMobileServiceAccess();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileGate(gate)!;

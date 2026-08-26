@@ -110,6 +110,28 @@ export const serviceCoordinationPointSchema = z.object({
   isAcceptanceRequired: z.boolean().default(true),
 });
 
+export const serviceCoordinationUpdateSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("dependency"),
+    id: z.uuid(),
+    status: z.enum(["pending", "ready", "blocked", "completed", "waived"]),
+    dependencyType: z.enum(["finish_to_start", "evidence_required", "handoff"]).optional(),
+    note: z.string().trim().max(1000).nullable().optional(),
+  }).strict(),
+  z.object({
+    kind: z.literal("point"),
+    id: z.uuid(),
+    status: z.enum(["open", "ready", "blocked", "resolved", "waived"]),
+    title: z.string().trim().min(1).max(240).optional(),
+    locationLabel: z.string().trim().max(240).nullable().optional(),
+    serviceTypes: z.array(concreteServiceTypeSchema).min(2).max(3).optional(),
+    description: z.string().trim().max(2000).nullable().optional(),
+    assignedTo: z.uuid().nullable().optional(),
+    dueAt: z.iso.datetime().nullable().optional(),
+    isAcceptanceRequired: z.boolean().optional(),
+  }).strict(),
+]);
+
 export const cameraVaultViewerSchema = z.object({
   profileId: z.uuid(),
   canReveal: z.boolean().default(true),

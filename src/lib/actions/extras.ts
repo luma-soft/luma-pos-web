@@ -4,11 +4,21 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { customers, products, projects, promotions } from "@/db/schema";
+import {
+  customers,
+  products,
+  projects,
+  promotions,
+  serviceCoordinationPoints,
+  serviceHandoverDocuments,
+  serviceJobDependencies,
+  serviceJobs,
+} from "@/db/schema";
 import { type ActionResult, requireManager } from "./common";
 import { Routes } from "@/lib/routes";
 import { isServiceSnapshotJobLocked } from "@/lib/services/field-api";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { evaluateServiceProjectClose } from "@/lib/services/project-close";
 
 // ============ Công trình ============
 
@@ -31,6 +41,52 @@ const projectUpdateSchema = projectSchema.extend({
   siteContactPhone: z.string().trim().max(20).optional(),
 });
 export type UpdateProjectInput = z.input<typeof projectUpdateSchema>;
+
+async function canCloseServiceProject(
+  storeId: string,
+  projectId: string,
+  serviceType: "camera" | "electrical" | "plumbing" | "mixed",
+) {
+  const [jobs, handoverDocuments, dependencies, coordinationPoints] =
+    await Promise.all([
+      db.select({ status: serviceJobs.status }).from(serviceJobs).where(and(
+        eq(serviceJobs.storeId, storeId),
+        eq(serviceJobs.projectId, projectId),
+      )),
+      db.select({
+        type: serviceHandoverDocuments.type,
+        status: serviceHandoverDocuments.status,
+      }).from(serviceHandoverDocuments).where(and(
+        eq(serviceHandoverDocuments.storeId, storeId),
+        eq(serviceHandoverDocuments.projectId, projectId),
+      )),
+      serviceType === "mixed"
+        ? db.select({ status: serviceJobDependencies.status })
+          .from(serviceJobDependencies).where(and(
+            eq(serviceJobDependencies.storeId, storeId),
+            eq(serviceJobDependencies.projectId, projectId),
+          ))
+        : Promise.resolve([]),
+      serviceType === "mixed"
+        ? db.select({
+          status: serviceCoordinationPoints.status,
+          isAcceptanceRequired:
+            serviceCoordinationPoints.isAcceptanceRequired,
+        }).from(serviceCoordinationPoints).where(and(
+          eq(serviceCoordinationPoints.storeId, storeId),
+          eq(serviceCoordinationPoints.projectId, projectId),
+        ))
+        : Promise.resolve([]),
+    ]);
+
+  return evaluateServiceProjectClose({
+    serviceType,
+    jobStatuses: jobs.map((job) => job.status),
+    handoverDocuments,
+    dependencies,
+    coordinationPoints,
+  }).canClose;
+}
 
 export async function createProject(input: CreateProjectInput): Promise<ActionResult<{ id: string }>> {
   let context;
@@ -72,6 +128,21 @@ export async function toggleProjectStatus(id: string): Promise<ActionResult> {
     return { ok: false, error: "errors.unauthorized" };
   }
   try {
+    const [current] = await db.select({
+      status: projects.status,
+      serviceType: projects.serviceType,
+    }).from(projects).where(and(
+      eq(projects.storeId, context.storeId),
+      eq(projects.id, id),
+    )).limit(1);
+    if (!current) return { ok: false, error: "errors.notFound" };
+    if (
+      current.status === "active"
+      && current.serviceType
+      && !await canCloseServiceProject(context.storeId, id, current.serviceType)
+    ) {
+      return { ok: false, error: "services.errors.projectCloseBlocked" };
+    }
     await db.update(projects).set({
       status: sql`case when ${projects.status} = 'active' then 'done' else 'active' end`,
       serviceStage: sql`case
@@ -172,11 +243,26 @@ export async function updateProject(input: UpdateProjectInput): Promise<ActionRe
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
   try {
+    const [current] = await db.select({
+      serviceType: projects.serviceType,
+    }).from(projects).where(and(
+      eq(projects.storeId, gate.storeId),
+      eq(projects.id, v.id),
+    )).limit(1);
+    if (!current) return { ok: false, error: "errors.notFound" };
     if (v.customerId) {
       const [customer] = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.storeId, gate.storeId), eq(customers.id, v.customerId))).limit(1);
       if (!customer) return { ok: false, error: "errors.invalidData" };
     }
-    const isServiceProject = Boolean(v.serviceType);
+    const effectiveServiceType = v.serviceType ?? current.serviceType;
+    if (
+      v.status === "done"
+      && effectiveServiceType
+      && !await canCloseServiceProject(gate.storeId, v.id, effectiveServiceType)
+    ) {
+      return { ok: false, error: "services.errors.projectCloseBlocked" };
+    }
+    const isServiceProject = Boolean(effectiveServiceType);
     const serviceStage = v.status === "done" ? "completed" : v.serviceStage;
     await db.update(projects).set({
       name: v.name.trim(),
@@ -185,7 +271,7 @@ export async function updateProject(input: UpdateProjectInput): Promise<ActionRe
       note: v.note?.trim() || null,
       status: v.status,
       ...(isServiceProject ? {
-        serviceType: v.serviceType,
+        serviceType: effectiveServiceType,
         serviceStage,
         startsOn: v.startsOn ?? null,
         targetEndsOn: v.targetEndsOn ?? null,
