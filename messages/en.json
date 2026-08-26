@@ -2992,6 +2992,7 @@
     },
     "materials": {
       "title": "Job materials",
+      "product": "Product",
       "create": "Add material",
       "edit": "Update material",
       "planned": "Planned quantity",

@@ -2992,6 +2992,7 @@
     },
     "materials": {
       "title": "Vật tư thi công",
+      "product": "Sản phẩm",
       "create": "Thêm vật tư",
       "edit": "Cập nhật vật tư",
       "planned": "Số lượng dự kiến",

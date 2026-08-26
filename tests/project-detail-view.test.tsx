@@ -1,6 +1,7 @@
 import { describe, expect, mock, test } from "bun:test";
 import { NextIntlClientProvider, createTranslator } from "next-intl";
 import { renderToStaticMarkup } from "react-dom/server";
+import enMessages from "../messages/en.json";
 import viMessages from "../messages/vi.json";
 import type { ProjectDetail } from "@/lib/data/projects";
 
@@ -120,6 +121,11 @@ function expectSharedDetailContent(html: string) {
 }
 
 describe("ProjectDetailView", () => {
+  test("provides the material product label in every supported locale", () => {
+    expect(createTranslator({ locale: "vi", messages: viMessages })("services.materials.product")).toBe("Sản phẩm");
+    expect(createTranslator({ locale: "en", messages: enMessages })("services.materials.product")).toBe("Product");
+  });
+
   test("renders project actions as two separated buttons in the modal toolbar", async () => {
     const { ProjectDetailActions } = await importProjectDetailView();
     const html = renderToStaticMarkup(
