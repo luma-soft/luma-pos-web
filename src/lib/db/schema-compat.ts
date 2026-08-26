@@ -36,3 +36,44 @@ export async function hasProductComplianceColumns() {
     throw error;
   }
 }
+
+async function hasProjectRedesignSchemaQuery() {
+  const rows = await db.execute<{ count: number }>(sql`
+    select count(*)::int as count
+    from information_schema.tables
+    where table_schema = current_schema()
+      and table_name in (
+        'service_job_trade_records',
+        'service_job_dependencies',
+        'service_coordination_points',
+        'service_camera_vaults'
+      )
+  `);
+  const columnRows = await db.execute<{ count: number }>(sql`
+    select count(*)::int as count
+    from information_schema.columns
+    where table_schema = current_schema()
+      and table_name = 'installed_assets'
+      and column_name = 'specs'
+  `);
+  return Number(rows.rows[0]?.count ?? 0) === 4
+    && Number(columnRows.rows[0]?.count ?? 0) === 1;
+}
+
+const cachedHasProjectRedesignSchema = unstable_cache(
+  hasProjectRedesignSchemaQuery,
+  ["schema-compat-project-redesign"],
+  { revalidate: 30 },
+);
+
+export async function hasProjectRedesignSchema() {
+  try {
+    return await cachedHasProjectRedesignSchema();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("incrementalCache missing")) {
+      return hasProjectRedesignSchemaQuery();
+    }
+    throw error;
+  }
+}

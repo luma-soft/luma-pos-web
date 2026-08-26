@@ -28,6 +28,7 @@ import { ProjectEdit } from "../project-widgets";
 import { ProjectServiceTab, ProjectServiceTabs } from "./project-service-tabs";
 import { MobileRecordCard, MobileRecordField } from "@/components/mobile-ui";
 import { DirectPrintButton } from "@/components/print/direct-print-button";
+import { ProjectRedesignedExperience } from "./project-redesigned-experience";
 
 type ServiceOptions = Awaited<ReturnType<typeof getServiceFormOptions>> | null;
 type Translator = Awaited<ReturnType<typeof getTranslations>>;
@@ -63,7 +64,11 @@ export async function ProjectDetailView({
           />
         </div>
       )}
-      <ProjectDetailBody detail={detail} serviceOptions={serviceOptions} t={t} />
+      {detail.project.serviceType && serviceOptions ? (
+        <ProjectRedesignedExperience detail={detail} serviceOptions={serviceOptions} />
+      ) : (
+        <ProjectDetailBody detail={detail} serviceOptions={serviceOptions} t={t} />
+      )}
     </div>
   );
 }

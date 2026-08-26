@@ -1,13 +1,14 @@
 import { updateProject } from "@/lib/actions/extras";
 import { getProjectDetail } from "@/lib/data/projects";
-import { requireMobileManager, requireMobileSalesAccess } from "@/lib/mobile/auth";
+import { requireMobileManager, requireMobileUser } from "@/lib/mobile/auth";
 import { mobileAction, mobileError, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
+import { storeFeatureEnabled } from "@/lib/tenancy/store-features";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const gate = await requireMobileSalesAccess();
+  const gate = await requireMobileUser();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileGate(gate)!;
@@ -15,6 +16,14 @@ export async function GET(
   const { id } = await params;
   const detail = await getProjectDetail(gate.storeId, id);
   if (!detail) return mobileError("errors.notFound", 404);
+  if (detail.project.serviceType) {
+    if (
+      !storeFeatureEnabled(gate.features, "field_services")
+      || !["owner", "manager", "technician"].includes(gate.role)
+    ) return mobileError("errors.forbidden", 403);
+  } else if (!["owner", "manager", "cashier"].includes(gate.role)) {
+    return mobileError("errors.forbidden", 403);
+  }
   return mobileOk(detail);
 }
 

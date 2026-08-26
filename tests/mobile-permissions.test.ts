@@ -35,6 +35,11 @@ describe("mobile permission matrix", () => {
       reauthRequired: true,
       managerApprovalAllowed: false,
     });
+    expect(permissions["service.credentials"]).toEqual({
+      allowed: true,
+      reauthRequired: true,
+      managerApprovalAllowed: false,
+    });
     expect(permissions["cash.manage"].reauthRequired).toBe(true);
     expect(permissions["payment.reconcile"].reauthRequired).toBe(true);
     expect(permissions["customer.erase"].reauthRequired).toBe(true);
@@ -44,6 +49,7 @@ describe("mobile permission matrix", () => {
     const permissions = permissionMatrixForRole("technician");
 
     expect(permissions["service.field"].allowed).toBe(true);
+    expect(permissions["service.credentials"].allowed).toBe(false);
     expect(permissions["dashboard.view"].allowed).toBe(true);
     expect(permissions["pos.sell"].allowed).toBe(false);
     expect(permissions["catalog.manage"].allowed).toBe(false);

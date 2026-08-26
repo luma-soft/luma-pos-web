@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     ? body as Record<string, unknown>
     : null;
   const permissionValue = payload?.permission?.toString().trim() ?? "";
-  const approverId = payload?.approverId?.toString().trim() ?? "";
+  const approverId = payload?.approverId?.toString().trim() || gate.userId;
   const pin = payload?.pin?.toString().trim() ?? "";
   const scope = payload?.scope?.toString().trim() ?? "";
   const reason = payload?.reason?.toString().trim() ?? "";

@@ -73,6 +73,8 @@ const detail = {
   plannedMaterialCost: 0,
   handoverDocuments: [],
   maintenancePlans: [],
+  dependencies: [],
+  coordinationPoints: [],
 } satisfies ProjectDetail;
 
 async function importProjectDetailView() {

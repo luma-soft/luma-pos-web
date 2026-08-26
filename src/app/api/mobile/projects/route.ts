@@ -1,4 +1,5 @@
 import { createProject } from "@/lib/actions/extras";
+import { createServiceProject } from "@/lib/actions/services";
 import { getProjectRows } from "@/lib/data/projects";
 import { requireMobileManager, requireMobileSalesAccess } from "@/lib/mobile/auth";
 import { mobileAction, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
@@ -22,5 +23,7 @@ export async function POST(request: Request) {
     return mobileAction({ ok: false, error: "errors.invalidData" });
   }
 
-  return mobileAction(await createProject(body as Parameters<typeof createProject>[0]));
+  return "serviceType" in body && body.serviceType
+    ? mobileAction(await createServiceProject(body as Parameters<typeof createServiceProject>[0]))
+    : mobileAction(await createProject(body as Parameters<typeof createProject>[0]));
 }

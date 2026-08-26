@@ -3,6 +3,7 @@ import type { Role } from "@/lib/actions/common";
 export const mobilePermissionKeys = [
   "dashboard.view",
   "service.field",
+  "service.credentials",
   "pos.sell",
   "catalog.manage",
   "reports.view",
@@ -74,6 +75,7 @@ export function permissionMatrixForRole(role: Role): MobilePermissionMatrix {
 
   if (role === "manager") {
     matrix["service.field"] = direct();
+    matrix["service.credentials"] = direct(true);
     matrix["reports.view"] = direct();
     matrix["pos.sell"] = direct();
     matrix["catalog.manage"] = direct();

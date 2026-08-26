@@ -8,6 +8,9 @@ import { relations, sql } from "drizzle-orm";
 import type { StorePrefs } from "@/lib/schemas/settings";
 import type { ServiceChecklistItem } from "@/lib/services/domain";
 
+export type ServiceTradeRecordData = Record<string, unknown>;
+export type InstalledAssetSpecs = Record<string, unknown>;
+
 function missingStoreId(): string {
   if (process.env.NODE_ENV === "test" && process.env.LUMA_TEST_STORE_ID) {
     return process.env.LUMA_TEST_STORE_ID;
@@ -1218,7 +1221,10 @@ export const projects = pgTable("projects", {
   siteContactPhone: varchar("site_contact_phone", { length: 20 }),
   note: text("note"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-}, (t) => [index("projects_customer_idx").on(t.customerId)]);
+}, (t) => [
+  unique("projects_store_id_id_unique").on(t.storeId, t.id),
+  index("projects_customer_idx").on(t.customerId),
+]);
 
 // ============= Thi công & dịch vụ =============
 
@@ -1246,11 +1252,71 @@ export const serviceJobs = pgTable("service_jobs", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
+  unique("service_jobs_store_id_id_unique").on(t.storeId, t.id),
   uniqueIndex("service_jobs_store_code_unique").on(t.storeId, t.code),
   check("service_jobs_version_check", sql`${t.version} > 0 and ${t.checklistVersion} > 0 and ${t.assetsVersion} > 0`),
   index("service_jobs_project_idx").on(t.projectId, t.createdAt),
   index("service_jobs_status_schedule_idx").on(t.status, t.scheduledAt),
   index("service_jobs_assignee_idx").on(t.assignedTo, t.status),
+]);
+
+export const serviceJobTradeRecords = pgTable("service_job_trade_records", {
+  storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id),
+  id: uuid("id").primaryKey().defaultRandom(),
+  jobId: uuid("job_id").notNull().references(() => serviceJobs.id, { onDelete: "cascade" }),
+  serviceType: serviceTypeEnum("service_type").notNull(),
+  schemaVersion: integer("schema_version").notNull().default(1),
+  data: jsonb("data").$type<ServiceTradeRecordData>().notNull().default({}),
+  version: integer("version").notNull().default(1),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("service_job_trade_records_job_unique").on(t.jobId),
+  check("service_job_trade_records_type_check", sql`${t.serviceType} in ('camera', 'electrical', 'plumbing')`),
+  check("service_job_trade_records_version_check", sql`${t.schemaVersion} > 0 and ${t.version} > 0`),
+  index("service_job_trade_records_store_type_idx").on(t.storeId, t.serviceType),
+]);
+
+export const serviceJobDependencies = pgTable("service_job_dependencies", {
+  storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id),
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  predecessorJobId: uuid("predecessor_job_id").notNull().references(() => serviceJobs.id, { onDelete: "cascade" }),
+  successorJobId: uuid("successor_job_id").notNull().references(() => serviceJobs.id, { onDelete: "cascade" }),
+  dependencyType: text("dependency_type").notNull().default("finish_to_start"),
+  status: text("status").notNull().default("pending"),
+  note: text("note"),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("service_job_dependencies_pair_unique").on(t.predecessorJobId, t.successorJobId),
+  check("service_job_dependencies_not_self_check", sql`${t.predecessorJobId} <> ${t.successorJobId}`),
+  check("service_job_dependencies_type_check", sql`${t.dependencyType} in ('finish_to_start', 'evidence_required', 'handoff')`),
+  check("service_job_dependencies_status_check", sql`${t.status} in ('pending', 'ready', 'blocked', 'completed', 'waived')`),
+  index("service_job_dependencies_project_idx").on(t.projectId, t.status),
+]);
+
+export const serviceCoordinationPoints = pgTable("service_coordination_points", {
+  storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id),
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  locationLabel: text("location_label"),
+  serviceTypes: jsonb("service_types").$type<Array<"camera" | "electrical" | "plumbing">>().notNull().default([]),
+  status: text("status").notNull().default("open"),
+  description: text("description"),
+  assignedTo: uuid("assigned_to").references(() => profiles.id, { onDelete: "set null" }),
+  dueAt: timestamp("due_at", { withTimezone: true }),
+  isAcceptanceRequired: boolean("is_acceptance_required").notNull().default(true),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("service_coordination_points_status_check", sql`${t.status} in ('open', 'ready', 'blocked', 'resolved', 'waived')`),
+  check("service_coordination_points_types_check", sql`jsonb_typeof(${t.serviceTypes}) = 'array' and jsonb_array_length(${t.serviceTypes}) >= 2`),
+  index("service_coordination_points_project_idx").on(t.projectId, t.status),
 ]);
 
 export const serviceJobMaterials = pgTable("service_job_materials", {
@@ -1375,15 +1441,55 @@ export const installedAssets = pgTable("installed_assets", {
   supplierWarrantyEndsOn: date("supplier_warranty_ends_on"),
   status: serviceAssetStatusEnum("status").notNull().default("installed"),
   note: text("note"),
+  specs: jsonb("specs").$type<InstalledAssetSpecs>().notNull().default({}),
   version: integer("version").notNull().default(1),
   createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
+  unique("installed_assets_store_id_id_unique").on(t.storeId, t.id),
   check("installed_assets_version_check", sql`${t.version} > 0`),
   index("installed_assets_project_idx").on(t.projectId, t.status),
   index("installed_assets_job_idx").on(t.jobId),
   uniqueIndex("installed_assets_serial_idx").on(t.serialNumber),
+]);
+
+export const serviceCameraVaults = pgTable("service_camera_vaults", {
+  storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id),
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  assetId: uuid("asset_id").notNull().references(() => installedAssets.id, { onDelete: "cascade" }),
+  ciphertext: text("ciphertext").notNull(),
+  iv: varchar("iv", { length: 24 }).notNull(),
+  authTag: varchar("auth_tag", { length: 32 }).notNull(),
+  keyVersion: integer("key_version").notNull().default(1),
+  configured: boolean("configured").notNull().default(false),
+  rotatedAt: timestamp("rotated_at", { withTimezone: true }),
+  rotatedBy: uuid("rotated_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("service_camera_vaults_asset_unique").on(t.assetId),
+  check("service_camera_vaults_key_version_check", sql`${t.keyVersion} > 0`),
+  index("service_camera_vaults_project_idx").on(t.projectId),
+]);
+
+export const serviceCameraVaultViewers = pgTable("service_camera_vault_viewers", {
+  storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id),
+  id: uuid("id").primaryKey().defaultRandom(),
+  vaultId: uuid("vault_id").notNull().references(() => serviceCameraVaults.id, { onDelete: "cascade" }),
+  profileId: uuid("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  canReveal: boolean("can_reveal").notNull().default(true),
+  canCopy: boolean("can_copy").notNull().default(false),
+  canRotate: boolean("can_rotate").notNull().default(false),
+  canManageViewers: boolean("can_manage_viewers").notNull().default(false),
+  grantedBy: uuid("granted_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("service_camera_vault_viewers_profile_unique").on(t.vaultId, t.profileId),
+  index("service_camera_vault_viewers_profile_idx").on(t.profileId, t.vaultId),
 ]);
 
 export const warrantyClaims = pgTable("warranty_claims", {

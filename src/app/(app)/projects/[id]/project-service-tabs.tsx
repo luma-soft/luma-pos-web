@@ -31,6 +31,12 @@ export function ProjectServiceTabs({ children, initialActive }: { children: Reac
                 )}
               >
                 {item.props.label}
+                {item.props.count !== undefined && (
+                  <span className={cn(
+                    "rounded-full px-1.5 py-0.5 font-mono text-[10px]",
+                    selected ? "bg-primary-100 text-primary-800 dark:bg-primary-900" : "bg-surface-2 text-slate-500",
+                  )}>{item.props.count}</span>
+                )}
               </button>
             );
           })}

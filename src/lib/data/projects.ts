@@ -9,8 +9,12 @@ import {
   profiles,
   projects,
   serviceCostEntries,
+  serviceCameraVaults,
+  serviceCoordinationPoints,
   serviceHandoverDocuments,
+  serviceJobDependencies,
   serviceJobMaterials,
+  serviceJobTradeRecords,
   serviceJobs,
   serviceMaintenancePlans,
   serviceMaterialAllocations,
@@ -20,6 +24,7 @@ import {
 } from "@/db/schema";
 import { calculateServiceProjectProfitability } from "@/lib/services/domain";
 import { coercePageSize } from "@/lib/pagination";
+import { hasProjectRedesignSchema } from "@/lib/db/schema-compat";
 
 const projectRowSelection = (storeId: string) => ({
   id: projects.id,
@@ -88,7 +93,92 @@ export async function getProjectDetail(storeId: string, id: string) {
   }).from(projects).leftJoin(customers, and(eq(projects.customerId, customers.id), eq(customers.storeId, storeId))).where(and(eq(projects.id, id), eq(projects.storeId, storeId))).limit(1);
   if (!project) return null;
 
-  const [relatedOrders, jobs, assets, claims, materials, statusLogs, costEntries, costSummary, plannedMaterialSummary, handoverDocuments, maintenancePlans] = await Promise.all([
+  const projectRedesignSchemaReady = await hasProjectRedesignSchema();
+  const jobSelection = {
+    id: serviceJobs.id,
+    code: serviceJobs.code,
+    serviceType: serviceJobs.serviceType,
+    title: serviceJobs.title,
+    status: serviceJobs.status,
+    priority: serviceJobs.priority,
+    assignedTo: serviceJobs.assignedTo,
+    assignedToName: profiles.fullName,
+    scheduledAt: serviceJobs.scheduledAt,
+    completedAt: serviceJobs.completedAt,
+    description: serviceJobs.description,
+    checklist: serviceJobs.checklist,
+    quoteOrderId: serviceJobs.quoteOrderId,
+    materialOrderId: serviceJobs.materialOrderId,
+    createdAt: serviceJobs.createdAt,
+  };
+  const jobsPromise = projectRedesignSchemaReady
+    ? db.select({
+      ...jobSelection,
+      tradeRecord: serviceJobTradeRecords.data,
+      tradeRecordVersion: serviceJobTradeRecords.version,
+    }).from(serviceJobs)
+      .leftJoin(profiles, eq(serviceJobs.assignedTo, profiles.id))
+      .leftJoin(serviceJobTradeRecords, and(
+        eq(serviceJobTradeRecords.jobId, serviceJobs.id),
+        eq(serviceJobTradeRecords.storeId, storeId),
+      ))
+      .where(and(eq(serviceJobs.projectId, id), eq(serviceJobs.storeId, storeId)))
+      .orderBy(desc(serviceJobs.createdAt))
+    : db.select(jobSelection).from(serviceJobs)
+      .leftJoin(profiles, eq(serviceJobs.assignedTo, profiles.id))
+      .where(and(eq(serviceJobs.projectId, id), eq(serviceJobs.storeId, storeId)))
+      .orderBy(desc(serviceJobs.createdAt))
+      .then((rows) => rows.map((row) => ({
+        ...row,
+        tradeRecord: null,
+        tradeRecordVersion: null,
+      })));
+
+  const assetSelection = {
+    id: installedAssets.id,
+    jobId: installedAssets.jobId,
+    productId: installedAssets.productId,
+    assetKind: installedAssets.assetKind,
+    name: installedAssets.name,
+    brand: installedAssets.brand,
+    model: installedAssets.model,
+    serialNumber: installedAssets.serialNumber,
+    macAddress: installedAssets.macAddress,
+    ipAddress: installedAssets.ipAddress,
+    locationLabel: installedAssets.locationLabel,
+    installedAt: installedAssets.installedAt,
+    createdAt: installedAssets.createdAt,
+    customerWarrantyEndsOn: installedAssets.customerWarrantyEndsOn,
+    supplierWarrantyEndsOn: installedAssets.supplierWarrantyEndsOn,
+    status: installedAssets.status,
+    note: installedAssets.note,
+  };
+  const assetsPromise = projectRedesignSchemaReady
+    ? db.select({
+      ...assetSelection,
+      specs: installedAssets.specs,
+      cameraVaultId: serviceCameraVaults.id,
+      cameraAccessConfigured: serviceCameraVaults.configured,
+      cameraAccessRotatedAt: serviceCameraVaults.rotatedAt,
+    }).from(installedAssets)
+      .leftJoin(serviceCameraVaults, and(
+        eq(serviceCameraVaults.assetId, installedAssets.id),
+        eq(serviceCameraVaults.storeId, storeId),
+      ))
+      .where(and(eq(installedAssets.projectId, id), eq(installedAssets.storeId, storeId)))
+      .orderBy(desc(installedAssets.createdAt))
+    : db.select(assetSelection).from(installedAssets)
+      .where(and(eq(installedAssets.projectId, id), eq(installedAssets.storeId, storeId)))
+      .orderBy(desc(installedAssets.createdAt))
+      .then((rows) => rows.map((row) => ({
+        ...row,
+        specs: {},
+        cameraVaultId: null,
+        cameraAccessConfigured: false,
+        cameraAccessRotatedAt: null,
+      })));
+
+  const [relatedOrders, jobs, assets, claims, materials, statusLogs, costEntries, costSummary, plannedMaterialSummary, handoverDocuments, maintenancePlans, dependencies, coordinationPoints] = await Promise.all([
     db.select({
       id: orders.id,
       code: orders.code,
@@ -105,47 +195,8 @@ export async function getProjectDetail(storeId: string, id: string) {
       .where(and(eq(orders.projectId, id), eq(orders.storeId, storeId)))
       .orderBy(desc(orders.createdAt))
       .limit(50),
-    db.select({
-      id: serviceJobs.id,
-      code: serviceJobs.code,
-      serviceType: serviceJobs.serviceType,
-      title: serviceJobs.title,
-      status: serviceJobs.status,
-      priority: serviceJobs.priority,
-      assignedTo: serviceJobs.assignedTo,
-      assignedToName: profiles.fullName,
-      scheduledAt: serviceJobs.scheduledAt,
-      completedAt: serviceJobs.completedAt,
-      description: serviceJobs.description,
-      checklist: serviceJobs.checklist,
-      quoteOrderId: serviceJobs.quoteOrderId,
-      materialOrderId: serviceJobs.materialOrderId,
-      createdAt: serviceJobs.createdAt,
-    }).from(serviceJobs)
-      .leftJoin(profiles, eq(serviceJobs.assignedTo, profiles.id))
-      .where(and(eq(serviceJobs.projectId, id), eq(serviceJobs.storeId, storeId)))
-      .orderBy(desc(serviceJobs.createdAt)),
-    db.select({
-      id: installedAssets.id,
-      jobId: installedAssets.jobId,
-      productId: installedAssets.productId,
-      assetKind: installedAssets.assetKind,
-      name: installedAssets.name,
-      brand: installedAssets.brand,
-      model: installedAssets.model,
-      serialNumber: installedAssets.serialNumber,
-      macAddress: installedAssets.macAddress,
-      ipAddress: installedAssets.ipAddress,
-      locationLabel: installedAssets.locationLabel,
-      installedAt: installedAssets.installedAt,
-      createdAt: installedAssets.createdAt,
-      customerWarrantyEndsOn: installedAssets.customerWarrantyEndsOn,
-      supplierWarrantyEndsOn: installedAssets.supplierWarrantyEndsOn,
-      status: installedAssets.status,
-      note: installedAssets.note,
-    }).from(installedAssets)
-      .where(and(eq(installedAssets.projectId, id), eq(installedAssets.storeId, storeId)))
-      .orderBy(desc(installedAssets.createdAt)),
+    jobsPromise,
+    assetsPromise,
     db.select({
       id: warrantyClaims.id,
       code: warrantyClaims.code,
@@ -267,6 +318,39 @@ export async function getProjectDetail(storeId: string, id: string) {
       .leftJoin(profiles, eq(serviceMaintenancePlans.assignedTo, profiles.id))
       .where(and(eq(serviceMaintenancePlans.projectId, id), eq(serviceMaintenancePlans.storeId, storeId)))
       .orderBy(serviceMaintenancePlans.nextDueOn),
+    projectRedesignSchemaReady ? db.select({
+      id: serviceJobDependencies.id,
+      predecessorJobId: serviceJobDependencies.predecessorJobId,
+      successorJobId: serviceJobDependencies.successorJobId,
+      dependencyType: serviceJobDependencies.dependencyType,
+      status: serviceJobDependencies.status,
+      note: serviceJobDependencies.note,
+      createdAt: serviceJobDependencies.createdAt,
+    }).from(serviceJobDependencies)
+      .where(and(
+        eq(serviceJobDependencies.projectId, id),
+        eq(serviceJobDependencies.storeId, storeId),
+      ))
+      .orderBy(desc(serviceJobDependencies.createdAt)) : Promise.resolve([]),
+    projectRedesignSchemaReady ? db.select({
+      id: serviceCoordinationPoints.id,
+      title: serviceCoordinationPoints.title,
+      locationLabel: serviceCoordinationPoints.locationLabel,
+      serviceTypes: serviceCoordinationPoints.serviceTypes,
+      status: serviceCoordinationPoints.status,
+      description: serviceCoordinationPoints.description,
+      assignedTo: serviceCoordinationPoints.assignedTo,
+      assignedToName: profiles.fullName,
+      dueAt: serviceCoordinationPoints.dueAt,
+      isAcceptanceRequired: serviceCoordinationPoints.isAcceptanceRequired,
+      createdAt: serviceCoordinationPoints.createdAt,
+    }).from(serviceCoordinationPoints)
+      .leftJoin(profiles, eq(serviceCoordinationPoints.assignedTo, profiles.id))
+      .where(and(
+        eq(serviceCoordinationPoints.projectId, id),
+        eq(serviceCoordinationPoints.storeId, storeId),
+      ))
+      .orderBy(desc(serviceCoordinationPoints.createdAt)) : Promise.resolve([]),
   ]);
 
   const [actualMaterialSummary] = await db.select({
@@ -293,6 +377,8 @@ export async function getProjectDetail(storeId: string, id: string) {
     plannedMaterialCost: Number(plannedMaterialSummary[0]?.plannedCost ?? 0),
     handoverDocuments,
     maintenancePlans,
+    dependencies,
+    coordinationPoints,
   };
 }
 
