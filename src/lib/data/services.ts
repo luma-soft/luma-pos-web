@@ -3,6 +3,7 @@ import { db } from "@/db";
 import {
   customers,
   installedAssets,
+  orders,
   profiles,
   projects,
   serviceJobs,
@@ -27,6 +28,9 @@ export async function getServiceDashboard(storeId: string) {
       targetEndsOn: projects.targetEndsOn,
       siteContactName: projects.siteContactName,
       siteContactPhone: projects.siteContactPhone,
+      orderCount: sql<number>`(select count(*) from ${orders} where ${orders.storeId} = ${storeId} and ${orders.projectId} = ${projects.id} and ${orders.status} != 'cancelled')::int`,
+      totalValue: sql<string>`coalesce((select sum(${orders.total}) from ${orders} where ${orders.storeId} = ${storeId} and ${orders.projectId} = ${projects.id} and ${orders.status} not in ('cancelled','quote','merged')), 0)`,
+      remaining: sql<string>`coalesce((select sum(${orders.total} - ${orders.amountPaid}) from ${orders} where ${orders.storeId} = ${storeId} and ${orders.projectId} = ${projects.id} and ${orders.status} = 'completed'), 0)`,
       jobCount: sql<number>`(select count(*) from ${serviceJobs} where ${serviceJobs.storeId} = ${storeId} and ${serviceJobs.projectId} = ${projects.id})::int`,
       openJobCount: sql<number>`(select count(*) from ${serviceJobs} where ${serviceJobs.storeId} = ${storeId} and ${serviceJobs.projectId} = ${projects.id} and ${serviceJobs.status} not in ('completed','cancelled'))::int`,
       assetCount: sql<number>`(select count(*) from ${installedAssets} where ${installedAssets.storeId} = ${storeId} and ${installedAssets.projectId} = ${projects.id} and ${installedAssets.status} != 'removed')::int`,
