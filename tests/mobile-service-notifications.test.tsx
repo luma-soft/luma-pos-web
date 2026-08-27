@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
+import { Camera, House } from "lucide-react";
 import viMessages from "../messages/vi.json";
 import enMessages from "../messages/en.json";
 import { ProjectServiceTab, ProjectServiceTabs } from "@/app/(app)/projects/[id]/project-service-tabs";
@@ -31,8 +32,8 @@ describe("project service mobile records", () => {
   test("service tab carousel exposes selected state, snap alignment, focus, and 44px targets", () => {
     const html = renderToStaticMarkup(
       <ProjectServiceTabs initialActive="overview">
-        <ProjectServiceTab id="overview" label="Overview">Overview content</ProjectServiceTab>
-        <ProjectServiceTab id="assets" label="Assets">Assets content</ProjectServiceTab>
+        <ProjectServiceTab id="overview" label="Overview" icon={<House />}>Overview content</ProjectServiceTab>
+        <ProjectServiceTab id="assets" label="Assets" icon={<Camera />}>Assets content</ProjectServiceTab>
       </ProjectServiceTabs>,
     );
 
@@ -41,6 +42,10 @@ describe("project service mobile records", () => {
     expect(html.match(/role="tab"/g)).toHaveLength(2);
     expect(html).toContain('aria-selected="true"');
     expect(html).toContain('aria-selected="false"');
+    expect(html).toContain('class="lucide lucide-house"');
+    expect(html).toContain('class="lucide lucide-camera"');
+    expect(html).toContain('data-project-tab-icon="overview"');
+    expect(html).toContain('data-project-tab-icon="assets"');
     expect(html.match(/class="(?=[^"]*min-h-11)(?=[^"]*snap-start)(?=[^"]*focus-visible:ring-2)[^"]*"/g)).toHaveLength(2);
   });
 

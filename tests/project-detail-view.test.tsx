@@ -1,4 +1,5 @@
 import { describe, expect, mock, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { NextIntlClientProvider, createTranslator } from "next-intl";
 import { renderToStaticMarkup } from "react-dom/server";
 import enMessages from "../messages/en.json";
@@ -20,6 +21,20 @@ mock.module("next/navigation", () => ({
     refresh: () => undefined,
     replace: () => undefined,
   }),
+}));
+
+mock.module("@/components/product-catalog-provider", () => ({
+  useProductCatalog: () => ({
+    products: [],
+    snapshot: null,
+    status: "synced",
+    refresh: async () => undefined,
+    search: () => [],
+  }),
+}));
+
+mock.module("@/components/confirm-dialog-provider", () => ({
+  useConfirmDialog: () => ({ confirm: async () => true }),
 }));
 
 const detail = {
@@ -108,6 +123,75 @@ async function renderProjectDetail(presentation: "page" | "modal") {
   );
 }
 
+async function renderServiceProjectDetail() {
+  const { ProjectDetailView } = await importProjectDetailView();
+  const view = await ProjectDetailView({
+    detail: {
+      ...detail,
+      assets: [
+        {
+          id: "asset-1",
+          jobId: null,
+          productId: null,
+          assetKind: "camera",
+          name: "Camera sảnh chính",
+          brand: "EZVIZ",
+          model: "H6C",
+          serialNumber: "SN-001",
+          macAddress: null,
+          ipAddress: null,
+          locationLabel: "Sảnh chính",
+          installedAt: new Date("2026-07-24T02:00:00.000Z"),
+          createdAt: new Date("2026-07-24T02:00:00.000Z"),
+          customerWarrantyEndsOn: null,
+          supplierWarrantyEndsOn: null,
+          status: "installed",
+          note: null,
+          specs: {},
+          cameraVaultId: null,
+          cameraAccessConfigured: false,
+          cameraAccessRotatedAt: null,
+        },
+      ],
+      statusLogs: [
+        {
+          id: "status-1",
+          jobId: "job-1",
+          fromStatus: "in_progress",
+          toStatus: "completed",
+          note: "Nghiệm thu hoàn tất",
+          createdByName: "Mai Site",
+          createdAt: new Date("2026-07-25T02:00:00.000Z"),
+        },
+      ],
+      project: {
+        ...detail.project,
+        serviceType: "camera",
+        serviceStage: "active",
+      },
+    },
+    serviceOptions: {
+      customerOptions: [],
+      projectOptions: [],
+      assigneeOptions: [],
+      jobOptions: [],
+      assetOptions: [],
+      warehouseOptions: [],
+    },
+    presentation: "page",
+  });
+
+  return renderToStaticMarkup(
+    <NextIntlClientProvider
+      locale="vi"
+      messages={viMessages}
+      timeZone="Asia/Ho_Chi_Minh"
+    >
+      {view}
+    </NextIntlClientProvider>,
+  );
+}
+
 function expectSharedDetailContent(html: string) {
   expect(html).toContain("Số đơn");
   expect(html).toContain("Giá trị vật tư");
@@ -157,6 +241,58 @@ describe("ProjectDetailView", () => {
     expect(html).toMatch(
       /<a[^>]*class="[^"]*h-11[^"]*text-xs[^"]*lg:h-8[^"]*"[^>]*>Tạo báo giá<\/a>/,
     );
+  });
+
+  test("renders semantic icons for every redesigned project flow tab", async () => {
+    const html = await renderServiceProjectDetail();
+
+    for (const id of ["overview", "execution", "devices", "aftercare", "finance"]) {
+      expect(html).toContain(`data-project-tab-icon="${id}"`);
+    }
+    expect(html).toContain('class="lucide lucide-house"');
+    expect(html).toContain('class="lucide lucide-wrench"');
+    expect(html).toContain('class="lucide lucide-camera"');
+    expect(html).toContain('class="lucide lucide-clipboard-check"');
+    expect(html).toContain('class="lucide lucide-file-text"');
+  });
+
+  test("renders semantic metric and activity icons in the project overview", async () => {
+    const html = await renderServiceProjectDetail();
+
+    for (const id of ["progress", "devices", "jobs", "warranty"]) {
+      expect(html).toContain(`data-project-pulse-icon="${id}"`);
+    }
+    expect(html).toContain('lucide-server');
+    expect(html).toContain('lucide-clipboard-list');
+    expect(html).toContain('data-project-activity-icon="status"');
+    expect(html).toContain('data-project-activity-icon="asset"');
+    expect(html).toContain('lucide-shield-check');
+    expect(html).toContain('lucide-camera');
+  });
+
+  test("renders semantic section icons throughout the camera access vault", async () => {
+    const html = await renderServiceProjectDetail();
+
+    for (const id of ["connection", "secrets", "viewers", "history"]) {
+      expect(html).toContain(`data-camera-vault-section="${id}"`);
+    }
+    expect(html).toContain('lucide-earth');
+    expect(html).toContain('lucide-lock-keyhole');
+    expect(html).toContain('lucide-users');
+    expect(html).toContain('lucide-history');
+    expect(html.match(/data-camera-secret-visibility="hidden"/g)).toHaveLength(6);
+  });
+
+  test("keeps mixed-project dependency and coordination icons explicit", () => {
+    const source = readFileSync(
+      "src/app/(app)/projects/[id]/project-redesigned-experience.tsx",
+      "utf8",
+    );
+
+    expect(source).toContain('data-project-coordination-icon="dependency"');
+    expect(source).toContain('data-project-coordination-icon="point"');
+    expect(source).toContain('<Link2');
+    expect(source).toContain('<MapPin');
   });
 
   test("shares project metrics and related orders while keeping page navigation out of the modal", async () => {

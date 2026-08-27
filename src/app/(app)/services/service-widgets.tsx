@@ -4,7 +4,21 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Plus } from "lucide-react";
+import {
+  CalendarClock,
+  Camera,
+  CheckCircle2,
+  CirclePause,
+  CircleX,
+  Droplets,
+  FileText,
+  HardHat,
+  Network,
+  Plus,
+  ShieldCheck,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 import { DataTableShell, RowPreviewModal, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { SearchableSelect } from "@/components/combobox";
@@ -63,6 +77,60 @@ type ServiceCostStaffOption = { id: string; name: string };
 type HandoverJobOption = { id: string; code: string; title: string };
 type MaintenanceStaffOption = { id: string; name: string };
 type MaintenanceAssetOption = { id: string; name: string; serialNumber: string | null };
+
+const projectTradeIcons: Record<"camera" | "electrical" | "plumbing" | "mixed", { icon: LucideIcon; tone: string }> = {
+  camera: { icon: Camera, tone: "bg-primary-50 text-primary-700" },
+  electrical: { icon: Zap, tone: "bg-amber-50 text-amber-700" },
+  plumbing: { icon: Droplets, tone: "bg-blue-50 text-blue-700" },
+  mixed: { icon: Network, tone: "bg-violet-50 text-violet-700" },
+};
+
+const projectStageIcons: Record<string, LucideIcon> = {
+  planning: CalendarClock,
+  quoted: FileText,
+  active: HardHat,
+  paused: CirclePause,
+  completed: CheckCircle2,
+  warranty: ShieldCheck,
+  cancelled: CircleX,
+};
+
+function ProjectTradeIcon({ type, compact = false }: { type: string | null; compact?: boolean }) {
+  const resolvedType = type === "electrical" || type === "plumbing" || type === "mixed" ? type : "camera";
+  const meta = projectTradeIcons[resolvedType];
+  const Icon = meta.icon;
+  return (
+    <span
+      aria-hidden="true"
+      data-project-trade-icon={resolvedType}
+      className={cn(
+        "grid shrink-0 place-items-center rounded-xl",
+        compact ? "h-7 w-7 rounded-lg" : "h-10 w-10",
+        meta.tone,
+      )}
+    >
+      <Icon className={compact ? "h-3.5 w-3.5" : "h-5 w-5"} />
+    </span>
+  );
+}
+
+function ProjectStageBadge({ stage, label }: { stage: string | null; label: string }) {
+  const resolvedStage = stage && projectStageIcons[stage] ? stage : "planning";
+  const Icon = projectStageIcons[resolvedStage];
+  const success = stage === "completed";
+  return (
+    <span
+      data-project-stage-icon={resolvedStage}
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium",
+        success ? "bg-in-soft text-in" : "bg-surface-2 text-slate-600",
+      )}
+    >
+      <Icon aria-hidden="true" className="h-3.5 w-3.5" />
+      {label}
+    </span>
+  );
+}
 
 export function ServiceDashboardFilters({
   tab,
@@ -124,24 +192,24 @@ export function ServiceProjectMobileRow({
   return (
     <article className="min-w-0 space-y-4 p-4">
       <div className="flex min-w-0 items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="break-words text-sm font-semibold text-primary-600">
-            <Link
-              href={Routes.project(row.id)}
-              className="inline-flex min-h-11 min-w-11 items-center hover:underline lg:min-h-0 lg:min-w-0"
-            >
-              {row.name}
-            </Link>
-          </h3>
-          <p className="mt-1 break-words text-xs font-medium text-slate-600 dark:text-slate-300">
-            {serviceTypeLabel(t, row.serviceType)}
-          </p>
-          <p className="mt-1 break-words text-xs text-slate-500">{row.customerName ?? "—"}</p>
+        <div className="flex min-w-0 items-start gap-3">
+          <ProjectTradeIcon type={row.serviceType} />
+          <div className="min-w-0">
+            <h3 className="break-words text-sm font-semibold text-primary-600">
+              <Link
+                href={Routes.project(row.id)}
+                className="inline-flex min-h-11 min-w-11 items-center hover:underline lg:min-h-0 lg:min-w-0"
+              >
+                {row.name}
+              </Link>
+            </h3>
+            <p className="mt-1 break-words text-xs font-medium text-slate-600 dark:text-slate-300">
+              {serviceTypeLabel(t, row.serviceType)}
+            </p>
+            <p className="mt-1 break-words text-xs text-slate-500">{row.customerName ?? "—"}</p>
+          </div>
         </div>
-        <ServiceBadge
-          label={row.serviceStage ? t(`services.stages.${row.serviceStage}` as never) : "—"}
-          tone={row.serviceStage === "completed" ? "success" : "default"}
-        />
+        <ProjectStageBadge stage={row.serviceStage} label={row.serviceStage ? t(`services.stages.${row.serviceStage}` as never) : "—"} />
       </div>
       <dl className="grid grid-cols-2 gap-x-3 gap-y-4 text-sm">
         <div className="min-w-0">
@@ -188,16 +256,29 @@ export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProject
       label: t("projects.cols.name"),
       required: true,
       render: (row) => (
-        <Link
-          href={Routes.project(row.id)}
-          onClick={stopRowToggle}
-          className="font-semibold text-primary-600 hover:underline"
-        >
-          {row.name}
-        </Link>
+        <div className="flex min-w-0 items-center gap-2.5">
+          <ProjectTradeIcon type={row.serviceType} />
+          <Link
+            href={Routes.project(row.id)}
+            onClick={stopRowToggle}
+            className="min-w-0 truncate font-semibold text-primary-600 hover:underline"
+          >
+            {row.name}
+          </Link>
+        </div>
       ),
     },
-    { key: "type", label: t("services.fields.type"), defaultVisible: true, render: (row) => serviceTypeLabel(t, row.serviceType) },
+    {
+      key: "type",
+      label: t("services.fields.type"),
+      defaultVisible: true,
+      render: (row) => (
+        <span className="inline-flex items-center gap-2">
+          <ProjectTradeIcon type={row.serviceType} compact />
+          {serviceTypeLabel(t, row.serviceType)}
+        </span>
+      ),
+    },
     { key: "customer", label: t("orders.cols.customer"), defaultVisible: true, render: (row) => row.customerName ?? "—" },
     {
       key: "progress",
@@ -213,7 +294,7 @@ export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProject
       key: "stage",
       label: t("services.fields.stage"),
       required: true,
-      render: (row) => <ServiceBadge label={row.serviceStage ? t(`services.stages.${row.serviceStage}` as never) : "—"} tone={row.serviceStage === "completed" ? "success" : "default"} />,
+      render: (row) => <ProjectStageBadge stage={row.serviceStage} label={row.serviceStage ? t(`services.stages.${row.serviceStage}` as never) : "—"} />,
     },
     {
       key: "actions",
@@ -1531,10 +1612,6 @@ export function WarrantyClaimStatusAction({
       </RowPreviewModal>
     </span>
   );
-}
-
-function ServiceBadge({ label, tone }: { label: string; tone: "default" | "success" }) {
-  return <span className={cn("inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium", tone === "success" ? "bg-in-soft text-in" : "bg-surface-2 text-slate-600")}>{label}</span>;
 }
 
 function serviceTypeLabel(t: ReturnType<typeof useTranslations>, type: string | null) {

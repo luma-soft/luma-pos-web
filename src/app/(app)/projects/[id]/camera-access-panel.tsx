@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Clipboard, Eye, EyeOff, LockKeyhole, RefreshCw, ShieldCheck, Trash2, UserPlus } from "lucide-react";
+import { CheckCircle2, Clipboard, Eye, EyeOff, Globe2, History, LockKeyhole, RefreshCw, ShieldCheck, Trash2, UserPlus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -138,9 +138,6 @@ export function CameraAccessPanel({ assets }: { assets: CameraAsset[] }) {
 
   useEffect(() => {
     if (!selected?.id) return;
-    setRevealed(null);
-    setEditing(false);
-    setPin("");
     void loadSummary(selected.id);
   }, [selected?.id]);
 
@@ -170,6 +167,14 @@ export function CameraAccessPanel({ assets }: { assets: CameraAsset[] }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  function selectAsset(assetId: string) {
+    if (assetId === selected?.id) return;
+    setRevealed(null);
+    setEditing(false);
+    setPin("");
+    setSelectedId(assetId);
   }
 
   async function approvalToken(assetId: string) {
@@ -323,7 +328,7 @@ export function CameraAccessPanel({ assets }: { assets: CameraAsset[] }) {
             <button
               key={asset.id}
               type="button"
-              onClick={() => setSelectedId(asset.id)}
+              onClick={() => selectAsset(asset.id)}
               className={cn(
                 "mb-1 flex min-h-16 w-full items-center gap-3 rounded-xl border px-3 py-3 text-left transition-colors",
                 selected?.id === asset.id
@@ -347,9 +352,12 @@ export function CameraAccessPanel({ assets }: { assets: CameraAsset[] }) {
       <div className="min-w-0 space-y-4">
         <section className="overflow-hidden rounded-xl border border-border bg-surface">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-soft px-4 py-3">
-            <div>
-              <h3 className="font-semibold">{selected?.name}</h3>
-              <p className="text-xs text-slate-500">Truy cập an toàn · không lưu bí mật khi ngoại tuyến</p>
+            <div data-camera-vault-section="connection" className="flex min-w-0 items-center gap-2.5">
+              <Globe2 className="h-5 w-5 shrink-0 text-primary-700" />
+              <div className="min-w-0">
+                <h3 className="truncate font-semibold">{selected?.name}</h3>
+                <p className="text-xs text-slate-500">Truy cập an toàn · không lưu bí mật khi ngoại tuyến</p>
+              </div>
             </div>
             <Button variant="outline" size="sm" onClick={() => selected && loadSummary(selected.id)} disabled={busy}>
               <RefreshCw className={cn("h-4 w-4", busy && "animate-spin")} />
@@ -371,7 +379,7 @@ export function CameraAccessPanel({ assets }: { assets: CameraAsset[] }) {
         <section className="rounded-xl border border-border bg-surface p-4">
           <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2 font-semibold"><LockKeyhole className="h-4 w-4" /> Thông tin bí mật</div>
+              <div data-camera-vault-section="secrets" className="flex items-center gap-2 font-semibold"><LockKeyhole className="h-4 w-4" /> Thông tin bí mật</div>
               <p className="mt-1 text-xs text-slate-500">Cần PIN của chính bạn để xem, sao chép hoặc xoay mật khẩu.</p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -408,7 +416,7 @@ export function CameraAccessPanel({ assets }: { assets: CameraAsset[] }) {
         <section className="grid gap-4 md:grid-cols-2">
           <div className="rounded-xl border border-border bg-surface p-4">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="font-semibold">Người được xem</h3>
+              <h3 data-camera-vault-section="viewers" className="flex items-center gap-2 font-semibold"><Users className="h-4 w-4 text-primary-700" /> Người được xem</h3>
               <span className="text-xs text-slate-500">{summary?.viewers.length ?? 0} người</span>
             </div>
             <div className="space-y-2">
@@ -480,7 +488,7 @@ export function CameraAccessPanel({ assets }: { assets: CameraAsset[] }) {
             )}
           </div>
           <div className="rounded-xl border border-border bg-surface p-4">
-            <h3 className="font-semibold">Lịch sử truy cập</h3>
+            <h3 data-camera-vault-section="history" className="flex items-center gap-2 font-semibold"><History className="h-4 w-4 text-primary-700" /> Lịch sử truy cập</h3>
             <p className="mt-2 text-sm text-slate-500">Mọi lần xem, sao chép, đổi quyền và xoay mật khẩu đều được ghi vào nhật ký kiểm toán mà không chứa giá trị bí mật.</p>
             <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
               {summary?.history.length ? summary.history.map((event) => (
@@ -515,9 +523,17 @@ function cameraAuditLabel(action: string) {
 }
 
 function SecretRow({ label, value, canCopy, onCopy }: { label: string; value?: string; canCopy: boolean; onCopy: () => void }) {
+  const visible = Boolean(value);
   return (
     <div className="flex min-h-12 items-center gap-3 rounded-lg border border-border-soft px-3 py-2">
       <div className="min-w-0 flex-1"><p className="text-xs text-slate-500">{label}</p><p className="truncate font-mono text-sm">{value || "••••••••••••"}</p></div>
+      <span
+        aria-hidden="true"
+        data-camera-secret-visibility={visible ? "visible" : "hidden"}
+        className="grid h-8 w-8 shrink-0 place-items-center text-slate-400"
+      >
+        {visible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+      </span>
       <button type="button" aria-label={`Sao chép ${label}`} onClick={onCopy} disabled={!value || !canCopy} className="grid h-11 w-11 place-items-center rounded-lg text-slate-500 hover:bg-surface-2 disabled:opacity-30"><Clipboard className="h-4 w-4" /></button>
     </div>
   );

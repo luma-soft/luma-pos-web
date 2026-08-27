@@ -30,6 +30,15 @@ export function ProjectServiceTabs({ children, initialActive }: { children: Reac
                   selected ? "bg-primary-50 text-primary-700 dark:bg-primary-950/40 dark:text-primary-300" : "text-slate-500 hover:bg-surface-2 hover:text-slate-900 dark:hover:text-slate-200",
                 )}
               >
+                {item.props.icon && (
+                  <span
+                    aria-hidden="true"
+                    data-project-tab-icon={item.props.id}
+                    className="shrink-0 [&_svg]:h-4 [&_svg]:w-4"
+                  >
+                    {item.props.icon}
+                  </span>
+                )}
                 {item.props.label}
                 {item.props.count !== undefined && (
                   <span className={cn(
@@ -50,6 +59,7 @@ export function ProjectServiceTabs({ children, initialActive }: { children: Reac
 export type ProjectServiceTabProps = {
   id: string;
   label: string;
+  icon?: ReactNode;
   count?: number;
   children: ReactNode;
 };

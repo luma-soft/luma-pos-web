@@ -5,9 +5,14 @@ import {
   CheckCircle2,
   CircleDollarSign,
   ClipboardCheck,
+  ClipboardList,
   FileText,
   HardHat,
+  House,
+  Link2,
+  MapPin,
   PackageCheck,
+  Server,
   ShieldCheck,
   Wrench,
   Zap,
@@ -68,19 +73,19 @@ export function ProjectRedesignedExperience({
     <div className="space-y-5" data-project-redesign="full-flow-v2">
       <ProjectPulse detail={detail} />
       <ProjectServiceTabs initialActive="overview">
-        <ProjectServiceTab id="overview" label="Tổng quan">
+        <ProjectServiceTab id="overview" label="Tổng quan" icon={<House />}>
           <OverviewTab detail={detail} />
         </ProjectServiceTab>
-        <ProjectServiceTab id="execution" label="Thi công" count={tabs.execution}>
+        <ProjectServiceTab id="execution" label="Thi công" icon={<Wrench />} count={tabs.execution}>
           <ExecutionTab detail={detail} serviceOptions={serviceOptions} />
         </ProjectServiceTab>
-        <ProjectServiceTab id="devices" label="Thiết bị" count={tabs.devices}>
+        <ProjectServiceTab id="devices" label="Thiết bị" icon={<Camera />} count={tabs.devices}>
           <DevicesTab detail={detail} cameraAssets={cameraAssets} />
         </ProjectServiceTab>
-        <ProjectServiceTab id="aftercare" label="Sau lắp đặt" count={tabs.aftercare}>
+        <ProjectServiceTab id="aftercare" label="Sau lắp đặt" icon={<ClipboardCheck />} count={tabs.aftercare}>
           <AftercareTab detail={detail} serviceOptions={serviceOptions} />
         </ProjectServiceTab>
-        <ProjectServiceTab id="finance" label="Tài chính & hồ sơ" count={tabs.finance}>
+        <ProjectServiceTab id="finance" label="Tài chính & hồ sơ" icon={<FileText />} count={tabs.finance}>
           <FinanceTab detail={detail} serviceOptions={serviceOptions} />
         </ProjectServiceTab>
       </ProjectServiceTabs>
@@ -93,18 +98,18 @@ function ProjectPulse({ detail }: { detail: ProjectDetail }) {
   const openClaims = claims.filter((claim) => !["closed", "void"].includes(claim.status)).length;
   return (
     <section className="grid overflow-hidden rounded-2xl border border-border bg-surface shadow-sm sm:grid-cols-2 lg:grid-cols-4">
-      <PulseMetric icon={<ProgressRing value={project.progressPercent} />} label="Tiến độ" value={`${project.progressPercent}%`} />
-      <PulseMetric icon={<PackageCheck className="h-6 w-6" />} label="Thiết bị đã lắp" value={String(assets.filter((asset) => asset.status === "installed").length)} />
-      <PulseMetric icon={<HardHat className="h-6 w-6" />} label="Lệnh việc" value={String(jobs.length)} />
-      <PulseMetric icon={<ShieldCheck className="h-6 w-6" />} label="Bảo hành đang mở" value={String(openClaims)} danger={openClaims > 0} />
+      <PulseMetric id="progress" icon={<ProgressRing value={project.progressPercent} />} label="Tiến độ" value={`${project.progressPercent}%`} />
+      <PulseMetric id="devices" icon={<Server className="h-6 w-6" />} label="Thiết bị đã lắp" value={String(assets.filter((asset) => asset.status === "installed").length)} />
+      <PulseMetric id="jobs" icon={<ClipboardList className="h-6 w-6" />} label="Lệnh việc" value={String(jobs.length)} />
+      <PulseMetric id="warranty" icon={<ShieldCheck className="h-6 w-6" />} label="Bảo hành đang mở" value={String(openClaims)} danger={openClaims > 0} />
     </section>
   );
 }
 
-function PulseMetric({ icon, label, value, danger }: { icon: React.ReactNode; label: string; value: string; danger?: boolean }) {
+function PulseMetric({ id, icon, label, value, danger }: { id: string; icon: React.ReactNode; label: string; value: string; danger?: boolean }) {
   return (
     <div className="flex min-h-28 items-center gap-4 border-b border-border-soft px-5 py-4 last:border-b-0 sm:[&:nth-child(odd)]:border-r lg:border-b-0 lg:border-r lg:last:border-r-0">
-      <span className={danger ? "text-er" : "text-primary-700"}>{icon}</span>
+      <span data-project-pulse-icon={id} className={danger ? "text-er" : "text-primary-700"}>{icon}</span>
       <div><p className="text-sm text-slate-500">{label}</p><p className={danger ? "text-2xl font-bold text-er" : "text-2xl font-bold"}>{value}</p></div>
     </div>
   );
@@ -123,8 +128,8 @@ function OverviewTab({ detail }: { detail: ProjectDetail }) {
   const { project, jobs, assets, claims, maintenancePlans, orders, statusLogs } = detail;
   const nextAction = deriveNextAction(detail);
   const recent = [
-    ...statusLogs.map((log) => ({ id: `status-${log.id}`, date: log.createdAt, title: log.note || `Cập nhật ${log.toStatus}`, meta: log.createdByName })),
-    ...assets.map((asset) => ({ id: `asset-${asset.id}`, date: asset.installedAt ?? asset.createdAt, title: `Ghi nhận thiết bị: ${asset.name}`, meta: asset.locationLabel })),
+    ...statusLogs.map((log) => ({ id: `status-${log.id}`, kind: "status" as const, date: log.createdAt, title: log.note || `Cập nhật ${log.toStatus}`, meta: log.createdByName })),
+    ...assets.map((asset) => ({ id: `asset-${asset.id}`, kind: "asset" as const, date: asset.installedAt ?? asset.createdAt, title: `Ghi nhận thiết bị: ${asset.name}`, meta: asset.locationLabel })),
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 6);
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,.85fr)]">
@@ -138,7 +143,7 @@ function OverviewTab({ detail }: { detail: ProjectDetail }) {
         </Panel>
         {project.serviceType === "mixed" && <TradeProgress jobs={jobs} />}
         <Panel title="Hoạt động gần đây">
-          {recent.length ? <div className="space-y-0">{recent.map((event, index) => <div key={event.id} className="relative flex gap-3 pb-5 last:pb-0"><span className="relative z-10 mt-1.5 h-3 w-3 shrink-0 rounded-full bg-primary-600 ring-4 ring-primary-50" />{index < recent.length - 1 && <span className="absolute bottom-0 left-[5px] top-4 w-px bg-border" />}<div><p className="text-sm font-semibold">{event.title}</p><p className="mt-1 text-xs text-slate-500">{formatDate(event.date)}{event.meta ? ` · ${event.meta}` : ""}</p></div></div>)}</div> : <Empty text="Chưa có hoạt động thi công." />}
+          {recent.length ? <div className="space-y-0">{recent.map((event, index) => <div key={event.id} className="relative flex gap-3 pb-5 last:pb-0"><span data-project-activity-icon={event.kind} className="relative z-10 grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary-50 text-primary-700 ring-4 ring-surface">{event.kind === "asset" ? <Camera className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}</span>{index < recent.length - 1 && <span className="absolute bottom-0 left-[15px] top-8 w-px bg-border" />}<div className="pt-0.5"><p className="text-sm font-semibold">{event.title}</p><p className="mt-1 text-xs text-slate-500">{formatDate(event.date)}{event.meta ? ` · ${event.meta}` : ""}</p></div></div>)}</div> : <Empty text="Chưa có hoạt động thi công." />}
         </Panel>
       </div>
       <div className="space-y-4">
@@ -173,11 +178,11 @@ function ExecutionTab({ detail, serviceOptions }: { detail: ProjectDetail; servi
             <div className="mt-4 space-y-2">{dependencies.length ? dependencies.map((dependency) => {
               const before = jobs.find((job) => job.id === dependency.predecessorJobId);
               const after = jobs.find((job) => job.id === dependency.successorJobId);
-              return <div key={dependency.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-border-soft px-3 py-3 text-sm"><StatusDot status={dependency.status} /><span className="font-medium">{before?.title ?? "Lệnh trước"}</span><span className="text-slate-400">→</span><span className="font-medium">{after?.title ?? "Lệnh sau"}</span><span className="ml-auto text-xs text-slate-500">{dependency.status}</span></div>;
+              return <div key={dependency.id} className="flex flex-wrap items-center gap-2 rounded-xl border border-border-soft px-3 py-3 text-sm"><span data-project-coordination-icon="dependency" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-surface-2 text-slate-600"><Link2 className="h-4 w-4" /></span><StatusDot status={dependency.status} /><span className="font-medium">{before?.title ?? "Lệnh trước"}</span><span className="text-slate-400">→</span><span className="font-medium">{after?.title ?? "Lệnh sau"}</span><span className="ml-auto text-xs text-slate-500">{dependency.status}</span></div>;
             }) : <Empty text="Chưa có quan hệ phụ thuộc liên bộ môn." />}</div>
           </Panel>
           <Panel title="Điểm giao kỹ thuật" subtitle={`${coordinationPoints.length} điểm đang được theo dõi`}>
-            <div className="space-y-2">{coordinationPoints.length ? coordinationPoints.map((point) => <div key={point.id} className="rounded-xl border border-border-soft p-3"><div className="flex items-start justify-between gap-3"><div><p className="font-semibold">{point.title}</p><p className="mt-1 text-xs text-slate-500">{point.locationLabel ?? "Chưa có vị trí"}</p></div><StatusPill status={point.status} /></div><div className="mt-3 flex flex-wrap gap-1">{point.serviceTypes.map((type) => <TradePill key={type} type={type} />)}</div>{point.description && <p className="mt-2 text-xs text-slate-600">{point.description}</p>}</div>) : <Empty text="Chưa có điểm giao kỹ thuật." />}</div>
+            <div className="space-y-2">{coordinationPoints.length ? coordinationPoints.map((point) => <div key={point.id} className="rounded-xl border border-border-soft p-3"><div className="flex items-start justify-between gap-3"><div className="flex min-w-0 items-start gap-2"><span data-project-coordination-icon="point" className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary-50 text-primary-700"><MapPin className="h-4 w-4" /></span><div className="min-w-0"><p className="font-semibold">{point.title}</p><p className="mt-1 text-xs text-slate-500">{point.locationLabel ?? "Chưa có vị trí"}</p></div></div><StatusPill status={point.status} /></div><div className="mt-3 flex flex-wrap gap-1">{point.serviceTypes.map((type) => <TradePill key={type} type={type} />)}</div>{point.description && <p className="mt-2 text-xs text-slate-600">{point.description}</p>}</div>) : <Empty text="Chưa có điểm giao kỹ thuật." />}</div>
           </Panel>
         </section>
       )}

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { Children, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NextIntlClientProvider } from "next-intl";
+import Link from "next/link";
 import viMessages from "../messages/vi.json";
 
 const capturedDataTableProps: Record<string, unknown>[] = [];
@@ -458,6 +459,10 @@ describe("final mobile table surfaces", () => {
     expect(html).toContain("Lắp camera nhà xưởng Bình Minh");
     expect(html).not.toContain("Công trình không được chọn");
     expect(html).toContain("Camera");
+    expect(html).toContain('data-project-trade-icon="camera"');
+    expect(html).toContain('lucide-camera');
+    expect(html).toContain('data-project-stage-icon="active"');
+    expect(html).toContain('lucide-hard-hat');
     expect(html).toContain("Công ty Bình Minh");
     expect(html).toContain("65%");
     expect(html).toContain("2/5");
@@ -487,15 +492,26 @@ describe("final mobile table surfaces", () => {
     ).find((column) => column.key === "name");
     expect(nameColumn).toBeDefined();
     const desktopName = nameColumn!.render(row);
-    expect(renderToStaticMarkup(desktopName)).toMatch(
-      /^<a [^>]*href="\/projects\/service-project-1"[^>]*>Lắp camera nhà xưởng Bình Minh<\/a>$/,
+    const desktopNameHtml = renderToStaticMarkup(desktopName);
+    expect(desktopNameHtml).toContain('data-project-trade-icon="camera"');
+    expect(desktopNameHtml).toContain('lucide-camera');
+    expect(desktopNameHtml).toMatch(
+      /<a [^>]*href="\/projects\/service-project-1"[^>]*>Lắp camera nhà xưởng Bình Minh<\/a>/,
     );
-    expect(isValidElement(desktopName)).toBe(true);
-    const desktopNameProps = (
-      desktopName as React.ReactElement<{
-        onClick?: (event: unknown) => void;
+    const stageColumn = (
+      tableProps.columns as Array<{
+        key: string;
+        render: (row: typeof row) => ReactNode;
       }>
-    ).props;
+    ).find((column) => column.key === "stage");
+    expect(stageColumn).toBeDefined();
+    const desktopStageHtml = renderToStaticMarkup(stageColumn!.render(row));
+    expect(desktopStageHtml).toContain('data-project-stage-icon="active"');
+    expect(desktopStageHtml).toContain('lucide-hard-hat');
+    expect(isValidElement(desktopName)).toBe(true);
+    const desktopNameProps = elementsOfType(desktopName, Link)[0]?.props as {
+      onClick?: (event: unknown) => void;
+    };
     const clickEvent = { type: "click" };
     expect(desktopNameProps.onClick).toBeFunction();
     desktopNameProps.onClick!(clickEvent);
