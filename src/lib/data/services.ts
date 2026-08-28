@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNotNull, ne, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, isNotNull, ne, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import {
   customers,
@@ -10,6 +10,96 @@ import {
   warehouses,
   warrantyClaims,
 } from "@/db/schema";
+
+export type ServiceProjectListQuery = {
+  q?: string;
+  status?: "active" | "done";
+  serviceType?: "camera" | "electrical" | "plumbing" | "mixed";
+  page?: number;
+  pageSize?: number;
+};
+
+export async function getServiceProjectsPage(
+  storeId: string,
+  query: ServiceProjectListQuery = {},
+) {
+  const page = Math.max(1, Math.floor(query.page ?? 1));
+  const pageSize = Math.min(50, Math.max(1, Math.floor(query.pageSize ?? 20)));
+  const q = query.q?.trim().slice(0, 100);
+  const conditions: SQL[] = [
+    eq(projects.storeId, storeId),
+    isNotNull(projects.serviceType),
+  ];
+  if (query.status) conditions.push(eq(projects.status, query.status));
+  if (query.serviceType) {
+    conditions.push(eq(projects.serviceType, query.serviceType));
+  }
+  if (q) {
+    const search = or(
+      ilike(projects.name, `%${q}%`),
+      ilike(projects.address, `%${q}%`),
+      ilike(customers.name, `%${q}%`),
+    );
+    if (search) conditions.push(search);
+  }
+  const where = and(...conditions)!;
+
+  const projectSelection = {
+    id: projects.id,
+    name: projects.name,
+    customerId: projects.customerId,
+    customerName: customers.name,
+    address: projects.address,
+    note: projects.note,
+    status: projects.status,
+    serviceType: projects.serviceType,
+    serviceStage: projects.serviceStage,
+    progressPercent: projects.progressPercent,
+    startsOn: projects.startsOn,
+    targetEndsOn: projects.targetEndsOn,
+    siteContactName: projects.siteContactName,
+    siteContactPhone: projects.siteContactPhone,
+    orderCount: sql<number>`(select count(*) from ${orders} where ${orders.storeId} = ${storeId} and ${orders.projectId} = ${projects.id} and ${orders.status} != 'cancelled')::int`,
+    totalValue: sql<string>`coalesce((select sum(${orders.total}) from ${orders} where ${orders.storeId} = ${storeId} and ${orders.projectId} = ${projects.id} and ${orders.status} not in ('cancelled','quote','merged')), 0)`,
+    remaining: sql<string>`coalesce((select sum(${orders.total} - ${orders.amountPaid}) from ${orders} where ${orders.storeId} = ${storeId} and ${orders.projectId} = ${projects.id} and ${orders.status} = 'completed'), 0)`,
+    jobCount: sql<number>`(select count(*) from ${serviceJobs} where ${serviceJobs.storeId} = ${storeId} and ${serviceJobs.projectId} = ${projects.id})::int`,
+    openJobCount: sql<number>`(select count(*) from ${serviceJobs} where ${serviceJobs.storeId} = ${storeId} and ${serviceJobs.projectId} = ${projects.id} and ${serviceJobs.status} not in ('completed','cancelled'))::int`,
+    assetCount: sql<number>`(select count(*) from ${installedAssets} where ${installedAssets.storeId} = ${storeId} and ${installedAssets.projectId} = ${projects.id} and ${installedAssets.status} != 'removed')::int`,
+    openClaimCount: sql<number>`(select count(*) from ${warrantyClaims} where ${warrantyClaims.storeId} = ${storeId} and ${warrantyClaims.projectId} = ${projects.id} and ${warrantyClaims.status} not in ('closed','void'))::int`,
+    createdAt: projects.createdAt,
+  };
+
+  const [rows, totalRows, summaryRows] = await Promise.all([
+    db.select(projectSelection)
+      .from(projects)
+      .leftJoin(customers, eq(projects.customerId, customers.id))
+      .where(where)
+      .orderBy(desc(projects.createdAt), desc(projects.id))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize),
+    db.select({ value: count() })
+      .from(projects)
+      .leftJoin(customers, eq(projects.customerId, customers.id))
+      .where(where),
+    db.select({
+      attention: sql<number>`count(*) filter (where ${projects.status} = 'active' and (${projects.serviceStage} = 'paused' or (${projects.targetEndsOn} is not null and ${projects.targetEndsOn} <= current_date + 4) or exists (select 1 from ${warrantyClaims} where ${warrantyClaims.storeId} = ${storeId} and ${warrantyClaims.projectId} = ${projects.id} and ${warrantyClaims.status} not in ('closed','void'))))::int`,
+      overdue: sql<number>`count(*) filter (where ${projects.status} = 'active' and ${projects.targetEndsOn} is not null and ${projects.targetEndsOn} < current_date)::int`,
+    })
+      .from(projects)
+      .leftJoin(customers, eq(projects.customerId, customers.id))
+      .where(where),
+  ]);
+
+  const total = totalRows[0]?.value ?? 0;
+  return {
+    rows,
+    total,
+    page,
+    pageSize,
+    pageCount: Math.max(1, Math.ceil(total / pageSize)),
+    summary: summaryRows[0] ?? { attention: 0, overdue: 0 },
+  };
+}
 
 export async function getServiceDashboard(storeId: string) {
   const [projectRows, jobRows, claimRows] = await Promise.all([

@@ -1,14 +1,35 @@
 import { createServiceProject } from "@/lib/actions/services";
-import { getServiceDashboard } from "@/lib/data/services";
+import { getServiceProjectsPage } from "@/lib/data/services";
 import { requireMobileServiceAccess, requireMobileServiceManager } from "@/lib/mobile/auth";
-import { mobileAction, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
+import {
+  mobileAction,
+  mobileGate,
+  mobileOk,
+  numberParam,
+  readJson,
+  searchParam,
+} from "@/lib/mobile/response";
 
-export async function GET() {
+export async function GET(request: Request) {
   const gate = await requireMobileServiceAccess();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileGate(gate)!;
-  return mobileOk({ rows: (await getServiceDashboard(gate.storeId)).projects });
+
+  const status = searchParam(request, "status");
+  const serviceType = searchParam(request, "serviceType");
+  return mobileOk(await getServiceProjectsPage(gate.storeId, {
+    q: searchParam(request, "q"),
+    status: status === "active" || status === "done" ? status : undefined,
+    serviceType: serviceType === "camera"
+      || serviceType === "electrical"
+      || serviceType === "plumbing"
+      || serviceType === "mixed"
+      ? serviceType
+      : undefined,
+    page: numberParam(request, "page", 1),
+    pageSize: numberParam(request, "pageSize", 20),
+  }));
 }
 
 export async function POST(request: Request) {
