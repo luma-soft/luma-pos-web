@@ -25,8 +25,8 @@ describe("shared list search and filter", () => {
     const source = readFileSync("src/components/list-search-filter.tsx", "utf8");
 
     expect(source).toContain("min-w-0 flex-1 lg:max-w-xl");
-    expect(source).toContain('"h-11 w-full rounded-xl');
-    expect(source).toContain('"relative inline-flex h-11 shrink-0 items-center gap-2 rounded-xl');
+    expect(source).toContain('"min-h-11 w-full rounded-xl');
+    expect(source).toContain('"relative inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl');
     expect(source).toContain("border border-primary-600");
     expect(source).toContain("gap-2");
   });

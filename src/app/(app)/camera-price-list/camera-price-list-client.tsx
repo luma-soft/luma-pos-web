@@ -678,7 +678,7 @@ export function CameraPriceListClient({
                           event.stopPropagation();
                           copyImage(item, index);
                         }}
-                        className="inline-flex h-9 w-9 items-center justify-center text-[#0b7b74] transition hover:bg-teal-50"
+                        className="inline-flex h-11 w-11 items-center justify-center text-[#0b7b74] transition hover:bg-teal-50"
                         aria-label={`Sao chép ảnh gói ${item.model}`}
                         title="Sao chép ảnh gói"
                       >
@@ -690,7 +690,7 @@ export function CameraPriceListClient({
                           event.stopPropagation();
                           copySpecsImage(item, index);
                         }}
-                        className="inline-flex h-9 w-9 items-center justify-center text-[#14344d] transition hover:bg-teal-50"
+                        className="inline-flex h-11 w-11 items-center justify-center text-[#14344d] transition hover:bg-teal-50"
                         aria-label={`Sao chép ảnh thông số ${item.model}`}
                         title="Sao chép ảnh thông số"
                       >
@@ -749,7 +749,7 @@ export function CameraPriceListClient({
                       <button
                         type="button"
                         onClick={() => copyImage(item, index)}
-                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-teal-200 bg-white px-3.5 py-2.5 text-sm font-bold text-[#087b74] shadow-[0_2px_8px_rgba(8,129,122,.06)] transition hover:border-teal-300 hover:bg-teal-50"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-teal-200 bg-white px-3.5 py-2.5 text-sm font-bold text-[#087b74] shadow-[0_2px_8px_rgba(8,129,122,.06)] transition hover:border-teal-300 hover:bg-teal-50"
                       >
                         <Copy className="h-4 w-4" />
                         Sao chép ảnh gói
@@ -757,7 +757,7 @@ export function CameraPriceListClient({
                       <button
                         type="button"
                         onClick={() => copySpecsImage(item, index)}
-                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-bold text-[#14344d] transition hover:border-teal-200 hover:bg-teal-50"
+                        className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-bold text-[#14344d] transition hover:border-teal-200 hover:bg-teal-50"
                       >
                         <ClipboardList className="h-4 w-4" />
                         Sao chép thông số

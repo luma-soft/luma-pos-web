@@ -393,7 +393,7 @@ function ProjectDetailBody({
             id="assets"
             title={t("services.fields.assets")}
             description={`${t("services.summary.assets", { count: assets.length })} · ${t("services.assets.afterInstallHint")}`}
-            action={<div className="[&_button]:min-h-11 lg:[&_button]:min-h-0"><InstalledAssetQuickCreate projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} /></div>}
+            action={<div className="[&_button]:min-h-11 lg:[&_button]:min-h-0"><InstalledAssetQuickCreate projectId={project.id} serviceType={project.serviceType} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} /></div>}
           >
             {assets.length === 0 ? (
               <Text variant="muted" size="sm" text={t("services.assets.empty")} />

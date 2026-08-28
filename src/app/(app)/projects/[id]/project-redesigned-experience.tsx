@@ -38,6 +38,7 @@ import {
 import { ProjectServiceTab, ProjectServiceTabs } from "./project-service-tabs";
 import { CameraAccessPanel } from "./camera-access-panel";
 import { TradeRecordEditor } from "./trade-record-editor";
+import { InstalledAssetPhotoThumbnail } from "./installed-asset-photo-thumbnail";
 
 type ServiceOptions = Awaited<ReturnType<typeof getServiceFormOptions>>;
 
@@ -210,8 +211,8 @@ function DevicesTab({ detail, cameraAssets }: { detail: ProjectDetail; cameraAss
   const { project, jobs, assets } = detail;
   return (
     <div className="space-y-4">
-      <Panel title="Thiết bị & tài sản đã lắp" subtitle={`${assets.length} thiết bị`} action={<InstalledAssetQuickCreate projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} />}>
-        {assets.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{assets.map((asset) => <div key={asset.id} className="rounded-xl border border-border-soft p-3"><div className="flex items-start justify-between gap-2"><div><p className="font-semibold">{asset.name}</p><p className="mt-1 text-xs text-slate-500">{[asset.brand, asset.model].filter(Boolean).join(" ") || asset.assetKind}</p></div><StatusPill status={asset.status} /></div><dl className="mt-3 grid grid-cols-2 gap-2 text-xs"><div><dt className="text-slate-500">Vị trí</dt><dd className="mt-0.5 font-medium">{asset.locationLabel ?? "—"}</dd></div><div><dt className="text-slate-500">Serial</dt><dd className="mt-0.5 truncate font-mono">{asset.serialNumber ?? "—"}</dd></div></dl></div>)}</div> : <Empty text="Chưa ghi nhận thiết bị đã lắp." />}
+      <Panel title="Thiết bị & tài sản đã lắp" subtitle={`${assets.length} thiết bị`} action={<InstalledAssetQuickCreate projectId={project.id} serviceType={project.serviceType} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} />}>
+        {assets.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{assets.map((asset) => <div key={asset.id} className="rounded-xl border border-border-soft p-3"><div className="flex items-start gap-3"><InstalledAssetPhotoThumbnail assetId={asset.id} assetName={asset.name} /><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate font-semibold">{asset.name}</p><p className="mt-1 truncate text-xs text-slate-500">{[asset.brand, asset.model].filter(Boolean).join(" ") || asset.assetKind}</p></div><StatusPill status={asset.status} /></div><dl className="mt-3 grid grid-cols-2 gap-2 text-xs"><div><dt className="text-slate-500">Vị trí</dt><dd className="mt-0.5 truncate font-medium">{asset.locationLabel ?? "—"}</dd></div><div><dt className="text-slate-500">Serial</dt><dd className="mt-0.5 truncate font-mono">{asset.serialNumber ?? "—"}</dd></div></dl></div></div></div>)}</div> : <Empty text="Chưa ghi nhận thiết bị đã lắp." />}
       </Panel>
       {(project.serviceType === "camera" || project.serviceType === "mixed") && (
         <Panel title="Truy cập Camera/NVR an toàn" subtitle="Thông tin bí mật được mã hóa riêng; không xuất hiện trong biên bản bàn giao.">

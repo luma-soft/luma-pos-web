@@ -462,7 +462,7 @@ export function CameraAccessPanel({ assets }: { assets: CameraAsset[] }) {
                           aria-pressed={viewerPermissions[key]}
                           onClick={() => toggleViewerPermission(key)}
                           className={cn(
-                            "min-h-11 rounded-lg border px-3 py-2 text-left text-xs font-semibold",
+                            "min-h-11 min-w-11 rounded-lg border px-3 py-2 text-left text-xs font-semibold",
                             viewerPermissions[key]
                               ? "border-primary-300 bg-primary-50 text-primary-700"
                               : "border-border text-slate-500 hover:bg-surface-2",

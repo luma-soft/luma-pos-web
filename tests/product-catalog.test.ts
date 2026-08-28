@@ -14,7 +14,9 @@ function product(overrides: Partial<ProductCatalogItem> = {}): ProductCatalogIte
     barcode: "8930000000128",
     name: "Thẻ nhớ Kioxia 128GB MicroSD",
     productKind: "product",
+    brandId: "kioxia",
     brandName: "Kioxia",
+    model: "EXCERIA G2",
     categoryId: "memory",
     categoryName: "Thẻ nhớ",
     baseUnit: "cái",
@@ -24,6 +26,7 @@ function product(overrides: Partial<ProductCatalogItem> = {}): ProductCatalogIte
     contractorPrice: null,
     agentPrice: null,
     imageUrls: [],
+    imageUpdatedAt: "2026-07-24T00:00:00.000Z",
     specs: null,
     parentProductId: null,
     variantName: null,
@@ -76,6 +79,10 @@ describe("shared product catalog", () => {
       "the nho",
       { stockManagedOnly: true },
     )).toEqual([]);
+  });
+
+  test("searches the normalized catalog model returned by the browse projection", () => {
+    expect(searchProductCatalog([product()], "exceria g2")).toHaveLength(1);
   });
 
   test("selects stock for the active warehouse", () => {

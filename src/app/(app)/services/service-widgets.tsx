@@ -66,6 +66,7 @@ import {
 } from "@/lib/services/domain";
 import { ProjectEdit } from "../projects/project-widgets";
 import { useProductCatalog } from "@/components/product-catalog-provider";
+import { InstalledAssetBatchCreate } from "./installed-asset-batch-create";
 
 type ProjectOption = { id: string; name: string; serviceType: string | null };
 type AssigneeOption = { id: string; name: string };
@@ -628,10 +629,12 @@ export function WarrantyClaimQuickCreate({
 
 export function InstalledAssetQuickCreate({
   projectId,
+  serviceType,
   jobs,
   initial,
 }: {
   projectId: string;
+  serviceType?: string | null;
   jobs: { id: string; code: string; title: string }[];
   initial?: {
     id: string;
@@ -714,6 +717,16 @@ export function InstalledAssetQuickCreate({
       }
       router.refresh();
     } else setError(t(result.error as never));
+  }
+
+  if (!initial) {
+    return (
+      <InstalledAssetBatchCreate
+        projectId={projectId}
+        serviceType={serviceType}
+        jobs={jobs}
+      />
+    );
   }
 
   return (

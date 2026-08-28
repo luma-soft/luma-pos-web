@@ -1439,6 +1439,7 @@ export const installedAssets = pgTable("installed_assets", {
   installedAt: timestamp("installed_at", { withTimezone: true }),
   customerWarrantyEndsOn: date("customer_warranty_ends_on"),
   supplierWarrantyEndsOn: date("supplier_warranty_ends_on"),
+  clientRequestId: varchar("client_request_id", { length: 200 }),
   status: serviceAssetStatusEnum("status").notNull().default("installed"),
   note: text("note"),
   specs: jsonb("specs").$type<InstalledAssetSpecs>().notNull().default({}),
@@ -1451,7 +1452,15 @@ export const installedAssets = pgTable("installed_assets", {
   check("installed_assets_version_check", sql`${t.version} > 0`),
   index("installed_assets_project_idx").on(t.projectId, t.status),
   index("installed_assets_job_idx").on(t.jobId),
-  uniqueIndex("installed_assets_serial_idx").on(t.serialNumber),
+  index("installed_assets_product_idx")
+    .on(t.productId)
+    .where(sql`${t.productId} is not null`),
+  uniqueIndex("installed_assets_store_serial_idx")
+    .on(t.storeId, t.serialNumber)
+    .where(sql`${t.serialNumber} is not null`),
+  uniqueIndex("installed_assets_store_request_idx")
+    .on(t.storeId, t.clientRequestId)
+    .where(sql`${t.clientRequestId} is not null`),
 ]);
 
 export const serviceCameraVaults = pgTable("service_camera_vaults", {
@@ -1625,6 +1634,9 @@ export const serviceAttachments = pgTable("service_attachments", {
   sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
   sha256: varchar("sha256", { length: 64 }),
   caption: text("caption"),
+  clientRequestId: varchar("client_request_id", { length: 200 }),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isPrimary: boolean("is_primary").notNull().default(false),
   createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -1635,11 +1647,20 @@ export const serviceAttachments = pgTable("service_attachments", {
   cleanupClaimedAt: timestamp("cleanup_claimed_at", { withTimezone: true }),
   cleanupClaimToken: uuid("cleanup_claim_token"),
 }, (t) => [
-  check("service_attachments_category_check", sql`${t.category} in ('before', 'after', 'issue', 'document', 'signature')`),
+  check("service_attachments_category_check", sql`${t.category} in ('before', 'after', 'issue', 'document', 'signature', 'asset')`),
   check("service_attachments_size_check", sql`${t.sizeBytes} > 0`),
+  check("service_attachments_sort_order_check", sql`${t.sortOrder} >= 0`),
+  check("service_attachments_primary_asset_check", sql`not ${t.isPrimary} or (${t.assetId} is not null and ${t.category} = 'asset')`),
   uniqueIndex("service_attachments_bucket_path_idx").on(t.bucket, t.path),
   index("service_attachments_job_idx").on(t.jobId, t.createdAt),
   index("service_attachments_claim_idx").on(t.claimId, t.createdAt),
+  index("service_attachments_asset_idx").on(t.assetId, t.sortOrder, t.createdAt),
+  uniqueIndex("service_attachments_asset_request_idx")
+    .on(t.storeId, t.assetId, t.clientRequestId)
+    .where(sql`${t.assetId} is not null and ${t.clientRequestId} is not null`),
+  uniqueIndex("service_attachments_asset_primary_idx")
+    .on(t.assetId)
+    .where(sql`${t.assetId} is not null and ${t.isPrimary} and ${t.deletedAt} is null`),
   index("service_attachments_active_job_idx").on(t.jobId, t.createdAt).where(sql`${t.deletedAt} is null`),
   index("service_attachments_cleanup_retry_idx").on(t.cleanupClaimedAt, t.createdAt).where(sql`${t.deletedAt} is not null and ${t.storageDeletedAt} is null`),
 ]);

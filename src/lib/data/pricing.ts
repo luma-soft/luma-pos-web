@@ -51,6 +51,8 @@ export interface PricingProductRow {
   categoryId: string | null;
   categoryName: string | null;
   brandId: string | null;
+  brandName: string | null;
+  model: string | null;
   supplierId: string | null;
   imageUrls: string[];
   imageUpdatedAt: string;
@@ -206,6 +208,8 @@ export async function getPricingPage(
         categoryId: products.categoryId,
         categoryName: categories.name,
         brandId: products.brandId,
+        brandName: brands.name,
+        model: sql<string | null>`${products.specs} ->> 'model'`,
         supplierId: products.supplierId,
         imageUrls: products.imageUrls,
         imageUpdatedAt: products.imageUpdatedAt,
@@ -240,6 +244,7 @@ export async function getPricingPage(
       })
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
+      .leftJoin(brands, eq(products.brandId, brands.id))
       .where(where)
       .orderBy(...orderBy)
       .limit(pageSize)
@@ -256,6 +261,8 @@ export async function getPricingPage(
       categoryId: row.categoryId,
       categoryName: row.categoryName,
       brandId: row.brandId,
+      brandName: row.brandName,
+      model: row.model,
       supplierId: row.supplierId,
       imageUrls: row.imageUrls ?? [],
       imageUpdatedAt: row.imageUpdatedAt.toISOString(),

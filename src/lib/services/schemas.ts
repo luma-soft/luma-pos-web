@@ -166,6 +166,150 @@ export const installedAssetCreateSchema = z.object({
 
 export type InstalledAssetCreateInput = z.input<typeof installedAssetCreateSchema>;
 
+const installedAssetBatchDraftSchema = installedAssetCreateSchema.omit({
+  projectId: true,
+}).extend({
+  clientDraftId: z.string().trim().min(1).max(80),
+});
+
+export const installedAssetBatchCreateSchema = z.object({
+  projectId: z.uuid(),
+  requestId: z.string().trim().min(8).max(100),
+  assets: z.array(installedAssetBatchDraftSchema).min(1).max(50),
+}).superRefine(({ assets }, context) => {
+  const draftIds = new Set<string>();
+  assets.forEach((asset, index) => {
+    if (draftIds.has(asset.clientDraftId)) {
+      context.addIssue({
+        code: "custom",
+        message: "clientDraftId must be unique within a batch",
+        path: ["assets", index, "clientDraftId"],
+      });
+    }
+    draftIds.add(asset.clientDraftId);
+  });
+});
+
+export type InstalledAssetBatchCreateInput = z.input<typeof installedAssetBatchCreateSchema>;
+
+export type InstalledAssetBatchValidationIssue =
+  | {
+    scope: "common";
+    field: "locationLabel" | "installedOn";
+    fieldLabel: string;
+  }
+  | {
+    scope: "asset";
+    clientDraftId: string;
+    draftIndex: number;
+    field: "name" | "assetKind";
+    fieldLabel: string;
+  };
+
+export function validateInstalledAssetBatchDrafts(value: {
+  locationLabel: string;
+  installedOn: string;
+  assets: Array<{
+    clientDraftId: string;
+    name: string;
+    assetKind: string;
+  }>;
+}): {
+  valid: boolean;
+  issues: InstalledAssetBatchValidationIssue[];
+  message: string;
+} {
+  const issues: InstalledAssetBatchValidationIssue[] = [];
+  if (!value.locationLabel.trim()) {
+    issues.push({
+      scope: "common",
+      field: "locationLabel",
+      fieldLabel: "Vị trí lắp đặt",
+    });
+  }
+  if (!value.installedOn.trim()) {
+    issues.push({
+      scope: "common",
+      field: "installedOn",
+      fieldLabel: "Ngày lắp đặt",
+    });
+  }
+  value.assets.forEach((asset, draftIndex) => {
+    if (!asset.name.trim()) {
+      issues.push({
+        scope: "asset",
+        clientDraftId: asset.clientDraftId,
+        draftIndex,
+        field: "name",
+        fieldLabel: "Tên thiết bị",
+      });
+    }
+    if (!asset.assetKind.trim()) {
+      issues.push({
+        scope: "asset",
+        clientDraftId: asset.clientDraftId,
+        draftIndex,
+        field: "assetKind",
+        fieldLabel: "Loại thiết bị",
+      });
+    }
+  });
+
+  const messageParts: string[] = [];
+  const commonLabels = issues
+    .filter((issue) => issue.scope === "common")
+    .map((issue) => issue.fieldLabel);
+  if (commonLabels.length) {
+    messageParts.push(`Thông tin áp dụng chung: thiếu ${commonLabels.join(", ")}.`);
+  }
+  value.assets.forEach((asset, draftIndex) => {
+    const labels = issues
+      .filter((issue) => issue.scope === "asset" && issue.clientDraftId === asset.clientDraftId)
+      .map((issue) => issue.fieldLabel);
+    if (labels.length) {
+      messageParts.push(`Thiết bị ${draftIndex + 1}: thiếu ${labels.join(", ")}.`);
+    }
+  });
+
+  return {
+    valid: issues.length === 0,
+    issues,
+    message: messageParts.join(" "),
+  };
+}
+
+export function installedAssetCatalogFeedback(
+  status: "loading" | "cached" | "synced" | "unavailable",
+  productCount: number,
+): {
+  state: "loading" | "error" | "empty" | "ready";
+  message: string;
+  retryable: boolean;
+} {
+  if (productCount > 0) {
+    return { state: "ready", message: "", retryable: false };
+  }
+  if (status === "loading") {
+    return {
+      state: "loading",
+      message: "Đang tải danh mục sản phẩm…",
+      retryable: false,
+    };
+  }
+  if (status === "unavailable") {
+    return {
+      state: "error",
+      message: "Không thể tải danh mục sản phẩm.",
+      retryable: true,
+    };
+  }
+  return {
+    state: "empty",
+    message: "Không tìm thấy sản phẩm phù hợp.",
+    retryable: false,
+  };
+}
+
 export const installedAssetUpdateSchema = installedAssetCreateSchema.omit({
   projectId: true,
 }).extend({
@@ -261,6 +405,24 @@ export const serviceAttachmentMetadataSchema = z.object({
   caption: z.string().trim().max(500).optional(),
 });
 
+export const serviceAssetAttachmentMetadataSchema = z.object({
+  assetId: z.uuid(),
+  category: z.literal("asset"),
+  fileName: z.string().trim().min(1).max(255),
+  mimeType: z.enum([
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+  ]),
+  sizeBytes: z.coerce.number().int().positive().max(15 * 1024 * 1024),
+  clientRequestId: z.string().trim().min(8).max(200),
+  sortOrder: z.coerce.number().int().min(0).max(100).default(0),
+  isPrimary: z.boolean().default(false),
+  caption: z.string().trim().max(500).optional(),
+});
+
 export const serviceSignatureSchema = z.object({
   jobId: z.uuid(),
   attachmentId: z.uuid(),
@@ -318,6 +480,7 @@ export type ServiceJobAssignmentInput = z.input<typeof serviceJobAssignmentSchem
 export type ServiceVisitMutationInput = z.input<typeof serviceVisitMutationSchema>;
 export type ServiceChecklistUpdateInput = z.input<typeof serviceChecklistUpdateSchema>;
 export type ServiceAttachmentMetadataInput = z.input<typeof serviceAttachmentMetadataSchema>;
+export type ServiceAssetAttachmentMetadataInput = z.input<typeof serviceAssetAttachmentMetadataSchema>;
 export type ServiceSignatureInput = z.input<typeof serviceSignatureSchema>;
 export type ServiceCompletionInput = z.input<typeof serviceCompletionSchema>;
 export type ServiceFieldAssetCreateInput = z.input<typeof serviceFieldAssetCreateSchema>;

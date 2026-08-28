@@ -1,6 +1,6 @@
 import { normalizeSearch } from "@/lib/normalize";
 
-export const PRODUCT_CATALOG_SCHEMA_VERSION = 3;
+export const PRODUCT_CATALOG_SCHEMA_VERSION = 4;
 
 export type CatalogUnit = {
   unitName: string;
@@ -22,7 +22,9 @@ export type ProductCatalogItem = {
   barcode: string | null;
   name: string;
   productKind: "product" | "service" | "combo";
+  brandId: string | null;
   brandName: string | null;
+  model: string | null;
   categoryId: string | null;
   categoryName: string | null;
   baseUnit: string;
@@ -102,6 +104,7 @@ export function searchProductCatalog(
       product.name,
       product.sku,
       product.barcode ?? "",
+      product.model ?? "",
       product.brandName ?? "",
       product.categoryName ?? "",
       ...product.units.flatMap((unit) => [unit.unitName, unit.barcode ?? ""]),

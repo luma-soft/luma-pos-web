@@ -4,8 +4,49 @@ export const SERVICE_EVIDENCE_MIME_TYPES = [
   "image/jpeg",
   "image/png",
   "image/webp",
+  "image/heic",
+  "image/heif",
   "application/pdf",
 ] as const;
+
+export function serviceEvidenceDeclaredMime(
+  fileName: string,
+  declared: string,
+) {
+  const normalized = declared.trim().toLowerCase();
+  if (SERVICE_EVIDENCE_MIME_TYPES.includes(
+    normalized as (typeof SERVICE_EVIDENCE_MIME_TYPES)[number],
+  )) {
+    return normalized;
+  }
+  const extension = fileName.trim().toLowerCase().split(".").pop();
+  return ({
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+    heic: "image/heic",
+    heif: "image/heif",
+    pdf: "application/pdf",
+  } as Record<string, string>)[extension ?? ""] ?? normalized;
+}
+
+export function serviceEvidencePhotoCapacity(
+  currentCount: number,
+  incomingCount: number,
+) {
+  const available = Math.max(0, 8 - Math.max(0, currentCount));
+  const normalizedIncoming = Math.max(0, incomingCount);
+  const acceptedCount = Math.min(available, normalizedIncoming);
+  const overflowCount = Math.max(0, normalizedIncoming - acceptedCount);
+  return {
+    acceptedCount,
+    overflowCount,
+    message: overflowCount > 0
+      ? `Mỗi thiết bị tối đa 8 ảnh. Đã bỏ qua ${overflowCount} ảnh vượt giới hạn.`
+      : "",
+  };
+}
 
 export function safeServiceEvidenceName(value: string) {
   return value
@@ -49,6 +90,25 @@ export function sniffServiceEvidenceMime(
     && bytes[2] === 0x44
     && bytes[3] === 0x46
   ) return "application/pdf";
+  if (
+    bytes[4] === 0x66
+    && bytes[5] === 0x74
+    && bytes[6] === 0x79
+    && bytes[7] === 0x70
+  ) {
+    const majorBrand = String.fromCharCode(
+      bytes[8] ?? 0,
+      bytes[9] ?? 0,
+      bytes[10] ?? 0,
+      bytes[11] ?? 0,
+    );
+    if (["heic", "heix", "hevc", "hevx"].includes(majorBrand)) {
+      return "image/heic";
+    }
+    if (["mif1", "msf1"].includes(majorBrand)) {
+      return "image/heif";
+    }
+  }
   void declared;
   return null;
 }

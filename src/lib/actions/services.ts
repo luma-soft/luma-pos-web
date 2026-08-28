@@ -6,6 +6,7 @@ import { db } from "@/db";
 import {
   installedAssets,
   orders,
+  products,
   projects,
   serviceCostEntries,
   serviceHandoverDocuments,
@@ -41,6 +42,8 @@ import {
 import {
   installedAssetCreateSchema,
   type InstalledAssetCreateInput,
+  installedAssetBatchCreateSchema,
+  type InstalledAssetBatchCreateInput,
   installedAssetUpdateSchema,
   type InstalledAssetUpdateInput,
   serviceJobCreateSchema,
@@ -844,6 +847,12 @@ export async function createInstalledAsset(
     if (!await serviceLinksAreValid(gate.storeId, value.projectId, { jobId: value.jobId })) {
       return { ok: false, error: "services.errors.relationMismatch" };
     }
+    if (value.productId) {
+      const [product] = await db.select({ id: products.id }).from(products)
+        .where(and(eq(products.storeId, gate.storeId), eq(products.id, value.productId)))
+        .limit(1);
+      if (!product) return { ok: false, error: "errors.notFound" };
+    }
     const [asset] = await db.insert(installedAssets).values({
       storeId: gate.storeId,
       projectId: value.projectId,
@@ -874,6 +883,159 @@ export async function createInstalledAsset(
         : isUniqueViolation(error)
           ? "services.errors.duplicateSerial"
           : "errors.serverError",
+    };
+  }
+}
+
+export type InstalledAssetBatchResult = Array<{
+  clientDraftId: string;
+  assetId: string;
+}>;
+
+export async function createInstalledAssetsBatch(
+  input: InstalledAssetBatchCreateInput,
+): Promise<ActionResult<InstalledAssetBatchResult>> {
+  const gate = await requireServiceManager();
+  if (!gate.ok) return gate;
+  const parsed = installedAssetBatchCreateSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const value = parsed.data;
+
+  try {
+    const jobIds = [...new Set(value.assets.flatMap((asset) => asset.jobId ? [asset.jobId] : []))];
+    const productIds = [...new Set(value.assets.flatMap((asset) => asset.productId ? [asset.productId] : []))];
+    const requestKeyByDraft = new Map(
+      value.assets.map((asset) => [asset.clientDraftId, `${value.requestId}:${asset.clientDraftId}`]),
+    );
+    const requestKeys = [...requestKeyByDraft.values()];
+    const result = await db.transaction(async (tx) => {
+      const [project] = await tx.select({
+        id: projects.id,
+        serviceType: projects.serviceType,
+      }).from(projects).where(and(
+        eq(projects.storeId, gate.storeId),
+        eq(projects.id, value.projectId),
+      )).limit(1).for("update");
+      if (!project?.serviceType) {
+        return { outcome: "projectRequired" as const };
+      }
+
+      if (jobIds.length > 0) {
+        const linkedJobs = await tx.select({
+          id: serviceJobs.id,
+          projectId: serviceJobs.projectId,
+        }).from(serviceJobs).where(and(
+          eq(serviceJobs.storeId, gate.storeId),
+          inArray(serviceJobs.id, jobIds),
+        ));
+        if (
+          linkedJobs.length !== jobIds.length
+          || linkedJobs.some((job) => job.projectId !== value.projectId)
+        ) {
+          return { outcome: "relationMismatch" as const };
+        }
+      }
+
+      if (productIds.length > 0) {
+        const linkedProducts = await tx.select({ id: products.id }).from(products)
+          .where(and(
+            eq(products.storeId, gate.storeId),
+            inArray(products.id, productIds),
+          ));
+        if (linkedProducts.length !== productIds.length) {
+          return { outcome: "productNotFound" as const };
+        }
+      }
+
+      const existing = await tx.select({
+        id: installedAssets.id,
+        clientRequestId: installedAssets.clientRequestId,
+        projectId: installedAssets.projectId,
+      }).from(installedAssets).where(and(
+        eq(installedAssets.storeId, gate.storeId),
+        inArray(installedAssets.clientRequestId, requestKeys),
+      ));
+      if (existing.some((asset) => asset.projectId !== value.projectId)) {
+        throw new Error("SERVICE_INSTALLED_ASSET_BATCH_CONFLICT");
+      }
+      const existingKeys = new Set(existing.flatMap((asset) => asset.clientRequestId ? [asset.clientRequestId] : []));
+      const missing = value.assets.filter((asset) => !existingKeys.has(requestKeyByDraft.get(asset.clientDraftId)!));
+
+      if (missing.length > 0) {
+        await tx.insert(installedAssets).values(missing.map((asset) => ({
+          storeId: gate.storeId,
+          projectId: value.projectId,
+          jobId: asset.jobId ?? null,
+          productId: asset.productId ?? null,
+          assetKind: asset.assetKind,
+          name: asset.name,
+          brand: asset.brand || null,
+          model: asset.model || null,
+          serialNumber: asset.serialNumber || null,
+          macAddress: asset.macAddress || null,
+          ipAddress: asset.ipAddress || null,
+          locationLabel: asset.locationLabel || null,
+          installedAt: asset.installedAt ? new Date(asset.installedAt) : null,
+          customerWarrantyEndsOn: asset.customerWarrantyEndsOn ?? null,
+          supplierWarrantyEndsOn: asset.supplierWarrantyEndsOn ?? null,
+          note: asset.note || null,
+          clientRequestId: requestKeyByDraft.get(asset.clientDraftId)!,
+          createdBy: gate.userId,
+        }))).onConflictDoNothing();
+      }
+
+      const persisted = await tx.select({
+        id: installedAssets.id,
+        clientRequestId: installedAssets.clientRequestId,
+        projectId: installedAssets.projectId,
+      }).from(installedAssets).where(and(
+        eq(installedAssets.storeId, gate.storeId),
+        inArray(installedAssets.clientRequestId, requestKeys),
+      ));
+      if (persisted.some((asset) => asset.projectId !== value.projectId)) {
+        throw new Error("SERVICE_INSTALLED_ASSET_BATCH_CONFLICT");
+      }
+      const idByRequestKey = new Map(
+        persisted.flatMap((asset) => asset.clientRequestId ? [[asset.clientRequestId, asset.id] as const] : []),
+      );
+      if (idByRequestKey.size !== value.assets.length) {
+        throw new Error("SERVICE_INSTALLED_ASSET_BATCH_CONFLICT");
+      }
+      return {
+        outcome: "created" as const,
+        rows: value.assets.map((asset) => ({
+          clientDraftId: asset.clientDraftId,
+          assetId: idByRequestKey.get(requestKeyByDraft.get(asset.clientDraftId)!)!,
+        })),
+      };
+    });
+
+    if (result.outcome === "projectRequired") {
+      return { ok: false, error: "services.errors.projectRequired" };
+    }
+    if (result.outcome === "relationMismatch") {
+      return { ok: false, error: "services.errors.relationMismatch" };
+    }
+    if (result.outcome === "productNotFound") {
+      return { ok: false, error: "errors.notFound" };
+    }
+
+    revalidateServiceProject(value.projectId);
+    await auditServiceMutation(
+      gate.userId,
+      "create_installed_assets_batch",
+      "installed_asset",
+      null,
+      { projectId: value.projectId, requestId: value.requestId, count: result.rows.length },
+    );
+    return { ok: true, data: result.rows };
+  } catch (error) {
+    console.error("createInstalledAssetsBatch failed:", error);
+    return {
+      ok: false,
+      error: isUniqueViolation(error) || (error instanceof Error && error.message === "SERVICE_INSTALLED_ASSET_BATCH_CONFLICT")
+        ? "services.errors.duplicateSerial"
+        : "errors.serverError",
     };
   }
 }

@@ -4,6 +4,7 @@ Triển khai lại toàn bộ trải nghiệm **Công trình** trên web và mob
 
 - `output/designs/project-full-flow-v1`
 - `output/designs/project-full-flow-v2-multi-trade`
+- `artifacts/project-device-photo-audit-2026-08-28/06-selected-option-2-multi-product-flow.png`
 
 Khi render v2 bị trùng phiên bản, dùng `05-web-plumbing-work-order-v2.png` và `08-mobile-mixed-coordination-v2.png` làm nguồn chuẩn.
 
@@ -36,6 +37,78 @@ Sau các chỉ số tiến độ/thiết bị/lệnh việc/bảo hành, phần 
 5. **Tài chính & hồ sơ**: doanh thu/chi phí/lợi nhuận, chứng từ, lịch sử và điều kiện đóng công trình.
 
 Trên mobile vẫn giữ năm nhóm nghiệp vụ nhưng trình bày thành tab cuộn ngang và card một cột, nút thao tác tối thiểu 44 px. Picker phải dùng `LumaPickerField`; sheet phải mở qua `showLumaModalSheet`. Trên web dùng picker Luma dạng trigger + popover/listbox, không dùng `<select>` hoặc `<datalist>` hiển thị.
+
+## Thiết bị đã lắp — flow bắt buộc theo phương án 2
+
+Áp dụng đúng render `06-selected-option-2-multi-product-flow.png`. Không tự đổi hierarchy, interaction model, icon, khoảng cách hoặc trạng thái hiển thị. Giữ nguyên navigation và header dùng chung hiện có.
+
+### Chọn nguồn thiết bị
+
+- Có đúng hai nguồn ngang hàng: **Chọn từ sản phẩm** và **Nhập thủ công**.
+- Nguồn mặc định là **Chọn từ sản phẩm**. Nhập thủ công tạo thiết bị không có `product_id` nhưng vẫn dùng cùng cấu trúc snapshot, ảnh và validation.
+- Luôn hiển thị thông báo: **Chỉ liên kết thông tin sản phẩm, không trừ tồn kho**.
+- Tuyệt đối không tạo stock movement, reservation, outbound transaction, điều chỉnh `total_stock` hoặc bất kỳ side effect kho nào khi chọn hay lưu thiết bị.
+
+### Web — custom multi-select
+
+- Dùng Luma custom picker dạng trigger + controlled popover/listbox; không dùng `<select>`, `<datalist>` hoặc popup native.
+- Cho tìm theo tên, SKU, barcode và model; hỗ trợ filter theo component dùng chung nếu đã có.
+- Mỗi hàng có ảnh sản phẩm, tên, SKU, thương hiệu/model và checkbox chọn nhiều.
+- Footer picker phải hiện **Đã chọn N sản phẩm** và CTA **Thêm N sản phẩm**.
+- Khi mở lại picker, giữ nguyên các sản phẩm đã chọn; bỏ chọn phải cập nhật danh sách bản nháp nhưng không được làm mất dữ liệu của các bản nháp còn lại.
+- Phải kiểm thử cả trạng thái picker đóng và mở, bàn phím, focus, outside-click, Escape, Enter/Space và screen reader label.
+
+### Mobile — tái sử dụng màn hình có sẵn
+
+- Không viết product picker mới và không mở bottom sheet cho bước chọn sản phẩm.
+- Điều hướng toàn màn hình tới `SelectProductPage` tại `lib/src/core/widgets/select_product_page.dart` bằng `Navigator.push`/route chuẩn hiện có.
+- Tái sử dụng `MobileProductBrowseDataSource`, tìm kiếm, bộ lọc, thumbnail, trạng thái chọn và footer xác nhận của component dùng chung.
+- Không truyền `maxSelection: 1`; phải cho chọn nhiều sản phẩm. Truyền `initiallySelected` để giữ lựa chọn khi quay lại.
+- Footer dùng đúng copy **Thêm N sản phẩm**. Sau xác nhận, nhận `List<MobileBrowseProduct>` và quay về form thêm thiết bị.
+- Không fork/copy `SelectProductPage`, `ProductSelectionRow` hoặc logic browse/filter sang feature Công trình.
+
+### Tạo danh sách bản nháp thiết bị
+
+- Mỗi sản phẩm được chọn tạo đúng một bản nháp thiết bị độc lập; khóa ổn định theo `product_id` để rebuild không làm mất dữ liệu đang nhập.
+- Có khu vực **Thông tin áp dụng chung** cho lệnh việc, vị trí lắp, ngày lắp, hạn bảo hành và ghi chú. Giá trị chung áp dụng cho mọi bản nháp nhưng từng thiết bị vẫn có thể override khi nghiệp vụ yêu cầu.
+- Danh sách hiển thị **Thiết bị đã chọn (N)**. Mỗi hàng có thumbnail, tên, SKU, loại, trạng thái hoàn thiện, xóa và expand/collapse.
+- Snapshot mỗi thiết bị được phép sửa và tối thiểu gồm: tên thiết bị, loại thiết bị, thương hiệu, model, serial, MAC, địa chỉ IP, vị trí lắp, ngày lắp, hạn bảo hành, lệnh việc và ghi chú.
+- Khi chọn sản phẩm, tự điền dữ liệu catalog có sẵn nhưng không khóa field. Ảnh catalog chỉ để tham khảo và không tự trở thành ảnh lắp đặt.
+- CTA lưu phải dùng copy theo số lượng: **Lưu N thiết bị**. Validation phải chỉ rõ bản nháp nào và field nào còn thiếu.
+
+### Ảnh thiết bị
+
+- Mỗi bản nháp có bộ ảnh riêng, không dùng chung ảnh giữa các thiết bị.
+- Web hỗ trợ kéo-thả và chọn file. Mobile hỗ trợ **Chụp ảnh** và **Chọn từ thư viện**.
+- Cho xem thumbnail, xóa, sắp xếp và chọn **Ảnh chính**; giới hạn mặc định 8 ảnh/thiết bị; hỗ trợ JPG, PNG và HEIC với validation dung lượng/định dạng rõ ràng.
+- Dùng bucket private và signed URL ngắn hạn. Mở rộng attachment hiện có bằng liên kết `asset_id` và category `asset`; không lưu URL public vĩnh viễn trong `installed_assets`.
+- Sau khi tạo asset, upload ảnh theo từng asset. Lỗi upload phải hiển thị đúng thiết bị bị lỗi và cho retry mà không tạo trùng asset.
+
+### API và dữ liệu
+
+- Product browse API phải trả đủ dữ liệu cần cho UI/snapshot: `id`, `name`, `sku`, `barcode`, `imageUrl`, `imageUpdatedAt`, `categoryName`, `brandId`, `brandName`, `model` và các field hiện có. Bổ sung API/model nếu còn thiếu, không suy đoán brand/model từ tên sản phẩm.
+- Mobile payload phải gửi `productId` cho từng thiết bị chọn từ catalog; nhập thủ công gửi `productId: null`.
+- Thêm contract batch để lưu nhiều thiết bị trong một thao tác. Phần tạo record phải chạy transaction all-or-nothing, kiểm tra project/job/product cùng `store_id` và trả mapping ổn định từ client draft sang asset đã tạo.
+- Batch endpoint phải idempotent để retry không tạo thiết bị trùng. Không được gọi API tạo đơn lẻ trong vòng lặp mà không có cơ chế idempotency và tổng hợp lỗi.
+- API web và mobile dùng chung domain/service; không duy trì hai implementation nghiệp vụ khác nhau.
+
+### Icon contract — phải khớp thiết kế 100%
+
+- Dùng đúng icon semantic và style đã thể hiện trong render: chọn từ sản phẩm, nhập thủ công, tìm kiếm, bộ lọc, checkbox chọn nhiều, thông tin không trừ kho, camera, thư viện ảnh, upload, ảnh chính, xóa, expand/collapse, quay lại, đóng và lịch.
+- Web và mobile phải dùng cùng ý nghĩa icon, cùng trạng thái active/inactive/disabled và cùng optical size. Không thay icon bằng emoji, ký tự Unicode, text symbol hoặc icon gần nghĩa khác.
+- Web dùng icon component/thư viện hiện có của Luma; mobile ưu tiên `LumaDesignIcon` và mapping tài sản hiện có. Nếu icon trong render chưa có, bổ sung đúng asset/mapping vào design icon system thay vì dùng `Icons.*` tùy tiện trong feature.
+- Tạo bảng mapping kiểm chứng `design icon -> web component/name -> mobile LumaDesignIcon/name -> size -> color -> state` và dùng bảng này làm nguồn triển khai.
+- Icon trong field/button phải giữ alignment, stroke weight, khoảng cách với label và kích thước đúng render. Touch target mobile tối thiểu 44 px nhưng glyph không được phóng to sai tỷ lệ.
+- Thêm widget/component test cho đúng icon name ở các trạng thái quan trọng; golden/screenshot phải bắt được icon sai, thiếu hoặc fallback.
+
+### Acceptance cho flow thiết bị
+
+- Web và mobile cùng chọn được nhiều sản phẩm, tạo cùng số lượng bản nháp và lưu ra cùng số lượng installed asset.
+- Chọn/lưu thiết bị không làm thay đổi tồn kho trước và sau thao tác; có test integration đối chiếu stock balance/stock movement.
+- Quay lại màn chọn sản phẩm giữ nguyên lựa chọn; bỏ/chọn lại không làm sai dữ liệu các bản nháp khác.
+- Ảnh được gắn đúng asset, private, hiển thị lại sau reload và retry không tạo trùng record/attachment.
+- Manual mode, catalog mode, mixed device types, empty/loading/error/permission-denied, partial upload failure và validation nhiều bản nháp đều có test.
+- So sánh web và mobile implementation với `06-selected-option-2-multi-product-flow.png` ở đúng viewport. Không hoàn tất khi còn sai icon, hierarchy, spacing, border, radius, typography hoặc trạng thái picker P0/P1/P2.
 
 ## Camera/NVR — vault bắt buộc
 

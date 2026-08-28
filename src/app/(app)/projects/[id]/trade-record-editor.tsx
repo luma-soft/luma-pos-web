@@ -164,7 +164,7 @@ export function TradeRecordEditor({
                   aria-pressed={item.completed}
                   onClick={() => setSafety((rows) => rows.map((row, rowIndex) => rowIndex === index ? { ...row, completed: !row.completed } : row))}
                   className={cn(
-                    "min-h-11 rounded-xl border px-3 py-2 text-left text-sm font-semibold",
+                    "min-h-11 min-w-11 rounded-xl border px-3 py-2 text-left text-sm font-semibold",
                     item.completed ? "border-primary-300 bg-primary-50 text-primary-700" : "border-border hover:bg-surface-2",
                   )}
                 >

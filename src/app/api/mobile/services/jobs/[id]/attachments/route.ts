@@ -5,12 +5,11 @@ import { getFieldServiceJobDetail } from "@/lib/data/service-field";
 import { requireMobileServiceAccess } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
 import {
-  MAX_SERVICE_EVIDENCE_BYTES,
   safeServiceEvidenceName,
   SERVICE_EVIDENCE_BUCKET,
-  SERVICE_EVIDENCE_MIME_TYPES,
   sniffServiceEvidenceMime,
 } from "@/lib/services/evidence-storage";
+import { ensureServiceEvidenceBucket } from "@/lib/services/evidence-bucket";
 import { serviceAttachmentMetadataSchema } from "@/lib/services/schemas";
 import {
   completeServiceEvidenceStorageRemoval,
@@ -23,21 +22,6 @@ import {
 } from "@/lib/services/field-api";
 import { requireLockedServiceJobAccess } from "@/lib/services/field-operations";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-
-async function ensureEvidenceBucket() {
-  const supabase = createSupabaseAdminClient();
-  const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-  if (listError) throw listError;
-  if (!buckets.some((bucket) => bucket.name === SERVICE_EVIDENCE_BUCKET)) {
-    const { error } = await supabase.storage.createBucket(SERVICE_EVIDENCE_BUCKET, {
-      public: false,
-      fileSizeLimit: MAX_SERVICE_EVIDENCE_BYTES,
-      allowedMimeTypes: [...SERVICE_EVIDENCE_MIME_TYPES],
-    });
-    if (error) throw error;
-  }
-  return supabase;
-}
 
 export async function POST(
   request: Request,
@@ -81,7 +65,7 @@ export async function POST(
   const path = `stores/${gate.storeId}/services/jobs/${id}/${gate.userId}/${Date.now()}-${randomUUID()}-${safeName}`;
 
   try {
-    const supabase = await ensureEvidenceBucket();
+    const supabase = await ensureServiceEvidenceBucket();
     const { error: uploadError } = await supabase.storage
       .from(SERVICE_EVIDENCE_BUCKET)
       .upload(path, bytes, { contentType: file.type, upsert: false });
