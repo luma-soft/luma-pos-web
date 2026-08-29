@@ -2,11 +2,57 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import * as serviceSchemas from "../src/lib/services/schemas";
 import * as serviceEvidenceStorage from "../src/lib/services/evidence-storage";
+import { resizeInstalledAssetProductDrafts } from "../src/lib/services/installed-asset-quantity";
 
 const projectId = "11111111-1111-4111-8111-111111111111";
 const productId = "22222222-2222-4222-8222-222222222222";
 
 describe("installed asset batch input", () => {
+  it("expands catalog quantity into independent drafts with stable unique ids", () => {
+    const initial = [{ clientDraftId: "camera-unit-1", productId }];
+    let nextId = 1;
+
+    const expanded = resizeInstalledAssetProductDrafts({
+      drafts: initial,
+      productId,
+      quantity: 3,
+      createDraft: () => ({
+        clientDraftId: `camera-unit-${++nextId}`,
+        productId,
+      }),
+    });
+
+    expect(expanded.drafts).toHaveLength(3);
+    expect(expanded.removed).toEqual([]);
+    expect(new Set(expanded.drafts.map((draft) => draft.clientDraftId)).size).toBe(3);
+    expect(expanded.drafts.map((draft) => draft.productId)).toEqual([
+      productId,
+      productId,
+      productId,
+    ]);
+  });
+
+  it("caps catalog quantity at the 50-device API batch limit", () => {
+    const otherDrafts = Array.from({ length: 49 }, (_, index) => ({
+      clientDraftId: `other-${index}`,
+      productId: `other-product-${index}`,
+    }));
+    const initial = [
+      ...otherDrafts,
+      { clientDraftId: "camera-unit-1", productId },
+    ];
+
+    const resized = resizeInstalledAssetProductDrafts({
+      drafts: initial,
+      productId,
+      quantity: 3,
+      createDraft: () => ({ clientDraftId: "should-not-be-created", productId }),
+    });
+
+    expect(resized.quantity).toBe(1);
+    expect(resized.drafts).toHaveLength(50);
+  });
+
   it("reports the exact common and per-device fields that block saving", () => {
     const validate = (
       serviceSchemas as typeof serviceSchemas & {
@@ -341,7 +387,7 @@ describe("installed asset visual and interaction contract", () => {
     expect(source).toContain('event.key !== "Escape"');
     expect(source).toContain("event.stopPropagation()");
     expect(source).toContain('event.key === "Enter" || event.key === " "');
-    expect(source).toContain("Thêm {catalogDrafts.length} sản phẩm");
+    expect(source).toContain("Thêm {selectedProductCount} sản phẩm");
     expect(source).toContain("commonExpanded");
     expect(source).toContain('aria-controls="installed-asset-common-fields"');
     expect(source).not.toMatch(/<select|<datalist/);

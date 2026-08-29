@@ -19,15 +19,21 @@ import {
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { RowPreviewModal } from "@/components/data-table";
+import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { SearchableSelect } from "@/components/combobox";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { Field } from "@/components/ui/label";
+import { QuantityInput } from "@/components/ui/quantity-input";
 import { createInstalledAssetsBatch } from "@/lib/actions/services";
 import { normalizeSearch } from "@/lib/normalize";
 import type { ProductCatalogItem } from "@/lib/product-catalog";
 import { serviceEvidencePhotoCapacity } from "@/lib/services/evidence-storage";
+import {
+  INSTALLED_ASSET_BATCH_LIMIT,
+  resizeInstalledAssetProductDrafts,
+} from "@/lib/services/installed-asset-quantity";
 import {
   installedAssetCatalogFeedback,
   validateInstalledAssetBatchDrafts,
@@ -56,6 +62,7 @@ type AssetDraft = {
   macAddress: string;
   ipAddress: string;
   photos: PendingPhoto[];
+  edited: boolean;
 };
 
 export function InstalledAssetBatchCreate({
@@ -69,6 +76,7 @@ export function InstalledAssetBatchCreate({
 }) {
   const t = useTranslations();
   const router = useRouter();
+  const dialog = useConfirmDialog();
   const { products, status: catalogStatus, refresh: refreshCatalog } = useProductCatalog();
   const [open, setOpen] = useState(false);
   const [source, setSource] = useState<AssetSource>("catalog");
@@ -92,6 +100,7 @@ export function InstalledAssetBatchCreate({
     () => new Set(catalogDrafts.flatMap((draft) => draft.productId ? [draft.productId] : [])),
     [catalogDrafts],
   );
+  const selectedProductCount = selectedIds.size;
   const visibleProducts = useMemo(() => {
     const normalized = normalizeSearch(query);
     return products.filter((product) => {
@@ -128,23 +137,65 @@ export function InstalledAssetBatchCreate({
     setExpandedDraftId(next === "catalog" ? catalogDrafts[0]?.clientDraftId ?? null : manualDraft.clientDraftId);
   }
 
-  function toggleProduct(product: ProductCatalogItem) {
+  async function toggleProduct(product: ProductCatalogItem) {
     if (busy) return;
     setSource("catalog");
-    setCatalogDrafts((current) => {
-      const existing = current.find((draft) => draft.productId === product.id);
-      if (existing) {
-        releaseDraftPhotos(existing);
-        const next = current.filter((draft) => draft.productId !== product.id);
-        if (expandedDraftId === existing.clientDraftId) {
-          setExpandedDraftId(next[0]?.clientDraftId ?? null);
-        }
-        return next;
+    const existing = catalogDrafts.filter((draft) => draft.productId === product.id);
+    if (existing.length > 0) {
+      if (existing.some(hasDraftUserData)) {
+        const confirmed = await dialog.confirm({
+          title: "Bỏ sản phẩm đã nhập thông tin?",
+          description: `Thao tác này sẽ xóa ${existing.length} hồ sơ thiết bị cùng serial, ảnh và thông tin đã nhập.`,
+          confirmLabel: "Bỏ sản phẩm",
+          cancelLabel: "Giữ lại",
+          variant: "destructive",
+        });
+        if (!confirmed) return;
       }
-      const draft = makeCatalogDraft(product, serviceType);
-      setExpandedDraftId((value) => value ?? draft.clientDraftId);
-      return [...current, draft];
+      existing.forEach(releaseDraftPhotos);
+      const next = catalogDrafts.filter((draft) => draft.productId !== product.id);
+      setCatalogDrafts(next);
+      if (existing.some((draft) => draft.clientDraftId === expandedDraftId)) {
+        setExpandedDraftId(next[0]?.clientDraftId ?? null);
+      }
+      return;
+    }
+    if (catalogDrafts.length >= INSTALLED_ASSET_BATCH_LIMIT) {
+      setError(`Mỗi lần chỉ có thể tạo tối đa ${INSTALLED_ASSET_BATCH_LIMIT} thiết bị.`);
+      return;
+    }
+    const draft = makeCatalogDraft(product, serviceType);
+    setCatalogDrafts((current) => [...current, draft]);
+    setExpandedDraftId((value) => value ?? draft.clientDraftId);
+  }
+
+  async function updateProductQuantity(product: ProductCatalogItem, quantity: number) {
+    if (busy) return;
+    const resized = resizeInstalledAssetProductDrafts({
+      drafts: catalogDrafts,
+      productId: product.id,
+      quantity,
+      createDraft: () => makeCatalogDraft(product, serviceType),
     });
+    if (resized.removed.some(hasDraftUserData)) {
+      const confirmed = await dialog.confirm({
+        title: "Giảm số lượng thiết bị?",
+        description: `Thao tác này sẽ xóa ${resized.removed.length} hồ sơ thiết bị cùng serial, ảnh và thông tin đã nhập.`,
+        confirmLabel: "Giảm số lượng",
+        cancelLabel: "Giữ lại",
+        variant: "destructive",
+      });
+      if (!confirmed) return;
+    }
+    resized.removed.forEach(releaseDraftPhotos);
+    setCatalogDrafts(resized.drafts);
+    if (resized.removed.some((draft) => draft.clientDraftId === expandedDraftId)) {
+      setExpandedDraftId(
+        resized.drafts.find((draft) => draft.productId === product.id)?.clientDraftId
+          ?? resized.drafts[0]?.clientDraftId
+          ?? null,
+      );
+    }
   }
 
   function updateDraft(clientDraftId: string, patch: Partial<AssetDraft>) {
@@ -153,18 +204,29 @@ export function InstalledAssetBatchCreate({
       return;
     }
     setCatalogDrafts((current) => current.map((draft) => (
-      draft.clientDraftId === clientDraftId ? { ...draft, ...patch } : draft
+      draft.clientDraftId === clientDraftId ? { ...draft, ...patch, edited: true } : draft
     )));
   }
 
-  function removeDraft(clientDraftId: string) {
-    setCatalogDrafts((current) => {
-      const removed = current.find((draft) => draft.clientDraftId === clientDraftId);
-      if (removed) releaseDraftPhotos(removed);
-      const next = current.filter((draft) => draft.clientDraftId !== clientDraftId);
-      if (expandedDraftId === clientDraftId) setExpandedDraftId(next[0]?.clientDraftId ?? null);
-      return next;
-    });
+  async function removeDraft(clientDraftId: string) {
+    const removed = catalogDrafts.find((draft) => draft.clientDraftId === clientDraftId);
+    if (!removed) return;
+    if (hasDraftUserData(removed)) {
+      const confirmed = await dialog.confirm({
+        title: "Xóa thiết bị đã nhập thông tin?",
+        description: "Serial, ảnh và thông tin đã nhập cho thiết bị này sẽ bị xóa.",
+        confirmLabel: "Xóa thiết bị",
+        cancelLabel: "Giữ lại",
+        variant: "destructive",
+      });
+      if (!confirmed) return;
+    }
+    releaseDraftPhotos(removed);
+    const next = catalogDrafts.filter((draft) => draft.clientDraftId !== clientDraftId);
+    setCatalogDrafts(next);
+    if (expandedDraftId === clientDraftId) {
+      setExpandedDraftId(next[0]?.clientDraftId ?? null);
+    }
   }
 
   function addPhotos(clientDraftId: string, files: FileList | null) {
@@ -445,7 +507,7 @@ export function InstalledAssetBatchCreate({
                                 key={product.id}
                                 product={product}
                                 selected={selectedIds.has(product.id)}
-                                onToggle={() => toggleProduct(product)}
+                                onToggle={() => void toggleProduct(product)}
                               />
                             ))}
                             {visibleProducts.length === 0 && (
@@ -455,14 +517,14 @@ export function InstalledAssetBatchCreate({
                         )}
                       </div>
                       <div className="flex items-center justify-between gap-3 border-t border-border-soft bg-surface-2 px-3 py-2">
-                        <span className="text-xs text-slate-600">Đã chọn {catalogDrafts.length} sản phẩm</span>
+                        <span className="text-xs text-slate-600">Đã chọn {selectedProductCount} sản phẩm</span>
                         <Button
                           type="button"
                           size="sm"
-                          disabled={catalogDrafts.length === 0}
+                          disabled={selectedProductCount === 0}
                           onClick={() => setPickerOpen(false)}
                         >
-                          Thêm {catalogDrafts.length} sản phẩm
+                          Thêm {selectedProductCount} sản phẩm
                         </Button>
                       </div>
                     </>
@@ -543,30 +605,47 @@ export function InstalledAssetBatchCreate({
             ) : (
               <div className="space-y-2">
                 {drafts.map((draft, index) => (
-                  <DraftCard
-                    key={draft.clientDraftId}
-                    draft={draft}
-                    index={index}
-                    expanded={expandedDraftId === draft.clientDraftId}
-                    complete={Boolean(
-                      locationLabel.trim()
-                      && installedOn
-                      && draft.name.trim()
-                      && draft.assetKind.trim()
-                      && draft.serialNumber.trim()
-                      && draft.photos.length,
+                  <div key={draft.clientDraftId} className="space-y-2">
+                    {source === "catalog" && draft.productId && catalogDrafts.findIndex(
+                      (item) => item.productId === draft.productId,
+                    ) === index && (
+                      <ProductQuantityRow
+                        draft={draft}
+                        quantity={catalogDrafts.filter((item) => item.productId === draft.productId).length}
+                        max={INSTALLED_ASSET_BATCH_LIMIT - catalogDrafts.filter(
+                          (item) => item.productId !== draft.productId,
+                        ).length}
+                        disabled={busy}
+                        onChange={(quantity) => {
+                          const product = products.find((item) => item.id === draft.productId);
+                          if (product) void updateProductQuantity(product, quantity);
+                        }}
+                      />
                     )}
-                    canDelete={source === "catalog"}
-                    onToggle={() => setExpandedDraftId(
-                      expandedDraftId === draft.clientDraftId ? null : draft.clientDraftId,
-                    )}
-                    onDelete={() => removeDraft(draft.clientDraftId)}
-                    onChange={(patch) => updateDraft(draft.clientDraftId, patch)}
-                    onFiles={(files) => addPhotos(draft.clientDraftId, files)}
-                    onRemovePhoto={(photoId) => removePhoto(draft.clientDraftId, photoId)}
-                    onSetPrimary={(photoId) => makePrimaryPhoto(draft.clientDraftId, photoId)}
-                    onMovePhoto={(fromPhotoId, toPhotoId) => movePhoto(draft.clientDraftId, fromPhotoId, toPhotoId)}
-                  />
+                    <DraftCard
+                      draft={draft}
+                      index={index}
+                      expanded={expandedDraftId === draft.clientDraftId}
+                      complete={Boolean(
+                        locationLabel.trim()
+                        && installedOn
+                        && draft.name.trim()
+                        && draft.assetKind.trim()
+                        && draft.serialNumber.trim()
+                        && draft.photos.length,
+                      )}
+                      canDelete={source === "catalog"}
+                      onToggle={() => setExpandedDraftId(
+                        expandedDraftId === draft.clientDraftId ? null : draft.clientDraftId,
+                      )}
+                      onDelete={() => void removeDraft(draft.clientDraftId)}
+                      onChange={(patch) => updateDraft(draft.clientDraftId, patch)}
+                      onFiles={(files) => addPhotos(draft.clientDraftId, files)}
+                      onRemovePhoto={(photoId) => removePhoto(draft.clientDraftId, photoId)}
+                      onSetPrimary={(photoId) => makePrimaryPhoto(draft.clientDraftId, photoId)}
+                      onMovePhoto={(fromPhotoId, toPhotoId) => movePhoto(draft.clientDraftId, fromPhotoId, toPhotoId)}
+                    />
+                  </div>
                 ))}
               </div>
             )}
@@ -574,6 +653,42 @@ export function InstalledAssetBatchCreate({
         </div>
       </RowPreviewModal>
     </>
+  );
+}
+
+function ProductQuantityRow({
+  draft,
+  quantity,
+  max,
+  disabled,
+  onChange,
+}: {
+  draft: AssetDraft;
+  quantity: number;
+  max: number;
+  disabled: boolean;
+  onChange: (quantity: number) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-primary-200 bg-primary-50/45 p-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-slate-900">{draft.name}</p>
+        <p className="text-xs text-slate-500">Mỗi đơn vị tạo một hồ sơ thiết bị riêng.</p>
+      </div>
+      <Field label="Số lượng" className="w-full shrink-0 sm:w-40">
+        <QuantityInput
+          value={quantity}
+          min={1}
+          max={max}
+          decimals={0}
+          disabled={disabled}
+          onChange={onChange}
+          decrementLabel={`Giảm số lượng ${draft.name}`}
+          inputLabel={`Số lượng ${draft.name}`}
+          incrementLabel={`Tăng số lượng ${draft.name}`}
+        />
+      </Field>
+    </div>
   );
 }
 
@@ -846,7 +961,7 @@ function CatalogThumb({ product }: { product: ProductCatalogItem }) {
 
 function makeCatalogDraft(product: ProductCatalogItem, serviceType?: string | null): AssetDraft {
   return {
-    clientDraftId: `product-${product.id}`,
+    clientDraftId: `product-${product.id}-${crypto.randomUUID()}`,
     productId: product.id,
     sku: product.sku,
     catalogImageUrl: product.imageUrls?.[0] ?? null,
@@ -858,6 +973,7 @@ function makeCatalogDraft(product: ProductCatalogItem, serviceType?: string | nu
     macAddress: "",
     ipAddress: "",
     photos: [],
+    edited: false,
   };
 }
 
@@ -875,6 +991,7 @@ function makeManualDraft(serviceType?: string | null): AssetDraft {
     macAddress: "",
     ipAddress: "",
     photos: [],
+    edited: false,
   };
 }
 
@@ -886,6 +1003,10 @@ function defaultAssetKind(serviceType?: string | null) {
 
 function releaseDraftPhotos(draft: AssetDraft) {
   draft.photos.forEach((photo) => URL.revokeObjectURL(photo.previewUrl));
+}
+
+function hasDraftUserData(draft: AssetDraft) {
+  return draft.edited || draft.photos.length > 0;
 }
 
 function todayDate() {
