@@ -363,13 +363,16 @@ describe("web product image upload", () => {
     expect(request.searchParams.get("path")).toBe(PUBLIC_PATH);
   });
 
-  test("deletes only recognizable legacy Supabase product URLs by extracted path", async () => {
+  test("requests deferred cleanup only for recognizable legacy Supabase URLs", async () => {
     const legacyPath =
       `stores/${STORE_ID}/products/drafts/user-1/old-image.png`;
     const requests: string[] = [];
     const fetcher: typeof fetch = async (input) => {
       requests.push(input.toString());
-      return Response.json({ ok: true });
+      return Response.json({
+        ok: true,
+        data: { path: legacyPath, status: "deferred" },
+      }, { status: 202 });
     };
 
     const legacyUrl =

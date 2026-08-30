@@ -1,9 +1,10 @@
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { and, eq, sql } from "drizzle-orm";
-import { db } from "@/db";
-import { products } from "@/db/schema";
 import { requireMobileStockAccess } from "@/lib/mobile/auth";
-import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
+import {
+  mobileAccepted,
+  mobileError,
+  mobileGate,
+  mobileOk,
+} from "@/lib/mobile/response";
 import { convertHeifToJpeg } from "@/lib/images/heif";
 import {
   PRODUCT_IMAGE_EXTENSION_BY_MIME,
@@ -19,12 +20,7 @@ type ProductImageRouteDependencies = {
     "putManagedObject" | "deleteMedia"
   >;
   convertHeif?: typeof convertHeifToJpeg;
-  removeLegacy?: (path: string) => Promise<void>;
   legacyPublicBaseUrl?: string;
-  isLegacyReferenced?: (input: {
-    storeId: string;
-    url: string;
-  }) => Promise<boolean>;
 };
 
 const PRODUCT_IMAGES_BUCKET = "products";
@@ -34,7 +30,7 @@ const LEGACY_PRODUCT_STORAGE_PREFIX =
 function trustedLegacyCoordinate(
   value: string,
   configuredBaseUrl: string,
-): { url: string; path: string } | null {
+): { path: string } | null {
   try {
     const configured = new URL(configuredBaseUrl);
     const url = new URL(value);
@@ -58,29 +54,10 @@ function trustedLegacyCoordinate(
     const path = decodeURIComponent(
       url.pathname.slice(LEGACY_PRODUCT_STORAGE_PREFIX.length),
     );
-    return path && !path.includes("..") ? { url: value, path } : null;
+    return path && !path.includes("..") ? { path } : null;
   } catch {
     return null;
   }
-}
-
-async function legacyImageIsReferenced(input: {
-  storeId: string;
-  url: string;
-}) {
-  const [reference] = await db.select({ id: products.id }).from(products)
-    .where(and(
-      eq(products.storeId, input.storeId),
-      sql`exists (
-        select 1
-        from jsonb_array_elements_text(
-          coalesce(${products.imageUrls}, '[]'::jsonb)
-        ) image_url(url)
-        where image_url.url = ${input.url}
-      )`,
-    ))
-    .limit(1);
-  return Boolean(reference);
 }
 
 function sniffImageMime(bytes: Uint8Array): ProductImageMime | null {
@@ -223,23 +200,9 @@ export async function deleteProductImage(
   ) {
     return mobileError("errors.forbidden", 403);
   }
-  try {
-    const referenced = await (
-      dependencies.isLegacyReferenced ?? legacyImageIsReferenced
-    )({ storeId: gate.storeId, url: coordinate.url });
-    if (referenced) return mobileError("media.referenced", 409);
-    if (dependencies.removeLegacy) {
-      await dependencies.removeLegacy(path);
-    } else {
-      const supabase = createSupabaseAdminClient();
-      const { error } = await supabase.storage
-        .from(PRODUCT_IMAGES_BUCKET)
-        .remove([path]);
-      if (error) throw error;
-    }
-    return mobileOk({ path });
-  } catch (error) {
-    console.error("delete_product_image failed:", error);
-    return mobileError("products.fields.imageUploadError", 500);
-  }
+  // Legacy rows have no durable upload-session claim. Physical deletion here
+  // would race product writers and cannot safely distinguish shared references
+  // whose URLs use an equivalent spelling. Product save removes the DB
+  // reference; migration/cleanup owns eventual object reclamation.
+  return mobileAccepted({ path, status: "deferred" as const });
 }

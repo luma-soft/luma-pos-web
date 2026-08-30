@@ -5,6 +5,10 @@ export function mobileOk<T>(data: T) {
   return NextResponse.json({ ok: true, data });
 }
 
+export function mobileAccepted<T>(data: T) {
+  return NextResponse.json({ ok: true, data }, { status: 202 });
+}
+
 export function mobileError(error: string, status = 400) {
   return NextResponse.json({ ok: false, error }, { status });
 }

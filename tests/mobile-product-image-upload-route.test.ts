@@ -1,8 +1,27 @@
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { MediaActor } from "@/lib/media/authorization";
 
+const legacyRemovals: string[][] = [];
+let legacyClientCreations = 0;
 mock.module("server-only", () => ({}));
 mock.module("@/db", () => ({ db: {} }));
+mock.module("@/lib/supabase/admin", () => ({
+  createSupabaseAdminClient() {
+    legacyClientCreations += 1;
+    return {
+      storage: {
+        from() {
+          return {
+            async remove(paths: string[]) {
+              legacyRemovals.push(paths);
+              return { error: null };
+            },
+          };
+        },
+      },
+    };
+  },
+}));
 afterAll(() => mock.restore());
 
 const STORE_ID = "11111111-1111-4111-8111-111111111111";
@@ -17,8 +36,6 @@ const managedPuts: Array<{
   bytes: Uint8Array;
 }> = [];
 const managedDeletes: string[] = [];
-const legacyRemovals: string[][] = [];
-const referencedLegacyUrls = new Set<string>();
 let heicConversions = 0;
 
 const { uploadProductImage: uploadHandler, deleteProductImage: deleteHandler } =
@@ -63,14 +80,7 @@ const dependencies = {
     heicConversions += 1;
     return Buffer.from([0xff, 0xd8, 0xff, 0x00]);
   },
-  async removeLegacy(path: string) {
-    legacyRemovals.push([path]);
-  },
   legacyPublicBaseUrl: "https://project.supabase.co",
-  async isLegacyReferenced(input: { storeId: string; url: string }) {
-    expect(input.storeId).toBe(STORE_ID);
-    return referencedLegacyUrls.has(input.url);
-  },
 };
 
 const uploadProductImage = (request: Request) =>
@@ -82,7 +92,7 @@ beforeEach(() => {
   managedPuts.splice(0);
   managedDeletes.splice(0);
   legacyRemovals.splice(0);
-  referencedLegacyUrls.clear();
+  legacyClientCreations = 0;
   heicConversions = 0;
 });
 
@@ -153,9 +163,10 @@ describe("DELETE /api/mobile/products/images", () => {
     expect(response.status).toBe(200);
     expect(managedDeletes).toEqual([MEDIA_ID]);
     expect(legacyRemovals).toEqual([]);
+    expect(legacyClientCreations).toBe(0);
   });
 
-  test("cleans up only an unreferenced trusted Supabase coordinate", async () => {
+  test("accepts trusted legacy coordinates for deferred cleanup without deleting storage", async () => {
     for (const path of [
       `${USER_ID}/uncommitted.jpg`,
       `stores/${STORE_ID}/products/drafts/${USER_ID}/uncommitted.jpg`,
@@ -165,26 +176,84 @@ describe("DELETE /api/mobile/products/images", () => {
         `https://luma.test/api/mobile/products/images?${new URLSearchParams({ path, url })}`,
         { method: "DELETE" },
       ));
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(202);
+      expect(await response.json()).toEqual({
+        ok: true,
+        data: { path, status: "deferred" },
+      });
     }
-    expect(legacyRemovals).toEqual([
-      [`${USER_ID}/uncommitted.jpg`],
-      [`stores/${STORE_ID}/products/drafts/${USER_ID}/uncommitted.jpg`],
-    ]);
+    expect(legacyRemovals).toEqual([]);
+    expect(legacyClientCreations).toBe(0);
   });
 
-  test("preserves a legacy object while any live product in the store references it", async () => {
+  test("defers exact, canonical-equivalent, shared, and concurrently referenced legacy objects", async () => {
     const path = `${USER_ID}/shared.jpg`;
-    const url = `https://project.supabase.co/storage/v1/object/public/products/${path}`;
-    referencedLegacyUrls.add(url);
+    const exactUrl =
+      `https://project.supabase.co/storage/v1/object/public/products/${path}`;
+    const equivalentUrls = [
+      exactUrl,
+      `https://PROJECT.SUPABASE.CO/storage/v1/object/public/products/${path}`,
+      `https://project.supabase.co/storage/v1/object/public/products/%32${path.slice(1)}`,
+    ];
+    let referenceChecks = 0;
+    const deferredDependencies = {
+      ...dependencies,
+      async isLegacyReferenced() {
+        referenceChecks += 1;
+        return true;
+      },
+      async removeLegacy(removedPath: string) {
+        legacyRemovals.push([removedPath]);
+      },
+    };
 
-    const response = await deleteProductImage(new Request(
+    for (const url of equivalentUrls) {
+      const response = await deleteHandler(new Request(
+        `https://luma.test/api/mobile/products/images?${new URLSearchParams({ path, url })}`,
+        { method: "DELETE" },
+      ), deferredDependencies);
+
+      expect(response.status).toBe(202);
+      expect(await response.json()).toEqual({
+        ok: true,
+        data: { path, status: "deferred" },
+      });
+    }
+    expect(referenceChecks).toBe(0);
+    expect(legacyRemovals).toEqual([]);
+    expect(legacyClientCreations).toBe(0);
+  });
+
+  test("does not race a cross-store or newly inserted reference before cleanup", async () => {
+    const path = `${USER_ID}/racy-shared.jpg`;
+    const url =
+      `https://project.supabase.co/storage/v1/object/public/products/${path}`;
+    let insertedConcurrently = false;
+    const racyDependencies = {
+      ...dependencies,
+      async isLegacyReferenced() {
+        // Models another writer inserting a reference after a non-atomic
+        // preflight check. Deferred cleanup performs no such check/delete pair.
+        insertedConcurrently = true;
+        return false;
+      },
+      async removeLegacy(removedPath: string) {
+        legacyRemovals.push([removedPath]);
+      },
+    };
+    const response = await deleteHandler(new Request(
       `https://luma.test/api/mobile/products/images?${new URLSearchParams({ path, url })}`,
       { method: "DELETE" },
-    ));
+    ), racyDependencies);
 
-    expect(response.status).toBe(409);
+    expect(response.status).toBe(202);
+    expect(await response.json()).toEqual({
+      ok: true,
+      data: { path, status: "deferred" },
+    });
+    expect(insertedConcurrently).toBe(false);
     expect(legacyRemovals).toEqual([]);
+    expect(legacyClientCreations).toBe(0);
   });
 
   test("rejects a foreign host even when it supplies the same trusted bucket path", async () => {
