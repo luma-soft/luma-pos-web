@@ -232,7 +232,7 @@ export function planKiotVietCustomerSync(input: {
     const mapping = mappingByExternalId.get(code);
     return mapping != null && currentById.has(mapping.localId);
   };
-  const historicalConflicts = historicalCodes.flatMap((code) => {
+  const historicalConflicts: KiotVietEntitySyncPlan["conflicts"] = historicalCodes.flatMap<KiotVietEntitySyncPlan["conflicts"][number]>((code) => {
     if (sourceByExternalId.has(code) || hasLiveMappedCustomer(code)) return [];
     const current = currentByCode.get(code);
     if (current) {

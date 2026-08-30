@@ -14,6 +14,7 @@
     "db:seed": "bun run src/db/seed.ts",
     "import:kiotviet": "bun run src/scripts/import-kiotviet.ts",
     "sync:kiotviet-products": "bun run src/scripts/sync-kiotviet-products.ts",
+    "sync:kiotviet-data": "bun run src/scripts/sync-kiotviet-data.ts",
     "create:admin": "bun run src/scripts/create-admin.ts",
     "db:seed-demo": "bun run src/db/seed-demo.ts",
     "db:seed-price-books": "bun run src/scripts/seed-price-books.ts",

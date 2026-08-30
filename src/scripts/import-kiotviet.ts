@@ -17,7 +17,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as XLSX from "xlsx";
-import { assertLegacyKiotVietImportReadOnly } from "../lib/kiotviet/product-sync-runner";
+import { assertLegacyKiotVietDataImportReadOnly } from "../lib/kiotviet/data-sync-runner";
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
@@ -195,7 +195,7 @@ function parseSuppliers(rows: Record<string, unknown>[]): ParsedSupplier[] {
 // ============ main ============
 
 async function main() {
-  assertLegacyKiotVietImportReadOnly(dryRun);
+  assertLegacyKiotVietDataImportReadOnly(dryRun);
   console.log(`📂 Đọc thư mục: ${dir}${dryRun ? "  (DRY RUN — không ghi DB)" : ""}\n`);
 
   const fSP = findFile("DanhSachSanPham");

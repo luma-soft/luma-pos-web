@@ -168,7 +168,6 @@ describe("KiotViet purchase receipt synchronization", () => {
               unitCost: 120000,
               discount: 0,
               total: 240000,
-              note: "Hàng dễ vỡ",
             },
           }],
           preservedLineIds: [],
@@ -194,7 +193,7 @@ describe("KiotViet purchase receipt synchronization", () => {
         {
           localId: "legacy-line", purchaseOrderId: "purchase-001", legacyImported: true,
           sourceSku: "ALT-001", unitName: "Hộp", quantity: 2, unitCost: 120000,
-          discount: 0, total: 240000, note: "Hàng dễ vỡ",
+          discount: 0, total: 240000,
         },
         { localId: "luma-line", purchaseOrderId: "purchase-001", legacyImported: false },
       ],
@@ -380,7 +379,7 @@ describe("KiotViet purchase receipt synchronization", () => {
       lineMappings: [{ externalId: "PN-002|BASE-001|cái|2", localId: "mapped-line" }],
       existingLines: [{
         localId: "mapped-line", purchaseOrderId: "purchase-002", legacyImported: true,
-        sourceSku: "BASE-001", unitName: "Cái", quantity: 1, unitCost: 1, discount: 0, total: 1, note: "one",
+        sourceSku: "BASE-001", unitName: "Cái", quantity: 1, unitCost: 1, discount: 0, total: 1,
       }],
     });
     expect(reserved.blockers).toEqual([]);
@@ -397,7 +396,7 @@ describe("KiotViet purchase receipt synchronization", () => {
       existingLines: ["legacy-a", "legacy-b"].map((localId) => ({
         localId, purchaseOrderId: "purchase-001", legacyImported: true,
         sourceSku: "ALT-001", unitName: "Hộp", quantity: 2, unitCost: 120000,
-        discount: 0, total: 240000, note: "Hàng dễ vỡ",
+        discount: 0, total: 240000,
       })),
     });
     expect(ambiguous.writes).toEqual([]);

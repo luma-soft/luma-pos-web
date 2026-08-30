@@ -21,6 +21,7 @@ import { randomUUID } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as XLSX from "xlsx";
+import { assertLegacyKiotVietDataImportReadOnly } from "../lib/kiotviet/data-sync-runner";
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
@@ -103,6 +104,7 @@ function cashCategory(loai: string, type: "in" | "out"): string {
 }
 
 async function main() {
+  assertLegacyKiotVietDataImportReadOnly(dryRun);
   console.log(`📂 Đọc thư mục: ${dir}${dryRun ? "  (DRY RUN — không ghi DB)" : ""}\n`);
 
   const fHD = findFile("DanhSachChiTietHoaDon");

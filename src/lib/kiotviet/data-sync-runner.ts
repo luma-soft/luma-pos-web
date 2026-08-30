@@ -16,6 +16,14 @@ export const KIOTVIET_SYNC_PHASES = [
 export type KiotVietSyncPhase = typeof KIOTVIET_SYNC_PHASES[number];
 export type KiotVietSyncPhaseArg = KiotVietSyncPhase | "all";
 
+export function assertLegacyKiotVietDataImportReadOnly(dryRun: boolean): void {
+  if (!dryRun) {
+    throw new Error(
+      "Legacy KiotViet data writes are disabled. Use: bun sync:kiotviet-data <directory> --store=hai-dang --phase=<phase>; review the dry-run before any separately approved --apply.",
+    );
+  }
+}
+
 export interface KiotVietInvariantSnapshot {
   stockLevels: { rows: number; quantity: string; reserved: string; fingerprint: string };
   stockMovements: { rows: number; quantity: string; fingerprint: string };

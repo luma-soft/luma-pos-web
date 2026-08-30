@@ -57,7 +57,6 @@ export interface KiotVietPurchaseCurrentLine {
   unitCost?: number | string;
   discount?: number | string;
   total?: number | string;
-  note?: string | null;
 }
 
 export interface KiotVietPurchaseLineSnapshot {
@@ -71,7 +70,6 @@ export interface KiotVietPurchaseLineSnapshot {
   unitCost: number;
   discount: number;
   total: number;
-  note: string | null;
 }
 
 export interface KiotVietPurchaseSnapshot {
@@ -288,7 +286,6 @@ function purchaseSourceRows(input: {
         unitCost: normalizeKiotVietNumber(row["Giá nhập"]),
         discount: normalizeKiotVietNumber(row["Giảm giá"]),
         total: normalizeKiotVietNumber(row["Thành tiền"]),
-        note: nullableText(row["Ghi chú hàng hóa"]),
       };
       return [{
         occurrenceKey: sourceProductKey(sourceSku, sourceUnitName),
