@@ -223,6 +223,76 @@ describe("KiotViet supplier-return synchronization", () => {
     }]);
   });
 
+  test("validates missing mapped children even when the mapped parent fingerprint is unchanged", () => {
+    const sourceFingerprint = stableKiotVietFingerprint(plan().returns[0]!);
+    const result = plan({
+      current: [{
+        localId: "return-001", code: "THN-001", fingerprint: sourceFingerprint,
+        settlementStatus: "partial", legacyImported: true,
+      }],
+      mappings: [{ externalId: "THN-001", localId: "return-001" }],
+      lineMappings: [{
+        externalId: "THN-001|ALT-001|hộp|1", localId: "missing-line",
+      }],
+    });
+
+    expect(result.entityPlan.unchanged).toHaveLength(1);
+    expect(result.writes).toEqual([]);
+    expect(result.blockers).toEqual([{
+      documentCode: "THN-001",
+      reference: "THN-001|ALT-001|hộp|1",
+      reason: "mapped_line_missing",
+    }]);
+  });
+
+  test("validates unmatched source-owned legacy children on an unchanged fully mapped parent", () => {
+    const sourceFingerprint = stableKiotVietFingerprint(plan().returns[0]!);
+    const result = plan({
+      current: [{
+        localId: "return-001", code: "THN-001", fingerprint: sourceFingerprint,
+        settlementStatus: "partial", legacyImported: true,
+      }],
+      mappings: [{ externalId: "THN-001", localId: "return-001" }],
+      lineMappings: [{
+        externalId: "THN-001|ALT-001|hộp|1", localId: "mapped-line",
+      }],
+      existingLines: [{
+        localId: "mapped-line", purchaseReturnId: "return-001",
+      }, {
+        localId: "unmatched-legacy", purchaseReturnId: "return-001", legacyImported: true,
+        legacyProductSku: "OLD-SKU", quantity: 1, unitCost: 1,
+        returnUnitCost: 1, total: 1,
+      }],
+    });
+
+    expect(result.writes).toEqual([]);
+    expect(result.blockers).toEqual([{
+      documentCode: "THN-001",
+      reference: "unmatched-legacy",
+      reason: "legacy_line_unmatched",
+    }]);
+    expect(result.preservedLineIds).toEqual(["unmatched-legacy"]);
+  });
+
+  test("keeps a genuinely unchanged parent with complete valid child mappings as a no-op", () => {
+    const sourceFingerprint = stableKiotVietFingerprint(plan().returns[0]!);
+    const result = plan({
+      current: [{
+        localId: "return-001", code: "THN-001", fingerprint: sourceFingerprint,
+        settlementStatus: "partial", legacyImported: true,
+      }],
+      mappings: [{ externalId: "THN-001", localId: "return-001" }],
+      lineMappings: [{
+        externalId: "THN-001|ALT-001|hộp|1", localId: "mapped-line",
+      }],
+      existingLines: [{ localId: "mapped-line", purchaseReturnId: "return-001" }],
+    });
+
+    expect(result.entityPlan.unchanged).toHaveLength(1);
+    expect(result.blockers).toEqual([]);
+    expect(result.writes).toEqual([]);
+  });
+
   test("blocks unresolved suppliers and products without dropping source lines", () => {
     const unresolvedSupplier = plan({ resolvedSuppliers: [] });
     expect(unresolvedSupplier.writes).toEqual([]);

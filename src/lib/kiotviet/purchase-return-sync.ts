@@ -540,18 +540,31 @@ export function planKiotVietPurchaseReturnSync(input: {
     action: "create" | "adopt" | "update";
     externalId: string;
     localId?: string;
+    emitWrite: boolean;
   }> = [
-    ...entityPlan.creates.map(({ externalId }) => ({ action: "create" as const, externalId })),
+    ...entityPlan.creates.map(({ externalId }) => ({
+      action: "create" as const, externalId, emitWrite: true,
+    })),
     ...entityPlan.adopts
-      .filter((value) => value.needsUpdate || needsChildProvenance(value.externalId))
-      .map(({ externalId, localId }) => ({ action: "adopt" as const, externalId, localId })),
+      .map(({ externalId, localId, needsUpdate }) => ({
+        action: "adopt" as const,
+        externalId,
+        localId,
+        emitWrite: needsUpdate || needsChildProvenance(externalId),
+      })),
     ...entityPlan.updates
-      .map(({ externalId, localId }) => ({ action: "update" as const, externalId, localId })),
+      .map(({ externalId, localId }) => ({
+        action: "update" as const, externalId, localId, emitWrite: true,
+      })),
     ...entityPlan.unchanged
-      .filter((value) => needsChildProvenance(value.externalId))
-      .map(({ externalId, localId }) => ({ action: "update" as const, externalId, localId })),
+      .map(({ externalId, localId }) => ({
+        action: "update" as const,
+        externalId,
+        localId,
+        emitWrite: needsChildProvenance(externalId),
+      })),
   ];
-  const writes = parents.map(({ action, externalId, localId }) => {
+  const candidateWrites = parents.map(({ action, externalId, localId, emitWrite }) => {
     const snapshot = returnsByCode.get(externalId)!;
     const lines = childWrites({
       documentCode: externalId,
@@ -563,6 +576,7 @@ export function planKiotVietPurchaseReturnSync(input: {
       blockers,
     });
     return {
+      emitWrite,
       action,
       externalId,
       ...(localId ? { localId } : {}),
@@ -578,7 +592,15 @@ export function planKiotVietPurchaseReturnSync(input: {
       },
     };
   });
-  const preservedLineIds = writes
+  const writes = candidateWrites
+    .filter((write) => write.emitWrite)
+    .map(({ action, externalId, localId, purchaseReturn }) => ({
+      action,
+      externalId,
+      ...(localId ? { localId } : {}),
+      purchaseReturn,
+    }));
+  const preservedLineIds = candidateWrites
     .flatMap((write) => write.purchaseReturn.preservedLineIds)
     .sort((left, right) => left.localeCompare(right));
   const settlementStatusRepairs = parents.filter((parent) => {
