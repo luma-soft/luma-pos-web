@@ -1,11 +1,13 @@
 import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db";
 import { mediaObjects, productMedia, products } from "@/db/schema";
+import { parseProductImagePublicUrl } from "@/lib/images/product-image-coordinate";
 import {
-  parseProductImagePublicUrl,
-  PRODUCT_MEDIA_PUBLIC_ORIGIN,
-} from "@/lib/images/product-image-coordinate";
+  getPublicMediaUrl,
+  type PublicMediaConfig,
+} from "@/lib/media/config";
 import { softDeleteMediaIfUnreferencedInTransaction } from "@/lib/media/repository-core";
+import { productMediaEligibilitySql } from "@/lib/products/product-media-eligibility";
 import { imageMediaIdsSchema } from "@/lib/products/product-media-schema";
 
 export { imageMediaIdsSchema } from "@/lib/products/product-media-schema";
@@ -35,12 +37,13 @@ export async function resolveLegacyProductImageIdsInTransaction(
     storeId: string;
     productId: string;
     imageUrls: readonly string[];
+    publicMedia: PublicMediaConfig;
   },
 ): Promise<string[]> {
   const ids: string[] = [];
   const seen = new Set<string>();
   for (const url of input.imageUrls) {
-    const coordinate = parseProductImagePublicUrl(url);
+    const coordinate = parseProductImagePublicUrl(url, input.publicMedia);
     if (
       !coordinate
       || coordinate.storeId !== input.storeId
@@ -60,19 +63,29 @@ export async function resolveLegacyProductImageIdsInTransaction(
         eq(mediaObjects.targetId, input.storeId),
         eq(mediaObjects.targetId, input.productId),
       ),
+      productMediaEligibilitySql(mediaObjects, {
+        storeId: input.storeId,
+        targetIds: [input.storeId, input.productId],
+        publicMedia: input.publicMedia,
+      }),
     ));
   const ownedIds = new Set(owned.map((record) => record.id));
   return ids.filter((id) => ownedIds.has(id));
 }
 
-export function externalProductImageUrls(requestedUrls: readonly string[]) {
+export function externalProductImageUrls(
+  requestedUrls: readonly string[],
+  publicMedia: Pick<PublicMediaConfig, "publicBaseUrl">,
+) {
+  const configuredHost = new URL(publicMedia.publicBaseUrl).hostname;
   const seen = new Set<string>();
   const ordered: string[] = [];
   for (const raw of requestedUrls) {
     const url = raw.trim();
     if (!url || seen.has(url)) continue;
     try {
-      if (new URL(url).origin === PRODUCT_MEDIA_PUBLIC_ORIGIN) continue;
+      const parsed = new URL(url);
+      if (parsed.hostname.replace(/\.$/, "") === configuredHost) continue;
     } catch {
       // The product schema retains legacy non-URL values for compatibility.
     }
@@ -97,7 +110,7 @@ export async function replaceProductMediaInTransaction(
     productId: string;
     imageMediaIds: readonly string[];
     imageUrls: readonly string[];
-    publicUrlForKey: (key: string) => string;
+    publicMedia: PublicMediaConfig;
     now?: Date;
   },
 ): Promise<{
@@ -157,6 +170,11 @@ export async function replaceProductMediaInTransaction(
     ))
     .orderBy(asc(productMedia.sortOrder));
 
+  const eligible = productMediaEligibilitySql(mediaObjects, {
+    storeId: input.storeId,
+    targetIds: [input.storeId, input.productId],
+    publicMedia: input.publicMedia,
+  });
   const records = ids.length === 0
     ? []
     : await transaction
@@ -174,15 +192,16 @@ export async function replaceProductMediaInTransaction(
         .where(and(
           eq(mediaObjects.storeId, input.storeId),
           inArray(mediaObjects.id, ids),
+          eligible,
         ))
         .for("update");
   const byId = new Map(records.map((record) => [record.id, record]));
   const orderedRecords = ids.map((id) => byId.get(id));
   const orderedUrls = orderedRecords.map((record) =>
-    record ? input.publicUrlForKey(record.objectKey) : null
+    record ? getPublicMediaUrl(record.objectKey, input.publicMedia) : null
   );
   const orderedCoordinates = orderedUrls.map((url) =>
-    url ? parseProductImagePublicUrl(url) : null
+    url ? parseProductImagePublicUrl(url, input.publicMedia) : null
   );
   if (
     orderedRecords.some((record, index) =>
@@ -261,17 +280,23 @@ export async function replaceProductMediaInTransaction(
           eq(productMedia.storeId, input.storeId),
           eq(productMedia.productId, product.parentProductId),
           isNull(productMedia.deletedAt),
-          eq(mediaObjects.status, "ready"),
-          eq(mediaObjects.visibility, "public"),
-          eq(mediaObjects.purpose, "product-image"),
-          eq(mediaObjects.domain, "products"),
-          eq(mediaObjects.targetId, product.parentProductId),
+          productMediaEligibilitySql(mediaObjects, {
+            storeId: input.storeId,
+            targetIds: [product.parentProductId],
+            publicMedia: input.publicMedia,
+          }),
         ))
         .orderBy(asc(productMedia.sortOrder));
-  const storedExternalImageUrls = externalProductImageUrls(input.imageUrls);
+  const storedExternalImageUrls = externalProductImageUrls(
+    input.imageUrls,
+    input.publicMedia,
+  );
   const compatibilityMediaUrls = media.length > 0
     ? media.map((image) => image.url)
-    : inherited.map((record) => input.publicUrlForKey(record.objectKey));
+    : inherited.map((record) => getPublicMediaUrl(
+      record.objectKey,
+      input.publicMedia,
+    ));
   const imageUrls = [
     ...storedExternalImageUrls,
     ...compatibilityMediaUrls,

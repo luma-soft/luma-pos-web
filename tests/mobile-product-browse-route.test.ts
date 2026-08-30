@@ -30,6 +30,13 @@ mock.module("@/lib/data/pricing", () => ({
           model: "LED-A60-12W",
           supplierId: "supplier",
           imageUrls: ["https://cdn.example/led.webp"],
+          imageMedia: [
+            {
+              mediaId: "50000000-0000-4000-8000-000000000001",
+              path: "stores/10000000-0000-4000-8000-000000000001/products/2026/08/50000000-0000-4000-8000-000000000001/original.webp",
+              url: "https://media.staging.lumapos.test/stores/10000000-0000-4000-8000-000000000001/products/2026/08/50000000-0000-4000-8000-000000000001/original.webp",
+            },
+          ],
           imageUpdatedAt: "2026-08-28T08:00:00.000Z",
           baseUnit: "cái",
           productKind: "product",
@@ -140,6 +147,11 @@ describe("GET /api/mobile/products/browse", () => {
           model: "LED-A60-12W",
           availableStock: 48,
           imageUrl: "https://cdn.example/led.webp",
+          imageMedia: [
+            {
+              mediaId: "50000000-0000-4000-8000-000000000001",
+            },
+          ],
           imageUpdatedAt: "2026-08-28T08:00:00.000Z",
           units: [{ unitName: "cái", multiplier: 1 }],
         },

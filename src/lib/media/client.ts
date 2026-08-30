@@ -71,6 +71,11 @@ type UploadIntent = {
   expiresAt: string;
 };
 
+type CompletionExpectation = Pick<
+  UploadIntent["media"],
+  "id" | "visibility" | "mimeType" | "sizeBytes" | "fileName"
+>;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -167,17 +172,17 @@ function parseUploadIntent(
 
 function parseDescriptor(
   value: unknown,
-  intent: UploadIntent,
+  expected: CompletionExpectation,
 ): ManagedMediaDescriptor | null {
   if (!isRecord(value) || value.ok !== true || !isRecord(value.data)) return null;
   const data = value.data;
   if (
-    data.id !== intent.media.id
+    data.id !== expected.id
     || !isVisibility(data.visibility)
-    || data.visibility !== intent.media.visibility
-    || data.mimeType !== intent.media.mimeType
-    || data.sizeBytes !== intent.media.sizeBytes
-    || data.fileName !== intent.media.fileName
+    || data.visibility !== expected.visibility
+    || data.mimeType !== expected.mimeType
+    || data.sizeBytes !== expected.sizeBytes
+    || data.fileName !== expected.fileName
     || !isAbsoluteHttpUrl(data.url)
     || (
       data.thumbnailUrl !== null
@@ -308,6 +313,76 @@ async function discardResponseBody(response: Response): Promise<void> {
   }
 }
 
+async function completeManagedMedia(
+  expected: CompletionExpectation,
+  fetcher: typeof fetch,
+  signal?: AbortSignal,
+): Promise<ManagedMediaDescriptor> {
+  const completionResponse = await fetchStage(
+    fetcher,
+    `${MEDIA_UPLOADS_ENDPOINT}/${encodeURIComponent(expected.id)}/complete`,
+    {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+      signal,
+    },
+    "complete",
+    signal,
+    expected.id,
+  );
+  if (!completionResponse.ok) {
+    await discardResponseBody(completionResponse);
+    throw uploadError({
+      stage: "complete",
+      code: "media.completionFailed",
+      statusCode: completionResponse.status,
+      mediaId: expected.id,
+    });
+  }
+  const descriptor = parseDescriptor(
+    await readJson(
+      completionResponse,
+      "complete",
+      signal,
+      expected.id,
+    ),
+    expected,
+  );
+  if (!descriptor) {
+    throw uploadError({
+      stage: "complete",
+      code: "media.invalidCompletionResponse",
+      statusCode: completionResponse.status,
+      mediaId: expected.id,
+    });
+  }
+  return descriptor;
+}
+
+export async function resumeManagedMediaCompletion(
+  file: File,
+  request: ManagedMediaUploadRequest,
+  mediaId: string,
+  fetcher: typeof fetch = globalThis.fetch,
+): Promise<ManagedMediaDescriptor> {
+  const normalizedMediaId = mediaId.trim();
+  if (!mediaIdSchema.safeParse(normalizedMediaId).success) {
+    throw uploadError({
+      stage: "complete",
+      code: "media.invalidCompletionResponse",
+    });
+  }
+  return completeManagedMedia({
+    id: normalizedMediaId,
+    visibility: MEDIA_PURPOSES[request.purpose].visibility,
+    mimeType: normalizeMediaType(file.type),
+    sizeBytes: file.size,
+    fileName: file.name,
+  }, fetcher, request.signal);
+}
+
 export async function uploadManagedMedia(
   file: File,
   request: ManagedMediaUploadRequest,
@@ -390,45 +465,5 @@ export async function uploadManagedMedia(
   }
   await discardResponseBody(uploadResponse);
 
-  const completionResponse = await fetchStage(
-    fetcher,
-    `${MEDIA_UPLOADS_ENDPOINT}/${encodeURIComponent(validatedMediaId)}/complete`,
-    {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: "{}",
-      signal,
-    },
-    "complete",
-    signal,
-    validatedMediaId,
-  );
-  if (!completionResponse.ok) {
-    await discardResponseBody(completionResponse);
-    throw uploadError({
-      stage: "complete",
-      code: "media.completionFailed",
-      statusCode: completionResponse.status,
-      mediaId: validatedMediaId,
-    });
-  }
-  const descriptor = parseDescriptor(
-    await readJson(
-      completionResponse,
-      "complete",
-      signal,
-      validatedMediaId,
-    ),
-    intent,
-  );
-  if (!descriptor) {
-    throw uploadError({
-      stage: "complete",
-      code: "media.invalidCompletionResponse",
-      statusCode: completionResponse.status,
-      mediaId: validatedMediaId,
-    });
-  }
-  return descriptor;
+  return completeManagedMedia(intent.media, fetcher, signal);
 }

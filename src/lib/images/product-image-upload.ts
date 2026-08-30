@@ -4,7 +4,12 @@ import {
   type ProductImageMime,
 } from "@/lib/images/product-image-spec";
 import { parseProductImagePublicUrl } from "@/lib/images/product-image-coordinate";
-import { uploadManagedMedia } from "@/lib/media/client";
+import {
+  ManagedMediaUploadError,
+  resumeManagedMediaCompletion,
+  uploadManagedMedia,
+  type ManagedMediaDescriptor,
+} from "@/lib/media/client";
 
 export {
   PRODUCT_IMAGE_ACCEPT,
@@ -34,13 +39,19 @@ export type UploadedProductImage = {
 
 export type ProductImageUploadBatch = {
   completed: UploadedProductImage[];
-  remaining: File[];
+  remaining: ProductImageUploadDraft[];
   error?: string;
+};
+
+export type ProductImageUploadDraft = {
+  file: File;
+  completionMediaId?: string;
 };
 
 type ProductImageUploader = (
   file: File,
   targetId: string,
+  completionMediaId?: string,
 ) => Promise<UploadedProductImage>;
 
 function normalizedUploadFile(file: File): File | null {
@@ -57,11 +68,33 @@ function normalizedUploadFile(file: File): File | null {
   });
 }
 
+function productImageFromManagedDescriptor(
+  media: Pick<ManagedMediaDescriptor, "id" | "url" | "visibility">,
+  targetId: string,
+  publicMediaBaseUrl: string,
+  reportedPath?: string,
+): UploadedProductImage {
+  const coordinate = publicMediaBaseUrl
+    ? parseProductImagePublicUrl(media.url, { publicBaseUrl: publicMediaBaseUrl })
+    : null;
+  if (
+    media.visibility !== "public"
+    || !coordinate
+    || coordinate.storeId !== targetId
+    || coordinate.mediaId !== media.id
+    || (reportedPath !== undefined && reportedPath !== coordinate.path)
+  ) {
+    throw new ProductImageUploadError();
+  }
+  return { mediaId: media.id, url: media.url, path: coordinate.path };
+}
+
 export async function uploadProductImageFile(
   file: File,
   targetId: string,
   fetcher: typeof fetch = fetch,
   now: () => Date = () => new Date(),
+  publicMediaBaseUrl = "",
 ): Promise<UploadedProductImage> {
   const uploadFile = normalizedUploadFile(file);
   if (
@@ -110,18 +143,14 @@ export async function uploadProductImageFile(
           fetcher,
           now,
         );
-    const coordinate = parseProductImagePublicUrl(media.url);
-    if (
-      media.visibility !== "public"
-      || !coordinate
-      || coordinate.storeId !== targetId
-      || coordinate.mediaId !== media.id
-      || (reportedPath !== undefined && reportedPath !== coordinate.path)
-    ) {
-      throw new ProductImageUploadError();
-    }
-    return { mediaId: media.id, url: media.url, path: coordinate.path };
+    return productImageFromManagedDescriptor(
+      media,
+      targetId,
+      publicMediaBaseUrl,
+      reportedPath,
+    );
   } catch (error) {
+    if (error instanceof ManagedMediaUploadError) throw error;
     if (error instanceof ProductImageUploadError) throw error;
     const message = error instanceof Error && error.message
       ? error.message
@@ -132,19 +161,59 @@ export async function uploadProductImageFile(
 
 export async function uploadProductImageFiles(input: {
   completed: readonly UploadedProductImage[];
-  drafts: readonly File[];
+  drafts: readonly (File | ProductImageUploadDraft)[];
   targetId: string;
   upload?: ProductImageUploader;
+  publicMediaBaseUrl?: string;
 }): Promise<ProductImageUploadBatch> {
   const completed = [...input.completed];
-  const upload = input.upload ?? uploadProductImageFile;
-  for (let index = 0; index < input.drafts.length; index += 1) {
+  const drafts: ProductImageUploadDraft[] = input.drafts.map((draft) =>
+    draft instanceof File ? { file: draft } : { ...draft }
+  );
+  const upload = input.upload ?? (async (file, targetId, completionMediaId) => {
+    if (!completionMediaId) {
+      return uploadProductImageFile(
+        file,
+        targetId,
+        fetch,
+        () => new Date(),
+        input.publicMediaBaseUrl,
+      );
+    }
+    const uploadFile = normalizedUploadFile(file);
+    if (!uploadFile || !input.publicMediaBaseUrl) {
+      throw new ProductImageUploadError();
+    }
+    const media = await resumeManagedMediaCompletion(
+      uploadFile,
+      { purpose: "product-image", targetId },
+      completionMediaId,
+    );
+    return productImageFromManagedDescriptor(
+      media,
+      targetId,
+      input.publicMediaBaseUrl,
+    );
+  });
+  for (let index = 0; index < drafts.length; index += 1) {
+    const draft = drafts[index]!;
     try {
-      completed.push(await upload(input.drafts[index]!, input.targetId));
+      completed.push(await upload(
+        draft.file,
+        input.targetId,
+        draft.completionMediaId,
+      ));
     } catch (error) {
+      if (
+        error instanceof ManagedMediaUploadError
+        && error.retryFrom === "complete"
+        && error.mediaId
+      ) {
+        draft.completionMediaId = error.mediaId;
+      }
       return {
         completed,
-        remaining: input.drafts.slice(index),
+        remaining: drafts.slice(index),
         error: error instanceof Error && error.message
           ? error.message
           : "products.fields.imageUploadError",
@@ -176,15 +245,37 @@ export async function deleteUploadedProductImage(
 const LEGACY_PRODUCT_STORAGE_PREFIX =
   "/storage/v1/object/public/products/";
 
+export function managedImageToDeleteImmediately(input: {
+  url: string;
+  managedImages: readonly UploadedProductImage[];
+  initialMediaIds: ReadonlySet<string>;
+}): UploadedProductImage | null {
+  const image = input.managedImages.find((candidate) =>
+    candidate.url === input.url
+  );
+  return image && !input.initialMediaIds.has(image.mediaId) ? image : null;
+}
+
 export async function deleteLegacyProductImageUrl(
   imageUrl: string,
+  trustedPublicBaseUrl: string,
   fetcher: typeof fetch = fetch,
 ): Promise<boolean> {
   let path = "";
   try {
     const url = new URL(imageUrl);
+    const trusted = new URL(trustedPublicBaseUrl);
     if (
       url.protocol !== "https:"
+      || trusted.protocol !== "https:"
+      || trusted.pathname !== "/"
+      || trusted.search
+      || trusted.hash
+      || trusted.username
+      || trusted.password
+      || trusted.port
+      || trusted.hostname.endsWith(".")
+      || url.origin !== trusted.origin
       || url.username
       || url.password
       || url.search
@@ -203,7 +294,10 @@ export async function deleteLegacyProductImageUrl(
 
   try {
     const response = await fetcher(
-      `/api/inventory/products/images?${new URLSearchParams({ path })}`,
+      `/api/inventory/products/images?${new URLSearchParams({
+        path,
+        url: imageUrl,
+      })}`,
       { method: "DELETE" },
     );
     if (!response.ok) throw new ProductImageUploadError();

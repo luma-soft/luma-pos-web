@@ -4,6 +4,7 @@ import { getPriceBooks, getPriceOverridesForProducts } from "@/lib/data/price-bo
 import { NewProductForm } from "./product-form";
 import { productToFormInitialValues } from "../product-form-values";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { getPublicMediaConfig } from "@/lib/media/config";
 
 interface Props {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -13,6 +14,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 
 export default async function NewProductPage({ searchParams }: Props) {
   const context = await requireStoreContext();
+  const publicMedia = getPublicMediaConfig();
   const sp = await searchParams;
   const copyFrom = typeof sp.copyFrom === "string" ? sp.copyFrom : undefined;
   const sameTypeAs = typeof sp.sameTypeAs === "string" ? sp.sameTypeAs : undefined;
@@ -38,12 +40,13 @@ export default async function NewProductPage({ searchParams }: Props) {
   return (
     <NewProductForm
       storeId={context.storeId}
+      publicMediaBaseUrl={publicMedia.publicBaseUrl}
       categories={options.categories}
       brands={options.brands}
       suppliers={options.suppliers}
       comboProducts={options.comboProducts}
       priceBooks={priceBooks}
-      initialValues={seedProduct ? productToFormInitialValues(seedProduct, copyFrom ? "copy" : "sameType", priceBookPrices) : undefined}
+      initialValues={seedProduct ? productToFormInitialValues(seedProduct, copyFrom ? "copy" : "sameType", priceBookPrices, publicMedia) : undefined}
       initialManagedImages={undefined}
       aiPreview={aiPreview}
       creationKind={seedProduct?.productKind ?? creationKind}

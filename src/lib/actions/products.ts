@@ -33,7 +33,7 @@ import {
   toMoney,
 } from "./common";
 import { syncProductUnits } from "@/lib/products/product-unit-sync";
-import { getPublicMediaUrl } from "@/lib/media/config";
+import { getPublicMediaConfig } from "@/lib/media/config";
 import {
   externalProductImageUrls,
   ProductMediaValidationError,
@@ -619,6 +619,7 @@ export async function updateProduct(
   const parsed = updateProductSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
+  const publicMedia = getPublicMediaConfig();
 
   try {
     await db.transaction(async (tx) => {
@@ -646,13 +647,14 @@ export async function updateProduct(
             storeId: gate.storeId,
             productId: v.id,
             imageUrls: v.imageUrls ?? [],
+            publicMedia,
           });
         await replaceProductMediaInTransaction(tx, {
           storeId: gate.storeId,
           productId: v.id,
           imageMediaIds,
           imageUrls: v.imageUrls ?? [],
-          publicUrlForKey: getPublicMediaUrl,
+          publicMedia,
         });
       }
 
@@ -765,7 +767,7 @@ export async function updateProduct(
         if (fields.has("description"))
           patch.description = v.description || null;
         if (fields.has("imageUrls") && v.imageUrls) {
-          patch.imageUrls = externalProductImageUrls(v.imageUrls);
+          patch.imageUrls = externalProductImageUrls(v.imageUrls, publicMedia);
           patch.imageUpdatedAt = sql`now()` as unknown as Date;
         }
         if (fields.has("category")) patch.categoryId = v.categoryId || null;
@@ -877,6 +879,7 @@ export async function createProduct(
     return { ok: false, error: "errors.invalidData" };
   }
   const v = parsed.data;
+  const publicMedia = getPublicMediaConfig();
 
   const sku = v.sku?.trim() || generateSku();
   const weightKg =
@@ -940,13 +943,14 @@ export async function createProduct(
             storeId,
             productId,
             imageUrls: v.imageUrls,
+            publicMedia,
           });
         return replaceProductMediaInTransaction(tx, {
           storeId,
           productId,
           imageMediaIds,
           imageUrls: v.imageUrls,
-          publicUrlForKey: getPublicMediaUrl,
+          publicMedia,
         });
       }
 
@@ -1140,7 +1144,7 @@ export async function createProduct(
             specs: mergeSpecs(descriptiveSpecs, child.specs),
             imageUrls:
               child.imageUrls.length > 0
-                ? externalProductImageUrls(child.imageUrls)
+                ? externalProductImageUrls(child.imageUrls, publicMedia)
                 : parentImages.externalImageUrls,
             isActive: v.lifecycleStatus === "active" && child.directSale,
           })

@@ -1,6 +1,10 @@
 import { randomUUID as nodeRandomUUID } from "node:crypto";
 
-import type { MediaVisibility, ObjectStorage } from "@/lib/media/types";
+import {
+  isDefinitiveObjectStorageWriteError,
+  type MediaVisibility,
+  type ObjectStorage,
+} from "@/lib/media/types";
 import { getR2Config } from "@/lib/media/config";
 import { createMediaThumbnail, isSafeRasterMimeType } from "@/lib/media/image-variants";
 import { createObjectKey } from "@/lib/media/object-key";
@@ -389,6 +393,9 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
         url: completed.url,
       };
     } catch (error) {
+      if (!wroteObject && !isDefinitiveObjectStorageWriteError(error)) {
+        throw error;
+      }
       try {
         const abandoned = await dependencies.repository.abandonPending({
           storeId: actor.storeId,

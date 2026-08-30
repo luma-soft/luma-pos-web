@@ -1,5 +1,6 @@
 import type { ProductDetail } from "@/lib/data/products";
 import { parseProductImagePublicUrl } from "@/lib/images/product-image-coordinate";
+import type { PublicMediaConfig } from "@/lib/media/config";
 import type { CreateProductInput } from "./new/schema";
 
 type ProductSeedMode = "edit" | "copy" | "sameType";
@@ -9,6 +10,7 @@ export function productToFormInitialValues(
   product: ProductDetail,
   mode: ProductSeedMode = "edit",
   priceBookPrices: Record<string, string | number | null | undefined> = {},
+  publicMedia?: PublicMediaConfig,
 ): Partial<CreateProductInput> {
   const specs = (product.specs as Record<string, string[]> | null) ?? {};
   const orderNote = specs[PRODUCT_ORDER_NOTE_SPEC_KEY]?.[0] ?? "";
@@ -76,7 +78,7 @@ export function productToFormInitialValues(
     imageUrls: mode === "copy"
       ? (product.imageUrls ?? []).filter(
           (url) =>
-            !parseProductImagePublicUrl(url)
+            (!publicMedia || !parseProductImagePublicUrl(url, publicMedia))
             && !imageMedia.some((image) => image.url === url),
         )
       : product.imageUrls ?? [],

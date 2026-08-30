@@ -14,7 +14,8 @@ mock.module("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: () => mockedSupabaseClient,
 }));
 
-const { readR2Config } = await import("../src/lib/media/config");
+const { readPublicMediaConfig, readR2Config } = await import("../src/lib/media/config");
+const { ObjectStorageWriteError } = await import("../src/lib/media/types");
 const { createObjectKey } = await import("../src/lib/media/object-key");
 const { R2ObjectStorage } = await import("../src/lib/media/r2-storage");
 const { getObjectStorage } = await import("../src/lib/media/storage");
@@ -156,6 +157,16 @@ test("reads a complete R2 configuration with separate public and private buckets
   expect(readR2Config(R2_ENV)).toEqual(R2_CONFIG);
 });
 
+test("reads public media policy without access credentials or a private bucket", () => {
+  expect(readPublicMediaConfig({
+    R2_PUBLIC_BUCKET: "public-media",
+    R2_PUBLIC_BASE_URL: "https://media.staging.lumapos.test/",
+  })).toEqual({
+    publicBucket: "public-media",
+    publicBaseUrl: "https://media.staging.lumapos.test",
+  });
+});
+
 test("rejects malformed R2 configuration values before constructing an endpoint", () => {
   const invalidCases = [
     ["account ID", { R2_ACCOUNT_ID: "acct/../../evil" }],
@@ -169,6 +180,7 @@ test("rejects malformed R2 configuration values before constructing an endpoint"
     ["credential-bearing public URL", { R2_PUBLIC_BASE_URL: "https://user:pass@media.lumapos.vn" }],
     ["query-bearing public URL", { R2_PUBLIC_BASE_URL: "https://media.lumapos.vn?token=secret" }],
     ["fragment-bearing public URL", { R2_PUBLIC_BASE_URL: "https://media.lumapos.vn#section" }],
+    ["trailing-dot public URL", { R2_PUBLIC_BASE_URL: "https://media.lumapos.vn." }],
   ] as const;
 
   for (const [label, overrides] of invalidCases) {
@@ -271,6 +283,47 @@ test("R2 download presigning uses a GET command with the requested expiry", asyn
 });
 
 describe("R2 object adapter", () => {
+  test.each([
+    [412, "definitive-no-write"],
+    [400, "definitive-no-write"],
+    [408, "ambiguous"],
+    [500, "ambiguous"],
+  ] as const)(
+    "classifies PUT HTTP %i as %s",
+    async (httpStatusCode, outcome) => {
+      const storage = r2WithClient(async () => {
+        throw Object.assign(new Error("put failed"), {
+          $metadata: { httpStatusCode },
+        });
+      });
+
+      await expect(storage.put({
+        bucket: "public-media",
+        key: "stores/store/products/2026/08/media/original.png",
+        body: new Uint8Array([1]),
+        contentType: "image/png",
+        ifNoneMatch: "*",
+      })).rejects.toEqual(expect.objectContaining({
+        name: ObjectStorageWriteError.name,
+        outcome,
+      }));
+    },
+  );
+
+  test("defaults an unclassified network PUT rejection to ambiguous", async () => {
+    const storage = r2WithClient(async () => {
+      throw new TypeError("fetch failed");
+    });
+
+    await expect(storage.put({
+      bucket: "public-media",
+      key: "stores/store/products/2026/08/media/original.png",
+      body: new Uint8Array([1]),
+      contentType: "image/png",
+      ifNoneMatch: "*",
+    })).rejects.toEqual(expect.objectContaining({ outcome: "ambiguous" }));
+  });
+
   test("maps put, get, and delete calls to their bucket/key commands", async () => {
     const commands: unknown[] = [];
     const storage = r2WithClient(async (command) => {

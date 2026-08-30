@@ -27,7 +27,11 @@ import {
   type PricingSort,
 } from "@/lib/pricing/pricing-policy";
 import { pricingStockCondition } from "@/lib/data/pricing-stock";
-import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
+import {
+  productCompatibilityImageUrls,
+  productManagedImageDescriptors,
+  type ProductManagedImageDescriptor,
+} from "@/lib/products/product-media-read";
 
 export interface PricingQuery {
   q?: string;
@@ -56,6 +60,7 @@ export interface PricingProductRow {
   model: string | null;
   supplierId: string | null;
   imageUrls: string[];
+  imageMedia: ProductManagedImageDescriptor[];
   imageUpdatedAt: string;
   baseUnit: string;
   productKind: string;
@@ -213,6 +218,7 @@ export async function getPricingPage(
         model: sql<string | null>`${products.specs} ->> 'model'`,
         supplierId: products.supplierId,
         imageUrls: productCompatibilityImageUrls(storeId),
+        imageMedia: productManagedImageDescriptors(storeId),
         imageUpdatedAt: products.imageUpdatedAt,
         baseUnit: products.baseUnit,
         productKind: products.productKind,
@@ -266,6 +272,7 @@ export async function getPricingPage(
       model: row.model,
       supplierId: row.supplierId,
       imageUrls: row.imageUrls ?? [],
+      imageMedia: row.imageMedia ?? [],
       imageUpdatedAt: row.imageUpdatedAt.toISOString(),
       baseUnit: row.baseUnit,
       productKind: row.productKind,

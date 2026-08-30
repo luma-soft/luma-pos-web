@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   ManagedMediaUploadError,
+  resumeManagedMediaCompletion,
   uploadManagedMedia,
   type ManagedMediaDescriptor,
   type ManagedMediaUploadRequest,
@@ -394,6 +395,40 @@ describe("web managed media upload client", () => {
       retryFrom: "complete",
     });
     expect(completeCalls).toBe(1);
+  });
+
+  test("resumes completion without another intent or signed PUT", async () => {
+    const calls: string[] = [];
+    let failCompletion = true;
+    const fetcher: typeof fetch = async (input) => {
+      const url = input.toString();
+      calls.push(url);
+      if (url === "/api/mobile/media/uploads") return responseJson(intentPayload());
+      if (url === SIGNED_URL) return new Response(null, { status: 200 });
+      if (failCompletion) {
+        return responseJson({ ok: false }, { status: 502 });
+      }
+      return responseJson(descriptorPayload());
+    };
+
+    const first = asUploadError(
+      await uploadAtFixedTime(fetcher).catch((caught) => caught),
+    );
+    failCompletion = false;
+    const completed = await resumeManagedMediaCompletion(
+      FILE,
+      REQUEST,
+      first.mediaId!,
+      fetcher,
+    );
+
+    expect(completed.id).toBe(MEDIA_ID);
+    expect(calls).toEqual([
+      "/api/mobile/media/uploads",
+      SIGNED_URL,
+      `/api/mobile/media/uploads/${MEDIA_ID}/complete`,
+      `/api/mobile/media/uploads/${MEDIA_ID}/complete`,
+    ]);
   });
 
   test("rejects malformed completion descriptors and retains completion retry coordinates", async () => {

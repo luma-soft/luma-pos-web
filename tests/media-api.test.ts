@@ -6,7 +6,10 @@ mock.module("@/db", () => ({ db: {} }));
 
 import type { MobileGate } from "../src/lib/mobile/auth";
 import type { MediaRecord, MediaRepository } from "../src/lib/media/service";
-import type { ObjectStorage } from "../src/lib/media/types";
+import {
+  ObjectStorageWriteError,
+  type ObjectStorage,
+} from "../src/lib/media/types";
 
 const { createCompleteUploadHandler } = await import(
   "../src/app/api/mobile/media/uploads/[mediaId]/complete/route"
@@ -92,7 +95,7 @@ function createHarness(options: {
   protectedDelete?: boolean;
   mutateTargetBeforeDelete?: string;
   objectBytes?: Uint8Array;
-  failOriginalPut?: boolean;
+  originalPutFailure?: "definitive" | "ambiguous-before" | "ambiguous-after";
   failCompletionHead?: boolean;
 } = {}) {
   const records = new Map(
@@ -214,16 +217,34 @@ function createHarness(options: {
       });
       const coordinate = `${input.bucket}:${input.key}`;
       if (input.ifNoneMatch === "*" && storageState.heads.has(coordinate)) {
-        throw Object.assign(new Error("precondition failed"), { status: 412 });
+        throw new ObjectStorageWriteError(
+          "precondition failed",
+          "definitive-no-write",
+        );
       }
-      if (input.ifNoneMatch === "*" && options.failOriginalPut) {
-        throw new Error("storage unavailable");
+      if (input.ifNoneMatch === "*" && options.originalPutFailure === "definitive") {
+        throw new ObjectStorageWriteError(
+          "request rejected before write",
+          "definitive-no-write",
+        );
+      }
+      if (input.ifNoneMatch === "*" && options.originalPutFailure === "ambiguous-before") {
+        throw new ObjectStorageWriteError(
+          "connection lost before response",
+          "ambiguous",
+        );
       }
       storageState.heads.set(coordinate, {
         sizeBytes: input.body.byteLength,
         contentType: input.contentType,
         etag: "put",
       });
+      if (input.ifNoneMatch === "*" && options.originalPutFailure === "ambiguous-after") {
+        throw new ObjectStorageWriteError(
+          "connection lost after commit",
+          "ambiguous",
+        );
+      }
       return { sizeBytes: input.body.byteLength, contentType: input.contentType, etag: "thumb" };
     },
     async get() {
@@ -612,8 +633,8 @@ describe("server managed object writes", () => {
     expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("ready");
   });
 
-  test("soft-deletes pending metadata when a create-only server write fails", async () => {
-    const harness = createHarness({ failOriginalPut: true });
+  test("abandons pending metadata only after a definitive no-write failure", async () => {
+    const harness = createHarness({ originalPutFailure: "definitive" });
     await expect(harness.service.putManagedObject(gate, {
       purpose: "product-image",
       targetId: STORE_ID,
@@ -624,6 +645,50 @@ describe("server managed object writes", () => {
 
     expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("deleted");
     expect(harness.storageState.removed).toEqual([]);
+  });
+
+  test.each(["ambiguous-before", "ambiguous-after"] as const)(
+    "keeps metadata pending after an %s PUT failure for later reconciliation",
+    async (originalPutFailure) => {
+      const harness = createHarness({ originalPutFailure });
+      await expect(harness.service.putManagedObject(gate, {
+        purpose: "product-image",
+        targetId: STORE_ID,
+        fileName: "camera.png",
+        mimeType: "image/png",
+        sizeBytes: 4,
+      }, Uint8Array.from([0x89, 0x50, 0x4e, 0x47]))).rejects.toThrow();
+
+      expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("pending");
+      expect(harness.storageState.removed).toEqual([]);
+      const key = `public-media:stores/${STORE_ID}/products/2026/08/${MEDIA_ID}/original.png`;
+      expect(harness.storageState.heads.has(key)).toBe(
+        originalPutFailure === "ambiguous-after",
+      );
+    },
+  );
+
+  test("never removes a pre-existing object after a create-only conflict", async () => {
+    const harness = createHarness();
+    const key = `stores/${STORE_ID}/products/2026/08/${MEDIA_ID}/original.png`;
+    harness.storageState.heads.set(`public-media:${key}`, {
+      sizeBytes: 99,
+      contentType: "image/png",
+      etag: "pre-existing",
+    });
+
+    await expect(harness.service.putManagedObject(gate, {
+      purpose: "product-image",
+      targetId: STORE_ID,
+      fileName: "camera.png",
+      mimeType: "image/png",
+      sizeBytes: 4,
+    }, Uint8Array.from([0x89, 0x50, 0x4e, 0x47]))).rejects.toThrow();
+
+    expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("deleted");
+    expect(harness.storageState.removed).toEqual([]);
+    expect(harness.storageState.heads.get(`public-media:${key}`)?.etag)
+      .toBe("pre-existing");
   });
 
   test("removes the create-only object when completion fails before ready", async () => {

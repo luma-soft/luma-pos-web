@@ -1,4 +1,5 @@
-export const PRODUCT_MEDIA_PUBLIC_ORIGIN = "https://media.lumapos.vn";
+import type { PublicMediaConfig } from "@/lib/media/config";
+
 const UUID_SEGMENT =
   "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const IMMUTABLE_PRODUCT_IMAGE_PATH = new RegExp(
@@ -14,12 +15,28 @@ export type ProductImageCoordinate = {
 
 export function parseProductImagePublicUrl(
   value: string,
+  publicMedia: Pick<PublicMediaConfig, "publicBaseUrl">,
 ): ProductImageCoordinate | null {
   try {
+    const configuredBase = new URL(publicMedia.publicBaseUrl);
+    if (
+      configuredBase.protocol !== "https:"
+      || !configuredBase.hostname
+      || configuredBase.hostname.endsWith(".")
+      || configuredBase.username
+      || configuredBase.password
+      || configuredBase.port
+      || configuredBase.pathname !== "/"
+      || configuredBase.search
+      || configuredBase.hash
+      || configuredBase.origin !== publicMedia.publicBaseUrl
+    ) {
+      return null;
+    }
     const url = new URL(value);
     if (
       url.protocol !== "https:"
-      || url.origin !== PRODUCT_MEDIA_PUBLIC_ORIGIN
+      || url.origin !== configuredBase.origin
       || url.username
       || url.password
       || url.search
@@ -29,6 +46,7 @@ export function parseProductImagePublicUrl(
     }
 
     const path = decodeURIComponent(url.pathname.replace(/^\/+/, ""));
+    if (url.pathname !== `/${path}`) return null;
     const match = IMMUTABLE_PRODUCT_IMAGE_PATH.exec(path);
     if (!match) return null;
     return { storeId: match[1]!, mediaId: match[2]!, path };

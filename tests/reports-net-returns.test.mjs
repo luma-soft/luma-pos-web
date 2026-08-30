@@ -4,6 +4,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 
 const project = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
+process.env.DATABASE_URL ??= "postgresql://test:test@127.0.0.1:1/lumapos_test";
 const schema = await import(`${project}/src/db/schema.ts`);
 const { getReportsForDatabase } = await import(`${project}/src/lib/data/reports.ts`);
 const STORE_ID = "00000000-0000-4000-8000-000000000001";
@@ -82,7 +83,10 @@ await database.insert(schema.returnItems).values({
   total: "100.00",
 });
 
-const report = await getReportsForDatabase(database, STORE_ID, 1);
+const report = await getReportsForDatabase(database, STORE_ID, 1, {}, {
+  publicBucket: "public-media",
+  publicBaseUrl: "https://media.staging.lumapos.test",
+});
 const today = new Date().toISOString().slice(0, 10);
 
 assert.equal(report.summary.revenue, -100);

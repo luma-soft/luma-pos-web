@@ -8,6 +8,28 @@ export type MediaObjectHead = {
   etag: string | null;
 };
 
+export type ObjectStorageWriteOutcome =
+  | "definitive-no-write"
+  | "ambiguous";
+
+export class ObjectStorageWriteError extends Error {
+  constructor(
+    message: string,
+    readonly outcome: ObjectStorageWriteOutcome,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.name = "ObjectStorageWriteError";
+  }
+}
+
+export function isDefinitiveObjectStorageWriteError(
+  error: unknown,
+): error is ObjectStorageWriteError {
+  return error instanceof ObjectStorageWriteError
+    && error.outcome === "definitive-no-write";
+}
+
 export class ObjectStorageOperationUnsupportedError extends Error {
   readonly code = "OBJECT_STORAGE_OPERATION_UNSUPPORTED";
 

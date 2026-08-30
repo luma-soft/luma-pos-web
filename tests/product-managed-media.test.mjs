@@ -5,10 +5,6 @@ import { drizzle } from "drizzle-orm/pglite";
 import { and, asc, eq, isNull } from "drizzle-orm";
 
 const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
-const productActionsSource = readFileSync(
-  `${projectRoot}/src/lib/actions/products.ts`,
-  "utf8",
-);
 const schema = await import(`${projectRoot}/src/db/schema.ts`);
 const { mediaObjects, productMedia, products, stockLevels } = schema;
 const {
@@ -18,7 +14,10 @@ const {
   resolveLegacyProductImageIdsInTransaction,
   replaceProductMediaInTransaction,
 } = await import(`${projectRoot}/src/lib/products/product-media.ts`);
-const { productCompatibilityImageUrls } = await import(
+const {
+  productCompatibilityImageUrls,
+  productManagedImageDescriptors,
+} = await import(
   `${projectRoot}/src/lib/products/product-media-read.ts`
 );
 
@@ -41,15 +40,23 @@ const MEDIA_WRONG_TARGET = "50000000-0000-4000-8000-000000000007";
 const MEDIA_PARENT = "50000000-0000-4000-8000-000000000008";
 const MEDIA_DELETED = "50000000-0000-4000-8000-000000000009";
 const MEDIA_WRONG_FORMAT = "50000000-0000-4000-8000-000000000010";
+const MEDIA_SUPABASE = "50000000-0000-4000-8000-000000000011";
+const MEDIA_WRONG_BUCKET = "50000000-0000-4000-8000-000000000012";
+const MEDIA_READY_DELETED = "50000000-0000-4000-8000-000000000013";
+const MEDIA_MIME_MISMATCH = "50000000-0000-4000-8000-000000000014";
 const EXTERNAL_A = "https://images.vendor.test/catalog/a.jpg";
 const EXTERNAL_B = "https://images.vendor.test/catalog/b.jpg";
+const PUBLIC_MEDIA = {
+  publicBaseUrl: "https://media.staging.lumapos.test",
+  publicBucket: "public-media",
+};
 
 function objectKey(storeId, mediaId, extension = "webp") {
   return `stores/${storeId}/products/2026/08/${mediaId}/original.${extension}`;
 }
 
 function publicUrl(storeId, mediaId, extension = "webp") {
-  return `https://media.lumapos.vn/${objectKey(storeId, mediaId, extension)}`;
+  return `${PUBLIC_MEDIA.publicBaseUrl}/${objectKey(storeId, mediaId, extension)}`;
 }
 
 function mediaValue({
@@ -62,16 +69,19 @@ function mediaValue({
   domain = "products",
   extension = "webp",
   mimeType = extension === "gif" ? "image/gif" : "image/webp",
+  provider = "r2",
+  bucket,
+  deletedAt = null,
 }) {
   return {
     id,
     storeId,
-    provider: "r2",
+    provider,
     visibility,
     purpose,
     targetId,
     domain,
-    bucket: visibility === "public" ? "public-media" : "private-media",
+    bucket: bucket ?? (visibility === "public" ? "public-media" : "private-media"),
     objectKey: objectKey(storeId, id, extension),
     originalFileName: `${id}.${extension}`,
     mimeType,
@@ -80,6 +90,7 @@ function mediaValue({
     uploadExpiresAt: new Date("2026-08-30T04:00:00.000Z"),
     readyAt: status === "ready" ? new Date("2026-08-30T03:00:00.000Z") : null,
     verifiedAt: status === "ready" ? new Date("2026-08-30T03:00:00.000Z") : null,
+    deletedAt,
   };
 }
 
@@ -141,6 +152,27 @@ beforeEach(async () => {
     mediaValue({ id: MEDIA_PARENT, targetId: PARENT_ID }),
     mediaValue({ id: MEDIA_DELETED, status: "deleted" }),
     mediaValue({ id: MEDIA_WRONG_FORMAT, extension: "gif" }),
+    mediaValue({
+      id: MEDIA_SUPABASE,
+      provider: "supabase",
+      targetId: PRODUCT_ID,
+    }),
+    mediaValue({
+      id: MEDIA_WRONG_BUCKET,
+      bucket: "another-public-bucket",
+      targetId: PRODUCT_ID,
+    }),
+    mediaValue({
+      id: MEDIA_READY_DELETED,
+      targetId: PRODUCT_ID,
+      deletedAt: new Date("2026-08-30T03:05:00.000Z"),
+    }),
+    mediaValue({
+      id: MEDIA_MIME_MISMATCH,
+      targetId: PRODUCT_ID,
+      extension: "png",
+      mimeType: "image/jpeg",
+    }),
   ]);
 });
 
@@ -155,7 +187,7 @@ async function replaceFor(productId, imageMediaIds, imageUrls) {
       productId,
       imageMediaIds,
       imageUrls,
-      publicUrlForKey: (key) => `https://media.lumapos.vn/${key}`,
+      publicMedia: PUBLIC_MEDIA,
       now: new Date("2026-08-30T03:30:00.000Z"),
     })
   );
@@ -168,12 +200,11 @@ describe("product managed media transaction", () => {
       publicUrl(STORE_ID, MEDIA_A),
       publicUrl(STORE_B, MEDIA_FOREIGN),
       `${publicUrl(STORE_ID, MEDIA_A, "gif")}?untrusted=1`,
+      `http://media.staging.lumapos.test/${objectKey(STORE_ID, MEDIA_A)}`,
+      `https://media.staging.lumapos.test./${objectKey(STORE_ID, MEDIA_A)}`,
       EXTERNAL_A,
       EXTERNAL_B,
-    ])).toEqual([EXTERNAL_A, EXTERNAL_B]);
-    expect(productActionsSource).toContain(
-      "patch.imageUrls = externalProductImageUrls(v.imageUrls)",
-    );
+    ], PUBLIC_MEDIA)).toEqual([EXTERNAL_A, EXTERNAL_B]);
   });
 
   test("uses Task 3 UUIDs, a bounded list, and rejects duplicates instead of deduplicating", () => {
@@ -224,10 +255,7 @@ describe("product managed media transaction", () => {
       .from(products).where(eq(products.id, PRODUCT_ID));
     expect(product.imageUrls).toEqual([EXTERNAL_A, EXTERNAL_B]);
     const [catalogProduct] = await database.select({
-      imageUrls: productCompatibilityImageUrls(
-        STORE_ID,
-        "https://media.lumapos.vn",
-      ),
+      imageUrls: productCompatibilityImageUrls(STORE_ID, PUBLIC_MEDIA),
     }).from(products).where(eq(products.id, PRODUCT_ID));
     expect(catalogProduct.imageUrls).toEqual(result.imageUrls);
   });
@@ -242,6 +270,10 @@ describe("product managed media transaction", () => {
       MEDIA_WRONG_TARGET,
       MEDIA_DELETED,
       MEDIA_WRONG_FORMAT,
+      MEDIA_SUPABASE,
+      MEDIA_WRONG_BUCKET,
+      MEDIA_READY_DELETED,
+      MEDIA_MIME_MISMATCH,
     ];
     for (const mediaId of invalid) {
       await expect(replace([mediaId], [EXTERNAL_A])).rejects.toBeInstanceOf(
@@ -269,6 +301,7 @@ describe("product managed media transaction", () => {
           publicUrl(STORE_B, MEDIA_FOREIGN),
           publicUrl(STORE_ID, MEDIA_WRONG_TARGET),
         ],
+        publicMedia: PUBLIC_MEDIA,
       })
     );
     expect(resolved).toEqual([MEDIA_A, MEDIA_B]);
@@ -281,9 +314,84 @@ describe("product managed media transaction", () => {
           publicUrl(STORE_ID, MEDIA_PARENT),
           publicUrl(STORE_ID, MEDIA_A),
         ],
+        publicMedia: PUBLIC_MEDIA,
       })
     );
     expect(childResolved).toEqual([MEDIA_A]);
+  });
+
+  test("old browse-shaped edits recover, reorder, and remove managed IDs without destructive empty input", async () => {
+    await replace([MEDIA_A, MEDIA_B], [EXTERNAL_A]);
+    const [browseRow] = await database.select({
+      imageUrls: productCompatibilityImageUrls(STORE_ID, PUBLIC_MEDIA),
+    }).from(products).where(eq(products.id, PRODUCT_ID));
+    expect(browseRow).not.toHaveProperty("imageMedia");
+
+    const applyOldBrowsePatch = (imageUrls) => database.transaction(async (transaction) => {
+      const recoveredIds = await resolveLegacyProductImageIdsInTransaction(transaction, {
+        storeId: STORE_ID,
+        productId: PRODUCT_ID,
+        imageUrls,
+        publicMedia: PUBLIC_MEDIA,
+      });
+      return replaceProductMediaInTransaction(transaction, {
+        storeId: STORE_ID,
+        productId: PRODUCT_ID,
+        imageMediaIds: recoveredIds,
+        imageUrls,
+        publicMedia: PUBLIC_MEDIA,
+        now: new Date("2026-08-30T03:30:00.000Z"),
+      });
+    });
+
+    await applyOldBrowsePatch(browseRow.imageUrls);
+    let active = await database.select({
+      mediaId: productMedia.mediaObjectId,
+      sortOrder: productMedia.sortOrder,
+    }).from(productMedia).where(and(
+      eq(productMedia.productId, PRODUCT_ID),
+      isNull(productMedia.deletedAt),
+    )).orderBy(asc(productMedia.sortOrder));
+    expect(active).toEqual([
+      { mediaId: MEDIA_A, sortOrder: 0 },
+      { mediaId: MEDIA_B, sortOrder: 1 },
+    ]);
+
+    await applyOldBrowsePatch([
+      publicUrl(STORE_ID, MEDIA_B),
+      publicUrl(STORE_ID, MEDIA_A),
+      EXTERNAL_B,
+    ]);
+    active = await database.select({
+      mediaId: productMedia.mediaObjectId,
+      sortOrder: productMedia.sortOrder,
+    }).from(productMedia).where(and(
+      eq(productMedia.productId, PRODUCT_ID),
+      isNull(productMedia.deletedAt),
+    )).orderBy(asc(productMedia.sortOrder));
+    expect(active).toEqual([
+      { mediaId: MEDIA_B, sortOrder: 0 },
+      { mediaId: MEDIA_A, sortOrder: 1 },
+    ]);
+
+    await applyOldBrowsePatch([publicUrl(STORE_ID, MEDIA_B), EXTERNAL_B]);
+    const mediaStatuses = await database.select({
+      id: mediaObjects.id,
+      status: mediaObjects.status,
+    }).from(mediaObjects).where(and(
+      eq(mediaObjects.storeId, STORE_ID),
+      eq(mediaObjects.domain, "products"),
+    ));
+    expect(mediaStatuses.find((row) => row.id === MEDIA_A)?.status).toBe("deleted");
+    expect(mediaStatuses.find((row) => row.id === MEDIA_B)?.status).toBe("ready");
+    active = await database.select({
+      mediaId: productMedia.mediaObjectId,
+      sortOrder: productMedia.sortOrder,
+    }).from(productMedia).where(and(
+      eq(productMedia.productId, PRODUCT_ID),
+      isNull(productMedia.deletedAt),
+    ));
+    expect(active).toEqual([{ mediaId: MEDIA_B, sortOrder: 0 }]);
   });
 
   test("removal soft-deletes the association and now-unreferenced managed object", async () => {
@@ -303,10 +411,7 @@ describe("product managed media transaction", () => {
       .from(stockLevels).where(eq(stockLevels.productId, PRODUCT_ID));
     expect(stock.quantity).toBe("37.0000");
     const [catalogProduct] = await database.select({
-      imageUrls: productCompatibilityImageUrls(
-        STORE_ID,
-        "https://media.lumapos.vn",
-      ),
+      imageUrls: productCompatibilityImageUrls(STORE_ID, PUBLIC_MEDIA),
     }).from(products).where(eq(products.id, PRODUCT_ID));
     expect(catalogProduct.imageUrls).toEqual([
       EXTERNAL_A,
@@ -322,10 +427,7 @@ describe("product managed media transaction", () => {
       .from(products).where(eq(products.id, CHILD_ID));
     expect(storedChild.imageUrls).toEqual([EXTERNAL_A]);
     const [inherited] = await database.select({
-      imageUrls: productCompatibilityImageUrls(
-        STORE_ID,
-        "https://media.lumapos.vn",
-      ),
+      imageUrls: productCompatibilityImageUrls(STORE_ID, PUBLIC_MEDIA),
     }).from(products).where(eq(products.id, CHILD_ID));
     expect(inherited.imageUrls).toEqual([EXTERNAL_A, parentUrl]);
 
@@ -335,10 +437,7 @@ describe("product managed media transaction", () => {
       parentUrl,
     ]);
     const [preserved] = await database.select({
-      imageUrls: productCompatibilityImageUrls(
-        STORE_ID,
-        "https://media.lumapos.vn",
-      ),
+      imageUrls: productCompatibilityImageUrls(STORE_ID, PUBLIC_MEDIA),
     }).from(products).where(eq(products.id, CHILD_ID));
     expect(preserved.imageUrls).toEqual([EXTERNAL_A, parentUrl]);
     expect(await database.select().from(productMedia).where(and(
@@ -351,11 +450,32 @@ describe("product managed media transaction", () => {
       .from(products).where(eq(products.id, CHILD_ID));
     expect(storedRefreshed.imageUrls).toEqual([EXTERNAL_B]);
     const [refreshed] = await database.select({
-      imageUrls: productCompatibilityImageUrls(
-        STORE_ID,
-        "https://media.lumapos.vn",
-      ),
+      imageUrls: productCompatibilityImageUrls(STORE_ID, PUBLIC_MEDIA),
     }).from(products).where(eq(products.id, CHILD_ID));
     expect(refreshed.imageUrls).toEqual([EXTERNAL_B]);
+  });
+
+  test("omits provider, bucket, deleted, and MIME-incompatible coordinates from every read projection", async () => {
+    await database.insert(productMedia).values([
+      MEDIA_SUPABASE,
+      MEDIA_WRONG_BUCKET,
+      MEDIA_READY_DELETED,
+      MEDIA_MIME_MISMATCH,
+    ].map((mediaId, sortOrder) => ({
+      storeId: STORE_ID,
+      productId: PRODUCT_ID,
+      mediaObjectId: mediaId,
+      sortOrder,
+      isPrimary: false,
+    })));
+
+    const [row] = await database.select({
+      imageUrls: productCompatibilityImageUrls(STORE_ID, PUBLIC_MEDIA),
+      imageMedia: productManagedImageDescriptors(
+        STORE_ID,
+        PUBLIC_MEDIA,
+      ),
+    }).from(products).where(eq(products.id, PRODUCT_ID));
+    expect(row).toEqual({ imageUrls: [], imageMedia: [] });
   });
 });

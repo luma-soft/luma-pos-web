@@ -54,10 +54,10 @@ import { AI_WORKFLOW_DRAFT_STORAGE_KEY, tenantStorageKey } from "@/components/ai
 import { useTenantClientScope } from "@/components/tenant-client-scope";
 import {
   PRODUCT_IMAGE_ACCEPT,
-  deleteLegacyProductImageUrl,
   deleteUploadedProductImage,
-  uploadProductImageFile,
+  managedImageToDeleteImmediately,
   uploadProductImageFiles,
+  type ProductImageUploadDraft,
   type UploadedProductImage,
 } from "@/lib/images/product-image-upload";
 
@@ -89,6 +89,7 @@ function specsWithOrderNote(
 
 export interface NewProductFormProps {
   storeId: string;
+  publicMediaBaseUrl: string;
   categories: ProductFormOptions["categories"];
   brands: ProductFormOptions["brands"];
   suppliers?: ProductFormOptions["suppliers"]; // NCC tự gắn khi nhập hàng, không sửa ở form
@@ -111,6 +112,7 @@ export function NewProductForm({
   categories,
   brands,
   storeId,
+  publicMediaBaseUrl,
   comboProducts = [],
   priceBooks = [],
   mode = "create",
@@ -374,6 +376,7 @@ export function NewProductForm({
         {tab === "info" && (
           <InfoTab
             storeId={storeId}
+            publicMediaBaseUrl={publicMediaBaseUrl}
             categories={categories}
             brands={brands}
             priceBooks={priceBooks}
@@ -471,6 +474,7 @@ function FormActions({
 
 function InfoTab({
   storeId,
+  publicMediaBaseUrl,
   categories,
   brands,
   suppliers,
@@ -484,6 +488,7 @@ function InfoTab({
     <>
       <BasicInfoSection
         storeId={storeId}
+        publicMediaBaseUrl={publicMediaBaseUrl}
         categories={categories}
         brands={brands}
         suppliers={suppliers}
@@ -1054,6 +1059,7 @@ function BasicInfoSection({
   categories,
   brands,
   storeId,
+  publicMediaBaseUrl,
   initialManagedImages = [],
 }: NewProductFormProps) {
   const t = useTranslations();
@@ -1144,6 +1150,7 @@ function BasicInfoSection({
 
         <ImageUploadGrid
           storeId={storeId}
+          publicMediaBaseUrl={publicMediaBaseUrl}
           initialManagedImages={initialManagedImages}
         />
       </div>
@@ -1155,9 +1162,11 @@ const MAX_IMAGES = 10;
 
 function ImageUploadGrid({
   storeId,
+  publicMediaBaseUrl,
   initialManagedImages,
 }: {
   storeId: string;
+  publicMediaBaseUrl: string;
   initialManagedImages: UploadedProductImage[];
 }) {
   const t = useTranslations();
@@ -1168,7 +1177,7 @@ function ImageUploadGrid({
     [initialManagedImages],
   );
   const [managedImages, setManagedImages] = useState(initialManagedImages);
-  const [drafts, setDrafts] = useState<File[]>([]);
+  const [drafts, setDrafts] = useState<ProductImageUploadDraft[]>([]);
   const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState("");
   const [urlInput, setUrlInput] = useState("");
@@ -1210,7 +1219,7 @@ function ImageUploadGrid({
     }
   }
 
-  async function uploadFiles(nextDrafts: File[]) {
+  async function uploadFiles(nextDrafts: ProductImageUploadDraft[]) {
     if (nextDrafts.length === 0) return;
     setErr("");
     setUploading(true);
@@ -1218,7 +1227,7 @@ function ImageUploadGrid({
       completed: [],
       drafts: nextDrafts,
       targetId: storeId,
-      upload: uploadProductImageFile,
+      publicMediaBaseUrl,
     });
     if (result.completed.length > 0) {
       setImageState(
@@ -1236,27 +1245,25 @@ function ImageUploadGrid({
     const available = MAX_IMAGES - urls.length;
     const nextDrafts = [
       ...drafts,
-      ...Array.from(files),
+      ...Array.from(files, (file) => ({ file })),
     ].slice(0, available);
     setDrafts(nextDrafts);
     await uploadFiles(nextDrafts);
   }
 
   const remove = async (url: string) => {
-    const image = managedImages.find((candidate) => candidate.url === url);
+    const image = managedImageToDeleteImmediately({
+      url,
+      managedImages,
+      initialMediaIds,
+    });
     setImageState(
       urls.filter((candidate) => candidate !== url),
       managedImages.filter((candidate) => candidate.url !== url),
     );
-    if (image && !initialMediaIds.has(image.mediaId)) {
+    if (image) {
       try {
         await deleteUploadedProductImage(image);
-      } catch {
-        setErr(t("products.fields.imageUploadError"));
-      }
-    } else if (!image) {
-      try {
-        await deleteLegacyProductImageUrl(url);
       } catch {
         setErr(t("products.fields.imageUploadError"));
       }

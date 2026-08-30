@@ -4,6 +4,7 @@ import { getPriceBooks, getPriceOverridesForProducts } from "@/lib/data/price-bo
 import { NewProductForm } from "../../new/product-form";
 import { productToFormInitialValues } from "../../product-form-values";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { getPublicMediaConfig } from "@/lib/media/config";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -14,6 +15,7 @@ export default async function EditProductPage({ params, searchParams }: Props) {
   const { id } = await params;
   const sp = await searchParams;
   const context = await requireStoreContext();
+  const publicMedia = getPublicMediaConfig();
   const [product, options, priceBooks, priceOverridesByBook] = await Promise.all([
     getProduct(context.storeId, id),
     getProductFormOptions(context.storeId),
@@ -28,11 +30,12 @@ export default async function EditProductPage({ params, searchParams }: Props) {
   return (
     <NewProductForm
       storeId={context.storeId}
+      publicMediaBaseUrl={publicMedia.publicBaseUrl}
       mode="edit"
       productId={id}
       isVariantChild={Boolean(product.parentProductId)}
       siblingCount={product.siblings.length}
-      initialValues={productToFormInitialValues(product, "edit", priceBookPrices)}
+      initialValues={productToFormInitialValues(product, "edit", priceBookPrices, publicMedia)}
       initialManagedImages={product.imageMedia}
       categories={options.categories}
       brands={options.brands}

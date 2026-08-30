@@ -34,8 +34,11 @@ import {
   DEFAULT_PRODUCT_LIST_SORT,
   type ProductListSort,
 } from "@/lib/inventory/product-list-policy";
-import { getPublicMediaUrl } from "@/lib/media/config";
-import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
+import {
+  productCompatibilityImageUrls,
+  productManagedImageDescriptors,
+  type ProductManagedImageDescriptor,
+} from "@/lib/products/product-media-read";
 import {
   buildRelatedProductLookup,
   selectRelatedProducts,
@@ -67,45 +70,17 @@ export interface ProductListFilters {
 
 export const PRODUCT_ORDER_NOTE_SPEC_KEY = "__orderNote";
 
-type ProductMediaCoordinate = { mediaId: string; path: string };
-
 function productMediaCoordinates(storeId: string) {
-  return sql<ProductMediaCoordinate[]>`coalesce((
-    select json_agg(json_build_object(
-      'mediaId', pm.media_object_id,
-      'path', media.object_key
-    ) order by pm.sort_order)
-    from product_media pm
-    join media_objects media
-      on media.id = pm.media_object_id
-     and media.store_id = pm.store_id
-    where pm.store_id = ${storeId}
-      and pm.product_id = ${products.id}
-      and pm.deleted_at is null
-      and media.status = 'ready'
-      and media.deleted_at is null
-      and media.visibility = 'public'
-      and media.purpose = 'product-image'
-      and media.domain = 'products'
-      and media.target_id = ${products.id}
-  ), '[]'::json)`;
-}
-
-function productMediaDescriptors(records: ProductMediaCoordinate[]) {
-  return records.map((record) => ({
-    mediaId: record.mediaId,
-    path: record.path,
-    url: getPublicMediaUrl(record.path),
-  }));
+  return productManagedImageDescriptors(storeId);
 }
 
 function withProductMedia<
-  T extends { imageMediaRecords: ProductMediaCoordinate[] },
+  T extends { imageMediaRecords: ProductManagedImageDescriptor[] },
 >(row: T) {
   const { imageMediaRecords, ...product } = row;
   return {
     ...product,
-    imageMedia: productMediaDescriptors(imageMediaRecords),
+    imageMedia: imageMediaRecords,
   };
 }
 

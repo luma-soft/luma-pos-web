@@ -10,7 +10,12 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 import { getR2Config, type R2Config } from "@/lib/media/config";
-import type { MediaObjectHead, ObjectStorage } from "@/lib/media/types";
+import {
+  ObjectStorageWriteError,
+  type MediaObjectHead,
+  type ObjectStorage,
+  type ObjectStorageWriteOutcome,
+} from "@/lib/media/types";
 
 function isMissingObject(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -26,6 +31,33 @@ function isMissingObject(error: unknown): boolean {
 function publicObjectUrl(baseUrl: string, key: string): string {
   const encodedKey = key.split("/").map(encodeURIComponent).join("/");
   return `${baseUrl}/${encodedKey}`;
+}
+
+function writeFailureOutcome(error: unknown): ObjectStorageWriteOutcome {
+  if (!error || typeof error !== "object") return "ambiguous";
+  const candidate = error as {
+    status?: number;
+    statusCode?: number;
+    $metadata?: { httpStatusCode?: number };
+  };
+  const status = candidate.$metadata?.httpStatusCode
+    ?? candidate.statusCode
+    ?? candidate.status;
+  return status != null && [
+    400,
+    401,
+    403,
+    404,
+    405,
+    409,
+    411,
+    412,
+    413,
+    415,
+    422,
+  ].includes(status)
+    ? "definitive-no-write"
+    : "ambiguous";
 }
 
 export class R2ObjectStorage implements ObjectStorage {
@@ -53,20 +85,28 @@ export class R2ObjectStorage implements ObjectStorage {
     contentType: string;
     ifNoneMatch?: "*";
   }): Promise<MediaObjectHead> {
-    const result = await this.client.send(
-      new PutObjectCommand({
-        Bucket: input.bucket,
-        Key: input.key,
-        Body: input.body,
-        ContentType: input.contentType,
-        IfNoneMatch: input.ifNoneMatch,
-      }),
-    );
-    return {
-      sizeBytes: input.body.byteLength,
-      contentType: input.contentType,
-      etag: result.ETag ?? null,
-    };
+    try {
+      const result = await this.client.send(
+        new PutObjectCommand({
+          Bucket: input.bucket,
+          Key: input.key,
+          Body: input.body,
+          ContentType: input.contentType,
+          IfNoneMatch: input.ifNoneMatch,
+        }),
+      );
+      return {
+        sizeBytes: input.body.byteLength,
+        contentType: input.contentType,
+        etag: result.ETag ?? null,
+      };
+    } catch (error) {
+      throw new ObjectStorageWriteError(
+        "Object storage write failed",
+        writeFailureOutcome(error),
+        { cause: error },
+      );
+    }
   }
 
   async get(input: { bucket: string; key: string }): Promise<Uint8Array> {

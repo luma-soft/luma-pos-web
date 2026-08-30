@@ -1,4 +1,7 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { and, eq, sql } from "drizzle-orm";
+import { db } from "@/db";
+import { products } from "@/db/schema";
 import { requireMobileStockAccess } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
 import { convertHeifToJpeg } from "@/lib/images/heif";
@@ -17,9 +20,68 @@ type ProductImageRouteDependencies = {
   >;
   convertHeif?: typeof convertHeifToJpeg;
   removeLegacy?: (path: string) => Promise<void>;
+  legacyPublicBaseUrl?: string;
+  isLegacyReferenced?: (input: {
+    storeId: string;
+    url: string;
+  }) => Promise<boolean>;
 };
 
 const PRODUCT_IMAGES_BUCKET = "products";
+const LEGACY_PRODUCT_STORAGE_PREFIX =
+  `/storage/v1/object/public/${PRODUCT_IMAGES_BUCKET}/`;
+
+function trustedLegacyCoordinate(
+  value: string,
+  configuredBaseUrl: string,
+): { url: string; path: string } | null {
+  try {
+    const configured = new URL(configuredBaseUrl);
+    const url = new URL(value);
+    if (
+      configured.protocol !== "https:"
+      || configured.pathname !== "/"
+      || configured.username
+      || configured.password
+      || configured.port
+      || configured.search
+      || configured.hash
+      || configured.hostname.endsWith(".")
+      || url.origin !== configured.origin
+      || url.username
+      || url.password
+      || url.port
+      || url.search
+      || url.hash
+      || !url.pathname.startsWith(LEGACY_PRODUCT_STORAGE_PREFIX)
+    ) return null;
+    const path = decodeURIComponent(
+      url.pathname.slice(LEGACY_PRODUCT_STORAGE_PREFIX.length),
+    );
+    return path && !path.includes("..") ? { url: value, path } : null;
+  } catch {
+    return null;
+  }
+}
+
+async function legacyImageIsReferenced(input: {
+  storeId: string;
+  url: string;
+}) {
+  const [reference] = await db.select({ id: products.id }).from(products)
+    .where(and(
+      eq(products.storeId, input.storeId),
+      sql`exists (
+        select 1
+        from jsonb_array_elements_text(
+          coalesce(${products.imageUrls}, '[]'::jsonb)
+        ) image_url(url)
+        where image_url.url = ${input.url}
+      )`,
+    ))
+    .limit(1);
+  return Boolean(reference);
+}
 
 function sniffImageMime(bytes: Uint8Array): ProductImageMime | null {
   if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
@@ -144,15 +206,28 @@ export async function deleteProductImage(
   }
 
   const path = params.get("path")?.trim() ?? "";
+  const legacyUrl = params.get("url")?.trim() ?? "";
+  const coordinate = trustedLegacyCoordinate(
+    legacyUrl,
+    dependencies.legacyPublicBaseUrl
+      ?? process.env.NEXT_PUBLIC_SUPABASE_URL
+      ?? "",
+  );
   const tenantPrefix = `stores/${gate.storeId}/products/drafts/${gate.userId}/`;
   const legacyPrefix = `${gate.userId}/`;
   if (
-    (!path.startsWith(tenantPrefix) && !path.startsWith(legacyPrefix))
+    !coordinate
+    || coordinate.path !== path
+    || (!path.startsWith(tenantPrefix) && !path.startsWith(legacyPrefix))
     || path.includes("..")
   ) {
     return mobileError("errors.forbidden", 403);
   }
   try {
+    const referenced = await (
+      dependencies.isLegacyReferenced ?? legacyImageIsReferenced
+    )({ storeId: gate.storeId, url: coordinate.url });
+    if (referenced) return mobileError("media.referenced", 409);
     if (dependencies.removeLegacy) {
       await dependencies.removeLegacy(path);
     } else {

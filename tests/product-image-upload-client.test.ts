@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   deleteLegacyProductImageUrl,
   deleteUploadedProductImage,
+  managedImageToDeleteImmediately,
   PRODUCT_IMAGE_ACCEPT,
   PRODUCT_IMAGE_MAX_BYTES,
   ProductImageUploadError,
@@ -9,12 +10,14 @@ import {
   uploadProductImageFiles,
   type UploadedProductImage,
 } from "../src/lib/images/product-image-upload";
+import { ManagedMediaUploadError } from "../src/lib/media/client";
 
 const STORE_ID = "11111111-1111-4111-8111-111111111111";
 const MEDIA_ID = "22222222-2222-4222-8222-222222222222";
 const PUBLIC_PATH =
   `stores/${STORE_ID}/products/2026/08/${MEDIA_ID}/original.png`;
-const PUBLIC_URL = `https://media.lumapos.vn/${PUBLIC_PATH}`;
+const PUBLIC_BASE_URL = "https://media.staging.lumapos.test";
+const PUBLIC_URL = `${PUBLIC_BASE_URL}/${PUBLIC_PATH}`;
 
 function png(name = "Hải Đăng.png") {
   return new File(
@@ -70,6 +73,7 @@ describe("web product image upload", () => {
         });
       },
       () => new Date("2026-08-30T03:00:00.000Z"),
+      PUBLIC_BASE_URL,
     );
 
     expect(requests.map((request) => [request.url, request.init?.method])).toEqual([
@@ -111,7 +115,10 @@ describe("web product image upload", () => {
     });
 
     expect(first.completed).toEqual([completed]);
-    expect(first.remaining.map((file) => file.name)).toEqual(["second.png", "third.png"]);
+    expect(first.remaining.map((draft) => draft.file.name)).toEqual([
+      "second.png",
+      "third.png",
+    ]);
     expect(first.error).toBe("errors.network");
 
     const retried = await uploadProductImageFiles({
@@ -130,6 +137,95 @@ describe("web product image upload", () => {
       "third.png",
     ]);
     expect(retried.remaining).toEqual([]);
+  });
+
+  test("retains completion coordinates and retries without a new file PUT", async () => {
+    const file = png("completion.png");
+    const completionCalls: Array<string | undefined> = [];
+    const first = await uploadProductImageFiles({
+      completed: [],
+      drafts: [file],
+      targetId: STORE_ID,
+      upload: async (_file, _targetId, completionMediaId) => {
+        completionCalls.push(completionMediaId);
+        throw new ManagedMediaUploadError({
+          stage: "complete",
+          code: "media.completionFailed",
+          statusCode: 502,
+          mediaId: MEDIA_ID,
+          retryFrom: "complete",
+        });
+      },
+    });
+
+    expect(first.remaining).toEqual([{
+      file,
+      completionMediaId: MEDIA_ID,
+    }]);
+    const retried = await uploadProductImageFiles({
+      completed: first.completed,
+      drafts: first.remaining,
+      targetId: STORE_ID,
+      upload: async (_file, _targetId, completionMediaId) => {
+        completionCalls.push(completionMediaId);
+        return { mediaId: MEDIA_ID, url: PUBLIC_URL, path: PUBLIC_PATH };
+      },
+    });
+
+    expect(completionCalls).toEqual([undefined, MEDIA_ID]);
+    expect(retried.completed).toHaveLength(1);
+    expect(retried.remaining).toEqual([]);
+  });
+
+  test("the real product wrapper preserves Task 4 completion retry state", async () => {
+    const file = png("completion-wrapper.png");
+    const fetcher: typeof fetch = async (input) => {
+      const url = input.toString();
+      if (url === "/api/mobile/media/uploads") {
+        return Response.json({
+          ok: true,
+          data: {
+            media: {
+              id: MEDIA_ID,
+              visibility: "public",
+              status: "pending",
+              mimeType: "image/png",
+              sizeBytes: file.size,
+              fileName: file.name,
+            },
+            method: "PUT",
+            uploadUrl: "https://r2.test/upload",
+            headers: {
+              "Content-Type": "image/png",
+              "If-None-Match": "*",
+            },
+            expiresAt: "2026-08-30T04:00:00.000Z",
+          },
+        });
+      }
+      if (url === "https://r2.test/upload") {
+        return new Response(null, { status: 200 });
+      }
+      return Response.json({ ok: false }, { status: 502 });
+    };
+
+    const result = await uploadProductImageFiles({
+      completed: [],
+      drafts: [file],
+      targetId: STORE_ID,
+      upload: (draft, targetId) => uploadProductImageFile(
+        draft,
+        targetId,
+        fetcher,
+        () => new Date("2026-08-30T03:00:00.000Z"),
+        PUBLIC_BASE_URL,
+      ),
+    });
+
+    expect(result.remaining).toEqual([{
+      file,
+      completionMediaId: MEDIA_ID,
+    }]);
   });
 
   test("rejects oversized and unsupported files before making a request", async () => {
@@ -203,6 +299,7 @@ describe("web product image upload", () => {
         });
       },
       () => new Date("2026-08-30T03:00:00.000Z"),
+      PUBLIC_BASE_URL,
     )).rejects.toBeInstanceOf(ProductImageUploadError);
   });
 
@@ -234,16 +331,18 @@ describe("web product image upload", () => {
           data: {
             mediaId: MEDIA_ID,
             path: jpegPath,
-            url: `https://media.lumapos.vn/${jpegPath}`,
+            url: `${PUBLIC_BASE_URL}/${jpegPath}`,
           },
         });
       },
+      () => new Date("2026-08-30T03:00:00.000Z"),
+      PUBLIC_BASE_URL,
     );
 
     expect(uploaded).toEqual({
       mediaId: MEDIA_ID,
       path: jpegPath,
-      url: `https://media.lumapos.vn/${jpegPath}`,
+      url: `${PUBLIC_BASE_URL}/${jpegPath}`,
     });
   });
 
@@ -273,19 +372,38 @@ describe("web product image upload", () => {
       return Response.json({ ok: true });
     };
 
+    const legacyUrl =
+      `https://project.supabase.co/storage/v1/object/public/products/${legacyPath}`;
     expect(await deleteLegacyProductImageUrl(
-      `https://project.supabase.co/storage/v1/object/public/products/${legacyPath}`,
+      legacyUrl,
+      "https://project.supabase.co",
       fetcher,
     )).toBe(true);
-    expect(await deleteLegacyProductImageUrl(PUBLIC_URL, fetcher)).toBe(false);
     expect(await deleteLegacyProductImageUrl(
-      "https://example.com/storage/v1/object/public/avatars/me.png",
+      PUBLIC_URL,
+      "https://project.supabase.co",
+      fetcher,
+    )).toBe(false);
+    expect(await deleteLegacyProductImageUrl(
+      `https://attacker.test/storage/v1/object/public/products/${legacyPath}`,
+      "https://project.supabase.co",
       fetcher,
     )).toBe(false);
 
     const request = new URL(requests[0]!, "https://app.lumapos.vn");
     expect(requests).toHaveLength(1);
     expect(request.searchParams.get("path")).toBe(legacyPath);
+    expect(request.searchParams.get("url")).toBe(legacyUrl);
     expect(request.searchParams.has("mediaId")).toBe(false);
+  });
+
+  test("persisted legacy removal stays local on cancel or save failure", () => {
+    const legacyUrl =
+      `https://project.supabase.co/storage/v1/object/public/products/${STORE_ID}/persisted.jpg`;
+    expect(managedImageToDeleteImmediately({
+      url: legacyUrl,
+      managedImages: [],
+      initialMediaIds: new Set(),
+    })).toBeNull();
   });
 });

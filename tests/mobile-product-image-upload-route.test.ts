@@ -18,6 +18,7 @@ const managedPuts: Array<{
 }> = [];
 const managedDeletes: string[] = [];
 const legacyRemovals: string[][] = [];
+const referencedLegacyUrls = new Set<string>();
 let heicConversions = 0;
 
 const { uploadProductImage: uploadHandler, deleteProductImage: deleteHandler } =
@@ -65,6 +66,11 @@ const dependencies = {
   async removeLegacy(path: string) {
     legacyRemovals.push([path]);
   },
+  legacyPublicBaseUrl: "https://project.supabase.co",
+  async isLegacyReferenced(input: { storeId: string; url: string }) {
+    expect(input.storeId).toBe(STORE_ID);
+    return referencedLegacyUrls.has(input.url);
+  },
 };
 
 const uploadProductImage = (request: Request) =>
@@ -76,6 +82,7 @@ beforeEach(() => {
   managedPuts.splice(0);
   managedDeletes.splice(0);
   legacyRemovals.splice(0);
+  referencedLegacyUrls.clear();
   heicConversions = 0;
 });
 
@@ -148,13 +155,14 @@ describe("DELETE /api/mobile/products/images", () => {
     expect(legacyRemovals).toEqual([]);
   });
 
-  test("retains strict user-scoped legacy Supabase cleanup", async () => {
+  test("cleans up only an unreferenced trusted Supabase coordinate", async () => {
     for (const path of [
       `${USER_ID}/uncommitted.jpg`,
       `stores/${STORE_ID}/products/drafts/${USER_ID}/uncommitted.jpg`,
     ]) {
+      const url = `https://project.supabase.co/storage/v1/object/public/products/${path}`;
       const response = await deleteProductImage(new Request(
-        `https://luma.test/api/mobile/products/images?path=${encodeURIComponent(path)}`,
+        `https://luma.test/api/mobile/products/images?${new URLSearchParams({ path, url })}`,
         { method: "DELETE" },
       ));
       expect(response.status).toBe(200);
@@ -165,9 +173,36 @@ describe("DELETE /api/mobile/products/images", () => {
     ]);
   });
 
+  test("preserves a legacy object while any live product in the store references it", async () => {
+    const path = `${USER_ID}/shared.jpg`;
+    const url = `https://project.supabase.co/storage/v1/object/public/products/${path}`;
+    referencedLegacyUrls.add(url);
+
+    const response = await deleteProductImage(new Request(
+      `https://luma.test/api/mobile/products/images?${new URLSearchParams({ path, url })}`,
+      { method: "DELETE" },
+    ));
+
+    expect(response.status).toBe(409);
+    expect(legacyRemovals).toEqual([]);
+  });
+
+  test("rejects a foreign host even when it supplies the same trusted bucket path", async () => {
+    const path = `${USER_ID}/uncommitted.jpg`;
+    const url = `https://attacker.test/storage/v1/object/public/products/${path}`;
+    const response = await deleteProductImage(new Request(
+      `https://luma.test/api/mobile/products/images?${new URLSearchParams({ path, url })}`,
+      { method: "DELETE" },
+    ));
+
+    expect(response.status).toBe(403);
+    expect(legacyRemovals).toEqual([]);
+  });
+
   test("never accepts a path-only R2 key or another user's legacy path", async () => {
     for (const path of [
       PATH,
+      `${USER_ID}/path-only.jpg`,
       "someone-else/uncommitted.jpg",
       `stores/${STORE_ID}/products/drafts/someone-else/uncommitted.jpg`,
     ]) {

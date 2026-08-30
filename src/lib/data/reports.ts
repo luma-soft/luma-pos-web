@@ -11,6 +11,10 @@ import {
   returns,
 } from "@/db/schema";
 import { calculateDashboardFinancials } from "@/lib/dashboard/financials";
+import {
+  getPublicMediaConfig,
+  type PublicMediaConfig,
+} from "@/lib/media/config";
 import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
 
 export type ReportFilters = {
@@ -353,6 +357,7 @@ async function getCoreReportsForDatabase(
   storeId: string,
   rangeDays: number,
   filters: ReportFilters,
+  publicMedia: PublicMediaConfig,
 ) {
   const { from, to, where, operationalWhere, returnWhere } = reportConditions(storeId, rangeDays, filters);
   const [
@@ -416,7 +421,7 @@ async function getCoreReportsForDatabase(
       productName: sql<string>`max(${orderItems.productName})`,
       qtySold: sql<string>`sum(${orderItems.quantity} * ${orderItems.unitMultiplier})`,
       baseUnit: sql<string>`max(${products.baseUnit})`,
-      imageUrls: productCompatibilityImageUrls(storeId),
+      imageUrls: productCompatibilityImageUrls(storeId, publicMedia),
       revenue: sql<string>`sum(${orderItems.total})`,
       cost: sql<string>`sum(${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})`,
       profit: sql<string>`sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice}))`,
@@ -628,14 +633,27 @@ export async function getReportsForDatabase(
   storeId: string,
   rangeDays = 30,
   filters: ReportFilters = {},
+  publicMedia: PublicMediaConfig = getPublicMediaConfig(),
 ) {
   const { from, to } = reportBounds(rangeDays, filters);
   const duration = Math.max(86_400_000, to.getTime() - from.getTime());
   const previousTo = new Date(from);
   const previousFrom = new Date(from.getTime() - duration);
   const [current, previous] = await Promise.all([
-    getCoreReportsForDatabase(database, storeId, rangeDays, { ...filters, from, to }),
-    getCoreReportsForDatabase(database, storeId, rangeDays, { ...filters, from: previousFrom, to: previousTo }),
+    getCoreReportsForDatabase(
+      database,
+      storeId,
+      rangeDays,
+      { ...filters, from, to },
+      publicMedia,
+    ),
+    getCoreReportsForDatabase(
+      database,
+      storeId,
+      rangeDays,
+      { ...filters, from: previousFrom, to: previousTo },
+      publicMedia,
+    ),
   ]);
   return {
     rangeDays,

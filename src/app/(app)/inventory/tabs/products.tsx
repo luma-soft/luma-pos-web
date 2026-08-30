@@ -27,6 +27,7 @@ import { CategoriesManager } from "../../products/categories/categories-manager"
 import { ProductCatalogSwitcher } from "./product-catalog-switcher";
 import { ListSearchFilterBar } from "@/components/list-search-filter";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { getPublicMediaConfig } from "@/lib/media/config";
 import {
   DEFAULT_PRODUCT_LIST_SORT,
   parseProductListSort,
@@ -149,6 +150,7 @@ export async function ProductEditorModal({
   closeNavigation?: "push" | "replace";
 }) {
   const context = await requireStoreContext();
+  const publicMedia = getPublicMediaConfig();
   const modal = searchParams.productModal;
   if (!modal) return null;
   if (!["create", "edit", "copy", "sameType"].includes(modal)) return null;
@@ -176,7 +178,7 @@ export async function ProductEditorModal({
     ? searchParams.productKind as "product" | "service" | "combo"
     : "product";
   const initialValues = seedProduct
-    ? productToFormInitialValues(seedProduct, modal === "copy" ? "copy" : modal === "sameType" ? "sameType" : "edit", priceBookPrices)
+    ? productToFormInitialValues(seedProduct, modal === "copy" ? "copy" : modal === "sameType" ? "sameType" : "edit", priceBookPrices, publicMedia)
     : undefined;
 
   return (
@@ -189,6 +191,7 @@ export async function ProductEditorModal({
       >
         <NewProductForm
           storeId={context.storeId}
+          publicMediaBaseUrl={publicMedia.publicBaseUrl}
           mode={mode}
           productId={editId}
           isVariantChild={Boolean(seedProduct?.parentProductId)}

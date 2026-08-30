@@ -7,6 +7,11 @@ export type R2Config = {
   publicBaseUrl: string;
 };
 
+export type PublicMediaConfig = Pick<
+  R2Config,
+  "publicBucket" | "publicBaseUrl"
+>;
+
 type R2Environment = Record<string, string | undefined>;
 const CLOUDFLARE_ACCOUNT_ID_PATTERN = /^[0-9a-f]{32}$/i;
 const R2_BUCKET_NAME_PATTERN = /^(?=.{3,63}$)[a-z0-9](?:[a-z0-9-]*[a-z0-9])$/;
@@ -48,6 +53,7 @@ function readPublicBaseUrl(env: R2Environment): string {
   if (
     url.protocol !== "https:" ||
     !url.hostname ||
+    url.hostname.endsWith(".") ||
     url.username ||
     url.password ||
     url.port ||
@@ -61,11 +67,20 @@ function readPublicBaseUrl(env: R2Environment): string {
   return url.origin;
 }
 
+export function readPublicMediaConfig(
+  env: R2Environment,
+): PublicMediaConfig {
+  return {
+    publicBucket: readBucketName(env, "R2_PUBLIC_BUCKET"),
+    publicBaseUrl: readPublicBaseUrl(env),
+  };
+}
+
 export function readR2Config(env: R2Environment): R2Config {
-  const publicBucket = readBucketName(env, "R2_PUBLIC_BUCKET");
+  const publicMedia = readPublicMediaConfig(env);
   const privateBucket = readBucketName(env, "R2_PRIVATE_BUCKET");
 
-  if (publicBucket === privateBucket) {
+  if (publicMedia.publicBucket === privateBucket) {
     throw new Error("R2 public and private buckets must be different");
   }
 
@@ -73,17 +88,23 @@ export function readR2Config(env: R2Environment): R2Config {
     accountId: readAccountId(env),
     accessKeyId: requiredValue(env, "R2_ACCESS_KEY_ID"),
     secretAccessKey: requiredValue(env, "R2_SECRET_ACCESS_KEY"),
-    publicBucket,
+    ...publicMedia,
     privateBucket,
-    publicBaseUrl: readPublicBaseUrl(env),
   };
+}
+
+export function getPublicMediaConfig(): PublicMediaConfig {
+  return readPublicMediaConfig(process.env);
 }
 
 export function getR2Config(): R2Config {
   return readR2Config(process.env);
 }
 
-export function getPublicMediaUrl(key: string): string {
+export function getPublicMediaUrl(
+  key: string,
+  config: PublicMediaConfig = getPublicMediaConfig(),
+): string {
   const encodedKey = key.split("/").map(encodeURIComponent).join("/");
-  return `${getR2Config().publicBaseUrl}/${encodedKey}`;
+  return `${config.publicBaseUrl}/${encodedKey}`;
 }
