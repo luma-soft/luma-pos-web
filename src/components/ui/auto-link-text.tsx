@@ -21,7 +21,7 @@ function linkifiedParts(value: string): ReactNode[] {
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex min-h-11 min-w-11 text-primary-600 underline decoration-primary-300 underline-offset-2 transition hover:text-primary-700 lg:min-h-0 lg:min-w-0"
+        className="inline-flex min-h-11 min-w-11 max-w-full [overflow-wrap:anywhere] text-primary-600 underline decoration-primary-300 underline-offset-2 transition hover:text-primary-700 lg:min-h-0 lg:min-w-0"
       >
         {url}
       </a>,

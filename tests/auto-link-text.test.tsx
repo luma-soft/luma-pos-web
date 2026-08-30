@@ -30,4 +30,18 @@ describe("AutoLinkText", () => {
     expect(html).toContain("javascript:alert(1)");
     expect(html).toContain("ftp://example.com/file");
   });
+
+  test("allows long URLs to wrap inside constrained detail cells", () => {
+    const html = renderToStaticMarkup(
+      <AutoLinkText>
+        https://example.com/catalog/products/a-very-long-unbroken-product-image-identifier.jpg
+      </AutoLinkText>,
+    );
+    const linkClasses = html
+      .match(/<a[^>]*class="([^"]+)"/)?.[1]
+      .split(" ");
+
+    expect(linkClasses).toContain("max-w-full");
+    expect(linkClasses).toContain("[overflow-wrap:anywhere]");
+  });
 });
