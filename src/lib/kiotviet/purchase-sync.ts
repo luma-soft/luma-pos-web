@@ -199,6 +199,12 @@ function sourceLineFingerprint(line: KiotVietPurchaseLineSnapshot): string {
   });
 }
 
+function sourceLineOccurrenceFingerprint(
+  line: Omit<KiotVietPurchaseLineSnapshot, "externalId" | "productId">,
+): string {
+  return stableKiotVietFingerprint(line);
+}
+
 function currentLineFingerprint(line: KiotVietPurchaseCurrentLine): string | null {
   const sourceSku = nullableText(line.legacyProductSku) ?? nullableText(line.sourceSku);
   if (
@@ -252,8 +258,7 @@ function purchaseSourceRows(input: {
       input.blockers.push({ documentCode: code, reference: "__kiotviet_unknown_supplier__", reason: "unresolved_unknown_supplier" });
     }
 
-    const occurrences = new Map<string, number>();
-    const lines = rows.flatMap((row) => {
+    const canonicalLines = rows.flatMap((row) => {
       const sourceSku = normalizeKiotVietText(row["Mã hàng"]);
       const suppliedSourceUnitName = nullableText(row.ĐVT);
       const product = productForSourceRow({
@@ -274,12 +279,7 @@ function purchaseSourceRows(input: {
         throw new Error(`KiotViet purchase ${code} has invalid product unit multiplier for ${sourceSku}`);
       }
       const sourceUnitName = suppliedSourceUnitName ?? product.sourceUnitName;
-      const occurrenceKey = `${sourceSku}\u0000${sourceUnitName.toLocaleLowerCase("vi")}`;
-      const occurrence = (occurrences.get(occurrenceKey) ?? 0) + 1;
-      occurrences.set(occurrenceKey, occurrence);
-      return [{
-        externalId: buildKiotVietChildExternalId({ documentCode: code, sku: sourceSku, unitName: sourceUnitName, occurrence }),
-        productId: product.productId,
+      const sourceLine = {
         sourceSku,
         productName: nullableText(row["Tên hàng"]) ?? sourceSku,
         unitName: sourceUnitName,
@@ -289,7 +289,32 @@ function purchaseSourceRows(input: {
         discount: normalizeKiotVietNumber(row["Giảm giá"]),
         total: normalizeKiotVietNumber(row["Thành tiền"]),
         note: nullableText(row["Ghi chú hàng hóa"]),
+      };
+      return [{
+        occurrenceKey: sourceProductKey(sourceSku, sourceUnitName),
+        occurrenceFingerprint: sourceLineOccurrenceFingerprint(sourceLine),
+        productId: product.productId,
+        sourceLine,
       }];
+    });
+    canonicalLines.sort((left, right) => (
+      left.occurrenceKey.localeCompare(right.occurrenceKey)
+      || left.occurrenceFingerprint.localeCompare(right.occurrenceFingerprint)
+    ));
+    const occurrences = new Map<string, number>();
+    const lines = canonicalLines.map(({ occurrenceKey, productId, sourceLine }) => {
+      const occurrence = (occurrences.get(occurrenceKey) ?? 0) + 1;
+      occurrences.set(occurrenceKey, occurrence);
+      return {
+        externalId: buildKiotVietChildExternalId({
+          documentCode: code,
+          sku: sourceLine.sourceSku,
+          unitName: sourceLine.unitName,
+          occurrence,
+        }),
+        productId,
+        ...sourceLine,
+      };
     });
     lines.sort((left, right) => left.externalId.localeCompare(right.externalId));
     return {

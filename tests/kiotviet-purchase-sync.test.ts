@@ -313,6 +313,62 @@ describe("KiotViet purchase receipt synchronization", () => {
     ]);
   });
 
+  test("assigns stable occurrence IDs and legacy children to same-SKU/unit rows regardless of source order", () => {
+    const oneUnitRow = {
+      ...sourceRows[1]!,
+      "Tổng tiền hàng": 3,
+      "Cần trả NCC": 3,
+      "Số lượng": 1,
+      "Giá nhập": 1,
+      "Thành tiền": 1,
+      "Ghi chú hàng hóa": "one unit",
+    };
+    const twoUnitRow = {
+      ...oneUnitRow,
+      "Số lượng": 2,
+      "Thành tiền": 2,
+      "Ghi chú hàng hóa": "two units",
+    };
+    const common = {
+      current: [{ localId: "purchase-002", code: "PN-002", fingerprint: "outdated", subtotal: 0, legacyImported: true }],
+      existingLines: [
+        {
+          localId: "legacy-one-unit",
+          purchaseOrderId: "purchase-002",
+          legacyImported: true,
+          legacyProductSku: "BASE-001",
+          quantity: 1,
+          unitCost: 1,
+          total: 1,
+        },
+        {
+          localId: "legacy-two-units",
+          purchaseOrderId: "purchase-002",
+          legacyImported: true,
+          legacyProductSku: "BASE-001",
+          quantity: 2,
+          unitCost: 1,
+          total: 2,
+        },
+      ],
+    };
+    const forward = plan({ ...common, sourceRows: [oneUnitRow, twoUnitRow] });
+    const reversed = plan({ ...common, sourceRows: [twoUnitRow, oneUnitRow] });
+
+    expect(forward.blockers).toEqual([]);
+    expect(reversed.blockers).toEqual([]);
+    expect(reversed.purchases).toEqual(forward.purchases);
+    expect(reversed.writes).toEqual(forward.writes);
+    expect(forward.writes[0]?.purchase.lines.map(({ externalId, localId }) => ({ externalId, localId }))).toEqual([
+      { externalId: "PN-002|BASE-001|cái|1", localId: expect.any(String) },
+      { externalId: "PN-002|BASE-001|cái|2", localId: expect.any(String) },
+    ]);
+    expect(forward.writes[0]?.purchase.lines.map((line) => line.localId).sort()).toEqual([
+      "legacy-one-unit",
+      "legacy-two-units",
+    ]);
+  });
+
   test("reserves mapped child IDs before a legacy fallback can reuse them", () => {
     const duplicateRows = [
       { ...sourceRows[1]!, "Tổng tiền hàng": 2, "Cần trả NCC": 2, "Thành tiền": 1, "Giá nhập": 1, "Ghi chú hàng hóa": "one" },
