@@ -34,6 +34,7 @@ import {
   returnReasons,
   returnRefundMethods,
 } from "@/lib/returns/list-filter-schema";
+import { bookingStatusOptions } from "@/lib/orders/booking-status-filter";
 import {
   LumaDateRangePicker,
   LumaEntityPicker,
@@ -121,12 +122,6 @@ const copy = {
 
 const quoteStatuses = [
   { value: "quote", label: "Đang mở" },
-  { value: "all", label: "Tất cả" },
-  { value: "cancelled", label: "Đã hủy" },
-] as const;
-
-const bookingStatuses = [
-  { value: "confirmed", label: "Đang chờ" },
   { value: "all", label: "Tất cả" },
   { value: "cancelled", label: "Đã hủy" },
 ] as const;
@@ -799,7 +794,7 @@ export function DocumentFilterDrawer({
                         name="status"
                         ariaLabel="Trạng thái đặt hàng"
                         value={draft.status}
-                        options={bookingStatuses}
+                        options={bookingStatusOptions}
                         onChange={(value) => updateDraft({ status: value })}
                       />
                     </FilterSection>

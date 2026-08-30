@@ -5,7 +5,6 @@ import { TableSkeleton } from "@/components/table-skeleton";
 import {
   getOrders,
   type OrderPaymentFilter,
-  type OrderStatusFilter,
 } from "@/lib/data/orders";
 import {
   DEFAULT_TIME_FILTER_PRESET,
@@ -17,16 +16,16 @@ import {
   type OrderTimePreset,
 } from "@/lib/orders/filter-date-range";
 import { parsePageSize } from "@/lib/pagination";
+import { resolveBookingStatus } from "@/lib/orders/booking-status-filter";
 import { BookingsTable } from "./bookings-table";
 import { DocumentFilterDrawer } from "./document-filter-drawer";
 import { requireStoreContext } from "@/lib/auth/store-context";
 
 type SP = Record<string, string | undefined>;
-const BOOKING_STATUSES: OrderStatusFilter[] = ["confirmed", "all", "cancelled"];
 const PAYMENT_STATUSES: OrderPaymentFilter[] = ["all", "paid", "partial", "unpaid"];
 
 export async function BookingsTab({ searchParams }: { searchParams: SP }) {
-  const status = validValue(searchParams.status, BOOKING_STATUSES, "confirmed");
+  const status = resolveBookingStatus(searchParams.status);
   const payment = validValue(searchParams.payment, PAYMENT_STATUSES, "all");
   const created = resolveDateFilter(searchParams);
   const delivery = resolveDeliveryFilter(searchParams);
@@ -67,7 +66,7 @@ export async function BookingsTab({ searchParams }: { searchParams: SP }) {
 async function BookingsContent({ searchParams }: { searchParams: SP }) {
   const context = await requireStoreContext();
   const t = await getTranslations();
-  const status = validValue(searchParams.status, BOOKING_STATUSES, "confirmed");
+  const status = resolveBookingStatus(searchParams.status);
   const payment = validValue(searchParams.payment, PAYMENT_STATUSES, "all");
   const created = resolveDateFilter(searchParams);
   const delivery = resolveDeliveryFilter(searchParams);
