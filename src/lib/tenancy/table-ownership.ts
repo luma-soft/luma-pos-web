@@ -45,6 +45,7 @@ const TENANT_CHILD_TABLES = [
   "mobile_approvals",
   "product_prices",
   "product_units",
+  "product_source_mappings",
   "product_combo_items",
   "product_suppliers",
   "stock_levels",

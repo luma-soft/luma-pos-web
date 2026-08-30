@@ -489,12 +489,41 @@ export const productUnits = pgTable("product_units", {
   storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   productId: uuid("product_id").notNull().references(() => products.id, { onDelete: "cascade" }),
+  sku: varchar("sku", { length: 50 }),
   unitName: varchar("unit_name", { length: 30 }).notNull(), // hộp, m², thùng, pallet
   multiplier: decimal("multiplier", { precision: 14, scale: 4 }).notNull(), // 1 unitName = N base units
   barcode: varchar("barcode", { length: 50 }),
   priceOverride: decimal("price_override", { precision: 14, scale: 2 }),
   sortOrder: integer("sort_order").default(0),
-}, (t) => [index("product_units_product_idx").on(t.productId)]);
+}, (t) => [
+  index("product_units_product_idx").on(t.productId),
+  uniqueIndex("product_units_store_sku_idx")
+    .on(t.storeId, t.sku)
+    .where(sql`${t.sku} is not null`),
+]);
+
+// Stable ownership mapping for server-side imports and synchronization.
+export const productSourceMappings = pgTable("product_source_mappings", {
+  storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id, { onDelete: "cascade" }),
+  id: uuid("id").primaryKey().defaultRandom(),
+  productId: uuid("product_id").notNull(),
+  provider: varchar("provider", { length: 30 }).notNull(),
+  externalId: varchar("external_id", { length: 100 }).notNull(),
+  lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("product_source_mappings_store_external_idx")
+    .on(t.storeId, t.provider, t.externalId),
+  uniqueIndex("product_source_mappings_store_product_idx")
+    .on(t.storeId, t.provider, t.productId),
+  foreignKey({
+    columns: [t.storeId, t.productId],
+    foreignColumns: [products.storeId, products.id],
+    name: "product_source_mappings_product_tenant_fk",
+  }).onDelete("cascade"),
+]);
 
 // Thành phần của combo. quantity luôn tính theo đơn vị cơ bản của sản phẩm con.
 export const productComboItems = pgTable("product_combo_items", {

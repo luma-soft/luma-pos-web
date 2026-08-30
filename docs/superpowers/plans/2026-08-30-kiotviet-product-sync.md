@@ -68,6 +68,7 @@ Run `bun test tests/kiotviet-product-sync.test.ts`. Expected: all parser and pla
 
 **Files:**
 - Modify: `src/db/schema.ts`
+- Modify: `src/lib/tenancy/table-ownership.ts`
 - Generate: `drizzle/0114_*.sql`
 - Generate: `drizzle/meta/0114_snapshot.json`
 - Modify: `drizzle/meta/_journal.json`
@@ -91,7 +92,7 @@ Define `productSourceMappings` with `storeId`, `productId`, `provider`, `externa
 
 - [ ] **Step 4: Generate the Drizzle migration**
 
-Run `bun db:generate`. Review the generated SQL, then add `ENABLE ROW LEVEL SECURITY` and the tenant SELECT policy for `authenticated` if Drizzle does not generate those statements.
+Run `bun db:generate`. Review the generated SQL, then add `ENABLE ROW LEVEL SECURITY`, revoke all `anon`/`authenticated` privileges, and keep the operational mapping table free of Data API policies.
 
 - [ ] **Step 5: Run the migration test and verify GREEN**
 
