@@ -17,6 +17,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as XLSX from "xlsx";
+import { assertLegacyKiotVietImportReadOnly } from "../lib/kiotviet/product-sync-runner";
 
 const args = process.argv.slice(2);
 const dryRun = args.includes("--dry-run");
@@ -194,6 +195,7 @@ function parseSuppliers(rows: Record<string, unknown>[]): ParsedSupplier[] {
 // ============ main ============
 
 async function main() {
+  assertLegacyKiotVietImportReadOnly(dryRun);
   console.log(`📂 Đọc thư mục: ${dir}${dryRun ? "  (DRY RUN — không ghi DB)" : ""}\n`);
 
   const fSP = findFile("DanhSachSanPham");
@@ -230,7 +232,7 @@ async function main() {
   console.log(`NCC: ${parsedSuppliers.length} (tổng nợ trả ${(totalPayable / 1e6).toFixed(1)}tr)\n`);
 
   if (dryRun) {
-    console.log("✅ Dry-run xong — chạy lại không có --dry-run để ghi vào DB.");
+    console.log("✅ Dry-run xong — dùng sync:kiotviet-products để đồng bộ sản phẩm an toàn.");
     process.exit(0);
   }
 
