@@ -12,8 +12,12 @@ type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
 
 function isMissingObject(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
-  const candidate = error as { status?: number; statusCode?: number };
-  return candidate.status === 404 || candidate.statusCode === 404;
+  const candidate = error as {
+    status?: number | string;
+    statusCode?: number | string;
+  };
+  return candidate.status === 404 || candidate.status === "404" ||
+    candidate.statusCode === 404 || candidate.statusCode === "404";
 }
 
 export class SupabaseObjectStorage implements ObjectStorage {

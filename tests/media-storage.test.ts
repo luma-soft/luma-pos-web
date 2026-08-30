@@ -161,6 +161,9 @@ test("rejects malformed R2 configuration values before constructing an endpoint"
     ["account ID", { R2_ACCOUNT_ID: "acct/../../evil" }],
     ["public bucket", { R2_PUBLIC_BUCKET: "PUBLIC bucket/invalid" }],
     ["private bucket", { R2_PRIVATE_BUCKET: "private_" }],
+    ["dotted public bucket", { R2_PUBLIC_BUCKET: "public.media" }],
+    ["leading-hyphen bucket", { R2_PUBLIC_BUCKET: "-public-media" }],
+    ["trailing-hyphen bucket", { R2_PUBLIC_BUCKET: "public-media-" }],
     ["same buckets", { R2_PRIVATE_BUCKET: R2_ENV.R2_PUBLIC_BUCKET }],
     ["non-HTTPS public URL", { R2_PUBLIC_BASE_URL: "http://media.lumapos.vn" }],
     ["credential-bearing public URL", { R2_PUBLIC_BASE_URL: "https://user:pass@media.lumapos.vn" }],
@@ -185,6 +188,51 @@ test("R2 presigned PUT URLs bind content type and requested expiry", async () =>
   expect(parsed.searchParams.get("X-Amz-Expires")).toBe("300");
   expect(parsed.searchParams.get("X-Amz-SignedHeaders")?.split(";"))
     .toContain("content-type");
+});
+
+test("R2 presigned download URLs bind the requested bucket, key, and expiry", async () => {
+  const key = "stores/store/projects/2026/08/media/original.pdf";
+  const url = await new R2ObjectStorage(R2_CONFIG).createDownloadUrl({
+    bucket: R2_CONFIG.privateBucket,
+    key,
+    expiresInSeconds: 120,
+  });
+  const parsed = new URL(url);
+
+  expect(parsed.host).toBe(
+    `${R2_CONFIG.privateBucket}.${R2_CONFIG.accountId}.r2.cloudflarestorage.com`,
+  );
+  expect(parsed.pathname).toBe(`/${key}`);
+  expect(parsed.searchParams.get("X-Amz-Expires")).toBe("120");
+  expect(parsed.searchParams.get("X-Amz-SignedHeaders")).toBe("host");
+});
+
+test("R2 download presigning uses a GET command with the requested expiry", async () => {
+  let signedCommand: unknown;
+  let signedOptions: unknown;
+  const storage = new R2ObjectStorage(
+    R2_CONFIG,
+    {} as S3Client,
+    (async (_client: unknown, command: unknown, options: unknown) => {
+      signedCommand = command;
+      signedOptions = options;
+      return "https://signed.example/download";
+    }) as never,
+  );
+
+  await expect(
+    storage.createDownloadUrl({
+      bucket: "private-media",
+      key: "folder/file.pdf",
+      expiresInSeconds: 45,
+    }),
+  ).resolves.toBe("https://signed.example/download");
+  expect(signedCommand).toBeInstanceOf(GetObjectCommand);
+  expect((signedCommand as GetObjectCommand).input).toMatchObject({
+    Bucket: "private-media",
+    Key: "folder/file.pdf",
+  });
+  expect(signedOptions).toMatchObject({ expiresIn: 45 });
 });
 
 describe("R2 object adapter", () => {
@@ -307,5 +355,44 @@ describe("storage factory and Supabase compatibility adapter", () => {
     expect(storage.publicUrl({ key: "logo image.png" })).toBe(
       "https://legacy.example/public/logo image.png",
     );
+  });
+
+  test("maps Supabase SDK-shaped missing heads to null and propagates other errors", async () => {
+    const numeric404 = new SupabaseObjectStorage(
+      "legacy-public",
+      {
+        storage: {
+          from: () => ({
+            info: async () => ({ data: null, error: { status: 404 } }),
+          }),
+        },
+      } as never,
+    );
+    const string404 = new SupabaseObjectStorage(
+      "legacy-public",
+      {
+        storage: {
+          from: () => ({
+            info: async () => ({ data: null, error: { statusCode: "404" } }),
+          }),
+        },
+      } as never,
+    );
+    const unavailable = Object.assign(new Error("unavailable"), { status: 503 });
+    const failing = new SupabaseObjectStorage(
+      "legacy-public",
+      {
+        storage: {
+          from: () => ({
+            info: async () => ({ data: null, error: unavailable }),
+          }),
+        },
+      } as never,
+    );
+    const input = { bucket: "legacy-private", key: "folder/file.pdf" };
+
+    await expect(numeric404.head(input)).resolves.toBeNull();
+    await expect(string404.head(input)).resolves.toBeNull();
+    await expect(failing.head(input)).rejects.toThrow("unavailable");
   });
 });

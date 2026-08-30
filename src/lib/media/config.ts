@@ -9,8 +9,7 @@ export type R2Config = {
 
 type R2Environment = Record<string, string | undefined>;
 const CLOUDFLARE_ACCOUNT_ID_PATTERN = /^[0-9a-f]{32}$/i;
-const R2_BUCKET_NAME_PATTERN = /^(?=.{3,63}$)(?!.*\.\.)(?!.*\.-)(?!.*-\.)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])$/;
-const IPV4_ADDRESS_PATTERN = /^(?:\d{1,3}\.){3}\d{1,3}$/;
+const R2_BUCKET_NAME_PATTERN = /^(?=.{3,63}$)[a-z0-9](?:[a-z0-9-]*[a-z0-9])$/;
 
 function requiredValue(env: R2Environment, name: string): string {
   const value = env[name]?.trim();
@@ -31,7 +30,7 @@ function readBucketName(
   name: "R2_PUBLIC_BUCKET" | "R2_PRIVATE_BUCKET",
 ): string {
   const bucket = requiredValue(env, name);
-  if (!R2_BUCKET_NAME_PATTERN.test(bucket) || IPV4_ADDRESS_PATTERN.test(bucket)) {
+  if (!R2_BUCKET_NAME_PATTERN.test(bucket)) {
     throw new Error(`R2 bucket ${name} is invalid`);
   }
   return bucket;

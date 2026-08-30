@@ -34,6 +34,7 @@ export class R2ObjectStorage implements ObjectStorage {
   constructor(
     private readonly config: R2Config = getR2Config(),
     client?: S3Client,
+    private readonly presign: typeof getSignedUrl = getSignedUrl,
   ) {
     this.client = client ?? new S3Client({
       region: "auto",
@@ -99,7 +100,7 @@ export class R2ObjectStorage implements ObjectStorage {
     contentType: string;
     expiresInSeconds: number;
   }): Promise<string> {
-    return getSignedUrl(
+    return this.presign(
       this.client,
       new PutObjectCommand({
         Bucket: input.bucket,
@@ -118,7 +119,7 @@ export class R2ObjectStorage implements ObjectStorage {
     key: string;
     expiresInSeconds: number;
   }): Promise<string> {
-    return getSignedUrl(
+    return this.presign(
       this.client,
       new GetObjectCommand({ Bucket: input.bucket, Key: input.key }),
       { expiresIn: input.expiresInSeconds },
