@@ -7,6 +7,7 @@ import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import type { StorePrefs } from "@/lib/schemas/settings";
 import type { ServiceChecklistItem } from "@/lib/services/domain";
+import type { MediaProvider, MediaVisibility } from "@/lib/media/types";
 
 export type ServiceTradeRecordData = Record<string, unknown>;
 export type InstalledAssetSpecs = Record<string, unknown>;
@@ -115,6 +116,43 @@ export const profiles = pgTable("profiles", {
     .on(t.phoneNormalized)
     .where(sql`${t.phoneNormalized} is not null`),
   unique("profiles_store_id_id_unique").on(t.storeId, t.id),
+]);
+
+// ============= Canonical media registry =============
+
+export const mediaObjects = pgTable("media_objects", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id, { onDelete: "cascade" }),
+  provider: text("provider").$type<MediaProvider>().notNull().default("r2"),
+  visibility: text("visibility").$type<MediaVisibility>().notNull(),
+  domain: text("domain").notNull(),
+  bucket: text("bucket").notNull(),
+  objectKey: text("object_key").notNull(),
+  originalFileName: text("original_file_name").notNull(),
+  mimeType: text("mime_type").notNull(),
+  sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
+  sha256: varchar("sha256", { length: 64 }),
+  width: integer("width"),
+  height: integer("height"),
+  thumbnailObjectKey: text("thumbnail_object_key"),
+  thumbnailSizeBytes: bigint("thumbnail_size_bytes", { mode: "number" }),
+  status: text("status").$type<"pending" | "ready" | "quarantined" | "deleted">().notNull().default("pending"),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  readyAt: timestamp("ready_at", { withTimezone: true }),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  legacyBucket: text("legacy_bucket"),
+  legacyPath: text("legacy_path"),
+  legacyUrl: text("legacy_url"),
+}, (t) => [
+  check("media_objects_provider_check", sql`${t.provider} in ('r2', 'supabase')`),
+  check("media_objects_visibility_check", sql`${t.visibility} in ('public', 'private')`),
+  check("media_objects_status_check", sql`${t.status} in ('pending', 'ready', 'quarantined', 'deleted')`),
+  check("media_objects_size_check", sql`${t.sizeBytes} > 0`),
+  unique("media_objects_location_unique").on(t.provider, t.bucket, t.objectKey),
+  unique("media_objects_store_id_id_unique").on(t.storeId, t.id),
+  index("media_objects_store_status_domain_idx").on(t.storeId, t.status, t.domain, t.createdAt),
 ]);
 
 export const storeFeatures = pgTable("store_features", {
@@ -263,7 +301,16 @@ export const brands = pgTable("brands", {
   storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id),
   name: text("name").notNull(),
   logoUrl: text("logo_url"),
-}, (t) => [uniqueIndex("brands_store_name_unique").on(t.storeId, t.name)]);
+  logoMediaObjectId: uuid("logo_media_object_id"),
+}, (t) => [
+  uniqueIndex("brands_store_name_unique").on(t.storeId, t.name),
+  index("brands_logo_media_object_idx").on(t.logoMediaObjectId).where(sql`${t.logoMediaObjectId} is not null`),
+  foreignKey({
+    columns: [t.storeId, t.logoMediaObjectId],
+    foreignColumns: [mediaObjects.storeId, mediaObjects.id],
+    name: "brands_logo_media_object_tenant_fk",
+  }).onDelete("no action"),
+]);
 
 // ============= Price books (bảng giá động) =============
 // Bảng giá mặc định (isDefault) đọc products.retailPrice. Bảng khác lưu override
@@ -369,6 +416,7 @@ export const products = pgTable("products", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   uniqueIndex("products_store_sku_unique").on(t.storeId, t.sku),
+  unique("products_store_id_id_unique").on(t.storeId, t.id),
   index("products_sku_idx").on(t.sku),
   index("products_barcode_idx").on(t.barcode),
   index("products_name_idx").on(t.name),
@@ -379,6 +427,36 @@ export const products = pgTable("products", {
   // danh sách SP lọc đang bán + sắp theo ngày tạo (trang Sản phẩm/Thiết lập giá)
   index("products_active_created_idx").on(t.isActive, t.createdAt),
   index("products_total_stock_idx").on(t.totalStock), // lọc/sắp theo tồn (trang Tồn kho)
+]);
+
+export const productMedia = pgTable("product_media", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id, { onDelete: "cascade" }),
+  productId: uuid("product_id").notNull(),
+  mediaObjectId: uuid("media_object_id").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isPrimary: boolean("is_primary").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, (t) => [
+  unique("product_media_product_unique").on(t.productId, t.mediaObjectId),
+  check("product_media_sort_order_check", sql`${t.sortOrder} >= 0`),
+  uniqueIndex("product_media_active_primary_unique")
+    .on(t.productId)
+    .where(sql`${t.isPrimary} = true and ${t.deletedAt} is null`),
+  index("product_media_store_product_order_idx")
+    .on(t.storeId, t.productId, t.sortOrder)
+    .where(sql`${t.deletedAt} is null`),
+  foreignKey({
+    columns: [t.storeId, t.productId],
+    foreignColumns: [products.storeId, products.id],
+    name: "product_media_product_tenant_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [t.storeId, t.mediaObjectId],
+    foreignColumns: [mediaObjects.storeId, mediaObjects.id],
+    name: "product_media_object_tenant_fk",
+  }).onDelete("no action"),
 ]);
 
 // ============= Product Units (multi đơn vị tính) =============
@@ -1397,6 +1475,30 @@ export const serviceHandoverDocuments = pgTable("service_handover_documents", {
   check("service_handover_documents_type_check", sql`${t.type} in ('survey', 'acceptance', 'handover')`),
   check("service_handover_documents_status_check", sql`${t.status} in ('draft', 'signed')`),
   index("service_handover_documents_project_idx").on(t.projectId, t.createdAt),
+  unique("service_handover_documents_store_id_id_unique").on(t.storeId, t.id),
+]);
+
+export const serviceHandoverDocumentMedia = pgTable("service_handover_document_media", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id, { onDelete: "cascade" }),
+  documentId: uuid("document_id").notNull(),
+  mediaObjectId: uuid("media_object_id").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  unique("service_handover_document_media_unique").on(t.documentId, t.mediaObjectId),
+  check("service_handover_document_media_sort_order_check", sql`${t.sortOrder} >= 0`),
+  index("service_handover_document_media_store_document_order_idx").on(t.storeId, t.documentId, t.sortOrder),
+  foreignKey({
+    columns: [t.storeId, t.documentId],
+    foreignColumns: [serviceHandoverDocuments.storeId, serviceHandoverDocuments.id],
+    name: "service_handover_document_media_document_tenant_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [t.storeId, t.mediaObjectId],
+    foreignColumns: [mediaObjects.storeId, mediaObjects.id],
+    name: "service_handover_document_media_object_tenant_fk",
+  }).onDelete("no action"),
 ]);
 
 export const serviceMaintenancePlans = pgTable("service_maintenance_plans", {
@@ -1626,6 +1728,8 @@ export const serviceAttachments = pgTable("service_attachments", {
   claimId: uuid("claim_id").references(() => warrantyClaims.id, { onDelete: "cascade" }),
   assetId: uuid("asset_id").references(() => installedAssets.id, { onDelete: "restrict" }),
   requestId: uuid("request_id").references((): AnyPgColumn => serviceCustomerRequests.id, { onDelete: "cascade" }),
+  mediaObjectId: uuid("media_object_id"),
+  projectPhase: text("project_phase").$type<"survey" | "construction" | "after_installation" | "acceptance" | "handover" | "other">(),
   category: text("category").notNull(),
   bucket: varchar("bucket", { length: 80 }).notNull(),
   path: text("path").notNull(),
@@ -1651,6 +1755,7 @@ export const serviceAttachments = pgTable("service_attachments", {
   check("service_attachments_size_check", sql`${t.sizeBytes} > 0`),
   check("service_attachments_sort_order_check", sql`${t.sortOrder} >= 0`),
   check("service_attachments_primary_asset_check", sql`not ${t.isPrimary} or (${t.assetId} is not null and ${t.category} = 'asset')`),
+  check("service_attachments_project_phase_check", sql`${t.projectPhase} is null or ${t.projectPhase} in ('survey', 'construction', 'after_installation', 'acceptance', 'handover', 'other')`),
   uniqueIndex("service_attachments_bucket_path_idx").on(t.bucket, t.path),
   index("service_attachments_job_idx").on(t.jobId, t.createdAt),
   index("service_attachments_claim_idx").on(t.claimId, t.createdAt),
@@ -1663,6 +1768,12 @@ export const serviceAttachments = pgTable("service_attachments", {
     .where(sql`${t.assetId} is not null and ${t.isPrimary} and ${t.deletedAt} is null`),
   index("service_attachments_active_job_idx").on(t.jobId, t.createdAt).where(sql`${t.deletedAt} is null`),
   index("service_attachments_cleanup_retry_idx").on(t.cleanupClaimedAt, t.createdAt).where(sql`${t.deletedAt} is not null and ${t.storageDeletedAt} is null`),
+  index("service_attachments_media_object_idx").on(t.mediaObjectId).where(sql`${t.mediaObjectId} is not null`),
+  foreignKey({
+    columns: [t.storeId, t.mediaObjectId],
+    foreignColumns: [mediaObjects.storeId, mediaObjects.id],
+    name: "service_attachments_media_object_tenant_fk",
+  }).onDelete("no action"),
 ]);
 
 export const serviceSignatures = pgTable("service_signatures", {
@@ -1787,6 +1898,7 @@ export const serviceCustomerRequestAttachments = pgTable("service_customer_reque
   storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id),
   id: uuid("id").primaryKey().defaultRandom(),
   requestId: uuid("request_id").notNull().references(() => serviceCustomerRequests.id, { onDelete: "cascade" }),
+  mediaObjectId: uuid("media_object_id"),
   bucket: text("bucket").notNull(),
   path: text("path").notNull().unique(),
   fileName: text("file_name").notNull(),
@@ -1802,6 +1914,12 @@ export const serviceCustomerRequestAttachments = pgTable("service_customer_reque
   check("service_customer_request_attachments_dimensions_check", sql`(${t.width} is null and ${t.height} is null) or (${t.width} > 0 and ${t.height} > 0 and ${t.width} <= 6000 and ${t.height} <= 6000 and (${t.width}::bigint * ${t.height}::bigint) <= 20000000)`),
   check("service_customer_request_attachments_sha_check", sql`${t.sha256} ~ '^[0-9a-f]{64}$'`),
   index("service_customer_request_attachments_request_idx").on(t.requestId, t.createdAt),
+  index("service_customer_request_attachments_media_object_idx").on(t.mediaObjectId).where(sql`${t.mediaObjectId} is not null`),
+  foreignKey({
+    columns: [t.storeId, t.mediaObjectId],
+    foreignColumns: [mediaObjects.storeId, mediaObjects.id],
+    name: "service_customer_request_attachments_media_object_tenant_fk",
+  }).onDelete("no action"),
 ]);
 
 export const serviceCustomerRequestStorageCleanup = pgTable("service_customer_request_storage_cleanup", {
@@ -2454,6 +2572,54 @@ export const internalUseItems = pgTable("internal_use_items", {
   total: decimal("total", { precision: 14, scale: 2 }).notNull(),
 }, (t) => [index("internal_use_items_issue_idx").on(t.issueId)]);
 
+// ============= Media migration tracking =============
+
+export const mediaMigrationRuns = pgTable("media_migration_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id, { onDelete: "cascade" }),
+  status: text("status").$type<"pending" | "running" | "completed" | "failed" | "rolled_back">().notNull().default("pending"),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  lastError: text("last_error"),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("media_migration_runs_status_check", sql`${t.status} in ('pending', 'running', 'completed', 'failed', 'rolled_back')`),
+  unique("media_migration_runs_store_id_id_unique").on(t.storeId, t.id),
+  index("media_migration_runs_store_status_idx").on(t.storeId, t.status, t.createdAt),
+]);
+
+export const mediaMigrationItems = pgTable("media_migration_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id, { onDelete: "cascade" }),
+  runId: uuid("run_id").notNull(),
+  sourceProvider: text("source_provider").$type<MediaProvider>().notNull(),
+  sourceBucket: text("source_bucket").notNull(),
+  sourceKey: text("source_key").notNull(),
+  mediaObjectId: uuid("media_object_id"),
+  status: text("status").$type<"pending" | "copied" | "verified" | "failed" | "rolled_back">().notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("media_migration_items_source_provider_check", sql`${t.sourceProvider} in ('r2', 'supabase')`),
+  check("media_migration_items_status_check", sql`${t.status} in ('pending', 'copied', 'verified', 'failed', 'rolled_back')`),
+  check("media_migration_items_attempts_check", sql`${t.attempts} >= 0`),
+  unique("media_migration_items_source_unique").on(t.runId, t.sourceProvider, t.sourceBucket, t.sourceKey),
+  index("media_migration_items_store_status_idx").on(t.storeId, t.status, t.updatedAt),
+  foreignKey({
+    columns: [t.storeId, t.runId],
+    foreignColumns: [mediaMigrationRuns.storeId, mediaMigrationRuns.id],
+    name: "media_migration_items_run_tenant_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [t.storeId, t.mediaObjectId],
+    foreignColumns: [mediaObjects.storeId, mediaObjects.id],
+    name: "media_migration_items_object_tenant_fk",
+  }).onDelete("no action"),
+]);
+
 // ============= Relations =============
 
 export const productsRelations = relations(products, ({ one, many }) => ({
@@ -2463,6 +2629,40 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   stockLevels: many(stockLevels),
   comboItems: many(productComboItems, { relationName: "comboProduct" }),
   includedInCombos: many(productComboItems, { relationName: "comboComponent" }),
+  media: many(productMedia),
+}));
+
+export const mediaObjectsRelations = relations(mediaObjects, ({ one, many }) => ({
+  store: one(stores, { fields: [mediaObjects.storeId], references: [stores.id] }),
+  creator: one(profiles, { fields: [mediaObjects.createdBy], references: [profiles.id] }),
+  products: many(productMedia),
+  handoverDocuments: many(serviceHandoverDocumentMedia),
+  migrationItems: many(mediaMigrationItems),
+}));
+
+export const productMediaRelations = relations(productMedia, ({ one }) => ({
+  product: one(products, { fields: [productMedia.productId], references: [products.id] }),
+  mediaObject: one(mediaObjects, { fields: [productMedia.mediaObjectId], references: [mediaObjects.id] }),
+}));
+
+export const serviceHandoverDocumentMediaRelations = relations(serviceHandoverDocumentMedia, ({ one }) => ({
+  document: one(serviceHandoverDocuments, {
+    fields: [serviceHandoverDocumentMedia.documentId],
+    references: [serviceHandoverDocuments.id],
+  }),
+  mediaObject: one(mediaObjects, {
+    fields: [serviceHandoverDocumentMedia.mediaObjectId],
+    references: [mediaObjects.id],
+  }),
+}));
+
+export const mediaMigrationRunsRelations = relations(mediaMigrationRuns, ({ many }) => ({
+  items: many(mediaMigrationItems),
+}));
+
+export const mediaMigrationItemsRelations = relations(mediaMigrationItems, ({ one }) => ({
+  run: one(mediaMigrationRuns, { fields: [mediaMigrationItems.runId], references: [mediaMigrationRuns.id] }),
+  mediaObject: one(mediaObjects, { fields: [mediaMigrationItems.mediaObjectId], references: [mediaObjects.id] }),
 }));
 
 export const productComboItemsRelations = relations(productComboItems, ({ one }) => ({

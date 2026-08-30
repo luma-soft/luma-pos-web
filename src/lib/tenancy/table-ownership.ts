@@ -38,6 +38,7 @@ const TENANT_ROOT_TABLES = [
   "store_settings",
   "marketplace_shops",
   "internal_use_issues",
+  "media_objects",
 ] as const;
 
 const TENANT_CHILD_TABLES = [
@@ -108,6 +109,8 @@ const TENANT_CHILD_TABLES = [
   "marketplace_messages",
   "ai_listing_suggestions",
   "internal_use_items",
+  "product_media",
+  "service_handover_document_media",
 ] as const;
 
 const OPERATIONAL_SYSTEM_TABLES = [
@@ -129,6 +132,8 @@ const OPERATIONAL_SYSTEM_TABLES = [
   "ai_usage_events",
   "zalo_message_events",
   "marketplace_sync_jobs",
+  "media_migration_runs",
+  "media_migration_items",
 ] as const;
 
 function entries(

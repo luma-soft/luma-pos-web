@@ -17,4 +17,12 @@ describe("tenant ownership manifest", () => {
     expect(schemaTables).toHaveLength(uniqueSchemaTables.size);
     expect([...manifestTables].sort()).toEqual([...uniqueSchemaTables].sort());
   });
+
+  test("classifies canonical media tables as tenant-owned", () => {
+    expect(TABLE_OWNERSHIP.media_objects).toBe("tenant-root");
+    expect(TABLE_OWNERSHIP.product_media).toBe("tenant-child");
+    expect(TABLE_OWNERSHIP.service_handover_document_media).toBe("tenant-child");
+    expect(TABLE_OWNERSHIP.media_migration_runs).toBe("operational/system");
+    expect(TABLE_OWNERSHIP.media_migration_items).toBe("operational/system");
+  });
 });

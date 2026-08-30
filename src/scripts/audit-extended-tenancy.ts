@@ -31,6 +31,8 @@ const extendedTables = [
   "marketplace_product_mappings", "marketplace_order_mappings",
   "marketplace_message_threads", "marketplace_messages", "marketplace_sync_jobs",
   "ai_listing_suggestions",
+  "media_objects", "product_media", "service_handover_document_media",
+  "media_migration_runs", "media_migration_items",
 ] as const;
 
 function assertAudit(condition: boolean, message: string): asserts condition {
