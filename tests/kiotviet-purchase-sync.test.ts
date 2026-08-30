@@ -4,7 +4,11 @@ import * as XLSX from "xlsx";
 import { readKiotVietDataBundle } from "@/lib/kiotviet/data-sync-files";
 import { createKiotVietHistoryProductResolver } from "@/lib/kiotviet/history-product-resolver";
 import { parseKiotVietProductRows } from "@/lib/kiotviet/product-sync";
-import { planKiotVietPurchaseSync, type KiotVietResolvedPurchaseProduct } from "@/lib/kiotviet/purchase-sync";
+import {
+  kiotVietPurchaseFingerprint,
+  planKiotVietPurchaseSync,
+  type KiotVietResolvedPurchaseProduct,
+} from "@/lib/kiotviet/purchase-sync";
 
 const sourceRows = [
   {
@@ -157,6 +161,7 @@ describe("KiotViet purchase receipt synchronization", () => {
           note: "Giao đủ chứng từ",
           lines: [{
             action: "create",
+            adoptionMethod: "created",
             externalId: "PN-001|ALT-001|hộp|1",
             line: {
               productId: "product-001",
@@ -205,7 +210,7 @@ describe("KiotViet purchase receipt synchronization", () => {
       action: "adopt",
       localId: "purchase-001",
       purchase: {
-        lines: [{ action: "update", localId: "legacy-line", externalId: "PN-001|ALT-001|hộp|1" }],
+        lines: [{ action: "adopt", adoptionMethod: "legacy_adopted", localId: "legacy-line", externalId: "PN-001|ALT-001|hộp|1" }],
         preservedLineIds: ["luma-line"],
       },
     });
@@ -230,11 +235,54 @@ describe("KiotViet purchase receipt synchronization", () => {
 
     expect(result.blockers).toEqual([]);
     expect(result.writes[0]?.purchase.lines).toMatchObject([{
-      action: "update",
+      action: "adopt",
+      adoptionMethod: "legacy_adopted",
       localId: "legacy-import-line",
       externalId: "PN-001|ALT-001|hộp|1",
     }]);
     expect(result.writes[0]?.purchase.preservedLineIds).toEqual([]);
+  });
+
+  test("backfills child provenance for an exact bootstrap receipt and preserves Luma children", () => {
+    const source = plan({ sourceRows: [sourceRows[0]!] }).purchases[0]!;
+    const result = plan({
+      sourceRows: [sourceRows[0]!],
+      current: [{
+        localId: "purchase-001",
+        code: "PN-001",
+        fingerprint: kiotVietPurchaseFingerprint(source),
+        subtotal: 240000,
+        legacyImported: false,
+      }],
+      existingLines: [{
+        localId: "bootstrap-line",
+        purchaseOrderId: "purchase-001",
+        legacyAdoptionEligible: true,
+        legacyProductSku: "ALT-001",
+        quantity: 2,
+        unitCost: 120000,
+        discount: 0,
+        total: 240000,
+      }, {
+        localId: "luma-line",
+        purchaseOrderId: "purchase-001",
+        legacyImported: false,
+      }],
+    });
+
+    expect(result.blockers).toEqual([]);
+    expect(result.writes).toMatchObject([{
+      action: "adopt",
+      localId: "purchase-001",
+      purchase: {
+        lines: [{
+          action: "adopt",
+          adoptionMethod: "legacy_adopted",
+          localId: "bootstrap-line",
+        }],
+        preservedLineIds: ["luma-line"],
+      },
+    }]);
   });
 
   test("blocks an adopted legacy receipt when a recoverable legacy line SKU cannot match the source", () => {
@@ -302,11 +350,11 @@ describe("KiotViet purchase receipt synchronization", () => {
       .map((line) => ({ action: line.action, externalId: line.externalId, localId: line.localId }))
       .sort((left, right) => left.externalId.localeCompare(right.externalId)))).toEqual([
       [
-        { action: "update", externalId: "PN-001|ALT-001|hộp|1", localId: "legacy-alt-line" },
+        { action: "adopt", externalId: "PN-001|ALT-001|hộp|1", localId: "legacy-alt-line" },
         { action: "create", externalId: "PN-001|BASE-001|cái|1", localId: undefined },
       ],
       [
-        { action: "update", externalId: "PN-001|ALT-001|hộp|1", localId: "legacy-alt-line" },
+        { action: "adopt", externalId: "PN-001|ALT-001|hộp|1", localId: "legacy-alt-line" },
         { action: "create", externalId: "PN-001|BASE-001|cái|1", localId: undefined },
       ],
     ]);

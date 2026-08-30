@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readKiotVietDataBundle } from "@/lib/kiotviet/data-sync-files";
-import { planKiotVietBookingSync } from "@/lib/kiotviet/booking-sync";
+import { kiotVietBookingFingerprint, planKiotVietBookingSync } from "@/lib/kiotviet/booking-sync";
 import {
   bookingStatusOptions,
   resolveBookingStatus,
@@ -122,6 +122,10 @@ describe("KiotViet booking synchronization", () => {
       sourceRows,
       current: [],
       mappings: [],
+      lineMappings: [],
+      paymentMappings: [],
+      existingLines: [],
+      existingPayments: [],
       resolvedCustomers,
       resolvedProducts,
     });
@@ -140,6 +144,8 @@ describe("KiotViet booking synchronization", () => {
       preserves: 0,
       unresolvedCustomers: 0,
       unresolvedProducts: 0,
+      preservedLines: 0,
+      preservedPayments: 0,
     });
     expect(plan.blockers).toEqual([]);
     expect(plan.writes[0]).toMatchObject({
@@ -163,44 +169,52 @@ describe("KiotViet booking synchronization", () => {
     });
     expect(plan.writes[0]?.booking.lines).toEqual([
       {
+        action: "create",
+        adoptionMethod: "created",
         externalId: "DH-001|ALT-001|hộp|1",
-        productId: "product-001",
-        sourceSku: "ALT-001",
-        productName: "Sản phẩm hộp",
-        unitName: "Hộp",
-        unitMultiplier: 12,
-        quantity: 2,
-        unitPrice: 120000,
-        discount: 0,
-        total: 240000,
-        note: "Hàng dễ vỡ",
+        line: {
+          productId: "product-001",
+          sourceSku: "ALT-001",
+          productName: "Sản phẩm hộp",
+          unitName: "Hộp",
+          unitMultiplier: 12,
+          quantity: 2,
+          unitPrice: 120000,
+          discount: 0,
+          total: 240000,
+          note: "Hàng dễ vỡ",
+        },
       },
       {
+        action: "create",
+        adoptionMethod: "created",
         externalId: "DH-001|ALT-001|hộp|2",
-        productId: "product-001",
-        sourceSku: "ALT-001",
-        productName: "Sản phẩm hộp",
-        unitName: "Hộp",
-        unitMultiplier: 12,
-        quantity: 1,
-        unitPrice: 0,
-        discount: 0,
-        total: 0,
-        note: null,
+        line: {
+          productId: "product-001",
+          sourceSku: "ALT-001",
+          productName: "Sản phẩm hộp",
+          unitName: "Hộp",
+          unitMultiplier: 12,
+          quantity: 1,
+          unitPrice: 0,
+          discount: 0,
+          total: 0,
+          note: null,
+        },
       },
     ]);
     expect(plan.writes[0]?.booking.payments).toEqual([
       {
+        action: "create",
+        adoptionMethod: "created",
         externalId: "DH-001|payment|cash|1",
-        channel: "cash",
-        method: "cash",
-        amount: 8000,
+        payment: { channel: "cash", method: "cash", amount: 8000 },
       },
       {
+        action: "create",
+        adoptionMethod: "created",
         externalId: "DH-001|payment|bank_transfer|1",
-        channel: "bank_transfer",
-        method: "bank_transfer",
-        amount: 30000,
+        payment: { channel: "bank_transfer", method: "bank_transfer", amount: 30000 },
       },
     ]);
     expect(plan.writes[1]?.booking).toMatchObject({
@@ -217,6 +231,10 @@ describe("KiotViet booking synchronization", () => {
       sourceRows: [sourceRows[0]!],
       current: [],
       mappings: [],
+      lineMappings: [],
+      paymentMappings: [],
+      existingLines: [],
+      existingPayments: [],
       resolvedCustomers: [],
       resolvedProducts: [],
     });
@@ -228,6 +246,122 @@ describe("KiotViet booking synchronization", () => {
     ]);
   });
 
+  test("adopts exact legacy booking children and preserves Luma-native children", () => {
+    const baseline = planKiotVietBookingSync({
+      sourceRows: [sourceRows[0]!],
+      current: [],
+      mappings: [],
+      lineMappings: [],
+      paymentMappings: [],
+      existingLines: [],
+      existingPayments: [],
+      resolvedCustomers,
+      resolvedProducts,
+    });
+    const booking = baseline.bookings[0]!;
+    const plan = planKiotVietBookingSync({
+      sourceRows: [sourceRows[0]!],
+      current: [{
+        localId: "booking-001",
+        code: "DH-001",
+        fingerprint: kiotVietBookingFingerprint(booking),
+        legacyImported: false,
+      }],
+      mappings: [],
+      lineMappings: [],
+      paymentMappings: [],
+      existingLines: [{
+        localId: "legacy-line",
+        orderId: "booking-001",
+        legacyAdoptionEligible: true,
+        sourceSku: "ALT-001",
+        unitName: "Hộp",
+        quantity: 2,
+        unitPrice: 120000,
+        discount: 0,
+        total: 240000,
+        note: "Hàng dễ vỡ",
+      }, { localId: "luma-line", orderId: "booking-001" }],
+      existingPayments: [{
+        localId: "legacy-payment",
+        orderId: "booking-001",
+        legacyAdoptionEligible: true,
+        method: "cash",
+        amount: 8000,
+      }, { localId: "luma-payment", orderId: "booking-001" }],
+      resolvedCustomers,
+      resolvedProducts,
+    });
+
+    expect(plan.blockers).toEqual([]);
+    expect(plan.writes[0]).toMatchObject({ action: "adopt", localId: "booking-001" });
+    expect(plan.writes[0]?.booking.lines[0]).toMatchObject({
+      action: "adopt", adoptionMethod: "legacy_adopted", localId: "legacy-line",
+    });
+    expect(plan.writes[0]?.booking.payments[0]).toMatchObject({
+      action: "adopt", adoptionMethod: "legacy_adopted", localId: "legacy-payment",
+    });
+    expect(plan.writes[0]?.booking.preservedLineIds).toEqual(["luma-line"]);
+    expect(plan.writes[0]?.booking.preservedPaymentIds).toEqual(["luma-payment"]);
+  });
+
+  test("updates mapped booking children and is a no-op after their mappings exist", () => {
+    const baseline = planKiotVietBookingSync({
+      sourceRows: [sourceRows[0]!],
+      current: [],
+      mappings: [],
+      lineMappings: [],
+      paymentMappings: [],
+      existingLines: [],
+      existingPayments: [],
+      resolvedCustomers,
+      resolvedProducts,
+    });
+    const booking = baseline.bookings[0]!;
+    const current = [{
+      localId: "booking-001", code: "DH-001", fingerprint: "stale", legacyImported: false,
+    }];
+    const childState = {
+      lineMappings: [{ externalId: "DH-001|ALT-001|hộp|1", localId: "line-001" }],
+      paymentMappings: [
+        { externalId: "DH-001|payment|cash|1", localId: "payment-001" },
+        { externalId: "DH-001|payment|bank_transfer|1", localId: "payment-002" },
+      ],
+      existingLines: [{ localId: "line-001", orderId: "booking-001" }],
+      existingPayments: [
+        { localId: "payment-001", orderId: "booking-001" },
+        { localId: "payment-002", orderId: "booking-001" },
+      ],
+    };
+    const update = planKiotVietBookingSync({
+      sourceRows: [sourceRows[0]!],
+      current,
+      mappings: [{ externalId: "DH-001", localId: "booking-001" }],
+      ...childState,
+      resolvedCustomers,
+      resolvedProducts,
+    });
+    expect(update.blockers).toEqual([]);
+    expect(update.writes[0]).toMatchObject({ action: "update" });
+    expect(update.writes[0]?.booking.lines[0]).toMatchObject({
+      action: "update", adoptionMethod: "mapped", localId: "line-001",
+    });
+    expect(update.writes[0]?.booking.payments[0]).toMatchObject({
+      action: "update", adoptionMethod: "mapped", localId: "payment-001",
+    });
+
+    const rerun = planKiotVietBookingSync({
+      sourceRows: [sourceRows[0]!],
+      current: [{ ...current[0]!, fingerprint: kiotVietBookingFingerprint(booking) }],
+      mappings: [{ externalId: "DH-001", localId: "booking-001" }],
+      ...childState,
+      resolvedCustomers,
+      resolvedProducts,
+    });
+    expect(rerun.blockers).toEqual([]);
+    expect(rerun.writes).toEqual([]);
+  });
+
   suppliedBundleTest("maps the reviewed workbook's 22 historical completions and one temporary draft without operational actions", () => {
     const source = readKiotVietDataBundle(suppliedBundleDirectory!).sources
       .find((candidate) => candidate.phase === "bookings")!;
@@ -235,6 +369,10 @@ describe("KiotViet booking synchronization", () => {
       sourceRows: source.rows,
       current: [],
       mappings: [],
+      lineMappings: [],
+      paymentMappings: [],
+      existingLines: [],
+      existingPayments: [],
       resolvedCustomers: [...new Set(source.rows.map((row) => String(row["Mã khách hàng"] ?? "").trim()))]
         .filter((code) => code && code !== "Khách lẻ")
         .map((code) => ({ code, customerId: `customer:${code}` })),

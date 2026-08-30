@@ -12,6 +12,7 @@ import {
   normalizeKiotVietText,
   planKiotVietEntities,
   stableKiotVietFingerprint,
+  withoutKiotVietExternalId,
 } from "./data-sync-plan";
 
 const BOOKING_CODE = "Mã đặt hàng";
@@ -43,6 +44,23 @@ export interface KiotVietBookingCurrent {
   code: string | null;
   fingerprint: string;
   legacyImported: boolean;
+}
+
+export interface KiotVietBookingCurrentChild {
+  localId: string;
+  orderId: string;
+  legacyImported?: boolean;
+  /** Exact-match bootstrap candidate; eligibility alone never makes the row source-owned. */
+  legacyAdoptionEligible?: boolean;
+  sourceSku?: string;
+  unitName?: string;
+  quantity?: number | string;
+  unitPrice?: number | string;
+  discount?: number | string;
+  total?: number | string;
+  note?: string | null;
+  method?: KiotVietBookingPaymentMethod;
+  amount?: number | string;
 }
 
 export interface KiotVietBookingLineSnapshot {
@@ -85,12 +103,46 @@ export interface KiotVietBookingSnapshot {
   payments: KiotVietBookingPaymentSnapshot[];
 }
 
+export interface KiotVietBookingLineWrite {
+  action: "create" | "adopt" | "update";
+  adoptionMethod: "created" | "legacy_adopted" | "mapped";
+  externalId: string;
+  localId?: string;
+  line: Omit<KiotVietBookingLineSnapshot, "externalId">;
+}
+
+export interface KiotVietBookingPaymentWrite {
+  action: "create" | "adopt" | "update";
+  adoptionMethod: "created" | "legacy_adopted" | "mapped";
+  externalId: string;
+  localId?: string;
+  payment: Omit<KiotVietBookingPaymentSnapshot, "externalId">;
+}
+
+export interface KiotVietBookingWriteSnapshot extends Omit<KiotVietBookingSnapshot, "lines" | "payments"> {
+  lines: KiotVietBookingLineWrite[];
+  payments: KiotVietBookingPaymentWrite[];
+  preservedLineIds: string[];
+  preservedPaymentIds: string[];
+}
+
 export type KiotVietBookingWrite = {
   action: "create" | "adopt" | "update";
   externalId: string;
   localId?: string;
-  booking: KiotVietBookingSnapshot;
+  booking: KiotVietBookingWriteSnapshot;
 };
+
+type KiotVietBookingBlockerReason =
+  | "unresolved_customer"
+  | "unresolved_product"
+  | "mapped_line_missing"
+  | "mapped_payment_missing"
+  | "mapped_line_parent_mismatch"
+  | "mapped_payment_parent_mismatch"
+  | "ambiguous_legacy_line_match"
+  | "ambiguous_legacy_payment_match"
+  | "duplicate_local_child_write";
 
 export interface KiotVietBookingSyncPlan {
   bookings: KiotVietBookingSnapshot[];
@@ -99,7 +151,7 @@ export interface KiotVietBookingSyncPlan {
   blockers: Array<{
     documentCode: string;
     reference: string;
-    reason: "unresolved_customer" | "unresolved_product";
+    reason: KiotVietBookingBlockerReason;
   }>;
   summary: {
     documents: number;
@@ -115,6 +167,8 @@ export interface KiotVietBookingSyncPlan {
     preserves: number;
     unresolvedCustomers: number;
     unresolvedProducts: number;
+    preservedLines: number;
+    preservedPayments: number;
   };
 }
 
@@ -150,11 +204,194 @@ function uniqueByKey<T>(values: T[], keyOf: (value: T) => string, label: string)
 }
 
 export function kiotVietBookingFingerprint(booking: KiotVietBookingSnapshot): string {
+  const { lines, payments, ...parent } = booking;
+  const normalizedLines = lines.map(withoutKiotVietExternalId)
+    .sort((left, right) => stableKiotVietFingerprint(left).localeCompare(stableKiotVietFingerprint(right)));
+  const normalizedPayments = payments.map(withoutKiotVietExternalId)
+    .sort((left, right) => stableKiotVietFingerprint(left).localeCompare(stableKiotVietFingerprint(right)));
   return stableKiotVietFingerprint({
-    ...booking,
-    lines: [...booking.lines].sort((left, right) => left.externalId.localeCompare(right.externalId)),
-    payments: [...booking.payments].sort((left, right) => left.externalId.localeCompare(right.externalId)),
+    ...parent,
+    lines: normalizedLines,
+    payments: normalizedPayments,
   });
+}
+
+function sourceLineFingerprint(line: KiotVietBookingLineSnapshot): string {
+  return stableKiotVietFingerprint({
+    sourceSku: line.sourceSku,
+    unitName: line.unitName,
+    quantity: line.quantity,
+    unitPrice: line.unitPrice,
+    discount: line.discount,
+    total: line.total,
+    note: line.note,
+  });
+}
+
+function sourcePaymentFingerprint(payment: KiotVietBookingPaymentSnapshot): string {
+  return stableKiotVietFingerprint({ method: payment.method, amount: payment.amount });
+}
+
+function currentChildFingerprint(
+  child: KiotVietBookingCurrentChild,
+  kind: "line" | "payment",
+): string | null {
+  if (!child.legacyImported && !child.legacyAdoptionEligible) return null;
+  if (kind === "payment") {
+    if (!child.method || child.amount == null) return null;
+    return stableKiotVietFingerprint({
+      method: child.method,
+      amount: normalizeKiotVietNumber(child.amount),
+    });
+  }
+  if (
+    !child.sourceSku
+    || !child.unitName
+    || child.quantity == null
+    || child.unitPrice == null
+    || child.discount == null
+    || child.total == null
+  ) return null;
+  return stableKiotVietFingerprint({
+    sourceSku: child.sourceSku,
+    unitName: child.unitName,
+    quantity: normalizeKiotVietNumber(child.quantity),
+    unitPrice: normalizeKiotVietNumber(child.unitPrice),
+    discount: normalizeKiotVietNumber(child.discount),
+    total: normalizeKiotVietNumber(child.total),
+    note: child.note ?? null,
+  });
+}
+
+function childReason(
+  kind: "line" | "payment",
+  suffix: "missing" | "parent_mismatch" | "ambiguous_legacy",
+): KiotVietBookingBlockerReason {
+  if (suffix === "missing") return kind === "line" ? "mapped_line_missing" : "mapped_payment_missing";
+  if (suffix === "parent_mismatch") {
+    return kind === "line" ? "mapped_line_parent_mismatch" : "mapped_payment_parent_mismatch";
+  }
+  return kind === "line" ? "ambiguous_legacy_line_match" : "ambiguous_legacy_payment_match";
+}
+
+function childWrites<T extends { externalId: string }>(input: {
+  documentCode: string;
+  parentId: string | undefined;
+  values: T[];
+  mappings: Map<string, KiotVietEntityMappingSnapshot>;
+  currentById: Map<string, KiotVietBookingCurrentChild>;
+  kind: "line" | "payment";
+  sourceFingerprint: (value: T) => string;
+  blockers: KiotVietBookingSyncPlan["blockers"];
+}): {
+  writes: Array<{
+    externalId: string;
+    localId?: string;
+    adoptionMethod: "created" | "legacy_adopted" | "mapped";
+    value: Omit<T, "externalId">;
+  }>;
+  preservedIds: string[];
+} {
+  if (!input.parentId) {
+    for (const value of input.values) {
+      const mapping = input.mappings.get(value.externalId);
+      if (!mapping) continue;
+      input.blockers.push({
+        documentCode: input.documentCode,
+        reference: value.externalId,
+        reason: input.currentById.has(mapping.localId)
+          ? childReason(input.kind, "parent_mismatch")
+          : childReason(input.kind, "missing"),
+      });
+    }
+    return {
+      writes: input.values.map(({ externalId, ...value }) => ({
+        externalId,
+        adoptionMethod: "created" as const,
+        value,
+      })),
+      preservedIds: [],
+    };
+  }
+
+  const selectedIds = new Set<string>();
+  const reservedIds = new Set([...input.mappings.values()].map((mapping) => mapping.localId));
+  const mappedByExternalId = new Map<string, KiotVietBookingCurrentChild>();
+  for (const value of input.values) {
+    const mapping = input.mappings.get(value.externalId);
+    if (!mapping) continue;
+    const current = input.currentById.get(mapping.localId);
+    if (!current) {
+      input.blockers.push({
+        documentCode: input.documentCode,
+        reference: value.externalId,
+        reason: childReason(input.kind, "missing"),
+      });
+      continue;
+    }
+    if (current.orderId !== input.parentId) {
+      input.blockers.push({
+        documentCode: input.documentCode,
+        reference: value.externalId,
+        reason: childReason(input.kind, "parent_mismatch"),
+      });
+      continue;
+    }
+    if (selectedIds.has(current.localId)) {
+      input.blockers.push({
+        documentCode: input.documentCode,
+        reference: value.externalId,
+        reason: "duplicate_local_child_write",
+      });
+      continue;
+    }
+    selectedIds.add(current.localId);
+    mappedByExternalId.set(value.externalId, current);
+  }
+
+  const writes = input.values.map(({ externalId, ...value }) => {
+    const mapped = mappedByExternalId.get(externalId);
+    if (mapped) {
+      return {
+        externalId,
+        localId: mapped.localId,
+        adoptionMethod: "mapped" as const,
+        value,
+      };
+    }
+    if (input.mappings.has(externalId)) {
+      return { externalId, adoptionMethod: "created" as const, value };
+    }
+    const fingerprint = input.sourceFingerprint({ externalId, ...value } as T);
+    const candidates = [...input.currentById.values()].filter((current) => (
+      current.orderId === input.parentId
+      && !selectedIds.has(current.localId)
+      && !reservedIds.has(current.localId)
+      && currentChildFingerprint(current, input.kind) === fingerprint
+    ));
+    if (candidates.length > 1) {
+      input.blockers.push({
+        documentCode: input.documentCode,
+        reference: externalId,
+        reason: childReason(input.kind, "ambiguous_legacy"),
+      });
+      return { externalId, adoptionMethod: "created" as const, value };
+    }
+    const legacy = candidates[0];
+    if (!legacy) return { externalId, adoptionMethod: "created" as const, value };
+    selectedIds.add(legacy.localId);
+    return {
+      externalId,
+      localId: legacy.localId,
+      adoptionMethod: "legacy_adopted" as const,
+      value,
+    };
+  });
+  const preservedIds = [...input.currentById.values()]
+    .filter((current) => current.orderId === input.parentId && !selectedIds.has(current.localId))
+    .map((current) => current.localId)
+    .sort((left, right) => left.localeCompare(right));
+  return { writes, preservedIds };
 }
 
 function assertReconciledBookings(rows: KiotVietDataRow[]): void {
@@ -174,12 +411,28 @@ export function planKiotVietBookingSync(input: {
   sourceRows: KiotVietDataRow[];
   current: KiotVietBookingCurrent[];
   mappings: KiotVietEntityMappingSnapshot[];
+  lineMappings: KiotVietEntityMappingSnapshot[];
+  paymentMappings: KiotVietEntityMappingSnapshot[];
+  existingLines: KiotVietBookingCurrentChild[];
+  existingPayments: KiotVietBookingCurrentChild[];
   resolvedCustomers: KiotVietResolvedBookingCustomer[];
   resolvedProducts: KiotVietResolvedBookingProduct[];
 }): KiotVietBookingSyncPlan {
   assertReconciledBookings(input.sourceRows);
   const customersByCode = uniqueByKey(input.resolvedCustomers, (customer) => customer.code, "customer code");
   const productsBySku = uniqueByKey(input.resolvedProducts, (product) => product.sku, "product SKU");
+  const lineMappings = uniqueByKey(input.lineMappings, (mapping) => mapping.externalId, "line mapping identity");
+  const paymentMappings = uniqueByKey(
+    input.paymentMappings,
+    (mapping) => mapping.externalId,
+    "payment mapping identity",
+  );
+  const existingLines = uniqueByKey(input.existingLines, (line) => line.localId, "current line identity");
+  const existingPayments = uniqueByKey(
+    input.existingPayments,
+    (payment) => payment.localId,
+    "current payment identity",
+  );
   const blockers: KiotVietBookingSyncPlan["blockers"] = [];
   const bookings = groupKiotVietDocumentRows(input.sourceRows, {
     codeColumn: BOOKING_CODE,
@@ -292,25 +545,73 @@ export function planKiotVietBookingSync(input: {
     mappings: input.mappings,
   });
   const bookingByCode = new Map(bookings.map((booking) => [booking.code, booking]));
-  const writes: KiotVietBookingWrite[] = blockers.length > 0 ? [] : [
-    ...entityPlan.creates.map(({ externalId }) => ({
-      action: "create" as const,
-      externalId,
-      booking: bookingByCode.get(externalId)!,
-    })),
-    ...entityPlan.adopts.filter((item) => item.needsUpdate).map(({ externalId, localId }) => ({
-      action: "adopt" as const,
-      externalId,
-      localId,
-      booking: bookingByCode.get(externalId)!,
-    })),
+  const needsChildProvenance = (externalId: string): boolean => {
+    const booking = bookingByCode.get(externalId);
+    return booking?.lines.some((line) => !lineMappings.has(line.externalId)) === true
+      || booking?.payments.some((payment) => !paymentMappings.has(payment.externalId)) === true;
+  };
+  const parents: Array<{
+    action: "create" | "adopt" | "update";
+    externalId: string;
+    localId?: string;
+  }> = [
+    ...entityPlan.creates.map(({ externalId }) => ({ action: "create" as const, externalId })),
+    ...entityPlan.adopts.filter((item) => item.needsUpdate || needsChildProvenance(item.externalId))
+      .map(({ externalId, localId }) => ({ action: "adopt" as const, externalId, localId })),
     ...entityPlan.updates.map(({ externalId, localId }) => ({
-      action: "update" as const,
-      externalId,
-      localId,
-      booking: bookingByCode.get(externalId)!,
+      action: "update" as const, externalId, localId,
     })),
+    ...entityPlan.unchanged.filter((item) => needsChildProvenance(item.externalId))
+      .map(({ externalId, localId }) => ({ action: "update" as const, externalId, localId })),
   ];
+  const candidateWrites: KiotVietBookingWrite[] = parents.map(({ action, externalId, localId }) => {
+    const booking = bookingByCode.get(externalId)!;
+    const lines = childWrites({
+      documentCode: externalId,
+      parentId: localId,
+      values: booking.lines,
+      mappings: lineMappings,
+      currentById: existingLines,
+      kind: "line",
+      sourceFingerprint: sourceLineFingerprint,
+      blockers,
+    });
+    const payments = childWrites({
+      documentCode: externalId,
+      parentId: localId,
+      values: booking.payments,
+      mappings: paymentMappings,
+      currentById: existingPayments,
+      kind: "payment",
+      sourceFingerprint: sourcePaymentFingerprint,
+      blockers,
+    });
+    return {
+      action,
+      externalId,
+      ...(localId ? { localId } : {}),
+      booking: {
+        ...booking,
+        lines: lines.writes.map(({ externalId: childExternalId, localId: childLocalId, adoptionMethod, value }) => ({
+          action: adoptionMethod === "legacy_adopted" ? "adopt" as const : childLocalId ? "update" as const : "create" as const,
+          adoptionMethod,
+          externalId: childExternalId,
+          ...(childLocalId ? { localId: childLocalId } : {}),
+          line: value,
+        })),
+        payments: payments.writes.map(({ externalId: childExternalId, localId: childLocalId, adoptionMethod, value }) => ({
+          action: adoptionMethod === "legacy_adopted" ? "adopt" as const : childLocalId ? "update" as const : "create" as const,
+          adoptionMethod,
+          externalId: childExternalId,
+          ...(childLocalId ? { localId: childLocalId } : {}),
+          payment: value,
+        })),
+        preservedLineIds: lines.preservedIds,
+        preservedPaymentIds: payments.preservedIds,
+      },
+    };
+  });
+  const writes = blockers.length > 0 ? [] : candidateWrites;
   const completed = bookings.filter((booking) => booking.status === "completed").length;
   const draft = bookings.filter((booking) => booking.status === "draft").length;
 
@@ -333,6 +634,8 @@ export function planKiotVietBookingSync(input: {
       preserves: entityPlan.preserves.length,
       unresolvedCustomers: blockers.filter((blocker) => blocker.reason === "unresolved_customer").length,
       unresolvedProducts: blockers.filter((blocker) => blocker.reason === "unresolved_product").length,
+      preservedLines: candidateWrites.reduce((sum, write) => sum + write.booking.preservedLineIds.length, 0),
+      preservedPayments: candidateWrites.reduce((sum, write) => sum + write.booking.preservedPaymentIds.length, 0),
     },
   };
 }

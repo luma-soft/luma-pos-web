@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { readKiotVietDataBundle } from "@/lib/kiotviet/data-sync-files";
-import { stableKiotVietFingerprint } from "@/lib/kiotviet/data-sync-plan";
-import { planKiotVietPurchaseReturnSync } from "@/lib/kiotviet/purchase-return-sync";
+import {
+  kiotVietPurchaseReturnFingerprint,
+  planKiotVietPurchaseReturnSync,
+} from "@/lib/kiotviet/purchase-return-sync";
 
 const sourceRows = [{
   "Mã trả hàng nhập": "THN-001",
@@ -83,6 +85,7 @@ describe("KiotViet supplier-return synchronization", () => {
         createdAt: new Date("2026-08-30T03:15:00.000Z"),
         lines: [{
           action: "create",
+          adoptionMethod: "created",
           externalId: "THN-001|ALT-001|hộp|1",
           line: {
             purchaseOrderItemId: null,
@@ -162,7 +165,7 @@ describe("KiotViet supplier-return synchronization", () => {
         purchaseOrderId: null,
         settlementStatus: "partial",
         lines: [{
-          action: "update", localId: "legacy-line",
+          action: "adopt", adoptionMethod: "legacy_adopted", localId: "legacy-line",
           externalId: "THN-001|ALT-001|hộp|1",
           line: { purchaseOrderItemId: null },
         }],
@@ -192,7 +195,7 @@ describe("KiotViet supplier-return synchronization", () => {
       localId: "return-001",
       purchaseReturn: {
         lines: [{
-          action: "update", localId: "legacy-line",
+          action: "adopt", adoptionMethod: "legacy_adopted", localId: "legacy-line",
           externalId: "THN-001|ALT-001|hộp|1",
         }],
         preservedLineIds: [],
@@ -201,7 +204,7 @@ describe("KiotViet supplier-return synchronization", () => {
   });
 
   test("backfills missing child provenance for an otherwise unchanged mapped parent", () => {
-    const sourceFingerprint = stableKiotVietFingerprint(plan().returns[0]!);
+    const sourceFingerprint = kiotVietPurchaseReturnFingerprint(plan().returns[0]!);
     const result = plan({
       current: [{
         localId: "return-001", code: "THN-001", fingerprint: sourceFingerprint,
@@ -219,12 +222,14 @@ describe("KiotViet supplier-return synchronization", () => {
     expect(result.blockers).toEqual([]);
     expect(result.writes).toMatchObject([{
       action: "update", localId: "return-001",
-      purchaseReturn: { lines: [{ action: "update", localId: "legacy-line" }] },
+      purchaseReturn: {
+        lines: [{ action: "adopt", adoptionMethod: "legacy_adopted", localId: "legacy-line" }],
+      },
     }]);
   });
 
   test("validates missing mapped children even when the mapped parent fingerprint is unchanged", () => {
-    const sourceFingerprint = stableKiotVietFingerprint(plan().returns[0]!);
+    const sourceFingerprint = kiotVietPurchaseReturnFingerprint(plan().returns[0]!);
     const result = plan({
       current: [{
         localId: "return-001", code: "THN-001", fingerprint: sourceFingerprint,
@@ -246,7 +251,7 @@ describe("KiotViet supplier-return synchronization", () => {
   });
 
   test("validates unmatched source-owned legacy children on an unchanged fully mapped parent", () => {
-    const sourceFingerprint = stableKiotVietFingerprint(plan().returns[0]!);
+    const sourceFingerprint = kiotVietPurchaseReturnFingerprint(plan().returns[0]!);
     const result = plan({
       current: [{
         localId: "return-001", code: "THN-001", fingerprint: sourceFingerprint,
@@ -275,7 +280,7 @@ describe("KiotViet supplier-return synchronization", () => {
   });
 
   test("keeps a genuinely unchanged parent with complete valid child mappings as a no-op", () => {
-    const sourceFingerprint = stableKiotVietFingerprint(plan().returns[0]!);
+    const sourceFingerprint = kiotVietPurchaseReturnFingerprint(plan().returns[0]!);
     const result = plan({
       current: [{
         localId: "return-001", code: "THN-001", fingerprint: sourceFingerprint,
@@ -437,7 +442,10 @@ describe("KiotViet supplier-return synchronization", () => {
 
     expect(result.blockers).toEqual([]);
     expect(result.writes[0]?.purchaseReturn.lines).toMatchObject([{
-      action: "update", localId: "legacy-free", externalId: "THN-001|ALT-001|hộp|1",
+      action: "adopt",
+      adoptionMethod: "legacy_adopted",
+      localId: "legacy-free",
+      externalId: "THN-001|ALT-001|hộp|1",
     }]);
     expect(result.writes[0]?.purchaseReturn.preservedLineIds).toEqual(["legacy-reserved"]);
   });

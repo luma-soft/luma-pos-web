@@ -160,23 +160,33 @@ async function applySuppliers(input: ApplyInput & { plan: Extract<KiotVietTypedP
   await refreshEntityMappings({ ...input, entityType: "supplier", entityPlan: input.plan.typedPlan.entityPlan });
 }
 
-function orderValues(value: {
+function orderBaseValues(value: {
   code: string; documentType: "booking" | "sale"; status: "completed" | "draft";
   paymentStatus: "unpaid" | "deposit" | "paid"; customerId: string | null; createdAt: Date;
   subtotal: number; discount: number; tax: number; shippingFee: number; total: number; amountPaid: number;
-  note: string | null; deliveryDate?: Date | null; sourceOrderId?: string | null;
-}, includeStatus = true) {
+  note: string | null;
+}) {
   assertOptionalUuid(value.customerId, "customer reference");
-  assertOptionalUuid(value.sourceOrderId, "source booking reference");
   return {
     code: value.code, documentType: value.documentType,
-    ...(includeStatus ? { status: value.status } : {}),
+    status: value.status,
     paymentStatus: value.paymentStatus, customerId: value.customerId,
-    deliveryDate: value.deliveryDate ?? null, sourceOrderId: value.sourceOrderId ?? null,
     subtotal: String(value.subtotal), discount: String(value.discount), tax: String(value.tax),
     shippingFee: String(value.shippingFee), total: String(value.total), amountPaid: String(value.amountPaid),
     note: value.note, createdAt: value.createdAt, updatedAt: new Date(),
   };
+}
+
+function bookingOrderValues(value: Parameters<typeof orderBaseValues>[0] & { deliveryDate: Date | null }) {
+  return { ...orderBaseValues(value), deliveryDate: value.deliveryDate };
+}
+
+function saleOrderValues(
+  value: Parameters<typeof orderBaseValues>[0] & { sourceOrderId: string | null },
+  status: "completed" | "returned",
+) {
+  assertOptionalUuid(value.sourceOrderId, "source booking reference");
+  return { ...orderBaseValues(value), status, sourceOrderId: value.sourceOrderId };
 }
 
 type OrderLine = {
@@ -234,14 +244,20 @@ async function applyBookings(input: ApplyInput & { plan: Extract<KiotVietTypedPh
   for (const write of input.plan.typedPlan.writes) {
     const localId = write.localId ?? randomUUID();
     const parentWasCreated = write.action === "create";
-    const values = orderValues(write.booking);
+    const values = bookingOrderValues(write.booking);
     if (parentWasCreated) await input.transaction.insert(orders).values({ id: localId, storeId: input.storeId, ...values });
     else await requireUpdated(await input.transaction.update(orders).set(values).where(and(
       eq(orders.storeId, input.storeId), eq(orders.id, localId), eq(orders.documentType, "booking"),
     )).returning({ id: orders.id }), `Booking ${localId}`);
     await mapSource({ ...input, entityType: "booking", externalId: write.externalId, localId, method: adoptionMethod(write.action, write.localId) });
-    for (const line of write.booking.lines) await writeOrderLine({ ...input, parentId: localId, entityType: "booking_line", externalId: line.externalId, line, parentWasCreated });
-    for (const payment of write.booking.payments) await writeOrderPayment({ ...input, parentId: localId, entityType: "booking_payment", externalId: payment.externalId, payment, parentWasCreated });
+    for (const child of write.booking.lines) await writeOrderLine({
+      ...input, parentId: localId, entityType: "booking_line", externalId: child.externalId,
+      localId: child.localId, line: child.line, parentWasCreated, method: child.adoptionMethod,
+    });
+    for (const child of write.booking.payments) await writeOrderPayment({
+      ...input, parentId: localId, entityType: "booking_payment", externalId: child.externalId,
+      localId: child.localId, payment: child.payment, parentWasCreated, method: child.adoptionMethod,
+    });
   }
   await refreshEntityMappings({ ...input, entityType: "booking", entityPlan: input.plan.typedPlan.entityPlan });
 }
@@ -250,16 +266,21 @@ async function applySales(input: ApplyInput & { plan: Extract<KiotVietTypedPhase
   for (const write of input.plan.typedPlan.writes) {
     const localId = write.localId ?? randomUUID();
     const parentWasCreated = write.action === "create";
-    // Customer-return reconciliation owns the `returned` transition. A later
-    // sales refresh may update source-owned amounts/details but must not undo it.
-    const values = orderValues(write.sale, parentWasCreated);
+    const currentStatus = parentWasCreated ? undefined : await input.transaction
+      .select({ status: orders.status }).from(orders).where(and(
+        eq(orders.storeId, input.storeId), eq(orders.id, localId), eq(orders.documentType, "sale"),
+      )).limit(1);
+    // Customer-return reconciliation owns only the `returned` transition.
+    // Every other stale mapped status is source-owned and repaired to completed.
+    const status = currentStatus?.[0]?.status === "returned" ? "returned" : "completed";
+    const values = saleOrderValues(write.sale, status);
     if (parentWasCreated) await input.transaction.insert(orders).values({ id: localId, storeId: input.storeId, ...values });
     else await requireUpdated(await input.transaction.update(orders).set(values).where(and(
       eq(orders.storeId, input.storeId), eq(orders.id, localId), eq(orders.documentType, "sale"),
     )).returning({ id: orders.id }), `Sale ${localId}`);
     await mapSource({ ...input, entityType: "sale", externalId: write.externalId, localId, method: adoptionMethod(write.action, write.localId) });
-    for (const child of write.sale.lines) await writeOrderLine({ ...input, parentId: localId, entityType: "sale_line", externalId: child.externalId, localId: child.localId, line: child.line, parentWasCreated, method: adoptionMethod(child.action, child.localId) });
-    for (const child of write.sale.payments) await writeOrderPayment({ ...input, parentId: localId, entityType: "sale_payment", externalId: child.externalId, localId: child.localId, payment: child.payment, parentWasCreated, method: adoptionMethod(child.action, child.localId) });
+    for (const child of write.sale.lines) await writeOrderLine({ ...input, parentId: localId, entityType: "sale_line", externalId: child.externalId, localId: child.localId, line: child.line, parentWasCreated, method: child.adoptionMethod });
+    for (const child of write.sale.payments) await writeOrderPayment({ ...input, parentId: localId, entityType: "sale_payment", externalId: child.externalId, localId: child.localId, payment: child.payment, parentWasCreated, method: child.adoptionMethod });
   }
   await refreshEntityMappings({ ...input, entityType: "sale", entityPlan: input.plan.typedPlan.entityPlan });
 }
@@ -292,7 +313,7 @@ async function applyPurchases(input: ApplyInput & { plan: Extract<KiotVietTypedP
       else await requireUpdated(await input.transaction.update(purchaseOrderItems).set(values).where(and(
         eq(purchaseOrderItems.storeId, input.storeId), eq(purchaseOrderItems.purchaseOrderId, localId), eq(purchaseOrderItems.id, childId),
       )).returning({ id: purchaseOrderItems.id }), `Purchase line ${childId}`);
-      await mapSource({ ...input, entityType: "purchase_line", externalId: child.externalId, localId: childId, method: adoptionMethod(child.action, child.localId) });
+      await mapSource({ ...input, entityType: "purchase_line", externalId: child.externalId, localId: childId, method: child.adoptionMethod });
     }
   }
   await refreshEntityMappings({ ...input, entityType: "purchase", entityPlan: input.plan.typedPlan.entityPlan });
@@ -329,7 +350,7 @@ async function applyReturns(input: ApplyInput & { plan: Extract<KiotVietTypedPha
       else await requireUpdated(await input.transaction.update(returnItems).set(values).where(and(
         eq(returnItems.storeId, input.storeId), eq(returnItems.returnId, localId), eq(returnItems.id, childId),
       )).returning({ id: returnItems.id }), `Return line ${childId}`);
-      await mapSource({ ...input, entityType: "customer_return_line", externalId: child.externalId, localId: childId, method: adoptionMethod(child.action, child.localId) });
+      await mapSource({ ...input, entityType: "customer_return_line", externalId: child.externalId, localId: childId, method: child.adoptionMethod });
     }
   }
   for (const repair of input.plan.typedPlan.saleStatusUpdates) {
@@ -371,7 +392,7 @@ async function applyPurchaseReturns(input: ApplyInput & { plan: Extract<KiotViet
       else await requireUpdated(await input.transaction.update(purchaseReturnItems).set(values).where(and(
         eq(purchaseReturnItems.storeId, input.storeId), eq(purchaseReturnItems.purchaseReturnId, localId), eq(purchaseReturnItems.id, childId),
       )).returning({ id: purchaseReturnItems.id }), `Supplier return line ${childId}`);
-      await mapSource({ ...input, entityType: "supplier_return_line", externalId: child.externalId, localId: childId, method: adoptionMethod(child.action, child.localId) });
+      await mapSource({ ...input, entityType: "supplier_return_line", externalId: child.externalId, localId: childId, method: child.adoptionMethod });
     }
   }
   await refreshEntityMappings({ ...input, entityType: "supplier_return", entityPlan: input.plan.typedPlan.entityPlan });

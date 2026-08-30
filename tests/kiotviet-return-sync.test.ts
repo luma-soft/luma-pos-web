@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readKiotVietDataBundle } from "@/lib/kiotviet/data-sync-files";
 import { groupKiotVietDocumentRows, normalizeKiotVietNumber, normalizeKiotVietText } from "@/lib/kiotviet/data-sync-plan";
-import { planKiotVietReturnSync } from "@/lib/kiotviet/return-sync";
+import { kiotVietReturnFingerprint, planKiotVietReturnSync } from "@/lib/kiotviet/return-sync";
 
 const sourceRows = [
   {
@@ -104,6 +104,7 @@ describe("KiotViet customer return synchronization", () => {
         paymentSnapshots: [{ channel: "cash", amount: 50000 }],
         lines: [{
           action: "create",
+          adoptionMethod: "created",
           externalId: "TH-001|ALT-001|hộp|1",
           line: {
             orderItemId: "sale-line-001",
@@ -266,11 +267,53 @@ describe("KiotViet customer return synchronization", () => {
       action: "adopt",
       localId: "return-001",
       return: {
-        lines: [{ action: "update", localId: "legacy-return-line" }],
+        lines: [{ action: "adopt", adoptionMethod: "legacy_adopted", localId: "legacy-return-line" }],
         preservedLineIds: ["luma-return-line"],
       },
     });
     expect(result.preservedLineIds).toEqual(["luma-return-line"]);
+  });
+
+  test("backfills child provenance for an exact bootstrap return and preserves Luma children", () => {
+    const source = plan().returns[0]!;
+    const result = plan({
+      current: [{
+        localId: "return-001",
+        code: "TH-001",
+        fingerprint: kiotVietReturnFingerprint(source),
+        legacyImported: false,
+      }],
+      existingLines: [{
+        localId: "bootstrap-line",
+        returnId: "return-001",
+        active: true,
+        legacyAdoptionEligible: true,
+        legacyProductSku: "ALT-001",
+        orderItemId: "sale-line-001",
+        quantity: 2,
+        unitPrice: 100000,
+        total: 200000,
+      }, {
+        localId: "luma-line",
+        returnId: "return-001",
+        active: true,
+        legacyImported: false,
+      }],
+    });
+
+    expect(result.blockers).toEqual([]);
+    expect(result.writes).toMatchObject([{
+      action: "adopt",
+      localId: "return-001",
+      return: {
+        lines: [{
+          action: "adopt",
+          adoptionMethod: "legacy_adopted",
+          localId: "bootstrap-line",
+        }],
+        preservedLineIds: ["luma-line"],
+      },
+    }]);
   });
 
   test("reserves a mapped stale occurrence so legacy fallback cannot steal its child ID", () => {

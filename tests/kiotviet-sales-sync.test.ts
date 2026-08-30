@@ -6,6 +6,7 @@ import { parseKiotVietProductRows } from "@/lib/kiotviet/product-sync";
 import { createKiotVietHistoryProductResolver } from "@/lib/kiotviet/history-product-resolver";
 import {
   auditKiotVietSaleProductResolutions,
+  kiotVietSaleFingerprint,
   planKiotVietSalesSync,
   type KiotVietResolvedSaleProduct,
 } from "@/lib/kiotviet/sales-sync";
@@ -99,6 +100,23 @@ const resolvedProducts = [
 
 const suppliedBundleDirectory = process.env.KIOTVIET_BUNDLE_DIR;
 const suppliedBundleTest = suppliedBundleDirectory ? test : test.skip;
+
+function planSales(input: Partial<Parameters<typeof planKiotVietSalesSync>[0]> = {}) {
+  return planKiotVietSalesSync({
+    storeId: "store-001",
+    sourceRows,
+    current: [],
+    mappings: [],
+    lineMappings: [],
+    paymentMappings: [],
+    existingLines: [],
+    existingPayments: [],
+    resolvedCustomers,
+    resolvedProducts,
+    resolvedBookings: [{ code: "DH-001", bookingId: "booking-001" }],
+    ...input,
+  });
+}
 
 function task6StyleWorkbookResolutions(
   sourceRows: Record<string, unknown>[],
@@ -210,6 +228,7 @@ describe("KiotViet sales invoice synchronization", () => {
     expect(plan.writes[0]?.sale.lines).toEqual([
       {
         action: "create",
+        adoptionMethod: "created",
         externalId: "HD-001|ALT-001|hộp|1",
         line: {
           productId: "product-001",
@@ -226,6 +245,7 @@ describe("KiotViet sales invoice synchronization", () => {
       },
       {
         action: "create",
+        adoptionMethod: "created",
         externalId: "HD-001|ALT-001|hộp|2",
         line: {
           productId: "product-001",
@@ -244,11 +264,13 @@ describe("KiotViet sales invoice synchronization", () => {
     expect(plan.writes[0]?.sale.payments).toEqual([
       {
         action: "create",
+        adoptionMethod: "created",
         externalId: "HD-001|payment|cash|1",
         payment: { channel: "cash", method: "cash", amount: 8000 },
       },
       {
         action: "create",
+        adoptionMethod: "created",
         externalId: "HD-001|payment|bank_transfer|1",
         payment: { channel: "bank_transfer", method: "bank_transfer", amount: 30000 },
       },
@@ -393,14 +415,41 @@ describe("KiotViet sales invoice synchronization", () => {
 
     expect(plan.blockers).toEqual([]);
     expect(plan.writes[0]?.sale.lines).toMatchObject([
-      { action: "update", externalId: "HD-001|ALT-001|hộp|1", localId: "legacy-line" },
+      { action: "adopt", adoptionMethod: "legacy_adopted", externalId: "HD-001|ALT-001|hộp|1", localId: "legacy-line" },
     ]);
     expect(plan.writes[0]?.sale.payments).toMatchObject([
-      { action: "update", externalId: "HD-001|payment|cash|1", localId: "legacy-cash" },
-      { action: "update", externalId: "HD-001|payment|bank_transfer|1", localId: "legacy-bank" },
+      { action: "adopt", adoptionMethod: "legacy_adopted", externalId: "HD-001|payment|cash|1", localId: "legacy-cash" },
+      { action: "adopt", adoptionMethod: "legacy_adopted", externalId: "HD-001|payment|bank_transfer|1", localId: "legacy-bank" },
     ]);
     expect(plan.writes[0]?.sale.preservedLineIds).toEqual(["luma-line"]);
     expect(plan.writes[0]?.sale.preservedPaymentIds).toEqual(["luma-payment"]);
+  });
+
+  test("backfills child provenance for an exact bootstrap parent while preserving unrelated Luma children", () => {
+    const source = planKiotVietSalesSync({
+      storeId: "store-001", sourceRows: [sourceRows[0]!], current: [], mappings: [], lineMappings: [], paymentMappings: [],
+      existingLines: [], existingPayments: [], resolvedCustomers, resolvedProducts,
+      resolvedBookings: [{ code: "DH-001", bookingId: "booking-001" }],
+    }).sales[0]!;
+    const plan = planKiotVietSalesSync({
+      storeId: "store-001", sourceRows: [sourceRows[0]!],
+      current: [{ localId: "sale-bootstrap", code: "HD-001", fingerprint: kiotVietSaleFingerprint(source), legacyImported: false }],
+      mappings: [], lineMappings: [], paymentMappings: [],
+      existingLines: [{ ...source.lines[0]!, localId: "legacy-line", orderId: "sale-bootstrap", legacyImported: false, legacyAdoptionEligible: true },
+        { localId: "luma-line", orderId: "sale-bootstrap", legacyImported: false }],
+      existingPayments: source.payments.map((payment, index) => ({
+        ...payment, localId: `legacy-payment-${index}`, orderId: "sale-bootstrap", legacyImported: false, legacyAdoptionEligible: true,
+      })),
+      resolvedCustomers, resolvedProducts, resolvedBookings: [{ code: "DH-001", bookingId: "booking-001" }],
+    });
+
+    expect(plan.blockers).toEqual([]);
+    expect(plan.writes).toHaveLength(1);
+    expect(plan.writes[0]).toMatchObject({ action: "adopt", externalId: "HD-001", localId: "sale-bootstrap" });
+    expect(plan.writes[0]?.sale.lines[0]).toMatchObject({
+      action: "adopt", adoptionMethod: "legacy_adopted", localId: "legacy-line",
+    });
+    expect(plan.writes[0]?.sale.preservedLineIds).toEqual(["luma-line"]);
   });
 
   test("adopts the legacy importer alternate-unit placeholder and aggregate payment without duplication", () => {
@@ -446,11 +495,11 @@ describe("KiotViet sales invoice synchronization", () => {
 
     expect(plan.blockers).toEqual([]);
     expect(plan.writes[0]?.sale.lines).toMatchObject([
-      { action: "update", externalId: "HD-001|ALT-001|hộp|1", localId: "legacy-alt-line" },
+      { action: "adopt", adoptionMethod: "legacy_adopted", externalId: "HD-001|ALT-001|hộp|1", localId: "legacy-alt-line" },
     ]);
     expect(plan.writes[0]?.sale.payments).toMatchObject([
-      { action: "create", externalId: "HD-001|payment|cash|1" },
-      { action: "update", externalId: "HD-001|payment|bank_transfer|1", localId: "legacy-aggregate-bank" },
+      { action: "create", adoptionMethod: "created", externalId: "HD-001|payment|cash|1" },
+      { action: "adopt", adoptionMethod: "legacy_adopted", externalId: "HD-001|payment|bank_transfer|1", localId: "legacy-aggregate-bank" },
     ]);
     expect(plan.writes[0]?.sale.preservedLineIds).toEqual([]);
     expect(plan.writes[0]?.sale.preservedPaymentIds).toEqual([]);
@@ -669,6 +718,40 @@ describe("KiotViet sales invoice synchronization", () => {
       localId: "luma-sale",
       reason: "code_collision",
     }]);
+  });
+
+  test("preserves only returned lifecycle status and repairs other mapped sale drift", () => {
+    const source = planSales({ sourceRows: [sourceRows[0]!] }).sales[0]!;
+    const completedFingerprint = kiotVietSaleFingerprint(source);
+    const returned = planSales({
+      sourceRows: [sourceRows[0]!],
+      current: [{
+        localId: "sale-001", code: source.code, status: "returned",
+        fingerprint: "actual-returned-fingerprint", completedFingerprint, legacyImported: true,
+      }],
+      mappings: [{ externalId: source.code, localId: "sale-001" }],
+      lineMappings: source.lines.map((line, index) => ({
+        externalId: line.externalId, localId: `line-${index}`,
+      })),
+      paymentMappings: source.payments.map((payment, index) => ({
+        externalId: payment.externalId, localId: `payment-${index}`,
+      })),
+      existingLines: source.lines.map((_, index) => ({ localId: `line-${index}`, orderId: "sale-001" })),
+      existingPayments: source.payments.map((_, index) => ({ localId: `payment-${index}`, orderId: "sale-001" })),
+    });
+    expect(returned.entityPlan.unchanged).toEqual([{ externalId: source.code, localId: "sale-001" }]);
+    expect(returned.writes).toEqual([]);
+
+    const draft = planSales({
+      sourceRows: [sourceRows[0]!],
+      current: [{
+        localId: "sale-001", code: source.code, status: "draft",
+        fingerprint: "actual-draft-fingerprint", completedFingerprint, legacyImported: true,
+      }],
+      mappings: [{ externalId: source.code, localId: "sale-001" }],
+    });
+    expect(draft.entityPlan.updates).toEqual([{ externalId: source.code, localId: "sale-001" }]);
+    expect(draft.writes[0]).toMatchObject({ action: "update", localId: "sale-001" });
   });
 
   test("blocks a child mapping whose parent invoice cannot be safely adopted", () => {

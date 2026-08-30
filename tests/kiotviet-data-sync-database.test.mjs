@@ -562,16 +562,17 @@ describe("KiotViet store-scoped database adapter", () => {
       bookings: [], entityPlan: emptyEntityPlan, blockers: [], summary: {},
       writes: [{ action: "create", externalId: "DH-APPLY-ALL", booking: {
         ...orderBase, code: "DH-APPLY-ALL", documentType: "booking", deliveryDate: null,
-        lines: [{ ...line, externalId: "DH-APPLY-ALL|SKU-APPLY-ALL|cái|1" }],
-        payments: [{ externalId: "DH-APPLY-ALL|payment|cash|1", channel: "cash", method: "cash", amount: 20 }],
+        lines: [{ action: "create", adoptionMethod: "created", externalId: "DH-APPLY-ALL|SKU-APPLY-ALL|cái|1", line: { ...line, externalId: undefined } }],
+        payments: [{ action: "create", adoptionMethod: "created", externalId: "DH-APPLY-ALL|payment|cash|1", payment: { channel: "cash", method: "cash", amount: 20 } }],
+        preservedLineIds: [], preservedPaymentIds: [],
       } }],
     });
     await apply("sales", {
       sales: [], entityPlan: emptyEntityPlan, blockers: [], summary: {},
       writes: [{ action: "create", externalId: "HD-APPLY-ALL", sale: {
         ...orderBase, code: "HD-APPLY-ALL", documentType: "sale", sourceOrderId: null,
-        lines: [{ action: "create", externalId: "HD-APPLY-ALL|SKU-APPLY-ALL|cái|1", line: { ...line, externalId: undefined } }],
-        payments: [{ action: "create", externalId: "HD-APPLY-ALL|payment|cash|1", payment: { channel: "cash", method: "cash", amount: 20 } }],
+        lines: [{ action: "create", adoptionMethod: "created", externalId: "HD-APPLY-ALL|SKU-APPLY-ALL|cái|1", line: { ...line, externalId: undefined } }],
+        payments: [{ action: "create", adoptionMethod: "created", externalId: "HD-APPLY-ALL|payment|cash|1", payment: { channel: "cash", method: "cash", amount: 20 } }],
         preservedLineIds: [], preservedPaymentIds: [],
       } }],
     });
@@ -579,7 +580,29 @@ describe("KiotViet store-scoped database adapter", () => {
       .where(and(eq(schema.orders.storeId, STORE_ID), eq(schema.orders.code, "HD-APPLY-ALL")));
     const [saleLine] = await database.select().from(schema.orderItems)
       .where(and(eq(schema.orderItems.storeId, STORE_ID), eq(schema.orderItems.orderId, sale.id)));
-    await database.update(schema.orders).set({ status: "returned" }).where(eq(schema.orders.id, sale.id));
+    const [booking] = await database.select().from(schema.orders)
+      .where(and(eq(schema.orders.storeId, STORE_ID), eq(schema.orders.code, "DH-APPLY-ALL")));
+    const [bookingLine] = await database.select().from(schema.orderItems)
+      .where(and(eq(schema.orderItems.storeId, STORE_ID), eq(schema.orderItems.orderId, booking.id)));
+    const [bookingPayment] = await database.select().from(schema.payments)
+      .where(and(eq(schema.payments.storeId, STORE_ID), eq(schema.payments.orderId, booking.id)));
+    await database.update(schema.orders).set({ sourceOrderId: sale.id }).where(eq(schema.orders.id, booking.id));
+    await apply("bookings", {
+      bookings: [], entityPlan: emptyEntityPlan, blockers: [], summary: {},
+      writes: [{ action: "update", externalId: "DH-APPLY-ALL", localId: booking.id, booking: {
+        ...orderBase, code: "DH-APPLY-ALL", documentType: "booking", deliveryDate: new Date("2026-01-03T00:00:00Z"),
+        lines: [{ action: "update", adoptionMethod: "mapped", localId: bookingLine.id,
+          externalId: "DH-APPLY-ALL|SKU-APPLY-ALL|cái|1", line: { ...line, externalId: undefined } }],
+        payments: [{ action: "update", adoptionMethod: "mapped", localId: bookingPayment.id,
+          externalId: "DH-APPLY-ALL|payment|cash|1", payment: { channel: "cash", method: "cash", amount: 20 } }],
+        preservedLineIds: [], preservedPaymentIds: [],
+      } }],
+    });
+    expect((await database.select({ sourceOrderId: schema.orders.sourceOrderId }).from(schema.orders)
+      .where(eq(schema.orders.id, booking.id)))[0].sourceOrderId).toBe(sale.id);
+    const preservedSaleDelivery = new Date("2026-01-04T00:00:00Z");
+    await database.update(schema.orders).set({ status: "returned", deliveryDate: preservedSaleDelivery })
+      .where(eq(schema.orders.id, sale.id));
     await apply("sales", {
       sales: [], entityPlan: emptyEntityPlan, blockers: [], summary: {},
       writes: [{ action: "update", externalId: "HD-APPLY-ALL", localId: sale.id, sale: {
@@ -587,16 +610,33 @@ describe("KiotViet store-scoped database adapter", () => {
         lines: [], payments: [], preservedLineIds: [saleLine.id], preservedPaymentIds: [],
       } }],
     });
-    const [updatedSale] = await database.select({ status: schema.orders.status, note: schema.orders.note })
+    const [updatedSale] = await database.select({
+      status: schema.orders.status, note: schema.orders.note, deliveryDate: schema.orders.deliveryDate,
+    })
       .from(schema.orders).where(eq(schema.orders.id, sale.id));
-    expect(updatedSale).toMatchObject({ status: "returned", note: "source-owned update" });
+    expect(updatedSale).toMatchObject({
+      status: "returned", note: "source-owned update", deliveryDate: preservedSaleDelivery,
+    });
+    await database.update(schema.orders).set({ status: "draft" }).where(eq(schema.orders.id, sale.id));
+    await apply("sales", {
+      sales: [], entityPlan: emptyEntityPlan, blockers: [], summary: {},
+      writes: [{ action: "update", externalId: "HD-APPLY-ALL", localId: sale.id, sale: {
+        ...orderBase, code: "HD-APPLY-ALL", documentType: "sale", sourceOrderId: null,
+        lines: [], payments: [], preservedLineIds: [saleLine.id], preservedPaymentIds: [],
+      } }],
+    });
+    expect((await database.select({
+      status: schema.orders.status, deliveryDate: schema.orders.deliveryDate,
+    }).from(schema.orders).where(eq(schema.orders.id, sale.id)))[0]).toMatchObject({
+      status: "completed", deliveryDate: preservedSaleDelivery,
+    });
     await apply("purchases", {
       purchases: [], entityPlan: emptyEntityPlan, blockers: [], preservedLineIds: [], summary: {},
       writes: [{ action: "create", externalId: "PN-APPLY-ALL", purchase: {
         code: "PN-APPLY-ALL", status: "received", supplierId: supplier.id,
         createdAt: new Date("2026-01-01T00:00:00Z"), subtotal: 20, discount: 0, vatRate: 0,
         tax: 0, total: 20, amountPaid: 20, invoiceNumber: null, note: null, preservedLineIds: [],
-        lines: [{ action: "create", externalId: "PN-APPLY-ALL|SKU-APPLY-ALL|cái|1", line: {
+        lines: [{ action: "create", adoptionMethod: "created", externalId: "PN-APPLY-ALL|SKU-APPLY-ALL|cái|1", line: {
           productId: product.id, sourceSku: "SKU-APPLY-ALL", productName: "Apply product", unitName: "Cái", unitMultiplier: 1,
           quantity: 2, unitCost: 10, discount: 0, total: 20,
         } }],
@@ -609,7 +649,7 @@ describe("KiotViet store-scoped database adapter", () => {
         status: "completed", createdAt: new Date("2026-01-02T00:00:00Z"), subtotal: 10, discount: 0, tax: 0,
         otherRefund: 0, returnFee: 0, totalRefund: 10, refundAmount: 10, settlementStatus: "settled", note: null,
         paymentSnapshots: [{ channel: "cash", amount: 10 }], preservedLineIds: [],
-        lines: [{ action: "create", externalId: "TH-APPLY-ALL|SKU-APPLY-ALL|cái|1", line: {
+        lines: [{ action: "create", adoptionMethod: "created", externalId: "TH-APPLY-ALL|SKU-APPLY-ALL|cái|1", line: {
           orderItemId: saleLine.id, productId: product.id, sourceSku: "SKU-APPLY-ALL", productName: "Apply product",
           unitName: "Cái", unitMultiplier: 1, quantity: 1, unitPrice: 10, total: 10, restock: false,
         } }],
@@ -621,7 +661,7 @@ describe("KiotViet store-scoped database adapter", () => {
         code: "THN-APPLY-ALL", purchaseOrderId: null, supplierId: supplier.id, status: "completed", settlementStatus: "settled",
         subtotal: 10, discount: 0, vatRate: 0, tax: 0, totalRefund: 10, refundAmount: 10, refundMethod: "cash",
         debtAmount: 0, note: null, createdAt: new Date("2026-01-02T00:00:00Z"), preservedLineIds: [],
-        lines: [{ action: "create", externalId: "THN-APPLY-ALL|SKU-APPLY-ALL|cái|1", line: {
+        lines: [{ action: "create", adoptionMethod: "created", externalId: "THN-APPLY-ALL|SKU-APPLY-ALL|cái|1", line: {
           purchaseOrderItemId: null, productId: product.id, sourceSku: "SKU-APPLY-ALL", productName: "Apply product",
           unitName: "Cái", unitMultiplier: 1, quantity: 1, unitCost: 10, returnUnitCost: 10, total: 10,
         } }],
@@ -656,6 +696,185 @@ describe("KiotViet store-scoped database adapter", () => {
       .where(eq(schema.kiotvietSourceMappings.id, saleMapping.id));
     const withoutTombstones = await loadKiotVietPlanningStateFromDatabase(database, "hai-dang");
     expect(withoutTombstones.current.mappings.sale ?? []).not.toContainEqual(expect.objectContaining({ externalId: "HD-APPLY-ALL" }));
+  });
+
+  test("bootstraps exact legacy documents with an empty mapping set and blocks a near-match Luma collision", async () => {
+    const [warehouse] = await database.select().from(schema.warehouses)
+      .where(and(eq(schema.warehouses.storeId, STORE_ID), eq(schema.warehouses.isDefault, true)));
+    const [product] = await database.insert(schema.products).values({
+      storeId: STORE_ID, sku: "SKU-BOOTSTRAP", name: "Bootstrap product", baseUnit: "Cái",
+    }).returning();
+    const [customer] = await database.insert(schema.customers).values({
+      storeId: STORE_ID, code: "KH-BOOTSTRAP", name: "Bootstrap customer",
+    }).returning();
+    const [supplier] = await database.insert(schema.suppliers).values({
+      storeId: STORE_ID, code: "NCC-BOOTSTRAP", name: "Bootstrap supplier",
+    }).returning();
+    const createdAt = new Date("2026-01-01T00:00:00Z");
+    const [booking] = await database.insert(schema.orders).values({
+      storeId: STORE_ID, code: "DH-BOOTSTRAP", documentType: "booking", status: "completed",
+      paymentStatus: "unpaid", customerId: customer.id, createdAt, subtotal: "20", total: "20",
+    }).returning();
+    await database.insert(schema.orderItems).values({
+      storeId: STORE_ID, orderId: booking.id, productId: product.id, productName: "Bootstrap product",
+      unitName: "Cái", unitMultiplier: "1", quantity: "2",
+      unitPrice: "10", total: "20",
+    });
+    const [sale] = await database.insert(schema.orders).values({
+      storeId: STORE_ID, code: "HD-BOOTSTRAP", documentType: "sale", status: "completed",
+      paymentStatus: "paid", customerId: customer.id, sourceOrderId: booking.id, createdAt,
+      subtotal: "20", total: "20", amountPaid: "20",
+    }).returning();
+    const [saleLine] = await database.insert(schema.orderItems).values({
+      storeId: STORE_ID, orderId: sale.id, productId: product.id, productName: "Bootstrap product",
+      unitName: "Cái", unitMultiplier: "1", quantity: "2",
+      unitPrice: "10", total: "20",
+    }).returning();
+    await database.insert(schema.payments).values({
+      storeId: STORE_ID, orderId: sale.id, method: "cash", amount: "20",
+      note: "Import lịch sử KiotViet",
+    });
+    const [purchase] = await database.insert(schema.purchaseOrders).values({
+      storeId: STORE_ID, warehouseId: warehouse.id, code: "PN-BOOTSTRAP", supplierId: supplier.id,
+      status: "received", createdAt, subtotal: "0", total: "20", amountPaid: "0",
+    }).returning();
+    await database.insert(schema.purchaseOrderItems).values({
+      storeId: STORE_ID, purchaseOrderId: purchase.id, productId: product.id,
+      productName: "Bootstrap product", unitName: "Cái", unitMultiplier: "1",
+      quantity: "2", unitCost: "10", total: "20",
+    });
+    const [customerReturn] = await database.insert(schema.returns).values({
+      storeId: STORE_ID, code: "TH-BOOTSTRAP", orderId: sale.id, customerId: customer.id,
+      status: "completed", totalRefund: "10", createdAt,
+    }).returning();
+    await database.insert(schema.returnItems).values({
+      storeId: STORE_ID, returnId: customerReturn.id, orderItemId: saleLine.id,
+      productId: product.id, productName: "Bootstrap product", unitName: "Cái", unitMultiplier: "1",
+      quantity: "1", unitPrice: "10", total: "10", restock: true,
+    });
+    const [supplierReturn] = await database.insert(schema.purchaseReturns).values({
+      storeId: STORE_ID, warehouseId: warehouse.id, code: "THN-BOOTSTRAP", supplierId: supplier.id,
+      status: "completed", settlementStatus: "unsettled", subtotal: "10", totalRefund: "10",
+      debtAmount: "10", note: "Import trả hàng nhập KiotViet", createdAt,
+    }).returning();
+    await database.insert(schema.purchaseReturnItems).values({
+      storeId: STORE_ID, purchaseReturnId: supplierReturn.id, productId: product.id,
+      productName: "Bootstrap product", sku: "SKU-BOOTSTRAP", unitName: "Cái", unitMultiplier: "1",
+      quantity: "1", unitCost: "10", returnUnitCost: "10", total: "10",
+    });
+
+    const rowBase = {
+      "Thời gian": "01/01/2026 07:00:00", "Mã khách hàng": "KH-BOOTSTRAP",
+      "Mã hàng": "SKU-BOOTSTRAP", "Tên hàng": "Bootstrap product", ĐVT: "Cái",
+      "Số lượng": 2, "Trạng thái": "Hoàn thành", "Ghi chú": null,
+    };
+    const sources = {
+      customers: [{ "Mã khách hàng": "KH-BOOTSTRAP", "Tên khách hàng": "Bootstrap customer", "Nợ cần thu hiện tại": 0, "Tổng bán trừ trả hàng": 0, "Trạng thái": "Hoạt động" }],
+      suppliers: [{ "Mã nhà cung cấp": "NCC-BOOTSTRAP", "Tên nhà cung cấp": "Bootstrap supplier", "Nợ cần trả hiện tại": 0, "Trạng thái": "Hoạt động" }],
+      bookings: [{ ...rowBase, "Mã đặt hàng": "DH-BOOTSTRAP", "Thời gian giao hàng": null,
+        "Tổng tiền hàng": 20, "Giảm giá phiếu đặt": 0, VAT: 0, "Thu khác": 0,
+        "Khách cần trả": 20, "Khách đã trả": 0, "Tiền mặt": 0, Thẻ: 0,
+        "Chuyển khoản": 0, Ví: 0, Điểm: 0, "Đơn giá": 10, "Giảm giá": 0,
+        "Thành tiền": 20, "Ghi chú hàng hóa": null }],
+      sales: [{ ...rowBase, "Mã hóa đơn": "HD-BOOTSTRAP", "Mã đặt hàng": "DH-BOOTSTRAP",
+        "Tổng tiền hàng": 20, "Giảm giá hóa đơn": 0, VAT: 0, "Thu khác": 0,
+        "Khách cần trả": 20, "Khách đã trả": 20, "Tiền mặt": 20, Thẻ: 0,
+        "Chuyển khoản": 0, Ví: 0, "Đơn giá": 10, "Giảm giá": 0,
+        "Thành tiền": 20, "Ghi chú hàng hóa": null }],
+      purchases: [{ ...rowBase, "Mã nhập hàng": "PN-BOOTSTRAP", "Mã nhà cung cấp": "NCC-BOOTSTRAP",
+        "Số hóa đơn đầu vào": "", "Tổng tiền hàng": 20, "Giảm giá phiếu nhập": 0,
+        "VAT nhập hàng": 0, "VAT phiếu nhập": 0, "Cần trả NCC": 20,
+        "Tiền đã trả NCC": 0, "Trạng thái": "Đã nhập hàng", "Giá nhập": 10,
+        "Giảm giá": 0, "Thành tiền": 20, "Ghi chú hàng hóa": null }],
+      returns: [{ ...rowBase, "Mã trả hàng": "TH-BOOTSTRAP", "Mã hóa đơn": "HD-BOOTSTRAP",
+        "Tổng tiền hàng trả": 10, "Giảm giá phiếu trả": 0, "VAT hoàn lại": 0,
+        "Thu khác hoàn lại": 0, "Phí trả hàng": 0, "Cần trả khách": 10,
+        "Đã trả khách": 0, "Tiền mặt": 0, Thẻ: 0, "Chuyển khoản": 0, Ví: 0,
+        Điểm: 0, "Trạng thái": "Đã trả", "Số lượng": 1, "Giá nhập lại": 10 }],
+      "purchase-returns": [{ ...rowBase, "Mã trả hàng nhập": "THN-BOOTSTRAP",
+        "Mã nhà cung cấp": "NCC-BOOTSTRAP", "Tổng tiền hàng trả": 10, "Giảm giá": 0,
+        "VAT trả hàng nhập": 0, "NCC cần trả": 10, "Tiền NCC trả": 0,
+        "Trạng thái": "Đã trả hàng", "Ghi chú": "", "Số lượng": 1,
+        "Giá trả lại": 10, "Thành tiền": 10 }],
+    };
+    const phases = ["customers", "suppliers", "bookings", "sales", "purchases", "returns", "purchase-returns"];
+    const codeColumns = {
+      customers: "Mã khách hàng", suppliers: "Mã nhà cung cấp", bookings: "Mã đặt hàng",
+      sales: "Mã hóa đơn", purchases: "Mã nhập hàng", returns: "Mã trả hàng",
+      "purchase-returns": "Mã trả hàng nhập",
+    };
+    const bundle = {
+      bundleSha256: BUNDLE_SHA,
+      sources: phases.map((phase) => ({
+        phase, filename: `${phase}.xlsx`, path: `/tmp/${phase}.xlsx`, sha256: SOURCE_SHA,
+        headers: [], rows: sources[phase], rowCount: sources[phase].length,
+        documentCount: 1, codeColumn: codeColumns[phase],
+      })),
+    };
+    const loaded = await loadKiotVietPlanningStateFromDatabase(database, "hai-dang");
+    const plans = planKiotVietBundle(bundle, loaded);
+    for (const phase of ["bookings", "sales", "purchases", "returns", "purchase-returns"]) {
+      const plan = plans.find((candidate) => candidate.phase === phase);
+      expect(plan.blockers).toEqual([]);
+      expect(plan.typedPlan.entityPlan.adopts).toHaveLength(1);
+      expect(plan.typedPlan.writes).toHaveLength(1);
+    }
+
+    for (const phase of ["bookings", "sales", "purchases", "returns", "purchase-returns"]) {
+      const plan = plans.find((candidate) => candidate.phase === phase);
+      const runId = await createAuditRepository().startRun({
+        phase, sourceFileName: `${phase}-bootstrap.xlsx`, sourceSha256: SOURCE_SHA,
+        bundleSha256: BUNDLE_SHA, sourceRows: 1, sourceDocuments: 1,
+      });
+      await database.transaction(async (rawTransaction) => {
+        const syncTransaction = await createKiotVietDataSyncTransaction({
+          transaction: rawTransaction, storeId: STORE_ID, expectedStoreSlug: "hai-dang",
+        });
+        await applyKiotVietTypedPhasePlan({
+          transaction: rawTransaction, syncTransaction, storeId: STORE_ID, runId,
+          sourceSha256: SOURCE_SHA, plan,
+        });
+      });
+    }
+    const bootMappings = await database.select().from(schema.kiotvietSourceMappings)
+      .where(and(eq(schema.kiotvietSourceMappings.storeId, STORE_ID), eq(schema.kiotvietSourceMappings.sourceSha256, SOURCE_SHA)));
+    for (const entityType of ["booking", "sale", "purchase", "customer_return", "supplier_return"]) {
+      expect(bootMappings).toContainEqual(expect.objectContaining({ entityType, adoptionMethod: "legacy_adopted" }));
+    }
+    for (const entityType of [
+      "booking_line", "sale_line", "sale_payment", "purchase_line",
+      "customer_return_line", "supplier_return_line",
+    ]) {
+      expect(bootMappings).toContainEqual(expect.objectContaining({
+        entityType, adoptionMethod: "legacy_adopted",
+      }));
+    }
+    const rerunPlans = planKiotVietBundle(
+      bundle,
+      await loadKiotVietPlanningStateFromDatabase(database, "hai-dang"),
+    );
+    for (const phase of ["bookings", "sales", "purchases", "returns", "purchase-returns"]) {
+      const rerun = rerunPlans.find((candidate) => candidate.phase === phase);
+      expect(rerun.blockers).toEqual([]);
+      expect(rerun.typedPlan.writes).toEqual([]);
+    }
+
+    await database.insert(schema.orders).values({
+      storeId: STORE_ID, code: "DH-LUMA-COLLISION", documentType: "booking", status: "completed",
+      paymentStatus: "unpaid", customerId: customer.id, createdAt, subtotal: "19", total: "19",
+    });
+    const collisionBundle = structuredClone(bundle);
+    collisionBundle.sources.find((item) => item.phase === "bookings").rows.push({
+      ...sources.bookings[0], "Mã đặt hàng": "DH-LUMA-COLLISION",
+    });
+    collisionBundle.sources.find((item) => item.phase === "bookings").rowCount = 2;
+    collisionBundle.sources.find((item) => item.phase === "bookings").documentCount = 2;
+    const collisionState = await loadKiotVietPlanningStateFromDatabase(database, "hai-dang");
+    const collisionPlan = planKiotVietBundle(collisionBundle, collisionState)
+      .find((candidate) => candidate.phase === "bookings");
+    expect(collisionPlan.typedPlan.entityPlan.conflicts).toContainEqual(expect.objectContaining({
+      externalId: "DH-LUMA-COLLISION", reason: "code_collision",
+    }));
   });
 
   test("replans a real transactional customer apply to zero managed changes", async () => {

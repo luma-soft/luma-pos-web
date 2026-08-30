@@ -86,6 +86,14 @@ export function stableKiotVietFingerprint(value: unknown): string {
     .digest("hex");
 }
 
+export function withoutKiotVietExternalId<T extends { externalId: string }>(
+  value: T,
+): Omit<T, "externalId"> {
+  const result: Partial<T> = { ...value };
+  delete result.externalId;
+  return result as Omit<T, "externalId">;
+}
+
 export function assertUniqueKiotVietCodes(
   rows: KiotVietDataRow[],
   codeColumn: string,

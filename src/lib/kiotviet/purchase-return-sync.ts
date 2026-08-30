@@ -12,6 +12,7 @@ import {
   normalizeKiotVietText,
   planKiotVietEntities,
   stableKiotVietFingerprint,
+  withoutKiotVietExternalId,
 } from "./data-sync-plan";
 
 const PURCHASE_RETURN_CODE = "Mã trả hàng nhập";
@@ -48,6 +49,7 @@ export interface KiotVietPurchaseReturnCurrentLine {
   localId: string;
   purchaseReturnId: string;
   legacyImported?: boolean;
+  legacyAdoptionEligible?: boolean;
   /** Supplied by the loader by joining the legacy row to its product. */
   legacyProductSku?: string;
   sourceSku?: string;
@@ -91,7 +93,8 @@ export interface KiotVietPurchaseReturnSnapshot {
 }
 
 export interface KiotVietPurchaseReturnLineWrite {
-  action: "create" | "update";
+  action: "create" | "adopt" | "update";
+  adoptionMethod: "created" | "legacy_adopted" | "mapped";
   externalId: string;
   localId?: string;
   line: Omit<KiotVietPurchaseReturnLineSnapshot, "externalId">;
@@ -185,7 +188,10 @@ function settlementStatus(total: number, paid: number): KiotVietPurchaseReturnSn
 }
 
 export function kiotVietPurchaseReturnFingerprint(value: KiotVietPurchaseReturnSnapshot): string {
-  return stableKiotVietFingerprint(value);
+  const { lines, ...parent } = value;
+  const normalizedLines = lines.map(withoutKiotVietExternalId)
+    .sort((left, right) => stableKiotVietFingerprint(left).localeCompare(stableKiotVietFingerprint(right)));
+  return stableKiotVietFingerprint({ ...parent, lines: normalizedLines });
 }
 
 function sourceLineFingerprint(value: KiotVietPurchaseReturnLineSnapshot): string {
@@ -201,7 +207,7 @@ function sourceLineFingerprint(value: KiotVietPurchaseReturnLineSnapshot): strin
 function currentLineFingerprint(value: KiotVietPurchaseReturnCurrentLine): string | null {
   const sourceSku = nullableText(value.legacyProductSku) ?? nullableText(value.sourceSku);
   if (
-    !value.legacyImported
+    (!value.legacyImported && !value.legacyAdoptionEligible)
     || !sourceSku
     || value.quantity == null
     || value.unitCost == null
@@ -343,6 +349,8 @@ function childWrites(input: {
   blockers: KiotVietPurchaseReturnSyncPlan["blockers"];
 }): {
   writes: Array<{
+    action: "create" | "adopt" | "update";
+    adoptionMethod: "created" | "legacy_adopted" | "mapped";
     externalId: string;
     localId?: string;
     line: Omit<KiotVietPurchaseReturnLineSnapshot, "externalId">;
@@ -361,7 +369,12 @@ function childWrites(input: {
       });
     }
     return {
-      writes: input.values.map(({ externalId, ...line }) => ({ externalId, line })),
+      writes: input.values.map(({ externalId, ...line }) => ({
+        action: "create" as const,
+        adoptionMethod: "created" as const,
+        externalId,
+        line,
+      })),
       preservedIds: [],
     };
   }
@@ -449,7 +462,7 @@ function childWrites(input: {
         current.purchaseReturnId === input.parentId
         && !selectedIds.has(current.localId)
         && !reservedMappedIds.has(current.localId)
-        && currentLineFingerprint(current) != null
+        && current.legacyImported === true
       ))
       .map((current) => current.localId)
       .sort((left, right) => left.localeCompare(right));
@@ -464,9 +477,32 @@ function childWrites(input: {
   }
 
   const writes = input.values.map(({ externalId, ...line }) => {
-    const current = mappedCurrentByExternalId.get(externalId)
-      ?? legacyCurrentByExternalId.get(externalId);
-    return current ? { externalId, localId: current.localId, line } : { externalId, line };
+    const mapped = mappedCurrentByExternalId.get(externalId);
+    if (mapped) {
+      return {
+        action: "update" as const,
+        adoptionMethod: "mapped" as const,
+        externalId,
+        localId: mapped.localId,
+        line,
+      };
+    }
+    const legacy = legacyCurrentByExternalId.get(externalId);
+    if (legacy) {
+      return {
+        action: "adopt" as const,
+        adoptionMethod: "legacy_adopted" as const,
+        externalId,
+        localId: legacy.localId,
+        line,
+      };
+    }
+    return {
+      action: "create" as const,
+      adoptionMethod: "created" as const,
+      externalId,
+      line,
+    };
   });
   const preservedIds = [...input.currentById.values()]
     .filter((current) => current.purchaseReturnId === input.parentId && !selectedIds.has(current.localId))
@@ -582,12 +618,7 @@ export function planKiotVietPurchaseReturnSync(input: {
       ...(localId ? { localId } : {}),
       purchaseReturn: {
         ...snapshot,
-        lines: lines.writes.map(({ externalId: childExternalId, localId: childLocalId, line }) => ({
-          action: childLocalId ? "update" as const : "create" as const,
-          externalId: childExternalId,
-          ...(childLocalId ? { localId: childLocalId } : {}),
-          line,
-        })),
+        lines: lines.writes,
         preservedLineIds: lines.preservedIds,
       },
     };
