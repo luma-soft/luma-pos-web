@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readKiotVietDataBundle } from "@/lib/kiotviet/data-sync-files";
+import { stableKiotVietFingerprint } from "@/lib/kiotviet/data-sync-plan";
 import { planKiotVietPurchaseReturnSync } from "@/lib/kiotviet/purchase-return-sync";
 
 const sourceRows = [{
@@ -168,6 +169,58 @@ describe("KiotViet supplier-return synchronization", () => {
         preservedLineIds: ["luma-line"],
       },
     });
+  });
+
+  test("reuses an exact legacy child for a mapped existing parent without child provenance", () => {
+    const result = plan({
+      current: [{
+        localId: "return-001", code: "THN-001", fingerprint: "outdated",
+        settlementStatus: "settled", legacyImported: true,
+      }],
+      mappings: [{ externalId: "THN-001", localId: "return-001" }],
+      existingLines: [{
+        localId: "legacy-line", purchaseReturnId: "return-001", legacyImported: true,
+        legacyProductSku: "ALT-001", quantity: 2, unitCost: 120000,
+        returnUnitCost: 120000, total: 240000,
+      }],
+    });
+
+    expect(result.blockers).toEqual([]);
+    expect(result.writes).toHaveLength(1);
+    expect(result.writes[0]).toMatchObject({
+      action: "update",
+      localId: "return-001",
+      purchaseReturn: {
+        lines: [{
+          action: "update", localId: "legacy-line",
+          externalId: "THN-001|ALT-001|hộp|1",
+        }],
+        preservedLineIds: [],
+      },
+    });
+  });
+
+  test("backfills missing child provenance for an otherwise unchanged mapped parent", () => {
+    const sourceFingerprint = stableKiotVietFingerprint(plan().returns[0]!);
+    const result = plan({
+      current: [{
+        localId: "return-001", code: "THN-001", fingerprint: sourceFingerprint,
+        settlementStatus: "partial", legacyImported: true,
+      }],
+      mappings: [{ externalId: "THN-001", localId: "return-001" }],
+      existingLines: [{
+        localId: "legacy-line", purchaseReturnId: "return-001", legacyImported: true,
+        legacyProductSku: "ALT-001", quantity: 2, unitCost: 120000,
+        returnUnitCost: 120000, total: 240000,
+      }],
+    });
+
+    expect(result.entityPlan.unchanged).toEqual([{ externalId: "THN-001", localId: "return-001" }]);
+    expect(result.blockers).toEqual([]);
+    expect(result.writes).toMatchObject([{
+      action: "update", localId: "return-001",
+      purchaseReturn: { lines: [{ action: "update", localId: "legacy-line" }] },
+    }]);
   });
 
   test("blocks unresolved suppliers and products without dropping source lines", () => {

@@ -533,6 +533,9 @@ export function planKiotVietPurchaseReturnSync(input: {
   }
   const returnsByCode = new Map(returns.map((value) => [value.code, value]));
   const currentById = new Map(input.current.map((value) => [value.localId, value]));
+  const needsChildProvenance = (externalId: string): boolean => (
+    returnsByCode.get(externalId)?.lines.some((line) => !lineMappings.has(line.externalId)) ?? false
+  );
   const parents: Array<{
     action: "create" | "adopt" | "update";
     externalId: string;
@@ -540,9 +543,12 @@ export function planKiotVietPurchaseReturnSync(input: {
   }> = [
     ...entityPlan.creates.map(({ externalId }) => ({ action: "create" as const, externalId })),
     ...entityPlan.adopts
-      .filter((value) => value.needsUpdate)
+      .filter((value) => value.needsUpdate || needsChildProvenance(value.externalId))
       .map(({ externalId, localId }) => ({ action: "adopt" as const, externalId, localId })),
     ...entityPlan.updates
+      .map(({ externalId, localId }) => ({ action: "update" as const, externalId, localId })),
+    ...entityPlan.unchanged
+      .filter((value) => needsChildProvenance(value.externalId))
       .map(({ externalId, localId }) => ({ action: "update" as const, externalId, localId })),
   ];
   const writes = parents.map(({ action, externalId, localId }) => {
@@ -553,7 +559,7 @@ export function planKiotVietPurchaseReturnSync(input: {
       values: snapshot.lines,
       mappings: lineMappings,
       currentById: existingLines,
-      allowLegacyAdoption: action === "adopt",
+      allowLegacyAdoption: localId != null,
       blockers,
     });
     return {
