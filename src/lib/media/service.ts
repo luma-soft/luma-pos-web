@@ -41,6 +41,17 @@ import {
 
 const UPLOAD_EXPIRY_SECONDS = 600;
 const DOWNLOAD_EXPIRY_SECONDS = 900;
+const CANONICAL_PRODUCT_IMAGE_PATH = new RegExp(
+  "^stores/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
+    + "/products/[0-9]{4}/(?:0[1-9]|1[0-2])/"
+    + "([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
+    + "/original\\.(jpg|png|webp)$",
+);
+const PRODUCT_IMAGE_MIME_BY_EXTENSION = {
+  jpg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+} as const;
 
 export type MediaStatus = "pending" | "ready" | "quarantined" | "deleted";
 
@@ -480,12 +491,57 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
     return { id: result.media.id, status: "deleted" as const };
   }
 
+  async function deleteManagedProductImageByPath(
+    actor: MediaActor,
+    objectKey: string,
+  ) {
+    const match = CANONICAL_PRODUCT_IMAGE_PATH.exec(objectKey);
+    const storeId = match?.[1];
+    const mediaId = match?.[2];
+    const extension = match?.[3] as
+      | keyof typeof PRODUCT_IMAGE_MIME_BY_EXTENSION
+      | undefined;
+    if (
+      !storeId
+      || storeId !== actor.storeId
+      || !mediaId
+      || !extension
+    ) {
+      throw new MediaServiceError("errors.notFound", 404);
+    }
+
+    const media = await dependencies.repository.getForStore({
+      storeId: actor.storeId,
+      mediaId,
+    });
+    if (
+      !media
+      || media.id !== mediaId
+      || media.storeId !== actor.storeId
+      || media.provider !== "r2"
+      || media.visibility !== "public"
+      || media.purpose !== "product-image"
+      || media.targetId !== actor.storeId
+      || media.domain !== "products"
+      || media.bucket !== dependencies.config.publicBucket
+      || media.objectKey !== objectKey
+      || media.mimeType !== PRODUCT_IMAGE_MIME_BY_EXTENSION[extension]
+      || media.status !== "ready"
+      || media.deletedAt !== null
+    ) {
+      throw new MediaServiceError("errors.notFound", 404);
+    }
+
+    return deleteMedia(actor, media.id);
+  }
+
   return {
     createUploadIntent,
     completeUpload,
     putManagedObject,
     resolveMedia,
     deleteMedia,
+    deleteManagedProductImageByPath,
   };
 }
 

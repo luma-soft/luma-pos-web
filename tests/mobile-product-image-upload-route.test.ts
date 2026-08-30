@@ -1,5 +1,10 @@
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { MediaActor } from "@/lib/media/authorization";
+import type {
+  MediaRecord,
+  MediaRepository,
+} from "@/lib/media/service";
+import type { ObjectStorage } from "@/lib/media/types";
 
 const legacyRemovals: string[][] = [];
 let legacyClientCreations = 0;
@@ -25,10 +30,13 @@ mock.module("@/lib/supabase/admin", () => ({
 afterAll(() => mock.restore());
 
 const STORE_ID = "11111111-1111-4111-8111-111111111111";
+const FOREIGN_STORE_ID = "11111111-1111-4111-8111-111111111112";
 const USER_ID = "22222222-2222-4222-8222-222222222222";
 const MEDIA_ID = "33333333-3333-4333-8333-333333333333";
+const OTHER_MEDIA_ID = "33333333-3333-4333-8333-333333333334";
 const PATH = `stores/${STORE_ID}/products/2026/08/${MEDIA_ID}/original.jpg`;
 const URL = `https://media.lumapos.vn/${PATH}`;
+const NOW = new Date("2026-08-31T03:00:00.000Z");
 
 const managedPuts: Array<{
   actor: Record<string, unknown>;
@@ -40,6 +48,9 @@ let heicConversions = 0;
 
 const { uploadProductImage: uploadHandler, deleteProductImage: deleteHandler } =
   await import("../src/lib/images/product-image-route");
+const { createMediaService, MediaServiceError } = await import(
+  "../src/lib/media/service"
+);
 
 const dependencies = {
   authenticate: async () => ({
@@ -75,6 +86,9 @@ const dependencies = {
       managedDeletes.push(mediaId);
       return { id: mediaId, status: "deleted" as const };
     },
+    async deleteManagedProductImageByPath() {
+      throw new MediaServiceError("errors.notFound", 404);
+    },
   },
   async convertHeif() {
     heicConversions += 1;
@@ -104,6 +118,182 @@ function uploadRequest(bytes: number[], type = "image/jpeg") {
     method: "POST",
     body: form,
   });
+}
+
+function createOldClientLifecycleHarness(options: { referenced?: boolean } = {}) {
+  const records = new Map<string, MediaRecord>();
+  const objects = new Map<
+    string,
+    { body: Uint8Array; contentType: string }
+  >();
+  const removed: Array<{ bucket: string; key: string }> = [];
+  const softDeleteInputs: Array<Record<string, unknown>> = [];
+
+  const repository: MediaRepository = {
+    async createPending(input) {
+      const record: MediaRecord = {
+        ...input,
+        status: "pending",
+        createdBy: input.createdBy ?? null,
+        createdAt: NOW,
+        readyAt: null,
+        verifiedAt: null,
+        deletedAt: null,
+        thumbnailObjectKey: null,
+        thumbnailSizeBytes: null,
+      };
+      records.set(`${record.storeId}:${record.id}`, record);
+      return record;
+    },
+    async getForStore(input) {
+      return records.get(`${input.storeId}:${input.mediaId}`) ?? null;
+    },
+    async markReady(input) {
+      const coordinate = `${input.storeId}:${input.mediaId}`;
+      const current = records.get(coordinate);
+      if (!current || current.status !== "pending") return null;
+      const ready: MediaRecord = {
+        ...current,
+        status: "ready",
+        sizeBytes: input.actualSizeBytes,
+        readyAt: input.readyAt,
+        verifiedAt: input.verifiedAt,
+      };
+      records.set(coordinate, ready);
+      return ready;
+    },
+    async saveThumbnail(input) {
+      const coordinate = `${input.storeId}:${input.mediaId}`;
+      const current = records.get(coordinate);
+      if (!current || current.status !== "ready") return null;
+      const updated: MediaRecord = {
+        ...current,
+        thumbnailObjectKey: input.objectKey,
+        thumbnailSizeBytes: input.sizeBytes,
+      };
+      records.set(coordinate, updated);
+      return updated;
+    },
+    async abandonPending(input) {
+      const coordinate = `${input.storeId}:${input.mediaId}`;
+      const current = records.get(coordinate);
+      if (
+        !current
+        || current.status !== "pending"
+        || current.purpose !== input.expectedPurpose
+        || current.targetId !== input.expectedTargetId
+      ) return null;
+      const deleted: MediaRecord = {
+        ...current,
+        status: "deleted",
+        deletedAt: input.deletedAt,
+      };
+      records.set(coordinate, deleted);
+      return deleted;
+    },
+    async softDeleteIfUnreferenced(input) {
+      softDeleteInputs.push(input);
+      if (options.referenced) return { outcome: "referenced" };
+      const coordinate = `${input.storeId}:${input.mediaId}`;
+      const current = records.get(coordinate);
+      if (
+        !current
+        || current.status !== "ready"
+        || current.purpose !== input.expectedPurpose
+        || current.targetId !== input.expectedTargetId
+      ) return { outcome: "conflict" };
+      const deleted: MediaRecord = {
+        ...current,
+        status: "deleted",
+        deletedAt: input.deletedAt,
+      };
+      records.set(coordinate, deleted);
+      return { outcome: "deleted", media: deleted };
+    },
+  };
+
+  const storage: ObjectStorage = {
+    async put(input) {
+      objects.set(`${input.bucket}:${input.key}`, {
+        body: input.body,
+        contentType: input.contentType,
+      });
+      return {
+        sizeBytes: input.body.byteLength,
+        contentType: input.contentType,
+        etag: "old-client-upload",
+      };
+    },
+    async get(input) {
+      const object = objects.get(`${input.bucket}:${input.key}`);
+      if (!object) throw new Error("missing test object");
+      return object.body;
+    },
+    async head(input) {
+      const object = objects.get(`${input.bucket}:${input.key}`);
+      return object
+        ? {
+            sizeBytes: object.body.byteLength,
+            contentType: object.contentType,
+            etag: "old-client-upload",
+          }
+        : null;
+    },
+    async createUploadUrl() {
+      throw new Error("old-client multipart upload must not create an intent");
+    },
+    async createDownloadUrl() {
+      throw new Error("product images must not use signed downloads");
+    },
+    async remove(input) {
+      removed.push(input);
+      objects.delete(`${input.bucket}:${input.key}`);
+    },
+    publicUrl(input) {
+      return `https://media.lumapos.vn/${input.key}`;
+    },
+  };
+
+  const service = createMediaService({
+    storage,
+    repository,
+    config: { publicBucket: "public-media", privateBucket: "private-media" },
+    authorizeTarget: async () => "allowed",
+    now: () => NOW,
+    randomUUID: () => MEDIA_ID,
+    logger: { error() {} },
+  });
+
+  return {
+    records,
+    removed,
+    softDeleteInputs,
+    dependencies: {
+      authenticate: dependencies.authenticate,
+      mediaService: service,
+      convertHeif: dependencies.convertHeif,
+      legacyPublicBaseUrl: dependencies.legacyPublicBaseUrl,
+    },
+  };
+}
+
+async function uploadFromOldClient(
+  harness: ReturnType<typeof createOldClientLifecycleHarness>,
+) {
+  const response = await uploadHandler(
+    uploadRequest([0xff, 0xd8, 0xff, 0x00]),
+    harness.dependencies,
+  );
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  return { path: body.data.path as string };
+}
+
+function pathOnlyDeleteRequest(path: string) {
+  return new Request(
+    `https://luma.test/api/mobile/products/images?${new URLSearchParams({ path })}`,
+    { method: "DELETE" },
+  );
 }
 
 describe("POST /api/mobile/products/images", () => {
@@ -184,6 +374,147 @@ describe("DELETE /api/mobile/products/images", () => {
     }
     expect(legacyRemovals).toEqual([]);
     expect(legacyClientCreations).toBe(0);
+  });
+
+  test("lets an old client discard its multipart upload by retaining only the managed path", async () => {
+    const harness = createOldClientLifecycleHarness();
+    const retained = await uploadFromOldClient(harness);
+
+    const response = await deleteHandler(
+      pathOnlyDeleteRequest(retained.path),
+      harness.dependencies,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      ok: true,
+      data: { mediaId: MEDIA_ID, status: "deleted" },
+    });
+    expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe(
+      "deleted",
+    );
+    expect(harness.softDeleteInputs).toEqual([expect.objectContaining({
+      storeId: STORE_ID,
+      mediaId: MEDIA_ID,
+      expectedPurpose: "product-image",
+      expectedTargetId: STORE_ID,
+    })]);
+    expect(harness.removed).toEqual([]);
+  });
+
+  test("rejects non-exact managed path metadata without entering deletion", async () => {
+    const cases: Array<{
+      name: string;
+      mutate?: (record: MediaRecord) => void;
+      path?: string;
+    }> = [
+      {
+        name: "foreign store path",
+        path: PATH.replace(STORE_ID, FOREIGN_STORE_ID),
+      },
+      {
+        name: "wrong purpose",
+        mutate: (record) => { record.purpose = "project-document"; },
+      },
+      {
+        name: "wrong domain",
+        mutate: (record) => { record.domain = "projects"; },
+      },
+      {
+        name: "wrong staging target",
+        mutate: (record) => { record.targetId = OTHER_MEDIA_ID; },
+      },
+      {
+        name: "wrong bucket",
+        mutate: (record) => { record.bucket = "private-media"; },
+      },
+      {
+        name: "wrong visibility",
+        mutate: (record) => { record.visibility = "private"; },
+      },
+      {
+        name: "wrong object key",
+        mutate: (record) => {
+          record.objectKey = PATH.replace("/2026/08/", "/2026/07/");
+        },
+      },
+      {
+        name: "MIME and extension mismatch",
+        mutate: (record) => { record.mimeType = "image/png"; },
+      },
+      {
+        name: "legacy provider row",
+        mutate: (record) => { record.provider = "supabase"; },
+      },
+      {
+        name: "different embedded media ID",
+        path: PATH.replace(MEDIA_ID, OTHER_MEDIA_ID),
+      },
+    ];
+
+    for (const candidate of cases) {
+      const harness = createOldClientLifecycleHarness();
+      const retained = await uploadFromOldClient(harness);
+      const record = harness.records.get(`${STORE_ID}:${MEDIA_ID}`)!;
+      candidate.mutate?.(record);
+
+      const response = await deleteHandler(
+        pathOnlyDeleteRequest(candidate.path ?? retained.path),
+        harness.dependencies,
+      );
+
+      expect(response.status, candidate.name).toBe(403);
+      expect(record.status, candidate.name).toBe("ready");
+      expect(harness.softDeleteInputs, candidate.name).toEqual([]);
+      expect(harness.removed, candidate.name).toEqual([]);
+    }
+  });
+
+  test("rejects noncanonical managed paths without entering deletion", async () => {
+    const harness = createOldClientLifecycleHarness();
+    await uploadFromOldClient(harness);
+    const noncanonical = [
+      `/${PATH}`,
+      PATH.replace("/products/", "/products//"),
+      PATH.replace("/2026/08/", "/2026/8/"),
+      PATH.toUpperCase(),
+      PATH.replace("original.jpg", "original.jpeg"),
+      `${PATH}/`,
+    ];
+
+    for (const path of noncanonical) {
+      const response = await deleteHandler(
+        pathOnlyDeleteRequest(path),
+        harness.dependencies,
+      );
+      expect(response.status, path).toBe(403);
+    }
+    expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe(
+      "ready",
+    );
+    expect(harness.softDeleteInputs).toEqual([]);
+    expect(harness.removed).toEqual([]);
+  });
+
+  test("keeps a referenced old-client upload live and reports the conflict", async () => {
+    const harness = createOldClientLifecycleHarness({ referenced: true });
+    const retained = await uploadFromOldClient(harness);
+
+    const response = await deleteHandler(
+      pathOnlyDeleteRequest(retained.path),
+      harness.dependencies,
+    );
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      ok: false,
+      error: "media.referenced",
+    });
+    expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe(
+      "ready",
+    );
+    expect(harness.softDeleteInputs).toHaveLength(1);
+    expect(harness.removed).toEqual([]);
   });
 
   test("defers exact, canonical-equivalent, shared, and concurrently referenced legacy objects", async () => {
@@ -268,9 +599,9 @@ describe("DELETE /api/mobile/products/images", () => {
     expect(legacyRemovals).toEqual([]);
   });
 
-  test("never accepts a path-only R2 key or another user's legacy path", async () => {
+  test("never accepts an untracked path-only R2 key or another user's legacy path", async () => {
     for (const path of [
-      PATH,
+      PATH.replace(MEDIA_ID, OTHER_MEDIA_ID),
       `${USER_ID}/path-only.jpg`,
       "someone-else/uncommitted.jpg",
       `stores/${STORE_ID}/products/drafts/someone-else/uncommitted.jpg`,

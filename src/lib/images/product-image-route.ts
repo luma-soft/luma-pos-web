@@ -17,7 +17,7 @@ type ProductImageRouteDependencies = {
   authenticate?: typeof requireMobileStockAccess;
   mediaService?: Pick<
     ReturnType<typeof getMediaService>,
-    "putManagedObject" | "deleteMedia"
+    "putManagedObject" | "deleteMedia" | "deleteManagedProductImageByPath"
   >;
   convertHeif?: typeof convertHeifToJpeg;
   legacyPublicBaseUrl?: string;
@@ -182,8 +182,22 @@ export async function deleteProductImage(
     }
   }
 
-  const path = params.get("path")?.trim() ?? "";
+  const pathValue = params.get("path") ?? "";
   const legacyUrl = params.get("url")?.trim() ?? "";
+  if (pathValue && !legacyUrl) {
+    try {
+      const result = await (dependencies.mediaService ?? getMediaService())
+        .deleteManagedProductImageByPath(gate, pathValue);
+      return mobileOk({ mediaId: result.id, status: result.status });
+    } catch (error) {
+      const mapped = mediaServiceError(error);
+      return mapped.status === 404
+        ? mobileError("errors.forbidden", 403)
+        : mobileError(mapped.error, mapped.status);
+    }
+  }
+
+  const path = pathValue.trim();
   const coordinate = trustedLegacyCoordinate(
     legacyUrl,
     dependencies.legacyPublicBaseUrl
