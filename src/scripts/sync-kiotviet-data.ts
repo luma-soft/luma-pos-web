@@ -5,6 +5,7 @@ import { normalizeKiotVietText } from "../lib/kiotviet/data-sync-plan";
 import {
   KIOTVIET_SYNC_PHASES,
   assertKiotVietDataSyncApplyGuard,
+  executeKiotVietDataSyncPhase,
   parseKiotVietDataSyncArgs,
   type KiotVietSyncPhase,
   type KiotVietSyncPhaseArg,
@@ -19,16 +20,17 @@ import {
   createKiotVietHistoryProductResolver,
   type KiotVietHistoryProductResolverInput,
 } from "../lib/kiotviet/history-product-resolver";
-import { planKiotVietBookingSync } from "../lib/kiotviet/booking-sync";
-import { planKiotVietSalesSync } from "../lib/kiotviet/sales-sync";
-import { planKiotVietPurchaseSync } from "../lib/kiotviet/purchase-sync";
-import { planKiotVietReturnSync } from "../lib/kiotviet/return-sync";
-import { planKiotVietPurchaseReturnSync } from "../lib/kiotviet/purchase-return-sync";
+import { kiotVietBookingFingerprint, planKiotVietBookingSync } from "../lib/kiotviet/booking-sync";
+import { kiotVietSaleFingerprint, planKiotVietSalesSync } from "../lib/kiotviet/sales-sync";
+import { kiotVietPurchaseFingerprint, planKiotVietPurchaseSync } from "../lib/kiotviet/purchase-sync";
+import { kiotVietReturnFingerprint, planKiotVietReturnSync } from "../lib/kiotviet/return-sync";
+import { kiotVietPurchaseReturnFingerprint, planKiotVietPurchaseReturnSync } from "../lib/kiotviet/purchase-return-sync";
 import type { KiotVietBookingCurrent } from "../lib/kiotviet/booking-sync";
 import type { KiotVietSaleCurrent, KiotVietSaleCurrentChild } from "../lib/kiotviet/sales-sync";
 import type { KiotVietPurchaseCurrent, KiotVietPurchaseCurrentLine } from "../lib/kiotviet/purchase-sync";
 import type { KiotVietReturnCurrent, KiotVietReturnCurrentLine, KiotVietReturnSale } from "../lib/kiotviet/return-sync";
 import type { KiotVietPurchaseReturnCurrent, KiotVietPurchaseReturnCurrentLine } from "../lib/kiotviet/purchase-return-sync";
+import type { KiotVietTypedPhasePlan } from "../lib/kiotviet/data-sync-apply";
 
 interface KiotVietCliCurrentState {
   customers: KiotVietCustomerCurrent[];
@@ -67,6 +69,10 @@ export interface KiotVietCliPhasePlan {
   blockers: KiotVietCliBlocker[];
 }
 
+export type KiotVietCliExecutablePhasePlan = KiotVietCliPhasePlan & {
+  typedPlan: KiotVietTypedPhasePlan["typedPlan"] | null;
+};
+
 export interface KiotVietDataSyncReport {
   version: 1;
   status: "dry-run" | "applied";
@@ -86,10 +92,88 @@ export interface KiotVietDataSyncCliDependencies {
   loadPlanningState?: (storeSlug: string | null) => Promise<KiotVietCliPlanningState>;
   applyPhase?: (input: {
     phase: KiotVietSyncPhase;
+    storeId: string;
     reviewedSha256: string;
     bundle: KiotVietDataBundle;
-    plan: KiotVietCliPhasePlan;
+    plan: KiotVietCliExecutablePhasePlan;
   }) => Promise<{ postApplyPlan: KiotVietCliPhasePlan }>;
+}
+
+export async function applyKiotVietPhaseWithDatabase(database: ProductionDatabase, input: {
+  phase: KiotVietSyncPhase;
+  storeId: string;
+  reviewedSha256: string;
+  bundle: KiotVietDataBundle;
+  plan: KiotVietCliExecutablePhasePlan;
+}): Promise<{ postApplyPlan: KiotVietCliPhasePlan }> {
+  if (!input.plan.typedPlan) throw new Error(`KiotViet ${input.phase} plan is not executable`);
+  const db = database;
+  const { createKiotVietDataSyncAuditRepository, createKiotVietDataSyncTransaction } = await import("../lib/kiotviet/data-sync-database");
+  const { applyKiotVietTypedPhasePlan } = await import("../lib/kiotviet/data-sync-apply");
+  const selectedSource = input.phase === "product-references" ? null : source(input.bundle, input.phase);
+  let postApplyPlan: KiotVietCliPhasePlan | null = null;
+  const transactionHandles = new WeakMap<object, ProductionTransaction>();
+  await executeKiotVietDataSyncPhase({
+    apply: true,
+    phase: input.phase,
+    storeSlug: "hai-dang",
+    reviewedSourceSha256: input.reviewedSha256,
+    source: selectedSource ? {
+      fileName: selectedSource.filename,
+      sha256: selectedSource.sha256,
+      bundleSha256: input.bundle.bundleSha256,
+      rowCount: selectedSource.rowCount,
+      documentCount: selectedSource.documentCount,
+    } : {
+      fileName: "kiotviet-data-bundle",
+      sha256: input.bundle.bundleSha256,
+      bundleSha256: input.bundle.bundleSha256,
+      rowCount: input.bundle.sources.reduce((sum, item) => sum + item.rowCount, 0),
+      documentCount: input.bundle.sources.reduce((sum, item) => sum + item.documentCount, 0),
+    },
+    audit: createKiotVietDataSyncAuditRepository({
+      storeId: input.storeId,
+      expectedStoreSlug: "hai-dang",
+      runInTransaction: (work) => db.transaction(work),
+    }),
+    runInTransaction: (work) => db.transaction(async (rawTransaction) => {
+      const syncTransaction = await createKiotVietDataSyncTransaction({
+        transaction: rawTransaction,
+        storeId: input.storeId,
+        expectedStoreSlug: "hai-dang",
+      });
+      transactionHandles.set(syncTransaction, rawTransaction);
+      return work(syncTransaction);
+    }),
+    work: async (syncTransaction, runId) => {
+      // The phase runner owns the transaction. Re-enter through the same raw
+      // transaction so writes, invariant snapshots, and the post-plan share a view.
+      const rawTransaction = transactionHandles.get(syncTransaction);
+      if (!rawTransaction) throw new Error("KiotViet transactional database handle is unavailable");
+      await applyKiotVietTypedPhasePlan({
+        transaction: rawTransaction,
+        syncTransaction,
+        storeId: input.storeId,
+        runId,
+        sourceSha256: input.reviewedSha256,
+        plan: input.plan as KiotVietTypedPhasePlan,
+      });
+      const reloaded = await loadKiotVietPlanningStateFromDatabase(rawTransaction, "hai-dang");
+      const replanned = planKiotVietBundle(input.bundle, reloaded)
+        .find((candidate) => candidate.phase === input.phase)!;
+      postApplyPlan = { phase: replanned.phase, summary: replanned.summary, blockers: replanned.blockers };
+      const remaining = managedChangeCount(postApplyPlan);
+      if (remaining !== 0) throw new Error(`KiotViet post-apply dry-run is not zero-diff: ${remaining} managed changes/blockers remain`);
+      return { ...input.plan.summary, postApplyManagedChanges: remaining };
+    },
+  });
+  if (!postApplyPlan) throw new Error("KiotViet post-apply plan was not produced");
+  return { postApplyPlan };
+}
+
+async function applyProductionKiotVietPhase(input: Parameters<typeof applyKiotVietPhaseWithDatabase>[1]) {
+  const { db } = await import("../db");
+  return applyKiotVietPhaseWithDatabase(db, input);
 }
 
 function source(bundle: KiotVietDataBundle, phase: KiotVietDataPhase): KiotVietWorkbookSource {
@@ -139,6 +223,32 @@ function managedChangeCount(plan: KiotVietCliPhasePlan): number {
     + plan.blockers.reduce((sum, blocker) => sum + blocker.count, 0);
 }
 
+const LOCAL_REFERENCE_KEYS = new Set([
+  "localId", "customerId", "supplierId", "productId", "bookingId", "orderId",
+  "sourceOrderId", "orderItemId", "purchaseOrderId", "purchaseOrderItemId",
+]);
+
+export function assertKiotVietExecutablePlan(plan: KiotVietCliExecutablePhasePlan): void {
+  if (!plan.typedPlan) throw new Error(`KiotViet ${plan.phase} plan is not executable`);
+  const visit = (value: unknown, key: string | null): void => {
+    if (value == null) return;
+    if (typeof value === "string") {
+      if (key && LOCAL_REFERENCE_KEYS.has(key) && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
+        throw new Error(`KiotViet ${plan.phase} has unresolved local reference in ${key}`);
+      }
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item, key);
+      return;
+    }
+    if (typeof value === "object") {
+      for (const [childKey, child] of Object.entries(value)) visit(child, childKey);
+    }
+  };
+  visit(plan.typedPlan, null);
+}
+
 function emptyCurrentState(): KiotVietCliCurrentState {
   return {
     customers: [], suppliers: [], bookings: [], sales: [], saleLines: [], salePayments: [],
@@ -147,8 +257,8 @@ function emptyCurrentState(): KiotVietCliCurrentState {
   };
 }
 
-function legacySalePaymentMethod(value: string): "cash" | "card" | "bank_transfer" | "momo" | "credit" | undefined {
-  return value === "cash" || value === "card" || value === "bank_transfer" || value === "momo" || value === "credit"
+function legacySalePaymentMethod(value: string): "cash" | "card" | "bank_transfer" | "momo" | undefined {
+  return value === "cash" || value === "card" || value === "bank_transfer" || value === "momo"
     ? value
     : undefined;
 }
@@ -156,7 +266,7 @@ function legacySalePaymentMethod(value: string): "cash" | "card" | "bank_transfe
 export function planKiotVietBundle(
   bundle: KiotVietDataBundle,
   state: KiotVietCliPlanningState,
-): KiotVietCliPhasePlan[] {
+): KiotVietCliExecutablePhasePlan[] {
   const current = state.current ?? emptyCurrentState();
   const mappings = (entityType: string) => current.mappings[entityType] ?? [];
   const customerPlan = planKiotVietCustomerSync({
@@ -178,11 +288,13 @@ export function planKiotVietBundle(
   const customerIdByCode = new Map(current.customers.flatMap((item) => item.code ? [[item.code, item.localId] as const] : []));
   const supplierIdByCode = new Map(current.suppliers.flatMap((item) => item.code ? [[item.code, item.localId] as const] : []));
   const resolvedCustomers = [
-    ...customerPlan.customers.map((item) => ({ code: item.code, customerId: customerIdByCode.get(item.code) ?? `pending-customer:${item.code}` })),
+    ...current.customers.flatMap((item) => item.code ? [{ code: item.code, customerId: item.localId }] : []),
+    ...customerPlan.customers.filter((item) => !customerIdByCode.has(item.code)).map((item) => ({ code: item.code, customerId: `pending-customer:${item.code}` })),
     ...customerPlan.historicalPlaceholders.map((item) => ({ code: item.code, customerId: `source-customer-placeholder:${item.code}` })),
   ];
   const resolvedSuppliers = [
-    ...supplierPlan.suppliers.map((item) => ({ code: item.code, supplierId: supplierIdByCode.get(item.code) ?? `pending-supplier:${item.code}` })),
+    ...current.suppliers.flatMap((item) => item.code ? [{ code: item.code, supplierId: item.localId }] : []),
+    ...supplierPlan.suppliers.filter((item) => !supplierIdByCode.has(item.code)).map((item) => ({ code: item.code, supplierId: `pending-supplier:${item.code}` })),
     ...supplierPlan.historicalPlaceholders.map((item) => ({ code: item.code, supplierId: `source-supplier-placeholder:${item.code}` })),
   ];
   const bookingPlan = planKiotVietBookingSync({
@@ -197,7 +309,8 @@ export function planKiotVietBundle(
   });
   const purchasePlan = planKiotVietPurchaseSync({
     storeId: state.storeId, sourceRows: source(bundle, "purchases").rows, current: current.purchases, mappings: mappings("purchase"), lineMappings: mappings("purchase_line"), existingLines: current.purchaseLines,
-    resolvedSuppliers, unknownSupplierId: "source-supplier:unknown",
+    resolvedSuppliers,
+    unknownSupplierId: mappings("supplier").find((item) => item.externalId === "__kiotviet_unknown_supplier__")?.localId ?? null,
     resolvedProducts: uniqueProducts.map((item) => ({ sku: item.sourceSku, productId: item.productId, unitName: item.unitName, sourceUnitName: item.sourceUnitName, unitMultiplier: item.unitMultiplier, resolutionSource: item.source })),
   });
   const syntheticSaleLinks = salesPlan.sales.map((item) => ({
@@ -212,6 +325,7 @@ export function planKiotVietBundle(
   const purchaseReturnSource = source(bundle, "purchase-returns");
   let purchaseReturnSummary: Record<string, number>;
   let purchaseReturnReasons: string[];
+  let purchaseReturnTypedPlan: ReturnType<typeof planKiotVietPurchaseReturnSync> | null;
   try {
     const purchaseReturnPlan = planKiotVietPurchaseReturnSync({
       storeId: state.storeId, sourceRows: purchaseReturnSource.rows, current: current.purchaseReturns, mappings: mappings("supplier_return"), lineMappings: mappings("supplier_return_line"), existingLines: current.purchaseReturnLines, resolvedSuppliers,
@@ -219,22 +333,29 @@ export function planKiotVietBundle(
     });
     purchaseReturnSummary = purchaseReturnPlan.summary;
     purchaseReturnReasons = purchaseReturnPlan.blockers.map((item) => item.reason);
+    purchaseReturnTypedPlan = purchaseReturnPlan;
   } catch (error) {
     if (!(error instanceof Error) || !error.message.includes("requires source SKU and source unit")) throw error;
     purchaseReturnSummary = { documents: purchaseReturnSource.documentCount, sourceLines: purchaseReturnSource.rowCount };
     purchaseReturnReasons = ["blank_source_sku_or_unit"];
+    purchaseReturnTypedPlan = null;
   }
   const raw = [
-    ["customers", customerPlan.summary, customerPlan.entityPlan.conflicts.map((item) => item.reason)],
-    ["suppliers", supplierPlan.summary, supplierPlan.entityPlan.conflicts.map((item) => item.reason)],
-    ["product-references", productAudit.summary, productAudit.blockers.map((item) => item.reason)],
-    ["bookings", bookingPlan.summary, [...bookingPlan.blockers.map((item) => item.reason), ...bookingPlan.entityPlan.conflicts.map((item) => item.reason)]],
-    ["sales", salesPlan.summary, [...salesPlan.blockers.map((item) => item.reason), ...salesPlan.entityPlan.conflicts.map((item) => item.reason)]],
-    ["purchases", purchasePlan.summary, [...purchasePlan.blockers.map((item) => item.reason), ...purchasePlan.entityPlan.conflicts.map((item) => item.reason)]],
-    ["returns", returnPlan.summary, [...returnPlan.blockers.map((item) => item.reason), ...returnPlan.entityPlan.conflicts.map((item) => item.reason)]],
-    ["purchase-returns", purchaseReturnSummary, purchaseReturnReasons],
+    ["customers", customerPlan.summary, customerPlan.entityPlan.conflicts.map((item) => item.reason), customerPlan],
+    ["suppliers", supplierPlan.summary, supplierPlan.entityPlan.conflicts.map((item) => item.reason), supplierPlan],
+    ["product-references", productAudit.summary, productAudit.blockers.map((item) => item.reason), productAudit],
+    ["bookings", bookingPlan.summary, [...bookingPlan.blockers.map((item) => item.reason), ...bookingPlan.entityPlan.conflicts.map((item) => item.reason)], bookingPlan],
+    ["sales", salesPlan.summary, [...salesPlan.blockers.map((item) => item.reason), ...salesPlan.entityPlan.conflicts.map((item) => item.reason)], salesPlan],
+    ["purchases", purchasePlan.summary, [...purchasePlan.blockers.map((item) => item.reason), ...purchasePlan.entityPlan.conflicts.map((item) => item.reason)], purchasePlan],
+    ["returns", returnPlan.summary, [...returnPlan.blockers.map((item) => item.reason), ...returnPlan.entityPlan.conflicts.map((item) => item.reason)], returnPlan],
+    ["purchase-returns", purchaseReturnSummary, purchaseReturnReasons, purchaseReturnTypedPlan],
   ] as const;
-  return raw.map(([phase, summary, reasons]) => ({ phase, summary: compactSummary(summary), blockers: groupedBlockers(phase, reasons) }));
+  return raw.map(([phase, summary, reasons, typedPlan]) => ({
+    phase,
+    summary: compactSummary(summary),
+    blockers: groupedBlockers(phase, reasons),
+    typedPlan,
+  })) as KiotVietCliExecutablePhasePlan[];
 }
 
 export function buildKiotVietDataSyncReport(input: {
@@ -269,9 +390,15 @@ export function formatKiotVietDataSyncReport(report: KiotVietDataSyncReport): { 
   return { json, text };
 }
 
-async function loadProductionReadOnlyState(storeSlug: string | null): Promise<KiotVietCliPlanningState> {
+type ProductionDatabase = (typeof import("../db"))["db"];
+type ProductionTransaction = Parameters<Parameters<ProductionDatabase["transaction"]>[0]>[0];
+
+export async function loadKiotVietPlanningStateFromDatabase(
+  database: ProductionDatabase | ProductionTransaction,
+  storeSlug: string | null,
+): Promise<KiotVietCliPlanningState> {
   if (!storeSlug) throw new Error("Dry-run database planning requires --store=hai-dang");
-  const { db } = await import("../db");
+  const db = database as ProductionDatabase;
   const schema = await import("../db/schema");
   const { and, eq, sql } = await import("drizzle-orm");
   const [store] = await db.select({ id: schema.stores.id }).from(schema.stores).where(eq(schema.stores.slug, storeSlug)).limit(1);
@@ -292,14 +419,14 @@ async function loadProductionReadOnlyState(storeSlug: string | null): Promise<Ki
       .from(schema.customers).where(eq(schema.customers.storeId, store.id)),
     db.select({ localId: schema.suppliers.id, code: schema.suppliers.code, name: schema.suppliers.name, phone: schema.suppliers.phone, email: schema.suppliers.email, address: schema.suppliers.address, taxCode: schema.suppliers.taxCode, note: schema.suppliers.note, currentDebt: schema.suppliers.currentDebt })
       .from(schema.suppliers).where(eq(schema.suppliers.storeId, store.id)),
-    db.select({ localId: schema.orders.id, code: schema.orders.code, documentType: schema.orders.documentType, status: schema.orders.status, customerId: schema.orders.customerId })
+    db.select({ localId: schema.orders.id, code: schema.orders.code, documentType: schema.orders.documentType, status: schema.orders.status, paymentStatus: schema.orders.paymentStatus, customerId: schema.orders.customerId, sourceOrderId: schema.orders.sourceOrderId, deliveryDate: schema.orders.deliveryDate, createdAt: schema.orders.createdAt, subtotal: schema.orders.subtotal, discount: schema.orders.discount, tax: schema.orders.tax, shippingFee: schema.orders.shippingFee, total: schema.orders.total, amountPaid: schema.orders.amountPaid, note: schema.orders.note })
       .from(schema.orders).where(eq(schema.orders.storeId, store.id)),
     db.select({ localId: schema.orderItems.id, orderId: schema.orderItems.orderId, productId: schema.orderItems.productId, productName: schema.orderItems.productName, sourceSku: schema.products.sku, unitName: schema.orderItems.unitName, unitMultiplier: schema.orderItems.unitMultiplier, quantity: schema.orderItems.quantity, unitPrice: schema.orderItems.unitPrice, discount: schema.orderItems.discount, total: schema.orderItems.total, note: schema.orderItems.note })
       .from(schema.orderItems).innerJoin(schema.products, and(eq(schema.orderItems.productId, schema.products.id), eq(schema.products.storeId, store.id)))
       .where(eq(schema.orderItems.storeId, store.id)),
     db.select({ localId: schema.payments.id, orderId: schema.payments.orderId, method: schema.payments.method, amount: schema.payments.amount, note: schema.payments.note })
       .from(schema.payments).where(eq(schema.payments.storeId, store.id)),
-    db.select({ localId: schema.purchaseOrders.id, code: schema.purchaseOrders.code, subtotal: schema.purchaseOrders.subtotal })
+    db.select({ localId: schema.purchaseOrders.id, code: schema.purchaseOrders.code, supplierId: schema.purchaseOrders.supplierId, status: schema.purchaseOrders.status, createdAt: schema.purchaseOrders.createdAt, subtotal: schema.purchaseOrders.subtotal, discount: schema.purchaseOrders.discount, vatRate: schema.purchaseOrders.vatRate, tax: schema.purchaseOrders.tax, total: schema.purchaseOrders.total, amountPaid: schema.purchaseOrders.amountPaid, invoiceNumber: schema.purchaseOrders.invoiceNumber, note: schema.purchaseOrders.note })
       .from(schema.purchaseOrders).where(eq(schema.purchaseOrders.storeId, store.id)),
     db.select({ localId: schema.purchaseOrderItems.id, purchaseOrderId: schema.purchaseOrderItems.purchaseOrderId, legacyProductSku: schema.products.sku, quantity: schema.purchaseOrderItems.quantity, unitCost: schema.purchaseOrderItems.unitCost, discount: schema.purchaseOrderItems.discount, total: schema.purchaseOrderItems.total })
       .from(schema.purchaseOrderItems).innerJoin(schema.products, and(eq(schema.purchaseOrderItems.productId, schema.products.id), eq(schema.products.storeId, store.id)))
@@ -309,16 +436,40 @@ async function loadProductionReadOnlyState(storeSlug: string | null): Promise<Ki
     db.select({ localId: schema.returnItems.id, returnId: schema.returnItems.returnId, orderItemId: schema.returnItems.orderItemId, legacyProductSku: schema.products.sku, quantity: schema.returnItems.quantity, unitPrice: schema.returnItems.unitPrice, total: schema.returnItems.total })
       .from(schema.returnItems).innerJoin(schema.products, and(eq(schema.returnItems.productId, schema.products.id), eq(schema.products.storeId, store.id)))
       .where(eq(schema.returnItems.storeId, store.id)),
-    db.select({ localId: schema.purchaseReturns.id, code: schema.purchaseReturns.code, settlementStatus: schema.purchaseReturns.settlementStatus })
+    db.select({ localId: schema.purchaseReturns.id, code: schema.purchaseReturns.code, purchaseOrderId: schema.purchaseReturns.purchaseOrderId, supplierId: schema.purchaseReturns.supplierId, status: schema.purchaseReturns.status, settlementStatus: schema.purchaseReturns.settlementStatus, subtotal: schema.purchaseReturns.subtotal, discount: schema.purchaseReturns.discount, vatRate: schema.purchaseReturns.vatRate, tax: schema.purchaseReturns.tax, totalRefund: schema.purchaseReturns.totalRefund, refundAmount: schema.purchaseReturns.refundAmount, refundMethod: schema.purchaseReturns.refundMethod, debtAmount: schema.purchaseReturns.debtAmount, note: schema.purchaseReturns.note, createdAt: schema.purchaseReturns.createdAt })
       .from(schema.purchaseReturns).where(eq(schema.purchaseReturns.storeId, store.id)),
     db.select({ localId: schema.purchaseReturnItems.id, purchaseReturnId: schema.purchaseReturnItems.purchaseReturnId, legacyProductSku: schema.products.sku, quantity: schema.purchaseReturnItems.quantity, unitCost: schema.purchaseReturnItems.unitCost, returnUnitCost: schema.purchaseReturnItems.returnUnitCost, total: schema.purchaseReturnItems.total })
       .from(schema.purchaseReturnItems).innerJoin(schema.products, and(eq(schema.purchaseReturnItems.productId, schema.products.id), eq(schema.products.storeId, store.id)))
       .where(eq(schema.purchaseReturnItems.storeId, store.id)),
   ]);
+  const schemaSnapshots = schemaReady ? await Promise.all([
+    db.select({ localId: schema.suppliers.id, isActive: schema.suppliers.isActive })
+      .from(schema.suppliers).where(eq(schema.suppliers.storeId, store.id)),
+    db.select({ localId: schema.orderItems.id, orderId: schema.orderItems.orderId, productId: schema.orderItems.productId, productName: schema.orderItems.productName, sourceSku: schema.orderItems.sourceSku, unitName: schema.orderItems.unitName, unitMultiplier: schema.orderItems.unitMultiplier, quantity: schema.orderItems.quantity, unitPrice: schema.orderItems.unitPrice, discount: schema.orderItems.discount, total: schema.orderItems.total, note: schema.orderItems.note })
+      .from(schema.orderItems).where(eq(schema.orderItems.storeId, store.id)),
+    db.select({ localId: schema.purchaseOrderItems.id, purchaseOrderId: schema.purchaseOrderItems.purchaseOrderId, productId: schema.purchaseOrderItems.productId, productName: schema.purchaseOrderItems.productName, sourceSku: schema.purchaseOrderItems.sku, unitName: schema.purchaseOrderItems.unitName, unitMultiplier: schema.purchaseOrderItems.unitMultiplier, quantity: schema.purchaseOrderItems.quantity, unitCost: schema.purchaseOrderItems.unitCost, discount: schema.purchaseOrderItems.discount, total: schema.purchaseOrderItems.total })
+      .from(schema.purchaseOrderItems).where(eq(schema.purchaseOrderItems.storeId, store.id)),
+    db.select({ localId: schema.returns.id, code: schema.returns.code, orderId: schema.returns.orderId, customerId: schema.returns.customerId, status: schema.returns.status, createdAt: schema.returns.createdAt, invoiceCode: schema.returns.sourceInvoiceCode, subtotal: schema.returns.sourceSubtotal, discount: schema.returns.sourceDiscount, tax: schema.returns.sourceTax, otherRefund: schema.returns.sourceOtherRefund, returnFee: schema.returns.sourceReturnFee, totalRefund: schema.returns.totalRefund, refundAmount: schema.returns.refundAmount, settlementStatus: schema.returns.settlementStatus, note: schema.returns.note, paymentSnapshots: schema.returns.sourcePaymentSnapshots })
+      .from(schema.returns).where(eq(schema.returns.storeId, store.id)),
+    db.select({ localId: schema.returnItems.id, returnId: schema.returnItems.returnId, orderItemId: schema.returnItems.orderItemId, productId: schema.returnItems.productId, productName: schema.returnItems.productName, sourceSku: schema.returnItems.sourceSku, unitName: schema.returnItems.unitName, unitMultiplier: schema.returnItems.unitMultiplier, quantity: schema.returnItems.quantity, unitPrice: schema.returnItems.unitPrice, total: schema.returnItems.total, restock: schema.returnItems.restock })
+      .from(schema.returnItems).where(eq(schema.returnItems.storeId, store.id)),
+    db.select({ localId: schema.purchaseReturnItems.id, purchaseReturnId: schema.purchaseReturnItems.purchaseReturnId, purchaseOrderItemId: schema.purchaseReturnItems.purchaseOrderItemId, productId: schema.purchaseReturnItems.productId, productName: schema.purchaseReturnItems.productName, sourceSku: schema.purchaseReturnItems.sku, unitName: schema.purchaseReturnItems.unitName, unitMultiplier: schema.purchaseReturnItems.unitMultiplier, quantity: schema.purchaseReturnItems.quantity, unitCost: schema.purchaseReturnItems.unitCost, returnUnitCost: schema.purchaseReturnItems.returnUnitCost, total: schema.purchaseReturnItems.total })
+      .from(schema.purchaseReturnItems).where(eq(schema.purchaseReturnItems.storeId, store.id)),
+  ]) : null;
+  const supplierActiveById = new Map(schemaSnapshots?.[0].map((item) => [item.localId, item.isActive]) ?? []);
+  const effectiveOrderLineRows = schemaSnapshots?.[1] ?? orderLineRows;
+  const effectivePurchaseLineRows = schemaSnapshots?.[2] ?? purchaseLineRows.map((item) => ({ ...item, productId: "", productName: null, sourceSku: item.legacyProductSku, unitName: null, unitMultiplier: "1" }));
+  const effectiveReturnRows = schemaSnapshots?.[3] ?? returnRows;
+  const effectiveReturnLineRows = schemaSnapshots?.[4] ?? returnLineRows.map((item) => ({ ...item, productId: "", productName: item.legacyProductSku, sourceSku: item.legacyProductSku, unitName: "", unitMultiplier: "1", restock: false }));
+  const effectivePurchaseReturnLineRows = schemaSnapshots?.[5] ?? purchaseReturnLineRows.map((item) => ({ ...item, purchaseOrderItemId: null, productId: "", productName: item.legacyProductSku, sourceSku: item.legacyProductSku, unitName: "", unitMultiplier: "1" }));
   const mappingState: KiotVietCliCurrentState["mappings"] = {};
   if (schemaReady) {
     const rows = await db.select({ entityType: schema.kiotvietSourceMappings.entityType, externalId: schema.kiotvietSourceMappings.externalId, localId: schema.kiotvietSourceMappings.localId })
-      .from(schema.kiotvietSourceMappings).where(and(eq(schema.kiotvietSourceMappings.storeId, store.id), eq(schema.kiotvietSourceMappings.provider, "kiotviet"), sql`${schema.kiotvietSourceMappings.deletedAt} is null`));
+      .from(schema.kiotvietSourceMappings).where(and(
+        eq(schema.kiotvietSourceMappings.storeId, store.id),
+        eq(schema.kiotvietSourceMappings.provider, "kiotviet"),
+        sql`${schema.kiotvietSourceMappings.deletedAt} is null`,
+      ));
     for (const row of rows) {
       const values = mappingState[row.entityType] ?? [];
       values.push({ externalId: row.externalId, localId: row.localId });
@@ -328,8 +479,8 @@ async function loadProductionReadOnlyState(storeSlug: string | null): Promise<Ki
   const saleOrders = orderRows.filter((item) => item.documentType === "sale");
   const saleOrderIds = new Set(saleOrders.map((item) => item.localId));
   const bookingOrders = orderRows.filter((item) => item.documentType === "booking");
-  const linesByOrder = new Map<string, typeof orderLineRows>();
-  for (const line of orderLineRows) {
+  const linesByOrder = new Map<string, typeof effectiveOrderLineRows>();
+  for (const line of effectiveOrderLineRows) {
     const values = linesByOrder.get(line.orderId) ?? [];
     values.push(line);
     linesByOrder.set(line.orderId, values);
@@ -341,11 +492,195 @@ async function loadProductionReadOnlyState(storeSlug: string | null): Promise<Ki
   const currentBaseProducts = base.filter((item) => !ignoredLegacyUnitPlaceholders.has(item.sku));
   const baseSkus = new Set(currentBaseProducts.map((item) => item.sku));
   const duplicateUnitSkus = units.filter((item) => item.sku && baseSkus.has(item.sku));
+  const externalByLocal = (entityType: string) => new Map(
+    (mappingState[entityType] ?? []).map((mapping) => [mapping.localId, mapping.externalId]),
+  );
+  const parentMappings = {
+    booking: externalByLocal("booking"), sale: externalByLocal("sale"), purchase: externalByLocal("purchase"),
+    customerReturn: externalByLocal("customer_return"), supplierReturn: externalByLocal("supplier_return"),
+  };
+  const childMappings = {
+    bookingLine: externalByLocal("booking_line"), bookingPayment: externalByLocal("booking_payment"),
+    saleLine: externalByLocal("sale_line"), salePayment: externalByLocal("sale_payment"),
+    purchaseLine: externalByLocal("purchase_line"), customerReturnLine: externalByLocal("customer_return_line"),
+    supplierReturnLine: externalByLocal("supplier_return_line"),
+  };
+  const paymentByOrder = new Map<string, typeof paymentRows>();
+  for (const payment of paymentRows) {
+    const values = paymentByOrder.get(payment.orderId) ?? [];
+    values.push(payment);
+    paymentByOrder.set(payment.orderId, values);
+  }
+  const invalidManagedSnapshots: string[] = [];
+  const mappedOrderLines = (orderId: string, mappings: Map<string, string>) => (linesByOrder.get(orderId) ?? []).flatMap((line) => {
+    const externalId = mappings.get(line.localId);
+    if (!externalId) return [];
+    const sourceSku = normalizeKiotVietText(line.sourceSku);
+    const unitName = normalizeKiotVietText(line.unitName);
+    const multiplier = Number(line.unitMultiplier);
+    if (!sourceSku || !unitName || !Number.isFinite(multiplier) || multiplier <= 0 || !line.productId) {
+      invalidManagedSnapshots.push(`order_line:${line.localId}`);
+      return [];
+    }
+    return [{
+      externalId, productId: line.productId, sourceSku, productName: line.productName,
+      unitName, unitMultiplier: multiplier, quantity: Number(line.quantity), unitPrice: Number(line.unitPrice),
+      discount: Number(line.discount), total: Number(line.total), note: line.note,
+    }];
+  }).sort((left, right) => left.externalId.localeCompare(right.externalId));
+  const mappedPayments = (orderId: string, mappings: Map<string, string>, allowCredit: boolean) => (paymentByOrder.get(orderId) ?? []).flatMap((payment) => {
+    const externalId = mappings.get(payment.localId);
+    const method = legacySalePaymentMethod(payment.method) ?? (allowCredit && payment.method === "credit" ? "credit" as const : undefined);
+    if (!externalId || !method) return [];
+    const channel = externalId.split("|")[2];
+    if (!channel || !["cash", "card", "bank_transfer", "wallet", "points"].includes(channel)) {
+      invalidManagedSnapshots.push(`payment:${payment.localId}`);
+      return [];
+    }
+    return [{ externalId, channel: channel as "cash" | "card" | "bank_transfer" | "wallet" | "points", method, amount: Number(payment.amount) }];
+  }).sort((left, right) => left.externalId.localeCompare(right.externalId));
+  const orderFingerprint = (item: typeof orderRows[number], type: "booking" | "sale") => {
+    if (!schemaReady) return "pre-migration-legacy-current";
+    const lineMap = type === "booking" ? childMappings.bookingLine : childMappings.saleLine;
+    const paymentMap = type === "booking" ? childMappings.bookingPayment : childMappings.salePayment;
+    const paymentSnapshots = mappedPayments(item.localId, paymentMap, type === "booking");
+    const common = {
+      code: item.code, documentType: type,
+      status: type === "sale" ? "completed" as const : item.status as "completed" | "draft",
+      paymentStatus: item.paymentStatus as "unpaid" | "deposit" | "paid",
+      customerId: item.customerId, createdAt: item.createdAt, subtotal: Number(item.subtotal),
+      discount: Number(item.discount), tax: Number(item.tax), shippingFee: Number(item.shippingFee),
+      total: Number(item.total), amountPaid: Number(item.amountPaid), note: item.note,
+      lines: mappedOrderLines(item.localId, lineMap), payments: paymentSnapshots,
+    };
+    return type === "booking"
+      ? kiotVietBookingFingerprint({ ...common, documentType: "booking", status: common.status as "completed" | "draft", deliveryDate: item.deliveryDate,
+        payments: paymentSnapshots as Array<{ externalId: string; channel: "cash" | "card" | "bank_transfer" | "wallet" | "points"; method: "cash" | "card" | "bank_transfer" | "momo" | "credit"; amount: number }> })
+      : kiotVietSaleFingerprint({ ...common, documentType: "sale", status: "completed", sourceOrderId: item.sourceOrderId,
+        payments: paymentSnapshots.filter((payment) => payment.method !== "credit") as Array<{ externalId: string; channel: "cash" | "card" | "bank_transfer" | "wallet"; method: "cash" | "card" | "bank_transfer" | "momo"; amount: number }> });
+  };
+  const purchaseLinesByParent = new Map<string, typeof effectivePurchaseLineRows>();
+  for (const line of effectivePurchaseLineRows) {
+    const values = purchaseLinesByParent.get(line.purchaseOrderId) ?? [];
+    values.push(line);
+    purchaseLinesByParent.set(line.purchaseOrderId, values);
+  }
+  const purchaseFingerprint = (item: typeof purchaseRows[number]) => {
+    if (!schemaReady) return "pre-migration-legacy-current";
+    const lines = (purchaseLinesByParent.get(item.localId) ?? []).flatMap((line) => {
+      const externalId = childMappings.purchaseLine.get(line.localId);
+      const sourceSku = normalizeKiotVietText(line.sourceSku);
+      const unitName = normalizeKiotVietText(line.unitName);
+      const unitMultiplier = Number(line.unitMultiplier);
+      if (!externalId) return [];
+      if (!sourceSku || !unitName || unitMultiplier <= 0 || !line.productId || !line.productName) {
+        invalidManagedSnapshots.push(`purchase_line:${line.localId}`);
+        return [];
+      }
+      return [{ externalId, productId: line.productId, sourceSku, productName: line.productName, unitName,
+        unitMultiplier, quantity: Number(line.quantity), unitCost: Number(line.unitCost), discount: Number(line.discount), total: Number(line.total) }];
+    }).sort((left, right) => left.externalId.localeCompare(right.externalId));
+    return kiotVietPurchaseFingerprint({ code: item.code, status: item.status as "received" | "draft", supplierId: item.supplierId,
+      createdAt: item.createdAt, subtotal: Number(item.subtotal), discount: Number(item.discount), vatRate: Number(item.vatRate),
+      tax: Number(item.tax), total: Number(item.total), amountPaid: Number(item.amountPaid), invoiceNumber: item.invoiceNumber, note: item.note, lines });
+  };
+  const returnLinesByParent = new Map<string, typeof effectiveReturnLineRows>();
+  for (const line of effectiveReturnLineRows) {
+    const values = returnLinesByParent.get(line.returnId) ?? [];
+    values.push(line);
+    returnLinesByParent.set(line.returnId, values);
+  }
+  const returnFingerprint = (item: typeof effectiveReturnRows[number]) => {
+    if (!schemaReady || !("invoiceCode" in item)) return "pre-migration-legacy-current";
+    const value = item as {
+      localId: string; code: string; orderId: string | null; customerId: string | null; status: string; createdAt: Date;
+      invoiceCode: string | null; subtotal: string | null; discount: string | null; tax: string | null;
+      otherRefund: string | null; returnFee: string | null; totalRefund: string; refundAmount: string | null;
+      settlementStatus: string | null; note: string | null; paymentSnapshots: unknown;
+    };
+    const lines = (returnLinesByParent.get(value.localId) ?? []).flatMap((line) => {
+      const externalId = childMappings.customerReturnLine.get(line.localId);
+      if (!externalId) return [];
+      const sourceSku = normalizeKiotVietText(line.sourceSku);
+      const unitName = normalizeKiotVietText(line.unitName);
+      const unitMultiplier = Number(line.unitMultiplier);
+      if (!sourceSku || !unitName || unitMultiplier <= 0 || !line.productId || line.restock !== false) {
+        invalidManagedSnapshots.push(`return_line:${line.localId}`);
+        return [];
+      }
+      return [{ externalId, orderItemId: line.orderItemId, productId: line.productId, sourceSku,
+        productName: line.productName ?? sourceSku, unitName, unitMultiplier, quantity: Number(line.quantity),
+        unitPrice: Number(line.unitPrice), total: Number(line.total), restock: false as const }];
+    }).sort((left, right) => left.externalId.localeCompare(right.externalId));
+    if (value.subtotal == null || value.discount == null || value.tax == null || value.otherRefund == null || value.returnFee == null || value.refundAmount == null
+      || !["unsettled", "partial", "settled"].includes(value.settlementStatus ?? "") || !Array.isArray(value.paymentSnapshots)) {
+      invalidManagedSnapshots.push(`return:${value.localId}`);
+      return "invalid-managed-return-snapshot";
+    }
+    return kiotVietReturnFingerprint({ code: value.code, invoiceCode: value.invoiceCode, orderId: value.orderId,
+      customerId: value.customerId, status: value.status as "completed" | "cancelled", createdAt: value.createdAt,
+      subtotal: Number(value.subtotal), discount: Number(value.discount), tax: Number(value.tax), otherRefund: Number(value.otherRefund),
+      returnFee: Number(value.returnFee), totalRefund: Number(value.totalRefund), refundAmount: Number(value.refundAmount),
+      settlementStatus: value.settlementStatus as "unsettled" | "partial" | "settled", note: value.note,
+      paymentSnapshots: value.paymentSnapshots as Array<{ channel: "cash" | "card" | "bank_transfer" | "wallet" | "points"; amount: number }>, lines });
+  };
+  const purchaseReturnLinesByParent = new Map<string, typeof effectivePurchaseReturnLineRows>();
+  for (const line of effectivePurchaseReturnLineRows) {
+    const values = purchaseReturnLinesByParent.get(line.purchaseReturnId) ?? [];
+    values.push(line);
+    purchaseReturnLinesByParent.set(line.purchaseReturnId, values);
+  }
+  const purchaseReturnFingerprint = (item: typeof purchaseReturnRows[number]) => {
+    if (!schemaReady) return "pre-migration-legacy-current";
+    const lines = (purchaseReturnLinesByParent.get(item.localId) ?? []).flatMap((line) => {
+      const externalId = childMappings.supplierReturnLine.get(line.localId);
+      if (!externalId) return [];
+      const sourceSku = normalizeKiotVietText(line.sourceSku);
+      const unitName = normalizeKiotVietText(line.unitName);
+      const unitMultiplier = Number(line.unitMultiplier);
+      if (!sourceSku || !unitName || unitMultiplier <= 0 || !line.productId || !line.productName) {
+        invalidManagedSnapshots.push(`supplier_return_line:${line.localId}`);
+        return [];
+      }
+      return [{ externalId, purchaseOrderItemId: null as null, productId: line.productId, sourceSku,
+        productName: line.productName, unitName, unitMultiplier, quantity: Number(line.quantity), unitCost: Number(line.unitCost),
+        returnUnitCost: Number(line.returnUnitCost), total: Number(line.total) }];
+    }).sort((left, right) => left.externalId.localeCompare(right.externalId));
+    return kiotVietPurchaseReturnFingerprint({ code: item.code, purchaseOrderId: null, supplierId: item.supplierId,
+      status: item.status as "completed" | "draft", settlementStatus: item.settlementStatus as "unsettled" | "partial" | "settled",
+      subtotal: Number(item.subtotal), discount: Number(item.discount), vatRate: Number(item.vatRate), tax: Number(item.tax),
+      totalRefund: Number(item.totalRefund), refundAmount: Number(item.refundAmount), refundMethod: item.refundMethod as "cash" | null,
+      debtAmount: Number(item.debtAmount), note: item.note, createdAt: item.createdAt, lines });
+  };
+  // Materialize every fingerprint before publishing loader blockers. Fingerprint
+  // reconstruction is also where malformed persisted source snapshots are found.
+  const current: KiotVietCliCurrentState = {
+    customers: customerRows.map((item) => ({ ...item, legacyImported: !schemaReady || externalByLocal("customer").has(item.localId) })),
+    suppliers: supplierRows.map((item) => ({ ...item, isActive: supplierActiveById.get(item.localId) ?? true, legacyImported: !schemaReady || externalByLocal("supplier").has(item.localId) })),
+    bookings: bookingOrders.map((item) => ({ localId: item.localId, code: item.code, fingerprint: orderFingerprint(item, "booking"), legacyImported: !schemaReady || parentMappings.booking.has(item.localId) })),
+    sales: saleOrders.map((item) => ({ localId: item.localId, code: item.code, fingerprint: orderFingerprint(item, "sale"), legacyImported: !schemaReady || parentMappings.sale.has(item.localId) })),
+    saleLines: effectiveOrderLineRows.filter((item) => saleOrderIds.has(item.orderId)).map((item) => ({ ...item, sourceSku: item.sourceSku ?? undefined, legacyImported: !schemaReady || childMappings.saleLine.has(item.localId) })),
+    salePayments: paymentRows.filter((item) => saleOrderIds.has(item.orderId)).map((item) => {
+      const method = legacySalePaymentMethod(item.method);
+      return { localId: item.localId, orderId: item.orderId, amount: item.amount, note: item.note, ...(method ? { method } : {}), legacyImported: method != null && (!schemaReady || childMappings.salePayment.has(item.localId)), legacyAggregatePayment: item.note === "Import lịch sử KiotViet" };
+    }),
+    purchases: purchaseRows.map((item) => ({ ...item, fingerprint: purchaseFingerprint(item), legacyImported: !schemaReady || parentMappings.purchase.has(item.localId) })),
+    purchaseLines: effectivePurchaseLineRows.map((item) => ({ ...item, sourceSku: item.sourceSku ?? undefined, legacyProductSku: item.sourceSku ?? undefined, legacyProductName: item.productName ?? undefined, unitName: item.unitName ?? undefined, legacyImported: !schemaReady || childMappings.purchaseLine.has(item.localId) })),
+    returns: effectiveReturnRows.map((item) => ({ localId: item.localId, code: item.code, fingerprint: returnFingerprint(item), legacyImported: !schemaReady || parentMappings.customerReturn.has(item.localId) })),
+    returnLines: effectiveReturnLineRows.map((item) => ({ ...item, sourceSku: item.sourceSku ?? undefined, legacyProductSku: item.sourceSku ?? undefined, active: effectiveReturnRows.find((parent) => parent.localId === item.returnId)?.status === "completed", legacyImported: !schemaReady || childMappings.customerReturnLine.has(item.localId) })),
+    returnSales: saleOrders.flatMap((item) => item.status === "completed" || item.status === "returned" ? [{
+      invoiceCode: item.code, orderId: item.localId, customerId: item.customerId, status: item.status,
+      items: (linesByOrder.get(item.localId) ?? []).flatMap((line) => line.sourceSku ? [{ localId: line.localId, sourceSku: line.sourceSku, unitName: line.unitName, quantity: line.quantity }] : []),
+    }] : []),
+    purchaseReturns: purchaseReturnRows.flatMap((item) => ["unsettled", "partial", "settled"].includes(item.settlementStatus) ? [{ ...item, fingerprint: purchaseReturnFingerprint(item), settlementStatus: item.settlementStatus as "unsettled" | "partial" | "settled", legacyImported: !schemaReady || parentMappings.supplierReturn.has(item.localId) }] : []),
+    purchaseReturnLines: effectivePurchaseReturnLineRows.map((item) => ({ ...item, sourceSku: item.sourceSku ?? undefined, legacyProductSku: item.sourceSku ?? undefined, legacyImported: !schemaReady || childMappings.supplierReturnLine.has(item.localId) })),
+    mappings: mappingState,
+  };
   return {
     storeId: store.id, schemaReady,
     loaderBlockers: [
       ...(duplicateUnitSkus.length > 0 ? [{ phase: "product-references" as const, reason: "base_alternate_sku_collision", count: duplicateUnitSkus.length }] : []),
-      { phase: "all", reason: "production_apply_adapter_unavailable", count: 1 },
+      ...(invalidManagedSnapshots.length > 0 ? [{ phase: "all" as const, reason: "invalid_managed_source_snapshot", count: invalidManagedSnapshots.length }] : []),
     ],
     productCatalog: {
       currentBaseProducts,
@@ -355,29 +690,13 @@ async function loadProductionReadOnlyState(storeSlug: string | null): Promise<Ki
       // inactive live product mapping alone is not approval, so fail closed.
       approvedHistoricalPlaceholders: [],
     },
-    current: {
-      customers: customerRows.map((item) => ({ ...item, legacyImported: !schemaReady })),
-      suppliers: supplierRows.map((item) => ({ ...item, isActive: true, legacyImported: !schemaReady })),
-      bookings: bookingOrders.map((item) => ({ localId: item.localId, code: item.code, fingerprint: "pre-migration-legacy-current", legacyImported: !schemaReady })),
-      sales: saleOrders.map((item) => ({ localId: item.localId, code: item.code, fingerprint: "pre-migration-legacy-current", legacyImported: !schemaReady })),
-      saleLines: orderLineRows.filter((item) => saleOrderIds.has(item.orderId)).map((item) => ({ ...item, legacyImported: !schemaReady })),
-      salePayments: paymentRows.filter((item) => saleOrderIds.has(item.orderId)).map((item) => {
-        const method = legacySalePaymentMethod(item.method);
-        return { localId: item.localId, orderId: item.orderId, amount: item.amount, note: item.note, ...(method ? { method } : {}), legacyImported: !schemaReady && method != null, legacyAggregatePayment: item.note === "Import lịch sử KiotViet" };
-      }),
-      purchases: purchaseRows.map((item) => ({ ...item, fingerprint: "pre-migration-legacy-current", legacyImported: !schemaReady })),
-      purchaseLines: purchaseLineRows.map((item) => ({ ...item, legacyImported: !schemaReady })),
-      returns: returnRows.map((item) => ({ localId: item.localId, code: item.code, fingerprint: "pre-migration-legacy-current", legacyImported: !schemaReady })),
-      returnLines: returnLineRows.map((item) => ({ ...item, active: returnRows.find((parent) => parent.localId === item.returnId)?.status === "completed", legacyImported: !schemaReady })),
-      returnSales: saleOrders.flatMap((item) => item.status === "completed" || item.status === "returned" ? [{
-        invoiceCode: item.code, orderId: item.localId, customerId: item.customerId, status: item.status,
-        items: (linesByOrder.get(item.localId) ?? []).map((line) => ({ localId: line.localId, sourceSku: line.sourceSku, unitName: line.unitName, quantity: line.quantity })),
-      }] : []),
-      purchaseReturns: purchaseReturnRows.flatMap((item) => ["unsettled", "partial", "settled"].includes(item.settlementStatus) ? [{ ...item, fingerprint: "pre-migration-legacy-current", settlementStatus: item.settlementStatus as "unsettled" | "partial" | "settled", legacyImported: !schemaReady }] : []),
-      purchaseReturnLines: purchaseReturnLineRows.map((item) => ({ ...item, legacyImported: !schemaReady })),
-      mappings: mappingState,
-    },
+    current,
   };
+}
+
+async function loadProductionReadOnlyState(storeSlug: string | null): Promise<KiotVietCliPlanningState> {
+  const { db } = await import("../db");
+  return loadKiotVietPlanningStateFromDatabase(db, storeSlug);
 }
 
 export async function runKiotVietDataSyncCli(argv: string[], dependencies: KiotVietDataSyncCliDependencies = {}) {
@@ -387,8 +706,9 @@ export async function runKiotVietDataSyncCli(argv: string[], dependencies: KiotV
     assertKiotVietDataSyncApplyGuard({ apply: true, phase: args.phase, storeSlug: args.storeSlug, reviewedSourceSha256: args.reviewedSourceSha256, actualSourceSha256: reviewedHashForPhase(bundle, args.phase) });
   }
   const state = await (dependencies.loadPlanningState ?? loadProductionReadOnlyState)(args.storeSlug);
-  const plans = planKiotVietBundle(bundle, state);
-  const selected = args.phase === "all" ? null : plans.find((item) => item.phase === args.phase)!;
+  const executablePlans = planKiotVietBundle(bundle, state);
+  const plans = executablePlans.map(({ phase, summary, blockers }) => ({ phase, summary, blockers }));
+  const selected = args.phase === "all" ? null : executablePlans.find((item) => item.phase === args.phase)!;
   const prerequisite = [
     ...(state.schemaReady ? [] : [{ phase: args.phase, reason: "missing_prerequisite_schema", count: 1 } as KiotVietCliBlocker]),
     ...(state.loaderBlockers ?? []),
@@ -397,8 +717,15 @@ export async function runKiotVietDataSyncCli(argv: string[], dependencies: KiotV
     if (!state.schemaReady) throw new Error("Cannot apply: prerequisite migration 0116 (kiotviet_source_mappings) is not deployed");
     if (prerequisite.length > 0) throw new Error(`Cannot apply: ${prerequisite.map((item) => item.reason).join(", ")}`);
     if (!selected || selected.blockers.length > 0) throw new Error("Cannot apply a KiotViet phase with unresolved blockers");
-    if (!dependencies.applyPhase) throw new Error("Production apply adapter is intentionally unavailable until its phase checkpoint is approved");
-    const applied = await dependencies.applyPhase({ phase: args.phase as KiotVietSyncPhase, reviewedSha256: reviewedHashForPhase(bundle, args.phase as KiotVietSyncPhase), bundle, plan: selected });
+    assertKiotVietExecutablePlan(selected);
+    const applyPhase = dependencies.applyPhase ?? applyProductionKiotVietPhase;
+    const applied = await applyPhase({
+      phase: args.phase as KiotVietSyncPhase,
+      storeId: state.storeId,
+      reviewedSha256: reviewedHashForPhase(bundle, args.phase as KiotVietSyncPhase),
+      bundle,
+      plan: selected,
+    });
     const remaining = managedChangeCount(applied.postApplyPlan);
     if (remaining !== 0) throw new Error(`KiotViet post-apply dry-run is not zero-diff: ${remaining} managed changes/blockers remain`);
   }

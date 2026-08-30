@@ -11,6 +11,14 @@ const {
   createKiotVietDataSyncTransaction,
 } = await import(`${projectRoot}/src/lib/kiotviet/data-sync-database.ts`);
 const {
+  applyKiotVietTypedPhasePlan,
+} = await import(`${projectRoot}/src/lib/kiotviet/data-sync-apply.ts`);
+const {
+  applyKiotVietPhaseWithDatabase,
+  loadKiotVietPlanningStateFromDatabase,
+  planKiotVietBundle,
+} = await import(`${projectRoot}/src/scripts/sync-kiotviet-data.ts`);
+const {
   assertKiotVietHistoryInvariants,
   createEmptyKiotVietInvariantSnapshot,
   executeKiotVietDataSyncPhase,
@@ -225,6 +233,64 @@ describe("KiotViet invariant harness", () => {
 });
 
 describe("KiotViet store-scoped database adapter", () => {
+  test("applies a customer create to the real transaction and creates its source mapping", async () => {
+    const runId = await createAuditRepository().startRun({
+      phase: "customers",
+      sourceFileName: "customers.xlsx",
+      sourceSha256: SOURCE_SHA,
+      bundleSha256: BUNDLE_SHA,
+      sourceRows: 1,
+      sourceDocuments: 1,
+    });
+
+    await database.transaction(async (rawTransaction) => {
+      const syncTransaction = await createKiotVietDataSyncTransaction({
+        transaction: rawTransaction,
+        storeId: STORE_ID,
+        expectedStoreSlug: "hai-dang",
+      });
+      await applyKiotVietTypedPhasePlan({
+        transaction: rawTransaction,
+        syncTransaction,
+        storeId: STORE_ID,
+        runId,
+        sourceSha256: SOURCE_SHA,
+        plan: {
+          phase: "customers",
+          summary: { created: 1 },
+          blockers: [],
+          typedPlan: {
+            customers: [],
+            entityPlan: { creates: [], adopts: [], updates: [], unchanged: [], preserves: [], conflicts: [] },
+            inactivations: [],
+            historicalPlaceholders: [],
+            sourceTotals: { currentDebt: 25, totalSpent: 100 },
+            summary: { created: 1, adopted: 0, updated: 0, unchanged: 0, conflicts: 0, preserved: 0, inactivated: 0, historicalPlaceholders: 0, debtCorrections: 0, totalSpentCorrections: 0 },
+            writes: [{
+              action: "create",
+              externalId: "KH-APPLY",
+              customer: { externalId: "KH-APPLY", code: "KH-APPLY", name: "Apply customer", phone: null, email: null, address: null, taxCode: null, note: null, isActive: true, currentDebt: 25, totalSpent: 100, type: "retail" },
+            }],
+          },
+        },
+      });
+    });
+
+    const [created] = await database.select().from(schema.customers)
+      .where(and(eq(schema.customers.storeId, STORE_ID), eq(schema.customers.code, "KH-APPLY")));
+    expect(created).toMatchObject({ name: "Apply customer", currentDebt: "25.00", totalSpent: "100.00" });
+    const [mapping] = await database.select().from(schema.kiotvietSourceMappings)
+      .where(and(
+        eq(schema.kiotvietSourceMappings.storeId, STORE_ID),
+        eq(schema.kiotvietSourceMappings.entityType, "customer"),
+        eq(schema.kiotvietSourceMappings.externalId, "KH-APPLY"),
+      ));
+    expect(mapping).toMatchObject({ localId: created.id, adoptionMethod: "created", lastSeenRunId: runId });
+    await database.delete(schema.kiotvietSourceMappings).where(eq(schema.kiotvietSourceMappings.id, mapping.id));
+    await database.delete(schema.customers).where(eq(schema.customers.id, created.id));
+    await database.delete(schema.kiotvietSyncRuns).where(eq(schema.kiotvietSyncRuns.id, runId));
+  });
+
   test("captures invariants, validates mapping ownership, and preserves mapping identity", async () => {
     const [customer, otherCustomer] = await database.insert(schema.customers).values([
       { storeId: STORE_ID, code: "KH-1", name: "Customer 1", currentDebt: "25", totalSpent: "100" },
@@ -404,5 +470,247 @@ describe("KiotViet store-scoped database adapter", () => {
       errorDetails: { message: "forced rollback" },
     });
     expect(failedRun.completedAt).toBeInstanceOf(Date);
+  });
+
+  test("applies source-owned creates for every document phase without operational side effects", async () => {
+    let [warehouse] = await database.select().from(schema.warehouses)
+      .where(and(eq(schema.warehouses.storeId, STORE_ID), eq(schema.warehouses.isDefault, true)));
+    if (!warehouse) {
+      [warehouse] = await database.insert(schema.warehouses).values({
+        storeId: STORE_ID,
+        name: "Apply default warehouse",
+        isDefault: true,
+      }).returning();
+    }
+    expect(warehouse).toBeDefined();
+    const [product] = await database.insert(schema.products).values({
+      storeId: STORE_ID,
+      sku: "SKU-APPLY-ALL",
+      name: "Apply product",
+      baseUnit: "Cái",
+    }).returning({ id: schema.products.id });
+    const [customer] = await database.insert(schema.customers).values({
+      storeId: STORE_ID,
+      code: "KH-APPLY-ALL",
+      name: "Apply customer all",
+    }).returning({ id: schema.customers.id });
+    const emptyEntityPlan = { creates: [], adopts: [], updates: [], unchanged: [], preserves: [], conflicts: [] };
+    async function apply(phase, typedPlan) {
+      const runId = await createAuditRepository().startRun({
+        phase,
+        sourceFileName: `${phase}.xlsx`,
+        sourceSha256: SOURCE_SHA,
+        bundleSha256: BUNDLE_SHA,
+        sourceRows: 1,
+        sourceDocuments: 1,
+      });
+      await database.transaction(async (rawTransaction) => {
+        const syncTransaction = await createKiotVietDataSyncTransaction({
+          transaction: rawTransaction,
+          storeId: STORE_ID,
+          expectedStoreSlug: "hai-dang",
+        });
+        await applyKiotVietTypedPhasePlan({
+          transaction: rawTransaction,
+          syncTransaction,
+          storeId: STORE_ID,
+          runId,
+          sourceSha256: SOURCE_SHA,
+          plan: { phase, summary: { creates: 1 }, blockers: [], typedPlan },
+        });
+      });
+    }
+
+    const line = {
+      externalId: "DOC-APPLY-ALL|SKU-APPLY-ALL|cái|1",
+      productId: product.id,
+      sourceSku: "SKU-APPLY-ALL",
+      productName: "Apply product",
+      unitName: "Cái",
+      unitMultiplier: 1,
+      quantity: 2,
+      unitPrice: 10,
+      discount: 0,
+      total: 20,
+      note: null,
+    };
+    const orderBase = {
+      status: "completed",
+      paymentStatus: "paid",
+      customerId: customer.id,
+      createdAt: new Date("2026-01-01T00:00:00Z"),
+      subtotal: 20,
+      discount: 0,
+      tax: 0,
+      shippingFee: 0,
+      total: 20,
+      amountPaid: 20,
+      note: null,
+    };
+    await apply("product-references", { summary: {}, resolutions: [], blockers: [] });
+    await apply("suppliers", {
+      suppliers: [], entityPlan: emptyEntityPlan, inactivations: [], historicalPlaceholders: [],
+      unknownSupplierPlaceholder: null, sourceTotals: { currentDebt: 0, netPurchases: 0 }, blockers: [], summary: {},
+      writes: [{ action: "create", externalId: "NCC-APPLY-ALL", supplier: {
+        code: "NCC-APPLY-ALL", name: "Apply supplier all", phone: null, email: null, address: null,
+        taxCode: null, note: null, isActive: true, currentDebt: 0,
+      } }],
+    });
+    const [supplier] = await database.select({ id: schema.suppliers.id }).from(schema.suppliers)
+      .where(and(eq(schema.suppliers.storeId, STORE_ID), eq(schema.suppliers.code, "NCC-APPLY-ALL")));
+    await apply("bookings", {
+      bookings: [], entityPlan: emptyEntityPlan, blockers: [], summary: {},
+      writes: [{ action: "create", externalId: "DH-APPLY-ALL", booking: {
+        ...orderBase, code: "DH-APPLY-ALL", documentType: "booking", deliveryDate: null,
+        lines: [{ ...line, externalId: "DH-APPLY-ALL|SKU-APPLY-ALL|cái|1" }],
+        payments: [{ externalId: "DH-APPLY-ALL|payment|cash|1", channel: "cash", method: "cash", amount: 20 }],
+      } }],
+    });
+    await apply("sales", {
+      sales: [], entityPlan: emptyEntityPlan, blockers: [], summary: {},
+      writes: [{ action: "create", externalId: "HD-APPLY-ALL", sale: {
+        ...orderBase, code: "HD-APPLY-ALL", documentType: "sale", sourceOrderId: null,
+        lines: [{ action: "create", externalId: "HD-APPLY-ALL|SKU-APPLY-ALL|cái|1", line: { ...line, externalId: undefined } }],
+        payments: [{ action: "create", externalId: "HD-APPLY-ALL|payment|cash|1", payment: { channel: "cash", method: "cash", amount: 20 } }],
+        preservedLineIds: [], preservedPaymentIds: [],
+      } }],
+    });
+    const [sale] = await database.select().from(schema.orders)
+      .where(and(eq(schema.orders.storeId, STORE_ID), eq(schema.orders.code, "HD-APPLY-ALL")));
+    const [saleLine] = await database.select().from(schema.orderItems)
+      .where(and(eq(schema.orderItems.storeId, STORE_ID), eq(schema.orderItems.orderId, sale.id)));
+    await database.update(schema.orders).set({ status: "returned" }).where(eq(schema.orders.id, sale.id));
+    await apply("sales", {
+      sales: [], entityPlan: emptyEntityPlan, blockers: [], summary: {},
+      writes: [{ action: "update", externalId: "HD-APPLY-ALL", localId: sale.id, sale: {
+        ...orderBase, code: "HD-APPLY-ALL", documentType: "sale", sourceOrderId: null, note: "source-owned update",
+        lines: [], payments: [], preservedLineIds: [saleLine.id], preservedPaymentIds: [],
+      } }],
+    });
+    const [updatedSale] = await database.select({ status: schema.orders.status, note: schema.orders.note })
+      .from(schema.orders).where(eq(schema.orders.id, sale.id));
+    expect(updatedSale).toMatchObject({ status: "returned", note: "source-owned update" });
+    await apply("purchases", {
+      purchases: [], entityPlan: emptyEntityPlan, blockers: [], preservedLineIds: [], summary: {},
+      writes: [{ action: "create", externalId: "PN-APPLY-ALL", purchase: {
+        code: "PN-APPLY-ALL", status: "received", supplierId: supplier.id,
+        createdAt: new Date("2026-01-01T00:00:00Z"), subtotal: 20, discount: 0, vatRate: 0,
+        tax: 0, total: 20, amountPaid: 20, invoiceNumber: null, note: null, preservedLineIds: [],
+        lines: [{ action: "create", externalId: "PN-APPLY-ALL|SKU-APPLY-ALL|cái|1", line: {
+          productId: product.id, sourceSku: "SKU-APPLY-ALL", productName: "Apply product", unitName: "Cái", unitMultiplier: 1,
+          quantity: 2, unitCost: 10, discount: 0, total: 20,
+        } }],
+      } }],
+    });
+    await apply("returns", {
+      returns: [], entityPlan: emptyEntityPlan, blockers: [], preservedLineIds: [], linkageExceptions: [], saleStatusUpdates: [], summary: {},
+      writes: [{ action: "create", externalId: "TH-APPLY-ALL", return: {
+        code: "TH-APPLY-ALL", invoiceCode: "HD-APPLY-ALL", orderId: sale.id, customerId: customer.id,
+        status: "completed", createdAt: new Date("2026-01-02T00:00:00Z"), subtotal: 10, discount: 0, tax: 0,
+        otherRefund: 0, returnFee: 0, totalRefund: 10, refundAmount: 10, settlementStatus: "settled", note: null,
+        paymentSnapshots: [{ channel: "cash", amount: 10 }], preservedLineIds: [],
+        lines: [{ action: "create", externalId: "TH-APPLY-ALL|SKU-APPLY-ALL|cái|1", line: {
+          orderItemId: saleLine.id, productId: product.id, sourceSku: "SKU-APPLY-ALL", productName: "Apply product",
+          unitName: "Cái", unitMultiplier: 1, quantity: 1, unitPrice: 10, total: 10, restock: false,
+        } }],
+      } }],
+    });
+    await apply("purchase-returns", {
+      returns: [], entityPlan: emptyEntityPlan, blockers: [], preservedLineIds: [], operationalEffects: [], summary: {},
+      writes: [{ action: "create", externalId: "THN-APPLY-ALL", purchaseReturn: {
+        code: "THN-APPLY-ALL", purchaseOrderId: null, supplierId: supplier.id, status: "completed", settlementStatus: "settled",
+        subtotal: 10, discount: 0, vatRate: 0, tax: 0, totalRefund: 10, refundAmount: 10, refundMethod: "cash",
+        debtAmount: 0, note: null, createdAt: new Date("2026-01-02T00:00:00Z"), preservedLineIds: [],
+        lines: [{ action: "create", externalId: "THN-APPLY-ALL|SKU-APPLY-ALL|cái|1", line: {
+          purchaseOrderItemId: null, productId: product.id, sourceSku: "SKU-APPLY-ALL", productName: "Apply product",
+          unitName: "Cái", unitMultiplier: 1, quantity: 1, unitCost: 10, returnUnitCost: 10, total: 10,
+        } }],
+      } }],
+    });
+
+    expect(await database.select().from(schema.orders).where(eq(schema.orders.code, "DH-APPLY-ALL"))).toHaveLength(1);
+    expect(await database.select().from(schema.purchaseOrders).where(eq(schema.purchaseOrders.code, "PN-APPLY-ALL"))).toHaveLength(1);
+    expect(await database.select().from(schema.returns).where(eq(schema.returns.code, "TH-APPLY-ALL"))).toHaveLength(1);
+    expect(await database.select().from(schema.purchaseReturns).where(eq(schema.purchaseReturns.code, "THN-APPLY-ALL"))).toHaveLength(1);
+    const mappings = await database.select().from(schema.kiotvietSourceMappings)
+      .where(and(eq(schema.kiotvietSourceMappings.storeId, STORE_ID), eq(schema.kiotvietSourceMappings.sourceSha256, SOURCE_SHA)));
+    expect(mappings.map((item) => item.entityType)).toEqual(expect.arrayContaining([
+      "booking", "booking_line", "booking_payment", "sale", "sale_line", "sale_payment",
+      "supplier", "purchase", "purchase_line", "customer_return", "customer_return_line", "supplier_return", "supplier_return_line",
+    ]));
+    expect(await database.select().from(schema.stockMovements).where(eq(schema.stockMovements.storeId, STORE_ID))).toHaveLength(0);
+    expect(await database.select().from(schema.cashTransactions).where(eq(schema.cashTransactions.storeId, STORE_ID))).toHaveLength(0);
+
+    const loaded = await loadKiotVietPlanningStateFromDatabase(database, "hai-dang");
+    expect(loaded.current.sales.find((item) => item.code === "HD-APPLY-ALL").fingerprint)
+      .toMatch(/^[0-9a-f]{64}$/);
+    expect(loaded.current.saleLines.find((item) => item.orderId === sale.id).sourceSku).toBe("SKU-APPLY-ALL");
+    await database.update(schema.orderItems).set({ sourceSku: null }).where(eq(schema.orderItems.id, saleLine.id));
+    const invalidSnapshot = await loadKiotVietPlanningStateFromDatabase(database, "hai-dang");
+    expect(invalidSnapshot.loaderBlockers).toContainEqual({
+      phase: "all", reason: "invalid_managed_source_snapshot", count: 1,
+    });
+    await database.update(schema.orderItems).set({ sourceSku: "SKU-APPLY-ALL" }).where(eq(schema.orderItems.id, saleLine.id));
+    const saleMapping = mappings.find((item) => item.entityType === "sale" && item.externalId === "HD-APPLY-ALL");
+    await database.update(schema.kiotvietSourceMappings).set({ deletedAt: new Date() })
+      .where(eq(schema.kiotvietSourceMappings.id, saleMapping.id));
+    const withoutTombstones = await loadKiotVietPlanningStateFromDatabase(database, "hai-dang");
+    expect(withoutTombstones.current.mappings.sale ?? []).not.toContainEqual(expect.objectContaining({ externalId: "HD-APPLY-ALL" }));
+  });
+
+  test("replans a real transactional customer apply to zero managed changes", async () => {
+    const phases = ["customers", "suppliers", "bookings", "sales", "purchases", "returns", "purchase-returns"];
+    const bundle = {
+      bundleSha256: BUNDLE_SHA,
+      sources: phases.map((phase) => ({
+        phase,
+        filename: `${phase}.xlsx`,
+        path: `/tmp/${phase}.xlsx`,
+        sha256: phase === "customers" ? SOURCE_SHA : "c".repeat(64),
+        headers: [],
+        rows: phase === "customers" ? [{
+          "Mã khách hàng": "KH-POST-ZERO",
+          "Tên khách hàng": "Post zero customer",
+          "Nợ cần thu hiện tại": 15,
+          "Tổng bán trừ trả hàng": 30,
+          "Trạng thái": "Hoạt động",
+        }] : [],
+        rowCount: phase === "customers" ? 1 : 0,
+        documentCount: phase === "customers" ? 1 : 0,
+        codeColumn: phase === "customers" ? "Mã khách hàng" : "code",
+      })),
+    };
+    const beforeState = await loadKiotVietPlanningStateFromDatabase(database, "hai-dang");
+    const plan = planKiotVietBundle(bundle, beforeState).find((item) => item.phase === "customers");
+    expect(plan.summary.created).toBe(1);
+    const applied = await applyKiotVietPhaseWithDatabase(database, {
+      phase: "customers",
+      storeId: STORE_ID,
+      reviewedSha256: SOURCE_SHA,
+      bundle,
+      plan,
+    });
+    expect(applied.postApplyPlan.summary).toMatchObject({ created: 0, adopted: 0, updated: 0, conflicts: 0 });
+    expect(applied.postApplyPlan.blockers).toEqual([]);
+    const [run] = await database.select().from(schema.kiotvietSyncRuns)
+      .where(eq(schema.kiotvietSyncRuns.sourceFileName, "customers.xlsx"));
+    expect(run.status).toBe("completed");
+
+    const nextSha = "d".repeat(64);
+    const rerunBundle = structuredClone(bundle);
+    rerunBundle.bundleSha256 = nextSha;
+    rerunBundle.sources[0].sha256 = nextSha;
+    const rerunState = await loadKiotVietPlanningStateFromDatabase(database, "hai-dang");
+    const unchangedPlan = planKiotVietBundle(rerunBundle, rerunState).find((item) => item.phase === "customers");
+    expect(unchangedPlan.summary.unchanged).toBe(1);
+    await applyKiotVietPhaseWithDatabase(database, {
+      phase: "customers", storeId: STORE_ID, reviewedSha256: nextSha, bundle: rerunBundle, plan: unchangedPlan,
+    });
+    const [refreshedMapping] = await database.select().from(schema.kiotvietSourceMappings).where(and(
+      eq(schema.kiotvietSourceMappings.storeId, STORE_ID),
+      eq(schema.kiotvietSourceMappings.entityType, "customer"),
+      eq(schema.kiotvietSourceMappings.externalId, "KH-POST-ZERO"),
+    ));
+    expect(refreshedMapping.sourceSha256).toBe(nextSha);
   });
 });

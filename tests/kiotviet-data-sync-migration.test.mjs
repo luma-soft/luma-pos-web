@@ -36,6 +36,9 @@ describe("KiotViet remaining-data synchronization migration", () => {
       where table_name in ('kiotviet_sync_runs', 'kiotviet_source_mappings')
          or (table_name = 'suppliers' and column_name = 'is_active')
          or (table_name = 'returns' and column_name in ('refund_amount', 'settlement_status'))
+         or (table_name = 'returns' and column_name in ('source_invoice_code', 'source_subtotal', 'source_discount', 'source_tax', 'source_other_refund', 'source_return_fee', 'source_payment_snapshots'))
+         or (table_name = 'order_items' and column_name = 'source_sku')
+         or (table_name = 'return_items' and column_name = 'source_sku')
          or (table_name = 'purchase_order_items' and column_name in ('product_name', 'sku', 'unit_name', 'unit_multiplier'))
          or (table_name = 'purchase_return_items' and column_name = 'unit_multiplier')
       order by table_name, ordinal_position
@@ -68,13 +71,22 @@ describe("KiotViet remaining-data synchronization migration", () => {
       { table_name: "kiotviet_sync_runs", column_name: "error_details", is_nullable: "YES" },
       { table_name: "kiotviet_sync_runs", column_name: "started_at", is_nullable: "NO" },
       { table_name: "kiotviet_sync_runs", column_name: "completed_at", is_nullable: "YES" },
+      { table_name: "order_items", column_name: "source_sku", is_nullable: "YES" },
       { table_name: "purchase_order_items", column_name: "product_name", is_nullable: "YES" },
       { table_name: "purchase_order_items", column_name: "sku", is_nullable: "YES" },
       { table_name: "purchase_order_items", column_name: "unit_name", is_nullable: "YES" },
       { table_name: "purchase_order_items", column_name: "unit_multiplier", is_nullable: "NO" },
       { table_name: "purchase_return_items", column_name: "unit_multiplier", is_nullable: "NO" },
+      { table_name: "return_items", column_name: "source_sku", is_nullable: "YES" },
       { table_name: "returns", column_name: "refund_amount", is_nullable: "YES" },
       { table_name: "returns", column_name: "settlement_status", is_nullable: "YES" },
+      { table_name: "returns", column_name: "source_invoice_code", is_nullable: "YES" },
+      { table_name: "returns", column_name: "source_subtotal", is_nullable: "YES" },
+      { table_name: "returns", column_name: "source_discount", is_nullable: "YES" },
+      { table_name: "returns", column_name: "source_tax", is_nullable: "YES" },
+      { table_name: "returns", column_name: "source_other_refund", is_nullable: "YES" },
+      { table_name: "returns", column_name: "source_return_fee", is_nullable: "YES" },
+      { table_name: "returns", column_name: "source_payment_snapshots", is_nullable: "YES" },
       { table_name: "suppliers", column_name: "is_active", is_nullable: "NO" },
     ]);
   });

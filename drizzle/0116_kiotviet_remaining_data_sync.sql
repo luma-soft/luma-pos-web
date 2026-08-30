@@ -3,7 +3,14 @@ ALTER TABLE "suppliers"
 --> statement-breakpoint
 ALTER TABLE "returns"
   ADD COLUMN "refund_amount" numeric(14, 2),
-  ADD COLUMN "settlement_status" text;
+  ADD COLUMN "settlement_status" text,
+  ADD COLUMN "source_invoice_code" varchar(30),
+  ADD COLUMN "source_subtotal" numeric(14, 2),
+  ADD COLUMN "source_discount" numeric(14, 2),
+  ADD COLUMN "source_tax" numeric(14, 2),
+  ADD COLUMN "source_other_refund" numeric(14, 2),
+  ADD COLUMN "source_return_fee" numeric(14, 2),
+  ADD COLUMN "source_payment_snapshots" jsonb;
 --> statement-breakpoint
 ALTER TABLE "returns"
   ADD CONSTRAINT "returns_refund_amount_check"
@@ -16,6 +23,12 @@ ALTER TABLE "purchase_order_items"
   ADD COLUMN "sku" varchar(50),
   ADD COLUMN "unit_name" varchar(30),
   ADD COLUMN "unit_multiplier" numeric(14, 4) DEFAULT 1 NOT NULL;
+--> statement-breakpoint
+ALTER TABLE "order_items"
+  ADD COLUMN "source_sku" varchar(50);
+--> statement-breakpoint
+ALTER TABLE "return_items"
+  ADD COLUMN "source_sku" varchar(50);
 --> statement-breakpoint
 ALTER TABLE "purchase_return_items"
   ADD COLUMN "unit_multiplier" numeric(14, 4) DEFAULT 1 NOT NULL;

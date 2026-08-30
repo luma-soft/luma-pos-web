@@ -264,8 +264,12 @@ function uniqueByKey<T>(values: T[], keyOf: (value: T) => string, label: string)
   return result;
 }
 
-function sourceSaleFingerprint(sale: KiotVietSaleSnapshot): string {
-  return stableKiotVietFingerprint(sale);
+export function kiotVietSaleFingerprint(sale: KiotVietSaleSnapshot): string {
+  return stableKiotVietFingerprint({
+    ...sale,
+    lines: [...sale.lines].sort((left, right) => left.externalId.localeCompare(right.externalId)),
+    payments: [...sale.payments].sort((left, right) => left.externalId.localeCompare(right.externalId)),
+  });
 }
 
 export function auditKiotVietSaleProductResolutions(input: {
@@ -680,7 +684,7 @@ export function planKiotVietSalesSync(input: {
     blockers,
   });
   const entityPlan = planKiotVietEntities({
-    sources: sales.map((sale) => ({ externalId: sale.code, fingerprint: sourceSaleFingerprint(sale) })),
+    sources: sales.map((sale) => ({ externalId: sale.code, fingerprint: kiotVietSaleFingerprint(sale) })),
     current: input.current.map((sale) => ({
       localId: sale.localId,
       code: sale.code,

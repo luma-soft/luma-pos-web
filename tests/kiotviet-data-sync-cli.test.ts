@@ -1,11 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import {
   buildKiotVietDataSyncReport,
+  assertKiotVietExecutablePlan,
   formatKiotVietDataSyncReport,
   reviewedHashForPhase,
   runKiotVietDataSyncCli,
 } from "@/scripts/sync-kiotviet-data";
 import type { KiotVietDataBundle } from "@/lib/kiotviet/data-sync-types";
+import type { KiotVietDataSyncCliDependencies } from "@/scripts/sync-kiotviet-data";
 import { assertLegacyKiotVietDataImportReadOnly } from "@/lib/kiotviet/data-sync-runner";
 
 const sha = (value: string) => value.repeat(64);
@@ -25,6 +27,15 @@ function emptyBundle(): KiotVietDataBundle {
 }
 
 describe("guarded KiotViet data sync CLI", () => {
+  test("rejects unresolved synthetic local IDs before an apply transaction", () => {
+    expect(() => assertKiotVietExecutablePlan({
+      phase: "sales",
+      summary: {},
+      blockers: [],
+      typedPlan: { writes: [{ sale: { customerId: "pending-customer:KH-1" } }] },
+    } as never)).toThrow("unresolved local reference");
+  });
+
   test("uses the bundle hash for product references and workbook hash otherwise", () => {
     const bundle = emptyBundle();
     expect(reviewedHashForPhase(bundle, "product-references")).toBe(bundle.bundleSha256);
@@ -78,7 +89,7 @@ describe("guarded KiotViet data sync CLI", () => {
       loadPlanningState: async () => ({ storeId: "store", schemaReady: true, productCatalog: {
         currentBaseProducts: [], productUnits: [], archivedSourceMappings: [], approvedHistoricalPlaceholders: [],
       } }),
-      applyPhase: async () => { applied += 1; },
+      applyPhase: async () => { applied += 1; return { postApplyPlan: { phase: "product-references", summary: {}, blockers: [] } }; },
     })).rejects.toThrow("reviewed source SHA-256 does not match");
     expect(applied).toBe(0);
   });
@@ -90,15 +101,18 @@ describe("guarded KiotViet data sync CLI", () => {
 
   test("single-phase apply requires the adapter's transactional reload to be zero-diff", async () => {
     const bundle = emptyBundle();
-    const dependencies = {
+    const dependencies: KiotVietDataSyncCliDependencies = {
       readBundle: () => bundle,
       loadPlanningState: async () => ({ storeId: "store", schemaReady: true, productCatalog: {
         currentBaseProducts: [], productUnits: [], archivedSourceMappings: [], approvedHistoricalPlaceholders: [],
       } }),
-      applyPhase: async () => ({ postApplyPlan: {
-        phase: "product-references" as const,
-        summary: { creates: 1 }, blockers: [],
-      } }),
+      applyPhase: async (input) => {
+        expect(input.plan.typedPlan).toBeDefined();
+        return { postApplyPlan: {
+          phase: "product-references" as const,
+          summary: { creates: 1 }, blockers: [],
+        } };
+      },
     };
     await expect(runKiotVietDataSyncCli([
       "/tmp", "--store=hai-dang", "--phase=product-references", "--apply", `--source-sha256=${bundle.bundleSha256}`,

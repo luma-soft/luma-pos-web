@@ -149,8 +149,12 @@ function uniqueByKey<T>(values: T[], keyOf: (value: T) => string, label: string)
   return result;
 }
 
-function sourceBookingFingerprint(booking: KiotVietBookingSnapshot): string {
-  return stableKiotVietFingerprint(booking);
+export function kiotVietBookingFingerprint(booking: KiotVietBookingSnapshot): string {
+  return stableKiotVietFingerprint({
+    ...booking,
+    lines: [...booking.lines].sort((left, right) => left.externalId.localeCompare(right.externalId)),
+    payments: [...booking.payments].sort((left, right) => left.externalId.localeCompare(right.externalId)),
+  });
 }
 
 function assertReconciledBookings(rows: KiotVietDataRow[]): void {
@@ -277,7 +281,7 @@ export function planKiotVietBookingSync(input: {
   const entityPlan = planKiotVietEntities({
     sources: bookings.map((booking) => ({
       externalId: booking.code,
-      fingerprint: sourceBookingFingerprint(booking),
+      fingerprint: kiotVietBookingFingerprint(booking),
     })),
     current: input.current.map((booking) => ({
       localId: booking.localId,

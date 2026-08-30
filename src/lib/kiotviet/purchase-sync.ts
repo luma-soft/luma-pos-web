@@ -184,7 +184,7 @@ function purchaseStatus(value: unknown): KiotVietPurchaseSnapshot["status"] {
   throw new Error(`Unsupported KiotViet purchase status: ${normalizeKiotVietText(value)}`);
 }
 
-function sourcePurchaseFingerprint(purchase: KiotVietPurchaseSnapshot): string {
+export function kiotVietPurchaseFingerprint(purchase: KiotVietPurchaseSnapshot): string {
   return stableKiotVietFingerprint(purchase);
 }
 
@@ -471,7 +471,7 @@ export function planKiotVietPurchaseSync(input: {
     blockers,
   });
   const entityPlan = planKiotVietEntities({
-    sources: purchases.map((purchase) => ({ externalId: purchase.code, fingerprint: sourcePurchaseFingerprint(purchase) })),
+    sources: purchases.map((purchase) => ({ externalId: purchase.code, fingerprint: kiotVietPurchaseFingerprint(purchase) })),
     current: input.current.map((purchase) => ({
       localId: purchase.localId,
       code: purchase.code,

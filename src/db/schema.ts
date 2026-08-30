@@ -960,6 +960,7 @@ export const orderItems = pgTable("order_items", {
   productName: text("product_name").notNull(), // snapshot
   unitName: varchar("unit_name", { length: 30 }).notNull(), // unit dùng khi bán
   unitMultiplier: decimal("unit_multiplier", { precision: 14, scale: 4 }).notNull(), // snapshot
+  sourceSku: varchar("source_sku", { length: 50 }), // KiotViet historical source-unit SKU snapshot
   // Nguồn bảng giá của dòng; null = Giá Chung, null field ở bản ghi cũ = không lưu nguồn.
   priceBookId: uuid("price_book_id").references(() => priceBooks.id, { onDelete: "set null" }),
 
@@ -1307,6 +1308,13 @@ export const returns = pgTable("returns", {
   totalRefund: decimal("total_refund", { precision: 14, scale: 2 }).notNull().default("0"),
   refundAmount: decimal("refund_amount", { precision: 14, scale: 2 }),
   settlementStatus: text("settlement_status"),
+  sourceInvoiceCode: varchar("source_invoice_code", { length: 30 }),
+  sourceSubtotal: decimal("source_subtotal", { precision: 14, scale: 2 }),
+  sourceDiscount: decimal("source_discount", { precision: 14, scale: 2 }),
+  sourceTax: decimal("source_tax", { precision: 14, scale: 2 }),
+  sourceOtherRefund: decimal("source_other_refund", { precision: 14, scale: 2 }),
+  sourceReturnFee: decimal("source_return_fee", { precision: 14, scale: 2 }),
+  sourcePaymentSnapshots: jsonb("source_payment_snapshots").$type<Array<{ channel: string; amount: number }>>(),
   status: text("status").notNull().default("completed"), // completed, cancelled
   exchangeOrderId: uuid("exchange_order_id").references(() => orders.id),
   exchangeDifference: decimal("exchange_difference", { precision: 14, scale: 2 }),
@@ -1334,6 +1342,7 @@ export const returnItems = pgTable("return_items", {
   productName: text("product_name").notNull(),
   unitName: varchar("unit_name", { length: 30 }).notNull(),
   unitMultiplier: decimal("unit_multiplier", { precision: 14, scale: 4 }).notNull(),
+  sourceSku: varchar("source_sku", { length: 50 }),
   quantity: decimal("quantity", { precision: 14, scale: 4 }).notNull(),
   unitPrice: decimal("unit_price", { precision: 14, scale: 2 }).notNull(),
   total: decimal("total", { precision: 14, scale: 2 }).notNull(),

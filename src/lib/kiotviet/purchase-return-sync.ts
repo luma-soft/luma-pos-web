@@ -184,7 +184,7 @@ function settlementStatus(total: number, paid: number): KiotVietPurchaseReturnSn
   return "settled";
 }
 
-function sourceReturnFingerprint(value: KiotVietPurchaseReturnSnapshot): string {
+export function kiotVietPurchaseReturnFingerprint(value: KiotVietPurchaseReturnSnapshot): string {
   return stableKiotVietFingerprint(value);
 }
 
@@ -519,7 +519,7 @@ export function planKiotVietPurchaseReturnSync(input: {
   const entityPlan = planKiotVietEntities({
     sources: returns.map((value) => ({
       externalId: value.code,
-      fingerprint: sourceReturnFingerprint(value),
+      fingerprint: kiotVietPurchaseReturnFingerprint(value),
     })),
     current: input.current,
     mappings: input.mappings,

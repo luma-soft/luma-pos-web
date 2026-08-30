@@ -227,7 +227,7 @@ function paymentSnapshots(row: KiotVietDataRow): KiotVietReturnPaymentSnapshot[]
   });
 }
 
-function sourceReturnFingerprint(value: KiotVietReturnSnapshot): string {
+export function kiotVietReturnFingerprint(value: KiotVietReturnSnapshot): string {
   return stableKiotVietFingerprint(value);
 }
 
@@ -582,7 +582,7 @@ export function planKiotVietReturnSync(input: {
     linkageExceptions,
   });
   const entityPlan = planKiotVietEntities({
-    sources: returns.map((value) => ({ externalId: value.code, fingerprint: sourceReturnFingerprint(value) })),
+    sources: returns.map((value) => ({ externalId: value.code, fingerprint: kiotVietReturnFingerprint(value) })),
     current: input.current.map((value) => ({
       localId: value.localId,
       code: value.code,
