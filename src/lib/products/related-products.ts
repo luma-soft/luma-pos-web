@@ -4,6 +4,24 @@ export type RelatedProductCoordinate = {
   relatedProductId: string | null;
 };
 
+export function buildRelatedProductLookup(
+  hasRelatedProductColumn: boolean,
+  products: readonly Pick<RelatedProductCoordinate, "id" | "relatedProductId">[],
+): { groupKeys: string[]; rootIds: string[] } | null {
+  if (!hasRelatedProductColumn || products.length === 0) return null;
+
+  return {
+    groupKeys: [...new Set(products.flatMap((product) => (
+      product.relatedProductId
+        ? [product.id, product.relatedProductId]
+        : [product.id]
+    )))],
+    rootIds: [...new Set(products.flatMap((product) => (
+      product.relatedProductId ? [product.relatedProductId] : []
+    )))],
+  };
+}
+
 export function selectRelatedProducts<
   TProduct extends RelatedProductCoordinate,
   TCandidate extends RelatedProductCoordinate,

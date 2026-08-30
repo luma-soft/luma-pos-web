@@ -1,7 +1,17 @@
 import { describe, expect, it } from "bun:test";
-import { selectRelatedProducts } from "@/lib/products/related-products";
+import {
+  buildRelatedProductLookup,
+  selectRelatedProducts,
+} from "@/lib/products/related-products";
 
 describe("same-type product selection", () => {
+  it("disables related-product queries until the migration is installed", () => {
+    expect(buildRelatedProductLookup(false, [{
+      id: "pvc-34-c3",
+      relatedProductId: null,
+    }])).toBeNull();
+  });
+
   it("uses the KiotViet related-product group instead of the category", () => {
     const selected = {
       id: "pvc-34-c3",

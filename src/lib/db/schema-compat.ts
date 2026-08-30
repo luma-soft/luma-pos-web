@@ -37,6 +37,35 @@ export async function hasProductComplianceColumns() {
   }
 }
 
+async function hasProductRelatedColumnQuery() {
+  const rows = await db.execute<{ count: number }>(sql`
+    select count(*)::int as count
+    from information_schema.columns
+    where table_schema = current_schema()
+      and table_name = 'products'
+      and column_name = 'related_product_id'
+  `);
+  return Number(rows.rows[0]?.count ?? 0) === 1;
+}
+
+const cachedHasProductRelatedColumn = unstable_cache(
+  hasProductRelatedColumnQuery,
+  ["schema-compat-products-related-column"],
+  { revalidate: 30 },
+);
+
+export async function hasProductRelatedColumn() {
+  try {
+    return await cachedHasProductRelatedColumn();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.includes("incrementalCache missing")) {
+      return hasProductRelatedColumnQuery();
+    }
+    throw error;
+  }
+}
+
 async function hasProjectRedesignSchemaQuery() {
   const rows = await db.execute<{ count: number }>(sql`
     select count(*)::int as count

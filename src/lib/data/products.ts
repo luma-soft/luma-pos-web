@@ -26,12 +26,18 @@ import {
 } from "@/db/schema";
 import { accentInsensitiveLike } from "@/lib/search";
 import { coercePageSize, DEFAULT_PAGE_SIZE } from "@/lib/pagination";
-import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
+import {
+  hasProductComplianceColumns,
+  hasProductRelatedColumn,
+} from "@/lib/db/schema-compat";
 import {
   DEFAULT_PRODUCT_LIST_SORT,
   type ProductListSort,
 } from "@/lib/inventory/product-list-policy";
-import { selectRelatedProducts } from "@/lib/products/related-products";
+import {
+  buildRelatedProductLookup,
+  selectRelatedProducts,
+} from "@/lib/products/related-products";
 
 export const PRODUCTS_PAGE_SIZE = 20;
 
@@ -77,8 +83,14 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
   const sort = filters.sort ?? "name";
   const status: ProductStatusFilter = filters.status ?? "active";
   const view: ProductListView = filters.view ?? "grouped";
-  const hasComplianceColumns = await hasProductComplianceColumns();
+  const [hasComplianceColumns, hasRelatedProducts] = await Promise.all([
+    hasProductComplianceColumns(),
+    hasProductRelatedColumn(),
+  ]);
   const complianceFields = productComplianceFields(hasComplianceColumns);
+  const relatedProductIdField = hasRelatedProducts
+    ? products.relatedProductId
+    : sql<string | null>`null`;
   const conditions: SQL[] = [eq(products.storeId, storeId)];
   const exactProductId = filters.exactProductId;
 
@@ -231,7 +243,7 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
         trackBatches: complianceFields.trackBatches,
         shelfLifeDays: complianceFields.shelfLifeDays,
         lifecycleStatus: complianceFields.lifecycleStatus,
-        relatedProductId: products.relatedProductId,
+        relatedProductId: relatedProductIdField,
         parentProductId: products.parentProductId,
         variantName: products.variantName,
         isVariantParent: products.isVariantParent,
@@ -369,7 +381,7 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
             trackBatches: complianceFields.trackBatches,
             shelfLifeDays: complianceFields.shelfLifeDays,
             lifecycleStatus: complianceFields.lifecycleStatus,
-            relatedProductId: products.relatedProductId,
+            relatedProductId: relatedProductIdField,
             parentProductId: products.parentProductId,
             variantName: products.variantName,
             isVariantParent: products.isVariantParent,
@@ -583,28 +595,15 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
     );
   }
 
-  const relatedGroupKeys = [
-    ...new Set(
-      rows
-        .flatMap((row) => [row.id, row.relatedProductId])
-        .filter((id): id is string => Boolean(id)),
-    ),
-  ];
-  const relatedRootIds = [
-    ...new Set(
-      rows
-        .map((row) => row.relatedProductId)
-        .filter((id): id is string => Boolean(id)),
-    ),
-  ];
-  const relatedWhere = or(
-    relatedGroupKeys.length > 0
-      ? inArray(products.relatedProductId, relatedGroupKeys)
-      : undefined,
-    relatedRootIds.length > 0
-      ? inArray(products.id, relatedRootIds)
-      : undefined,
-  );
+  const relatedLookup = buildRelatedProductLookup(hasRelatedProducts, rows);
+  const relatedWhere = relatedLookup
+    ? or(
+        inArray(products.relatedProductId, relatedLookup.groupKeys),
+        relatedLookup.rootIds.length > 0
+          ? inArray(products.id, relatedLookup.rootIds)
+          : undefined,
+      )
+    : undefined;
   const relatedCandidates = relatedWhere
     ? await db
         .select({
