@@ -34,7 +34,7 @@ import {
   returnReasons,
   returnRefundMethods,
 } from "@/lib/returns/list-filter-schema";
-import { bookingStatusOptions } from "@/lib/orders/booking-status-filter";
+import { bookingStatusOptions, serializeBookingStatus } from "@/lib/orders/booking-status-filter";
 import {
   LumaDateRangePicker,
   LumaEntityPicker,
@@ -201,7 +201,7 @@ function createDraftFromValues(kind: DocumentFilterKind, values: DocumentFilterV
       deliveryPreset: nextPreset,
       deliveryFrom: nextRange.from,
       deliveryTo: nextRange.to,
-      status: values.status ?? "confirmed",
+      status: values.status ?? "all",
       payment: values.payment ?? "all",
     };
   }
@@ -254,7 +254,8 @@ function createFilterCountQuery(kind: DocumentFilterKind, draft: DocumentFilterD
     }
     if (draft.deliveryFrom) query.set("deliveryFrom", draft.deliveryFrom);
     if (draft.deliveryTo) query.set("deliveryTo", draft.deliveryTo);
-    if (draft.status && draft.status !== "confirmed") query.set("status", draft.status);
+    const status = serializeBookingStatus(draft.status);
+    if (status) query.set(...status);
     if (draft.payment && draft.payment !== "all") query.set("payment", draft.payment);
   } else if (kind === "quotes" && draft.status && draft.status !== "quote") {
     query.set("status", draft.status);

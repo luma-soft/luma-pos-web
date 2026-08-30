@@ -13,3 +13,8 @@ export function resolveBookingStatus(value: string | undefined): BookingStatusFi
     ? value as BookingStatusFilter
     : "all";
 }
+
+export function serializeBookingStatus(value: string | undefined): ["status", Exclude<BookingStatusFilter, "all">] | null {
+  const status = resolveBookingStatus(value);
+  return status === "all" ? null : ["status", status];
+}

@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { readKiotVietDataBundle } from "@/lib/kiotviet/data-sync-files";
 import { planKiotVietBookingSync } from "@/lib/kiotviet/booking-sync";
-import { bookingStatusOptions, resolveBookingStatus } from "@/lib/orders/booking-status-filter";
+import {
+  bookingStatusOptions,
+  resolveBookingStatus,
+  serializeBookingStatus,
+} from "@/lib/orders/booking-status-filter";
 
 const sourceRows = [
   {
@@ -93,6 +97,9 @@ const resolvedProducts = [
   { sku: "BASE-001", productId: "product-002", unitName: "Cái", unitMultiplier: 1 },
 ];
 
+const suppliedBundleDirectory = process.env.KIOTVIET_BUNDLE_DIR;
+const suppliedBundleTest = suppliedBundleDirectory ? test : test.skip;
+
 describe("KiotViet booking synchronization", () => {
   test("keeps historical completed and draft bookings visible and directly filterable", () => {
     expect(resolveBookingStatus(undefined)).toBe("all");
@@ -105,6 +112,9 @@ describe("KiotViet booking synchronization", () => {
       { value: "draft", label: "Phiếu tạm" },
       { value: "cancelled", label: "Đã hủy" },
     ]);
+    expect(serializeBookingStatus("all")).toBeNull();
+    expect(serializeBookingStatus("confirmed")).toEqual(["status", "confirmed"]);
+    expect(serializeBookingStatus("completed")).toEqual(["status", "completed"]);
   });
 
   test("plans direct booking snapshots with completed lifecycle, source units, payments, and stable child keys", () => {
@@ -218,8 +228,8 @@ describe("KiotViet booking synchronization", () => {
     ]);
   });
 
-  test("maps the reviewed workbook's 22 historical completions and one temporary draft without operational actions", () => {
-    const source = readKiotVietDataBundle("/Users/cvthien/Downloads").sources
+  suppliedBundleTest("maps the reviewed workbook's 22 historical completions and one temporary draft without operational actions", () => {
+    const source = readKiotVietDataBundle(suppliedBundleDirectory!).sources
       .find((candidate) => candidate.phase === "bookings")!;
     const plan = planKiotVietBookingSync({
       sourceRows: source.rows,
