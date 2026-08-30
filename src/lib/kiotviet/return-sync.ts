@@ -523,7 +523,11 @@ function saleStatusUpdates(input: {
     const writtenIds = new Set(write.return.lines.flatMap((line) => line.localId ? [line.localId] : []));
     for (const existing of input.existingLines) {
       if (existing.returnId !== write.localId || writtenIds.has(existing.localId)) continue;
-      if (existing.active === false || !existing.orderItemId || existing.quantity == null) continue;
+      // `return_items` has no independent status. For an affected parent that
+      // is now completed, every preserved current child is active by virtue of
+      // that resulting parent state; a loader's old inherited flag is not a
+      // child lifecycle signal and must not suppress its contribution.
+      if (!existing.orderItemId || existing.quantity == null) continue;
       const quantity = normalizeKiotVietNumber(existing.quantity);
       returnedBySaleItem.set(existing.orderItemId, (returnedBySaleItem.get(existing.orderItemId) ?? 0) + quantity);
     }

@@ -226,7 +226,9 @@ describe("KiotViet customer return synchronization", () => {
       }, {
         localId: "preserved-luma-line",
         returnId: "return-001",
-        active: true,
+        // `return_items` has no status. The loader inherited this false value
+        // from the formerly cancelled parent, not from an inactive child.
+        active: false,
         orderItemId: "sale-line-002",
         quantity: 1,
       }],
