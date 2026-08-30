@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import { join } from "node:path";
+import * as XLSX from "xlsx";
 import { readKiotVietDataBundle } from "@/lib/kiotviet/data-sync-files";
-import { planKiotVietSalesSync } from "@/lib/kiotviet/sales-sync";
+import { parseKiotVietProductRows } from "@/lib/kiotviet/product-sync";
+import {
+  auditKiotVietSaleProductResolutions,
+  planKiotVietSalesSync,
+} from "@/lib/kiotviet/sales-sync";
 
 const sourceRows = [
   {
@@ -85,8 +91,8 @@ const sourceRows = [
 
 const resolvedCustomers = [{ code: "KH-001", customerId: "customer-001" }];
 const resolvedProducts = [
-  { sku: "ALT-001", productId: "product-001", unitName: "Hộp", unitMultiplier: 12 },
-  { sku: "BASE-001", productId: "product-002", unitName: "Cái", unitMultiplier: 1 },
+  { sku: "ALT-001", productId: "product-001", unitName: "Hộp", unitMultiplier: 12, resolutionSource: "alternate_unit" as const },
+  { sku: "BASE-001", productId: "product-002", unitName: "Cái", unitMultiplier: 1, resolutionSource: "current_base" as const },
 ];
 
 const suppliedBundleDirectory = process.env.KIOTVIET_BUNDLE_DIR;
@@ -291,6 +297,174 @@ describe("KiotViet sales invoice synchronization", () => {
     expect(reconciled.summary).toMatchObject({ adopts: 1, preservedLines: 1, preservedPayments: 1 });
   });
 
+  test("adopts exact legacy child snapshots one-to-one before creating invoice children", () => {
+    const plan = planKiotVietSalesSync({
+      storeId: "store-001",
+      sourceRows: [sourceRows[0]!],
+      current: [{
+        localId: "sale-001",
+        code: "HD-001",
+        fingerprint: "outdated-source-fingerprint",
+        legacyImported: true,
+      }],
+      mappings: [],
+      lineMappings: [],
+      paymentMappings: [],
+      existingLines: [
+        {
+          localId: "legacy-line",
+          orderId: "sale-001",
+          productId: "product-001",
+          productName: "Sản phẩm hộp",
+          unitName: "Hộp",
+          unitMultiplier: 12,
+          quantity: 2,
+          unitPrice: 120000,
+          discount: 0,
+          total: 240000,
+          note: "Hàng dễ vỡ",
+          legacyImported: true,
+        },
+        {
+          localId: "luma-line",
+          orderId: "sale-001",
+          productId: "luma-product",
+          productName: "Luma-native row",
+          unitName: "Cái",
+          unitMultiplier: 1,
+          quantity: 1,
+          unitPrice: 1,
+          discount: 0,
+          total: 1,
+          note: null,
+          legacyImported: false,
+        },
+      ],
+      existingPayments: [
+        { localId: "legacy-cash", orderId: "sale-001", method: "cash", amount: 8000, legacyImported: true },
+        { localId: "legacy-bank", orderId: "sale-001", method: "bank_transfer", amount: 30000, legacyImported: true },
+        { localId: "luma-payment", orderId: "sale-001", method: "card", amount: 12, legacyImported: false },
+      ],
+      resolvedCustomers,
+      resolvedProducts,
+      resolvedBookings: [{ code: "DH-001", bookingId: "booking-001" }],
+    });
+
+    expect(plan.blockers).toEqual([]);
+    expect(plan.writes[0]?.sale.lines).toMatchObject([
+      { action: "update", externalId: "HD-001|ALT-001|hộp|1", localId: "legacy-line" },
+    ]);
+    expect(plan.writes[0]?.sale.payments).toMatchObject([
+      { action: "update", externalId: "HD-001|payment|cash|1", localId: "legacy-cash" },
+      { action: "update", externalId: "HD-001|payment|bank_transfer|1", localId: "legacy-bank" },
+    ]);
+    expect(plan.writes[0]?.sale.preservedLineIds).toEqual(["luma-line"]);
+    expect(plan.writes[0]?.sale.preservedPaymentIds).toEqual(["luma-payment"]);
+  });
+
+  test("preserves a normalized source unit after the catalog unit is renamed", () => {
+    const plan = planKiotVietSalesSync({
+      storeId: "store-001",
+      sourceRows: [{ ...sourceRows[2]!, ĐVT: " Cây cũ " }],
+      current: [],
+      mappings: [],
+      lineMappings: [],
+      paymentMappings: [],
+      existingLines: [],
+      existingPayments: [],
+      resolvedCustomers,
+      resolvedProducts: [{
+        sku: "BASE-001",
+        productId: "product-002",
+        unitName: "Cây mới",
+        sourceUnitName: "Cây cũ",
+        unitMultiplier: 1,
+        resolutionSource: "archived_mapping",
+      }],
+      resolvedBookings: [],
+    });
+
+    expect(plan.blockers).toEqual([]);
+    expect(plan.writes[0]?.sale.lines).toMatchObject([{
+      externalId: "HD-002|BASE-001|cây cũ|1",
+      line: { unitName: "Cây cũ", unitMultiplier: 1 },
+    }]);
+  });
+
+  test("blocks a source unit that disagrees with an explicit Task 6 resolution", () => {
+    const plan = planKiotVietSalesSync({
+      storeId: "store-001",
+      sourceRows: [{ ...sourceRows[2]!, ĐVT: "Cây cũ" }],
+      current: [],
+      mappings: [],
+      lineMappings: [],
+      paymentMappings: [],
+      existingLines: [],
+      existingPayments: [],
+      resolvedCustomers,
+      resolvedProducts: [{
+        sku: "BASE-001",
+        productId: "product-002",
+        unitName: "Cây mới",
+        sourceUnitName: "Hộp đã phê duyệt",
+        unitMultiplier: 1,
+        resolutionSource: "archived_mapping",
+      }],
+      resolvedBookings: [],
+    });
+
+    expect(plan.writes).toEqual([]);
+    expect(plan.blockers).toEqual([{
+      documentCode: "HD-002",
+      reference: "BASE-001",
+      reason: "unresolved_product_unit",
+    }]);
+  });
+
+  test("blocks ambiguous exact legacy child matches instead of reusing either ID", () => {
+    const legacyLine = {
+      orderId: "sale-001",
+      productId: "product-001",
+      productName: "Sản phẩm hộp",
+      unitName: "Hộp",
+      unitMultiplier: 12,
+      quantity: 2,
+      unitPrice: 120000,
+      discount: 0,
+      total: 240000,
+      note: "Hàng dễ vỡ",
+      legacyImported: true,
+    };
+    const plan = planKiotVietSalesSync({
+      storeId: "store-001",
+      sourceRows: [sourceRows[0]!],
+      current: [{
+        localId: "sale-001",
+        code: "HD-001",
+        fingerprint: "outdated-source-fingerprint",
+        legacyImported: true,
+      }],
+      mappings: [],
+      lineMappings: [],
+      paymentMappings: [],
+      existingLines: [
+        { localId: "legacy-line-a", ...legacyLine },
+        { localId: "legacy-line-b", ...legacyLine },
+      ],
+      existingPayments: [],
+      resolvedCustomers,
+      resolvedProducts,
+      resolvedBookings: [{ code: "DH-001", bookingId: "booking-001" }],
+    });
+
+    expect(plan.writes).toEqual([]);
+    expect(plan.blockers).toEqual([{
+      documentCode: "HD-001",
+      reference: "HD-001|ALT-001|hộp|1",
+      reason: "ambiguous_legacy_line_match",
+    }]);
+  });
+
   test("blocks same-code collisions instead of adopting a Luma-native order", () => {
     const plan = planKiotVietSalesSync({
       storeId: "store-001",
@@ -388,7 +562,13 @@ describe("KiotViet sales invoice synchronization", () => {
       existingLines: [],
       existingPayments: [],
       resolvedCustomers: [],
-      resolvedProducts: [{ sku: "BASE-001", productId: "product-002", unitName: "Cái", unitMultiplier: 1 }],
+      resolvedProducts: [{
+        sku: "BASE-001",
+        productId: "product-002",
+        unitName: "Cái",
+        unitMultiplier: 1,
+        resolutionSource: "current_base",
+      }],
       resolvedBookings: [],
     });
 
@@ -421,7 +601,13 @@ describe("KiotViet sales invoice synchronization", () => {
         .map((code) => ({ code, customerId: `customer:${code}` })),
       resolvedProducts: [...new Map(source.rows.map((row) => {
         const sku = String(row["Mã hàng"]);
-        return [sku, { sku, productId: `product:${sku}`, unitName: String(row.ĐVT), unitMultiplier: 1 }];
+        return [sku, {
+          sku,
+          productId: `product:${sku}`,
+          unitName: String(row.ĐVT),
+          unitMultiplier: 1,
+          resolutionSource: "current_base" as const,
+        }];
       })).values()],
       resolvedBookings: [...new Set(source.rows.map((row) => String(row["Mã đặt hàng"] ?? "").trim()))]
         .filter(Boolean)
@@ -437,5 +623,61 @@ describe("KiotViet sales invoice synchronization", () => {
     expect(plan.writes.some((write) => "eInvoice" in write.sale)).toBe(false);
     expect(plan.writes.some((write) => "shiftId" in write.sale)).toBe(false);
     expect(plan.writes.some((write) => "notifications" in write.sale)).toBe(false);
+  });
+
+  suppliedBundleTest("audits the 374 sales-line occurrences needing an archived or approved historical resolution", () => {
+    const source = readKiotVietDataBundle(suppliedBundleDirectory!).sources
+      .find((candidate) => candidate.phase === "sales")!;
+    const productWorkbook = XLSX.readFile(join(
+      suppliedBundleDirectory!,
+      "DanhSachSanPham_KV30082026-224750-732.xlsx",
+    ));
+    const productRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(
+      productWorkbook.Sheets[productWorkbook.SheetNames[0]!],
+      { defval: null },
+    );
+    const productSnapshot = parseKiotVietProductRows(productRows);
+    const baseBySku = new Map(productSnapshot.products.map((product) => [product.sku, product]));
+    const alternateBySku = new Map(productSnapshot.units.map((unit) => [unit.sku, unit]));
+    const firstSourceRowBySku = new Map(source.rows.map((row) => [String(row["Mã hàng"]), row]));
+    const resolvedProducts = [...firstSourceRowBySku].map(([sku, row]) => {
+      const base = baseBySku.get(sku);
+      if (base) return {
+        sku,
+        productId: `product:${sku}`,
+        unitName: base.baseUnit,
+        sourceUnitName: String(row.ĐVT),
+        unitMultiplier: 1,
+        resolutionSource: "current_base" as const,
+      };
+      const alternate = alternateBySku.get(sku);
+      if (alternate) return {
+        sku,
+        productId: `product:${alternate.baseSku}`,
+        unitName: alternate.unitName,
+        sourceUnitName: String(row.ĐVT),
+        unitMultiplier: alternate.multiplier,
+        resolutionSource: "alternate_unit" as const,
+      };
+      return {
+        sku,
+        productId: `historical:${sku}`,
+        unitName: String(row.ĐVT),
+        sourceUnitName: String(row.ĐVT),
+        unitMultiplier: 1,
+        resolutionSource: "archived_mapping" as const,
+      };
+    });
+
+    expect(auditKiotVietSaleProductResolutions({ sourceRows: source.rows, resolvedProducts }).summary).toEqual({
+      referenceCount: 9305,
+      currentBaseOccurrences: 8273,
+      alternateUnitOccurrences: 658,
+      archivedMappingOccurrences: 374,
+      approvedPlaceholderOccurrences: 0,
+      missingMasterOccurrences: 374,
+      missingMasterSkuCount: 137,
+      unresolvedOccurrences: 0,
+    });
   });
 });

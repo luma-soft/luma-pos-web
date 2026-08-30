@@ -25,6 +25,11 @@ const PAYMENT_CHANNELS = [
 
 type KiotVietPaymentMethod = "cash" | "card" | "bank_transfer" | "momo";
 type KiotVietPaymentChannel = "cash" | "card" | "bank_transfer" | "wallet";
+export type KiotVietSaleProductResolutionSource =
+  | "current_base"
+  | "alternate_unit"
+  | "archived_mapping"
+  | "approved_historical_placeholder";
 
 export interface KiotVietResolvedSaleCustomer {
   code: string;
@@ -35,7 +40,9 @@ export interface KiotVietResolvedSaleProduct {
   sku: string;
   productId: string;
   unitName: string;
+  sourceUnitName?: string;
   unitMultiplier: number;
+  resolutionSource: KiotVietSaleProductResolutionSource;
 }
 
 export interface KiotVietResolvedSaleBooking {
@@ -53,6 +60,18 @@ export interface KiotVietSaleCurrent {
 export interface KiotVietSaleCurrentChild {
   localId: string;
   orderId: string;
+  legacyImported?: boolean;
+  productId?: string;
+  productName?: string;
+  unitName?: string;
+  unitMultiplier?: number | string;
+  quantity?: number | string;
+  unitPrice?: number | string;
+  discount?: number | string;
+  total?: number | string;
+  note?: string | null;
+  method?: KiotVietPaymentMethod;
+  amount?: number | string;
 }
 
 export interface KiotVietSaleLineSnapshot {
@@ -126,11 +145,14 @@ export type KiotVietSaleWrite = {
 type KiotVietSaleBlockerReason =
   | "unresolved_customer"
   | "unresolved_product"
+  | "unresolved_product_unit"
   | "unresolved_booking"
   | "mapped_line_missing"
   | "mapped_payment_missing"
   | "mapped_line_parent_mismatch"
-  | "mapped_payment_parent_mismatch";
+  | "mapped_payment_parent_mismatch"
+  | "ambiguous_legacy_line_match"
+  | "ambiguous_legacy_payment_match";
 
 export interface KiotVietSalesSyncPlan {
   sales: KiotVietSaleSnapshot[];
@@ -159,6 +181,19 @@ export interface KiotVietSalesSyncPlan {
   };
 }
 
+export interface KiotVietSaleProductResolutionAudit {
+  summary: {
+    referenceCount: number;
+    currentBaseOccurrences: number;
+    alternateUnitOccurrences: number;
+    archivedMappingOccurrences: number;
+    approvedPlaceholderOccurrences: number;
+    missingMasterOccurrences: number;
+    missingMasterSkuCount: number;
+    unresolvedOccurrences: number;
+  };
+}
+
 function nullableText(value: unknown): string | null {
   return normalizeKiotVietText(value) || null;
 }
@@ -181,6 +216,10 @@ function mismatchedChildParentReason(kind: "line" | "payment"): KiotVietSaleBloc
   return kind === "line" ? "mapped_line_parent_mismatch" : "mapped_payment_parent_mismatch";
 }
 
+function ambiguousLegacyChildReason(kind: "line" | "payment"): KiotVietSaleBlockerReason {
+  return kind === "line" ? "ambiguous_legacy_line_match" : "ambiguous_legacy_payment_match";
+}
+
 function paymentStatus(total: number, amountPaid: number): KiotVietSaleSnapshot["paymentStatus"] {
   if (total <= 0 || amountPaid >= total) return "paid";
   return amountPaid > 0 ? "deposit" : "unpaid";
@@ -199,6 +238,112 @@ function uniqueByKey<T>(values: T[], keyOf: (value: T) => string, label: string)
 
 function sourceSaleFingerprint(sale: KiotVietSaleSnapshot): string {
   return stableKiotVietFingerprint(sale);
+}
+
+export function auditKiotVietSaleProductResolutions(input: {
+  sourceRows: KiotVietDataRow[];
+  resolvedProducts: KiotVietResolvedSaleProduct[];
+}): KiotVietSaleProductResolutionAudit {
+  const productsBySku = uniqueByKey(input.resolvedProducts, (product) => product.sku, "product SKU");
+  let currentBaseOccurrences = 0;
+  let alternateUnitOccurrences = 0;
+  let archivedMappingOccurrences = 0;
+  let approvedPlaceholderOccurrences = 0;
+  let unresolvedOccurrences = 0;
+  const missingMasterSkus = new Set<string>();
+
+  for (const row of input.sourceRows) {
+    const sku = normalizeKiotVietText(row["Mã hàng"]);
+    const product = productsBySku.get(sku);
+    if (!product) {
+      unresolvedOccurrences += 1;
+      missingMasterSkus.add(sku);
+      continue;
+    }
+    switch (product.resolutionSource) {
+      case "current_base":
+        currentBaseOccurrences += 1;
+        break;
+      case "alternate_unit":
+        alternateUnitOccurrences += 1;
+        break;
+      case "archived_mapping":
+        archivedMappingOccurrences += 1;
+        missingMasterSkus.add(sku);
+        break;
+      case "approved_historical_placeholder":
+        approvedPlaceholderOccurrences += 1;
+        missingMasterSkus.add(sku);
+        break;
+    }
+  }
+
+  const missingMasterOccurrences = archivedMappingOccurrences + approvedPlaceholderOccurrences;
+  return {
+    summary: {
+      referenceCount: input.sourceRows.length,
+      currentBaseOccurrences,
+      alternateUnitOccurrences,
+      archivedMappingOccurrences,
+      approvedPlaceholderOccurrences,
+      missingMasterOccurrences,
+      missingMasterSkuCount: missingMasterSkus.size,
+      unresolvedOccurrences,
+    },
+  };
+}
+
+function sourceLineFingerprint(line: KiotVietSaleLineSnapshot): string {
+  return stableKiotVietFingerprint({
+    productId: line.productId,
+    productName: line.productName,
+    unitName: line.unitName,
+    unitMultiplier: line.unitMultiplier,
+    quantity: line.quantity,
+    unitPrice: line.unitPrice,
+    discount: line.discount,
+    total: line.total,
+    note: line.note,
+  });
+}
+
+function sourcePaymentFingerprint(payment: KiotVietSalePaymentSnapshot): string {
+  return stableKiotVietFingerprint({ method: payment.method, amount: payment.amount });
+}
+
+function currentChildFingerprint(
+  child: KiotVietSaleCurrentChild,
+  kind: "line" | "payment",
+): string | null {
+  if (!child.legacyImported) return null;
+  if (kind === "payment") {
+    if (!child.method || child.amount == null) return null;
+    return stableKiotVietFingerprint({
+      method: child.method,
+      amount: normalizeKiotVietNumber(child.amount),
+    });
+  }
+  if (
+    !child.productId
+    || !child.productName
+    || !child.unitName
+    || child.unitMultiplier == null
+    || child.quantity == null
+    || child.unitPrice == null
+    || child.discount == null
+    || child.total == null
+  ) return null;
+  return stableKiotVietFingerprint({
+    productId: child.productId,
+    productName: child.productName,
+    unitName: child.unitName,
+    unitMultiplier: normalizeKiotVietNumber(child.unitMultiplier),
+    quantity: normalizeKiotVietNumber(child.quantity),
+    unitPrice: normalizeKiotVietNumber(child.unitPrice),
+    discount: normalizeKiotVietNumber(child.discount),
+    total: normalizeKiotVietNumber(child.total),
+    note: child.note ?? null,
+  });
 }
 
 function assertReconciledSales(rows: KiotVietDataRow[]): void {
@@ -261,20 +406,29 @@ function saleSourceRows(input: {
       if (!Number.isFinite(product.unitMultiplier) || product.unitMultiplier <= 0) {
         throw new Error(`KiotViet sale ${code} has invalid product unit multiplier for ${sourceSku}`);
       }
-      const occurrenceKey = `${sourceSku}\u0000${product.unitName.toLocaleLowerCase("vi")}`;
+      const sourceUnitName = nullableText(row.ĐVT) ?? product.sourceUnitName ?? product.unitName;
+      if (
+        product.sourceUnitName
+        && normalizeKiotVietText(product.sourceUnitName).toLocaleLowerCase("vi")
+          !== sourceUnitName.toLocaleLowerCase("vi")
+      ) {
+        input.blockers.push({ documentCode: code, reference: sourceSku, reason: "unresolved_product_unit" });
+        return [];
+      }
+      const occurrenceKey = `${sourceSku}\u0000${sourceUnitName.toLocaleLowerCase("vi")}`;
       const occurrence = (occurrences.get(occurrenceKey) ?? 0) + 1;
       occurrences.set(occurrenceKey, occurrence);
       return [{
         externalId: buildKiotVietChildExternalId({
           documentCode: code,
           sku: sourceSku,
-          unitName: product.unitName,
+          unitName: sourceUnitName,
           occurrence,
         }),
         productId: product.productId,
         sourceSku,
         productName: nullableText(row["Tên hàng"]) ?? sourceSku,
-        unitName: product.unitName,
+        unitName: sourceUnitName,
         unitMultiplier: product.unitMultiplier,
         quantity: normalizeKiotVietNumber(row["Số lượng"]),
         unitPrice: normalizeKiotVietNumber(row["Đơn giá"]),
@@ -328,6 +482,8 @@ function childWrites<T extends { externalId: string }>(input: {
   mappings: Map<string, KiotVietEntityMappingSnapshot>;
   currentById: Map<string, KiotVietSaleCurrentChild>;
   kind: "line" | "payment";
+  allowLegacyAdoption: boolean;
+  sourceFingerprint: (value: T) => string;
   blockers: KiotVietSalesSyncPlan["blockers"];
 }): { writes: Array<{ externalId: string; localId?: string; value: Omit<T, "externalId"> }>; preservedIds: string[] } {
   if (!input.parentId) {
@@ -350,26 +506,47 @@ function childWrites<T extends { externalId: string }>(input: {
   const selectedIds = new Set<string>();
   const writes = input.values.map(({ externalId, ...value }) => {
     const mapping = input.mappings.get(externalId);
-    if (!mapping) return { externalId, value };
-    const current = input.currentById.get(mapping.localId);
-    if (!current) {
+    if (mapping) {
+      const current = input.currentById.get(mapping.localId);
+      if (!current) {
+        input.blockers.push({
+          documentCode: input.documentCode,
+          reference: externalId,
+          reason: missingChildReason(input.kind),
+        });
+        return { externalId, value };
+      }
+      if (current.orderId !== input.parentId) {
+        input.blockers.push({
+          documentCode: input.documentCode,
+          reference: externalId,
+          reason: mismatchedChildParentReason(input.kind),
+        });
+        return { externalId, value };
+      }
+      selectedIds.add(current.localId);
+      return { externalId, localId: current.localId, value };
+    }
+
+    if (!input.allowLegacyAdoption) return { externalId, value };
+    const fingerprint = input.sourceFingerprint({ externalId, ...value } as T);
+    const candidates = [...input.currentById.values()].filter((current) => (
+      current.orderId === input.parentId
+      && !selectedIds.has(current.localId)
+      && currentChildFingerprint(current, input.kind) === fingerprint
+    ));
+    if (candidates.length > 1) {
       input.blockers.push({
         documentCode: input.documentCode,
         reference: externalId,
-        reason: missingChildReason(input.kind),
+        reason: ambiguousLegacyChildReason(input.kind),
       });
       return { externalId, value };
     }
-    if (current.orderId !== input.parentId) {
-      input.blockers.push({
-        documentCode: input.documentCode,
-        reference: externalId,
-        reason: mismatchedChildParentReason(input.kind),
-      });
-      return { externalId, value };
-    }
-    selectedIds.add(current.localId);
-    return { externalId, localId: current.localId, value };
+    const legacy = candidates[0];
+    if (!legacy) return { externalId, value };
+    selectedIds.add(legacy.localId);
+    return { externalId, localId: legacy.localId, value };
   });
   const preservedIds = [...input.currentById.values()]
     .filter((current) => current.orderId === input.parentId && !selectedIds.has(current.localId))
@@ -443,6 +620,8 @@ export function planKiotVietSalesSync(input: {
       mappings: lineMappings,
       currentById: existingLines,
       kind: "line",
+      allowLegacyAdoption: action === "adopt",
+      sourceFingerprint: sourceLineFingerprint,
       blockers,
     });
     const payments = childWrites({
@@ -452,6 +631,8 @@ export function planKiotVietSalesSync(input: {
       mappings: paymentMappings,
       currentById: existingPayments,
       kind: "payment",
+      allowLegacyAdoption: action === "adopt",
+      sourceFingerprint: sourcePaymentFingerprint,
       blockers,
     });
     return {
@@ -494,7 +675,9 @@ export function planKiotVietSalesSync(input: {
       conflicts: entityPlan.conflicts.length,
       preserves: entityPlan.preserves.length,
       unresolvedCustomers: blockers.filter((blocker) => blocker.reason === "unresolved_customer").length,
-      unresolvedProducts: blockers.filter((blocker) => blocker.reason === "unresolved_product").length,
+      unresolvedProducts: blockers.filter((blocker) => (
+        blocker.reason === "unresolved_product" || blocker.reason === "unresolved_product_unit"
+      )).length,
       unresolvedBookings: blockers.filter((blocker) => blocker.reason === "unresolved_booking").length,
       preservedLines: writes.reduce((sum, write) => sum + write.sale.preservedLineIds.length, 0),
       preservedPayments: writes.reduce((sum, write) => sum + write.sale.preservedPaymentIds.length, 0),
