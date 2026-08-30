@@ -263,6 +263,56 @@ describe("KiotViet purchase receipt synchronization", () => {
     expect(result.preservedLineIds).toEqual(["legacy-mismatched-line"]);
   });
 
+  test("matches legacy children globally so source row order cannot block a later safe match", () => {
+    const legacyRow = {
+      ...sourceRows[0]!,
+      "Tổng tiền hàng": 240001,
+      "Cần trả NCC": 241501,
+    };
+    const newRow = {
+      ...legacyRow,
+      "Mã hàng": "BASE-001",
+      "Tên hàng": "Sản phẩm lẻ",
+      ĐVT: "Cái",
+      "Số lượng": 1,
+      "Giá nhập": 1,
+      "Thành tiền": 1,
+      "Ghi chú hàng hóa": null,
+    };
+    const common = {
+      current: [{ localId: "purchase-001", code: "PN-001", fingerprint: "outdated", subtotal: 0, legacyImported: true }],
+      existingLines: [{
+        localId: "legacy-alt-line",
+        purchaseOrderId: "purchase-001",
+        legacyImported: true,
+        legacyProductSku: "ALT-001",
+        quantity: 2,
+        unitCost: 120000,
+        total: 240000,
+      }],
+    };
+    const plans = [[legacyRow, newRow], [newRow, legacyRow]].map((rows) => plan({ ...common, sourceRows: rows }));
+
+    expect(plans.map((result) => result.blockers)).toEqual([[], []]);
+    expect(plans.map((result) => result.preservedLineIds)).toEqual([[], []]);
+    expect(plans.map((result) => result.purchases[0]?.lines.map((line) => line.externalId))).toEqual([
+      ["PN-001|ALT-001|hộp|1", "PN-001|BASE-001|cái|1"],
+      ["PN-001|ALT-001|hộp|1", "PN-001|BASE-001|cái|1"],
+    ]);
+    expect(plans.map((result) => result.writes[0]?.purchase.lines
+      .map((line) => ({ action: line.action, externalId: line.externalId, localId: line.localId }))
+      .sort((left, right) => left.externalId.localeCompare(right.externalId)))).toEqual([
+      [
+        { action: "update", externalId: "PN-001|ALT-001|hộp|1", localId: "legacy-alt-line" },
+        { action: "create", externalId: "PN-001|BASE-001|cái|1", localId: undefined },
+      ],
+      [
+        { action: "update", externalId: "PN-001|ALT-001|hộp|1", localId: "legacy-alt-line" },
+        { action: "create", externalId: "PN-001|BASE-001|cái|1", localId: undefined },
+      ],
+    ]);
+  });
+
   test("reserves mapped child IDs before a legacy fallback can reuse them", () => {
     const duplicateRows = [
       { ...sourceRows[1]!, "Tổng tiền hàng": 2, "Cần trả NCC": 2, "Thành tiền": 1, "Giá nhập": 1, "Ghi chú hàng hóa": "one" },

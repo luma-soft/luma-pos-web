@@ -291,6 +291,7 @@ function purchaseSourceRows(input: {
         note: nullableText(row["Ghi chú hàng hóa"]),
       }];
     });
+    lines.sort((left, right) => left.externalId.localeCompare(right.externalId));
     return {
       code,
       status: purchaseStatus(header["Trạng thái"]),
@@ -339,56 +340,81 @@ function childWrites(input: {
   // occurrence cannot steal an ID mapped to a later occurrence.
   const selectedIds = new Set<string>();
   const mappedCurrentByExternalId = new Map<string, KiotVietPurchaseCurrentLine>();
+  let childIdentityFailure = false;
   for (const value of input.values) {
     const mapping = input.mappings.get(value.externalId);
     if (!mapping) continue;
     const current = input.currentById.get(mapping.localId);
     if (!current) {
       input.blockers.push({ documentCode: input.documentCode, reference: value.externalId, reason: "mapped_line_missing" });
+      childIdentityFailure = true;
       continue;
     }
     if (current.purchaseOrderId !== input.parentId) {
       input.blockers.push({ documentCode: input.documentCode, reference: value.externalId, reason: "mapped_line_parent_mismatch" });
+      childIdentityFailure = true;
       continue;
     }
     if (selectedIds.has(current.localId)) {
       input.blockers.push({ documentCode: input.documentCode, reference: value.externalId, reason: "duplicate_local_child_write" });
+      childIdentityFailure = true;
       continue;
     }
     selectedIds.add(current.localId);
     mappedCurrentByExternalId.set(value.externalId, current);
   }
 
-  const writes = input.values.map(({ externalId, ...line }) => {
-    const mapped = mappedCurrentByExternalId.get(externalId);
-    if (mapped) return { externalId, localId: mapped.localId, line };
-    if (input.mappings.has(externalId)) return { externalId, line };
-    if (!input.allowLegacyAdoption) return { externalId, line };
-
-    const fingerprint = sourceLineFingerprint({ externalId, ...line });
-    const candidates = [...input.currentById.values()].filter((current) => (
-      current.purchaseOrderId === input.parentId
-      && !selectedIds.has(current.localId)
-      && currentLineFingerprint(current) === fingerprint
-    ));
-    if (candidates.length > 1) {
-      input.blockers.push({ documentCode: input.documentCode, reference: externalId, reason: "ambiguous_legacy_line_match" });
-      return { externalId, line };
+  // Decide all fallback matches before emitting writes. A genuinely new source
+  // line must not block a later source line that uniquely matches a legacy row.
+  const legacyCurrentByExternalId = new Map<string, KiotVietPurchaseCurrentLine>();
+  const unmatchedSourceExternalIds: string[] = [];
+  if (input.allowLegacyAdoption) {
+    for (const value of [...input.values].sort((left, right) => left.externalId.localeCompare(right.externalId))) {
+      if (mappedCurrentByExternalId.has(value.externalId) || input.mappings.has(value.externalId)) continue;
+      const fingerprint = sourceLineFingerprint(value);
+      const candidates = [...input.currentById.values()].filter((current) => (
+        current.purchaseOrderId === input.parentId
+        && !selectedIds.has(current.localId)
+        && currentLineFingerprint(current) === fingerprint
+      ));
+      if (candidates.length > 1) {
+        input.blockers.push({
+          documentCode: input.documentCode,
+          reference: value.externalId,
+          reason: "ambiguous_legacy_line_match",
+        });
+        childIdentityFailure = true;
+        continue;
+      }
+      const legacy = candidates[0];
+      if (!legacy) {
+        unmatchedSourceExternalIds.push(value.externalId);
+        continue;
+      }
+      selectedIds.add(legacy.localId);
+      legacyCurrentByExternalId.set(value.externalId, legacy);
     }
-    const legacy = candidates[0];
-    if (!legacy) {
-      const hasUnmatchedRecoverableLegacyLine = [...input.currentById.values()].some((current) => (
+
+    const unmatchedLegacyIds = [...input.currentById.values()]
+      .filter((current) => (
         current.purchaseOrderId === input.parentId
         && !selectedIds.has(current.localId)
         && currentLineFingerprint(current) != null
-      ));
-      if (hasUnmatchedRecoverableLegacyLine) {
-        input.blockers.push({ documentCode: input.documentCode, reference: externalId, reason: "legacy_line_unmatched" });
-      }
-      return { externalId, line };
+      ))
+      .map((current) => current.localId)
+      .sort((left, right) => left.localeCompare(right));
+    if (!childIdentityFailure && unmatchedLegacyIds.length > 0) {
+      input.blockers.push({
+        documentCode: input.documentCode,
+        reference: unmatchedSourceExternalIds.sort((left, right) => left.localeCompare(right))[0] ?? unmatchedLegacyIds[0]!,
+        reason: "legacy_line_unmatched",
+      });
     }
-    selectedIds.add(legacy.localId);
-    return { externalId, localId: legacy.localId, line };
+  }
+
+  const writes = input.values.map(({ externalId, ...line }) => {
+    const current = mappedCurrentByExternalId.get(externalId) ?? legacyCurrentByExternalId.get(externalId);
+    return current ? { externalId, localId: current.localId, line } : { externalId, line };
   });
   const preservedIds = [...input.currentById.values()]
     .filter((current) => current.purchaseOrderId === input.parentId && !selectedIds.has(current.localId))
