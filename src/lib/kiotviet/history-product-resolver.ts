@@ -258,7 +258,7 @@ export function auditKiotVietHistoryProducts(input: {
 export function assertKiotVietHistoryProductAuditComplete(
   audit: KiotVietHistoryProductAudit,
 ): void {
-  const count = audit.summary.awaitingPlaceholderApprovalCount;
+  const count = audit.blockers.length;
   if (count === 0) return;
   const noun = count === 1 ? "reference awaits" : "references await";
   throw new Error(

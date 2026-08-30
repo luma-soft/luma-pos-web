@@ -111,4 +111,23 @@ describe("KiotViet historical product resolver", () => {
     expect(() => assertKiotVietHistoryProductAuditComplete(audit))
       .toThrow("KiotViet history product resolution is blocking: 1 reference awaits historical placeholder approval");
   });
+
+  test("fails closed when a caller falsifies an unresolved audit summary", () => {
+    const resolver = createKiotVietHistoryProductResolver({
+      currentBaseProducts: [],
+      productUnits: [],
+      archivedSourceMappings: [],
+      approvedHistoricalPlaceholders: [],
+    });
+    const audit = auditKiotVietHistoryProducts({
+      resolver,
+      references: [{ sku: "NEEDS-APPROVAL" }],
+    });
+
+    audit.summary.awaitingPlaceholderApprovalCount = 0;
+    audit.summary.unresolvedReferenceCount = 0;
+
+    expect(() => assertKiotVietHistoryProductAuditComplete(audit))
+      .toThrow("KiotViet history product resolution is blocking: 1 reference awaits historical placeholder approval");
+  });
 });
