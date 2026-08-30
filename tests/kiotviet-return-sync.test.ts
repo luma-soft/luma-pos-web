@@ -191,13 +191,55 @@ describe("KiotViet customer return synchronization", () => {
         quantity: 2,
         unitPrice: 100000,
         total: 200000,
+      }, {
+        localId: "preserved-luma-line",
+        returnId: "return-001",
+        active: true,
+        orderItemId: "sale-line-002",
+        quantity: 1,
       }],
-      sales: [{ ...sales[0]!, status: "returned" }],
+      sales: [{
+        ...sales[0]!,
+        status: "returned",
+        items: [{ localId: "sale-line-002", sourceSku: "OTHER", unitName: "Cái", quantity: 1 }],
+      }],
     });
 
     expect(result.blockers).toEqual([]);
     expect(result.writes[0]?.return.status).toBe("cancelled");
     expect(result.saleStatusUpdates).toEqual([{ orderId: "order-001", status: "completed" }]);
+  });
+
+  test("reactivating a return includes its preserved active children in the parent total", () => {
+    const result = plan({
+      current: [{ localId: "return-001", code: "TH-001", fingerprint: "outdated", legacyImported: true }],
+      existingLines: [{
+        localId: "legacy-return-line",
+        returnId: "return-001",
+        active: false,
+        legacyImported: true,
+        legacyProductSku: "ALT-001",
+        orderItemId: "sale-line-001",
+        quantity: 2,
+        unitPrice: 100000,
+        total: 200000,
+      }, {
+        localId: "preserved-luma-line",
+        returnId: "return-001",
+        active: true,
+        orderItemId: "sale-line-002",
+        quantity: 1,
+      }],
+      sales: [{
+        ...sales[0]!,
+        status: "completed",
+        items: [...sales[0]!.items, { localId: "sale-line-002", sourceSku: "OTHER", unitName: "Cái", quantity: 1 }],
+      }],
+    });
+
+    expect(result.blockers).toEqual([]);
+    expect(result.writes[0]?.return.preservedLineIds).toEqual(["preserved-luma-line"]);
+    expect(result.saleStatusUpdates).toEqual([{ orderId: "order-001", status: "returned" }]);
   });
 
   test("adopts the actual legacy item shape and preserves Luma-native return children", () => {
@@ -227,6 +269,31 @@ describe("KiotViet customer return synchronization", () => {
       },
     });
     expect(result.preservedLineIds).toEqual(["luma-return-line"]);
+  });
+
+  test("reserves a mapped stale occurrence so legacy fallback cannot steal its child ID", () => {
+    const result = plan({
+      current: [{ localId: "return-001", code: "TH-001", fingerprint: "outdated", legacyImported: true }],
+      lineMappings: [{ externalId: "TH-001|ALT-001|hộp|2", localId: "stale-mapped-line" }],
+      existingLines: [{
+        localId: "stale-mapped-line",
+        returnId: "return-001",
+        legacyImported: true,
+        legacyProductSku: "ALT-001",
+        quantity: 2,
+        unitPrice: 100000,
+        total: 200000,
+      }],
+    });
+
+    expect(result.blockers).toEqual([]);
+    expect(result.writes[0]).toMatchObject({
+      action: "adopt",
+      return: {
+        lines: [{ action: "create", externalId: "TH-001|ALT-001|hộp|1" }],
+        preservedLineIds: ["stale-mapped-line"],
+      },
+    });
   });
 
   test("assigns duplicate source occurrences deterministically regardless of worksheet row order", () => {
@@ -338,6 +405,31 @@ describe("KiotViet customer return synchronization", () => {
       codeColumn: "Mã hóa đơn",
       consistentHeaderColumns: [],
     }).map((group) => group.externalId));
+    const aggregateBySkuUnit = (rows: Record<string, unknown>[]) => rows.reduce((totals, row) => {
+      const key = [
+        normalizeKiotVietText(row["Mã hàng"]),
+        normalizeKiotVietText(row.ĐVT).toLocaleLowerCase("vi"),
+      ].join("\u0000");
+      totals.set(key, (totals.get(key) ?? 0) + normalizeKiotVietNumber(row["Số lượng"]));
+      return totals;
+    }, new Map<string, number>());
+    const salesByInvoice = new Map(groupKiotVietDocumentRows(saleSource.rows, {
+      codeColumn: "Mã hóa đơn",
+      consistentHeaderColumns: [],
+    }).map((group) => [group.externalId, aggregateBySkuUnit(group.rows)]));
+    const returnComparison = returnGroups.reduce((summary, group) => {
+      const saleTotals = salesByInvoice.get(normalizeKiotVietText(group.rows[0]!["Mã hóa đơn"]));
+      if (!saleTotals) return { ...summary, missingInvoice: summary.missingInvoice + 1 };
+      const returnTotals = aggregateBySkuUnit(group.rows);
+      const partial = [...saleTotals].some(([key, saleQuantity]) => (
+        (returnTotals.get(key) ?? 0) !== saleQuantity
+      )) || [...returnTotals].some(([key, returnQuantity]) => (
+        (saleTotals.get(key) ?? 0) !== returnQuantity
+      ));
+      return partial
+        ? { ...summary, partial: summary.partial + 1 }
+        : { ...summary, full: summary.full + 1 };
+    }, { full: 0, partial: 0, missingInvoice: 0 });
     const settlement = { unsettled: 0, partial: 0, settled: 0 };
     for (const group of returnGroups) {
       const header = group.rows[0]!;
@@ -350,6 +442,7 @@ describe("KiotViet customer return synchronization", () => {
 
     expect({ documents: returnGroups.length, lines: returnSource.rows.length }).toEqual({ documents: 113, lines: 440 });
     expect(returnGroups.filter((group) => !saleCodes.has(normalizeKiotVietText(group.rows[0]!["Mã hóa đơn"])))).toHaveLength(38);
+    expect(returnComparison).toEqual({ full: 5, partial: 70, missingInvoice: 38 });
     expect(settlement).toEqual({ unsettled: 74, partial: 0, settled: 39 });
   });
 });

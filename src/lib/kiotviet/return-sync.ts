@@ -417,6 +417,17 @@ function childWrites(input: {
   }
 
   const selectedIds = new Set<string>();
+  // A mapping for an occurrence that is absent from this source snapshot still
+  // owns its local child. Reserve it before fallback matching so a new/stable
+  // occurrence cannot steal the ID, and so it remains an intentional preserve.
+  const reservedMappedIds = new Set<string>();
+  const sourceExternalIds = new Set(input.values.map((value) => value.externalId));
+  for (const [externalId, mapping] of [...input.mappings.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))) {
+    if (sourceExternalIds.has(externalId)) continue;
+    const current = input.currentById.get(mapping.localId);
+    if (current?.returnId === input.parentId) reservedMappedIds.add(current.localId);
+  }
   const mappedCurrentByExternalId = new Map<string, KiotVietReturnCurrentLine>();
   let childIdentityFailure = false;
   for (const value of input.values) {
@@ -450,6 +461,7 @@ function childWrites(input: {
       const candidates = [...input.currentById.values()].filter((current) => (
         current.returnId === input.parentId
         && !selectedIds.has(current.localId)
+        && !reservedMappedIds.has(current.localId)
         && currentLineFingerprint(current) === sourceLineFingerprint(value)
       ));
       if (candidates.length > 1) {
@@ -466,7 +478,12 @@ function childWrites(input: {
       legacyCurrentByExternalId.set(value.externalId, legacy);
     }
     const unmatchedLegacyIds = [...input.currentById.values()]
-      .filter((current) => current.returnId === input.parentId && !selectedIds.has(current.localId) && currentLineFingerprint(current) != null)
+      .filter((current) => (
+        current.returnId === input.parentId
+        && !selectedIds.has(current.localId)
+        && !reservedMappedIds.has(current.localId)
+        && currentLineFingerprint(current) != null
+      ))
       .map((current) => current.localId)
       .sort((left, right) => left.localeCompare(right));
     if (!childIdentityFailure && unmatchedLegacyIds.length > 0) {
@@ -494,28 +511,23 @@ function saleStatusUpdates(input: {
   writes: KiotVietReturnWrite[];
   blockers: KiotVietReturnSyncPlan["blockers"];
 }): Array<{ orderId: string; status: "completed" | "returned" }> {
-  const contributionByLineId = new Map<string, { orderItemId: string; quantity: number }>();
-  for (const line of input.existingLines) {
-    if (line.active === false || !line.orderItemId || line.quantity == null) continue;
-    contributionByLineId.set(line.localId, {
-      orderItemId: line.orderItemId,
-      quantity: normalizeKiotVietNumber(line.quantity),
-    });
-  }
+  const affectedParentIds = new Set(input.writes.flatMap((write) => write.localId ? [write.localId] : []));
   const returnedBySaleItem = new Map<string, number>();
-  for (const contribution of contributionByLineId.values()) {
-    returnedBySaleItem.set(
-      contribution.orderItemId,
-      (returnedBySaleItem.get(contribution.orderItemId) ?? 0) + contribution.quantity,
-    );
+  for (const line of input.existingLines) {
+    if (affectedParentIds.has(line.returnId) || line.active === false || !line.orderItemId || line.quantity == null) continue;
+    const quantity = normalizeKiotVietNumber(line.quantity);
+    returnedBySaleItem.set(line.orderItemId, (returnedBySaleItem.get(line.orderItemId) ?? 0) + quantity);
   }
   for (const write of input.writes) {
+    if (write.return.status !== "completed") continue;
+    const writtenIds = new Set(write.return.lines.flatMap((line) => line.localId ? [line.localId] : []));
+    for (const existing of input.existingLines) {
+      if (existing.returnId !== write.localId || writtenIds.has(existing.localId)) continue;
+      if (existing.active === false || !existing.orderItemId || existing.quantity == null) continue;
+      const quantity = normalizeKiotVietNumber(existing.quantity);
+      returnedBySaleItem.set(existing.orderItemId, (returnedBySaleItem.get(existing.orderItemId) ?? 0) + quantity);
+    }
     for (const line of write.return.lines) {
-      if (line.localId) {
-        const old = contributionByLineId.get(line.localId);
-        if (old) returnedBySaleItem.set(old.orderItemId, (returnedBySaleItem.get(old.orderItemId) ?? 0) - old.quantity);
-      }
-      if (write.return.status !== "completed") continue;
       if (!line.line.orderItemId) continue;
       returnedBySaleItem.set(
         line.line.orderItemId,
