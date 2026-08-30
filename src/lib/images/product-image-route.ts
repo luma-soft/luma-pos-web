@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireMobileStockAccess } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
@@ -8,6 +7,17 @@ import {
   PRODUCT_IMAGE_MAX_BYTES,
   type ProductImageMime,
 } from "@/lib/images/product-image-spec";
+import { getMediaService, mediaServiceError } from "@/lib/media/service";
+
+type ProductImageRouteDependencies = {
+  authenticate?: typeof requireMobileStockAccess;
+  mediaService?: Pick<
+    ReturnType<typeof getMediaService>,
+    "putManagedObject" | "deleteMedia"
+  >;
+  convertHeif?: typeof convertHeifToJpeg;
+  removeLegacy?: (path: string) => Promise<void>;
+};
 
 const PRODUCT_IMAGES_BUCKET = "products";
 
@@ -50,8 +60,11 @@ function sniffImageMime(bytes: Uint8Array): ProductImageMime | null {
   return null;
 }
 
-export async function uploadProductImage(request: Request) {
-  const gate = await requireMobileStockAccess();
+export async function uploadProductImage(
+  request: Request,
+  dependencies: ProductImageRouteDependencies = {},
+) {
+  const gate = await (dependencies.authenticate ?? requireMobileStockAccess)();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileError("errors.unauthorized", 401);
@@ -83,47 +96,72 @@ export async function uploadProductImage(request: Request) {
   try {
     const isHeif = extension === "heic" || extension === "heif";
     const bytes = isHeif
-      ? await convertHeifToJpeg(sourceBytes)
+      ? await (dependencies.convertHeif ?? convertHeifToJpeg)(sourceBytes)
       : sourceBytes;
-    const storedExtension = isHeif ? "jpg" : extension;
     const contentType = isHeif ? "image/jpeg" : file.type;
-    const path = `stores/${gate.storeId}/products/drafts/${gate.userId}/${Date.now()}-${randomUUID()}.${storedExtension}`;
-    const supabase = createSupabaseAdminClient();
-    const { error } = await supabase.storage
-      .from(PRODUCT_IMAGES_BUCKET)
-      .upload(path, bytes, {
-        contentType,
-        upsert: false,
-      });
-    if (error) throw error;
-    const { data } = supabase.storage
-      .from(PRODUCT_IMAGES_BUCKET)
-      .getPublicUrl(path);
-    return mobileOk({ url: data.publicUrl, path });
+    const fileName = isHeif
+      ? `${file.name.replace(/\.[^.]+$/, "")}.jpg`
+      : file.name;
+    const result = await (dependencies.mediaService ?? getMediaService())
+      .putManagedObject(gate, {
+      purpose: "product-image",
+      targetId: gate.storeId,
+      fileName,
+      mimeType: contentType,
+      sizeBytes: bytes.byteLength,
+    }, bytes);
+    return mobileOk(result);
   } catch (error) {
     console.error("upload_product_image failed:", error);
-    return mobileError("products.fields.imageUploadError", 500);
+    const mapped = mediaServiceError(error);
+    return mobileError(
+      mapped.status >= 500 ? "products.fields.imageUploadError" : mapped.error,
+      mapped.status,
+    );
   }
 }
 
-export async function deleteProductImage(request: Request) {
-  const gate = await requireMobileStockAccess();
+export async function deleteProductImage(
+  request: Request,
+  dependencies: ProductImageRouteDependencies = {},
+) {
+  const gate = await (dependencies.authenticate ?? requireMobileStockAccess)();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
   if (!gate.ok) return mobileError("errors.unauthorized", 401);
 
-  const path = new URL(request.url).searchParams.get("path")?.trim() ?? "";
-  const tenantPrefix = `stores/${gate.storeId}/products/`;
+  const params = new URL(request.url).searchParams;
+  const mediaId = params.get("mediaId")?.trim() ?? "";
+  if (mediaId) {
+    try {
+      const result = await (dependencies.mediaService ?? getMediaService())
+        .deleteMedia(gate, mediaId);
+      return mobileOk({ mediaId: result.id, status: result.status });
+    } catch (error) {
+      const mapped = mediaServiceError(error);
+      return mobileError(mapped.error, mapped.status);
+    }
+  }
+
+  const path = params.get("path")?.trim() ?? "";
+  const tenantPrefix = `stores/${gate.storeId}/products/drafts/${gate.userId}/`;
   const legacyPrefix = `${gate.userId}/`;
-  if ((!path.startsWith(tenantPrefix) && !path.startsWith(legacyPrefix)) || path.includes("..")) {
+  if (
+    (!path.startsWith(tenantPrefix) && !path.startsWith(legacyPrefix))
+    || path.includes("..")
+  ) {
     return mobileError("errors.forbidden", 403);
   }
   try {
-    const supabase = createSupabaseAdminClient();
-    const { error } = await supabase.storage
-      .from(PRODUCT_IMAGES_BUCKET)
-      .remove([path]);
-    if (error) throw error;
+    if (dependencies.removeLegacy) {
+      await dependencies.removeLegacy(path);
+    } else {
+      const supabase = createSupabaseAdminClient();
+      const { error } = await supabase.storage
+        .from(PRODUCT_IMAGES_BUCKET)
+        .remove([path]);
+      if (error) throw error;
+    }
     return mobileOk({ path });
   } catch (error) {
     console.error("delete_product_image failed:", error);

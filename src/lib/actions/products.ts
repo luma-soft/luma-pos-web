@@ -33,6 +33,14 @@ import {
   toMoney,
 } from "./common";
 import { syncProductUnits } from "@/lib/products/product-unit-sync";
+import { getPublicMediaUrl } from "@/lib/media/config";
+import {
+  externalProductImageUrls,
+  ProductMediaValidationError,
+  replaceProductMediaInTransaction,
+  resolveLegacyProductImageIdsInTransaction,
+} from "@/lib/products/product-media";
+import { imageMediaIdsSchema } from "@/lib/products/product-media-schema";
 
 /** Tạo nhóm hàng mới từ form (combobox "+ thêm"). Trả id. */
 export async function createCategory(
@@ -357,6 +365,7 @@ const updateProductSchema = z.object({
   location: z.string().trim().optional(),
   description: z.string().trim().optional(),
   imageUrls: z.array(z.string()).optional(),
+  imageMediaIds: imageMediaIdsSchema.optional(),
   comboItems: z.array(z.object({
     productId: z.uuid(),
     quantity: z.number().positive(),
@@ -631,6 +640,22 @@ export async function updateProduct(
         throw new Error("PRODUCT_KIND_IMMUTABLE");
       }
 
+      if (v.imageMediaIds !== undefined || v.imageUrls !== undefined) {
+        const imageMediaIds = v.imageMediaIds
+          ?? await resolveLegacyProductImageIdsInTransaction(tx, {
+            storeId: gate.storeId,
+            productId: v.id,
+            imageUrls: v.imageUrls ?? [],
+          });
+        await replaceProductMediaInTransaction(tx, {
+          storeId: gate.storeId,
+          productId: v.id,
+          imageMediaIds,
+          imageUrls: v.imageUrls ?? [],
+          publicUrlForKey: getPublicMediaUrl,
+        });
+      }
+
       await tx
         .update(products)
         .set({
@@ -662,7 +687,6 @@ export async function updateProduct(
             : { isActive: v.isActive }),
           location: v.location || null,
           description: v.description || null,
-          ...(v.imageUrls ? { imageUrls: v.imageUrls } : {}),
           specs: v.specs && Object.keys(v.specs).length > 0 ? v.specs : null,
           updatedAt: sql`now()`,
         })
@@ -740,8 +764,10 @@ export async function updateProduct(
         };
         if (fields.has("description"))
           patch.description = v.description || null;
-        if (fields.has("imageUrls") && v.imageUrls)
-          patch.imageUrls = v.imageUrls;
+        if (fields.has("imageUrls") && v.imageUrls) {
+          patch.imageUrls = externalProductImageUrls(v.imageUrls);
+          patch.imageUpdatedAt = sql`now()` as unknown as Date;
+        }
         if (fields.has("category")) patch.categoryId = v.categoryId || null;
         if (fields.has("brand")) patch.brandId = v.brandId || null;
         if (fields.has("directSale")) patch.isActive = v.isActive;
@@ -827,6 +853,9 @@ export async function updateProduct(
     };
     const message = e instanceof Error ? e.message : "";
     if (known[message]) return { ok: false, error: known[message] };
+    if (e instanceof ProductMediaValidationError) {
+      return { ok: false, error: e.error };
+    }
     const cause = (e as { cause?: { code?: string } }).cause;
     if (cause?.code === "23505")
       return { ok: false, error: "products.errors.skuExists" };
@@ -902,6 +931,23 @@ export async function createProduct(
               isPrimary: i === 0,
             })),
           );
+      }
+
+      async function associateImages(productId: string) {
+        const imageMediaIds = v.imageMediaIds.length > 0
+          ? v.imageMediaIds
+          : await resolveLegacyProductImageIdsInTransaction(tx, {
+            storeId,
+            productId,
+            imageUrls: v.imageUrls,
+          });
+        return replaceProductMediaInTransaction(tx, {
+          storeId,
+          productId,
+          imageMediaIds,
+          imageUrls: v.imageUrls,
+          publicUrlForKey: getPublicMediaUrl,
+        });
       }
 
       const [defaultWh] = await tx
@@ -984,6 +1030,7 @@ export async function createProduct(
           })
           .returning({ id: products.id });
 
+        await associateImages(product.id);
         await insertUnits(product.id);
         await insertSuppliers(product.id);
         if (v.productKind === "product") {
@@ -1044,6 +1091,7 @@ export async function createProduct(
         })
         .returning({ id: products.id });
 
+      const parentImages = await associateImages(parent.id);
       await insertUnits(parent.id);
       await insertSuppliers(parent.id);
 
@@ -1091,7 +1139,9 @@ export async function createProduct(
             dimensions: buildDimensions(v),
             specs: mergeSpecs(descriptiveSpecs, child.specs),
             imageUrls:
-              child.imageUrls.length > 0 ? child.imageUrls : v.imageUrls,
+              child.imageUrls.length > 0
+                ? externalProductImageUrls(child.imageUrls)
+                : parentImages.externalImageUrls,
             isActive: v.lifecycleStatus === "active" && child.directSale,
           })
           .returning({ id: products.id });
@@ -1127,6 +1177,9 @@ export async function createProduct(
       msg.includes("duplicate key")
     ) {
       return { ok: false, error: "products.errors.skuExists" };
+    }
+    if (e instanceof ProductMediaValidationError) {
+      return { ok: false, error: e.error };
     }
     console.error("createProduct failed:", e);
     return { ok: false, error: "errors.serverError" };

@@ -24,6 +24,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { completeAiText, loadAiProviderConfig, parseJsonText } from "@/lib/ai/provider-adapter";
 import { consumeAiUsage, recordAiTokenUsage } from "@/lib/ai/usage";
 import { consumeTrackedStockLots } from "@/lib/inventory/stock-lot-service";
+import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
 import {
   aiListingFillSchema,
   importShopeeOrderSchema,
@@ -136,7 +137,7 @@ async function getProductForListing(storeId: string, productId: string) {
       totalStock: products.totalStock,
       weight: products.weight,
       dimensions: products.dimensions,
-      imageUrls: products.imageUrls,
+      imageUrls: productCompatibilityImageUrls(storeId),
       categoryName: sql<string | null>`(select name from categories where id = ${products.categoryId} limit 1)`,
       brandName: sql<string | null>`(select name from brands where id = ${products.brandId} limit 1)`,
     })

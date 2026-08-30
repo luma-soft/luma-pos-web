@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { imageMediaIdsSchema } from "@/lib/products/product-media-schema";
 
 export const productUnitSchema = z.object({
   id: z.uuid().optional(),
@@ -65,6 +66,7 @@ export const createProductSchema = z.object({
   brandId: z.string().optional(),
   supplierIds: z.array(z.string()).default([]), // nhiều NCC; phần tử đầu = NCC chính
   imageUrls: z.array(z.string()).max(10).default([]),
+  imageMediaIds: imageMediaIdsSchema.default([]),
 
   // Pricing
   costPrice: z.number().min(0).default(0),

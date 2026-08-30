@@ -19,6 +19,7 @@ import {
   type ProductCatalogSnapshot,
 } from "@/lib/product-catalog";
 import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
+import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
 
 export async function getProductCatalogRevision(storeId: string): Promise<string> {
   const [state] = await db
@@ -65,7 +66,7 @@ async function buildProductCatalogSnapshot(
         wholesalePrice: products.wholesalePrice,
         contractorPrice: products.contractorPrice,
         agentPrice: products.agentPrice,
-        imageUrls: products.imageUrls,
+        imageUrls: productCompatibilityImageUrls(storeId),
         imageUpdatedAt: products.imageUpdatedAt,
         specs: products.specs,
         parentProductId: products.parentProductId,

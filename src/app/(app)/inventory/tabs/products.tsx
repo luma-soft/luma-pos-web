@@ -188,11 +188,13 @@ export async function ProductEditorModal({
         className="h-dvh w-full max-w-7xl overflow-hidden bg-surface shadow-2xl sm:h-[min(92dvh,920px)] sm:rounded-2xl"
       >
         <NewProductForm
+          storeId={context.storeId}
           mode={mode}
           productId={editId}
           isVariantChild={Boolean(seedProduct?.parentProductId)}
           siblingCount={seedProduct?.siblings.length ?? 0}
           initialValues={initialValues}
+          initialManagedImages={mode === "edit" ? seedProduct?.imageMedia : undefined}
           categories={options.categories}
           brands={options.brands}
           suppliers={options.suppliers}

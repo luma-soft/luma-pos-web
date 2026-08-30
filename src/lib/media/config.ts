@@ -82,3 +82,8 @@ export function readR2Config(env: R2Environment): R2Config {
 export function getR2Config(): R2Config {
   return readR2Config(process.env);
 }
+
+export function getPublicMediaUrl(key: string): string {
+  const encodedKey = key.split("/").map(encodeURIComponent).join("/");
+  return `${getR2Config().publicBaseUrl}/${encodedKey}`;
+}

@@ -47,6 +47,14 @@ export type SaveMediaThumbnailInput = {
   sizeBytes: number;
 };
 
+export type AbandonPendingMediaInput = {
+  storeId: string;
+  mediaId: string;
+  expectedPurpose: MediaPurpose;
+  expectedTargetId: string;
+  deletedAt: Date;
+};
+
 export type { SoftDeleteMediaInput, SoftDeleteMediaResult } from "@/lib/media/repository-core";
 
 export function buildCreatePendingMediaQuery(
@@ -120,6 +128,27 @@ export function buildSaveMediaThumbnailQuery(
 
 export async function saveMediaThumbnail(input: SaveMediaThumbnailInput) {
   const [row] = await buildSaveMediaThumbnailQuery(db, input);
+  return row ?? null;
+}
+
+export function buildAbandonPendingMediaQuery(
+  database: Pick<typeof db, "update">,
+  input: AbandonPendingMediaInput,
+) {
+  return database.update(mediaObjects).set({
+    status: "deleted",
+    deletedAt: input.deletedAt,
+  }).where(and(
+    eq(mediaObjects.id, input.mediaId),
+    eq(mediaObjects.storeId, input.storeId),
+    eq(mediaObjects.status, "pending"),
+    eq(mediaObjects.purpose, input.expectedPurpose),
+    eq(mediaObjects.targetId, input.expectedTargetId),
+  )).returning();
+}
+
+export async function abandonPendingMedia(input: AbandonPendingMediaInput) {
+  const [row] = await buildAbandonPendingMediaQuery(db, input);
   return row ?? null;
 }
 

@@ -27,11 +27,13 @@ export default async function EditProductPage({ params, searchParams }: Props) {
 
   return (
     <NewProductForm
+      storeId={context.storeId}
       mode="edit"
       productId={id}
       isVariantChild={Boolean(product.parentProductId)}
       siblingCount={product.siblings.length}
       initialValues={productToFormInitialValues(product, "edit", priceBookPrices)}
+      initialManagedImages={product.imageMedia}
       categories={options.categories}
       brands={options.brands}
       suppliers={options.suppliers}

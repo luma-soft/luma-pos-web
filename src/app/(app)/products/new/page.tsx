@@ -37,12 +37,14 @@ export default async function NewProductPage({ searchParams }: Props) {
 
   return (
     <NewProductForm
+      storeId={context.storeId}
       categories={options.categories}
       brands={options.brands}
       suppliers={options.suppliers}
       comboProducts={options.comboProducts}
       priceBooks={priceBooks}
       initialValues={seedProduct ? productToFormInitialValues(seedProduct, copyFrom ? "copy" : "sameType", priceBookPrices) : undefined}
+      initialManagedImages={undefined}
       aiPreview={aiPreview}
       creationKind={seedProduct?.productKind ?? creationKind}
     />

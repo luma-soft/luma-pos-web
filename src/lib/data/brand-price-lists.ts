@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { brands, categories, products } from "@/db/schema";
+import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
 
 function firstImage(value: unknown) {
   return Array.isArray(value) && typeof value[0] === "string" ? value[0] : null;
@@ -43,7 +44,7 @@ export async function getBrandPriceListProducts(storeId: string, brandNames: str
       retailPrice: products.retailPrice,
       warrantyMonths: products.warrantyMonths,
       description: products.description,
-      imageUrls: products.imageUrls,
+      imageUrls: productCompatibilityImageUrls(storeId),
       specs: products.specs,
     })
     .from(products)

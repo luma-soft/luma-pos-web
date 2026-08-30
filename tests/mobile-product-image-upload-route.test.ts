@@ -1,69 +1,81 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
-import { createMobileAuthMock } from "./helpers/mobile-auth-mock";
+import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import type { MediaActor } from "@/lib/media/authorization";
 
+mock.module("server-only", () => ({}));
+mock.module("@/db", () => ({ db: {} }));
 afterAll(() => mock.restore());
 
-const uploads: Array<{
-  bucket: string;
-  path: string;
+const STORE_ID = "11111111-1111-4111-8111-111111111111";
+const USER_ID = "22222222-2222-4222-8222-222222222222";
+const MEDIA_ID = "33333333-3333-4333-8333-333333333333";
+const PATH = `stores/${STORE_ID}/products/2026/08/${MEDIA_ID}/original.jpg`;
+const URL = `https://media.lumapos.vn/${PATH}`;
+
+const managedPuts: Array<{
+  actor: Record<string, unknown>;
+  input: Record<string, unknown>;
   bytes: Uint8Array;
-  options: Record<string, unknown>;
 }> = [];
-const removals: string[][] = [];
+const managedDeletes: string[] = [];
+const legacyRemovals: string[][] = [];
 let heicConversions = 0;
 
-mock.module("@/lib/images/heif", () => ({
-  async convertHeifToJpeg() {
-    heicConversions += 1;
-    return Uint8Array.from([0xff, 0xd8, 0xff, 0x00]);
-  },
-}));
+const { uploadProductImage: uploadHandler, deleteProductImage: deleteHandler } =
+  await import("../src/lib/images/product-image-route");
 
-mock.module("@/lib/mobile/auth", () => createMobileAuthMock({
-  requireMobileStockAccess: async () => ({
-    ok: true,
-    storeId: "store-1",
-    userId: "user-1",
-    role: "manager",
-  }),
-}));
-
-mock.module("@/lib/supabase/admin", () => ({
-  createSupabaseAdminClient: () => ({
-    storage: {
-      from: (bucket: string) => ({
-        upload: async (
-          path: string,
-          bytes: Uint8Array,
-          options: Record<string, unknown>,
-        ) => {
-          uploads.push({ bucket, path, bytes, options });
-          return { error: null };
-        },
-        getPublicUrl: (path: string) => ({
-          data: { publicUrl: `https://cdn.test/${bucket}/${path}` },
-        }),
-        remove: async (paths: string[]) => {
-          removals.push(paths);
-          return { error: null };
-        },
-      }),
+const dependencies = {
+  authenticate: async () => ({
+    ok: true as const,
+    storeId: STORE_ID,
+    userId: USER_ID,
+    role: "manager" as const,
+    features: {
+      camera_quote_builder: true,
+      camera_price_list: true,
+      hunonic_price_list: true,
+      rang_dong_price_list: true,
+      field_services: true,
+      online_sales: true,
+      ai_assistant: true,
+      einvoice: true,
     },
   }),
-}));
+  mediaService: {
+    async putManagedObject(
+      actor: MediaActor,
+      input: unknown,
+      bytes: Uint8Array,
+    ) {
+      managedPuts.push({
+        actor,
+        input: input as Record<string, unknown>,
+        bytes,
+      });
+      return { mediaId: MEDIA_ID, path: PATH, url: URL };
+    },
+    async deleteMedia(_actor: MediaActor, mediaId: string) {
+      managedDeletes.push(mediaId);
+      return { id: mediaId, status: "deleted" as const };
+    },
+  },
+  async convertHeif() {
+    heicConversions += 1;
+    return Buffer.from([0xff, 0xd8, 0xff, 0x00]);
+  },
+  async removeLegacy(path: string) {
+    legacyRemovals.push([path]);
+  },
+};
 
-let uploadProductImage: (request: Request) => Promise<Response>;
-let deleteProductImage: (request: Request) => Promise<Response>;
-
-beforeAll(async () => {
-  ({ POST: uploadProductImage, DELETE: deleteProductImage } = await import(
-    "../src/app/api/mobile/products/images/route"
-  ));
-});
+const uploadProductImage = (request: Request) =>
+  uploadHandler(request, dependencies);
+const deleteProductImage = (request: Request) =>
+  deleteHandler(request, dependencies);
 
 beforeEach(() => {
-  uploads.splice(0);
-  removals.splice(0);
+  managedPuts.splice(0);
+  managedDeletes.splice(0);
+  legacyRemovals.splice(0);
   heicConversions = 0;
 });
 
@@ -78,94 +90,94 @@ function uploadRequest(bytes: number[], type = "image/jpeg") {
 }
 
 describe("POST /api/mobile/products/images", () => {
-  test("uploads a validated image to a unique user-scoped path", async () => {
+  test("writes validated bytes through MediaService and returns managed coordinates", async () => {
     const response = await uploadProductImage(
       uploadRequest([0xff, 0xd8, 0xff, 0x00]),
     );
-    const payload = await response.json();
 
     expect(response.status).toBe(200);
-    expect(uploads).toHaveLength(1);
-    expect(uploads[0]).toMatchObject({
-      bucket: "products",
-      options: { contentType: "image/jpeg", upsert: false },
+    expect(await response.json()).toEqual({
+      ok: true,
+      data: { mediaId: MEDIA_ID, url: URL, path: PATH },
     });
-    expect(uploads[0]?.path).toMatch(/^stores\/store-1\/products\/drafts\/user-1\/\d+-[\w-]+\.jpg$/);
-    expect(payload.data.url).toBe(
-      `https://cdn.test/products/${uploads[0]?.path}`,
-    );
+    expect(managedPuts).toHaveLength(1);
+    expect(managedPuts[0]).toMatchObject({
+      actor: { storeId: STORE_ID, userId: USER_ID },
+      input: {
+        purpose: "product-image",
+        targetId: STORE_ID,
+        fileName: "camera.jpeg",
+        mimeType: "image/jpeg",
+        sizeBytes: 4,
+      },
+    });
+    expect(Array.from(managedPuts[0]!.bytes)).toEqual([0xff, 0xd8, 0xff, 0x00]);
   });
 
-  test("accepts a PNG selected by the web product form", async () => {
-    const response = await uploadProductImage(
-      uploadRequest(
-        [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
-        "image/png",
-      ),
-    );
-
-    expect(response.status).toBe(200);
-    expect(uploads[0]).toMatchObject({
-      options: { contentType: "image/png", upsert: false },
-    });
-    expect(uploads[0]?.path).toEndWith(".png");
-  });
-
-  test("rejects a declared image whose bytes do not match", async () => {
-    const response = await uploadProductImage(
+  test("keeps MIME sniffing and HEIF-to-JPEG conversion before managed storage", async () => {
+    const mismatch = await uploadProductImage(
       uploadRequest([0x89, 0x50, 0x4e, 0x47], "image/jpeg"),
     );
+    expect(mismatch.status).toBe(400);
+    expect(managedPuts).toEqual([]);
 
-    expect(response.status).toBe(400);
-    expect(uploads).toHaveLength(0);
-  });
-
-  test("rejects unsupported image formats", async () => {
-    const response = await uploadProductImage(
-      uploadRequest([0x00, 0x00, 0x00], "image/heic"),
-    );
-
-    expect(response.status).toBe(400);
-    expect(uploads).toHaveLength(0);
-  });
-
-  test("normalizes an iPhone HEIC image to JPEG before storage", async () => {
-    const response = await uploadProductImage(
-      uploadRequest(
-        [0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63],
-        "image/heic",
-      ),
-    );
-
-    expect(response.status).toBe(200);
+    const heif = await uploadProductImage(uploadRequest(
+      [0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63],
+      "image/heic",
+    ));
+    expect(heif.status).toBe(200);
     expect(heicConversions).toBe(1);
-    expect(uploads[0]).toMatchObject({
-      options: { contentType: "image/jpeg", upsert: false },
+    expect(managedPuts[0]).toMatchObject({
+      input: {
+        fileName: "camera.jpg",
+        mimeType: "image/jpeg",
+        sizeBytes: 4,
+      },
     });
-    expect(uploads[0]?.path).toEndWith(".jpg");
   });
+});
 
-  test("deletes only an uncommitted image owned by the current user", async () => {
-    const response = await deleteProductImage(
-      new Request(
-        "https://luma.test/api/mobile/products/images?path=user-1%2Funcommitted.jpg",
-        { method: "DELETE" },
-      ),
-    );
-
+describe("DELETE /api/mobile/products/images", () => {
+  test("deletes by managed media ID without passing an R2 key to Supabase", async () => {
+    const response = await deleteProductImage(new Request(
+      `https://luma.test/api/mobile/products/images?mediaId=${MEDIA_ID}&path=${encodeURIComponent(PATH)}`,
+      { method: "DELETE" },
+    ));
     expect(response.status).toBe(200);
-    expect(removals).toEqual([["user-1/uncommitted.jpg"]]);
+    expect(managedDeletes).toEqual([MEDIA_ID]);
+    expect(legacyRemovals).toEqual([]);
   });
 
-  test("does not delete another user's image", async () => {
-    const response = await deleteProductImage(
-      new Request(
-        "https://luma.test/api/mobile/products/images?path=user-2%2Fimage.jpg",
+  test("retains strict user-scoped legacy Supabase cleanup", async () => {
+    for (const path of [
+      `${USER_ID}/uncommitted.jpg`,
+      `stores/${STORE_ID}/products/drafts/${USER_ID}/uncommitted.jpg`,
+    ]) {
+      const response = await deleteProductImage(new Request(
+        `https://luma.test/api/mobile/products/images?path=${encodeURIComponent(path)}`,
         { method: "DELETE" },
-      ),
-    );
+      ));
+      expect(response.status).toBe(200);
+    }
+    expect(legacyRemovals).toEqual([
+      [`${USER_ID}/uncommitted.jpg`],
+      [`stores/${STORE_ID}/products/drafts/${USER_ID}/uncommitted.jpg`],
+    ]);
+  });
 
-    expect(response.status).toBe(403);
-    expect(removals).toHaveLength(0);
+  test("never accepts a path-only R2 key or another user's legacy path", async () => {
+    for (const path of [
+      PATH,
+      "someone-else/uncommitted.jpg",
+      `stores/${STORE_ID}/products/drafts/someone-else/uncommitted.jpg`,
+    ]) {
+      const response = await deleteProductImage(new Request(
+        `https://luma.test/api/mobile/products/images?path=${encodeURIComponent(path)}`,
+        { method: "DELETE" },
+      ));
+      expect(response.status).toBe(403);
+    }
+    expect(managedDeletes).toEqual([]);
+    expect(legacyRemovals).toEqual([]);
   });
 });

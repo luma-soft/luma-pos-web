@@ -5,12 +5,14 @@ import { getR2Config } from "@/lib/media/config";
 import { createMediaThumbnail, isSafeRasterMimeType } from "@/lib/media/image-variants";
 import { createObjectKey } from "@/lib/media/object-key";
 import {
+  abandonPendingMedia,
   createPendingMedia,
   getMediaForStore,
   markMediaReady,
   saveMediaThumbnail,
   softDeleteMediaIfUnreferenced,
   type CreatePendingMediaInput,
+  type AbandonPendingMediaInput,
   type GetMediaForStoreInput,
   type MarkMediaReadyInput,
   type SaveMediaThumbnailInput,
@@ -24,6 +26,7 @@ import {
   normalizeMediaType,
   uploadIntentSchema,
   type MediaPurpose,
+  type UploadIntentInput,
 } from "@/lib/media/schemas";
 import { getObjectStorage } from "@/lib/media/storage";
 import {
@@ -76,6 +79,7 @@ export type MediaRepository = {
   getForStore(input: GetMediaForStoreInput): Promise<MediaRecord | null>;
   markReady(input: Required<MarkMediaReadyInput>): Promise<MediaRecord | null>;
   saveThumbnail(input: SaveMediaThumbnailInput): Promise<MediaRecord | null>;
+  abandonPending(input: AbandonPendingMediaInput): Promise<MediaRecord | null>;
   softDeleteIfUnreferenced(
     input: Required<SoftDeleteMediaInput>,
   ): Promise<SoftDeleteMediaResult>;
@@ -116,6 +120,7 @@ function defaultRepository(): MediaRepository {
     getForStore: getMediaForStore as MediaRepository["getForStore"],
     markReady: markMediaReady as MediaRepository["markReady"],
     saveThumbnail: saveMediaThumbnail as MediaRepository["saveThumbnail"],
+    abandonPending: abandonPendingMedia as MediaRepository["abandonPending"],
     softDeleteIfUnreferenced: softDeleteMediaIfUnreferenced,
   };
 }
@@ -173,10 +178,10 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
     };
   }
 
-  async function createUploadIntent(actor: MediaActor, value: unknown) {
-    const parsed = uploadIntentSchema.safeParse(value);
-    if (!parsed.success) throw new MediaServiceError("errors.invalidData", 400);
-    const input = parsed.data;
+  async function createPendingObject(
+    actor: MediaActor,
+    input: UploadIntentInput,
+  ) {
     await requireTarget(actor, input.purpose, input.targetId, false);
 
     const policy = MEDIA_PURPOSES[input.purpose];
@@ -216,6 +221,16 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
       uploadExpiresAt,
       createdBy: actor.userId,
     });
+    return { media, uploadExpiresAt };
+  }
+
+  async function createUploadIntent(actor: MediaActor, value: unknown) {
+    const parsed = uploadIntentSchema.safeParse(value);
+    if (!parsed.success) throw new MediaServiceError("errors.invalidData", 400);
+    const input = parsed.data;
+    const { media, uploadExpiresAt } = await createPendingObject(actor, input);
+    const bucket = media.bucket;
+    const objectKey = media.objectKey;
     const uploadUrl = await dependencies.storage.createUploadUrl({
       bucket,
       key: objectKey,
@@ -342,8 +357,106 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
     return descriptor(media);
   }
 
+  async function putManagedObject(
+    actor: MediaActor,
+    value: unknown,
+    bytes: Uint8Array,
+  ) {
+    const parsed = uploadIntentSchema.safeParse(value);
+    if (
+      !parsed.success
+      || !(bytes instanceof Uint8Array)
+      || bytes.byteLength !== parsed.data.sizeBytes
+    ) {
+      throw new MediaServiceError("errors.invalidData", 400);
+    }
+    const input = parsed.data;
+    const { media } = await createPendingObject(actor, input);
+    let wroteObject = false;
+    try {
+      await dependencies.storage.put({
+        bucket: media.bucket,
+        key: media.objectKey,
+        body: bytes,
+        contentType: media.mimeType,
+        ifNoneMatch: "*",
+      });
+      wroteObject = true;
+      const completed = await completeUpload(actor, media.id);
+      return {
+        mediaId: completed.id,
+        path: media.objectKey,
+        url: completed.url,
+      };
+    } catch (error) {
+      try {
+        const abandoned = await dependencies.repository.abandonPending({
+          storeId: actor.storeId,
+          mediaId: media.id,
+          expectedPurpose: media.purpose,
+          expectedTargetId: media.targetId,
+          deletedAt: now(),
+        });
+        if (wroteObject && abandoned) {
+          try {
+            await dependencies.storage.remove({
+              bucket: media.bucket,
+              key: media.objectKey,
+            });
+          } catch (cleanupError) {
+            logger.error("media object compensation failed", {
+              mediaId: media.id,
+              error: cleanupError,
+            });
+          }
+        }
+      } catch (cleanupError) {
+        logger.error("media pending compensation failed", {
+          mediaId: media.id,
+          error: cleanupError,
+        });
+      }
+      throw error;
+    }
+  }
+
   async function deleteMedia(actor: MediaActor, mediaId: string) {
-    const authorized = await loadAuthorizedReady(actor, mediaId);
+    if (!mediaIdSchema.safeParse(mediaId).success) {
+      throw new MediaServiceError("errors.notFound", 404);
+    }
+    const authorized = await dependencies.repository.getForStore({
+      storeId: actor.storeId,
+      mediaId,
+    });
+    if (
+      !authorized
+      || (authorized.status !== "pending" && authorized.status !== "ready")
+    ) {
+      throw new MediaServiceError("errors.notFound", 404);
+    }
+    await requireTarget(actor, authorized.purpose, authorized.targetId, true);
+    if (authorized.status === "pending") {
+      const deleted = await dependencies.repository.abandonPending({
+        storeId: actor.storeId,
+        mediaId,
+        expectedPurpose: authorized.purpose,
+        expectedTargetId: authorized.targetId,
+        deletedAt: now(),
+      });
+      if (!deleted) throw new MediaServiceError("media.deleteConflict", 409);
+      try {
+        await dependencies.storage.remove({
+          bucket: deleted.bucket,
+          key: deleted.objectKey,
+        });
+      } catch (error) {
+        logger.error("pending media object cleanup failed", {
+          mediaId,
+          error,
+        });
+      }
+      return { id: deleted.id, status: "deleted" as const };
+    }
     const coordinates = { storeId: actor.storeId, mediaId };
     const result = await dependencies.repository.softDeleteIfUnreferenced({
       ...coordinates,
@@ -360,7 +473,13 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
     return { id: result.media.id, status: "deleted" as const };
   }
 
-  return { createUploadIntent, completeUpload, resolveMedia, deleteMedia };
+  return {
+    createUploadIntent,
+    completeUpload,
+    putManagedObject,
+    resolveMedia,
+    deleteMedia,
+  };
 }
 
 let singleton: MediaService | null = null;

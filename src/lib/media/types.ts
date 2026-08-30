@@ -26,6 +26,7 @@ export interface ObjectStorage {
     key: string;
     body: Uint8Array;
     contentType: string;
+    ifNoneMatch?: "*";
   }): Promise<MediaObjectHead>;
   get(input: { bucket: string; key: string }): Promise<Uint8Array>;
   head(input: {

@@ -34,7 +34,7 @@ export function catalogItemToPosProduct(
     barcode: product.barcode,
     name: product.name,
     productKind: product.productKind,
-    imageUrls: product.imageUrls,
+    imageUrls: product.imageUrls ?? [],
     imageUpdatedAt: new Date(product.imageUpdatedAt),
     specs: product.specs,
     parentProductId: product.parentProductId,

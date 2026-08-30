@@ -6,6 +6,7 @@ import { getPriceBooks } from "@/lib/data/price-books";
 import type { Role } from "@/lib/actions/common";
 import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
 import { accentInsensitiveLike } from "@/lib/search";
+import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
 
 export interface PosUnit {
   unitName: string;
@@ -36,14 +37,18 @@ function recentSaleOrder() {
 }
 
 /** Select dùng chung cho lưới POS + tìm kiếm (cùng shape PosProduct). */
-function posProductSelect(warehouseId: string | null, hasComplianceColumns: boolean) {
+function posProductSelect(
+  storeId: string,
+  warehouseId: string | null,
+  hasComplianceColumns: boolean,
+) {
   return {
     id: products.id,
     sku: products.sku,
     barcode: products.barcode,
     name: products.name,
     productKind: products.productKind,
-    imageUrls: products.imageUrls,
+    imageUrls: productCompatibilityImageUrls(storeId),
     imageUpdatedAt: products.imageUpdatedAt,
     specs: products.specs,
     parentProductId: products.parentProductId,
@@ -195,7 +200,7 @@ export async function getPosData(storeId: string, options?: {
   const includeProductCategories = [...new Set(options?.includeProductCategories ?? [])];
   const [rootRows, sourceProductRows, customerRows] = await Promise.all([
     db
-      .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
+      .select(posProductSelect(storeId, defaultWh?.id ?? null, hasComplianceColumns))
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(activeRootCondition(storeId))
@@ -205,7 +210,7 @@ export async function getPosData(storeId: string, options?: {
       .limit(200),
     includeProductIds.length || includeProductSkus.length || includeProductCategories.length
       ? db
-          .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
+          .select(posProductSelect(storeId, defaultWh?.id ?? null, hasComplianceColumns))
           .from(products)
           .leftJoin(categories, eq(products.categoryId, categories.id))
           .where(and(
@@ -236,7 +241,7 @@ export async function getPosData(storeId: string, options?: {
   const parentIds = rootRows.filter((p) => p.isVariantParent).map((p) => p.id);
   const childRows = parentIds.length > 0
     ? await db
-        .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
+        .select(posProductSelect(storeId, defaultWh?.id ?? null, hasComplianceColumns))
         .from(products)
         .leftJoin(categories, eq(products.categoryId, categories.id))
         .where(and(
@@ -348,7 +353,7 @@ export async function searchPosProductRows(storeId: string, q: string): Promise<
 
   const [childRows, rootRows] = await Promise.all([
     db
-      .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
+      .select(posProductSelect(storeId, defaultWh?.id ?? null, hasComplianceColumns))
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(and(
@@ -360,7 +365,7 @@ export async function searchPosProductRows(storeId: string, q: string): Promise<
       .orderBy(...recentSaleOrder())
       .limit(40),
     db
-      .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
+      .select(posProductSelect(storeId, defaultWh?.id ?? null, hasComplianceColumns))
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .where(and(activeRootCondition(storeId), match))
@@ -371,7 +376,7 @@ export async function searchPosProductRows(storeId: string, q: string): Promise<
   const parentIds = rootRows.filter((p) => p.isVariantParent).map((p) => p.id);
   const pickerChildren = parentIds.length > 0
     ? await db
-        .select(posProductSelect(defaultWh?.id ?? null, hasComplianceColumns))
+        .select(posProductSelect(storeId, defaultWh?.id ?? null, hasComplianceColumns))
         .from(products)
         .leftJoin(categories, eq(products.categoryId, categories.id))
         .where(and(

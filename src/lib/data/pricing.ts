@@ -27,6 +27,7 @@ import {
   type PricingSort,
 } from "@/lib/pricing/pricing-policy";
 import { pricingStockCondition } from "@/lib/data/pricing-stock";
+import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
 
 export interface PricingQuery {
   q?: string;
@@ -211,7 +212,7 @@ export async function getPricingPage(
         brandName: brands.name,
         model: sql<string | null>`${products.specs} ->> 'model'`,
         supplierId: products.supplierId,
-        imageUrls: products.imageUrls,
+        imageUrls: productCompatibilityImageUrls(storeId),
         imageUpdatedAt: products.imageUpdatedAt,
         baseUnit: products.baseUnit,
         productKind: products.productKind,

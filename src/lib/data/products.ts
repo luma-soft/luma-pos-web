@@ -34,6 +34,8 @@ import {
   DEFAULT_PRODUCT_LIST_SORT,
   type ProductListSort,
 } from "@/lib/inventory/product-list-policy";
+import { getPublicMediaUrl } from "@/lib/media/config";
+import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
 import {
   buildRelatedProductLookup,
   selectRelatedProducts,
@@ -64,6 +66,48 @@ export interface ProductListFilters {
 }
 
 export const PRODUCT_ORDER_NOTE_SPEC_KEY = "__orderNote";
+
+type ProductMediaCoordinate = { mediaId: string; path: string };
+
+function productMediaCoordinates(storeId: string) {
+  return sql<ProductMediaCoordinate[]>`coalesce((
+    select json_agg(json_build_object(
+      'mediaId', pm.media_object_id,
+      'path', media.object_key
+    ) order by pm.sort_order)
+    from product_media pm
+    join media_objects media
+      on media.id = pm.media_object_id
+     and media.store_id = pm.store_id
+    where pm.store_id = ${storeId}
+      and pm.product_id = ${products.id}
+      and pm.deleted_at is null
+      and media.status = 'ready'
+      and media.deleted_at is null
+      and media.visibility = 'public'
+      and media.purpose = 'product-image'
+      and media.domain = 'products'
+      and media.target_id = ${products.id}
+  ), '[]'::json)`;
+}
+
+function productMediaDescriptors(records: ProductMediaCoordinate[]) {
+  return records.map((record) => ({
+    mediaId: record.mediaId,
+    path: record.path,
+    url: getPublicMediaUrl(record.path),
+  }));
+}
+
+function withProductMedia<
+  T extends { imageMediaRecords: ProductMediaCoordinate[] },
+>(row: T) {
+  const { imageMediaRecords, ...product } = row;
+  return {
+    ...product,
+    imageMedia: productMediaDescriptors(imageMediaRecords),
+  };
+}
 
 function productComplianceFields(hasColumns: boolean) {
   return {
@@ -256,7 +300,8 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
         weight: products.weight,
         dimensions: products.dimensions,
         specs: products.specs,
-        imageUrls: products.imageUrls,
+        imageUrls: productCompatibilityImageUrls(storeId),
+        imageMediaRecords: productMediaCoordinates(storeId),
         imageUpdatedAt: products.imageUpdatedAt,
         comboItems: sql<Array<{
           productId: string;
@@ -394,7 +439,8 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
             weight: products.weight,
             dimensions: products.dimensions,
             specs: products.specs,
-            imageUrls: products.imageUrls,
+            imageUrls: productCompatibilityImageUrls(storeId),
+            imageMediaRecords: productMediaCoordinates(storeId),
             imageUpdatedAt: products.imageUpdatedAt,
             comboItems: sql<never[]>`'[]'::json`,
             childCount: sql<number>`0`,
@@ -631,10 +677,11 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
 
   return {
     rows: rows.map((row) => {
+      const productRow = withProductMedia(row);
       const relatedProducts = selectRelatedProducts(row, relatedCandidates);
       return {
-        ...row,
-        children: childrenByParent.get(row.id) ?? [],
+        ...productRow,
+        children: (childrenByParent.get(row.id) ?? []).map(withProductMedia),
         stockLocations: Array.from(
           stockLocationsByDisplay.get(row.id)?.values() ?? [],
         ),
@@ -730,7 +777,8 @@ export async function getProduct(storeId: string, id: string) {
       weight: products.weight,
       dimensions: products.dimensions,
       specs: products.specs,
-      imageUrls: products.imageUrls,
+      imageUrls: productCompatibilityImageUrls(storeId),
+      imageMediaRecords: productMediaCoordinates(storeId),
       imageUpdatedAt: products.imageUpdatedAt,
       isActive: products.isActive,
       createdAt: products.createdAt,
@@ -797,7 +845,7 @@ export async function getProduct(storeId: string, id: string) {
           sku: products.sku,
           name: products.name,
           variantName: products.variantName,
-          imageUrls: products.imageUrls,
+          imageUrls: productCompatibilityImageUrls(storeId),
           imageUpdatedAt: products.imageUpdatedAt,
           productKind: products.productKind,
           isActive: products.isActive,
@@ -823,7 +871,7 @@ export async function getProduct(storeId: string, id: string) {
           retailPrice: products.retailPrice,
           baseUnit: products.baseUnit,
           totalStock: sql<string>`(select coalesce(sum(${stockLevels.quantity}),0) from ${stockLevels} where ${stockLevels.productId} = ${products.id})`,
-          imageUrls: products.imageUrls,
+          imageUrls: productCompatibilityImageUrls(storeId),
           imageUpdatedAt: products.imageUpdatedAt,
           isActive: products.isActive,
         })
@@ -858,7 +906,7 @@ export async function getProduct(storeId: string, id: string) {
   }
 
   return {
-    ...p,
+    ...withProductMedia(p),
     units,
     comboItems,
     suppliers: supplierRows,
@@ -900,7 +948,7 @@ export const getProductFormOptions = unstable_cache(
           productKind: products.productKind,
           costPrice: products.costPrice,
           retailPrice: products.retailPrice,
-          imageUrls: products.imageUrls,
+          imageUrls: productCompatibilityImageUrls(storeId),
           imageUpdatedAt: products.imageUpdatedAt,
           totalStock: sql<string>`coalesce((
             select sum(${stockLevels.quantity})

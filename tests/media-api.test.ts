@@ -92,6 +92,8 @@ function createHarness(options: {
   protectedDelete?: boolean;
   mutateTargetBeforeDelete?: string;
   objectBytes?: Uint8Array;
+  failOriginalPut?: boolean;
+  failCompletionHead?: boolean;
 } = {}) {
   const records = new Map(
     (options.initial ?? []).map((record) => [`${record.storeId}:${record.id}`, record]),
@@ -99,7 +101,13 @@ function createHarness(options: {
   const storageState = {
     heads: new Map<string, { sizeBytes: number; contentType: string | null; etag: string | null }>(),
     removed: [] as Array<{ bucket: string; key: string }>,
-    puts: [] as Array<{ bucket: string; key: string; contentType: string; sizeBytes: number }>,
+    puts: [] as Array<{
+      bucket: string;
+      key: string;
+      contentType: string;
+      sizeBytes: number;
+      ifNoneMatch?: "*";
+    }>,
     downloads: 0,
     uploadIntents: [] as Array<{
       bucket: string;
@@ -176,6 +184,23 @@ function createHarness(options: {
       records.set(key, deleted);
       return { outcome: "deleted", media: deleted };
     },
+    async abandonPending(input) {
+      const key = `${input.storeId}:${input.mediaId}`;
+      const current = records.get(key);
+      if (
+        !current
+        || current.status !== "pending"
+        || current.purpose !== input.expectedPurpose
+        || current.targetId !== input.expectedTargetId
+      ) return null;
+      const deleted = {
+        ...current,
+        status: "deleted" as const,
+        deletedAt: input.deletedAt,
+      };
+      records.set(key, deleted);
+      return deleted;
+    },
   };
 
   const storage: ObjectStorage = {
@@ -185,6 +210,19 @@ function createHarness(options: {
         key: input.key,
         contentType: input.contentType,
         sizeBytes: input.body.byteLength,
+        ifNoneMatch: input.ifNoneMatch,
+      });
+      const coordinate = `${input.bucket}:${input.key}`;
+      if (input.ifNoneMatch === "*" && storageState.heads.has(coordinate)) {
+        throw Object.assign(new Error("precondition failed"), { status: 412 });
+      }
+      if (input.ifNoneMatch === "*" && options.failOriginalPut) {
+        throw new Error("storage unavailable");
+      }
+      storageState.heads.set(coordinate, {
+        sizeBytes: input.body.byteLength,
+        contentType: input.contentType,
+        etag: "put",
       });
       return { sizeBytes: input.body.byteLength, contentType: input.contentType, etag: "thumb" };
     },
@@ -193,7 +231,10 @@ function createHarness(options: {
       return options.objectBytes ?? new Uint8Array([1, 2, 3]);
     },
     async head(input) {
-      return storageState.heads.get(`${input.bucket}:${input.key}`) ?? null;
+      const head = storageState.heads.get(`${input.bucket}:${input.key}`) ?? null;
+      return head && options.failCompletionHead
+        ? { ...head, sizeBytes: head.sizeBytes + 1 }
+        : head;
     },
     async createUploadUrl(input) {
       storageState.uploadIntents.push(input);
@@ -543,6 +584,68 @@ describe("media completion API", () => {
   });
 });
 
+describe("server managed object writes", () => {
+  test("writes bytes directly with create-only semantics, verifies, and returns public coordinates", async () => {
+    const harness = createHarness();
+    const result = await harness.service.putManagedObject(gate, {
+      purpose: "product-image",
+      targetId: STORE_ID,
+      fileName: "camera.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: 4,
+    }, Uint8Array.from([0xff, 0xd8, 0xff, 0x00]));
+
+    const path = `stores/${STORE_ID}/products/2026/08/${MEDIA_ID}/original.jpg`;
+    expect(result).toEqual({
+      mediaId: MEDIA_ID,
+      path,
+      url: `https://media.lumapos.vn/${path}`,
+    });
+    expect(harness.storageState.uploadIntents).toEqual([]);
+    expect(harness.storageState.puts[0]).toEqual({
+      bucket: "public-media",
+      key: path,
+      contentType: "image/jpeg",
+      sizeBytes: 4,
+      ifNoneMatch: "*",
+    });
+    expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("ready");
+  });
+
+  test("soft-deletes pending metadata when a create-only server write fails", async () => {
+    const harness = createHarness({ failOriginalPut: true });
+    await expect(harness.service.putManagedObject(gate, {
+      purpose: "product-image",
+      targetId: STORE_ID,
+      fileName: "camera.png",
+      mimeType: "image/png",
+      sizeBytes: 4,
+    }, Uint8Array.from([0x89, 0x50, 0x4e, 0x47]))).rejects.toThrow();
+
+    expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("deleted");
+    expect(harness.storageState.removed).toEqual([]);
+  });
+
+  test("removes the create-only object when completion fails before ready", async () => {
+    const harness = createHarness({ failCompletionHead: true });
+    await expect(harness.service.putManagedObject(gate, {
+      purpose: "product-image",
+      targetId: STORE_ID,
+      fileName: "camera.png",
+      mimeType: "image/png",
+      sizeBytes: 4,
+    }, Uint8Array.from([0x89, 0x50, 0x4e, 0x47]))).rejects.toThrow(
+      "media.uploadMismatch",
+    );
+
+    expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("deleted");
+    expect(harness.storageState.removed).toEqual([{
+      bucket: "public-media",
+      key: `stores/${STORE_ID}/products/2026/08/${MEDIA_ID}/original.png`,
+    }]);
+  });
+});
+
 describe("target-aware media authorization", () => {
   function authorizerHarness() {
     const state = {
@@ -672,6 +775,20 @@ describe("media resolve and delete API", () => {
     expect(await response.json()).toEqual({ ok: true, data: { id: MEDIA_ID, status: "deleted" } });
     expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("deleted");
     expect(harness.storageState.removed).toEqual([]);
+  });
+
+  test("DELETE safely abandons an uncommitted pending upload", async () => {
+    const harness = createHarness({ initial: [pendingRecord()] });
+    const response = await harness.remove(mediaRequest(MEDIA_ID, "DELETE"), {
+      params: Promise.resolve({ mediaId: MEDIA_ID }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("deleted");
+    expect(harness.storageState.removed).toEqual([{
+      bucket: "private-media",
+      key: `stores/${STORE_ID}/projects/2026/08/${MEDIA_ID}/original.pdf`,
+    }]);
   });
 
   test("DELETE preserves referenced evidence or signature media", async () => {

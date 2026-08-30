@@ -54,7 +54,11 @@ import { AI_WORKFLOW_DRAFT_STORAGE_KEY, tenantStorageKey } from "@/components/ai
 import { useTenantClientScope } from "@/components/tenant-client-scope";
 import {
   PRODUCT_IMAGE_ACCEPT,
+  deleteLegacyProductImageUrl,
+  deleteUploadedProductImage,
   uploadProductImageFile,
+  uploadProductImageFiles,
+  type UploadedProductImage,
 } from "@/lib/images/product-image-upload";
 
 type Tab = "info" | "description" | "variants";
@@ -84,6 +88,7 @@ function specsWithOrderNote(
 }
 
 export interface NewProductFormProps {
+  storeId: string;
   categories: ProductFormOptions["categories"];
   brands: ProductFormOptions["brands"];
   suppliers?: ProductFormOptions["suppliers"]; // NCC tự gắn khi nhập hàng, không sửa ở form
@@ -94,6 +99,7 @@ export interface NewProductFormProps {
   isVariantChild?: boolean;
   siblingCount?: number;
   initialValues?: Partial<CreateProductInput>;
+  initialManagedImages?: UploadedProductImage[];
   layout?: "page" | "modal";
   closeHref?: string;
   closeNavigation?: "push" | "replace";
@@ -104,6 +110,7 @@ export interface NewProductFormProps {
 export function NewProductForm({
   categories,
   brands,
+  storeId,
   comboProducts = [],
   priceBooks = [],
   mode = "create",
@@ -111,6 +118,7 @@ export function NewProductForm({
   isVariantChild = false,
   siblingCount = 0,
   initialValues,
+  initialManagedImages = [],
   layout = "page",
   closeHref,
   closeNavigation = "push",
@@ -140,6 +148,7 @@ export function NewProductForm({
       categoryId: "",
       brandId: "",
       imageUrls: [],
+      imageMediaIds: [],
       costPrice: 0,
       retailPrice: 0,
       priceBookPrices: {},
@@ -222,6 +231,7 @@ export function NewProductForm({
         location: values.location,
         description: values.description,
         imageUrls: values.imageUrls,
+        imageMediaIds: values.imageMediaIds,
         comboItems: values.comboItems,
         isActive: values.directSale,
         specs: specsWithOrderNote(specs, values.invoiceNote),
@@ -363,12 +373,14 @@ export function NewProductForm({
       >
         {tab === "info" && (
           <InfoTab
+            storeId={storeId}
             categories={categories}
             brands={brands}
             priceBooks={priceBooks}
             comboProducts={comboProducts}
             mode={mode}
             creationKind={creationKind}
+            initialManagedImages={initialManagedImages}
           />
         )}
         {tab === "variants" && (
@@ -458,20 +470,24 @@ function FormActions({
 }
 
 function InfoTab({
+  storeId,
   categories,
   brands,
   suppliers,
   priceBooks,
   comboProducts,
+  initialManagedImages,
 }: NewProductFormProps) {
   const { watch } = useFormCtx();
   const productKind = watch("productKind") ?? "product";
   return (
     <>
       <BasicInfoSection
+        storeId={storeId}
         categories={categories}
         brands={brands}
         suppliers={suppliers}
+        initialManagedImages={initialManagedImages}
       />
       {productKind === "combo" && (
         <ComboItemsField products={comboProducts ?? []} />
@@ -1034,7 +1050,12 @@ function VariantChildrenPreview() {
   );
 }
 
-function BasicInfoSection({ categories, brands }: NewProductFormProps) {
+function BasicInfoSection({
+  categories,
+  brands,
+  storeId,
+  initialManagedImages = [],
+}: NewProductFormProps) {
   const t = useTranslations();
   const { register, watch, setValue } = useFormCtx();
   const [extraCats, setExtraCats] = useState<{ id: string; name: string }[]>(
@@ -1121,7 +1142,10 @@ function BasicInfoSection({ categories, brands }: NewProductFormProps) {
           </div>
         </div>
 
-        <ImageUploadGrid />
+        <ImageUploadGrid
+          storeId={storeId}
+          initialManagedImages={initialManagedImages}
+        />
       </div>
     </Section>
   );
@@ -1129,13 +1153,45 @@ function BasicInfoSection({ categories, brands }: NewProductFormProps) {
 
 const MAX_IMAGES = 10;
 
-function ImageUploadGrid() {
+function ImageUploadGrid({
+  storeId,
+  initialManagedImages,
+}: {
+  storeId: string;
+  initialManagedImages: UploadedProductImage[];
+}) {
   const t = useTranslations();
   const { watch, setValue } = useFormCtx();
   const urls: string[] = watch("imageUrls") ?? [];
+  const initialMediaIds = useMemo(
+    () => new Set(initialManagedImages.map((image) => image.mediaId)),
+    [initialManagedImages],
+  );
+  const [managedImages, setManagedImages] = useState(initialManagedImages);
+  const [drafts, setDrafts] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState("");
   const [urlInput, setUrlInput] = useState("");
+
+  function setImageState(
+    nextUrls: string[],
+    nextManagedImages: UploadedProductImage[],
+  ) {
+    const managedByUrl = new Map(
+      nextManagedImages.map((image) => [image.url, image]),
+    );
+    const orderedManaged = nextUrls.flatMap((url) => {
+      const image = managedByUrl.get(url);
+      return image ? [image] : [];
+    });
+    setManagedImages(orderedManaged);
+    setValue("imageUrls", nextUrls, { shouldDirty: true });
+    setValue(
+      "imageMediaIds",
+      orderedManaged.map((image) => image.mediaId),
+      { shouldDirty: true },
+    );
+  }
 
   function addImageUrl() {
     const value = urlInput.trim();
@@ -1147,39 +1203,65 @@ function ImageUploadGrid() {
         setUrlInput("");
         return;
       }
-      setValue("imageUrls", [...urls, value], { shouldDirty: true });
+      setImageState([...urls, value], managedImages);
       setUrlInput("");
     } catch {
       setErr(t("products.fields.imageUrlInvalid"));
     }
   }
 
-  async function upload(files: FileList | null) {
-    if (!files?.length) return;
+  async function uploadFiles(nextDrafts: File[]) {
+    if (nextDrafts.length === 0) return;
     setErr("");
     setUploading(true);
-    const added: string[] = [];
-    try {
-      for (const file of Array.from(files).slice(0, MAX_IMAGES - urls.length)) {
-        const uploaded = await uploadProductImageFile(file);
-        added.push(uploaded.url);
-      }
-    } catch {
-      setErr(t("products.fields.imageUploadError"));
-    } finally {
-      if (added.length > 0) {
-        setValue("imageUrls", [...urls, ...added], { shouldDirty: true });
-      }
-      setUploading(false);
+    const result = await uploadProductImageFiles({
+      completed: [],
+      drafts: nextDrafts,
+      targetId: storeId,
+      upload: uploadProductImageFile,
+    });
+    if (result.completed.length > 0) {
+      setImageState(
+        [...urls, ...result.completed.map((image) => image.url)],
+        [...managedImages, ...result.completed],
+      );
     }
+    setDrafts(result.remaining);
+    if (result.error) setErr(t("products.fields.imageUploadError"));
+    setUploading(false);
   }
 
-  const remove = (u: string) =>
-    setValue(
-      "imageUrls",
-      urls.filter((x) => x !== u),
-      { shouldDirty: true },
+  async function upload(files: FileList | null) {
+    if (!files?.length) return;
+    const available = MAX_IMAGES - urls.length;
+    const nextDrafts = [
+      ...drafts,
+      ...Array.from(files),
+    ].slice(0, available);
+    setDrafts(nextDrafts);
+    await uploadFiles(nextDrafts);
+  }
+
+  const remove = async (url: string) => {
+    const image = managedImages.find((candidate) => candidate.url === url);
+    setImageState(
+      urls.filter((candidate) => candidate !== url),
+      managedImages.filter((candidate) => candidate.url !== url),
     );
+    if (image && !initialMediaIds.has(image.mediaId)) {
+      try {
+        await deleteUploadedProductImage(image);
+      } catch {
+        setErr(t("products.fields.imageUploadError"));
+      }
+    } else if (!image) {
+      try {
+        await deleteLegacyProductImageUrl(url);
+      } catch {
+        setErr(t("products.fields.imageUploadError"));
+      }
+    }
+  };
 
   return (
     <div>
@@ -1232,7 +1314,7 @@ function ImageUploadGrid() {
             )}
             <button
               type="button"
-              onClick={() => remove(u)}
+              onClick={() => void remove(u)}
               className="absolute right-1 top-1 grid h-11 w-11 place-items-center rounded-full bg-black/55 text-white opacity-100 transition lg:h-9 lg:w-9 lg:opacity-0 lg:group-hover:opacity-100"
               aria-label={t("common.delete")}
             >
@@ -1267,6 +1349,16 @@ function ImageUploadGrid() {
           </label>
         )}
       </div>
+      {drafts.length > 0 && !uploading && (
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => void uploadFiles(drafts)}
+          className="mt-2 w-full"
+        >
+          {t("common.retry")}
+        </Button>
+      )}
       {err ? (
         <p className="text-xs text-red-600 mt-2">{err}</p>
       ) : (

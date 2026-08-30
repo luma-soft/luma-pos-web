@@ -11,6 +11,7 @@ import {
   returns,
 } from "@/db/schema";
 import { calculateDashboardFinancials } from "@/lib/dashboard/financials";
+import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
 
 export type ReportFilters = {
   customerId?: string;
@@ -228,7 +229,7 @@ export async function getReportProducts(
       productName: sql<string>`max(${orderItems.productName})`,
       qtySold: sql<string>`sum(${orderItems.quantity} * ${orderItems.unitMultiplier})`,
       baseUnit: sql<string>`max(${products.baseUnit})`,
-      imageUrls: products.imageUrls,
+      imageUrls: productCompatibilityImageUrls(storeId),
       revenue: sql<string>`sum(${orderItems.total})`,
       cost: sql<string>`sum(${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})`,
       profit: sql<string>`sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice}))`,
@@ -238,7 +239,7 @@ export async function getReportProducts(
       .innerJoin(products, eq(orderItems.productId, products.id))
       .leftJoin(customers, eq(orders.customerId, customers.id))
       .where(where)
-      .groupBy(orderItems.productId, products.imageUrls)
+      .groupBy(orderItems.productId, products.id, products.imageUrls)
       .orderBy(desc(sql`sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice}))`))
       .limit(safePageSize)
       .offset((safePage - 1) * safePageSize),
@@ -415,12 +416,12 @@ async function getCoreReportsForDatabase(
       productName: sql<string>`max(${orderItems.productName})`,
       qtySold: sql<string>`sum(${orderItems.quantity} * ${orderItems.unitMultiplier})`,
       baseUnit: sql<string>`max(${products.baseUnit})`,
-      imageUrls: products.imageUrls,
+      imageUrls: productCompatibilityImageUrls(storeId),
       revenue: sql<string>`sum(${orderItems.total})`,
       cost: sql<string>`sum(${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})`,
       profit: sql<string>`sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice}))`,
     }).from(orderItems).innerJoin(orders, eq(orderItems.orderId, orders.id)).innerJoin(products, eq(orderItems.productId, products.id))
-      .leftJoin(customers, eq(orders.customerId, customers.id)).where(where).groupBy(orderItems.productId, products.imageUrls),
+      .leftJoin(customers, eq(orders.customerId, customers.id)).where(where).groupBy(orderItems.productId, products.id, products.imageUrls),
     database.select({
       productId: returnItems.productId,
       qtyReturned: sql<string>`coalesce(sum(${returnItems.quantity} * ${returnItems.unitMultiplier}), 0)`,

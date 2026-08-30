@@ -12,6 +12,7 @@ import {
   pricingStockCondition,
   type PricingStockFilter,
 } from "@/lib/data/pricing-stock";
+import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
 
 export const INVENTORY_PAGE_SIZE = 30;
 
@@ -331,7 +332,7 @@ export async function getPurchase(storeId: string, id: string) {
       productName: products.name,
       sku: products.sku,
       baseUnit: products.baseUnit,
-      imageUrls: products.imageUrls,
+      imageUrls: productCompatibilityImageUrls(storeId),
       imageUpdatedAt: products.imageUpdatedAt,
       batchNumber: purchaseOrderItems.batchNumber,
       expiryDate: purchaseOrderItems.expiryDate,

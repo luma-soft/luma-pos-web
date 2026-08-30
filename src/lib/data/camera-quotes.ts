@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { brands, categories, customers, products, warehouses } from "@/db/schema";
+import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
 import {
   CAMERA_QUOTE_CARD_SKUS,
   CAMERA_QUOTE_DETAIL_MATERIAL_SKUS,
@@ -52,7 +53,7 @@ export async function getCameraQuoteFormOptions(storeId: string, includePrivate 
         brand: brands.name,
         retailPrice: products.retailPrice,
         description: products.description,
-        imageUrls: products.imageUrls,
+        imageUrls: productCompatibilityImageUrls(storeId),
         specs: products.specs,
       })
       .from(products)
@@ -69,7 +70,7 @@ export async function getCameraQuoteFormOptions(storeId: string, includePrivate 
         brand: brands.name,
         retailPrice: products.retailPrice,
         description: products.description,
-        imageUrls: products.imageUrls,
+        imageUrls: productCompatibilityImageUrls(storeId),
         specs: products.specs,
       })
       .from(products)

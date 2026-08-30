@@ -51,6 +51,7 @@ export class R2ObjectStorage implements ObjectStorage {
     key: string;
     body: Uint8Array;
     contentType: string;
+    ifNoneMatch?: "*";
   }): Promise<MediaObjectHead> {
     const result = await this.client.send(
       new PutObjectCommand({
@@ -58,6 +59,7 @@ export class R2ObjectStorage implements ObjectStorage {
         Key: input.key,
         Body: input.body,
         ContentType: input.contentType,
+        IfNoneMatch: input.ifNoneMatch,
       }),
     );
     return {

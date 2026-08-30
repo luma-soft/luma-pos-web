@@ -1,4 +1,5 @@
 import type { ProductDetail } from "@/lib/data/products";
+import { parseProductImagePublicUrl } from "@/lib/images/product-image-coordinate";
 import type { CreateProductInput } from "./new/schema";
 
 type ProductSeedMode = "edit" | "copy" | "sameType";
@@ -14,6 +15,7 @@ export function productToFormInitialValues(
   const attributeSpecs = Object.entries(specs).filter(
     ([name]) => name !== PRODUCT_ORDER_NOTE_SPEC_KEY,
   );
+  const imageMedia = product.imageMedia ?? [];
   const shared: Partial<CreateProductInput> = {
     productKind: product.productKind,
     categoryId: product.categoryId ?? "",
@@ -71,7 +73,16 @@ export function productToFormInitialValues(
     sku: mode === "copy" ? "" : product.sku,
     barcode: mode === "copy" ? "" : (product.barcode ?? ""),
     name: product.name,
-    imageUrls: product.imageUrls ?? [],
+    imageUrls: mode === "copy"
+      ? (product.imageUrls ?? []).filter(
+          (url) =>
+            !parseProductImagePublicUrl(url)
+            && !imageMedia.some((image) => image.url === url),
+        )
+      : product.imageUrls ?? [],
+    imageMediaIds: mode === "edit"
+      ? imageMedia.map((image) => image.mediaId)
+      : [],
     location: product.location ?? "",
     description: product.description ?? "",
     invoiceNote: orderNote,
