@@ -28,7 +28,9 @@ CREATE TABLE "media_objects" (
   CONSTRAINT "media_objects_status_check" CHECK ("status" IN ('pending','ready','quarantined','deleted')),
   CONSTRAINT "media_objects_size_check" CHECK ("size_bytes" > 0),
   CONSTRAINT "media_objects_location_unique" UNIQUE ("provider","bucket","object_key"),
-  CONSTRAINT "media_objects_store_id_id_unique" UNIQUE ("store_id","id")
+  CONSTRAINT "media_objects_store_id_id_unique" UNIQUE ("store_id","id"),
+  CONSTRAINT "media_objects_created_by_tenant_fk" FOREIGN KEY ("store_id","created_by")
+    REFERENCES "profiles"("store_id","id") ON DELETE NO ACTION
 );--> statement-breakpoint
 
 CREATE TABLE "product_media" (
@@ -56,6 +58,9 @@ CREATE INDEX "product_media_store_product_order_idx"
   ON "product_media" ("store_id","product_id","sort_order")
   WHERE "deleted_at" IS NULL;--> statement-breakpoint
 
+CREATE INDEX "product_media_store_media_object_idx"
+  ON "product_media" ("store_id","media_object_id");--> statement-breakpoint
+
 CREATE TABLE "service_handover_document_media" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
   "store_id" uuid NOT NULL REFERENCES "stores"("id") ON DELETE CASCADE,
@@ -74,6 +79,9 @@ CREATE TABLE "service_handover_document_media" (
 CREATE INDEX "service_handover_document_media_store_document_order_idx"
   ON "service_handover_document_media" ("store_id","document_id","sort_order");--> statement-breakpoint
 
+CREATE INDEX "service_handover_document_media_store_media_object_idx"
+  ON "service_handover_document_media" ("store_id","media_object_id");--> statement-breakpoint
+
 CREATE TABLE "media_migration_runs" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
   "store_id" uuid NOT NULL REFERENCES "stores"("id") ON DELETE CASCADE,
@@ -84,11 +92,17 @@ CREATE TABLE "media_migration_runs" (
   "created_by" uuid REFERENCES "profiles"("id") ON DELETE SET NULL,
   "created_at" timestamptz DEFAULT now() NOT NULL,
   CONSTRAINT "media_migration_runs_status_check" CHECK ("status" IN ('pending','running','completed','failed','rolled_back')),
-  CONSTRAINT "media_migration_runs_store_id_id_unique" UNIQUE ("store_id","id")
+  CONSTRAINT "media_migration_runs_store_id_id_unique" UNIQUE ("store_id","id"),
+  CONSTRAINT "media_migration_runs_created_by_tenant_fk" FOREIGN KEY ("store_id","created_by")
+    REFERENCES "profiles"("store_id","id") ON DELETE NO ACTION
 );--> statement-breakpoint
 
 CREATE INDEX "media_migration_runs_store_status_idx"
   ON "media_migration_runs" ("store_id","status","created_at");--> statement-breakpoint
+
+CREATE INDEX "media_migration_runs_store_created_by_idx"
+  ON "media_migration_runs" ("store_id","created_by")
+  WHERE "created_by" IS NOT NULL;--> statement-breakpoint
 
 CREATE TABLE "media_migration_items" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
@@ -115,6 +129,10 @@ CREATE TABLE "media_migration_items" (
 
 CREATE INDEX "media_migration_items_store_status_idx"
   ON "media_migration_items" ("store_id","status","updated_at");--> statement-breakpoint
+
+CREATE INDEX "media_migration_items_store_media_object_idx"
+  ON "media_migration_items" ("store_id","media_object_id")
+  WHERE "media_object_id" IS NOT NULL;--> statement-breakpoint
 
 ALTER TABLE "brands"
   ADD COLUMN "logo_media_object_id" uuid;--> statement-breakpoint
@@ -146,6 +164,10 @@ ALTER TABLE "service_customer_request_attachments"
 CREATE INDEX "media_objects_store_status_domain_idx"
   ON "media_objects" ("store_id","status","domain","created_at");--> statement-breakpoint
 
+CREATE INDEX "media_objects_store_created_by_idx"
+  ON "media_objects" ("store_id","created_by")
+  WHERE "created_by" IS NOT NULL;--> statement-breakpoint
+
 CREATE INDEX "brands_logo_media_object_idx"
   ON "brands" ("logo_media_object_id")
   WHERE "logo_media_object_id" IS NOT NULL;--> statement-breakpoint
@@ -165,7 +187,7 @@ ALTER TABLE "media_migration_runs" ENABLE ROW LEVEL SECURITY;--> statement-break
 ALTER TABLE "media_migration_items" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 
 REVOKE ALL PRIVILEGES ON TABLE "media_objects", "product_media", "service_handover_document_media", "media_migration_runs", "media_migration_items" FROM anon;--> statement-breakpoint
-REVOKE INSERT, UPDATE, DELETE ON TABLE "media_objects", "product_media", "service_handover_document_media", "media_migration_runs", "media_migration_items" FROM authenticated;--> statement-breakpoint
+REVOKE ALL PRIVILEGES ON TABLE "media_objects", "product_media", "service_handover_document_media", "media_migration_runs", "media_migration_items" FROM authenticated;--> statement-breakpoint
 GRANT SELECT ON TABLE "media_objects", "product_media", "service_handover_document_media", "media_migration_runs", "media_migration_items" TO authenticated;--> statement-breakpoint
 
 CREATE POLICY "store_member_select" ON "media_objects" FOR SELECT TO authenticated

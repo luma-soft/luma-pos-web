@@ -21,6 +21,8 @@ test("media tables are tenant-owned and protected by SELECT-only RLS", () => {
   expect(sql).toContain('"store_id" uuid NOT NULL');
   expect(sql).toContain("store_id = public.current_active_store_id()");
   expect(sql).not.toMatch(/FOR (?:UPDATE|INSERT|DELETE) TO authenticated/i);
+  expect(sql).toContain("REVOKE ALL PRIVILEGES ON TABLE");
+  expect(sql).toMatch(/REVOKE ALL PRIVILEGES ON TABLE[^;]+FROM authenticated/);
 
   for (const table of tenantTables) {
     expect(sql).toContain(`ALTER TABLE "${table}" ENABLE ROW LEVEL SECURITY`);

@@ -153,6 +153,14 @@ export const mediaObjects = pgTable("media_objects", {
   unique("media_objects_location_unique").on(t.provider, t.bucket, t.objectKey),
   unique("media_objects_store_id_id_unique").on(t.storeId, t.id),
   index("media_objects_store_status_domain_idx").on(t.storeId, t.status, t.domain, t.createdAt),
+  index("media_objects_store_created_by_idx")
+    .on(t.storeId, t.createdBy)
+    .where(sql`${t.createdBy} is not null`),
+  foreignKey({
+    columns: [t.storeId, t.createdBy],
+    foreignColumns: [profiles.storeId, profiles.id],
+    name: "media_objects_created_by_tenant_fk",
+  }).onDelete("no action"),
 ]);
 
 export const storeFeatures = pgTable("store_features", {
@@ -447,6 +455,7 @@ export const productMedia = pgTable("product_media", {
   index("product_media_store_product_order_idx")
     .on(t.storeId, t.productId, t.sortOrder)
     .where(sql`${t.deletedAt} is null`),
+  index("product_media_store_media_object_idx").on(t.storeId, t.mediaObjectId),
   foreignKey({
     columns: [t.storeId, t.productId],
     foreignColumns: [products.storeId, products.id],
@@ -1489,6 +1498,7 @@ export const serviceHandoverDocumentMedia = pgTable("service_handover_document_m
   unique("service_handover_document_media_unique").on(t.documentId, t.mediaObjectId),
   check("service_handover_document_media_sort_order_check", sql`${t.sortOrder} >= 0`),
   index("service_handover_document_media_store_document_order_idx").on(t.storeId, t.documentId, t.sortOrder),
+  index("service_handover_document_media_store_media_object_idx").on(t.storeId, t.mediaObjectId),
   foreignKey({
     columns: [t.storeId, t.documentId],
     foreignColumns: [serviceHandoverDocuments.storeId, serviceHandoverDocuments.id],
@@ -2587,6 +2597,14 @@ export const mediaMigrationRuns = pgTable("media_migration_runs", {
   check("media_migration_runs_status_check", sql`${t.status} in ('pending', 'running', 'completed', 'failed', 'rolled_back')`),
   unique("media_migration_runs_store_id_id_unique").on(t.storeId, t.id),
   index("media_migration_runs_store_status_idx").on(t.storeId, t.status, t.createdAt),
+  index("media_migration_runs_store_created_by_idx")
+    .on(t.storeId, t.createdBy)
+    .where(sql`${t.createdBy} is not null`),
+  foreignKey({
+    columns: [t.storeId, t.createdBy],
+    foreignColumns: [profiles.storeId, profiles.id],
+    name: "media_migration_runs_created_by_tenant_fk",
+  }).onDelete("no action"),
 ]);
 
 export const mediaMigrationItems = pgTable("media_migration_items", {
@@ -2608,6 +2626,9 @@ export const mediaMigrationItems = pgTable("media_migration_items", {
   check("media_migration_items_attempts_check", sql`${t.attempts} >= 0`),
   unique("media_migration_items_source_unique").on(t.runId, t.sourceProvider, t.sourceBucket, t.sourceKey),
   index("media_migration_items_store_status_idx").on(t.storeId, t.status, t.updatedAt),
+  index("media_migration_items_store_media_object_idx")
+    .on(t.storeId, t.mediaObjectId)
+    .where(sql`${t.mediaObjectId} is not null`),
   foreignKey({
     columns: [t.storeId, t.runId],
     foreignColumns: [mediaMigrationRuns.storeId, mediaMigrationRuns.id],
