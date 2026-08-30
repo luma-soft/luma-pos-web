@@ -135,6 +135,8 @@ const OPERATIONAL_SYSTEM_TABLES = [
   "marketplace_sync_jobs",
   "media_migration_runs",
   "media_migration_items",
+  "kiotviet_sync_runs",
+  "kiotviet_source_mappings",
 ] as const;
 
 function entries(

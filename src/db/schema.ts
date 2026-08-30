@@ -527,6 +527,60 @@ export const productSourceMappings = pgTable("product_source_mappings", {
   }).onDelete("cascade"),
 ]);
 
+// ============= KiotViet controlled data synchronization =============
+
+export const kiotvietSyncRuns = pgTable("kiotviet_sync_runs", {
+  storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id, { onDelete: "cascade" }),
+  id: uuid("id").primaryKey().defaultRandom(),
+  provider: varchar("provider", { length: 30 }).notNull().default("kiotviet"),
+  phase: varchar("phase", { length: 30 }).notNull(),
+  sourceFileName: text("source_file_name").notNull(),
+  sourceSha256: varchar("source_sha256", { length: 64 }).notNull(),
+  bundleSha256: varchar("bundle_sha256", { length: 64 }),
+  sourceRows: integer("source_rows").notNull().default(0),
+  sourceDocuments: integer("source_documents").notNull().default(0),
+  status: varchar("status", { length: 20 }).notNull().default("running"),
+  summary: jsonb("summary").$type<Record<string, unknown>>().notNull().default({}),
+  errorDetails: jsonb("error_details").$type<Record<string, unknown>>(),
+  startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (t) => [
+  unique("kiotviet_sync_runs_store_id_id_unique").on(t.storeId, t.id),
+  check("kiotviet_sync_runs_source_sha256_check", sql`${t.sourceSha256} ~ '^[0-9a-f]{64}$'`),
+  check("kiotviet_sync_runs_counts_check", sql`${t.sourceRows} >= 0 and ${t.sourceDocuments} >= 0`),
+  check("kiotviet_sync_runs_status_check", sql`${t.status} in ('running', 'completed', 'failed', 'rolled_back')`),
+  index("kiotviet_sync_runs_store_status_idx").on(t.storeId, t.status, t.startedAt),
+]);
+
+export const kiotvietSourceMappings = pgTable("kiotviet_source_mappings", {
+  storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id, { onDelete: "cascade" }),
+  id: uuid("id").primaryKey().defaultRandom(),
+  provider: varchar("provider", { length: 30 }).notNull().default("kiotviet"),
+  entityType: varchar("entity_type", { length: 40 }).notNull(),
+  externalId: varchar("external_id", { length: 160 }).notNull(),
+  localId: uuid("local_id").notNull(),
+  sourceSha256: varchar("source_sha256", { length: 64 }).notNull(),
+  adoptionMethod: varchar("adoption_method", { length: 24 }).notNull(),
+  lastSeenRunId: uuid("last_seen_run_id").notNull(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("kiotviet_source_mappings_store_external_idx")
+    .on(t.storeId, t.provider, t.entityType, t.externalId),
+  uniqueIndex("kiotviet_source_mappings_store_local_idx")
+    .on(t.storeId, t.provider, t.entityType, t.localId),
+  index("kiotviet_source_mappings_store_run_idx").on(t.storeId, t.lastSeenRunId),
+  check("kiotviet_source_mappings_source_sha256_check", sql`${t.sourceSha256} ~ '^[0-9a-f]{64}$'`),
+  check("kiotviet_source_mappings_adoption_method_check", sql`${t.adoptionMethod} in ('mapped', 'created', 'legacy_adopted')`),
+  check("kiotviet_source_mappings_entity_type_check", sql`${t.entityType} in ('customer', 'supplier', 'booking', 'booking_line', 'booking_payment', 'sale', 'sale_line', 'sale_payment', 'purchase', 'purchase_line', 'customer_return', 'customer_return_line', 'supplier_return', 'supplier_return_line')`),
+  foreignKey({
+    columns: [t.storeId, t.lastSeenRunId],
+    foreignColumns: [kiotvietSyncRuns.storeId, kiotvietSyncRuns.id],
+    name: "kiotviet_source_mappings_run_tenant_fk",
+  }).onDelete("restrict"),
+]);
+
 // Thành phần của combo. quantity luôn tính theo đơn vị cơ bản của sản phẩm con.
 export const productComboItems = pgTable("product_combo_items", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -814,6 +868,7 @@ export const suppliers = pgTable("suppliers", {
   taxCode: varchar("tax_code", { length: 30 }),
   currentDebt: decimal("current_debt", { precision: 14, scale: 2 }).notNull().default("0"),
   note: text("note"),
+  isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   uniqueIndex("suppliers_store_code_unique").on(t.storeId, t.code).where(sql`${t.code} is not null`),
@@ -1075,6 +1130,10 @@ export const purchaseOrderItems = pgTable("purchase_order_items", {
   storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id),
   purchaseOrderId: uuid("purchase_order_id").notNull().references(() => purchaseOrders.id, { onDelete: "cascade" }),
   productId: uuid("product_id").notNull().references(() => products.id),
+  productName: text("product_name"),
+  sku: varchar("sku", { length: 50 }),
+  unitName: varchar("unit_name", { length: 30 }),
+  unitMultiplier: decimal("unit_multiplier", { precision: 14, scale: 4 }).notNull().default("1"),
   quantity: decimal("quantity", { precision: 14, scale: 4 }).notNull(),
   unitCost: decimal("unit_cost", { precision: 14, scale: 2 }).notNull(),
   discount: decimal("discount", { precision: 14, scale: 2 }).notNull().default("0"), // giảm giá dòng
@@ -1218,6 +1277,7 @@ export const purchaseReturnItems = pgTable("purchase_return_items", {
   productName: text("product_name").notNull(),
   sku: varchar("sku", { length: 50 }).notNull(),
   unitName: varchar("unit_name", { length: 30 }).notNull(),
+  unitMultiplier: decimal("unit_multiplier", { precision: 14, scale: 4 }).notNull().default("1"),
   quantity: decimal("quantity", { precision: 14, scale: 4 }).notNull(),
   unitCost: decimal("unit_cost", { precision: 14, scale: 2 }).notNull(),
   returnUnitCost: decimal("return_unit_cost", { precision: 14, scale: 2 }).notNull(),
@@ -1245,6 +1305,8 @@ export const returns = pgTable("returns", {
   reason: text("reason"),
   refundMethod: refundMethodEnum("refund_method").notNull().default("cash"),
   totalRefund: decimal("total_refund", { precision: 14, scale: 2 }).notNull().default("0"),
+  refundAmount: decimal("refund_amount", { precision: 14, scale: 2 }),
+  settlementStatus: text("settlement_status"),
   status: text("status").notNull().default("completed"), // completed, cancelled
   exchangeOrderId: uuid("exchange_order_id").references(() => orders.id),
   exchangeDifference: decimal("exchange_difference", { precision: 14, scale: 2 }),
