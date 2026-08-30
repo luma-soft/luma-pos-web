@@ -1,0 +1,1607 @@
+import "server-only";
+
+import Busboy from "busboy";
+import { Readable, Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import { inflateRawSync } from "node:zlib";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { z } from "zod";
+
+import { db } from "@/db";
+import {
+  mediaObjects,
+  projects,
+  serviceAttachments,
+  serviceHandoverDocumentMedia,
+  serviceHandoverDocuments,
+} from "@/db/schema";
+import {
+  authorizeMediaTarget,
+  type AuthorizeMediaTarget,
+  type MediaActor,
+  type MediaTargetAuthorization,
+} from "@/lib/media/authorization";
+import {
+  softDeleteMediaIfUnreferencedCore,
+  softDeleteMediaIfUnreferencedInTransaction,
+  type SoftDeleteMediaResult,
+} from "@/lib/media/repository-core";
+import type {
+  AbandonPendingMediaInput,
+  CreatePendingMediaInput,
+  GetMediaForStoreInput,
+  MarkMediaReadyInput,
+  SaveMediaThumbnailInput,
+  SoftDeleteMediaInput,
+} from "@/lib/media/repository";
+import {
+  getMediaService,
+  type MediaRecord,
+  type MediaRepository,
+  type MediaService,
+  MediaServiceError,
+} from "@/lib/media/service";
+import type { MediaPurpose } from "@/lib/media/schemas";
+import { getObjectStorage } from "@/lib/media/storage";
+import type { MediaProvider, ObjectStorage } from "@/lib/media/types";
+
+// Drizzle's Node Postgres and PGlite adapters share the fluent operations used
+// here. Keeping this core adapter-neutral lets the transaction invariants run
+// against the same SQL engine in tests.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type DatabaseLike = any;
+
+export const PROJECT_MEDIA_SIGNED_URL_SECONDS = 15 * 60;
+export const PROJECT_MEDIA_MAX_BYTES = 25 * 1024 * 1024;
+export const PROJECT_MEDIA_PHASES = [
+  "survey",
+  "construction",
+  "after_installation",
+  "acceptance",
+  "handover",
+  "other",
+] as const;
+
+export type ProjectMediaPhase = (typeof PROJECT_MEDIA_PHASES)[number];
+
+const filenameSchema = z.string()
+  .trim()
+  .min(1)
+  .max(255)
+  .refine((value) => !/[\\/\u0000-\u001f\u007f]/.test(value));
+
+const nullableCaptionSchema = z.preprocess(
+  (value) => typeof value === "string" && value.trim() === "" ? null : value,
+  z.string().trim().max(500).nullable().optional().transform((value) => value ?? null),
+);
+
+const optionalDocumentIdSchema = z.preprocess(
+  (value) => typeof value === "string" && value.trim() === "" ? undefined : value,
+  z.uuid().optional(),
+);
+
+export const projectMediaUploadSchema = z.object({
+  phase: z.enum(PROJECT_MEDIA_PHASES),
+  caption: nullableCaptionSchema,
+  documentId: optionalDocumentIdSchema,
+  fileName: filenameSchema,
+  mimeType: z.string().trim().min(1).max(160).transform((value) => value.toLowerCase()),
+  sizeBytes: z.number().int().positive().max(PROJECT_MEDIA_MAX_BYTES),
+});
+
+const managerUploadSchema = projectMediaUploadSchema.extend({
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+});
+
+const MIME_BY_EXTENSION: Record<string, string> = {
+  avif: "image/avif",
+  gif: "image/gif",
+  heic: "image/heic",
+  heif: "image/heif",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+  pdf: "application/pdf",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+};
+
+function ascii(bytes: Uint8Array, start: number, end: number) {
+  return new TextDecoder("ascii").decode(bytes.subarray(start, end));
+}
+
+function extensionOf(fileName: string) {
+  const marker = fileName.lastIndexOf(".");
+  return marker < 0 ? "" : fileName.slice(marker + 1).toLowerCase();
+}
+
+function hasPrefix(bytes: Uint8Array, expected: readonly number[]) {
+  return bytes.length >= expected.length
+    && expected.every((value, index) => bytes[index] === value);
+}
+
+function uint16(bytes: Uint8Array, offset: number) {
+  if (offset < 0 || offset + 2 > bytes.length) return null;
+  return bytes[offset] | (bytes[offset + 1] << 8);
+}
+
+function uint32(bytes: Uint8Array, offset: number) {
+  if (offset < 0 || offset + 4 > bytes.length) return null;
+  return (
+    bytes[offset]
+    | (bytes[offset + 1] << 8)
+    | (bytes[offset + 2] << 16)
+    | (bytes[offset + 3] << 24)
+  ) >>> 0;
+}
+
+const ZIP_MAX_ENTRIES = 4_096;
+const ZIP_MAX_ENTRY_UNCOMPRESSED_BYTES = 32 * 1024 * 1024;
+const ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES = 32 * 1024 * 1024;
+const OPC_METADATA_MAX_BYTES = 2 * 1024 * 1024;
+const OPC_INSPECTION_MAX_BYTES = 12 * 1024 * 1024;
+
+type ParsedZipEntry = {
+  name: string;
+  flags: number;
+  method: 0 | 8;
+  checksum: number;
+  compressedSize: number;
+  uncompressedSize: number;
+  dataOffset: number;
+};
+
+type ParsedZip = {
+  entries: Map<string, ParsedZipEntry>;
+  lowerNames: Map<string, string>;
+};
+
+function decodeZipName(
+  bytes: Uint8Array,
+  start: number,
+  length: number,
+  utf8: boolean,
+) {
+  if (length < 1 || start < 0 || start + length > bytes.length) return null;
+  try {
+    const raw = bytes.subarray(start, start + length);
+    if (!utf8 && raw.some((byte) => byte > 0x7f)) return null;
+    const name = new TextDecoder(utf8 ? "utf-8" : "ascii", { fatal: true })
+      .decode(raw);
+    const segments = name.split("/");
+    if (
+      !name
+      || name.includes("\\")
+      || name.includes("\0")
+      || name.includes("%")
+      || name.includes(":")
+      || name.startsWith("/")
+      || name.includes("//")
+      || segments.some((segment, index) =>
+        (segment === "" && index !== segments.length - 1)
+        || segment === "."
+        || segment === "..")
+    ) return null;
+    return name;
+  } catch {
+    return null;
+  }
+}
+
+function crc32(bytes: Uint8Array) {
+  let checksum = 0xffffffff;
+  for (const byte of bytes) {
+    checksum ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      checksum = (checksum >>> 1) ^ (0xedb88320 & -(checksum & 1));
+    }
+  }
+  return (checksum ^ 0xffffffff) >>> 0;
+}
+
+/** Strict, bounded ZIP directory parsing sufficient to inspect an OPC package. */
+function parseZip(bytes: Uint8Array): ParsedZip | null {
+  if (bytes.length < 22) return null;
+  const earliest = Math.max(0, bytes.length - 22 - 0xffff);
+  let endOffset = -1;
+  for (let offset = bytes.length - 22; offset >= earliest; offset -= 1) {
+    if (uint32(bytes, offset) === 0x06054b50) {
+      endOffset = offset;
+      break;
+    }
+  }
+  if (endOffset < 0) return null;
+  const disk = uint16(bytes, endOffset + 4);
+  const centralDisk = uint16(bytes, endOffset + 6);
+  const diskEntries = uint16(bytes, endOffset + 8);
+  const totalEntries = uint16(bytes, endOffset + 10);
+  const centralSize = uint32(bytes, endOffset + 12);
+  const centralOffset = uint32(bytes, endOffset + 16);
+  const commentLength = uint16(bytes, endOffset + 20);
+  if (
+    disk !== 0
+    || centralDisk !== 0
+    || diskEntries === null
+    || totalEntries === null
+    || diskEntries !== totalEntries
+    || totalEntries < 1
+    || totalEntries > ZIP_MAX_ENTRIES
+    || centralSize === null
+    || centralOffset === null
+    || commentLength === null
+    || endOffset + 22 + commentLength !== bytes.length
+    || centralOffset + centralSize !== endOffset
+  ) return null;
+
+  const entries = new Map<string, ParsedZipEntry>();
+  const lowerNames = new Map<string, string>();
+  const localRanges: Array<{ start: number; end: number }> = [];
+  let totalUncompressedSize = 0;
+  let offset = centralOffset;
+  for (let index = 0; index < totalEntries; index += 1) {
+    if (uint32(bytes, offset) !== 0x02014b50) return null;
+    const flags = uint16(bytes, offset + 8);
+    const method = uint16(bytes, offset + 10);
+    const checksum = uint32(bytes, offset + 16);
+    const compressedSize = uint32(bytes, offset + 20);
+    const uncompressedSize = uint32(bytes, offset + 24);
+    const nameLength = uint16(bytes, offset + 28);
+    const extraLength = uint16(bytes, offset + 30);
+    const entryCommentLength = uint16(bytes, offset + 32);
+    const localOffset = uint32(bytes, offset + 42);
+    if (
+      flags === null
+      || (flags & 1) !== 0
+      || (flags & 0x2060) !== 0
+      || (method !== 0 && method !== 8)
+      || checksum === null
+      || compressedSize === null
+      || uncompressedSize === null
+      || uncompressedSize > ZIP_MAX_ENTRY_UNCOMPRESSED_BYTES
+      || nameLength === null
+      || extraLength === null
+      || entryCommentLength === null
+      || localOffset === null
+    ) return null;
+    totalUncompressedSize += uncompressedSize;
+    if (totalUncompressedSize > ZIP_MAX_TOTAL_UNCOMPRESSED_BYTES) return null;
+    if (method === 0 && compressedSize !== uncompressedSize) return null;
+    const name = decodeZipName(
+      bytes,
+      offset + 46,
+      nameLength,
+      (flags & 0x0800) !== 0,
+    );
+    const next = offset + 46 + nameLength + extraLength + entryCommentLength;
+    const lowerName = name?.toLowerCase();
+    if (
+      !name
+      || !lowerName
+      || next > endOffset
+      || entries.has(name)
+      || lowerNames.has(lowerName)
+    ) return null;
+
+    if (uint32(bytes, localOffset) !== 0x04034b50) return null;
+    const localFlags = uint16(bytes, localOffset + 6);
+    const localMethod = uint16(bytes, localOffset + 8);
+    const localChecksum = uint32(bytes, localOffset + 14);
+    const localCompressedSize = uint32(bytes, localOffset + 18);
+    const localUncompressedSize = uint32(bytes, localOffset + 22);
+    const localNameLength = uint16(bytes, localOffset + 26);
+    const localExtraLength = uint16(bytes, localOffset + 28);
+    if (
+      localFlags !== flags
+      || localMethod !== method
+      || localChecksum === null
+      || localCompressedSize === null
+      || localUncompressedSize === null
+      || localNameLength === null
+      || localExtraLength === null
+      || ((flags & 0x0008) === 0 && (
+        localChecksum !== checksum
+        || localCompressedSize !== compressedSize
+        || localUncompressedSize !== uncompressedSize
+      ))
+      || ((flags & 0x0008) !== 0 && (
+        ![0, checksum].includes(localChecksum)
+        || ![0, compressedSize].includes(localCompressedSize)
+        || ![0, uncompressedSize].includes(localUncompressedSize)
+      ))
+    ) return null;
+    const localName = decodeZipName(
+      bytes,
+      localOffset + 30,
+      localNameLength,
+      (localFlags & 0x0800) !== 0,
+    );
+    const dataOffset = localOffset + 30 + localNameLength + localExtraLength;
+    if (
+      localName !== name
+      || dataOffset + compressedSize > centralOffset
+    ) return null;
+    const dataEnd = dataOffset + compressedSize;
+    let localEnd = dataEnd;
+    if ((flags & 0x0008) !== 0) {
+      if (uint32(bytes, localEnd) === 0x08074b50) localEnd += 4;
+      const descriptorChecksum = uint32(bytes, localEnd);
+      const descriptorCompressedSize = uint32(bytes, localEnd + 4);
+      const descriptorUncompressedSize = uint32(bytes, localEnd + 8);
+      if (
+        descriptorChecksum !== checksum
+        || descriptorCompressedSize !== compressedSize
+        || descriptorUncompressedSize !== uncompressedSize
+      ) return null;
+      localEnd += 12;
+    }
+    localRanges.push({ start: localOffset, end: localEnd });
+    entries.set(name, {
+      name,
+      flags,
+      method,
+      checksum,
+      compressedSize,
+      uncompressedSize,
+      dataOffset,
+    });
+    lowerNames.set(lowerName, name);
+    offset = next;
+  }
+  if (offset !== centralOffset + centralSize) return null;
+  localRanges.sort((left, right) => left.start - right.start);
+  if (
+    localRanges[0]?.start !== 0
+    || localRanges.at(-1)?.end !== centralOffset
+    || localRanges.some((range, index) =>
+      range.end > centralOffset
+      || (index > 0 && range.start !== localRanges[index - 1].end)
+    )
+  ) return null;
+  return { entries, lowerNames };
+}
+
+function readZipEntry(bytes: Uint8Array, entry: ParsedZipEntry) {
+  const compressed = bytes.subarray(
+    entry.dataOffset,
+    entry.dataOffset + entry.compressedSize,
+  );
+  let contents: Uint8Array;
+  try {
+    contents = entry.method === 0
+      ? compressed
+      : new Uint8Array(inflateRawSync(compressed, {
+        maxOutputLength: Math.max(1, entry.uncompressedSize),
+      }));
+  } catch {
+    return null;
+  }
+  if (
+    contents.byteLength !== entry.uncompressedSize
+    || crc32(contents) !== entry.checksum
+  ) return null;
+  return contents;
+}
+
+function decodeXmlAttribute(value: string) {
+  if (/&(?!amp;|quot;|apos;|lt;|gt;|#\d+;|#x[0-9a-f]+;)/i.test(value)) {
+    return null;
+  }
+  let valid = true;
+  const decoded = value.replace(
+    /&(?:amp|quot|apos|lt|gt|#\d+|#x[0-9a-f]+);/gi,
+    (entity) => {
+      if (entity === "&amp;") return "&";
+      if (entity === "&quot;") return '"';
+      if (entity === "&apos;") return "'";
+      if (entity === "&lt;") return "<";
+      if (entity === "&gt;") return ">";
+      const numeric = entity[2].toLowerCase() === "x"
+        ? Number.parseInt(entity.slice(3, -1), 16)
+        : Number.parseInt(entity.slice(2, -1), 10);
+      if (
+        !Number.isInteger(numeric)
+        || numeric < 0x20
+        || numeric > 0x10ffff
+        || (numeric >= 0xd800 && numeric <= 0xdfff)
+      ) {
+        valid = false;
+        return "";
+      }
+      return String.fromCodePoint(numeric);
+    },
+  );
+  if (!valid) return null;
+  return decoded;
+}
+
+function parseXmlAttributes(source: string) {
+  const attributes = new Map<string, string>();
+  let remaining = source;
+  while (remaining.trim()) {
+    const match = /^\s+([A-Za-z_][\w:.-]*)\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(remaining);
+    if (!match || attributes.has(match[1])) return null;
+    const value = decodeXmlAttribute(match[2] ?? match[3] ?? "");
+    if (value === null) return null;
+    attributes.set(match[1], value);
+    remaining = remaining.slice(match[0].length);
+  }
+  return attributes;
+}
+
+type FlatXmlChild = { name: string; attributes: Map<string, string> };
+
+function parseFlatOpcXml(
+  bytes: Uint8Array,
+  expectedRoot: string,
+  expectedNamespace: string,
+  allowedChildren: ReadonlySet<string>,
+): FlatXmlChild[] | null {
+  if (bytes.byteLength < 1 || bytes.byteLength > OPC_METADATA_MAX_BYTES) return null;
+  let source: string;
+  try {
+    source = new TextDecoder("utf-8", { fatal: true }).decode(bytes).trim();
+  } catch {
+    return null;
+  }
+  if (source.charCodeAt(0) === 0xfeff) source = source.slice(1).trimStart();
+  if (source.startsWith("<?xml")) {
+    const end = source.indexOf("?>");
+    if (end < 0) return null;
+    source = source.slice(end + 2).trimStart();
+  }
+  if (source.includes("<!") || source.includes("<?")) return null;
+
+  const tokens: Array<{
+    name: string;
+    closing: boolean;
+    selfClosing: boolean;
+    attributes: Map<string, string>;
+  }> = [];
+  const tag = /<([^<>]+)>/g;
+  let cursor = 0;
+  for (let match = tag.exec(source); match; match = tag.exec(source)) {
+    if (source.slice(cursor, match.index).trim()) return null;
+    let body = match[1].trim();
+    const closing = body.startsWith("/");
+    const selfClosing = !closing && body.endsWith("/");
+    if (closing) body = body.slice(1).trim();
+    if (selfClosing) body = body.slice(0, -1).trimEnd();
+    const parsed = /^([A-Za-z_][\w:.-]*)([\s\S]*)$/.exec(body);
+    if (!parsed || (closing && parsed[2].trim())) return null;
+    const attributes = closing ? new Map<string, string>() : parseXmlAttributes(parsed[2]);
+    if (!attributes) return null;
+    tokens.push({
+      name: parsed[1].split(":").at(-1)!,
+      closing,
+      selfClosing,
+      attributes,
+    });
+    cursor = tag.lastIndex;
+  }
+  if (source.slice(cursor).trim() || tokens.length < 2) return null;
+  const root = tokens[0];
+  const close = tokens.at(-1)!;
+  if (
+    root.name !== expectedRoot
+    || root.closing
+    || root.selfClosing
+    || close.name !== expectedRoot
+    || !close.closing
+    || close.selfClosing
+    || root.attributes.size !== 1
+    || root.attributes.get("xmlns") !== expectedNamespace
+  ) return null;
+  const children: FlatXmlChild[] = [];
+  for (const child of tokens.slice(1, -1)) {
+    if (
+      child.closing
+      || !child.selfClosing
+      || !allowedChildren.has(child.name)
+    ) return null;
+    children.push({ name: child.name, attributes: child.attributes });
+  }
+  return children;
+}
+
+function exactAttributes(
+  attributes: Map<string, string>,
+  required: readonly string[],
+  optional: readonly string[] = [],
+) {
+  return required.every((key) => attributes.has(key))
+    && [...attributes.keys()].every((key) =>
+      required.includes(key) || optional.includes(key));
+}
+
+const OPC_CONTENT_TYPES_NAMESPACE =
+  "http://schemas.openxmlformats.org/package/2006/content-types";
+const OPC_RELATIONSHIPS_NAMESPACE =
+  "http://schemas.openxmlformats.org/package/2006/relationships";
+const OPC_RELATIONSHIP_DANGER =
+  /\/(?:afchunk|attachedtemplate|attachedtoolbars|oleobject|package|vba|activex|control|externallink|externallinkpath|customui|webextension|webextensiontaskpanes|taskpanes)$/i;
+const OPC_CONTENT_TYPE_DANGER =
+  /(?:macroenabled|vba|activex|oleobject|embeddedpackage|webextension|taskpanes|x-msdownload|javascript|text\/html|image\/svg)/i;
+const OPC_NAME_DANGER =
+  /(?:^|\/)(?:activex|embeddings)(?:\/|$)|(?:^|\/)vbaproject\.bin$|\.(?:exe|dll|com|scr|msi|jar|js|vbs|ps1|bat|cmd|html?|svg)$/i;
+
+const OPEN_XML_IDENTITIES = {
+  docx: {
+    mainPart: "word/document.xml",
+    rootName: "document",
+    contentType:
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+  },
+  xlsx: {
+    mainPart: "xl/workbook.xml",
+    rootName: "workbook",
+    contentType:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+  },
+  pptx: {
+    mainPart: "ppt/presentation.xml",
+    rootName: "presentation",
+    contentType:
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml",
+  },
+} as const;
+
+function hasExpectedXmlRoot(bytes: Uint8Array, expectedRoot: string) {
+  let source: string;
+  try {
+    source = new TextDecoder("utf-8", { fatal: true }).decode(bytes).trimStart();
+  } catch {
+    return false;
+  }
+  if (source.charCodeAt(0) === 0xfeff) source = source.slice(1).trimStart();
+  if (source.startsWith("<?xml")) {
+    const end = source.indexOf("?>");
+    if (end < 0) return false;
+    source = source.slice(end + 2).trimStart();
+  }
+  if (/<!\s*(?:doctype|entity)/i.test(source)) return false;
+  while (source.startsWith("<!--")) {
+    const end = source.indexOf("-->");
+    if (end < 0) return false;
+    source = source.slice(end + 3).trimStart();
+  }
+  const root = /^<([A-Za-z_][\w:.-]*)\b/.exec(source)?.[1];
+  return root?.split(":").at(-1) === expectedRoot;
+}
+
+function relationshipSource(name: string) {
+  if (name === "_rels/.rels") return "";
+  const marker = name.lastIndexOf("/_rels/");
+  if (marker < 0 || !name.endsWith(".rels")) return null;
+  const directory = name.slice(0, marker);
+  const sourceName = name.slice(marker + "/_rels/".length, -".rels".length);
+  return sourceName ? `${directory}/${sourceName}` : null;
+}
+
+function resolveOpcTarget(sourcePart: string, target: string) {
+  if (
+    !target
+    || target.includes("\\")
+    || target.includes("\0")
+    || target.includes("%")
+    || target.includes("?")
+    || target.includes("#")
+    || /^[a-z][a-z0-9+.-]*:/i.test(target)
+  ) return null;
+  const parts = target.startsWith("/")
+    ? []
+    : sourcePart.split("/").slice(0, -1);
+  for (const segment of target.replace(/^\/+/, "").split("/")) {
+    if (!segment || segment === ".") continue;
+    if (segment === "..") {
+      if (parts.length === 0) return null;
+      parts.pop();
+    } else {
+      parts.push(segment);
+    }
+  }
+  return parts.join("/").toLowerCase();
+}
+
+function isSafeOpenXml(bytes: Uint8Array, archive: ParsedZip, extension: string) {
+  const identity = OPEN_XML_IDENTITIES[extension as keyof typeof OPEN_XML_IDENTITIES];
+  if (!identity) return false;
+  const metadata = new Map<string, Uint8Array>();
+  let mainContents: Uint8Array | null = null;
+  let inspectionBytes = 0;
+  for (const entry of archive.entries.values()) {
+    const lowerName = entry.name.toLowerCase();
+    if (
+      OPC_NAME_DANGER.test(lowerName)
+      || (entry.name.endsWith("/") && entry.uncompressedSize !== 0)
+    ) return false;
+    const inspect = lowerName === identity.mainPart
+      || lowerName === "[content_types].xml"
+      || lowerName.endsWith(".rels");
+    if (!inspect) continue;
+    inspectionBytes += entry.uncompressedSize;
+    if (inspectionBytes > OPC_INSPECTION_MAX_BYTES) return false;
+    const contents = readZipEntry(bytes, entry);
+    if (!contents) return false;
+    if (lowerName === identity.mainPart) mainContents = contents;
+    if (lowerName === "[content_types].xml" || lowerName.endsWith(".rels")) {
+      if (contents.byteLength > OPC_METADATA_MAX_BYTES) return false;
+      metadata.set(lowerName, contents);
+    }
+  }
+  const contentTypeXml = metadata.get("[content_types].xml");
+  const rootRelationshipsXml = metadata.get("_rels/.rels");
+  const mainEntryName = archive.lowerNames.get(identity.mainPart);
+  if (
+    !contentTypeXml
+    || !rootRelationshipsXml
+    || !mainEntryName
+    || !mainContents
+    || !hasExpectedXmlRoot(mainContents, identity.rootName)
+  ) return false;
+  const mainEntry = archive.entries.get(mainEntryName)!;
+  if (mainEntry.uncompressedSize < 1) return false;
+
+  const contentTypeChildren = parseFlatOpcXml(
+    contentTypeXml,
+    "Types",
+    OPC_CONTENT_TYPES_NAMESPACE,
+    new Set(["Default", "Override"]),
+  );
+  if (!contentTypeChildren) return false;
+  const defaults = new Map<string, string>();
+  const overrides = new Map<string, string>();
+  for (const child of contentTypeChildren) {
+    if (child.name === "Default") {
+      if (!exactAttributes(child.attributes, ["Extension", "ContentType"])) return false;
+      const extensionName = child.attributes.get("Extension")!.toLowerCase();
+      const contentType = child.attributes.get("ContentType")!.toLowerCase();
+      if (
+        !/^[a-z0-9]+$/.test(extensionName)
+        || !/^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/.test(contentType)
+        || OPC_CONTENT_TYPE_DANGER.test(contentType)
+        || defaults.has(extensionName)
+      ) return false;
+      defaults.set(extensionName, contentType);
+    } else {
+      if (!exactAttributes(child.attributes, ["PartName", "ContentType"])) return false;
+      const partName = child.attributes.get("PartName")!;
+      const contentType = child.attributes.get("ContentType")!.toLowerCase();
+      const normalizedPart = partName.startsWith("/")
+        ? partName.slice(1).toLowerCase()
+        : "";
+      if (
+        !normalizedPart
+        || partName.includes("%")
+        || !archive.lowerNames.has(normalizedPart)
+        || !/^[a-z0-9!#$&^_.+-]+\/[a-z0-9!#$&^_.+-]+$/.test(contentType)
+        || OPC_CONTENT_TYPE_DANGER.test(contentType)
+        || overrides.has(normalizedPart)
+      ) return false;
+      overrides.set(normalizedPart, contentType);
+    }
+  }
+  if (overrides.get(identity.mainPart) !== identity.contentType) return false;
+  const identityCount = Object.values(OPEN_XML_IDENTITIES).filter((candidate) =>
+    archive.lowerNames.has(candidate.mainPart)
+    && overrides.get(candidate.mainPart) === candidate.contentType
+  ).length;
+  if (identityCount !== 1) return false;
+  for (const lowerName of archive.lowerNames.keys()) {
+    if (lowerName.endsWith("/") || lowerName === "[content_types].xml") continue;
+    const extensionName = lowerName.includes(".") ? lowerName.split(".").at(-1)! : "";
+    const contentType = overrides.get(lowerName) ?? defaults.get(extensionName);
+    if (!contentType || OPC_CONTENT_TYPE_DANGER.test(contentType)) return false;
+  }
+
+  let rootOfficeDocumentCount = 0;
+  for (const [relationshipName, relationshipXml] of metadata) {
+    if (!relationshipName.endsWith(".rels")) continue;
+    const sourcePart = relationshipSource(relationshipName);
+    if (sourcePart === null) return false;
+    const relationships = parseFlatOpcXml(
+      relationshipXml,
+      "Relationships",
+      OPC_RELATIONSHIPS_NAMESPACE,
+      new Set(["Relationship"]),
+    );
+    if (!relationships) return false;
+    const ids = new Set<string>();
+    for (const relationship of relationships) {
+      if (!exactAttributes(
+        relationship.attributes,
+        ["Id", "Type", "Target"],
+        ["TargetMode"],
+      )) return false;
+      const id = relationship.attributes.get("Id")!;
+      const type = relationship.attributes.get("Type")!;
+      const target = relationship.attributes.get("Target")!;
+      const targetMode = relationship.attributes.get("TargetMode") ?? "Internal";
+      if (!id || ids.has(id) || !/^https?:\/\//i.test(type) || OPC_RELATIONSHIP_DANGER.test(type)) {
+        return false;
+      }
+      ids.add(id);
+      if (targetMode.toLowerCase() === "external") {
+        if (
+          !/\/hyperlink$/i.test(type)
+          || !/^(?:https?:|mailto:)/i.test(target)
+        ) return false;
+        continue;
+      }
+      if (targetMode.toLowerCase() !== "internal") return false;
+      const resolved = resolveOpcTarget(sourcePart, target);
+      if (!resolved || !archive.lowerNames.has(resolved)) return false;
+      if (relationshipName === "_rels/.rels" && /\/officedocument$/i.test(type)) {
+        rootOfficeDocumentCount += 1;
+        if (resolved !== identity.mainPart) return false;
+      }
+    }
+  }
+  return rootOfficeDocumentCount === 1;
+}
+
+/**
+ * Returns the canonical MIME only when signature, extension, and any declared
+ * MIME agree. Office compound/ZIP containers are additionally constrained by
+ * their extension because their leading magic is shared by several formats.
+ */
+export function sniffProjectMediaMime(
+  bytes: Uint8Array,
+  fileName: string,
+  declaredMimeType: string,
+): string | null {
+  const extension = extensionOf(fileName);
+  const expected = MIME_BY_EXTENSION[extension];
+  const declared = declaredMimeType.trim().toLowerCase();
+  if (!expected || (declared && declared !== expected)) return null;
+
+  let detected: string | null = null;
+  if (hasPrefix(bytes, [0xff, 0xd8, 0xff])) detected = "image/jpeg";
+  else if (hasPrefix(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) {
+    detected = "image/png";
+  } else if (bytes.length >= 12 && ascii(bytes, 0, 4) === "RIFF" && ascii(bytes, 8, 12) === "WEBP") {
+    detected = "image/webp";
+  } else if (bytes.length >= 6 && ["GIF87a", "GIF89a"].includes(ascii(bytes, 0, 6))) {
+    detected = "image/gif";
+  } else if (hasPrefix(bytes, [0x25, 0x50, 0x44, 0x46])) {
+    detected = "application/pdf";
+  } else if (bytes.length >= 12 && ascii(bytes, 4, 8) === "ftyp") {
+    const brand = ascii(bytes, 8, 12).toLowerCase();
+    if (["avif", "avis"].includes(brand)) detected = "image/avif";
+    else if (["heic", "heix", "hevc", "hevx", "mif1", "msf1"].includes(brand)) {
+      detected = expected === "image/heif" ? "image/heif" : "image/heic";
+    }
+  } else if (
+    hasPrefix(bytes, [0x50, 0x4b, 0x03, 0x04])
+    || hasPrefix(bytes, [0x50, 0x4b, 0x05, 0x06])
+    || hasPrefix(bytes, [0x50, 0x4b, 0x07, 0x08])
+  ) {
+    const archive = parseZip(bytes);
+    if (archive && isSafeOpenXml(bytes, archive, extension)) detected = expected;
+  }
+  return detected === expected ? detected : null;
+}
+
+export const PROJECT_MEDIA_MULTIPART_MAX_BYTES =
+  PROJECT_MEDIA_MAX_BYTES + 64 * 1024;
+
+export type ParsedProjectMediaMultipart = {
+  fields: Record<string, string>;
+  file: {
+    fileName: string;
+    mimeType: string;
+    bytes: Uint8Array;
+  };
+};
+
+const PROJECT_MEDIA_MULTIPART_FIELDS = new Set([
+  "phase",
+  "caption",
+  "documentId",
+]);
+
+function projectMediaMultipartError(
+  code = "PROJECT_MEDIA_MULTIPART_INVALID",
+) {
+  return new Error(code);
+}
+
+export async function parseProjectMediaMultipart(
+  request: Request,
+): Promise<ParsedProjectMediaMultipart> {
+  if (!request.body) throw projectMediaMultipartError();
+  const declaredLength = Number(request.headers.get("content-length"));
+  if (
+    Number.isFinite(declaredLength)
+    && declaredLength > PROJECT_MEDIA_MULTIPART_MAX_BYTES
+  ) throw projectMediaMultipartError("PROJECT_MEDIA_MULTIPART_TOO_LARGE");
+
+  let parser: ReturnType<typeof Busboy>;
+  try {
+    parser = Busboy({
+      headers: {
+        "content-type": request.headers.get("content-type") ?? "",
+      },
+      limits: {
+        fileSize: PROJECT_MEDIA_MAX_BYTES,
+        files: 1,
+        fields: 3,
+        fieldNameSize: 30,
+        fieldSize: 2_000,
+        parts: 4,
+        headerPairs: 20,
+      },
+    });
+  } catch {
+    throw projectMediaMultipartError();
+  }
+
+  const source = Readable.fromWeb(request.body as never);
+  let rawBytes = 0;
+  const limiter = new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      rawBytes += chunk.length;
+      callback(
+        rawBytes > PROJECT_MEDIA_MULTIPART_MAX_BYTES
+          ? projectMediaMultipartError("PROJECT_MEDIA_MULTIPART_TOO_LARGE")
+          : null,
+        chunk,
+      );
+    },
+  });
+  const fields: Record<string, string> = {};
+  let parsedFile: ParsedProjectMediaMultipart["file"] | null = null;
+  let validationError: Error | null = null;
+
+  function invalidate(code?: string) {
+    if (validationError) return;
+    validationError = projectMediaMultipartError(code);
+    source.destroy();
+    limiter.destroy();
+  }
+
+  parser.on("field", (name, value, info) => {
+    if (
+      !PROJECT_MEDIA_MULTIPART_FIELDS.has(name)
+      || Object.hasOwn(fields, name)
+      || info.nameTruncated
+      || info.valueTruncated
+    ) {
+      invalidate();
+      return;
+    }
+    fields[name] = value;
+  });
+  parser.on("file", (name, file, info) => {
+    file.on("error", () => undefined);
+    if (name !== "file" || !info.filename || parsedFile) {
+      file.resume();
+      invalidate();
+      return;
+    }
+    const chunks: Buffer[] = [];
+    let size = 0;
+    let truncated = false;
+    file.on("limit", () => {
+      truncated = true;
+      invalidate("PROJECT_MEDIA_MULTIPART_TOO_LARGE");
+    });
+    file.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size > PROJECT_MEDIA_MAX_BYTES) {
+        truncated = true;
+        invalidate("PROJECT_MEDIA_MULTIPART_TOO_LARGE");
+        return;
+      }
+      chunks.push(chunk);
+    });
+    file.on("end", () => {
+      if (truncated || validationError || size < 1) return;
+      parsedFile = {
+        fileName: info.filename,
+        mimeType: info.mimeType,
+        bytes: new Uint8Array(Buffer.concat(chunks, size)),
+      };
+    });
+  });
+  for (const event of ["filesLimit", "fieldsLimit", "partsLimit"] as const) {
+    parser.on(event, () => invalidate());
+  }
+
+  try {
+    await pipeline(source, limiter, parser);
+  } catch (error) {
+    const candidate = validationError ?? error;
+    if (
+      candidate instanceof Error
+      && (
+        candidate.message === "PROJECT_MEDIA_MULTIPART_TOO_LARGE"
+        || candidate.message === "PROJECT_MEDIA_MULTIPART_INVALID"
+      )
+    ) throw candidate;
+    throw projectMediaMultipartError();
+  } finally {
+    if (!source.destroyed) source.destroy();
+    if (!limiter.destroyed) limiter.destroy();
+    if (!parser.destroyed) parser.destroy();
+  }
+  if (validationError) throw validationError;
+  if (!Object.hasOwn(fields, "phase") || !parsedFile) {
+    throw projectMediaMultipartError();
+  }
+  return { fields, file: parsedFile };
+}
+
+export class ProjectMediaError extends Error {
+  constructor(
+    readonly error: string,
+    readonly status: number,
+  ) {
+    super(error);
+    this.name = "ProjectMediaError";
+  }
+}
+
+export class ProjectMediaRepositoryError extends Error {
+  constructor(readonly code: string) {
+    super(code);
+    this.name = "ProjectMediaRepositoryError";
+  }
+}
+
+export type ProjectMediaInternalRecord = {
+  id: string;
+  mediaId: string;
+  phase: ProjectMediaPhase;
+  caption: string | null;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: Date;
+  provider: "r2" | "supabase";
+  bucket: string;
+  objectKey: string;
+};
+
+export type ProjectMediaDescriptor = Omit<
+  ProjectMediaInternalRecord,
+  "provider" | "bucket" | "objectKey"
+> & { signedUrl: string };
+
+export type ProjectAttachmentSummary = Omit<
+  ProjectMediaInternalRecord,
+  "provider" | "bucket" | "objectKey"
+> & { documentIds: string[] };
+
+function expectedDomain(purpose: MediaPurpose) {
+  if (purpose === "project-document") return "projects";
+  if (purpose === "service-evidence") return "service-evidence";
+  if (purpose === "product-image") return "products";
+  return "ai";
+}
+
+export async function requireReadyManagedMediaInTransaction(
+  transaction: DatabaseLike,
+  input: {
+    storeId: string;
+    mediaId: string;
+    purpose: MediaPurpose;
+    targetId: string;
+    expectedPath: string;
+    sha256?: string | null;
+    width?: number | null;
+    height?: number | null;
+    mimeType?: string;
+    sizeBytes?: number;
+    fileName?: string;
+  },
+): Promise<typeof mediaObjects.$inferSelect> {
+  const [media] = await transaction.select().from(mediaObjects).where(and(
+    eq(mediaObjects.storeId, input.storeId),
+    eq(mediaObjects.id, input.mediaId),
+  )).limit(1).for("update");
+  if (
+    !media
+    || media.provider !== "r2"
+    || media.visibility !== "private"
+    || media.status !== "ready"
+    || media.deletedAt !== null
+    || media.purpose !== input.purpose
+    || media.targetId !== input.targetId
+    || media.domain !== expectedDomain(input.purpose)
+    || media.objectKey !== input.expectedPath
+    || (input.mimeType !== undefined && media.mimeType !== input.mimeType)
+    || (input.sizeBytes !== undefined && media.sizeBytes !== input.sizeBytes)
+    || (input.fileName !== undefined && media.originalFileName !== input.fileName)
+    || (input.sha256 && media.sha256 && media.sha256 !== input.sha256)
+    || (input.width !== undefined && input.width !== null && media.width !== null && media.width !== input.width)
+    || (input.height !== undefined && input.height !== null && media.height !== null && media.height !== input.height)
+  ) {
+    throw new ProjectMediaRepositoryError("MANAGED_MEDIA_CONFLICT");
+  }
+  if (
+    (input.sha256 && media.sha256 === null)
+    || (input.width !== undefined && input.width !== null && media.width === null)
+    || (input.height !== undefined && input.height !== null && media.height === null)
+  ) {
+    const [updated] = await transaction.update(mediaObjects).set({
+      sha256: input.sha256 ?? media.sha256,
+      width: input.width ?? media.width,
+      height: input.height ?? media.height,
+    }).where(and(
+      eq(mediaObjects.storeId, input.storeId),
+      eq(mediaObjects.id, input.mediaId),
+      eq(mediaObjects.status, "ready"),
+    )).returning();
+    if (!updated) throw new ProjectMediaRepositoryError("MANAGED_MEDIA_CONFLICT");
+    return updated;
+  }
+  return media;
+}
+
+export function compensateManagedMediaAssociation(
+  database: DatabaseLike,
+  input: {
+    storeId: string;
+    mediaId: string;
+    purpose: MediaPurpose;
+    targetId: string;
+    deletedAt?: Date;
+  },
+): Promise<SoftDeleteMediaResult> {
+  return softDeleteMediaIfUnreferencedCore(database, {
+    storeId: input.storeId,
+    mediaId: input.mediaId,
+    expectedPurpose: input.purpose,
+    expectedTargetId: input.targetId,
+    deletedAt: input.deletedAt,
+  });
+}
+
+export function createDatabaseMediaRepository(
+  database: DatabaseLike,
+  options: { forceCreatedByNull?: boolean } = {},
+): MediaRepository {
+  return {
+    async createPending(input: CreatePendingMediaInput) {
+      const [row] = await database.insert(mediaObjects).values({
+        ...input,
+        status: "pending",
+        createdBy: options.forceCreatedByNull ? null : input.createdBy ?? null,
+      }).returning();
+      return row as MediaRecord;
+    },
+    async getForStore(input: GetMediaForStoreInput) {
+      const [row] = await database.select().from(mediaObjects).where(and(
+        eq(mediaObjects.storeId, input.storeId),
+        eq(mediaObjects.id, input.mediaId),
+      )).limit(1);
+      return (row as MediaRecord | undefined) ?? null;
+    },
+    async markReady(input: Required<MarkMediaReadyInput>) {
+      const [row] = await database.update(mediaObjects).set({
+        status: "ready",
+        sizeBytes: input.actualSizeBytes,
+        readyAt: input.readyAt,
+        verifiedAt: input.verifiedAt,
+      }).where(and(
+        eq(mediaObjects.storeId, input.storeId),
+        eq(mediaObjects.id, input.mediaId),
+        eq(mediaObjects.status, "pending"),
+      )).returning();
+      return (row as MediaRecord | undefined) ?? null;
+    },
+    async saveThumbnail(input: SaveMediaThumbnailInput) {
+      const [row] = await database.update(mediaObjects).set({
+        thumbnailObjectKey: input.objectKey,
+        thumbnailSizeBytes: input.sizeBytes,
+      }).where(and(
+        eq(mediaObjects.storeId, input.storeId),
+        eq(mediaObjects.id, input.mediaId),
+        eq(mediaObjects.status, "ready"),
+      )).returning();
+      return (row as MediaRecord | undefined) ?? null;
+    },
+    async abandonPending(input: AbandonPendingMediaInput) {
+      const [row] = await database.update(mediaObjects).set({
+        status: "deleted",
+        deletedAt: input.deletedAt,
+      }).where(and(
+        eq(mediaObjects.storeId, input.storeId),
+        eq(mediaObjects.id, input.mediaId),
+        eq(mediaObjects.status, "pending"),
+        eq(mediaObjects.purpose, input.expectedPurpose),
+        eq(mediaObjects.targetId, input.expectedTargetId),
+      )).returning();
+      return (row as MediaRecord | undefined) ?? null;
+    },
+    softDeleteIfUnreferenced(input: Required<SoftDeleteMediaInput>) {
+      return softDeleteMediaIfUnreferencedCore(database, input);
+    },
+  };
+}
+
+export async function resolveManagedPrivateMediaUrl(
+  actor: MediaActor,
+  mediaId: string,
+  options: {
+    expiresInSeconds?: number;
+    expectedPurpose?: MediaPurpose;
+    expectedTargetId?: string;
+    database?: DatabaseLike;
+    authorizeTarget?: AuthorizeMediaTarget;
+    storageForProvider?: (provider: MediaProvider) => Pick<ObjectStorage, "createDownloadUrl">;
+  } = {},
+) {
+  const database = options.database ?? db;
+  const [media] = await database.select().from(mediaObjects).where(and(
+    eq(mediaObjects.storeId, actor.storeId),
+    eq(mediaObjects.id, mediaId),
+  )).limit(1);
+  if (
+    !media
+    || media.status !== "ready"
+    || media.deletedAt !== null
+    || media.visibility !== "private"
+    || (options.expectedPurpose && media.purpose !== options.expectedPurpose)
+    || (options.expectedTargetId && media.targetId !== options.expectedTargetId)
+  ) throw new MediaServiceError("errors.notFound", 404);
+  const authorization = await (options.authorizeTarget ?? authorizeMediaTarget)({
+    actor,
+    purpose: media.purpose,
+    targetId: media.targetId,
+  });
+  if (authorization !== "allowed") {
+    throw new MediaServiceError("errors.notFound", 404);
+  }
+  return (options.storageForProvider ?? getObjectStorage)(media.provider).createDownloadUrl({
+    bucket: media.bucket,
+    key: media.objectKey,
+    expiresInSeconds: options.expiresInSeconds ?? PROJECT_MEDIA_SIGNED_URL_SECONDS,
+  });
+}
+
+export type ProjectMediaRepository = {
+  listProjectAttachments(input: {
+    storeId: string;
+    projectId: string;
+  }): Promise<ProjectMediaInternalRecord[]>;
+  createProjectAttachment(input: {
+    storeId: string;
+    actorId: string | null;
+    projectId: string;
+    mediaId: string;
+    expectedPath: string;
+    phase: ProjectMediaPhase;
+    caption: string | null;
+    documentId?: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    sha256: string;
+    createdAt?: Date;
+  }): Promise<ProjectMediaInternalRecord>;
+  deleteProjectAttachment(input: {
+    storeId: string;
+    actorId: string | null;
+    projectId: string;
+    attachmentId: string;
+    deletedAt?: Date;
+  }): Promise<{
+    outcome: "deleted" | "already_deleted" | "referenced" | "not_found" | "conflict";
+    id?: string;
+  }>;
+};
+
+class ProjectMediaDeleteRollback extends Error {
+  constructor(readonly outcome: "referenced" | "conflict") {
+    super(`PROJECT_MEDIA_DELETE_${outcome.toUpperCase()}`);
+  }
+}
+
+export function createDatabaseProjectMediaRepository(
+  database: DatabaseLike,
+): ProjectMediaRepository {
+  return {
+    async listProjectAttachments(input) {
+      const rows = await database.select({
+        id: serviceAttachments.id,
+        mediaId: serviceAttachments.mediaObjectId,
+        phase: serviceAttachments.projectPhase,
+        caption: serviceAttachments.caption,
+        fileName: serviceAttachments.fileName,
+        mimeType: serviceAttachments.mimeType,
+        sizeBytes: serviceAttachments.sizeBytes,
+        createdAt: serviceAttachments.createdAt,
+        provider: mediaObjects.provider,
+        bucket: mediaObjects.bucket,
+        objectKey: mediaObjects.objectKey,
+      }).from(serviceAttachments).innerJoin(mediaObjects, and(
+        eq(mediaObjects.storeId, serviceAttachments.storeId),
+        eq(mediaObjects.id, serviceAttachments.mediaObjectId),
+      )).where(and(
+        eq(serviceAttachments.storeId, input.storeId),
+        eq(serviceAttachments.projectId, input.projectId),
+        isNull(serviceAttachments.jobId),
+        isNull(serviceAttachments.claimId),
+        isNull(serviceAttachments.assetId),
+        isNull(serviceAttachments.requestId),
+        isNull(serviceAttachments.deletedAt),
+        eq(mediaObjects.storeId, input.storeId),
+        eq(mediaObjects.status, "ready"),
+        eq(mediaObjects.visibility, "private"),
+        eq(mediaObjects.purpose, "project-document"),
+        eq(mediaObjects.targetId, input.projectId),
+        eq(mediaObjects.domain, "projects"),
+        isNull(mediaObjects.deletedAt),
+      )).orderBy(asc(serviceAttachments.createdAt), asc(serviceAttachments.id));
+      return rows.map((row: typeof rows[number]) => ({
+        ...row,
+        mediaId: row.mediaId!,
+        phase: row.phase ?? "other",
+      }));
+    },
+
+    async createProjectAttachment(input) {
+      return database.transaction(async (transaction: DatabaseLike) => {
+        const [project] = await transaction.select({ id: projects.id })
+          .from(projects).where(and(
+            eq(projects.storeId, input.storeId),
+            eq(projects.id, input.projectId),
+          )).limit(1).for("update");
+        if (!project) {
+          throw new ProjectMediaRepositoryError("PROJECT_MEDIA_PROJECT_NOT_FOUND");
+        }
+        if (input.documentId) {
+          const [document] = await transaction.select({ id: serviceHandoverDocuments.id })
+            .from(serviceHandoverDocuments).where(and(
+              eq(serviceHandoverDocuments.storeId, input.storeId),
+              eq(serviceHandoverDocuments.id, input.documentId),
+              eq(serviceHandoverDocuments.projectId, input.projectId),
+            )).limit(1).for("update");
+          if (!document) {
+            throw new ProjectMediaRepositoryError("PROJECT_MEDIA_DOCUMENT_NOT_FOUND");
+          }
+        }
+        const media = await requireReadyManagedMediaInTransaction(transaction, {
+          storeId: input.storeId,
+          mediaId: input.mediaId,
+          purpose: "project-document",
+          targetId: input.projectId,
+          expectedPath: input.expectedPath,
+          sha256: input.sha256,
+          mimeType: input.mimeType,
+          sizeBytes: input.sizeBytes,
+          fileName: input.fileName,
+        });
+        const [attachment] = await transaction.insert(serviceAttachments).values({
+          storeId: input.storeId,
+          projectId: input.projectId,
+          jobId: null,
+          claimId: null,
+          assetId: null,
+          requestId: null,
+          mediaObjectId: media.id,
+          projectPhase: input.phase,
+          category: "document",
+          bucket: media.bucket,
+          path: media.objectKey,
+          fileName: input.fileName,
+          mimeType: input.mimeType,
+          sizeBytes: input.sizeBytes,
+          sha256: input.sha256,
+          caption: input.caption,
+          createdBy: input.actorId,
+          createdAt: input.createdAt,
+        }).returning({
+          id: serviceAttachments.id,
+          phase: serviceAttachments.projectPhase,
+          caption: serviceAttachments.caption,
+          fileName: serviceAttachments.fileName,
+          mimeType: serviceAttachments.mimeType,
+          sizeBytes: serviceAttachments.sizeBytes,
+          createdAt: serviceAttachments.createdAt,
+        });
+        if (!attachment) {
+          throw new ProjectMediaRepositoryError("PROJECT_MEDIA_ASSOCIATION_CONFLICT");
+        }
+        if (input.documentId) {
+          const [{ nextSortOrder }] = await transaction.select({
+            nextSortOrder: sql<number>`coalesce(max(${serviceHandoverDocumentMedia.sortOrder}), -1) + 1`,
+          }).from(serviceHandoverDocumentMedia).where(and(
+            eq(serviceHandoverDocumentMedia.storeId, input.storeId),
+            eq(serviceHandoverDocumentMedia.documentId, input.documentId),
+          ));
+          await transaction.insert(serviceHandoverDocumentMedia).values({
+            storeId: input.storeId,
+            documentId: input.documentId,
+            mediaObjectId: media.id,
+            sortOrder: Number(nextSortOrder),
+          });
+        }
+        return {
+          ...attachment,
+          mediaId: media.id,
+          phase: attachment.phase ?? "other",
+          provider: media.provider,
+          bucket: media.bucket,
+          objectKey: media.objectKey,
+        };
+      });
+    },
+
+    async deleteProjectAttachment(input) {
+      try {
+        return await database.transaction(async (transaction: DatabaseLike) => {
+          const [attachment] = await transaction.select().from(serviceAttachments)
+            .where(and(
+              eq(serviceAttachments.storeId, input.storeId),
+              eq(serviceAttachments.projectId, input.projectId),
+              eq(serviceAttachments.id, input.attachmentId),
+            )).limit(1).for("update");
+          const projectLevel = attachment
+            && attachment.jobId === null
+            && attachment.claimId === null
+            && attachment.assetId === null
+            && attachment.requestId === null
+            && attachment.mediaObjectId !== null;
+          if (!projectLevel) return { outcome: "not_found" as const };
+          if (attachment.deletedAt !== null) {
+            return { outcome: "already_deleted" as const, id: attachment.id };
+          }
+          const documentLinks = await transaction.select({
+            id: serviceHandoverDocumentMedia.id,
+            projectId: serviceHandoverDocuments.projectId,
+          }).from(serviceHandoverDocumentMedia).innerJoin(
+            serviceHandoverDocuments,
+            and(
+              eq(serviceHandoverDocuments.storeId, serviceHandoverDocumentMedia.storeId),
+              eq(serviceHandoverDocuments.id, serviceHandoverDocumentMedia.documentId),
+            ),
+          ).where(and(
+            eq(serviceHandoverDocumentMedia.storeId, input.storeId),
+            eq(serviceHandoverDocumentMedia.mediaObjectId, attachment.mediaObjectId!),
+          ));
+          if (documentLinks.some((link: { projectId: string }) => link.projectId !== input.projectId)) {
+            throw new ProjectMediaDeleteRollback("conflict");
+          }
+          await transaction.delete(serviceHandoverDocumentMedia).where(and(
+            eq(serviceHandoverDocumentMedia.storeId, input.storeId),
+            eq(serviceHandoverDocumentMedia.mediaObjectId, attachment.mediaObjectId!),
+          ));
+          const [deletedAttachment] = await transaction.update(serviceAttachments).set({
+            deletedAt: input.deletedAt ?? new Date(),
+            deletedBy: input.actorId,
+          }).where(and(
+            eq(serviceAttachments.storeId, input.storeId),
+            eq(serviceAttachments.id, attachment.id),
+            isNull(serviceAttachments.deletedAt),
+          )).returning({ id: serviceAttachments.id });
+          if (!deletedAttachment) throw new ProjectMediaDeleteRollback("conflict");
+          const mediaResult = await softDeleteMediaIfUnreferencedInTransaction(transaction, {
+            storeId: input.storeId,
+            mediaId: attachment.mediaObjectId!,
+            expectedPurpose: "project-document",
+            expectedTargetId: input.projectId,
+            deletedAt: input.deletedAt,
+          });
+          if (mediaResult.outcome !== "deleted") {
+            throw new ProjectMediaDeleteRollback(mediaResult.outcome);
+          }
+          return { outcome: "deleted" as const, id: attachment.id };
+        });
+      } catch (error) {
+        if (error instanceof ProjectMediaDeleteRollback) {
+          return { outcome: error.outcome };
+        }
+        throw error;
+      }
+    },
+  };
+}
+
+export async function listProjectAttachmentSummaries(
+  database: DatabaseLike,
+  input: { storeId: string; projectId: string },
+): Promise<ProjectAttachmentSummary[]> {
+  const rows = await createDatabaseProjectMediaRepository(database)
+    .listProjectAttachments(input);
+  if (rows.length === 0) return [];
+  const mediaIds = rows.map((row) => row.mediaId);
+  const links = await database.select({
+    mediaId: serviceHandoverDocumentMedia.mediaObjectId,
+    documentId: serviceHandoverDocumentMedia.documentId,
+  }).from(serviceHandoverDocumentMedia).innerJoin(
+    serviceHandoverDocuments,
+    and(
+      eq(serviceHandoverDocuments.storeId, serviceHandoverDocumentMedia.storeId),
+      eq(serviceHandoverDocuments.id, serviceHandoverDocumentMedia.documentId),
+    ),
+  ).where(and(
+    eq(serviceHandoverDocumentMedia.storeId, input.storeId),
+    eq(serviceHandoverDocuments.projectId, input.projectId),
+    inArray(serviceHandoverDocumentMedia.mediaObjectId, mediaIds),
+  )).orderBy(
+    asc(serviceHandoverDocumentMedia.sortOrder),
+    asc(serviceHandoverDocumentMedia.createdAt),
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    mediaId: row.mediaId,
+    phase: row.phase,
+    caption: row.caption,
+    fileName: row.fileName,
+    mimeType: row.mimeType,
+    sizeBytes: row.sizeBytes,
+    createdAt: row.createdAt,
+    documentIds: links
+      .filter((link: { mediaId: string }) => link.mediaId === row.mediaId)
+      .map((link: { documentId: string }) => link.documentId),
+  }));
+}
+
+export type ProjectMediaManager = ReturnType<typeof createProjectMediaManager>;
+
+export function createProjectMediaManager(dependencies: {
+  authorizeProject: (
+    actor: MediaActor,
+    projectId: string,
+  ) => Promise<MediaTargetAuthorization>;
+  repository: ProjectMediaRepository;
+  mediaService: Pick<MediaService, "putManagedObject">;
+  sign: (
+    record: ProjectMediaInternalRecord,
+    expiresInSeconds: number,
+  ) => Promise<string>;
+  compensate: (input: {
+    storeId: string;
+    mediaId: string;
+    purpose: "project-document";
+    targetId: string;
+  }) => Promise<SoftDeleteMediaResult>;
+  logger?: Pick<Console, "error">;
+}) {
+  const logger = dependencies.logger ?? console;
+
+  async function authorize(actor: MediaActor, projectId: string) {
+    const result = await dependencies.authorizeProject(actor, projectId);
+    if (result === "allowed") return;
+    if (result === "not_found") throw new ProjectMediaError("errors.notFound", 404);
+    throw new ProjectMediaError("errors.forbidden", 403);
+  }
+
+  async function descriptor(
+    record: ProjectMediaInternalRecord,
+    existingSignedUrl?: string,
+  ) {
+    const signedUrl = existingSignedUrl
+      ?? await dependencies.sign(record, PROJECT_MEDIA_SIGNED_URL_SECONDS);
+    return {
+      id: record.id,
+      mediaId: record.mediaId,
+      phase: record.phase,
+      caption: record.caption,
+      fileName: record.fileName,
+      mimeType: record.mimeType,
+      sizeBytes: record.sizeBytes,
+      createdAt: record.createdAt,
+      signedUrl,
+    } satisfies ProjectMediaDescriptor;
+  }
+
+  return {
+    async list(actor: MediaActor, projectId: string) {
+      await authorize(actor, projectId);
+      const rows = await dependencies.repository.listProjectAttachments({
+        storeId: actor.storeId,
+        projectId,
+      });
+      return Promise.all(rows.map((record) => descriptor(record)));
+    },
+
+    async upload(
+      actor: MediaActor,
+      projectId: string,
+      value: unknown,
+      bytes: Uint8Array,
+    ) {
+      await authorize(actor, projectId);
+      const parsed = managerUploadSchema.safeParse(value);
+      if (!parsed.success || bytes.byteLength !== parsed.data.sizeBytes) {
+        throw new ProjectMediaError("errors.invalidData", 400);
+      }
+      const input = parsed.data;
+      const uploaded = await dependencies.mediaService.putManagedObject(actor, {
+        purpose: "project-document",
+        targetId: projectId,
+        fileName: input.fileName,
+        mimeType: input.mimeType,
+        sizeBytes: input.sizeBytes,
+      }, bytes);
+      let record: ProjectMediaInternalRecord;
+      try {
+        record = await dependencies.repository.createProjectAttachment({
+          storeId: actor.storeId,
+          actorId: actor.userId,
+          projectId,
+          mediaId: uploaded.mediaId,
+          expectedPath: uploaded.path,
+          phase: input.phase,
+          caption: input.caption,
+          documentId: input.documentId,
+          fileName: input.fileName,
+          mimeType: input.mimeType,
+          sizeBytes: input.sizeBytes,
+          sha256: input.sha256,
+        });
+      } catch (error) {
+        try {
+          await dependencies.compensate({
+            storeId: actor.storeId,
+            mediaId: uploaded.mediaId,
+            purpose: "project-document",
+            targetId: projectId,
+          });
+        } catch (compensationError) {
+          logger.error("project media association compensation failed", {
+            mediaId: uploaded.mediaId,
+            error: compensationError,
+          });
+        }
+        throw error;
+      }
+      // MediaService already produced a fresh private URL. Re-signing after the
+      // association commit could turn a successful write into a retry/duplicate.
+      return descriptor(record, uploaded.url);
+    },
+
+    async delete(actor: MediaActor, projectId: string, attachmentId: string) {
+      await authorize(actor, projectId);
+      const result = await dependencies.repository.deleteProjectAttachment({
+        storeId: actor.storeId,
+        actorId: actor.userId,
+        projectId,
+        attachmentId,
+      });
+      if (result.outcome === "not_found") {
+        throw new ProjectMediaError("errors.notFound", 404);
+      }
+      if (result.outcome === "referenced") {
+        throw new ProjectMediaError("media.referenced", 409);
+      }
+      if (result.outcome === "conflict") {
+        throw new ProjectMediaError("media.deleteConflict", 409);
+      }
+      return {
+        id: result.id ?? attachmentId,
+        status: result.outcome,
+      };
+    },
+  };
+}
+
+let singleton: ProjectMediaManager | null = null;
+
+export function getProjectMediaManager(): ProjectMediaManager {
+  if (!singleton) {
+    const repository = createDatabaseProjectMediaRepository(db);
+    singleton = createProjectMediaManager({
+      authorizeProject: (actor, projectId) => authorizeMediaTarget({
+        actor,
+        purpose: "project-document",
+        targetId: projectId,
+      }),
+      repository,
+      mediaService: getMediaService(),
+      sign: (record, expiresInSeconds) => getObjectStorage(record.provider)
+        .createDownloadUrl({
+          bucket: record.bucket,
+          key: record.objectKey,
+          expiresInSeconds,
+        }),
+      compensate: (input) => compensateManagedMediaAssociation(db, input),
+    });
+  }
+  return singleton;
+}

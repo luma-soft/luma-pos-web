@@ -1,15 +1,22 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { serviceAttachments, serviceJobEvents } from "@/db/schema";
+import {
+  serviceAttachments,
+  serviceJobEvents,
+  serviceJobs,
+} from "@/db/schema";
 import { getFieldServiceJobDetail } from "@/lib/data/service-field";
+import {
+  compensateManagedMediaAssociation,
+  requireReadyManagedMediaInTransaction,
+} from "@/lib/media/project-media";
+import { softDeleteMediaIfUnreferencedInTransaction } from "@/lib/media/repository-core";
+import { getMediaService, mediaServiceError } from "@/lib/media/service";
+import { getObjectStorage } from "@/lib/media/storage";
 import { requireMobileServiceAccess } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
-import {
-  safeServiceEvidenceName,
-  SERVICE_EVIDENCE_BUCKET,
-  sniffServiceEvidenceMime,
-} from "@/lib/services/evidence-storage";
-import { ensureServiceEvidenceBucket } from "@/lib/services/evidence-bucket";
+import { sniffServiceEvidenceMime } from "@/lib/services/evidence-storage";
 import { serviceAttachmentMetadataSchema } from "@/lib/services/schemas";
 import {
   completeServiceEvidenceStorageRemoval,
@@ -21,7 +28,6 @@ import {
   mobileFieldOperation,
 } from "@/lib/services/field-api";
 import { requireLockedServiceJobAccess } from "@/lib/services/field-operations";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export async function POST(
   request: Request,
@@ -61,27 +67,40 @@ export async function POST(
     return mobileError("services.errors.unsupportedEvidence", 400);
   }
   const sha256 = createHash("sha256").update(bytes).digest("hex");
-  const safeName = safeServiceEvidenceName(file.name);
-  const path = `stores/${gate.storeId}/services/jobs/${id}/${gate.userId}/${Date.now()}-${randomUUID()}-${safeName}`;
 
   try {
-    const supabase = await ensureServiceEvidenceBucket();
-    const { error: uploadError } = await supabase.storage
-      .from(SERVICE_EVIDENCE_BUCKET)
-      .upload(path, bytes, { contentType: file.type, upsert: false });
-    if (uploadError) throw uploadError;
+    const managed = await getMediaService().putManagedObject(gate, {
+      purpose: "service-evidence",
+      targetId: id,
+      fileName: file.name,
+      mimeType: file.type,
+      sizeBytes: file.size,
+    }, bytes);
     try {
       const [attachment] = await db.transaction(async (tx) => {
         await requireLockedServiceJobAccess(tx, {
           userId: gate.userId,
           role: gate.role,
         }, id);
+        const media = await requireReadyManagedMediaInTransaction(tx, {
+          storeId: gate.storeId,
+          mediaId: managed.mediaId,
+          purpose: "service-evidence",
+          targetId: id,
+          expectedPath: managed.path,
+          sha256,
+          mimeType: file.type,
+          sizeBytes: file.size,
+          fileName: file.name,
+        });
         const rows = await tx.insert(serviceAttachments).values({
+          storeId: gate.storeId,
           projectId: detail.projectId,
           jobId: id,
+          mediaObjectId: media.id,
           category: parsed.data.category,
-          bucket: SERVICE_EVIDENCE_BUCKET,
-          path,
+          bucket: media.bucket,
+          path: media.objectKey,
           fileName: file.name,
           mimeType: file.type,
           sizeBytes: file.size,
@@ -106,10 +125,19 @@ export async function POST(
       });
       return mobileOk(attachment);
     } catch (error) {
-      await supabase.storage.from(SERVICE_EVIDENCE_BUCKET).remove([path]);
+      await compensateManagedMediaAssociation(db, {
+        storeId: gate.storeId,
+        mediaId: managed.mediaId,
+        purpose: "service-evidence",
+        targetId: id,
+      });
       throw error;
     }
   } catch (error) {
+    const managedError = mediaServiceError(error);
+    if (managedError.status !== 500) {
+      return mobileError(managedError.error, managedError.status);
+    }
     if (isServiceSnapshotJobLocked(error)) {
       return mobileError("services.errors.signedSnapshotLocked", 409);
     }
@@ -138,18 +166,55 @@ export async function DELETE(
   const { id } = await params;
   const attachmentId = new URL(request.url).searchParams.get("attachmentId");
   if (!attachmentId) return mobileError("errors.invalidData", 400);
-  const supabase = createSupabaseAdminClient();
   return mobileFieldOperation(async () => {
-    const result = await db.transaction((tx) => deleteServiceEvidenceCore(tx, {
-      userId: gate.userId,
-      role: gate.role,
-    }, { jobId: id, attachmentId }));
-    if (result.storagePending) await completeServiceEvidenceStorageRemoval(db, {
-    async remove(bucket, path) {
-      const { error } = await supabase.storage.from(bucket).remove([path]);
-      if (error) throw error;
-    },
-    }, { jobId: id, attachmentId });
+    const result = await db.transaction(async (tx) => {
+      const [ownedJob] = await tx.select({ id: serviceJobs.id })
+        .from(serviceJobs).where(and(
+          eq(serviceJobs.storeId, gate.storeId),
+          eq(serviceJobs.id, id),
+        )).limit(1).for("update");
+      if (!ownedJob) throw new Error("SERVICE_JOB_NOT_FOUND");
+      const [before] = await tx.select({
+        mediaObjectId: serviceAttachments.mediaObjectId,
+        deletedAt: serviceAttachments.deletedAt,
+      }).from(serviceAttachments).where(and(
+        eq(serviceAttachments.id, attachmentId),
+        eq(serviceAttachments.storeId, gate.storeId),
+        eq(serviceAttachments.jobId, id),
+      )).limit(1).for("update");
+      if (!before) throw new Error("SERVICE_ATTACHMENT_NOT_FOUND");
+      const deleted = await deleteServiceEvidenceCore(tx, {
+        userId: gate.userId,
+        role: gate.role,
+      }, { jobId: id, attachmentId });
+      if (!before.mediaObjectId) return { ...deleted, managed: false };
+      if (!before.deletedAt) {
+        const mediaResult = await softDeleteMediaIfUnreferencedInTransaction(tx, {
+          storeId: gate.storeId,
+          mediaId: before.mediaObjectId,
+          expectedPurpose: "service-evidence",
+          expectedTargetId: id,
+        });
+        if (mediaResult.outcome === "conflict") {
+          throw new Error("SERVICE_ATTACHMENT_MEDIA_CONFLICT");
+        }
+        await tx.update(serviceAttachments).set({
+          storageDeletedAt: new Date(),
+        }).where(and(
+          eq(serviceAttachments.id, attachmentId),
+          eq(serviceAttachments.jobId, id),
+        ));
+      }
+      return { ...deleted, managed: true };
+    });
+    if (!result.managed && result.storagePending) {
+      const legacyStorage = getObjectStorage("supabase");
+      await completeServiceEvidenceStorageRemoval(db, {
+        async remove(bucket, path) {
+          await legacyStorage.remove({ bucket, key: path });
+        },
+      }, { jobId: id, attachmentId });
+    }
     return { id: result.id };
   });
 }

@@ -5,6 +5,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 
 afterAll(() => mock.restore());
+mock.module("server-only", () => ({}));
 
 const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const schema = await import(`${projectRoot}/src/db/schema.ts`);

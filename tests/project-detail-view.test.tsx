@@ -88,6 +88,7 @@ const detail = {
   },
   plannedMaterialCost: 0,
   handoverDocuments: [],
+  projectAttachments: [],
   maintenancePlans: [],
   dependencies: [],
   coordinationPoints: [],

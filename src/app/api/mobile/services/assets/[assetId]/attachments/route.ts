@@ -2,12 +2,17 @@ import { createHash } from "node:crypto";
 import { and, asc, count, eq, isNull, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { installedAssets, serviceAttachments } from "@/db/schema";
+import type { MediaActor } from "@/lib/media/authorization";
+import {
+  compensateManagedMediaAssociation,
+  requireReadyManagedMediaInTransaction,
+  resolveManagedPrivateMediaUrl,
+} from "@/lib/media/project-media";
+import { getMediaService } from "@/lib/media/service";
+import { getObjectStorage } from "@/lib/media/storage";
 import { requireMobileServiceManager } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
-import { ensureServiceEvidenceBucket } from "@/lib/services/evidence-bucket";
 import {
-  safeServiceEvidenceName,
-  SERVICE_EVIDENCE_BUCKET,
   serviceEvidenceDeclaredMime,
   sniffServiceEvidenceMime,
 } from "@/lib/services/evidence-storage";
@@ -17,11 +22,40 @@ async function loadAsset(storeId: string, assetId: string) {
   const [asset] = await db.select({
     id: installedAssets.id,
     projectId: installedAssets.projectId,
+    jobId: installedAssets.jobId,
   }).from(installedAssets).where(and(
     eq(installedAssets.storeId, storeId),
     eq(installedAssets.id, assetId),
   )).limit(1);
   return asset ?? null;
+}
+
+type AssetAttachmentStorage = {
+  mediaObjectId: string | null;
+  bucket: string;
+  path: string;
+};
+
+async function resolveAssetAttachmentUrl(
+  actor: MediaActor,
+  attachment: AssetAttachmentStorage,
+  target: {
+    purpose: "service-evidence" | "project-document";
+    targetId: string;
+  },
+) {
+  if (attachment.mediaObjectId) {
+    return resolveManagedPrivateMediaUrl(actor, attachment.mediaObjectId, {
+      expiresInSeconds: 15 * 60,
+      expectedPurpose: target.purpose,
+      expectedTargetId: target.targetId,
+    });
+  }
+  return getObjectStorage("supabase").createDownloadUrl({
+    bucket: attachment.bucket,
+    key: attachment.path,
+    expiresInSeconds: 15 * 60,
+  });
 }
 
 export async function GET(
@@ -38,6 +72,7 @@ export async function GET(
 
   const attachments = await db.select({
     id: serviceAttachments.id,
+    mediaObjectId: serviceAttachments.mediaObjectId,
     bucket: serviceAttachments.bucket,
     path: serviceAttachments.path,
     fileName: serviceAttachments.fileName,
@@ -52,14 +87,25 @@ export async function GET(
     eq(serviceAttachments.category, "asset"),
     isNull(serviceAttachments.deletedAt),
   )).orderBy(asc(serviceAttachments.sortOrder), asc(serviceAttachments.createdAt));
+  const mediaTarget = {
+    purpose: "project-document" as const,
+    targetId: asset.projectId,
+  };
 
-  const supabase = await ensureServiceEvidenceBucket();
   const data = await Promise.all(attachments.map(async (attachment) => {
-    const { data: signed, error } = await supabase.storage
-      .from(attachment.bucket)
-      .createSignedUrl(attachment.path, 15 * 60);
-    if (error) throw error;
-    return { ...attachment, signedUrl: signed.signedUrl };
+    const signedUrl = await resolveAssetAttachmentUrl(gate, attachment, mediaTarget);
+    return {
+      id: attachment.id,
+      bucket: attachment.bucket,
+      path: attachment.path,
+      fileName: attachment.fileName,
+      mimeType: attachment.mimeType,
+      sizeBytes: attachment.sizeBytes,
+      sortOrder: attachment.sortOrder,
+      isPrimary: attachment.isPrimary,
+      createdAt: attachment.createdAt,
+      signedUrl,
+    };
   }));
   return mobileOk(data);
 }
@@ -104,14 +150,16 @@ export async function POST(
     return mobileError("services.errors.unsupportedEvidence", 400);
   }
   const sha256 = createHash("sha256").update(bytes).digest("hex");
-  const safeName = safeServiceEvidenceName(file.name);
-  const safeRequestId = safeServiceEvidenceName(parsed.data.clientRequestId);
-  const path = `stores/${gate.storeId}/services/assets/${assetId}/${gate.userId}/${safeRequestId}-${sha256.slice(0, 16)}-${safeName}`;
+  // Asset photos are an immutable project-owned coordinate. The asset's job
+  // assignment is editable and therefore cannot be part of media identity.
+  const purpose = "project-document" as const;
+  const targetId = asset.projectId;
 
   try {
-    const supabase = await ensureServiceEvidenceBucket();
     const [existing] = await db.select({
       id: serviceAttachments.id,
+      mediaObjectId: serviceAttachments.mediaObjectId,
+      bucket: serviceAttachments.bucket,
       path: serviceAttachments.path,
       fileName: serviceAttachments.fileName,
       mimeType: serviceAttachments.mimeType,
@@ -127,10 +175,10 @@ export async function POST(
       isNull(serviceAttachments.deletedAt),
     )).limit(1);
     if (existing) {
-      const { data: signed, error: signedError } = await supabase.storage
-        .from(SERVICE_EVIDENCE_BUCKET)
-        .createSignedUrl(existing.path, 15 * 60);
-      if (signedError) throw signedError;
+      const signedUrl = await resolveAssetAttachmentUrl(gate, existing, {
+        purpose,
+        targetId,
+      });
       return mobileOk({
         id: existing.id,
         fileName: existing.fileName,
@@ -139,22 +187,48 @@ export async function POST(
         sortOrder: existing.sortOrder,
         isPrimary: existing.isPrimary,
         createdAt: existing.createdAt,
-        signedUrl: signed.signedUrl,
+        signedUrl,
       });
     }
-    const { error: uploadError } = await supabase.storage
-      .from(SERVICE_EVIDENCE_BUCKET)
-      .upload(path, bytes, { contentType: detectedMime, upsert: true });
-    if (uploadError) throw uploadError;
+    const managed = await getMediaService().putManagedObject(gate, {
+      purpose,
+      targetId,
+      fileName: file.name,
+      mimeType: detectedMime,
+      sizeBytes: file.size,
+    }, bytes);
+    let attachment: {
+      id: string;
+      mediaObjectId: string | null;
+      bucket: string;
+      path: string;
+      fileName: string;
+      mimeType: string;
+      sizeBytes: number;
+      sortOrder: number;
+      isPrimary: boolean;
+      createdAt: Date;
+    };
     try {
-      const [attachment] = await db.transaction(async (tx) => {
-        await tx.select({ id: installedAssets.id }).from(installedAssets).where(and(
+      [attachment] = await db.transaction(async (tx) => {
+        const [lockedAsset] = await tx.select({
+          id: installedAssets.id,
+          projectId: installedAssets.projectId,
+          jobId: installedAssets.jobId,
+        }).from(installedAssets).where(and(
           eq(installedAssets.storeId, gate.storeId),
           eq(installedAssets.id, assetId),
         )).limit(1).for("update");
+        if (
+          !lockedAsset
+          || lockedAsset.projectId !== asset.projectId
+          || lockedAsset.jobId !== asset.jobId
+        ) throw new Error("SERVICE_ASSET_NOT_FOUND");
 
         let [persisted] = await tx.select({
           id: serviceAttachments.id,
+          mediaObjectId: serviceAttachments.mediaObjectId,
+          bucket: serviceAttachments.bucket,
           path: serviceAttachments.path,
           fileName: serviceAttachments.fileName,
           mimeType: serviceAttachments.mimeType,
@@ -183,13 +257,25 @@ export async function POST(
             throw new Error("SERVICE_ASSET_PHOTO_LIMIT");
           }
 
+          const media = await requireReadyManagedMediaInTransaction(tx, {
+            storeId: gate.storeId,
+            mediaId: managed.mediaId,
+            purpose,
+            targetId,
+            expectedPath: managed.path,
+            sha256,
+            mimeType: detectedMime,
+            sizeBytes: file.size,
+            fileName: file.name,
+          });
           await tx.insert(serviceAttachments).values({
             storeId: gate.storeId,
             projectId: asset.projectId,
             assetId,
+            mediaObjectId: media.id,
             category: "asset",
-            bucket: SERVICE_EVIDENCE_BUCKET,
-            path,
+            bucket: media.bucket,
+            path: media.objectKey,
             fileName: file.name,
             mimeType: detectedMime,
             sizeBytes: file.size,
@@ -202,6 +288,8 @@ export async function POST(
           }).onConflictDoNothing();
           [persisted] = await tx.select({
             id: serviceAttachments.id,
+            mediaObjectId: serviceAttachments.mediaObjectId,
+            bucket: serviceAttachments.bucket,
             path: serviceAttachments.path,
             fileName: serviceAttachments.fileName,
             mimeType: serviceAttachments.mimeType,
@@ -231,18 +319,38 @@ export async function POST(
          }
          return [persisted];
        });
-       if (attachment.path !== path) {
-         await supabase.storage.from(SERVICE_EVIDENCE_BUCKET).remove([path]);
-       }
-       const { data: signed, error: signedError } = await supabase.storage
-        .from(SERVICE_EVIDENCE_BUCKET)
-        .createSignedUrl(attachment.path, 15 * 60);
-      if (signedError) throw signedError;
-      return mobileOk({ ...attachment, signedUrl: signed.signedUrl });
     } catch (error) {
-      await supabase.storage.from(SERVICE_EVIDENCE_BUCKET).remove([path]);
+      await compensateManagedMediaAssociation(db, {
+        storeId: gate.storeId,
+        mediaId: managed.mediaId,
+        purpose,
+        targetId,
+      });
       throw error;
     }
+    if (attachment.mediaObjectId !== managed.mediaId) {
+      await compensateManagedMediaAssociation(db, {
+        storeId: gate.storeId,
+        mediaId: managed.mediaId,
+        purpose,
+        targetId,
+      });
+    }
+    const signedUrl = await resolveAssetAttachmentUrl(gate, attachment, {
+      purpose,
+      targetId,
+    });
+    return mobileOk({
+      id: attachment.id,
+      path: attachment.path,
+      fileName: attachment.fileName,
+      mimeType: attachment.mimeType,
+      sizeBytes: attachment.sizeBytes,
+      sortOrder: attachment.sortOrder,
+      isPrimary: attachment.isPrimary,
+      createdAt: attachment.createdAt,
+      signedUrl,
+    });
   } catch (error) {
     console.error("installed asset photo upload failed:", error);
     if (error instanceof Error && error.message === "SERVICE_ASSET_PHOTO_LIMIT") {

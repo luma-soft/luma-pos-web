@@ -298,7 +298,10 @@ describe("installed asset batch persistence contract", () => {
 
     expect(route).toContain("clientRequestId");
     expect(route).toContain("onConflictDoNothing");
-    expect(route).toContain("upsert: true");
+    expect(route).toContain("putManagedObject");
+    expect(route).toContain("mediaObjectId");
+    expect(route).toContain("compensateManagedMediaAssociation");
+    expect(route).not.toContain("upsert: true");
     expect(webFlow).toContain('form.set("clientRequestId", photo.id)');
     expect(mobileRepository).toContain("'clientRequestId': clientRequestId");
   });
@@ -332,8 +335,27 @@ describe("installed asset batch persistence contract", () => {
     expect(post).toContain('.for("update")');
     expect(post).toContain("SERVICE_ASSET_PHOTO_LIMIT");
     expect(post).toContain("count(serviceAttachments.id)");
-    expect(post).toContain("createSignedUrl(attachment.path, 15 * 60)");
-    expect(post).toContain("if (attachment.path !== path)");
+    expect(post).toContain("resolveAssetAttachmentUrl");
+    expect(post).toContain("if (attachment.mediaObjectId !== managed.mediaId)");
+    expect(post).toContain("id: attachment.id");
+    expect(post).not.toContain("...legacyShape");
+  });
+
+  it("dual-reads legacy photos while signing canonical R2 objects for new uploads", () => {
+    const route = readFileSync(
+      "src/app/api/mobile/services/assets/[assetId]/attachments/route.ts",
+      "utf8",
+    );
+
+    expect(route).toContain("resolveManagedPrivateMediaUrl");
+    expect(route).toContain("expectedPurpose: target.purpose");
+    expect(route).toContain("expectedTargetId: target.targetId");
+    expect(route).toContain('purpose: "project-document" as const');
+    expect(route).toContain("targetId: asset.projectId");
+    expect(route).not.toContain('asset.jobId ? "service-evidence"');
+    expect(route).toContain('getObjectStorage("supabase")');
+    expect(route).toContain("expiresInSeconds: 15 * 60");
+    expect(route).not.toContain("ensureServiceEvidenceBucket");
   });
 });
 

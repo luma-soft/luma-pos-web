@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import {
   canonicalizeSignedDocument,
   hashSignedDocument,
@@ -50,5 +51,44 @@ describe("service evidence upload policy", () => {
       new Uint8Array([0x00, 0x01, 0x02, 0x03]),
       "image/jpeg",
     )).toBeNull();
+  });
+});
+
+describe("service evidence managed-media route contract", () => {
+  test("writes new job evidence through MediaService and records the canonical media id", () => {
+    const source = readFileSync(
+      "src/app/api/mobile/services/jobs/[id]/attachments/route.ts",
+      "utf8",
+    );
+    const post = source.slice(source.indexOf("export async function POST"), source.indexOf("export async function DELETE"));
+
+    expect(post).toContain("getMediaService");
+    expect(post).toContain("putManagedObject");
+    expect(post).toContain("mediaObjectId");
+    expect(post).toContain("requireReadyManagedMediaInTransaction");
+    expect(post).toContain("compensateManagedMediaAssociation");
+    expect(post).toContain("mediaServiceError(error)");
+    expect(post).not.toContain(".storage.from(");
+  });
+
+  test("dual-reads job evidence and logically deletes managed media without synchronous R2 removal", () => {
+    const collection = readFileSync(
+      "src/app/api/mobile/services/jobs/[id]/attachments/route.ts",
+      "utf8",
+    );
+    const item = readFileSync(
+      "src/app/api/mobile/services/jobs/[id]/attachments/[attachmentId]/route.ts",
+      "utf8",
+    );
+
+    expect(item).toContain("mediaObjectId");
+    expect(item).toContain("resolveManagedPrivateMediaUrl");
+    expect(item).toContain("15 * 60");
+    expect(item).toContain("eq(serviceJobs.storeId, gate.storeId)");
+    expect(item).toContain("eq(serviceAttachments.storeId, gate.storeId)");
+    expect(collection).toContain("eq(serviceJobs.storeId, gate.storeId)");
+    expect(collection).toContain("eq(serviceAttachments.storeId, gate.storeId)");
+    expect(collection).toContain("softDeleteMediaIfUnreferencedInTransaction");
+    expect(collection).toContain("completeServiceEvidenceStorageRemoval");
   });
 });

@@ -1,15 +1,24 @@
-import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { projects, serviceCustomerRequests, serviceSlaPolicies, storeFeatures } from "@/db/schema";
+import {
+  projects,
+  serviceCustomerRequestAttachments,
+  serviceCustomerRequests,
+  serviceSlaPolicies,
+  storeFeatures,
+} from "@/db/schema";
+import { getR2Config } from "@/lib/media/config";
+import {
+  compensateManagedMediaAssociation,
+  createDatabaseMediaRepository,
+  requireReadyManagedMediaInTransaction,
+} from "@/lib/media/project-media";
+import { createMediaService } from "@/lib/media/service";
+import { getObjectStorage } from "@/lib/media/storage";
 import { mobileError, mobileOk } from "@/lib/mobile/response";
 import {
   consumePublicRateLimitCore,
-  CUSTOMER_REQUEST_EVIDENCE_BUCKET,
-  CUSTOMER_REQUEST_EVIDENCE_MAX_BYTES,
-  CUSTOMER_REQUEST_EVIDENCE_MIME_TYPES,
   sanitizeCustomerRequestEvidence,
-  stageCustomerRequestStorageCleanupCore,
   submitCustomerRequestCore,
 } from "@/lib/services/customer-request-portal";
 import {
@@ -18,8 +27,10 @@ import {
   isCustomerRequestTokenViewable,
 } from "@/lib/services/customer-request-token";
 import { serviceCustomerRequestSubmitSchema } from "@/lib/services/schemas";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { parseCustomerRequestMultipart } from "@/lib/services/customer-request-multipart";
+import { CURRENT_STORE_FEATURE_DEFAULTS } from "@/lib/tenancy/store-features";
+
+const PORTAL_MEDIA_ACTOR_ID = "00000000-0000-4000-8000-000000000000";
 
 async function consumeLimit(input: { key: string; limit: number; windowSeconds: number }) {
   return db.transaction((tx) => consumePublicRateLimitCore(tx, input));
@@ -33,30 +44,26 @@ function limited(result: { allowed: boolean; retryAfterSeconds: number }) {
   );
 }
 
-async function ensurePrivateBucket() {
-  const supabase = createSupabaseAdminClient();
-  const { data, error } = await supabase.storage.listBuckets();
-  if (error) throw error;
-  const existing = data.find((bucket) => bucket.name === CUSTOMER_REQUEST_EVIDENCE_BUCKET);
-  const options = {
-    public: false,
-    fileSizeLimit: CUSTOMER_REQUEST_EVIDENCE_MAX_BYTES,
-    allowedMimeTypes: [...CUSTOMER_REQUEST_EVIDENCE_MIME_TYPES],
+function createPortalMediaCapability(storeId: string, projectId: string) {
+  const actor = {
+    storeId,
+    userId: PORTAL_MEDIA_ACTOR_ID,
+    role: "manager" as const,
+    features: CURRENT_STORE_FEATURE_DEFAULTS,
   };
-  if (!existing) {
-    const { error: createError } = await supabase.storage.createBucket(
-      CUSTOMER_REQUEST_EVIDENCE_BUCKET,
-      options,
-    );
-    if (createError) throw createError;
-  } else if (existing.public) {
-    const { error: updateError } = await supabase.storage.updateBucket(
-      CUSTOMER_REQUEST_EVIDENCE_BUCKET,
-      options,
-    );
-    if (updateError) throw updateError;
-  }
-  return supabase;
+  const mediaService = createMediaService({
+    storage: getObjectStorage("r2"),
+    repository: createDatabaseMediaRepository(db, { forceCreatedByNull: true }),
+    config: getR2Config(),
+    authorizeTarget: async ({ actor: candidate, purpose, targetId }) =>
+      candidate.storeId === storeId
+        && candidate.userId === PORTAL_MEDIA_ACTOR_ID
+        && purpose === "project-document"
+        && targetId === projectId
+        ? "allowed"
+        : "not_found",
+  });
+  return { actor, mediaService };
 }
 
 export async function GET(
@@ -138,6 +145,7 @@ export async function POST(
   const [current] = await db.select({
     id: serviceCustomerRequests.id,
     storeId: serviceCustomerRequests.storeId,
+    projectId: serviceCustomerRequests.projectId,
     status: serviceCustomerRequests.status,
     submittedAt: serviceCustomerRequests.submittedAt,
     tokenExpiresAt: serviceCustomerRequests.tokenExpiresAt,
@@ -195,10 +203,6 @@ export async function POST(
     eq(serviceSlaPolicies.isActive, true),
   )).limit(1);
   const now = new Date();
-  const objects = sanitized.map(({ image }) => ({
-    bucket: CUSTOMER_REQUEST_EVIDENCE_BUCKET,
-    path: `stores/${current.storeId}/services/customer-requests/${current.id}/${now.getTime()}-${randomUUID()}.${image.extension}`,
-  }));
   if (sanitized.length === 0) {
     try {
       const result = await db.transaction((tx) => submitCustomerRequestCore(tx, {
@@ -221,42 +225,83 @@ export async function POST(
       return mobileError("errors.serverError", 500);
     }
   }
-  let staged: Awaited<ReturnType<typeof stageCustomerRequestStorageCleanupCore>> = [];
+  const uploaded: Array<{
+    mediaId: string;
+    path: string;
+    fileName: string;
+    mimeType: "image/jpeg" | "image/png" | "image/webp";
+    sizeBytes: number;
+    width: number;
+    height: number;
+    sha256: string;
+  }> = [];
   try {
-    const supabase = await ensurePrivateBucket();
-    staged = await db.transaction((tx) => stageCustomerRequestStorageCleanupCore(tx, {
-      requestId: current.id,
-      objects,
-      now,
-    }));
-    for (let index = 0; index < sanitized.length; index++) {
-      const item = sanitized[index];
-      const object = staged[index];
-      const { error } = await supabase.storage.from(object.bucket).upload(
-        object.path,
-        item.image.bytes,
-        { contentType: item.image.mimeType, upsert: false },
-      );
-      if (error) throw error;
-    }
-    const result = await db.transaction((tx) => submitCustomerRequestCore(tx, {
-      requestId: current.id,
-      ...parsed.data,
-      now,
-      responseMinutes: policy?.responseMinutes ?? null,
-      resolutionMinutes: policy?.resolutionMinutes ?? null,
-      attachments: sanitized.map((item, index) => ({
-        cleanupId: staged[index].id,
-        bucket: staged[index].bucket,
-        path: staged[index].path,
-        fileName: item.file.fileName.replace(/[^a-zA-Z0-9._ -]/g, "_").slice(0, 200),
+    const { actor, mediaService } = createPortalMediaCapability(
+      current.storeId,
+      current.projectId,
+    );
+    for (const item of sanitized) {
+      const fileName = item.file.fileName
+        .replace(/[^a-zA-Z0-9._ -]/g, "_")
+        .slice(0, 200);
+      const managed = await mediaService.putManagedObject(actor, {
+        purpose: "project-document",
+        targetId: current.projectId,
+        fileName,
+        mimeType: item.image.mimeType,
+        sizeBytes: item.image.bytes.length,
+      }, item.image.bytes);
+      uploaded.push({
+        mediaId: managed.mediaId,
+        path: managed.path,
+        fileName,
         mimeType: item.image.mimeType,
         sizeBytes: item.image.bytes.length,
         width: item.image.width,
         height: item.image.height,
         sha256: item.image.sha256,
-      })),
-    }));
+      });
+    }
+    const result = await db.transaction(async (tx) => {
+      const submitted = await submitCustomerRequestCore(tx, {
+        requestId: current.id,
+        ...parsed.data,
+        now,
+        responseMinutes: policy?.responseMinutes ?? null,
+        resolutionMinutes: policy?.resolutionMinutes ?? null,
+      });
+      const attachments = [];
+      for (const object of uploaded) {
+        const media = await requireReadyManagedMediaInTransaction(tx, {
+          storeId: current.storeId,
+          mediaId: object.mediaId,
+          purpose: "project-document",
+          targetId: current.projectId,
+          expectedPath: object.path,
+          sha256: object.sha256,
+          width: object.width,
+          height: object.height,
+          mimeType: object.mimeType,
+          sizeBytes: object.sizeBytes,
+          fileName: object.fileName,
+        });
+        attachments.push({
+          storeId: current.storeId,
+          requestId: current.id,
+          mediaObjectId: media.id,
+          bucket: media.bucket,
+          path: media.objectKey,
+          fileName: object.fileName,
+          mimeType: object.mimeType,
+          sizeBytes: object.sizeBytes,
+          width: object.width,
+          height: object.height,
+          sha256: object.sha256,
+        });
+      }
+      await tx.insert(serviceCustomerRequestAttachments).values(attachments);
+      return submitted;
+    });
     return mobileOk({
       code: result.code,
       status: result.status,
@@ -264,12 +309,30 @@ export async function POST(
       resolutionDueAt: result.resolutionDueAt,
     });
   } catch (error) {
+    for (const object of uploaded) {
+      try {
+        await compensateManagedMediaAssociation(db, {
+          storeId: current.storeId,
+          mediaId: object.mediaId,
+          purpose: "project-document",
+          targetId: current.projectId,
+        });
+      } catch (compensationError) {
+        console.error("customer request media compensation failed", {
+          requestId: current.id,
+          mediaId: object.mediaId,
+          error: compensationError instanceof Error
+            ? compensationError.message
+            : "unknown",
+        });
+      }
+    }
     if (error instanceof Error && error.message === "CUSTOMER_REQUEST_NOT_SUBMITTABLE") {
       return mobileError("errors.notFound", 404);
     }
     console.error("customer request atomic submit failed", {
       requestId: current.id,
-      stagedCount: staged.length,
+      uploadedCount: uploaded.length,
       error: error instanceof Error ? error.message : "unknown",
     });
     return mobileError("errors.serverError", 500);

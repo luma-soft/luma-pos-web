@@ -1,9 +1,11 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { serviceAttachments } from "@/db/schema";
+import { serviceAttachments, serviceJobs } from "@/db/schema";
+import { resolveManagedPrivateMediaUrl } from "@/lib/media/project-media";
+import { mediaServiceError } from "@/lib/media/service";
+import { getObjectStorage } from "@/lib/media/storage";
 import { requireMobileServiceAccess } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireLockedServiceJobAccess } from "@/lib/services/field-operations";
 
 export async function GET(
@@ -16,33 +18,51 @@ export async function GET(
   if (!gate.ok) return mobileError("errors.unauthorized", 401);
   const { id, attachmentId } = await params;
   try {
-    const supabase = createSupabaseAdminClient();
-    const signedUrl = await db.transaction(async (tx) => {
+    const attachment = await db.transaction(async (tx) => {
+      const [ownedJob] = await tx.select({ id: serviceJobs.id })
+        .from(serviceJobs).where(and(
+          eq(serviceJobs.storeId, gate.storeId),
+          eq(serviceJobs.id, id),
+        )).limit(1).for("update");
+      if (!ownedJob) return null;
       await requireLockedServiceJobAccess(tx, {
         userId: gate.userId,
         role: gate.role,
       }, id);
       const [attachment] = await tx.select({
+        mediaObjectId: serviceAttachments.mediaObjectId,
         bucket: serviceAttachments.bucket,
         path: serviceAttachments.path,
       }).from(serviceAttachments)
         .where(and(
           eq(serviceAttachments.id, attachmentId),
+          eq(serviceAttachments.storeId, gate.storeId),
           eq(serviceAttachments.jobId, id),
           isNull(serviceAttachments.deletedAt),
         ))
         .limit(1);
-      if (!attachment) return null;
-      const { data, error } = await supabase.storage
-        .from(attachment.bucket)
-        .createSignedUrl(attachment.path, 15 * 60);
-      if (error) throw error;
-      return data.signedUrl;
+      return attachment ?? null;
     });
+    if (!attachment) return mobileError("errors.notFound", 404);
+    const signedUrl = attachment.mediaObjectId
+      ? await resolveManagedPrivateMediaUrl(gate, attachment.mediaObjectId, {
+        expiresInSeconds: 15 * 60,
+        expectedPurpose: "service-evidence",
+        expectedTargetId: id,
+      })
+      : await getObjectStorage("supabase").createDownloadUrl({
+        bucket: attachment.bucket,
+        key: attachment.path,
+        expiresInSeconds: 15 * 60,
+      });
     return signedUrl
       ? mobileOk({ signedUrl })
       : mobileError("errors.notFound", 404);
   } catch (error) {
+    const resolved = mediaServiceError(error);
+    if (resolved.status !== 500) {
+      return mobileError(resolved.error, resolved.status);
+    }
     if (
       error instanceof Error
       && (

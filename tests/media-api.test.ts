@@ -97,6 +97,7 @@ function createHarness(options: {
   objectBytes?: Uint8Array;
   originalPutFailure?: "definitive" | "ambiguous-before" | "ambiguous-after";
   failCompletionHead?: boolean;
+  failDownloadSign?: boolean;
 } = {}) {
   const records = new Map(
     (options.initial ?? []).map((record) => [`${record.storeId}:${record.id}`, record]),
@@ -262,6 +263,7 @@ function createHarness(options: {
       return `https://r2.test/${input.bucket}/${input.key}?X-Amz-Expires=${input.expiresInSeconds}&X-Amz-Signature=upload`;
     },
     async createDownloadUrl(input) {
+      if (options.failDownloadSign) throw new Error("private signing failed");
       return `https://r2.test/${input.bucket}/${input.key}?X-Amz-Expires=${input.expiresInSeconds}&X-Amz-Signature=download`;
     },
     async remove(input) {
@@ -649,7 +651,7 @@ describe("server managed object writes", () => {
 
   test.each(["ambiguous-before", "ambiguous-after"] as const)(
     "keeps metadata pending after an %s PUT failure for later reconciliation",
-    async (originalPutFailure) => {
+    async (originalPutFailure: "ambiguous-before" | "ambiguous-after") => {
       const harness = createHarness({ originalPutFailure });
       await expect(harness.service.putManagedObject(gate, {
         purpose: "product-image",
@@ -708,6 +710,22 @@ describe("server managed object writes", () => {
       bucket: "public-media",
       key: `stores/${STORE_ID}/products/2026/08/${MEDIA_ID}/original.png`,
     }]);
+  });
+
+  test("soft-deletes an unreferenced ready object when private signing fails", async () => {
+    const harness = createHarness({ failDownloadSign: true });
+    await expect(harness.service.putManagedObject(gate, {
+      purpose: "project-document",
+      targetId: PROJECT_ID,
+      fileName: "handover.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 4,
+    }, Uint8Array.from([0x25, 0x50, 0x44, 0x46]))).rejects.toThrow(
+      "private signing failed",
+    );
+
+    expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("deleted");
+    expect(harness.storageState.removed).toEqual([]);
   });
 });
 

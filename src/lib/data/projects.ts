@@ -25,6 +25,7 @@ import {
 import { calculateServiceProjectProfitability } from "@/lib/services/domain";
 import { coercePageSize } from "@/lib/pagination";
 import { hasProjectRedesignSchema } from "@/lib/db/schema-compat";
+import { listProjectAttachmentSummaries } from "@/lib/media/project-media";
 
 const projectRowSelection = (storeId: string) => ({
   id: projects.id,
@@ -178,7 +179,7 @@ export async function getProjectDetail(storeId: string, id: string) {
         cameraAccessRotatedAt: null,
       })));
 
-  const [relatedOrders, jobs, assets, claims, materials, statusLogs, costEntries, costSummary, plannedMaterialSummary, handoverDocuments, maintenancePlans, dependencies, coordinationPoints] = await Promise.all([
+  const [relatedOrders, jobs, assets, claims, materials, statusLogs, costEntries, costSummary, plannedMaterialSummary, handoverDocuments, projectAttachments, maintenancePlans, dependencies, coordinationPoints] = await Promise.all([
     db.select({
       id: orders.id,
       code: orders.code,
@@ -299,6 +300,7 @@ export async function getProjectDetail(storeId: string, id: string) {
     }).from(serviceHandoverDocuments)
       .where(and(eq(serviceHandoverDocuments.projectId, id), eq(serviceHandoverDocuments.storeId, storeId)))
       .orderBy(desc(serviceHandoverDocuments.createdAt)),
+    listProjectAttachmentSummaries(db, { storeId, projectId: id }),
     db.select({
       id: serviceMaintenancePlans.id,
       assetId: serviceMaintenancePlans.assetId,
@@ -376,6 +378,7 @@ export async function getProjectDetail(storeId: string, id: string) {
     profitability,
     plannedMaterialCost: Number(plannedMaterialSummary[0]?.plannedCost ?? 0),
     handoverDocuments,
+    projectAttachments,
     maintenancePlans,
     dependencies,
     coordinationPoints,

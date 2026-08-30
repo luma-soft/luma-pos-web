@@ -49,10 +49,37 @@ test("rejects oversized total streams without trusting content-length", async ()
   );
 });
 
-test("forces the warranty evidence bucket to stay private", async () => {
+test("stores warranty evidence as managed private R2 media in the claim transaction", async () => {
   const source = await Bun.file(
     `${process.cwd()}/src/app/api/mobile/services/warranty-claims/route.ts`,
   ).text();
-  expect(source).toContain("existing.public");
-  expect(source).toContain("updateBucket");
+  expect(source).toContain("putManagedObject");
+  expect(source).toContain("requireReadyManagedMediaInTransaction");
+  expect(source).toContain("mediaObjectId");
+  expect(source).toContain("compensateManagedMediaAssociation");
+  expect(source).toContain("managedError.status === 403");
+  expect(source).toContain('mobileError("errors.notFound", 404)');
+  expect(source).not.toContain("createSupabaseAdminClient");
+  expect(source).not.toContain("stageServiceStorageCleanupCore");
+});
+
+test("warranty detail dual-reads private evidence with the legacy attachment shape", async () => {
+  const source = await Bun.file(
+    `${process.cwd()}/src/app/api/mobile/services/warranty-claims/[id]/route.ts`,
+  ).text();
+
+  expect(source).toContain("eq(warrantyClaims.storeId, gate.storeId)");
+  expect(source).toContain("mediaObjectId");
+  expect(source).toContain("resolveManagedPrivateMediaUrl");
+  expect(source).toContain("projectId: serviceAttachments.projectId");
+  expect(source).toContain("jobId: serviceAttachments.jobId");
+  expect(source).toContain('purpose: "service-evidence" as const');
+  expect(source).toContain('purpose: "project-document" as const');
+  expect(source).toContain("expectedPurpose: mediaTarget.purpose");
+  expect(source).toContain("expectedTargetId: mediaTarget.targetId");
+  expect(source).toContain("authorizeTarget: async");
+  expect(source).not.toContain("expectedTargetId: result.claim.jobId");
+  expect(source).toContain('getObjectStorage("supabase")');
+  expect(source).toContain("expiresInSeconds: 15 * 60");
+  expect(source).toContain("return { ...attachment, signedUrl }");
 });

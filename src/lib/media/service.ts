@@ -408,28 +408,48 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
         throw error;
       }
       try {
-        const abandoned = await dependencies.repository.abandonPending({
+        const current = await dependencies.repository.getForStore({
           storeId: actor.storeId,
           mediaId: media.id,
-          expectedPurpose: media.purpose,
-          expectedTargetId: media.targetId,
-          deletedAt: now(),
         });
-        if (wroteObject && abandoned) {
-          try {
-            await dependencies.storage.remove({
-              bucket: media.bucket,
-              key: media.objectKey,
-            });
-          } catch (cleanupError) {
-            logger.error("media object compensation failed", {
+        if (wroteObject && current?.status === "ready") {
+          const deleted = await dependencies.repository.softDeleteIfUnreferenced({
+            storeId: actor.storeId,
+            mediaId: media.id,
+            expectedPurpose: media.purpose,
+            expectedTargetId: media.targetId,
+            deletedAt: now(),
+          });
+          if (deleted.outcome !== "deleted") {
+            logger.error("media ready compensation was retained", {
               mediaId: media.id,
-              error: cleanupError,
+              outcome: deleted.outcome,
             });
+          }
+        } else {
+          const abandoned = await dependencies.repository.abandonPending({
+            storeId: actor.storeId,
+            mediaId: media.id,
+            expectedPurpose: media.purpose,
+            expectedTargetId: media.targetId,
+            deletedAt: now(),
+          });
+          if (wroteObject && abandoned) {
+            try {
+              await dependencies.storage.remove({
+                bucket: media.bucket,
+                key: media.objectKey,
+              });
+            } catch (cleanupError) {
+              logger.error("media object compensation failed", {
+                mediaId: media.id,
+                error: cleanupError,
+              });
+            }
           }
         }
       } catch (cleanupError) {
-        logger.error("media pending compensation failed", {
+        logger.error("media write compensation failed", {
           mediaId: media.id,
           error: cleanupError,
         });

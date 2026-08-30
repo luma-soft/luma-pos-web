@@ -157,4 +157,44 @@ describe("customer request streaming multipart", () => {
       })),
     ])))).rejects.toThrow("CUSTOMER_REQUEST_MULTIPART_INVALID");
   });
+
+  test("stores public portal evidence through an exact project-scoped managed-media capability", () => {
+    const route = readFileSync(
+      new URL("../src/app/api/portal/service-request/[token]/route.ts", import.meta.url),
+      "utf8",
+    );
+
+    expect(route).toContain("createDatabaseMediaRepository");
+    expect(route).toContain("forceCreatedByNull: true");
+    expect(route).toContain("putManagedObject");
+    expect(route).toContain('purpose: "project-document"');
+    expect(route).toContain("mediaObjectId");
+    expect(route).toContain("compensateManagedMediaAssociation");
+    expect(route).not.toContain("createSupabaseAdminClient");
+    expect(route).not.toContain("stageCustomerRequestStorageCleanupCore");
+  });
+
+  test("manager attachment reads preserve the ten-minute legacy URL envelope across providers", () => {
+    const route = readFileSync(
+      new URL(
+        "../src/app/api/mobile/services/customer-requests/[id]/attachments/[attachmentId]/route.ts",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+
+    expect(route).toContain("eq(serviceCustomerRequestAttachments.storeId, gate.storeId)");
+    expect(route).toContain("mediaPurpose: mediaObjects.purpose");
+    expect(route).toContain("mediaTargetId: mediaObjects.targetId");
+    expect(route).toContain("mediaDomain: mediaObjects.domain");
+    expect(route).toContain("mediaObjectId");
+    expect(route).toContain("resolveManagedPrivateMediaUrl");
+    expect(route).toContain("expectedPurpose: attachment.mediaPurpose!");
+    expect(route).toContain("expectedTargetId: attachment.mediaTargetId!");
+    expect(route).toContain("authorizeTarget: async");
+    expect(route).not.toContain("attachment.linkedJobId");
+    expect(route).toContain('getObjectStorage("supabase")');
+    expect(route).toContain("expiresInSeconds: 10 * 60");
+    expect(route).toContain("mobileOk({ url, expiresIn: 600 })");
+  });
 });

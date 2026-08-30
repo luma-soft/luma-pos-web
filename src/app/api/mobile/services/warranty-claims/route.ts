@@ -1,5 +1,16 @@
 import { randomUUID } from "node:crypto";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
+import {
+  serviceAttachments,
+  serviceJobs,
+  warrantyClaims,
+} from "@/db/schema";
+import {
+  compensateManagedMediaAssociation,
+  requireReadyManagedMediaInTransaction,
+} from "@/lib/media/project-media";
+import { getMediaService, mediaServiceError } from "@/lib/media/service";
 import { requireMobileServiceAccess } from "@/lib/mobile/auth";
 import {
   mobileError,
@@ -10,50 +21,23 @@ import {
 } from "@/lib/mobile/response";
 import {
   safeServiceEvidenceName,
-  SERVICE_EVIDENCE_BUCKET,
 } from "@/lib/services/evidence-storage";
-import {
-  CUSTOMER_REQUEST_EVIDENCE_MAX_BYTES,
-  CUSTOMER_REQUEST_EVIDENCE_MIME_TYPES,
-} from "@/lib/services/customer-request-portal";
 import { technicianWarrantyClaimCreateSchema } from "@/lib/services/schemas";
 import {
   createTechnicianWarrantyClaimCore,
-  finalizeTechnicianWarrantyClaimEvidenceCore,
   listWarrantyClaimsForActorCore,
   sanitizeTechnicianWarrantyEvidence,
-  stageServiceStorageCleanupCore,
 } from "@/lib/services/technician-warranty";
 import { parseTechnicianWarrantyMultipart } from "@/lib/services/technician-warranty-multipart";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-
-async function ensureEvidenceBucket() {
-  const supabase = createSupabaseAdminClient();
-  const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-  if (listError) throw listError;
-  const existing = buckets.find((bucket) => bucket.name === SERVICE_EVIDENCE_BUCKET);
-  const options = {
-    public: false,
-    fileSizeLimit: CUSTOMER_REQUEST_EVIDENCE_MAX_BYTES,
-    allowedMimeTypes: [...CUSTOMER_REQUEST_EVIDENCE_MIME_TYPES],
-  };
-  if (!existing) {
-    const { error } = await supabase.storage.createBucket(
-      SERVICE_EVIDENCE_BUCKET,
-      options,
-    );
-    if (error) throw error;
-  } else if (existing.public) {
-    const { error } = await supabase.storage.updateBucket(
-      SERVICE_EVIDENCE_BUCKET,
-      options,
-    );
-    if (error) throw error;
-  }
-  return supabase;
-}
 
 function warrantyError(error: unknown) {
+  const managedError = mediaServiceError(error);
+  if (managedError.status === 403 || managedError.status === 404) {
+    return mobileError("errors.notFound", 404);
+  }
+  if (managedError.status !== 500) {
+    return mobileError(managedError.error, managedError.status);
+  }
   const message = error instanceof Error ? error.message : "";
   if (
     message === "SERVICE_WARRANTY_FORBIDDEN"
@@ -76,13 +60,19 @@ export async function GET(request: Request) {
   if (blocked) return blocked;
   if (!gate.ok) return mobileError("errors.unauthorized", 401);
   const jobId = (searchParam(request, "jobId", "") ?? "").trim() || null;
-  return mobileOk({
-    rows: await listWarrantyClaimsForActorCore(db, {
-      actorId: gate.userId,
-      role: gate.role,
-      jobId,
-    }),
+  const rows = await listWarrantyClaimsForActorCore(db, {
+    actorId: gate.userId,
+    role: gate.role,
+    jobId,
   });
+  const owned = rows.length === 0
+    ? []
+    : await db.select({ id: warrantyClaims.id }).from(warrantyClaims).where(and(
+      eq(warrantyClaims.storeId, gate.storeId),
+      inArray(warrantyClaims.id, rows.map((row) => row.id)),
+    ));
+  const ownedIds = new Set(owned.map((row) => row.id));
+  return mobileOk({ rows: rows.filter((row) => ownedIds.has(row.id)) });
 }
 
 export async function POST(request: Request) {
@@ -132,12 +122,14 @@ export async function POST(request: Request) {
   if (!parsed.success) return mobileError("errors.invalidData", 400);
   const claimId = randomUUID();
   let uploaded: {
-    cleanupId: string;
+    mediaId: string;
     path: string;
     fileName: string;
     mimeType: string;
     sizeBytes: number;
     sha256: string;
+    width: number;
+    height: number;
   } | null = null;
   try {
     if (file) {
@@ -151,27 +143,23 @@ export async function POST(request: Request) {
         file.fileName.replace(/\.[^.]+$/, ""),
       );
       const canonicalName = `${baseName}.${image.extension}`;
-      const path = `stores/${gate.storeId}/services/jobs/${parsed.data.jobId}/warranty/${claimId}/${gate.userId}/${randomUUID()}.${image.extension}`;
-      const [cleanup] = await db.transaction((tx) =>
-        stageServiceStorageCleanupCore(tx, {
-          bucket: SERVICE_EVIDENCE_BUCKET,
-          path,
-        }));
+      const managed = await getMediaService().putManagedObject(gate, {
+        purpose: "service-evidence",
+        targetId: parsed.data.jobId,
+        fileName: canonicalName,
+        mimeType: image.mimeType,
+        sizeBytes: image.bytes.length,
+      }, image.bytes);
       uploaded = {
-        cleanupId: cleanup.id,
-        path,
+        mediaId: managed.mediaId,
+        path: managed.path,
         fileName: canonicalName,
         mimeType: image.mimeType,
         sizeBytes: image.bytes.length,
         sha256: image.sha256,
+        width: image.width,
+        height: image.height,
       };
-      const supabase = await ensureEvidenceBucket();
-      const { error } = await supabase.storage.from(SERVICE_EVIDENCE_BUCKET)
-        .upload(uploaded.path, image.bytes, {
-          contentType: image.mimeType,
-          upsert: false,
-        });
-      if (error) throw error;
     }
 
     const claimInput = {
@@ -186,18 +174,59 @@ export async function POST(request: Request) {
           ? new Date(parsed.data.scheduledAt)
           : null,
       } as const;
-    const claim = await db.transaction((tx) => uploaded
-      ? finalizeTechnicianWarrantyClaimEvidenceCore(tx, {
-        claim: claimInput,
-        cleanupId: uploaded.cleanupId,
-        bucket: SERVICE_EVIDENCE_BUCKET,
-        path: uploaded.path,
-        fileName: uploaded.fileName,
-        mimeType: uploaded.mimeType,
-        sizeBytes: uploaded.sizeBytes,
-        sha256: uploaded.sha256,
-      })
-      : createTechnicianWarrantyClaimCore(tx, claimInput));
+    let claim;
+    try {
+      claim = await db.transaction(async (tx) => {
+        const [ownedJob] = await tx.select({ id: serviceJobs.id })
+          .from(serviceJobs).where(and(
+            eq(serviceJobs.storeId, gate.storeId),
+            eq(serviceJobs.id, parsed.data.jobId),
+          )).limit(1);
+        if (!ownedJob) throw new Error("SERVICE_WARRANTY_JOB_NOT_FOUND");
+        const created = await createTechnicianWarrantyClaimCore(tx, claimInput);
+        if (!uploaded) return created;
+        const media = await requireReadyManagedMediaInTransaction(tx, {
+          storeId: gate.storeId,
+          mediaId: uploaded.mediaId,
+          purpose: "service-evidence",
+          targetId: parsed.data.jobId,
+          expectedPath: uploaded.path,
+          sha256: uploaded.sha256,
+          width: uploaded.width,
+          height: uploaded.height,
+          mimeType: uploaded.mimeType,
+          sizeBytes: uploaded.sizeBytes,
+          fileName: uploaded.fileName,
+        });
+        await tx.insert(serviceAttachments).values({
+          storeId: gate.storeId,
+          projectId: created.projectId,
+          jobId: created.jobId,
+          claimId: created.id,
+          assetId: created.assetId,
+          mediaObjectId: media.id,
+          category: "issue",
+          bucket: media.bucket,
+          path: media.objectKey,
+          fileName: uploaded.fileName,
+          mimeType: uploaded.mimeType,
+          sizeBytes: uploaded.sizeBytes,
+          sha256: uploaded.sha256,
+          createdBy: gate.userId,
+        });
+        return created;
+      });
+    } catch (error) {
+      if (uploaded) {
+        await compensateManagedMediaAssociation(db, {
+          storeId: gate.storeId,
+          mediaId: uploaded.mediaId,
+          purpose: "service-evidence",
+          targetId: parsed.data.jobId,
+        });
+      }
+      throw error;
+    }
     return mobileOk(claim);
   } catch (error) {
     return warrantyError(error);
