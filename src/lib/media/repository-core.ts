@@ -33,7 +33,7 @@ type MediaTransactionalDatabase = Pick<typeof db, "transaction">;
 async function hasLiveMediaReference(
   transaction: MediaTransaction,
   input: Pick<SoftDeleteMediaInput, "storeId" | "mediaId">,
-) {
+): Promise<"referenced" | "malformed" | "none"> {
   const queries = [
     transaction.select({ id: brands.id }).from(brands).where(and(
       eq(brands.storeId, input.storeId),
@@ -77,21 +77,54 @@ async function hasLiveMediaReference(
         eq(serviceAttachments.mediaObjectId, input.mediaId),
         isNull(serviceSignatures.invalidatedAt),
       )).limit(1),
-    transaction.select({ id: aiChatMessages.id }).from(aiChatMessages).where(and(
-      eq(aiChatMessages.storeId, input.storeId),
-      sql`exists (
-        select 1
-        from jsonb_array_elements(coalesce(${aiChatMessages.attachments}, '[]'::jsonb)) attachment
-        where attachment->>'mediaId' = ${input.mediaId}
-      )`,
-    )).limit(1),
   ];
 
   // Keep these queries sequential on the transaction's single connection.
   for (const query of queries) {
-    if ((await query)[0]) return true;
+    if ((await query)[0]) return "referenced";
   }
-  return false;
+
+  const [malformedAiDocument] = await transaction.select({ id: aiChatMessages.id })
+    .from(aiChatMessages)
+    .where(and(
+      eq(aiChatMessages.storeId, input.storeId),
+      sql`${aiChatMessages.attachments} is not null and (
+        jsonb_typeof(${aiChatMessages.attachments}) <> 'array'
+        or exists (
+          select 1
+          from jsonb_array_elements(
+            case when jsonb_typeof(${aiChatMessages.attachments}) = 'array'
+              then ${aiChatMessages.attachments} else '[]'::jsonb end
+          ) attachment
+          where jsonb_typeof(attachment) <> 'object'
+             or (
+               attachment ? 'mediaId'
+               and (
+                 jsonb_typeof(attachment->'mediaId') <> 'string'
+                 or attachment->>'mediaId' !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+               )
+             )
+        )
+      )`,
+    )).limit(1);
+  if (malformedAiDocument) return "malformed";
+
+  const [aiReference] = await transaction.select({ id: aiChatMessages.id })
+    .from(aiChatMessages)
+    .where(and(
+      eq(aiChatMessages.storeId, input.storeId),
+      sql`exists (
+        select 1
+        from jsonb_array_elements(
+          case when jsonb_typeof(${aiChatMessages.attachments}) = 'array'
+            then ${aiChatMessages.attachments} else '[]'::jsonb end
+        ) attachment
+        where jsonb_typeof(attachment) = 'object'
+          and jsonb_typeof(attachment->'mediaId') = 'string'
+          and attachment->>'mediaId' = ${input.mediaId}
+      )`,
+    )).limit(1);
+  return aiReference ? "referenced" : "none";
 }
 
 export async function softDeleteMediaIfUnreferencedInTransaction(
@@ -111,7 +144,11 @@ export async function softDeleteMediaIfUnreferencedInTransaction(
     return { outcome: "conflict" };
   }
 
-  if (await hasLiveMediaReference(transaction, input)) {
+  const referenceState = await hasLiveMediaReference(transaction, input);
+  if (referenceState === "malformed") {
+    return { outcome: "conflict" };
+  }
+  if (referenceState === "referenced") {
     return { outcome: "referenced" };
   }
 

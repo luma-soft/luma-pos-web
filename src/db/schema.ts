@@ -273,6 +273,7 @@ export const aiChatSessions = pgTable("ai_chat_sessions", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 }, (t) => [
+  unique("ai_chat_sessions_store_id_id_unique").on(t.storeId, t.id),
   index("ai_chat_sessions_owner_idx").on(t.ownerId, t.updatedAt),
   index("ai_chat_sessions_surface_idx").on(t.surface, t.updatedAt),
 ]);
@@ -291,7 +292,13 @@ export const aiChatMessages = pgTable("ai_chat_messages", {
   metadata: jsonb("metadata").$type<Record<string, unknown> | null>(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
+  check("ai_chat_messages_attachments_shape_check", sql`public.is_valid_ai_attachment_document(${t.attachments})`),
   index("ai_chat_messages_session_idx").on(t.sessionId, t.createdAt),
+  foreignKey({
+    columns: [t.storeId, t.sessionId],
+    foreignColumns: [aiChatSessions.storeId, aiChatSessions.id],
+    name: "ai_chat_messages_session_tenant_fk",
+  }).onDelete("cascade"),
 ]);
 
 // ============= Categories =============
@@ -1767,6 +1774,7 @@ export const serviceAttachments = pgTable("service_attachments", {
   cleanupClaimedAt: timestamp("cleanup_claimed_at", { withTimezone: true }),
   cleanupClaimToken: uuid("cleanup_claim_token"),
 }, (t) => [
+  unique("service_attachments_store_id_id_unique").on(t.storeId, t.id),
   check("service_attachments_category_check", sql`${t.category} in ('before', 'after', 'issue', 'document', 'signature', 'asset')`),
   check("service_attachments_size_check", sql`${t.sizeBytes} > 0`),
   check("service_attachments_sort_order_check", sql`${t.sortOrder} >= 0`),
@@ -1816,6 +1824,11 @@ export const serviceSignatures = pgTable("service_signatures", {
   check("service_signatures_invalidation_check", sql`${t.invalidatedAt} is not null or (${t.invalidatedBy} is null and ${t.invalidationReason} is null)`),
   index("service_signatures_job_idx").on(t.jobId, t.signedAt),
   index("service_signatures_active_job_idx").on(t.jobId, t.signedAt).where(sql`${t.invalidatedAt} is null`),
+  foreignKey({
+    columns: [t.storeId, t.attachmentId],
+    foreignColumns: [serviceAttachments.storeId, serviceAttachments.id],
+    name: "service_signatures_attachment_tenant_fk",
+  }).onDelete("restrict"),
 ]);
 
 export const serviceJobEvents = pgTable("service_job_events", {

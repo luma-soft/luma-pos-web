@@ -8,6 +8,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import postgres from "postgres";
+import { applyMigrationFileAtomically } from "./migration-runner";
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error("DATABASE_URL not set");
@@ -15,13 +16,6 @@ if (!url) throw new Error("DATABASE_URL not set");
 // Không đặt timeout qua startup param (pooler transaction mode không hỗ trợ);
 // set bằng lệnh SET sau khi kết nối (migration nên chạy qua direct/session :5432).
 const sql = postgres(url, { max: 1, prepare: false });
-
-// mã lỗi PG "đối tượng đã tồn tại" — an toàn để bỏ qua khi replay
-const ALREADY_EXISTS = new Set([
-  "42P07", // duplicate_table (table/index)
-  "42710", // duplicate_object (type, enum value, constraint)
-  "42701", // duplicate_column
-]);
 
 // lỗi kẹt khóa — thử lại được
 const LOCK_ERRORS = new Set([
@@ -54,31 +48,27 @@ for (const file of files) {
   }
   console.log(`▶ Applying ${file}`);
   const content = readFileSync(join(dir, file), "utf8");
-  // drizzle separates statements with --> statement-breakpoint
-  const statements = content.split("--> statement-breakpoint").map((s) => s.trim()).filter(Boolean);
-  let skipped = 0;
-  for (const stmt of statements) {
-    let attempt = 0;
-    for (;;) {
-      try {
-        await sql.unsafe(stmt);
-        break;
-      } catch (e) {
-        const code = (e as { code?: string }).code;
-        if (code && ALREADY_EXISTS.has(code)) { skipped++; break; }
-        // kẹt khóa → thử lại tối đa 5 lần, mỗi lần chờ tăng dần
-        if (code && LOCK_ERRORS.has(code) && attempt < 5) {
-          attempt++;
-          console.log(`  ⏳ kẹt khóa (${code}), thử lại lần ${attempt}/5…`);
-          await sleep(2000 * attempt);
-          continue;
-        }
-        throw e;
+  let attempt = 0;
+  let result;
+  for (;;) {
+    const connection = await sql.reserve();
+    try {
+      result = await applyMigrationFileAtomically(connection, file, content);
+      break;
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      if (code && LOCK_ERRORS.has(code) && attempt < 5) {
+        attempt++;
+        console.log(`  ⏳ kẹt khóa (${code}), thử lại cả file lần ${attempt}/5…`);
+        await sleep(2000 * attempt);
+        continue;
       }
+      throw error;
+    } finally {
+      connection.release();
     }
   }
-  await sql`insert into _migrations (name) values (${file}) on conflict do nothing`;
-  console.log(`  ✓ ${statements.length} statements${skipped ? ` (${skipped} đã tồn tại, bỏ qua)` : ""}`);
+  console.log(`  ✓ ${result.statementCount} statements${result.skippedCount ? ` (${result.skippedCount} đã tồn tại, bỏ qua)` : ""}`);
   ran++;
 }
 

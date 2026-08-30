@@ -80,6 +80,10 @@ BEGIN
   WHERE attachment.id = NEW.attachment_id
     AND attachment.store_id = NEW.store_id;
 
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'MEDIA_SIGNATURE_ATTACHMENT_TENANT_MISMATCH'
+      USING ERRCODE = '23514';
+  END IF;
   IF referenced_media_id IS NULL THEN
     RETURN NEW;
   END IF;
@@ -100,7 +104,7 @@ END
 $$;--> statement-breakpoint
 
 CREATE TRIGGER service_signatures_ready_media_reference
-BEFORE INSERT OR UPDATE OF attachment_id, invalidated_at ON public.service_signatures
+BEFORE INSERT OR UPDATE OF attachment_id, invalidated_at, store_id ON public.service_signatures
 FOR EACH ROW
 WHEN (NEW.invalidated_at IS NULL)
 EXECUTE FUNCTION public.guard_ready_signature_media_reference();--> statement-breakpoint
@@ -115,9 +119,14 @@ DECLARE
   referenced_media_id uuid;
 BEGIN
   FOR referenced_media_id IN
-    SELECT NULLIF(attachment->>'mediaId', '')::uuid
-    FROM jsonb_array_elements(COALESCE(NEW.attachments, '[]'::jsonb)) attachment
-    WHERE attachment ? 'mediaId'
+    SELECT DISTINCT (attachment->>'mediaId')::uuid
+    FROM jsonb_array_elements(
+      CASE WHEN jsonb_typeof(NEW.attachments) = 'array'
+        THEN NEW.attachments ELSE '[]'::jsonb END
+    ) attachment
+    WHERE jsonb_typeof(attachment) = 'object'
+      AND jsonb_typeof(attachment->'mediaId') = 'string'
+      AND attachment->>'mediaId' ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
   LOOP
     PERFORM 1
     FROM public.media_objects
@@ -136,7 +145,7 @@ END
 $$;--> statement-breakpoint
 
 CREATE TRIGGER ai_chat_messages_ready_media_references
-BEFORE INSERT OR UPDATE OF attachments ON public.ai_chat_messages
+BEFORE INSERT OR UPDATE OF attachments, store_id ON public.ai_chat_messages
 FOR EACH ROW
 WHEN (NEW.attachments IS NOT NULL)
 EXECUTE FUNCTION public.guard_ready_ai_media_references();
