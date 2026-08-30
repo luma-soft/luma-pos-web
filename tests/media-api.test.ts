@@ -90,6 +90,7 @@ function createHarness(options: {
   authorize?: "allowed" | "forbidden" | "not_found";
   initial?: MediaRecord[];
   protectedDelete?: boolean;
+  mutateTargetBeforeDelete?: string;
   objectBytes?: Uint8Array;
 } = {}) {
   const records = new Map(
@@ -100,6 +101,13 @@ function createHarness(options: {
     removed: [] as Array<{ bucket: string; key: string }>,
     puts: [] as Array<{ bucket: string; key: string; contentType: string; sizeBytes: number }>,
     downloads: 0,
+    uploadIntents: [] as Array<{
+      bucket: string;
+      key: string;
+      contentType: string;
+      expiresInSeconds: number;
+      ifNoneMatch?: string;
+    }>,
   };
 
   const repository: MediaRepository = {
@@ -145,20 +153,28 @@ function createHarness(options: {
       records.set(key, updated);
       return updated;
     },
-    async softDelete(input) {
+    async softDeleteIfUnreferenced(input) {
+      if (options.protectedDelete) return { outcome: "referenced" };
       const key = `${input.storeId}:${input.mediaId}`;
-      const current = records.get(key);
-      if (!current || current.status !== "ready") return null;
+      let current = records.get(key);
+      if (!current || current.status !== "ready") return { outcome: "conflict" };
+      if (options.mutateTargetBeforeDelete) {
+        current = { ...current, targetId: options.mutateTargetBeforeDelete };
+        records.set(key, current);
+      }
+      if (
+        current.purpose !== input.expectedPurpose
+        || current.targetId !== input.expectedTargetId
+      ) {
+        return { outcome: "conflict" };
+      }
       const deleted = {
         ...current,
         status: "deleted" as const,
         deletedAt: input.deletedAt,
       };
       records.set(key, deleted);
-      return deleted;
-    },
-    async isDeletionProtected() {
-      return options.protectedDelete ?? false;
+      return { outcome: "deleted", media: deleted };
     },
   };
 
@@ -180,6 +196,7 @@ function createHarness(options: {
       return storageState.heads.get(`${input.bucket}:${input.key}`) ?? null;
     },
     async createUploadUrl(input) {
+      storageState.uploadIntents.push(input);
       return `https://r2.test/${input.bucket}/${input.key}?X-Amz-Expires=${input.expiresInSeconds}&X-Amz-Signature=upload`;
     },
     async createDownloadUrl(input) {
@@ -212,6 +229,30 @@ function createHarness(options: {
     complete: createCompleteUploadHandler({ authenticate, service }),
     resolve: createResolveMediaHandler({ authenticate, service }),
     remove: createDeleteMediaHandler({ authenticate, service }),
+    async putOriginal(
+      mediaId: string,
+      body: Uint8Array,
+      contentType: string,
+      ifNoneMatch: string | null,
+    ) {
+      const record = records.get(`${STORE_ID}:${mediaId}`);
+      if (!record) throw new Error("missing media intent");
+      const intent = storageState.uploadIntents.find((candidate) =>
+        candidate.bucket === record.bucket && candidate.key === record.objectKey
+      );
+      if (intent?.ifNoneMatch !== "*" || ifNoneMatch !== "*") {
+        throw new Error("unsigned create-only precondition");
+      }
+      const coordinate = `${record.bucket}:${record.objectKey}`;
+      if (storageState.heads.has(coordinate)) {
+        throw Object.assign(new Error("precondition failed"), { status: 412 });
+      }
+      storageState.heads.set(coordinate, {
+        sizeBytes: body.byteLength,
+        contentType,
+        etag: "original",
+      });
+    },
   };
 }
 
@@ -240,7 +281,10 @@ describe("media upload intent API", () => {
         },
         method: "PUT",
         uploadUrl: expect.stringContaining("X-Amz-Signature=upload"),
-        headers: { "Content-Type": "application/pdf" },
+        headers: {
+          "Content-Type": "application/pdf",
+          "If-None-Match": "*",
+        },
         expiresAt: "2026-08-30T03:10:00.000Z",
       },
     });
@@ -260,6 +304,33 @@ describe("media upload intent API", () => {
     expect(stored?.objectKey).toBe(
       `stores/${STORE_ID}/projects/2026/08/${MEDIA_ID}/original.pdf`,
     );
+  });
+
+  test("create-only upload cannot overwrite the immutable object after completion", async () => {
+    const harness = createHarness();
+    const intent = await harness.upload(jsonRequest({
+      purpose: "project-document",
+      targetId: PROJECT_ID,
+      fileName: "nghiem-thu.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 3,
+    }));
+    expect(intent.status).toBe(200);
+    expect((await intent.json()).data.headers).toEqual({
+      "Content-Type": "application/pdf",
+      "If-None-Match": "*",
+    });
+
+    await harness.putOriginal(MEDIA_ID, new Uint8Array([1, 2, 3]), "application/pdf", "*");
+    const complete = await harness.complete(jsonRequest({}), {
+      params: Promise.resolve({ mediaId: MEDIA_ID }),
+    });
+    expect(complete.status).toBe(200);
+
+    await expect(
+      harness.putOriginal(MEDIA_ID, new Uint8Array([4, 5, 6]), "application/pdf", "*"),
+    ).rejects.toMatchObject({ status: 412 });
+    expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("ready");
   });
 
   test("public product staging uses the store UUID target and an immutable public bucket key", async () => {
@@ -497,8 +568,8 @@ describe("target-aware media authorization", () => {
         async getServiceJob(storeId, jobId) {
           return state.serviceJobs.get(`${storeId}:${jobId}`) ?? null;
         },
-        async technicianAssignedToJob(jobId, userId) {
-          return state.jobAssignments.has(`${jobId}:${userId}`);
+        async technicianAssignedToJob(storeId, jobId, userId) {
+          return state.jobAssignments.has(`${storeId}:${jobId}:${userId}`);
         },
         async ownsAiSession(storeId, sessionId, userId) {
           return state.aiSessions.has(`${storeId}:${sessionId}:${userId}`);
@@ -534,7 +605,7 @@ describe("target-aware media authorization", () => {
     state.serviceJobs.set(`${STORE_ID}:${PROJECT_ID}`, { assignedTo: null });
     expect(await authorize({ actor: technician, purpose: "service-evidence", targetId: PROJECT_ID }))
       .toBe("forbidden");
-    state.jobAssignments.add(`${PROJECT_ID}:${USER_ID}`);
+    state.jobAssignments.add(`${STORE_ID}:${PROJECT_ID}:${USER_ID}`);
     expect(await authorize({ actor: technician, purpose: "service-evidence", targetId: PROJECT_ID }))
       .toBe("allowed");
   });
@@ -616,15 +687,34 @@ describe("media resolve and delete API", () => {
     expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("ready");
     expect(harness.storageState.removed).toEqual([]);
   });
+
+  test("DELETE fails closed if authorized target coordinates change before the row lock", async () => {
+    const harness = createHarness({
+      mutateTargetBeforeDelete: OTHER_MEDIA_ID,
+      initial: [pendingRecord({ status: "ready" })],
+    });
+    const response = await harness.remove(mediaRequest(MEDIA_ID, "DELETE"), {
+      params: Promise.resolve({ mediaId: MEDIA_ID }),
+    });
+
+    expect(response.status).toBe(409);
+    expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("ready");
+    expect(harness.storageState.removed).toEqual([]);
+  });
 });
 
 test("upload intent coordinates are durable and indexed without modifying migration 0110", () => {
   const migration = readFileSync("drizzle/0111_media_upload_intent_coordinates.sql", "utf8");
   const schema = readFileSync("src/db/schema.ts", "utf8");
 
-  expect(migration).toContain('ADD COLUMN "purpose" text NOT NULL');
-  expect(migration).toContain('ADD COLUMN "target_id" uuid NOT NULL');
-  expect(migration).toContain('ADD COLUMN "upload_expires_at" timestamptz NOT NULL');
+  expect(migration).toContain('ADD COLUMN "purpose" text');
+  expect(migration).toContain('ADD COLUMN "target_id" uuid');
+  expect(migration).toContain('ADD COLUMN "upload_expires_at" timestamptz');
+  expect(migration).toContain('ALTER COLUMN "purpose" SET NOT NULL');
+  expect(migration).toContain('ALTER COLUMN "target_id" SET NOT NULL');
+  expect(migration).toContain('ALTER COLUMN "upload_expires_at" SET NOT NULL');
+  expect(migration).toContain("ELSE 'project-document'");
+  expect(migration).toContain('"status" = CASE WHEN "status" = \'deleted\'');
   expect(migration).toContain("'product-image','project-document','service-evidence','ai-attachment'");
   expect(migration).toContain('("store_id","purpose","target_id")');
   expect(migration).toContain('("status","upload_expires_at")');

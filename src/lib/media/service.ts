@@ -7,15 +7,15 @@ import { createObjectKey } from "@/lib/media/object-key";
 import {
   createPendingMedia,
   getMediaForStore,
-  isMediaDeletionProtected,
   markMediaReady,
   saveMediaThumbnail,
-  softDeleteMedia,
+  softDeleteMediaIfUnreferenced,
   type CreatePendingMediaInput,
   type GetMediaForStoreInput,
   type MarkMediaReadyInput,
   type SaveMediaThumbnailInput,
   type SoftDeleteMediaInput,
+  type SoftDeleteMediaResult,
 } from "@/lib/media/repository";
 import {
   extensionForMediaType,
@@ -76,8 +76,9 @@ export type MediaRepository = {
   getForStore(input: GetMediaForStoreInput): Promise<MediaRecord | null>;
   markReady(input: Required<MarkMediaReadyInput>): Promise<MediaRecord | null>;
   saveThumbnail(input: SaveMediaThumbnailInput): Promise<MediaRecord | null>;
-  softDelete(input: Required<SoftDeleteMediaInput>): Promise<MediaRecord | null>;
-  isDeletionProtected(input: GetMediaForStoreInput): Promise<boolean>;
+  softDeleteIfUnreferenced(
+    input: Required<SoftDeleteMediaInput>,
+  ): Promise<SoftDeleteMediaResult>;
 };
 
 export class MediaServiceError extends Error {
@@ -115,8 +116,7 @@ function defaultRepository(): MediaRepository {
     getForStore: getMediaForStore as MediaRepository["getForStore"],
     markReady: markMediaReady as MediaRepository["markReady"],
     saveThumbnail: saveMediaThumbnail as MediaRepository["saveThumbnail"],
-    softDelete: softDeleteMedia as MediaRepository["softDelete"],
-    isDeletionProtected: isMediaDeletionProtected,
+    softDeleteIfUnreferenced: softDeleteMediaIfUnreferenced,
   };
 }
 
@@ -220,6 +220,7 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
       bucket,
       key: objectKey,
       contentType: input.mimeType,
+      ifNoneMatch: "*",
       expiresInSeconds: UPLOAD_EXPIRY_SECONDS,
     });
     return {
@@ -233,7 +234,10 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
       },
       method: "PUT" as const,
       uploadUrl,
-      headers: { "Content-Type": input.mimeType },
+      headers: {
+        "Content-Type": input.mimeType,
+        "If-None-Match": "*",
+      },
       expiresAt: uploadExpiresAt.toISOString(),
     };
   }
@@ -339,17 +343,21 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
   }
 
   async function deleteMedia(actor: MediaActor, mediaId: string) {
-    await loadAuthorizedReady(actor, mediaId);
+    const authorized = await loadAuthorizedReady(actor, mediaId);
     const coordinates = { storeId: actor.storeId, mediaId };
-    if (await dependencies.repository.isDeletionProtected(coordinates)) {
-      throw new MediaServiceError("media.referenced", 409);
-    }
-    const deleted = await dependencies.repository.softDelete({
+    const result = await dependencies.repository.softDeleteIfUnreferenced({
       ...coordinates,
       deletedAt: now(),
+      expectedPurpose: authorized.purpose,
+      expectedTargetId: authorized.targetId,
     });
-    if (!deleted) throw new MediaServiceError("media.deleteConflict", 409);
-    return { id: deleted.id, status: "deleted" as const };
+    if (result.outcome === "referenced") {
+      throw new MediaServiceError("media.referenced", 409);
+    }
+    if (result.outcome === "conflict") {
+      throw new MediaServiceError("media.deleteConflict", 409);
+    }
+    return { id: result.media.id, status: "deleted" as const };
   }
 
   return { createUploadIntent, completeUpload, resolveMedia, deleteMedia };

@@ -176,18 +176,53 @@ test("rejects malformed R2 configuration values before constructing an endpoint"
   }
 });
 
-test("R2 presigned PUT URLs bind content type and requested expiry", async () => {
+test("R2 presigned create-only PUT URLs bind content type, If-None-Match, and expiry", async () => {
   const url = await new R2ObjectStorage(R2_CONFIG).createUploadUrl({
     bucket: R2_CONFIG.privateBucket,
     key: "stores/store/projects/2026/08/media/original.pdf",
     contentType: "application/pdf",
+    ifNoneMatch: "*",
     expiresInSeconds: 300,
   });
   const parsed = new URL(url);
 
   expect(parsed.searchParams.get("X-Amz-Expires")).toBe("300");
-  expect(parsed.searchParams.get("X-Amz-SignedHeaders")?.split(";"))
-    .toContain("content-type");
+  expect(parsed.searchParams.get("X-Amz-SignedHeaders")?.split(";").sort())
+    .toEqual(expect.arrayContaining(["content-type", "if-none-match"]));
+});
+
+test("R2 upload presigning sends a create-only PutObject command", async () => {
+  let signedCommand: unknown;
+  let signedOptions: unknown;
+  const storage = new R2ObjectStorage(
+    R2_CONFIG,
+    {} as S3Client,
+    (async (_client: unknown, command: unknown, options: unknown) => {
+      signedCommand = command;
+      signedOptions = options;
+      return "https://signed.example/upload";
+    }) as never,
+  );
+
+  await storage.createUploadUrl({
+    bucket: "private-media",
+    key: "folder/file.pdf",
+    contentType: "application/pdf",
+    ifNoneMatch: "*",
+    expiresInSeconds: 45,
+  });
+
+  expect(signedCommand).toBeInstanceOf(PutObjectCommand);
+  expect((signedCommand as PutObjectCommand).input).toMatchObject({
+    Bucket: "private-media",
+    Key: "folder/file.pdf",
+    ContentType: "application/pdf",
+    IfNoneMatch: "*",
+  });
+  expect(signedOptions).toMatchObject({
+    expiresIn: 45,
+    signableHeaders: new Set(["content-type", "if-none-match"]),
+  });
 });
 
 test("R2 presigned download URLs bind the requested bucket, key, and expiry", async () => {
@@ -328,6 +363,7 @@ describe("storage factory and Supabase compatibility adapter", () => {
       storage.createUploadUrl({
         ...input,
         contentType: "application/pdf",
+        ifNoneMatch: "*",
         expiresInSeconds: 300,
       }),
     ).rejects.toMatchObject({

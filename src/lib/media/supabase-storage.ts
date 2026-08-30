@@ -76,6 +76,7 @@ export class SupabaseObjectStorage implements ObjectStorage {
     bucket: string;
     key: string;
     contentType: string;
+    ifNoneMatch: "*";
     expiresInSeconds: number;
   }): Promise<string> {
     void input;

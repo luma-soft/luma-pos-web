@@ -36,6 +36,7 @@ export interface ObjectStorage {
     bucket: string;
     key: string;
     contentType: string;
+    ifNoneMatch: "*";
     expiresInSeconds: number;
   }): Promise<string>;
   createDownloadUrl(input: {

@@ -64,20 +64,21 @@ test("service attachments retain compatibility coordinates", () => {
 
 test("repository scopes reads and one-way state transitions to the store", () => {
   const repository = readFileSync("src/lib/media/repository.ts", "utf8");
+  const core = readFileSync("src/lib/media/repository-core.ts", "utf8");
 
   expect(repository).toContain("eq(mediaObjects.storeId, input.storeId)");
   expect(repository).toContain('eq(mediaObjects.status, "pending")');
   expect(repository).toContain('status: "ready"');
-  expect(repository).toContain('eq(mediaObjects.status, "ready")');
-  expect(repository).toContain('status: "deleted"');
+  expect(core).toContain('eq(mediaObjects.status, "ready")');
+  expect(core).toContain('status: "deleted"');
+  expect(core).toContain('.for("update")');
+  expect(core).toContain('outcome: "referenced"');
   expect(repository).not.toContain("db.delete(mediaObjects)");
+  expect(core).not.toContain(".delete(mediaObjects)");
 });
 
-test("repository update SQL scopes ready and delete transitions by media and store", async () => {
-  const {
-    buildMarkMediaReadyQuery,
-    buildSoftDeleteMediaQuery,
-  } = await import("../src/lib/media/repository");
+test("repository update SQL scopes ready transitions by media and store", async () => {
+  const { buildMarkMediaReadyQuery } = await import("../src/lib/media/repository");
   const input = {
     storeId: "11111111-1111-4111-8111-111111111111",
     mediaId: "22222222-2222-4222-8222-222222222222",
@@ -96,16 +97,6 @@ test("repository update SQL scopes ready and delete transitions by media and sto
   expect(ready.params).toContain("pending");
   expect(ready.params).toContain("ready");
 
-  const deleted = buildSoftDeleteMediaQuery(queryDb, {
-    ...input,
-    deletedAt: new Date("2026-08-30T01:00:00.000Z"),
-  }).toSQL();
-  expect(deleted.sql).toContain('where ("media_objects"."id" = $');
-  expect(deleted.sql).toContain('and "media_objects"."store_id" = $');
-  expect(deleted.params).toContain(input.mediaId);
-  expect(deleted.params).toContain(input.storeId);
-  expect(deleted.params).toContain("ready");
-  expect(deleted.params).toContain("deleted");
 });
 
 test("repository insert starts pending and reads by media plus store", async () => {

@@ -98,6 +98,7 @@ export class R2ObjectStorage implements ObjectStorage {
     bucket: string;
     key: string;
     contentType: string;
+    ifNoneMatch: "*";
     expiresInSeconds: number;
   }): Promise<string> {
     return this.presign(
@@ -106,10 +107,11 @@ export class R2ObjectStorage implements ObjectStorage {
         Bucket: input.bucket,
         Key: input.key,
         ContentType: input.contentType,
+        IfNoneMatch: input.ifNoneMatch,
       }),
       {
         expiresIn: input.expiresInSeconds,
-        signableHeaders: new Set(["content-type"]),
+        signableHeaders: new Set(["content-type", "if-none-match"]),
       },
     );
   }
