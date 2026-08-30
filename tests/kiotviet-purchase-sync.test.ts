@@ -238,6 +238,31 @@ describe("KiotViet purchase receipt synchronization", () => {
     expect(result.writes[0]?.purchase.preservedLineIds).toEqual([]);
   });
 
+  test("blocks an adopted legacy receipt when a recoverable legacy line SKU cannot match the source", () => {
+    const result = plan({
+      sourceRows: [sourceRows[0]!],
+      current: [{ localId: "purchase-001", code: "PN-001", fingerprint: "outdated", subtotal: 0, legacyImported: true }],
+      existingLines: [{
+        localId: "legacy-mismatched-line",
+        purchaseOrderId: "purchase-001",
+        legacyImported: true,
+        legacyProductSku: "WRONG-SKU",
+        quantity: 2,
+        unitCost: 120000,
+        total: 240000,
+      }],
+    });
+
+    expect(result.writes).toEqual([]);
+    expect(result.blockers).toEqual([{
+      documentCode: "PN-001",
+      reference: "PN-001|ALT-001|hộp|1",
+      reason: "legacy_line_unmatched",
+    }]);
+    expect(result.entityPlan.preserves).toEqual([]);
+    expect(result.preservedLineIds).toEqual(["legacy-mismatched-line"]);
+  });
+
   test("reserves mapped child IDs before a legacy fallback can reuse them", () => {
     const duplicateRows = [
       { ...sourceRows[1]!, "Tổng tiền hàng": 2, "Cần trả NCC": 2, "Thành tiền": 1, "Giá nhập": 1, "Ghi chú hàng hóa": "one" },

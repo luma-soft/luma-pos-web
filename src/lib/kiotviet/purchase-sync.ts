@@ -117,12 +117,15 @@ type KiotVietPurchaseBlockerReason =
   | "mapped_line_missing"
   | "mapped_line_parent_mismatch"
   | "ambiguous_legacy_line_match"
+  | "legacy_line_unmatched"
   | "duplicate_local_child_write";
 
 export interface KiotVietPurchaseSyncPlan {
   purchases: KiotVietPurchaseSnapshot[];
   entityPlan: KiotVietEntitySyncPlan;
   writes: KiotVietPurchaseWrite[];
+  /** Child IDs intentionally left untouched when a write is blocked. */
+  preservedLineIds: string[];
   blockers: Array<{ documentCode: string; reference: string; reason: KiotVietPurchaseBlockerReason }>;
   summary: {
     documents: number;
@@ -373,7 +376,17 @@ function childWrites(input: {
       return { externalId, line };
     }
     const legacy = candidates[0];
-    if (!legacy) return { externalId, line };
+    if (!legacy) {
+      const hasUnmatchedRecoverableLegacyLine = [...input.currentById.values()].some((current) => (
+        current.purchaseOrderId === input.parentId
+        && !selectedIds.has(current.localId)
+        && currentLineFingerprint(current) != null
+      ));
+      if (hasUnmatchedRecoverableLegacyLine) {
+        input.blockers.push({ documentCode: input.documentCode, reference: externalId, reason: "legacy_line_unmatched" });
+      }
+      return { externalId, line };
+    }
     selectedIds.add(legacy.localId);
     return { externalId, localId: legacy.localId, line };
   });
@@ -462,11 +475,15 @@ export function planKiotVietPurchaseSync(input: {
       && normalizeKiotVietNumber(current.subtotal) === 0
       && purchase.subtotal !== 0;
   }).length;
+  const preservedLineIds = writes
+    .flatMap((write) => write.purchase.preservedLineIds)
+    .sort((left, right) => left.localeCompare(right));
 
   return {
     purchases,
     entityPlan,
     writes: blockers.length > 0 ? [] : writes,
+    preservedLineIds,
     blockers,
     summary: {
       documents: purchases.length,
@@ -479,7 +496,7 @@ export function planKiotVietPurchaseSync(input: {
       preserves: entityPlan.preserves.length,
       unresolvedSuppliers: blockers.filter((blocker) => blocker.reason === "unresolved_supplier" || blocker.reason === "unresolved_unknown_supplier").length,
       unresolvedProducts: blockers.filter((blocker) => blocker.reason === "unresolved_product" || blocker.reason === "unresolved_product_unit").length,
-      preservedLines: writes.reduce((sum, write) => sum + write.purchase.preservedLineIds.length, 0),
+      preservedLines: preservedLineIds.length,
       subtotalRepairs,
     },
   };
