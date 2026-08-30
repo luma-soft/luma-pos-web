@@ -8,13 +8,17 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import postgres from "postgres";
-import { runMigrationChain } from "./migration-runner";
+import {
+  readMigrationDatabaseUrl,
+  runMigrationChainWithReservedConnection,
+} from "./migration-runner";
 
-const url = process.env.DATABASE_URL;
-if (!url) throw new Error("DATABASE_URL not set");
+// Fail before constructing a client or attempting a network connection. The
+// application DATABASE_URL may be a transaction pooler and is never a fallback.
+const url = readMigrationDatabaseUrl(process.env);
 
-// Không đặt timeout qua startup param (pooler transaction mode không hỗ trợ);
-// set bằng lệnh SET sau khi kết nối (migration nên chạy qua direct/session :5432).
+// Migration connections must use a direct/session endpoint. Session settings,
+// backend PID checks, and the advisory lock all stay on one reserved connection.
 const sql = postgres(url, { max: 1, prepare: false });
 
 const dir = "drizzle";
@@ -24,28 +28,20 @@ const migrations = files.map((name) => ({
   content: readFileSync(join(dir, name), "utf8"),
 }));
 
-const connection = await sql.reserve();
-try {
-  const result = await runMigrationChain(connection, migrations, {
-    // Configure DDL waits only after the global lock, so a second runner waits
-    // for serialization instead of timing out while acquiring the run lock.
-    afterLockAcquired: async () => {
-      try {
-        await connection.unsafe("set lock_timeout = '5s'");
-        await connection.unsafe("set statement_timeout = '120s'");
-      } catch { /* transaction-mode poolers may reject session settings */ }
-    },
-    onFileStart: (file) => console.log(`▶ Applying ${file}`),
-    onFileRetry: (file, code, attempt, maximum) => {
-      console.log(`  ⏳ ${file} kẹt khóa (${code}), thử lại cả file lần ${attempt}/${maximum}…`);
-    },
-  });
-  for (const file of result.skipped) console.log(`⏭  ${file} (đã apply trước đó)`);
-  console.log(`\n✅ ${result.applied.length > 0
-    ? `Applied ${result.applied.length} migration(s)`
-    : "Không có migration mới"} — tracking trong bảng _migrations`);
-} finally {
-  connection.release();
-  await sql.end();
-}
+const result = await runMigrationChainWithReservedConnection(sql, migrations, {
+  // Configure DDL waits only after the global lock, so a second runner waits
+  // for serialization instead of timing out while acquiring the run lock.
+  afterLockAcquired: async (connection) => {
+    await connection.unsafe("set lock_timeout = '5s'");
+    await connection.unsafe("set statement_timeout = '120s'");
+  },
+  onFileStart: (file) => console.log(`▶ Applying ${file}`),
+  onFileRetry: (file, code, attempt, maximum) => {
+    console.log(`  ⏳ ${file} kẹt khóa (${code}), thử lại cả file lần ${attempt}/${maximum}…`);
+  },
+});
+for (const file of result.skipped) console.log(`⏭  ${file} (đã apply trước đó)`);
+console.log(`\n✅ ${result.applied.length > 0
+  ? `Applied ${result.applied.length} migration(s)`
+  : "Không có migration mới"} — tracking trong bảng _migrations`);
 process.exit(0);

@@ -21,7 +21,8 @@ Hệ thống quản lý bán hàng cho cửa hàng VLXD / thiết bị điện n
    - `Project URL` (Settings → API)
    - `anon` key (Settings → API)
    - `service_role` key (Settings → API, giữ bí mật)
-   - Connection string (Settings → Database → URI mode → **Connection pooling**)
+   - App connection string: Transaction pooler port `6543`
+   - Migration connection string: Session pooler port `5432` (hoặc Direct port `5432` nếu máy có IPv6)
 
 ### 2. Cấu hình env
 
@@ -57,7 +58,7 @@ bun dev
 |------|-------|
 | `bun dev` | Dev server (Turbopack) |
 | `bun build` | Production build |
-| `bun db:push` | Apply schema thay đổi lên Supabase |
+| `bun db:push` | Apply schema qua `MIGRATION_DATABASE_URL` direct/session |
 | `bun db:generate` | Generate migration SQL files |
 | `bun db:studio` | Mở Drizzle Studio (UI xem/sửa data) |
 | `bun db:seed` | Insert data mẫu (categories, brands) |

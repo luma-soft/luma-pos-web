@@ -2,25 +2,35 @@
 
 ## Chuẩn bị (1 lần)
 
-### 1. Lấy connection string dạng pooler
+### 1. Lấy hai connection string đúng mục đích
 
 Supabase Dashboard → project → nút **Connect** (trên cùng) → tab **URI**:
 
-- **Session pooler** (port `5432`, host `aws-*.pooler.supabase.com`) → dùng cho **local** (`bun db:push`, `bun dev`)
-- **Transaction pooler** (port `6543`, cùng host) → dùng cho **Vercel** (env `DATABASE_URL`)
+- **Session pooler** (port `5432`, host `aws-*.pooler.supabase.com`) → `MIGRATION_DATABASE_URL`, chỉ dùng cho migration (`bun db:push` / `apply-migrations`)
+- **Transaction pooler** (port `6543`, cùng host) → `DATABASE_URL`, dùng cho app serverless trên **Vercel**
 
-> ⚠️ KHÔNG dùng string "Direct connection" (`db.<ref>.supabase.co`) — host này chỉ có IPv6, mạng không có IPv6 sẽ lỗi `getaddrinfo ENOTFOUND`. Pooler hostname có IPv4, chạy được mọi nơi.
+> `MIGRATION_DATABASE_URL` bắt buộc là endpoint direct/session giữ nguyên một backend PostgreSQL. Runner từ chối port `6543` và query hint transaction/pgbouncer trước khi mở kết nối. Với Supabase, ưu tiên Session pooler port `5432`; Direct connection port `5432` cũng hợp lệ nếu máy chạy migration có IPv6.
 >
-> Serverless mỗi invocation mở connection mới nên bắt buộc đi qua pooler. Code đã set `prepare: false` + `max: 1` cho production.
+> `DATABASE_URL` của app có thể tiếp tục dùng transaction pooler `6543`. Runner không tự fallback từ `MIGRATION_DATABASE_URL` sang biến này.
 
 ### 2. Apply migrations lên Supabase (từ máy local)
 
 ```bash
-bun db:push   # apply drizzle/0000 → 0003
+# .env.local/secret store đã có MIGRATION_DATABASE_URL port 5432
+bun db:push
 bun db:seed   # nếu DB mới
 ```
 
-Migrations KHÔNG chạy lúc deploy — luôn chạy từ local trước khi deploy schema mới.
+Không ghi URL thật vào shell history hoặc repo; đặt nó trong secret store/env của máy chạy migration. Migrations KHÔNG chạy lúc deploy — luôn chạy từ local/CI migration job trước khi deploy schema mới.
+
+Để chạy concurrency test tùy chọn, chỉ trỏ vào database test dùng riêng và có thể xóa dữ liệu:
+
+```bash
+# Chỉ set TEST_MIGRATION_DATABASE_URL trong secret store của test job
+bun test tests/migration-runner-postgres.test.mjs
+```
+
+Nếu biến này không được đặt, test sẽ skip và không kết nối database ngoài.
 
 ## Deploy
 
@@ -64,3 +74,4 @@ vercel --prod
 - Font dùng system stack (không phụ thuộc Google Fonts lúc build, render tiếng Việt chuẩn).
 - `NEXT_DIST_DIR` (tùy chọn): đổi thư mục build output cho CI — Vercel không cần set.
 - Khi đổi schema: `bun db:push` từ local **trước**, rồi mới deploy code.
+- Migration runner phải dùng `MIGRATION_DATABASE_URL` direct/session port `5432`; không dùng `DATABASE_URL` port `6543` của Vercel.
