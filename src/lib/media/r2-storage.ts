@@ -31,8 +31,11 @@ function publicObjectUrl(baseUrl: string, key: string): string {
 export class R2ObjectStorage implements ObjectStorage {
   private readonly client: S3Client;
 
-  constructor(private readonly config: R2Config = getR2Config()) {
-    this.client = new S3Client({
+  constructor(
+    private readonly config: R2Config = getR2Config(),
+    client?: S3Client,
+  ) {
+    this.client = client ?? new S3Client({
       region: "auto",
       endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
       credentials: {
@@ -103,7 +106,10 @@ export class R2ObjectStorage implements ObjectStorage {
         Key: input.key,
         ContentType: input.contentType,
       }),
-      { expiresIn: input.expiresInSeconds },
+      {
+        expiresIn: input.expiresInSeconds,
+        signableHeaders: new Set(["content-type"]),
+      },
     );
   }
 

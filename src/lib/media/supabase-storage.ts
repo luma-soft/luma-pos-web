@@ -2,7 +2,13 @@ import "server-only";
 
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
-import type { MediaObjectHead, ObjectStorage } from "@/lib/media/types";
+import {
+  ObjectStorageOperationUnsupportedError,
+  type MediaObjectHead,
+  type ObjectStorage,
+} from "@/lib/media/types";
+
+type SupabaseAdminClient = ReturnType<typeof createSupabaseAdminClient>;
 
 function isMissingObject(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
@@ -11,9 +17,10 @@ function isMissingObject(error: unknown): boolean {
 }
 
 export class SupabaseObjectStorage implements ObjectStorage {
-  private readonly supabase = createSupabaseAdminClient();
-
-  constructor(private readonly publicBucket = "products") {}
+  constructor(
+    private readonly publicBucket = "products",
+    private readonly supabase: SupabaseAdminClient = createSupabaseAdminClient(),
+  ) {}
 
   async put(input: {
     bucket: string;
@@ -67,13 +74,11 @@ export class SupabaseObjectStorage implements ObjectStorage {
     contentType: string;
     expiresInSeconds: number;
   }): Promise<string> {
-    void input.contentType;
-    void input.expiresInSeconds;
-    const { data, error } = await this.supabase.storage
-      .from(input.bucket)
-      .createSignedUploadUrl(input.key);
-    if (error) throw error;
-    return data.signedUrl;
+    void input;
+    throw new ObjectStorageOperationUnsupportedError(
+      "supabase",
+      "createUploadUrl",
+    );
   }
 
   async createDownloadUrl(input: {

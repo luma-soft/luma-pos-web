@@ -8,6 +8,9 @@ export type R2Config = {
 };
 
 type R2Environment = Record<string, string | undefined>;
+const CLOUDFLARE_ACCOUNT_ID_PATTERN = /^[0-9a-f]{32}$/i;
+const R2_BUCKET_NAME_PATTERN = /^(?=.{3,63}$)(?!.*\.\.)(?!.*\.-)(?!.*-\.)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])$/;
+const IPV4_ADDRESS_PATTERN = /^(?:\d{1,3}\.){3}\d{1,3}$/;
 
 function requiredValue(env: R2Environment, name: string): string {
   const value = env[name]?.trim();
@@ -15,21 +18,65 @@ function requiredValue(env: R2Environment, name: string): string {
   return value;
 }
 
+function readAccountId(env: R2Environment): string {
+  const accountId = requiredValue(env, "R2_ACCOUNT_ID");
+  if (!CLOUDFLARE_ACCOUNT_ID_PATTERN.test(accountId)) {
+    throw new Error("R2 account ID is invalid");
+  }
+  return accountId;
+}
+
+function readBucketName(
+  env: R2Environment,
+  name: "R2_PUBLIC_BUCKET" | "R2_PRIVATE_BUCKET",
+): string {
+  const bucket = requiredValue(env, name);
+  if (!R2_BUCKET_NAME_PATTERN.test(bucket) || IPV4_ADDRESS_PATTERN.test(bucket)) {
+    throw new Error(`R2 bucket ${name} is invalid`);
+  }
+  return bucket;
+}
+
+function readPublicBaseUrl(env: R2Environment): string {
+  const value = requiredValue(env, "R2_PUBLIC_BASE_URL");
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("R2 public base URL is invalid");
+  }
+
+  if (
+    url.protocol !== "https:" ||
+    !url.hostname ||
+    url.username ||
+    url.password ||
+    url.port ||
+    url.pathname !== "/" ||
+    url.search ||
+    url.hash
+  ) {
+    throw new Error("R2 public base URL is invalid");
+  }
+
+  return url.origin;
+}
+
 export function readR2Config(env: R2Environment): R2Config {
-  const publicBucket = requiredValue(env, "R2_PUBLIC_BUCKET");
-  const privateBucket = requiredValue(env, "R2_PRIVATE_BUCKET");
+  const publicBucket = readBucketName(env, "R2_PUBLIC_BUCKET");
+  const privateBucket = readBucketName(env, "R2_PRIVATE_BUCKET");
 
   if (publicBucket === privateBucket) {
     throw new Error("R2 public and private buckets must be different");
   }
 
   return {
-    accountId: requiredValue(env, "R2_ACCOUNT_ID"),
+    accountId: readAccountId(env),
     accessKeyId: requiredValue(env, "R2_ACCESS_KEY_ID"),
     secretAccessKey: requiredValue(env, "R2_SECRET_ACCESS_KEY"),
     publicBucket,
     privateBucket,
-    publicBaseUrl: requiredValue(env, "R2_PUBLIC_BASE_URL").replace(/\/+$/, ""),
+    publicBaseUrl: readPublicBaseUrl(env),
   };
 }
 

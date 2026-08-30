@@ -8,6 +8,18 @@ export type MediaObjectHead = {
   etag: string | null;
 };
 
+export class ObjectStorageOperationUnsupportedError extends Error {
+  readonly code = "OBJECT_STORAGE_OPERATION_UNSUPPORTED";
+
+  constructor(
+    readonly provider: MediaProvider,
+    readonly operation: "createUploadUrl",
+  ) {
+    super(`${provider} object storage does not support ${operation}`);
+    this.name = "ObjectStorageOperationUnsupportedError";
+  }
+}
+
 export interface ObjectStorage {
   put(input: {
     bucket: string;
