@@ -5,7 +5,9 @@ import { PGlite } from "@electric-sql/pglite";
 const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const {
   applyMigrationFileAtomically,
+  createMigrationPostgresClient,
   MIGRATION_ADVISORY_LOCK_KEY,
+  MIGRATION_POOL_END_TIMEOUT_SECONDS,
   readMigrationDatabaseUrl,
   runMigrationChain,
   runMigrationChainWithReservedConnection,
@@ -98,7 +100,10 @@ function createRunConnection(name, shared, options = {}) {
       if (normalized.startsWith("select pg_advisory_lock")) {
         await shared.lock.acquire(name, parameters[0]);
         shared.events.push(`${name}:lock-acquired`);
-        return [{ pg_advisory_lock: null }];
+        return [{
+          pg_advisory_lock: null,
+          backend_pid: options.backendPid ?? 10_001,
+        }];
       }
       if (normalized.startsWith("select pg_advisory_unlock")) {
         shared.lock.release(name, parameters[0]);
@@ -172,6 +177,12 @@ function createLifecycleConnection(options = {}) {
   const backendPids = options.backendPids ?? [40_001];
   let backendPidIndex = 0;
 
+  const nextBackendPid = () => {
+    const index = Math.min(backendPidIndex, backendPids.length - 1);
+    backendPidIndex++;
+    return backendPids[index];
+  };
+
   const fail = (phase) => {
     if (options.failAt !== phase) return;
     const error = new Error(`${phase} failed`);
@@ -185,13 +196,11 @@ function createLifecycleConnection(options = {}) {
       if (normalized.startsWith("select pg_advisory_lock")) {
         events.push("lock");
         fail("lock");
-        return [{ pg_advisory_lock: null }];
+        return [{ pg_advisory_lock: null, backend_pid: nextBackendPid() }];
       }
       if (normalized === "select pg_backend_pid() as backend_pid") {
         events.push("session-verify");
-        const index = Math.min(backendPidIndex, backendPids.length - 1);
-        backendPidIndex++;
-        return [{ backend_pid: backendPids[index] }];
+        return [{ backend_pid: nextBackendPid() }];
       }
       if (normalized.startsWith("select pg_advisory_unlock")) {
         events.push("unlock");
@@ -246,6 +255,96 @@ function createLifecycleConnection(options = {}) {
   return { connection, events, tracked };
 }
 
+function createBackendSwitchConnection({
+  lockPid,
+  outerPid,
+  transactionPid,
+  transactionPids = [transactionPid],
+}) {
+  const events = [];
+  const tracked = new Set();
+  let transactionStarted = false;
+  let pendingEffect = false;
+  let pendingTracking = null;
+  let committedEffects = 0;
+  let transactionPidIndex = 0;
+  let activeTransactionPid = transactionPids[0];
+
+  const nextTransactionPid = () => {
+    const index = Math.min(transactionPidIndex, transactionPids.length - 1);
+    transactionPidIndex++;
+    activeTransactionPid = transactionPids[index];
+    return activeTransactionPid;
+  };
+
+  const connection = {
+    async unsafe(statement, parameters = []) {
+      const normalized = statement.trim().replace(/\s+/g, " ").toLowerCase();
+      if (normalized.startsWith("select pg_advisory_lock")) {
+        events.push(`lock:${lockPid}`);
+        return [{ pg_advisory_lock: null, backend_pid: lockPid }];
+      }
+      if (normalized === "select pg_backend_pid() as backend_pid") {
+        const backendPid = transactionStarted ? nextTransactionPid() : outerPid;
+        events.push(`${transactionStarted ? "transaction" : "outer"}:${backendPid}`);
+        return [{ backend_pid: backendPid }];
+      }
+      if (normalized.startsWith("select pg_advisory_unlock")) {
+        events.push(`unlock:${outerPid}`);
+        return [{ pg_advisory_unlock: outerPid === lockPid }];
+      }
+      if (normalized.startsWith("create table if")) return [];
+      if (normalized === "select name from _migrations where name <> $1") {
+        return [...tracked].map((name) => ({ name }));
+      }
+      if (normalized === "begin") {
+        transactionStarted = true;
+        pendingEffect = false;
+        pendingTracking = null;
+        events.push(`begin:${activeTransactionPid}`);
+        return [];
+      }
+      if (normalized === "select name from _migrations where name = $1") {
+        return tracked.has(parameters[0]) ? [{ name: parameters[0] }] : [];
+      }
+      if (normalized === "select apply_once()") {
+        pendingEffect = true;
+        events.push(`effect:${activeTransactionPid}`);
+        return [];
+      }
+      if (normalized === "insert into _migrations (name) values ($1)") {
+        pendingTracking = parameters[0];
+        events.push(`tracking:${activeTransactionPid}`);
+        return [];
+      }
+      if (normalized === "commit") {
+        if (pendingEffect) committedEffects++;
+        if (pendingTracking) tracked.add(pendingTracking);
+        transactionStarted = false;
+        pendingEffect = false;
+        pendingTracking = null;
+        events.push(`commit:${activeTransactionPid}`);
+        return [];
+      }
+      if (normalized === "rollback") {
+        transactionStarted = false;
+        pendingEffect = false;
+        pendingTracking = null;
+        events.push(`rollback:${activeTransactionPid}`);
+        return [];
+      }
+      throw new Error(`unexpected backend-switch SQL: ${statement}`);
+    },
+  };
+
+  return {
+    connection,
+    events,
+    tracked,
+    get committedEffects() { return committedEffects; },
+  };
+}
+
 async function captureFailure(promise) {
   try {
     await promise;
@@ -264,12 +363,54 @@ describe("migration connection configuration", () => {
     })).toThrow(/MIGRATION_DATABASE_URL.*required/i);
   });
 
-  test("rejects known transaction-pooler URLs without exposing credentials", async () => {
+  test("rejects incomplete URLs instead of inheriting endpoint fields from PG variables", async () => {
+    const rejected = [
+      {
+        url: "postgresql://migration:no-port-secret@db.example.test/postgres",
+        environment: { PGPORT: "6543" },
+      },
+      {
+        url: "postgresql:///postgres",
+        environment: {
+          PGHOST: "transaction-pooler.example.test",
+          PGPORT: "6543",
+          PGUSER: "fallback-user",
+        },
+      },
+      {
+        url: "postgresql://db.example.test:5432/postgres",
+        environment: { PGUSER: "fallback-user" },
+      },
+      {
+        url: "postgresql://migration:no-database-secret@db.example.test:5432/",
+        environment: { PGDATABASE: "fallback-database" },
+      },
+    ];
+
+    for (const { url, environment } of rejected) {
+      const error = await captureFailure(Promise.resolve().then(() => readMigrationDatabaseUrl({
+        ...environment,
+        MIGRATION_DATABASE_URL: url,
+      })));
+      expect(error.message).toMatch(/hostname|port|database|username|complete|explicit/i);
+      expect(error.message).not.toContain(url);
+      expect(error.message).not.toMatch(/(?:no-port|no-database)-secret/);
+    }
+  });
+
+  test("rejects known transaction and statement pooler hints without exposing credentials", async () => {
     const rejectedUrls = [
       "postgresql://migration:port-secret@pooler.example.test:6543/postgres",
+      "POSTGRESQL://migration:ipv6-port-secret@[2001:db8::8]:6543/postgres",
       "postgresql://migration:query-secret@pooler.example.test:5432/postgres?pgbouncer=true",
+      "postgresql://migration:on-secret@pooler.example.test:5432/postgres?pgbouncer=on",
+      "postgresql://migration:enabled-secret@pooler.example.test:5432/postgres?pg_bouncer=enabled",
       "postgresql://migration:mode-secret@pooler.example.test:5432/postgres?pool_mode=transaction",
+      "postgresql://migration:statement-secret@pooler.example.test:5432/postgres?pool-mode=Statement",
+      "postgresql://migration:mode-variant-secret@pooler.example.test:5432/postgres?mode=statement",
       "postgresql://migration:options-secret@pooler.example.test:5432/postgres?options=--pool_mode%3Dtransaction",
+      "postgresql://migration:encoded-statement-secret@pooler.example.test:5432/postgres?options=--pool_mode%253Dstatement",
+      "postgresql://migration:encoded-pgbouncer-secret@pooler.example.test:5432/postgres?options=-c%20pgbouncer%3Don",
     ];
 
     for (const migrationUrl of rejectedUrls) {
@@ -279,21 +420,82 @@ describe("migration connection configuration", () => {
       expect(error).toBeInstanceOf(Error);
       expect(error.message).toMatch(/direct|session|transaction/i);
       expect(error.message).not.toContain(migrationUrl);
-      expect(error.message).not.toMatch(/(?:port|query|mode|options)-secret/);
+      expect(error.message).not.toMatch(
+        /(?:port|ipv6-port|query|on|enabled|mode|statement|mode-variant|options|encoded-statement|encoded-pgbouncer)-secret/,
+      );
     }
   });
 
-  test("accepts explicit PostgreSQL direct and session URLs on port 5432", () => {
-    const acceptedUrls = [
-      "postgresql://migration:secret@db.project.supabase.co:5432/postgres",
-      "postgres://migration:secret@aws-1-region.pooler.supabase.com:5432/postgres?sslmode=require",
+  test("returns complete direct and IPv6 endpoint fields parsed from the URL itself", () => {
+    const accepted = [
+      {
+        url: "postgresql://migration:secret@db.project.supabase.co:5432/postgres",
+        endpoint: {
+          hostname: "db.project.supabase.co",
+          port: 5432,
+          database: "postgres",
+          username: "migration",
+          password: "secret",
+        },
+      },
+      {
+        url: "postgres://migr%61tion:p%40ss@[2001:db8::7]:5432/luma?sslmode=require",
+        endpoint: {
+          hostname: "2001:db8::7",
+          port: 5432,
+          database: "luma",
+          username: "migration",
+          password: "p@ss",
+        },
+      },
     ];
-    for (const migrationUrl of acceptedUrls) {
+    for (const { url, endpoint } of accepted) {
       expect(readMigrationDatabaseUrl({
         DATABASE_URL: "postgresql://app:app-secret@pooler.example.test:6543/postgres",
-        MIGRATION_DATABASE_URL: migrationUrl,
+        PGHOST: "wrong-host.example.test",
+        PGPORT: "6543",
+        PGDATABASE: "wrong-database",
+        PGUSER: "wrong-user",
+        MIGRATION_DATABASE_URL: url,
       }))
-        .toBe(migrationUrl);
+        .toEqual({ connectionString: url, ...endpoint });
+    }
+  });
+
+  test("production postgres client options exactly match the validated endpoint and disable lifetime", async () => {
+    const previous = {
+      PGHOST: process.env.PGHOST,
+      PGPORT: process.env.PGPORT,
+      PGDATABASE: process.env.PGDATABASE,
+      PGUSER: process.env.PGUSER,
+    };
+    Object.assign(process.env, {
+      PGHOST: "wrong-host.example.test",
+      PGPORT: "6543",
+      PGDATABASE: "wrong-database",
+      PGUSER: "wrong-user",
+    });
+
+    let sql;
+    try {
+      const config = readMigrationDatabaseUrl({
+        MIGRATION_DATABASE_URL:
+          "postgresql://migration:client-secret@[2001:db8::9]:5432/luma?sslmode=require",
+      });
+      sql = createMigrationPostgresClient(config);
+      expect(sql.options.host).toEqual(["2001:db8::9"]);
+      expect(sql.options.port).toEqual([5432]);
+      expect(sql.options.database).toBe("luma");
+      expect(sql.options.user).toBe("migration");
+      expect(sql.options.max).toBe(1);
+      expect(sql.options.prepare).toBe(false);
+      expect(sql.options.max_lifetime).toBeNull();
+    } finally {
+      await sql?.end({ timeout: 0 });
+      for (const [key, value] of Object.entries(previous)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
     }
   });
 });
@@ -412,13 +614,98 @@ describe("migration lifecycle failure semantics", () => {
     expect(error.message).toMatch(/locked tracking recheck/i);
   });
 
-  test("fails fatally when the backend PID changes after advisory acquisition", async () => {
+  test("binds the expected PID to the lock owner returned by the acquisition round trip", async () => {
     const { connection } = createLifecycleConnection({ backendPids: [51_001, 51_002] });
     const error = await captureFailure(runMigrationChain(connection, []));
     expect(error.phase).toBe("session-verify");
     expect(error.message).toMatch(/backend PID.*changed/i);
     expect(error.expectedBackendPid).toBe(51_001);
     expect(error.observedBackendPid).toBe(51_002);
+  });
+
+  test("A lock to B outer to C transaction to B cannot execute or track a file", async () => {
+    const switched = createBackendSwitchConnection({
+      lockPid: 52_001,
+      outerPid: 52_002,
+      transactionPid: 52_003,
+    });
+    const error = await captureFailure(runMigrationChain(
+      switched.connection,
+      [{ name: "backend-switch.sql", content: "select apply_once()" }],
+      { sleep: async () => {} },
+    ));
+    expect(error.phase).toBe("session-verify");
+    expect(error.expectedBackendPid).toBe(52_001);
+    expect(error.observedBackendPid).toBe(52_002);
+    expect(switched.committedEffects).toBe(0);
+    expect([...switched.tracked]).toEqual([]);
+    expect(switched.events).not.toContain("effect:52003");
+    expect(switched.events).not.toContain("tracking:52003");
+  });
+
+  test("verifies the lock owner PID immediately inside BEGIN and rolls back before effects", async () => {
+    const switched = createBackendSwitchConnection({
+      lockPid: 53_001,
+      outerPid: 53_001,
+      transactionPid: 53_003,
+    });
+    const error = await captureFailure(runMigrationChain(
+      switched.connection,
+      [{ name: "transaction-switch.sql", content: "select apply_once()" }],
+      { sleep: async () => {} },
+    ));
+    expect(error.phase).toBe("session-verify");
+    expect(error.fileName).toBe("transaction-switch.sql");
+    expect(error.expectedBackendPid).toBe(53_001);
+    expect(error.observedBackendPid).toBe(53_003);
+    expect(switched.events).toContain("begin:53003");
+    expect(switched.events).toContain("transaction:53003");
+    expect(switched.events).toContain("rollback:53003");
+    expect(switched.events).not.toContain("effect:53003");
+    expect(switched.events).not.toContain("tracking:53003");
+    expect(switched.committedEffects).toBe(0);
+    expect([...switched.tracked]).toEqual([]);
+  });
+
+  test("verifies PID before tracking insert and rolls back pending statement effects", async () => {
+    const switched = createBackendSwitchConnection({
+      lockPid: 54_001,
+      outerPid: 54_001,
+      transactionPids: [54_001, 54_001, 54_003],
+    });
+    const error = await captureFailure(runMigrationChain(
+      switched.connection,
+      [{ name: "switch-before-tracking.sql", content: "select apply_once()" }],
+      { sleep: async () => {} },
+    ));
+    expect(error.phase).toBe("session-verify");
+    expect(error.message).toMatch(/before tracking insert/i);
+    expect(switched.events).toContain("effect:54001");
+    expect(switched.events).not.toContain("tracking:54001");
+    expect(switched.events).toContain("rollback:54003");
+    expect(switched.committedEffects).toBe(0);
+    expect([...switched.tracked]).toEqual([]);
+  });
+
+  test("verifies PID before COMMIT and rolls back pending effects and tracking", async () => {
+    const switched = createBackendSwitchConnection({
+      lockPid: 55_001,
+      outerPid: 55_001,
+      transactionPids: [55_001, 55_001, 55_001, 55_003],
+    });
+    const error = await captureFailure(runMigrationChain(
+      switched.connection,
+      [{ name: "switch-before-commit.sql", content: "select apply_once()" }],
+      { sleep: async () => {} },
+    ));
+    expect(error.phase).toBe("session-verify");
+    expect(error.message).toMatch(/before COMMIT/i);
+    expect(switched.events).toContain("effect:55001");
+    expect(switched.events).toContain("tracking:55001");
+    expect(switched.events).toContain("rollback:55003");
+    expect(switched.events).not.toContain("commit:55003");
+    expect(switched.committedEffects).toBe(0);
+    expect([...switched.tracked]).toEqual([]);
   });
 
   test("reports reserved-connection release failure after a successful chain", async () => {
@@ -453,6 +740,109 @@ describe("migration lifecycle failure semantics", () => {
     expect(error).toBeInstanceOf(AggregateError);
     expect(error.message).toMatch(/release-combined\.sql.*statement 1/i);
     expect(error.secondaryErrors?.at(-1)?.phase).toBe("release");
+  });
+
+  test("releases the reservation before bounded pool shutdown", async () => {
+    const { connection } = createLifecycleConnection();
+    const events = [];
+    const reservedConnection = {
+      ...connection,
+      release() {
+        events.push("release");
+      },
+    };
+    await expect(runMigrationChainWithReservedConnection(
+      {
+        async reserve() {
+          events.push("reserve");
+          return reservedConnection;
+        },
+        async end(options) {
+          events.push(["end", options]);
+        },
+      },
+      [],
+    )).resolves.toEqual({ applied: [], skipped: [] });
+    expect(events).toEqual([
+      "reserve",
+      "release",
+      ["end", { timeout: MIGRATION_POOL_END_TIMEOUT_SECONDS }],
+    ]);
+  });
+
+  test("a bounded pool shutdown failure makes an otherwise successful run fail truthfully", async () => {
+    const { connection } = createLifecycleConnection();
+    const error = await captureFailure(runMigrationChainWithReservedConnection(
+      {
+        reserve: async () => ({ ...connection, release() {} }),
+        async end(options) {
+          expect(options).toEqual({ timeout: MIGRATION_POOL_END_TIMEOUT_SECONDS });
+          throw new Error("bounded pool shutdown timed out");
+        },
+      },
+      [],
+    ));
+    expect(error.phase).toBe("release");
+    expect(error.cause?.message).toBe("bounded pool shutdown timed out");
+  });
+
+  test("a successful chain rejects when pool shutdown outlives its bound", async () => {
+    const { connection } = createLifecycleConnection();
+    let endOptions;
+    const error = await captureFailure(runMigrationChainWithReservedConnection(
+      {
+        reserve: async () => ({ ...connection, release() {} }),
+        async end(options) {
+          endOptions = options;
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        },
+      },
+      [],
+      { poolEndTimeoutSeconds: 0.001 },
+    ));
+    expect(endOptions).toEqual({ timeout: 0.001 });
+    expect(error.phase).toBe("release");
+    expect(error.cause?.message).toMatch(/pool shutdown timed out/i);
+  });
+
+  test("pool shutdown failure stays secondary to the migration failure", async () => {
+    const { connection } = createLifecycleConnection({ failAt: "statement" });
+    const error = await captureFailure(runMigrationChainWithReservedConnection(
+      {
+        reserve: async () => ({ ...connection, release() {} }),
+        async end() {
+          throw new Error("bounded pool shutdown timed out");
+        },
+      },
+      [{ name: "primary-before-end.sql", content: "select apply_once()" }],
+      { sleep: async () => {} },
+    ));
+    expect(error).toBeInstanceOf(AggregateError);
+    expect(error.phase).toBe("statement");
+    expect(error.fileName).toBe("primary-before-end.sql");
+    expect(error.cause?.message).toMatch(/primary-before-end\.sql.*statement 1/i);
+    expect(error.secondaryErrors?.at(-1)?.cause?.message)
+      .toBe("bounded pool shutdown timed out");
+  });
+
+  test("pool shutdown timeout stays secondary to the migration failure", async () => {
+    const { connection } = createLifecycleConnection({ failAt: "statement" });
+    const error = await captureFailure(runMigrationChainWithReservedConnection(
+      {
+        reserve: async () => ({ ...connection, release() {} }),
+        async end() {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        },
+      },
+      [{ name: "primary-before-timeout.sql", content: "select apply_once()" }],
+      { sleep: async () => {}, poolEndTimeoutSeconds: 0.001 },
+    ));
+    expect(error).toBeInstanceOf(AggregateError);
+    expect(error.phase).toBe("statement");
+    expect(error.fileName).toBe("primary-before-timeout.sql");
+    expect(error.cause?.message).toMatch(/primary-before-timeout\.sql.*statement 1/i);
+    expect(error.secondaryErrors?.at(-1)?.cause?.message)
+      .toMatch(/pool shutdown timed out/i);
   });
 });
 
@@ -625,7 +1015,14 @@ describe("production migration runner file atomicity", () => {
     const chainDatabase = new PGlite();
     const chainConnection = {
       async unsafe(statement, parameters = []) {
-        if (statement.trim().toLowerCase() === "select pg_backend_pid() as backend_pid") {
+        const normalized = statement.trim().replace(/\s+/g, " ").toLowerCase();
+        if (normalized.startsWith("select pg_advisory_lock")) {
+          return [{ pg_advisory_lock: null, backend_pid: 70_001 }];
+        }
+        if (normalized.startsWith("select pg_advisory_unlock")) {
+          return [{ pg_advisory_unlock: true }];
+        }
+        if (normalized === "select pg_backend_pid() as backend_pid") {
           // PGlite returns 0 for this process-local compatibility function.
           // The production runner requires a real PostgreSQL positive backend PID.
           return [{ backend_pid: 70_001 }];
@@ -747,6 +1144,21 @@ $body$;`;
     }
   });
 
+  test("treats PostgreSQL high-bit whitespace code points as identifier characters on both sides", () => {
+    const highBitIdentifierCharacters = ["\u00a0", "\u2003", "\u2028", "\ufeff"];
+    for (const character of highBitIdentifierCharacters) {
+      const statements = [
+        `CREATE INDEX ${character}CONCURRENTLY ON token_boundary(id);`,
+        `CREATE INDEX CONCURRENTLY${character} ON token_boundary(id);`,
+        `DROP INDEX ${character}CONCURRENTLY;`,
+        `DROP INDEX CONCURRENTLY${character};`,
+      ];
+      for (const statement of statements) {
+        expect(transactionalizeMigrationStatement(statement)).toBe(statement);
+      }
+    }
+  });
+
   test("preserves a Unicode-tagged dollar body and its marker text byte-for-byte", () => {
     const unicodeDollarBody = `DO $é$
 BEGIN
@@ -817,6 +1229,82 @@ SELECT 2; SELECT (3 + 4);`;
       expect((await unicodeDatabase.query(`
         select indexname from pg_indexes where indexname = 'é'
       `)).rows).toEqual([]);
+    } finally {
+      await unicodeDatabase.close();
+    }
+  });
+
+  test("creates and drops only the intended high-bit indexes and tracks each source", async () => {
+    const unicodeDatabase = new PGlite();
+    const unicodeConnection = {
+      async unsafe(statement, parameters = []) {
+        if (parameters.length) return (await unicodeDatabase.query(statement, parameters)).rows;
+        return unicodeDatabase.exec(statement);
+      },
+    };
+    const highBitIdentifierCharacters = ["\u00a0", "\u2003", "\u2028", "\ufeff"];
+    const trackedFiles = [];
+    try {
+      await unicodeDatabase.exec(`
+        create table _migrations (name text primary key, applied_at timestamptz not null default now());
+        create table high_bit_tokens (id integer primary key);
+      `);
+
+      for (const character of highBitIdentifierCharacters) {
+        const codePoint = character.codePointAt(0).toString(16).padStart(4, "0");
+        const leadingName = `${character}concurrently`;
+        // PostgreSQL/PGlite accepts U+FEFF as the high-bit prefix that prevents
+        // keyword recognition, then omits that leading BOM from the catalog name.
+        const leadingCatalogName = character === "\ufeff" ? "concurrently" : leadingName;
+        const sentinelCatalogName = character === "\ufeff" ? "" : character;
+        const suffixName = `concurrently${character}`;
+        const createLeadingFile = `high-bit-${codePoint}-create-leading.sql`;
+        const createSuffixFile = `high-bit-${codePoint}-create-suffix.sql`;
+        const dropLeadingFile = `high-bit-${codePoint}-drop-leading.sql`;
+        const dropSuffixFile = `high-bit-${codePoint}-drop-suffix.sql`;
+
+        await expect(applyMigrationFileAtomically(
+          unicodeConnection,
+          createLeadingFile,
+          `CREATE INDEX ${character}CONCURRENTLY ON high_bit_tokens(id);`,
+        )).resolves.toEqual({ status: "applied", statementCount: 1 });
+        await expect(applyMigrationFileAtomically(
+          unicodeConnection,
+          createSuffixFile,
+          `CREATE INDEX CONCURRENTLY${character} ON high_bit_tokens(id);`,
+        )).resolves.toEqual({ status: "applied", statementCount: 1 });
+        trackedFiles.push(createLeadingFile, createSuffixFile);
+
+        const createdNames = (await unicodeDatabase.query(
+          "select indexname from pg_indexes where tablename = 'high_bit_tokens'",
+        )).rows.map(({ indexname }) => indexname);
+        expect(createdNames).toContain(leadingCatalogName);
+        expect(createdNames).toContain(suffixName);
+
+        await unicodeDatabase.exec(`CREATE INDEX "${character}" ON high_bit_tokens(id);`);
+        await expect(applyMigrationFileAtomically(
+          unicodeConnection,
+          dropLeadingFile,
+          `DROP INDEX ${character}CONCURRENTLY;`,
+        )).resolves.toEqual({ status: "applied", statementCount: 1 });
+        await expect(applyMigrationFileAtomically(
+          unicodeConnection,
+          dropSuffixFile,
+          `DROP INDEX CONCURRENTLY${character};`,
+        )).resolves.toEqual({ status: "applied", statementCount: 1 });
+        trackedFiles.push(dropLeadingFile, dropSuffixFile);
+
+        const remainingNames = (await unicodeDatabase.query(
+          "select indexname from pg_indexes where tablename = 'high_bit_tokens'",
+        )).rows.map(({ indexname }) => indexname);
+        expect(remainingNames).toContain(sentinelCatalogName);
+        expect(remainingNames).not.toContain(leadingCatalogName);
+        expect(remainingNames).not.toContain(suffixName);
+      }
+
+      expect((await unicodeDatabase.query(
+        "select name from _migrations order by name",
+      )).rows.map(({ name }) => name)).toEqual([...trackedFiles].sort());
     } finally {
       await unicodeDatabase.close();
     }

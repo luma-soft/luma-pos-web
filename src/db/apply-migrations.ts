@@ -7,19 +7,19 @@
  */
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import postgres from "postgres";
 import {
+  createMigrationPostgresClient,
   readMigrationDatabaseUrl,
   runMigrationChainWithReservedConnection,
 } from "./migration-runner";
 
 // Fail before constructing a client or attempting a network connection. The
 // application DATABASE_URL may be a transaction pooler and is never a fallback.
-const url = readMigrationDatabaseUrl(process.env);
+const databaseConfig = readMigrationDatabaseUrl(process.env);
 
 // Migration connections must use a direct/session endpoint. Session settings,
 // backend PID checks, and the advisory lock all stay on one reserved connection.
-const sql = postgres(url, { max: 1, prepare: false });
+const sql = createMigrationPostgresClient(databaseConfig);
 
 const dir = "drizzle";
 const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();

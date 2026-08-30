@@ -1,8 +1,9 @@
 import { expect, test } from "bun:test";
-import postgres from "postgres";
 
 const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const {
+  createMigrationPostgresClient,
+  MIGRATION_POOL_END_TIMEOUT_SECONDS,
   readMigrationDatabaseUrl,
   runMigrationChain,
 } = await import(`${projectRoot}/src/db/migration-runner.ts`);
@@ -17,10 +18,11 @@ function deferred() {
 }
 
 postgresTest("two reserved PostgreSQL sessions serialize and recheck tracking", async () => {
-  const databaseUrl = readMigrationDatabaseUrl({
+  const databaseConfig = readMigrationDatabaseUrl({
     MIGRATION_DATABASE_URL: testDatabaseUrl,
   });
-  const sql = postgres(databaseUrl, { max: 3, prepare: false });
+  const sql = createMigrationPostgresClient(databaseConfig, { maxConnections: 3 });
+  expect(sql.options.max_lifetime).toBeNull();
   const schema = `migration_runner_${crypto.randomUUID().replaceAll("-", "")}`;
   const quotedSchema = `"${schema}"`;
   let firstConnection;
@@ -92,7 +94,7 @@ postgresTest("two reserved PostgreSQL sessions serialize and recheck tracking", 
     try {
       await sql.unsafe(`drop schema if exists ${quotedSchema} cascade`);
     } finally {
-      await sql.end();
+      await sql.end({ timeout: MIGRATION_POOL_END_TIMEOUT_SECONDS });
     }
   }
 });

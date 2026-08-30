@@ -1,3 +1,5 @@
+import postgres from "postgres";
+
 export interface MigrationConnection {
   unsafe(statement: string, parameters?: readonly unknown[]): Promise<unknown>;
 }
@@ -8,10 +10,11 @@ export interface ReservedMigrationConnection extends MigrationConnection {
 
 export interface MigrationConnectionPool {
   reserve(): Promise<ReservedMigrationConnection>;
-  end?(): Promise<void>;
+  end?(options?: { timeout?: number }): Promise<void>;
 }
 
 export const MIGRATION_ADVISORY_LOCK_KEY = 1_280_657_217;
+export const MIGRATION_POOL_END_TIMEOUT_SECONDS = 5;
 
 export type MigrationPhase =
   | "reserve"
@@ -40,6 +43,84 @@ export type MigrationOperationalError = Error & {
 };
 
 const TRANSACTION_POOLER_PORT = "6543";
+const FALSE_POOL_HINT_VALUES = new Set(["0", "false", "no", "off", "disabled"]);
+
+export interface MigrationDatabaseConfig {
+  connectionString: string;
+  hostname: string;
+  port: number;
+  database: string;
+  username: string;
+  password: string;
+}
+
+function decodeUrlComponent(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    throw new Error("MIGRATION_DATABASE_URL must be a valid PostgreSQL URL");
+  }
+}
+
+function repeatedlyDecodeUrlComponent(value: string): string {
+  let decoded = value;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let next: string;
+    try {
+      next = decodeURIComponent(decoded);
+    } catch {
+      return decoded;
+    }
+    if (next === decoded) return decoded;
+    decoded = next;
+  }
+  return decoded;
+}
+
+function normalizedPoolHintKey(value: string): string {
+  return repeatedlyDecodeUrlComponent(value).toLowerCase().replaceAll("_", "").replaceAll("-", "");
+}
+
+function hasUnsupportedPoolHint(parsed: URL): boolean {
+  const postgresOptionWhitespace = "[\\x09-\\x0d ]*";
+  const poolModePattern = new RegExp(
+    `(?:pool[_-]?mode|poolmode|mode)${postgresOptionWhitespace}=${postgresOptionWhitespace}`
+      + "(?:transaction|statement)(?:[^A-Za-z0-9_]|$)",
+    "i",
+  );
+  const pgbouncerPattern = new RegExp(
+    `(?:pg[_-]?bouncer|pgbouncer)${postgresOptionWhitespace}=${postgresOptionWhitespace}`
+      + "([^&;,\\x09-\\x0d ]*)",
+    "i",
+  );
+
+  for (const [rawKey, rawValue] of parsed.searchParams.entries()) {
+    const key = normalizedPoolHintKey(rawKey);
+    const value = repeatedlyDecodeUrlComponent(rawValue).trim().toLowerCase();
+    if ((key === "poolmode" || key === "mode")
+      && (value === "transaction" || value === "statement")) {
+      return true;
+    }
+    if (key === "pgbouncer" && !FALSE_POOL_HINT_VALUES.has(value)) {
+      return true;
+    }
+
+    const candidates = [
+      repeatedlyDecodeUrlComponent(rawKey),
+      repeatedlyDecodeUrlComponent(rawValue),
+      repeatedlyDecodeUrlComponent(`${rawKey}=${rawValue}`),
+    ];
+    for (const candidate of candidates) {
+      if (poolModePattern.test(candidate)) return true;
+      const pgbouncerMatch = candidate.match(pgbouncerPattern);
+      if (pgbouncerMatch
+        && !FALSE_POOL_HINT_VALUES.has(pgbouncerMatch[1].trim().toLowerCase())) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 /**
  * Migrations require a dedicated direct/session connection. The application URL
@@ -48,7 +129,7 @@ const TRANSACTION_POOLER_PORT = "6543";
  */
 export function readMigrationDatabaseUrl(
   environment: Record<string, string | undefined>,
-): string {
+): MigrationDatabaseConfig {
   const value = environment.MIGRATION_DATABASE_URL?.trim();
   if (!value) {
     throw new Error(
@@ -66,28 +147,74 @@ export function readMigrationDatabaseUrl(
     throw new Error("MIGRATION_DATABASE_URL must use the postgres or postgresql protocol");
   }
 
-  const hasTransactionModeHint = [...parsed.searchParams.entries()].some(([rawKey, rawValue]) => {
-    const key = rawKey.toLowerCase();
-    const parameterValue = rawValue.toLowerCase();
-    if ((key === "pool_mode" || key === "poolmode" || key === "mode")
-      && parameterValue === "transaction") {
-      return true;
-    }
-    if (key === "pgbouncer"
-      && (parameterValue === "" || ["1", "true", "yes", "transaction"].includes(parameterValue))) {
-      return true;
-    }
-    return /\b(?:pool_mode|poolmode|mode)\s*=\s*transaction\b/i.test(rawValue)
-      || /\bpgbouncer\s*=\s*(?:1|true|yes|transaction)\b/i.test(rawValue);
-  });
-
-  if (parsed.port === TRANSACTION_POOLER_PORT || hasTransactionModeHint) {
+  const username = decodeUrlComponent(parsed.username);
+  const password = decodeUrlComponent(parsed.password);
+  const hostname = parsed.hostname.startsWith("[") && parsed.hostname.endsWith("]")
+    ? parsed.hostname.slice(1, -1)
+    : parsed.hostname;
+  const database = parsed.pathname.slice(1);
+  const port = Number(parsed.port);
+  if (!hostname || !parsed.port || !Number.isSafeInteger(port) || port <= 0
+    || !database || !username) {
     throw new Error(
-      "MIGRATION_DATABASE_URL must use a direct or session PostgreSQL endpoint "
-      + "(Supabase: port 5432); transaction/pgbouncer pooling is unsupported",
+      "MIGRATION_DATABASE_URL must be complete and explicit "
+      + "(hostname, port, database path, and username)",
     );
   }
-  return value;
+
+  if (parsed.port === TRANSACTION_POOLER_PORT || hasUnsupportedPoolHint(parsed)) {
+    throw new Error(
+      "MIGRATION_DATABASE_URL must use a direct or session PostgreSQL endpoint "
+      + "(Supabase: port 5432); transaction/statement/pgbouncer pooling is unsupported",
+    );
+  }
+  return {
+    connectionString: value,
+    hostname,
+    port,
+    database,
+    username,
+    password,
+  };
+}
+
+export function createMigrationPostgresClient(
+  config: MigrationDatabaseConfig,
+  options: { maxConnections?: number } = {},
+) {
+  const maxConnections = options.maxConnections ?? 1;
+  if (!Number.isSafeInteger(maxConnections) || maxConnections <= 0) {
+    throw new Error("Migration PostgreSQL client maxConnections must be a positive integer");
+  }
+
+  const sql = postgres(config.connectionString, {
+    // postgres-js supports arrays internally for exact multi-host pairing. An
+    // array also prevents its string host parser from splitting an IPv6 colon.
+    host: [config.hostname] as unknown as string,
+    port: [config.port] as unknown as number,
+    database: config.database,
+    user: config.username,
+    password: () => config.password,
+    max: maxConnections,
+    prepare: false,
+    max_lifetime: null,
+  });
+  const effectiveHost = sql.options.host;
+  const effectivePort = sql.options.port;
+  const endpointMatches = Array.isArray(effectiveHost)
+    && effectiveHost.length === 1
+    && effectiveHost[0] === config.hostname
+    && Array.isArray(effectivePort)
+    && effectivePort.length === 1
+    && effectivePort[0] === config.port
+    && sql.options.database === config.database
+    && sql.options.user === config.username;
+  if (!endpointMatches || sql.options.max_lifetime !== null) {
+    throw new Error(
+      "Migration PostgreSQL client options do not match the validated dedicated configuration",
+    );
+  }
+  return sql;
 }
 
 function asError(error: unknown): Error {
@@ -199,6 +326,7 @@ export interface MigrationRunResult {
 
 export interface MigrationRunOptions {
   maxFileRetries?: number;
+  poolEndTimeoutSeconds?: number;
   sleep?: (milliseconds: number) => Promise<void>;
   afterLockAcquired?: (connection: MigrationConnection) => Promise<void>;
   onFileStart?: (fileName: string) => void;
@@ -234,6 +362,28 @@ const isDollarTagPart = (character: string | undefined) => (
   character !== undefined
   && (/[A-Za-z0-9_]/.test(character) || isHighIdentifierCharacter(character))
 );
+const isPostgresWhitespace = (character: string | undefined) => (
+  character === " "
+  || character === "\t"
+  || character === "\n"
+  || character === "\r"
+  || character === "\f"
+  || character === "\v"
+);
+
+function trimPostgresWhitespace(value: string): string {
+  let start = 0;
+  let end = value.length;
+  while (start < end && isPostgresWhitespace(value[start])) start++;
+  while (end > start && isPostgresWhitespace(value[end - 1])) end--;
+  return value.slice(start, end);
+}
+
+function trimPostgresWhitespaceEnd(value: string): string {
+  let end = value.length;
+  while (end > 0 && isPostgresWhitespace(value[end - 1])) end--;
+  return value.slice(0, end);
+}
 
 function dollarQuoteTagAt(statement: string, start: number): string | undefined {
   if (statement[start] !== "$") return undefined;
@@ -287,14 +437,14 @@ function scanSql(statement: string, handlers: SqlScannerHandlers): void {
     const character = statement[index];
     const next = statement[index + 1];
 
-    if (/\s/.test(character)) {
+    if (isPostgresWhitespace(character)) {
       index++;
       continue;
     }
     if (character === "-" && next === "-") {
       const lineEnd = statement.indexOf("\n", index + 2);
       const commentEnd = lineEnd === -1 ? statement.length : lineEnd;
-      const comment = statement.slice(index, commentEnd).trimEnd();
+      const comment = trimPostgresWhitespaceEnd(statement.slice(index, commentEnd));
       const end = lineEnd === -1 ? statement.length : lineEnd + 1;
       if (depth === 0 && comment === STATEMENT_BREAKPOINT) {
         handlers.onTopLevelBreakpoint?.(index, end);
@@ -370,7 +520,7 @@ export function splitMigrationStatements(content: string): string[] {
   const statements: string[] = [];
   let statementStart = 0;
   const pushStatement = (end: number) => {
-    const statement = content.slice(statementStart, end).trim();
+    const statement = trimPostgresWhitespace(content.slice(statementStart, end));
     if (statement) statements.push(statement);
   };
 
@@ -455,15 +605,22 @@ export async function applyMigrationFileAtomically(
   connection: MigrationConnection,
   fileName: string,
   content: string,
+  expectedBackendPid?: number,
 ): Promise<MigrationFileResult> {
   const statements = splitMigrationStatements(content);
   let phase: MigrationPhase = "begin";
   let statementNumber = 0;
   let transactionStarted = false;
+  const verifyFileBackendPid = async (boundary: string) => {
+    if (expectedBackendPid === undefined) return;
+    phase = "session-verify";
+    await verifyBackendPid(connection, expectedBackendPid, boundary, fileName);
+  };
 
   try {
     await connection.unsafe("begin");
     transactionStarted = true;
+    await verifyFileBackendPid("immediately after BEGIN");
 
     phase = "tracking-read";
     const tracked = await connection.unsafe(
@@ -471,34 +628,41 @@ export async function applyMigrationFileAtomically(
       [fileName],
     ) as unknown[];
     if (tracked.length > 0) {
+      await verifyFileBackendPid("before COMMIT of tracked-file recheck");
       phase = "commit";
       await connection.unsafe("commit");
       transactionStarted = false;
       return { status: "already-applied", statementCount: 0 };
     }
 
+    await verifyFileBackendPid("before executing file statements");
     for (const [index, rawStatement] of statements.entries()) {
       phase = "statement";
       statementNumber = index + 1;
       await connection.unsafe(transactionalizeMigrationStatement(rawStatement));
     }
 
+    await verifyFileBackendPid("before tracking insert");
     phase = "tracking-insert";
     await connection.unsafe(
       "insert into _migrations (name) values ($1)",
       [fileName],
     );
+    await verifyFileBackendPid("before COMMIT");
     phase = "commit";
     await connection.unsafe("commit");
     transactionStarted = false;
     return { status: "applied", statementCount: statements.length };
   } catch (cause) {
     const outcomeUnknown = phase === "commit" && isConnectionLoss(cause);
-    const primary = createPhaseError(phase, cause, {
-      fileName,
-      statementNumber: phase === "statement" ? statementNumber : undefined,
-      outcomeUnknown,
-    });
+    const causeError = asError(cause) as MigrationOperationalError;
+    const primary = causeError.phase === "session-verify"
+      ? causeError
+      : createPhaseError(phase, cause, {
+        fileName,
+        statementNumber: phase === "statement" ? statementNumber : undefined,
+        outcomeUnknown,
+      });
     const cleanupErrors: MigrationOperationalError[] = [];
 
     if (transactionStarted) {
@@ -534,21 +698,26 @@ async function runPhase<T>(
   }
 }
 
-async function readBackendPid(connection: MigrationConnection): Promise<number> {
-  const rows = await connection.unsafe(
-    "select pg_backend_pid() as backend_pid",
-  ) as Array<{ backend_pid?: number | string }>;
-  const value = Number(rows[0]?.backend_pid);
+function backendPidFromRows(rows: unknown): number {
+  const value = Number((rows as Array<{ backend_pid?: number | string }>)[0]?.backend_pid);
   if (!Number.isSafeInteger(value) || value <= 0) {
     throw new Error("pg_backend_pid() did not return a positive integer");
   }
   return value;
 }
 
+async function readBackendPid(connection: MigrationConnection): Promise<number> {
+  const rows = await connection.unsafe(
+    "select pg_backend_pid() as backend_pid",
+  );
+  return backendPidFromRows(rows);
+}
+
 async function verifyBackendPid(
   connection: MigrationConnection,
   expectedBackendPid: number,
   boundary: string,
+  fileName?: string,
 ): Promise<void> {
   let observedBackendPid: number;
   try {
@@ -556,6 +725,7 @@ async function verifyBackendPid(
   } catch (cause) {
     throw createPhaseError("session-verify", cause, {
       boundary,
+      fileName,
       expectedBackendPid,
     });
   }
@@ -565,10 +735,12 @@ async function verifyBackendPid(
     );
     const error = createPhaseError("session-verify", cause, {
       boundary,
+      fileName,
       expectedBackendPid,
       observedBackendPid,
     });
-    error.message = `PostgreSQL backend PID changed during ${boundary}: `
+    error.message = `${fileName ? `Migration ${fileName}: ` : ""}`
+      + `PostgreSQL backend PID changed during ${boundary}: `
       + `expected ${expectedBackendPid}, observed ${observedBackendPid}`;
     throw error;
   }
@@ -589,15 +761,16 @@ export async function runMigrationChain(
   let primaryError: MigrationOperationalError | undefined;
 
   try {
-    await runPhase("lock", () => connection.unsafe(
-      "select pg_advisory_lock($1)", [MIGRATION_ADVISORY_LOCK_KEY],
+    const lockRows = await runPhase("lock", () => connection.unsafe(
+      "select pg_advisory_lock($1), pg_backend_pid() as backend_pid",
+      [MIGRATION_ADVISORY_LOCK_KEY],
     ));
     lockHeld = true;
     try {
-      expectedBackendPid = await readBackendPid(connection);
+      expectedBackendPid = backendPidFromRows(lockRows);
     } catch (cause) {
       throw createPhaseError("session-verify", cause, {
-        boundary: "after advisory acquisition",
+        boundary: "advisory acquisition round trip",
       });
     }
 
@@ -644,6 +817,7 @@ export async function runMigrationChain(
             connection,
             migration.name,
             migration.content,
+            expectedBackendPid,
           );
           await verifyBackendPid(
             connection,
@@ -752,7 +926,30 @@ export async function runMigrationChainWithReservedConnection(
   }
   if (pool.end) {
     try {
-      await pool.end();
+      const timeoutSeconds = options.poolEndTimeoutSeconds
+        ?? MIGRATION_POOL_END_TIMEOUT_SECONDS;
+      if (!Number.isFinite(timeoutSeconds) || timeoutSeconds <= 0) {
+        throw new Error("Migration connection pool shutdown timeout must be positive");
+      }
+      let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+      const timeoutFailure = new Promise<never>((_resolve, reject) => {
+        timeoutHandle = setTimeout(() => {
+          reject(new Error(
+            `Migration connection pool shutdown timed out after ${timeoutSeconds} seconds`,
+          ));
+        }, timeoutSeconds * 1_000);
+      });
+      try {
+        // Register our rejecting timer before postgres-js registers its
+        // force-destroy timer. postgres-js resolves after forced teardown, so
+        // the outer bound is what makes that timeout visible to the caller.
+        await Promise.race([
+          Promise.resolve().then(() => pool.end!({ timeout: timeoutSeconds })),
+          timeoutFailure,
+        ]);
+      } finally {
+        if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
+      }
     } catch (cause) {
       releaseErrors.push(createPhaseError("release", cause, {
         boundary: "connection pool",
