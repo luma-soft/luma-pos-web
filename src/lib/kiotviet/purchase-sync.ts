@@ -48,6 +48,9 @@ export interface KiotVietPurchaseCurrentLine {
   localId: string;
   purchaseOrderId: string;
   legacyImported?: boolean;
+  /** SKU supplied by a store-loader join to the legacy line's product row. */
+  legacyProductSku?: string;
+  legacyProductName?: string;
   sourceSku?: string;
   unitName?: string;
   quantity?: number | string;
@@ -187,33 +190,26 @@ function sourcePurchaseFingerprint(purchase: KiotVietPurchaseSnapshot): string {
 function sourceLineFingerprint(line: KiotVietPurchaseLineSnapshot): string {
   return stableKiotVietFingerprint({
     sourceSku: line.sourceSku,
-    unitName: line.unitName,
     quantity: line.quantity,
     unitCost: line.unitCost,
-    discount: line.discount,
     total: line.total,
-    note: line.note,
   });
 }
 
 function currentLineFingerprint(line: KiotVietPurchaseCurrentLine): string | null {
+  const sourceSku = nullableText(line.legacyProductSku) ?? nullableText(line.sourceSku);
   if (
     !line.legacyImported
-    || !line.sourceSku
-    || !line.unitName
+    || !sourceSku
     || line.quantity == null
     || line.unitCost == null
-    || line.discount == null
     || line.total == null
   ) return null;
   return stableKiotVietFingerprint({
-    sourceSku: line.sourceSku,
-    unitName: line.unitName,
+    sourceSku,
     quantity: normalizeKiotVietNumber(line.quantity),
     unitCost: normalizeKiotVietNumber(line.unitCost),
-    discount: normalizeKiotVietNumber(line.discount),
     total: normalizeKiotVietNumber(line.total),
-    note: line.note ?? null,
   });
 }
 

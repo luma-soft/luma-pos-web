@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import { join } from "node:path";
+import * as XLSX from "xlsx";
 import { readKiotVietDataBundle } from "@/lib/kiotviet/data-sync-files";
-import { planKiotVietPurchaseSync } from "@/lib/kiotviet/purchase-sync";
+import { createKiotVietHistoryProductResolver } from "@/lib/kiotviet/history-product-resolver";
+import { parseKiotVietProductRows } from "@/lib/kiotviet/product-sync";
+import { planKiotVietPurchaseSync, type KiotVietResolvedPurchaseProduct } from "@/lib/kiotviet/purchase-sync";
 
 const sourceRows = [
   {
@@ -70,6 +74,58 @@ function plan(input: Partial<Parameters<typeof planKiotVietPurchaseSync>[0]> = {
     resolvedProducts,
     ...input,
   });
+}
+
+function task6StyleWorkbookResolutions(
+  rows: Record<string, unknown>[],
+  snapshot: ReturnType<typeof parseKiotVietProductRows>,
+): { resolvedProducts: KiotVietResolvedPurchaseProduct[]; currentBase: number; alternateUnit: number; unresolved: number } {
+  const resolver = createKiotVietHistoryProductResolver({
+    currentBaseProducts: snapshot.products.map((product) => ({
+      id: `product:${product.sku}`,
+      sku: product.sku,
+      baseUnit: product.baseUnit,
+    })),
+    productUnits: snapshot.units.map((unit) => ({
+      productId: `product:${unit.baseSku}`,
+      sku: unit.sku,
+      unitName: unit.unitName,
+      multiplier: unit.multiplier,
+    })),
+    archivedSourceMappings: [],
+    approvedHistoricalPlaceholders: [],
+  });
+  let currentBase = 0;
+  let alternateUnit = 0;
+  let unresolved = 0;
+  const bySourceIdentity = new Map<string, KiotVietResolvedPurchaseProduct | null>();
+  for (const row of rows) {
+    const sku = String(row["Mã hàng"] ?? "");
+    const sourceUnitName = String(row.ĐVT ?? "");
+    const resolution = resolver.resolve({ sku, unitName: sourceUnitName });
+    const key = `${sku.trim()}\u0000${sourceUnitName.trim().toLocaleLowerCase("vi")}`;
+    if (resolution.status !== "resolved") {
+      unresolved += 1;
+      bySourceIdentity.set(key, null);
+      continue;
+    }
+    if (resolution.source === "current_base") currentBase += 1;
+    if (resolution.source === "alternate_unit") alternateUnit += 1;
+    bySourceIdentity.set(key, {
+      sku: resolution.sourceSku,
+      productId: resolution.productId,
+      unitName: resolution.unitName,
+      sourceUnitName: resolution.sourceUnitName,
+      unitMultiplier: resolution.unitMultiplier,
+      resolutionSource: resolution.source,
+    });
+  }
+  return {
+    resolvedProducts: [...bySourceIdentity.values()].filter((value): value is KiotVietResolvedPurchaseProduct => value != null),
+    currentBase,
+    alternateUnit,
+    unresolved,
+  };
 }
 
 describe("KiotViet purchase receipt synchronization", () => {
@@ -154,6 +210,32 @@ describe("KiotViet purchase receipt synchronization", () => {
         preservedLineIds: ["luma-line"],
       },
     });
+  });
+
+  test("adopts the actual legacy importer line shape using its joined product SKU", () => {
+    const result = plan({
+      sourceRows: [sourceRows[0]!],
+      current: [{ localId: "purchase-001", code: "PN-001", fingerprint: "outdated", subtotal: 0, legacyImported: true }],
+      existingLines: [{
+        // The legacy importer persisted only product ID + quantity/cost/total.
+        // The loader supplies this SKU by joining that product ID to products.
+        localId: "legacy-import-line",
+        purchaseOrderId: "purchase-001",
+        legacyImported: true,
+        legacyProductSku: "ALT-001",
+        quantity: 2,
+        unitCost: 120000,
+        total: 240000,
+      }],
+    });
+
+    expect(result.blockers).toEqual([]);
+    expect(result.writes[0]?.purchase.lines).toMatchObject([{
+      action: "update",
+      localId: "legacy-import-line",
+      externalId: "PN-001|ALT-001|hộp|1",
+    }]);
+    expect(result.writes[0]?.purchase.preservedLineIds).toEqual([]);
   });
 
   test("reserves mapped child IDs before a legacy fallback can reuse them", () => {
@@ -268,28 +350,27 @@ describe("KiotViet purchase receipt synchronization", () => {
     expect(result.writes.every((write) => !("notifications" in write.purchase))).toBe(true);
   });
 
-  suppliedBundleTest("plans the supplied workbook only when every supplier and source SKU/unit has an explicit resolution", () => {
+  suppliedBundleTest("classifies purchase source units through Task 6 and blocks the unresolved workbook occurrences", () => {
     const source = readKiotVietDataBundle(suppliedBundleDirectory!).sources.find((item) => item.phase === "purchases")!;
+    const productWorkbook = XLSX.readFile(join(
+      suppliedBundleDirectory!,
+      "DanhSachSanPham_KV30082026-224750-732.xlsx",
+    ));
+    const productSnapshot = parseKiotVietProductRows(XLSX.utils.sheet_to_json<Record<string, unknown>>(
+      productWorkbook.Sheets[productWorkbook.SheetNames[0]!],
+      { defval: null },
+    ));
     const supplierCodes = [...new Set(source.rows.map((row) => String(row["Mã nhà cung cấp"] ?? "").trim()))].filter(Boolean);
-    const productResolutions = [...new Map(source.rows.map((row) => {
-      const sku = String(row["Mã hàng"] ?? "").trim();
-      const sourceUnitName = String(row.ĐVT ?? "").trim();
-      // Task 6 normalizes a blank workbook unit to the resolved product's base
-      // unit. The planner then uses its unique-SKU fallback for that blank row.
-      const resolvedUnitName = sourceUnitName || "Cái";
-      return [sku, {
-        sku, productId: `product:${sku}`, unitName: resolvedUnitName, sourceUnitName: resolvedUnitName, unitMultiplier: 1,
-        resolutionSource: "current_base" as const,
-      }];
-    })).values()];
+    const resolutions = task6StyleWorkbookResolutions(source.rows, productSnapshot);
     const result = plan({
       sourceRows: source.rows,
       resolvedSuppliers: supplierCodes.map((code) => ({ code, supplierId: `supplier:${code}` })),
-      resolvedProducts: productResolutions,
+      resolvedProducts: resolutions.resolvedProducts,
     });
 
-    expect(result.blockers).toEqual([]);
-    expect(result.summary).toMatchObject({ documents: 1169, lines: 4611, creates: 1169 });
-    expect(result.writes.every((write) => write.purchase.status === "received" || write.purchase.status === "draft")).toBe(true);
+    expect(resolutions).toMatchObject({ currentBase: 4063, alternateUnit: 339, unresolved: 209 });
+    expect(result.writes).toEqual([]);
+    expect(result.summary).toMatchObject({ documents: 1169, lines: 4402, creates: 1169, unresolvedProducts: 209 });
+    expect(result.blockers.filter((blocker) => blocker.reason === "unresolved_product")).toHaveLength(209);
   });
 });
