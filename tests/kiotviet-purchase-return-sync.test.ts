@@ -174,7 +174,7 @@ describe("KiotViet supplier-return synchronization", () => {
     });
   });
 
-  test("reuses an exact legacy child for a mapped existing parent without child provenance", () => {
+  test("creates an unmapped source child instead of stealing an exact child under a mapped parent", () => {
     const result = plan({
       current: [{
         localId: "return-001", code: "THN-001", fingerprint: "outdated",
@@ -195,10 +195,10 @@ describe("KiotViet supplier-return synchronization", () => {
       localId: "return-001",
       purchaseReturn: {
         lines: [{
-          action: "adopt", adoptionMethod: "legacy_adopted", localId: "legacy-line",
+          action: "create", adoptionMethod: "created",
           externalId: "THN-001|ALT-001|hộp|1",
         }],
-        preservedLineIds: [],
+        preservedLineIds: ["legacy-line"],
       },
     });
   });
@@ -223,7 +223,8 @@ describe("KiotViet supplier-return synchronization", () => {
     expect(result.writes).toMatchObject([{
       action: "update", localId: "return-001",
       purchaseReturn: {
-        lines: [{ action: "adopt", adoptionMethod: "legacy_adopted", localId: "legacy-line" }],
+        lines: [{ action: "create", adoptionMethod: "created" }],
+        preservedLineIds: ["legacy-line"],
       },
     }]);
   });
@@ -250,7 +251,7 @@ describe("KiotViet supplier-return synchronization", () => {
     }]);
   });
 
-  test("validates unmatched source-owned legacy children on an unchanged fully mapped parent", () => {
+  test("ignores unmapped legacy-looking children once the parent and source child are mapped", () => {
     const sourceFingerprint = kiotVietPurchaseReturnFingerprint(plan().returns[0]!);
     const result = plan({
       current: [{
@@ -271,11 +272,7 @@ describe("KiotViet supplier-return synchronization", () => {
     });
 
     expect(result.writes).toEqual([]);
-    expect(result.blockers).toEqual([{
-      documentCode: "THN-001",
-      reference: "unmatched-legacy",
-      reason: "legacy_line_unmatched",
-    }]);
+    expect(result.blockers).toEqual([]);
     expect(result.preservedLineIds).toEqual(["unmatched-legacy"]);
   });
 

@@ -1,7 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { readKiotVietDataBundle } from "@/lib/kiotviet/data-sync-files";
 import { groupKiotVietDocumentRows, normalizeKiotVietNumber, normalizeKiotVietText } from "@/lib/kiotviet/data-sync-plan";
-import { kiotVietReturnFingerprint, planKiotVietReturnSync } from "@/lib/kiotviet/return-sync";
+import {
+  kiotVietReturnFingerprint,
+  kiotVietReturnLegacyBootstrapFingerprint,
+  planKiotVietReturnSync,
+} from "@/lib/kiotviet/return-sync";
 
 const sourceRows = [
   {
@@ -274,6 +278,41 @@ describe("KiotViet customer return synchronization", () => {
     expect(result.preservedLineIds).toEqual(["luma-return-line"]);
   });
 
+  test("adopts an old-schema return only when stable parent and complete child evidence match", () => {
+    const source = plan().returns[0]!;
+    const exact = plan({
+      current: [{
+        localId: "return-001", code: "TH-001", fingerprint: "old-schema",
+        legacyImported: false,
+        legacyBootstrapFingerprint: kiotVietReturnLegacyBootstrapFingerprint(source),
+      }],
+      existingLines: [{
+        localId: "legacy-return-line", returnId: "return-001", legacyAdoptionEligible: true,
+        legacyProductSku: "ALT-001", orderItemId: "sale-line-001",
+        quantity: 2, unitPrice: 100000, total: 200000,
+      }],
+    });
+    expect(exact.entityPlan.adopts).toEqual([{
+      externalId: "TH-001", localId: "return-001", needsUpdate: true,
+    }]);
+
+    const mismatch = plan({
+      current: [{
+        localId: "return-001", code: "TH-001", fingerprint: "old-schema",
+        legacyImported: false, legacyBootstrapFingerprint: "near-match-not-exact",
+      }],
+      existingLines: [{
+        localId: "legacy-return-line", returnId: "return-001", legacyAdoptionEligible: true,
+        legacyProductSku: "ALT-001", orderItemId: "sale-line-001",
+        quantity: 1, unitPrice: 100000, total: 100000,
+      }],
+    });
+    expect(mismatch.entityPlan.conflicts).toEqual([{
+      externalId: "TH-001", localId: "return-001", reason: "code_collision",
+    }]);
+    expect(mismatch.writes).toEqual([]);
+  });
+
   test("backfills child provenance for an exact bootstrap return and preserves Luma children", () => {
     const source = plan().returns[0]!;
     const result = plan({
@@ -314,6 +353,27 @@ describe("KiotViet customer return synchronization", () => {
         preservedLineIds: ["luma-line"],
       },
     }]);
+  });
+
+  test("does not adopt an unmapped exact child after the return parent is mapped", () => {
+    const result = plan({
+      sales: [{ ...sales[0]!, items: [{ ...sales[0]!.items[0]!, quantity: 4 }] }],
+      current: [{
+        localId: "return-001", code: "TH-001", fingerprint: "stale", legacyImported: true,
+      }],
+      mappings: [{ externalId: "TH-001", localId: "return-001" }],
+      existingLines: [{
+        localId: "luma-line", returnId: "return-001", active: false,
+        legacyAdoptionEligible: true, legacyProductSku: "ALT-001", orderItemId: "sale-line-001",
+        quantity: 2, unitPrice: 100000, total: 200000,
+      }],
+    });
+
+    expect(result.blockers).toEqual([]);
+    expect(result.writes[0]?.return.lines[0]).toMatchObject({
+      action: "create", adoptionMethod: "created",
+    });
+    expect(result.writes[0]?.return.preservedLineIds).toEqual(["luma-line"]);
   });
 
   test("reserves a mapped stale occurrence so legacy fallback cannot steal its child ID", () => {

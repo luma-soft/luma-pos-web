@@ -43,6 +43,8 @@ export interface KiotVietPurchaseReturnCurrent {
   fingerprint: string;
   settlementStatus: "unsettled" | "partial" | "settled";
   legacyImported: boolean;
+  /** Exact old-importer parent + complete-child evidence, reconstructed by the loader. */
+  legacyBootstrapFingerprint?: string;
 }
 
 export interface KiotVietPurchaseReturnCurrentLine {
@@ -192,6 +194,31 @@ export function kiotVietPurchaseReturnFingerprint(value: KiotVietPurchaseReturnS
   const normalizedLines = lines.map(withoutKiotVietExternalId)
     .sort((left, right) => stableKiotVietFingerprint(left).localeCompare(stableKiotVietFingerprint(right)));
   return stableKiotVietFingerprint({ ...parent, lines: normalizedLines });
+}
+
+export function kiotVietPurchaseReturnLegacyBootstrapFingerprint(
+  value: KiotVietPurchaseReturnSnapshot,
+): string {
+  const normalizedLines = value.lines.map(withoutKiotVietExternalId)
+    .sort((left, right) => stableKiotVietFingerprint(left).localeCompare(stableKiotVietFingerprint(right)));
+  return stableKiotVietFingerprint({
+    code: value.code,
+    purchaseOrderId: value.purchaseOrderId,
+    supplierId: value.supplierId,
+    status: value.status,
+    settlementStatus: value.settlementStatus,
+    subtotal: value.subtotal,
+    discount: value.discount,
+    vatRate: value.vatRate,
+    tax: value.tax,
+    totalRefund: value.totalRefund,
+    refundAmount: value.refundAmount,
+    refundMethod: value.refundMethod,
+    debtAmount: value.debtAmount,
+    createdAt: value.createdAt,
+    sourceNoteWasBlank: value.note == null,
+    lines: normalizedLines,
+  });
 }
 
 function sourceLineFingerprint(value: KiotVietPurchaseReturnLineSnapshot): string {
@@ -552,12 +579,21 @@ export function planKiotVietPurchaseReturnSync(input: {
     productsBySourceKey,
     blockers,
   });
+  const returnsByCode = new Map(returns.map((value) => [value.code, value]));
   const entityPlan = planKiotVietEntities({
     sources: returns.map((value) => ({
       externalId: value.code,
       fingerprint: kiotVietPurchaseReturnFingerprint(value),
     })),
-    current: input.current,
+    current: input.current.map((value) => ({
+      ...value,
+      legacyImported: value.legacyImported || (() => {
+        const source = value.code == null ? undefined : returnsByCode.get(value.code);
+        return source != null
+          && value.legacyBootstrapFingerprint != null
+          && value.legacyBootstrapFingerprint === kiotVietPurchaseReturnLegacyBootstrapFingerprint(source);
+      })(),
+    })),
     mappings: input.mappings,
   });
   for (const conflict of entityPlan.conflicts) {
@@ -567,7 +603,6 @@ export function planKiotVietPurchaseReturnSync(input: {
       reason: "parent_identity_conflict",
     });
   }
-  const returnsByCode = new Map(returns.map((value) => [value.code, value]));
   const currentById = new Map(input.current.map((value) => [value.localId, value]));
   const needsChildProvenance = (externalId: string): boolean => (
     returnsByCode.get(externalId)?.lines.some((line) => !lineMappings.has(line.externalId)) ?? false
@@ -608,7 +643,7 @@ export function planKiotVietPurchaseReturnSync(input: {
       values: snapshot.lines,
       mappings: lineMappings,
       currentById: existingLines,
-      allowLegacyAdoption: localId != null,
+      allowLegacyAdoption: action === "adopt",
       blockers,
     });
     return {

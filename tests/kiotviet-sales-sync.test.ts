@@ -452,6 +452,37 @@ describe("KiotViet sales invoice synchronization", () => {
     expect(plan.writes[0]?.sale.preservedLineIds).toEqual(["luma-line"]);
   });
 
+  test("does not let an unmapped source child steal an exact Luma child under a mapped sale", () => {
+    const result = planSales({
+      sourceRows: [sourceRows[0]!],
+      current: [{
+        localId: "sale-001", code: "HD-001", fingerprint: "stale", legacyImported: true,
+      }],
+      mappings: [{ externalId: "HD-001", localId: "sale-001" }],
+      existingLines: [{
+        localId: "luma-line", orderId: "sale-001", legacyAdoptionEligible: true,
+        sourceSku: "ALT-001", unitName: "Hộp", quantity: 2, unitPrice: 120000,
+        discount: 0, total: 240000, note: "Hàng dễ vỡ",
+      }],
+      existingPayments: [{
+        localId: "luma-payment", orderId: "sale-001", legacyAdoptionEligible: true,
+        method: "cash", amount: 8000,
+      }],
+    });
+
+    expect(result.blockers).toEqual([]);
+    expect(result.writes[0]?.sale.lines[0]).toMatchObject({
+      action: "create", adoptionMethod: "created",
+    });
+    expect(result.writes[0]?.sale.lines[0]?.localId).toBeUndefined();
+    expect(result.writes[0]?.sale.payments[0]).toMatchObject({
+      action: "create", adoptionMethod: "created",
+    });
+    expect(result.writes[0]?.sale.payments[0]?.localId).toBeUndefined();
+    expect(result.writes[0]?.sale.preservedLineIds).toContain("luma-line");
+    expect(result.writes[0]?.sale.preservedPaymentIds).toContain("luma-payment");
+  });
+
   test("adopts the legacy importer alternate-unit placeholder and aggregate payment without duplication", () => {
     const plan = planKiotVietSalesSync({
       storeId: "store-001",

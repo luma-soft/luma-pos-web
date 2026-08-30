@@ -52,6 +52,8 @@ export interface KiotVietReturnCurrent {
   code: string | null;
   fingerprint: string;
   legacyImported: boolean;
+  /** Exact old-importer parent + complete-child evidence, reconstructed by the loader. */
+  legacyBootstrapFingerprint?: string;
 }
 
 export interface KiotVietReturnCurrentLine {
@@ -235,6 +237,37 @@ export function kiotVietReturnFingerprint(value: KiotVietReturnSnapshot): string
   const normalizedLines = lines.map(withoutKiotVietExternalId)
     .sort((left, right) => stableKiotVietFingerprint(left).localeCompare(stableKiotVietFingerprint(right)));
   return stableKiotVietFingerprint({ ...parent, lines: normalizedLines });
+}
+
+export function kiotVietReturnLegacyBootstrapFingerprint(
+  value: Pick<KiotVietReturnSnapshot,
+    "code" | "invoiceCode" | "orderId" | "customerId" | "status" | "createdAt" | "totalRefund" | "note"
+  > & {
+    lines: Array<Pick<KiotVietReturnLineSnapshot,
+      "orderItemId" | "sourceSku" | "quantity" | "unitPrice" | "total"
+    >>;
+  },
+): string {
+  const lines = value.lines.map((line) => ({
+    orderItemId: line.orderItemId,
+    sourceSku: line.sourceSku,
+    quantity: line.quantity,
+    unitPrice: line.unitPrice,
+    total: line.total,
+  })).sort((left, right) => (
+    stableKiotVietFingerprint(left).localeCompare(stableKiotVietFingerprint(right))
+  ));
+  return stableKiotVietFingerprint({
+    code: value.code,
+    invoiceCode: value.invoiceCode,
+    orderId: value.orderId,
+    customerId: value.customerId,
+    status: value.status,
+    createdAt: value.createdAt,
+    totalRefund: value.totalRefund,
+    note: value.note,
+    lines,
+  });
 }
 
 function sourceLineFingerprint(value: KiotVietReturnLineSnapshot): string {
@@ -590,17 +623,22 @@ export function planKiotVietReturnSync(input: {
     blockers,
     linkageExceptions,
   });
+  const returnsByCode = new Map(returns.map((value) => [value.code, value]));
   const entityPlan = planKiotVietEntities({
     sources: returns.map((value) => ({ externalId: value.code, fingerprint: kiotVietReturnFingerprint(value) })),
     current: input.current.map((value) => ({
       localId: value.localId,
       code: value.code,
       fingerprint: value.fingerprint,
-      legacyImported: value.legacyImported,
+      legacyImported: value.legacyImported || (() => {
+        const source = value.code == null ? undefined : returnsByCode.get(value.code);
+        return source != null
+          && value.legacyBootstrapFingerprint != null
+          && value.legacyBootstrapFingerprint === kiotVietReturnLegacyBootstrapFingerprint(source);
+      })(),
     })),
     mappings: input.mappings,
   });
-  const returnsByCode = new Map(returns.map((value) => [value.code, value]));
   const needsChildProvenance = (externalId: string): boolean => (
     returnsByCode.get(externalId)?.lines.some((line) => !lineMappings.has(line.externalId)) ?? false
   );
@@ -637,7 +675,7 @@ export function planKiotVietReturnSync(input: {
       values: snapshot.lines,
       mappings: lineMappings,
       currentById: existingLines,
-      allowLegacyAdoption: localId != null,
+      allowLegacyAdoption: action === "adopt",
       blockers,
     });
     return {

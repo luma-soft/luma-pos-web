@@ -21,10 +21,26 @@ import {
   type KiotVietHistoryProductResolverInput,
 } from "../lib/kiotviet/history-product-resolver";
 import { kiotVietBookingFingerprint, planKiotVietBookingSync } from "../lib/kiotviet/booking-sync";
-import { kiotVietSaleFingerprint, planKiotVietSalesSync } from "../lib/kiotviet/sales-sync";
-import { kiotVietPurchaseFingerprint, planKiotVietPurchaseSync } from "../lib/kiotviet/purchase-sync";
-import { kiotVietReturnFingerprint, planKiotVietReturnSync } from "../lib/kiotviet/return-sync";
-import { kiotVietPurchaseReturnFingerprint, planKiotVietPurchaseReturnSync } from "../lib/kiotviet/purchase-return-sync";
+import {
+  kiotVietSaleFingerprint,
+  kiotVietSaleLegacyBootstrapFingerprint,
+  planKiotVietSalesSync,
+} from "../lib/kiotviet/sales-sync";
+import {
+  kiotVietPurchaseFingerprint,
+  kiotVietPurchaseLegacyBootstrapFingerprint,
+  planKiotVietPurchaseSync,
+} from "../lib/kiotviet/purchase-sync";
+import {
+  kiotVietReturnFingerprint,
+  kiotVietReturnLegacyBootstrapFingerprint,
+  planKiotVietReturnSync,
+} from "../lib/kiotviet/return-sync";
+import {
+  kiotVietPurchaseReturnFingerprint,
+  kiotVietPurchaseReturnLegacyBootstrapFingerprint,
+  planKiotVietPurchaseReturnSync,
+} from "../lib/kiotviet/purchase-return-sync";
 import type { KiotVietBookingCurrent, KiotVietBookingCurrentChild } from "../lib/kiotviet/booking-sync";
 import type { KiotVietSaleCurrent, KiotVietSaleCurrentChild } from "../lib/kiotviet/sales-sync";
 import type { KiotVietPurchaseCurrent, KiotVietPurchaseCurrentLine } from "../lib/kiotviet/purchase-sync";
@@ -740,7 +756,60 @@ export async function loadKiotVietPlanningStateFromDatabase(
   const legacySaleOrderIds = new Set(paymentRows.filter((payment) => (
     payment.note === "Import lịch sử KiotViet"
   )).map((payment) => payment.orderId));
-  const legacyPurchaseOrderIds = new Set(purchaseRows.filter((purchase) => {
+  const saleLegacyBootstrapFingerprint = (sale: typeof saleOrders[number]): string | undefined => {
+    if (!legacySaleOrderIds.has(sale.localId)) return undefined;
+    const lines = linesByOrder.get(sale.localId) ?? [];
+    const aggregatePayments = (paymentByOrder.get(sale.localId) ?? []).filter((payment) => (
+      payment.note === "Import lịch sử KiotViet"
+    ));
+    const aggregate = aggregatePayments.length === 1 ? aggregatePayments[0] : undefined;
+    const method = aggregate == null ? undefined : legacySalePaymentMethod(aggregate.method);
+    if (!aggregate || !method || lines.length === 0 || lines.some((line) => (
+      !normalizeKiotVietText(line.sourceSku)
+      || !normalizeKiotVietText(line.unitName)
+      || line.quantity == null
+      || line.unitPrice == null
+      || line.discount == null
+      || line.total == null
+    ))) return undefined;
+    const channel = method === "momo" ? "wallet" as const : method;
+    return kiotVietSaleLegacyBootstrapFingerprint({
+      code: sale.code,
+      documentType: "sale",
+      status: "completed",
+      paymentStatus: sale.paymentStatus as "unpaid" | "deposit" | "paid",
+      customerId: sale.customerId,
+      sourceOrderId: sale.sourceOrderId,
+      createdAt: sale.createdAt,
+      subtotal: Number(sale.subtotal),
+      discount: Number(sale.discount),
+      tax: Number(sale.tax),
+      shippingFee: Number(sale.shippingFee),
+      total: Number(sale.total),
+      amountPaid: Number(sale.amountPaid),
+      note: sale.note,
+      lines: lines.map((line) => ({
+        externalId: `bootstrap-line:${line.localId}`,
+        productId: line.productId,
+        sourceSku: normalizeKiotVietText(line.sourceSku),
+        productName: line.productName,
+        unitName: normalizeKiotVietText(line.unitName),
+        unitMultiplier: Number(line.unitMultiplier),
+        quantity: Number(line.quantity),
+        unitPrice: Number(line.unitPrice),
+        discount: Number(line.discount),
+        total: Number(line.total),
+        note: line.note,
+      })),
+      payments: [{
+        externalId: `bootstrap-payment:${aggregate.localId}`,
+        channel,
+        method,
+        amount: Number(aggregate.amount),
+      }],
+    });
+  };
+  const legacyPurchaseBootstrapCandidates = new Set(purchaseRows.filter((purchase) => {
     const lines = purchaseLinesByParent.get(purchase.localId) ?? [];
     return Number(purchase.subtotal) === 0
       && Number(purchase.discount) === 0
@@ -750,7 +819,27 @@ export async function loadKiotVietPlanningStateFromDatabase(
       && lines.length > 0
       && lines.every((line) => line.sourceSnapshotPersisted === false);
   }).map((purchase) => purchase.localId));
-  const legacyReturnIds = new Set((schemaSnapshots?.[3] ?? []).filter((value) => {
+  const purchaseLegacyBootstrapFingerprint = (purchase: typeof purchaseRows[number]): string | undefined => {
+    if (!legacyPurchaseBootstrapCandidates.has(purchase.localId)) return undefined;
+    const lines = purchaseLinesByParent.get(purchase.localId) ?? [];
+    if (lines.some((line) => !normalizeKiotVietText(line.sourceSku))) return undefined;
+    return kiotVietPurchaseLegacyBootstrapFingerprint({
+      code: purchase.code,
+      status: purchase.status as "received" | "draft",
+      supplierId: purchase.supplierId,
+      createdAt: purchase.createdAt,
+      total: Number(purchase.total),
+      amountPaid: Number(purchase.amountPaid),
+      note: purchase.note,
+      lines: lines.map((line) => ({
+        sourceSku: normalizeKiotVietText(line.sourceSku),
+        quantity: Number(line.quantity),
+        unitCost: Number(line.unitCost),
+        total: Number(line.total),
+      })),
+    });
+  };
+  const legacyReturnBootstrapCandidates = new Set((schemaSnapshots?.[3] ?? []).filter((value) => {
     const lines = returnLinesByParent.get(value.localId) ?? [];
     return value.subtotal == null
       && value.discount == null
@@ -762,9 +851,91 @@ export async function loadKiotVietPlanningStateFromDatabase(
       && lines.length > 0
       && lines.every((line) => line.sourceSnapshotPersisted === false && line.restock === true);
   }).map((value) => value.localId));
+  const orderById = new Map(orderRows.map((order) => [order.localId, order]));
+  const returnLegacyBootstrapFingerprint = (
+    value: typeof effectiveReturnRows[number],
+  ): string | undefined => {
+    if (!("orderId" in value)
+      || !("customerId" in value)
+      || !("createdAt" in value)
+      || !("totalRefund" in value)
+      || !("note" in value)) return undefined;
+    const stableValue = value as {
+      localId: string;
+      code: string;
+      orderId: string | null;
+      customerId: string | null;
+      status: string;
+      createdAt: Date;
+      totalRefund: string;
+      note: string | null;
+    };
+    if (!legacyReturnBootstrapCandidates.has(stableValue.localId)) return undefined;
+    const lines = returnLinesByParent.get(stableValue.localId) ?? [];
+    if (lines.some((line) => !normalizeKiotVietText(line.sourceSku))) return undefined;
+    return kiotVietReturnLegacyBootstrapFingerprint({
+      code: stableValue.code,
+      invoiceCode: stableValue.orderId == null ? null : orderById.get(stableValue.orderId)?.code ?? null,
+      orderId: stableValue.orderId,
+      customerId: stableValue.customerId,
+      status: stableValue.status as "completed" | "cancelled",
+      createdAt: stableValue.createdAt,
+      totalRefund: Number(stableValue.totalRefund),
+      note: stableValue.note,
+      lines: lines.map((line) => ({
+        orderItemId: line.orderItemId,
+        sourceSku: normalizeKiotVietText(line.sourceSku),
+        quantity: Number(line.quantity),
+        unitPrice: Number(line.unitPrice),
+        total: Number(line.total),
+      })),
+    });
+  };
   const legacySupplierReturnIds = new Set(purchaseReturnRows.filter((value) => (
     value.note === "Import trả hàng nhập KiotViet"
   )).map((value) => value.localId));
+  const supplierReturnLegacyBootstrapFingerprint = (
+    value: typeof purchaseReturnRows[number],
+  ): string | undefined => {
+    if (!legacySupplierReturnIds.has(value.localId)) return undefined;
+    const lines = purchaseReturnLinesByParent.get(value.localId) ?? [];
+    if (lines.length === 0 || lines.some((line) => (
+      !normalizeKiotVietText(line.sourceSku)
+      || !normalizeKiotVietText(line.unitName)
+      || !line.productId
+      || !line.productName
+    ))) return undefined;
+    return kiotVietPurchaseReturnLegacyBootstrapFingerprint({
+      code: value.code,
+      purchaseOrderId: null,
+      supplierId: value.supplierId,
+      status: value.status as "completed" | "draft",
+      settlementStatus: value.settlementStatus as "unsettled" | "partial" | "settled",
+      subtotal: Number(value.subtotal),
+      discount: Number(value.discount),
+      vatRate: Number(value.vatRate),
+      tax: Number(value.tax),
+      totalRefund: Number(value.totalRefund),
+      refundAmount: Number(value.refundAmount),
+      refundMethod: value.refundMethod as "cash" | null,
+      debtAmount: Number(value.debtAmount),
+      note: null,
+      createdAt: value.createdAt,
+      lines: lines.map((line) => ({
+        externalId: `bootstrap-line:${line.localId}`,
+        purchaseOrderItemId: null,
+        productId: line.productId,
+        sourceSku: normalizeKiotVietText(line.sourceSku),
+        productName: line.productName,
+        unitName: normalizeKiotVietText(line.unitName),
+        unitMultiplier: Number(line.unitMultiplier),
+        quantity: Number(line.quantity),
+        unitCost: Number(line.unitCost),
+        returnUnitCost: Number(line.returnUnitCost),
+        total: Number(line.total),
+      })),
+    });
+  };
   const completedSaleFingerprint = (item: typeof saleOrders[number]): string => {
     if (!schemaReady || item.status === "completed") return orderFingerprint(item, "sale");
     return orderFingerprint({ ...item, status: "completed" }, "sale");
@@ -796,12 +967,13 @@ export async function loadKiotVietPlanningStateFromDatabase(
       status: item.status,
       fingerprint: orderFingerprint(item, "sale"),
       completedFingerprint: completedSaleFingerprint(item),
-      legacyImported: !schemaReady || parentMappings.sale.has(item.localId) || legacySaleOrderIds.has(item.localId),
+      legacyBootstrapFingerprint: saleLegacyBootstrapFingerprint(item),
+      legacyImported: !schemaReady || parentMappings.sale.has(item.localId),
     })),
     saleLines: effectiveOrderLineRows.filter((item) => saleOrderIds.has(item.orderId)).map((item) => ({
       ...item,
       sourceSku: item.sourceSku ?? undefined,
-      legacyImported: !schemaReady || childMappings.saleLine.has(item.localId) || legacySaleOrderIds.has(item.orderId),
+      legacyImported: !schemaReady || childMappings.saleLine.has(item.localId),
       legacyAdoptionEligible: schemaReady && !parentMappings.sale.has(item.orderId),
     })),
     salePayments: paymentRows.filter((item) => saleOrderIds.has(item.orderId)).map((item) => {
@@ -809,33 +981,50 @@ export async function loadKiotVietPlanningStateFromDatabase(
       return {
         localId: item.localId, orderId: item.orderId, amount: item.amount, note: item.note,
         ...(method ? { method } : {}),
-        legacyImported: method != null && (!schemaReady || childMappings.salePayment.has(item.localId) || legacySaleOrderIds.has(item.orderId)),
+        legacyImported: method != null && (!schemaReady || childMappings.salePayment.has(item.localId)),
         legacyAdoptionEligible: schemaReady && !parentMappings.sale.has(item.orderId),
         legacyAggregatePayment: item.note === "Import lịch sử KiotViet",
       };
     }),
-    purchases: purchaseRows.map((item) => ({ ...item, fingerprint: purchaseFingerprint(item), legacyImported: !schemaReady || parentMappings.purchase.has(item.localId) || legacyPurchaseOrderIds.has(item.localId) })),
+    purchases: purchaseRows.map((item) => ({
+      ...item,
+      fingerprint: purchaseFingerprint(item),
+      legacyBootstrapFingerprint: purchaseLegacyBootstrapFingerprint(item),
+      legacyImported: !schemaReady || parentMappings.purchase.has(item.localId),
+    })),
     purchaseLines: effectivePurchaseLineRows.map((item) => ({
       ...item, sourceSku: item.sourceSku ?? undefined, legacyProductSku: item.sourceSku ?? undefined,
       legacyProductName: item.productName ?? undefined, unitName: item.unitName ?? undefined,
-      legacyImported: !schemaReady || childMappings.purchaseLine.has(item.localId) || legacyPurchaseOrderIds.has(item.purchaseOrderId),
+      legacyImported: !schemaReady || childMappings.purchaseLine.has(item.localId),
       legacyAdoptionEligible: schemaReady && !parentMappings.purchase.has(item.purchaseOrderId),
     })),
-    returns: effectiveReturnRows.map((item) => ({ localId: item.localId, code: item.code, fingerprint: returnFingerprint(item), legacyImported: !schemaReady || parentMappings.customerReturn.has(item.localId) || legacyReturnIds.has(item.localId) })),
+    returns: effectiveReturnRows.map((item) => ({
+      localId: item.localId,
+      code: item.code,
+      fingerprint: returnFingerprint(item),
+      legacyBootstrapFingerprint: schemaReady ? returnLegacyBootstrapFingerprint(item) : undefined,
+      legacyImported: !schemaReady || parentMappings.customerReturn.has(item.localId),
+    })),
     returnLines: effectiveReturnLineRows.map((item) => ({
       ...item, sourceSku: item.sourceSku ?? undefined, legacyProductSku: item.sourceSku ?? undefined,
       active: effectiveReturnRows.find((parent) => parent.localId === item.returnId)?.status === "completed",
-      legacyImported: !schemaReady || childMappings.customerReturnLine.has(item.localId) || legacyReturnIds.has(item.returnId),
+      legacyImported: !schemaReady || childMappings.customerReturnLine.has(item.localId),
       legacyAdoptionEligible: schemaReady && !parentMappings.customerReturn.has(item.returnId),
     })),
     returnSales: saleOrders.flatMap((item) => item.status === "completed" || item.status === "returned" ? [{
       invoiceCode: item.code, orderId: item.localId, customerId: item.customerId, status: item.status,
       items: (linesByOrder.get(item.localId) ?? []).flatMap((line) => line.sourceSku ? [{ localId: line.localId, sourceSku: line.sourceSku, unitName: line.unitName, quantity: line.quantity }] : []),
     }] : []),
-    purchaseReturns: purchaseReturnRows.flatMap((item) => ["unsettled", "partial", "settled"].includes(item.settlementStatus) ? [{ ...item, fingerprint: purchaseReturnFingerprint(item), settlementStatus: item.settlementStatus as "unsettled" | "partial" | "settled", legacyImported: !schemaReady || parentMappings.supplierReturn.has(item.localId) || legacySupplierReturnIds.has(item.localId) }] : []),
+    purchaseReturns: purchaseReturnRows.flatMap((item) => ["unsettled", "partial", "settled"].includes(item.settlementStatus) ? [{
+      ...item,
+      fingerprint: purchaseReturnFingerprint(item),
+      legacyBootstrapFingerprint: supplierReturnLegacyBootstrapFingerprint(item),
+      settlementStatus: item.settlementStatus as "unsettled" | "partial" | "settled",
+      legacyImported: !schemaReady || parentMappings.supplierReturn.has(item.localId),
+    }] : []),
     purchaseReturnLines: effectivePurchaseReturnLineRows.map((item) => ({
       ...item, sourceSku: item.sourceSku ?? undefined, legacyProductSku: item.sourceSku ?? undefined,
-      legacyImported: !schemaReady || childMappings.supplierReturnLine.has(item.localId) || legacySupplierReturnIds.has(item.purchaseReturnId),
+      legacyImported: !schemaReady || childMappings.supplierReturnLine.has(item.localId),
       legacyAdoptionEligible: schemaReady && !parentMappings.supplierReturn.has(item.purchaseReturnId),
     })),
     mappings: mappingState,

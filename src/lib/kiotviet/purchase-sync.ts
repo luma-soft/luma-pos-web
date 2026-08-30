@@ -43,6 +43,8 @@ export interface KiotVietPurchaseCurrent {
   fingerprint: string;
   subtotal: number | string;
   legacyImported: boolean;
+  /** Exact old-importer parent + complete-child evidence, reconstructed by the loader. */
+  legacyBootstrapFingerprint?: string;
 }
 
 export interface KiotVietPurchaseCurrentLine {
@@ -192,6 +194,33 @@ export function kiotVietPurchaseFingerprint(purchase: KiotVietPurchaseSnapshot):
   const normalizedLines = lines.map(withoutKiotVietExternalId)
     .sort((left, right) => stableKiotVietFingerprint(left).localeCompare(stableKiotVietFingerprint(right)));
   return stableKiotVietFingerprint({ ...parent, lines: normalizedLines });
+}
+
+export function kiotVietPurchaseLegacyBootstrapFingerprint(
+  purchase: Pick<KiotVietPurchaseSnapshot,
+    "code" | "status" | "supplierId" | "createdAt" | "total" | "amountPaid" | "note"
+  > & {
+    lines: Array<Pick<KiotVietPurchaseLineSnapshot, "sourceSku" | "quantity" | "unitCost" | "total">>;
+  },
+): string {
+  const lines = purchase.lines.map((line) => ({
+    sourceSku: line.sourceSku,
+    quantity: line.quantity,
+    unitCost: line.unitCost,
+    total: line.total,
+  })).sort((left, right) => (
+    stableKiotVietFingerprint(left).localeCompare(stableKiotVietFingerprint(right))
+  ));
+  return stableKiotVietFingerprint({
+    code: purchase.code,
+    status: purchase.status,
+    supplierId: purchase.supplierId,
+    createdAt: purchase.createdAt,
+    total: purchase.total,
+    amountPaid: purchase.amountPaid,
+    note: purchase.note,
+    lines,
+  });
 }
 
 function sourceLineFingerprint(line: KiotVietPurchaseLineSnapshot): string {
@@ -479,17 +508,22 @@ export function planKiotVietPurchaseSync(input: {
     productsBySourceKey,
     blockers,
   });
+  const purchasesByCode = new Map(purchases.map((purchase) => [purchase.code, purchase]));
   const entityPlan = planKiotVietEntities({
     sources: purchases.map((purchase) => ({ externalId: purchase.code, fingerprint: kiotVietPurchaseFingerprint(purchase) })),
     current: input.current.map((purchase) => ({
       localId: purchase.localId,
       code: purchase.code,
       fingerprint: purchase.fingerprint,
-      legacyImported: purchase.legacyImported,
+      legacyImported: purchase.legacyImported || (() => {
+        const source = purchase.code == null ? undefined : purchasesByCode.get(purchase.code);
+        return source != null
+          && purchase.legacyBootstrapFingerprint != null
+          && purchase.legacyBootstrapFingerprint === kiotVietPurchaseLegacyBootstrapFingerprint(source);
+      })(),
     })),
     mappings: input.mappings,
   });
-  const purchasesByCode = new Map(purchases.map((purchase) => [purchase.code, purchase]));
   const currentById = new Map(input.current.map((purchase) => [purchase.localId, purchase]));
   const needsChildProvenance = (externalId: string): boolean => (
     purchasesByCode.get(externalId)?.lines.some((line) => !lineMappings.has(line.externalId)) ?? false
@@ -527,7 +561,7 @@ export function planKiotVietPurchaseSync(input: {
       values: purchase.lines,
       mappings: lineMappings,
       currentById: existingLines,
-      allowLegacyAdoption: localId != null,
+      allowLegacyAdoption: action === "adopt",
       blockers,
     });
     return {

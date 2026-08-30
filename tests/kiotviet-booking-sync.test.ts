@@ -305,6 +305,41 @@ describe("KiotViet booking synchronization", () => {
     expect(plan.writes[0]?.booking.preservedPaymentIds).toEqual(["luma-payment"]);
   });
 
+  test("does not adopt unmapped exact children after the booking parent is mapped", () => {
+    const baseline = planKiotVietBookingSync({
+      sourceRows: [sourceRows[0]!], current: [], mappings: [], lineMappings: [], paymentMappings: [],
+      existingLines: [], existingPayments: [], resolvedCustomers, resolvedProducts,
+    });
+    const plan = planKiotVietBookingSync({
+      sourceRows: [sourceRows[0]!],
+      current: [{ localId: "booking-001", code: "DH-001", fingerprint: "stale", legacyImported: true }],
+      mappings: [{ externalId: "DH-001", localId: "booking-001" }],
+      lineMappings: [], paymentMappings: [],
+      existingLines: [{
+        localId: "luma-line", orderId: "booking-001", legacyAdoptionEligible: true,
+        sourceSku: baseline.bookings[0]!.lines[0]!.sourceSku,
+        unitName: baseline.bookings[0]!.lines[0]!.unitName,
+        quantity: baseline.bookings[0]!.lines[0]!.quantity,
+        unitPrice: baseline.bookings[0]!.lines[0]!.unitPrice,
+        discount: baseline.bookings[0]!.lines[0]!.discount,
+        total: baseline.bookings[0]!.lines[0]!.total,
+        note: baseline.bookings[0]!.lines[0]!.note,
+      }],
+      existingPayments: [{
+        localId: "luma-payment", orderId: "booking-001", legacyAdoptionEligible: true,
+        method: baseline.bookings[0]!.payments[0]!.method,
+        amount: baseline.bookings[0]!.payments[0]!.amount,
+      }],
+      resolvedCustomers, resolvedProducts,
+    });
+
+    expect(plan.blockers).toEqual([]);
+    expect(plan.writes[0]?.booking.lines[0]).toMatchObject({ action: "create", adoptionMethod: "created" });
+    expect(plan.writes[0]?.booking.payments[0]).toMatchObject({ action: "create", adoptionMethod: "created" });
+    expect(plan.writes[0]?.booking.preservedLineIds).toContain("luma-line");
+    expect(plan.writes[0]?.booking.preservedPaymentIds).toContain("luma-payment");
+  });
+
   test("updates mapped booking children and is a no-op after their mappings exist", () => {
     const baseline = planKiotVietBookingSync({
       sourceRows: [sourceRows[0]!],

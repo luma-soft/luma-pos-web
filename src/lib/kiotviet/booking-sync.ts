@@ -281,6 +281,7 @@ function childWrites<T extends { externalId: string }>(input: {
   mappings: Map<string, KiotVietEntityMappingSnapshot>;
   currentById: Map<string, KiotVietBookingCurrentChild>;
   kind: "line" | "payment";
+  allowLegacyAdoption: boolean;
   sourceFingerprint: (value: T) => string;
   blockers: KiotVietBookingSyncPlan["blockers"];
 }): {
@@ -360,6 +361,9 @@ function childWrites<T extends { externalId: string }>(input: {
       };
     }
     if (input.mappings.has(externalId)) {
+      return { externalId, adoptionMethod: "created" as const, value };
+    }
+    if (!input.allowLegacyAdoption) {
       return { externalId, adoptionMethod: "created" as const, value };
     }
     const fingerprint = input.sourceFingerprint({ externalId, ...value } as T);
@@ -573,6 +577,7 @@ export function planKiotVietBookingSync(input: {
       mappings: lineMappings,
       currentById: existingLines,
       kind: "line",
+      allowLegacyAdoption: action === "adopt",
       sourceFingerprint: sourceLineFingerprint,
       blockers,
     });
@@ -583,6 +588,7 @@ export function planKiotVietBookingSync(input: {
       mappings: paymentMappings,
       currentById: existingPayments,
       kind: "payment",
+      allowLegacyAdoption: action === "adopt",
       sourceFingerprint: sourcePaymentFingerprint,
       blockers,
     });

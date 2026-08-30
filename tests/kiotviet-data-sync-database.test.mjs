@@ -863,17 +863,79 @@ describe("KiotViet store-scoped database adapter", () => {
       storeId: STORE_ID, code: "DH-LUMA-COLLISION", documentType: "booking", status: "completed",
       paymentStatus: "unpaid", customerId: customer.id, createdAt, subtotal: "19", total: "19",
     });
+    const [purchaseCollision] = await database.insert(schema.purchaseOrders).values({
+      storeId: STORE_ID, warehouseId: warehouse.id, code: "PN-LUMA-COLLISION",
+      supplierId: supplier.id, status: "received", createdAt, subtotal: "0", total: "20",
+    }).returning();
+    await database.insert(schema.purchaseOrderItems).values({
+      storeId: STORE_ID, purchaseOrderId: purchaseCollision.id, productId: product.id,
+      productName: "Bootstrap product", unitName: "Cái", unitMultiplier: "1",
+      quantity: "3", unitCost: "10", total: "30",
+    });
+    const [saleCollision] = await database.insert(schema.orders).values({
+      storeId: STORE_ID, code: "HD-LUMA-COLLISION", documentType: "sale", status: "completed",
+      paymentStatus: "paid", customerId: customer.id, sourceOrderId: booking.id, createdAt,
+      subtotal: "20", total: "20", amountPaid: "20",
+    }).returning();
+    await database.insert(schema.orderItems).values({
+      storeId: STORE_ID, orderId: saleCollision.id, productId: product.id,
+      productName: "Bootstrap product", unitName: "Cái", unitMultiplier: "1",
+      quantity: "3", unitPrice: "10", total: "30",
+    });
+    await database.insert(schema.payments).values({
+      storeId: STORE_ID, orderId: saleCollision.id, method: "cash", amount: "20",
+      note: "Import lịch sử KiotViet",
+    });
+    const [returnCollision] = await database.insert(schema.returns).values({
+      storeId: STORE_ID, code: "TH-LUMA-COLLISION", orderId: sale.id, customerId: customer.id,
+      status: "completed", totalRefund: "10", createdAt,
+    }).returning();
+    await database.insert(schema.returnItems).values({
+      storeId: STORE_ID, returnId: returnCollision.id, orderItemId: saleLine.id,
+      productId: product.id, productName: "Bootstrap product", unitName: "Cái", unitMultiplier: "1",
+      quantity: "2", unitPrice: "10", total: "20", restock: true,
+    });
     const collisionBundle = structuredClone(bundle);
     collisionBundle.sources.find((item) => item.phase === "bookings").rows.push({
       ...sources.bookings[0], "Mã đặt hàng": "DH-LUMA-COLLISION",
     });
     collisionBundle.sources.find((item) => item.phase === "bookings").rowCount = 2;
     collisionBundle.sources.find((item) => item.phase === "bookings").documentCount = 2;
+    collisionBundle.sources.find((item) => item.phase === "purchases").rows.push({
+      ...sources.purchases[0], "Mã nhập hàng": "PN-LUMA-COLLISION",
+    });
+    collisionBundle.sources.find((item) => item.phase === "purchases").rowCount = 2;
+    collisionBundle.sources.find((item) => item.phase === "purchases").documentCount = 2;
+    collisionBundle.sources.find((item) => item.phase === "sales").rows.push({
+      ...sources.sales[0], "Mã hóa đơn": "HD-LUMA-COLLISION",
+    });
+    collisionBundle.sources.find((item) => item.phase === "sales").rowCount = 2;
+    collisionBundle.sources.find((item) => item.phase === "sales").documentCount = 2;
+    collisionBundle.sources.find((item) => item.phase === "returns").rows.push({
+      ...sources.returns[0], "Mã trả hàng": "TH-LUMA-COLLISION",
+    });
+    collisionBundle.sources.find((item) => item.phase === "returns").rowCount = 2;
+    collisionBundle.sources.find((item) => item.phase === "returns").documentCount = 2;
     const collisionState = await loadKiotVietPlanningStateFromDatabase(database, "hai-dang");
     const collisionPlan = planKiotVietBundle(collisionBundle, collisionState)
       .find((candidate) => candidate.phase === "bookings");
     expect(collisionPlan.typedPlan.entityPlan.conflicts).toContainEqual(expect.objectContaining({
       externalId: "DH-LUMA-COLLISION", reason: "code_collision",
+    }));
+    const purchaseCollisionPlan = planKiotVietBundle(collisionBundle, collisionState)
+      .find((candidate) => candidate.phase === "purchases");
+    expect(purchaseCollisionPlan.typedPlan.entityPlan.conflicts).toContainEqual(expect.objectContaining({
+      externalId: "PN-LUMA-COLLISION", reason: "code_collision",
+    }));
+    const saleCollisionPlan = planKiotVietBundle(collisionBundle, collisionState)
+      .find((candidate) => candidate.phase === "sales");
+    expect(saleCollisionPlan.typedPlan.entityPlan.conflicts).toContainEqual(expect.objectContaining({
+      externalId: "HD-LUMA-COLLISION", reason: "code_collision",
+    }));
+    const returnCollisionPlan = planKiotVietBundle(collisionBundle, collisionState)
+      .find((candidate) => candidate.phase === "returns");
+    expect(returnCollisionPlan.typedPlan.entityPlan.conflicts).toContainEqual(expect.objectContaining({
+      externalId: "TH-LUMA-COLLISION", reason: "code_collision",
     }));
   });
 

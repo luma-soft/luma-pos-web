@@ -6,6 +6,7 @@ import { createKiotVietHistoryProductResolver } from "@/lib/kiotviet/history-pro
 import { parseKiotVietProductRows } from "@/lib/kiotviet/product-sync";
 import {
   kiotVietPurchaseFingerprint,
+  kiotVietPurchaseLegacyBootstrapFingerprint,
   planKiotVietPurchaseSync,
   type KiotVietResolvedPurchaseProduct,
 } from "@/lib/kiotviet/purchase-sync";
@@ -243,6 +244,42 @@ describe("KiotViet purchase receipt synchronization", () => {
     expect(result.writes[0]?.purchase.preservedLineIds).toEqual([]);
   });
 
+  test("adopts an old-schema receipt only when its complete bootstrap evidence matches source", () => {
+    const source = plan({ sourceRows: [sourceRows[0]!] }).purchases[0]!;
+    const exact = plan({
+      sourceRows: [sourceRows[0]!],
+      current: [{
+        localId: "purchase-001", code: "PN-001", fingerprint: "old-schema",
+        subtotal: 0, legacyImported: false,
+        legacyBootstrapFingerprint: kiotVietPurchaseLegacyBootstrapFingerprint(source),
+      }],
+      existingLines: [{
+        localId: "legacy-line", purchaseOrderId: "purchase-001", legacyAdoptionEligible: true,
+        legacyProductSku: "ALT-001", quantity: 2, unitCost: 120000, total: 240000,
+      }],
+    });
+    expect(exact.entityPlan.adopts).toEqual([{
+      externalId: "PN-001", localId: "purchase-001", needsUpdate: true,
+    }]);
+
+    const mismatch = plan({
+      sourceRows: [sourceRows[0]!],
+      current: [{
+        localId: "purchase-001", code: "PN-001", fingerprint: "old-schema",
+        subtotal: 0, legacyImported: false,
+        legacyBootstrapFingerprint: "near-match-not-exact",
+      }],
+      existingLines: [{
+        localId: "legacy-line", purchaseOrderId: "purchase-001", legacyAdoptionEligible: true,
+        legacyProductSku: "ALT-001", quantity: 3, unitCost: 120000, total: 360000,
+      }],
+    });
+    expect(mismatch.entityPlan.conflicts).toEqual([{
+      externalId: "PN-001", localId: "purchase-001", reason: "code_collision",
+    }]);
+    expect(mismatch.writes).toEqual([]);
+  });
+
   test("backfills child provenance for an exact bootstrap receipt and preserves Luma children", () => {
     const source = plan({ sourceRows: [sourceRows[0]!] }).purchases[0]!;
     const result = plan({
@@ -283,6 +320,27 @@ describe("KiotViet purchase receipt synchronization", () => {
         preservedLineIds: ["luma-line"],
       },
     }]);
+  });
+
+  test("does not adopt an unmapped exact child after the receipt parent is mapped", () => {
+    const result = plan({
+      sourceRows: [sourceRows[0]!],
+      current: [{
+        localId: "purchase-001", code: "PN-001", fingerprint: "stale",
+        subtotal: 240000, legacyImported: true,
+      }],
+      mappings: [{ externalId: "PN-001", localId: "purchase-001" }],
+      existingLines: [{
+        localId: "luma-line", purchaseOrderId: "purchase-001", legacyAdoptionEligible: true,
+        legacyProductSku: "ALT-001", quantity: 2, unitCost: 120000, total: 240000,
+      }],
+    });
+
+    expect(result.blockers).toEqual([]);
+    expect(result.writes[0]?.purchase.lines[0]).toMatchObject({
+      action: "create", adoptionMethod: "created",
+    });
+    expect(result.writes[0]?.purchase.preservedLineIds).toEqual(["luma-line"]);
   });
 
   test("blocks an adopted legacy receipt when a recoverable legacy line SKU cannot match the source", () => {

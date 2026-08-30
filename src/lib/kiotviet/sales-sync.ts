@@ -61,6 +61,8 @@ export interface KiotVietSaleCurrent {
   /** Same persisted snapshot normalized to completed for the return-owned exception. */
   completedFingerprint?: string;
   legacyImported: boolean;
+  /** Exact old-importer parent + complete-child + aggregate-payment evidence. */
+  legacyBootstrapFingerprint?: string;
 }
 
 export interface KiotVietSaleCurrentChild {
@@ -377,8 +379,43 @@ function legacyAggregatePayment(sale: KiotVietSaleSnapshot): {
   };
 }
 
+export function kiotVietSaleLegacyBootstrapFingerprint(sale: KiotVietSaleSnapshot): string {
+  const lines = sale.lines.map((line) => ({
+    sourceSku: line.sourceSku,
+    unitName: line.unitName,
+    quantity: line.quantity,
+    unitPrice: line.unitPrice,
+    discount: line.discount,
+    total: line.total,
+    note: line.note,
+  })).sort((left, right) => (
+    stableKiotVietFingerprint(left).localeCompare(stableKiotVietFingerprint(right))
+  ));
+  const aggregatePayment = legacyAggregatePayment(sale);
+  return stableKiotVietFingerprint({
+    code: sale.code,
+    status: sale.status,
+    paymentStatus: sale.paymentStatus,
+    customerId: sale.customerId,
+    sourceOrderId: sale.sourceOrderId,
+    createdAt: sale.createdAt,
+    subtotal: sale.subtotal,
+    discount: sale.discount,
+    tax: sale.tax,
+    shippingFee: sale.shippingFee,
+    total: sale.total,
+    amountPaid: sale.amountPaid,
+    note: sale.note,
+    lines,
+    aggregatePayment: aggregatePayment == null ? null : {
+      method: aggregatePayment.method,
+      amount: aggregatePayment.amount,
+    },
+  });
+}
+
 function isProvenLegacyAggregatePayment(child: KiotVietSaleCurrentChild): boolean {
-  return child.legacyImported === true
+  return (child.legacyImported === true || child.legacyAdoptionEligible === true)
     && (child.legacyAggregatePayment === true || child.note === LEGACY_HISTORY_PAYMENT_NOTE);
 }
 
@@ -697,6 +734,7 @@ export function planKiotVietSalesSync(input: {
     bookingsByCode,
     blockers,
   });
+  const salesByCode = new Map(sales.map((sale) => [sale.code, sale]));
   const entityPlan = planKiotVietEntities({
     sources: sales.map((sale) => ({ externalId: sale.code, fingerprint: kiotVietSaleFingerprint(sale) })),
     current: input.current.map((sale) => ({
@@ -705,11 +743,15 @@ export function planKiotVietSalesSync(input: {
       fingerprint: sale.status === "returned"
         ? sale.completedFingerprint ?? sale.fingerprint
         : sale.fingerprint,
-      legacyImported: sale.legacyImported,
+      legacyImported: sale.legacyImported || (() => {
+        const source = sale.code == null ? undefined : salesByCode.get(sale.code);
+        return source != null
+          && sale.legacyBootstrapFingerprint != null
+          && sale.legacyBootstrapFingerprint === kiotVietSaleLegacyBootstrapFingerprint(source);
+      })(),
     })),
     mappings: input.mappings,
   });
-  const salesByCode = new Map(sales.map((sale) => [sale.code, sale]));
   const needsChildProvenance = (externalId: string): boolean => {
     const sale = salesByCode.get(externalId);
     return sale?.lines.some((line) => !lineMappings.has(line.externalId)) === true
@@ -739,7 +781,7 @@ export function planKiotVietSalesSync(input: {
       mappings: lineMappings,
       currentById: existingLines,
       kind: "line",
-      allowLegacyAdoption: localId != null,
+      allowLegacyAdoption: action === "adopt",
       sourceFingerprint: sourceLineFingerprint,
       blockers,
     });
@@ -750,7 +792,7 @@ export function planKiotVietSalesSync(input: {
       mappings: paymentMappings,
       currentById: existingPayments,
       kind: "payment",
-      allowLegacyAdoption: localId != null,
+      allowLegacyAdoption: action === "adopt",
       sourceFingerprint: sourcePaymentFingerprint,
       legacyAggregate: legacyAggregatePayment(sale),
       blockers,
