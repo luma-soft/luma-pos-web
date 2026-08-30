@@ -125,6 +125,8 @@ export const mediaObjects = pgTable("media_objects", {
   storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id, { onDelete: "cascade" }),
   provider: text("provider").$type<MediaProvider>().notNull().default("r2"),
   visibility: text("visibility").$type<MediaVisibility>().notNull(),
+  purpose: text("purpose").$type<"product-image" | "project-document" | "service-evidence" | "ai-attachment">().notNull(),
+  targetId: uuid("target_id").notNull(),
   domain: text("domain").notNull(),
   bucket: text("bucket").notNull(),
   objectKey: text("object_key").notNull(),
@@ -139,6 +141,7 @@ export const mediaObjects = pgTable("media_objects", {
   status: text("status").$type<"pending" | "ready" | "quarantined" | "deleted">().notNull().default("pending"),
   createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  uploadExpiresAt: timestamp("upload_expires_at", { withTimezone: true }).notNull(),
   readyAt: timestamp("ready_at", { withTimezone: true }),
   verifiedAt: timestamp("verified_at", { withTimezone: true }),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -148,10 +151,13 @@ export const mediaObjects = pgTable("media_objects", {
 }, (t) => [
   check("media_objects_provider_check", sql`${t.provider} in ('r2', 'supabase')`),
   check("media_objects_visibility_check", sql`${t.visibility} in ('public', 'private')`),
+  check("media_objects_purpose_check", sql`${t.purpose} in ('product-image', 'project-document', 'service-evidence', 'ai-attachment')`),
   check("media_objects_status_check", sql`${t.status} in ('pending', 'ready', 'quarantined', 'deleted')`),
   check("media_objects_size_check", sql`${t.sizeBytes} > 0`),
   unique("media_objects_location_unique").on(t.provider, t.bucket, t.objectKey),
   unique("media_objects_store_id_id_unique").on(t.storeId, t.id),
+  index("media_objects_store_purpose_target_idx").on(t.storeId, t.purpose, t.targetId),
+  index("media_objects_status_upload_expiry_idx").on(t.status, t.uploadExpiresAt),
   index("media_objects_store_status_domain_idx").on(t.storeId, t.status, t.domain, t.createdAt),
   index("media_objects_store_created_by_idx")
     .on(t.storeId, t.createdBy)

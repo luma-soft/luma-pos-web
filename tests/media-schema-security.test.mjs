@@ -73,10 +73,12 @@ async function authenticatedOperationIsDenied(statement) {
 
 function mediaValues(id, storeId, suffix, createdBy = null) {
   const creator = createdBy ? `'${createdBy}'` : "null";
+  const targetId = storeId === STORE_A ? PROJECT_A : PROJECT_B;
   return `(
-    '${id}', '${storeId}', 'r2', 'private', 'projects', 'private-media',
+    '${id}', '${storeId}', 'r2', 'private', 'project-document', '${targetId}',
+    'projects', 'private-media',
     'stores/${storeId}/projects/2026/08/${id}/original.pdf',
-    '${suffix}.pdf', 'application/pdf', 1024, 'ready', ${creator}, now()
+    '${suffix}.pdf', 'application/pdf', 1024, 'ready', ${creator}, now(), now() + interval '10 minutes'
   )`;
 }
 
@@ -141,8 +143,9 @@ beforeAll(async () => {
     );
 
     insert into media_objects (
-      id, store_id, provider, visibility, domain, bucket, object_key,
-      original_file_name, mime_type, size_bytes, status, created_by, created_at
+      id, store_id, provider, visibility, purpose, target_id, domain, bucket,
+      object_key, original_file_name, mime_type, size_bytes, status, created_by,
+      created_at, upload_expires_at
     ) values
       ${mediaValues(MEDIA_A, STORE_A, "media-a", PROFILE_A)},
       ${mediaValues(MEDIA_A_2, STORE_A, "media-a-2")},
@@ -211,12 +214,14 @@ describe("media schema executable tenant security", () => {
   test("rejects cross-store creators and preserves nullable creator SET NULL", async () => {
     await expect(database.exec(`
       insert into media_objects (
-        id, store_id, provider, visibility, domain, bucket, object_key,
-        original_file_name, mime_type, size_bytes, created_by
+        id, store_id, provider, visibility, purpose, target_id, domain, bucket,
+        object_key, original_file_name, mime_type, size_bytes, created_by,
+        upload_expires_at
       ) values (
         '00000000-0000-4000-8000-000000000076', '${STORE_A}', 'r2', 'private',
-        'projects', 'private-media', 'cross-store-creator-object', 'cross.pdf',
-        'application/pdf', 1024, '${PROFILE_B}'
+        'project-document', '${PROJECT_A}', 'projects', 'private-media',
+        'cross-store-creator-object', 'cross.pdf', 'application/pdf', 1024,
+        '${PROFILE_B}', now() + interval '10 minutes'
       )
     `)).rejects.toThrow();
     await expect(database.exec(`
