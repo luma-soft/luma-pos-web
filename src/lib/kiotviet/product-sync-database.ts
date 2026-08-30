@@ -242,6 +242,13 @@ export function createKiotVietProductSyncTransaction(input: {
       })));
     },
 
+    async setRelatedProduct(productId, relatedProductId) {
+      await transaction
+        .update(products)
+        .set({ relatedProductId, updatedAt: new Date() })
+        .where(and(eq(products.storeId, storeId), eq(products.id, productId)));
+    },
+
     async archiveProduct(action) {
       await transaction
         .update(products)

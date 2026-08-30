@@ -29,11 +29,12 @@ beforeAll(async () => {
 afterAll(async () => database.close());
 
 describe("KiotViet product synchronization migration", () => {
-  test("adds tenant-owned source mappings and alternate-unit SKUs", async () => {
+  test("adds tenant-owned source mappings, related products, and alternate-unit SKUs", async () => {
     const columns = await database.query(`
       select table_name, column_name, is_nullable
       from information_schema.columns
       where (table_name = 'product_source_mappings')
+         or (table_name = 'products' and column_name = 'related_product_id')
          or (table_name = 'product_units' and column_name = 'sku')
       order by table_name, ordinal_position
     `);
@@ -49,6 +50,7 @@ describe("KiotViet product synchronization migration", () => {
       { table_name: "product_source_mappings", column_name: "created_at", is_nullable: "NO" },
       { table_name: "product_source_mappings", column_name: "updated_at", is_nullable: "NO" },
       { table_name: "product_units", column_name: "sku", is_nullable: "YES" },
+      { table_name: "products", column_name: "related_product_id", is_nullable: "YES" },
     ]);
   });
 

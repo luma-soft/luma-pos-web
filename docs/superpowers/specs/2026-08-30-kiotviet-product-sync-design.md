@@ -12,6 +12,7 @@ This change covers product master data only. It does not synchronize customers, 
 
 - A row without `Mã ĐVT Cơ bản` is a base product and owns the product identity.
 - A row with `Mã ĐVT Cơ bản` is an alternate unit of the referenced base product. Its `Mã hàng` is a unit SKU, not another product.
+- `Mã HH Liên quan` on a base-product row identifies the KiotViet same-type group root. LumaPOS stores this separately from `parent_product_id`, because the referenced root remains a sellable SKU rather than becoming a synthetic variant parent.
 - `Tồn kho` on the base row is the authoritative stock quantity in the base unit. Alternate-unit stock is another representation of the same stock and must never be added to the base quantity.
 - `Đang kinh doanh = 0` maps to `is_active = false` and `lifecycle_status = archived`. Any other value maps to active.
 - `Được bán trực tiếp` remains distinct from business status. LumaPOS has no equivalent product field in this scope, so it is reported but does not deactivate the product.
@@ -44,6 +45,7 @@ For current KiotViet base products, the synchronization owns:
 - weight, location, specifications, image URLs;
 - active/lifecycle status;
 - alternate units, including unit SKU, barcode, multiplier, price override, and source order;
+- the KiotViet same-type relationship used by the product-detail related-products tab;
 - combo components and component quantities;
 - default warehouse quantity and minimum stock level.
 
@@ -68,4 +70,3 @@ Dry-run produces a deterministic summary for create, update, archive, preserve, 
 ## Verification
 
 Pure behavior tests cover parsing, stock invariants, ownership classification, archive decisions, price preservation, unit mapping, status mapping, and combo parsing. A PGlite migration test covers tenant constraints, source-mapping uniqueness, RLS enablement, and alternate-unit SKU uniqueness. Type checking, focused tests, the full suite, and a dry-run against the supplied workbook provide completion evidence.
-

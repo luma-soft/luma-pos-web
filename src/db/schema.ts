@@ -388,6 +388,7 @@ export const products = pgTable("products", {
   name: text("name").notNull(),
   productKind: productKindEnum("product_kind").notNull().default("product"),
   fullName: text("full_name"), // "Gạch granite Viglacera 60x60 Đỏ Matte"
+  relatedProductId: uuid("related_product_id").references((): AnyPgColumn => products.id, { onDelete: "set null" }),
   parentProductId: uuid("parent_product_id").references((): AnyPgColumn => products.id, { onDelete: "set null" }),
   variantName: text("variant_name"),
   isVariantParent: boolean("is_variant_parent").notNull().default(false),
@@ -442,6 +443,7 @@ export const products = pgTable("products", {
   index("products_barcode_idx").on(t.barcode),
   index("products_name_idx").on(t.name),
   index("products_category_idx").on(t.categoryId),
+  index("products_related_idx").on(t.relatedProductId),
   index("products_parent_idx").on(t.parentProductId),
   index("products_variant_parent_idx").on(t.isVariantParent, t.parentProductId),
   index("products_lifecycle_status_idx").on(t.lifecycleStatus),

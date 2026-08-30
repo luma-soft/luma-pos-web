@@ -128,6 +128,7 @@ export interface ProductSyncTransaction {
   upsertSourceMapping(input: UpsertSourceMappingInput): Promise<void>;
   markSourceDeleted(input: MarkSourceDeletedInput): Promise<void>;
   replaceComboItems(productId: string, components: ResolvedComboComponent[]): Promise<void>;
+  setRelatedProduct(productId: string, relatedProductId: string | null): Promise<void>;
   archiveProduct(action: ProductArchiveAction): Promise<void>;
 }
 
@@ -158,6 +159,17 @@ export async function applyKiotVietProductSync(input: {
       const units = unitsByBaseSku.get(unit.baseSku) ?? [];
       units.push(unit);
       unitsByBaseSku.set(unit.baseSku, units);
+    }
+
+    for (const action of actions) {
+      const productId = productIdsBySku.get(action.source.sku);
+      if (!productId) throw new Error(`Missing synchronized product id for ${action.source.sku}`);
+      await transaction.setRelatedProduct(
+        productId,
+        action.source.relatedSku
+          ? productIdsBySku.get(action.source.relatedSku) ?? null
+          : null,
+      );
     }
 
     for (const action of actions) {

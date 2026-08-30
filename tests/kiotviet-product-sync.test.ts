@@ -29,6 +29,7 @@ describe("KiotViet product snapshot parsing", () => {
         "Được bán trực tiếp": 0,
         "Mô tả": "Ống PVC thử nghiệm",
         "Vị trí": "A-01",
+        "Mã HH Liên quan": "SP-GROUP",
       },
       {
         "Loại hàng": "Hàng hóa",
@@ -69,6 +70,7 @@ describe("KiotViet product snapshot parsing", () => {
         ],
         isActive: false,
         directSale: false,
+        relatedSku: "SP-GROUP",
         specs: {
           SIZE: ["21"],
           "LOẠI ỐNG": ["C2"],
@@ -146,6 +148,7 @@ describe("KiotViet product synchronization planning", () => {
     imageUrls: [],
     isActive: true,
     directSale: true,
+    relatedSku: null,
     specs: null,
     comboComponents: [],
   });

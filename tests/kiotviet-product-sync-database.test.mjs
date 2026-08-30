@@ -49,6 +49,7 @@ const product = (sku, stock, comboComponents = []) => ({
   imageUrls: ["https://img.example/product.jpg"],
   isActive: true,
   directSale: true,
+  relatedSku: null,
   specs: { SIZE: ["21"] },
   comboComponents,
 });
@@ -107,7 +108,10 @@ describe("KiotViet product sync Drizzle transaction", () => {
     const snapshot = {
       products: [
         product("PART", 4),
-        product("COMBO", 0, [{ sku: "PART", quantity: 2 }]),
+        {
+          ...product("COMBO", 0, [{ sku: "PART", quantity: 2 }]),
+          relatedSku: "PART",
+        },
       ],
       units: [{
         sku: "PART-BOX",
@@ -154,6 +158,7 @@ describe("KiotViet product sync Drizzle transaction", () => {
       totalStock: schema.products.totalStock,
       isActive: schema.products.isActive,
       lifecycleStatus: schema.products.lifecycleStatus,
+      relatedProductId: schema.products.relatedProductId,
     }).from(schema.products).where(eq(schema.products.storeId, STORE_ID));
     const bySku = new Map(syncedProducts.map((row) => [row.sku, row]));
     expect(bySku.get("PART")).toMatchObject({
@@ -167,6 +172,7 @@ describe("KiotViet product sync Drizzle transaction", () => {
     });
     expect(bySku.get("COMBO")).toMatchObject({
       name: "COMBO source name",
+      relatedProductId: partId,
       isActive: true,
       lifecycleStatus: "active",
     });

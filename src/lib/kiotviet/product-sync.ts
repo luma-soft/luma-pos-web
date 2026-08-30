@@ -24,6 +24,7 @@ export interface KiotVietProduct {
   imageUrls: string[];
   isActive: boolean;
   directSale: boolean;
+  relatedSku: string | null;
   specs: Record<string, string[]> | null;
   comboComponents: KiotVietComboComponent[];
 }
@@ -209,6 +210,7 @@ export function parseKiotVietProductRows(rows: SourceRow[]): KiotVietProductSnap
       imageUrls: parseImages(row["Hình ảnh (url1,url2...)"]),
       isActive: text(row["Đang kinh doanh"]) !== "0",
       directSale: text(row["Được bán trực tiếp"]) !== "0",
+      relatedSku: text(row["Mã HH Liên quan"]) || null,
       specs,
       comboComponents: parseComboComponents(row["Hàng thành phần"]),
     });

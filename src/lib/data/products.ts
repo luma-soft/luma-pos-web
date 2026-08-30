@@ -31,6 +31,7 @@ import {
   DEFAULT_PRODUCT_LIST_SORT,
   type ProductListSort,
 } from "@/lib/inventory/product-list-policy";
+import { selectRelatedProducts } from "@/lib/products/related-products";
 
 export const PRODUCTS_PAGE_SIZE = 20;
 
@@ -230,6 +231,7 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
         trackBatches: complianceFields.trackBatches,
         shelfLifeDays: complianceFields.shelfLifeDays,
         lifecycleStatus: complianceFields.lifecycleStatus,
+        relatedProductId: products.relatedProductId,
         parentProductId: products.parentProductId,
         variantName: products.variantName,
         isVariantParent: products.isVariantParent,
@@ -367,6 +369,7 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
             trackBatches: complianceFields.trackBatches,
             shelfLifeDays: complianceFields.shelfLifeDays,
             lifecycleStatus: complianceFields.lifecycleStatus,
+            relatedProductId: products.relatedProductId,
             parentProductId: products.parentProductId,
             variantName: products.variantName,
             isVariantParent: products.isVariantParent,
@@ -580,28 +583,26 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
     );
   }
 
-  const parentKeys = [
+  const relatedGroupKeys = [
     ...new Set(
       rows
-        .map(
-          (row) => row.parentProductId ?? (row.isVariantParent ? row.id : null),
-        )
+        .flatMap((row) => [row.id, row.relatedProductId])
         .filter((id): id is string => Boolean(id)),
     ),
   ];
-  const categoryIds = [
+  const relatedRootIds = [
     ...new Set(
       rows
-        .map((row) => row.categoryId)
+        .map((row) => row.relatedProductId)
         .filter((id): id is string => Boolean(id)),
     ),
   ];
   const relatedWhere = or(
-    parentKeys.length > 0
-      ? inArray(products.parentProductId, parentKeys)
+    relatedGroupKeys.length > 0
+      ? inArray(products.relatedProductId, relatedGroupKeys)
       : undefined,
-    categoryIds.length > 0
-      ? inArray(products.categoryId, categoryIds)
+    relatedRootIds.length > 0
+      ? inArray(products.id, relatedRootIds)
       : undefined,
   );
   const relatedCandidates = relatedWhere
@@ -611,6 +612,7 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
           sku: products.sku,
           name: products.name,
           categoryId: products.categoryId,
+          relatedProductId: products.relatedProductId,
           parentProductId: products.parentProductId,
           variantName: products.variantName,
           baseUnit: products.baseUnit,
@@ -624,23 +626,13 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
         .leftJoin(stockLevels, eq(stockLevels.productId, products.id))
         .where(and(eq(products.storeId, storeId), relatedWhere))
         .groupBy(products.id)
-        .orderBy(asc(products.name))
+        .orderBy(asc(products.sku))
         .limit(240)
     : [];
 
   return {
     rows: rows.map((row) => {
-      const parentKey =
-        row.parentProductId ?? (row.isVariantParent ? row.id : null);
-      const relatedProducts = relatedCandidates
-        .filter((candidate) => {
-          if (candidate.id === row.id) return false;
-          if (parentKey) return candidate.parentProductId === parentKey;
-          return Boolean(
-            row.categoryId && candidate.categoryId === row.categoryId,
-          );
-        })
-        .slice(0, 12);
+      const relatedProducts = selectRelatedProducts(row, relatedCandidates);
       return {
         ...row,
         children: childrenByParent.get(row.id) ?? [],

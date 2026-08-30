@@ -35,6 +35,7 @@ const product = (sku: string, stock: number, comboComponents: KiotVietProduct["c
   imageUrls: [],
   isActive: true,
   directSale: true,
+  relatedSku: null,
   specs: null,
   comboComponents,
 });
@@ -159,7 +160,10 @@ describe("KiotViet product sync transactional application", () => {
     const snapshot: KiotVietProductSnapshot = {
       products: [
         product("PART", 4),
-        product("COMBO", 0, [{ sku: "PART", quantity: 2 }]),
+        {
+          ...product("COMBO", 0, [{ sku: "PART", quantity: 2 }]),
+          relatedSku: "PART",
+        },
       ],
       units: [{
         sku: "PART-BOX",
@@ -203,6 +207,9 @@ describe("KiotViet product sync transactional application", () => {
       async replaceComboItems(productId, components) {
         calls.push(["replaceComboItems", productId, components]);
       },
+      async setRelatedProduct(productId, relatedProductId) {
+        calls.push(["setRelatedProduct", productId, relatedProductId]);
+      },
       async archiveProduct(action) {
         calls.push(["archiveProduct", action.productId, action.sku, action.reason]);
       },
@@ -224,6 +231,8 @@ describe("KiotViet product sync transactional application", () => {
     expect(calls).toEqual([
       ["upsertProduct", "COMBO", undefined],
       ["upsertProduct", "PART", "part-id"],
+      ["setRelatedProduct", "combo-id", "part-id"],
+      ["setRelatedProduct", "part-id", null],
       ["replaceUnits", "combo-id", []],
       ["setStock", "combo-id", 0, 0, true],
       ["upsertSourceMapping", "combo-id", "COMBO", null],
