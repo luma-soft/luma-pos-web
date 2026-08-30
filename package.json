@@ -37,6 +37,8 @@
     "ops:archive-store": "bun run src/scripts/archive-store.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "3.1121.0",
+    "@aws-sdk/s3-request-presigner": "3.1121.0",
     "@hookform/resolvers": "^5.2.2",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.105.3",
