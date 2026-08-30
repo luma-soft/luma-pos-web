@@ -4,6 +4,7 @@ import {
   ManagedMediaUploadError,
   uploadManagedMedia,
   type ManagedMediaDescriptor,
+  type ManagedMediaUploadRequest,
 } from "../src/lib/media/client";
 
 const STORE_ID = "11111111-1111-4111-8111-111111111111";
@@ -16,8 +17,12 @@ const REQUEST = {
   purpose: "product-image" as const,
   targetId: STORE_ID,
 };
+const NOW = new Date("2026-08-30T03:00:00.000Z");
 
-function intentPayload(overrides: Record<string, unknown> = {}) {
+function intentPayload(
+  overrides: Record<string, unknown> = {},
+  mediaOverrides: Record<string, unknown> = {},
+) {
   return {
     ok: true,
     data: {
@@ -28,6 +33,7 @@ function intentPayload(overrides: Record<string, unknown> = {}) {
         mimeType: "image/png",
         sizeBytes: 4,
         fileName: "camera.png",
+        ...mediaOverrides,
       },
       method: "PUT",
       uploadUrl: SIGNED_URL,
@@ -39,6 +45,19 @@ function intentPayload(overrides: Record<string, unknown> = {}) {
       ...overrides,
     },
   };
+}
+
+function uploadAtFixedTime(
+  fetcher: typeof fetch,
+  request: ManagedMediaUploadRequest = REQUEST,
+  file: File = FILE,
+) {
+  return uploadManagedMedia(
+    file,
+    request,
+    fetcher,
+    () => new Date(NOW.getTime()),
+  );
 }
 
 function descriptorPayload(overrides: Record<string, unknown> = {}) {
@@ -84,7 +103,7 @@ describe("web managed media upload client", () => {
       throw new Error("unexpected URL");
     };
 
-    const result = await uploadManagedMedia(FILE, REQUEST, fetcher);
+    const result = await uploadAtFixedTime(fetcher);
 
     expect(calls.map(({ url, init }) => `${init?.method ?? "GET"} ${url}`)).toEqual([
       "POST /api/mobile/media/uploads",
@@ -122,7 +141,7 @@ describe("web managed media upload client", () => {
       return responseJson(descriptorPayload());
     };
 
-    await uploadManagedMedia(FILE, REQUEST, fetcher);
+    await uploadAtFixedTime(fetcher);
 
     const headers = new Headers(signedPut?.headers);
     expect(headers.get("Content-Type")).toBe("image/png");
@@ -152,14 +171,14 @@ describe("web managed media upload client", () => {
     };
 
     const error = asUploadError(
-      await uploadManagedMedia(FILE, REQUEST, fetcher).catch((caught) => caught),
+      await uploadAtFixedTime(fetcher).catch((caught) => caught),
     );
 
     expect(error).toMatchObject({
       stage: "intent",
       code: "media.invalidIntentResponse",
       retryFrom: "intent",
-      mediaId: undefined,
+      mediaId: MEDIA_ID,
     });
     expect(calls).toEqual(["/api/mobile/media/uploads"]);
     expect(error.message).not.toContain("do-not-forward");
@@ -167,7 +186,7 @@ describe("web managed media upload client", () => {
 
   test("reports intent HTTP failures without leaking response bodies", async () => {
     const error = asUploadError(
-      await uploadManagedMedia(FILE, REQUEST, async () => responseJson({
+      await uploadAtFixedTime(async () => responseJson({
         ok: false,
         error: "secret-backend-detail",
         signedUrl: SIGNED_URL,
@@ -188,7 +207,7 @@ describe("web managed media upload client", () => {
   test("rejects malformed intent payloads without issuing a PUT", async () => {
     let calls = 0;
     const error = asUploadError(
-      await uploadManagedMedia(FILE, REQUEST, async () => {
+      await uploadAtFixedTime(async () => {
         calls += 1;
         return responseJson(intentPayload({ method: "POST" }));
       }).catch((caught) => caught),
@@ -198,9 +217,111 @@ describe("web managed media upload client", () => {
       stage: "intent",
       code: "media.invalidIntentResponse",
       retryFrom: "intent",
+      mediaId: MEDIA_ID,
     });
     expect(calls).toBe(1);
   });
+
+  const invalidIntentScenarios: Array<{
+    name: string;
+    payload: unknown;
+    request?: ManagedMediaUploadRequest;
+    retainedMediaId?: string;
+  }> = [
+    {
+      name: "non-UUID media id",
+      payload: intentPayload({}, { id: "not-a-uuid" }),
+    },
+    {
+      name: "UUID shape outside the Task 3 schema",
+      payload: intentPayload({}, {
+        id: "44444444-4444-0444-8444-444444444444",
+      }),
+    },
+    {
+      name: "non-pending media coordinate",
+      payload: intentPayload({}, { status: "complete" }),
+    },
+    {
+      name: "MIME unrelated to the draft",
+      payload: intentPayload({
+        headers: {
+          "Content-Type": "application/pdf",
+          "If-None-Match": "*",
+        },
+      }, { mimeType: "application/pdf" }),
+      retainedMediaId: MEDIA_ID,
+    },
+    {
+      name: "product-image private visibility",
+      payload: intentPayload({}, { visibility: "private" }),
+      retainedMediaId: MEDIA_ID,
+    },
+    {
+      name: "project-document public visibility",
+      payload: intentPayload({}, { visibility: "public" }),
+      request: { ...REQUEST, purpose: "project-document" },
+      retainedMediaId: MEDIA_ID,
+    },
+    {
+      name: "service-evidence public visibility",
+      payload: intentPayload({}, { visibility: "public" }),
+      request: { ...REQUEST, purpose: "service-evidence" },
+      retainedMediaId: MEDIA_ID,
+    },
+    {
+      name: "ai-attachment public visibility",
+      payload: intentPayload({}, { visibility: "public" }),
+      request: { ...REQUEST, purpose: "ai-attachment" },
+      retainedMediaId: MEDIA_ID,
+    },
+    {
+      name: "expiry equal to the injected clock",
+      payload: intentPayload({ expiresAt: NOW.toISOString() }),
+      retainedMediaId: MEDIA_ID,
+    },
+    {
+      name: "expired intent",
+      payload: intentPayload({ expiresAt: "2026-08-30T02:59:59.999Z" }),
+      retainedMediaId: MEDIA_ID,
+    },
+    {
+      name: "parseable but non-ISO expiry",
+      payload: intentPayload({ expiresAt: "2026-08-30 03:10:00Z" }),
+      retainedMediaId: MEDIA_ID,
+    },
+    {
+      name: "malformed signed URL after a valid pending coordinate",
+      payload: intentPayload({ uploadUrl: "not-absolute" }),
+      retainedMediaId: MEDIA_ID,
+    },
+  ];
+
+  for (const scenario of invalidIntentScenarios) {
+    test(`rejects ${scenario.name} before signed PUT`, async () => {
+      const calls: string[] = [];
+      const fetcher: typeof fetch = async (input) => {
+        calls.push(input.toString());
+        return responseJson(scenario.payload);
+      };
+
+      const error = asUploadError(
+        await uploadAtFixedTime(
+          fetcher,
+          scenario.request ?? REQUEST,
+        ).catch((caught) => caught),
+      );
+
+      expect(error).toMatchObject({
+        stage: "intent",
+        code: "media.invalidIntentResponse",
+        retryFrom: "intent",
+        mediaId: scenario.retainedMediaId,
+      });
+      expect(calls).toEqual(["/api/mobile/media/uploads"]);
+      expect(error.message).not.toContain("not-absolute");
+    });
+  }
 
   test("retains the pending media id and skips completion after a non-2xx PUT", async () => {
     const calls: string[] = [];
@@ -212,7 +333,7 @@ describe("web managed media upload client", () => {
     };
 
     const error = asUploadError(
-      await uploadManagedMedia(FILE, REQUEST, fetcher).catch((caught) => caught),
+      await uploadAtFixedTime(fetcher).catch((caught) => caught),
     );
 
     expect(error).toMatchObject({
@@ -237,7 +358,7 @@ describe("web managed media upload client", () => {
     };
 
     const error = asUploadError(
-      await uploadManagedMedia(FILE, REQUEST, fetcher).catch((caught) => caught),
+      await uploadAtFixedTime(fetcher).catch((caught) => caught),
     );
 
     expect(error).toMatchObject({
@@ -262,7 +383,7 @@ describe("web managed media upload client", () => {
     };
 
     const error = asUploadError(
-      await uploadManagedMedia(FILE, REQUEST, fetcher).catch((caught) => caught),
+      await uploadAtFixedTime(fetcher).catch((caught) => caught),
     );
 
     expect(error).toMatchObject({
@@ -284,7 +405,7 @@ describe("web managed media upload client", () => {
     };
 
     const error = asUploadError(
-      await uploadManagedMedia(FILE, REQUEST, fetcher).catch((caught) => caught),
+      await uploadAtFixedTime(fetcher).catch((caught) => caught),
     );
 
     expect(error).toMatchObject({
@@ -318,10 +439,9 @@ describe("web managed media upload client", () => {
       };
 
       const error = asUploadError(
-        await uploadManagedMedia(
-          FILE,
-          { ...REQUEST, signal: controller.signal },
+        await uploadAtFixedTime(
           fetcher,
+          { ...REQUEST, signal: controller.signal },
         ).catch((caught) => caught),
       );
 

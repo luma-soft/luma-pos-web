@@ -1,4 +1,9 @@
-import type { MediaPurpose } from "./schemas";
+import {
+  MEDIA_PURPOSES,
+  mediaIdSchema,
+  normalizeMediaType,
+  type MediaPurpose,
+} from "./schemas";
 
 const MEDIA_UPLOADS_ENDPOINT = "/api/mobile/media/uploads";
 
@@ -78,6 +83,16 @@ function isVisibility(value: unknown): value is "public" | "private" {
   return value === "public" || value === "private";
 }
 
+function isFutureTask3IsoDate(value: unknown, now: Date): value is string {
+  if (typeof value !== "string") return false;
+  const expiresAt = Date.parse(value);
+  const nowMs = now.getTime();
+  return Number.isFinite(expiresAt)
+    && Number.isFinite(nowMs)
+    && new Date(expiresAt).toISOString() === value
+    && expiresAt > nowMs;
+}
+
 function isAbsoluteHttpUrl(value: unknown): value is string {
   if (!isNonEmptyString(value)) return false;
   try {
@@ -91,12 +106,34 @@ function isAbsoluteHttpUrl(value: unknown): value is string {
   }
 }
 
-function parseUploadIntent(value: unknown, file: File): UploadIntent | null {
+function pendingMediaId(value: unknown): string | undefined {
+  if (!isRecord(value) || value.ok !== true || !isRecord(value.data)) {
+    return undefined;
+  }
+  const media = value.data.media;
+  if (
+    !isRecord(media)
+    || media.status !== "pending"
+    || !mediaIdSchema.safeParse(media.id).success
+  ) {
+    return undefined;
+  }
+  return media.id as string;
+}
+
+function parseUploadIntent(
+  value: unknown,
+  file: File,
+  request: ManagedMediaUploadRequest,
+  now: Date,
+): UploadIntent | null {
   if (!isRecord(value) || value.ok !== true || !isRecord(value.data)) return null;
   const data = value.data;
   if (!isRecord(data.media) || !isRecord(data.headers)) return null;
   const media = data.media;
   const headers = data.headers;
+  const expectedMimeType = normalizeMediaType(file.type);
+  const expectedVisibility = MEDIA_PURPOSES[request.purpose].visibility;
   const headerNames = Object.keys(headers).sort();
   if (
     headerNames.length !== 2
@@ -106,10 +143,12 @@ function parseUploadIntent(value: unknown, file: File): UploadIntent | null {
     return null;
   }
   if (
-    !isNonEmptyString(media.id)
+    !mediaIdSchema.safeParse(media.id).success
     || !isVisibility(media.visibility)
+    || media.visibility !== expectedVisibility
     || media.status !== "pending"
     || !isNonEmptyString(media.mimeType)
+    || media.mimeType !== expectedMimeType
     || !Number.isSafeInteger(media.sizeBytes)
     || (media.sizeBytes as number) <= 0
     || !isNonEmptyString(media.fileName)
@@ -119,8 +158,7 @@ function parseUploadIntent(value: unknown, file: File): UploadIntent | null {
     || !isAbsoluteHttpUrl(data.uploadUrl)
     || headers["Content-Type"] !== media.mimeType
     || headers["If-None-Match"] !== "*"
-    || !isNonEmptyString(data.expiresAt)
-    || !Number.isFinite(Date.parse(data.expiresAt))
+    || !isFutureTask3IsoDate(data.expiresAt, now)
   ) {
     return null;
   }
@@ -274,6 +312,7 @@ export async function uploadManagedMedia(
   file: File,
   request: ManagedMediaUploadRequest,
   fetcher: typeof fetch = globalThis.fetch,
+  now: () => Date = () => new Date(),
 ): Promise<ManagedMediaDescriptor> {
   const signal = request.signal;
   const intentResponse = await fetchStage(
@@ -303,19 +342,24 @@ export async function uploadManagedMedia(
       statusCode: intentResponse.status,
     });
   }
+  const intentPayload = await readJson(intentResponse, "intent", signal);
+  const mediaId = pendingMediaId(intentPayload);
   const intent = parseUploadIntent(
-    await readJson(intentResponse, "intent", signal),
+    intentPayload,
     file,
+    request,
+    now(),
   );
   if (!intent) {
     throw uploadError({
       stage: "intent",
       code: "media.invalidIntentResponse",
       statusCode: intentResponse.status,
+      mediaId,
     });
   }
 
-  const mediaId = intent.media.id;
+  const validatedMediaId = intent.media.id;
   const uploadResponse = await fetchStage(
     fetcher,
     intent.uploadUrl,
@@ -333,7 +377,7 @@ export async function uploadManagedMedia(
     },
     "upload",
     signal,
-    mediaId,
+    validatedMediaId,
   );
   if (!uploadResponse.ok) {
     await discardResponseBody(uploadResponse);
@@ -341,14 +385,14 @@ export async function uploadManagedMedia(
       stage: "upload",
       code: "media.uploadFailed",
       statusCode: uploadResponse.status,
-      mediaId,
+      mediaId: validatedMediaId,
     });
   }
   await discardResponseBody(uploadResponse);
 
   const completionResponse = await fetchStage(
     fetcher,
-    `${MEDIA_UPLOADS_ENDPOINT}/${encodeURIComponent(mediaId)}/complete`,
+    `${MEDIA_UPLOADS_ENDPOINT}/${encodeURIComponent(validatedMediaId)}/complete`,
     {
       method: "POST",
       credentials: "same-origin",
@@ -358,7 +402,7 @@ export async function uploadManagedMedia(
     },
     "complete",
     signal,
-    mediaId,
+    validatedMediaId,
   );
   if (!completionResponse.ok) {
     await discardResponseBody(completionResponse);
@@ -366,11 +410,16 @@ export async function uploadManagedMedia(
       stage: "complete",
       code: "media.completionFailed",
       statusCode: completionResponse.status,
-      mediaId,
+      mediaId: validatedMediaId,
     });
   }
   const descriptor = parseDescriptor(
-    await readJson(completionResponse, "complete", signal, mediaId),
+    await readJson(
+      completionResponse,
+      "complete",
+      signal,
+      validatedMediaId,
+    ),
     intent,
   );
   if (!descriptor) {
@@ -378,7 +427,7 @@ export async function uploadManagedMedia(
       stage: "complete",
       code: "media.invalidCompletionResponse",
       statusCode: completionResponse.status,
-      mediaId,
+      mediaId: validatedMediaId,
     });
   }
   return descriptor;
