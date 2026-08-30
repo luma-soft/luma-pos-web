@@ -74,10 +74,21 @@ async function PricingContent({
         />
       </div>
       <PricingTable
-        key={[params.q ?? "", params.category ?? "", page, pageSize].join(":")}
         books={books}
         rows={tableRows}
         total={total}
+        resetScrollKey={[
+          params.q,
+          params.category,
+          params.brandId,
+          params.supplierId,
+          params.productKind,
+          params.stock,
+          params.sort,
+          params.status,
+          page,
+          pageSize,
+        ].join("\u0000")}
       />
       <Pagination page={page} pageCount={pageCount} total={total} pageSize={pageSize} unitLabel={t("products.unitLabel")} />
     </>

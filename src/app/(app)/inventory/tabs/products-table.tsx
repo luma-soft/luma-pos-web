@@ -235,10 +235,12 @@ export function buildProductUnitColumns({
 
 export function ProductsTable({
   rows,
+  resetScrollKey,
   selectionEnabled = true,
   empty,
 }: {
   rows: ProductListResult["rows"];
+  resetScrollKey?: string | number;
   selectionEnabled?: boolean;
   empty?: ReactNode;
 }) {
@@ -340,6 +342,7 @@ export function ProductsTable({
         minWidth="1120px"
         maxHeight="calc(100dvh - 250px)"
         fillHeight
+        resetScrollKey={resetScrollKey}
         empty={empty}
         mobileListClassName="!space-y-0 overflow-hidden rounded-xl border border-border-soft bg-surface"
         mobileRowClassName="!rounded-none !border-x-0 !border-t-0 last:!border-b-0"

@@ -171,7 +171,7 @@ export function PricingMobileRow({
   );
 }
 
-export function PricingTable({ books: initialBooks, rows: initialRows, total }: { books: PricingBook[]; rows: PricingRow[]; total: number }) {
+export function PricingTable({ books: initialBooks, rows: initialRows, total, resetScrollKey }: { books: PricingBook[]; rows: PricingRow[]; total: number; resetScrollKey?: string | number }) {
   const t = useTranslations();
   const router = useRouter();
   const [books, setBooks] = useState(initialBooks);
@@ -520,6 +520,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total }: 
         minWidth={`${Math.max(780, 610 + visibleBooks.length * 170)}px`}
         maxHeight="calc(100dvh - 340px)"
         fillHeight
+        resetScrollKey={resetScrollKey}
         renderMobileRow={({ row }) => (
           <PricingMobileRow
             row={row}

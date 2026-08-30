@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, isValidElement, type ReactNode, type SyntheticEvent, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Fragment, isValidElement, type ReactNode, type SyntheticEvent, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronUp, Columns3, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -37,6 +37,19 @@ type MobileRenderProps<T> = {
 
 export function stopRowToggle(event: SyntheticEvent) {
   event.stopPropagation();
+}
+
+export function resetDataTableScroll(region: { scrollTop: number }) {
+  region.scrollTop = 0;
+}
+
+export function dataTableResultSetKey(
+  searchParams: { toString: () => string },
+  expandedParam: string,
+) {
+  const resultSetParams = new URLSearchParams(searchParams.toString());
+  resultSetParams.delete(expandedParam);
+  return resultSetParams.toString();
 }
 
 const NON_SORTABLE_COLUMN_KEYS = new Set(["select", "action", "actions", "menu"]);
@@ -181,6 +194,7 @@ export function DataTableShell<T>({
   minHeight = 280,
   fillHeight = true,
   canExpand,
+  resetScrollKey,
 }: {
   tableId: string;
   rows: T[];
@@ -217,6 +231,8 @@ export function DataTableShell<T>({
   minHeight?: number;
   fillHeight?: boolean;
   canExpand?: (row: T) => boolean;
+  /** Identifies a new result set whose first row should become visible. */
+  resetScrollKey?: string | number;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -230,6 +246,12 @@ export function DataTableShell<T>({
   const [storedVisible, setStoredVisible] = useState<Set<string> | null>(null);
   const [activeSortColumn, setActiveSortColumn] = useState<string | null>(null);
   const [sort, setSort] = useState<{ key: string; direction: SortDirection } | null>(null);
+  const queryResultSetKey = dataTableResultSetKey(params, expandedParam);
+  const effectiveResetScrollKey = resetScrollKey ?? queryResultSetKey;
+
+  useLayoutEffect(() => {
+    if (desktopTableRef.current) resetDataTableScroll(desktopTableRef.current);
+  }, [effectiveResetScrollKey, sort]);
 
   useEffect(() => {
     let active = true;

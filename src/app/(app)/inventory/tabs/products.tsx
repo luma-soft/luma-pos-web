@@ -255,6 +255,19 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
       {!cameraMaterials && <ProductsToolbar params={params} categories={categories} brands={brands} suppliers={suppliers} resultCount={total} />}
       <ProductsTable
         rows={rows}
+        resetScrollKey={[
+          params.q,
+          params.category,
+          params.brandId,
+          params.supplierId,
+          params.productKind,
+          params.stock,
+          params.sort,
+          status,
+          view,
+          page,
+          pageSize,
+        ].join("\u0000")}
         selectionEnabled={!cameraMaterials}
         empty={(
           <div className="rounded-card border border-dashed border-border bg-surface p-12 text-center text-slate-400">
