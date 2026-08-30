@@ -202,7 +202,7 @@ export function planKiotVietCustomerSync(input: {
     return code ? [[code, customer] as const] : [];
   }));
   const mappedLocalIds = new Set(input.mappings.map((mapping) => mapping.localId));
-  const mappedExternalIds = new Set(input.mappings.map((mapping) => mapping.externalId));
+  const mappingByExternalId = new Map(input.mappings.map((mapping) => [mapping.externalId, mapping]));
   const entityPlan = planKiotVietEntities({
     sources: customers.map((customer) => ({
       externalId: customer.externalId,
@@ -228,9 +228,24 @@ export function planKiotVietCustomerSync(input: {
   const historicalCodes = [...new Set([...input.historicalDocumentCustomerCodes]
     .map((code) => normalizeKiotVietText(code))
     .filter(Boolean))].sort((left, right) => left.localeCompare(right));
+  const hasLiveMappedCustomer = (code: string) => {
+    const mapping = mappingByExternalId.get(code);
+    return mapping != null && currentById.has(mapping.localId);
+  };
+  const historicalConflicts = historicalCodes.flatMap((code) => {
+    if (sourceByExternalId.has(code) || hasLiveMappedCustomer(code)) return [];
+    const current = currentByCode.get(code);
+    if (current) {
+      return [{ externalId: code, localId: current.localId, reason: "code_collision" as const }];
+    }
+    const mapping = mappingByExternalId.get(code);
+    return mapping ? [{ externalId: code, localId: mapping.localId, reason: "mapped_local_missing" as const }] : [];
+  });
+  entityPlan.conflicts.push(...historicalConflicts);
+  entityPlan.conflicts.sort((left, right) => left.externalId.localeCompare(right.externalId));
   const historicalPlaceholders = historicalCodes
     .filter((code) => !sourceByExternalId.has(code))
-    .filter((code) => !currentByCode.has(code) && !mappedExternalIds.has(code))
+    .filter((code) => !currentByCode.has(code) && !mappingByExternalId.has(code))
     .map((code) => ({
       externalId: code,
       code,

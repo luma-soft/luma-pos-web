@@ -152,6 +152,41 @@ describe("KiotViet customer master synchronization", () => {
     }]);
   });
 
+  test("blocks a historical document code that collides with an unproven Luma-only customer", () => {
+    const plan = planKiotVietCustomerSync({
+      sourceRows: [{
+        "Mã khách hàng": "KH-ACTIVE",
+        "Tên khách hàng": "Active",
+        "Nợ cần thu hiện tại": 0,
+        "Tổng bán trừ trả hàng": 0,
+        "Trạng thái": "Đang giao dịch",
+      }],
+      current: [{
+        localId: "luma-history",
+        code: "KH-HISTORY",
+        name: "Luma-only historical collision",
+        phone: null,
+        email: null,
+        address: null,
+        taxCode: null,
+        note: null,
+        isActive: true,
+        currentDebt: 0,
+        totalSpent: 0,
+        legacyImported: false,
+      }],
+      mappings: [],
+      historicalDocumentCustomerCodes: ["KH-HISTORY"],
+    });
+
+    expect(plan.historicalPlaceholders).toEqual([]);
+    expect(plan.entityPlan.conflicts).toEqual([{
+      externalId: "KH-HISTORY",
+      localId: "luma-history",
+      reason: "code_collision",
+    }]);
+  });
+
   test("reports the reviewed adoption and correction counts deterministically", () => {
     const sourceRows = Array.from({ length: 103 }, (_, index) => ({
       "Mã khách hàng": `KH-${String(index + 1).padStart(3, "0")}`,
