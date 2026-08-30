@@ -46,6 +46,7 @@ export type KiotVietHistoryProductResolution =
     source: "current_base" | "alternate_unit" | "archived_mapping" | "approved_historical_placeholder";
     productId: string;
     sourceSku: string;
+    sourceUnitName: string;
     unitName: string;
     unitMultiplier: number;
   }
@@ -144,6 +145,7 @@ export function createKiotVietHistoryProductResolver(
   return {
     resolve(reference) {
       const sku = required(reference.sku, "source SKU");
+      const suppliedSourceUnitName = normalizeKiotVietText(reference.unitName);
       const base = baseBySku.get(sku);
       if (base) {
         return {
@@ -151,6 +153,7 @@ export function createKiotVietHistoryProductResolver(
           source: "current_base",
           productId: base.id,
           sourceSku: sku,
+          sourceUnitName: suppliedSourceUnitName || unitName(base.baseUnit),
           unitName: unitName(base.baseUnit),
           unitMultiplier: 1,
         };
@@ -163,6 +166,7 @@ export function createKiotVietHistoryProductResolver(
           source: "alternate_unit",
           productId: unit.productId,
           sourceSku: sku,
+          sourceUnitName: suppliedSourceUnitName || unitName(unit.unitName),
           unitName: unitName(unit.unitName),
           unitMultiplier: unit.multiplier,
         };
@@ -175,6 +179,7 @@ export function createKiotVietHistoryProductResolver(
           source: "archived_mapping",
           productId: archived.productId,
           sourceSku: sku,
+          sourceUnitName: suppliedSourceUnitName || unitName(archived.baseUnit),
           unitName: unitName(archived.baseUnit),
           unitMultiplier: 1,
         };
@@ -187,6 +192,7 @@ export function createKiotVietHistoryProductResolver(
           source: "approved_historical_placeholder",
           productId: placeholder.productId,
           sourceSku: sku,
+          sourceUnitName: suppliedSourceUnitName || unitName(placeholder.baseUnit),
           unitName: unitName(placeholder.baseUnit),
           unitMultiplier: 1,
         };

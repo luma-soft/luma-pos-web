@@ -24,37 +24,45 @@ describe("KiotViet historical product resolver", () => {
       ],
     });
 
-    expect(resolver.resolve({ sku: "BASE" })).toEqual({
+    expect(resolver.resolve({ sku: "BASE", unitName: "Cái nguồn" })).toEqual({
       status: "resolved",
       source: "current_base",
       productId: "base-id",
       sourceSku: "BASE",
+      sourceUnitName: "Cái nguồn",
       unitName: "Cái",
       unitMultiplier: 1,
     });
-    expect(resolver.resolve({ sku: "ALT" })).toEqual({
+    expect(resolver.resolve({ sku: "ALT", unitName: "Thùng nguồn" })).toEqual({
       status: "resolved",
       source: "alternate_unit",
       productId: "base-id",
       sourceSku: "ALT",
+      sourceUnitName: "Thùng nguồn",
       unitName: "Thùng",
       unitMultiplier: 12,
     });
-    expect(resolver.resolve({ sku: "ARCHIVED" })).toEqual({
+    expect(resolver.resolve({ sku: "ARCHIVED", unitName: "Mét nguồn" })).toEqual({
       status: "resolved",
       source: "archived_mapping",
       productId: "archived-id",
       sourceSku: "ARCHIVED",
+      sourceUnitName: "Mét nguồn",
       unitName: "Mét",
       unitMultiplier: 1,
     });
-    expect(resolver.resolve({ sku: "MISSING" })).toEqual({
+    expect(resolver.resolve({ sku: "MISSING", unitName: "Cuộn nguồn" })).toEqual({
       status: "resolved",
       source: "approved_historical_placeholder",
       productId: "placeholder-id",
       sourceSku: "MISSING",
+      sourceUnitName: "Cuộn nguồn",
       unitName: "Cuộn",
       unitMultiplier: 1,
+    });
+    expect(resolver.resolve({ sku: "BASE" })).toMatchObject({
+      status: "resolved",
+      sourceUnitName: "Cái",
     });
   });
 
@@ -69,9 +77,9 @@ describe("KiotViet historical product resolver", () => {
     const audit = auditKiotVietHistoryProducts({
       resolver,
       references: [
-        { sku: "BASE", documentCode: "HD001" },
-        { sku: "ALT", documentCode: "HD001" },
-        { sku: "ALT", documentCode: "HD002" },
+        { sku: "BASE", unitName: "Cái", documentCode: "HD001" },
+        { sku: "ALT", unitName: "Thùng", documentCode: "HD001" },
+        { sku: "ALT", unitName: "Thùng", documentCode: "HD002" },
         { sku: "NEEDS-APPROVAL", productName: "Hàng lịch sử", unitName: "Bộ", documentCode: "HD003" },
       ],
     });
@@ -121,7 +129,7 @@ describe("KiotViet historical product resolver", () => {
     });
     const audit = auditKiotVietHistoryProducts({
       resolver,
-      references: [{ sku: "NEEDS-APPROVAL" }],
+      references: [{ sku: "NEEDS-APPROVAL", unitName: "Cái" }],
     });
 
     audit.summary.awaitingPlaceholderApprovalCount = 0;
