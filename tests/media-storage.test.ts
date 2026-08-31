@@ -52,6 +52,13 @@ function r2WithClient(
   return new R2ObjectStorage(R2_CONFIG, { send } as unknown as S3Client);
 }
 
+test("R2 client uses path-style bucket URLs", () => {
+  const storage = new R2ObjectStorage(R2_CONFIG);
+  const client = (storage as unknown as { client: S3Client }).client;
+
+  expect(client.config.forcePathStyle).toBe(true);
+});
+
 function createSupabaseClient() {
   const calls: Array<{ operation: string; bucket: string; key?: string }> = [];
   const fileApi = {
@@ -247,9 +254,9 @@ test("R2 presigned download URLs bind the requested bucket, key, and expiry", as
   const parsed = new URL(url);
 
   expect(parsed.host).toBe(
-    `${R2_CONFIG.privateBucket}.${R2_CONFIG.accountId}.r2.cloudflarestorage.com`,
+    `${R2_CONFIG.accountId}.r2.cloudflarestorage.com`,
   );
-  expect(parsed.pathname).toBe(`/${key}`);
+  expect(parsed.pathname).toBe(`/${R2_CONFIG.privateBucket}/${key}`);
   expect(parsed.searchParams.get("X-Amz-Expires")).toBe("120");
   expect(parsed.searchParams.get("X-Amz-SignedHeaders")).toBe("host");
 });

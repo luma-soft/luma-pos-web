@@ -14,6 +14,7 @@ try {
       const client = new S3Client({
         region: "auto",
         endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+        forcePathStyle: true,
         credentials: { accessKeyId, secretAccessKey },
       });
       await client.send(new HeadBucketCommand({ Bucket: bucket }));
