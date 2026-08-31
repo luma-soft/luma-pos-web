@@ -9,7 +9,7 @@
     },
     {
       "path": "/api/cron/media/cleanup",
-      "schedule": "15 * * * *"
+      "schedule": "15 2 * * *"
     }
   ]
 }

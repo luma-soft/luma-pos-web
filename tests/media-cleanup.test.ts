@@ -172,10 +172,10 @@ describe("bounded R2 media cleanup", () => {
 });
 
 describe("media cleanup cron", () => {
-  test("runs hourly at minute 15", () => {
+  test("runs daily at 09:15 Asia/Ho_Chi_Minh on Vercel Hobby", () => {
     expect(vercelConfig.crons).toContainEqual({
       path: "/api/cron/media/cleanup",
-      schedule: "15 * * * *",
+      schedule: "15 2 * * *",
     });
   });
 
