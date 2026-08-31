@@ -40,12 +40,20 @@ Nếu biến này không được đặt, test sẽ skip và không kết nối 
 2. [vercel.com/new](https://vercel.com/new) → Import repo → Vercel tự nhận Next.js + bun.lock
 3. Khai báo **Environment Variables** (Production + Preview):
 
-   | Tên | Giá trị |
-   |---|---|
-   | `NEXT_PUBLIC_SUPABASE_URL` | `https://<ref>.supabase.co` |
-   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon key |
-   | `SUPABASE_SERVICE_ROLE_KEY` | service role key (Sensitive ✓) |
-   | `DATABASE_URL` | **pooler string port 6543** (Sensitive ✓) |
+   | Tên                             | Giá trị                                                    |
+   | ------------------------------- | ---------------------------------------------------------- |
+   | `NEXT_PUBLIC_SUPABASE_URL`      | `https://<ref>.supabase.co`                                |
+   | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon key                                                   |
+   | `SUPABASE_SERVICE_ROLE_KEY`     | service role key (Sensitive ✓)                             |
+   | `DATABASE_URL`                  | **pooler string port 6543** (Sensitive ✓)                  |
+   | `MEDIA_WRITE_PROVIDER`          | `r2` only after the managed-media rollout gates pass       |
+   | `R2_ACCOUNT_ID`                 | Cloudflare account ID (Sensitive ✓)                        |
+   | `R2_ACCESS_KEY_ID`              | R2 access-key ID (Sensitive ✓)                             |
+   | `R2_SECRET_ACCESS_KEY`          | R2 secret access key (Sensitive ✓)                         |
+   | `R2_PUBLIC_BUCKET`              | Public product-media bucket                                |
+   | `R2_PRIVATE_BUCKET`             | Private project/service/AI bucket; must differ from public |
+   | `R2_PUBLIC_BASE_URL`            | Public HTTPS custom-domain origin, without path/query      |
+   | `CRON_SECRET`                   | 32+ character bearer used by protected cron routes         |
 
 4. Deploy. Region đã pin `sin1` (Singapore — cùng region Supabase) trong `vercel.json`.
 
@@ -63,10 +71,46 @@ vercel --prod
 
 ## Sau deploy — checklist
 
-- [ ] Supabase → **Authentication → URL Configuration**: thêm `https://<app>.vercel.app` vào *Site URL* + *Redirect URLs* (không thêm thì login redirect fail)
+- [ ] Supabase → **Authentication → URL Configuration**: thêm `https://<app>.vercel.app` vào _Site URL_ + _Redirect URLs_ (không thêm thì login redirect fail)
 - [ ] Đăng nhập thử, tạo 1 đơn POS, xem dashboard
 - [ ] Link portal khách (`/portal/<token>`) hoạt động không cần đăng nhập
 - [ ] In thử hóa đơn A4/A5/K80
+
+## Managed media R2 release gates
+
+Do not enable R2 writes from configuration alone. Run the server-side probe first;
+it validates all six R2 variables, requires `MEDIA_WRITE_PROVIDER=r2`, validates
+the public HTTPS origin, and sends `HeadBucket` to both configured buckets:
+
+```bash
+bun run media:r2:preflight
+```
+
+The command prints capability/boolean readiness only. It never prints account
+credentials, bucket names, object keys, signed URLs, file names, or tenant data.
+Only after it passes may release operators attest
+`LUMA_R2_PUBLIC_BUCKET_REACHABLE=true` and
+`LUMA_R2_PRIVATE_BUCKET_REACHABLE=true` for the mobile production preflight.
+
+Roll out in this exact order:
+
+1. Apply schema through `0119` and deploy dual-provider read support while R2 writes remain disabled in the production environment.
+2. Probe non-production CORS, signed PUT, private signed GET, public custom domain, both bucket `HEAD` checks, and the protected cleanup cron.
+3. Enable product-image R2 writes and monitor errors/fallbacks for 24 hours.
+4. Enable project/service/installed-asset/warranty/customer-request writes and monitor for 48 hours.
+5. Enable AI attachment writes and monitor for 24 hours.
+6. Run migration inventory/copy/verify dry runs, then execute bounded batches using one reviewed run UUID per store.
+7. Prefer R2 reads and monitor Supabase fallbacks for 30 days.
+8. Delete Supabase source objects only after every retention, checksum, fallback, quarantine, cleanup-health, and rollback gate passes.
+
+Required evidence before production promotion:
+
+- [ ] `bun run media:r2:preflight` returns `ready: true` and `managed-media-r2-v1`.
+- [ ] public and private bucket probes pass with distinct bucket names.
+- [ ] signed PUT, private signed GET, and public custom-domain reads pass from the deployed origin/mobile client.
+- [ ] `GET /api/cron/media/cleanup` rejects a wrong bearer and returns aggregate metrics for the valid bearer.
+- [ ] migrations `0118` and `0119` are applied before the corresponding app code is deployed.
+- [ ] no unresolved/quarantined migration item or recorded Supabase fallback remains before source deletion.
 
 ## Ghi chú kỹ thuật
 

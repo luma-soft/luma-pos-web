@@ -151,6 +151,35 @@ and retry state first.
 - `fallback_reads_present`: keep Supabase data; identify callers still reading legacy coordinates.
 - interrupted command: rerun the same command and run UUID. Every item transition is idempotent.
 
+## Production rollout and release gate
+
+Before enabling any production R2 write, run:
+
+```bash
+bun run media:r2:preflight
+```
+
+This command requires `MEDIA_WRITE_PROVIDER=r2`, validates the six `R2_*`
+variables, enforces a public HTTPS origin, and probes both buckets with
+`HeadBucket`. Its output is safe aggregate readiness and the
+`managed-media-r2-v1` capability only.
+
+Release order is mandatory:
+
+1. schema plus dual-provider reads, with production R2 writes disabled;
+2. non-production CORS, signed PUT/GET, custom-domain, bucket and cleanup-cron checks;
+3. product-image writes, then 24-hour observation;
+4. project/service and related field-media writes, then 48-hour observation;
+5. AI writes, then 24-hour observation;
+6. bounded inventory/copy/verify/cutover after dry-run review;
+7. R2-preferred reads with 30 days of zero Supabase fallback/quarantine;
+8. source deletion only after the existing 30-day gate and rollback review.
+
+Record the two successful bucket probes as
+`LUMA_R2_PUBLIC_BUCKET_REACHABLE=true` and
+`LUMA_R2_PRIVATE_BUCKET_REACHABLE=true` only for the release-preflight run that
+uses the same production configuration.
+
 ## Audit evidence to retain
 
 - run UUID, store UUID, operator, start/end timestamps;
