@@ -52,7 +52,7 @@ export type RecoverReadyMediaAfterFailureResult =
 type MediaTransaction = Pick<typeof db, "select" | "update">;
 type MediaTransactionalDatabase = Pick<typeof db, "transaction">;
 
-async function hasLiveMediaReference(
+export async function getLiveMediaReferenceStateInTransaction(
   transaction: MediaTransaction,
   input: Pick<SoftDeleteMediaInput, "storeId" | "mediaId">,
 ): Promise<"referenced" | "malformed" | "none"> {
@@ -186,7 +186,7 @@ export async function recoverReadyMediaAfterFailureInTransaction(
   }
   if (media.status !== "ready") return { outcome: "conflict" };
 
-  const referenceState = await hasLiveMediaReference(transaction, coordinates);
+  const referenceState = await getLiveMediaReferenceStateInTransaction(transaction, coordinates);
   if (referenceState === "referenced") return { outcome: "referenced" };
 
   const status = referenceState === "malformed" ? "quarantined" : "deleted";
@@ -236,7 +236,7 @@ export async function softDeleteMediaIfUnreferencedInTransaction(
     return { outcome: "conflict" };
   }
 
-  const referenceState = await hasLiveMediaReference(transaction, coordinates);
+  const referenceState = await getLiveMediaReferenceStateInTransaction(transaction, coordinates);
   if (referenceState === "malformed") {
     return { outcome: "conflict" };
   }

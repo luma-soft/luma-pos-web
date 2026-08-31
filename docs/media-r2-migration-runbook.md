@@ -119,6 +119,30 @@ bun --conditions=react-server run src/scripts/migrate-media-to-r2.ts delete-sour
 
 Physical R2 cleanup is not part of this command. Task 11 owns orphan/pending cleanup and reference protection.
 
+## Managed R2 cleanup
+
+`GET /api/cron/media/cleanup` runs hourly at minute 15 and requires
+`Authorization: Bearer ${CRON_SECRET}`. Each invocation claims at most 50 rows
+with a 15-minute lease, then:
+
+- removes abandoned pending R2 uploads after 24 hours;
+- removes soft-deleted, unreferenced R2 originals and thumbnails;
+- treats an already missing object as a successful idempotent cleanup;
+- records attempt count and the last storage error for retry;
+- returns aggregate counts and reclaimed bytes only—never keys, signed URLs,
+  file names, store identifiers, or tenant PII.
+
+Reference checks cover active product media, brand logos, service/customer
+attachments, handover documents, signatures, migration items, and persisted AI
+attachments before a cleanup lease can be claimed. The cleanup claim also moves
+expired pending media to `deleted`, so a new active reference cannot race the
+physical deletion.
+
+Configure the R2 bucket lifecycle rule to abort incomplete multipart uploads
+after seven days. Do not configure a time-based deletion rule for ordinary
+objects: application cleanup is authoritative because it verifies references
+and retry state first.
+
 ## Failure handling
 
 - `failed`: correct the transient storage/database problem and rerun the same stage/run.

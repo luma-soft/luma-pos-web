@@ -6,6 +6,10 @@
     {
       "path": "/api/cron/notifications/outbox",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/media/cleanup",
+      "schedule": "15 * * * *"
     }
   ]
 }

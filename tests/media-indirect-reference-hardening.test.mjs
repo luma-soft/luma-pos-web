@@ -179,6 +179,7 @@ beforeAll(async () => {
 
   await applySqlFile(`${projectRoot}/drizzle/0112_media_reference_delete_guard.sql`);
   await applySqlFile(`${projectRoot}/drizzle/0113_media_indirect_reference_hardening.sql`);
+  await applySqlFile(`${projectRoot}/drizzle/0119_media_cleanup_leases.sql`);
 });
 
 afterAll(async () => client.close());
