@@ -193,7 +193,7 @@ export async function updateAiSettings(input: AiSettingsInput): Promise<ActionRe
         openaiApiKey: nextKey,
         openaiApiKeySet: Boolean(nextKey),
         openaiVisionModel: v.visionModel,
-        attachmentsBucket: v.attachmentsBucket,
+        attachmentsBucket: v.attachmentsBucket ?? current.ai.attachmentsBucket,
         monthlyUsageLimit: typeof requested.monthlyUsageLimit === "number"
           ? v.monthlyUsageLimit
           : current.ai.monthlyUsageLimit,
@@ -432,7 +432,7 @@ export async function testAiProvider(input: AiSettingsInput, kind: AiProviderTes
       openaiVisionModel: v.visionModel,
       openaiApiKey: nextKey,
       openaiApiKeySet: Boolean(nextKey),
-      attachmentsBucket: v.attachmentsBucket,
+      attachmentsBucket: v.attachmentsBucket ?? current.ai.attachmentsBucket,
       monthlyUsageLimit: v.monthlyUsageLimit,
       showFloatingLauncher: v.showFloatingLauncher,
     });
@@ -490,7 +490,7 @@ export async function testAiProvider(input: AiSettingsInput, kind: AiProviderTes
       openaiApiKey: v.openaiApiKey?.trim() ?? "",
       openaiApiKeySet: Boolean(v.openaiApiKey?.trim()),
       openaiVisionModel: v.visionModel,
-      attachmentsBucket: v.attachmentsBucket,
+      attachmentsBucket: v.attachmentsBucket ?? "ai-attachments",
       monthlyUsageLimit: v.monthlyUsageLimit,
       showFloatingLauncher: v.showFloatingLauncher,
     });

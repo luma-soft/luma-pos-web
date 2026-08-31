@@ -417,7 +417,7 @@ export const aiSettingsInputSchema = z.object({
   openaiApiKey: z.string().max(500).optional(),
   clearOpenaiApiKey: z.boolean().default(false),
   openaiVisionModel: z.enum(AI_VISION_MODELS).default("gemini-2.5-flash"),
-  attachmentsBucket: z.enum(AI_ATTACHMENT_BUCKETS).default("ai-attachments"),
+  attachmentsBucket: z.enum(AI_ATTACHMENT_BUCKETS).optional(),
   monthlyUsageLimit: z.number().int().min(0).max(100000).default(1000),
   showFloatingLauncher: z.boolean().default(true),
 });

@@ -88,7 +88,13 @@ export function useAssistantState(surface: AssistantSurface): AssistantControlle
   const [listening, setListening] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const uploadSessionIdRef = useRef<string | null>(null);
+  const uploadSessionPromiseRef = useRef<Promise<string> | null>(null);
   const activePreset = actionPresetById(actionPresets, activePresetId);
+
+  useEffect(() => {
+    uploadSessionIdRef.current = sessionId;
+  }, [sessionId]);
 
   useEffect(() => {
     window.localStorage.setItem(chatHistoryKey, JSON.stringify(sanitizeMessagesForStorage(msgs)));
@@ -177,6 +183,26 @@ export function useAssistantState(surface: AssistantSurface): AssistantControlle
       : [];
   const suggestions = suggestionGroups.flatMap((group) => group.items);
 
+  async function ensureUploadSession() {
+    const currentSessionId = sessionId ?? uploadSessionIdRef.current;
+    if (currentSessionId) return currentSessionId;
+    if (uploadSessionPromiseRef.current) return uploadSessionPromiseRef.current;
+    uploadSessionPromiseRef.current = postJson("/api/mobile/ai/sessions", {
+      surface,
+      title: activePreset?.sessionTitle ?? defaultSessionTitle,
+    }).then((data) => {
+      const id = (data as { session?: { id?: unknown } }).session?.id;
+      if (typeof id !== "string" || !id) throw new Error("ai.session.missing");
+      uploadSessionIdRef.current = id;
+      setSessionId(id);
+      void refreshSessions(false).catch(() => {});
+      return id;
+    }).finally(() => {
+      uploadSessionPromiseRef.current = null;
+    });
+    return uploadSessionPromiseRef.current;
+  }
+
   function addFiles(files: FileList | File[]) {
     const next: ComposerAttachment[] = [];
     setAttachmentError(null);
@@ -206,7 +232,8 @@ export function useAssistantState(surface: AssistantSurface): AssistantControlle
         status: "uploading",
       };
       next.push(localAttachment);
-      void uploadAiAttachment(file)
+      void ensureUploadSession()
+        .then((uploadSessionId) => uploadAiAttachment(file, surface, uploadSessionId))
         .then((uploaded) => {
           setAttachments((current) => current.map((item) => item.localId === localId
             ? { ...item, ...uploaded, localId, previewUrl: item.previewUrl, status: "uploaded" }
@@ -294,8 +321,10 @@ export function useAssistantState(surface: AssistantSurface): AssistantControlle
       const data = await postJson("/api/mobile/ai/assistant", {
         prompt,
         surface,
-        attachments: outgoingAttachments.map(({ id, bucket, path, name, mimeType, size, kind, signedUrl }) => ({
+        attachments: outgoingAttachments.map(({ id, mediaId, sessionId: attachmentSessionId, bucket, path, name, mimeType, size, kind, signedUrl }) => ({
           id,
+          mediaId,
+          sessionId: attachmentSessionId,
           bucket,
           path,
           name,

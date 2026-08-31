@@ -58,11 +58,48 @@ describe("AI tenant scope contract", () => {
     expect(draft).toMatch(/insert\(purchaseOrderItems\)[\s\S]*?storeId,/);
   });
 
-  test("signs only AI attachments owned by the authenticated store and user", () => {
+  test("routes new AI attachments through managed media and limits Supabase to legacy reads", () => {
     const attachments = read("src/app/api/mobile/ai/attachments/route.ts");
+    const parser = read("src/lib/ai/attachments.ts");
 
+    expect(attachments).toContain('purpose: "ai-attachment"');
+    expect(attachments).toContain('form.get("sessionId")');
+    expect(attachments).toContain(".putManagedObject");
+    expect(attachments).toContain(".resolveMedia");
+    expect(attachments).toContain("mediaId");
     expect(attachments).toContain("const ownerPrefix = `stores/${gate.storeId}/users/${gate.userId}/`");
     expect(attachments).toContain("path.startsWith(ownerPrefix)");
     expect(attachments).not.toContain("path.startsWith(`${gate.userId}/`)");
+    expect(attachments).not.toContain(".upload(path, buffer");
+    expect(parser).toContain("attachment.mediaId");
+    expect(parser).toContain("readMedia");
+    expect(parser).toContain("getAiAttachmentsBucket");
+  });
+
+  test("shows managed R2 as read-only while retaining the legacy bucket preference", () => {
+    const settingsClient = read("src/app/(app)/settings/settings-client.tsx");
+    const settingsSchema = read("src/lib/schemas/settings.ts");
+    const settingsActions = read("src/lib/actions/settings.ts");
+
+    expect(settingsClient).toContain("Cloudflare R2 (managed)");
+    expect(settingsClient).not.toContain("AI_BUCKET_OPTIONS");
+    expect(settingsClient).not.toContain('set("attachmentsBucket"');
+    expect(settingsSchema).toContain("attachmentsBucket: z.enum(AI_ATTACHMENT_BUCKETS).optional()");
+    expect(settingsActions).toContain("attachmentsBucket: v.attachmentsBucket ?? current.ai.attachmentsBucket");
+  });
+
+  test("binds every web attachment call site to one active or ephemeral AI session", () => {
+    const api = read("src/components/ai-assistant/api.ts");
+    const state = read("src/components/ai-assistant/use-assistant-state.ts");
+    const quickAction = read("src/components/ai-quick-actions/ai-quick-action-modal.tsx");
+    const types = read("src/components/ai-assistant/types.ts");
+
+    expect(api).toContain('form.append("sessionId", sessionId)');
+    expect(state).toContain("ensureUploadSession");
+    expect(state).toContain("uploadAiAttachment(file, surface, uploadSessionId)");
+    expect(quickAction).toContain("ensureUploadSession");
+    expect(quickAction).toContain("uploadAiAttachment(file, surface, uploadSessionId)");
+    expect(types).toContain("mediaId?: string;");
+    expect(types).toContain("sessionId?: string;");
   });
 });

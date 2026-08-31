@@ -145,10 +145,9 @@ export async function POST(request: Request) {
     },
   });
   const parsedAttachments = attachments.length
-    ? await Promise.all(attachments.slice(0, 4).map((attachment) => parseAiAttachment({
+      ? await Promise.all(attachments.slice(0, 4).map((attachment) => parseAiAttachment({
         attachment,
-        storeId: gate.storeId,
-        userId: gate.userId,
+        actor: gate,
         prompt,
       })))
     : [];

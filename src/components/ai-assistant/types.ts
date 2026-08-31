@@ -19,6 +19,8 @@ export type SpeechRecognitionCtor = new () => {
 
 export type ComposerAttachment = {
   id: string;
+  mediaId?: string;
+  sessionId?: string;
   localId?: string;
   name: string;
   mimeType: string;

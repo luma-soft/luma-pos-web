@@ -2,9 +2,12 @@ import * as XLSX from "xlsx";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { parseAiAttachmentWithProvider, type AiAttachmentParseResult } from "@/lib/ai/provider";
 import { getAiAttachmentsBucket } from "@/lib/data/settings";
+import type { MediaActor } from "@/lib/media/authorization";
+import { getMediaService } from "@/lib/media/service";
 
 export type AiAttachmentMetadata = {
   id?: string;
+  mediaId?: string;
   bucket?: string;
   path?: string;
   name?: string;
@@ -64,32 +67,58 @@ function unsupportedResult(message: string): AiAttachmentParseResult {
   };
 }
 
-async function downloadAttachment(input: AiAttachmentMetadata, storeId: string, userId: string) {
-  const bucket = input.bucket || await getAiAttachmentsBucket(storeId);
-  const path = input.path || input.id;
-  if (!path || !path.startsWith(`stores/${storeId}/users/${userId}/`)) {
-    throw new Error("ATTACHMENT_FORBIDDEN");
-  }
+async function defaultLegacyDownload(bucket: string, path: string) {
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase.storage.from(bucket).download(path);
   if (error) throw error;
-  return Buffer.from(await data.arrayBuffer());
+  return new Uint8Array(await data.arrayBuffer());
+}
+
+export async function readAiAttachmentBytes(input: {
+  attachment: AiAttachmentMetadata;
+  actor: MediaActor;
+  readManaged?: (actor: MediaActor, mediaId: string) => Promise<Uint8Array>;
+  downloadLegacy?: (bucket: string, path: string) => Promise<Uint8Array>;
+  getLegacyBucket?: (storeId: string) => Promise<string>;
+}) {
+  const {
+    attachment,
+    actor,
+    readManaged = async (managedActor, mediaId) =>
+      (await getMediaService().readMedia(managedActor, mediaId)).bytes,
+    downloadLegacy = defaultLegacyDownload,
+    getLegacyBucket = getAiAttachmentsBucket,
+  } = input;
+  if (attachment.mediaId) {
+    return readManaged(actor, attachment.mediaId);
+  }
+
+  const configuredBucket = await getLegacyBucket(actor.storeId);
+  const bucket = attachment.bucket || configuredBucket;
+  const path = attachment.path || attachment.id;
+  if (
+    bucket !== configuredBucket
+    || !path
+    || !path.startsWith(`stores/${actor.storeId}/users/${actor.userId}/`)
+  ) {
+    throw new Error("ATTACHMENT_FORBIDDEN");
+  }
+  return downloadLegacy(bucket, path);
 }
 
 export async function parseAiAttachment(input: {
   attachment: AiAttachmentMetadata;
-  storeId: string;
-  userId: string;
+  actor: MediaActor;
   prompt?: string;
 }): Promise<ParsedAiAttachment> {
-  const { attachment, storeId, userId, prompt } = input;
+  const { attachment, actor, prompt } = input;
   const mimeType = attachment.mimeType || "";
   let result: AiAttachmentParseResult;
   try {
-    const bytes = await downloadAttachment(attachment, storeId, userId);
+    const bytes = Buffer.from(await readAiAttachmentBytes({ attachment, actor }));
     if (mimeType.startsWith("image/")) {
       result = await parseAiAttachmentWithProvider({
-        storeId,
+        storeId: actor.storeId,
         name: attachment.name || "image",
         mimeType,
         bytes,

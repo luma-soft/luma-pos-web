@@ -44,10 +44,15 @@ export async function getJson(path: string) {
   return json?.data ?? json;
 }
 
-export async function uploadAiAttachment(file: File, surface = "web"): Promise<ComposerAttachment> {
+export async function uploadAiAttachment(
+  file: File,
+  surface: string,
+  sessionId: string,
+): Promise<ComposerAttachment> {
   const form = new FormData();
   form.append("file", file);
   form.append("surface", surface);
+  form.append("sessionId", sessionId);
   const res = await fetch("/api/mobile/ai/attachments", {
     method: "POST",
     body: form,

@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { AiActionPreview } from "@/lib/ai/actions";
 import { AttachmentPill } from "@/components/ai-assistant/attachment-pill";
-import { postJson, uploadAiAttachment } from "@/components/ai-assistant/api";
+import { deleteJson, postJson, uploadAiAttachment } from "@/components/ai-assistant/api";
 import type { AssistantResponse, AssistantSurface, ComposerAttachment } from "@/components/ai-assistant/types";
 import { ACCEPTED_ATTACHMENT_TYPES, MAX_ATTACHMENTS, MAX_ATTACHMENT_BYTES, attachmentKind } from "@/components/ai-assistant/utils";
 import { AiQuickActionPreviewPanel } from "./ai-quick-action-preview-panel";
@@ -18,8 +18,8 @@ import { isPreviewApplicable, quickActionPrompt } from "./utils";
 const ACCEPTED_FILE_INPUT_TYPES = Array.from(ACCEPTED_ATTACHMENT_TYPES).join(",");
 
 function attachmentPayload(attachment: ComposerAttachment) {
-  const { id, bucket, path, name, mimeType, size, kind, signedUrl } = attachment;
-  return { id, bucket, path, name, mimeType, size, kind, signedUrl };
+  const { id, mediaId, sessionId, bucket, path, name, mimeType, size, kind, signedUrl } = attachment;
+  return { id, mediaId, sessionId, bucket, path, name, mimeType, size, kind, signedUrl };
 }
 
 export function AiQuickActionModal({
@@ -55,6 +55,8 @@ export function AiQuickActionModal({
 }) {
   const t = useTranslations();
   const fileRef = useRef<HTMLInputElement>(null);
+  const uploadSessionIdRef = useRef<string | null>(null);
+  const uploadSessionPromiseRef = useRef<Promise<string> | null>(null);
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState("");
@@ -65,6 +67,33 @@ export function AiQuickActionModal({
   const [preview, setPreview] = useState<AiActionPreview | null>(null);
 
   if (!open) return null;
+
+  async function ensureUploadSession() {
+    if (uploadSessionIdRef.current) return uploadSessionIdRef.current;
+    if (uploadSessionPromiseRef.current) return uploadSessionPromiseRef.current;
+    uploadSessionPromiseRef.current = postJson("/api/mobile/ai/sessions", {
+      surface,
+      title,
+    }).then((data) => {
+      const id = (data as { session?: { id?: unknown } }).session?.id;
+      if (typeof id !== "string" || !id) throw new Error("ai.session.missing");
+      uploadSessionIdRef.current = id;
+      return id;
+    }).finally(() => {
+      uploadSessionPromiseRef.current = null;
+    });
+    return uploadSessionPromiseRef.current;
+  }
+
+  function closeModal() {
+    const uploadSessionId = uploadSessionIdRef.current;
+    uploadSessionIdRef.current = null;
+    uploadSessionPromiseRef.current = null;
+    if (uploadSessionId) {
+      void deleteJson(`/api/mobile/ai/sessions?sessionId=${uploadSessionId}`).catch(() => {});
+    }
+    onClose();
+  }
 
   function addFiles(files: FileList | File[]) {
     const next: ComposerAttachment[] = [];
@@ -95,7 +124,8 @@ export function AiQuickActionModal({
         status: "uploading",
       };
       next.push(localAttachment);
-      void uploadAiAttachment(file, surface)
+      void ensureUploadSession()
+        .then((uploadSessionId) => uploadAiAttachment(file, surface, uploadSessionId))
         .then((uploaded) => {
           setAttachments((current) => current.map((item) => item.localId === localId
             ? { ...item, ...uploaded, localId, previewUrl: item.previewUrl, status: "uploaded" }
@@ -171,7 +201,7 @@ export function AiQuickActionModal({
     setError("");
     try {
       await onApply(preview, mode);
-      onClose();
+      closeModal();
     } catch (applyError) {
       setError(applyError instanceof Error ? applyError.message : t("errors.serverError"));
     } finally {
@@ -188,7 +218,7 @@ export function AiQuickActionModal({
     <div
       className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/45 px-3 py-5 backdrop-blur-[2px]"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget && !busy && !applyBusy) onClose();
+        if (event.target === event.currentTarget && !busy && !applyBusy) closeModal();
       }}
     >
       <section
@@ -205,7 +235,7 @@ export function AiQuickActionModal({
             </div>
             <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
           </div>
-          <Button type="button" variant="outline" size="iconSm" onClick={onClose} disabled={busy || Boolean(applyBusy)} aria-label={t("common.close")}>
+          <Button type="button" variant="outline" size="iconSm" onClick={closeModal} disabled={busy || Boolean(applyBusy)} aria-label={t("common.close")}>
             <X className="h-4 w-4" />
           </Button>
         </header>
@@ -281,7 +311,7 @@ export function AiQuickActionModal({
             {hasExistingData ? existingDataLabel : t("aiQuick.noExistingData")}
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <Button type="button" variant="outline" onClick={onClose} disabled={busy || Boolean(applyBusy)} size="sm">
+            <Button type="button" variant="outline" onClick={closeModal} disabled={busy || Boolean(applyBusy)} size="sm">
               {t("common.cancel")}
             </Button>
             {hasExistingData && (

@@ -427,6 +427,15 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
     return descriptor(await loadAuthorizedReady(actor, mediaId));
   }
 
+  async function readMedia(actor: MediaActor, mediaId: string) {
+    const media = await loadAuthorizedReady(actor, mediaId);
+    const bytes = await dependencies.storage.get({
+      bucket: media.bucket,
+      key: media.objectKey,
+    });
+    return { media, bytes };
+  }
+
   async function saveThumbnailForReadyMedia(media: MediaRecord): Promise<MediaRecord> {
     if (!isSafeRasterMimeType(media.mimeType)) return media;
     try {
@@ -962,6 +971,7 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
     putReservedManagedObject,
     reserveManagedObject,
     resolveMedia,
+    readMedia,
     deleteMedia,
     deleteManagedProductImageByPath,
   };

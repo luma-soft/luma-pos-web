@@ -32,7 +32,6 @@ import {
 } from "@/lib/actions/settings";
 import type { PaymentBankAccountRow, StoreSettings, StaffRow } from "@/lib/data/settings";
 import {
-  AI_ATTACHMENT_BUCKETS,
   AI_PROVIDERS,
   AI_TEXT_MODELS,
   AI_VISION_MODELS,
@@ -138,19 +137,9 @@ const AI_MODEL_OPTIONS = AI_VISION_MODELS.map((value) => ({
       ? "Higher accuracy"
       : "Fastest / lowest cost",
 }));
-const AI_BUCKET_OPTIONS = AI_ATTACHMENT_BUCKETS.map((value) => ({
-  value,
-  label: value,
-  hint: value === "ai-attachments"
-    ? "Default"
-    : value === "ai-pos-attachments"
-      ? "POS only"
-      : "Shared AI bucket",
-}));
 type AiVisionModel = (typeof AI_VISION_MODELS)[number];
 type AiProvider = (typeof AI_PROVIDERS)[number];
 type AiTextModel = (typeof AI_TEXT_MODELS)[number];
-type AiAttachmentBucket = (typeof AI_ATTACHMENT_BUCKETS)[number];
 type AiUsageStatus = {
   period: string;
   used: number;
@@ -218,9 +207,6 @@ function providerKeyHelp(provider: AiProvider, L: boolean) {
   return L
     ? "Dùng OpenAI API key cho text và OCR/ảnh."
     : "Use an OpenAI API key for text and vision/OCR.";
-}
-function coerceAiAttachmentBucket(value: string): AiAttachmentBucket {
-  return AI_ATTACHMENT_BUCKETS.includes(value as AiAttachmentBucket) ? value as AiAttachmentBucket : "ai-attachments";
 }
 function formatAiTestMessage(message: string, L: boolean) {
   const map: Record<string, [string, string]> = {
@@ -1697,7 +1683,6 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
     visionModel: AiVisionModel;
     openaiApiKey: string;
     openaiVisionModel: AiVisionModel;
-    attachmentsBucket: AiAttachmentBucket;
     monthlyUsageLimit: number;
     showFloatingLauncher: boolean;
   }>({
@@ -1706,7 +1691,6 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
     visionModel: coerceAiVisionModel(prefs.visionModel || prefs.openaiVisionModel),
     openaiApiKey: "",
     openaiVisionModel: coerceAiVisionModel(prefs.visionModel || prefs.openaiVisionModel),
-    attachmentsBucket: coerceAiAttachmentBucket(prefs.attachmentsBucket),
     monthlyUsageLimit: prefs.monthlyUsageLimit,
     showFloatingLauncher: prefs.showFloatingLauncher,
   });
@@ -1845,16 +1829,19 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <span className={FL}>{L ? "Bucket lưu file đính kèm" : "Attachment bucket"}</span>
-              <SearchableSelect
-                options={AI_BUCKET_OPTIONS}
-                value={form.attachmentsBucket}
-                onChange={(value) => set("attachmentsBucket", coerceAiAttachmentBucket(value))}
-                allowClear={false}
-                showSearch={false}
-                disabled={!canEdit}
-                className={searchableTouch}
-              />
+              <span className={FL}>{L ? "Lưu trữ file đính kèm" : "Attachment storage"}</span>
+              <div className={cn(FI, "flex items-center justify-between gap-3 bg-canvas")}
+                aria-label={L ? "Lưu trữ file đính kèm được quản lý" : "Managed attachment storage"}>
+                <span className="font-semibold text-slate-800 dark:text-slate-100">Cloudflare R2 (managed)</span>
+                <span className="rounded-full bg-ok-soft px-2 py-0.5 text-[10px] font-bold text-ok">
+                  {L ? "Tự động" : "Automatic"}
+                </span>
+              </div>
+              <span className="text-[11px] leading-relaxed text-slate-500">
+                {L
+                  ? "File mới được lưu riêng tư trên hạ tầng R2 do LumaPOS quản lý. Bucket Supabase cũ chỉ còn dùng để đọc dữ liệu trước khi chuyển đổi."
+                  : "New files use private LumaPOS-managed R2 storage. The legacy Supabase bucket remains read-only for pre-migration attachments."}
+              </span>
             </div>
             <div className="flex flex-col gap-1">
               <span className={FL}>{L ? "Giới hạn lượt AI/tháng" : "Monthly AI unit limit"}</span>

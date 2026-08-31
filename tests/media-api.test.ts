@@ -1129,6 +1129,36 @@ describe("target-aware media authorization", () => {
 });
 
 describe("media resolve and delete API", () => {
+  test("reads authorized ready private media bytes without exposing storage coordinates", async () => {
+    const bytes = Uint8Array.from([9, 8, 7, 6]);
+    const harness = createHarness({
+      initial: [pendingRecord({
+        purpose: "ai-attachment",
+        targetId: PROJECT_ID,
+        domain: "ai",
+        bucket: "private-media",
+        objectKey: `stores/${STORE_ID}/ai/2026/08/${MEDIA_ID}/original.png`,
+        originalFileName: "hoa-don.png",
+        mimeType: "image/png",
+        sizeBytes: bytes.byteLength,
+        status: "ready",
+        readyAt: NOW,
+      })],
+      objectBytes: bytes,
+    });
+
+    await expect(harness.service.readMedia(gate, MEDIA_ID)).resolves.toEqual({
+      bytes,
+      media: expect.objectContaining({
+        id: MEDIA_ID,
+        purpose: "ai-attachment",
+        targetId: PROJECT_ID,
+        mimeType: "image/png",
+      }),
+    });
+    expect(harness.storageState.downloads).toBe(1);
+  });
+
   test("resolves, signs, and soft-deletes with UUID-equivalent casing", async () => {
     const ready = pendingRecord({
       id: CASE_MEDIA_ID,
