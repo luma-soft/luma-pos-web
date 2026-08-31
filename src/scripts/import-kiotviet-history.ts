@@ -130,7 +130,7 @@ async function main() {
   console.log(`SKU tham chiếu trong lịch sử: ${allSkus.size}\n`);
 
   if (dryRun) {
-    console.log("✅ Dry-run xong — chạy lại không có --dry-run để ghi vào DB.");
+    console.log("✅ Dry-run xong — writer cũ chỉ đọc. Dùng bun sync:kiotviet-data theo từng phase để review/apply có kiểm soát.");
     process.exit(0);
   }
 

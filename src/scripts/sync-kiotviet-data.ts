@@ -10,8 +10,16 @@ import {
   type KiotVietSyncPhase,
   type KiotVietSyncPhaseArg,
 } from "../lib/kiotviet/data-sync-runner";
-import { planKiotVietCustomerSync } from "../lib/kiotviet/customer-sync";
-import { planKiotVietSupplierSync } from "../lib/kiotviet/supplier-sync";
+import {
+  assertKiotVietCustomerSourceTotals,
+  parseKiotVietCustomerSources,
+  planKiotVietCustomerSync,
+} from "../lib/kiotviet/customer-sync";
+import {
+  assertKiotVietSupplierSourceTotals,
+  parseKiotVietSupplierSources,
+  planKiotVietSupplierSync,
+} from "../lib/kiotviet/supplier-sync";
 import type { KiotVietCustomerCurrent } from "../lib/kiotviet/customer-sync";
 import type { KiotVietSupplierCurrent } from "../lib/kiotviet/supplier-sync";
 import type { KiotVietEntityMappingSnapshot } from "../lib/kiotviet/data-sync-types";
@@ -125,11 +133,12 @@ export async function applyKiotVietPhaseWithDatabase(database: ProductionDatabas
   plan: KiotVietCliExecutablePhasePlan;
 }): Promise<{ postApplyPlan: KiotVietCliPhasePlan }> {
   if (!input.plan.typedPlan) throw new Error(`KiotViet ${input.phase} plan is not executable`);
+  assertReviewedMasterTotalsForPhase(input.bundle, input.phase);
   const db = database;
   const { createKiotVietDataSyncAuditRepository, createKiotVietDataSyncTransaction } = await import("../lib/kiotviet/data-sync-database");
   const { applyKiotVietTypedPhasePlan } = await import("../lib/kiotviet/data-sync-apply");
   const selectedSource = input.phase === "product-references" ? null : source(input.bundle, input.phase);
-  let postApplyPlan: KiotVietCliPhasePlan | null = null;
+  let postApplyPlan: KiotVietCliExecutablePhasePlan | null = null;
   const transactionHandles = new WeakMap<object, ProductionTransaction>();
   await executeKiotVietDataSyncPhase({
     apply: true,
@@ -179,7 +188,7 @@ export async function applyKiotVietPhaseWithDatabase(database: ProductionDatabas
       const reloaded = await loadKiotVietPlanningStateFromDatabase(rawTransaction, "hai-dang");
       const replanned = planKiotVietBundle(input.bundle, reloaded)
         .find((candidate) => candidate.phase === input.phase)!;
-      postApplyPlan = { phase: replanned.phase, summary: replanned.summary, blockers: replanned.blockers };
+      postApplyPlan = replanned;
       const remaining = managedChangeCount(postApplyPlan);
       if (remaining !== 0) throw new Error(`KiotViet post-apply dry-run is not zero-diff: ${remaining} managed changes/blockers remain`);
       return { ...input.plan.summary, postApplyManagedChanges: remaining };
@@ -219,14 +228,17 @@ function historicalCodes(bundle: KiotVietDataBundle, column: string): string[] {
 function productReferences(bundle: KiotVietDataBundle, includeBookings: boolean) {
   return bundle.sources.filter((item) => (
     !["customers", "suppliers"].includes(item.phase) && (includeBookings || item.phase !== "bookings")
-  )).flatMap((item) =>
-    item.rows.map((row) => ({
-      sku: normalizeKiotVietText(row["Mã hàng"]),
+  )).flatMap((item) => item.rows.flatMap((row) => {
+    const sku = normalizeKiotVietText(row["Mã hàng"]);
+    const unitName = normalizeKiotVietText(row.ĐVT);
+    if (item.phase === "purchase-returns" && (!sku || !unitName)) return [];
+    return [{
+      sku,
       productName: normalizeKiotVietText(row["Tên hàng"]),
-      unitName: normalizeKiotVietText(row.ĐVT),
+      unitName,
       documentCode: normalizeKiotVietText(row[item.codeColumn]),
-    })),
-  );
+    }];
+  }));
 }
 
 function compactSummary(value: Record<string, unknown>): Record<string, number> {
@@ -235,10 +247,39 @@ function compactSummary(value: Record<string, unknown>): Record<string, number> 
     .sort(([left], [right]) => left.localeCompare(right)));
 }
 
+const MANAGED_CHANGE_SUMMARY_KEYS = [
+  "created", "creates", "adopted", "adopts", "updated", "updates", "conflicts",
+  "inactivated", "historicalPlaceholders", "unknownSupplierPlaceholders",
+  "debtCorrections", "totalSpentCorrections", "parentStatusUpdates",
+  "subtotalRepairs", "settlementStatusRepairs",
+] as const;
+
 function managedChangeCount(plan: KiotVietCliPhasePlan): number {
-  const keys = ["created", "creates", "adopted", "adopts", "updated", "updates", "conflicts"];
-  return keys.reduce((sum, key) => sum + (plan.summary[key] ?? 0), 0)
+  const summaryChanges = MANAGED_CHANGE_SUMMARY_KEYS.reduce(
+    (sum, key) => sum + (plan.summary[key] ?? 0),
+    0,
+  );
+  const typedPlan = "typedPlan" in plan
+    ? (plan as KiotVietCliExecutablePhasePlan).typedPlan
+    : null;
+  let structuralChanges = 0;
+  if (typedPlan && "writes" in typedPlan && Array.isArray(typedPlan.writes)) {
+    structuralChanges += typedPlan.writes.length;
+  }
+  if (typedPlan && "saleStatusUpdates" in typedPlan && Array.isArray(typedPlan.saleStatusUpdates)) {
+    structuralChanges += typedPlan.saleStatusUpdates.length;
+  }
+  return Math.max(summaryChanges, structuralChanges)
     + plan.blockers.reduce((sum, blocker) => sum + blocker.count, 0);
+}
+
+function assertReviewedMasterTotalsForPhase(bundle: KiotVietDataBundle, phase: KiotVietSyncPhase): void {
+  if (phase === "customers") {
+    assertKiotVietCustomerSourceTotals(parseKiotVietCustomerSources(source(bundle, "customers").rows));
+  }
+  if (phase === "suppliers") {
+    assertKiotVietSupplierSourceTotals(parseKiotVietSupplierSources(source(bundle, "suppliers").rows));
+  }
 }
 
 const LOCAL_REFERENCE_KEYS = new Set([
@@ -347,7 +388,24 @@ export function planKiotVietBundle(
   let purchaseReturnSummary: Record<string, number>;
   let purchaseReturnReasons: string[];
   let purchaseReturnTypedPlan: ReturnType<typeof planKiotVietPurchaseReturnSync> | null;
-  try {
+  const invalidPurchaseReturnRows = purchaseReturnSource.rows.filter((row) => (
+    !normalizeKiotVietText(row["Mã hàng"]) || !normalizeKiotVietText(row.ĐVT)
+  ));
+  if (invalidPurchaseReturnRows.length > 0) {
+    purchaseReturnSummary = {
+      documents: purchaseReturnSource.documentCount,
+      sourceLines: purchaseReturnSource.rowCount,
+      invalidSourceLines: invalidPurchaseReturnRows.length,
+      affectedDocuments: new Set(invalidPurchaseReturnRows.map((row) => (
+        normalizeKiotVietText(row[purchaseReturnSource.codeColumn]) || "__blank_document__"
+      ))).size,
+    };
+    purchaseReturnReasons = Array.from(
+      { length: invalidPurchaseReturnRows.length },
+      () => "blank_source_sku_or_unit",
+    );
+    purchaseReturnTypedPlan = null;
+  } else {
     const purchaseReturnPlan = planKiotVietPurchaseReturnSync({
       storeId: state.storeId, sourceRows: purchaseReturnSource.rows, current: current.purchaseReturns, mappings: mappings("supplier_return"), lineMappings: mappings("supplier_return_line"), existingLines: current.purchaseReturnLines, resolvedSuppliers,
       resolvedProducts: uniqueProducts.map((item) => ({ sku: item.sourceSku, productId: item.productId, unitName: item.unitName, sourceUnitName: item.sourceUnitName, unitMultiplier: item.unitMultiplier, resolutionSource: item.source })),
@@ -355,11 +413,6 @@ export function planKiotVietBundle(
     purchaseReturnSummary = purchaseReturnPlan.summary;
     purchaseReturnReasons = purchaseReturnPlan.blockers.map((item) => item.reason);
     purchaseReturnTypedPlan = purchaseReturnPlan;
-  } catch (error) {
-    if (!(error instanceof Error) || !error.message.includes("requires source SKU and source unit")) throw error;
-    purchaseReturnSummary = { documents: purchaseReturnSource.documentCount, sourceLines: purchaseReturnSource.rowCount };
-    purchaseReturnReasons = ["blank_source_sku_or_unit"];
-    purchaseReturnTypedPlan = null;
   }
   const raw = [
     ["customers", customerPlan.summary, customerPlan.entityPlan.conflicts.map((item) => item.reason), customerPlan],
@@ -545,13 +598,18 @@ export async function loadKiotVietPlanningStateFromDatabase(
   }));
   const mappingState: KiotVietCliCurrentState["mappings"] = {};
   if (schemaReady) {
-    const rows = await db.select({ entityType: schema.kiotvietSourceMappings.entityType, externalId: schema.kiotvietSourceMappings.externalId, localId: schema.kiotvietSourceMappings.localId })
+    const rows = await db.select({
+      entityType: schema.kiotvietSourceMappings.entityType,
+      externalId: schema.kiotvietSourceMappings.externalId,
+      localId: schema.kiotvietSourceMappings.localId,
+      deletedAt: schema.kiotvietSourceMappings.deletedAt,
+    })
       .from(schema.kiotvietSourceMappings).where(and(
         eq(schema.kiotvietSourceMappings.storeId, store.id),
         eq(schema.kiotvietSourceMappings.provider, "kiotviet"),
-        sql`${schema.kiotvietSourceMappings.deletedAt} is null`,
       ));
     for (const row of rows) {
+      if (row.deletedAt && row.entityType !== "customer" && row.entityType !== "supplier") continue;
       const values = mappingState[row.entityType] ?? [];
       values.push({ externalId: row.externalId, localId: row.localId });
       mappingState[row.entityType] = values;
@@ -1071,6 +1129,7 @@ export async function runKiotVietDataSyncCli(argv: string[], dependencies: KiotV
     if (prerequisite.length > 0) throw new Error(`Cannot apply: ${prerequisite.map((item) => item.reason).join(", ")}`);
     if (!selected || selected.blockers.length > 0) throw new Error("Cannot apply a KiotViet phase with unresolved blockers");
     assertKiotVietExecutablePlan(selected);
+    assertReviewedMasterTotalsForPhase(bundle, args.phase as KiotVietSyncPhase);
     const applyPhase = dependencies.applyPhase ?? applyProductionKiotVietPhase;
     const applied = await applyPhase({
       phase: args.phase as KiotVietSyncPhase,

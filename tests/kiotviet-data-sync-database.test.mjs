@@ -952,8 +952,8 @@ describe("KiotViet store-scoped database adapter", () => {
         rows: phase === "customers" ? [{
           "Mã khách hàng": "KH-POST-ZERO",
           "Tên khách hàng": "Post zero customer",
-          "Nợ cần thu hiện tại": 15,
-          "Tổng bán trừ trả hàng": 30,
+          "Nợ cần thu hiện tại": 130_924_782,
+          "Tổng bán trừ trả hàng": 3_400_176_291,
           "Trạng thái": "Hoạt động",
         }] : [],
         rowCount: phase === "customers" ? 1 : 0,
@@ -993,5 +993,44 @@ describe("KiotViet store-scoped database adapter", () => {
       eq(schema.kiotvietSourceMappings.externalId, "KH-POST-ZERO"),
     ));
     expect(refreshedMapping.sourceSha256).toBe(nextSha);
+
+    await database.update(schema.customers).set({ isActive: false }).where(and(
+      eq(schema.customers.storeId, STORE_ID),
+      eq(schema.customers.code, "KH-POST-ZERO"),
+    ));
+    await database.update(schema.kiotvietSourceMappings).set({ deletedAt: new Date("2026-08-31T00:00:00.000Z") }).where(and(
+      eq(schema.kiotvietSourceMappings.storeId, STORE_ID),
+      eq(schema.kiotvietSourceMappings.entityType, "customer"),
+      eq(schema.kiotvietSourceMappings.externalId, "KH-POST-ZERO"),
+    ));
+    const reactivationState = await loadKiotVietPlanningStateFromDatabase(database, "hai-dang");
+    expect(reactivationState.current.mappings.customer).toContainEqual({
+      externalId: "KH-POST-ZERO",
+      localId: refreshedMapping.localId,
+    });
+    const reactivationPlan = planKiotVietBundle(rerunBundle, reactivationState)
+      .find((item) => item.phase === "customers");
+    expect(reactivationPlan.summary).toMatchObject({ updated: 1, conflicts: 0 });
+    const reactivationSha = "e".repeat(64);
+    const reactivationBundle = structuredClone(rerunBundle);
+    reactivationBundle.bundleSha256 = reactivationSha;
+    reactivationBundle.sources[0].sha256 = reactivationSha;
+    await applyKiotVietPhaseWithDatabase(database, {
+      phase: "customers", storeId: STORE_ID, reviewedSha256: reactivationSha,
+      bundle: reactivationBundle, plan: reactivationPlan,
+    });
+    const [reactivatedCustomer] = await database.select({ isActive: schema.customers.isActive })
+      .from(schema.customers).where(and(
+        eq(schema.customers.storeId, STORE_ID),
+        eq(schema.customers.code, "KH-POST-ZERO"),
+      ));
+    const [reactivatedMapping] = await database.select({ deletedAt: schema.kiotvietSourceMappings.deletedAt })
+      .from(schema.kiotvietSourceMappings).where(and(
+        eq(schema.kiotvietSourceMappings.storeId, STORE_ID),
+        eq(schema.kiotvietSourceMappings.entityType, "customer"),
+        eq(schema.kiotvietSourceMappings.externalId, "KH-POST-ZERO"),
+      ));
+    expect(reactivatedCustomer.isActive).toBe(true);
+    expect(reactivatedMapping.deletedAt).toBeNull();
   });
 });

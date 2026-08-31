@@ -3,6 +3,7 @@ import {
   buildKiotVietDataSyncReport,
   assertKiotVietExecutablePlan,
   formatKiotVietDataSyncReport,
+  planKiotVietBundle,
   reviewedHashForPhase,
   runKiotVietDataSyncCli,
 } from "@/scripts/sync-kiotviet-data";
@@ -110,12 +111,78 @@ describe("guarded KiotViet data sync CLI", () => {
         expect(input.plan.typedPlan).toBeDefined();
         return { postApplyPlan: {
           phase: "product-references" as const,
-          summary: { creates: 1 }, blockers: [],
+          summary: { parentStatusUpdates: 1 }, blockers: [],
         } };
       },
     };
     await expect(runKiotVietDataSyncCli([
       "/tmp", "--store=hai-dang", "--phase=product-references", "--apply", `--source-sha256=${bundle.bundleSha256}`,
     ], dependencies)).rejects.toThrow("post-apply dry-run is not zero-diff");
+  });
+
+  test("single-phase apply rejects post-apply child writes even when summary counters are zero", async () => {
+    const bundle = emptyBundle();
+    await expect(runKiotVietDataSyncCli([
+      "/tmp", "--store=hai-dang", "--phase=product-references", "--apply", `--source-sha256=${bundle.bundleSha256}`,
+    ], {
+      readBundle: () => bundle,
+      loadPlanningState: async () => ({ storeId: "store", schemaReady: true, productCatalog: {
+        currentBaseProducts: [], productUnits: [], archivedSourceMappings: [], approvedHistoricalPlaceholders: [],
+      } }),
+      applyPhase: async () => ({ postApplyPlan: {
+        phase: "product-references",
+        summary: {},
+        blockers: [],
+        typedPlan: { writes: [{}] },
+      } as never }),
+    })).rejects.toThrow("post-apply dry-run is not zero-diff");
+  });
+
+  test("customer and supplier apply require the reviewed master snapshot totals", async () => {
+    const bundle = emptyBundle();
+    let applied = 0;
+    for (const phase of ["customers", "suppliers"] as const) {
+      const selectedSource = bundle.sources.find((item) => item.phase === phase)!;
+      await expect(runKiotVietDataSyncCli([
+        "/tmp", "--store=hai-dang", `--phase=${phase}`, "--apply", `--source-sha256=${selectedSource.sha256}`,
+      ], {
+        readBundle: () => bundle,
+        loadPlanningState: async () => ({ storeId: "store", schemaReady: true, productCatalog: {
+          currentBaseProducts: [], productUnits: [], archivedSourceMappings: [], approvedHistoricalPlaceholders: [],
+        } }),
+        applyPhase: async () => {
+          applied += 1;
+          return { postApplyPlan: { phase, summary: {}, blockers: [] } };
+        },
+      })).rejects.toThrow(`KiotViet ${phase === "customers" ? "customer debt" : "supplier debt"} total must be`);
+    }
+    expect(applied).toBe(0);
+  });
+
+  test("counts every supplier-return row with a blank source SKU or unit", () => {
+    const bundle = emptyBundle();
+    const selectedSource = bundle.sources.find((item) => item.phase === "purchase-returns")!;
+    selectedSource.rows = [
+      { "Mã trả hàng nhập": "THN-1", "Mã hàng": "", ĐVT: "Cái" },
+      { "Mã trả hàng nhập": "THN-1", "Mã hàng": "SKU-1", ĐVT: "" },
+      { "Mã trả hàng nhập": "THN-2", "Mã hàng": "", ĐVT: "" },
+    ];
+    selectedSource.rowCount = 3;
+    selectedSource.documentCount = 2;
+    selectedSource.codeColumn = "Mã trả hàng nhập";
+    const plan = planKiotVietBundle(bundle, {
+      storeId: "store",
+      schemaReady: true,
+      productCatalog: {
+        currentBaseProducts: [], productUnits: [], archivedSourceMappings: [], approvedHistoricalPlaceholders: [],
+      },
+    }).find((item) => item.phase === "purchase-returns")!;
+    expect(plan.typedPlan).toBeNull();
+    expect(plan.summary).toMatchObject({ invalidSourceLines: 3, affectedDocuments: 2 });
+    expect(plan.blockers).toEqual([{
+      phase: "purchase-returns",
+      reason: "blank_source_sku_or_unit",
+      count: 3,
+    }]);
   });
 });
