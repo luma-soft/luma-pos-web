@@ -230,6 +230,50 @@ describe("ProjectMediaPanel", () => {
     expect(media.shouldDismissProjectMediaPicker(root, outside)).toBe(true);
   });
 
+  test("moves Tab focus to the external control adjacent to the picker trigger", async () => {
+    const media = await loadMediaModule();
+    expect(media?.projectMediaPickerTabTarget).toBeFunction();
+    expect(media?.moveProjectMediaPickerTabFocus).toBeFunction();
+    if (!media?.projectMediaPickerTabTarget || !media.moveProjectMediaPickerTabFocus) return;
+
+    let focused: HTMLElement | null = null;
+    const previous = { focus: () => { focused = previous; } } as HTMLElement;
+    const trigger = {} as HTMLElement;
+    const activeOption = {} as HTMLElement;
+    const next = { focus: () => { focused = next; } } as HTMLElement;
+    const pickerRoot = {
+      contains: (candidate: Node) => candidate === trigger || candidate === activeOption,
+    } as HTMLElement;
+    const focusables = [previous, trigger, activeOption, next];
+
+    expect(media.projectMediaPickerTabTarget(
+      focusables,
+      pickerRoot,
+      trigger,
+      false,
+    )).toBe(next);
+    expect(media.projectMediaPickerTabTarget(
+      focusables,
+      pickerRoot,
+      trigger,
+      true,
+    )).toBe(previous);
+    expect(media.moveProjectMediaPickerTabFocus(
+      focusables,
+      pickerRoot,
+      trigger,
+      false,
+    )).toBe(true);
+    expect(focused).toBe(next);
+    expect(media.moveProjectMediaPickerTabFocus(
+      focusables,
+      pickerRoot,
+      trigger,
+      true,
+    )).toBe(true);
+    expect(focused).toBe(previous);
+  });
+
   test("applies the Aftercare phase defaults while Finance keeps every phase", async () => {
     const media = await loadMediaModule();
     expect(media?.filterProjectMediaItems).toBeFunction();
@@ -612,8 +656,14 @@ describe("project media upload queue", () => {
     expect(media?.uploadProjectMediaFiles).toBeFunction();
     if (!media) return;
 
-    const states: Array<{ status: string; progress: number }> = [];
-    await media.uploadProjectMediaFiles({
+    const states: Array<{
+      status: string;
+      progress: number;
+      retryable?: boolean;
+      httpStatus: number | null;
+      errorCategory: string | null;
+    }> = [];
+    const result = await media.uploadProjectMediaFiles({
       projectId: "project-1",
       files: [{
         localId: "progress-file",
@@ -627,13 +677,179 @@ describe("project media upload queue", () => {
       onStatus: (_localId, patch) => states.push({
         status: patch.status,
         progress: patch.progress,
+        retryable: patch.retryable,
+        httpStatus: patch.httpStatus,
+        errorCategory: patch.errorCategory,
       }),
     });
 
     expect(states).toEqual([
-      { status: "uploading", progress: 12 },
-      { status: "uploading", progress: 78 },
-      { status: "complete", progress: 100 },
+      {
+        status: "uploading",
+        progress: 12,
+        retryable: undefined,
+        httpStatus: null,
+        errorCategory: null,
+      },
+      {
+        status: "uploading",
+        progress: 78,
+        retryable: undefined,
+        httpStatus: 200,
+        errorCategory: null,
+      },
+      {
+        status: "complete",
+        progress: 100,
+        retryable: false,
+        httpStatus: 200,
+        errorCategory: null,
+      },
+    ]);
+    expect(result[0]).toMatchObject({
+      status: "complete",
+      retryable: false,
+      httpStatus: 200,
+      errorCategory: null,
+    });
+  });
+
+  test("retains failure category and HTTP status while retrying only transient failures", async () => {
+    const media = await loadMediaModule();
+    expect(media?.uploadProjectMediaFiles).toBeFunction();
+    expect(media?.failedProjectMediaUploads).toBeFunction();
+    if (!media) return;
+
+    const cases = [
+      { localId: "10000000-0000-4000-8000-000000000011", fileName: "network.pdf", status: null, category: "network", retryable: true },
+      { localId: "10000000-0000-4000-8000-000000000012", fileName: "invalid-400.pdf", status: 400, category: "validation", retryable: false },
+      { localId: "10000000-0000-4000-8000-000000000013", fileName: "unauthorized-401.pdf", status: 401, category: "auth", retryable: false },
+      { localId: "10000000-0000-4000-8000-000000000014", fileName: "forbidden-403.pdf", status: 403, category: "auth", retryable: false },
+      { localId: "10000000-0000-4000-8000-000000000015", fileName: "missing-404.pdf", status: 404, category: "not_found", retryable: false },
+      { localId: "10000000-0000-4000-8000-000000000016", fileName: "timeout-408.pdf", status: 408, category: "timeout", retryable: true },
+      { localId: "10000000-0000-4000-8000-000000000017", fileName: "conflict-409.pdf", status: 409, category: "conflict", retryable: false },
+      { localId: "10000000-0000-4000-8000-000000000021", fileName: "expired-410.pdf", status: 410, category: "expired", retryable: false },
+      { localId: "10000000-0000-4000-8000-000000000018", fileName: "rate-429.pdf", status: 429, category: "rate_limit", retryable: true },
+      { localId: "10000000-0000-4000-8000-000000000019", fileName: "server-500.pdf", status: 500, category: "server", retryable: true },
+      { localId: "10000000-0000-4000-8000-000000000020", fileName: "invalid-response.pdf", status: 200, category: "invalid_response", retryable: false },
+    ] as const;
+    const files = cases.map((entry) => ({
+      localId: entry.localId,
+      file: new File([entry.fileName], entry.fileName, { type: "application/pdf" }),
+    }));
+    const finalPatches = new Map<string, {
+      status: "queued" | "uploading" | "complete" | "failed";
+      retryable?: boolean;
+      httpStatus?: number | null;
+      errorCategory?: string | null;
+    }>();
+    const fetcher = async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const file = (init?.body as FormData).get("file") as File;
+      const fixture = cases.find((entry) => entry.fileName === file.name);
+      if (!fixture || fixture.status === null) throw new TypeError("Failed to fetch");
+      if (fixture.category === "invalid_response") {
+        return Response.json({ ok: true }, { status: fixture.status });
+      }
+      return Response.json(
+        { error: `fixture.${fixture.status}` },
+        { status: fixture.status },
+      );
+    };
+
+    const results = await media.uploadProjectMediaFiles({
+      projectId: "project-1",
+      files,
+      phase: "acceptance",
+      fetcher,
+      onStatus: (localId, patch) => {
+        finalPatches.set(localId, {
+          status: patch.status,
+          retryable: patch.retryable,
+          httpStatus: patch.httpStatus,
+          errorCategory: patch.errorCategory,
+        });
+      },
+    });
+
+    expect(results.map((result) => ({
+      localId: result.localId,
+      status: result.status,
+      retryable: result.retryable,
+      httpStatus: result.httpStatus,
+      errorCategory: result.errorCategory,
+    }))).toEqual(cases.map(({ localId, status: httpStatus, category: errorCategory, retryable }) => ({
+      localId,
+      status: "failed",
+      retryable,
+      httpStatus,
+      errorCategory,
+    })));
+    const liveStates = cases.map(({ localId }) => {
+      const patch = finalPatches.get(localId);
+      if (!patch) throw new Error(`Missing final upload patch for ${localId}`);
+      return { localId, ...patch };
+    });
+    expect(liveStates).toEqual(cases.map(({ localId, status: httpStatus, category: errorCategory, retryable }) => ({
+      localId,
+      status: "failed",
+      retryable,
+      httpStatus,
+      errorCategory,
+    })));
+    expect(media.failedProjectMediaUploads(files, results).map((file) => file.localId)).toEqual(
+      cases.filter((entry) => entry.retryable).map((entry) => entry.localId),
+    );
+    expect(media.retryableProjectMediaUploadCount).toBeFunction();
+    if (!media.retryableProjectMediaUploadCount) return;
+    expect(media.retryableProjectMediaUploadCount(liveStates)).toBe(4);
+  });
+
+  test("maps terminal upload categories to useful Vietnamese and English copy", async () => {
+    const media = await loadMediaModule();
+    expect(media?.projectMediaUploadErrorMessageKey).toBeFunction();
+    if (!media?.projectMediaUploadErrorMessageKey) return;
+
+    const categories = [
+      "network",
+      "timeout",
+      "rate_limit",
+      "server",
+      "validation",
+      "conflict",
+      "expired",
+      "auth",
+      "not_found",
+      "invalid_response",
+    ] as const;
+    const keys = categories.map(media.projectMediaUploadErrorMessageKey);
+
+    expect(keys).toEqual([
+      "uploadError",
+      "uploadError",
+      "uploadError",
+      "uploadError",
+      "uploadValidation",
+      "uploadConflict",
+      "uploadExpired",
+      "uploadAuth",
+      "uploadNotFound",
+      "uploadInvalidResponse",
+    ]);
+    expect(keys.slice(4).map((key) => viMessages.projectMedia[key])).toEqual([
+      "Tệp hoặc thông tin tải lên không hợp lệ. Hãy kiểm tra rồi chọn lại.",
+      "Tệp tải lên xung đột với hồ sơ công trình hiện có. Hãy làm mới rồi chọn lại.",
+      "Phiên tải tệp đã hết hạn. Hãy chọn lại tệp để tải lên.",
+      "Bạn không có quyền tải tệp này. Hãy đăng nhập lại hoặc liên hệ quản trị viên.",
+      "Không tìm thấy công trình hoặc hồ sơ liên kết. Hãy làm mới rồi kiểm tra lại.",
+      "Máy chủ trả về phản hồi tải lên không hợp lệ. Hãy kiểm tra dịch vụ trước khi thử lại.",
+    ]);
+    expect(keys.slice(4).map((key) => enMessages.projectMedia[key])).toEqual([
+      "This file or its upload details are invalid. Check them and choose the file again.",
+      "This upload conflicts with an existing project file. Refresh and choose the file again.",
+      "This upload window has expired. Choose the file again to upload it.",
+      "You do not have permission to upload this file. Sign in again or contact an administrator.",
+      "The project or linked record was not found. Refresh and check it again.",
+      "The server returned an invalid upload response. Check the service before trying again.",
     ]);
   });
 

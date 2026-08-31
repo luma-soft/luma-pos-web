@@ -1,5 +1,6 @@
 import {
   afterAll,
+  afterEach,
   beforeAll,
   describe,
   expect,
@@ -7,10 +8,11 @@ import {
   test,
 } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { deflateRawSync } from "node:zlib";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 
 mock.module("server-only", () => ({}));
 mock.module("@/db", () => ({ db: {} }));
@@ -25,7 +27,10 @@ import type {
   ProjectMediaInternalRecord,
   ProjectMediaRepository,
 } from "../src/lib/media/project-media";
-import type { ObjectStorage } from "../src/lib/media/types";
+import {
+  ObjectStorageWriteError,
+  type ObjectStorage,
+} from "../src/lib/media/types";
 
 const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const schema = await import(`${projectRoot}/src/db/schema.ts`);
@@ -45,12 +50,17 @@ const {
   ProjectMediaError,
   createDatabaseProjectMediaRepository,
   createProjectMediaManager,
+  compensateManagedMediaAssociation,
+  cleanupTerminalProjectAttachmentReservation,
   listProjectAttachmentSummaries,
   projectMediaUploadSchema,
   resolveManagedPrivateMediaUrl,
   sniffProjectMediaMime,
 } = await import(`${projectRoot}/src/lib/media/project-media.ts`);
 const { createMediaService } = await import(`${projectRoot}/src/lib/media/service.ts`);
+const { createDatabaseMediaRepository } = await import(
+  `${projectRoot}/src/lib/media/repository.ts`
+);
 const { createProjectAttachmentHandlers } = await import(
   `${projectRoot}/src/app/api/mobile/services/projects/[id]/attachments/route.ts`
 );
@@ -67,6 +77,20 @@ const OTHER_MEDIA_ID = "a1000000-0000-4000-8000-000000000008";
 const ATTACHMENT_ID = "a1000000-0000-4000-8000-000000000009";
 const BRAND_ID = "a1000000-0000-4000-8000-000000000010";
 const IDEMPOTENCY_ID = "a1000000-0000-4000-8000-000000000011";
+const RESERVATION_ID = "a1000000-0000-4000-8000-000000000014";
+const PROJECT_UPLOAD_ID = "a1000000-0000-4000-8000-000000000015";
+const AMBIGUOUS_UPLOAD_ID = "a1000000-0000-4000-8000-000000000016";
+const DUPLICATE_UPLOAD_ID = "a1000000-0000-4000-8000-000000000017";
+const AMBIGUOUS_BEFORE_ID = "a1000000-0000-4000-8000-000000000018";
+const CONCURRENT_UPLOAD_ID = "a1000000-0000-4000-8000-000000000019";
+const CHANGED_UPLOAD_ID = "a1000000-0000-4000-8000-000000000020";
+const CROSS_STORE_RESERVATION_ID = "a1000000-0000-4000-8000-000000000021";
+const CROSS_PURPOSE_RESERVATION_ID = "a1000000-0000-4000-8000-000000000022";
+const CROSS_TARGET_RESERVATION_ID = "a1000000-0000-4000-8000-000000000023";
+const TERMINAL_RESERVATION_ID = "a1000000-0000-4000-8000-000000000024";
+const TERMINAL_RACE_ID = "a1000000-0000-4000-8000-000000000025";
+const EXPIRED_EMPTY_RESERVATION_ID = "a1000000-0000-4000-8000-000000000026";
+const EXPIRED_MISMATCH_RESERVATION_ID = "a1000000-0000-4000-8000-000000000027";
 const NOW = new Date("2026-08-31T08:00:00.000Z");
 
 const actor: MediaActor = {
@@ -264,15 +288,46 @@ function fakeManagerHarness(options: {
         throw new Error("PROJECT_MEDIA_DOCUMENT_NOT_FOUND");
       }
     },
+    async reserveProjectAttachment(input: unknown) {
+      const candidate = input as {
+        idempotencyKey: string;
+        mediaId: string;
+        phase: ProjectMediaInternalRecord["phase"];
+        caption: string | null;
+        fileName: string;
+        mimeType: string;
+        sizeBytes: number;
+        expectedPath: string;
+        documentId?: string;
+        sha256: string;
+      };
+      return {
+        record: internalRecord({
+          id: candidate.idempotencyKey,
+          mediaId: candidate.mediaId,
+          phase: candidate.phase,
+          caption: candidate.caption,
+          fileName: candidate.fileName,
+          mimeType: candidate.mimeType,
+          sizeBytes: candidate.sizeBytes,
+          objectKey: candidate.expectedPath,
+        }),
+        documentIds: candidate.documentId ? [candidate.documentId] : [],
+        sha256: candidate.sha256,
+        mediaStatus: "pending" as const,
+      };
+    },
     async createProjectAttachment(input: unknown) {
       if (options.associationFailure) throw new Error("association failed");
       idempotentRecord = internalRecord({
         id: (input as { idempotencyKey?: string }).idempotencyKey ?? ATTACHMENT_ID,
+        mediaId: (input as { mediaId: string }).mediaId,
         phase: (input as { phase: string }).phase,
         caption: (input as { caption: string | null }).caption,
         fileName: (input as { fileName: string }).fileName,
         mimeType: (input as { mimeType: string }).mimeType,
         sizeBytes: (input as { sizeBytes: number }).sizeBytes,
+        objectKey: (input as { expectedPath: string }).expectedPath,
       });
       idempotentSha256 = (input as { sha256: string }).sha256;
       return idempotentRecord;
@@ -282,18 +337,51 @@ function fakeManagerHarness(options: {
       return { outcome: options.deleteOutcome ?? "deleted", id: ATTACHMENT_ID };
     },
   };
+  const reservations = new Map<string, { path: string }>();
   const mediaService = {
-    async putManagedObject(_actor: MediaActor, input: unknown, _bytes: Uint8Array) {
+    async reserveManagedObject(_actor: MediaActor, input: unknown) {
+      void _actor;
+      const candidate = input as {
+        reservationId: string;
+        purpose: string;
+        targetId: string;
+        fileName: string;
+        mimeType: string;
+        sizeBytes: number;
+      };
+      state.uploadCalls.push({
+        purpose: candidate.purpose,
+        targetId: candidate.targetId,
+        fileName: candidate.fileName,
+        mimeType: candidate.mimeType,
+        sizeBytes: candidate.sizeBytes,
+      });
+      const path = `stores/${STORE_ID}/projects/2026/08/${candidate.reservationId}/original.jpg`;
+      const created = !reservations.has(candidate.reservationId);
+      reservations.set(candidate.reservationId, { path });
+      return {
+        mediaId: candidate.reservationId,
+        path,
+        status: "pending" as const,
+        created,
+      };
+    },
+    async putReservedManagedObject(
+      _actor: MediaActor,
+      mediaId: string,
+      _bytes: Uint8Array,
+    ) {
       void _actor;
       void _bytes;
-      state.uploadCalls.push(input);
+      const path = reservations.get(mediaId)?.path
+        ?? `stores/${STORE_ID}/projects/2026/08/${mediaId}/original.jpg`;
       return {
-        mediaId: MEDIA_ID,
-        path: `stores/${STORE_ID}/projects/2026/08/${MEDIA_ID}/original.jpg`,
+        mediaId,
+        path,
         url: "https://r2.test/upload-result",
       };
     },
-  } as Pick<MediaService, "putManagedObject">;
+  } as Pick<MediaService, "reserveManagedObject" | "putReservedManagedObject">;
   const manager = createProjectMediaManager({
     authorizeProject: async () => options.authorization ?? "allowed",
     repository,
@@ -588,11 +676,7 @@ describe("project media validation and orchestration", () => {
     expect(state.uploadCalls).toHaveLength(1);
   });
 
-  test("compensates the unused object when concurrent idempotent uploads converge", async () => {
-    const mediaIds = [
-      "a1000000-0000-4000-8000-000000000012",
-      "a1000000-0000-4000-8000-000000000013",
-    ];
+  test("concurrent idempotent uploads converge on one reserved media id", async () => {
     let winner: ProjectMediaInternalRecord | null = null;
     let createCount = 0;
     let releaseCreates: () => void = () => {};
@@ -604,6 +688,20 @@ describe("project media validation and orchestration", () => {
         async listProjectAttachments() { return []; },
         async getProjectAttachment() { return null; },
         async validateProjectDocument() {},
+        async reserveProjectAttachment(
+          input: Parameters<ProjectMediaRepository["reserveProjectAttachment"]>[0],
+        ) {
+          return {
+            record: internalRecord({
+              id: input.idempotencyKey,
+              mediaId: input.mediaId,
+              objectKey: input.expectedPath,
+            }),
+            documentIds: [],
+            sha256: input.sha256,
+            mediaStatus: "pending" as const,
+          };
+        },
         async createProjectAttachment(
           input: Parameters<ProjectMediaRepository["createProjectAttachment"]>[0],
         ) {
@@ -627,8 +725,16 @@ describe("project media validation and orchestration", () => {
         },
       },
       mediaService: {
-        async putManagedObject() {
-          const mediaId = mediaIds.shift()!;
+        async reserveManagedObject(_actor: MediaActor, value: unknown) {
+          const mediaId = (value as { reservationId: string }).reservationId;
+          return {
+            mediaId,
+            path: `stores/${STORE_ID}/projects/2026/08/${mediaId}/original.jpg`,
+            status: "pending" as const,
+            created: createCount === 0,
+          };
+        },
+        async putReservedManagedObject(_actor: MediaActor, mediaId: string) {
           return {
             mediaId,
             path: `stores/${STORE_ID}/projects/2026/08/${mediaId}/original.jpg`,
@@ -661,8 +767,11 @@ describe("project media validation and orchestration", () => {
       IDEMPOTENCY_ID,
       IDEMPOTENCY_ID,
     ]);
-    expect(compensated).toHaveLength(1);
-    expect(compensated[0]).not.toBe(results[0].mediaId);
+    expect(results.map((result) => result.mediaId)).toEqual([
+      IDEMPOTENCY_ID,
+      IDEMPOTENCY_ID,
+    ]);
+    expect(compensated).toHaveLength(0);
   });
 
   test("creates an attachment-disposition signature for a fresh authorized download", async () => {
@@ -722,10 +831,10 @@ describe("project media validation and orchestration", () => {
     }]);
     expect(state.compensationCalls).toEqual([{
       storeId: STORE_ID,
-      mediaId: MEDIA_ID,
+      mediaId: IDEMPOTENCY_ID,
       purpose: "project-document",
       targetId: PROJECT_ID,
-      expectedObjectKey: `stores/${STORE_ID}/projects/2026/08/${MEDIA_ID}/original.jpg`,
+      expectedObjectKey: `stores/${STORE_ID}/projects/2026/08/${IDEMPOTENCY_ID}/original.jpg`,
       expectedCreatedBy: USER_ID,
     }]);
   });
@@ -763,10 +872,10 @@ describe("project media validation and orchestration", () => {
     }]);
     expect(state.compensationCalls).toEqual([{
       storeId: STORE_ID,
-      mediaId: MEDIA_ID,
+      mediaId: IDEMPOTENCY_ID,
       purpose: "project-document",
       targetId: PROJECT_ID,
-      expectedObjectKey: `stores/${STORE_ID}/projects/2026/08/${MEDIA_ID}/original.jpg`,
+      expectedObjectKey: `stores/${STORE_ID}/projects/2026/08/${IDEMPOTENCY_ID}/original.jpg`,
       expectedCreatedBy: USER_ID,
     }]);
   });
@@ -829,9 +938,28 @@ describe("project media validation and orchestration", () => {
           deletedAt: null,
           thumbnailObjectKey: null,
           thumbnailSizeBytes: null,
+          sha256: input.sha256 ?? null,
         };
         records.set(record.id, record);
         return record;
+      },
+      async reservePending(input) {
+        const existing = records.get(input.id);
+        if (existing) return { media: existing, created: false };
+        const record: MediaRecord = {
+          ...input,
+          status: "pending",
+          createdBy: input.createdBy ?? null,
+          createdAt: NOW,
+          readyAt: null,
+          verifiedAt: null,
+          deletedAt: null,
+          thumbnailObjectKey: null,
+          thumbnailSizeBytes: null,
+          sha256: input.sha256 ?? null,
+        };
+        records.set(record.id, record);
+        return { media: record, created: true };
       },
       async getForStore(input) {
         return records.get(input.mediaId) ?? null;
@@ -853,6 +981,9 @@ describe("project media validation and orchestration", () => {
         return null;
       },
       async abandonPending() {
+        return null;
+      },
+      async quarantinePending() {
         return null;
       },
       async recoverReadyAfterFailure() {
@@ -914,11 +1045,27 @@ describe("project media validation and orchestration", () => {
           return null;
         },
         async validateProjectDocument() {},
+        async reserveProjectAttachment(
+          input: Parameters<ProjectMediaRepository["reserveProjectAttachment"]>[0],
+        ) {
+          return {
+            record: internalRecord({
+              id: input.idempotencyKey,
+              mediaId: input.mediaId,
+              objectKey: input.expectedPath,
+            }),
+            documentIds: [],
+            sha256: input.sha256,
+            mediaStatus: "pending" as const,
+          };
+        },
         async createProjectAttachment(
           input: Parameters<ProjectMediaRepository["createProjectAttachment"]>[0],
         ) {
           association = { expectedPath: input.expectedPath };
           return internalRecord({
+            id: input.idempotencyKey,
+            mediaId: input.mediaId,
             phase: input.phase,
             caption: input.caption,
             objectKey: input.expectedPath,
@@ -934,20 +1081,21 @@ describe("project media validation and orchestration", () => {
       compensate: async () => ({ outcome: "referenced" }),
     });
 
+    const body = Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]);
     await manager.upload(actor, PROJECT_ID, {
       phase: "after_installation",
       caption: null,
       fileName: "site-after.jpg",
       mimeType: "image/jpeg",
       sizeBytes: 4,
-      sha256: "c".repeat(64),
+      sha256: createHash("sha256").update(body).digest("hex"),
       idempotencyKey: IDEMPOTENCY_ID,
-    }, Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]));
+    }, body);
 
     expect(puts[0]).toMatchObject({
       bucket: "lumapos-test-private-media",
       ifNoneMatch: "*",
-      key: expect.stringContaining(`/projects/2026/08/${MEDIA_ID}/original.jpg`),
+      key: expect.stringContaining(`/projects/2026/08/${IDEMPOTENCY_ID}/original.jpg`),
     });
     expect(association).toEqual({ expectedPath: puts[0].key });
   });
@@ -982,7 +1130,7 @@ describe("project attachment route contract", () => {
     expect(response.status).toBe(200);
     expect((await response.json()).data).toMatchObject({
       id: IDEMPOTENCY_ID,
-      mediaId: MEDIA_ID,
+      mediaId: IDEMPOTENCY_ID,
       phase: "after_installation",
       fileName: "site-after.jpg",
       mimeType: "image/jpeg",
@@ -1231,6 +1379,126 @@ describe("project media database repository", () => {
 
   afterAll(async () => client.close());
 
+  afterEach(async () => {
+    const taskIds = [
+      RESERVATION_ID,
+      PROJECT_UPLOAD_ID,
+      AMBIGUOUS_UPLOAD_ID,
+      DUPLICATE_UPLOAD_ID,
+      AMBIGUOUS_BEFORE_ID,
+      CONCURRENT_UPLOAD_ID,
+      CHANGED_UPLOAD_ID,
+      CROSS_STORE_RESERVATION_ID,
+      CROSS_PURPOSE_RESERVATION_ID,
+      CROSS_TARGET_RESERVATION_ID,
+      TERMINAL_RESERVATION_ID,
+      TERMINAL_RACE_ID,
+      EXPIRED_EMPTY_RESERVATION_ID,
+      EXPIRED_MISMATCH_RESERVATION_ID,
+    ];
+    await database.delete(serviceHandoverDocumentMedia).where(inArray(
+      serviceHandoverDocumentMedia.mediaObjectId,
+      taskIds,
+    ));
+    await database.delete(serviceAttachments).where(inArray(
+      serviceAttachments.id,
+      taskIds,
+    ));
+    await database.delete(mediaObjects).where(inArray(mediaObjects.id, taskIds));
+  });
+
+  function databaseBackedManager(
+    storage: ObjectStorage,
+    projectRepository: ProjectMediaRepository = repository,
+    currentTime: Date = NOW,
+  ) {
+    const service = createMediaService({
+      storage,
+      repository: createDatabaseMediaRepository(database),
+      config: {
+        publicBucket: "lumapos-test-public-media",
+        privateBucket: "lumapos-test-private-media",
+      },
+      authorizeTarget: async () => "allowed",
+      now: () => currentTime,
+      logger: { error() {} },
+    });
+    return createProjectMediaManager({
+      authorizeProject: async () => "allowed",
+      repository: projectRepository,
+      mediaService: service,
+      sign: async (record: ProjectMediaInternalRecord) =>
+        `https://r2.test/${record.objectKey}?signed=1`,
+      compensate: (
+        input: Parameters<typeof compensateManagedMediaAssociation>[1],
+      ) => compensateManagedMediaAssociation(database, input),
+      logger: { error() {} },
+    });
+  }
+
+  function objectStorageHarness(
+    firstFailure?: "ambiguous-before" | "ambiguous-after" | "definitive-before",
+  ) {
+    const objects = new Map<string, { bytes: Uint8Array; contentType: string }>();
+    const putKeys: string[] = [];
+    let first = true;
+    const storage: ObjectStorage = {
+      async put(input) {
+        putKeys.push(input.key);
+        const coordinate = `${input.bucket}:${input.key}`;
+        if (first && (
+          firstFailure === "ambiguous-before"
+          || firstFailure === "definitive-before"
+        )) {
+          first = false;
+          throw new ObjectStorageWriteError(
+            firstFailure === "definitive-before"
+              ? "provider rejected before write"
+              : "connection lost before commit",
+            firstFailure === "definitive-before" ? "definitive-no-write" : "ambiguous",
+          );
+        }
+        if (input.ifNoneMatch === "*" && objects.has(coordinate)) {
+          throw new ObjectStorageWriteError("precondition failed", "definitive-no-write");
+        }
+        objects.set(coordinate, {
+          bytes: input.body.slice(),
+          contentType: input.contentType,
+        });
+        if (first && firstFailure === "ambiguous-after") {
+          first = false;
+          throw new ObjectStorageWriteError("connection lost after commit", "ambiguous");
+        }
+        first = false;
+        return {
+          sizeBytes: input.body.byteLength,
+          contentType: input.contentType,
+          etag: "stored",
+        };
+      },
+      async get(input) {
+        const value = objects.get(`${input.bucket}:${input.key}`);
+        if (!value) throw new Error("missing object");
+        return value.bytes;
+      },
+      async head(input) {
+        const value = objects.get(`${input.bucket}:${input.key}`);
+        return value ? {
+          sizeBytes: value.bytes.byteLength,
+          contentType: value.contentType,
+          etag: "stored",
+        } : null;
+      },
+      async createUploadUrl() { return "https://r2.test/upload"; },
+      async createDownloadUrl(input) {
+        return `https://r2.test/${input.key}?expires=${input.expiresInSeconds}`;
+      },
+      async remove() {},
+      publicUrl(input) { return `https://r2.test/${input.key}`; },
+    };
+    return { storage, objects, putKeys };
+  }
+
   test("lists only active project-level rows and excludes job/claim/asset/request media", async () => {
     expect(await repository.listProjectAttachments({
       storeId: STORE_ID,
@@ -1241,6 +1509,744 @@ describe("project media database repository", () => {
       provider: "r2",
       bucket: "lumapos-test-private-media",
     })]);
+  });
+
+  test("uses the production media repository against the same PGlite registry", async () => {
+    const mediaRepository = createDatabaseMediaRepository(database);
+
+    expect(await mediaRepository.getForStore({
+      storeId: STORE_ID,
+      mediaId: MEDIA_ID,
+    })).toMatchObject({
+      id: MEDIA_ID,
+      storeId: STORE_ID,
+      status: "ready",
+      purpose: "project-document",
+      targetId: PROJECT_ID,
+    });
+  });
+
+  test("reserves one deterministic pending media row for a repeated request id", async () => {
+    const mediaRepository = createDatabaseMediaRepository(database);
+    const input = {
+      id: RESERVATION_ID,
+      storeId: STORE_ID,
+      provider: "r2" as const,
+      visibility: "private" as const,
+      purpose: "project-document" as const,
+      targetId: PROJECT_ID,
+      domain: "projects",
+      bucket: "lumapos-test-private-media",
+      objectKey: `stores/${STORE_ID}/projects/2026/08/${RESERVATION_ID}/original.pdf`,
+      originalFileName: "reserved.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 4,
+      sha256: "e".repeat(64),
+      uploadExpiresAt: new Date(NOW.getTime() + 600_000),
+      createdBy: USER_ID,
+    };
+
+    expect(await mediaRepository.reservePending(input)).toMatchObject({
+      created: true,
+      media: { id: RESERVATION_ID, sha256: "e".repeat(64) },
+    });
+    expect(await mediaRepository.reservePending(input)).toMatchObject({
+      created: false,
+      media: { id: RESERVATION_ID, sha256: "e".repeat(64) },
+    });
+    expect(await database.select().from(mediaObjects).where(eq(
+      mediaObjects.id,
+      RESERVATION_ID,
+    ))).toHaveLength(1);
+  });
+
+  test("reserves exact project request metadata against pending managed media", async () => {
+    await database.insert(mediaObjects).values({
+      id: PROJECT_UPLOAD_ID,
+      storeId: STORE_ID,
+      provider: "r2",
+      visibility: "private",
+      purpose: "project-document",
+      targetId: PROJECT_ID,
+      domain: "projects",
+      bucket: "lumapos-test-private-media",
+      objectKey: `stores/${STORE_ID}/projects/2026/08/${PROJECT_UPLOAD_ID}/original.pdf`,
+      originalFileName: "handover-reserved.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 4,
+      sha256: "f".repeat(64),
+      status: "pending",
+      uploadExpiresAt: new Date(NOW.getTime() + 600_000),
+      createdBy: USER_ID,
+    });
+    const input = {
+      storeId: STORE_ID,
+      actorId: USER_ID,
+      projectId: PROJECT_ID,
+      mediaId: PROJECT_UPLOAD_ID,
+      expectedPath: `stores/${STORE_ID}/projects/2026/08/${PROJECT_UPLOAD_ID}/original.pdf`,
+      phase: "handover" as const,
+      caption: "Biên bản bàn giao",
+      documentId: DOCUMENT_ID,
+      fileName: "handover-reserved.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 4,
+      sha256: "f".repeat(64),
+      idempotencyKey: PROJECT_UPLOAD_ID,
+      createdAt: NOW,
+    };
+
+    expect(await repository.reserveProjectAttachment(input)).toMatchObject({
+      mediaStatus: "pending",
+      record: {
+        id: PROJECT_UPLOAD_ID,
+        mediaId: PROJECT_UPLOAD_ID,
+        phase: "handover",
+      },
+      documentIds: [DOCUMENT_ID],
+      sha256: "f".repeat(64),
+    });
+    expect(await repository.reserveProjectAttachment(input)).toMatchObject({
+      mediaStatus: "pending",
+      record: { id: PROJECT_UPLOAD_ID, mediaId: PROJECT_UPLOAD_ID },
+    });
+    expect(await database.select().from(serviceAttachments).where(eq(
+      serviceAttachments.id,
+      PROJECT_UPLOAD_ID,
+    ))).toHaveLength(1);
+
+    await database.update(mediaObjects).set({
+      status: "ready",
+      readyAt: NOW,
+      verifiedAt: NOW,
+    }).where(eq(mediaObjects.id, PROJECT_UPLOAD_ID));
+    expect(await repository.createProjectAttachment(input)).toMatchObject({
+      id: PROJECT_UPLOAD_ID,
+      mediaId: PROJECT_UPLOAD_ID,
+      phase: "handover",
+    });
+    expect(await database.select().from(serviceHandoverDocumentMedia).where(eq(
+      serviceHandoverDocumentMedia.mediaObjectId,
+      PROJECT_UPLOAD_ID,
+    ))).toHaveLength(1);
+  });
+
+  test("retries an ambiguous-after PUT through one media key and one attachment", async () => {
+    const bytes = Uint8Array.from([1, 2, 3, 4]);
+    const objects = new Map<string, Uint8Array>();
+    const putKeys: string[] = [];
+    let ambiguousAfter = true;
+    const storage: ObjectStorage = {
+      async put(input) {
+        putKeys.push(input.key);
+        const coordinate = `${input.bucket}:${input.key}`;
+        if (input.ifNoneMatch === "*" && objects.has(coordinate)) {
+          throw new ObjectStorageWriteError("precondition failed", "definitive-no-write");
+        }
+        objects.set(coordinate, input.body.slice());
+        if (ambiguousAfter) {
+          ambiguousAfter = false;
+          throw new ObjectStorageWriteError("connection lost after commit", "ambiguous");
+        }
+        return {
+          sizeBytes: input.body.byteLength,
+          contentType: input.contentType,
+          etag: "stored",
+        };
+      },
+      async get(input) {
+        const value = objects.get(`${input.bucket}:${input.key}`);
+        if (!value) throw new Error("missing object");
+        return value;
+      },
+      async head(input) {
+        const value = objects.get(`${input.bucket}:${input.key}`);
+        return value ? {
+          sizeBytes: value.byteLength,
+          contentType: "application/pdf",
+          etag: "stored",
+        } : null;
+      },
+      async createUploadUrl() { return "https://r2.test/upload"; },
+      async createDownloadUrl(input) {
+        return `https://r2.test/${input.key}?expires=${input.expiresInSeconds}`;
+      },
+      async remove() {},
+      publicUrl(input) { return `https://r2.test/${input.key}`; },
+    };
+    const generatedIds = [AMBIGUOUS_UPLOAD_ID, DUPLICATE_UPLOAD_ID];
+    const service = createMediaService({
+      storage,
+      repository: createDatabaseMediaRepository(database),
+      config: {
+        publicBucket: "lumapos-test-public-media",
+        privateBucket: "lumapos-test-private-media",
+      },
+      authorizeTarget: async () => "allowed",
+      now: () => NOW,
+      randomUUID: () => generatedIds.shift() ?? DUPLICATE_UPLOAD_ID,
+      logger: { error() {} },
+    });
+    const manager = createProjectMediaManager({
+      authorizeProject: async () => "allowed",
+      repository,
+      mediaService: service,
+      sign: async (record: ProjectMediaInternalRecord) =>
+        `https://r2.test/${record.objectKey}?signed=1`,
+      compensate: (
+        input: Parameters<typeof compensateManagedMediaAssociation>[1],
+      ) => compensateManagedMediaAssociation(database, input),
+      logger: { error() {} },
+    });
+    const input = {
+      phase: "handover" as const,
+      caption: "Biên bản retry",
+      documentId: DOCUMENT_ID,
+      fileName: "ambiguous-retry.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: bytes.byteLength,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      idempotencyKey: AMBIGUOUS_UPLOAD_ID,
+    };
+
+    await expect(manager.upload(actor, PROJECT_ID, input, bytes)).rejects.toThrow(
+      "connection lost after commit",
+    );
+    const result = await manager.upload(actor, PROJECT_ID, input, bytes);
+
+    expect(result).toMatchObject({
+      id: AMBIGUOUS_UPLOAD_ID,
+      mediaId: AMBIGUOUS_UPLOAD_ID,
+    });
+    expect(await database.select({ id: mediaObjects.id, key: mediaObjects.objectKey })
+      .from(mediaObjects).where(inArray(mediaObjects.id, [
+        AMBIGUOUS_UPLOAD_ID,
+        DUPLICATE_UPLOAD_ID,
+      ]))).toEqual([{
+        id: AMBIGUOUS_UPLOAD_ID,
+        key: expect.stringContaining(`/${AMBIGUOUS_UPLOAD_ID}/original.pdf`),
+      }]);
+    expect(await database.select({
+      id: serviceAttachments.id,
+      mediaId: serviceAttachments.mediaObjectId,
+    }).from(serviceAttachments).where(eq(
+      serviceAttachments.id,
+      AMBIGUOUS_UPLOAD_ID,
+    ))).toEqual([{ id: AMBIGUOUS_UPLOAD_ID, mediaId: AMBIGUOUS_UPLOAD_ID }]);
+    expect(new Set(putKeys)).toEqual(new Set([
+      expect.stringContaining(`/${AMBIGUOUS_UPLOAD_ID}/original.pdf`),
+    ]));
+  });
+
+  test("retries an ambiguous-before PUT through the same pending row and hidden reservation", async () => {
+    const bytes = Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]);
+    const { storage, objects, putKeys } = objectStorageHarness("ambiguous-before");
+    const manager = databaseBackedManager(storage);
+    const input = {
+      phase: "acceptance" as const,
+      caption: "Nghiệm thu retry",
+      documentId: DOCUMENT_ID,
+      fileName: "ambiguous-before.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: bytes.byteLength,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      idempotencyKey: AMBIGUOUS_BEFORE_ID,
+    };
+
+    await expect(manager.upload(actor, PROJECT_ID, input, bytes)).rejects.toThrow(
+      "connection lost before commit",
+    );
+    expect(await repository.listProjectAttachments({
+      storeId: STORE_ID,
+      projectId: PROJECT_ID,
+    })).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: AMBIGUOUS_BEFORE_ID }),
+    ]));
+    expect(await repository.getProjectAttachment({
+      storeId: STORE_ID,
+      projectId: PROJECT_ID,
+      attachmentId: AMBIGUOUS_BEFORE_ID,
+    })).toBeNull();
+    expect(await listProjectAttachmentSummaries(database, {
+      storeId: STORE_ID,
+      projectId: PROJECT_ID,
+    })).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: AMBIGUOUS_BEFORE_ID }),
+    ]));
+    await expect(manager.download(
+      actor,
+      PROJECT_ID,
+      AMBIGUOUS_BEFORE_ID,
+    )).rejects.toMatchObject({ status: 404 });
+    await expect(manager.delete(
+      actor,
+      PROJECT_ID,
+      AMBIGUOUS_BEFORE_ID,
+    )).rejects.toMatchObject({ status: 404 });
+    expect(await database.select({
+      id: serviceAttachments.id,
+      mediaId: serviceAttachments.mediaObjectId,
+    }).from(serviceAttachments).where(eq(
+      serviceAttachments.id,
+      AMBIGUOUS_BEFORE_ID,
+    ))).toEqual([{ id: AMBIGUOUS_BEFORE_ID, mediaId: null }]);
+    expect(await database.select().from(serviceHandoverDocumentMedia).where(eq(
+      serviceHandoverDocumentMedia.mediaObjectId,
+      AMBIGUOUS_BEFORE_ID,
+    ))).toHaveLength(0);
+
+    expect(await manager.upload(actor, PROJECT_ID, input, bytes)).toMatchObject({
+      id: AMBIGUOUS_BEFORE_ID,
+      mediaId: AMBIGUOUS_BEFORE_ID,
+    });
+    expect(putKeys).toHaveLength(2);
+    expect(new Set(putKeys)).toHaveLength(1);
+    expect(objects).toHaveLength(1);
+    expect(await database.select().from(mediaObjects).where(eq(
+      mediaObjects.id,
+      AMBIGUOUS_BEFORE_ID,
+    ))).toHaveLength(1);
+  });
+
+  test("retains one retryable reservation after a definitive no-write provider result", async () => {
+    const bytes = Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]);
+    const { storage, objects, putKeys } = objectStorageHarness("definitive-before");
+    const manager = databaseBackedManager(storage);
+    const input = {
+      phase: "construction" as const,
+      caption: null,
+      fileName: "definitive-retry.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: bytes.byteLength,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      idempotencyKey: DUPLICATE_UPLOAD_ID,
+    };
+
+    await expect(manager.upload(actor, PROJECT_ID, input, bytes)).rejects.toThrow(
+      "provider rejected before write",
+    );
+    expect(await database.select({
+      status: mediaObjects.status,
+      key: mediaObjects.objectKey,
+    }).from(mediaObjects).where(eq(
+      mediaObjects.id,
+      DUPLICATE_UPLOAD_ID,
+    ))).toEqual([{
+      status: "pending",
+      key: expect.stringContaining(`/${DUPLICATE_UPLOAD_ID}/original.jpg`),
+    }]);
+    expect(await manager.upload(actor, PROJECT_ID, input, bytes)).toMatchObject({
+      id: DUPLICATE_UPLOAD_ID,
+      mediaId: DUPLICATE_UPLOAD_ID,
+    });
+    expect(putKeys).toHaveLength(2);
+    expect(new Set(putKeys)).toHaveLength(1);
+    expect(objects).toHaveLength(1);
+  });
+
+  test("terminalizes an expired empty reservation without a second provider write", async () => {
+    const bytes = Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]);
+    const { storage, objects, putKeys } = objectStorageHarness("ambiguous-before");
+    const input = {
+      phase: "after_installation" as const,
+      caption: null,
+      fileName: "expired-empty.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: bytes.byteLength,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      idempotencyKey: EXPIRED_EMPTY_RESERVATION_ID,
+    };
+
+    await expect(databaseBackedManager(storage).upload(
+      actor,
+      PROJECT_ID,
+      input,
+      bytes,
+    )).rejects.toThrow("connection lost before commit");
+
+    await expect(databaseBackedManager(
+      storage,
+      repository,
+      new Date(NOW.getTime() + 600_000),
+    ).upload(actor, PROJECT_ID, input, bytes)).rejects.toMatchObject({
+      error: "media.uploadExpired",
+      status: 410,
+    });
+
+    expect(putKeys).toHaveLength(1);
+    expect(objects).toHaveLength(0);
+    expect(await database.select({ status: mediaObjects.status }).from(mediaObjects).where(eq(
+      mediaObjects.id,
+      EXPIRED_EMPTY_RESERVATION_ID,
+    ))).toEqual([{ status: "deleted" }]);
+    expect(await database.select({
+      mediaId: serviceAttachments.mediaObjectId,
+      deletedAt: serviceAttachments.deletedAt,
+    }).from(serviceAttachments).where(eq(
+      serviceAttachments.id,
+      EXPIRED_EMPTY_RESERVATION_ID,
+    ))).toEqual([{ mediaId: null, deletedAt: expect.any(Date) }]);
+  });
+
+  test("quarantines an expired reservation when its exact key has mismatched bytes", async () => {
+    const bytes = Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]);
+    const { storage, objects, putKeys } = objectStorageHarness("ambiguous-before");
+    const input = {
+      phase: "after_installation" as const,
+      caption: null,
+      fileName: "expired-mismatch.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: bytes.byteLength,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      idempotencyKey: EXPIRED_MISMATCH_RESERVATION_ID,
+    };
+
+    await expect(databaseBackedManager(storage).upload(
+      actor,
+      PROJECT_ID,
+      input,
+      bytes,
+    )).rejects.toThrow("connection lost before commit");
+
+    const [reserved] = await database.select({
+      bucket: mediaObjects.bucket,
+      objectKey: mediaObjects.objectKey,
+    }).from(mediaObjects).where(eq(mediaObjects.id, EXPIRED_MISMATCH_RESERVATION_ID));
+    objects.set(`${reserved.bucket}:${reserved.objectKey}`, {
+      bytes: Uint8Array.from([0xff, 0xd8, 0xff, 0x00]),
+      contentType: "image/jpeg",
+    });
+
+    await expect(databaseBackedManager(
+      storage,
+      repository,
+      new Date(NOW.getTime() + 600_000),
+    ).upload(actor, PROJECT_ID, input, bytes)).rejects.toMatchObject({
+      error: "media.reservationConflict",
+      status: 409,
+    });
+
+    expect(putKeys).toHaveLength(1);
+    expect(await database.select({ status: mediaObjects.status }).from(mediaObjects).where(eq(
+      mediaObjects.id,
+      EXPIRED_MISMATCH_RESERVATION_ID,
+    ))).toEqual([{ status: "quarantined" }]);
+    expect(await database.select({
+      mediaId: serviceAttachments.mediaObjectId,
+      deletedAt: serviceAttachments.deletedAt,
+    }).from(serviceAttachments).where(eq(
+      serviceAttachments.id,
+      EXPIRED_MISMATCH_RESERVATION_ID,
+    ))).toEqual([{ mediaId: null, deletedAt: expect.any(Date) }]);
+  });
+
+  test("cleans a hidden reservation only after reconciliation makes its media terminal", async () => {
+    const sha256 = "b".repeat(64);
+    const expectedPath = `stores/${STORE_ID}/projects/2026/08/${TERMINAL_RESERVATION_ID}/original.jpg`;
+    await database.insert(mediaObjects).values({
+      id: TERMINAL_RESERVATION_ID,
+      storeId: STORE_ID,
+      provider: "r2",
+      visibility: "private",
+      purpose: "project-document",
+      targetId: PROJECT_ID,
+      domain: "projects",
+      bucket: "lumapos-test-private-media",
+      objectKey: expectedPath,
+      originalFileName: "expired.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: 4,
+      sha256,
+      status: "pending",
+      uploadExpiresAt: new Date(NOW.getTime() - 1),
+      createdBy: USER_ID,
+    });
+    await repository.reserveProjectAttachment({
+      storeId: STORE_ID,
+      actorId: USER_ID,
+      projectId: PROJECT_ID,
+      mediaId: TERMINAL_RESERVATION_ID,
+      expectedPath,
+      phase: "after_installation",
+      caption: null,
+      fileName: "expired.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: 4,
+      sha256,
+      idempotencyKey: TERMINAL_RESERVATION_ID,
+      createdAt: NOW,
+    });
+
+    expect(await cleanupTerminalProjectAttachmentReservation(database, {
+      storeId: STORE_ID,
+      projectId: PROJECT_ID,
+      mediaId: TERMINAL_RESERVATION_ID,
+      attachmentId: TERMINAL_RESERVATION_ID,
+      cleanedAt: NOW,
+    })).toEqual({ outcome: "retained" });
+    await database.update(mediaObjects).set({
+      status: "deleted",
+      deletedAt: NOW,
+    }).where(eq(mediaObjects.id, TERMINAL_RESERVATION_ID));
+    expect(await cleanupTerminalProjectAttachmentReservation(database, {
+      storeId: STORE_ID,
+      projectId: PROJECT_ID,
+      mediaId: TERMINAL_RESERVATION_ID,
+      attachmentId: TERMINAL_RESERVATION_ID,
+      cleanedAt: NOW,
+    })).toEqual({ outcome: "cleaned" });
+    expect(await database.select({ deletedAt: serviceAttachments.deletedAt })
+      .from(serviceAttachments).where(eq(
+        serviceAttachments.id,
+        TERMINAL_RESERVATION_ID,
+      ))).toEqual([{ deletedAt: NOW }]);
+  });
+
+  test("soft-deletes the hidden reservation after terminal association recovery", async () => {
+    const bytes = Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]);
+    const { storage, objects } = objectStorageHarness();
+    const raceRepository: ProjectMediaRepository = {
+      ...repository,
+      async reserveProjectAttachment(input) {
+        const reserved = await repository.reserveProjectAttachment(input);
+        await database.delete(serviceHandoverDocuments).where(eq(
+          serviceHandoverDocuments.id,
+          DOCUMENT_ID,
+        ));
+        return reserved;
+      },
+    };
+    const manager = databaseBackedManager(storage, raceRepository);
+    try {
+      await expect(manager.upload(actor, PROJECT_ID, {
+        phase: "handover",
+        caption: null,
+        documentId: DOCUMENT_ID,
+        fileName: "terminal-race.jpg",
+        mimeType: "image/jpeg",
+        sizeBytes: bytes.byteLength,
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+        idempotencyKey: TERMINAL_RACE_ID,
+      }, bytes)).rejects.toMatchObject({
+        code: "PROJECT_MEDIA_DOCUMENT_NOT_FOUND",
+      });
+      expect(await database.select({ status: mediaObjects.status })
+        .from(mediaObjects).where(eq(
+          mediaObjects.id,
+          TERMINAL_RACE_ID,
+        ))).toEqual([{ status: "deleted" }]);
+      expect(await database.select({
+        mediaId: serviceAttachments.mediaObjectId,
+        deletedAt: serviceAttachments.deletedAt,
+      }).from(serviceAttachments).where(eq(
+        serviceAttachments.id,
+        TERMINAL_RACE_ID,
+      ))).toEqual([{ mediaId: null, deletedAt: expect.any(Date) }]);
+      expect(objects).toHaveLength(1);
+    } finally {
+      await database.insert(serviceHandoverDocuments).values({
+        id: DOCUMENT_ID,
+        storeId: STORE_ID,
+        projectId: PROJECT_ID,
+        type: "handover",
+        title: "Handover",
+      }).onConflictDoNothing();
+      await database.insert(serviceHandoverDocumentMedia).values({
+        storeId: STORE_ID,
+        documentId: DOCUMENT_ID,
+        mediaObjectId: MEDIA_ID,
+        sortOrder: 0,
+      }).onConflictDoNothing();
+    }
+  });
+
+  test("concurrent same-key retries converge on one media row, key, and attachment", async () => {
+    const bytes = Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]);
+    const { storage, objects, putKeys } = objectStorageHarness();
+    const manager = databaseBackedManager(storage);
+    const input = {
+      phase: "after_installation" as const,
+      caption: null,
+      fileName: "concurrent.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: bytes.byteLength,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      idempotencyKey: CONCURRENT_UPLOAD_ID,
+    };
+
+    const results = await Promise.all([
+      manager.upload(actor, PROJECT_ID, input, bytes),
+      manager.upload(actor, PROJECT_ID, input, bytes),
+    ]);
+
+    expect(results).toEqual([
+      expect.objectContaining({ id: CONCURRENT_UPLOAD_ID, mediaId: CONCURRENT_UPLOAD_ID }),
+      expect.objectContaining({ id: CONCURRENT_UPLOAD_ID, mediaId: CONCURRENT_UPLOAD_ID }),
+    ]);
+    expect(await database.select().from(mediaObjects).where(eq(
+      mediaObjects.id,
+      CONCURRENT_UPLOAD_ID,
+    ))).toHaveLength(1);
+    expect(await database.select().from(serviceAttachments).where(eq(
+      serviceAttachments.id,
+      CONCURRENT_UPLOAD_ID,
+    ))).toHaveLength(1);
+    expect(new Set(putKeys)).toHaveLength(1);
+    expect(objects).toHaveLength(1);
+  });
+
+  test("rejects every changed pending payload coordinate without writing another object", async () => {
+    const bytes = Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]);
+    const { storage, putKeys } = objectStorageHarness("ambiguous-before");
+    const manager = databaseBackedManager(storage);
+    const input = {
+      phase: "handover" as const,
+      caption: "Bản gốc",
+      documentId: DOCUMENT_ID,
+      fileName: "unchanged.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: bytes.byteLength,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      idempotencyKey: CHANGED_UPLOAD_ID,
+    };
+    await expect(manager.upload(actor, PROJECT_ID, input, bytes)).rejects.toThrow(
+      "connection lost before commit",
+    );
+
+    const fiveBytes = Uint8Array.from([0xff, 0xd8, 0xff, 0xdb, 0x00]);
+    const changed = [
+      { label: "phase", value: { ...input, phase: "acceptance" }, body: bytes },
+      { label: "caption", value: { ...input, caption: "Đã đổi" }, body: bytes },
+      { label: "document", value: { ...input, documentId: undefined }, body: bytes },
+      { label: "name", value: { ...input, fileName: "changed.jpg" }, body: bytes },
+      { label: "mime", value: { ...input, mimeType: "image/png" }, body: bytes },
+      {
+        label: "size",
+        value: {
+          ...input,
+          sizeBytes: fiveBytes.byteLength,
+          sha256: createHash("sha256").update(fiveBytes).digest("hex"),
+        },
+        body: fiveBytes,
+      },
+      { label: "sha", value: { ...input, sha256: "f".repeat(64) }, body: bytes },
+    ];
+    const failures: Array<{ label: string; status: unknown; name: unknown }> = [];
+    for (const candidate of changed) {
+      try {
+        await manager.upload(actor, PROJECT_ID, candidate.value, candidate.body);
+        failures.push({ label: candidate.label, status: "resolved", name: null });
+      } catch (error) {
+        const failure = error as { status?: unknown; name?: unknown };
+        failures.push({
+          label: candidate.label,
+          status: failure.status,
+          name: failure.name,
+        });
+      }
+    }
+    expect(failures).toEqual(changed.map(({ label }) => ({
+      label,
+      status: 409,
+      name: expect.any(String),
+    })));
+    expect(putKeys).toHaveLength(1);
+    expect(await database.select().from(mediaObjects).where(eq(
+      mediaObjects.id,
+      CHANGED_UPLOAD_ID,
+    ))).toHaveLength(1);
+    expect(await database.select({ mediaId: serviceAttachments.mediaObjectId })
+      .from(serviceAttachments).where(eq(
+        serviceAttachments.id,
+        CHANGED_UPLOAD_ID,
+      ))).toEqual([{ mediaId: null }]);
+  });
+
+  test("conceals reservation UUID collisions across store, purpose, and target", async () => {
+    const sha256 = "a".repeat(64);
+    await database.insert(mediaObjects).values([
+      {
+        id: CROSS_STORE_RESERVATION_ID,
+        storeId: STORE_B,
+        provider: "r2",
+        visibility: "private",
+        purpose: "project-document",
+        targetId: PROJECT_B,
+        domain: "projects",
+        bucket: "lumapos-test-private-media",
+        objectKey: `stores/${STORE_B}/projects/2026/08/${CROSS_STORE_RESERVATION_ID}/original.jpg`,
+        originalFileName: "collision.jpg",
+        mimeType: "image/jpeg",
+        sizeBytes: 4,
+        sha256,
+        status: "pending",
+        uploadExpiresAt: new Date(NOW.getTime() + 600_000),
+      },
+      {
+        id: CROSS_PURPOSE_RESERVATION_ID,
+        storeId: STORE_ID,
+        provider: "r2",
+        visibility: "private",
+        purpose: "service-evidence",
+        targetId: JOB_ID,
+        domain: "service-evidence",
+        bucket: "lumapos-test-private-media",
+        objectKey: `stores/${STORE_ID}/service-evidence/2026/08/${CROSS_PURPOSE_RESERVATION_ID}/original.jpg`,
+        originalFileName: "collision.jpg",
+        mimeType: "image/jpeg",
+        sizeBytes: 4,
+        sha256,
+        status: "pending",
+        uploadExpiresAt: new Date(NOW.getTime() + 600_000),
+      },
+      {
+        id: CROSS_TARGET_RESERVATION_ID,
+        storeId: STORE_ID,
+        provider: "r2",
+        visibility: "private",
+        purpose: "project-document",
+        targetId: JOB_ID,
+        domain: "projects",
+        bucket: "lumapos-test-private-media",
+        objectKey: `stores/${STORE_ID}/projects/2026/08/${CROSS_TARGET_RESERVATION_ID}/original.jpg`,
+        originalFileName: "collision.jpg",
+        mimeType: "image/jpeg",
+        sizeBytes: 4,
+        sha256,
+        status: "pending",
+        uploadExpiresAt: new Date(NOW.getTime() + 600_000),
+      },
+    ]);
+    const service = createMediaService({
+      storage: objectStorageHarness().storage,
+      repository: createDatabaseMediaRepository(database),
+      config: {
+        publicBucket: "lumapos-test-public-media",
+        privateBucket: "lumapos-test-private-media",
+      },
+      authorizeTarget: async () => "allowed",
+      now: () => NOW,
+      logger: { error() {} },
+    });
+    for (const reservationId of [
+      CROSS_STORE_RESERVATION_ID,
+      CROSS_PURPOSE_RESERVATION_ID,
+      CROSS_TARGET_RESERVATION_ID,
+    ]) {
+      await expect(service.reserveManagedObject(actor, {
+        reservationId,
+        purpose: "project-document",
+        targetId: PROJECT_ID,
+        fileName: "collision.jpg",
+        mimeType: "image/jpeg",
+        sizeBytes: 4,
+        sha256,
+      })).rejects.toMatchObject({
+        error: "media.reservationConflict",
+        status: 409,
+        message: "media.reservationConflict",
+      });
+    }
   });
 
   test("conceals a job attachment from project download lookup", async () => {

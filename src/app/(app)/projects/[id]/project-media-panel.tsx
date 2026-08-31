@@ -82,6 +82,18 @@ type PhasePickerOption = {
 type ProjectMediaListState = "loading" | "ready" | "error";
 type ProjectMediaUploadStatus = "queued" | "uploading" | "complete" | "failed";
 
+export type ProjectMediaUploadErrorCategory =
+  | "network"
+  | "timeout"
+  | "rate_limit"
+  | "server"
+  | "validation"
+  | "conflict"
+  | "expired"
+  | "auth"
+  | "not_found"
+  | "invalid_response";
+
 export type ProjectMediaPendingFile = {
   localId: string;
   file: File;
@@ -93,6 +105,9 @@ export type ProjectMediaUploadResult = {
   status: "complete" | "failed";
   item?: ProjectMediaItem;
   error?: string;
+  retryable: boolean;
+  httpStatus: number | null;
+  errorCategory: ProjectMediaUploadErrorCategory | null;
 };
 
 type ProjectMediaQueueItem = ProjectMediaPendingFile & {
@@ -100,6 +115,9 @@ type ProjectMediaQueueItem = ProjectMediaPendingFile & {
   progress: number;
   item?: ProjectMediaItem;
   error?: string;
+  retryable?: boolean;
+  httpStatus: number | null;
+  errorCategory: ProjectMediaUploadErrorCategory | null;
 };
 
 type UploadStatusPatch = {
@@ -107,6 +125,9 @@ type UploadStatusPatch = {
   progress: number;
   item?: ProjectMediaItem;
   error?: string;
+  retryable?: boolean;
+  httpStatus: number | null;
+  errorCategory: ProjectMediaUploadErrorCategory | null;
 };
 
 export const PROJECT_MEDIA_UPLOAD_CONCURRENCY = 3;
@@ -131,6 +152,47 @@ const PROJECT_MEDIA_FOCUSABLE = [
   "textarea:not([disabled])",
   '[tabindex]:not([tabindex="-1"])',
 ].join(",");
+
+export function isRetryableProjectMediaUploadStatus(status: number) {
+  return isRetryableProjectMediaUploadErrorCategory(
+    projectMediaUploadErrorCategoryForStatus(status),
+  );
+}
+
+export function projectMediaUploadErrorCategoryForStatus(
+  status: number,
+): ProjectMediaUploadErrorCategory {
+  if (status === 408) return "timeout";
+  if (status === 429) return "rate_limit";
+  if (status >= 500) return "server";
+  if (status === 401 || status === 403) return "auth";
+  if (status === 404) return "not_found";
+  if (status === 409) return "conflict";
+  if (status === 410) return "expired";
+  if (status >= 400) return "validation";
+  return "invalid_response";
+}
+
+export function isRetryableProjectMediaUploadErrorCategory(
+  category: ProjectMediaUploadErrorCategory,
+) {
+  return category === "network"
+    || category === "timeout"
+    || category === "rate_limit"
+    || category === "server";
+}
+
+export function projectMediaUploadErrorMessageKey(
+  category: ProjectMediaUploadErrorCategory,
+) {
+  if (category === "validation") return "uploadValidation" as const;
+  if (category === "conflict") return "uploadConflict" as const;
+  if (category === "expired") return "uploadExpired" as const;
+  if (category === "auth") return "uploadAuth" as const;
+  if (category === "not_found") return "uploadNotFound" as const;
+  if (category === "invalid_response") return "uploadInvalidResponse" as const;
+  return "uploadError" as const;
+}
 
 export function filterProjectMediaItems(
   items: readonly ProjectMediaItem[],
@@ -201,6 +263,39 @@ export function shouldDismissProjectMediaPicker(
   target: Node,
 ) {
   return Boolean(root && !root.contains(target));
+}
+
+export function projectMediaPickerTabTarget(
+  focusables: readonly HTMLElement[],
+  root: Pick<HTMLElement, "contains"> | null,
+  trigger: HTMLElement | null,
+  shiftKey: boolean,
+) {
+  if (!root || !trigger) return null;
+  const triggerIndex = focusables.indexOf(trigger);
+  if (triggerIndex < 0) return null;
+  const step = shiftKey ? -1 : 1;
+  for (
+    let index = triggerIndex + step;
+    index >= 0 && index < focusables.length;
+    index += step
+  ) {
+    const candidate = focusables[index];
+    if (!root.contains(candidate)) return candidate;
+  }
+  return null;
+}
+
+export function moveProjectMediaPickerTabFocus(
+  focusables: readonly HTMLElement[],
+  root: Pick<HTMLElement, "contains"> | null,
+  trigger: HTMLElement | null,
+  shiftKey: boolean,
+) {
+  const target = projectMediaPickerTabTarget(focusables, root, trigger, shiftKey);
+  if (!target) return false;
+  target.focus();
+  return true;
 }
 
 export function projectMediaDownloadUrl(projectId: string, attachmentId: string) {
@@ -302,21 +397,42 @@ export async function uploadProjectMediaFiles({
       cursor += 1;
       const pending = files[index];
       const requestContext = pending.uploadContext ?? { phase, caption, documentId };
-      onStatus?.(pending.localId, { status: "uploading", progress: 12 });
+      onStatus?.(pending.localId, {
+        status: "uploading",
+        progress: 12,
+        httpStatus: null,
+        errorCategory: null,
+      });
       const form = new FormData();
       form.set("file", pending.file);
       form.set("phase", requestContext.phase);
       form.set("idempotencyKey", pending.localId);
       if (requestContext.caption?.trim()) form.set("caption", requestContext.caption.trim());
       if (requestContext.documentId) form.set("documentId", requestContext.documentId);
+      let retryable = true;
+      let httpStatus: number | null = null;
+      let errorCategory: ProjectMediaUploadErrorCategory = "network";
       try {
         const response = await fetcher(
           `/api/mobile/services/projects/${encodeURIComponent(projectId)}/attachments`,
           { method: "POST", body: form },
         );
-        onStatus?.(pending.localId, { status: "uploading", progress: 78 });
+        httpStatus = response.status;
+        onStatus?.(pending.localId, {
+          status: "uploading",
+          progress: 78,
+          httpStatus,
+          errorCategory: null,
+        });
         const body = await readProjectMediaResponse(response);
-        if (!response.ok || !body.data || Array.isArray(body.data)) {
+        if (!response.ok) {
+          errorCategory = projectMediaUploadErrorCategoryForStatus(response.status);
+          retryable = isRetryableProjectMediaUploadErrorCategory(errorCategory);
+          throw new Error(body.error ?? "PROJECT_MEDIA_UPLOAD_FAILED");
+        }
+        if (!body.data || Array.isArray(body.data)) {
+          errorCategory = "invalid_response";
+          retryable = false;
           throw new Error(body.error ?? "PROJECT_MEDIA_UPLOAD_FAILED");
         }
         const item: ProjectMediaItem = {
@@ -325,21 +441,41 @@ export async function uploadProjectMediaFiles({
             ? [requestContext.documentId]
             : body.data.documentIds ?? [],
         };
-        results[index] = { localId: pending.localId, status: "complete", item };
+        results[index] = {
+          localId: pending.localId,
+          status: "complete",
+          item,
+          retryable: false,
+          httpStatus,
+          errorCategory: null,
+        };
         onStatus?.(pending.localId, {
           status: "complete",
           progress: 100,
           item,
+          retryable: false,
+          httpStatus,
+          errorCategory: null,
         });
       } catch (error) {
         const message = error instanceof Error
           ? error.message
           : "PROJECT_MEDIA_UPLOAD_FAILED";
-        results[index] = { localId: pending.localId, status: "failed", error: message };
+        results[index] = {
+          localId: pending.localId,
+          status: "failed",
+          error: message,
+          retryable,
+          httpStatus,
+          errorCategory,
+        };
         onStatus?.(pending.localId, {
           status: "failed",
           progress: 0,
           error: message,
+          retryable,
+          httpStatus,
+          errorCategory,
         });
       }
     }
@@ -359,9 +495,17 @@ export function failedProjectMediaUploads(
   results: readonly ProjectMediaUploadResult[],
 ) {
   const failed = new Set(
-    results.filter((result) => result.status === "failed").map((result) => result.localId),
+    results
+      .filter((result) => result.status === "failed" && result.retryable)
+      .map((result) => result.localId),
   );
   return files.filter((file) => failed.has(file.localId));
+}
+
+export function retryableProjectMediaUploadCount(
+  items: readonly { status: ProjectMediaUploadStatus; retryable?: boolean }[],
+) {
+  return items.filter((item) => item.status === "failed" && item.retryable).length;
 }
 
 export async function deleteProjectMediaItem({
@@ -443,10 +587,29 @@ export function ProjectMediaPhasePicker({
 
   function handleKeyDown(event: ReactKeyboardEvent) {
     if (!["ArrowDown", "ArrowUp", "Enter", " ", "Escape", "Tab"].includes(event.key)) return;
-    if (event.key !== "Tab") {
-      event.preventDefault();
-      event.stopPropagation();
+    if (event.key === "Tab") {
+      const focusables = Array.from(
+        document.querySelectorAll<HTMLElement>(PROJECT_MEDIA_FOCUSABLE),
+      ).filter((element) => (
+        element.tabIndex >= 0
+        && element.getClientRects().length > 0
+        && !element.closest("[inert]")
+      ));
+      const moved = moveProjectMediaPickerTabFocus(
+        focusables,
+        rootRef.current,
+        triggerRef.current,
+        event.shiftKey,
+      );
+      setOpen(false);
+      if (moved) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      return;
     }
+    event.preventDefault();
+    event.stopPropagation();
     const next = nextProjectMediaPickerState(
       { open, activeIndex },
       event.key,
@@ -902,9 +1065,7 @@ function ProjectMediaPanelBody({
     selectedPhase === "all" ? undefined : selectedPhase as ProjectMediaPhase,
   );
   const failedCount = queue.filter((item) => item.status === "failed").length;
-  const retryableFailedCount = queue.filter((item) => (
-    item.status === "failed" && isAcceptedProjectMediaFile(item.file)
-  )).length;
+  const retryableFailedCount = retryableProjectMediaUploadCount(queue);
   const queuedCount = queue.filter((item) => item.status === "queued").length;
   const completeCount = queue.filter((item) => item.status === "complete").length;
 
@@ -928,6 +1089,9 @@ function ProjectMediaPanelBody({
         status: valid ? "queued" : "failed",
         progress: 0,
         error: valid ? undefined : t("unsupportedFile"),
+        retryable: valid ? undefined : false,
+        httpStatus: null,
+        errorCategory: valid ? null : "validation",
       };
     });
     setQueue((current) => [...current, ...next]);
@@ -965,11 +1129,22 @@ function ProjectMediaPanelBody({
       onStatus: patchQueue,
     });
     const completed = results.flatMap((result) => result.item ? [result.item] : []);
-    const failedIds = new Set(results.filter((result) => result.status === "failed").map((result) => result.localId));
-    if (failedIds.size > 0) {
-      setQueue((current) => current.map((item) => (
-        failedIds.has(item.localId) ? { ...item, error: t("uploadError") } : item
-      )));
+    const failedById = new Map(results.flatMap((result) => (
+      result.status === "failed" ? [[result.localId, result] as const] : []
+    )));
+    if (failedById.size > 0) {
+      setQueue((current) => current.map((item) => {
+        const failure = failedById.get(item.localId);
+        if (!failure) return item;
+        const errorCategory = failure.errorCategory ?? "invalid_response";
+        return {
+          ...item,
+          retryable: failure.retryable,
+          httpStatus: failure.httpStatus,
+          errorCategory,
+          error: t(projectMediaUploadErrorMessageKey(errorCategory)),
+        };
+      }));
     }
     if (completed.length > 0) {
       mutateItems((current) => {
@@ -988,11 +1163,19 @@ function ProjectMediaPanelBody({
 
   async function retryFailed() {
     const targets = queue
-      .filter((item) => item.status === "failed" && isAcceptedProjectMediaFile(item.file))
+      .filter((item) => item.status === "failed" && item.retryable)
       .map(({ localId, file, uploadContext }) => ({ localId, file, uploadContext }));
     setQueue((current) => current.map((item) => (
       targets.some((target) => target.localId === item.localId)
-        ? { ...item, status: "queued", progress: 0, error: undefined }
+        ? {
+            ...item,
+            status: "queued",
+            progress: 0,
+            error: undefined,
+            retryable: undefined,
+            httpStatus: null,
+            errorCategory: null,
+          }
         : item
     )));
     await runUploads(targets);

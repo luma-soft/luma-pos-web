@@ -141,9 +141,29 @@ function createOldClientLifecycleHarness(options: { referenced?: boolean } = {})
         deletedAt: null,
         thumbnailObjectKey: null,
         thumbnailSizeBytes: null,
+        sha256: input.sha256 ?? null,
       };
       records.set(`${record.storeId}:${record.id}`, record);
       return record;
+    },
+    async reservePending(input) {
+      const coordinate = `${input.storeId}:${input.id}`;
+      const existing = records.get(coordinate);
+      if (existing) return { media: existing, created: false };
+      const record: MediaRecord = {
+        ...input,
+        status: "pending",
+        createdBy: input.createdBy ?? null,
+        createdAt: NOW,
+        readyAt: null,
+        verifiedAt: null,
+        deletedAt: null,
+        thumbnailObjectKey: null,
+        thumbnailSizeBytes: null,
+        sha256: input.sha256 ?? null,
+      };
+      records.set(coordinate, record);
+      return { media: record, created: true };
     },
     async getForStore(input) {
       return records.get(`${input.storeId}:${input.mediaId}`) ?? null;
@@ -190,6 +210,23 @@ function createOldClientLifecycleHarness(options: { referenced?: boolean } = {})
       };
       records.set(coordinate, deleted);
       return deleted;
+    },
+    async quarantinePending(input) {
+      const coordinate = `${input.storeId}:${input.mediaId}`;
+      const current = records.get(coordinate);
+      if (
+        !current
+        || current.status !== "pending"
+        || current.purpose !== input.expectedPurpose
+        || current.targetId !== input.expectedTargetId
+      ) return null;
+      const quarantined: MediaRecord = {
+        ...current,
+        status: "quarantined",
+        deletedAt: null,
+      };
+      records.set(coordinate, quarantined);
+      return quarantined;
     },
     async recoverReadyAfterFailure(input) {
       const coordinate = `${input.storeId}:${input.mediaId}`;

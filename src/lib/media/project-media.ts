@@ -33,6 +33,7 @@ import type {
   CreatePendingMediaInput,
   GetMediaForStoreInput,
   MarkMediaReadyInput,
+  QuarantinePendingMediaInput,
   SaveMediaThumbnailInput,
   SoftDeleteMediaInput,
 } from "@/lib/media/repository";
@@ -50,6 +51,7 @@ import {
   canonicalizeNullableUuidCoordinate,
   canonicalizeUuidCoordinate,
   canonicalUuidCoordinateSchema,
+  nullableUuidCoordinatesEqual,
   uuidCoordinatesEqual,
 } from "@/lib/media/uuid-coordinate";
 
@@ -960,6 +962,16 @@ export class ProjectMediaRepositoryError extends Error {
   }
 }
 
+function isUniqueConstraintError(error: unknown) {
+  let candidate = error;
+  for (let depth = 0; depth < 4 && candidate && typeof candidate === "object"; depth += 1) {
+    const record = candidate as { code?: unknown; cause?: unknown };
+    if (record.code === "23505") return true;
+    candidate = record.cause;
+  }
+  return false;
+}
+
 export type ProjectMediaInternalRecord = {
   id: string;
   mediaId: string;
@@ -988,6 +1000,10 @@ export type ProjectMediaIdempotencyRecord = {
   record: ProjectMediaInternalRecord;
   documentIds: string[];
   sha256: string | null;
+};
+
+export type ProjectMediaUploadReservation = ProjectMediaIdempotencyRecord & {
+  mediaStatus: "pending" | "ready";
 };
 
 function expectedDomain(purpose: MediaPurpose) {
@@ -1111,6 +1127,31 @@ export function createDatabaseMediaRepository(
       }).returning();
       return row as MediaRecord;
     },
+    async reservePending(input: CreatePendingMediaInput) {
+      const values = {
+        ...input,
+        id: canonicalizeUuidCoordinate(input.id),
+        storeId: canonicalizeUuidCoordinate(input.storeId),
+        targetId: canonicalizeUuidCoordinate(input.targetId),
+        status: "pending" as const,
+        createdBy: options.forceCreatedByNull
+          ? null
+          : canonicalizeNullableUuidCoordinate(input.createdBy ?? null),
+      };
+      const [created] = await database.insert(mediaObjects).values(values)
+        .onConflictDoNothing({ target: mediaObjects.id })
+        .returning();
+      if (created) {
+        return { media: created as MediaRecord, created: true };
+      }
+      const [existing] = await database.select().from(mediaObjects).where(and(
+        eq(mediaObjects.storeId, values.storeId),
+        eq(mediaObjects.id, values.id),
+      )).limit(1);
+      return existing
+        ? { media: existing as MediaRecord, created: false }
+        : null;
+    },
     async getForStore(input: GetMediaForStoreInput) {
       const [row] = await database.select().from(mediaObjects).where(and(
         eq(mediaObjects.storeId, canonicalizeUuidCoordinate(input.storeId)),
@@ -1146,6 +1187,19 @@ export function createDatabaseMediaRepository(
       const [row] = await database.update(mediaObjects).set({
         status: "deleted",
         deletedAt: input.deletedAt,
+      }).where(and(
+        eq(mediaObjects.storeId, canonicalizeUuidCoordinate(input.storeId)),
+        eq(mediaObjects.id, canonicalizeUuidCoordinate(input.mediaId)),
+        eq(mediaObjects.status, "pending"),
+        eq(mediaObjects.purpose, input.expectedPurpose),
+        eq(mediaObjects.targetId, canonicalizeUuidCoordinate(input.expectedTargetId)),
+      )).returning();
+      return (row as MediaRecord | undefined) ?? null;
+    },
+    async quarantinePending(input: QuarantinePendingMediaInput) {
+      const [row] = await database.update(mediaObjects).set({
+        status: "quarantined",
+        deletedAt: null,
       }).where(and(
         eq(mediaObjects.storeId, canonicalizeUuidCoordinate(input.storeId)),
         eq(mediaObjects.id, canonicalizeUuidCoordinate(input.mediaId)),
@@ -1224,6 +1278,22 @@ export type ProjectMediaRepository = {
     projectId: string;
     documentId: string;
   }): Promise<void>;
+  reserveProjectAttachment(input: {
+    storeId: string;
+    actorId: string | null;
+    projectId: string;
+    mediaId: string;
+    expectedPath: string;
+    phase: ProjectMediaPhase;
+    caption: string | null;
+    documentId?: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    sha256: string;
+    idempotencyKey: string;
+    createdAt?: Date;
+  }): Promise<ProjectMediaUploadReservation>;
   createProjectAttachment(input: {
     storeId: string;
     actorId: string | null;
@@ -1240,6 +1310,13 @@ export type ProjectMediaRepository = {
     idempotencyKey: string;
     createdAt?: Date;
   }): Promise<ProjectMediaInternalRecord>;
+  cleanupTerminalProjectAttachmentReservation?(input: {
+    storeId: string;
+    projectId: string;
+    mediaId: string;
+    attachmentId: string;
+    cleanedAt?: Date;
+  }): Promise<{ outcome: "cleaned" | "retained" }>;
   deleteProjectAttachment(input: {
     storeId: string;
     actorId: string | null;
@@ -1273,6 +1350,13 @@ function projectMediaReplayMatches(
     && existing.sha256 === input.sha256
     && existing.documentIds.length === expectedDocumentIds.length
     && expectedDocumentIds.every((id) => existing.documentIds.includes(id));
+}
+
+function projectMediaReservationClientRequestId(
+  attachmentId: string,
+  documentId?: string,
+) {
+  return `project-upload:${attachmentId}:${documentId ?? "none"}`;
 }
 
 export function createDatabaseProjectMediaRepository(
@@ -1405,6 +1489,195 @@ export function createDatabaseProjectMediaRepository(
       }
     },
 
+    async reserveProjectAttachment(input) {
+      const coordinates = {
+        storeId: canonicalizeUuidCoordinate(input.storeId),
+        actorId: canonicalizeNullableUuidCoordinate(input.actorId),
+        projectId: canonicalizeUuidCoordinate(input.projectId),
+        mediaId: canonicalizeUuidCoordinate(input.mediaId),
+        attachmentId: canonicalizeUuidCoordinate(input.idempotencyKey),
+        documentId: input.documentId
+          ? canonicalizeUuidCoordinate(input.documentId)
+          : undefined,
+      };
+      try {
+        return await database.transaction(async (transaction: DatabaseLike) => {
+          const [project] = await transaction.select({ id: projects.id })
+            .from(projects).where(and(
+              eq(projects.storeId, coordinates.storeId),
+              eq(projects.id, coordinates.projectId),
+            )).limit(1).for("update");
+          if (!project) {
+            throw new ProjectMediaRepositoryError("PROJECT_MEDIA_PROJECT_NOT_FOUND");
+          }
+          if (coordinates.documentId) {
+            const [document] = await transaction.select({ id: serviceHandoverDocuments.id })
+              .from(serviceHandoverDocuments).where(and(
+                eq(serviceHandoverDocuments.storeId, coordinates.storeId),
+                eq(serviceHandoverDocuments.id, coordinates.documentId),
+                eq(serviceHandoverDocuments.projectId, coordinates.projectId),
+              )).limit(1).for("update");
+            if (!document) {
+              throw new ProjectMediaRepositoryError("PROJECT_MEDIA_DOCUMENT_NOT_FOUND");
+            }
+          }
+
+          const [media] = await transaction.select().from(mediaObjects).where(and(
+            eq(mediaObjects.storeId, coordinates.storeId),
+            eq(mediaObjects.id, coordinates.mediaId),
+          )).limit(1).for("update");
+          if (
+            !media
+            || media.provider !== "r2"
+            || media.visibility !== "private"
+            || (media.status !== "pending" && media.status !== "ready")
+            || media.deletedAt !== null
+            || media.purpose !== "project-document"
+            || !uuidCoordinatesEqual(media.targetId, coordinates.projectId)
+            || media.domain !== "projects"
+            || media.objectKey !== input.expectedPath
+            || media.mimeType !== input.mimeType
+            || media.sizeBytes !== input.sizeBytes
+            || media.originalFileName !== input.fileName
+            || media.sha256 !== input.sha256
+            || !nullableUuidCoordinatesEqual(media.createdBy, coordinates.actorId)
+          ) {
+            throw new ProjectMediaRepositoryError("PROJECT_MEDIA_ASSOCIATION_CONFLICT");
+          }
+
+          const [existing] = await transaction.select({
+            id: serviceAttachments.id,
+            mediaId: serviceAttachments.mediaObjectId,
+            phase: serviceAttachments.projectPhase,
+            caption: serviceAttachments.caption,
+            fileName: serviceAttachments.fileName,
+            mimeType: serviceAttachments.mimeType,
+            sizeBytes: serviceAttachments.sizeBytes,
+            sha256: serviceAttachments.sha256,
+            clientRequestId: serviceAttachments.clientRequestId,
+            createdAt: serviceAttachments.createdAt,
+          }).from(serviceAttachments).where(and(
+            eq(serviceAttachments.storeId, coordinates.storeId),
+            eq(serviceAttachments.projectId, coordinates.projectId),
+            eq(serviceAttachments.id, coordinates.attachmentId),
+            isNull(serviceAttachments.jobId),
+            isNull(serviceAttachments.claimId),
+            isNull(serviceAttachments.assetId),
+            isNull(serviceAttachments.requestId),
+            isNull(serviceAttachments.deletedAt),
+          )).limit(1);
+          if (existing) {
+            const links = !existing.mediaId ? [] : await transaction.select({
+              documentId: serviceHandoverDocumentMedia.documentId,
+            }).from(serviceHandoverDocumentMedia).innerJoin(
+              serviceHandoverDocuments,
+              and(
+                eq(serviceHandoverDocuments.storeId, serviceHandoverDocumentMedia.storeId),
+                eq(serviceHandoverDocuments.id, serviceHandoverDocumentMedia.documentId),
+              ),
+            ).where(and(
+              eq(serviceHandoverDocumentMedia.storeId, coordinates.storeId),
+              eq(serviceHandoverDocumentMedia.mediaObjectId, existing.mediaId),
+              eq(serviceHandoverDocuments.projectId, coordinates.projectId),
+            ));
+            const reservedDocumentIds = existing.mediaId
+              ? links.map((link: { documentId: string }) => link.documentId)
+              : existing.clientRequestId === projectMediaReservationClientRequestId(
+                  coordinates.attachmentId,
+                  coordinates.documentId,
+                )
+                ? coordinates.documentId ? [coordinates.documentId] : []
+                : [];
+            const replay = {
+              record: {
+                id: existing.id,
+                mediaId: existing.mediaId ?? media.id,
+                phase: existing.phase ?? "other",
+                caption: existing.caption,
+                fileName: existing.fileName,
+                mimeType: existing.mimeType,
+                sizeBytes: existing.sizeBytes,
+                createdAt: existing.createdAt,
+                provider: media.provider,
+                bucket: media.bucket,
+                objectKey: media.objectKey,
+              },
+              documentIds: reservedDocumentIds,
+              sha256: existing.sha256,
+            } satisfies ProjectMediaIdempotencyRecord;
+            if (
+              !projectMediaReplayMatches(replay, input)
+              || (existing.mediaId === null
+                && existing.clientRequestId !== projectMediaReservationClientRequestId(
+                  coordinates.attachmentId,
+                  coordinates.documentId,
+                ))
+              || (existing.mediaId !== null
+                && !uuidCoordinatesEqual(existing.mediaId, coordinates.mediaId))
+            ) {
+              throw new ProjectMediaRepositoryError("PROJECT_MEDIA_ASSOCIATION_CONFLICT");
+            }
+            return { ...replay, mediaStatus: media.status };
+          }
+          const [attachment] = await transaction.insert(serviceAttachments).values({
+            id: coordinates.attachmentId,
+            clientRequestId: projectMediaReservationClientRequestId(
+              coordinates.attachmentId,
+              coordinates.documentId,
+            ),
+            storeId: coordinates.storeId,
+            projectId: coordinates.projectId,
+            jobId: null,
+            claimId: null,
+            assetId: null,
+            requestId: null,
+            mediaObjectId: null,
+            projectPhase: input.phase,
+            category: "document",
+            bucket: media.bucket,
+            path: media.objectKey,
+            fileName: input.fileName,
+            mimeType: input.mimeType,
+            sizeBytes: input.sizeBytes,
+            sha256: input.sha256,
+            caption: input.caption,
+            createdBy: coordinates.actorId,
+            createdAt: input.createdAt,
+          }).returning({
+            id: serviceAttachments.id,
+            phase: serviceAttachments.projectPhase,
+            caption: serviceAttachments.caption,
+            fileName: serviceAttachments.fileName,
+            mimeType: serviceAttachments.mimeType,
+            sizeBytes: serviceAttachments.sizeBytes,
+            createdAt: serviceAttachments.createdAt,
+          });
+          if (!attachment) {
+            throw new ProjectMediaRepositoryError("PROJECT_MEDIA_ASSOCIATION_CONFLICT");
+          }
+          return {
+            record: {
+              ...attachment,
+              mediaId: media.id,
+              phase: attachment.phase ?? "other",
+              provider: media.provider,
+              bucket: media.bucket,
+              objectKey: media.objectKey,
+            },
+            documentIds: coordinates.documentId ? [coordinates.documentId] : [],
+            sha256: input.sha256,
+            mediaStatus: media.status,
+          };
+        });
+      } catch (error) {
+        if (error instanceof ProjectMediaRepositoryError) throw error;
+        if (isUniqueConstraintError(error)) {
+          throw new ProjectMediaRepositoryError("PROJECT_MEDIA_ASSOCIATION_CONFLICT");
+        }
+        throw error;
+      }
+    },
+
     async createProjectAttachment(input) {
       const coordinates = {
         storeId: canonicalizeUuidCoordinate(input.storeId),
@@ -1436,6 +1709,92 @@ export function createDatabaseProjectMediaRepository(
           }
         }
         const attachmentId = canonicalizeUuidCoordinate(input.idempotencyKey);
+        const [reservation] = await transaction.select().from(serviceAttachments)
+          .where(and(
+            eq(serviceAttachments.storeId, coordinates.storeId),
+            eq(serviceAttachments.projectId, coordinates.projectId),
+            eq(serviceAttachments.id, attachmentId),
+          )).limit(1).for("update");
+        if (reservation && reservation.mediaObjectId === null) {
+          const expectedRequestId = projectMediaReservationClientRequestId(
+            attachmentId,
+            coordinates.documentId,
+          );
+          if (
+            reservation.jobId !== null
+            || reservation.claimId !== null
+            || reservation.assetId !== null
+            || reservation.requestId !== null
+            || reservation.deletedAt !== null
+            || reservation.category !== "document"
+            || reservation.projectPhase !== input.phase
+            || reservation.caption !== input.caption
+            || reservation.fileName !== input.fileName
+            || reservation.mimeType !== input.mimeType
+            || reservation.sizeBytes !== input.sizeBytes
+            || reservation.sha256 !== input.sha256
+            || reservation.clientRequestId !== expectedRequestId
+            || !nullableUuidCoordinatesEqual(reservation.createdBy, coordinates.actorId)
+          ) {
+            throw new ProjectMediaRepositoryError("PROJECT_MEDIA_ASSOCIATION_CONFLICT");
+          }
+          const media = await requireReadyManagedMediaInTransaction(transaction, {
+            storeId: coordinates.storeId,
+            mediaId: coordinates.mediaId,
+            purpose: "project-document",
+            targetId: coordinates.projectId,
+            expectedPath: input.expectedPath,
+            sha256: input.sha256,
+            mimeType: input.mimeType,
+            sizeBytes: input.sizeBytes,
+            fileName: input.fileName,
+          });
+          const [attachment] = await transaction.update(serviceAttachments).set({
+            mediaObjectId: media.id,
+            clientRequestId: attachmentId,
+            bucket: media.bucket,
+            path: media.objectKey,
+          }).where(and(
+            eq(serviceAttachments.storeId, coordinates.storeId),
+            eq(serviceAttachments.projectId, coordinates.projectId),
+            eq(serviceAttachments.id, attachmentId),
+            isNull(serviceAttachments.mediaObjectId),
+            isNull(serviceAttachments.deletedAt),
+          )).returning({
+            id: serviceAttachments.id,
+            phase: serviceAttachments.projectPhase,
+            caption: serviceAttachments.caption,
+            fileName: serviceAttachments.fileName,
+            mimeType: serviceAttachments.mimeType,
+            sizeBytes: serviceAttachments.sizeBytes,
+            createdAt: serviceAttachments.createdAt,
+          });
+          if (!attachment) {
+            throw new ProjectMediaRepositoryError("PROJECT_MEDIA_ASSOCIATION_CONFLICT");
+          }
+          if (coordinates.documentId) {
+            const [{ nextSortOrder }] = await transaction.select({
+              nextSortOrder: sql<number>`coalesce(max(${serviceHandoverDocumentMedia.sortOrder}), -1) + 1`,
+            }).from(serviceHandoverDocumentMedia).where(and(
+              eq(serviceHandoverDocumentMedia.storeId, coordinates.storeId),
+              eq(serviceHandoverDocumentMedia.documentId, coordinates.documentId),
+            ));
+            await transaction.insert(serviceHandoverDocumentMedia).values({
+              storeId: coordinates.storeId,
+              documentId: coordinates.documentId,
+              mediaObjectId: media.id,
+              sortOrder: Number(nextSortOrder),
+            });
+          }
+          return {
+            ...attachment,
+            mediaId: media.id,
+            phase: attachment.phase ?? "other",
+            provider: media.provider,
+            bucket: media.bucket,
+            objectKey: media.objectKey,
+          };
+        }
         const [existing] = await transaction.select({
           id: serviceAttachments.id,
           mediaId: serviceAttachments.mediaObjectId,
@@ -1574,6 +1933,10 @@ export function createDatabaseProjectMediaRepository(
       });
     },
 
+    cleanupTerminalProjectAttachmentReservation(input) {
+      return cleanupTerminalProjectAttachmentReservation(database, input);
+    },
+
     async deleteProjectAttachment(input) {
       const coordinates = {
         storeId: canonicalizeUuidCoordinate(input.storeId),
@@ -1652,6 +2015,77 @@ export function createDatabaseProjectMediaRepository(
   };
 }
 
+/**
+ * Task 11 reconciliation hook. A pending reservation remains retryable even
+ * after an ambiguous or definitive-no-write provider response. Reconciliation
+ * must HEAD/verify that exact key first, then either complete it or move the
+ * media row to a terminal state. Only the latter permits this hidden request
+ * row to be soft-deleted; this function never removes a physical object.
+ */
+export async function cleanupTerminalProjectAttachmentReservation(
+  database: DatabaseLike,
+  input: {
+    storeId: string;
+    projectId: string;
+    mediaId: string;
+    attachmentId: string;
+    cleanedAt?: Date;
+  },
+): Promise<{ outcome: "cleaned" | "retained" }> {
+  const coordinates = {
+    storeId: canonicalizeUuidCoordinate(input.storeId),
+    projectId: canonicalizeUuidCoordinate(input.projectId),
+    mediaId: canonicalizeUuidCoordinate(input.mediaId),
+    attachmentId: canonicalizeUuidCoordinate(input.attachmentId),
+  };
+  if (!uuidCoordinatesEqual(coordinates.mediaId, coordinates.attachmentId)) {
+    return { outcome: "retained" };
+  }
+  return database.transaction(async (transaction: DatabaseLike) => {
+    const [media] = await transaction.select().from(mediaObjects).where(and(
+      eq(mediaObjects.storeId, coordinates.storeId),
+      eq(mediaObjects.id, coordinates.mediaId),
+    )).limit(1).for("update");
+    if (
+      !media
+      || (media.status !== "deleted" && media.status !== "quarantined")
+      || media.purpose !== "project-document"
+      || media.domain !== "projects"
+      || !uuidCoordinatesEqual(media.targetId, coordinates.projectId)
+    ) return { outcome: "retained" as const };
+
+    const [reservation] = await transaction.select().from(serviceAttachments)
+      .where(and(
+        eq(serviceAttachments.storeId, coordinates.storeId),
+        eq(serviceAttachments.projectId, coordinates.projectId),
+        eq(serviceAttachments.id, coordinates.attachmentId),
+      )).limit(1).for("update");
+    const requestPrefix = `project-upload:${coordinates.attachmentId}:`;
+    if (
+      !reservation
+      || reservation.mediaObjectId !== null
+      || reservation.jobId !== null
+      || reservation.claimId !== null
+      || reservation.assetId !== null
+      || reservation.requestId !== null
+      || reservation.category !== "document"
+      || !reservation.clientRequestId?.startsWith(requestPrefix)
+    ) return { outcome: "retained" as const };
+    if (reservation.deletedAt !== null) return { outcome: "cleaned" as const };
+
+    const [cleaned] = await transaction.update(serviceAttachments).set({
+      deletedAt: input.cleanedAt ?? new Date(),
+    }).where(and(
+      eq(serviceAttachments.storeId, coordinates.storeId),
+      eq(serviceAttachments.projectId, coordinates.projectId),
+      eq(serviceAttachments.id, coordinates.attachmentId),
+      isNull(serviceAttachments.mediaObjectId),
+      isNull(serviceAttachments.deletedAt),
+    )).returning({ id: serviceAttachments.id });
+    return { outcome: cleaned ? "cleaned" as const : "retained" as const };
+  });
+}
+
 export async function listProjectAttachmentSummaries(
   database: DatabaseLike,
   input: { storeId: string; projectId: string },
@@ -1706,7 +2140,10 @@ export function createProjectMediaManager(dependencies: {
     projectId: string,
   ) => Promise<MediaTargetAuthorization>;
   repository: ProjectMediaRepository;
-  mediaService: Pick<MediaService, "putManagedObject">;
+  mediaService: Pick<
+    MediaService,
+    "reserveManagedObject" | "putReservedManagedObject"
+  >;
   sign: (
     record: ProjectMediaInternalRecord,
     expiresInSeconds: number,
@@ -1792,13 +2229,69 @@ export function createProjectMediaManager(dependencies: {
         }
         return descriptor(existing.record);
       }
-      const uploaded = await dependencies.mediaService.putManagedObject(coordinates.actor, {
+      const reservation = await dependencies.mediaService.reserveManagedObject(coordinates.actor, {
+        reservationId: input.idempotencyKey,
         purpose: "project-document",
         targetId: coordinates.projectId,
         fileName: input.fileName,
         mimeType: input.mimeType,
         sizeBytes: input.sizeBytes,
-      }, bytes);
+        sha256: input.sha256,
+      });
+      try {
+        await dependencies.repository.reserveProjectAttachment({
+          storeId: coordinates.actor.storeId,
+          actorId: coordinates.actor.userId,
+          projectId: coordinates.projectId,
+          mediaId: reservation.mediaId,
+          expectedPath: reservation.path,
+          phase: input.phase,
+          caption: input.caption,
+          documentId: input.documentId,
+          fileName: input.fileName,
+          mimeType: input.mimeType,
+          sizeBytes: input.sizeBytes,
+          sha256: input.sha256,
+          idempotencyKey: input.idempotencyKey,
+        });
+      } catch (error) {
+        if (
+          error instanceof ProjectMediaRepositoryError
+          && error.code === "PROJECT_MEDIA_ASSOCIATION_CONFLICT"
+        ) {
+          throw new ProjectMediaError("media.associationConflict", 409);
+        }
+        throw error;
+      }
+      let uploaded: Awaited<ReturnType<MediaService["putReservedManagedObject"]>>;
+      try {
+        uploaded = await dependencies.mediaService.putReservedManagedObject(
+          coordinates.actor,
+          reservation.mediaId,
+          bytes,
+        );
+      } catch (error) {
+        if (
+          error instanceof MediaServiceError
+          && (error.status === 409 || error.status === 410)
+          && dependencies.repository.cleanupTerminalProjectAttachmentReservation
+        ) {
+          try {
+            await dependencies.repository.cleanupTerminalProjectAttachmentReservation({
+              storeId: coordinates.actor.storeId,
+              projectId: coordinates.projectId,
+              mediaId: reservation.mediaId,
+              attachmentId: input.idempotencyKey,
+            });
+          } catch (cleanupError) {
+            logger.error("project media terminal reservation cleanup failed", {
+              mediaId: reservation.mediaId,
+              error: cleanupError,
+            });
+          }
+        }
+        throw error;
+      }
       const mediaId = canonicalizeUuidCoordinate(uploaded.mediaId);
       let record: ProjectMediaInternalRecord;
       try {
@@ -1818,8 +2311,9 @@ export function createProjectMediaManager(dependencies: {
           idempotencyKey: input.idempotencyKey,
         });
       } catch (error) {
+        let recovery: ManagedMediaAssociationCompensationResult;
         try {
-          await dependencies.compensate({
+          recovery = await dependencies.compensate({
             storeId: coordinates.actor.storeId,
             mediaId,
             purpose: "project-document",
@@ -1833,6 +2327,24 @@ export function createProjectMediaManager(dependencies: {
             error: compensationError,
           });
           throw compensationError;
+        }
+        if (
+          recovery.outcome !== "referenced"
+          && dependencies.repository.cleanupTerminalProjectAttachmentReservation
+        ) {
+          try {
+            await dependencies.repository.cleanupTerminalProjectAttachmentReservation({
+              storeId: coordinates.actor.storeId,
+              projectId: coordinates.projectId,
+              mediaId,
+              attachmentId: input.idempotencyKey,
+            });
+          } catch (cleanupError) {
+            logger.error("project media terminal reservation cleanup failed", {
+              mediaId,
+              error: cleanupError,
+            });
+          }
         }
         throw error;
       }

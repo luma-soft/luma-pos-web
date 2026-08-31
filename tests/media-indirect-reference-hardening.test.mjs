@@ -53,6 +53,8 @@ const RECOVERY_MANAGER_MEDIA = "85000000-0000-4000-8000-000000000051";
 const RECOVERY_MANAGER_USER = "8fabcdef-abcd-4def-8abc-defabcdef052";
 const RECOVERY_MANAGER_DOCUMENT = "85000000-0000-4000-8000-000000000053";
 const UUID_ASSOCIATION_MEDIA = "81abcdef-abcd-4def-8abc-defabcdef054";
+const UUID_ASSOCIATION_REQUEST = "81abcdef-abcd-4def-8abc-defabcdef058";
+const RECOVERY_MANAGER_REQUEST = "85000000-0000-4000-8000-000000000059";
 const UUID_CREATOR_MEDIA = "82abcdef-abcd-4def-8abc-defabcdef055";
 const UUID_SOFT_DELETE_MEDIA = "83abcdef-abcd-4def-8abc-defabcdef056";
 const UUID_PORTAL_MEDIA = "84abcdef-abcd-4def-8abc-defabcdef057";
@@ -321,6 +323,7 @@ describe("indirect media reference hardening", () => {
       mimeType: "application/pdf",
       sizeBytes: 16,
       sha256: "c".repeat(64),
+      idempotencyKey: UUID_ASSOCIATION_REQUEST,
     });
     expect(created).toMatchObject({ mediaId: UUID_ASSOCIATION_MEDIA });
     await expect(compensateManagedMediaAssociation(database, {
@@ -442,9 +445,37 @@ describe("indirect media reference hardening", () => {
             ${serviceHandoverDocuments.id} = ${input.documentId}
           `);
         },
+        async reserveProjectAttachment(input) {
+          return {
+            record: {
+              id: input.idempotencyKey,
+              mediaId: RECOVERY_MANAGER_MEDIA,
+              phase: input.phase,
+              caption: input.caption,
+              fileName: input.fileName,
+              mimeType: input.mimeType,
+              sizeBytes: input.sizeBytes,
+              createdAt: new Date(),
+              provider: "r2",
+              bucket: "private-media",
+              objectKey: `indirect/${RECOVERY_MANAGER_MEDIA}.pdf`,
+            },
+            documentIds: [input.documentId],
+            sha256: input.sha256,
+            mediaStatus: "ready",
+          };
+        },
       },
       mediaService: {
-        async putManagedObject() {
+        async reserveManagedObject() {
+          return {
+            mediaId: RECOVERY_MANAGER_MEDIA,
+            path: `indirect/${RECOVERY_MANAGER_MEDIA}.pdf`,
+            status: "ready",
+            created: false,
+          };
+        },
+        async putReservedManagedObject() {
           return {
             mediaId: RECOVERY_MANAGER_MEDIA,
             path: `indirect/${RECOVERY_MANAGER_MEDIA}.pdf`,
@@ -472,6 +503,7 @@ describe("indirect media reference hardening", () => {
       mimeType: "application/pdf",
       sizeBytes: 16,
       sha256: "a".repeat(64),
+      idempotencyKey: RECOVERY_MANAGER_REQUEST,
     }, new Uint8Array(16))).rejects.toMatchObject({
       code: "PROJECT_MEDIA_DOCUMENT_NOT_FOUND",
     });

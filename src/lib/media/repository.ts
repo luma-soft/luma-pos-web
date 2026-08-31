@@ -62,6 +62,11 @@ export type AbandonPendingMediaInput = {
   deletedAt: Date;
 };
 
+export type QuarantinePendingMediaInput = Omit<
+  AbandonPendingMediaInput,
+  "deletedAt"
+>;
+
 export type {
   RecoverReadyMediaAfterFailureInput,
   RecoverReadyMediaAfterFailureResult,
@@ -69,11 +74,8 @@ export type {
   SoftDeleteMediaResult,
 } from "@/lib/media/repository-core";
 
-export function buildCreatePendingMediaQuery(
-  database: Pick<typeof db, "insert">,
-  input: CreatePendingMediaInput,
-) {
-  return database.insert(mediaObjects).values({
+function pendingMediaValues(input: CreatePendingMediaInput) {
+  return {
     id: canonicalizeUuidCoordinate(input.id),
     storeId: canonicalizeUuidCoordinate(input.storeId),
     provider: input.provider,
@@ -87,7 +89,7 @@ export function buildCreatePendingMediaQuery(
     mimeType: input.mimeType,
     sizeBytes: input.sizeBytes,
     uploadExpiresAt: input.uploadExpiresAt,
-    status: "pending",
+    status: "pending" as const,
     createdBy: canonicalizeNullableUuidCoordinate(input.createdBy ?? null),
     sha256: input.sha256 ?? null,
     width: input.width ?? null,
@@ -95,12 +97,34 @@ export function buildCreatePendingMediaQuery(
     legacyBucket: input.legacyBucket ?? null,
     legacyPath: input.legacyPath ?? null,
     legacyUrl: input.legacyUrl ?? null,
-  }).returning();
+  };
+}
+
+export function buildCreatePendingMediaQuery(
+  database: Pick<typeof db, "insert">,
+  input: CreatePendingMediaInput,
+) {
+  return database.insert(mediaObjects).values(pendingMediaValues(input)).returning();
+}
+
+export function buildReservePendingMediaQuery(
+  database: Pick<typeof db, "insert">,
+  input: CreatePendingMediaInput,
+) {
+  return database.insert(mediaObjects)
+    .values(pendingMediaValues(input))
+    .onConflictDoNothing({ target: mediaObjects.id })
+    .returning();
 }
 
 export async function createPendingMedia(input: CreatePendingMediaInput) {
   const [row] = await buildCreatePendingMediaQuery(db, input);
   return row;
+}
+
+export async function reservePendingMedia(input: CreatePendingMediaInput) {
+  const repository = createDatabaseMediaRepository(db);
+  return repository.reservePending(input);
 }
 
 export function buildMarkMediaReadyQuery(
@@ -164,6 +188,27 @@ export async function abandonPendingMedia(input: AbandonPendingMediaInput) {
   return row ?? null;
 }
 
+export function buildQuarantinePendingMediaQuery(
+  database: Pick<typeof db, "update">,
+  input: QuarantinePendingMediaInput,
+) {
+  return database.update(mediaObjects).set({
+    status: "quarantined",
+    deletedAt: null,
+  }).where(and(
+    eq(mediaObjects.id, canonicalizeUuidCoordinate(input.mediaId)),
+    eq(mediaObjects.storeId, canonicalizeUuidCoordinate(input.storeId)),
+    eq(mediaObjects.status, "pending"),
+    eq(mediaObjects.purpose, input.expectedPurpose),
+    eq(mediaObjects.targetId, canonicalizeUuidCoordinate(input.expectedTargetId)),
+  )).returning();
+}
+
+export async function quarantinePendingMedia(input: QuarantinePendingMediaInput) {
+  const [row] = await buildQuarantinePendingMediaQuery(db, input);
+  return row ?? null;
+}
+
 export type GetMediaForStoreInput = {
   storeId: string;
   mediaId: string;
@@ -185,6 +230,50 @@ export function buildGetMediaForStoreQuery(
 export async function getMediaForStore(input: GetMediaForStoreInput) {
   const [row] = await buildGetMediaForStoreQuery(db, input);
   return row ?? null;
+}
+
+export function createDatabaseMediaRepository(database: typeof db) {
+  return {
+    async createPending(input: CreatePendingMediaInput) {
+      const [row] = await buildCreatePendingMediaQuery(database, input);
+      return row;
+    },
+    async reservePending(input: CreatePendingMediaInput) {
+      const [created] = await buildReservePendingMediaQuery(database, input);
+      if (created) return { media: created, created: true as const };
+      const [existing] = await buildGetMediaForStoreQuery(database, {
+        storeId: input.storeId,
+        mediaId: input.id,
+      });
+      return existing ? { media: existing, created: false as const } : null;
+    },
+    async getForStore(input: GetMediaForStoreInput) {
+      const [row] = await buildGetMediaForStoreQuery(database, input);
+      return row ?? null;
+    },
+    async markReady(input: MarkMediaReadyInput) {
+      const [row] = await buildMarkMediaReadyQuery(database, input);
+      return row ?? null;
+    },
+    async saveThumbnail(input: SaveMediaThumbnailInput) {
+      const [row] = await buildSaveMediaThumbnailQuery(database, input);
+      return row ?? null;
+    },
+    async abandonPending(input: AbandonPendingMediaInput) {
+      const [row] = await buildAbandonPendingMediaQuery(database, input);
+      return row ?? null;
+    },
+    async quarantinePending(input: QuarantinePendingMediaInput) {
+      const [row] = await buildQuarantinePendingMediaQuery(database, input);
+      return row ?? null;
+    },
+    recoverReadyAfterFailure(input: RecoverReadyMediaAfterFailureInput) {
+      return recoverReadyMediaAfterFailureCore(database, input);
+    },
+    softDeleteIfUnreferenced(input: SoftDeleteMediaInput) {
+      return softDeleteMediaIfUnreferencedCore(database, input);
+    },
+  };
 }
 
 export function softDeleteMediaIfUnreferenced(

@@ -1,4 +1,5 @@
 import { describe, expect, mock, test } from "bun:test";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
 mock.module("server-only", () => ({}));
@@ -88,6 +89,7 @@ function pendingRecord(overrides: Partial<MediaRecord> = {}): MediaRecord {
     deletedAt: null,
     thumbnailObjectKey: null,
     thumbnailSizeBytes: null,
+    sha256: null,
     ...overrides,
   };
 }
@@ -142,6 +144,22 @@ function createHarness(options: {
       });
       records.set(`${record.storeId}:${record.id}`, record);
       return record;
+    },
+    async reservePending(input) {
+      const key = `${input.storeId}:${input.id}`;
+      const existing = records.get(key);
+      if (existing) return { media: existing, created: false };
+      const record = pendingRecord({
+        ...input,
+        createdAt: options.now ?? NOW,
+        readyAt: null,
+        verifiedAt: null,
+        deletedAt: null,
+        thumbnailObjectKey: null,
+        thumbnailSizeBytes: null,
+      });
+      records.set(key, record);
+      return { media: record, created: true };
     },
     async getForStore(input) {
       return records.get(`${input.storeId}:${input.mediaId}`) ?? null;
@@ -230,6 +248,23 @@ function createHarness(options: {
       };
       records.set(key, deleted);
       return deleted;
+    },
+    async quarantinePending(input) {
+      const key = `${input.storeId}:${input.mediaId}`;
+      const current = records.get(key);
+      if (
+        !current
+        || current.status !== "pending"
+        || current.purpose !== input.expectedPurpose
+        || current.targetId !== input.expectedTargetId
+      ) return null;
+      const quarantined = {
+        ...current,
+        status: "quarantined" as const,
+        deletedAt: null,
+      };
+      records.set(key, quarantined);
+      return quarantined;
     },
   };
 
@@ -662,6 +697,89 @@ describe("media completion API", () => {
 });
 
 describe("server managed object writes", () => {
+  test("reserves one managed-media id for an exact repeated request", async () => {
+    const harness = createHarness();
+    const request = {
+      reservationId: MEDIA_ID,
+      purpose: "project-document",
+      targetId: PROJECT_ID,
+      fileName: "nghiem-thu.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 1024,
+      sha256: "a".repeat(64),
+    };
+
+    expect(await harness.service.reserveManagedObject(gate, request)).toMatchObject({
+      mediaId: MEDIA_ID,
+      created: true,
+      status: "pending",
+    });
+    expect(await harness.service.reserveManagedObject(gate, request)).toMatchObject({
+      mediaId: MEDIA_ID,
+      created: false,
+      status: "pending",
+    });
+    expect(harness.records.size).toBe(1);
+  });
+
+  test("resumes the exact pending object after an ambiguous-after managed PUT", async () => {
+    const bytes = Uint8Array.from([1, 2, 3, 4]);
+    const harness = createHarness({
+      objectBytes: bytes,
+      originalPutFailure: "ambiguous-after",
+    });
+    await harness.service.reserveManagedObject(gate, {
+      reservationId: MEDIA_ID,
+      purpose: "project-document",
+      targetId: PROJECT_ID,
+      fileName: "nghiem-thu.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: bytes.byteLength,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+    });
+
+    await expect(harness.service.putReservedManagedObject(
+      gate,
+      MEDIA_ID,
+      bytes,
+    )).rejects.toThrow("connection lost after commit");
+    expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("pending");
+
+    expect(await harness.service.putReservedManagedObject(
+      gate,
+      MEDIA_ID,
+      bytes,
+    )).toMatchObject({ mediaId: MEDIA_ID });
+    expect(harness.storageState.puts).toHaveLength(1);
+    expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("ready");
+  });
+
+  test("reconciles an ambiguous-after object after the upload window expires", async () => {
+    const bytes = Uint8Array.from([1, 2, 3, 4]);
+    const record = pendingRecord({
+      sizeBytes: bytes.byteLength,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+    });
+    const harness = createHarness({
+      now: new Date("2026-08-30T03:10:00.000Z"),
+      initial: [record],
+      objectBytes: bytes,
+    });
+    harness.storageState.heads.set(`${record.bucket}:${record.objectKey}`, {
+      sizeBytes: bytes.byteLength,
+      contentType: record.mimeType,
+      etag: "ambiguous-after",
+    });
+
+    await expect(harness.service.putReservedManagedObject(
+      gate,
+      MEDIA_ID,
+      bytes,
+    )).resolves.toMatchObject({ mediaId: MEDIA_ID, path: record.objectKey });
+    expect(harness.storageState.puts).toEqual([]);
+    expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("ready");
+  });
+
   test("writes bytes directly with create-only semantics, verifies, and returns public coordinates", async () => {
     const harness = createHarness();
     const result = await harness.service.putManagedObject(gate, {
