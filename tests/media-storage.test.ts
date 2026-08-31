@@ -29,7 +29,7 @@ const R2_ENV = {
   R2_SECRET_ACCESS_KEY: "secret-key",
   R2_PUBLIC_BUCKET: "public-media",
   R2_PRIVATE_BUCKET: "private-media",
-  R2_PUBLIC_BASE_URL: "https://media.lumapos.vn/",
+  R2_PUBLIC_BASE_URL: "https://media.lumapos.shop/",
 };
 
 Object.assign(process.env, R2_ENV, {
@@ -43,7 +43,7 @@ const R2_CONFIG = {
   secretAccessKey: R2_ENV.R2_SECRET_ACCESS_KEY,
   publicBucket: R2_ENV.R2_PUBLIC_BUCKET,
   privateBucket: R2_ENV.R2_PRIVATE_BUCKET,
-  publicBaseUrl: "https://media.lumapos.vn",
+  publicBaseUrl: "https://media.lumapos.shop",
 };
 
 function r2WithClient(
@@ -183,11 +183,11 @@ test("rejects malformed R2 configuration values before constructing an endpoint"
     ["leading-hyphen bucket", { R2_PUBLIC_BUCKET: "-public-media" }],
     ["trailing-hyphen bucket", { R2_PUBLIC_BUCKET: "public-media-" }],
     ["same buckets", { R2_PRIVATE_BUCKET: R2_ENV.R2_PUBLIC_BUCKET }],
-    ["non-HTTPS public URL", { R2_PUBLIC_BASE_URL: "http://media.lumapos.vn" }],
-    ["credential-bearing public URL", { R2_PUBLIC_BASE_URL: "https://user:pass@media.lumapos.vn" }],
-    ["query-bearing public URL", { R2_PUBLIC_BASE_URL: "https://media.lumapos.vn?token=secret" }],
-    ["fragment-bearing public URL", { R2_PUBLIC_BASE_URL: "https://media.lumapos.vn#section" }],
-    ["trailing-dot public URL", { R2_PUBLIC_BASE_URL: "https://media.lumapos.vn." }],
+    ["non-HTTPS public URL", { R2_PUBLIC_BASE_URL: "http://media.lumapos.shop" }],
+    ["credential-bearing public URL", { R2_PUBLIC_BASE_URL: "https://user:pass@media.lumapos.shop" }],
+    ["query-bearing public URL", { R2_PUBLIC_BASE_URL: "https://media.lumapos.shop?token=secret" }],
+    ["fragment-bearing public URL", { R2_PUBLIC_BASE_URL: "https://media.lumapos.shop#section" }],
+    ["trailing-dot public URL", { R2_PUBLIC_BASE_URL: "https://media.lumapos.shop." }],
   ] as const;
 
   for (const [label, overrides] of invalidCases) {
@@ -445,7 +445,7 @@ describe("R2 object adapter", () => {
         key: "stores/store/products/2026/08/media/original file #1.pdf",
       }),
     ).toBe(
-      "https://media.lumapos.vn/stores/store/products/2026/08/media/original%20file%20%231.pdf",
+      "https://media.lumapos.shop/stores/store/products/2026/08/media/original%20file%20%231.pdf",
     );
   });
 });

@@ -35,7 +35,7 @@ const USER_ID = "22222222-2222-4222-8222-222222222222";
 const MEDIA_ID = "33333333-3333-4333-8333-333333333333";
 const OTHER_MEDIA_ID = "33333333-3333-4333-8333-333333333334";
 const PATH = `stores/${STORE_ID}/products/2026/08/${MEDIA_ID}/original.jpg`;
-const URL = `https://media.lumapos.vn/${PATH}`;
+const URL = `https://media.lumapos.shop/${PATH}`;
 const NOW = new Date("2026-08-31T03:00:00.000Z");
 
 const managedPuts: Array<{
@@ -350,7 +350,7 @@ function createOldClientLifecycleHarness(options: { referenced?: boolean } = {})
       objects.delete(`${input.bucket}:${input.key}`);
     },
     publicUrl(input) {
-      return `https://media.lumapos.vn/${input.key}`;
+      return `https://media.lumapos.shop/${input.key}`;
     },
   };
 

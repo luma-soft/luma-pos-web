@@ -4,7 +4,7 @@
 
 **Goal:** Move every LumaPOS-managed media upload to Cloudflare R2 while keeping Supabase Database/Auth, preserving existing web/mobile behavior, and providing a reversible migration for existing Supabase objects.
 
-**Architecture:** Add a canonical `media_objects` registry and a provider-neutral storage boundary with R2 as the write provider and Supabase as a temporary fallback. Public catalog assets resolve through `media.lumapos.vn`; private project/service/AI assets resolve through authorized short-lived signed URLs. Existing response fields remain compatible while web and Flutter adopt media descriptors incrementally.
+**Architecture:** Add a canonical `media_objects` registry and a provider-neutral storage boundary with R2 as the write provider and Supabase as a temporary fallback. Public catalog assets resolve through `media.lumapos.shop`; private project/service/AI assets resolve through authorized short-lived signed URLs. Existing response fields remain compatible while web and Flutter adopt media descriptors incrementally.
 
 **Tech Stack:** Next.js 16, TypeScript, Bun, Drizzle/Postgres on Supabase, Supabase Auth, Cloudflare R2 S3 API, AWS SDK v3, React 19, Flutter/Dart, Vitest-compatible Bun tests, Flutter widget/unit tests.
 
@@ -15,7 +15,7 @@
 - Supabase Database, Auth, and Realtime remain unchanged; only LumaPOS-owned binary objects move.
 - Do not copy camera URLs, vendor app URLs, payment/checkout URLs, Shopee-hosted media, or arbitrary user-entered external URLs.
 - Use `lumapos-<environment>-public-media` and `lumapos-<environment>-private-media` as separate R2 buckets.
-- Production public media uses immutable URLs under `https://media.lumapos.vn`.
+- Production public media uses immutable URLs under `https://media.lumapos.shop`.
 - Private objects never receive public URLs; every download requires backend authorization and a short-lived signed URL.
 - Keep `imageUrl`, `imageUrls`, `photoUrls`, and `signedUrl` compatibility fields until active web and mobile clients use media descriptors.
 - Use immutable object keys under `stores/<store-id>/<domain>/<yyyy>/<mm>/<media-id>/original.<validated-extension>`; the original filename remains database metadata and never enters the object key.
@@ -160,7 +160,7 @@ R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
 R2_PUBLIC_BUCKET=lumapos-production-public-media
 R2_PRIVATE_BUCKET=lumapos-production-private-media
-R2_PUBLIC_BASE_URL=https://media.lumapos.vn
+R2_PUBLIC_BASE_URL=https://media.lumapos.shop
 MEDIA_SUPABASE_FALLBACK_ENABLED=true
 ```
 
@@ -546,13 +546,13 @@ rtk git commit -m "feat(media): add mobile signed upload client"
 expect(uploaded).toEqual({
   mediaId: "media-1",
   path: "stores/store-1/products/2026/08/media-1/original.webp",
-  url: "https://media.lumapos.vn/stores/store-1/products/2026/08/media-1/original.webp",
+  url: "https://media.lumapos.shop/stores/store-1/products/2026/08/media-1/original.webp",
 });
 ```
 
 ```dart
 expect(result.uploaded.single.mediaId, 'media-1');
-expect(result.urls.single, startsWith('https://media.lumapos.vn/'));
+expect(result.urls.single, startsWith('https://media.lumapos.shop/'));
 ```
 
 - [ ] **Step 2: Run product upload tests and verify compatibility code fails the new contract**

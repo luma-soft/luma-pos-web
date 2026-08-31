@@ -9,7 +9,7 @@ const READY_ENV = {
   R2_SECRET_ACCESS_KEY: "secret-key",
   R2_PUBLIC_BUCKET: "lumapos-public",
   R2_PRIVATE_BUCKET: "lumapos-private",
-  R2_PUBLIC_BASE_URL: "https://media.lumapos.vn",
+  R2_PUBLIC_BASE_URL: "https://media.lumapos.shop",
 };
 
 describe("managed media production readiness", () => {

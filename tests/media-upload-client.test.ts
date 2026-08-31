@@ -71,7 +71,7 @@ function descriptorPayload(overrides: Record<string, unknown> = {}) {
       mimeType: "image/png",
       sizeBytes: 4,
       fileName: "camera.png",
-      url: "https://media.lumapos.vn/stores/store/products/media/original.png",
+      url: "https://media.lumapos.shop/stores/store/products/media/original.png",
       thumbnailUrl: null,
       ...overrides,
     },
@@ -126,7 +126,7 @@ describe("web managed media upload client", () => {
       mimeType: "image/png",
       sizeBytes: 4,
       fileName: "camera.png",
-      url: "https://media.lumapos.vn/stores/store/products/media/original.png",
+      url: "https://media.lumapos.shop/stores/store/products/media/original.png",
       thumbnailUrl: null,
     });
   });

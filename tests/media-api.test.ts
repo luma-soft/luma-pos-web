@@ -374,7 +374,7 @@ function createHarness(options: {
       storageState.removed.push(input);
     },
     publicUrl(input) {
-      return `https://media.lumapos.vn/${input.key}`;
+      return `https://media.lumapos.shop/${input.key}`;
     },
   };
 
@@ -713,7 +713,7 @@ describe("media completion API", () => {
       sizeBytes: expect.any(Number),
     }]);
     expect((await response.json()).data.thumbnailUrl).toBe(
-      `https://media.lumapos.vn/stores/${STORE_ID}/products/2026/08/${MEDIA_ID}/thumbnail.webp`,
+      `https://media.lumapos.shop/stores/${STORE_ID}/products/2026/08/${MEDIA_ID}/thumbnail.webp`,
     );
   });
 
@@ -837,7 +837,7 @@ describe("server managed object writes", () => {
     expect(result).toEqual({
       mediaId: MEDIA_ID,
       path,
-      url: `https://media.lumapos.vn/${path}`,
+      url: `https://media.lumapos.shop/${path}`,
     });
     expect(harness.storageState.uploadIntents).toEqual([]);
     expect(harness.storageState.puts[0]).toEqual({
@@ -1250,7 +1250,7 @@ describe("media resolve and delete API", () => {
       params: Promise.resolve({ mediaId: MEDIA_ID }),
     });
     expect(response.status).toBe(200);
-    expect((await response.json()).data.url).toBe(`https://media.lumapos.vn/${objectKey}`);
+    expect((await response.json()).data.url).toBe(`https://media.lumapos.shop/${objectKey}`);
   });
 
   test("DELETE soft-deletes metadata and never removes storage synchronously", async () => {

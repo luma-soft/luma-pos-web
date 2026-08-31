@@ -46,7 +46,7 @@ This is initially fast but retains duplicated upload, signing, deletion, and aut
 
 ### B. Use R2 but keep only full URLs in existing columns
 
-Using `media.lumapos.vn` would hide the provider from clients, but full URLs do not provide reliable ownership, cleanup, integrity, retention, or private authorization metadata. Rejected as the canonical design, though compatibility URL fields remain during rollout.
+Using `media.lumapos.shop` would hide the provider from clients, but full URLs do not provide reliable ownership, cleanup, integrity, retention, or private authorization metadata. Rejected as the canonical design, though compatibility URL fields remain during rollout.
 
 ### C. Add a canonical media registry and a provider-neutral storage service
 
@@ -59,7 +59,7 @@ Each deployment environment owns separate R2 buckets:
 - `lumapos-<environment>-public-media`: product and brand/catalog media intended for unauthenticated display.
 - `lumapos-<environment>-private-media`: project files, service evidence, installed-device photos, warranty media, customer-request files, AI attachments, and other tenant-private objects.
 
-Public objects are served through the stable first-party domain `media.lumapos.vn` in production. Object keys are immutable; replacing an image creates a new object key, allowing a long CDN cache lifetime without stale-content bugs.
+Public objects are served through the stable first-party domain `media.lumapos.shop` in production. Object keys are immutable; replacing an image creates a new object key, allowing a long CDN cache lifetime without stale-content bugs.
 
 Private buckets have no public domain. Private downloads use short-lived signed URLs issued only after backend authorization. R2 account credentials are server-side secrets and are never sent to web or mobile clients.
 
@@ -136,7 +136,7 @@ Clients may calculate SHA-256 for integrity metadata. Migration jobs must calcul
 
 ### Public read
 
-The API returns an immutable URL under `media.lumapos.vn`. Public responses use an appropriate long-lived `Cache-Control` policy because replacement produces a new key.
+The API returns an immutable URL under `media.lumapos.shop`. Public responses use an appropriate long-lived `Cache-Control` policy because replacement produces a new key.
 
 ### Private read
 
