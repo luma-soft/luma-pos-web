@@ -2,6 +2,10 @@ import { createHash, randomUUID } from "node:crypto";
 
 import postgres from "postgres";
 
+import {
+  buildAiAttachmentCutoverSql,
+  buildAiAttachmentRollbackSql,
+} from "@/lib/media/ai-migration-sql";
 import { getR2Config } from "@/lib/media/config";
 import {
   classifyLegacyUrl,
@@ -410,26 +414,15 @@ class PostgresMigrationRepository implements MediaMigrationRepository {
             set sort_order = excluded.sort_order
           `;
         } else if (reference.kind === "ai-attachment") {
-          await tx`
-            update ai_chat_messages
-            set attachments = (
-              select jsonb_agg(
-                case when ordinality - 1 = ${sortOrder}
-                  then (attachment - 'signedUrl') || jsonb_build_object(
-                    'mediaId', ${locked.id},
-                    'bucket', ${locked.targetBucket},
-                    'path', ${locked.targetKey}
-                  )
-                  else attachment
-                end
-                order by ordinality
-              )
-              from jsonb_array_elements(attachments) with ordinality
-                as entries(attachment, ordinality)
-            )
-            where store_id = ${locked.storeId}::uuid
-              and id = ${reference.recordId}::uuid
-          `;
+          const statement = buildAiAttachmentCutoverSql({
+            sortOrder,
+            mediaId: locked.id,
+            targetBucket: locked.targetBucket,
+            targetKey: locked.targetKey,
+            storeId: locked.storeId,
+            recordId: reference.recordId,
+          });
+          await tx.unsafe(statement.text, statement.parameters);
         }
       }
 
@@ -500,26 +493,14 @@ class PostgresMigrationRepository implements MediaMigrationRepository {
               and media_object_id = ${locked.id}::uuid
           `;
         } else if (reference.kind === "ai-attachment") {
-          await tx`
-            update ai_chat_messages
-            set attachments = (
-              select jsonb_agg(
-                case when ordinality - 1 = ${sortOrder}
-                  then (attachment - 'mediaId' - 'signedUrl')
-                    || jsonb_build_object(
-                      'bucket', ${locked.sourceBucket},
-                      'path', ${locked.sourceKey}
-                    )
-                  else attachment
-                end
-                order by ordinality
-              )
-              from jsonb_array_elements(attachments) with ordinality
-                as entries(attachment, ordinality)
-            )
-            where store_id = ${locked.storeId}::uuid
-              and id = ${reference.recordId}::uuid
-          `;
+          const statement = buildAiAttachmentRollbackSql({
+            sortOrder,
+            sourceBucket: locked.sourceBucket,
+            sourceKey: locked.sourceKey,
+            storeId: locked.storeId,
+            recordId: reference.recordId,
+          });
+          await tx.unsafe(statement.text, statement.parameters);
         }
       }
 
