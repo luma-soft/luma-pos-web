@@ -10,7 +10,9 @@ const { createAiAttachmentHandlers } = await import(
   "../src/app/api/mobile/ai/attachments/route"
 );
 const { readAiAttachmentBytes } = await import("../src/lib/ai/attachments");
-const { uploadAiAttachment } = await import("../src/components/ai-assistant/api");
+const { resolveAiAttachmentUrl, uploadAiAttachment } = await import(
+  "../src/components/ai-assistant/api"
+);
 
 const STORE_ID = "11111111-1111-4111-8111-111111111111";
 const USER_ID = "22222222-2222-4222-8222-222222222222";
@@ -278,6 +280,40 @@ describe("AI attachment web client contract", () => {
         sessionId: SESSION_ID,
         surface: "web",
       }]);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test("refreshes managed preview URLs by mediaId before legacy bucket/path", async () => {
+    const originalFetch = globalThis.fetch;
+    const calls: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      calls.push(input.toString());
+      return Response.json({
+        ok: true,
+        data: { signedUrl: "https://r2.test/private?X-Amz-Signature=fresh" },
+      });
+    }) as typeof fetch;
+    try {
+      const resolved = await resolveAiAttachmentUrl({
+        id: MEDIA_ID,
+        mediaId: MEDIA_ID,
+        sessionId: SESSION_ID,
+        bucket: "lumapos-test-private-media",
+        path: `stores/${STORE_ID}/ai/${MEDIA_ID}/original`,
+        name: "hóa-đơn.png",
+        mimeType: "image/png",
+        size: 12,
+        kind: "image",
+        signedUrl: "https://r2.test/private?X-Amz-Signature=expired",
+        status: "uploaded",
+      });
+
+      expect(resolved).toContain("X-Amz-Signature=fresh");
+      expect(calls).toEqual([
+        `/api/mobile/ai/attachments?mediaId=${MEDIA_ID}`,
+      ]);
     } finally {
       globalThis.fetch = originalFetch;
     }

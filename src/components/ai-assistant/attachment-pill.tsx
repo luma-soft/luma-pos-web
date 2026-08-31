@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { ExternalLink, FileText, ImageIcon, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { resolveAiAttachmentUrl } from "./api";
 import type { ComposerAttachment } from "./types";
 import { fileSizeText } from "./utils";
 
@@ -24,22 +25,9 @@ export function AttachmentPill({
   const isImage = attachment.kind === "image";
   const isPdf = attachment.mimeType === "application/pdf";
 
-  async function resolveAttachmentUrl() {
-    if (attachment.previewUrl) return attachment.previewUrl;
-    if (attachment.bucket && attachment.path) {
-      const params = new URLSearchParams({ bucket: attachment.bucket, path: attachment.path });
-      const res = await fetch(`/api/mobile/ai/attachments?${params.toString()}`);
-      const json = await res.json().catch(() => null);
-      if (res.ok && json?.ok !== false && typeof json?.data?.signedUrl === "string") {
-        return json.data.signedUrl as string;
-      }
-    }
-    return attachment.signedUrl ?? null;
-  }
-
   async function openViewer() {
     setViewerError(null);
-    const url = await resolveAttachmentUrl().catch(() => null);
+    const url = await resolveAiAttachmentUrl(attachment).catch(() => null);
     if (!url) {
       setViewerError(t("ai.composer.attachmentUnavailable"));
       return;

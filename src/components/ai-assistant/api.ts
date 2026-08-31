@@ -63,3 +63,27 @@ export async function uploadAiAttachment(
   }
   return json.data as ComposerAttachment;
 }
+
+export async function resolveAiAttachmentUrl(
+  attachment: ComposerAttachment,
+): Promise<string | null> {
+  if (attachment.previewUrl) return attachment.previewUrl;
+  const params = attachment.mediaId
+    ? new URLSearchParams({ mediaId: attachment.mediaId })
+    : attachment.bucket && attachment.path
+      ? new URLSearchParams({
+        bucket: attachment.bucket,
+        path: attachment.path,
+      })
+      : null;
+  if (params) {
+    const res = await fetch(`/api/mobile/ai/attachments?${params.toString()}`);
+    const json = await res.json().catch(() => null);
+    if (
+      res.ok
+      && json?.ok !== false
+      && typeof json?.data?.signedUrl === "string"
+    ) return json.data.signedUrl as string;
+  }
+  return attachment.signedUrl ?? null;
+}
