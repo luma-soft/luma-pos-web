@@ -60,7 +60,7 @@ function assertOptionalUuid(value: string | null | undefined, label: string): vo
 
 function adoptionMethod(action: string, suppliedLocalId: string | undefined): KiotVietMappingAdoptionMethod {
   if (!suppliedLocalId) return "created";
-  return action === "adopt" ? "legacy_adopted" : "mapped";
+  return action === "adopt" || action === "historical_adopt" ? "legacy_adopted" : "mapped";
 }
 
 async function mapSource(input: ApplyInput & {
@@ -143,7 +143,7 @@ async function applySuppliers(input: ApplyInput & { plan: Extract<KiotVietTypedP
         address: "address" in value ? value.address : null, taxCode: "taxCode" in value ? value.taxCode : null,
         note: "note" in value ? value.note : null, isActive: value.isActive, currentDebt: String(value.currentDebt),
       });
-    } else if (write.action === "inactivate") {
+    } else if (write.action === "inactivate" || write.action === "historical_adopt") {
       await requireUpdated(await input.transaction.update(suppliers).set({ isActive: false })
         .where(and(eq(suppliers.storeId, input.storeId), eq(suppliers.id, localId))).returning({ id: suppliers.id }), `Supplier ${localId}`);
     } else if (write.action === "adopt" || write.action === "update") {
@@ -155,7 +155,7 @@ async function applySuppliers(input: ApplyInput & { plan: Extract<KiotVietTypedP
       }).where(and(eq(suppliers.storeId, input.storeId), eq(suppliers.id, localId))).returning({ id: suppliers.id }), `Supplier ${localId}`);
     }
     await mapSource({ ...input, entityType: "supplier", externalId: write.externalId, localId,
-      method: adoptionMethod(write.action, write.localId), deletedAt: write.action === "inactivate" ? new Date() : null });
+      method: adoptionMethod(write.action, write.localId), deletedAt: write.action === "inactivate" || write.action === "historical_adopt" ? new Date() : null });
   }
   await refreshEntityMappings({ ...input, entityType: "supplier", entityPlan: input.plan.typedPlan.entityPlan });
 }

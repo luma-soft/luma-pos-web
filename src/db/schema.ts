@@ -862,7 +862,7 @@ export const suppliers = pgTable("suppliers", {
   storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id),
   code: varchar("code", { length: 30 }),
   name: text("name").notNull(),
-  phone: varchar("phone", { length: 20 }),
+  phone: text("phone"),
   email: text("email"),
   address: text("address"),
   taxCode: varchar("tax_code", { length: 30 }),

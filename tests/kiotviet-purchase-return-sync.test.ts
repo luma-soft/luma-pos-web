@@ -310,11 +310,27 @@ describe("KiotViet supplier-return synchronization", () => {
     });
   });
 
-  test("requires nonblank source SKU and source unit and rejects an unresolved unit", () => {
+  test("requires a nonblank source SKU, infers a blank current-base unit, and rejects an unresolved explicit unit", () => {
     expect(() => plan({ sourceRows: [{ ...sourceRows[0]!, "Mã hàng": " " }] }))
       .toThrow("requires source SKU and source unit");
-    expect(() => plan({ sourceRows: [{ ...sourceRows[0]!, ĐVT: " " }] }))
-      .toThrow("requires source SKU and source unit");
+
+    const inferred = plan({
+      sourceRows: [{ ...sourceRows[0]!, "Mã hàng": "BASE-001", ĐVT: " " }],
+      resolvedProducts: [{
+        sku: "BASE-001",
+        productId: "product-base",
+        unitName: "cái",
+        sourceUnitName: "cái",
+        unitMultiplier: 1,
+        resolutionSource: "current_base",
+      }],
+    });
+    expect(inferred.blockers).toEqual([]);
+    expect(inferred.returns[0]?.lines[0]).toMatchObject({
+      externalId: "THN-001|BASE-001|cái|1",
+      unitName: "cái",
+      unitMultiplier: 1,
+    });
 
     const result = plan({ sourceRows: [{ ...sourceRows[0]!, ĐVT: "Thùng" }] });
     expect(result.blockers).toContainEqual({
@@ -511,13 +527,11 @@ describe("KiotViet supplier-return synchronization", () => {
       .every((line) => line.line.purchaseOrderItemId === null)).toBe(true);
   });
 
-  suppliedBundleTest("fails closed on blank source units in the reviewed supplier-return workbook", () => {
+  suppliedBundleTest("records the reviewed supplier-return workbook's blank-unit scope", () => {
     const source = readKiotVietDataBundle(suppliedBundleDirectory!).sources
       .find((candidate) => candidate.phase === "purchase-returns")!;
 
     expect({ documents: source.documentCount, lines: source.rowCount }).toEqual({ documents: 65, lines: 198 });
     expect(source.rows.filter((row) => !String(row.ĐVT ?? "").trim())).toHaveLength(86);
-    expect(() => plan({ sourceRows: source.rows }))
-      .toThrow("KiotViet purchase return requires source SKU and source unit");
   });
 });

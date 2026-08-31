@@ -17,6 +17,7 @@ import {
 } from "../lib/kiotviet/customer-sync";
 import {
   assertKiotVietSupplierSourceTotals,
+  hasKiotVietLegacySupplierMarker,
   parseKiotVietSupplierSources,
   planKiotVietSupplierSync,
 } from "../lib/kiotviet/supplier-sync";
@@ -185,7 +186,11 @@ export async function applyKiotVietPhaseWithDatabase(database: ProductionDatabas
         sourceSha256: input.reviewedSha256,
         plan: input.plan as KiotVietTypedPhasePlan,
       });
-      const reloaded = await loadKiotVietPlanningStateFromDatabase(rawTransaction, "hai-dang");
+      const reloaded = await loadKiotVietPlanningStateFromDatabase(
+        rawTransaction,
+        "hai-dang",
+        { serializeQueries: true },
+      );
       const replanned = planKiotVietBundle(input.bundle, reloaded)
         .find((candidate) => candidate.phase === input.phase)!;
       postApplyPlan = replanned;
@@ -231,7 +236,7 @@ function productReferences(bundle: KiotVietDataBundle, includeBookings: boolean)
   )).flatMap((item) => item.rows.flatMap((row) => {
     const sku = normalizeKiotVietText(row["Mã hàng"]);
     const unitName = normalizeKiotVietText(row.ĐVT);
-    if (item.phase === "purchase-returns" && (!sku || !unitName)) return [];
+    if (item.phase === "purchase-returns" && !sku) return [];
     return [{
       sku,
       productName: normalizeKiotVietText(row["Tên hàng"]),
@@ -389,7 +394,7 @@ export function planKiotVietBundle(
   let purchaseReturnReasons: string[];
   let purchaseReturnTypedPlan: ReturnType<typeof planKiotVietPurchaseReturnSync> | null;
   const invalidPurchaseReturnRows = purchaseReturnSource.rows.filter((row) => (
-    !normalizeKiotVietText(row["Mã hàng"]) || !normalizeKiotVietText(row.ĐVT)
+    !normalizeKiotVietText(row["Mã hàng"])
   ));
   if (invalidPurchaseReturnRows.length > 0) {
     purchaseReturnSummary = {
@@ -464,12 +469,33 @@ export function formatKiotVietDataSyncReport(report: KiotVietDataSyncReport): { 
   return { json, text };
 }
 
+export function shouldBootstrapUnmappedKiotVietLegacy(input: {
+  schemaReady: boolean;
+  mappingCount: number;
+  hasLegacyEvidence: boolean;
+}): boolean {
+  return input.schemaReady && input.mappingCount === 0 && input.hasLegacyEvidence;
+}
+
+export async function executeKiotVietPlanningQueries<T extends readonly unknown[]>(
+  tasks: { [K in keyof T]: () => PromiseLike<T[K]> },
+  serialized: boolean,
+): Promise<T> {
+  if (!serialized) {
+    return await Promise.all(tasks.map((task) => task())) as unknown as T;
+  }
+  const results: unknown[] = [];
+  for (const task of tasks) results.push(await task());
+  return results as unknown as T;
+}
+
 type ProductionDatabase = (typeof import("../db"))["db"];
 type ProductionTransaction = Parameters<Parameters<ProductionDatabase["transaction"]>[0]>[0];
 
 export async function loadKiotVietPlanningStateFromDatabase(
   database: ProductionDatabase | ProductionTransaction,
   storeSlug: string | null,
+  options: { serializeQueries?: boolean } = {},
 ): Promise<KiotVietCliPlanningState> {
   if (!storeSlug) throw new Error("Dry-run database planning requires --store=hai-dang");
   const db = database as ProductionDatabase;
@@ -480,56 +506,57 @@ export async function loadKiotVietPlanningStateFromDatabase(
   const relationResult = await db.execute(sql`select to_regclass('public.kiotviet_source_mappings')::text as name`);
   const relation = relationResult.rows[0] as { name?: string | null } | undefined;
   const schemaReady = Boolean(relation?.name);
-  const [base, units, archived] = await Promise.all([
-    db.select({ id: schema.products.id, sku: schema.products.sku, name: schema.products.name, baseUnit: schema.products.baseUnit, isActive: schema.products.isActive, lifecycleStatus: schema.products.lifecycleStatus }).from(schema.products).where(eq(schema.products.storeId, store.id)),
-    db.select({ productId: schema.productUnits.productId, sku: schema.productUnits.sku, unitName: schema.productUnits.unitName, multiplier: schema.productUnits.multiplier })
+  const serialized = options.serializeQueries === true;
+  const [base, units, archived] = await executeKiotVietPlanningQueries([
+    () => db.select({ id: schema.products.id, sku: schema.products.sku, name: schema.products.name, baseUnit: schema.products.baseUnit, isActive: schema.products.isActive, lifecycleStatus: schema.products.lifecycleStatus }).from(schema.products).where(eq(schema.products.storeId, store.id)),
+    () => db.select({ productId: schema.productUnits.productId, sku: schema.productUnits.sku, unitName: schema.productUnits.unitName, multiplier: schema.productUnits.multiplier })
       .from(schema.productUnits).where(eq(schema.productUnits.storeId, store.id)),
-    db.select({ productId: schema.productSourceMappings.productId, externalId: schema.productSourceMappings.externalId, baseUnit: schema.products.baseUnit })
+    () => db.select({ productId: schema.productSourceMappings.productId, externalId: schema.productSourceMappings.externalId, baseUnit: schema.products.baseUnit })
       .from(schema.productSourceMappings).innerJoin(schema.products, and(eq(schema.productSourceMappings.productId, schema.products.id), eq(schema.products.storeId, store.id)))
       .where(and(eq(schema.productSourceMappings.storeId, store.id), eq(schema.productSourceMappings.provider, "kiotviet"), sql`${schema.productSourceMappings.deletedAt} is not null`)),
-  ]);
-  const [customerRows, supplierRows, orderRows, orderLineRows, paymentRows, purchaseRows, purchaseLineRows, returnRows, returnLineRows, purchaseReturnRows, purchaseReturnLineRows] = await Promise.all([
-    db.select({ localId: schema.customers.id, code: schema.customers.code, name: schema.customers.name, phone: schema.customers.phone, email: schema.customers.email, address: schema.customers.address, taxCode: schema.customers.taxCode, note: schema.customers.note, isActive: schema.customers.isActive, currentDebt: schema.customers.currentDebt, totalSpent: schema.customers.totalSpent })
+  ] as const, serialized);
+  const [customerRows, supplierRows, orderRows, orderLineRows, paymentRows, purchaseRows, purchaseLineRows, returnRows, returnLineRows, purchaseReturnRows, purchaseReturnLineRows] = await executeKiotVietPlanningQueries([
+    () => db.select({ localId: schema.customers.id, code: schema.customers.code, name: schema.customers.name, phone: schema.customers.phone, email: schema.customers.email, address: schema.customers.address, taxCode: schema.customers.taxCode, note: schema.customers.note, isActive: schema.customers.isActive, currentDebt: schema.customers.currentDebt, totalSpent: schema.customers.totalSpent })
       .from(schema.customers).where(eq(schema.customers.storeId, store.id)),
-    db.select({ localId: schema.suppliers.id, code: schema.suppliers.code, name: schema.suppliers.name, phone: schema.suppliers.phone, email: schema.suppliers.email, address: schema.suppliers.address, taxCode: schema.suppliers.taxCode, note: schema.suppliers.note, currentDebt: schema.suppliers.currentDebt })
+    () => db.select({ localId: schema.suppliers.id, code: schema.suppliers.code, name: schema.suppliers.name, phone: schema.suppliers.phone, email: schema.suppliers.email, address: schema.suppliers.address, taxCode: schema.suppliers.taxCode, note: schema.suppliers.note, currentDebt: schema.suppliers.currentDebt })
       .from(schema.suppliers).where(eq(schema.suppliers.storeId, store.id)),
-    db.select({ localId: schema.orders.id, code: schema.orders.code, documentType: schema.orders.documentType, status: schema.orders.status, paymentStatus: schema.orders.paymentStatus, customerId: schema.orders.customerId, sourceOrderId: schema.orders.sourceOrderId, deliveryDate: schema.orders.deliveryDate, createdAt: schema.orders.createdAt, subtotal: schema.orders.subtotal, discount: schema.orders.discount, tax: schema.orders.tax, shippingFee: schema.orders.shippingFee, total: schema.orders.total, amountPaid: schema.orders.amountPaid, note: schema.orders.note })
+    () => db.select({ localId: schema.orders.id, code: schema.orders.code, documentType: schema.orders.documentType, status: schema.orders.status, paymentStatus: schema.orders.paymentStatus, customerId: schema.orders.customerId, sourceOrderId: schema.orders.sourceOrderId, deliveryDate: schema.orders.deliveryDate, createdAt: schema.orders.createdAt, subtotal: schema.orders.subtotal, discount: schema.orders.discount, tax: schema.orders.tax, shippingFee: schema.orders.shippingFee, total: schema.orders.total, amountPaid: schema.orders.amountPaid, note: schema.orders.note })
       .from(schema.orders).where(eq(schema.orders.storeId, store.id)),
-    db.select({ localId: schema.orderItems.id, orderId: schema.orderItems.orderId, productId: schema.orderItems.productId, productName: schema.orderItems.productName, legacyProductSku: schema.products.sku, legacyProductName: schema.products.name, legacyUnitName: schema.products.baseUnit, unitName: schema.orderItems.unitName, unitMultiplier: schema.orderItems.unitMultiplier, quantity: schema.orderItems.quantity, unitPrice: schema.orderItems.unitPrice, discount: schema.orderItems.discount, total: schema.orderItems.total, note: schema.orderItems.note })
+    () => db.select({ localId: schema.orderItems.id, orderId: schema.orderItems.orderId, productId: schema.orderItems.productId, productName: schema.orderItems.productName, legacyProductSku: schema.products.sku, legacyProductName: schema.products.name, legacyUnitName: schema.products.baseUnit, unitName: schema.orderItems.unitName, unitMultiplier: schema.orderItems.unitMultiplier, quantity: schema.orderItems.quantity, unitPrice: schema.orderItems.unitPrice, discount: schema.orderItems.discount, total: schema.orderItems.total, note: schema.orderItems.note })
       .from(schema.orderItems).innerJoin(schema.products, and(eq(schema.orderItems.productId, schema.products.id), eq(schema.products.storeId, store.id)))
       .where(eq(schema.orderItems.storeId, store.id)),
-    db.select({ localId: schema.payments.id, orderId: schema.payments.orderId, method: schema.payments.method, amount: schema.payments.amount, note: schema.payments.note })
+    () => db.select({ localId: schema.payments.id, orderId: schema.payments.orderId, method: schema.payments.method, amount: schema.payments.amount, note: schema.payments.note })
       .from(schema.payments).where(eq(schema.payments.storeId, store.id)),
-    db.select({ localId: schema.purchaseOrders.id, code: schema.purchaseOrders.code, supplierId: schema.purchaseOrders.supplierId, status: schema.purchaseOrders.status, createdAt: schema.purchaseOrders.createdAt, subtotal: schema.purchaseOrders.subtotal, discount: schema.purchaseOrders.discount, vatRate: schema.purchaseOrders.vatRate, tax: schema.purchaseOrders.tax, total: schema.purchaseOrders.total, amountPaid: schema.purchaseOrders.amountPaid, invoiceNumber: schema.purchaseOrders.invoiceNumber, note: schema.purchaseOrders.note })
+    () => db.select({ localId: schema.purchaseOrders.id, code: schema.purchaseOrders.code, supplierId: schema.purchaseOrders.supplierId, status: schema.purchaseOrders.status, createdAt: schema.purchaseOrders.createdAt, subtotal: schema.purchaseOrders.subtotal, discount: schema.purchaseOrders.discount, vatRate: schema.purchaseOrders.vatRate, tax: schema.purchaseOrders.tax, total: schema.purchaseOrders.total, amountPaid: schema.purchaseOrders.amountPaid, invoiceNumber: schema.purchaseOrders.invoiceNumber, note: schema.purchaseOrders.note })
       .from(schema.purchaseOrders).where(eq(schema.purchaseOrders.storeId, store.id)),
-    db.select({ localId: schema.purchaseOrderItems.id, purchaseOrderId: schema.purchaseOrderItems.purchaseOrderId, legacyProductSku: schema.products.sku, legacyProductName: schema.products.name, legacyUnitName: schema.products.baseUnit, quantity: schema.purchaseOrderItems.quantity, unitCost: schema.purchaseOrderItems.unitCost, discount: schema.purchaseOrderItems.discount, total: schema.purchaseOrderItems.total })
+    () => db.select({ localId: schema.purchaseOrderItems.id, purchaseOrderId: schema.purchaseOrderItems.purchaseOrderId, legacyProductSku: schema.products.sku, legacyProductName: schema.products.name, legacyUnitName: schema.products.baseUnit, quantity: schema.purchaseOrderItems.quantity, unitCost: schema.purchaseOrderItems.unitCost, discount: schema.purchaseOrderItems.discount, total: schema.purchaseOrderItems.total })
       .from(schema.purchaseOrderItems).innerJoin(schema.products, and(eq(schema.purchaseOrderItems.productId, schema.products.id), eq(schema.products.storeId, store.id)))
       .where(eq(schema.purchaseOrderItems.storeId, store.id)),
-    db.select({ localId: schema.returns.id, code: schema.returns.code, status: schema.returns.status })
+    () => db.select({ localId: schema.returns.id, code: schema.returns.code, status: schema.returns.status })
       .from(schema.returns).where(eq(schema.returns.storeId, store.id)),
-    db.select({ localId: schema.returnItems.id, returnId: schema.returnItems.returnId, orderItemId: schema.returnItems.orderItemId, legacyProductSku: schema.products.sku, legacyProductName: schema.products.name, legacyUnitName: schema.products.baseUnit, quantity: schema.returnItems.quantity, unitPrice: schema.returnItems.unitPrice, total: schema.returnItems.total })
+    () => db.select({ localId: schema.returnItems.id, returnId: schema.returnItems.returnId, orderItemId: schema.returnItems.orderItemId, legacyProductSku: schema.products.sku, legacyProductName: schema.products.name, legacyUnitName: schema.products.baseUnit, quantity: schema.returnItems.quantity, unitPrice: schema.returnItems.unitPrice, total: schema.returnItems.total })
       .from(schema.returnItems).innerJoin(schema.products, and(eq(schema.returnItems.productId, schema.products.id), eq(schema.products.storeId, store.id)))
       .where(eq(schema.returnItems.storeId, store.id)),
-    db.select({ localId: schema.purchaseReturns.id, code: schema.purchaseReturns.code, purchaseOrderId: schema.purchaseReturns.purchaseOrderId, supplierId: schema.purchaseReturns.supplierId, status: schema.purchaseReturns.status, settlementStatus: schema.purchaseReturns.settlementStatus, subtotal: schema.purchaseReturns.subtotal, discount: schema.purchaseReturns.discount, vatRate: schema.purchaseReturns.vatRate, tax: schema.purchaseReturns.tax, totalRefund: schema.purchaseReturns.totalRefund, refundAmount: schema.purchaseReturns.refundAmount, refundMethod: schema.purchaseReturns.refundMethod, debtAmount: schema.purchaseReturns.debtAmount, note: schema.purchaseReturns.note, createdAt: schema.purchaseReturns.createdAt })
+    () => db.select({ localId: schema.purchaseReturns.id, code: schema.purchaseReturns.code, purchaseOrderId: schema.purchaseReturns.purchaseOrderId, supplierId: schema.purchaseReturns.supplierId, status: schema.purchaseReturns.status, settlementStatus: schema.purchaseReturns.settlementStatus, subtotal: schema.purchaseReturns.subtotal, discount: schema.purchaseReturns.discount, vatRate: schema.purchaseReturns.vatRate, tax: schema.purchaseReturns.tax, totalRefund: schema.purchaseReturns.totalRefund, refundAmount: schema.purchaseReturns.refundAmount, refundMethod: schema.purchaseReturns.refundMethod, debtAmount: schema.purchaseReturns.debtAmount, note: schema.purchaseReturns.note, createdAt: schema.purchaseReturns.createdAt })
       .from(schema.purchaseReturns).where(eq(schema.purchaseReturns.storeId, store.id)),
-    db.select({ localId: schema.purchaseReturnItems.id, purchaseReturnId: schema.purchaseReturnItems.purchaseReturnId, legacyProductSku: schema.products.sku, legacyProductName: schema.products.name, legacyUnitName: schema.products.baseUnit, quantity: schema.purchaseReturnItems.quantity, unitCost: schema.purchaseReturnItems.unitCost, returnUnitCost: schema.purchaseReturnItems.returnUnitCost, total: schema.purchaseReturnItems.total })
+    () => db.select({ localId: schema.purchaseReturnItems.id, purchaseReturnId: schema.purchaseReturnItems.purchaseReturnId, legacyProductSku: schema.products.sku, legacyProductName: schema.products.name, legacyUnitName: schema.products.baseUnit, quantity: schema.purchaseReturnItems.quantity, unitCost: schema.purchaseReturnItems.unitCost, returnUnitCost: schema.purchaseReturnItems.returnUnitCost, total: schema.purchaseReturnItems.total })
       .from(schema.purchaseReturnItems).innerJoin(schema.products, and(eq(schema.purchaseReturnItems.productId, schema.products.id), eq(schema.products.storeId, store.id)))
       .where(eq(schema.purchaseReturnItems.storeId, store.id)),
-  ]);
-  const schemaSnapshots = schemaReady ? await Promise.all([
-    db.select({ localId: schema.suppliers.id, isActive: schema.suppliers.isActive })
+  ] as const, serialized);
+  const schemaSnapshots = schemaReady ? await executeKiotVietPlanningQueries([
+    () => db.select({ localId: schema.suppliers.id, isActive: schema.suppliers.isActive })
       .from(schema.suppliers).where(eq(schema.suppliers.storeId, store.id)),
-    db.select({ localId: schema.orderItems.id, orderId: schema.orderItems.orderId, productId: schema.orderItems.productId, productName: schema.orderItems.productName, sourceSku: schema.orderItems.sourceSku, unitName: schema.orderItems.unitName, unitMultiplier: schema.orderItems.unitMultiplier, quantity: schema.orderItems.quantity, unitPrice: schema.orderItems.unitPrice, discount: schema.orderItems.discount, total: schema.orderItems.total, note: schema.orderItems.note })
+    () => db.select({ localId: schema.orderItems.id, orderId: schema.orderItems.orderId, productId: schema.orderItems.productId, productName: schema.orderItems.productName, sourceSku: schema.orderItems.sourceSku, unitName: schema.orderItems.unitName, unitMultiplier: schema.orderItems.unitMultiplier, quantity: schema.orderItems.quantity, unitPrice: schema.orderItems.unitPrice, discount: schema.orderItems.discount, total: schema.orderItems.total, note: schema.orderItems.note })
       .from(schema.orderItems).where(eq(schema.orderItems.storeId, store.id)),
-    db.select({ localId: schema.purchaseOrderItems.id, purchaseOrderId: schema.purchaseOrderItems.purchaseOrderId, productId: schema.purchaseOrderItems.productId, productName: schema.purchaseOrderItems.productName, sourceSku: schema.purchaseOrderItems.sku, unitName: schema.purchaseOrderItems.unitName, unitMultiplier: schema.purchaseOrderItems.unitMultiplier, quantity: schema.purchaseOrderItems.quantity, unitCost: schema.purchaseOrderItems.unitCost, discount: schema.purchaseOrderItems.discount, total: schema.purchaseOrderItems.total })
+    () => db.select({ localId: schema.purchaseOrderItems.id, purchaseOrderId: schema.purchaseOrderItems.purchaseOrderId, productId: schema.purchaseOrderItems.productId, productName: schema.purchaseOrderItems.productName, sourceSku: schema.purchaseOrderItems.sku, unitName: schema.purchaseOrderItems.unitName, unitMultiplier: schema.purchaseOrderItems.unitMultiplier, quantity: schema.purchaseOrderItems.quantity, unitCost: schema.purchaseOrderItems.unitCost, discount: schema.purchaseOrderItems.discount, total: schema.purchaseOrderItems.total })
       .from(schema.purchaseOrderItems).where(eq(schema.purchaseOrderItems.storeId, store.id)),
-    db.select({ localId: schema.returns.id, code: schema.returns.code, orderId: schema.returns.orderId, customerId: schema.returns.customerId, status: schema.returns.status, createdAt: schema.returns.createdAt, invoiceCode: schema.returns.sourceInvoiceCode, subtotal: schema.returns.sourceSubtotal, discount: schema.returns.sourceDiscount, tax: schema.returns.sourceTax, otherRefund: schema.returns.sourceOtherRefund, returnFee: schema.returns.sourceReturnFee, totalRefund: schema.returns.totalRefund, refundAmount: schema.returns.refundAmount, settlementStatus: schema.returns.settlementStatus, note: schema.returns.note, paymentSnapshots: schema.returns.sourcePaymentSnapshots })
+    () => db.select({ localId: schema.returns.id, code: schema.returns.code, orderId: schema.returns.orderId, customerId: schema.returns.customerId, status: schema.returns.status, createdAt: schema.returns.createdAt, invoiceCode: schema.returns.sourceInvoiceCode, subtotal: schema.returns.sourceSubtotal, discount: schema.returns.sourceDiscount, tax: schema.returns.sourceTax, otherRefund: schema.returns.sourceOtherRefund, returnFee: schema.returns.sourceReturnFee, totalRefund: schema.returns.totalRefund, refundAmount: schema.returns.refundAmount, settlementStatus: schema.returns.settlementStatus, note: schema.returns.note, paymentSnapshots: schema.returns.sourcePaymentSnapshots })
       .from(schema.returns).where(eq(schema.returns.storeId, store.id)),
-    db.select({ localId: schema.returnItems.id, returnId: schema.returnItems.returnId, orderItemId: schema.returnItems.orderItemId, productId: schema.returnItems.productId, productName: schema.returnItems.productName, sourceSku: schema.returnItems.sourceSku, unitName: schema.returnItems.unitName, unitMultiplier: schema.returnItems.unitMultiplier, quantity: schema.returnItems.quantity, unitPrice: schema.returnItems.unitPrice, total: schema.returnItems.total, restock: schema.returnItems.restock })
+    () => db.select({ localId: schema.returnItems.id, returnId: schema.returnItems.returnId, orderItemId: schema.returnItems.orderItemId, productId: schema.returnItems.productId, productName: schema.returnItems.productName, sourceSku: schema.returnItems.sourceSku, unitName: schema.returnItems.unitName, unitMultiplier: schema.returnItems.unitMultiplier, quantity: schema.returnItems.quantity, unitPrice: schema.returnItems.unitPrice, total: schema.returnItems.total, restock: schema.returnItems.restock })
       .from(schema.returnItems).where(eq(schema.returnItems.storeId, store.id)),
-    db.select({ localId: schema.purchaseReturnItems.id, purchaseReturnId: schema.purchaseReturnItems.purchaseReturnId, purchaseOrderItemId: schema.purchaseReturnItems.purchaseOrderItemId, productId: schema.purchaseReturnItems.productId, productName: schema.purchaseReturnItems.productName, sourceSku: schema.purchaseReturnItems.sku, unitName: schema.purchaseReturnItems.unitName, unitMultiplier: schema.purchaseReturnItems.unitMultiplier, quantity: schema.purchaseReturnItems.quantity, unitCost: schema.purchaseReturnItems.unitCost, returnUnitCost: schema.purchaseReturnItems.returnUnitCost, total: schema.purchaseReturnItems.total })
+    () => db.select({ localId: schema.purchaseReturnItems.id, purchaseReturnId: schema.purchaseReturnItems.purchaseReturnId, purchaseOrderItemId: schema.purchaseReturnItems.purchaseOrderItemId, productId: schema.purchaseReturnItems.productId, productName: schema.purchaseReturnItems.productName, sourceSku: schema.purchaseReturnItems.sku, unitName: schema.purchaseReturnItems.unitName, unitMultiplier: schema.purchaseReturnItems.unitMultiplier, quantity: schema.purchaseReturnItems.quantity, unitCost: schema.purchaseReturnItems.unitCost, returnUnitCost: schema.purchaseReturnItems.returnUnitCost, total: schema.purchaseReturnItems.total })
       .from(schema.purchaseReturnItems).where(eq(schema.purchaseReturnItems.storeId, store.id)),
-  ]) : null;
+  ] as const, serialized) : null;
   const supplierActiveById = new Map(schemaSnapshots?.[0].map((item) => [item.localId, item.isActive]) ?? []);
   const legacyOrderLinesById = new Map(orderLineRows.map((item) => [item.localId, item]));
   const effectiveOrderLineRows = schemaSnapshots?.[1].map((item) => {
@@ -814,6 +841,15 @@ export async function loadKiotVietPlanningStateFromDatabase(
   const legacySaleOrderIds = new Set(paymentRows.filter((payment) => (
     payment.note === "Import lịch sử KiotViet"
   )).map((payment) => payment.orderId));
+  const legacySaleBootstrapCandidates = new Set(saleOrders.filter((sale) => {
+    const lines = linesByOrder.get(sale.localId) ?? [];
+    const payments = paymentByOrder.get(sale.localId) ?? [];
+    const hasImporterPayment = payments.some((payment) => payment.note === "Import lịch sử KiotViet");
+    const isUnpaidWithoutPayment = Number(sale.amountPaid) <= 0 && payments.length === 0;
+    return (hasImporterPayment || isUnpaidWithoutPayment)
+      && lines.length > 0
+      && lines.every((line) => line.sourceSnapshotPersisted === false);
+  }).map((sale) => sale.localId));
   const saleLegacyBootstrapFingerprint = (sale: typeof saleOrders[number]): string | undefined => {
     if (!legacySaleOrderIds.has(sale.localId)) return undefined;
     const lines = linesByOrder.get(sale.localId) ?? [];
@@ -1001,8 +1037,27 @@ export async function loadKiotVietPlanningStateFromDatabase(
   // Materialize every fingerprint before publishing loader blockers. Fingerprint
   // reconstruction is also where malformed persisted source snapshots are found.
   const current: KiotVietCliCurrentState = {
-    customers: customerRows.map((item) => ({ ...item, legacyImported: !schemaReady || externalByLocal("customer").has(item.localId) })),
-    suppliers: supplierRows.map((item) => ({ ...item, isActive: supplierActiveById.get(item.localId) ?? true, legacyImported: !schemaReady || externalByLocal("supplier").has(item.localId) })),
+    customers: customerRows.map((item) => ({
+      ...item,
+      legacyImported: !schemaReady || externalByLocal("customer").has(item.localId),
+      legacyBootstrapEligible: shouldBootstrapUnmappedKiotVietLegacy({
+        schemaReady,
+        mappingCount: mappingState.customer?.length ?? 0,
+        hasLegacyEvidence: true,
+      }),
+    })),
+    suppliers: supplierRows.map((item) => ({
+      ...item,
+      isActive: supplierActiveById.get(item.localId) ?? true,
+      legacyImported: !schemaReady
+        || externalByLocal("supplier").has(item.localId)
+        || hasKiotVietLegacySupplierMarker(item.note),
+      legacyBootstrapEligible: shouldBootstrapUnmappedKiotVietLegacy({
+        schemaReady,
+        mappingCount: mappingState.supplier?.length ?? 0,
+        hasLegacyEvidence: true,
+      }),
+    })),
     bookings: bookingOrders.map((item) => ({ localId: item.localId, code: item.code, fingerprint: orderFingerprint(item, "booking"), legacyImported: !schemaReady || parentMappings.booking.has(item.localId) })),
     bookingLines: effectiveOrderLineRows.filter((item) => bookingOrders.some((order) => order.localId === item.orderId)).map((item) => ({
       ...item,
@@ -1026,7 +1081,13 @@ export async function loadKiotVietPlanningStateFromDatabase(
       fingerprint: orderFingerprint(item, "sale"),
       completedFingerprint: completedSaleFingerprint(item),
       legacyBootstrapFingerprint: saleLegacyBootstrapFingerprint(item),
-      legacyImported: !schemaReady || parentMappings.sale.has(item.localId),
+      legacyImported: !schemaReady
+        || parentMappings.sale.has(item.localId)
+        || shouldBootstrapUnmappedKiotVietLegacy({
+          schemaReady,
+          mappingCount: parentMappings.sale.size,
+          hasLegacyEvidence: legacySaleBootstrapCandidates.has(item.localId),
+        }),
     })),
     saleLines: effectiveOrderLineRows.filter((item) => saleOrderIds.has(item.orderId)).map((item) => ({
       ...item,
@@ -1048,7 +1109,13 @@ export async function loadKiotVietPlanningStateFromDatabase(
       ...item,
       fingerprint: purchaseFingerprint(item),
       legacyBootstrapFingerprint: purchaseLegacyBootstrapFingerprint(item),
-      legacyImported: !schemaReady || parentMappings.purchase.has(item.localId),
+      legacyImported: !schemaReady
+        || parentMappings.purchase.has(item.localId)
+        || shouldBootstrapUnmappedKiotVietLegacy({
+          schemaReady,
+          mappingCount: parentMappings.purchase.size,
+          hasLegacyEvidence: legacyPurchaseBootstrapCandidates.has(item.localId),
+        }),
     })),
     purchaseLines: effectivePurchaseLineRows.map((item) => ({
       ...item, sourceSku: item.sourceSku ?? undefined, legacyProductSku: item.sourceSku ?? undefined,
@@ -1061,7 +1128,13 @@ export async function loadKiotVietPlanningStateFromDatabase(
       code: item.code,
       fingerprint: returnFingerprint(item),
       legacyBootstrapFingerprint: schemaReady ? returnLegacyBootstrapFingerprint(item) : undefined,
-      legacyImported: !schemaReady || parentMappings.customerReturn.has(item.localId),
+      legacyImported: !schemaReady
+        || parentMappings.customerReturn.has(item.localId)
+        || shouldBootstrapUnmappedKiotVietLegacy({
+          schemaReady,
+          mappingCount: parentMappings.customerReturn.size,
+          hasLegacyEvidence: legacyReturnBootstrapCandidates.has(item.localId),
+        }),
     })),
     returnLines: effectiveReturnLineRows.map((item) => ({
       ...item, sourceSku: item.sourceSku ?? undefined, legacyProductSku: item.sourceSku ?? undefined,
@@ -1078,7 +1151,13 @@ export async function loadKiotVietPlanningStateFromDatabase(
       fingerprint: purchaseReturnFingerprint(item),
       legacyBootstrapFingerprint: supplierReturnLegacyBootstrapFingerprint(item),
       settlementStatus: item.settlementStatus as "unsettled" | "partial" | "settled",
-      legacyImported: !schemaReady || parentMappings.supplierReturn.has(item.localId),
+      legacyImported: !schemaReady
+        || parentMappings.supplierReturn.has(item.localId)
+        || shouldBootstrapUnmappedKiotVietLegacy({
+          schemaReady,
+          mappingCount: parentMappings.supplierReturn.size,
+          hasLegacyEvidence: legacySupplierReturnIds.has(item.localId),
+        }),
     }] : []),
     purchaseReturnLines: effectivePurchaseReturnLineRows.map((item) => ({
       ...item, sourceSku: item.sourceSku ?? undefined, legacyProductSku: item.sourceSku ?? undefined,

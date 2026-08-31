@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readKiotVietDataBundle } from "@/lib/kiotviet/data-sync-files";
 import {
   assertKiotVietSupplierSourceTotals,
+  hasKiotVietLegacySupplierMarker,
   parseKiotVietSupplierSources,
   planKiotVietSupplierSync,
 } from "@/lib/kiotviet/supplier-sync";
@@ -24,6 +25,12 @@ const managedRow = {
 };
 
 describe("KiotViet supplier master synchronization", () => {
+  test("recognizes only the exact legacy importer supplier marker", () => {
+    expect(hasKiotVietLegacySupplierMarker("Tạo từ import lịch sử KiotViet")).toBe(true);
+    expect(hasKiotVietLegacySupplierMarker("Tạo từ import lịch sử KiotViet · edited")).toBe(false);
+    expect(hasKiotVietLegacySupplierMarker(null)).toBe(false);
+  });
+
   test("projects only source-managed supplier fields with signed debt and inactive state", () => {
     expect(parseKiotVietSupplierSources([managedRow])).toEqual([{
       externalId: "NCC-01",
@@ -174,6 +181,88 @@ describe("KiotViet supplier master synchronization", () => {
       localId: "luma-history",
       reason: "code_collision",
     }]);
+  });
+
+  test("bootstraps an empty-mapping supplier only when its stable name matches", () => {
+    const sourceRows = [{
+      "Mã nhà cung cấp": "NCC-BOOTSTRAP",
+      "Tên nhà cung cấp": "Nhà cung cấp bootstrap",
+      "Nợ cần trả hiện tại": 500,
+      "Tổng mua trừ trả hàng": 900,
+      "Trạng thái": "Đang giao dịch",
+    }];
+    const current = [{
+      localId: "supplier-bootstrap",
+      code: "NCC-BOOTSTRAP",
+      name: "Nhà cung cấp bootstrap",
+      phone: null,
+      email: null,
+      address: null,
+      taxCode: null,
+      note: null,
+      isActive: true,
+      currentDebt: 0,
+      legacyImported: false,
+      legacyBootstrapEligible: true,
+    }];
+    const adopted = planKiotVietSupplierSync({
+      sourceRows,
+      current,
+      mappings: [],
+      historicalDocumentSupplierCodes: [],
+    });
+    expect(adopted.entityPlan.adopts).toEqual([{
+      externalId: "NCC-BOOTSTRAP",
+      localId: "supplier-bootstrap",
+      needsUpdate: true,
+    }]);
+
+    const collision = planKiotVietSupplierSync({
+      sourceRows,
+      current: [{ ...current[0], name: "Nhà cung cấp Luma khác" }],
+      mappings: [],
+      historicalDocumentSupplierCodes: [],
+    });
+    expect(collision.entityPlan.conflicts).toContainEqual({
+      externalId: "NCC-BOOTSTRAP",
+      localId: "supplier-bootstrap",
+      reason: "code_collision",
+    });
+  });
+
+  test("adopts and inactivates an importer-proven historical supplier instead of creating a duplicate", () => {
+    const plan = planKiotVietSupplierSync({
+      sourceRows: [],
+      current: [{
+        localId: "legacy-history",
+        code: "NCC lẻ",
+        name: "Nhà cung cấp lẻ",
+        phone: null,
+        email: null,
+        address: null,
+        taxCode: null,
+        note: "Tạo từ import lịch sử KiotViet",
+        isActive: true,
+        currentDebt: 0,
+        legacyImported: true,
+      }],
+      mappings: [],
+      historicalDocumentSupplierCodes: ["NCC lẻ"],
+    });
+
+    expect(plan.entityPlan.conflicts).toEqual([]);
+    expect(plan.entityPlan.preserves).toEqual([]);
+    expect(plan.historicalAdoptions).toEqual([{
+      externalId: "NCC lẻ",
+      localId: "legacy-history",
+    }]);
+    expect(plan.writes).toEqual([{
+      action: "historical_adopt",
+      externalId: "NCC lẻ",
+      localId: "legacy-history",
+      supplier: { isActive: false },
+    }]);
+    expect(plan.summary).toMatchObject({ conflicts: 0, inactivated: 1 });
   });
 
   test("creates one deterministic inactive unknown supplier for purchases without a supplier code", () => {

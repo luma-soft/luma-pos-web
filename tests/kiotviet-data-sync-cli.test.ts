@@ -2,10 +2,12 @@ import { describe, expect, test } from "bun:test";
 import {
   buildKiotVietDataSyncReport,
   assertKiotVietExecutablePlan,
+  executeKiotVietPlanningQueries,
   formatKiotVietDataSyncReport,
   planKiotVietBundle,
   reviewedHashForPhase,
   runKiotVietDataSyncCli,
+  shouldBootstrapUnmappedKiotVietLegacy,
 } from "@/scripts/sync-kiotviet-data";
 import type { KiotVietDataBundle } from "@/lib/kiotviet/data-sync-types";
 import type { KiotVietDataSyncCliDependencies } from "@/scripts/sync-kiotviet-data";
@@ -28,6 +30,40 @@ function emptyBundle(): KiotVietDataBundle {
 }
 
 describe("guarded KiotViet data sync CLI", () => {
+  test("opens legacy bootstrap only for an empty entity mapping namespace with importer evidence", () => {
+    expect(shouldBootstrapUnmappedKiotVietLegacy({
+      schemaReady: true,
+      mappingCount: 0,
+      hasLegacyEvidence: true,
+    })).toBe(true);
+    expect(shouldBootstrapUnmappedKiotVietLegacy({
+      schemaReady: true,
+      mappingCount: 1,
+      hasLegacyEvidence: true,
+    })).toBe(false);
+    expect(shouldBootstrapUnmappedKiotVietLegacy({
+      schemaReady: true,
+      mappingCount: 0,
+      hasLegacyEvidence: false,
+    })).toBe(false);
+  });
+
+  test("serializes post-apply planning queries on one database transaction", async () => {
+    let active = 0;
+    let maximumActive = 0;
+    const task = (value: number) => async () => {
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      await Promise.resolve();
+      active -= 1;
+      return value;
+    };
+    expect(await executeKiotVietPlanningQueries([
+      task(1), task(2), task(3),
+    ] as const, true)).toEqual([1, 2, 3]);
+    expect(maximumActive).toBe(1);
+  });
+
   test("rejects unresolved synthetic local IDs before an apply transaction", () => {
     expect(() => assertKiotVietExecutablePlan({
       phase: "sales",
@@ -159,7 +195,7 @@ describe("guarded KiotViet data sync CLI", () => {
     expect(applied).toBe(0);
   });
 
-  test("counts every supplier-return row with a blank source SKU or unit", () => {
+  test("blocks blank supplier-return SKUs without rejecting rows whose unit can be inferred later", () => {
     const bundle = emptyBundle();
     const selectedSource = bundle.sources.find((item) => item.phase === "purchase-returns")!;
     selectedSource.rows = [
@@ -178,11 +214,11 @@ describe("guarded KiotViet data sync CLI", () => {
       },
     }).find((item) => item.phase === "purchase-returns")!;
     expect(plan.typedPlan).toBeNull();
-    expect(plan.summary).toMatchObject({ invalidSourceLines: 3, affectedDocuments: 2 });
+    expect(plan.summary).toMatchObject({ invalidSourceLines: 2, affectedDocuments: 2 });
     expect(plan.blockers).toEqual([{
       phase: "purchase-returns",
       reason: "blank_source_sku_or_unit",
-      count: 3,
+      count: 2,
     }]);
   });
 });

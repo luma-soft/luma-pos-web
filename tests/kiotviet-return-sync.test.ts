@@ -278,6 +278,62 @@ describe("KiotViet customer return synchronization", () => {
     expect(result.preservedLineIds).toEqual(["luma-return-line"]);
   });
 
+  test("adopts one uniquely identified legacy return line despite old importer price and unit drift", () => {
+    const result = plan({
+      current: [{ localId: "return-001", code: "TH-001", fingerprint: "outdated", legacyImported: true }],
+      existingLines: [{
+        localId: "legacy-drifted-line",
+        returnId: "return-001",
+        legacyImported: true,
+        legacyProductSku: "ALT-001",
+        productName: "Sản phẩm hộp",
+        unitName: "cái",
+        orderItemId: "sale-line-001",
+        quantity: 2,
+        unitPrice: 110000,
+        total: 220000,
+      }],
+    });
+
+    expect(result.blockers).toEqual([]);
+    expect(result.writes[0]?.return.lines).toMatchObject([{
+      action: "adopt",
+      localId: "legacy-drifted-line",
+      line: {
+        sourceSku: "ALT-001",
+        unitName: "Hộp",
+        unitPrice: 100000,
+        total: 200000,
+        restock: false,
+      },
+    }]);
+  });
+
+  test("keeps price-drift fallback blocked when two legacy lines share the stable identity", () => {
+    const result = plan({
+      current: [{ localId: "return-001", code: "TH-001", fingerprint: "outdated", legacyImported: true }],
+      existingLines: ["legacy-a", "legacy-b"].map((localId, index) => ({
+        localId,
+        returnId: "return-001",
+        legacyImported: true,
+        legacyProductSku: "ALT-001",
+        productName: "Sản phẩm hộp",
+        unitName: "cái",
+        orderItemId: "sale-line-001",
+        quantity: 2,
+        unitPrice: 110000 + index,
+        total: 220000 + index,
+      })),
+    });
+
+    expect(result.writes).toEqual([]);
+    expect(result.blockers).toContainEqual({
+      documentCode: "TH-001",
+      reference: "TH-001|ALT-001|hộp|1",
+      reason: "ambiguous_legacy_line_match",
+    });
+  });
+
   test("adopts an old-schema return only when stable parent and complete child evidence match", () => {
     const source = plan().returns[0]!;
     const exact = plan({

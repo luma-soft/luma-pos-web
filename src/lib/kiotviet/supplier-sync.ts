@@ -11,6 +11,11 @@ const SUPPLIER_CODE = "Mã nhà cung cấp";
 const UNKNOWN_SUPPLIER_EXTERNAL_ID = "__kiotviet_unknown_supplier__";
 const REVIEWED_SUPPLIER_DEBT_TOTAL = 69_447_521;
 const REVIEWED_SUPPLIER_NET_PURCHASES_TOTAL = 4_032_549_434;
+const LEGACY_SUPPLIER_MARKER = "Tạo từ import lịch sử KiotViet";
+
+export function hasKiotVietLegacySupplierMarker(note: string | null | undefined): boolean {
+  return normalizeKiotVietText(note) === LEGACY_SUPPLIER_MARKER;
+}
 
 export interface KiotVietSupplierSource {
   externalId: string;
@@ -38,6 +43,8 @@ export interface KiotVietSupplierCurrent {
   isActive: boolean;
   currentDebt: number | string;
   legacyImported: boolean;
+  /** One-time post-migration bootstrap; the planner still requires a stable name match. */
+  legacyBootstrapEligible?: boolean;
 }
 
 export interface KiotVietSupplierHistoricalPlaceholder {
@@ -83,6 +90,12 @@ type KiotVietSupplierWrite =
     supplier: { isActive: false };
   }
   | {
+    action: "historical_adopt";
+    externalId: string;
+    localId: string;
+    supplier: { isActive: false };
+  }
+  | {
     action: "historical_placeholder";
     externalId: string;
     localId?: undefined;
@@ -99,6 +112,7 @@ export interface KiotVietSupplierSyncPlan {
   suppliers: KiotVietSupplierSource[];
   entityPlan: KiotVietEntitySyncPlan;
   inactivations: Array<{ externalId: string; localId: string }>;
+  historicalAdoptions: Array<{ externalId: string; localId: string }>;
   historicalPlaceholders: KiotVietSupplierHistoricalPlaceholder[];
   unknownSupplierPlaceholder: KiotVietUnknownSupplierPlaceholder | null;
   writes: KiotVietSupplierWrite[];
@@ -236,12 +250,19 @@ export function planKiotVietSupplierSync(input: {
       externalId: supplier.externalId,
       fingerprint: supplierFingerprint(sourceManagedSupplier(supplier)),
     })),
-    current: input.current.map((supplier) => ({
-      localId: supplier.localId,
-      code: supplier.code,
-      fingerprint: supplierFingerprint(currentManagedSupplier(supplier)),
-      legacyImported: supplier.legacyImported,
-    })),
+    current: input.current.map((supplier) => {
+      const code = nullableText(supplier.code);
+      const source = code ? sourceByExternalId.get(code) : undefined;
+      const stableBootstrapIdentity = supplier.legacyBootstrapEligible === true
+        && source != null
+        && normalizeKiotVietText(supplier.name) === normalizeKiotVietText(source.name);
+      return {
+        localId: supplier.localId,
+        code: supplier.code,
+        fingerprint: supplierFingerprint(currentManagedSupplier(supplier)),
+        legacyImported: supplier.legacyImported || stableBootstrapIdentity,
+      };
+    }),
     mappings: input.mappings.filter((mapping) => mapping.externalId !== UNKNOWN_SUPPLIER_EXTERNAL_ID),
   });
 
@@ -265,10 +286,15 @@ export function planKiotVietSupplierSync(input: {
     return mapping != null && currentById.has(mapping.localId);
   };
   const historicalConflicts: KiotVietEntitySyncPlan["conflicts"] = [];
+  const historicalAdoptions: Array<{ externalId: string; localId: string }> = [];
   for (const code of historicalCodes) {
     if (sourceByExternalId.has(code) || hasLiveMappedSupplier(code)) continue;
     const current = currentByCode.get(code);
     if (current) {
+      if (current.legacyImported) {
+        historicalAdoptions.push({ externalId: code, localId: current.localId });
+        continue;
+      }
       historicalConflicts.push({ externalId: code, localId: current.localId, reason: "code_collision" });
       continue;
     }
@@ -278,6 +304,8 @@ export function planKiotVietSupplierSync(input: {
     }
   }
   entityPlan.conflicts.push(...historicalConflicts);
+  const historicalAdoptedLocalIds = new Set(historicalAdoptions.map((item) => item.localId));
+  entityPlan.preserves = entityPlan.preserves.filter((item) => !historicalAdoptedLocalIds.has(item.localId));
 
   const unknownMapping = mappingByExternalId.get(UNKNOWN_SUPPLIER_EXTERNAL_ID);
   if (hasUnknownSupplierReference && unknownMapping && !currentById.has(unknownMapping.localId)) {
@@ -327,6 +355,12 @@ export function planKiotVietSupplierSync(input: {
       localId,
       supplier: { isActive: false as const },
     })),
+    ...historicalAdoptions.map(({ externalId, localId }) => ({
+      action: "historical_adopt" as const,
+      externalId,
+      localId,
+      supplier: { isActive: false as const },
+    })),
     ...historicalPlaceholders.map((supplier) => ({
       action: "historical_placeholder" as const,
       externalId: supplier.externalId,
@@ -353,6 +387,7 @@ export function planKiotVietSupplierSync(input: {
     suppliers,
     entityPlan,
     inactivations,
+    historicalAdoptions,
     historicalPlaceholders,
     unknownSupplierPlaceholder,
     writes,
@@ -367,7 +402,7 @@ export function planKiotVietSupplierSync(input: {
       unchanged: entityPlan.unchanged.length,
       conflicts: entityPlan.conflicts.length,
       preserved: entityPlan.preserves.length,
-      inactivated: inactivatedLocalIds.size,
+      inactivated: inactivatedLocalIds.size + historicalAdoptions.length,
       historicalPlaceholders: historicalPlaceholders.length,
       unknownSupplierPlaceholders: unknownSupplierPlaceholder ? 1 : 0,
       debtCorrections,

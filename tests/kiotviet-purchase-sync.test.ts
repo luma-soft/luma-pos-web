@@ -244,6 +244,97 @@ describe("KiotViet purchase receipt synchronization", () => {
     expect(result.writes[0]?.purchase.preservedLineIds).toEqual([]);
   });
 
+  test("adopts a legacy line whose product SKU is the exact pre-{DEL} identity", () => {
+    const deletedRow = { ...sourceRows[0]!, "Mã hàng": "ALT-001{DEL}" };
+    const result = plan({
+      sourceRows: [deletedRow],
+      resolvedProducts: [{ ...resolvedProducts[0]!, sku: "ALT-001{DEL}" }],
+      current: [{
+        localId: "purchase-001", code: "PN-001", fingerprint: "outdated",
+        subtotal: 0, legacyImported: true,
+      }],
+      existingLines: [{
+        localId: "legacy-deleted-line",
+        purchaseOrderId: "purchase-001",
+        legacyImported: true,
+        legacyProductSku: "ALT-001",
+        quantity: 2,
+        unitCost: 120000,
+        total: 240000,
+      }],
+    });
+
+    expect(result.blockers).toEqual([]);
+    expect(result.writes[0]?.purchase.lines).toMatchObject([{
+      action: "adopt",
+      localId: "legacy-deleted-line",
+      externalId: "PN-001|ALT-001{DEL}|hộp|1",
+    }]);
+  });
+
+  test("repairs one importer product mismatch only when the monetary signature is unique on both sides", () => {
+    const result = plan({
+      sourceRows: [{ ...sourceRows[0]!, "Tên hàng": "Keo Dán Ống - 15g" }],
+      current: [{
+        localId: "purchase-001", code: "PN-001", fingerprint: "outdated",
+        subtotal: 0, legacyImported: true,
+      }],
+      existingLines: [{
+        localId: "legacy-wrong-product",
+        purchaseOrderId: "purchase-001",
+        legacyImported: true,
+        legacyProductSku: "WRONG-SKU",
+        legacyProductName: "Keo Dán Ống - 50g",
+        quantity: 2,
+        unitCost: 120000,
+        total: 240000,
+      }],
+    });
+
+    expect(result.blockers).toEqual([]);
+    expect(result.writes[0]?.purchase.lines).toMatchObject([{
+      action: "adopt",
+      localId: "legacy-wrong-product",
+      line: { sourceSku: "ALT-001", productId: "product-001" },
+    }]);
+
+    const duplicateValueRow = {
+      ...sourceRows[0]!,
+      "Mã hàng": "BASE-001",
+      "Tên hàng": "Sản phẩm lẻ",
+      ĐVT: "Cái",
+      "Tổng tiền hàng": 480000,
+      "Giảm giá phiếu nhập": 0,
+      "VAT phiếu nhập": 0,
+      "Cần trả NCC": 480000,
+    };
+    const ambiguous = plan({
+      sourceRows: [
+        { ...sourceRows[0]!, "Tổng tiền hàng": 480000, "Giảm giá phiếu nhập": 0, "VAT phiếu nhập": 0, "Cần trả NCC": 480000 },
+        duplicateValueRow,
+      ],
+      current: [{
+        localId: "purchase-001", code: "PN-001", fingerprint: "outdated",
+        subtotal: 0, legacyImported: true,
+      }],
+      existingLines: [{
+        localId: "legacy-wrong-product",
+        purchaseOrderId: "purchase-001",
+        legacyImported: true,
+        legacyProductSku: "WRONG-SKU",
+        quantity: 2,
+        unitCost: 120000,
+        total: 240000,
+      }],
+    });
+    expect(ambiguous.writes).toEqual([]);
+    expect(ambiguous.blockers).toContainEqual({
+      documentCode: "PN-001",
+      reference: "PN-001|ALT-001|hộp|1",
+      reason: "legacy_line_unmatched",
+    });
+  });
+
   test("adopts an old-schema receipt only when its complete bootstrap evidence matches source", () => {
     const source = plan({ sourceRows: [sourceRows[0]!] }).purchases[0]!;
     const exact = plan({

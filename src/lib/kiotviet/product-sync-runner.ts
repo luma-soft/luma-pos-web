@@ -212,7 +212,7 @@ export async function applyKiotVietProductSync(input: {
       if (action.reason === "historical_missing") {
         await transaction.upsertSourceMapping({
           productId: action.productId,
-          externalId: action.sku,
+          externalId: action.sourceExternalId ?? action.sku,
           lastSeenAt: seenAt,
           deletedAt: seenAt,
         });

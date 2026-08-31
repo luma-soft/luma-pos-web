@@ -255,6 +255,58 @@ function currentLineFingerprint(line: KiotVietPurchaseCurrentLine): string | nul
   });
 }
 
+function currentLineSku(line: KiotVietPurchaseCurrentLine): string | null {
+  return nullableText(line.legacyProductSku) ?? nullableText(line.sourceSku);
+}
+
+function eligibleLegacyCurrentLine(line: KiotVietPurchaseCurrentLine): boolean {
+  return Boolean(
+    (line.legacyImported || line.legacyAdoptionEligible)
+    && currentLineSku(line)
+    && line.quantity != null
+    && line.unitCost != null
+    && line.total != null,
+  );
+}
+
+function monetaryLineFingerprint(value: {
+  quantity: number | string;
+  unitCost: number | string;
+  total: number | string;
+}): string {
+  return stableKiotVietFingerprint({
+    quantity: normalizeKiotVietNumber(value.quantity),
+    unitCost: normalizeKiotVietNumber(value.unitCost),
+    total: normalizeKiotVietNumber(value.total),
+  });
+}
+
+function currentMonetaryLineFingerprint(line: KiotVietPurchaseCurrentLine): string | null {
+  if (!eligibleLegacyCurrentLine(line)) return null;
+  return monetaryLineFingerprint({
+    quantity: line.quantity!,
+    unitCost: line.unitCost!,
+    total: line.total!,
+  });
+}
+
+function deletedSkuAliases(left: string, right: string): boolean {
+  const deleted = (value: string) => {
+    const match = value.match(/^(.*)\{DEL\}$/i);
+    return match?.[1]?.trim() ? { base: match[1]!.trim(), deleted: true } : { base: value, deleted: false };
+  };
+  const a = deleted(left);
+  const b = deleted(right);
+  return a.deleted !== b.deleted && a.base === b.base;
+}
+
+function legacyProductFamily(value: string | null | undefined): string | null {
+  const normalized = nullableText(value)?.toLocaleLowerCase("vi");
+  if (!normalized) return null;
+  const separator = normalized.lastIndexOf(" - ");
+  return separator > 0 ? normalized.slice(0, separator).trim() : normalized;
+}
+
 function assertReconciledPurchases(rows: KiotVietDataRow[]): void {
   assertKiotVietDocumentReconciliation(rows, {
     codeColumn: PURCHASE_CODE,
@@ -426,14 +478,17 @@ function childWrites(input: {
   const legacyCurrentByExternalId = new Map<string, KiotVietPurchaseCurrentLine>();
   const unmatchedSourceExternalIds: string[] = [];
   if (input.allowLegacyAdoption) {
-    for (const value of [...input.values].sort((left, right) => left.externalId.localeCompare(right.externalId))) {
-      if (mappedCurrentByExternalId.has(value.externalId) || input.mappings.has(value.externalId)) continue;
-      const fingerprint = sourceLineFingerprint(value);
-      const candidates = [...input.currentById.values()].filter((current) => (
-        current.purchaseOrderId === input.parentId
-        && !selectedIds.has(current.localId)
-        && currentLineFingerprint(current) === fingerprint
-      ));
+    const orderedValues = [...input.values].sort((left, right) => left.externalId.localeCompare(right.externalId));
+    const failedExternalIds = new Set<string>();
+    const availableCandidates = () => [...input.currentById.values()].filter((current) => (
+      current.purchaseOrderId === input.parentId
+      && !selectedIds.has(current.localId)
+      && eligibleLegacyCurrentLine(current)
+    ));
+    const adoptUnique = (
+      value: KiotVietPurchaseLineSnapshot,
+      candidates: KiotVietPurchaseCurrentLine[],
+    ): boolean => {
       if (candidates.length > 1) {
         input.blockers.push({
           documentCode: input.documentCode,
@@ -441,15 +496,68 @@ function childWrites(input: {
           reason: "ambiguous_legacy_line_match",
         });
         childIdentityFailure = true;
-        continue;
+        failedExternalIds.add(value.externalId);
+        return false;
       }
       const legacy = candidates[0];
-      if (!legacy) {
-        unmatchedSourceExternalIds.push(value.externalId);
-        continue;
-      }
+      if (!legacy) return false;
       selectedIds.add(legacy.localId);
       legacyCurrentByExternalId.set(value.externalId, legacy);
+      return true;
+    };
+
+    for (const value of orderedValues) {
+      if (mappedCurrentByExternalId.has(value.externalId) || input.mappings.has(value.externalId)) continue;
+      const fingerprint = sourceLineFingerprint(value);
+      adoptUnique(value, availableCandidates().filter((current) => currentLineFingerprint(current) === fingerprint));
+    }
+
+    for (const value of orderedValues) {
+      if (
+        mappedCurrentByExternalId.has(value.externalId)
+        || input.mappings.has(value.externalId)
+        || legacyCurrentByExternalId.has(value.externalId)
+        || failedExternalIds.has(value.externalId)
+      ) continue;
+      adoptUnique(value, availableCandidates().filter((current) => {
+        const sku = currentLineSku(current);
+        return sku != null
+          && deletedSkuAliases(value.sourceSku, sku)
+          && currentMonetaryLineFingerprint(current) === monetaryLineFingerprint(value);
+      }));
+    }
+
+    for (const value of orderedValues) {
+      if (
+        mappedCurrentByExternalId.has(value.externalId)
+        || input.mappings.has(value.externalId)
+        || legacyCurrentByExternalId.has(value.externalId)
+        || failedExternalIds.has(value.externalId)
+      ) continue;
+      const fingerprint = monetaryLineFingerprint(value);
+      const sameValueSourceCount = orderedValues.filter((candidate) => (
+        !mappedCurrentByExternalId.has(candidate.externalId)
+        && !input.mappings.has(candidate.externalId)
+        && !legacyCurrentByExternalId.has(candidate.externalId)
+        && !failedExternalIds.has(candidate.externalId)
+        && monetaryLineFingerprint(candidate) === fingerprint
+      )).length;
+      if (sameValueSourceCount === 1) {
+        adoptUnique(value, availableCandidates().filter((current) => (
+          currentMonetaryLineFingerprint(current) === fingerprint
+          && legacyProductFamily(current.legacyProductName) != null
+          && legacyProductFamily(current.legacyProductName) === legacyProductFamily(value.productName)
+        )));
+      }
+    }
+
+    for (const value of orderedValues) {
+      if (
+        !mappedCurrentByExternalId.has(value.externalId)
+        && !input.mappings.has(value.externalId)
+        && !legacyCurrentByExternalId.has(value.externalId)
+        && !failedExternalIds.has(value.externalId)
+      ) unmatchedSourceExternalIds.push(value.externalId);
     }
 
     const unmatchedLegacyIds = [...input.currentById.values()]

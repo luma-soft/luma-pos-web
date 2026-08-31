@@ -216,6 +216,26 @@ describe("KiotViet product synchronization planning", () => {
     expect(plan.preserves.map((action) => action.sku)).toEqual(["LUMA-ONLY"]);
   });
 
+  it("archives an exact stripped SKU for a KiotViet {DEL} history identity and retains that source identity", () => {
+    const plan = planKiotVietProductSync({
+      snapshot: { products: [], units: [] },
+      currentProducts: [
+        { id: "deleted-id", sku: "SP001896", stock: 0, isActive: true },
+        { id: "luma-id", sku: "SP001896-LOCAL", stock: 0, isActive: true },
+      ],
+      sourceMappings: [],
+      historicalSkus: new Set(["SP001896{DEL}"]),
+    });
+
+    expect(plan.archives).toEqual([{
+      productId: "deleted-id",
+      sku: "SP001896",
+      sourceExternalId: "SP001896{DEL}",
+      reason: "historical_missing",
+    }]);
+    expect(plan.preserves).toEqual([{ productId: "luma-id", sku: "SP001896-LOCAL" }]);
+  });
+
   it("rejects duplicate products, duplicate unit SKUs, and orphan units", () => {
     expect(() => planKiotVietProductSync({
       snapshot: {

@@ -187,6 +187,54 @@ describe("KiotViet customer master synchronization", () => {
     }]);
   });
 
+  test("bootstraps an empty-mapping customer only when its stable name matches", () => {
+    const sourceRows = [{
+      "Mã khách hàng": "KH-BOOTSTRAP",
+      "Tên khách hàng": "Khách bootstrap",
+      "Nợ cần thu hiện tại": 500,
+      "Tổng bán trừ trả hàng": 900,
+      "Trạng thái": "Đang giao dịch",
+    }];
+    const current = [{
+      localId: "customer-bootstrap",
+      code: "KH-BOOTSTRAP",
+      name: "Khách bootstrap",
+      phone: null,
+      email: null,
+      address: null,
+      taxCode: null,
+      note: null,
+      isActive: true,
+      currentDebt: 0,
+      totalSpent: 0,
+      legacyImported: false,
+      legacyBootstrapEligible: true,
+    }];
+    const adopted = planKiotVietCustomerSync({
+      sourceRows,
+      current,
+      mappings: [],
+      historicalDocumentCustomerCodes: [],
+    });
+    expect(adopted.entityPlan.adopts).toEqual([{
+      externalId: "KH-BOOTSTRAP",
+      localId: "customer-bootstrap",
+      needsUpdate: true,
+    }]);
+
+    const collision = planKiotVietCustomerSync({
+      sourceRows,
+      current: [{ ...current[0], name: "Khách Luma khác" }],
+      mappings: [],
+      historicalDocumentCustomerCodes: [],
+    });
+    expect(collision.entityPlan.conflicts).toContainEqual({
+      externalId: "KH-BOOTSTRAP",
+      localId: "customer-bootstrap",
+      reason: "code_collision",
+    });
+  });
+
   test("reports the reviewed adoption and correction counts deterministically", () => {
     const sourceRows = Array.from({ length: 103 }, (_, index) => ({
       "Mã khách hàng": `KH-${String(index + 1).padStart(3, "0")}`,

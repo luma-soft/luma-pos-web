@@ -291,6 +291,80 @@ describe("KiotViet store-scoped database adapter", () => {
     await database.delete(schema.kiotvietSyncRuns).where(eq(schema.kiotvietSyncRuns.id, runId));
   });
 
+  test("adopts an importer-proven historical supplier as inactive with deleted source ownership", async () => {
+    const [supplier] = await database.insert(schema.suppliers).values({
+      storeId: STORE_ID,
+      code: "NCC-HISTORY-APPLY",
+      name: "Historical supplier",
+      note: "Tạo từ import lịch sử KiotViet",
+      isActive: true,
+    }).returning({ id: schema.suppliers.id });
+    const runId = await createAuditRepository().startRun({
+      phase: "suppliers",
+      sourceFileName: "suppliers.xlsx",
+      sourceSha256: SOURCE_SHA,
+      bundleSha256: BUNDLE_SHA,
+      sourceRows: 0,
+      sourceDocuments: 0,
+    });
+
+    await database.transaction(async (rawTransaction) => {
+      const syncTransaction = await createKiotVietDataSyncTransaction({
+        transaction: rawTransaction,
+        storeId: STORE_ID,
+        expectedStoreSlug: "hai-dang",
+      });
+      await applyKiotVietTypedPhasePlan({
+        transaction: rawTransaction,
+        syncTransaction,
+        storeId: STORE_ID,
+        runId,
+        sourceSha256: SOURCE_SHA,
+        plan: {
+          phase: "suppliers",
+          summary: { inactivated: 1 },
+          blockers: [],
+          typedPlan: {
+            suppliers: [],
+            entityPlan: { creates: [], adopts: [], updates: [], unchanged: [], preserves: [], conflicts: [] },
+            inactivations: [],
+            historicalAdoptions: [{ externalId: "NCC-HISTORY-APPLY", localId: supplier.id }],
+            historicalPlaceholders: [],
+            unknownSupplierPlaceholder: null,
+            sourceTotals: { currentDebt: 0, netPurchases: 0 },
+            summary: { created: 0, adopted: 0, updated: 0, unchanged: 0, conflicts: 0, preserved: 0, inactivated: 1, historicalPlaceholders: 0, unknownSupplierPlaceholders: 0, debtCorrections: 0 },
+            writes: [{
+              action: "historical_adopt",
+              externalId: "NCC-HISTORY-APPLY",
+              localId: supplier.id,
+              supplier: { isActive: false },
+            }],
+          },
+        },
+      });
+    });
+
+    const [updated] = await database.select().from(schema.suppliers)
+      .where(eq(schema.suppliers.id, supplier.id));
+    expect(updated.isActive).toBe(false);
+    const [mapping] = await database.select().from(schema.kiotvietSourceMappings)
+      .where(and(
+        eq(schema.kiotvietSourceMappings.storeId, STORE_ID),
+        eq(schema.kiotvietSourceMappings.entityType, "supplier"),
+        eq(schema.kiotvietSourceMappings.externalId, "NCC-HISTORY-APPLY"),
+      ));
+    expect(mapping).toMatchObject({
+      localId: supplier.id,
+      adoptionMethod: "legacy_adopted",
+      lastSeenRunId: runId,
+    });
+    expect(mapping.deletedAt).toBeInstanceOf(Date);
+
+    await database.delete(schema.kiotvietSourceMappings).where(eq(schema.kiotvietSourceMappings.id, mapping.id));
+    await database.delete(schema.suppliers).where(eq(schema.suppliers.id, supplier.id));
+    await database.delete(schema.kiotvietSyncRuns).where(eq(schema.kiotvietSyncRuns.id, runId));
+  });
+
   test("captures invariants, validates mapping ownership, and preserves mapping identity", async () => {
     const [customer, otherCustomer] = await database.insert(schema.customers).values([
       { storeId: STORE_ID, code: "KH-1", name: "Customer 1", currentDebt: "25", totalSpent: "100" },

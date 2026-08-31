@@ -76,6 +76,8 @@ export interface ProductUpdateAction {
 export interface ProductArchiveAction {
   productId: string;
   sku: string;
+  /** Historical KiotViet identity, including its deletion suffix when present. */
+  sourceExternalId?: string;
   reason: ProductArchiveReason;
 }
 
@@ -260,6 +262,17 @@ export function planKiotVietProductSync(
   );
   const mappedProductIds = new Set(sourceMappings.map((mapping) => mapping.productId));
   const alternateUnitSkus = new Set(snapshot.units.map((unit) => unit.sku));
+  const deletedHistoricalIdentityBySku = new Map<string, string>();
+  for (const historicalSku of historicalSkus) {
+    const match = historicalSku.match(/^(.*)\{DEL\}$/i);
+    const strippedSku = match?.[1]?.trim();
+    if (!strippedSku) continue;
+    const existing = deletedHistoricalIdentityBySku.get(strippedSku);
+    if (existing && existing !== historicalSku) {
+      throw new Error(`Ambiguous KiotViet deleted history identity for ${strippedSku}`);
+    }
+    deletedHistoricalIdentityBySku.set(strippedSku, historicalSku);
+  }
   const updatedProductIds = new Set<string>();
   const creates: ProductCreateAction[] = [];
   const updates: ProductUpdateAction[] = [];
@@ -294,12 +307,19 @@ export function planKiotVietProductSync(
       reason = "alternate_unit_placeholder";
     } else if (mappedProductIds.has(current.id)) {
       reason = "mapped_missing";
-    } else if (historicalSkus.has(current.sku)) {
+    } else if (historicalSkus.has(current.sku) || deletedHistoricalIdentityBySku.has(current.sku)) {
       reason = "historical_missing";
     }
 
     if (reason) {
-      archives.push({ productId: current.id, sku: current.sku, reason });
+      archives.push({
+        productId: current.id,
+        sku: current.sku,
+        ...(reason === "historical_missing" ? {
+          sourceExternalId: deletedHistoricalIdentityBySku.get(current.sku) ?? current.sku,
+        } : {}),
+        reason,
+      });
     } else {
       preserves.push({ productId: current.id, sku: current.sku });
     }

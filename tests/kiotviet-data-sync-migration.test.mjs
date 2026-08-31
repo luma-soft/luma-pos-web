@@ -29,6 +29,15 @@ beforeAll(async () => {
 afterAll(async () => database.close());
 
 describe("KiotViet remaining-data synchronization migration", () => {
+  test("preserves multi-number KiotViet supplier phone values", async () => {
+    const columns = await database.query(`
+      select data_type, character_maximum_length
+      from information_schema.columns
+      where table_name = 'suppliers' and column_name = 'phone'
+    `);
+    expect(columns.rows).toEqual([{ data_type: "text", character_maximum_length: null }]);
+  });
+
   test("adds run audit, generic provenance, and missing source snapshot fields", async () => {
     const columns = await database.query(`
       select table_name, column_name, is_nullable

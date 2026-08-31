@@ -287,11 +287,31 @@ function sourceReturns(input: {
 
     const canonicalLines = rows.flatMap((row) => {
       const sourceSku = normalizeKiotVietText(row["Mã hàng"]);
-      const sourceUnitName = normalizeKiotVietText(row.ĐVT);
-      if (!sourceSku || !sourceUnitName) {
+      let sourceUnitName = normalizeKiotVietText(row.ĐVT);
+      if (!sourceSku) {
         throw new Error("KiotViet purchase return requires source SKU and source unit");
       }
-      const product = input.productsBySourceKey.get(sourceProductKey(sourceSku, sourceUnitName));
+      let product = sourceUnitName
+        ? input.productsBySourceKey.get(sourceProductKey(sourceSku, sourceUnitName))
+        : undefined;
+      if (!sourceUnitName) {
+        const inferredByIdentity = new Map<string, KiotVietResolvedPurchaseReturnProduct>();
+        for (const candidate of input.productsBySourceKey.values()) {
+          if (
+            normalizeKiotVietText(candidate.sku) !== sourceSku
+            || candidate.resolutionSource !== "current_base"
+          ) continue;
+          inferredByIdentity.set([
+            candidate.productId,
+            normalizeKiotVietText(candidate.unitName).toLocaleLowerCase("vi"),
+            String(candidate.unitMultiplier),
+          ].join("\u0000"), candidate);
+        }
+        if (inferredByIdentity.size === 1) {
+          product = [...inferredByIdentity.values()][0];
+          sourceUnitName = normalizeKiotVietText(product?.unitName);
+        }
+      }
       if (!product) {
         const hasSkuResolution = [...input.productsBySourceKey.values()]
           .some((candidate) => normalizeKiotVietText(candidate.sku) === sourceSku);

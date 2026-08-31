@@ -38,6 +38,8 @@ export interface KiotVietCustomerCurrent {
   currentDebt: number | string;
   totalSpent: number | string;
   legacyImported: boolean;
+  /** One-time post-migration bootstrap; the planner still requires a stable name match. */
+  legacyBootstrapEligible?: boolean;
   consentStatus?: string | null;
   zaloUserId?: string | null;
   portalToken?: string | null;
@@ -208,12 +210,19 @@ export function planKiotVietCustomerSync(input: {
       externalId: customer.externalId,
       fingerprint: customerFingerprint(sourceManagedCustomer(customer)),
     })),
-    current: input.current.map((customer) => ({
-      localId: customer.localId,
-      code: customer.code,
-      fingerprint: customerFingerprint(currentManagedCustomer(customer)),
-      legacyImported: customer.legacyImported,
-    })),
+    current: input.current.map((customer) => {
+      const code = nullableText(customer.code);
+      const source = code ? sourceByExternalId.get(code) : undefined;
+      const stableBootstrapIdentity = customer.legacyBootstrapEligible === true
+        && source != null
+        && normalizeKiotVietText(customer.name) === normalizeKiotVietText(source.name);
+      return {
+        localId: customer.localId,
+        code: customer.code,
+        fingerprint: customerFingerprint(currentManagedCustomer(customer)),
+        legacyImported: customer.legacyImported || stableBootstrapIdentity,
+      };
+    }),
     mappings: input.mappings,
   });
 

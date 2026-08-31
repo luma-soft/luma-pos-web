@@ -65,6 +65,8 @@ export interface KiotVietReturnCurrentLine {
   /** Supplied by the loader when the historical row only persisted product ID. */
   legacyProductSku?: string;
   sourceSku?: string;
+  productName?: string;
+  unitName?: string;
   orderItemId?: string | null;
   quantity?: number | string;
   unitPrice?: number | string;
@@ -292,6 +294,23 @@ function currentLineFingerprint(value: KiotVietReturnCurrentLine): string | null
   });
 }
 
+function stableLegacyLineIdentityMatches(
+  source: KiotVietReturnLineSnapshot,
+  current: KiotVietReturnCurrentLine,
+): boolean {
+  const currentSku = nullableText(current.legacyProductSku) ?? nullableText(current.sourceSku);
+  if (
+    (!current.legacyImported && !current.legacyAdoptionEligible)
+    || !currentSku
+    || current.quantity == null
+    || !nullableText(current.productName)
+  ) return false;
+  return currentSku === source.sourceSku
+    && normalizeKiotVietText(current.productName) === normalizeKiotVietText(source.productName)
+    && normalizeKiotVietNumber(current.quantity) === source.quantity
+    && (nullableText(current.orderItemId) ?? null) === source.orderItemId;
+}
+
 function assertReconciledReturns(rows: KiotVietDataRow[]): void {
   assertKiotVietDocumentReconciliation(rows, {
     codeColumn: RETURN_CODE,
@@ -495,13 +514,39 @@ function childWrites(input: {
   const legacyCurrentByExternalId = new Map<string, KiotVietReturnCurrentLine>();
   const unmatchedSourceExternalIds: string[] = [];
   if (input.allowLegacyAdoption) {
-    for (const value of [...input.values].sort((left, right) => left.externalId.localeCompare(right.externalId))) {
+    const orderedValues = [...input.values].sort((left, right) => left.externalId.localeCompare(right.externalId));
+    const failedExternalIds = new Set<string>();
+    for (const value of orderedValues) {
       if (mappedCurrentByExternalId.has(value.externalId) || input.mappings.has(value.externalId)) continue;
       const candidates = [...input.currentById.values()].filter((current) => (
         current.returnId === input.parentId
         && !selectedIds.has(current.localId)
         && !reservedMappedIds.has(current.localId)
         && currentLineFingerprint(current) === sourceLineFingerprint(value)
+      ));
+      if (candidates.length > 1) {
+        input.blockers.push({ documentCode: input.documentCode, reference: value.externalId, reason: "ambiguous_legacy_line_match" });
+        childIdentityFailure = true;
+        failedExternalIds.add(value.externalId);
+        continue;
+      }
+      const legacy = candidates[0];
+      if (!legacy) continue;
+      selectedIds.add(legacy.localId);
+      legacyCurrentByExternalId.set(value.externalId, legacy);
+    }
+    for (const value of orderedValues) {
+      if (
+        mappedCurrentByExternalId.has(value.externalId)
+        || input.mappings.has(value.externalId)
+        || legacyCurrentByExternalId.has(value.externalId)
+        || failedExternalIds.has(value.externalId)
+      ) continue;
+      const candidates = [...input.currentById.values()].filter((current) => (
+        current.returnId === input.parentId
+        && !selectedIds.has(current.localId)
+        && !reservedMappedIds.has(current.localId)
+        && stableLegacyLineIdentityMatches(value, current)
       ));
       if (candidates.length > 1) {
         input.blockers.push({ documentCode: input.documentCode, reference: value.externalId, reason: "ambiguous_legacy_line_match" });

@@ -184,7 +184,7 @@ describe("KiotViet product sync transactional application", () => {
         { id: "luma-id", sku: "LUMA", stock: 7, isActive: true },
       ],
       sourceMappings: [{ productId: "mapped-id", externalId: "MAPPED", deletedAt: null }],
-      historicalSkus: new Set(["DELETED"]),
+      historicalSkus: new Set(["DELETED{DEL}"]),
     });
     const calls: Array<[string, ...unknown[]]> = [];
     const transaction: ProductSyncTransaction = {
@@ -242,7 +242,7 @@ describe("KiotViet product sync transactional application", () => {
       ["replaceComboItems", "combo-id", [{ productId: "part-id", quantity: 2 }]],
       ["replaceComboItems", "part-id", []],
       ["archiveProduct", "deleted-id", "DELETED", "historical_missing"],
-      ["upsertSourceMapping", "deleted-id", "DELETED", seenAt],
+      ["upsertSourceMapping", "deleted-id", "DELETED{DEL}", seenAt],
       ["archiveProduct", "mapped-id", "MAPPED", "mapped_missing"],
       ["markSourceDeleted", "mapped-id", "MAPPED", seenAt],
     ]);
