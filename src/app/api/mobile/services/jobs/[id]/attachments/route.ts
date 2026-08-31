@@ -130,6 +130,8 @@ export async function POST(
         mediaId: managed.mediaId,
         purpose: "service-evidence",
         targetId: id,
+        expectedObjectKey: managed.path,
+        expectedCreatedBy: gate.userId,
       });
       throw error;
     }

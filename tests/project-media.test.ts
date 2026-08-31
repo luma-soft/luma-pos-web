@@ -216,19 +216,35 @@ function validWordEntries() {
 function fakeManagerHarness(options: {
   authorization?: "allowed" | "forbidden" | "not_found";
   associationFailure?: boolean;
+  documentValidationFailure?: boolean;
+  compensationFailure?: boolean;
   deleteOutcome?: "deleted" | "already_deleted" | "referenced" | "not_found" | "conflict";
 } = {}) {
   const state = {
     listCalls: 0,
     uploadCalls: [] as unknown[],
     signCalls: [] as Array<{ mediaId: string; expiresInSeconds: number }>,
-    compensationCalls: [] as Array<{ storeId: string; mediaId: string; purpose: string; targetId: string }>,
+    documentValidationCalls: [] as unknown[],
+    compensationCalls: [] as Array<{
+      storeId: string;
+      mediaId: string;
+      purpose: string;
+      targetId: string;
+      expectedObjectKey: string;
+      expectedCreatedBy: string | null;
+    }>,
     deleteCalls: [] as unknown[],
   };
   const repository = {
     async listProjectAttachments() {
       state.listCalls += 1;
       return [internalRecord()];
+    },
+    async validateProjectDocument(input: unknown) {
+      state.documentValidationCalls.push(input);
+      if (options.documentValidationFailure) {
+        throw new Error("PROJECT_MEDIA_DOCUMENT_NOT_FOUND");
+      }
     },
     async createProjectAttachment(input: unknown) {
       if (options.associationFailure) throw new Error("association failed");
@@ -262,15 +278,14 @@ function fakeManagerHarness(options: {
       state.signCalls.push({ mediaId: record.mediaId, expiresInSeconds });
       return `https://r2.test/${record.objectKey}?X-Amz-Expires=${expiresInSeconds}`;
     },
-    compensate: async (input: {
-      storeId: string;
-      mediaId: string;
-      purpose: "project-document";
-      targetId: string;
-    }) => {
+    compensate: async (input: typeof state.compensationCalls[number]) => {
       state.compensationCalls.push(input);
+      if (options.compensationFailure) {
+        throw new Error("MANAGED_MEDIA_RECOVERY_CONFLICT");
+      }
       return { outcome: "deleted" as const, media: { id: input.mediaId } };
     },
+    logger: { error() {} },
   });
   return { manager, state };
 }
@@ -503,7 +518,50 @@ describe("project media validation and orchestration", () => {
       mediaId: MEDIA_ID,
       purpose: "project-document",
       targetId: PROJECT_ID,
+      expectedObjectKey: `stores/${STORE_ID}/projects/2026/08/${MEDIA_ID}/original.jpg`,
+      expectedCreatedBy: USER_ID,
     }]);
+  });
+
+  test("prevalidates a handover document before uploading while retaining transaction revalidation", async () => {
+    const { manager, state } = fakeManagerHarness({
+      documentValidationFailure: true,
+    });
+    await expect(manager.upload(actor, PROJECT_ID, {
+      phase: "handover",
+      caption: null,
+      documentId: DOCUMENT_ID,
+      fileName: "handover.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: 4,
+      sha256: "a".repeat(64),
+    }, Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]))).rejects.toThrow(
+      "PROJECT_MEDIA_DOCUMENT_NOT_FOUND",
+    );
+    expect(state.documentValidationCalls).toEqual([{
+      storeId: STORE_ID,
+      projectId: PROJECT_ID,
+      documentId: DOCUMENT_ID,
+    }]);
+    expect(state.uploadCalls).toHaveLength(0);
+    expect(state.compensationCalls).toHaveLength(0);
+  });
+
+  test("propagates an unsafe association-recovery failure instead of hiding it", async () => {
+    const { manager } = fakeManagerHarness({
+      associationFailure: true,
+      compensationFailure: true,
+    });
+    await expect(manager.upload(actor, PROJECT_ID, {
+      phase: "other",
+      caption: null,
+      fileName: "failure.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: 4,
+      sha256: "a".repeat(64),
+    }, Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]))).rejects.toThrow(
+      "MANAGED_MEDIA_RECOVERY_CONFLICT",
+    );
   });
 
   test("writes a new dossier object to the private R2 project key before associating it", async () => {
@@ -546,6 +604,9 @@ describe("project media validation and orchestration", () => {
       },
       async abandonPending() {
         return null;
+      },
+      async recoverReadyAfterFailure() {
+        return { outcome: "referenced" };
       },
       async softDeleteIfUnreferenced() {
         return { outcome: "referenced" };
@@ -599,6 +660,7 @@ describe("project media validation and orchestration", () => {
         async listProjectAttachments() {
           return [];
         },
+        async validateProjectDocument() {},
         async createProjectAttachment(
           input: Parameters<ProjectMediaRepository["createProjectAttachment"]>[0],
         ) {
@@ -616,7 +678,7 @@ describe("project media validation and orchestration", () => {
       mediaService: service,
       sign: async (record: ProjectMediaInternalRecord, expiresInSeconds: number) =>
         `https://r2.test/${record.objectKey}?X-Amz-Expires=${expiresInSeconds}`,
-      compensate: async () => ({ outcome: "conflict" }),
+      compensate: async () => ({ outcome: "referenced" }),
     });
 
     await manager.upload(actor, PROJECT_ID, {

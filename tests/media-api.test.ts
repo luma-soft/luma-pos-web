@@ -98,6 +98,8 @@ function createHarness(options: {
   originalPutFailure?: "definitive" | "ambiguous-before" | "ambiguous-after";
   failCompletionHead?: boolean;
   failDownloadSign?: boolean;
+  readyRecoveryOutcome?: "deleted" | "quarantined" | "referenced" | "conflict";
+  readyRecoveryFailure?: boolean;
 } = {}) {
   const records = new Map(
     (options.initial ?? []).map((record) => [`${record.storeId}:${record.id}`, record]),
@@ -121,6 +123,7 @@ function createHarness(options: {
       ifNoneMatch?: string;
     }>,
   };
+  const readyRecoveryCalls: unknown[] = [];
 
   const repository: MediaRepository = {
     async createPending(input) {
@@ -166,6 +169,7 @@ function createHarness(options: {
       return updated;
     },
     async softDeleteIfUnreferenced(input) {
+      if (options.readyRecoveryOutcome) return { outcome: "conflict" };
       if (options.protectedDelete) return { outcome: "referenced" };
       const key = `${input.storeId}:${input.mediaId}`;
       let current = records.get(key);
@@ -187,6 +191,24 @@ function createHarness(options: {
       };
       records.set(key, deleted);
       return { outcome: "deleted", media: deleted };
+    },
+    async recoverReadyAfterFailure(input) {
+      readyRecoveryCalls.push(input);
+      if (options.readyRecoveryFailure) {
+        throw new Error("recovery database unavailable");
+      }
+      const outcome = options.readyRecoveryOutcome ?? "deleted";
+      if (outcome === "referenced" || outcome === "conflict") return { outcome };
+      const key = `${input.storeId}:${input.mediaId}`;
+      const current = records.get(key);
+      if (!current) return { outcome: "conflict" };
+      const recovered = {
+        ...current,
+        status: outcome,
+        deletedAt: outcome === "deleted" ? input.recoveredAt : null,
+      } as MediaRecord;
+      records.set(key, recovered);
+      return { outcome, media: recovered };
     },
     async abandonPending(input) {
       const key = `${input.storeId}:${input.mediaId}`;
@@ -287,6 +309,7 @@ function createHarness(options: {
 
   return {
     records,
+    readyRecoveryCalls,
     storageState,
     service,
     upload: createUploadIntentHandler({ authenticate, service }),
@@ -726,6 +749,86 @@ describe("server managed object writes", () => {
 
     expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("deleted");
     expect(harness.storageState.removed).toEqual([]);
+  });
+
+  test("quarantines a ready object when signing recovery is reference-indeterminate", async () => {
+    const harness = createHarness({
+      failDownloadSign: true,
+      readyRecoveryOutcome: "quarantined",
+    });
+    await expect(harness.service.putManagedObject(gate, {
+      purpose: "project-document",
+      targetId: PROJECT_ID,
+      fileName: "handover.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 4,
+    }, Uint8Array.from([0x25, 0x50, 0x44, 0x46]))).rejects.toThrow(
+      "private signing failed",
+    );
+
+    expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status)
+      .toBe("quarantined");
+    expect(harness.readyRecoveryCalls).toEqual([{
+      storeId: STORE_ID,
+      mediaId: MEDIA_ID,
+      expectedPurpose: "project-document",
+      expectedTargetId: PROJECT_ID,
+      expectedObjectKey: `stores/${STORE_ID}/projects/2026/08/${MEDIA_ID}/original.pdf`,
+      expectedCreatedBy: USER_ID,
+      recoveredAt: NOW,
+    }]);
+  });
+
+  test("keeps a ready object when signing recovery finds a live reference", async () => {
+    const harness = createHarness({
+      failDownloadSign: true,
+      readyRecoveryOutcome: "referenced",
+    });
+    await expect(harness.service.putManagedObject(gate, {
+      purpose: "project-document",
+      targetId: PROJECT_ID,
+      fileName: "referenced.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 4,
+    }, Uint8Array.from([0x25, 0x50, 0x44, 0x46]))).rejects.toThrow(
+      "private signing failed",
+    );
+
+    expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("ready");
+    expect(harness.readyRecoveryCalls).toHaveLength(1);
+    expect(harness.storageState.removed).toEqual([]);
+  });
+
+  test("surfaces conflict or database failure from ready signing recovery", async () => {
+    const conflict = createHarness({
+      failDownloadSign: true,
+      readyRecoveryOutcome: "conflict",
+    });
+    await expect(conflict.service.putManagedObject(gate, {
+      purpose: "project-document",
+      targetId: PROJECT_ID,
+      fileName: "conflict.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 4,
+    }, Uint8Array.from([0x25, 0x50, 0x44, 0x46]))).rejects.toThrow(
+      "media.readyRecoveryConflict",
+    );
+    expect(conflict.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("ready");
+
+    const failed = createHarness({
+      failDownloadSign: true,
+      readyRecoveryFailure: true,
+    });
+    await expect(failed.service.putManagedObject(gate, {
+      purpose: "project-document",
+      targetId: PROJECT_ID,
+      fileName: "database-error.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 4,
+    }, Uint8Array.from([0x25, 0x50, 0x44, 0x46]))).rejects.toThrow(
+      "recovery database unavailable",
+    );
+    expect(failed.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("ready");
   });
 });
 

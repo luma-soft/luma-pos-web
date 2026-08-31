@@ -191,6 +191,26 @@ function createOldClientLifecycleHarness(options: { referenced?: boolean } = {})
       records.set(coordinate, deleted);
       return deleted;
     },
+    async recoverReadyAfterFailure(input) {
+      const coordinate = `${input.storeId}:${input.mediaId}`;
+      const current = records.get(coordinate);
+      if (
+        !current
+        || current.status !== "ready"
+        || current.purpose !== input.expectedPurpose
+        || current.targetId !== input.expectedTargetId
+        || current.objectKey !== input.expectedObjectKey
+        || current.createdBy !== input.expectedCreatedBy
+      ) return { outcome: "conflict" };
+      if (options.referenced) return { outcome: "referenced" };
+      const deleted: MediaRecord = {
+        ...current,
+        status: "deleted",
+        deletedAt: input.recoveredAt,
+      };
+      records.set(coordinate, deleted);
+      return { outcome: "deleted", media: deleted };
+    },
     async softDeleteIfUnreferenced(input) {
       softDeleteInputs.push(input);
       if (options.referenced) return { outcome: "referenced" };

@@ -22,9 +22,10 @@ import {
   type MediaTargetAuthorization,
 } from "@/lib/media/authorization";
 import {
+  recoverReadyMediaAfterFailureCore,
   softDeleteMediaIfUnreferencedCore,
   softDeleteMediaIfUnreferencedInTransaction,
-  type SoftDeleteMediaResult,
+  type RecoverReadyMediaAfterFailureResult,
 } from "@/lib/media/repository-core";
 import type {
   AbandonPendingMediaInput,
@@ -1040,23 +1041,36 @@ export async function requireReadyManagedMediaInTransaction(
   return media;
 }
 
-export function compensateManagedMediaAssociation(
+export type ManagedMediaAssociationCompensationResult = Exclude<
+  RecoverReadyMediaAfterFailureResult,
+  { outcome: "conflict" }
+>;
+
+export async function compensateManagedMediaAssociation(
   database: DatabaseLike,
   input: {
     storeId: string;
     mediaId: string;
     purpose: MediaPurpose;
     targetId: string;
-    deletedAt?: Date;
+    expectedObjectKey: string;
+    expectedCreatedBy: string | null;
+    recoveredAt?: Date;
   },
-): Promise<SoftDeleteMediaResult> {
-  return softDeleteMediaIfUnreferencedCore(database, {
+): Promise<ManagedMediaAssociationCompensationResult> {
+  const result = await recoverReadyMediaAfterFailureCore(database, {
     storeId: input.storeId,
     mediaId: input.mediaId,
     expectedPurpose: input.purpose,
     expectedTargetId: input.targetId,
-    deletedAt: input.deletedAt,
+    expectedObjectKey: input.expectedObjectKey,
+    expectedCreatedBy: input.expectedCreatedBy,
+    recoveredAt: input.recoveredAt,
   });
+  if (result.outcome === "conflict") {
+    throw new ProjectMediaRepositoryError("MANAGED_MEDIA_RECOVERY_CONFLICT");
+  }
+  return result;
 }
 
 export function createDatabaseMediaRepository(
@@ -1116,6 +1130,9 @@ export function createDatabaseMediaRepository(
       )).returning();
       return (row as MediaRecord | undefined) ?? null;
     },
+    recoverReadyAfterFailure(input) {
+      return recoverReadyMediaAfterFailureCore(database, input);
+    },
     softDeleteIfUnreferenced(input: Required<SoftDeleteMediaInput>) {
       return softDeleteMediaIfUnreferencedCore(database, input);
     },
@@ -1167,6 +1184,11 @@ export type ProjectMediaRepository = {
     storeId: string;
     projectId: string;
   }): Promise<ProjectMediaInternalRecord[]>;
+  validateProjectDocument(input: {
+    storeId: string;
+    projectId: string;
+    documentId: string;
+  }): Promise<void>;
   createProjectAttachment(input: {
     storeId: string;
     actorId: string | null;
@@ -1241,6 +1263,18 @@ export function createDatabaseProjectMediaRepository(
         mediaId: row.mediaId!,
         phase: row.phase ?? "other",
       }));
+    },
+
+    async validateProjectDocument(input) {
+      const [document] = await database.select({ id: serviceHandoverDocuments.id })
+        .from(serviceHandoverDocuments).where(and(
+          eq(serviceHandoverDocuments.storeId, input.storeId),
+          eq(serviceHandoverDocuments.id, input.documentId),
+          eq(serviceHandoverDocuments.projectId, input.projectId),
+        )).limit(1);
+      if (!document) {
+        throw new ProjectMediaRepositoryError("PROJECT_MEDIA_DOCUMENT_NOT_FOUND");
+      }
     },
 
     async createProjectAttachment(input) {
@@ -1459,7 +1493,9 @@ export function createProjectMediaManager(dependencies: {
     mediaId: string;
     purpose: "project-document";
     targetId: string;
-  }) => Promise<SoftDeleteMediaResult>;
+    expectedObjectKey: string;
+    expectedCreatedBy: string | null;
+  }) => Promise<ManagedMediaAssociationCompensationResult>;
   logger?: Pick<Console, "error">;
 }) {
   const logger = dependencies.logger ?? console;
@@ -1512,6 +1548,13 @@ export function createProjectMediaManager(dependencies: {
         throw new ProjectMediaError("errors.invalidData", 400);
       }
       const input = parsed.data;
+      if (input.documentId) {
+        await dependencies.repository.validateProjectDocument({
+          storeId: actor.storeId,
+          projectId,
+          documentId: input.documentId,
+        });
+      }
       const uploaded = await dependencies.mediaService.putManagedObject(actor, {
         purpose: "project-document",
         targetId: projectId,
@@ -1542,12 +1585,15 @@ export function createProjectMediaManager(dependencies: {
             mediaId: uploaded.mediaId,
             purpose: "project-document",
             targetId: projectId,
+            expectedObjectKey: uploaded.path,
+            expectedCreatedBy: actor.userId,
           });
         } catch (compensationError) {
           logger.error("project media association compensation failed", {
             mediaId: uploaded.mediaId,
             error: compensationError,
           });
+          throw compensationError;
         }
         throw error;
       }

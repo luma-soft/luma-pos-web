@@ -1,34 +1,60 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { sql } from "drizzle-orm";
 
+mock.module("server-only", () => ({}));
+mock.module("@/db", () => ({ db: {} }));
+
 const projectRoot = new URL("..", import.meta.url).pathname.replace(/\/$/, "");
 const schema = await import(`${projectRoot}/src/db/schema.ts`);
 const {
+  mediaObjects,
+  serviceAttachments,
+  serviceHandoverDocuments,
+} = schema;
+const {
+  recoverReadyMediaAfterFailureInTransaction,
   softDeleteMediaIfUnreferencedCore,
-  softDeleteMediaIfUnreferencedInTransaction,
 } = await import(`${projectRoot}/src/lib/media/repository-core.ts`);
+const {
+  compensateManagedMediaAssociation,
+  createDatabaseProjectMediaRepository,
+  createProjectMediaManager,
+  resolveManagedPrivateMediaUrl,
+} = await import(`${projectRoot}/src/lib/media/project-media.ts`);
 
 const client = new PGlite();
 const database = drizzle(client, { schema });
 const STORE_A = "00000000-0000-4000-8000-000000000001";
 const STORE_B = "85000000-0000-4000-8000-000000000001";
+const STORE_C = "85000000-0000-4000-8000-000000000041";
 const PROJECT_A = "85000000-0000-4000-8000-000000000002";
 const PROJECT_B = "85000000-0000-4000-8000-000000000003";
+const PROJECT_C = "85000000-0000-4000-8000-000000000042";
 const JOB_A = "85000000-0000-4000-8000-000000000004";
 const JOB_B = "85000000-0000-4000-8000-000000000005";
 const SESSION_A = "85000000-0000-4000-8000-000000000006";
 const SESSION_B = "85000000-0000-4000-8000-000000000007";
+const SESSION_C = "85000000-0000-4000-8000-000000000043";
 const ATTACHMENT_SIGNATURE = "85000000-0000-4000-8000-000000000008";
 const AI_WRITER_MEDIA = "85000000-0000-4000-8000-000000000011";
 const SIGNATURE_DELETE_MEDIA = "85000000-0000-4000-8000-000000000012";
 const MALFORMED_TARGET = "85000000-0000-4000-8000-000000000013";
 const SAFE_TARGET = "85000000-0000-4000-8000-000000000014";
 const DUPLICATE_TARGET = "85000000-0000-4000-8000-000000000015";
+const RECOVERY_UNREFERENCED = "85000000-0000-4000-8000-000000000044";
+const RECOVERY_MALFORMED = "85000000-0000-4000-8000-000000000045";
+const RECOVERY_REFERENCED = "85abcdef-abcd-4def-8abc-defabcdef046";
+const RECOVERY_CONFLICT = "85000000-0000-4000-8000-000000000047";
+const RECOVERY_MANAGER_MEDIA = "85000000-0000-4000-8000-000000000051";
+const RECOVERY_MANAGER_USER = "85000000-0000-4000-8000-000000000052";
+const RECOVERY_MANAGER_DOCUMENT = "85000000-0000-4000-8000-000000000053";
 const AI_WRITER_MESSAGE = "85000000-0000-4000-8000-000000000021";
 const SIGNATURE_DELETE_ID = "85000000-0000-4000-8000-000000000022";
+const RECOVERY_MALFORMED_MESSAGE = "85000000-0000-4000-8000-000000000048";
+const RECOVERY_REFERENCE_MESSAGE = "85000000-0000-4000-8000-000000000049";
 const MALFORMED_MESSAGE_IDS = [
   "85000000-0000-4000-8000-000000000031",
   "85000000-0000-4000-8000-000000000032",
@@ -61,16 +87,22 @@ beforeAll(async () => {
   }
 
   await client.exec(`
-    insert into stores (id, slug) values ('${STORE_B}', 'media-indirect-b');
+    insert into stores (id, slug) values
+      ('${STORE_B}', 'media-indirect-b'),
+      ('${STORE_C}', 'media-indirect-c');
+    insert into profiles (id, store_id, full_name, role) values
+      ('${RECOVERY_MANAGER_USER}', '${STORE_C}', 'Recovery manager', 'manager');
     insert into projects (id, store_id, name, service_type) values
       ('${PROJECT_A}', '${STORE_A}', 'Indirect A', 'camera'),
-      ('${PROJECT_B}', '${STORE_B}', 'Indirect B', 'camera');
+      ('${PROJECT_B}', '${STORE_B}', 'Indirect B', 'camera'),
+      ('${PROJECT_C}', '${STORE_C}', 'Indirect C', 'camera');
     insert into service_jobs (id, store_id, project_id, code, service_type, title) values
       ('${JOB_A}', '${STORE_A}', '${PROJECT_A}', 'INDIRECT-A', 'camera', 'Indirect A'),
       ('${JOB_B}', '${STORE_B}', '${PROJECT_B}', 'INDIRECT-B', 'camera', 'Indirect B');
     insert into ai_chat_sessions (id, store_id, title) values
       ('${SESSION_A}', '${STORE_A}', 'Session A'),
-      ('${SESSION_B}', '${STORE_B}', 'Session B');
+      ('${SESSION_B}', '${STORE_B}', 'Session B'),
+      ('${SESSION_C}', '${STORE_C}', 'Session C');
     insert into media_objects (
       id, store_id, provider, visibility, purpose, target_id, domain, bucket,
       object_key, original_file_name, mime_type, size_bytes, status, upload_expires_at
@@ -79,7 +111,20 @@ beforeAll(async () => {
       ${mediaValue(SIGNATURE_DELETE_MEDIA, STORE_A, JOB_A)},
       ${mediaValue(MALFORMED_TARGET, STORE_B, PROJECT_B)},
       ${mediaValue(SAFE_TARGET, STORE_B, PROJECT_B)},
-      ${mediaValue(DUPLICATE_TARGET, STORE_B, SESSION_B)};
+      ${mediaValue(DUPLICATE_TARGET, STORE_B, SESSION_B)},
+      ${mediaValue(RECOVERY_UNREFERENCED, STORE_A, PROJECT_A)},
+      ${mediaValue(RECOVERY_MALFORMED, STORE_C, PROJECT_C)},
+      ${mediaValue(RECOVERY_REFERENCED, STORE_C, PROJECT_C)},
+      ${mediaValue(RECOVERY_CONFLICT, STORE_C, PROJECT_C)},
+      ${mediaValue(RECOVERY_MANAGER_MEDIA, STORE_C, PROJECT_C)};
+    update media_objects set created_by = '${RECOVERY_MANAGER_USER}'
+      where id = '${RECOVERY_MANAGER_MEDIA}';
+    insert into service_handover_documents (
+      id, store_id, project_id, type, title
+    ) values (
+      '${RECOVERY_MANAGER_DOCUMENT}', '${STORE_C}', '${PROJECT_C}',
+      'handover', 'Recovery race document'
+    );
     insert into service_attachments (
       id, store_id, project_id, job_id, media_object_id, category, bucket,
       path, file_name, mime_type, size_bytes
@@ -101,7 +146,11 @@ beforeAll(async () => {
       (gen_random_uuid(), '${STORE_B}', '${SESSION_B}', 'user', 'null', null),
       (gen_random_uuid(), '${STORE_B}', '${SESSION_B}', 'user', 'missing', '[{"name":"safe"}]'::jsonb),
       (gen_random_uuid(), '${STORE_B}', '${SESSION_B}', 'user', 'duplicate',
-       '[{"mediaId":"${DUPLICATE_TARGET}"},{"mediaId":"${DUPLICATE_TARGET}"}]'::jsonb);
+       '[{"mediaId":"${DUPLICATE_TARGET}"},{"mediaId":"${DUPLICATE_TARGET}"}]'::jsonb),
+      ('${RECOVERY_MALFORMED_MESSAGE}', '${STORE_C}', '${SESSION_C}', 'user', 'legacy malformed',
+       '{"mediaId":"${RECOVERY_MALFORMED}"}'::jsonb),
+      ('${RECOVERY_REFERENCE_MESSAGE}', '${STORE_C}', '${SESSION_C}', 'user', 'known live reference',
+       '[{"mediaId":"${RECOVERY_REFERENCED.toUpperCase()}"}]'::jsonb);
     insert into service_signatures (
       id, store_id, project_id, job_id, attachment_id, signer_name, document_hash
     ) values (
@@ -121,6 +170,168 @@ beforeAll(async () => {
 afterAll(async () => client.close());
 
 describe("indirect media reference hardening", () => {
+  function recoveryInput(mediaId, overrides = {}) {
+    return {
+      storeId: mediaId === RECOVERY_UNREFERENCED ? STORE_A : STORE_C,
+      mediaId,
+      purpose: "project-document",
+      targetId: mediaId === RECOVERY_UNREFERENCED ? PROJECT_A : PROJECT_C,
+      expectedObjectKey: `indirect/${mediaId}.pdf`,
+      expectedCreatedBy: null,
+      ...overrides,
+    };
+  }
+
+  test("association recovery deletes an ordinary unreferenced ready object", async () => {
+    await expect(compensateManagedMediaAssociation(
+      database,
+      recoveryInput(RECOVERY_UNREFERENCED),
+    )).resolves.toMatchObject({ outcome: "deleted" });
+    await expect(compensateManagedMediaAssociation(
+      database,
+      recoveryInput(RECOVERY_UNREFERENCED),
+    )).resolves.toMatchObject({ outcome: "deleted" });
+    const media = await client.query(
+      `select status, deleted_at is not null as deleted from media_objects where id = '${RECOVERY_UNREFERENCED}'`,
+    );
+    expect(media.rows).toEqual([{ status: "deleted", deleted: true }]);
+  });
+
+  test("association recovery quarantines malformed-reference uncertainty and is repeatable", async () => {
+    await expect(compensateManagedMediaAssociation(
+      database,
+      recoveryInput(RECOVERY_MALFORMED),
+    )).resolves.toMatchObject({ outcome: "quarantined" });
+    await expect(compensateManagedMediaAssociation(
+      database,
+      recoveryInput(RECOVERY_MALFORMED),
+    )).resolves.toMatchObject({ outcome: "quarantined" });
+
+    const media = await client.query(
+      `select status, deleted_at from media_objects where id = '${RECOVERY_MALFORMED}'`,
+    );
+    expect(media.rows).toEqual([{ status: "quarantined", deleted_at: null }]);
+
+    let signed = 0;
+    await expect(resolveManagedPrivateMediaUrl({
+      storeId: STORE_C,
+      userId: "85000000-0000-4000-8000-000000000050",
+      role: "manager",
+      features: { field_services: true },
+    }, RECOVERY_MALFORMED, {
+      database,
+      authorizeTarget: async () => "allowed",
+      storageForProvider: () => ({
+        async createDownloadUrl() {
+          signed += 1;
+          return "https://should-not-sign.test";
+        },
+      }),
+    })).rejects.toMatchObject({ status: 404 });
+    expect(signed).toBe(0);
+  });
+
+  test("association recovery protects a case-insensitive live UUID reference despite malformed rows", async () => {
+    await expect(compensateManagedMediaAssociation(
+      database,
+      recoveryInput(RECOVERY_REFERENCED),
+    )).resolves.toMatchObject({ outcome: "referenced" });
+    const media = await client.query(
+      `select status from media_objects where id = '${RECOVERY_REFERENCED}'`,
+    );
+    expect(media.rows).toEqual([{ status: "ready" }]);
+  });
+
+  test("association recovery rejects coordinate conflicts and propagates database exceptions", async () => {
+    await expect(compensateManagedMediaAssociation(database, recoveryInput(
+      RECOVERY_CONFLICT,
+      { expectedObjectKey: "indirect/not-this-upload.pdf" },
+    ))).rejects.toThrow("MANAGED_MEDIA_RECOVERY_CONFLICT");
+    await expect(compensateManagedMediaAssociation(database, recoveryInput(
+      RECOVERY_CONFLICT,
+      { expectedCreatedBy: RECOVERY_MANAGER_USER },
+    ))).rejects.toThrow("MANAGED_MEDIA_RECOVERY_CONFLICT");
+    await expect(compensateManagedMediaAssociation(database, recoveryInput(
+      RECOVERY_CONFLICT,
+      { storeId: STORE_A },
+    ))).rejects.toThrow("MANAGED_MEDIA_RECOVERY_CONFLICT");
+    await expect(compensateManagedMediaAssociation(database, recoveryInput(
+      RECOVERY_CONFLICT,
+      { purpose: "service-evidence" },
+    ))).rejects.toThrow("MANAGED_MEDIA_RECOVERY_CONFLICT");
+    await expect(compensateManagedMediaAssociation(database, recoveryInput(
+      RECOVERY_CONFLICT,
+      { targetId: PROJECT_B },
+    ))).rejects.toThrow("MANAGED_MEDIA_RECOVERY_CONFLICT");
+    const media = await client.query(
+      `select status from media_objects where id = '${RECOVERY_CONFLICT}'`,
+    );
+    expect(media.rows).toEqual([{ status: "ready" }]);
+
+    await expect(compensateManagedMediaAssociation({
+      async transaction() {
+        throw new Error("recovery database unavailable");
+      },
+    }, recoveryInput(RECOVERY_CONFLICT))).rejects.toThrow(
+      "recovery database unavailable",
+    );
+  });
+
+  test("a document race after prevalidation durably recovers the uploaded media", async () => {
+    const realRepository = createDatabaseProjectMediaRepository(database);
+    const manager = createProjectMediaManager({
+      authorizeProject: async () => "allowed",
+      repository: {
+        ...realRepository,
+        async validateProjectDocument(input) {
+          await realRepository.validateProjectDocument(input);
+          await database.delete(serviceHandoverDocuments).where(sql`
+            ${serviceHandoverDocuments.id} = ${input.documentId}
+          `);
+        },
+      },
+      mediaService: {
+        async putManagedObject() {
+          return {
+            mediaId: RECOVERY_MANAGER_MEDIA,
+            path: `indirect/${RECOVERY_MANAGER_MEDIA}.pdf`,
+            url: "https://r2.test/fresh-signed-url",
+          };
+        },
+      },
+      async sign() {
+        throw new Error("association failure must not reach signing");
+      },
+      compensate: (input) => compensateManagedMediaAssociation(database, input),
+      logger: { error() {} },
+    });
+
+    await expect(manager.upload({
+      storeId: STORE_C,
+      userId: RECOVERY_MANAGER_USER,
+      role: "manager",
+      features: { field_services: true },
+    }, PROJECT_C, {
+      phase: "handover",
+      caption: null,
+      documentId: RECOVERY_MANAGER_DOCUMENT,
+      fileName: `${RECOVERY_MANAGER_MEDIA}.pdf`,
+      mimeType: "application/pdf",
+      sizeBytes: 16,
+      sha256: "a".repeat(64),
+    }, new Uint8Array(16))).rejects.toMatchObject({
+      code: "PROJECT_MEDIA_DOCUMENT_NOT_FOUND",
+    });
+
+    const [media] = await database.select().from(mediaObjects).where(sql`
+      ${mediaObjects.id} = ${RECOVERY_MANAGER_MEDIA}
+    `);
+    expect(media).toMatchObject({ status: "quarantined", deletedAt: null });
+    expect(await database.select().from(serviceAttachments).where(sql`
+      ${serviceAttachments.mediaObjectId} = ${RECOVERY_MANAGER_MEDIA}
+    `)).toHaveLength(0);
+  });
+
   test("store coordinates are trigger inputs and tenant composite FKs enforce new writes", async () => {
     const triggerDefinitions = await client.query(`
       select tgname, pg_get_triggerdef(oid) definition
@@ -161,7 +372,7 @@ describe("indirect media reference hardening", () => {
     `)).rejects.toThrow();
   });
 
-  test("AI store-only writer wins before DELETE and leaves a live ready reference", async () => {
+  test("AI store-only writer wins before recovery and leaves a live ready reference", async () => {
     let updated;
     const hasLock = new Promise((resolve) => { updated = resolve; });
     let release;
@@ -175,16 +386,20 @@ describe("indirect media reference hardening", () => {
       await canCommit;
     });
     await hasLock;
-    const deleting = softDeleteMediaIfUnreferencedCore(database, {
+    const recovering = compensateManagedMediaAssociation(database, {
       storeId: STORE_A,
       mediaId: AI_WRITER_MEDIA,
+      purpose: "project-document",
+      targetId: SESSION_A,
+      expectedObjectKey: `indirect/${AI_WRITER_MEDIA}.pdf`,
+      expectedCreatedBy: null,
     });
     release();
     await writing;
-    expect((await deleting).outcome).toBe("referenced");
+    expect((await recovering).outcome).toBe("referenced");
   });
 
-  test("signature DELETE wins before a store-only writer and rejects the new reference", async () => {
+  test("signature recovery wins before a store-only writer and rejects the new reference", async () => {
     let locked;
     const hasLock = new Promise((resolve) => { locked = resolve; });
     let release;
@@ -197,9 +412,13 @@ describe("indirect media reference hardening", () => {
       `);
       locked();
       await canDelete;
-      return softDeleteMediaIfUnreferencedInTransaction(tx, {
+      return recoverReadyMediaAfterFailureInTransaction(tx, {
         storeId: STORE_A,
         mediaId: SIGNATURE_DELETE_MEDIA,
+        expectedPurpose: "project-document",
+        expectedTargetId: JOB_A,
+        expectedObjectKey: `indirect/${SIGNATURE_DELETE_MEDIA}.pdf`,
+        expectedCreatedBy: null,
       });
     });
     await hasLock;

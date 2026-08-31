@@ -170,6 +170,9 @@ describe("customer request streaming multipart", () => {
     expect(route).toContain('purpose: "project-document"');
     expect(route).toContain("mediaObjectId");
     expect(route).toContain("compensateManagedMediaAssociation");
+    expect(route).toContain("expectedObjectKey: object.path");
+    expect(route).toContain("expectedCreatedBy: null");
+    expect(route).toContain("customer request media recovery did not reach a safe state");
     expect(route).not.toContain("createSupabaseAdminClient");
     expect(route).not.toContain("stageCustomerRequestStorageCleanupCore");
   });

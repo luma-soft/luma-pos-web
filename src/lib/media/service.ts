@@ -13,12 +13,15 @@ import {
   createPendingMedia,
   getMediaForStore,
   markMediaReady,
+  recoverReadyMediaAfterFailure,
   saveMediaThumbnail,
   softDeleteMediaIfUnreferenced,
   type CreatePendingMediaInput,
   type AbandonPendingMediaInput,
   type GetMediaForStoreInput,
   type MarkMediaReadyInput,
+  type RecoverReadyMediaAfterFailureInput,
+  type RecoverReadyMediaAfterFailureResult,
   type SaveMediaThumbnailInput,
   type SoftDeleteMediaInput,
   type SoftDeleteMediaResult,
@@ -95,6 +98,9 @@ export type MediaRepository = {
   markReady(input: Required<MarkMediaReadyInput>): Promise<MediaRecord | null>;
   saveThumbnail(input: SaveMediaThumbnailInput): Promise<MediaRecord | null>;
   abandonPending(input: AbandonPendingMediaInput): Promise<MediaRecord | null>;
+  recoverReadyAfterFailure(
+    input: Required<RecoverReadyMediaAfterFailureInput>,
+  ): Promise<RecoverReadyMediaAfterFailureResult>;
   softDeleteIfUnreferenced(
     input: Required<SoftDeleteMediaInput>,
   ): Promise<SoftDeleteMediaResult>;
@@ -136,6 +142,7 @@ function defaultRepository(): MediaRepository {
     markReady: markMediaReady as MediaRepository["markReady"],
     saveThumbnail: saveMediaThumbnail as MediaRepository["saveThumbnail"],
     abandonPending: abandonPendingMedia as MediaRepository["abandonPending"],
+    recoverReadyAfterFailure: recoverReadyMediaAfterFailure,
     softDeleteIfUnreferenced: softDeleteMediaIfUnreferenced,
   };
 }
@@ -407,26 +414,52 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
       if (!wroteObject && !isDefinitiveObjectStorageWriteError(error)) {
         throw error;
       }
+      let current: MediaRecord | null;
       try {
-        const current = await dependencies.repository.getForStore({
+        current = await dependencies.repository.getForStore({
           storeId: actor.storeId,
           mediaId: media.id,
         });
-        if (wroteObject && current?.status === "ready") {
-          const deleted = await dependencies.repository.softDeleteIfUnreferenced({
+      } catch (recoveryError) {
+        logger.error("media write compensation failed", {
+          mediaId: media.id,
+          error: recoveryError,
+        });
+        throw recoveryError;
+      }
+      if (wroteObject && current?.status === "ready") {
+        let recovered: RecoverReadyMediaAfterFailureResult;
+        try {
+          recovered = await dependencies.repository.recoverReadyAfterFailure({
             storeId: actor.storeId,
             mediaId: media.id,
             expectedPurpose: media.purpose,
             expectedTargetId: media.targetId,
-            deletedAt: now(),
+            expectedObjectKey: media.objectKey,
+            expectedCreatedBy: media.createdBy,
+            recoveredAt: now(),
           });
-          if (deleted.outcome !== "deleted") {
-            logger.error("media ready compensation was retained", {
-              mediaId: media.id,
-              outcome: deleted.outcome,
-            });
-          }
-        } else {
+        } catch (recoveryError) {
+          logger.error("media ready compensation failed", {
+            mediaId: media.id,
+            error: recoveryError,
+          });
+          throw recoveryError;
+        }
+        if (recovered.outcome === "conflict") {
+          logger.error("media ready compensation conflicted", {
+            mediaId: media.id,
+          });
+          throw new MediaServiceError("media.readyRecoveryConflict", 500);
+        }
+        if (recovered.outcome !== "deleted") {
+          logger.error("media ready compensation was retained", {
+            mediaId: media.id,
+            outcome: recovered.outcome,
+          });
+        }
+      } else {
+        try {
           const abandoned = await dependencies.repository.abandonPending({
             storeId: actor.storeId,
             mediaId: media.id,
@@ -447,12 +480,12 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
               });
             }
           }
+        } catch (cleanupError) {
+          logger.error("media write compensation failed", {
+            mediaId: media.id,
+            error: cleanupError,
+          });
         }
-      } catch (cleanupError) {
-        logger.error("media write compensation failed", {
-          mediaId: media.id,
-          error: cleanupError,
-        });
       }
       throw error;
     }

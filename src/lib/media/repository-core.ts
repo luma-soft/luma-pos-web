@@ -27,6 +27,22 @@ export type SoftDeleteMediaResult =
   | { outcome: "referenced" }
   | { outcome: "conflict" };
 
+export type RecoverReadyMediaAfterFailureInput = {
+  storeId: string;
+  mediaId: string;
+  expectedPurpose: MediaPurpose;
+  expectedTargetId: string;
+  expectedObjectKey: string;
+  expectedCreatedBy: string | null;
+  recoveredAt?: Date;
+};
+
+export type RecoverReadyMediaAfterFailureResult =
+  | { outcome: "deleted"; media: { id: string } }
+  | { outcome: "quarantined"; media: { id: string } }
+  | { outcome: "referenced" }
+  | { outcome: "conflict" };
+
 type MediaTransaction = Pick<typeof db, "select" | "update">;
 type MediaTransactionalDatabase = Pick<typeof db, "transaction">;
 
@@ -84,6 +100,23 @@ async function hasLiveMediaReference(
     if ((await query)[0]) return "referenced";
   }
 
+  const [aiReference] = await transaction.select({ id: aiChatMessages.id })
+    .from(aiChatMessages)
+    .where(and(
+      eq(aiChatMessages.storeId, input.storeId),
+      sql`exists (
+        select 1
+        from jsonb_array_elements(
+          case when jsonb_typeof(${aiChatMessages.attachments}) = 'array'
+            then ${aiChatMessages.attachments} else '[]'::jsonb end
+        ) attachment
+        where jsonb_typeof(attachment) = 'object'
+          and jsonb_typeof(attachment->'mediaId') = 'string'
+          and lower(attachment->>'mediaId') = lower(${input.mediaId})
+      )`,
+    )).limit(1);
+  if (aiReference) return "referenced";
+
   const [malformedAiDocument] = await transaction.select({ id: aiChatMessages.id })
     .from(aiChatMessages)
     .where(and(
@@ -107,24 +140,59 @@ async function hasLiveMediaReference(
         )
       )`,
     )).limit(1);
-  if (malformedAiDocument) return "malformed";
+  return malformedAiDocument ? "malformed" : "none";
+}
 
-  const [aiReference] = await transaction.select({ id: aiChatMessages.id })
-    .from(aiChatMessages)
-    .where(and(
-      eq(aiChatMessages.storeId, input.storeId),
-      sql`exists (
-        select 1
-        from jsonb_array_elements(
-          case when jsonb_typeof(${aiChatMessages.attachments}) = 'array'
-            then ${aiChatMessages.attachments} else '[]'::jsonb end
-        ) attachment
-        where jsonb_typeof(attachment) = 'object'
-          and jsonb_typeof(attachment->'mediaId') = 'string'
-          and attachment->>'mediaId' = ${input.mediaId}
-      )`,
-    )).limit(1);
-  return aiReference ? "referenced" : "none";
+function createdByCondition(expectedCreatedBy: string | null) {
+  return expectedCreatedBy === null
+    ? isNull(mediaObjects.createdBy)
+    : eq(mediaObjects.createdBy, expectedCreatedBy);
+}
+
+export async function recoverReadyMediaAfterFailureInTransaction(
+  transaction: MediaTransaction,
+  input: RecoverReadyMediaAfterFailureInput,
+): Promise<RecoverReadyMediaAfterFailureResult> {
+  const [media] = await transaction.select().from(mediaObjects).where(and(
+    eq(mediaObjects.storeId, input.storeId),
+    eq(mediaObjects.id, input.mediaId),
+  )).limit(1).for("update");
+  if (
+    !media
+    || media.purpose !== input.expectedPurpose
+    || media.targetId !== input.expectedTargetId
+    || media.objectKey !== input.expectedObjectKey
+    || media.createdBy !== input.expectedCreatedBy
+  ) return { outcome: "conflict" };
+
+  if (media.status === "deleted") {
+    return { outcome: "deleted", media };
+  }
+  if (media.status === "quarantined") {
+    return { outcome: "quarantined", media };
+  }
+  if (media.status !== "ready") return { outcome: "conflict" };
+
+  const referenceState = await hasLiveMediaReference(transaction, input);
+  if (referenceState === "referenced") return { outcome: "referenced" };
+
+  const status = referenceState === "malformed" ? "quarantined" : "deleted";
+  const [recovered] = await transaction.update(mediaObjects).set({
+    status,
+    deletedAt: status === "deleted" ? input.recoveredAt ?? new Date() : null,
+  }).where(and(
+    eq(mediaObjects.storeId, input.storeId),
+    eq(mediaObjects.id, input.mediaId),
+    eq(mediaObjects.status, "ready"),
+    eq(mediaObjects.purpose, input.expectedPurpose),
+    eq(mediaObjects.targetId, input.expectedTargetId),
+    eq(mediaObjects.objectKey, input.expectedObjectKey),
+    createdByCondition(input.expectedCreatedBy),
+  )).returning();
+  if (!recovered) return { outcome: "conflict" };
+  return status === "deleted"
+    ? { outcome: "deleted", media: recovered }
+    : { outcome: "quarantined", media: recovered };
 }
 
 export async function softDeleteMediaIfUnreferencedInTransaction(
@@ -171,5 +239,14 @@ export function softDeleteMediaIfUnreferencedCore(
 ): Promise<SoftDeleteMediaResult> {
   return database.transaction((transaction) =>
     softDeleteMediaIfUnreferencedInTransaction(transaction, input)
+  );
+}
+
+export function recoverReadyMediaAfterFailureCore(
+  database: MediaTransactionalDatabase,
+  input: RecoverReadyMediaAfterFailureInput,
+): Promise<RecoverReadyMediaAfterFailureResult> {
+  return database.transaction((transaction) =>
+    recoverReadyMediaAfterFailureInTransaction(transaction, input)
   );
 }

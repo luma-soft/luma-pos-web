@@ -57,10 +57,20 @@ test("stores warranty evidence as managed private R2 media in the claim transact
   expect(source).toContain("requireReadyManagedMediaInTransaction");
   expect(source).toContain("mediaObjectId");
   expect(source).toContain("compensateManagedMediaAssociation");
+  expect(source).toContain("expectedObjectKey: uploaded.path");
+  expect(source).toContain("expectedCreatedBy: gate.userId");
   expect(source).toContain("managedError.status === 403");
   expect(source).toContain('mobileError("errors.notFound", 404)');
   expect(source).not.toContain("createSupabaseAdminClient");
   expect(source).not.toContain("stageServiceStorageCleanupCore");
+});
+
+test("warranty list binds the active store in its original query without global id refiltering", async () => {
+  const source = await Bun.file(
+    `${process.cwd()}/src/app/api/mobile/services/warranty-claims/route.ts`,
+  ).text();
+  expect(source).toContain("storeId: gate.storeId");
+  expect(source).not.toContain("inArray(warrantyClaims.id");
 });
 
 test("warranty detail dual-reads private evidence with the legacy attachment shape", async () => {

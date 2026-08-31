@@ -67,6 +67,8 @@ describe("service evidence managed-media route contract", () => {
     expect(post).toContain("mediaObjectId");
     expect(post).toContain("requireReadyManagedMediaInTransaction");
     expect(post).toContain("compensateManagedMediaAssociation");
+    expect(post).toContain("expectedObjectKey: managed.path");
+    expect(post).toContain("expectedCreatedBy: gate.userId");
     expect(post).toContain("mediaServiceError(error)");
     expect(post).not.toContain(".storage.from(");
   });

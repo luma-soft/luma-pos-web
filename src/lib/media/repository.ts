@@ -2,7 +2,10 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { mediaObjects } from "@/db/schema";
 import {
+  recoverReadyMediaAfterFailureCore,
   softDeleteMediaIfUnreferencedCore,
+  type RecoverReadyMediaAfterFailureInput,
+  type RecoverReadyMediaAfterFailureResult,
   type SoftDeleteMediaInput,
   type SoftDeleteMediaResult,
 } from "@/lib/media/repository-core";
@@ -55,7 +58,12 @@ export type AbandonPendingMediaInput = {
   deletedAt: Date;
 };
 
-export type { SoftDeleteMediaInput, SoftDeleteMediaResult } from "@/lib/media/repository-core";
+export type {
+  RecoverReadyMediaAfterFailureInput,
+  RecoverReadyMediaAfterFailureResult,
+  SoftDeleteMediaInput,
+  SoftDeleteMediaResult,
+} from "@/lib/media/repository-core";
 
 export function buildCreatePendingMediaQuery(
   database: Pick<typeof db, "insert">,
@@ -179,4 +187,10 @@ export function softDeleteMediaIfUnreferenced(
   input: SoftDeleteMediaInput,
 ): Promise<SoftDeleteMediaResult> {
   return softDeleteMediaIfUnreferencedCore(db, input);
+}
+
+export function recoverReadyMediaAfterFailure(
+  input: RecoverReadyMediaAfterFailureInput,
+): Promise<RecoverReadyMediaAfterFailureResult> {
+  return recoverReadyMediaAfterFailureCore(db, input);
 }

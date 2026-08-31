@@ -250,7 +250,12 @@ export async function sanitizeTechnicianWarrantyEvidence(input: {
 
 export async function listWarrantyClaimsForActorCore(
   database: NodePgDatabase<typeof schema> | ServiceTransaction,
-  input: { actorId: string; role: WarrantyActorRole; jobId?: string | null },
+  input: {
+    storeId: string;
+    actorId: string;
+    role: WarrantyActorRole;
+    jobId?: string | null;
+  },
 ) {
   return database.select({
     id: warrantyClaims.id,
@@ -268,6 +273,7 @@ export async function listWarrantyClaimsForActorCore(
   }).from(warrantyClaims)
     .leftJoin(installedAssets, eq(warrantyClaims.assetId, installedAssets.id))
     .where(and(
+      eq(warrantyClaims.storeId, input.storeId),
       input.jobId ? eq(warrantyClaims.jobId, input.jobId) : undefined,
       input.role === "technician"
         ? and(

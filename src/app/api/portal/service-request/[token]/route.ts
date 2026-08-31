@@ -309,6 +309,7 @@ export async function POST(
       resolutionDueAt: result.resolutionDueAt,
     });
   } catch (error) {
+    let recoveryFailure: unknown = null;
     for (const object of uploaded) {
       try {
         await compensateManagedMediaAssociation(db, {
@@ -316,8 +317,11 @@ export async function POST(
           mediaId: object.mediaId,
           purpose: "project-document",
           targetId: current.projectId,
+          expectedObjectKey: object.path,
+          expectedCreatedBy: null,
         });
       } catch (compensationError) {
+        recoveryFailure ??= compensationError;
         console.error("customer request media compensation failed", {
           requestId: current.id,
           mediaId: object.mediaId,
@@ -326,6 +330,15 @@ export async function POST(
             : "unknown",
         });
       }
+    }
+    if (recoveryFailure) {
+      console.error("customer request media recovery did not reach a safe state", {
+        requestId: current.id,
+        error: recoveryFailure instanceof Error
+          ? recoveryFailure.message
+          : "unknown",
+      });
+      return mobileError("errors.serverError", 500);
     }
     if (error instanceof Error && error.message === "CUSTOMER_REQUEST_NOT_SUBMITTABLE") {
       return mobileError("errors.notFound", 404);

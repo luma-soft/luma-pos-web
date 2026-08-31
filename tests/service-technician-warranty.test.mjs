@@ -19,6 +19,7 @@ const {
   serviceJobEvents,
   serviceJobs,
   serviceCustomerRequestStorageCleanup,
+  stores,
   warrantyClaimNotifications,
   warrantyClaims,
 } = schema;
@@ -68,6 +69,8 @@ const removedTechnicianId = "22222222-2222-4222-8222-222222222222";
 const managerId = "33333333-3333-4333-8333-333333333333";
 const ownerId = "44444444-4444-4444-8444-444444444444";
 const inactiveManagerId = "55555555-5555-4555-8555-555555555555";
+const foreignStoreId = "66666666-6666-4666-8666-666666666666";
+const foreignTechnicianId = "77777777-7777-4777-8777-777777777777";
 await db.insert(profiles).values([
   { id: technicianId, fullName: "Assigned technician", role: "technician" },
   { id: removedTechnicianId, fullName: "Removed technician", role: "technician" },
@@ -220,7 +223,105 @@ const completedClaim = await db.transaction((tx) => createTechnicianWarrantyClai
 }));
 if (!completedClaim.id) throw new Error("completed assigned job must accept a warranty report");
 
+await db.insert(stores).values({ id: foreignStoreId, slug: "warranty-foreign" });
+await db.insert(profiles).values({
+  id: foreignTechnicianId,
+  storeId: foreignStoreId,
+  fullName: "Foreign technician",
+  role: "technician",
+});
+const [crossStoreProject] = await db.insert(projects).values({
+  storeId: foreignStoreId,
+  name: "Cross-store warranty site",
+  serviceType: "camera",
+  serviceStage: "completed",
+}).returning();
+const [crossStoreJob] = await db.insert(serviceJobs).values({
+  storeId: foreignStoreId,
+  projectId: crossStoreProject.id,
+  code: "DV-WARRANTY-FOREIGN-STORE",
+  serviceType: "camera",
+  title: "Foreign tenant warranty work",
+  status: "warranty",
+  assignedTo: foreignTechnicianId,
+}).returning();
+await db.insert(serviceJobAssignments).values({
+  storeId: foreignStoreId,
+  jobId: crossStoreJob.id,
+  profileId: foreignTechnicianId,
+  assignmentRole: "primary",
+});
+const [crossStoreAsset] = await db.insert(installedAssets).values({
+  storeId: foreignStoreId,
+  projectId: crossStoreProject.id,
+  jobId: crossStoreJob.id,
+  assetKind: "camera",
+  name: "Foreign tenant camera",
+  status: "installed",
+}).returning();
+const [crossStoreClaim] = await db.insert(warrantyClaims).values({
+  storeId: foreignStoreId,
+  projectId: crossStoreProject.id,
+  jobId: crossStoreJob.id,
+  assetId: crossStoreAsset.id,
+  code: "BH-FOREIGN-STORE",
+  title: "Foreign tenant claim",
+  createdBy: foreignTechnicianId,
+}).returning();
+
+const listQueryLog = [];
+const loggedDatabase = drizzle(client, {
+  schema,
+  logger: {
+    logQuery(query, params) {
+      listQueryLog.push({ query, params });
+    },
+  },
+});
+const managerStoreRows = await listWarrantyClaimsForActorCore(loggedDatabase, {
+  storeId: project.storeId,
+  actorId: managerId,
+  role: "manager",
+});
+if (
+  managerStoreRows.some((row) => row.id === crossStoreClaim.id)
+  || !managerStoreRows.some((row) => row.id === created.id)
+) throw new Error("manager warranty list was not bounded by the active store query");
+const executedListQuery = listQueryLog.find(({ query }) =>
+  query.includes('from "warranty_claims"')
+);
+const managerStoreParamIndex = executedListQuery?.params.indexOf(project.storeId) ?? -1;
+if (
+  !executedListQuery
+  || managerStoreParamIndex < 0
+  || !executedListQuery.query.includes(
+    `"warranty_claims"."store_id" = $${managerStoreParamIndex + 1}`,
+  )
+) throw new Error("original warranty list SQL omitted the required store predicate");
+
+const technicianQueryStart = listQueryLog.length;
+const foreignTechnicianRows = await listWarrantyClaimsForActorCore(loggedDatabase, {
+  storeId: foreignStoreId,
+  actorId: foreignTechnicianId,
+  role: "technician",
+});
+const executedTechnicianListQuery = listQueryLog.slice(technicianQueryStart)
+  .find(({ query }) => query.includes('from "warranty_claims"'));
+const technicianStoreParamIndex = executedTechnicianListQuery?.params
+  .indexOf(foreignStoreId) ?? -1;
+if (
+  foreignTechnicianRows.length !== 1
+  || foreignTechnicianRows[0].id !== crossStoreClaim.id
+  || !executedTechnicianListQuery
+  || technicianStoreParamIndex < 0
+  || !executedTechnicianListQuery.params.includes(foreignTechnicianId)
+  || !executedTechnicianListQuery.query.includes(
+    `"warranty_claims"."store_id" = $${technicianStoreParamIndex + 1}`,
+  )
+) throw new Error("technician warranty list lost actor-and-store scope");
+
 const technicianRows = await listWarrantyClaimsForActorCore(db, {
+  storeId: project.storeId,
   actorId: technicianId,
   role: "technician",
 });
@@ -233,6 +334,7 @@ await db.update(serviceJobAssignments).set({ removedAt: new Date() }).where(eq(
 ));
 if (
   (await listWarrantyClaimsForActorCore(db, {
+    storeId: project.storeId,
     actorId: technicianId,
     role: "technician",
   })).length !== 0
@@ -327,6 +429,7 @@ await db.update(warrantyClaims).set({
   assetId: null,
 }).where(eq(warrantyClaims.id, legacyManagerClaim.id));
 const managerLegacyList = await listWarrantyClaimsForActorCore(db, {
+  storeId: project.storeId,
   actorId: managerId,
   role: "manager",
 });
@@ -350,6 +453,7 @@ if (
   || managerLegacyDetail.assetName !== null
 ) throw new Error("manager detail omitted or corrupted a null/null legacy claim");
 const technicianLegacyList = await listWarrantyClaimsForActorCore(db, {
+  storeId: project.storeId,
   actorId: technicianId,
   role: "technician",
 });

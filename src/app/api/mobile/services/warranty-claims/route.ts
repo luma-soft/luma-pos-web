@@ -1,10 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   serviceAttachments,
   serviceJobs,
-  warrantyClaims,
 } from "@/db/schema";
 import {
   compensateManagedMediaAssociation,
@@ -61,18 +60,12 @@ export async function GET(request: Request) {
   if (!gate.ok) return mobileError("errors.unauthorized", 401);
   const jobId = (searchParam(request, "jobId", "") ?? "").trim() || null;
   const rows = await listWarrantyClaimsForActorCore(db, {
+    storeId: gate.storeId,
     actorId: gate.userId,
     role: gate.role,
     jobId,
   });
-  const owned = rows.length === 0
-    ? []
-    : await db.select({ id: warrantyClaims.id }).from(warrantyClaims).where(and(
-      eq(warrantyClaims.storeId, gate.storeId),
-      inArray(warrantyClaims.id, rows.map((row) => row.id)),
-    ));
-  const ownedIds = new Set(owned.map((row) => row.id));
-  return mobileOk({ rows: rows.filter((row) => ownedIds.has(row.id)) });
+  return mobileOk({ rows });
 }
 
 export async function POST(request: Request) {
@@ -223,6 +216,8 @@ export async function POST(request: Request) {
           mediaId: uploaded.mediaId,
           purpose: "service-evidence",
           targetId: parsed.data.jobId,
+          expectedObjectKey: uploaded.path,
+          expectedCreatedBy: gate.userId,
         });
       }
       throw error;

@@ -325,6 +325,8 @@ export async function POST(
         mediaId: managed.mediaId,
         purpose,
         targetId,
+        expectedObjectKey: managed.path,
+        expectedCreatedBy: gate.userId,
       });
       throw error;
     }
@@ -334,6 +336,8 @@ export async function POST(
         mediaId: managed.mediaId,
         purpose,
         targetId,
+        expectedObjectKey: managed.path,
+        expectedCreatedBy: gate.userId,
       });
     }
     const signedUrl = await resolveAssetAttachmentUrl(gate, attachment, {

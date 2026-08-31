@@ -301,6 +301,8 @@ describe("installed asset batch persistence contract", () => {
     expect(route).toContain("putManagedObject");
     expect(route).toContain("mediaObjectId");
     expect(route).toContain("compensateManagedMediaAssociation");
+    expect(route.match(/expectedObjectKey: managed\.path/g)).toHaveLength(2);
+    expect(route.match(/expectedCreatedBy: gate\.userId/g)).toHaveLength(2);
     expect(route).not.toContain("upsert: true");
     expect(webFlow).toContain('form.set("clientRequestId", photo.id)');
     expect(mobileRepository).toContain("'clientRequestId': clientRequestId");
