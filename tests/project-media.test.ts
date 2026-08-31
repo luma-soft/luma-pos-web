@@ -66,6 +66,7 @@ const MEDIA_ID = "a1000000-0000-4000-8000-000000000007";
 const OTHER_MEDIA_ID = "a1000000-0000-4000-8000-000000000008";
 const ATTACHMENT_ID = "a1000000-0000-4000-8000-000000000009";
 const BRAND_ID = "a1000000-0000-4000-8000-000000000010";
+const IDEMPOTENCY_ID = "a1000000-0000-4000-8000-000000000011";
 const NOW = new Date("2026-08-31T08:00:00.000Z");
 
 const actor: MediaActor = {
@@ -223,7 +224,12 @@ function fakeManagerHarness(options: {
   const state = {
     listCalls: 0,
     uploadCalls: [] as unknown[],
-    signCalls: [] as Array<{ mediaId: string; expiresInSeconds: number }>,
+    signCalls: [] as Array<{
+      mediaId: string;
+      expiresInSeconds: number;
+      downloadFileName?: string;
+    }>,
+    getAttachmentCalls: [] as unknown[],
     documentValidationCalls: [] as unknown[],
     compensationCalls: [] as Array<{
       storeId: string;
@@ -235,10 +241,22 @@ function fakeManagerHarness(options: {
     }>,
     deleteCalls: [] as unknown[],
   };
+  let idempotentRecord: ProjectMediaInternalRecord | null = null;
+  let idempotentSha256: string | null = null;
   const repository = {
     async listProjectAttachments() {
       state.listCalls += 1;
       return [internalRecord()];
+    },
+    async getProjectAttachment(input: { attachmentId: string }) {
+      state.getAttachmentCalls.push(input);
+      if (input.attachmentId === ATTACHMENT_ID) {
+        return { record: internalRecord(), documentIds: [], sha256: "a".repeat(64) };
+      }
+      if (idempotentRecord?.id === input.attachmentId) {
+        return { record: idempotentRecord, documentIds: [], sha256: idempotentSha256 };
+      }
+      return null;
     },
     async validateProjectDocument(input: unknown) {
       state.documentValidationCalls.push(input);
@@ -248,10 +266,16 @@ function fakeManagerHarness(options: {
     },
     async createProjectAttachment(input: unknown) {
       if (options.associationFailure) throw new Error("association failed");
-      return internalRecord({
+      idempotentRecord = internalRecord({
+        id: (input as { idempotencyKey?: string }).idempotencyKey ?? ATTACHMENT_ID,
         phase: (input as { phase: string }).phase,
         caption: (input as { caption: string | null }).caption,
+        fileName: (input as { fileName: string }).fileName,
+        mimeType: (input as { mimeType: string }).mimeType,
+        sizeBytes: (input as { sizeBytes: number }).sizeBytes,
       });
+      idempotentSha256 = (input as { sha256: string }).sha256;
+      return idempotentRecord;
     },
     async deleteProjectAttachment(input: unknown) {
       state.deleteCalls.push(input);
@@ -274,8 +298,18 @@ function fakeManagerHarness(options: {
     authorizeProject: async () => options.authorization ?? "allowed",
     repository,
     mediaService,
-    sign: async (record: ProjectMediaInternalRecord, expiresInSeconds: number) => {
-      state.signCalls.push({ mediaId: record.mediaId, expiresInSeconds });
+    sign: async (
+      record: ProjectMediaInternalRecord,
+      expiresInSeconds: number,
+      options?: { downloadFileName?: string },
+    ) => {
+      state.signCalls.push({
+        mediaId: record.mediaId,
+        expiresInSeconds,
+        ...(options?.downloadFileName
+          ? { downloadFileName: options.downloadFileName }
+          : {}),
+      });
       return `https://r2.test/${record.objectKey}?X-Amz-Expires=${expiresInSeconds}`;
     },
     compensate: async (input: typeof state.compensationCalls[number]) => {
@@ -296,6 +330,7 @@ describe("project media validation and orchestration", () => {
       phase: "after_installation",
       caption: "  Sau lắp đặt  ",
       documentId: DOCUMENT_ID,
+      idempotencyKey: IDEMPOTENCY_ID,
       fileName: "site-after.jpg",
       mimeType: "image/jpeg",
       sizeBytes: 4,
@@ -358,6 +393,16 @@ describe("project media validation and orchestration", () => {
       "word/vbaProject.bin",
     ]), "macro.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
       .toBeNull();
+  });
+
+  test("requires a client idempotency key before accepting an upload", () => {
+    expect(projectMediaUploadSchema.safeParse({
+      phase: "after_installation",
+      caption: null,
+      fileName: "site-after.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: 4,
+    }).success).toBe(false);
   });
 
   test("accepts a structurally identified macro-free Open XML document", () => {
@@ -492,6 +537,167 @@ describe("project media validation and orchestration", () => {
     expect(state.listCalls).toBe(0);
   });
 
+  test("replays an upload idempotently by client attachment id without writing a second object", async () => {
+    const { manager, state } = fakeManagerHarness();
+    const upload = () => manager.upload(actor, PROJECT_ID, {
+      phase: "after_installation",
+      caption: "Mặt tiền",
+      fileName: "retry-safe.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: 4,
+      sha256: "a".repeat(64),
+      idempotencyKey: IDEMPOTENCY_ID,
+    }, Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]));
+
+    const first = await upload();
+    const replay = await upload();
+
+    expect(first.id).toBe(IDEMPOTENCY_ID);
+    expect(replay.id).toBe(IDEMPOTENCY_ID);
+    expect(state.uploadCalls).toHaveLength(1);
+    expect(state.getAttachmentCalls).toEqual([
+      { storeId: STORE_ID, projectId: PROJECT_ID, attachmentId: IDEMPOTENCY_ID },
+      { storeId: STORE_ID, projectId: PROJECT_ID, attachmentId: IDEMPOTENCY_ID },
+    ]);
+  });
+
+  test("rejects an idempotency key reused with a different upload payload", async () => {
+    const { manager, state } = fakeManagerHarness();
+    const base = {
+      phase: "after_installation" as const,
+      caption: "Mặt tiền",
+      fileName: "retry-safe.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: 4,
+      sha256: "a".repeat(64),
+      idempotencyKey: IDEMPOTENCY_ID,
+    };
+    await manager.upload(
+      actor,
+      PROJECT_ID,
+      base,
+      Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]),
+    );
+
+    await expect(manager.upload(
+      actor,
+      PROJECT_ID,
+      { ...base, caption: "Payload changed" },
+      Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]),
+    )).rejects.toMatchObject({ status: 409 });
+    expect(state.uploadCalls).toHaveLength(1);
+  });
+
+  test("compensates the unused object when concurrent idempotent uploads converge", async () => {
+    const mediaIds = [
+      "a1000000-0000-4000-8000-000000000012",
+      "a1000000-0000-4000-8000-000000000013",
+    ];
+    let winner: ProjectMediaInternalRecord | null = null;
+    let createCount = 0;
+    let releaseCreates: () => void = () => {};
+    const bothCreating = new Promise<void>((resolve) => { releaseCreates = resolve; });
+    const compensated: string[] = [];
+    const manager = createProjectMediaManager({
+      authorizeProject: async () => "allowed",
+      repository: {
+        async listProjectAttachments() { return []; },
+        async getProjectAttachment() { return null; },
+        async validateProjectDocument() {},
+        async createProjectAttachment(
+          input: Parameters<ProjectMediaRepository["createProjectAttachment"]>[0],
+        ) {
+          createCount += 1;
+          if (createCount === 2) releaseCreates();
+          await bothCreating;
+          winner ??= internalRecord({
+            id: input.idempotencyKey,
+            mediaId: input.mediaId,
+            phase: input.phase,
+            caption: input.caption,
+            fileName: input.fileName,
+            mimeType: input.mimeType,
+            sizeBytes: input.sizeBytes,
+            objectKey: input.expectedPath,
+          });
+          return winner;
+        },
+        async deleteProjectAttachment() {
+          return { outcome: "deleted", id: IDEMPOTENCY_ID };
+        },
+      },
+      mediaService: {
+        async putManagedObject() {
+          const mediaId = mediaIds.shift()!;
+          return {
+            mediaId,
+            path: `stores/${STORE_ID}/projects/2026/08/${mediaId}/original.jpg`,
+            url: `https://r2.test/${mediaId}`,
+          };
+        },
+      },
+      sign: async (record: ProjectMediaInternalRecord) => `https://r2.test/signed/${record.mediaId}`,
+      compensate: async (input: { mediaId: string }) => {
+        compensated.push(input.mediaId);
+        return { outcome: "deleted", media: { id: input.mediaId } } as const;
+      },
+    });
+    const input = {
+      phase: "after_installation" as const,
+      caption: null,
+      fileName: "concurrent.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: 4,
+      sha256: "c".repeat(64),
+      idempotencyKey: IDEMPOTENCY_ID,
+    };
+
+    const results = await Promise.all([
+      manager.upload(actor, PROJECT_ID, input, Uint8Array.from([0xff, 0xd8, 0xff, 0xdb])),
+      manager.upload(actor, PROJECT_ID, input, Uint8Array.from([0xff, 0xd8, 0xff, 0xdb])),
+    ]);
+
+    expect(results.map((result) => result.id)).toEqual([
+      IDEMPOTENCY_ID,
+      IDEMPOTENCY_ID,
+    ]);
+    expect(compensated).toHaveLength(1);
+    expect(compensated[0]).not.toBe(results[0].mediaId);
+  });
+
+  test("creates an attachment-disposition signature for a fresh authorized download", async () => {
+    const { manager, state } = fakeManagerHarness();
+
+    const result = await manager.download(actor, PROJECT_ID, ATTACHMENT_ID);
+    const repeated = await manager.download(actor, PROJECT_ID, ATTACHMENT_ID);
+
+    expect(result).toEqual({
+      fileName: "site-after.jpg",
+      url: expect.stringContaining("X-Amz-Expires=900"),
+    });
+    expect(repeated.fileName).toBe("site-after.jpg");
+    expect(state.signCalls).toEqual([
+      {
+        mediaId: MEDIA_ID,
+        expiresInSeconds: 15 * 60,
+        downloadFileName: "site-after.jpg",
+      },
+      {
+        mediaId: MEDIA_ID,
+        expiresInSeconds: 15 * 60,
+        downloadFileName: "site-after.jpg",
+      },
+    ]);
+  });
+
+  test("conceals an unauthorized download before looking up the attachment", async () => {
+    const { manager, state } = fakeManagerHarness({ authorization: "not_found" });
+
+    await expect(manager.download(actor, PROJECT_B, ATTACHMENT_ID)).rejects
+      .toMatchObject({ error: "errors.notFound", status: 404 });
+    expect(state.getAttachmentCalls).toEqual([]);
+  });
+
   test("uploads private project media and compensates a failed association without physical deletion", async () => {
     const { manager, state } = fakeManagerHarness({ associationFailure: true });
     await expect(manager.upload(actor, PROJECT_ID, {
@@ -502,6 +708,7 @@ describe("project media validation and orchestration", () => {
       mimeType: "image/jpeg",
       sizeBytes: 4,
       sha256: "a".repeat(64),
+      idempotencyKey: IDEMPOTENCY_ID,
     }, Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]))).rejects.toThrow(
       "association failed",
     );
@@ -537,6 +744,7 @@ describe("project media validation and orchestration", () => {
       mimeType: "image/jpeg",
       sizeBytes: 4,
       sha256: "d".repeat(64),
+      idempotencyKey: IDEMPOTENCY_ID.toUpperCase(),
     }, Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]))).rejects.toThrow(
       "association failed",
     );
@@ -575,6 +783,7 @@ describe("project media validation and orchestration", () => {
       mimeType: "image/jpeg",
       sizeBytes: 4,
       sha256: "a".repeat(64),
+      idempotencyKey: IDEMPOTENCY_ID,
     }, Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]))).rejects.toThrow(
       "PROJECT_MEDIA_DOCUMENT_NOT_FOUND",
     );
@@ -599,6 +808,7 @@ describe("project media validation and orchestration", () => {
       mimeType: "image/jpeg",
       sizeBytes: 4,
       sha256: "a".repeat(64),
+      idempotencyKey: IDEMPOTENCY_ID,
     }, Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]))).rejects.toThrow(
       "MANAGED_MEDIA_RECOVERY_CONFLICT",
     );
@@ -700,6 +910,9 @@ describe("project media validation and orchestration", () => {
         async listProjectAttachments() {
           return [];
         },
+        async getProjectAttachment() {
+          return null;
+        },
         async validateProjectDocument() {},
         async createProjectAttachment(
           input: Parameters<ProjectMediaRepository["createProjectAttachment"]>[0],
@@ -728,6 +941,7 @@ describe("project media validation and orchestration", () => {
       mimeType: "image/jpeg",
       sizeBytes: 4,
       sha256: "c".repeat(64),
+      idempotencyKey: IDEMPOTENCY_ID,
     }, Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]));
 
     expect(puts[0]).toMatchObject({
@@ -755,6 +969,7 @@ describe("project attachment route contract", () => {
     const form = new FormData();
     form.set("phase", "after_installation");
     form.set("caption", "Mặt tiền");
+    form.set("idempotencyKey", IDEMPOTENCY_ID);
     form.set("file", new File([
       Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]),
     ], "site-after.jpg", { type: "image/jpeg" }));
@@ -766,7 +981,7 @@ describe("project attachment route contract", () => {
 
     expect(response.status).toBe(200);
     expect((await response.json()).data).toMatchObject({
-      id: ATTACHMENT_ID,
+      id: IDEMPOTENCY_ID,
       mediaId: MEDIA_ID,
       phase: "after_installation",
       fileName: "site-after.jpg",
@@ -774,6 +989,63 @@ describe("project attachment route contract", () => {
       signedUrl: "https://r2.test/upload-result",
     });
     expect(state.signCalls).toEqual([]);
+    expect(state.getAttachmentCalls).toEqual([{
+      storeId: STORE_ID,
+      projectId: PROJECT_ID,
+      attachmentId: IDEMPOTENCY_ID,
+    }]);
+  });
+
+  test("rejects a multipart upload without an idempotency key", async () => {
+    const { manager, state } = fakeManagerHarness();
+    const handlers = createProjectAttachmentHandlers({
+      authenticate: async () => ({ ok: true, ...actor }),
+      manager,
+    });
+    const form = new FormData();
+    form.set("phase", "after_installation");
+    form.set("file", new File([
+      Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]),
+    ], "site-after.jpg", { type: "image/jpeg" }));
+
+    const response = await handlers.POST(new Request("https://luma.test", {
+      method: "POST",
+      body: form,
+    }), { params: Promise.resolve({ id: PROJECT_ID }) });
+
+    expect(response.status).toBe(400);
+    expect(state.uploadCalls).toEqual([]);
+  });
+
+  test("redirects an authorized download through a fresh disposition-aware signature", async () => {
+    const { manager } = fakeManagerHarness();
+    const handlers = createProjectAttachmentHandlers({
+      authenticate: async () => ({ ok: true, ...actor }),
+      manager,
+    });
+
+    const response = await handlers.GET(new Request(
+      `https://luma.test/api/mobile/services/projects/${PROJECT_ID}/attachments?attachmentId=${ATTACHMENT_ID}&download=1`,
+    ), { params: Promise.resolve({ id: PROJECT_ID }) });
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toContain("X-Amz-Expires=900");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+  });
+
+  test("rejects a malformed download attachment id before repository lookup", async () => {
+    const { manager, state } = fakeManagerHarness();
+    const handlers = createProjectAttachmentHandlers({
+      authenticate: async () => ({ ok: true, ...actor }),
+      manager,
+    });
+
+    const response = await handlers.GET(new Request(
+      `https://luma.test/api/mobile/services/projects/${PROJECT_ID}/attachments?attachmentId=not-a-uuid&download=1`,
+    ), { params: Promise.resolve({ id: PROJECT_ID }) });
+
+    expect(response.status).toBe(400);
+    expect(state.getAttachmentCalls).toEqual([]);
   });
 
   test("rejects multiple files and malformed phase/document controls", async () => {
@@ -934,6 +1206,7 @@ describe("project media database repository", () => {
         fileName: "site-after.jpg",
         mimeType: "image/jpeg",
         sizeBytes: 4,
+        sha256: "c".repeat(64),
       },
       {
         storeId: STORE_ID,
@@ -970,6 +1243,18 @@ describe("project media database repository", () => {
     })]);
   });
 
+  test("conceals a job attachment from project download lookup", async () => {
+    const [jobAttachment] = await database.select({
+      id: serviceAttachments.id,
+    }).from(serviceAttachments).where(eq(serviceAttachments.jobId, JOB_ID)).limit(1);
+
+    expect(await repository.getProjectAttachment({
+      storeId: STORE_ID,
+      projectId: PROJECT_ID,
+      attachmentId: jobAttachment.id,
+    })).toBeNull();
+  });
+
   test("returns project-detail summaries without persisted or embedded private URLs", async () => {
     expect(await listProjectAttachmentSummaries(database, {
       storeId: STORE_ID,
@@ -1003,6 +1288,44 @@ describe("project media database repository", () => {
     });
     expect(providers).toEqual(["r2"]);
     expect(url).toContain("expires=900");
+  });
+
+  test("rechecks a deterministic attachment id under the project lock", async () => {
+    const replay = await repository.createProjectAttachment({
+      storeId: STORE_ID,
+      actorId: USER_ID,
+      projectId: PROJECT_ID,
+      mediaId: OTHER_MEDIA_ID,
+      expectedPath: "unused-on-replay",
+      phase: "after_installation",
+      caption: null,
+      documentId: DOCUMENT_ID,
+      fileName: "site-after.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: 4,
+      sha256: "c".repeat(64),
+      idempotencyKey: ATTACHMENT_ID,
+    });
+
+    expect(replay.id).toBe(ATTACHMENT_ID);
+    expect(replay.mediaId).toBe(MEDIA_ID);
+    await expect(repository.createProjectAttachment({
+      storeId: STORE_ID,
+      actorId: USER_ID,
+      projectId: PROJECT_ID,
+      mediaId: OTHER_MEDIA_ID,
+      expectedPath: "unused-on-conflict",
+      phase: "after_installation",
+      caption: "changed",
+      documentId: DOCUMENT_ID,
+      fileName: "site-after.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: 4,
+      sha256: "c".repeat(64),
+      idempotencyKey: ATTACHMENT_ID,
+    })).rejects.toMatchObject({
+      code: "PROJECT_MEDIA_ASSOCIATION_CONFLICT",
+    });
   });
 
   test("rejects a document from another project/store transactionally", async () => {

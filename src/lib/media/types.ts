@@ -66,6 +66,7 @@ export interface ObjectStorage {
     bucket: string;
     key: string;
     expiresInSeconds: number;
+    downloadFileName?: string;
   }): Promise<string>;
   remove(input: { bucket: string; key: string }): Promise<void>;
   publicUrl(input: { key: string }): string;

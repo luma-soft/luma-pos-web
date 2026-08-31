@@ -90,10 +90,15 @@ export class SupabaseObjectStorage implements ObjectStorage {
     bucket: string;
     key: string;
     expiresInSeconds: number;
+    downloadFileName?: string;
   }): Promise<string> {
     const { data, error } = await this.supabase.storage
       .from(input.bucket)
-      .createSignedUrl(input.key, input.expiresInSeconds);
+      .createSignedUrl(
+        input.key,
+        input.expiresInSeconds,
+        input.downloadFileName ? { download: input.downloadFileName } : undefined,
+      );
     if (error) throw error;
     return data.signedUrl;
   }

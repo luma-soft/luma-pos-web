@@ -95,6 +95,7 @@ export const projectMediaUploadSchema = z.object({
   fileName: filenameSchema,
   mimeType: z.string().trim().min(1).max(160).transform((value) => value.toLowerCase()),
   sizeBytes: z.number().int().positive().max(PROJECT_MEDIA_MAX_BYTES),
+  idempotencyKey: canonicalUuidCoordinateSchema,
 });
 
 const managerUploadSchema = projectMediaUploadSchema.extend({
@@ -807,6 +808,7 @@ const PROJECT_MEDIA_MULTIPART_FIELDS = new Set([
   "phase",
   "caption",
   "documentId",
+  "idempotencyKey",
 ]);
 
 function projectMediaMultipartError(
@@ -834,10 +836,10 @@ export async function parseProjectMediaMultipart(
       limits: {
         fileSize: PROJECT_MEDIA_MAX_BYTES,
         files: 1,
-        fields: 3,
+        fields: 4,
         fieldNameSize: 30,
         fieldSize: 2_000,
-        parts: 4,
+        parts: 5,
         headerPairs: 20,
       },
     });
@@ -981,6 +983,12 @@ export type ProjectAttachmentSummary = Omit<
   ProjectMediaInternalRecord,
   "provider" | "bucket" | "objectKey"
 > & { documentIds: string[] };
+
+export type ProjectMediaIdempotencyRecord = {
+  record: ProjectMediaInternalRecord;
+  documentIds: string[];
+  sha256: string | null;
+};
 
 function expectedDomain(purpose: MediaPurpose) {
   if (purpose === "project-document") return "projects";
@@ -1206,6 +1214,11 @@ export type ProjectMediaRepository = {
     storeId: string;
     projectId: string;
   }): Promise<ProjectMediaInternalRecord[]>;
+  getProjectAttachment(input: {
+    storeId: string;
+    projectId: string;
+    attachmentId: string;
+  }): Promise<ProjectMediaIdempotencyRecord | null>;
   validateProjectDocument(input: {
     storeId: string;
     projectId: string;
@@ -1224,6 +1237,7 @@ export type ProjectMediaRepository = {
     mimeType: string;
     sizeBytes: number;
     sha256: string;
+    idempotencyKey: string;
     createdAt?: Date;
   }): Promise<ProjectMediaInternalRecord>;
   deleteProjectAttachment(input: {
@@ -1242,6 +1256,23 @@ class ProjectMediaDeleteRollback extends Error {
   constructor(readonly outcome: "referenced" | "conflict") {
     super(`PROJECT_MEDIA_DELETE_${outcome.toUpperCase()}`);
   }
+}
+
+type ProjectMediaReplayInput = z.infer<typeof managerUploadSchema>;
+
+function projectMediaReplayMatches(
+  existing: ProjectMediaIdempotencyRecord,
+  input: ProjectMediaReplayInput,
+) {
+  const expectedDocumentIds = input.documentId ? [input.documentId] : [];
+  return existing.record.phase === input.phase
+    && existing.record.caption === input.caption
+    && existing.record.fileName === input.fileName
+    && existing.record.mimeType === input.mimeType
+    && existing.record.sizeBytes === input.sizeBytes
+    && existing.sha256 === input.sha256
+    && existing.documentIds.length === expectedDocumentIds.length
+    && expectedDocumentIds.every((id) => existing.documentIds.includes(id));
 }
 
 export function createDatabaseProjectMediaRepository(
@@ -1289,6 +1320,76 @@ export function createDatabaseProjectMediaRepository(
       }));
     },
 
+    async getProjectAttachment(input) {
+      const storeId = canonicalizeUuidCoordinate(input.storeId);
+      const projectId = canonicalizeUuidCoordinate(input.projectId);
+      const attachmentId = canonicalizeUuidCoordinate(input.attachmentId);
+      const [row] = await database.select({
+        id: serviceAttachments.id,
+        mediaId: serviceAttachments.mediaObjectId,
+        phase: serviceAttachments.projectPhase,
+        caption: serviceAttachments.caption,
+        fileName: serviceAttachments.fileName,
+        mimeType: serviceAttachments.mimeType,
+        sizeBytes: serviceAttachments.sizeBytes,
+        sha256: serviceAttachments.sha256,
+        createdAt: serviceAttachments.createdAt,
+        provider: mediaObjects.provider,
+        bucket: mediaObjects.bucket,
+        objectKey: mediaObjects.objectKey,
+      }).from(serviceAttachments).innerJoin(mediaObjects, and(
+        eq(mediaObjects.storeId, serviceAttachments.storeId),
+        eq(mediaObjects.id, serviceAttachments.mediaObjectId),
+      )).where(and(
+        eq(serviceAttachments.storeId, storeId),
+        eq(serviceAttachments.projectId, projectId),
+        eq(serviceAttachments.id, attachmentId),
+        isNull(serviceAttachments.jobId),
+        isNull(serviceAttachments.claimId),
+        isNull(serviceAttachments.assetId),
+        isNull(serviceAttachments.requestId),
+        isNull(serviceAttachments.deletedAt),
+        eq(mediaObjects.storeId, storeId),
+        eq(mediaObjects.status, "ready"),
+        eq(mediaObjects.visibility, "private"),
+        eq(mediaObjects.purpose, "project-document"),
+        eq(mediaObjects.targetId, projectId),
+        eq(mediaObjects.domain, "projects"),
+        isNull(mediaObjects.deletedAt),
+      )).limit(1);
+      if (!row?.mediaId) return null;
+      const links = await database.select({
+        documentId: serviceHandoverDocumentMedia.documentId,
+      }).from(serviceHandoverDocumentMedia).innerJoin(
+        serviceHandoverDocuments,
+        and(
+          eq(serviceHandoverDocuments.storeId, serviceHandoverDocumentMedia.storeId),
+          eq(serviceHandoverDocuments.id, serviceHandoverDocumentMedia.documentId),
+        ),
+      ).where(and(
+        eq(serviceHandoverDocumentMedia.storeId, storeId),
+        eq(serviceHandoverDocumentMedia.mediaObjectId, row.mediaId),
+        eq(serviceHandoverDocuments.projectId, projectId),
+      ));
+      return {
+        record: {
+          id: row.id,
+          mediaId: row.mediaId,
+          phase: row.phase ?? "other",
+          caption: row.caption,
+          fileName: row.fileName,
+          mimeType: row.mimeType,
+          sizeBytes: row.sizeBytes,
+          createdAt: row.createdAt,
+          provider: row.provider,
+          bucket: row.bucket,
+          objectKey: row.objectKey,
+        },
+        documentIds: links.map((link: { documentId: string }) => link.documentId),
+        sha256: row.sha256,
+      };
+    },
+
     async validateProjectDocument(input) {
       const storeId = canonicalizeUuidCoordinate(input.storeId);
       const projectId = canonicalizeUuidCoordinate(input.projectId);
@@ -1334,6 +1435,76 @@ export function createDatabaseProjectMediaRepository(
             throw new ProjectMediaRepositoryError("PROJECT_MEDIA_DOCUMENT_NOT_FOUND");
           }
         }
+        const attachmentId = canonicalizeUuidCoordinate(input.idempotencyKey);
+        const [existing] = await transaction.select({
+          id: serviceAttachments.id,
+          mediaId: serviceAttachments.mediaObjectId,
+          phase: serviceAttachments.projectPhase,
+          caption: serviceAttachments.caption,
+          fileName: serviceAttachments.fileName,
+          mimeType: serviceAttachments.mimeType,
+          sizeBytes: serviceAttachments.sizeBytes,
+          sha256: serviceAttachments.sha256,
+          createdAt: serviceAttachments.createdAt,
+          provider: mediaObjects.provider,
+          bucket: mediaObjects.bucket,
+          objectKey: mediaObjects.objectKey,
+        }).from(serviceAttachments).innerJoin(mediaObjects, and(
+          eq(mediaObjects.storeId, serviceAttachments.storeId),
+          eq(mediaObjects.id, serviceAttachments.mediaObjectId),
+        )).where(and(
+          eq(serviceAttachments.storeId, coordinates.storeId),
+          eq(serviceAttachments.projectId, coordinates.projectId),
+          eq(serviceAttachments.id, attachmentId),
+          isNull(serviceAttachments.jobId),
+          isNull(serviceAttachments.claimId),
+          isNull(serviceAttachments.assetId),
+          isNull(serviceAttachments.requestId),
+          isNull(serviceAttachments.deletedAt),
+          eq(mediaObjects.storeId, coordinates.storeId),
+          eq(mediaObjects.status, "ready"),
+          eq(mediaObjects.visibility, "private"),
+          eq(mediaObjects.purpose, "project-document"),
+          eq(mediaObjects.targetId, coordinates.projectId),
+          eq(mediaObjects.domain, "projects"),
+          isNull(mediaObjects.deletedAt),
+        )).limit(1);
+        if (existing?.mediaId) {
+          const links = await transaction.select({
+            documentId: serviceHandoverDocumentMedia.documentId,
+          }).from(serviceHandoverDocumentMedia).innerJoin(
+            serviceHandoverDocuments,
+            and(
+              eq(serviceHandoverDocuments.storeId, serviceHandoverDocumentMedia.storeId),
+              eq(serviceHandoverDocuments.id, serviceHandoverDocumentMedia.documentId),
+            ),
+          ).where(and(
+            eq(serviceHandoverDocumentMedia.storeId, coordinates.storeId),
+            eq(serviceHandoverDocumentMedia.mediaObjectId, existing.mediaId),
+            eq(serviceHandoverDocuments.projectId, coordinates.projectId),
+          ));
+          const replay = {
+            record: {
+              id: existing.id,
+              mediaId: existing.mediaId,
+              phase: existing.phase ?? "other",
+              caption: existing.caption,
+              fileName: existing.fileName,
+              mimeType: existing.mimeType,
+              sizeBytes: existing.sizeBytes,
+              createdAt: existing.createdAt,
+              provider: existing.provider,
+              bucket: existing.bucket,
+              objectKey: existing.objectKey,
+            },
+            documentIds: links.map((link: { documentId: string }) => link.documentId),
+            sha256: existing.sha256,
+          } satisfies ProjectMediaIdempotencyRecord;
+          if (!projectMediaReplayMatches(replay, input)) {
+            throw new ProjectMediaRepositoryError("PROJECT_MEDIA_ASSOCIATION_CONFLICT");
+          }
+          return replay.record;
+        }
         const media = await requireReadyManagedMediaInTransaction(transaction, {
           storeId: coordinates.storeId,
           mediaId: coordinates.mediaId,
@@ -1346,6 +1517,8 @@ export function createDatabaseProjectMediaRepository(
           fileName: input.fileName,
         });
         const [attachment] = await transaction.insert(serviceAttachments).values({
+          id: canonicalizeUuidCoordinate(input.idempotencyKey),
+          clientRequestId: canonicalizeUuidCoordinate(input.idempotencyKey),
           storeId: coordinates.storeId,
           projectId: coordinates.projectId,
           jobId: null,
@@ -1537,6 +1710,7 @@ export function createProjectMediaManager(dependencies: {
   sign: (
     record: ProjectMediaInternalRecord,
     expiresInSeconds: number,
+    options?: { downloadFileName?: string },
   ) => Promise<string>;
   compensate: (input: {
     storeId: string;
@@ -1607,6 +1781,17 @@ export function createProjectMediaManager(dependencies: {
           documentId: input.documentId,
         });
       }
+      const existing = await dependencies.repository.getProjectAttachment({
+        storeId: coordinates.actor.storeId,
+        projectId: coordinates.projectId,
+        attachmentId: input.idempotencyKey,
+      });
+      if (existing) {
+        if (!projectMediaReplayMatches(existing, input)) {
+          throw new ProjectMediaError("media.associationConflict", 409);
+        }
+        return descriptor(existing.record);
+      }
       const uploaded = await dependencies.mediaService.putManagedObject(coordinates.actor, {
         purpose: "project-document",
         targetId: coordinates.projectId,
@@ -1630,6 +1815,7 @@ export function createProjectMediaManager(dependencies: {
           mimeType: input.mimeType,
           sizeBytes: input.sizeBytes,
           sha256: input.sha256,
+          idempotencyKey: input.idempotencyKey,
         });
       } catch (error) {
         try {
@@ -1650,9 +1836,39 @@ export function createProjectMediaManager(dependencies: {
         }
         throw error;
       }
+      if (!uuidCoordinatesEqual(record.mediaId, mediaId)) {
+        await dependencies.compensate({
+          storeId: coordinates.actor.storeId,
+          mediaId,
+          purpose: "project-document",
+          targetId: coordinates.projectId,
+          expectedObjectKey: uploaded.path,
+          expectedCreatedBy: coordinates.actor.userId,
+        });
+        return descriptor(record);
+      }
       // MediaService already produced a fresh private URL. Re-signing after the
       // association commit could turn a successful write into a retry/duplicate.
       return descriptor(record, uploaded.url);
+    },
+
+    async download(actor: MediaActor, projectId: string, attachmentId: string) {
+      const coordinates = await authorize(actor, projectId);
+      const canonicalAttachmentId = canonicalizeUuidCoordinate(attachmentId);
+      const attachment = await dependencies.repository.getProjectAttachment({
+        storeId: coordinates.actor.storeId,
+        projectId: coordinates.projectId,
+        attachmentId: canonicalAttachmentId,
+      });
+      if (!attachment) throw new ProjectMediaError("errors.notFound", 404);
+      return {
+        fileName: attachment.record.fileName,
+        url: await dependencies.sign(
+          attachment.record,
+          PROJECT_MEDIA_SIGNED_URL_SECONDS,
+          { downloadFileName: attachment.record.fileName },
+        ),
+      };
     },
 
     async delete(actor: MediaActor, projectId: string, attachmentId: string) {
@@ -1694,11 +1910,12 @@ export function getProjectMediaManager(): ProjectMediaManager {
       }),
       repository,
       mediaService: getMediaService(),
-      sign: (record, expiresInSeconds) => getObjectStorage(record.provider)
+      sign: (record, expiresInSeconds, options) => getObjectStorage(record.provider)
         .createDownloadUrl({
           bucket: record.bucket,
           key: record.objectKey,
           expiresInSeconds,
+          downloadFileName: options?.downloadFileName,
         }),
       compensate: (input) => compensateManagedMediaAssociation(db, input),
     });

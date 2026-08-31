@@ -22,6 +22,10 @@ import { RowPreviewModal } from "@/components/data-table";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { SearchableSelect } from "@/components/combobox";
+import {
+  ProjectMediaPanel,
+  type ProjectMediaOpenUploadSignal,
+} from "@/app/(app)/projects/[id]/project-media-panel";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { Field } from "@/components/ui/label";
@@ -65,6 +69,13 @@ type AssetDraft = {
   edited: boolean;
 };
 
+type CompletedAsset = {
+  assetId: string;
+  clientDraftId: string;
+  name: string;
+  photoCount: number;
+};
+
 export function InstalledAssetBatchCreate({
   projectId,
   serviceType,
@@ -95,6 +106,9 @@ export function InstalledAssetBatchCreate({
   const [requestId, setRequestId] = useState(() => newRequestId(projectId));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [completedAssets, setCompletedAssets] = useState<CompletedAsset[] | null>(null);
+  const [postInstallUploadSignal, setPostInstallUploadSignal] = useState<ProjectMediaOpenUploadSignal | null>(null);
+  const [postInstallUploaderOpen, setPostInstallUploaderOpen] = useState(false);
   const drafts = source === "catalog" ? catalogDrafts : [manualDraft];
   const selectedIds = useMemo(
     () => new Set(catalogDrafts.flatMap((draft) => draft.productId ? [draft.productId] : [])),
@@ -369,7 +383,15 @@ export function InstalledAssetBatchCreate({
       }
     }
     setBusy(false);
-    resetAndClose();
+    setCompletedAssets(drafts.flatMap((draft) => {
+      const assetId = assetIdByDraft.get(draft.clientDraftId);
+      return assetId ? [{
+        assetId,
+        clientDraftId: draft.clientDraftId,
+        name: draft.name,
+        photoCount: draft.photos.length,
+      }] : [];
+    }));
     router.refresh();
   }
 
@@ -390,6 +412,9 @@ export function InstalledAssetBatchCreate({
     setPickerOpen(true);
     setCommonExpanded(true);
     setError("");
+    setCompletedAssets(null);
+    setPostInstallUploadSignal(null);
+    setPostInstallUploaderOpen(false);
     setRequestId(newRequestId(projectId));
   }
 
@@ -402,7 +427,7 @@ export function InstalledAssetBatchCreate({
       <RowPreviewModal
         open={open}
         onClose={() => {
-          if (!busy) resetAndClose();
+          if (!busy && !postInstallUploaderOpen) resetAndClose();
         }}
         title="Thêm thiết bị đã lắp"
         closeLabel={t("common.close")}
@@ -411,15 +436,75 @@ export function InstalledAssetBatchCreate({
           <div className="flex w-full flex-col gap-2">
             {error && <p role="alert" className="text-sm font-medium text-red-600">{error}</p>}
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={resetAndClose} disabled={busy}>Hủy</Button>
-              <Button type="button" onClick={submit} disabled={!canSubmit || busy} loading={busy}>
-                Lưu {drafts.length} thiết bị
-              </Button>
+              {completedAssets ? (
+                <Button type="button" onClick={resetAndClose}>{t("common.close")}</Button>
+              ) : (
+                <>
+                  <Button type="button" variant="outline" onClick={resetAndClose} disabled={busy}>Hủy</Button>
+                  <Button type="button" onClick={submit} disabled={!canSubmit || busy} loading={busy}>
+                    Lưu {drafts.length} thiết bị
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         )}
       >
-        <div className="space-y-5" data-installed-asset-batch-flow>
+        {completedAssets ? (
+          <div className="space-y-5" data-installed-asset-batch-success>
+            <section
+              aria-labelledby="installed-asset-success-title"
+              className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5"
+            >
+              <div className="flex items-start gap-3">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-600 text-white">
+                  <Check aria-hidden="true" className="h-5 w-5" strokeWidth={2.5} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h3 id="installed-asset-success-title" className="text-base font-semibold text-emerald-950">
+                    {t("projectMedia.postInstall.successTitle")}
+                  </h3>
+                  <p className="mt-1 text-sm leading-6 text-emerald-800">
+                    {t("projectMedia.postInstall.successDescription")}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 space-y-2" role="list" aria-label={t("projectMedia.postInstall.deviceCount", { count: completedAssets.length })}>
+                {completedAssets.map((asset) => (
+                  <div
+                    key={asset.assetId}
+                    role="listitem"
+                    data-installed-asset-id={asset.assetId}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200/80 bg-white/80 px-3 py-2.5"
+                  >
+                    <span className="min-w-0 truncate text-sm font-medium text-slate-900">{asset.name}</span>
+                    <span className="shrink-0 text-xs font-medium text-emerald-700">
+                      {t("projectMedia.postInstall.photoCount", { count: asset.photoCount })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <Button
+                type="button"
+                className="mt-4"
+                onClick={() => setPostInstallUploadSignal((current) => ({
+                  sequence: (current?.sequence ?? 0) + 1,
+                  phase: "after_installation",
+                }))}
+              >
+                <Plus aria-hidden="true" className="h-4 w-4" />
+                {t("projectMedia.postInstall.addPhotos")}
+              </Button>
+            </section>
+
+            <ProjectMediaPanel
+              projectId={projectId}
+              phaseFilter={["after_installation"]}
+              openUploadSignal={postInstallUploadSignal}
+              onUploadOpenChange={setPostInstallUploaderOpen}
+            />
+          </div>
+        ) : <div className="space-y-5" data-installed-asset-batch-flow>
           <section aria-labelledby="asset-source-title">
             <h3 id="asset-source-title" className="mb-2 text-sm font-semibold text-slate-900">1. Chọn nguồn thiết bị</h3>
             <div className="grid gap-3 sm:grid-cols-2">
@@ -650,7 +735,7 @@ export function InstalledAssetBatchCreate({
               </div>
             )}
           </section>
-        </div>
+        </div>}
       </RowPreviewModal>
     </>
   );

@@ -364,6 +364,40 @@ describe("installed asset batch persistence contract", () => {
 });
 
 describe("installed asset visual and interaction contract", () => {
+  it("keeps the completed device result visible and opens the shared post-install dossier uploader", () => {
+    const source = readFileSync(
+      "src/app/(app)/services/installed-asset-batch-create.tsx",
+      "utf8",
+    );
+
+    expect(source).toContain("completedAssets");
+    expect(source).toContain("ProjectMediaPanel");
+    expect(source).toContain("postInstallUploadSignal");
+    expect(source).toContain('phaseFilter={["after_installation"]}');
+    expect(source).toContain('phase: "after_installation"');
+    expect(source).toContain('t("projectMedia.postInstall.addPhotos")');
+    expect(source).not.toContain("createInstalledAssetAttachment");
+  });
+
+  it("gives the shared uploader sole modal ownership without closing the completed result", () => {
+    const installedAssetSource = readFileSync(
+      "src/app/(app)/services/installed-asset-batch-create.tsx",
+      "utf8",
+    );
+    const projectMediaSource = readFileSync(
+      "src/app/(app)/projects/[id]/project-media-panel.tsx",
+      "utf8",
+    );
+
+    expect(installedAssetSource).toContain("!postInstallUploaderOpen");
+    expect(installedAssetSource).toContain("onUploadOpenChange={setPostInstallUploaderOpen}");
+    expect(projectMediaSource).toContain("createPortal");
+    expect(projectMediaSource).toContain("suspendParentProjectMediaDialog");
+    expect(projectMediaSource).toContain('parentDialog.setAttribute("aria-modal", "false")');
+    expect(projectMediaSource).toContain('parentDialog.setAttribute("aria-hidden", "true")');
+    expect(projectMediaSource).toContain('parentDialog.setAttribute("inert", "")');
+  });
+
   it("distinguishes loading, unavailable, empty, and ready catalog states", () => {
     const feedback = (
       serviceSchemas as typeof serviceSchemas & {

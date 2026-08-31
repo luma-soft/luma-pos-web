@@ -52,7 +52,7 @@ export function createProjectAttachmentHandlers(dependencies: {
   const manager = () => dependencies.manager ?? getProjectMediaManager();
 
   return {
-    async GET(_request: Request, { params }: RouteContext) {
+    async GET(request: Request, { params }: RouteContext) {
       const gate = await authenticate();
       const blocked = mobileGate(gate);
       if (blocked) return blocked;
@@ -60,6 +60,25 @@ export function createProjectAttachmentHandlers(dependencies: {
       const { id } = await params;
       if (!z.uuid().safeParse(id).success) return mobileError("errors.notFound", 404);
       try {
+        const searchParams = new URL(request.url).searchParams;
+        if (searchParams.get("download") === "1") {
+          const attachmentId = searchParams.get("attachmentId")?.trim();
+          if (!attachmentId || !z.uuid().safeParse(attachmentId).success) {
+            return mobileError("errors.invalidData", 400);
+          }
+          const download = await manager().download(
+            actorFromGate(gate),
+            id,
+            attachmentId,
+          );
+          return new Response(null, {
+            status: 307,
+            headers: {
+              Location: download.url,
+              "Cache-Control": "no-store",
+            },
+          });
+        }
         return mobileOk(await manager().list(actorFromGate(gate), id));
       } catch (error) {
         return projectMediaFailure(error);
@@ -100,6 +119,7 @@ export function createProjectAttachmentHandlers(dependencies: {
         phase: fields.phase,
         caption: fields.caption ?? null,
         documentId: fields.documentId,
+        idempotencyKey: fields.idempotencyKey,
         fileName: file.fileName,
         mimeType: detectedMime,
         sizeBytes: bytes.byteLength,

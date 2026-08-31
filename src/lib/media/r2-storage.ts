@@ -33,6 +33,17 @@ function publicObjectUrl(baseUrl: string, key: string): string {
   return `${baseUrl}/${encodedKey}`;
 }
 
+export function attachmentContentDisposition(fileName: string) {
+  const normalized = fileName.normalize("NFC").replace(/[\u0000-\u001f\u007f]/g, "").trim();
+  const fallback = normalized
+    .replace(/[^\x20-\x7e]/g, "_")
+    .replace(/["\\]/g, "_")
+    .slice(0, 120) || "download";
+  const encoded = encodeURIComponent(normalized || "download")
+    .replace(/[!'()*]/g, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+}
+
 function writeFailureOutcome(error: unknown): ObjectStorageWriteOutcome {
   if (!error || typeof error !== "object") return "ambiguous";
   const candidate = error as {
@@ -162,10 +173,17 @@ export class R2ObjectStorage implements ObjectStorage {
     bucket: string;
     key: string;
     expiresInSeconds: number;
+    downloadFileName?: string;
   }): Promise<string> {
     return this.presign(
       this.client,
-      new GetObjectCommand({ Bucket: input.bucket, Key: input.key }),
+      new GetObjectCommand({
+        Bucket: input.bucket,
+        Key: input.key,
+        ResponseContentDisposition: input.downloadFileName
+          ? attachmentContentDisposition(input.downloadFileName)
+          : undefined,
+      }),
       { expiresIn: input.expiresInSeconds },
     );
   }

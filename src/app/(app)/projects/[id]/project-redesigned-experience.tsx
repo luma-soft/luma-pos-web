@@ -39,6 +39,13 @@ import { ProjectServiceTab, ProjectServiceTabs } from "./project-service-tabs";
 import { CameraAccessPanel } from "./camera-access-panel";
 import { TradeRecordEditor } from "./trade-record-editor";
 import { InstalledAssetPhotoThumbnail } from "./installed-asset-photo-thumbnail";
+import {
+  CoordinatedProjectMediaPanel,
+  ProjectMediaRecordLinks,
+  ProjectMediaUploadButton,
+  ProjectMediaUploadCoordinator,
+  type ProjectMediaPhase,
+} from "./project-media-panel";
 
 type ServiceOptions = Awaited<ReturnType<typeof getServiceFormOptions>>;
 
@@ -47,6 +54,12 @@ const tradeMeta = {
   electrical: { label: "Điện", icon: Zap, tone: "text-amber-600", bar: "bg-amber-500", soft: "bg-amber-50" },
   plumbing: { label: "Nước", icon: Droplets, tone: "text-blue-600", bar: "bg-blue-600", soft: "bg-blue-50" },
 } as const;
+
+const AFTERCARE_MEDIA_PHASES = [
+  "after_installation",
+  "acceptance",
+  "handover",
+] as const satisfies readonly ProjectMediaPhase[];
 
 export function ProjectRedesignedExperience({
   detail,
@@ -73,7 +86,8 @@ export function ProjectRedesignedExperience({
   return (
     <div className="space-y-5" data-project-redesign="full-flow-v2">
       <ProjectPulse detail={detail} />
-      <ProjectServiceTabs initialActive="overview">
+      <ProjectMediaUploadCoordinator key={project.id} initialItems={detail.projectAttachments}>
+        <ProjectServiceTabs initialActive="overview">
         <ProjectServiceTab id="overview" label="Tổng quan" icon={<House />}>
           <OverviewTab detail={detail} />
         </ProjectServiceTab>
@@ -89,7 +103,8 @@ export function ProjectRedesignedExperience({
         <ProjectServiceTab id="finance" label="Tài chính & hồ sơ" icon={<FileText />} count={tabs.finance}>
           <FinanceTab detail={detail} serviceOptions={serviceOptions} />
         </ProjectServiceTab>
-      </ProjectServiceTabs>
+        </ProjectServiceTabs>
+      </ProjectMediaUploadCoordinator>
     </div>
   );
 }
@@ -227,15 +242,31 @@ function AftercareTab({ detail, serviceOptions }: { detail: ProjectDetail; servi
   const { project, jobs, assets, handoverDocuments, maintenancePlans, claims } = detail;
   return (
     <div className="grid gap-4 xl:grid-cols-3">
-      <Panel title="Nghiệm thu & bàn giao" subtitle={`${handoverDocuments.length} hồ sơ`} action={<ServiceHandoverEditor projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} />}>
-        <div className="space-y-2">{handoverDocuments.length ? handoverDocuments.map((document) => <RecordCard key={document.id} title={document.title} meta={`${document.type} · ${document.status}`} detail={document.signedBy ? `Ký bởi ${document.signedBy}` : "Chưa ký"} />) : <Empty text="Chưa có hồ sơ nghiệm thu hoặc bàn giao." />}</div>
-      </Panel>
-      <Panel title="Bảo trì định kỳ" subtitle={`${maintenancePlans.filter((plan) => plan.isActive).length} lịch đang chạy`} action={<ServiceMaintenanceEditor projectId={project.id} projectServiceType={project.serviceType!} assets={assets.map((asset) => ({ id: asset.id, name: asset.name, serialNumber: asset.serialNumber }))} staff={serviceOptions.assigneeOptions} />}>
-        <div className="space-y-2">{maintenancePlans.length ? maintenancePlans.map((plan) => <RecordCard key={plan.id} title={plan.title} meta={plan.assetName ?? serviceTypeLabel(plan.serviceType)} detail={`Kỳ tới ${formatDate(plan.nextDueOn)}`} />) : <Empty text="Chưa có lịch bảo trì." />}</div>
-      </Panel>
-      <Panel title="Bảo hành" subtitle={`${claims.filter((claim) => !["closed", "void"].includes(claim.status)).length} yêu cầu đang mở`} action={<WarrantyClaimQuickCreate projects={[{ id: project.id, name: project.name, serviceType: project.serviceType! }]} jobs={jobs.map((job) => ({ id: job.id, projectId: project.id, code: job.code, title: job.title }))} assets={assets.map((asset) => ({ id: asset.id, projectId: project.id, jobId: asset.jobId, name: asset.name, serialNumber: asset.serialNumber }))} />}>
-        <div className="space-y-2">{claims.length ? claims.map((claim) => <div key={claim.id} className="rounded-xl border border-border-soft p-3"><div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold">{claim.title}</p><p className="mt-1 text-xs text-slate-500">{claim.code} · {claim.assetName ?? "Toàn công trình"}</p></div><WarrantyClaimStatusAction claimId={claim.id} status={claim.status} diagnosis={claim.diagnosis} resolution={claim.resolution} /></div></div>) : <Empty text="Chưa có yêu cầu bảo hành." />}</div>
-      </Panel>
+        <Panel title="Nghiệm thu & bàn giao" subtitle={`${handoverDocuments.length} hồ sơ`} action={<ServiceHandoverEditor projectId={project.id} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} />}>
+          <div className="space-y-2">{handoverDocuments.length ? handoverDocuments.map((document) => {
+            const mediaPhase = projectMediaPhaseForDocument(document.type);
+            return (
+              <RecordCard
+                key={document.id}
+                title={document.title}
+                meta={`${document.type} · ${document.status}`}
+                detail={document.signedBy ? `Ký bởi ${document.signedBy}` : "Chưa ký"}
+                action={mediaPhase ? <ProjectMediaUploadButton phase={mediaPhase} documentId={document.id} /> : undefined}
+              >
+                <ProjectMediaRecordLinks documentId={document.id} />
+              </RecordCard>
+            );
+          }) : <Empty text="Chưa có hồ sơ nghiệm thu hoặc bàn giao." />}</div>
+        </Panel>
+        <Panel title="Bảo trì định kỳ" subtitle={`${maintenancePlans.filter((plan) => plan.isActive).length} lịch đang chạy`} action={<ServiceMaintenanceEditor projectId={project.id} projectServiceType={project.serviceType!} assets={assets.map((asset) => ({ id: asset.id, name: asset.name, serialNumber: asset.serialNumber }))} staff={serviceOptions.assigneeOptions} />}>
+          <div className="space-y-2">{maintenancePlans.length ? maintenancePlans.map((plan) => <RecordCard key={plan.id} title={plan.title} meta={plan.assetName ?? serviceTypeLabel(plan.serviceType)} detail={`Kỳ tới ${formatDate(plan.nextDueOn)}`} />) : <Empty text="Chưa có lịch bảo trì." />}</div>
+        </Panel>
+        <Panel title="Bảo hành" subtitle={`${claims.filter((claim) => !["closed", "void"].includes(claim.status)).length} yêu cầu đang mở`} action={<WarrantyClaimQuickCreate projects={[{ id: project.id, name: project.name, serviceType: project.serviceType! }]} jobs={jobs.map((job) => ({ id: job.id, projectId: project.id, code: job.code, title: job.title }))} assets={assets.map((asset) => ({ id: asset.id, projectId: project.id, jobId: asset.jobId, name: asset.name, serialNumber: asset.serialNumber }))} />}>
+          <div className="space-y-2">{claims.length ? claims.map((claim) => <div key={claim.id} className="rounded-xl border border-border-soft p-3"><div className="flex items-start justify-between gap-2"><div><p className="text-sm font-semibold">{claim.title}</p><p className="mt-1 text-xs text-slate-500">{claim.code} · {claim.assetName ?? "Toàn công trình"}</p></div><WarrantyClaimStatusAction claimId={claim.id} status={claim.status} diagnosis={claim.diagnosis} resolution={claim.resolution} /></div></div>) : <Empty text="Chưa có yêu cầu bảo hành." />}</div>
+        </Panel>
+        <div className="xl:col-span-3">
+          <CoordinatedProjectMediaPanel projectId={project.id} phaseFilter={AFTERCARE_MEDIA_PHASES} />
+        </div>
     </div>
   );
 }
@@ -265,6 +296,7 @@ function FinanceTab({ detail, serviceOptions }: { detail: ProjectDetail; service
         </Panel>
       </div>
       <Panel title="Hồ sơ công trình" subtitle={`${handoverDocuments.length} tài liệu`}><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{handoverDocuments.length ? handoverDocuments.map((document) => <RecordCard key={document.id} title={document.title} meta={document.type} detail={document.status === "signed" ? `Đã ký${document.signedBy ? ` · ${document.signedBy}` : ""}` : "Bản nháp"} />) : <Empty text="Chưa có hồ sơ." />}</div></Panel>
+      <CoordinatedProjectMediaPanel projectId={project.id} loadItems={false} receiveUploadSignal={false} />
     </div>
   );
 }
@@ -287,11 +319,17 @@ function Panel({ title, subtitle, action, children, flush = false }: { title: st
 function Empty({ text }: { text: string }) { return <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-slate-500">{text}</div>; }
 function InfoRow({ label, value }: { label: string; value: string }) { return <div className="grid grid-cols-[120px_1fr] gap-3 border-b border-border-soft px-4 py-3 text-sm last:border-0"><span className="text-slate-500">{label}</span><span className="font-medium">{value}</span></div>; }
 function MiniStat({ label, value }: { label: string; value: number }) { return <div className="rounded-lg bg-surface-2 px-2 py-3"><p className="text-xl font-bold">{value}</p><p className="mt-1 text-[11px] text-slate-500">{label}</p></div>; }
-function RecordCard({ title, meta, detail }: { title: string; meta: string; detail: string }) { return <div className="rounded-xl border border-border-soft p-3"><div className="flex items-start gap-2"><FileText className="mt-0.5 h-4 w-4 shrink-0 text-primary-600" /><div><p className="text-sm font-semibold">{title}</p><p className="mt-1 text-xs text-slate-500">{meta}</p><p className="mt-2 text-xs">{detail}</p></div></div></div>; }
+function RecordCard({ title, meta, detail, action, children }: { title: string; meta: string; detail: string; action?: React.ReactNode; children?: React.ReactNode }) { return <div className="rounded-xl border border-border-soft p-3"><div className="flex items-start gap-2"><FileText className="mt-0.5 h-4 w-4 shrink-0 text-primary-600" /><div className="min-w-0 flex-1"><p className="text-sm font-semibold">{title}</p><p className="mt-1 text-xs text-slate-500">{meta}</p><p className="mt-2 text-xs">{detail}</p>{children}</div>{action}</div></div>; }
 function FinanceMetric({ label, value, success }: { label: string; value: number; success?: boolean }) { return <div className="rounded-xl border border-border bg-surface p-4"><p className="text-xs text-slate-500">{label}</p><p className={success ? "mt-2 text-xl font-bold text-ok" : "mt-2 text-xl font-bold"}>{formatCurrency(value)}</p></div>; }
 function CloseCheck({ ok, label }: { ok: boolean; label: string }) { return <div className="flex items-center gap-2 border-b border-border-soft py-2 text-sm last:border-0">{ok ? <CheckCircle2 className="h-4 w-4 text-ok" /> : <AlertTriangle className="h-4 w-4 text-warn" />}<span>{label}</span></div>; }
 function StatusDot({ status }: { status: string }) { return <span className={status === "blocked" ? "h-2.5 w-2.5 rounded-full bg-er" : status === "completed" ? "h-2.5 w-2.5 rounded-full bg-ok" : "h-2.5 w-2.5 rounded-full bg-warn"} />; }
 function StatusPill({ status }: { status: string }) { const ok = ["installed", "resolved", "completed", "ready", "signed"].includes(status); const danger = ["blocked", "repair"].includes(status); return <span className={danger ? "rounded-full bg-er-soft px-2 py-1 text-[11px] font-semibold text-er" : ok ? "rounded-full bg-ok-soft px-2 py-1 text-[11px] font-semibold text-ok" : "rounded-full bg-warn-soft px-2 py-1 text-[11px] font-semibold text-warn"}>{status}</span>; }
+
+function projectMediaPhaseForDocument(type: string): ProjectMediaPhase | null {
+  if (type === "survey") return null;
+  if (type === "handover") return "handover";
+  return "acceptance";
+}
 function TradePill({ type }: { type: "camera" | "electrical" | "plumbing" }) { const meta = tradeMeta[type]; const Icon = meta.icon; return <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold ${meta.soft} ${meta.tone}`}><Icon className="h-3 w-3" />{meta.label}</span>; }
 function serviceTypeLabel(type: ProjectDetail["project"]["serviceType"] | "camera" | "electrical" | "plumbing") { return type === "camera" ? "Camera" : type === "electrical" ? "Điện" : type === "plumbing" ? "Nước" : type === "mixed" ? "Hỗn hợp" : "—"; }
 

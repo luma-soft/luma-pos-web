@@ -272,12 +272,16 @@ test("R2 download presigning uses a GET command with the requested expiry", asyn
       bucket: "private-media",
       key: "folder/file.pdf",
       expiresInSeconds: 45,
+      downloadFileName: "Biên bản bàn giao.pdf",
     }),
   ).resolves.toBe("https://signed.example/download");
   expect(signedCommand).toBeInstanceOf(GetObjectCommand);
   expect((signedCommand as GetObjectCommand).input).toMatchObject({
     Bucket: "private-media",
     Key: "folder/file.pdf",
+    ResponseContentDisposition: expect.stringContaining(
+      "filename*=UTF-8''Bi%C3%AAn%20b%E1%BA%A3n%20b%C3%A0n%20giao.pdf",
+    ),
   });
   expect(signedOptions).toMatchObject({ expiresIn: 45 });
 });
