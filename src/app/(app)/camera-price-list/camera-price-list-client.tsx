@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ClipboardList, Copy, Edit3, ImageOff, Search, X } from "lucide-react";
+import { ClipboardList, Copy, Edit3, ImageOff, ListChecks, Search, X } from "lucide-react";
 import Image from "next/image";
 import { NumberInput } from "@/components/ui/number-input";
+import { LumaActionMenu } from "@/components/ui/action-menu";
+import {
+  cameraQuoteCopyLayout,
+  type CameraQuoteCopyMode,
+} from "@/lib/camera-quote-copy";
 import { formatCurrency } from "@/lib/utils";
 
 type Variant = {
@@ -310,7 +315,12 @@ export function CameraPriceListClient({
     });
   }
 
-  async function copyImage(item: Model, index: number) {
+  async function copyQuoteImage(
+    item: Model,
+    index: number,
+    mode: Exclude<CameraQuoteCopyMode, "camera-only">,
+  ) {
+    const layout = cameraQuoteCopyLayout(mode);
     const canvas = document.createElement("canvas");
     canvas.width = 1500;
     canvas.height = 1900;
@@ -348,27 +358,29 @@ export function CameraPriceListClient({
     ctx.font = "800 34px Arial";
     canvasWrap(ctx, item.model, 540, 135, 480, 42);
     const variants = item.variants;
-    variants.forEach((variant, variantIndex) => {
-      const x = 1065 + (variantIndex % 2) * 150;
-      const y = 90 + Math.floor(variantIndex / 2) * 88;
-      ctx.fillStyle = "#e6f3f3";
-      ctx.fillRect(x, y, 140, 78);
-      ctx.strokeStyle = "#078a82";
-      ctx.strokeRect(x, y, 140, 78);
-      ctx.fillStyle = "#64748b";
-      ctx.font = "700 14px Arial";
-      ctx.fillText(
-        canvasMemoryLabel(memoryLabels[variantIndex] ?? "", variantIndex),
-        x + 12,
-        y + 26,
-      );
-      ctx.fillStyle = "#007e78";
-      ctx.font = "800 16px Arial";
-      ctx.fillText(formatCurrency(variant.price), x + 12, y + 49);
-      ctx.fillStyle = "#64748b";
-      ctx.font = "11px Arial";
-      ctx.fillText(`Lưu ${variant.storageEstimate}`, x + 12, y + 68);
-    });
+    if (layout.showPriceSummary) {
+      variants.forEach((variant, variantIndex) => {
+        const x = 1065 + (variantIndex % 2) * 150;
+        const y = 90 + Math.floor(variantIndex / 2) * 88;
+        ctx.fillStyle = "#e6f3f3";
+        ctx.fillRect(x, y, 140, 78);
+        ctx.strokeStyle = "#078a82";
+        ctx.strokeRect(x, y, 140, 78);
+        ctx.fillStyle = "#64748b";
+        ctx.font = "700 14px Arial";
+        ctx.fillText(
+          canvasMemoryLabel(memoryLabels[variantIndex] ?? "", variantIndex),
+          x + 12,
+          y + 26,
+        );
+        ctx.fillStyle = "#007e78";
+        ctx.font = "800 16px Arial";
+        ctx.fillText(formatCurrency(variant.price), x + 12, y + 49);
+        ctx.fillStyle = "#64748b";
+        ctx.font = "11px Arial";
+        ctx.fillText(`Lưu ${variant.storageEstimate}`, x + 12, y + 68);
+      });
+    }
     ctx.fillStyle = "#14344d";
     ctx.font = "800 27px Arial";
     ctx.fillText("THÔNG SỐ KỸ THUẬT", 540, 340);
@@ -398,49 +410,52 @@ export function CameraPriceListClient({
     const description = item.description;
     const descriptionLines = canvasWrap(ctx, description, 540, y, 790, 24);
     y = Math.max(900, y + descriptionLines * 24 + 42);
-    ctx.fillStyle = "#07817a";
-    ctx.fillRect(540, y, 815, 42);
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "700 18px Arial";
-    ctx.fillText("HẠNG MỤC", 560, y + 27);
-    const variantColumnWidth = 575 / variants.length;
-    ctx.textAlign = "center";
-    variants.forEach((_, variantIndex) =>
-      ctx.fillText(
-        canvasMemoryLabel(memoryLabels[variantIndex] ?? "", variantIndex),
-        780 + variantColumnWidth * (variantIndex + 0.5),
-        y + 27,
-      ),
-    );
-    ctx.textAlign = "left";
-    const items: Array<[string, keyof Variant]> = [
-      ["Camera", "cameraPrice"],
-      ["Thẻ nhớ", "cardPrice"],
-      ["Công lắp đặt", "installationPrice"],
-      ["Vật tư cơ bản", "materialPrice"],
-      ["TỔNG TRỌN GÓI", "price"],
-    ];
-    items.forEach(([label, key], itemIndex) => {
-      const rowY = y + 42 + itemIndex * 44;
-      ctx.fillStyle = itemIndex === items.length - 1 ? "#e1f1f1" : "#ffffff";
-      ctx.fillRect(540, rowY, 815, 44);
-      ctx.strokeStyle = "#cbd5e1";
-      ctx.strokeRect(540, rowY, 815, 44);
-      ctx.fillStyle = "#263b4a";
-      ctx.font =
-        itemIndex === items.length - 1 ? "800 18px Arial" : "18px Arial";
-      ctx.fillText(label, 560, rowY + 28);
-      variants.forEach((variant, variantIndex) => {
-        ctx.textAlign = "right";
+    let contentBottom = y;
+    if (layout.showPriceBreakdown) {
+      ctx.fillStyle = "#07817a";
+      ctx.fillRect(540, y, 815, 42);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "700 18px Arial";
+      ctx.fillText("HẠNG MỤC", 560, y + 27);
+      const variantColumnWidth = 575 / variants.length;
+      ctx.textAlign = "center";
+      variants.forEach((_, variantIndex) =>
         ctx.fillText(
-          formatCurrency(Number(variant[key])),
-          780 + variantColumnWidth * (variantIndex + 1) - 16,
-          rowY + 28,
-        );
-        ctx.textAlign = "left";
+          canvasMemoryLabel(memoryLabels[variantIndex] ?? "", variantIndex),
+          780 + variantColumnWidth * (variantIndex + 0.5),
+          y + 27,
+        ),
+      );
+      ctx.textAlign = "left";
+      const items: Array<[string, keyof Variant]> = [
+        ["Camera", "cameraPrice"],
+        ["Thẻ nhớ", "cardPrice"],
+        ["Công lắp đặt", "installationPrice"],
+        ["Vật tư cơ bản", "materialPrice"],
+        ["TỔNG TRỌN GÓI", "price"],
+      ];
+      items.forEach(([label, key], itemIndex) => {
+        const rowY = y + 42 + itemIndex * 44;
+        ctx.fillStyle = itemIndex === items.length - 1 ? "#e1f1f1" : "#ffffff";
+        ctx.fillRect(540, rowY, 815, 44);
+        ctx.strokeStyle = "#cbd5e1";
+        ctx.strokeRect(540, rowY, 815, 44);
+        ctx.fillStyle = "#263b4a";
+        ctx.font =
+          itemIndex === items.length - 1 ? "800 18px Arial" : "18px Arial";
+        ctx.fillText(label, 560, rowY + 28);
+        variants.forEach((variant, variantIndex) => {
+          ctx.textAlign = "right";
+          ctx.fillText(
+            formatCurrency(Number(variant[key])),
+            780 + variantColumnWidth * (variantIndex + 1) - 16,
+            rowY + 28,
+          );
+          ctx.textAlign = "left";
+        });
       });
-    });
-    const contentBottom = y + 42 + items.length * 44;
+      contentBottom = y + 42 + items.length * 44;
+    }
     ctx.strokeStyle = "#b7c7d3";
     ctx.strokeRect(72, 58, 1356, contentBottom - 28);
     ctx.fillStyle = "#64748b";
@@ -468,10 +483,50 @@ export function CameraPriceListClient({
 
     await deliverCanvasImage({
       canvas,
-      downloadName: `bao-gia-camera-goi-${String(index + 1).padStart(2, "0")}.png`,
-      copiedMessage: `Đã sao chép ảnh ${item.model}.`,
+      downloadName: `${mode === "price-summary" ? "bao-gia-camera-rut-gon" : "bao-gia-camera-day-du"}-${String(index + 1).padStart(2, "0")}.png`,
+      copiedMessage: mode === "price-summary"
+        ? `Đã sao chép ảnh giá gói ${item.model}.`
+        : `Đã sao chép ảnh báo giá đầy đủ ${item.model}.`,
       downloadedMessage: "Không thể sao chép; ảnh báo giá đã được tải xuống.",
     });
+  }
+
+  function copyMenu(item: Model, index: number, iconOnly: boolean) {
+    return (
+      <div onClick={(event) => event.stopPropagation()}>
+        <LumaActionMenu
+          label="Sao chép"
+          ariaLabel={`Chọn kiểu sao chép ${item.model}`}
+          icon={Copy}
+          iconOnly={iconOnly}
+          items={[
+            {
+              key: "camera-only",
+              label: "Chỉ thông tin camera",
+              icon: ClipboardList,
+              onSelect: () => copySpecsImage(item, index),
+            },
+            {
+              key: "price-summary",
+              label: "Giá gói rút gọn",
+              icon: Copy,
+              onSelect: () => copyQuoteImage(item, index, "price-summary"),
+            },
+            {
+              key: "full",
+              label: "Báo giá đầy đủ",
+              icon: ListChecks,
+              onSelect: () => copyQuoteImage(item, index, "full"),
+            },
+          ]}
+          className={
+            iconOnly
+              ? "inline-flex h-11 w-11 items-center justify-center rounded-lg border border-teal-200 bg-white text-[#0b7b74] transition hover:bg-teal-50"
+              : "inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-teal-200 bg-white px-3.5 py-2.5 text-sm font-bold text-[#087b74] shadow-[0_2px_8px_rgba(8,129,122,.06)] transition hover:border-teal-300 hover:bg-teal-50"
+          }
+        />
+      </div>
+    );
   }
 
   return (
@@ -532,32 +587,7 @@ export function CameraPriceListClient({
                     Phù hợp: {item.suitableFor[0]}
                   </p>
                 </div>
-                <div className="flex shrink-0 gap-1">
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      copyImage(item, index);
-                    }}
-                    className="grid h-11 w-11 place-items-center rounded-lg border border-teal-200 bg-teal-50/60 text-[#0b7b74] transition hover:bg-teal-50"
-                    aria-label={`Sao chép ảnh gói ${item.model}`}
-                    title="Sao chép ảnh gói"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      copySpecsImage(item, index);
-                    }}
-                    className="grid h-11 w-11 place-items-center rounded-lg border border-slate-200 bg-white text-[#14344d] transition hover:border-teal-200 hover:bg-teal-50"
-                    aria-label={`Sao chép ảnh thông số ${item.model}`}
-                    title="Sao chép ảnh thông số"
-                  >
-                    <ClipboardList className="h-4 w-4" />
-                  </button>
-                </div>
+                <div className="shrink-0">{copyMenu(item, index, true)}</div>
               </div>
               <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">
                 {item.description.split("\n")[0]}
@@ -671,31 +701,8 @@ export function CameraPriceListClient({
                     );
                   })}
                   <td className="border border-slate-300 px-1 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          copyImage(item, index);
-                        }}
-                        className="inline-flex h-11 w-11 items-center justify-center text-[#0b7b74] transition hover:bg-teal-50"
-                        aria-label={`Sao chép ảnh gói ${item.model}`}
-                        title="Sao chép ảnh gói"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          copySpecsImage(item, index);
-                        }}
-                        className="inline-flex h-11 w-11 items-center justify-center text-[#14344d] transition hover:bg-teal-50"
-                        aria-label={`Sao chép ảnh thông số ${item.model}`}
-                        title="Sao chép ảnh thông số"
-                      >
-                        <ClipboardList className="h-4 w-4" />
-                      </button>
+                    <div className="flex items-center justify-center">
+                      {copyMenu(item, index, true)}
                     </div>
                   </td>
                 </tr>
@@ -745,26 +752,12 @@ export function CameraPriceListClient({
                         {item.model}
                       </h3>
                     </div>
-                    <div className="flex flex-col gap-2 sm:flex-row">
-                      <button
-                        type="button"
-                        onClick={() => copyImage(item, index)}
-                        className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-teal-200 bg-white px-3.5 py-2.5 text-sm font-bold text-[#087b74] shadow-[0_2px_8px_rgba(8,129,122,.06)] transition hover:border-teal-300 hover:bg-teal-50"
-                      >
-                        <Copy className="h-4 w-4" />
-                        Sao chép ảnh gói
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => copySpecsImage(item, index)}
-                        className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-bold text-[#14344d] transition hover:border-teal-200 hover:bg-teal-50"
-                      >
-                        <ClipboardList className="h-4 w-4" />
-                        Sao chép thông số
-                      </button>
-                    </div>
+                    {copyMenu(item, index, false)}
                   </div>
-                  <div className="mt-6 grid gap-2 sm:grid-cols-2">
+                  <div
+                    data-testid="camera-package-total-prices"
+                    className="mt-6 grid gap-2 sm:grid-cols-2"
+                  >
                     {item.variants.map((variant, variantIndex) => (
                       <div
                         key={variant.id}
@@ -774,9 +767,28 @@ export function CameraPriceListClient({
                           {memoryLabels[variantIndex] ??
                             `Gói ${variantIndex + 1}`}
                         </p>
-                        <p className="mt-1 text-xl font-black text-[#007e78]">
-                          {formatCurrency(variant.price)}
-                        </p>
+                        <div className="mt-1 flex items-center justify-between gap-2">
+                          <p className="text-xl font-black text-[#007e78]">
+                            {formatCurrency(variant.price)}
+                          </p>
+                          {canEdit && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openPriceEditor(
+                                  item,
+                                  variant,
+                                  memoryLabels[variantIndex] ?? `Gói ${variantIndex + 1}`,
+                                  "price",
+                                )
+                              }
+                              className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-white hover:text-[#0b7b74]"
+                              aria-label={`Sửa tổng giá ${memoryLabels[variantIndex] ?? `Gói ${variantIndex + 1}`}`}
+                            >
+                              <Edit3 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
                         <p className="mt-1 text-xs text-slate-500">
                           Ghi liên tục: {variant.storageEstimate}
                         </p>

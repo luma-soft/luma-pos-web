@@ -14,13 +14,17 @@ export type LumaActionMenuItem = {
 
 export function LumaActionMenu({
   label,
+  ariaLabel,
   icon: TriggerIcon,
+  iconOnly = false,
   items,
   side = "bottom",
   className,
 }: {
   label: string;
+  ariaLabel?: string;
   icon?: LucideIcon;
+  iconOnly?: boolean;
   items: LumaActionMenuItem[];
   side?: "top" | "bottom";
   className?: string;
@@ -63,6 +67,7 @@ export function LumaActionMenu({
       <button
         ref={triggerRef}
         type="button"
+        aria-label={ariaLabel}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
@@ -76,7 +81,7 @@ export function LumaActionMenu({
         className={`${className ?? ""} min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11 lg:min-h-0 lg:min-w-0`}
       >
         {TriggerIcon && <TriggerIcon className="h-4 w-4" />}
-        {label}
+        {iconOnly ? <span className="sr-only">{label}</span> : label}
       </button>
       {open && (
         <div

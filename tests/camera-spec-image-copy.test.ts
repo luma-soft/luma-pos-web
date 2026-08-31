@@ -9,13 +9,12 @@ const source = readFileSync(
 describe("camera specification image copy", () => {
   test("offers a dedicated specification-only image action", () => {
     expect(source).toContain("async function copySpecsImage");
-    expect(source).toContain("Sao chép ảnh thông số");
-    expect(source).toContain("Sao chép thông số");
+    expect(source).toContain('label: "Chỉ thông tin camera"');
   });
 
   test("keeps prices out of the specification-only canvas", () => {
     const renderer = source.match(
-      /async function copySpecsImage[\s\S]*?\n  async function copyImage/,
+      /async function copySpecsImage[\s\S]*?\n  async function copyQuoteImage/,
     )?.[0];
 
     expect(renderer).toBeTruthy();
