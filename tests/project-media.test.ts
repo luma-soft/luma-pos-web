@@ -22,6 +22,7 @@ import type {
   MediaRecord,
   MediaRepository,
   MediaService,
+  ReservedMediaUploadLock,
 } from "../src/lib/media/service";
 import type {
   ProjectMediaInternalRecord,
@@ -91,6 +92,10 @@ const TERMINAL_RESERVATION_ID = "a1000000-0000-4000-8000-000000000024";
 const TERMINAL_RACE_ID = "a1000000-0000-4000-8000-000000000025";
 const EXPIRED_EMPTY_RESERVATION_ID = "a1000000-0000-4000-8000-000000000026";
 const EXPIRED_MISMATCH_RESERVATION_ID = "a1000000-0000-4000-8000-000000000027";
+const EXPIRY_FENCE_RESERVATION_ID = "a1000000-0000-4000-8000-000000000028";
+const HUNG_EXACT_RESERVATION_ID = "a1000000-0000-4000-8000-000000000029";
+const HUNG_MISSING_RESERVATION_ID = "a1000000-0000-4000-8000-000000000030";
+const HUNG_MISMATCH_RESERVATION_ID = "a1000000-0000-4000-8000-000000000031";
 const NOW = new Date("2026-08-31T08:00:00.000Z");
 
 const actor: MediaActor = {
@@ -964,6 +969,28 @@ describe("project media validation and orchestration", () => {
       async getForStore(input) {
         return records.get(input.mediaId) ?? null;
       },
+      async withReservedUploadLock(input, operation) {
+        const current = records.get(input.mediaId);
+        if (!current) return null;
+        return operation({
+          media: current,
+          async markReady(value) {
+            const pending = records.get(value.mediaId);
+            if (!pending || pending.status !== "pending") return null;
+            const ready: MediaRecord = {
+              ...pending,
+              status: "ready",
+              sizeBytes: value.actualSizeBytes,
+              readyAt: value.readyAt,
+              verifiedAt: value.verifiedAt,
+            };
+            records.set(ready.id, ready);
+            return ready;
+          },
+          async abandonPending() { return null; },
+          async quarantinePending() { return null; },
+        });
+      },
       async markReady(input) {
         const current = records.get(input.mediaId);
         if (!current || current.status !== "pending") return null;
@@ -1395,6 +1422,10 @@ describe("project media database repository", () => {
       TERMINAL_RACE_ID,
       EXPIRED_EMPTY_RESERVATION_ID,
       EXPIRED_MISMATCH_RESERVATION_ID,
+      EXPIRY_FENCE_RESERVATION_ID,
+      HUNG_EXACT_RESERVATION_ID,
+      HUNG_MISSING_RESERVATION_ID,
+      HUNG_MISMATCH_RESERVATION_ID,
     ];
     await database.delete(serviceHandoverDocumentMedia).where(inArray(
       serviceHandoverDocumentMedia.mediaObjectId,
@@ -1410,18 +1441,21 @@ describe("project media database repository", () => {
   function databaseBackedManager(
     storage: ObjectStorage,
     projectRepository: ProjectMediaRepository = repository,
-    currentTime: Date = NOW,
+    currentTime: Date | (() => Date) = NOW,
+    mediaRepository: MediaRepository = createDatabaseMediaRepository(database),
+    reservedUploadIoTimeoutMs?: number,
   ) {
     const service = createMediaService({
       storage,
-      repository: createDatabaseMediaRepository(database),
+      repository: mediaRepository,
       config: {
         publicBucket: "lumapos-test-public-media",
         privateBucket: "lumapos-test-private-media",
       },
       authorizeTarget: async () => "allowed",
-      now: () => currentTime,
+      now: typeof currentTime === "function" ? currentTime : () => currentTime,
       logger: { error() {} },
+      reservedUploadIoTimeoutMs,
     });
     return createProjectMediaManager({
       authorizeProject: async () => "allowed",
@@ -1938,6 +1972,305 @@ describe("project media database repository", () => {
       serviceAttachments.id,
       EXPIRED_MISMATCH_RESERVATION_ID,
     ))).toEqual([{ mediaId: null, deletedAt: expect.any(Date) }]);
+  });
+
+  test("keeps a pre-expiry managed upload fenced at its original expiry", async () => {
+    const bytes = Uint8Array.from([1, 2, 3, 4]);
+    const objects = new Map<string, { bytes: Uint8Array; contentType: string }>();
+    const putKeys: string[] = [];
+    const removeCalls: string[] = [];
+    let releasePut: (() => void) | null = null;
+    let signalPutEntered: (() => void) | null = null;
+    const putEntered = new Promise<void>((resolve) => {
+      signalPutEntered = resolve;
+    });
+    const putReleased = new Promise<void>((resolve) => {
+      releasePut = resolve;
+    });
+    const storage: ObjectStorage = {
+      async put(input) {
+        putKeys.push(input.key);
+        const coordinate = `${input.bucket}:${input.key}`;
+        if (input.ifNoneMatch === "*" && objects.has(coordinate)) {
+          throw new ObjectStorageWriteError("precondition failed", "definitive-no-write");
+        }
+        if (putKeys.length === 1) {
+          signalPutEntered?.();
+          await putReleased;
+        }
+        objects.set(coordinate, {
+          bytes: input.body.slice(),
+          contentType: input.contentType,
+        });
+        return {
+          sizeBytes: input.body.byteLength,
+          contentType: input.contentType,
+          etag: "stored",
+        };
+      },
+      async get(input) {
+        const value = objects.get(`${input.bucket}:${input.key}`);
+        if (!value) throw new Error("missing object");
+        return value.bytes;
+      },
+      async head(input) {
+        const value = objects.get(`${input.bucket}:${input.key}`);
+        return value ? {
+          sizeBytes: value.bytes.byteLength,
+          contentType: value.contentType,
+          etag: "stored",
+        } : null;
+      },
+      async createUploadUrl() { return "https://r2.test/upload"; },
+      async createDownloadUrl(input) {
+        return `https://r2.test/${input.key}?expires=${input.expiresInSeconds}`;
+      },
+      async remove(input) { removeCalls.push(input.key); },
+      publicUrl(input) { return `https://r2.test/${input.key}`; },
+    };
+    const input = {
+      phase: "handover" as const,
+      caption: "Expiry fence",
+      documentId: DOCUMENT_ID,
+      fileName: "expiry-fence.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: bytes.byteLength,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+      idempotencyKey: EXPIRY_FENCE_RESERVATION_ID,
+    };
+    let currentTime = NOW;
+    const first = databaseBackedManager(storage, repository, () => currentTime).upload(
+      actor,
+      PROJECT_ID,
+      input,
+      bytes,
+    );
+    await putEntered;
+
+    currentTime = new Date(NOW.getTime() + 600_000);
+
+    const baseRepository = createDatabaseMediaRepository(database);
+    let terminalizationAttempted = false;
+    const secondRepository: MediaRepository = {
+      ...baseRepository,
+      async withReservedUploadLock(lockInput, operation) {
+        return baseRepository.withReservedUploadLock(
+          lockInput,
+          async (lock: ReservedMediaUploadLock) => operation({
+            ...lock,
+            async abandonPending(reservation) {
+              terminalizationAttempted = true;
+              return lock.abandonPending(reservation);
+            },
+            async quarantinePending(reservation) {
+              terminalizationAttempted = true;
+              return lock.quarantinePending(reservation);
+            },
+          }),
+        );
+      },
+    };
+    const second = databaseBackedManager(
+      storage,
+      repository,
+      () => currentTime,
+      secondRepository,
+    ).upload(actor, PROJECT_ID, input, bytes);
+    let secondSettled = false;
+    void second.finally(() => { secondSettled = true; }).catch(() => undefined);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(terminalizationAttempted).toBe(false);
+    expect(secondSettled).toBe(false);
+    expect(putKeys).toHaveLength(1);
+    expect(objects).toHaveLength(0);
+    const release = releasePut ?? (() => {
+      throw new Error("paused PUT release was not initialized");
+    });
+    release();
+    const [firstResult, secondResult] = await Promise.allSettled([first, second]);
+
+    expect(firstResult).toMatchObject({ status: "fulfilled" });
+    expect(secondResult).toMatchObject({ status: "fulfilled" });
+    expect(await database.select({
+      id: mediaObjects.id,
+      status: mediaObjects.status,
+      key: mediaObjects.objectKey,
+    }).from(mediaObjects).where(eq(
+      mediaObjects.id,
+      EXPIRY_FENCE_RESERVATION_ID,
+    ))).toEqual([{
+      id: EXPIRY_FENCE_RESERVATION_ID,
+      status: "ready",
+      key: expect.stringContaining(`/${EXPIRY_FENCE_RESERVATION_ID}/original.pdf`),
+    }]);
+    expect(await database.select({
+      id: serviceAttachments.id,
+      mediaId: serviceAttachments.mediaObjectId,
+      deletedAt: serviceAttachments.deletedAt,
+    }).from(serviceAttachments).where(eq(
+      serviceAttachments.id,
+      EXPIRY_FENCE_RESERVATION_ID,
+    ))).toEqual([{
+      id: EXPIRY_FENCE_RESERVATION_ID,
+      mediaId: EXPIRY_FENCE_RESERVATION_ID,
+      deletedAt: null,
+    }]);
+    expect(putKeys).toEqual([
+      expect.stringContaining(`/${EXPIRY_FENCE_RESERVATION_ID}/original.pdf`),
+    ]);
+    expect(objects).toHaveLength(1);
+    expect(removeCalls).toEqual([]);
+  });
+
+  test("reconciles a hung fenced upload at expiry without deleting physical objects", async () => {
+    const bytes = Uint8Array.from([1, 2, 3, 4]);
+    const scenarios = [
+      {
+        id: HUNG_EXACT_RESERVATION_ID,
+        object: "exact",
+        status: "ready",
+        error: null,
+      },
+      {
+        id: HUNG_MISSING_RESERVATION_ID,
+        object: "missing",
+        status: "deleted",
+        error: { error: "media.uploadExpired", status: 410 },
+      },
+      {
+        id: HUNG_MISMATCH_RESERVATION_ID,
+        object: "mismatch",
+        status: "quarantined",
+        error: { error: "media.reservationConflict", status: 409 },
+      },
+    ] as const;
+
+    for (const scenario of scenarios) {
+      const objects = new Map<string, { bytes: Uint8Array; contentType: string }>();
+      const putKeys: string[] = [];
+      const removeCalls: string[] = [];
+      let firstPut = true;
+      const storage: ObjectStorage = {
+        async put(input) {
+          putKeys.push(input.key);
+          if (firstPut) {
+            firstPut = false;
+            await new Promise<void>((_resolve, reject) => {
+              const rejectAborted = () => reject(new Error("provider call aborted"));
+              if (input.signal?.aborted) {
+                rejectAborted();
+                return;
+              }
+              input.signal?.addEventListener("abort", rejectAborted, { once: true });
+            });
+          }
+          const coordinate = `${input.bucket}:${input.key}`;
+          if (input.ifNoneMatch === "*" && objects.has(coordinate)) {
+            throw new ObjectStorageWriteError("precondition failed", "definitive-no-write");
+          }
+          objects.set(coordinate, {
+            bytes: input.body.slice(),
+            contentType: input.contentType,
+          });
+          return {
+            sizeBytes: input.body.byteLength,
+            contentType: input.contentType,
+            etag: "stored",
+          };
+        },
+        async get(input) {
+          const object = objects.get(`${input.bucket}:${input.key}`);
+          if (!object) throw new Error("missing object");
+          return object.bytes;
+        },
+        async head(input) {
+          const object = objects.get(`${input.bucket}:${input.key}`);
+          return object ? {
+            sizeBytes: object.bytes.byteLength,
+            contentType: object.contentType,
+            etag: "stored",
+          } : null;
+        },
+        async createUploadUrl() { return "https://r2.test/upload"; },
+        async createDownloadUrl(input) {
+          return `https://r2.test/${input.key}?expires=${input.expiresInSeconds}`;
+        },
+        async remove(input) { removeCalls.push(input.key); },
+        publicUrl(input) { return `https://r2.test/${input.key}`; },
+      };
+      const input = {
+        phase: "handover" as const,
+        caption: "Hung writer",
+        documentId: DOCUMENT_ID,
+        fileName: `hung-${scenario.object}.pdf`,
+        mimeType: "application/pdf",
+        sizeBytes: bytes.byteLength,
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+        idempotencyKey: scenario.id,
+      };
+
+      await expect(databaseBackedManager(
+        storage,
+        repository,
+        NOW,
+        createDatabaseMediaRepository(database),
+        10,
+      ).upload(actor, PROJECT_ID, input, bytes)).rejects.toMatchObject({
+        error: "media.uploadInProgress",
+        status: 503,
+      });
+
+      const [reserved] = await database.select({
+        bucket: mediaObjects.bucket,
+        objectKey: mediaObjects.objectKey,
+        status: mediaObjects.status,
+      }).from(mediaObjects).where(eq(mediaObjects.id, scenario.id));
+      expect(reserved.status).toBe("pending");
+      if (scenario.object === "exact") {
+        objects.set(`${reserved.bucket}:${reserved.objectKey}`, {
+          bytes: bytes.slice(),
+          contentType: "application/pdf",
+        });
+      }
+      if (scenario.object === "mismatch") {
+        objects.set(`${reserved.bucket}:${reserved.objectKey}`, {
+          bytes: Uint8Array.from([1, 2, 3, 5]),
+          contentType: "application/pdf",
+        });
+      }
+
+      const retry = databaseBackedManager(
+        storage,
+        repository,
+        new Date(NOW.getTime() + 600_000),
+      ).upload(actor, PROJECT_ID, input, bytes);
+      if (scenario.error) {
+        await expect(retry).rejects.toMatchObject(scenario.error);
+      } else {
+        await expect(retry).resolves.toMatchObject({
+          id: scenario.id,
+          mediaId: scenario.id,
+        });
+      }
+
+      expect(await database.select({
+        status: mediaObjects.status,
+      }).from(mediaObjects).where(eq(mediaObjects.id, scenario.id))).toEqual([{
+        status: scenario.status,
+      }]);
+      expect(await database.select({
+        mediaId: serviceAttachments.mediaObjectId,
+        deletedAt: serviceAttachments.deletedAt,
+      }).from(serviceAttachments).where(eq(
+        serviceAttachments.id,
+        scenario.id,
+      ))).toEqual(scenario.status === "ready"
+        ? [{ mediaId: scenario.id, deletedAt: null }]
+        : [{ mediaId: null, deletedAt: expect.any(Date) }]);
+      expect(putKeys).toHaveLength(1);
+      expect(removeCalls).toEqual([]);
+      expect(objects).toHaveLength(scenario.object === "missing" ? 0 : 1);
+    }
   });
 
   test("cleans a hidden reservation only after reconciliation makes its media terminal", async () => {

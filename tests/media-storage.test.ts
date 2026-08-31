@@ -47,7 +47,7 @@ const R2_CONFIG = {
 };
 
 function r2WithClient(
-  send: (command: unknown) => Promise<unknown>,
+  send: (command: unknown, options?: unknown) => Promise<unknown>,
 ): InstanceType<typeof R2ObjectStorage> {
   return new R2ObjectStorage(R2_CONFIG, { send } as unknown as S3Client);
 }
@@ -366,6 +366,48 @@ describe("R2 object adapter", () => {
       Bucket: input.bucket,
       Key: input.key,
     });
+  });
+
+  test("passes a caller abort signal through each bounded object operation", async () => {
+    const calls: Array<{ command: unknown; options: unknown }> = [];
+    const storage = r2WithClient(async (command, options) => {
+      calls.push({ command, options });
+      if (command instanceof PutObjectCommand) return { ETag: "put-etag" };
+      if (command instanceof GetObjectCommand) {
+        return { Body: { transformToByteArray: async () => new Uint8Array([1, 2]) } };
+      }
+      return { ContentLength: 2, ContentType: "application/pdf", ETag: "head-etag" };
+    });
+    const controller = new AbortController();
+    const input = {
+      bucket: "private-media",
+      key: "stores/store/projects/2026/08/media/original.pdf",
+      signal: controller.signal,
+    };
+
+    await storage.put({
+      ...input,
+      body: new Uint8Array([1, 2]),
+      contentType: "application/pdf",
+      ifNoneMatch: "*",
+    });
+    await storage.get(input);
+    await storage.head(input);
+
+    expect(calls).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        command: expect.any(PutObjectCommand),
+        options: { abortSignal: controller.signal },
+      }),
+      expect.objectContaining({
+        command: expect.any(GetObjectCommand),
+        options: { abortSignal: controller.signal },
+      }),
+      expect.objectContaining({
+        command: expect.any(HeadObjectCommand),
+        options: { abortSignal: controller.signal },
+      }),
+    ]));
   });
 
   test("maps only a missing R2 HEAD response to null", async () => {

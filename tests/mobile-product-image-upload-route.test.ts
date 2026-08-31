@@ -168,6 +168,49 @@ function createOldClientLifecycleHarness(options: { referenced?: boolean } = {})
     async getForStore(input) {
       return records.get(`${input.storeId}:${input.mediaId}`) ?? null;
     },
+    async withReservedUploadLock(input, operation) {
+      const coordinate = `${input.storeId}:${input.mediaId}`;
+      const current = records.get(coordinate);
+      if (!current) return null;
+      return operation({
+        media: current,
+        async markReady(value) {
+          const pending = records.get(`${value.storeId}:${value.mediaId}`);
+          if (!pending || pending.status !== "pending") return null;
+          const ready: MediaRecord = {
+            ...pending,
+            status: "ready",
+            sizeBytes: value.actualSizeBytes,
+            readyAt: value.readyAt,
+            verifiedAt: value.verifiedAt,
+          };
+          records.set(`${ready.storeId}:${ready.id}`, ready);
+          return ready;
+        },
+        async abandonPending(value) {
+          const pending = records.get(`${value.storeId}:${value.mediaId}`);
+          if (!pending || pending.status !== "pending") return null;
+          const deleted: MediaRecord = {
+            ...pending,
+            status: "deleted",
+            deletedAt: value.deletedAt,
+          };
+          records.set(`${deleted.storeId}:${deleted.id}`, deleted);
+          return deleted;
+        },
+        async quarantinePending(value) {
+          const pending = records.get(`${value.storeId}:${value.mediaId}`);
+          if (!pending || pending.status !== "pending") return null;
+          const quarantined: MediaRecord = {
+            ...pending,
+            status: "quarantined",
+            deletedAt: null,
+          };
+          records.set(`${quarantined.storeId}:${quarantined.id}`, quarantined);
+          return quarantined;
+        },
+      });
+    },
     async markReady(input) {
       const coordinate = `${input.storeId}:${input.mediaId}`;
       const current = records.get(coordinate);

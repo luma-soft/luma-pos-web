@@ -8,16 +8,9 @@ import {
 import { getR2Config } from "@/lib/media/config";
 import { createMediaThumbnail, isSafeRasterMimeType } from "@/lib/media/image-variants";
 import { createObjectKey } from "@/lib/media/object-key";
+import { db } from "@/db";
 import {
-  abandonPendingMedia,
-  createPendingMedia,
-  getMediaForStore,
-  markMediaReady,
-  quarantinePendingMedia,
-  recoverReadyMediaAfterFailure,
-  reservePendingMedia,
-  saveMediaThumbnail,
-  softDeleteMediaIfUnreferenced,
+  createDatabaseMediaRepository,
   type CreatePendingMediaInput,
   type AbandonPendingMediaInput,
   type GetMediaForStoreInput,
@@ -53,6 +46,7 @@ import {
 
 const UPLOAD_EXPIRY_SECONDS = 600;
 const DOWNLOAD_EXPIRY_SECONDS = 900;
+const RESERVED_UPLOAD_IO_TIMEOUT_MS = 20_000;
 const CANONICAL_PRODUCT_IMAGE_PATH = new RegExp(
   "^stores/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"
     + "/products/[0-9]{4}/(?:0[1-9]|1[0-2])/"
@@ -102,6 +96,13 @@ export type MediaDescriptor = {
   thumbnailUrl: string | null;
 };
 
+export type ReservedMediaUploadLock = {
+  media: MediaRecord;
+  markReady(input: Required<MarkMediaReadyInput>): Promise<MediaRecord | null>;
+  abandonPending(input: AbandonPendingMediaInput): Promise<MediaRecord | null>;
+  quarantinePending(input: QuarantinePendingMediaInput): Promise<MediaRecord | null>;
+};
+
 export type MediaRepository = {
   createPending(input: CreatePendingMediaInput): Promise<MediaRecord>;
   reservePending(input: CreatePendingMediaInput): Promise<{
@@ -109,6 +110,10 @@ export type MediaRepository = {
     created: boolean;
   } | null>;
   getForStore(input: GetMediaForStoreInput): Promise<MediaRecord | null>;
+  withReservedUploadLock<T>(
+    input: GetMediaForStoreInput,
+    operation: (lock: ReservedMediaUploadLock) => Promise<T>,
+  ): Promise<T | null>;
   markReady(input: Required<MarkMediaReadyInput>): Promise<MediaRecord | null>;
   saveThumbnail(input: SaveMediaThumbnailInput): Promise<MediaRecord | null>;
   abandonPending(input: AbandonPendingMediaInput): Promise<MediaRecord | null>;
@@ -148,20 +153,11 @@ export type MediaServiceDependencies = {
   now?: () => Date;
   randomUUID?: () => string;
   logger?: Pick<Console, "error">;
+  reservedUploadIoTimeoutMs?: number;
 };
 
 function defaultRepository(): MediaRepository {
-  return {
-    createPending: createPendingMedia as MediaRepository["createPending"],
-    reservePending: reservePendingMedia as MediaRepository["reservePending"],
-    getForStore: getMediaForStore as MediaRepository["getForStore"],
-    markReady: markMediaReady as MediaRepository["markReady"],
-    saveThumbnail: saveMediaThumbnail as MediaRepository["saveThumbnail"],
-    abandonPending: abandonPendingMedia as MediaRepository["abandonPending"],
-    quarantinePending: quarantinePendingMedia as MediaRepository["quarantinePending"],
-    recoverReadyAfterFailure: recoverReadyMediaAfterFailure,
-    softDeleteIfUnreferenced: softDeleteMediaIfUnreferenced,
-  };
+  return createDatabaseMediaRepository(db) as MediaRepository;
 }
 
 function thumbnailKey(objectKey: string): string {
@@ -174,6 +170,32 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
   const now = dependencies.now ?? (() => new Date());
   const createId = dependencies.randomUUID ?? nodeRandomUUID;
   const logger = dependencies.logger ?? console;
+  const reservedUploadIoTimeoutMs = dependencies.reservedUploadIoTimeoutMs
+    ?? RESERVED_UPLOAD_IO_TIMEOUT_MS;
+  if (!Number.isFinite(reservedUploadIoTimeoutMs) || reservedUploadIoTimeoutMs <= 0) {
+    throw new Error("Reserved upload I/O timeout must be positive");
+  }
+
+  async function withReservedUploadIoDeadline<T>(
+    operation: (signal: AbortSignal) => Promise<T>,
+  ): Promise<T> {
+    const controller = new AbortController();
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, reservedUploadIoTimeoutMs);
+    try {
+      return await operation(controller.signal);
+    } catch (error) {
+      if (timedOut) {
+        throw new MediaServiceError("media.uploadInProgress", 503);
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
 
   async function requireTarget(
     candidateActor: MediaActor,
@@ -405,6 +427,38 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
     return descriptor(await loadAuthorizedReady(actor, mediaId));
   }
 
+  async function saveThumbnailForReadyMedia(media: MediaRecord): Promise<MediaRecord> {
+    if (!isSafeRasterMimeType(media.mimeType)) return media;
+    try {
+      const original = await dependencies.storage.get({
+        bucket: media.bucket,
+        key: media.objectKey,
+      });
+      const thumbnail = await createMediaThumbnail(original, media.mimeType);
+      const objectKey = thumbnailKey(media.objectKey);
+      await dependencies.storage.put({
+        bucket: media.bucket,
+        key: objectKey,
+        body: thumbnail,
+        contentType: "image/webp",
+      });
+      const updated = await dependencies.repository.saveThumbnail({
+        storeId: media.storeId,
+        mediaId: media.id,
+        objectKey,
+        sizeBytes: thumbnail.byteLength,
+      });
+      if (!updated) throw new Error("Thumbnail metadata update was rejected");
+      return updated;
+    } catch (error) {
+      logger.error("media thumbnail generation failed", {
+        mediaId: media.id,
+        error,
+      });
+      return media;
+    }
+  }
+
   async function completeUploadInternal(
     candidateActor: MediaActor,
     candidateMediaId: string,
@@ -461,35 +515,7 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
     }
     media = ready;
 
-    if (isSafeRasterMimeType(media.mimeType)) {
-      try {
-        const original = await dependencies.storage.get({
-          bucket: media.bucket,
-          key: media.objectKey,
-        });
-        const thumbnail = await createMediaThumbnail(original, media.mimeType);
-        const objectKey = thumbnailKey(media.objectKey);
-        await dependencies.storage.put({
-          bucket: media.bucket,
-          key: objectKey,
-          body: thumbnail,
-          contentType: "image/webp",
-        });
-        const updated = await dependencies.repository.saveThumbnail({
-          storeId: actor.storeId,
-          mediaId,
-          objectKey,
-          sizeBytes: thumbnail.byteLength,
-        });
-        if (!updated) throw new Error("Thumbnail metadata update was rejected");
-        media = updated;
-      } catch (error) {
-        logger.error("media thumbnail generation failed", {
-          mediaId,
-          error,
-        });
-      }
-    }
+    media = await saveThumbnailForReadyMedia(media);
     return descriptor(media);
   }
 
@@ -621,6 +647,7 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
     }
     const actor = canonicalizeMediaActor(candidateActor);
     const mediaId = parsedMediaId.data;
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
     const media = await dependencies.repository.getForStore({
       storeId: actor.storeId,
       mediaId,
@@ -630,19 +657,15 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
       || (media.status !== "pending" && media.status !== "ready")
       || bytes.byteLength !== media.sizeBytes
       || !media.sha256
-      || createHash("sha256").update(bytes).digest("hex") !== media.sha256
+      || sha256 !== media.sha256
     ) {
       throw new MediaServiceError("media.reservationConflict", 409);
     }
     const reservedMedia = media;
     await requireTarget(actor, reservedMedia.purpose, reservedMedia.targetId, true);
 
-    async function result(allowVerifiedExpiredObject = false) {
-      const completed = await completeUploadInternal(
-        actor,
-        reservedMedia.id,
-        allowVerifiedExpiredObject,
-      );
+    if (reservedMedia.status === "ready") {
+      const completed = await descriptor(reservedMedia);
       return {
         mediaId: completed.id,
         path: reservedMedia.objectKey,
@@ -650,86 +673,156 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
       };
     }
 
-    if (reservedMedia.status === "ready") return result();
-
-    async function inspectExistingObject(): Promise<
+    type ReservedObjectInspection =
       | { outcome: "missing" }
       | { outcome: "mismatch" }
-      | { outcome: "verified"; completed: Awaited<ReturnType<typeof result>> }
-    > {
-      const head = await dependencies.storage.head({
-        bucket: reservedMedia.bucket,
-        key: reservedMedia.objectKey,
-      });
+      | { outcome: "verified"; actualSizeBytes: number };
+    type ReservedUploadOutcome =
+      | { outcome: "ready"; media: MediaRecord }
+      | { outcome: "expired" }
+      | { outcome: "mismatch" }
+      | { outcome: "conflict" };
+
+    function matchesReservation(record: MediaRecord) {
+      return (
+        (record.status === "pending" || record.status === "ready")
+        && record.storeId === reservedMedia.storeId
+        && record.provider === reservedMedia.provider
+        && record.visibility === reservedMedia.visibility
+        && record.purpose === reservedMedia.purpose
+        && uuidCoordinatesEqual(record.targetId, reservedMedia.targetId)
+        && record.domain === reservedMedia.domain
+        && record.bucket === reservedMedia.bucket
+        && record.objectKey === reservedMedia.objectKey
+        && record.originalFileName === reservedMedia.originalFileName
+        && normalizeMediaType(record.mimeType) === normalizeMediaType(reservedMedia.mimeType)
+        && record.sizeBytes === reservedMedia.sizeBytes
+        && record.sha256 === sha256
+        && nullableUuidCoordinatesEqual(record.createdBy, reservedMedia.createdBy)
+        && record.deletedAt === null
+      );
+    }
+
+    async function inspectExistingObject(
+      record: MediaRecord,
+    ): Promise<ReservedObjectInspection> {
+      const head = await withReservedUploadIoDeadline((signal) => dependencies.storage.head({
+        bucket: record.bucket,
+        key: record.objectKey,
+        signal,
+      }));
       if (!head) return { outcome: "missing" };
       if (
-        head.sizeBytes !== reservedMedia.sizeBytes
-        || normalizeMediaType(head.contentType ?? "") !== normalizeMediaType(reservedMedia.mimeType)
+        head.sizeBytes !== record.sizeBytes
+        || normalizeMediaType(head.contentType ?? "") !== normalizeMediaType(record.mimeType)
       ) {
         return { outcome: "mismatch" };
       }
-      const storedBytes = await dependencies.storage.get({
-        bucket: reservedMedia.bucket,
-        key: reservedMedia.objectKey,
-      });
-      if (createHash("sha256").update(storedBytes).digest("hex") !== reservedMedia.sha256) {
+      const storedBytes = await withReservedUploadIoDeadline((signal) => dependencies.storage.get({
+        bucket: record.bucket,
+        key: record.objectKey,
+        signal,
+      }));
+      if (createHash("sha256").update(storedBytes).digest("hex") !== record.sha256) {
         return { outcome: "mismatch" };
       }
-      // This path has just verified the immutable key's size, MIME, and
-      // digest. It may safely complete an ambiguous provider write even when
-      // the original upload window has elapsed; it never authorizes a new PUT.
-      return { outcome: "verified", completed: await result(true) };
+      return { outcome: "verified", actualSizeBytes: head.sizeBytes };
     }
 
-    const existing = await inspectExistingObject();
-    if (existing.outcome === "verified") return existing.completed;
-    const expirationCheckAt = now();
-    if (expirationCheckAt.getTime() >= reservedMedia.uploadExpiresAt.getTime()) {
-      const terminal = existing.outcome === "mismatch"
-        ? await dependencies.repository.quarantinePending({
+    const resolved = await dependencies.repository.withReservedUploadLock(
+      { storeId: actor.storeId, mediaId: reservedMedia.id },
+      async (lock): Promise<ReservedUploadOutcome> => {
+        const lockedMedia = lock.media;
+        if (!matchesReservation(lockedMedia)) return { outcome: "conflict" };
+        if (lockedMedia.status === "ready") {
+          return { outcome: "ready", media: lockedMedia };
+        }
+
+        const markVerifiedReady = async (actualSizeBytes: number) => {
+          const completedAt = now();
+          const ready = await lock.markReady({
             storeId: actor.storeId,
-            mediaId: reservedMedia.id,
-            expectedPurpose: reservedMedia.purpose,
-            expectedTargetId: reservedMedia.targetId,
-          })
-        : await dependencies.repository.abandonPending({
-            storeId: actor.storeId,
-            mediaId: reservedMedia.id,
-            expectedPurpose: reservedMedia.purpose,
-            expectedTargetId: reservedMedia.targetId,
-            deletedAt: expirationCheckAt,
+            mediaId: lockedMedia.id,
+            actualSizeBytes,
+            readyAt: completedAt,
+            verifiedAt: completedAt,
           });
-      if (!terminal) {
-        const raced = await inspectExistingObject();
-        if (raced.outcome === "verified") return raced.completed;
-      }
-      if (existing.outcome === "mismatch") {
-        throw new MediaServiceError("media.reservationConflict", 409);
-      }
-      throw new MediaServiceError("media.uploadExpired", 410);
-    }
-    if (existing.outcome === "mismatch") {
+          return ready
+            ? { outcome: "ready", media: ready } as const
+            : { outcome: "conflict" } as const;
+        };
+
+        const existing = await inspectExistingObject(lockedMedia);
+        if (existing.outcome === "verified") {
+          return markVerifiedReady(existing.actualSizeBytes);
+        }
+
+        const checkedAt = now();
+        if (checkedAt.getTime() >= lockedMedia.uploadExpiresAt.getTime()) {
+          if (existing.outcome === "mismatch") {
+            const quarantined = await lock.quarantinePending({
+              storeId: actor.storeId,
+              mediaId: lockedMedia.id,
+              expectedPurpose: lockedMedia.purpose,
+              expectedTargetId: lockedMedia.targetId,
+            });
+            return quarantined ? { outcome: "mismatch" } : { outcome: "conflict" };
+          }
+          const abandoned = await lock.abandonPending({
+            storeId: actor.storeId,
+            mediaId: lockedMedia.id,
+            expectedPurpose: lockedMedia.purpose,
+            expectedTargetId: lockedMedia.targetId,
+            deletedAt: checkedAt,
+          });
+          return abandoned ? { outcome: "expired" } : { outcome: "conflict" };
+        }
+        if (existing.outcome === "mismatch") return { outcome: "mismatch" };
+
+        try {
+          await withReservedUploadIoDeadline((signal) => dependencies.storage.put({
+            bucket: lockedMedia.bucket,
+            key: lockedMedia.objectKey,
+            body: bytes,
+            contentType: lockedMedia.mimeType,
+            ifNoneMatch: "*",
+            signal,
+          }));
+        } catch (error) {
+          if (!isDefinitiveObjectStorageWriteError(error)) throw error;
+          const raced = await inspectExistingObject(lockedMedia);
+          if (raced.outcome === "verified") {
+            return markVerifiedReady(raced.actualSizeBytes);
+          }
+          if (raced.outcome === "mismatch") return { outcome: "mismatch" };
+          throw error;
+        }
+
+        const written = await inspectExistingObject(lockedMedia);
+        if (written.outcome === "verified") {
+          return markVerifiedReady(written.actualSizeBytes);
+        }
+        if (written.outcome === "mismatch") return { outcome: "mismatch" };
+        throw new MediaServiceError("media.uploadInProgress", 503);
+      },
+    );
+    if (!resolved || resolved.outcome === "conflict") {
       throw new MediaServiceError("media.reservationConflict", 409);
     }
-    try {
-      await dependencies.storage.put({
-        bucket: reservedMedia.bucket,
-        key: reservedMedia.objectKey,
-        body: bytes,
-        contentType: reservedMedia.mimeType,
-        ifNoneMatch: "*",
-      });
-    } catch (error) {
-      if (isDefinitiveObjectStorageWriteError(error)) {
-        const raced = await inspectExistingObject();
-        if (raced.outcome === "verified") return raced.completed;
-        if (raced.outcome === "mismatch") {
-          throw new MediaServiceError("media.reservationConflict", 409);
-        }
-      }
-      throw error;
+    if (resolved.outcome === "mismatch") {
+      throw new MediaServiceError("media.reservationConflict", 409);
     }
-    return result();
+    if (resolved.outcome === "expired") {
+      throw new MediaServiceError("media.uploadExpired", 410);
+    }
+
+    const completedMedia = await saveThumbnailForReadyMedia(resolved.media);
+    const completed = await descriptor(completedMedia);
+    return {
+      mediaId: completed.id,
+      path: completedMedia.objectKey,
+      url: completed.url,
+    };
   }
 
   async function deleteMedia(candidateActor: MediaActor, candidateMediaId: string) {
@@ -751,26 +844,55 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
     }
     await requireTarget(actor, authorized.purpose, authorized.targetId, true);
     if (authorized.status === "pending") {
-      const deleted = await dependencies.repository.abandonPending({
-        storeId: actor.storeId,
-        mediaId,
-        expectedPurpose: authorized.purpose,
-        expectedTargetId: authorized.targetId,
-        deletedAt: now(),
-      });
-      if (!deleted) throw new MediaServiceError("media.deleteConflict", 409);
-      try {
-        await dependencies.storage.remove({
-          bucket: deleted.bucket,
-          key: deleted.objectKey,
-        });
-      } catch (error) {
-        logger.error("pending media object cleanup failed", {
-          mediaId,
-          error,
-        });
+      const expectedPurpose = authorized.purpose;
+      const expectedTargetId = authorized.targetId;
+      const pendingDeletion = await dependencies.repository.withReservedUploadLock(
+        { storeId: actor.storeId, mediaId },
+        async (lock): Promise<
+          | { outcome: "deleted"; media: MediaRecord }
+          | { outcome: "ready"; media: MediaRecord }
+          | { outcome: "conflict" }
+        > => {
+          const lockedMedia = lock.media;
+          if (
+            lockedMedia.storeId !== actor.storeId
+            || lockedMedia.purpose !== expectedPurpose
+            || !uuidCoordinatesEqual(lockedMedia.targetId, expectedTargetId)
+          ) return { outcome: "conflict" };
+          if (lockedMedia.status === "ready") {
+            return { outcome: "ready", media: lockedMedia };
+          }
+          if (lockedMedia.status !== "pending") return { outcome: "conflict" };
+          const deleted = await lock.abandonPending({
+            storeId: actor.storeId,
+            mediaId,
+            expectedPurpose: lockedMedia.purpose,
+            expectedTargetId: lockedMedia.targetId,
+            deletedAt: now(),
+          });
+          return deleted
+            ? { outcome: "deleted", media: deleted }
+            : { outcome: "conflict" };
+        },
+      );
+      if (!pendingDeletion || pendingDeletion.outcome === "conflict") {
+        throw new MediaServiceError("media.deleteConflict", 409);
       }
-      return { id: deleted.id, status: "deleted" as const };
+      if (pendingDeletion.outcome === "deleted") {
+        try {
+          await dependencies.storage.remove({
+            bucket: pendingDeletion.media.bucket,
+            key: pendingDeletion.media.objectKey,
+          });
+        } catch (error) {
+          logger.error("pending media object cleanup failed", {
+            mediaId,
+            error,
+          });
+        }
+        return { id: pendingDeletion.media.id, status: "deleted" as const };
+      }
+      throw new MediaServiceError("media.deleteConflict", 409);
     }
     const coordinates = { storeId: actor.storeId, mediaId };
     const result = await dependencies.repository.softDeleteIfUnreferenced({

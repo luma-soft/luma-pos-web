@@ -15,6 +15,7 @@ import {
   canonicalizeNullableUuidCoordinate,
   canonicalizeUuidCoordinate,
 } from "@/lib/media/uuid-coordinate";
+import type { ReservedMediaUploadLock } from "@/lib/media/service";
 
 export type CreatePendingMediaInput = {
   id: string;
@@ -250,6 +251,37 @@ export function createDatabaseMediaRepository(database: typeof db) {
     async getForStore(input: GetMediaForStoreInput) {
       const [row] = await buildGetMediaForStoreQuery(database, input);
       return row ?? null;
+    },
+    async withReservedUploadLock<T>(
+      input: GetMediaForStoreInput,
+      operation: (lock: ReservedMediaUploadLock) => Promise<T>,
+    ): Promise<T | null> {
+      const coordinates = {
+        storeId: canonicalizeUuidCoordinate(input.storeId),
+        mediaId: canonicalizeUuidCoordinate(input.mediaId),
+      };
+      return database.transaction(async (transaction) => {
+        const [media] = await transaction.select().from(mediaObjects).where(and(
+          eq(mediaObjects.id, coordinates.mediaId),
+          eq(mediaObjects.storeId, coordinates.storeId),
+        )).limit(1).for("update");
+        if (!media) return null;
+        return operation({
+          media,
+          async markReady(value) {
+            const [row] = await buildMarkMediaReadyQuery(transaction, value);
+            return row ?? null;
+          },
+          async abandonPending(value) {
+            const [row] = await buildAbandonPendingMediaQuery(transaction, value);
+            return row ?? null;
+          },
+          async quarantinePending(value) {
+            const [row] = await buildQuarantinePendingMediaQuery(transaction, value);
+            return row ?? null;
+          },
+        });
+      });
     },
     async markReady(input: MarkMediaReadyInput) {
       const [row] = await buildMarkMediaReadyQuery(database, input);

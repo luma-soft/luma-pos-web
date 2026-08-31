@@ -42,6 +42,7 @@ import {
   type MediaRecord,
   type MediaRepository,
   type MediaService,
+  type ReservedMediaUploadLock,
   MediaServiceError,
 } from "@/lib/media/service";
 import type { MediaPurpose } from "@/lib/media/schemas";
@@ -1158,6 +1159,64 @@ export function createDatabaseMediaRepository(
         eq(mediaObjects.id, canonicalizeUuidCoordinate(input.mediaId)),
       )).limit(1);
       return (row as MediaRecord | undefined) ?? null;
+    },
+    async withReservedUploadLock<T>(
+      input: GetMediaForStoreInput,
+      operation: (lock: ReservedMediaUploadLock) => Promise<T>,
+    ): Promise<T | null> {
+      const coordinates = {
+        storeId: canonicalizeUuidCoordinate(input.storeId),
+        mediaId: canonicalizeUuidCoordinate(input.mediaId),
+      };
+      return database.transaction(async (transaction: DatabaseLike) => {
+        const [media] = await transaction.select().from(mediaObjects).where(and(
+          eq(mediaObjects.storeId, coordinates.storeId),
+          eq(mediaObjects.id, coordinates.mediaId),
+        )).limit(1).for("update");
+        if (!media) return null;
+        return operation({
+          media: media as MediaRecord,
+          async markReady(value: Required<MarkMediaReadyInput>) {
+            const [row] = await transaction.update(mediaObjects).set({
+              status: "ready",
+              sizeBytes: value.actualSizeBytes,
+              readyAt: value.readyAt,
+              verifiedAt: value.verifiedAt,
+            }).where(and(
+              eq(mediaObjects.storeId, canonicalizeUuidCoordinate(value.storeId)),
+              eq(mediaObjects.id, canonicalizeUuidCoordinate(value.mediaId)),
+              eq(mediaObjects.status, "pending"),
+            )).returning();
+            return (row as MediaRecord | undefined) ?? null;
+          },
+          async abandonPending(value: AbandonPendingMediaInput) {
+            const [row] = await transaction.update(mediaObjects).set({
+              status: "deleted",
+              deletedAt: value.deletedAt,
+            }).where(and(
+              eq(mediaObjects.storeId, canonicalizeUuidCoordinate(value.storeId)),
+              eq(mediaObjects.id, canonicalizeUuidCoordinate(value.mediaId)),
+              eq(mediaObjects.status, "pending"),
+              eq(mediaObjects.purpose, value.expectedPurpose),
+              eq(mediaObjects.targetId, canonicalizeUuidCoordinate(value.expectedTargetId)),
+            )).returning();
+            return (row as MediaRecord | undefined) ?? null;
+          },
+          async quarantinePending(value: QuarantinePendingMediaInput) {
+            const [row] = await transaction.update(mediaObjects).set({
+              status: "quarantined",
+              deletedAt: null,
+            }).where(and(
+              eq(mediaObjects.storeId, canonicalizeUuidCoordinate(value.storeId)),
+              eq(mediaObjects.id, canonicalizeUuidCoordinate(value.mediaId)),
+              eq(mediaObjects.status, "pending"),
+              eq(mediaObjects.purpose, value.expectedPurpose),
+              eq(mediaObjects.targetId, canonicalizeUuidCoordinate(value.expectedTargetId)),
+            )).returning();
+            return (row as MediaRecord | undefined) ?? null;
+          },
+        });
+      });
     },
     async markReady(input: Required<MarkMediaReadyInput>) {
       const [row] = await database.update(mediaObjects).set({

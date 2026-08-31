@@ -49,11 +49,13 @@ export interface ObjectStorage {
     body: Uint8Array;
     contentType: string;
     ifNoneMatch?: "*";
+    signal?: AbortSignal;
   }): Promise<MediaObjectHead>;
-  get(input: { bucket: string; key: string }): Promise<Uint8Array>;
+  get(input: { bucket: string; key: string; signal?: AbortSignal }): Promise<Uint8Array>;
   head(input: {
     bucket: string;
     key: string;
+    signal?: AbortSignal;
   }): Promise<MediaObjectHead | null>;
   createUploadUrl(input: {
     bucket: string;

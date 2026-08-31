@@ -95,6 +95,7 @@ export class R2ObjectStorage implements ObjectStorage {
     body: Uint8Array;
     contentType: string;
     ifNoneMatch?: "*";
+    signal?: AbortSignal;
   }): Promise<MediaObjectHead> {
     try {
       const result = await this.client.send(
@@ -105,6 +106,7 @@ export class R2ObjectStorage implements ObjectStorage {
           ContentType: input.contentType,
           IfNoneMatch: input.ifNoneMatch,
         }),
+        { abortSignal: input.signal },
       );
       return {
         sizeBytes: input.body.byteLength,
@@ -120,9 +122,10 @@ export class R2ObjectStorage implements ObjectStorage {
     }
   }
 
-  async get(input: { bucket: string; key: string }): Promise<Uint8Array> {
+  async get(input: { bucket: string; key: string; signal?: AbortSignal }): Promise<Uint8Array> {
     const result = await this.client.send(
       new GetObjectCommand({ Bucket: input.bucket, Key: input.key }),
+      { abortSignal: input.signal },
     );
     if (!result.Body) throw new Error("R2 object response is missing a body");
     return result.Body.transformToByteArray();
@@ -131,10 +134,12 @@ export class R2ObjectStorage implements ObjectStorage {
   async head(input: {
     bucket: string;
     key: string;
+    signal?: AbortSignal;
   }): Promise<MediaObjectHead | null> {
     try {
       const result = await this.client.send(
         new HeadObjectCommand({ Bucket: input.bucket, Key: input.key }),
+        { abortSignal: input.signal },
       );
       return {
         sizeBytes: result.ContentLength ?? 0,
