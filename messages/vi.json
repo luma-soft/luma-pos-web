@@ -1790,6 +1790,7 @@
       "items": "Sản phẩm",
       "payments": "Thanh toán",
       "noPayments": "Chưa có thanh toán nào",
+      "paid": "Đã thanh toán",
       "remaining": "Còn lại phải thu",
       "addPayment": "Ghi nhận thanh toán / thu nợ",
       "amount": "Số tiền",

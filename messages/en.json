@@ -1790,6 +1790,7 @@
       "items": "Items",
       "payments": "Payments",
       "noPayments": "No payments yet",
+      "paid": "Paid",
       "remaining": "Remaining",
       "addPayment": "Record payment / collect debt",
       "amount": "Amount",

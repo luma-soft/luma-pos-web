@@ -288,6 +288,7 @@ export async function OrderDetailPanel({
             <InfoLine label={t("pos.tax")} value={formatCurrency(Number(order.tax))} />
             <InfoLine label={t("pos.shipping")} value={formatCurrency(Number(order.shippingFee))} />
             <InfoLine label={t("pos.total")} value={formatCurrency(total)} valueClassName="text-base text-primary-600" strong />
+            {!isQuote && <InfoLine label={t("orders.detail.paid")} value={formatCurrency(paid)} valueClassName={paid > 0 ? "text-ok" : "text-slate-500"} strong />}
             {!isQuote && <InfoLine label={t("orders.detail.remaining")} value={formatCurrency(remaining)} valueClassName={remaining > 0 ? "text-er" : "text-ok"} strong />}
           </div>
 
