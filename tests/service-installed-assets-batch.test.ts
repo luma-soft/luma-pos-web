@@ -338,7 +338,9 @@ describe("installed asset batch persistence contract", () => {
     expect(post).toContain("SERVICE_ASSET_PHOTO_LIMIT");
     expect(post).toContain("count(serviceAttachments.id)");
     expect(post).toContain("resolveAssetAttachmentUrl");
-    expect(post).toContain("if (attachment.mediaObjectId !== managed.mediaId)");
+    expect(post).toContain(
+      "if (!nullableUuidCoordinatesEqual(attachment.mediaObjectId, managed.mediaId))",
+    );
     expect(post).toContain("id: attachment.id");
     expect(post).not.toContain("...legacyShape");
   });

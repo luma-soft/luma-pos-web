@@ -5,6 +5,10 @@ import {
   type MediaAuthorizationRepository,
 } from "@/lib/media/authorization-repository";
 import type { MediaPurpose } from "@/lib/media/schemas";
+import {
+  canonicalizeUuidCoordinate,
+  uuidCoordinatesEqual,
+} from "@/lib/media/uuid-coordinate";
 import type { StoreFeatureSet } from "@/lib/tenancy/store-features";
 import { storeFeatureEnabled } from "@/lib/tenancy/store-features";
 
@@ -16,6 +20,14 @@ export type MediaActor = {
 };
 
 export type MediaTargetAuthorization = "allowed" | "forbidden" | "not_found";
+
+export function canonicalizeMediaActor(actor: MediaActor): MediaActor {
+  return {
+    ...actor,
+    storeId: canonicalizeUuidCoordinate(actor.storeId),
+    userId: canonicalizeUuidCoordinate(actor.userId),
+  };
+}
 
 export type AuthorizeMediaTarget = (input: {
   actor: MediaActor;
@@ -33,13 +45,15 @@ const databaseAuthorizationRepository = createDatabaseMediaAuthorizationReposito
 export function createMediaTargetAuthorizer(
   repository: MediaAuthorizationRepository,
 ): AuthorizeMediaTarget {
-  return async ({ actor, purpose, targetId }) => {
+  return async ({ actor: candidateActor, purpose, targetId: candidateTargetId }) => {
+    const actor = canonicalizeMediaActor(candidateActor);
+    const targetId = canonicalizeUuidCoordinate(candidateTargetId);
     switch (purpose) {
       case "product-image": {
         if (!STOCK_ROLES.includes(actor.role)) return "forbidden";
         // The store ID is the explicit staging target for an image uploaded
         // before its product row exists. Other UUIDs must be tenant products.
-        if (targetId === actor.storeId) return "allowed";
+        if (uuidCoordinatesEqual(targetId, actor.storeId)) return "allowed";
         return await repository.productExists(actor.storeId, targetId)
           ? "allowed"
           : "not_found";
@@ -65,7 +79,9 @@ export function createMediaTargetAuthorizer(
         if (!job) return "not_found";
         if (actor.role === "owner" || actor.role === "manager") return "allowed";
         if (actor.role !== "technician") return "forbidden";
-        if (job.assignedTo === actor.userId) return "allowed";
+        if (job.assignedTo && uuidCoordinatesEqual(job.assignedTo, actor.userId)) {
+          return "allowed";
+        }
         return await repository.technicianAssignedToJob(
           actor.storeId,
           targetId,

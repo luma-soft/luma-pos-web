@@ -7,6 +7,11 @@ import {
   type PublicMediaConfig,
 } from "@/lib/media/config";
 import { softDeleteMediaIfUnreferencedInTransaction } from "@/lib/media/repository-core";
+import {
+  canonicalizeUuidCoordinate,
+  nullableUuidCoordinatesEqual,
+  uuidCoordinatesEqual,
+} from "@/lib/media/uuid-coordinate";
 import { productMediaEligibilitySql } from "@/lib/products/product-media-eligibility";
 import { imageMediaIdsSchema } from "@/lib/products/product-media-schema";
 
@@ -40,13 +45,15 @@ export async function resolveLegacyProductImageIdsInTransaction(
     publicMedia: PublicMediaConfig;
   },
 ): Promise<string[]> {
+  const storeId = canonicalizeUuidCoordinate(input.storeId);
+  const productId = canonicalizeUuidCoordinate(input.productId);
   const ids: string[] = [];
   const seen = new Set<string>();
   for (const url of input.imageUrls) {
     const coordinate = parseProductImagePublicUrl(url, input.publicMedia);
     if (
       !coordinate
-      || coordinate.storeId !== input.storeId
+      || !uuidCoordinatesEqual(coordinate.storeId, storeId)
       || seen.has(coordinate.mediaId)
     ) continue;
     ids.push(coordinate.mediaId);
@@ -57,15 +64,15 @@ export async function resolveLegacyProductImageIdsInTransaction(
   const owned = await transaction.select({ id: mediaObjects.id })
     .from(mediaObjects)
     .where(and(
-      eq(mediaObjects.storeId, input.storeId),
+      eq(mediaObjects.storeId, storeId),
       inArray(mediaObjects.id, ids),
       or(
-        eq(mediaObjects.targetId, input.storeId),
-        eq(mediaObjects.targetId, input.productId),
+        eq(mediaObjects.targetId, storeId),
+        eq(mediaObjects.targetId, productId),
       ),
       productMediaEligibilitySql(mediaObjects, {
-        storeId: input.storeId,
-        targetIds: [input.storeId, input.productId],
+        storeId,
+        targetIds: [storeId, productId],
         publicMedia: input.publicMedia,
       }),
     ));
@@ -120,20 +127,22 @@ export async function replaceProductMediaInTransaction(
 }> {
   const parsedIds = imageMediaIdsSchema.safeParse(input.imageMediaIds);
   if (!parsedIds.success) throw new ProductMediaValidationError();
+  const storeId = canonicalizeUuidCoordinate(input.storeId);
+  const productId = canonicalizeUuidCoordinate(input.productId);
   const ids = parsedIds.data;
   const changedAt = input.now ?? new Date();
 
   const [coordinates] = await transaction.select({
     parentProductId: products.parentProductId,
   }).from(products).where(and(
-    eq(products.storeId, input.storeId),
-    eq(products.id, input.productId),
+    eq(products.storeId, storeId),
+    eq(products.id, productId),
   )).limit(1);
   if (!coordinates) throw new ProductMediaValidationError();
   if (coordinates.parentProductId) {
     const [parent] = await transaction.select({ id: products.id })
       .from(products).where(and(
-        eq(products.storeId, input.storeId),
+        eq(products.storeId, storeId),
         eq(products.id, coordinates.parentProductId),
       )).limit(1).for("share");
     if (!parent) throw new ProductMediaValidationError();
@@ -143,12 +152,12 @@ export async function replaceProductMediaInTransaction(
     isVariantParent: products.isVariantParent,
     imageUrls: products.imageUrls,
   }).from(products).where(and(
-    eq(products.storeId, input.storeId),
-    eq(products.id, input.productId),
+    eq(products.storeId, storeId),
+    eq(products.id, productId),
   )).limit(1).for("update");
   if (
     !product
-    || product.parentProductId !== coordinates.parentProductId
+    || !nullableUuidCoordinatesEqual(product.parentProductId, coordinates.parentProductId)
   ) {
     throw new ProductMediaValidationError();
   }
@@ -164,15 +173,15 @@ export async function replaceProductMediaInTransaction(
       eq(mediaObjects.id, productMedia.mediaObjectId),
     ))
     .where(and(
-      eq(productMedia.storeId, input.storeId),
-      eq(productMedia.productId, input.productId),
+      eq(productMedia.storeId, storeId),
+      eq(productMedia.productId, productId),
       isNull(productMedia.deletedAt),
     ))
     .orderBy(asc(productMedia.sortOrder));
 
   const eligible = productMediaEligibilitySql(mediaObjects, {
-    storeId: input.storeId,
-    targetIds: [input.storeId, input.productId],
+    storeId,
+    targetIds: [storeId, productId],
     publicMedia: input.publicMedia,
   });
   const records = ids.length === 0
@@ -190,7 +199,7 @@ export async function replaceProductMediaInTransaction(
         })
         .from(mediaObjects)
         .where(and(
-          eq(mediaObjects.storeId, input.storeId),
+          eq(mediaObjects.storeId, storeId),
           inArray(mediaObjects.id, ids),
           eligible,
         ))
@@ -206,18 +215,18 @@ export async function replaceProductMediaInTransaction(
   if (
     orderedRecords.some((record, index) =>
       !record
-      || record.storeId !== input.storeId
+      || !uuidCoordinatesEqual(record.storeId, storeId)
       || record.status !== "ready"
       || record.visibility !== "public"
       || record.purpose !== "product-image"
       || record.domain !== "products"
       || (
-        record.targetId !== input.storeId
-        && record.targetId !== input.productId
+        !uuidCoordinatesEqual(record.targetId, storeId)
+        && !uuidCoordinatesEqual(record.targetId, productId)
       )
       || !orderedCoordinates[index]
-      || orderedCoordinates[index]?.storeId !== input.storeId
-      || orderedCoordinates[index]?.mediaId !== record.id
+      || !uuidCoordinatesEqual(orderedCoordinates[index]!.storeId, storeId)
+      || !uuidCoordinatesEqual(orderedCoordinates[index]!.mediaId, record.id)
       || orderedCoordinates[index]?.path !== record.objectKey
     )
   ) {
@@ -225,10 +234,10 @@ export async function replaceProductMediaInTransaction(
   }
 
   if (ids.length > 0) {
-    await transaction.update(mediaObjects).set({ targetId: input.productId }).where(and(
-      eq(mediaObjects.storeId, input.storeId),
+    await transaction.update(mediaObjects).set({ targetId: productId }).where(and(
+      eq(mediaObjects.storeId, storeId),
       inArray(mediaObjects.id, ids),
-      eq(mediaObjects.targetId, input.storeId),
+      eq(mediaObjects.targetId, storeId),
     ));
   }
 
@@ -236,15 +245,15 @@ export async function replaceProductMediaInTransaction(
     isPrimary: false,
     deletedAt: changedAt,
   }).where(and(
-    eq(productMedia.storeId, input.storeId),
-    eq(productMedia.productId, input.productId),
+    eq(productMedia.storeId, storeId),
+    eq(productMedia.productId, productId),
     isNull(productMedia.deletedAt),
   ));
 
   for (const [sortOrder, mediaId] of ids.entries()) {
     await transaction.insert(productMedia).values({
-      storeId: input.storeId,
-      productId: input.productId,
+      storeId,
+      productId,
       mediaObjectId: mediaId,
       sortOrder,
       isPrimary: sortOrder === 0,
@@ -277,11 +286,11 @@ export async function replaceProductMediaInTransaction(
           eq(mediaObjects.id, productMedia.mediaObjectId),
         ))
         .where(and(
-          eq(productMedia.storeId, input.storeId),
+          eq(productMedia.storeId, storeId),
           eq(productMedia.productId, product.parentProductId),
           isNull(productMedia.deletedAt),
           productMediaEligibilitySql(mediaObjects, {
-            storeId: input.storeId,
+            storeId,
             targetIds: [product.parentProductId],
             publicMedia: input.publicMedia,
           }),
@@ -306,8 +315,8 @@ export async function replaceProductMediaInTransaction(
     imageUpdatedAt: changedAt,
     updatedAt: changedAt,
   }).where(and(
-    eq(products.storeId, input.storeId),
-    eq(products.id, input.productId),
+    eq(products.storeId, storeId),
+    eq(products.id, productId),
   ));
 
   if (
@@ -318,8 +327,8 @@ export async function replaceProductMediaInTransaction(
       id: products.id,
       imageUrls: products.imageUrls,
     }).from(products).where(and(
-      eq(products.storeId, input.storeId),
-      eq(products.parentProductId, input.productId),
+      eq(products.storeId, storeId),
+      eq(products.parentProductId, productId),
     )).for("update");
     for (const child of children) {
       if (!sameOrderedUrls(child.imageUrls, product.imageUrls)) continue;
@@ -328,9 +337,9 @@ export async function replaceProductMediaInTransaction(
         imageUpdatedAt: changedAt,
         updatedAt: changedAt,
       }).where(and(
-        eq(products.storeId, input.storeId),
+        eq(products.storeId, storeId),
         eq(products.id, child.id),
-        eq(products.parentProductId, input.productId),
+        eq(products.parentProductId, productId),
       ));
     }
   }
@@ -339,11 +348,11 @@ export async function replaceProductMediaInTransaction(
   for (const { mediaId } of existing) {
     if (selectedIds.has(mediaId)) continue;
     await softDeleteMediaIfUnreferencedInTransaction(transaction, {
-      storeId: input.storeId,
+      storeId,
       mediaId,
       deletedAt: changedAt,
       expectedPurpose: "product-image",
-      expectedTargetId: input.productId,
+      expectedTargetId: productId,
     });
   }
 

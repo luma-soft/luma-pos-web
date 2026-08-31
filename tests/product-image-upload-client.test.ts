@@ -95,6 +95,61 @@ describe("web product image upload", () => {
     });
   });
 
+  test("accepts UUID-equivalent upload coordinates and preserves the returned URL path", async () => {
+    const storeId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const mediaId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+    const path = `stores/${storeId}/products/2026/08/${mediaId}/original.png`;
+    const url = `${PUBLIC_BASE_URL}/${path}`;
+    const uploaded = await uploadProductImageFile(
+      png("uppercase.png"),
+      storeId.toUpperCase(),
+      async (input) => {
+        const requestUrl = input.toString();
+        if (requestUrl === "/api/mobile/media/uploads") {
+          return Response.json({
+            ok: true,
+            data: {
+              media: {
+                id: mediaId.toUpperCase(),
+                visibility: "public",
+                status: "pending",
+                mimeType: "image/png",
+                sizeBytes: 4,
+                fileName: "uppercase.png",
+              },
+              method: "PUT",
+              uploadUrl: "https://r2.test/upload-uppercase",
+              headers: {
+                "Content-Type": "image/png",
+                "If-None-Match": "*",
+              },
+              expiresAt: "2026-08-30T04:00:00.000Z",
+            },
+          });
+        }
+        if (requestUrl === "https://r2.test/upload-uppercase") {
+          return new Response(null, { status: 200 });
+        }
+        return Response.json({
+          ok: true,
+          data: {
+            id: mediaId.toUpperCase(),
+            visibility: "public",
+            mimeType: "image/png",
+            sizeBytes: 4,
+            fileName: "uppercase.png",
+            url,
+            thumbnailUrl: null,
+          },
+        });
+      },
+      () => new Date("2026-08-30T03:00:00.000Z"),
+      PUBLIC_BASE_URL,
+    );
+
+    expect(uploaded).toEqual({ mediaId, url, path });
+  });
+
   test("keeps completed media IDs and retries only the remaining drafts", async () => {
     const completed: UploadedProductImage = {
       mediaId: MEDIA_ID,

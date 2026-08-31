@@ -22,7 +22,7 @@ const {
   `${projectRoot}/src/lib/services/evidence-deletion.ts`
 );
 
-const creatorId = "11111111-1111-4111-8111-111111111111";
+const creatorId = "a1111111-1111-4111-8111-111111111111";
 const foreignId = "22222222-2222-4222-8222-222222222222";
 const managerId = "33333333-3333-4333-8333-333333333333";
 const fixtureClients = new Set();
@@ -93,6 +93,26 @@ function storageThatRemoves() {
 }
 
 describe("service evidence deletion", () => {
+  test("accepts UUID-equivalent casing for the creator and deletion coordinates", async () => {
+    const { db, job, attachment } = await createFixture();
+
+    await expect(db.transaction((tx) => deleteServiceEvidenceCore(tx, {
+      userId: creatorId.toUpperCase(),
+      role: "technician",
+    }, {
+      jobId: job.id.toUpperCase(),
+      attachmentId: attachment.id.toUpperCase(),
+    }))).resolves.toMatchObject({ id: attachment.id, storagePending: true });
+
+    const [tombstone] = await db.select().from(serviceAttachments)
+      .where(eq(serviceAttachments.id, attachment.id));
+    expect(tombstone).toMatchObject({
+      createdBy: creatorId,
+      deletedBy: creatorId,
+      deletedAt: expect.any(Date),
+    });
+  });
+
   test("tombstones unsigned creator evidence before Storage cleanup and records a job event", async () => {
     const { db, job, attachment } = await createFixture();
     const { storage, removed } = storageThatRemoves();

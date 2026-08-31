@@ -8,6 +8,7 @@ import {
 import { resolveManagedPrivateMediaUrl } from "@/lib/media/project-media";
 import { mediaServiceError } from "@/lib/media/service";
 import { getObjectStorage } from "@/lib/media/storage";
+import { uuidCoordinatesEqual } from "@/lib/media/uuid-coordinate";
 import { requireMobileServiceManager } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
 
@@ -63,10 +64,10 @@ export async function GET(
         // The exact request attachment is the stable capability. Request/job
         // relinking must not rewrite or invalidate historical media identity.
         authorizeTarget: async ({ actor, purpose, targetId }) =>
-          actor.storeId === gate.storeId
-            && actor.userId === gate.userId
+          uuidCoordinatesEqual(actor.storeId, gate.storeId)
+            && uuidCoordinatesEqual(actor.userId, gate.userId)
             && purpose === attachment.mediaPurpose
-            && targetId === attachment.mediaTargetId
+            && uuidCoordinatesEqual(targetId, attachment.mediaTargetId!)
             ? "allowed"
             : "not_found",
       })

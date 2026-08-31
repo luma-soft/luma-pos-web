@@ -11,6 +11,10 @@ import {
 } from "@/db/schema";
 import type { Role } from "@/lib/actions/common";
 import { canAccessServiceJob } from "@/lib/services/access";
+import {
+  canonicalizeUuidCoordinate,
+  uuidCoordinatesEqual,
+} from "@/lib/media/uuid-coordinate";
 
 type ServiceTransaction = Parameters<
   Parameters<NodePgDatabase<typeof schema>["transaction"]>[0]
@@ -39,6 +43,14 @@ export async function deleteServiceEvidenceCore(
   input: { jobId: string; attachmentId: string },
   now = new Date(),
 ) {
+  const canonicalActor = {
+    ...actor,
+    userId: canonicalizeUuidCoordinate(actor.userId),
+  };
+  const coordinates = {
+    jobId: canonicalizeUuidCoordinate(input.jobId),
+    attachmentId: canonicalizeUuidCoordinate(input.attachmentId),
+  };
   const [attachment] = await tx.select({
     id: serviceAttachments.id,
     bucket: serviceAttachments.bucket,
@@ -48,8 +60,8 @@ export async function deleteServiceEvidenceCore(
     storageDeletedAt: serviceAttachments.storageDeletedAt,
   }).from(serviceAttachments)
     .where(and(
-      eq(serviceAttachments.id, input.attachmentId),
-      eq(serviceAttachments.jobId, input.jobId),
+      eq(serviceAttachments.id, coordinates.attachmentId),
+      eq(serviceAttachments.jobId, coordinates.jobId),
     ))
     .limit(1)
     .for("update");
@@ -59,19 +71,19 @@ export async function deleteServiceEvidenceCore(
       status: serviceJobs.status,
       assignedTo: serviceJobs.assignedTo,
     }).from(serviceJobs)
-      .where(eq(serviceJobs.id, input.jobId))
+      .where(eq(serviceJobs.id, coordinates.jobId))
       .limit(1)
       .for("update");
   const crew = await tx.select({ profileId: serviceJobAssignments.profileId })
       .from(serviceJobAssignments)
       .where(and(
-        eq(serviceJobAssignments.jobId, input.jobId),
+        eq(serviceJobAssignments.jobId, coordinates.jobId),
         isNull(serviceJobAssignments.removedAt),
       ));
   if (!job) throw new Error("SERVICE_JOB_NOT_FOUND");
   if (!canAccessServiceJob({
-    role: actor.role,
-    profileId: actor.userId,
+    role: canonicalActor.role,
+    profileId: canonicalActor.userId,
     primaryAssigneeId: job.assignedTo,
     crewProfileIds: crew.map((item) => item.profileId),
   })) throw new Error("SERVICE_JOB_FORBIDDEN");
@@ -91,30 +103,34 @@ export async function deleteServiceEvidenceCore(
     .for("update");
   if (signature) throw new Error("SERVICE_ATTACHMENT_SIGNED");
 
-  const canManageEvidence = actor.role === "owner" || actor.role === "manager";
-  if (!canManageEvidence && attachment.createdBy !== actor.userId) {
+  const canManageEvidence = canonicalActor.role === "owner" || canonicalActor.role === "manager";
+  if (
+    !canManageEvidence
+    && (!attachment.createdBy
+      || !uuidCoordinatesEqual(attachment.createdBy, canonicalActor.userId))
+  ) {
     throw new Error("SERVICE_ATTACHMENT_FORBIDDEN");
   }
 
   const [deleted] = await tx.update(serviceAttachments)
     .set({
       deletedAt: now,
-      deletedBy: actor.userId,
+      deletedBy: canonicalActor.userId,
       storageDeletedAt: null,
       storageDeleteAttempts: 0,
       storageDeleteLastError: null,
     })
     .where(and(
       eq(serviceAttachments.id, attachment.id),
-      eq(serviceAttachments.jobId, input.jobId),
+      eq(serviceAttachments.jobId, coordinates.jobId),
     ))
     .returning({ id: serviceAttachments.id });
   if (!deleted) throw new Error("SERVICE_ATTACHMENT_NOT_FOUND");
 
   await tx.insert(serviceJobEvents).values({
-    jobId: input.jobId,
+    jobId: coordinates.jobId,
     eventType: "job.attachment_deleted",
-    actorId: actor.userId,
+    actorId: canonicalActor.userId,
     payload: { attachmentId: attachment.id },
     createdAt: now,
   });

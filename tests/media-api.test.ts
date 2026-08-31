@@ -30,6 +30,10 @@ const USER_ID = "22222222-2222-4222-8222-222222222222";
 const PROJECT_ID = "33333333-3333-4333-8333-333333333333";
 const MEDIA_ID = "44444444-4444-4444-8444-444444444444";
 const OTHER_MEDIA_ID = "55555555-5555-4555-8555-555555555555";
+const CASE_STORE_ID = "a1111111-1111-4111-8111-111111111111";
+const CASE_USER_ID = "b2222222-2222-4222-8222-222222222222";
+const CASE_PROJECT_ID = "c3333333-3333-4333-8333-333333333333";
+const CASE_MEDIA_ID = "d4444444-4444-4444-8444-444444444444";
 const NOW = new Date("2026-08-30T03:00:00.000Z");
 
 const gate: Extract<MobileGate, { ok: true }> = {
@@ -390,6 +394,33 @@ describe("media upload intent API", () => {
     });
     expect(stored?.objectKey).toBe(
       `stores/${STORE_ID}/projects/2026/08/${MEDIA_ID}/original.pdf`,
+    );
+  });
+
+  test("canonicalizes UUID actor and target coordinates before persistence", async () => {
+    const harness = createHarness();
+    const uppercaseActor = {
+      ...gate,
+      storeId: CASE_STORE_ID.toUpperCase(),
+      userId: CASE_USER_ID.toUpperCase(),
+    };
+
+    await expect(harness.service.createUploadIntent(uppercaseActor, {
+      purpose: "project-document",
+      targetId: CASE_PROJECT_ID.toUpperCase(),
+      fileName: "uuid-case.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 16,
+    })).resolves.toMatchObject({ media: { id: MEDIA_ID } });
+
+    const stored = harness.records.get(`${CASE_STORE_ID}:${MEDIA_ID}`);
+    expect(stored).toMatchObject({
+      storeId: CASE_STORE_ID,
+      targetId: CASE_PROJECT_ID,
+      createdBy: CASE_USER_ID,
+    });
+    expect(stored?.objectKey).toBe(
+      `stores/${CASE_STORE_ID}/projects/2026/08/${MEDIA_ID}/original.pdf`,
     );
   });
 
@@ -881,6 +912,30 @@ describe("target-aware media authorization", () => {
       .toBe("forbidden");
   });
 
+  test("treats UUID-equivalent actor and staging target spellings as the same store", async () => {
+    const { state, authorize } = authorizerHarness();
+    const warehouse = {
+      ...gate,
+      storeId: CASE_STORE_ID.toUpperCase(),
+      userId: CASE_USER_ID.toUpperCase(),
+      role: "warehouse" as const,
+    };
+    await expect(authorize({
+      actor: warehouse,
+      purpose: "product-image",
+      targetId: CASE_STORE_ID,
+    })).resolves.toBe("allowed");
+
+    state.serviceJobs.set(`${CASE_STORE_ID}:${CASE_PROJECT_ID}`, {
+      assignedTo: CASE_USER_ID,
+    });
+    await expect(authorize({
+      actor: { ...warehouse, role: "technician" as const },
+      purpose: "service-evidence",
+      targetId: CASE_PROJECT_ID.toUpperCase(),
+    })).resolves.toBe("allowed");
+  });
+
   test("service project and evidence access require tenant targets plus technician assignment", async () => {
     const { state, authorize } = authorizerHarness();
     const technician = { ...gate, role: "technician" as const };
@@ -913,6 +968,62 @@ describe("target-aware media authorization", () => {
 });
 
 describe("media resolve and delete API", () => {
+  test("resolves, signs, and soft-deletes with UUID-equivalent casing", async () => {
+    const ready = pendingRecord({
+      id: CASE_MEDIA_ID,
+      storeId: CASE_STORE_ID,
+      targetId: CASE_PROJECT_ID,
+      createdBy: CASE_USER_ID,
+      objectKey: `stores/${CASE_STORE_ID}/projects/2026/08/${CASE_MEDIA_ID}/original.pdf`,
+      status: "ready",
+      readyAt: NOW,
+    });
+    const harness = createHarness({ initial: [ready] });
+    const uppercaseActor = {
+      ...gate,
+      storeId: CASE_STORE_ID.toUpperCase(),
+      userId: CASE_USER_ID.toUpperCase(),
+    };
+
+    await expect(harness.service.resolveMedia(
+      uppercaseActor,
+      CASE_MEDIA_ID.toUpperCase(),
+    )).resolves.toMatchObject({
+      id: CASE_MEDIA_ID,
+      url: expect.stringContaining("X-Amz-Signature=download"),
+    });
+    await expect(harness.service.deleteMedia(
+      uppercaseActor,
+      CASE_MEDIA_ID.toUpperCase(),
+    )).resolves.toEqual({ id: CASE_MEDIA_ID, status: "deleted" });
+    expect(harness.records.get(`${CASE_STORE_ID}:${CASE_MEDIA_ID}`)?.status).toBe("deleted");
+  });
+
+  test("deletes a managed product path with UUID-equivalent actor coordinates", async () => {
+    const objectKey = `stores/${CASE_STORE_ID}/products/2026/08/${CASE_MEDIA_ID}/original.png`;
+    const harness = createHarness({
+      initial: [pendingRecord({
+        id: CASE_MEDIA_ID,
+        storeId: CASE_STORE_ID,
+        visibility: "public",
+        purpose: "product-image",
+        targetId: CASE_STORE_ID,
+        domain: "products",
+        bucket: "public-media",
+        objectKey,
+        originalFileName: "camera.png",
+        mimeType: "image/png",
+        status: "ready",
+        readyAt: NOW,
+      })],
+    });
+    await expect(harness.service.deleteManagedProductImageByPath({
+      ...gate,
+      storeId: CASE_STORE_ID.toUpperCase(),
+      userId: CASE_USER_ID.toUpperCase(),
+    }, objectKey)).resolves.toEqual({ id: CASE_MEDIA_ID, status: "deleted" });
+  });
+
   test("cross-store media resolution is not found", async () => {
     const harness = createHarness({
       initial: [pendingRecord({ id: OTHER_MEDIA_ID, storeId: "66666666-6666-4666-8666-666666666666", status: "ready" })],

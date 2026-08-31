@@ -10,6 +10,10 @@ import {
 } from "@/lib/media/project-media";
 import { getMediaService } from "@/lib/media/service";
 import { getObjectStorage } from "@/lib/media/storage";
+import {
+  nullableUuidCoordinatesEqual,
+  uuidCoordinatesEqual,
+} from "@/lib/media/uuid-coordinate";
 import { requireMobileServiceManager } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
 import {
@@ -221,8 +225,8 @@ export async function POST(
         )).limit(1).for("update");
         if (
           !lockedAsset
-          || lockedAsset.projectId !== asset.projectId
-          || lockedAsset.jobId !== asset.jobId
+          || !uuidCoordinatesEqual(lockedAsset.projectId, asset.projectId)
+          || !nullableUuidCoordinatesEqual(lockedAsset.jobId, asset.jobId)
         ) throw new Error("SERVICE_ASSET_NOT_FOUND");
 
         let [persisted] = await tx.select({
@@ -330,7 +334,7 @@ export async function POST(
       });
       throw error;
     }
-    if (attachment.mediaObjectId !== managed.mediaId) {
+    if (!nullableUuidCoordinatesEqual(attachment.mediaObjectId, managed.mediaId)) {
       await compensateManagedMediaAssociation(db, {
         storeId: gate.storeId,
         mediaId: managed.mediaId,

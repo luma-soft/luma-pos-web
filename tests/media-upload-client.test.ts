@@ -10,6 +10,7 @@ import {
 
 const STORE_ID = "11111111-1111-4111-8111-111111111111";
 const MEDIA_ID = "44444444-4444-4444-8444-444444444444";
+const CASE_MEDIA_ID = "a4444444-4444-4444-8444-444444444444";
 const SIGNED_URL = "https://r2.test/signed?X-Amz-Signature=do-not-log";
 const FILE = new File([Uint8Array.from([0x89, 0x50, 0x4e, 0x47])], "camera.png", {
   type: "image/png",
@@ -428,6 +429,24 @@ describe("web managed media upload client", () => {
       SIGNED_URL,
       `/api/mobile/media/uploads/${MEDIA_ID}/complete`,
       `/api/mobile/media/uploads/${MEDIA_ID}/complete`,
+    ]);
+  });
+
+  test("canonicalizes a UUID-equivalent completion retry coordinate", async () => {
+    const calls: string[] = [];
+    const completed = await resumeManagedMediaCompletion(
+      FILE,
+      REQUEST,
+      CASE_MEDIA_ID.toUpperCase(),
+      async (input) => {
+        calls.push(input.toString());
+        return responseJson(descriptorPayload({ id: CASE_MEDIA_ID }));
+      },
+    );
+
+    expect(completed.id).toBe(CASE_MEDIA_ID);
+    expect(calls).toEqual([
+      `/api/mobile/media/uploads/${CASE_MEDIA_ID}/complete`,
     ]);
   });
 

@@ -24,13 +24,13 @@ const {
 const client = new PGlite();
 const database = drizzle(client, { schema });
 
-const STORE_ID = "10000000-0000-4000-8000-000000000001";
+const STORE_ID = "a0000000-0000-4000-8000-000000000001";
 const STORE_B = "20000000-0000-4000-8000-000000000001";
-const PRODUCT_ID = "30000000-0000-4000-8000-000000000001";
+const PRODUCT_ID = "b0000000-0000-4000-8000-000000000001";
 const PARENT_ID = "30000000-0000-4000-8000-000000000002";
 const CHILD_ID = "30000000-0000-4000-8000-000000000003";
 const WAREHOUSE_ID = "40000000-0000-4000-8000-000000000001";
-const MEDIA_A = "50000000-0000-4000-8000-000000000001";
+const MEDIA_A = "c0000000-0000-4000-8000-000000000001";
 const MEDIA_B = "50000000-0000-4000-8000-000000000002";
 const MEDIA_PENDING = "50000000-0000-4000-8000-000000000003";
 const MEDIA_PRIVATE = "50000000-0000-4000-8000-000000000004";
@@ -258,6 +258,33 @@ describe("product managed media transaction", () => {
       imageUrls: productCompatibilityImageUrls(STORE_ID, PUBLIC_MEDIA),
     }).from(products).where(eq(products.id, PRODUCT_ID));
     expect(catalogProduct.imageUrls).toEqual(result.imageUrls);
+  });
+
+  test("honors UUID-equivalent casing without rewriting the immutable object key", async () => {
+    const result = await database.transaction((transaction) =>
+      replaceProductMediaInTransaction(transaction, {
+        storeId: STORE_ID.toUpperCase(),
+        productId: PRODUCT_ID.toUpperCase(),
+        imageMediaIds: [MEDIA_A.toUpperCase()],
+        imageUrls: [],
+        publicMedia: PUBLIC_MEDIA,
+        now: new Date("2026-08-30T03:30:00.000Z"),
+      })
+    );
+
+    expect(result.media).toEqual([{
+      mediaId: MEDIA_A,
+      path: objectKey(STORE_ID, MEDIA_A),
+      url: publicUrl(STORE_ID, MEDIA_A),
+    }]);
+    expect(await database.transaction((transaction) =>
+      resolveLegacyProductImageIdsInTransaction(transaction, {
+        storeId: STORE_ID.toUpperCase(),
+        productId: PRODUCT_ID.toUpperCase(),
+        imageUrls: [publicUrl(STORE_ID, MEDIA_A)],
+        publicMedia: PUBLIC_MEDIA,
+      })
+    )).toEqual([MEDIA_A]);
   });
 
   test("rejects unknown, cross-store, wrong-state, wrong-purpose, wrong-target, and non-canonical IDs atomically", async () => {

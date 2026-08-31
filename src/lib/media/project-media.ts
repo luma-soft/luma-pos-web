@@ -17,6 +17,7 @@ import {
 } from "@/db/schema";
 import {
   authorizeMediaTarget,
+  canonicalizeMediaActor,
   type AuthorizeMediaTarget,
   type MediaActor,
   type MediaTargetAuthorization,
@@ -45,6 +46,12 @@ import {
 import type { MediaPurpose } from "@/lib/media/schemas";
 import { getObjectStorage } from "@/lib/media/storage";
 import type { MediaProvider, ObjectStorage } from "@/lib/media/types";
+import {
+  canonicalizeNullableUuidCoordinate,
+  canonicalizeUuidCoordinate,
+  canonicalUuidCoordinateSchema,
+  uuidCoordinatesEqual,
+} from "@/lib/media/uuid-coordinate";
 
 // Drizzle's Node Postgres and PGlite adapters share the fluent operations used
 // here. Keeping this core adapter-neutral lets the transaction invariants run
@@ -78,7 +85,7 @@ const nullableCaptionSchema = z.preprocess(
 
 const optionalDocumentIdSchema = z.preprocess(
   (value) => typeof value === "string" && value.trim() === "" ? undefined : value,
-  z.uuid().optional(),
+  canonicalUuidCoordinateSchema.optional(),
 );
 
 export const projectMediaUploadSchema = z.object({
@@ -998,9 +1005,14 @@ export async function requireReadyManagedMediaInTransaction(
     fileName?: string;
   },
 ): Promise<typeof mediaObjects.$inferSelect> {
+  const coordinates = {
+    storeId: canonicalizeUuidCoordinate(input.storeId),
+    mediaId: canonicalizeUuidCoordinate(input.mediaId),
+    targetId: canonicalizeUuidCoordinate(input.targetId),
+  };
   const [media] = await transaction.select().from(mediaObjects).where(and(
-    eq(mediaObjects.storeId, input.storeId),
-    eq(mediaObjects.id, input.mediaId),
+    eq(mediaObjects.storeId, coordinates.storeId),
+    eq(mediaObjects.id, coordinates.mediaId),
   )).limit(1).for("update");
   if (
     !media
@@ -1009,7 +1021,7 @@ export async function requireReadyManagedMediaInTransaction(
     || media.status !== "ready"
     || media.deletedAt !== null
     || media.purpose !== input.purpose
-    || media.targetId !== input.targetId
+    || !uuidCoordinatesEqual(media.targetId, coordinates.targetId)
     || media.domain !== expectedDomain(input.purpose)
     || media.objectKey !== input.expectedPath
     || (input.mimeType !== undefined && media.mimeType !== input.mimeType)
@@ -1031,8 +1043,8 @@ export async function requireReadyManagedMediaInTransaction(
       width: input.width ?? media.width,
       height: input.height ?? media.height,
     }).where(and(
-      eq(mediaObjects.storeId, input.storeId),
-      eq(mediaObjects.id, input.mediaId),
+      eq(mediaObjects.storeId, coordinates.storeId),
+      eq(mediaObjects.id, coordinates.mediaId),
       eq(mediaObjects.status, "ready"),
     )).returning();
     if (!updated) throw new ProjectMediaRepositoryError("MANAGED_MEDIA_CONFLICT");
@@ -1059,12 +1071,12 @@ export async function compensateManagedMediaAssociation(
   },
 ): Promise<ManagedMediaAssociationCompensationResult> {
   const result = await recoverReadyMediaAfterFailureCore(database, {
-    storeId: input.storeId,
-    mediaId: input.mediaId,
+    storeId: canonicalizeUuidCoordinate(input.storeId),
+    mediaId: canonicalizeUuidCoordinate(input.mediaId),
     expectedPurpose: input.purpose,
-    expectedTargetId: input.targetId,
+    expectedTargetId: canonicalizeUuidCoordinate(input.targetId),
     expectedObjectKey: input.expectedObjectKey,
-    expectedCreatedBy: input.expectedCreatedBy,
+    expectedCreatedBy: canonicalizeNullableUuidCoordinate(input.expectedCreatedBy),
     recoveredAt: input.recoveredAt,
   });
   if (result.outcome === "conflict") {
@@ -1081,15 +1093,20 @@ export function createDatabaseMediaRepository(
     async createPending(input: CreatePendingMediaInput) {
       const [row] = await database.insert(mediaObjects).values({
         ...input,
+        id: canonicalizeUuidCoordinate(input.id),
+        storeId: canonicalizeUuidCoordinate(input.storeId),
+        targetId: canonicalizeUuidCoordinate(input.targetId),
         status: "pending",
-        createdBy: options.forceCreatedByNull ? null : input.createdBy ?? null,
+        createdBy: options.forceCreatedByNull
+          ? null
+          : canonicalizeNullableUuidCoordinate(input.createdBy ?? null),
       }).returning();
       return row as MediaRecord;
     },
     async getForStore(input: GetMediaForStoreInput) {
       const [row] = await database.select().from(mediaObjects).where(and(
-        eq(mediaObjects.storeId, input.storeId),
-        eq(mediaObjects.id, input.mediaId),
+        eq(mediaObjects.storeId, canonicalizeUuidCoordinate(input.storeId)),
+        eq(mediaObjects.id, canonicalizeUuidCoordinate(input.mediaId)),
       )).limit(1);
       return (row as MediaRecord | undefined) ?? null;
     },
@@ -1100,8 +1117,8 @@ export function createDatabaseMediaRepository(
         readyAt: input.readyAt,
         verifiedAt: input.verifiedAt,
       }).where(and(
-        eq(mediaObjects.storeId, input.storeId),
-        eq(mediaObjects.id, input.mediaId),
+        eq(mediaObjects.storeId, canonicalizeUuidCoordinate(input.storeId)),
+        eq(mediaObjects.id, canonicalizeUuidCoordinate(input.mediaId)),
         eq(mediaObjects.status, "pending"),
       )).returning();
       return (row as MediaRecord | undefined) ?? null;
@@ -1111,8 +1128,8 @@ export function createDatabaseMediaRepository(
         thumbnailObjectKey: input.objectKey,
         thumbnailSizeBytes: input.sizeBytes,
       }).where(and(
-        eq(mediaObjects.storeId, input.storeId),
-        eq(mediaObjects.id, input.mediaId),
+        eq(mediaObjects.storeId, canonicalizeUuidCoordinate(input.storeId)),
+        eq(mediaObjects.id, canonicalizeUuidCoordinate(input.mediaId)),
         eq(mediaObjects.status, "ready"),
       )).returning();
       return (row as MediaRecord | undefined) ?? null;
@@ -1122,11 +1139,11 @@ export function createDatabaseMediaRepository(
         status: "deleted",
         deletedAt: input.deletedAt,
       }).where(and(
-        eq(mediaObjects.storeId, input.storeId),
-        eq(mediaObjects.id, input.mediaId),
+        eq(mediaObjects.storeId, canonicalizeUuidCoordinate(input.storeId)),
+        eq(mediaObjects.id, canonicalizeUuidCoordinate(input.mediaId)),
         eq(mediaObjects.status, "pending"),
         eq(mediaObjects.purpose, input.expectedPurpose),
-        eq(mediaObjects.targetId, input.expectedTargetId),
+        eq(mediaObjects.targetId, canonicalizeUuidCoordinate(input.expectedTargetId)),
       )).returning();
       return (row as MediaRecord | undefined) ?? null;
     },
@@ -1140,8 +1157,8 @@ export function createDatabaseMediaRepository(
 }
 
 export async function resolveManagedPrivateMediaUrl(
-  actor: MediaActor,
-  mediaId: string,
+  candidateActor: MediaActor,
+  candidateMediaId: string,
   options: {
     expiresInSeconds?: number;
     expectedPurpose?: MediaPurpose;
@@ -1152,6 +1169,11 @@ export async function resolveManagedPrivateMediaUrl(
   } = {},
 ) {
   const database = options.database ?? db;
+  const actor = canonicalizeMediaActor(candidateActor);
+  const mediaId = canonicalizeUuidCoordinate(candidateMediaId);
+  const expectedTargetId = options.expectedTargetId
+    ? canonicalizeUuidCoordinate(options.expectedTargetId)
+    : undefined;
   const [media] = await database.select().from(mediaObjects).where(and(
     eq(mediaObjects.storeId, actor.storeId),
     eq(mediaObjects.id, mediaId),
@@ -1162,12 +1184,12 @@ export async function resolveManagedPrivateMediaUrl(
     || media.deletedAt !== null
     || media.visibility !== "private"
     || (options.expectedPurpose && media.purpose !== options.expectedPurpose)
-    || (options.expectedTargetId && media.targetId !== options.expectedTargetId)
+    || (expectedTargetId && !uuidCoordinatesEqual(media.targetId, expectedTargetId))
   ) throw new MediaServiceError("errors.notFound", 404);
   const authorization = await (options.authorizeTarget ?? authorizeMediaTarget)({
     actor,
     purpose: media.purpose,
-    targetId: media.targetId,
+    targetId: canonicalizeUuidCoordinate(media.targetId),
   });
   if (authorization !== "allowed") {
     throw new MediaServiceError("errors.notFound", 404);
@@ -1227,6 +1249,8 @@ export function createDatabaseProjectMediaRepository(
 ): ProjectMediaRepository {
   return {
     async listProjectAttachments(input) {
+      const storeId = canonicalizeUuidCoordinate(input.storeId);
+      const projectId = canonicalizeUuidCoordinate(input.projectId);
       const rows = await database.select({
         id: serviceAttachments.id,
         mediaId: serviceAttachments.mediaObjectId,
@@ -1243,18 +1267,18 @@ export function createDatabaseProjectMediaRepository(
         eq(mediaObjects.storeId, serviceAttachments.storeId),
         eq(mediaObjects.id, serviceAttachments.mediaObjectId),
       )).where(and(
-        eq(serviceAttachments.storeId, input.storeId),
-        eq(serviceAttachments.projectId, input.projectId),
+        eq(serviceAttachments.storeId, storeId),
+        eq(serviceAttachments.projectId, projectId),
         isNull(serviceAttachments.jobId),
         isNull(serviceAttachments.claimId),
         isNull(serviceAttachments.assetId),
         isNull(serviceAttachments.requestId),
         isNull(serviceAttachments.deletedAt),
-        eq(mediaObjects.storeId, input.storeId),
+        eq(mediaObjects.storeId, storeId),
         eq(mediaObjects.status, "ready"),
         eq(mediaObjects.visibility, "private"),
         eq(mediaObjects.purpose, "project-document"),
-        eq(mediaObjects.targetId, input.projectId),
+        eq(mediaObjects.targetId, projectId),
         eq(mediaObjects.domain, "projects"),
         isNull(mediaObjects.deletedAt),
       )).orderBy(asc(serviceAttachments.createdAt), asc(serviceAttachments.id));
@@ -1266,11 +1290,14 @@ export function createDatabaseProjectMediaRepository(
     },
 
     async validateProjectDocument(input) {
+      const storeId = canonicalizeUuidCoordinate(input.storeId);
+      const projectId = canonicalizeUuidCoordinate(input.projectId);
+      const documentId = canonicalizeUuidCoordinate(input.documentId);
       const [document] = await database.select({ id: serviceHandoverDocuments.id })
         .from(serviceHandoverDocuments).where(and(
-          eq(serviceHandoverDocuments.storeId, input.storeId),
-          eq(serviceHandoverDocuments.id, input.documentId),
-          eq(serviceHandoverDocuments.projectId, input.projectId),
+          eq(serviceHandoverDocuments.storeId, storeId),
+          eq(serviceHandoverDocuments.id, documentId),
+          eq(serviceHandoverDocuments.projectId, projectId),
         )).limit(1);
       if (!document) {
         throw new ProjectMediaRepositoryError("PROJECT_MEDIA_DOCUMENT_NOT_FOUND");
@@ -1278,31 +1305,40 @@ export function createDatabaseProjectMediaRepository(
     },
 
     async createProjectAttachment(input) {
+      const coordinates = {
+        storeId: canonicalizeUuidCoordinate(input.storeId),
+        actorId: canonicalizeNullableUuidCoordinate(input.actorId),
+        projectId: canonicalizeUuidCoordinate(input.projectId),
+        mediaId: canonicalizeUuidCoordinate(input.mediaId),
+        documentId: input.documentId
+          ? canonicalizeUuidCoordinate(input.documentId)
+          : undefined,
+      };
       return database.transaction(async (transaction: DatabaseLike) => {
         const [project] = await transaction.select({ id: projects.id })
           .from(projects).where(and(
-            eq(projects.storeId, input.storeId),
-            eq(projects.id, input.projectId),
+            eq(projects.storeId, coordinates.storeId),
+            eq(projects.id, coordinates.projectId),
           )).limit(1).for("update");
         if (!project) {
           throw new ProjectMediaRepositoryError("PROJECT_MEDIA_PROJECT_NOT_FOUND");
         }
-        if (input.documentId) {
+        if (coordinates.documentId) {
           const [document] = await transaction.select({ id: serviceHandoverDocuments.id })
             .from(serviceHandoverDocuments).where(and(
-              eq(serviceHandoverDocuments.storeId, input.storeId),
-              eq(serviceHandoverDocuments.id, input.documentId),
-              eq(serviceHandoverDocuments.projectId, input.projectId),
+              eq(serviceHandoverDocuments.storeId, coordinates.storeId),
+              eq(serviceHandoverDocuments.id, coordinates.documentId),
+              eq(serviceHandoverDocuments.projectId, coordinates.projectId),
             )).limit(1).for("update");
           if (!document) {
             throw new ProjectMediaRepositoryError("PROJECT_MEDIA_DOCUMENT_NOT_FOUND");
           }
         }
         const media = await requireReadyManagedMediaInTransaction(transaction, {
-          storeId: input.storeId,
-          mediaId: input.mediaId,
+          storeId: coordinates.storeId,
+          mediaId: coordinates.mediaId,
           purpose: "project-document",
-          targetId: input.projectId,
+          targetId: coordinates.projectId,
           expectedPath: input.expectedPath,
           sha256: input.sha256,
           mimeType: input.mimeType,
@@ -1310,8 +1346,8 @@ export function createDatabaseProjectMediaRepository(
           fileName: input.fileName,
         });
         const [attachment] = await transaction.insert(serviceAttachments).values({
-          storeId: input.storeId,
-          projectId: input.projectId,
+          storeId: coordinates.storeId,
+          projectId: coordinates.projectId,
           jobId: null,
           claimId: null,
           assetId: null,
@@ -1326,7 +1362,7 @@ export function createDatabaseProjectMediaRepository(
           sizeBytes: input.sizeBytes,
           sha256: input.sha256,
           caption: input.caption,
-          createdBy: input.actorId,
+          createdBy: coordinates.actorId,
           createdAt: input.createdAt,
         }).returning({
           id: serviceAttachments.id,
@@ -1340,16 +1376,16 @@ export function createDatabaseProjectMediaRepository(
         if (!attachment) {
           throw new ProjectMediaRepositoryError("PROJECT_MEDIA_ASSOCIATION_CONFLICT");
         }
-        if (input.documentId) {
+        if (coordinates.documentId) {
           const [{ nextSortOrder }] = await transaction.select({
             nextSortOrder: sql<number>`coalesce(max(${serviceHandoverDocumentMedia.sortOrder}), -1) + 1`,
           }).from(serviceHandoverDocumentMedia).where(and(
-            eq(serviceHandoverDocumentMedia.storeId, input.storeId),
-            eq(serviceHandoverDocumentMedia.documentId, input.documentId),
+            eq(serviceHandoverDocumentMedia.storeId, coordinates.storeId),
+            eq(serviceHandoverDocumentMedia.documentId, coordinates.documentId),
           ));
           await transaction.insert(serviceHandoverDocumentMedia).values({
-            storeId: input.storeId,
-            documentId: input.documentId,
+            storeId: coordinates.storeId,
+            documentId: coordinates.documentId,
             mediaObjectId: media.id,
             sortOrder: Number(nextSortOrder),
           });
@@ -1366,13 +1402,19 @@ export function createDatabaseProjectMediaRepository(
     },
 
     async deleteProjectAttachment(input) {
+      const coordinates = {
+        storeId: canonicalizeUuidCoordinate(input.storeId),
+        actorId: canonicalizeNullableUuidCoordinate(input.actorId),
+        projectId: canonicalizeUuidCoordinate(input.projectId),
+        attachmentId: canonicalizeUuidCoordinate(input.attachmentId),
+      };
       try {
         return await database.transaction(async (transaction: DatabaseLike) => {
           const [attachment] = await transaction.select().from(serviceAttachments)
             .where(and(
-              eq(serviceAttachments.storeId, input.storeId),
-              eq(serviceAttachments.projectId, input.projectId),
-              eq(serviceAttachments.id, input.attachmentId),
+              eq(serviceAttachments.storeId, coordinates.storeId),
+              eq(serviceAttachments.projectId, coordinates.projectId),
+              eq(serviceAttachments.id, coordinates.attachmentId),
             )).limit(1).for("update");
           const projectLevel = attachment
             && attachment.jobId === null
@@ -1394,30 +1436,32 @@ export function createDatabaseProjectMediaRepository(
               eq(serviceHandoverDocuments.id, serviceHandoverDocumentMedia.documentId),
             ),
           ).where(and(
-            eq(serviceHandoverDocumentMedia.storeId, input.storeId),
+            eq(serviceHandoverDocumentMedia.storeId, coordinates.storeId),
             eq(serviceHandoverDocumentMedia.mediaObjectId, attachment.mediaObjectId!),
           ));
-          if (documentLinks.some((link: { projectId: string }) => link.projectId !== input.projectId)) {
+          if (documentLinks.some((link: { projectId: string }) =>
+            !uuidCoordinatesEqual(link.projectId, coordinates.projectId)
+          )) {
             throw new ProjectMediaDeleteRollback("conflict");
           }
           await transaction.delete(serviceHandoverDocumentMedia).where(and(
-            eq(serviceHandoverDocumentMedia.storeId, input.storeId),
+            eq(serviceHandoverDocumentMedia.storeId, coordinates.storeId),
             eq(serviceHandoverDocumentMedia.mediaObjectId, attachment.mediaObjectId!),
           ));
           const [deletedAttachment] = await transaction.update(serviceAttachments).set({
             deletedAt: input.deletedAt ?? new Date(),
-            deletedBy: input.actorId,
+            deletedBy: coordinates.actorId,
           }).where(and(
-            eq(serviceAttachments.storeId, input.storeId),
+            eq(serviceAttachments.storeId, coordinates.storeId),
             eq(serviceAttachments.id, attachment.id),
             isNull(serviceAttachments.deletedAt),
           )).returning({ id: serviceAttachments.id });
           if (!deletedAttachment) throw new ProjectMediaDeleteRollback("conflict");
           const mediaResult = await softDeleteMediaIfUnreferencedInTransaction(transaction, {
-            storeId: input.storeId,
+            storeId: coordinates.storeId,
             mediaId: attachment.mediaObjectId!,
             expectedPurpose: "project-document",
-            expectedTargetId: input.projectId,
+            expectedTargetId: coordinates.projectId,
             deletedAt: input.deletedAt,
           });
           if (mediaResult.outcome !== "deleted") {
@@ -1439,8 +1483,12 @@ export async function listProjectAttachmentSummaries(
   database: DatabaseLike,
   input: { storeId: string; projectId: string },
 ): Promise<ProjectAttachmentSummary[]> {
+  const coordinates = {
+    storeId: canonicalizeUuidCoordinate(input.storeId),
+    projectId: canonicalizeUuidCoordinate(input.projectId),
+  };
   const rows = await createDatabaseProjectMediaRepository(database)
-    .listProjectAttachments(input);
+    .listProjectAttachments(coordinates);
   if (rows.length === 0) return [];
   const mediaIds = rows.map((row) => row.mediaId);
   const links = await database.select({
@@ -1453,8 +1501,8 @@ export async function listProjectAttachmentSummaries(
       eq(serviceHandoverDocuments.id, serviceHandoverDocumentMedia.documentId),
     ),
   ).where(and(
-    eq(serviceHandoverDocumentMedia.storeId, input.storeId),
-    eq(serviceHandoverDocuments.projectId, input.projectId),
+    eq(serviceHandoverDocumentMedia.storeId, coordinates.storeId),
+    eq(serviceHandoverDocuments.projectId, coordinates.projectId),
     inArray(serviceHandoverDocumentMedia.mediaObjectId, mediaIds),
   )).orderBy(
     asc(serviceHandoverDocumentMedia.sortOrder),
@@ -1470,7 +1518,9 @@ export async function listProjectAttachmentSummaries(
     sizeBytes: row.sizeBytes,
     createdAt: row.createdAt,
     documentIds: links
-      .filter((link: { mediaId: string }) => link.mediaId === row.mediaId)
+      .filter((link: { mediaId: string }) =>
+        uuidCoordinatesEqual(link.mediaId, row.mediaId)
+      )
       .map((link: { documentId: string }) => link.documentId),
   }));
 }
@@ -1500,9 +1550,11 @@ export function createProjectMediaManager(dependencies: {
 }) {
   const logger = dependencies.logger ?? console;
 
-  async function authorize(actor: MediaActor, projectId: string) {
+  async function authorize(candidateActor: MediaActor, candidateProjectId: string) {
+    const actor = canonicalizeMediaActor(candidateActor);
+    const projectId = canonicalizeUuidCoordinate(candidateProjectId);
     const result = await dependencies.authorizeProject(actor, projectId);
-    if (result === "allowed") return;
+    if (result === "allowed") return { actor, projectId };
     if (result === "not_found") throw new ProjectMediaError("errors.notFound", 404);
     throw new ProjectMediaError("errors.forbidden", 403);
   }
@@ -1528,10 +1580,10 @@ export function createProjectMediaManager(dependencies: {
 
   return {
     async list(actor: MediaActor, projectId: string) {
-      await authorize(actor, projectId);
+      const coordinates = await authorize(actor, projectId);
       const rows = await dependencies.repository.listProjectAttachments({
-        storeId: actor.storeId,
-        projectId,
+        storeId: coordinates.actor.storeId,
+        projectId: coordinates.projectId,
       });
       return Promise.all(rows.map((record) => descriptor(record)));
     },
@@ -1542,7 +1594,7 @@ export function createProjectMediaManager(dependencies: {
       value: unknown,
       bytes: Uint8Array,
     ) {
-      await authorize(actor, projectId);
+      const coordinates = await authorize(actor, projectId);
       const parsed = managerUploadSchema.safeParse(value);
       if (!parsed.success || bytes.byteLength !== parsed.data.sizeBytes) {
         throw new ProjectMediaError("errors.invalidData", 400);
@@ -1550,25 +1602,26 @@ export function createProjectMediaManager(dependencies: {
       const input = parsed.data;
       if (input.documentId) {
         await dependencies.repository.validateProjectDocument({
-          storeId: actor.storeId,
-          projectId,
+          storeId: coordinates.actor.storeId,
+          projectId: coordinates.projectId,
           documentId: input.documentId,
         });
       }
-      const uploaded = await dependencies.mediaService.putManagedObject(actor, {
+      const uploaded = await dependencies.mediaService.putManagedObject(coordinates.actor, {
         purpose: "project-document",
-        targetId: projectId,
+        targetId: coordinates.projectId,
         fileName: input.fileName,
         mimeType: input.mimeType,
         sizeBytes: input.sizeBytes,
       }, bytes);
+      const mediaId = canonicalizeUuidCoordinate(uploaded.mediaId);
       let record: ProjectMediaInternalRecord;
       try {
         record = await dependencies.repository.createProjectAttachment({
-          storeId: actor.storeId,
-          actorId: actor.userId,
-          projectId,
-          mediaId: uploaded.mediaId,
+          storeId: coordinates.actor.storeId,
+          actorId: coordinates.actor.userId,
+          projectId: coordinates.projectId,
+          mediaId,
           expectedPath: uploaded.path,
           phase: input.phase,
           caption: input.caption,
@@ -1581,12 +1634,12 @@ export function createProjectMediaManager(dependencies: {
       } catch (error) {
         try {
           await dependencies.compensate({
-            storeId: actor.storeId,
-            mediaId: uploaded.mediaId,
+            storeId: coordinates.actor.storeId,
+            mediaId,
             purpose: "project-document",
-            targetId: projectId,
+            targetId: coordinates.projectId,
             expectedObjectKey: uploaded.path,
-            expectedCreatedBy: actor.userId,
+            expectedCreatedBy: coordinates.actor.userId,
           });
         } catch (compensationError) {
           logger.error("project media association compensation failed", {
@@ -1603,12 +1656,13 @@ export function createProjectMediaManager(dependencies: {
     },
 
     async delete(actor: MediaActor, projectId: string, attachmentId: string) {
-      await authorize(actor, projectId);
+      const coordinates = await authorize(actor, projectId);
+      const canonicalAttachmentId = canonicalizeUuidCoordinate(attachmentId);
       const result = await dependencies.repository.deleteProjectAttachment({
-        storeId: actor.storeId,
-        actorId: actor.userId,
-        projectId,
-        attachmentId,
+        storeId: coordinates.actor.storeId,
+        actorId: coordinates.actor.userId,
+        projectId: coordinates.projectId,
+        attachmentId: canonicalAttachmentId,
       });
       if (result.outcome === "not_found") {
         throw new ProjectMediaError("errors.notFound", 404);
@@ -1620,7 +1674,7 @@ export function createProjectMediaManager(dependencies: {
         throw new ProjectMediaError("media.deleteConflict", 409);
       }
       return {
-        id: result.id ?? attachmentId,
+        id: result.id ?? canonicalAttachmentId,
         status: result.outcome,
       };
     },

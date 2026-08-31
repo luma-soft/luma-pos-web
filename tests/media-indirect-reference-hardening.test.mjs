@@ -20,6 +20,7 @@ const {
 } = await import(`${projectRoot}/src/lib/media/repository-core.ts`);
 const {
   compensateManagedMediaAssociation,
+  createDatabaseMediaRepository,
   createDatabaseProjectMediaRepository,
   createProjectMediaManager,
   resolveManagedPrivateMediaUrl,
@@ -29,10 +30,10 @@ const client = new PGlite();
 const database = drizzle(client, { schema });
 const STORE_A = "00000000-0000-4000-8000-000000000001";
 const STORE_B = "85000000-0000-4000-8000-000000000001";
-const STORE_C = "85000000-0000-4000-8000-000000000041";
-const PROJECT_A = "85000000-0000-4000-8000-000000000002";
+const STORE_C = "8aabcdef-abcd-4def-8abc-defabcdef041";
+const PROJECT_A = "8babcdef-abcd-4def-8abc-defabcdef002";
 const PROJECT_B = "85000000-0000-4000-8000-000000000003";
-const PROJECT_C = "85000000-0000-4000-8000-000000000042";
+const PROJECT_C = "8cabcdef-abcd-4def-8abc-defabcdef042";
 const JOB_A = "85000000-0000-4000-8000-000000000004";
 const JOB_B = "85000000-0000-4000-8000-000000000005";
 const SESSION_A = "85000000-0000-4000-8000-000000000006";
@@ -44,13 +45,17 @@ const SIGNATURE_DELETE_MEDIA = "85000000-0000-4000-8000-000000000012";
 const MALFORMED_TARGET = "85000000-0000-4000-8000-000000000013";
 const SAFE_TARGET = "85000000-0000-4000-8000-000000000014";
 const DUPLICATE_TARGET = "85000000-0000-4000-8000-000000000015";
-const RECOVERY_UNREFERENCED = "85000000-0000-4000-8000-000000000044";
-const RECOVERY_MALFORMED = "85000000-0000-4000-8000-000000000045";
+const RECOVERY_UNREFERENCED = "8dabcdef-abcd-4def-8abc-defabcdef044";
+const RECOVERY_MALFORMED = "8eabcdef-abcd-4def-8abc-defabcdef045";
 const RECOVERY_REFERENCED = "85abcdef-abcd-4def-8abc-defabcdef046";
 const RECOVERY_CONFLICT = "85000000-0000-4000-8000-000000000047";
 const RECOVERY_MANAGER_MEDIA = "85000000-0000-4000-8000-000000000051";
-const RECOVERY_MANAGER_USER = "85000000-0000-4000-8000-000000000052";
+const RECOVERY_MANAGER_USER = "8fabcdef-abcd-4def-8abc-defabcdef052";
 const RECOVERY_MANAGER_DOCUMENT = "85000000-0000-4000-8000-000000000053";
+const UUID_ASSOCIATION_MEDIA = "81abcdef-abcd-4def-8abc-defabcdef054";
+const UUID_CREATOR_MEDIA = "82abcdef-abcd-4def-8abc-defabcdef055";
+const UUID_SOFT_DELETE_MEDIA = "83abcdef-abcd-4def-8abc-defabcdef056";
+const UUID_PORTAL_MEDIA = "84abcdef-abcd-4def-8abc-defabcdef057";
 const AI_WRITER_MESSAGE = "85000000-0000-4000-8000-000000000021";
 const SIGNATURE_DELETE_ID = "85000000-0000-4000-8000-000000000022";
 const RECOVERY_MALFORMED_MESSAGE = "85000000-0000-4000-8000-000000000048";
@@ -116,9 +121,16 @@ beforeAll(async () => {
       ${mediaValue(RECOVERY_MALFORMED, STORE_C, PROJECT_C)},
       ${mediaValue(RECOVERY_REFERENCED, STORE_C, PROJECT_C)},
       ${mediaValue(RECOVERY_CONFLICT, STORE_C, PROJECT_C)},
-      ${mediaValue(RECOVERY_MANAGER_MEDIA, STORE_C, PROJECT_C)};
+      ${mediaValue(RECOVERY_MANAGER_MEDIA, STORE_C, PROJECT_C)},
+      ${mediaValue(UUID_ASSOCIATION_MEDIA, STORE_C, PROJECT_C)},
+      ${mediaValue(UUID_CREATOR_MEDIA, STORE_C, PROJECT_C)},
+      ${mediaValue(UUID_SOFT_DELETE_MEDIA, STORE_A, PROJECT_A)};
     update media_objects set created_by = '${RECOVERY_MANAGER_USER}'
-      where id = '${RECOVERY_MANAGER_MEDIA}';
+      where id in (
+        '${RECOVERY_MANAGER_MEDIA}',
+        '${UUID_ASSOCIATION_MEDIA}',
+        '${UUID_CREATOR_MEDIA}'
+      );
     insert into service_handover_documents (
       id, store_id, project_id, type, title
     ) values (
@@ -185,11 +197,17 @@ describe("indirect media reference hardening", () => {
   test("association recovery deletes an ordinary unreferenced ready object", async () => {
     await expect(compensateManagedMediaAssociation(
       database,
-      recoveryInput(RECOVERY_UNREFERENCED),
+      recoveryInput(RECOVERY_UNREFERENCED, {
+        mediaId: RECOVERY_UNREFERENCED.toUpperCase(),
+        targetId: PROJECT_A.toUpperCase(),
+      }),
     )).resolves.toMatchObject({ outcome: "deleted" });
     await expect(compensateManagedMediaAssociation(
       database,
-      recoveryInput(RECOVERY_UNREFERENCED),
+      recoveryInput(RECOVERY_UNREFERENCED, {
+        mediaId: RECOVERY_UNREFERENCED.toUpperCase(),
+        targetId: PROJECT_A.toUpperCase(),
+      }),
     )).resolves.toMatchObject({ outcome: "deleted" });
     const media = await client.query(
       `select status, deleted_at is not null as deleted from media_objects where id = '${RECOVERY_UNREFERENCED}'`,
@@ -200,11 +218,19 @@ describe("indirect media reference hardening", () => {
   test("association recovery quarantines malformed-reference uncertainty and is repeatable", async () => {
     await expect(compensateManagedMediaAssociation(
       database,
-      recoveryInput(RECOVERY_MALFORMED),
+      recoveryInput(RECOVERY_MALFORMED, {
+        storeId: STORE_C.toUpperCase(),
+        mediaId: RECOVERY_MALFORMED.toUpperCase(),
+        targetId: PROJECT_C.toUpperCase(),
+      }),
     )).resolves.toMatchObject({ outcome: "quarantined" });
     await expect(compensateManagedMediaAssociation(
       database,
-      recoveryInput(RECOVERY_MALFORMED),
+      recoveryInput(RECOVERY_MALFORMED, {
+        storeId: STORE_C.toUpperCase(),
+        mediaId: RECOVERY_MALFORMED.toUpperCase(),
+        targetId: PROJECT_C.toUpperCase(),
+      }),
     )).resolves.toMatchObject({ outcome: "quarantined" });
 
     const media = await client.query(
@@ -234,7 +260,11 @@ describe("indirect media reference hardening", () => {
   test("association recovery protects a case-insensitive live UUID reference despite malformed rows", async () => {
     await expect(compensateManagedMediaAssociation(
       database,
-      recoveryInput(RECOVERY_REFERENCED),
+      recoveryInput(RECOVERY_REFERENCED, {
+        storeId: STORE_C.toUpperCase(),
+        mediaId: RECOVERY_REFERENCED.toUpperCase(),
+        targetId: PROJECT_C.toUpperCase(),
+      }),
     )).resolves.toMatchObject({ outcome: "referenced" });
     const media = await client.query(
       `select status from media_objects where id = '${RECOVERY_REFERENCED}'`,
@@ -277,6 +307,129 @@ describe("indirect media reference hardening", () => {
     );
   });
 
+  test("association accepts UUID-equivalent casing and keeps the opaque object key exact", async () => {
+    const repository = createDatabaseProjectMediaRepository(database);
+    const created = await repository.createProjectAttachment({
+      storeId: STORE_C.toUpperCase(),
+      actorId: RECOVERY_MANAGER_USER.toUpperCase(),
+      projectId: PROJECT_C.toUpperCase(),
+      mediaId: UUID_ASSOCIATION_MEDIA.toUpperCase(),
+      expectedPath: `indirect/${UUID_ASSOCIATION_MEDIA}.pdf`,
+      phase: "handover",
+      caption: null,
+      fileName: `${UUID_ASSOCIATION_MEDIA}.pdf`,
+      mimeType: "application/pdf",
+      sizeBytes: 16,
+      sha256: "c".repeat(64),
+    });
+    expect(created).toMatchObject({ mediaId: UUID_ASSOCIATION_MEDIA });
+    await expect(compensateManagedMediaAssociation(database, {
+      storeId: STORE_C.toUpperCase(),
+      mediaId: UUID_ASSOCIATION_MEDIA.toUpperCase(),
+      purpose: "project-document",
+      targetId: PROJECT_C.toUpperCase(),
+      expectedObjectKey: `indirect/${UUID_ASSOCIATION_MEDIA}.pdf`,
+      expectedCreatedBy: RECOVERY_MANAGER_USER.toUpperCase(),
+    })).resolves.toMatchObject({ outcome: "referenced" });
+  });
+
+  test("recovery canonicalizes a non-null creator and terminal retries", async () => {
+    const input = {
+      storeId: STORE_C.toUpperCase(),
+      mediaId: UUID_CREATOR_MEDIA.toUpperCase(),
+      purpose: "project-document",
+      targetId: PROJECT_C.toUpperCase(),
+      expectedObjectKey: `indirect/${UUID_CREATOR_MEDIA}.pdf`,
+      expectedCreatedBy: RECOVERY_MANAGER_USER.toUpperCase(),
+    };
+    await expect(compensateManagedMediaAssociation(database, input))
+      .resolves.toMatchObject({ outcome: "quarantined" });
+    await expect(compensateManagedMediaAssociation(database, input))
+      .resolves.toMatchObject({ outcome: "quarantined" });
+  });
+
+  test("portal recovery retains a null creator while canonicalizing UUID coordinates", async () => {
+    const repository = createDatabaseMediaRepository(database, { forceCreatedByNull: true });
+    const pending = await repository.createPending({
+      id: UUID_PORTAL_MEDIA.toUpperCase(),
+      storeId: STORE_C.toUpperCase(),
+      provider: "r2",
+      visibility: "private",
+      purpose: "project-document",
+      targetId: PROJECT_C.toUpperCase(),
+      domain: "projects",
+      bucket: "private-media",
+      objectKey: `indirect/${UUID_PORTAL_MEDIA}.pdf`,
+      originalFileName: `${UUID_PORTAL_MEDIA}.pdf`,
+      mimeType: "application/pdf",
+      sizeBytes: 16,
+      uploadExpiresAt: new Date(Date.now() + 60_000),
+      createdBy: RECOVERY_MANAGER_USER.toUpperCase(),
+    });
+    expect(pending).toMatchObject({
+      id: UUID_PORTAL_MEDIA,
+      storeId: STORE_C,
+      targetId: PROJECT_C,
+      createdBy: null,
+    });
+    await repository.markReady({
+      storeId: STORE_C.toUpperCase(),
+      mediaId: UUID_PORTAL_MEDIA.toUpperCase(),
+      actualSizeBytes: 16,
+      readyAt: new Date(),
+      verifiedAt: new Date(),
+    });
+    await expect(compensateManagedMediaAssociation(database, {
+      storeId: STORE_C.toUpperCase(),
+      mediaId: UUID_PORTAL_MEDIA.toUpperCase(),
+      purpose: "project-document",
+      targetId: PROJECT_C.toUpperCase(),
+      expectedObjectKey: `indirect/${UUID_PORTAL_MEDIA}.pdf`,
+      expectedCreatedBy: null,
+    })).resolves.toMatchObject({ outcome: "quarantined" });
+  });
+
+  test("private resolution and soft delete honor PostgreSQL UUID equivalence", async () => {
+    const authorizedCoordinates = [];
+    const url = await resolveManagedPrivateMediaUrl({
+      storeId: STORE_C.toUpperCase(),
+      userId: RECOVERY_MANAGER_USER.toUpperCase(),
+      role: "manager",
+      features: { field_services: true },
+    }, RECOVERY_CONFLICT.toUpperCase(), {
+      database,
+      expectedPurpose: "project-document",
+      expectedTargetId: PROJECT_C.toUpperCase(),
+      authorizeTarget: async (input) => {
+        authorizedCoordinates.push(input);
+        return "allowed";
+      },
+      storageForProvider: () => ({
+        async createDownloadUrl(input) {
+          return `https://r2.test/${input.key}`;
+        },
+      }),
+    });
+    expect(url).toBe(`https://r2.test/indirect/${RECOVERY_CONFLICT}.pdf`);
+    expect(authorizedCoordinates).toEqual([{
+      actor: {
+        storeId: STORE_C,
+        userId: RECOVERY_MANAGER_USER,
+        role: "manager",
+        features: { field_services: true },
+      },
+      purpose: "project-document",
+      targetId: PROJECT_C,
+    }]);
+
+    await expect(softDeleteMediaIfUnreferencedCore(database, {
+      storeId: STORE_A.toUpperCase(),
+      mediaId: UUID_SOFT_DELETE_MEDIA.toUpperCase(),
+      expectedPurpose: "project-document",
+      expectedTargetId: PROJECT_A.toUpperCase(),
+    })).resolves.toMatchObject({ outcome: "deleted" });
+  });
+
   test("a document race after prevalidation durably recovers the uploaded media", async () => {
     const realRepository = createDatabaseProjectMediaRepository(database);
     const manager = createProjectMediaManager({
@@ -307,14 +460,14 @@ describe("indirect media reference hardening", () => {
     });
 
     await expect(manager.upload({
-      storeId: STORE_C,
-      userId: RECOVERY_MANAGER_USER,
+      storeId: STORE_C.toUpperCase(),
+      userId: RECOVERY_MANAGER_USER.toUpperCase(),
       role: "manager",
       features: { field_services: true },
-    }, PROJECT_C, {
+    }, PROJECT_C.toUpperCase(), {
       phase: "handover",
       caption: null,
-      documentId: RECOVERY_MANAGER_DOCUMENT,
+      documentId: RECOVERY_MANAGER_DOCUMENT.toUpperCase(),
       fileName: `${RECOVERY_MANAGER_MEDIA}.pdf`,
       mimeType: "application/pdf",
       sizeBytes: 16,

@@ -10,6 +10,10 @@ import {
   uploadManagedMedia,
   type ManagedMediaDescriptor,
 } from "@/lib/media/client";
+import {
+  canonicalizeUuidCoordinate,
+  uuidCoordinatesEqual,
+} from "@/lib/media/uuid-coordinate";
 
 export {
   PRODUCT_IMAGE_ACCEPT,
@@ -74,19 +78,21 @@ function productImageFromManagedDescriptor(
   publicMediaBaseUrl: string,
   reportedPath?: string,
 ): UploadedProductImage {
+  const canonicalTargetId = canonicalizeUuidCoordinate(targetId);
+  const canonicalMediaId = canonicalizeUuidCoordinate(media.id);
   const coordinate = publicMediaBaseUrl
     ? parseProductImagePublicUrl(media.url, { publicBaseUrl: publicMediaBaseUrl })
     : null;
   if (
     media.visibility !== "public"
     || !coordinate
-    || coordinate.storeId !== targetId
-    || coordinate.mediaId !== media.id
+    || !uuidCoordinatesEqual(coordinate.storeId, canonicalTargetId)
+    || !uuidCoordinatesEqual(coordinate.mediaId, canonicalMediaId)
     || (reportedPath !== undefined && reportedPath !== coordinate.path)
   ) {
     throw new ProductImageUploadError();
   }
-  return { mediaId: media.id, url: media.url, path: coordinate.path };
+  return { mediaId: canonicalMediaId, url: media.url, path: coordinate.path };
 }
 
 export async function uploadProductImageFile(

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { canonicalUuidCoordinateSchema } from "@/lib/media/uuid-coordinate";
 
 export const MEDIA_PURPOSES = {
   "product-image": {
@@ -65,7 +66,7 @@ const baseUploadIntentSchema = z.object({
     "service-evidence",
     "ai-attachment",
   ]),
-  targetId: z.uuid(),
+  targetId: canonicalUuidCoordinateSchema,
   fileName: z.string()
     .trim()
     .min(1)
@@ -104,4 +105,4 @@ export const uploadIntentSchema = baseUploadIntentSchema.superRefine((input, con
 
 export type UploadIntentInput = z.infer<typeof uploadIntentSchema>;
 
-export const mediaIdSchema = z.uuid();
+export const mediaIdSchema = canonicalUuidCoordinateSchema;

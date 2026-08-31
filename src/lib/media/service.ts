@@ -38,9 +38,14 @@ import {
 import { getObjectStorage } from "@/lib/media/storage";
 import {
   authorizeMediaTarget,
+  canonicalizeMediaActor,
   type AuthorizeMediaTarget,
   type MediaActor,
 } from "@/lib/media/authorization";
+import {
+  canonicalizeUuidCoordinate,
+  uuidCoordinatesEqual,
+} from "@/lib/media/uuid-coordinate";
 
 const UPLOAD_EXPIRY_SECONDS = 600;
 const DOWNLOAD_EXPIRY_SECONDS = 900;
@@ -159,11 +164,13 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
   const logger = dependencies.logger ?? console;
 
   async function requireTarget(
-    actor: MediaActor,
+    candidateActor: MediaActor,
     purpose: MediaPurpose,
-    targetId: string,
+    candidateTargetId: string,
     conceal: boolean,
   ) {
+    const actor = canonicalizeMediaActor(candidateActor);
+    const targetId = canonicalizeUuidCoordinate(candidateTargetId);
     const result = await dependencies.authorizeTarget({ actor, purpose, targetId });
     if (result === "allowed") return;
     if (conceal || result === "not_found") {
@@ -201,16 +208,19 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
   }
 
   async function createPendingObject(
-    actor: MediaActor,
+    candidateActor: MediaActor,
     input: UploadIntentInput,
   ) {
-    await requireTarget(actor, input.purpose, input.targetId, false);
+    const actor = canonicalizeMediaActor(candidateActor);
+    const targetId = canonicalizeUuidCoordinate(input.targetId);
+    await requireTarget(actor, input.purpose, targetId, false);
 
     const policy = MEDIA_PURPOSES[input.purpose];
-    const mediaId = createId();
-    if (!mediaIdSchema.safeParse(mediaId).success) {
+    const parsedMediaId = mediaIdSchema.safeParse(createId());
+    if (!parsedMediaId.success) {
       throw new Error("Generated media ID is invalid");
     }
+    const mediaId = parsedMediaId.data;
     const extension = extensionForMediaType(input.mimeType);
     if (!extension) throw new MediaServiceError("errors.invalidData", 400);
     const createdAt = now();
@@ -233,7 +243,7 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
       provider: "r2",
       visibility: policy.visibility,
       purpose: input.purpose,
-      targetId: input.targetId,
+      targetId,
       domain: policy.domain,
       bucket,
       objectKey,
@@ -279,10 +289,13 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
     };
   }
 
-  async function loadAuthorizedReady(actor: MediaActor, mediaId: string) {
-    if (!mediaIdSchema.safeParse(mediaId).success) {
+  async function loadAuthorizedReady(candidateActor: MediaActor, candidateMediaId: string) {
+    const parsedMediaId = mediaIdSchema.safeParse(candidateMediaId);
+    if (!parsedMediaId.success) {
       throw new MediaServiceError("errors.notFound", 404);
     }
+    const actor = canonicalizeMediaActor(candidateActor);
+    const mediaId = parsedMediaId.data;
     const media = await dependencies.repository.getForStore({
       storeId: actor.storeId,
       mediaId,
@@ -298,10 +311,13 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
     return descriptor(await loadAuthorizedReady(actor, mediaId));
   }
 
-  async function completeUpload(actor: MediaActor, mediaId: string) {
-    if (!mediaIdSchema.safeParse(mediaId).success) {
+  async function completeUpload(candidateActor: MediaActor, candidateMediaId: string) {
+    const parsedMediaId = mediaIdSchema.safeParse(candidateMediaId);
+    if (!parsedMediaId.success) {
       throw new MediaServiceError("errors.notFound", 404);
     }
+    const actor = canonicalizeMediaActor(candidateActor);
+    const mediaId = parsedMediaId.data;
     let media = await dependencies.repository.getForStore({
       storeId: actor.storeId,
       mediaId,
@@ -380,7 +396,7 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
   }
 
   async function putManagedObject(
-    actor: MediaActor,
+    candidateActor: MediaActor,
     value: unknown,
     bytes: Uint8Array,
   ) {
@@ -392,6 +408,7 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
     ) {
       throw new MediaServiceError("errors.invalidData", 400);
     }
+    const actor = canonicalizeMediaActor(candidateActor);
     const input = parsed.data;
     const { media } = await createPendingObject(actor, input);
     let wroteObject = false;
@@ -491,10 +508,13 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
     }
   }
 
-  async function deleteMedia(actor: MediaActor, mediaId: string) {
-    if (!mediaIdSchema.safeParse(mediaId).success) {
+  async function deleteMedia(candidateActor: MediaActor, candidateMediaId: string) {
+    const parsedMediaId = mediaIdSchema.safeParse(candidateMediaId);
+    if (!parsedMediaId.success) {
       throw new MediaServiceError("errors.notFound", 404);
     }
+    const actor = canonicalizeMediaActor(candidateActor);
+    const mediaId = parsedMediaId.data;
     const authorized = await dependencies.repository.getForStore({
       storeId: actor.storeId,
       mediaId,
@@ -545,9 +565,10 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
   }
 
   async function deleteManagedProductImageByPath(
-    actor: MediaActor,
+    candidateActor: MediaActor,
     objectKey: string,
   ) {
+    const actor = canonicalizeMediaActor(candidateActor);
     const match = CANONICAL_PRODUCT_IMAGE_PATH.exec(objectKey);
     const storeId = match?.[1];
     const mediaId = match?.[2];
@@ -556,7 +577,7 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
       | undefined;
     if (
       !storeId
-      || storeId !== actor.storeId
+      || !uuidCoordinatesEqual(storeId, actor.storeId)
       || !mediaId
       || !extension
     ) {
@@ -569,12 +590,12 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
     });
     if (
       !media
-      || media.id !== mediaId
-      || media.storeId !== actor.storeId
+      || !uuidCoordinatesEqual(media.id, mediaId)
+      || !uuidCoordinatesEqual(media.storeId, actor.storeId)
       || media.provider !== "r2"
       || media.visibility !== "public"
       || media.purpose !== "product-image"
-      || media.targetId !== actor.storeId
+      || !uuidCoordinatesEqual(media.targetId, actor.storeId)
       || media.domain !== "products"
       || media.bucket !== dependencies.config.publicBucket
       || media.objectKey !== objectKey

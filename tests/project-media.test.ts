@@ -523,6 +523,46 @@ describe("project media validation and orchestration", () => {
     }]);
   });
 
+  test("canonicalizes UUID project, actor, and document coordinates before recovery", async () => {
+    const { manager, state } = fakeManagerHarness({ associationFailure: true });
+    const uppercaseActor = {
+      ...actor,
+      userId: USER_ID.toUpperCase(),
+    };
+    await expect(manager.upload(uppercaseActor, PROJECT_ID.toUpperCase(), {
+      phase: "handover",
+      caption: null,
+      documentId: DOCUMENT_ID.toUpperCase(),
+      fileName: "uuid-case.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: 4,
+      sha256: "d".repeat(64),
+    }, Uint8Array.from([0xff, 0xd8, 0xff, 0xdb]))).rejects.toThrow(
+      "association failed",
+    );
+
+    expect(state.documentValidationCalls).toEqual([{
+      storeId: STORE_ID,
+      projectId: PROJECT_ID,
+      documentId: DOCUMENT_ID,
+    }]);
+    expect(state.uploadCalls).toEqual([{
+      purpose: "project-document",
+      targetId: PROJECT_ID,
+      fileName: "uuid-case.jpg",
+      mimeType: "image/jpeg",
+      sizeBytes: 4,
+    }]);
+    expect(state.compensationCalls).toEqual([{
+      storeId: STORE_ID,
+      mediaId: MEDIA_ID,
+      purpose: "project-document",
+      targetId: PROJECT_ID,
+      expectedObjectKey: `stores/${STORE_ID}/projects/2026/08/${MEDIA_ID}/original.jpg`,
+      expectedCreatedBy: USER_ID,
+    }]);
+  });
+
   test("prevalidates a handover document before uploading while retaining transaction revalidation", async () => {
     const { manager, state } = fakeManagerHarness({
       documentValidationFailure: true,
@@ -1016,9 +1056,9 @@ describe("project media database repository", () => {
   test("removes the explicit document association and soft-deletes media atomically", async () => {
     expect(await repository.deleteProjectAttachment({
       storeId: STORE_ID,
-      actorId: USER_ID,
-      projectId: PROJECT_ID,
-      attachmentId: ATTACHMENT_ID,
+      actorId: USER_ID.toUpperCase(),
+      projectId: PROJECT_ID.toUpperCase(),
+      attachmentId: ATTACHMENT_ID.toUpperCase(),
       deletedAt: new Date(NOW.getTime() + 1_000),
     })).toEqual({
       outcome: "deleted",

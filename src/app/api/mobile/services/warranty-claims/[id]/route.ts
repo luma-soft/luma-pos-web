@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { serviceAttachments, warrantyClaims } from "@/db/schema";
 import { resolveManagedPrivateMediaUrl } from "@/lib/media/project-media";
 import { getObjectStorage } from "@/lib/media/storage";
+import { uuidCoordinatesEqual } from "@/lib/media/uuid-coordinate";
 import { requireMobileServiceAccess } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk } from "@/lib/mobile/response";
 import { getWarrantyClaimForActorCore } from "@/lib/services/technician-warranty";
@@ -64,10 +65,10 @@ export async function GET(
           // reassign the claim while its historical evidence keeps the job
           // coordinate that was immutable when the file was created.
           authorizeTarget: async ({ actor, purpose, targetId }) =>
-            actor.storeId === gate.storeId
-              && actor.userId === gate.userId
+            uuidCoordinatesEqual(actor.storeId, gate.storeId)
+              && uuidCoordinatesEqual(actor.userId, gate.userId)
               && purpose === mediaTarget.purpose
-              && targetId === mediaTarget.targetId
+              && uuidCoordinatesEqual(targetId, mediaTarget.targetId)
               ? "allowed"
               : "not_found",
         })

@@ -116,14 +116,17 @@ function pendingMediaId(value: unknown): string | undefined {
     return undefined;
   }
   const media = value.data.media;
+  const parsedMediaId = isRecord(media)
+    ? mediaIdSchema.safeParse(media.id)
+    : null;
   if (
     !isRecord(media)
     || media.status !== "pending"
-    || !mediaIdSchema.safeParse(media.id).success
+    || !parsedMediaId?.success
   ) {
     return undefined;
   }
-  return media.id as string;
+  return parsedMediaId.data;
 }
 
 function parseUploadIntent(
@@ -137,6 +140,7 @@ function parseUploadIntent(
   if (!isRecord(data.media) || !isRecord(data.headers)) return null;
   const media = data.media;
   const headers = data.headers;
+  const parsedMediaId = mediaIdSchema.safeParse(media.id);
   const expectedMimeType = normalizeMediaType(file.type);
   const expectedVisibility = MEDIA_PURPOSES[request.purpose].visibility;
   const headerNames = Object.keys(headers).sort();
@@ -148,7 +152,7 @@ function parseUploadIntent(
     return null;
   }
   if (
-    !mediaIdSchema.safeParse(media.id).success
+    !parsedMediaId.success
     || !isVisibility(media.visibility)
     || media.visibility !== expectedVisibility
     || media.status !== "pending"
@@ -167,7 +171,13 @@ function parseUploadIntent(
   ) {
     return null;
   }
-  return data as UploadIntent;
+  return {
+    ...(data as UploadIntent),
+    media: {
+      ...(media as UploadIntent["media"]),
+      id: parsedMediaId.data,
+    },
+  };
 }
 
 function parseDescriptor(
@@ -176,8 +186,10 @@ function parseDescriptor(
 ): ManagedMediaDescriptor | null {
   if (!isRecord(value) || value.ok !== true || !isRecord(value.data)) return null;
   const data = value.data;
+  const parsedMediaId = mediaIdSchema.safeParse(data.id);
   if (
-    data.id !== expected.id
+    !parsedMediaId.success
+    || parsedMediaId.data !== expected.id
     || !isVisibility(data.visibility)
     || data.visibility !== expected.visibility
     || data.mimeType !== expected.mimeType
@@ -192,7 +204,7 @@ function parseDescriptor(
     return null;
   }
   return {
-    id: data.id,
+    id: parsedMediaId.data,
     visibility: data.visibility,
     mimeType: data.mimeType,
     sizeBytes: data.sizeBytes,
@@ -367,13 +379,14 @@ export async function resumeManagedMediaCompletion(
   mediaId: string,
   fetcher: typeof fetch = globalThis.fetch,
 ): Promise<ManagedMediaDescriptor> {
-  const normalizedMediaId = mediaId.trim();
-  if (!mediaIdSchema.safeParse(normalizedMediaId).success) {
+  const parsedMediaId = mediaIdSchema.safeParse(mediaId.trim());
+  if (!parsedMediaId.success) {
     throw uploadError({
       stage: "complete",
       code: "media.invalidCompletionResponse",
     });
   }
+  const normalizedMediaId = parsedMediaId.data;
   return completeManagedMedia({
     id: normalizedMediaId,
     visibility: MEDIA_PURPOSES[request.purpose].visibility,

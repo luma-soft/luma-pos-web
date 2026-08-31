@@ -22,6 +22,22 @@ describe("product public-media coordinates", () => {
     )).toEqual({ storeId: STORE_ID, mediaId: MEDIA_ID, path: PATH });
   });
 
+  test("canonicalizes UUID path coordinates while preserving the exact object key", () => {
+    const upperStoreId = "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA";
+    const upperMediaId = "BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB";
+    const upperPath =
+      `stores/${upperStoreId}/products/2026/08/${upperMediaId}/original.jpg`;
+
+    expect(parseProductImagePublicUrl(
+      `${PUBLIC_MEDIA.publicBaseUrl}/${upperPath}`,
+      PUBLIC_MEDIA,
+    )).toEqual({
+      storeId: upperStoreId.toLowerCase(),
+      mediaId: upperMediaId.toLowerCase(),
+      path: upperPath,
+    });
+  });
+
   test("rejects malformed and alternate first-party coordinates", () => {
     for (const value of [
       `http://media.staging.lumapos.test/${PATH}`,

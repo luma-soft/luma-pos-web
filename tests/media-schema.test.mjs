@@ -66,7 +66,9 @@ test("repository scopes reads and one-way state transitions to the store", () =>
   const repository = readFileSync("src/lib/media/repository.ts", "utf8");
   const core = readFileSync("src/lib/media/repository-core.ts", "utf8");
 
-  expect(repository).toContain("eq(mediaObjects.storeId, input.storeId)");
+  expect(repository).toContain(
+    "eq(mediaObjects.storeId, canonicalizeUuidCoordinate(input.storeId))",
+  );
   expect(repository).toContain('eq(mediaObjects.status, "pending")');
   expect(repository).toContain('status: "ready"');
   expect(core).toContain('eq(mediaObjects.status, "ready")');
@@ -104,28 +106,36 @@ test("repository insert starts pending and reads by media plus store", async () 
     buildCreatePendingMediaQuery,
     buildGetMediaForStoreQuery,
   } = await import("../src/lib/media/repository");
-  const storeId = "11111111-1111-4111-8111-111111111111";
-  const mediaId = "22222222-2222-4222-8222-222222222222";
+  const storeId = "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA";
+  const mediaId = "BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB";
+  const targetId = "CCCCCCCC-CCCC-4CCC-8CCC-CCCCCCCCCCCC";
+  const canonicalStoreId = storeId.toLowerCase();
+  const canonicalMediaId = mediaId.toLowerCase();
+  const canonicalTargetId = targetId.toLowerCase();
 
   const pending = buildCreatePendingMediaQuery(queryDb, {
     id: mediaId,
     storeId,
     provider: "r2",
     visibility: "private",
+    purpose: "project-document",
+    targetId,
     domain: "projects",
     bucket: "private-media",
     objectKey: `stores/${storeId}/projects/2026/08/${mediaId}/original.pdf`,
     originalFileName: "handover.pdf",
     mimeType: "application/pdf",
     sizeBytes: 4096,
+    uploadExpiresAt: new Date("2026-08-30T00:10:00.000Z"),
   }).toSQL();
-  expect(pending.params).toContain(storeId);
-  expect(pending.params).toContain(mediaId);
+  expect(pending.params).toContain(canonicalStoreId);
+  expect(pending.params).toContain(canonicalMediaId);
+  expect(pending.params).toContain(canonicalTargetId);
   expect(pending.params).toContain("pending");
 
   const read = buildGetMediaForStoreQuery(queryDb, { storeId, mediaId }).toSQL();
   expect(read.sql).toContain('where ("media_objects"."id" = $');
   expect(read.sql).toContain('and "media_objects"."store_id" = $');
-  expect(read.params).toContain(mediaId);
-  expect(read.params).toContain(storeId);
+  expect(read.params).toContain(canonicalMediaId);
+  expect(read.params).toContain(canonicalStoreId);
 });

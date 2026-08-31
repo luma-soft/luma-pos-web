@@ -15,6 +15,7 @@ import {
 } from "@/lib/media/project-media";
 import { createMediaService } from "@/lib/media/service";
 import { getObjectStorage } from "@/lib/media/storage";
+import { uuidCoordinatesEqual } from "@/lib/media/uuid-coordinate";
 import { mobileError, mobileOk } from "@/lib/mobile/response";
 import {
   consumePublicRateLimitCore,
@@ -56,10 +57,10 @@ function createPortalMediaCapability(storeId: string, projectId: string) {
     repository: createDatabaseMediaRepository(db, { forceCreatedByNull: true }),
     config: getR2Config(),
     authorizeTarget: async ({ actor: candidate, purpose, targetId }) =>
-      candidate.storeId === storeId
-        && candidate.userId === PORTAL_MEDIA_ACTOR_ID
+      uuidCoordinatesEqual(candidate.storeId, storeId)
+        && uuidCoordinatesEqual(candidate.userId, PORTAL_MEDIA_ACTOR_ID)
         && purpose === "project-document"
-        && targetId === projectId
+        && uuidCoordinatesEqual(targetId, projectId)
         ? "allowed"
         : "not_found",
   });

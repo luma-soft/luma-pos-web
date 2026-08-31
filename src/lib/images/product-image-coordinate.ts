@@ -1,4 +1,5 @@
 import type { PublicMediaConfig } from "@/lib/media/config";
+import { canonicalizeUuidCoordinate } from "@/lib/media/uuid-coordinate";
 
 const UUID_SEGMENT =
   "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
@@ -49,7 +50,11 @@ export function parseProductImagePublicUrl(
     if (url.pathname !== `/${path}`) return null;
     const match = IMMUTABLE_PRODUCT_IMAGE_PATH.exec(path);
     if (!match) return null;
-    return { storeId: match[1]!, mediaId: match[2]!, path };
+    return {
+      storeId: canonicalizeUuidCoordinate(match[1]!),
+      mediaId: canonicalizeUuidCoordinate(match[2]!),
+      path,
+    };
   } catch {
     return null;
   }

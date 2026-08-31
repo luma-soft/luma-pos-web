@@ -11,6 +11,10 @@ import {
 } from "@/lib/media/repository-core";
 import type { MediaProvider, MediaVisibility } from "@/lib/media/types";
 import type { MediaPurpose } from "@/lib/media/schemas";
+import {
+  canonicalizeNullableUuidCoordinate,
+  canonicalizeUuidCoordinate,
+} from "@/lib/media/uuid-coordinate";
 
 export type CreatePendingMediaInput = {
   id: string;
@@ -70,12 +74,12 @@ export function buildCreatePendingMediaQuery(
   input: CreatePendingMediaInput,
 ) {
   return database.insert(mediaObjects).values({
-    id: input.id,
-    storeId: input.storeId,
+    id: canonicalizeUuidCoordinate(input.id),
+    storeId: canonicalizeUuidCoordinate(input.storeId),
     provider: input.provider,
     visibility: input.visibility,
     purpose: input.purpose,
-    targetId: input.targetId,
+    targetId: canonicalizeUuidCoordinate(input.targetId),
     domain: input.domain,
     bucket: input.bucket,
     objectKey: input.objectKey,
@@ -84,7 +88,7 @@ export function buildCreatePendingMediaQuery(
     sizeBytes: input.sizeBytes,
     uploadExpiresAt: input.uploadExpiresAt,
     status: "pending",
-    createdBy: input.createdBy ?? null,
+    createdBy: canonicalizeNullableUuidCoordinate(input.createdBy ?? null),
     sha256: input.sha256 ?? null,
     width: input.width ?? null,
     height: input.height ?? null,
@@ -109,8 +113,8 @@ export function buildMarkMediaReadyQuery(
     readyAt: input.readyAt ?? new Date(),
     verifiedAt: input.verifiedAt ?? new Date(),
   }).where(and(
-    eq(mediaObjects.id, input.mediaId),
-    eq(mediaObjects.storeId, input.storeId),
+    eq(mediaObjects.id, canonicalizeUuidCoordinate(input.mediaId)),
+    eq(mediaObjects.storeId, canonicalizeUuidCoordinate(input.storeId)),
     eq(mediaObjects.status, "pending"),
   )).returning();
 }
@@ -128,8 +132,8 @@ export function buildSaveMediaThumbnailQuery(
     thumbnailObjectKey: input.objectKey,
     thumbnailSizeBytes: input.sizeBytes,
   }).where(and(
-    eq(mediaObjects.id, input.mediaId),
-    eq(mediaObjects.storeId, input.storeId),
+    eq(mediaObjects.id, canonicalizeUuidCoordinate(input.mediaId)),
+    eq(mediaObjects.storeId, canonicalizeUuidCoordinate(input.storeId)),
     eq(mediaObjects.status, "ready"),
   )).returning();
 }
@@ -147,11 +151,11 @@ export function buildAbandonPendingMediaQuery(
     status: "deleted",
     deletedAt: input.deletedAt,
   }).where(and(
-    eq(mediaObjects.id, input.mediaId),
-    eq(mediaObjects.storeId, input.storeId),
+    eq(mediaObjects.id, canonicalizeUuidCoordinate(input.mediaId)),
+    eq(mediaObjects.storeId, canonicalizeUuidCoordinate(input.storeId)),
     eq(mediaObjects.status, "pending"),
     eq(mediaObjects.purpose, input.expectedPurpose),
-    eq(mediaObjects.targetId, input.expectedTargetId),
+    eq(mediaObjects.targetId, canonicalizeUuidCoordinate(input.expectedTargetId)),
   )).returning();
 }
 
@@ -172,8 +176,8 @@ export function buildGetMediaForStoreQuery(
   return database.select()
     .from(mediaObjects)
     .where(and(
-      eq(mediaObjects.id, input.mediaId),
-      eq(mediaObjects.storeId, input.storeId),
+      eq(mediaObjects.id, canonicalizeUuidCoordinate(input.mediaId)),
+      eq(mediaObjects.storeId, canonicalizeUuidCoordinate(input.storeId)),
     ))
     .limit(1);
 }

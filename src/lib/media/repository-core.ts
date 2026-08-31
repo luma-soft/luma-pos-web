@@ -13,6 +13,12 @@ import {
   serviceSignatures,
 } from "@/db/schema";
 import type { MediaPurpose } from "@/lib/media/schemas";
+import {
+  canonicalizeNullableUuidCoordinate,
+  canonicalizeUuidCoordinate,
+  nullableUuidCoordinatesEqual,
+  uuidCoordinatesEqual,
+} from "@/lib/media/uuid-coordinate";
 
 export type SoftDeleteMediaInput = {
   storeId: string;
@@ -153,16 +159,23 @@ export async function recoverReadyMediaAfterFailureInTransaction(
   transaction: MediaTransaction,
   input: RecoverReadyMediaAfterFailureInput,
 ): Promise<RecoverReadyMediaAfterFailureResult> {
+  const coordinates = {
+    ...input,
+    storeId: canonicalizeUuidCoordinate(input.storeId),
+    mediaId: canonicalizeUuidCoordinate(input.mediaId),
+    expectedTargetId: canonicalizeUuidCoordinate(input.expectedTargetId),
+    expectedCreatedBy: canonicalizeNullableUuidCoordinate(input.expectedCreatedBy),
+  };
   const [media] = await transaction.select().from(mediaObjects).where(and(
-    eq(mediaObjects.storeId, input.storeId),
-    eq(mediaObjects.id, input.mediaId),
+    eq(mediaObjects.storeId, coordinates.storeId),
+    eq(mediaObjects.id, coordinates.mediaId),
   )).limit(1).for("update");
   if (
     !media
-    || media.purpose !== input.expectedPurpose
-    || media.targetId !== input.expectedTargetId
-    || media.objectKey !== input.expectedObjectKey
-    || media.createdBy !== input.expectedCreatedBy
+    || media.purpose !== coordinates.expectedPurpose
+    || !uuidCoordinatesEqual(media.targetId, coordinates.expectedTargetId)
+    || media.objectKey !== coordinates.expectedObjectKey
+    || !nullableUuidCoordinatesEqual(media.createdBy, coordinates.expectedCreatedBy)
   ) return { outcome: "conflict" };
 
   if (media.status === "deleted") {
@@ -173,21 +186,21 @@ export async function recoverReadyMediaAfterFailureInTransaction(
   }
   if (media.status !== "ready") return { outcome: "conflict" };
 
-  const referenceState = await hasLiveMediaReference(transaction, input);
+  const referenceState = await hasLiveMediaReference(transaction, coordinates);
   if (referenceState === "referenced") return { outcome: "referenced" };
 
   const status = referenceState === "malformed" ? "quarantined" : "deleted";
   const [recovered] = await transaction.update(mediaObjects).set({
     status,
-    deletedAt: status === "deleted" ? input.recoveredAt ?? new Date() : null,
+    deletedAt: status === "deleted" ? coordinates.recoveredAt ?? new Date() : null,
   }).where(and(
-    eq(mediaObjects.storeId, input.storeId),
-    eq(mediaObjects.id, input.mediaId),
+    eq(mediaObjects.storeId, coordinates.storeId),
+    eq(mediaObjects.id, coordinates.mediaId),
     eq(mediaObjects.status, "ready"),
-    eq(mediaObjects.purpose, input.expectedPurpose),
-    eq(mediaObjects.targetId, input.expectedTargetId),
-    eq(mediaObjects.objectKey, input.expectedObjectKey),
-    createdByCondition(input.expectedCreatedBy),
+    eq(mediaObjects.purpose, coordinates.expectedPurpose),
+    eq(mediaObjects.targetId, coordinates.expectedTargetId),
+    eq(mediaObjects.objectKey, coordinates.expectedObjectKey),
+    createdByCondition(coordinates.expectedCreatedBy),
   )).returning();
   if (!recovered) return { outcome: "conflict" };
   return status === "deleted"
@@ -199,20 +212,31 @@ export async function softDeleteMediaIfUnreferencedInTransaction(
   transaction: MediaTransaction,
   input: SoftDeleteMediaInput,
 ): Promise<SoftDeleteMediaResult> {
+  const coordinates = {
+    ...input,
+    storeId: canonicalizeUuidCoordinate(input.storeId),
+    mediaId: canonicalizeUuidCoordinate(input.mediaId),
+    expectedTargetId: input.expectedTargetId
+      ? canonicalizeUuidCoordinate(input.expectedTargetId)
+      : undefined,
+  };
   const [media] = await transaction.select().from(mediaObjects).where(and(
-    eq(mediaObjects.storeId, input.storeId),
-    eq(mediaObjects.id, input.mediaId),
+    eq(mediaObjects.storeId, coordinates.storeId),
+    eq(mediaObjects.id, coordinates.mediaId),
     eq(mediaObjects.status, "ready"),
   )).limit(1).for("update");
   if (!media) return { outcome: "conflict" };
   if (
-    (input.expectedPurpose && media.purpose !== input.expectedPurpose)
-    || (input.expectedTargetId && media.targetId !== input.expectedTargetId)
+    (coordinates.expectedPurpose && media.purpose !== coordinates.expectedPurpose)
+    || (
+      coordinates.expectedTargetId
+      && !uuidCoordinatesEqual(media.targetId, coordinates.expectedTargetId)
+    )
   ) {
     return { outcome: "conflict" };
   }
 
-  const referenceState = await hasLiveMediaReference(transaction, input);
+  const referenceState = await hasLiveMediaReference(transaction, coordinates);
   if (referenceState === "malformed") {
     return { outcome: "conflict" };
   }
@@ -222,10 +246,10 @@ export async function softDeleteMediaIfUnreferencedInTransaction(
 
   const [deleted] = await transaction.update(mediaObjects).set({
     status: "deleted",
-    deletedAt: input.deletedAt ?? new Date(),
+    deletedAt: coordinates.deletedAt ?? new Date(),
   }).where(and(
-    eq(mediaObjects.storeId, input.storeId),
-    eq(mediaObjects.id, input.mediaId),
+    eq(mediaObjects.storeId, coordinates.storeId),
+    eq(mediaObjects.id, coordinates.mediaId),
     eq(mediaObjects.status, "ready"),
   )).returning();
   return deleted
