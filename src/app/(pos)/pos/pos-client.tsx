@@ -1610,16 +1610,15 @@ export function PosClient({
               <div className="p-3 lg:hidden">
                 <div className="flex items-start gap-2">
                   <span className="mt-0.5 w-5 shrink-0 text-center text-xs tabular-nums text-slate-400">{idx + 1}</span>
-                  <button
-                    type="button"
-                    disabled={isCameraQuoteDraft}
-                    onClick={() => setEditKey(editKey === l.key ? null : l.key)}
-                    title={t("pos.priceEditor.editHint")}
-                    className="min-h-11 min-w-0 flex-1 text-left disabled:cursor-not-allowed disabled:opacity-40"
+                  <Link
+                    href={Routes.productDetail(l.product.id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block min-h-11 min-w-0 flex-1 text-left hover:text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                   >
                     <p className={cn("text-sm font-semibold leading-5", stockInsufficient && "text-er")}>{l.product.name}</p>
                     <p className="mt-0.5 truncate text-xs text-slate-400">{l.product.sku ?? ""}</p>
-                  </button>
+                  </Link>
                   <button
                     type="button"
                     disabled={isCameraQuoteDraft}
@@ -1704,18 +1703,17 @@ export function PosClient({
                   >
                     <GripVertical className="w-3.5 h-3.5" />
                   </button>
-                  <button
-                    type="button"
-                    disabled={isCameraQuoteDraft}
-                    onClick={() => setEditKey(editKey === l.key ? null : l.key)}
-                    title={t("pos.priceEditor.editHint")}
+                  <Link
+                    href={Routes.productDetail(l.product.id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className={cn(
-                      "min-h-11 min-w-11 text-left font-medium text-sm whitespace-normal break-words hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-40",
+                      "inline-flex min-h-11 min-w-11 items-center text-left text-sm font-medium whitespace-normal break-words hover:text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
                       stockInsufficient && "text-er",
                     )}
                   >
                     {l.product.name}
-                  </button>
+                  </Link>
                   {eff.pct > 0 && (
                     <span className={cn(
                       "shrink-0 text-xs font-bold rounded px-1",
@@ -1760,22 +1758,22 @@ export function PosClient({
                     />
                   )}
                 </PosQuantitySlot>
-                <div className="relative flex h-8 w-28 shrink-0 items-start justify-end">
+                <div className="relative flex h-8 w-28 shrink-0 items-center justify-end">
                   <button
                     disabled={isCameraQuoteDraft}
                     onClick={() => setEditKey(editKey === l.key ? null : l.key)}
                     title={t("pos.priceEditor.editHint")}
-                    className="w-full text-right text-base tabular-nums text-slate-500 hover:text-primary-600"
+                    className="w-full text-right text-base leading-6 tabular-nums text-slate-500 hover:text-primary-600"
                   >
                     {formatCurrency(eff.price)}
                   </button>
                   {linePriceBookName && (
-                    <span className="absolute right-0 top-6 rounded bg-sky-50 px-1.5 py-0 text-[11px] font-semibold leading-4 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
+                    <span className="absolute right-0 top-7 rounded bg-sky-50 px-1.5 py-0 text-[11px] font-semibold leading-4 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
                       {linePriceBookName}
                     </span>
                   )}
                 </div>
-                <span className="w-28 text-right text-base font-bold tabular-nums shrink-0">{formatCurrency(eff.price * l.quantity)}</span>
+                <span className="w-28 shrink-0 text-right text-base font-bold leading-6 tabular-nums">{formatCurrency(eff.price * l.quantity)}</span>
               </div>
               <div className="-mt-1 hidden items-start gap-2 px-3 pb-1 lg:flex">
                 <span className="w-5 shrink-0" />

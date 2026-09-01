@@ -162,3 +162,27 @@ describe("POS mobile checkout", () => {
     expect(source).toContain('aria-labelledby="pos-price-editor-title"');
   });
 });
+
+describe("POS desktop cart lines", () => {
+  test("opens product details in a new tab from the product name", () => {
+    const source = readFileSync(
+      "src/app/(pos)/pos/pos-client.tsx",
+      "utf8",
+    );
+
+    expect(source).toMatch(
+      /<Link\s+href=\{Routes\.productDetail\(l\.product\.id\)\}\s+target="_blank"\s+rel="noopener noreferrer"/,
+    );
+  });
+
+  test("vertically centers unit price and line total on the same row", () => {
+    const source = readFileSync(
+      "src/app/(pos)/pos/pos-client.tsx",
+      "utf8",
+    );
+
+    expect(source).toContain(
+      'className="relative flex h-8 w-28 shrink-0 items-center justify-end"',
+    );
+  });
+});
