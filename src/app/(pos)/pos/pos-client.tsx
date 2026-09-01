@@ -39,6 +39,12 @@ import { Routes } from "@/lib/routes";
 import type { PosData, PosProduct, PosUnit } from "@/lib/data/pos";
 import { isProductStockManaged } from "@/lib/product-stock";
 import { rehydrateCartProducts } from "@/lib/pos/rehydrate-cart-products";
+import {
+  LEGACY_POS_ACTIVE_DRAFT_KEY,
+  LEGACY_POS_DRAFTS_KEY,
+  loadPosDraftSnapshot,
+  savePosDraftSnapshot,
+} from "@/lib/pos/draft-storage";
 import { buildPosOrderItemPayload } from "@/lib/pos/order-item-payload";
 import { resolvePosCartUnit } from "@/lib/pos/cart-unit";
 import {
@@ -217,8 +223,8 @@ interface PosDraft {
   returnRestock?: boolean;
 }
 
-const INV_KEY = "pos-invoices";
-const ACT_KEY = "pos-active-invoice";
+const INV_KEY = LEGACY_POS_DRAFTS_KEY;
+const ACT_KEY = LEGACY_POS_ACTIVE_DRAFT_KEY;
 const PRINT_SIZE_KEY = "pos-print-default-size";
 const AI_POS_DRAFT_KEY = "luma-pos-ai-cart-draft";
 const FIRST_INV_ID = "inv-1"; // id ổn định cho SSR (tránh hydration mismatch)
@@ -338,22 +344,6 @@ function isReturnKind(kind: PosDraftKind) {
 
 function scopedStorageKey(key: string, scopeId: string) {
   return `${key}:${scopeId}`;
-}
-
-function loadInvoices(scopeId: string): PosDraft[] | null {
-  try {
-    const raw = JSON.parse(localStorage.getItem(scopedStorageKey(INV_KEY, scopeId)) ?? "null") as Record<string, unknown>[] | null;
-    if (!raw || raw.length === 0) return null;
-    return ensureInvoiceFirst(raw.map(normalizeInvoice));
-  } catch {
-    return null;
-  }
-}
-
-function saveInvoices(scopeId: string, list: PosDraft[]) {
-  try {
-    localStorage.setItem(scopedStorageKey(INV_KEY, scopeId), JSON.stringify(list));
-  } catch { /* đầy quota — bỏ qua */ }
 }
 
 function pendingAiCartItem(raw: unknown, index: number): PosAiUnresolvedItem | null {
@@ -582,12 +572,20 @@ export function PosClient({
         : []),
   ]);
   const [activeId, setActiveId] = useState(initialSourceInvoice || initialContext ? SOURCE_INV_ID : FIRST_INV_ID);
+  const hydratedScopeRef = useRef<string | null>(null);
+  const latestDraftStateRef = useRef({ invoices, activeId });
+  useEffect(() => {
+    latestDraftStateRef.current = { invoices, activeId };
+  }, [activeId, invoices]);
 
   // load đơn đang soạn sau khi mount (tránh lệch SSR; defer cho react-compiler)
   useEffect(() => {
     if (initialSourceInvoice || initialContext) return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("aiDraft") === "1") return;
+    if (params.get("aiDraft") === "1") {
+      hydratedScopeRef.current = storageScope;
+      return;
+    }
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
@@ -595,35 +593,54 @@ export function PosClient({
       localStorage.removeItem(INV_KEY);
       localStorage.removeItem(ACT_KEY);
       localStorage.removeItem(AI_POS_DRAFT_KEY);
-      const saved = loadInvoices(storageScope);
-      if (saved) {
+      const snapshot = loadPosDraftSnapshot(localStorage, storageScope);
+      if (snapshot) {
+        const saved = ensureInvoiceFirst(snapshot.drafts.map(normalizeInvoice));
         const currentProducts = flattenProducts(data.products);
         const refreshed = saved.map((draft) => ({
           ...draft,
           cart: rehydrateCartProducts(draft.cart, currentProducts),
         }));
         setInvoices(refreshed);
-        const savedActive = localStorage.getItem(scopedStorageKey(ACT_KEY, storageScope));
+        const savedActive = snapshot.activeId;
         setActiveId(savedActive && refreshed.some((i) => i.id === savedActive) ? savedActive : refreshed[0].id);
       }
+      hydratedScopeRef.current = storageScope;
     });
     return () => { cancelled = true; };
   }, [data.products, initialContext, initialSourceInvoice, storageScope]);
 
-  // ghi localStorage mỗi khi đơn đổi (bỏ qua lần đầu để không ghi đè bản đã lưu)
-  const hydratedRef = useRef(false);
+  // Ghi atomically cả danh sách và tab active sau khi đã đọc snapshot cũ.
   useEffect(() => {
     if (initialSourceInvoice || initialContext) return;
-    if (!hydratedRef.current) { hydratedRef.current = true; return; }
-    saveInvoices(storageScope, invoices);
-  }, [initialContext, invoices, initialSourceInvoice, storageScope]);
+    if (hydratedScopeRef.current !== storageScope) return;
+    savePosDraftSnapshot(localStorage, storageScope, invoices, activeId);
+  }, [activeId, initialContext, invoices, initialSourceInvoice, storageScope]);
 
-  // nhớ tab đang mở (giữ khi chuyển trang rồi quay lại)
+  // Flush snapshot mới nhất khi rời POS hoặc browser đưa trang xuống nền.
   useEffect(() => {
-    if (!initialSourceInvoice && !initialContext && hydratedRef.current) {
-      try { localStorage.setItem(scopedStorageKey(ACT_KEY, storageScope), activeId); } catch { /* bỏ qua */ }
-    }
-  }, [activeId, initialContext, initialSourceInvoice, storageScope]);
+    if (initialSourceInvoice || initialContext) return;
+    const flush = () => {
+      if (hydratedScopeRef.current !== storageScope) return;
+      const latest = latestDraftStateRef.current;
+      savePosDraftSnapshot(
+        localStorage,
+        storageScope,
+        latest.invoices,
+        latest.activeId,
+      );
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      flush();
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [initialContext, initialSourceInvoice, storageScope]);
 
   useEffect(() => {
     if (!sepayCheckout || sepayCheckout.status !== "pending") return;
@@ -1155,7 +1172,7 @@ export function PosClient({
       const payload = stored?.payload && typeof stored.payload === "object" ? stored.payload : {};
       const payloadUnresolvedItems = Array.isArray(payload.unresolvedItems) ? payload.unresolvedItems : [];
       const rawItems = storedItems.length > 0 ? [...storedItems, ...payloadUnresolvedItems] : aiProductDraftItemsFromQuery(params);
-      if (rawItems.length > 0) hydratedRef.current = true;
+      if (rawItems.length > 0) hydratedScopeRef.current = storageScope;
       const consumed = applyRawAiCartItems(rawItems, payload);
       if (consumed) localStorage.removeItem(scopedStorageKey(AI_POS_DRAFT_KEY, storageScope));
       params.delete("aiDraft");
