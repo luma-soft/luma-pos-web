@@ -35,5 +35,5 @@ export async function POST(
     scope: `order:${id}`,
   });
   if (!authorization.ok) return mobileError(authorization.error, 403);
-  return mobileAction(await cancelOrderForUser(gate.userId, id));
+  return mobileAction(await cancelOrderForUser(gate.userId, gate.storeId, id));
 }

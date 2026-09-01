@@ -8,11 +8,13 @@ export function OrderDetailLink({
   orderId,
   children,
   className,
+  ariaLabel,
   onClick,
 }: {
   orderId: string;
   children: ReactNode;
   className?: string;
+  ariaLabel?: string;
   onClick?: MouseEventHandler<HTMLAnchorElement>;
 }) {
   const pathname = usePathname();
@@ -27,6 +29,7 @@ export function OrderDetailLink({
       scroll={false}
       onClick={onClick}
       className={className}
+      aria-label={ariaLabel}
     >
       {children}
     </Link>

@@ -13,6 +13,7 @@ const {
   customers,
   notificationEvents,
   orderItems,
+  orders,
   products,
   profiles,
   purchaseOrders,
@@ -112,6 +113,7 @@ mock.module("@/lib/notifications/outbox", () => createNotificationOutboxMock({
 const { createOrderForUser } = await import(`${projectRoot}/src/lib/orders/create.ts`);
 const { convertQuoteToOrderForUser } = await import(`${projectRoot}/src/lib/orders/convert.ts`);
 const { cancelOrderForUser } = await import(`${projectRoot}/src/lib/orders/cancel.ts`);
+const { cancelOrders } = await import(`${projectRoot}/src/lib/actions/orders.ts`);
 const { addPaymentForUser } = await import(`${projectRoot}/src/lib/orders/payment.ts`);
 const { importShopeeOrder } = await import(`${projectRoot}/src/lib/actions/marketplace.ts`);
 const {
@@ -461,7 +463,7 @@ const cancellableSale = await createOrderForUser(actor.id, {
   payment: { method: "credit", amount: 0 },
 });
 const cancelledSale = cancellableSale.ok
-  ? await cancelOrderForUser(actor.id, cancellableSale.data.id)
+  ? await cancelOrderForUser(actor.id, storeId, cancellableSale.data.id)
   : { ok: false, error: "sale setup failed" };
 const cancelDebtEvents = cancellableSale.ok
   ? await db.select().from(notificationEvents).where(eq(
@@ -475,6 +477,30 @@ ok(
     && cancelDebtEvents.length === 1
     && cancelDebtEvents[0].metadata?.delta === -100,
   cancelledSale.ok ? JSON.stringify(cancelDebtEvents) : cancelledSale.error,
+);
+
+const batchCancellableSale = await createOrderForUser(actor.id, {
+  mode: "sale",
+  clientId: "event-order-batch-cancel",
+  customerId: customer.id,
+  warehouseId: warehouse.id,
+  items: [{ productId: product.id, unitName: "cái", quantity: 1 }],
+  payment: { method: "credit", amount: 0 },
+});
+const batchCancellation = cancellableSale.ok && batchCancellableSale.ok
+  ? await cancelOrders([cancellableSale.data.id, batchCancellableSale.data.id])
+  : { ok: false, error: "batch setup failed" };
+const [batchCancelledRow] = batchCancellableSale.ok
+  ? await db.select({ status: orders.status }).from(orders).where(eq(orders.id, batchCancellableSale.data.id))
+  : [];
+ok(
+  "batch order cancellation continues past an ineligible order",
+  batchCancellation.ok
+    && batchCancellation.data.cancelled === 1
+    && batchCancellation.data.failedIds.length === 1
+    && batchCancellation.data.failedIds[0] === cancellableSale.data.id
+    && batchCancelledRow?.status === "cancelled",
+  JSON.stringify({ batchCancellation, batchCancelledRow }),
 );
 
 const editedPurchase = purchase.ok

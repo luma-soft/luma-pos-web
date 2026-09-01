@@ -127,6 +127,7 @@ export async function getReportInvoices(
       customerName: sql<string>`coalesce(${customers.name}, 'Khách lẻ')`,
       total: orders.total,
       amountPaid: orders.amountPaid,
+      productCount: sql<number>`count(distinct ${orderItems.productId})::int`,
       cost: sql<string>`coalesce(sum(${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice}), 0)`,
       profit: sql<string>`coalesce(sum(${orderItems.total} - (${orderItems.quantity} * ${orderItems.unitMultiplier} * ${products.costPrice})), 0)`,
     })

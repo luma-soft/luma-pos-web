@@ -49,6 +49,7 @@ export async function cancelQuoteForUser(
 
 export async function cancelOrderForUser(
   userId: string,
+  storeId: string,
   orderId: string
 ): Promise<ActionResult> {
   try {
@@ -58,7 +59,7 @@ export async function cancelOrderForUser(
       const [order] = await tx
         .select()
         .from(orders)
-        .where(eq(orders.id, orderId))
+        .where(and(eq(orders.id, orderId), eq(orders.storeId, storeId)))
         .limit(1);
       if (!order) throw new Error("ORDER_NOT_FOUND");
       if (order.status === "cancelled") throw new Error("ALREADY_CANCELLED");
@@ -66,14 +67,21 @@ export async function cancelOrderForUser(
       const [hasEInvoice] = await tx
         .select({ id: einvoices.id })
         .from(einvoices)
-        .where(and(eq(einvoices.orderId, orderId), eq(einvoices.status, "issued")))
+        .where(and(
+          eq(einvoices.storeId, storeId),
+          eq(einvoices.orderId, orderId),
+          eq(einvoices.status, "issued"),
+        ))
         .limit(1);
       if (hasEInvoice) throw new Error("HAS_EINVOICE");
 
       const items = await tx
         .select()
         .from(orderItems)
-        .where(eq(orderItems.orderId, orderId));
+        .where(and(
+          eq(orderItems.storeId, storeId),
+          eq(orderItems.orderId, orderId),
+        ));
       const isBooking = order.status === "confirmed";
       const isCompletedSale = order.status === "completed";
 
@@ -83,7 +91,7 @@ export async function cancelOrderForUser(
           await tx.update(stockLevels).set({
             reserved: sql`greatest(0, ${stockLevels.reserved} - ${toQty(baseQty)})`,
             updatedAt: sql`now()`,
-          }).where(sql`${stockLevels.productId} = ${i.productId} and ${stockLevels.warehouseId} = ${order.warehouseId}`);
+          }).where(sql`${stockLevels.storeId} = ${storeId} and ${stockLevels.productId} = ${i.productId} and ${stockLevels.warehouseId} = ${order.warehouseId}`);
         }
       }
 
@@ -97,9 +105,10 @@ export async function cancelOrderForUser(
               updatedAt: sql`now()`,
             })
             .where(
-              sql`${stockLevels.productId} = ${i.productId} and ${stockLevels.warehouseId} = ${order.warehouseId}`
+              sql`${stockLevels.storeId} = ${storeId} and ${stockLevels.productId} = ${i.productId} and ${stockLevels.warehouseId} = ${order.warehouseId}`
             );
           await tx.insert(stockMovements).values({
+            storeId,
             productId: i.productId,
             warehouseId: order.warehouseId,
             type: "return_in",
@@ -119,7 +128,10 @@ export async function cancelOrderForUser(
         const [customer] = await tx
           .select({ currentDebt: customers.currentDebt })
           .from(customers)
-          .where(eq(customers.id, order.customerId))
+          .where(and(
+            eq(customers.storeId, storeId),
+            eq(customers.id, order.customerId),
+          ))
           .limit(1)
           .for("update");
         const debtDelta = -Math.min(
@@ -132,7 +144,10 @@ export async function cancelOrderForUser(
             currentDebt: sql`greatest(${customers.currentDebt} - ${toMoney(Math.max(0, remaining))}, 0)`,
             totalSpent: sql`greatest(${customers.totalSpent} - ${order.total}, 0)`,
           })
-          .where(eq(customers.id, order.customerId));
+          .where(and(
+            eq(customers.storeId, storeId),
+            eq(customers.id, order.customerId),
+          ));
         debtNotification = await createDebtChangedEventInTx(tx, {
           storeId: order.storeId,
           entityType: "customer",
@@ -150,7 +165,7 @@ export async function cancelOrderForUser(
           status: "cancelled",
           updatedAt: sql`now()`,
         })
-        .where(eq(orders.id, orderId));
+        .where(and(eq(orders.storeId, storeId), eq(orders.id, orderId)));
       return { debtNotification };
     });
 

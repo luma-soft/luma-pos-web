@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import { PackageOpen } from "lucide-react";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { MobileRecordField } from "@/components/mobile-ui";
 import { OrderDetailLink } from "@/components/order-detail-link";
@@ -15,11 +16,7 @@ export function ReportInvoicesTable({ rows }: { rows: ReportInvoiceRow[] }) {
       label: t("orders.cols.code"),
       required: true,
       width: "180px",
-      render: (invoice) => (
-        <OrderDetailLink orderId={invoice.id} className="font-semibold text-primary-600 hover:underline">
-          {invoice.code}
-        </OrderDetailLink>
-      ),
+      render: (invoice) => <OrderSummaryLink row={invoice} />,
     },
     {
       key: "date",
@@ -105,12 +102,7 @@ export function ReportInvoiceMobileRow({ row }: { row: ReportInvoiceRow }) {
 
   return (
     <div className="p-3">
-      <OrderDetailLink
-        orderId={row.id}
-        className="inline-flex min-h-11 max-w-full items-center font-black text-primary-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 min-w-11"
-      >
-        <span className="truncate">{row.code}</span>
-      </OrderDetailLink>
+      <OrderSummaryLink row={row} mobile />
       <div className="text-xs font-medium text-slate-400">
         {formatDate(row.createdAt)} · {row.customerName}
       </div>
@@ -131,6 +123,26 @@ export function ReportInvoiceMobileRow({ row }: { row: ReportInvoiceRow }) {
         <MobileRecordField label="Biên lãi" value={`${row.margin.toLocaleString("vi-VN", { maximumFractionDigits: 1 })}%`} />
       </dl>
     </div>
+  );
+}
+
+function OrderSummaryLink({ row, mobile = false }: { row: ReportInvoiceRow; mobile?: boolean }) {
+  const count = row.productCount.toLocaleString("vi-VN");
+  return (
+    <OrderDetailLink
+      orderId={row.id}
+      ariaLabel={`Mở chi tiết đơn ${row.code}, gồm ${count} sản phẩm`}
+      className={cn(
+        "inline-flex max-w-full min-w-11 flex-col items-start justify-center rounded-md px-2 -ml-2 hover:bg-primary-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500",
+        mobile ? "min-h-11" : "min-h-10",
+      )}
+    >
+      <span className={cn("max-w-full truncate font-semibold text-primary-600 hover:underline", mobile && "font-black")}>{row.code}</span>
+      <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-medium text-slate-500">
+        <PackageOpen aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+        {count} sản phẩm
+      </span>
+    </OrderDetailLink>
   );
 }
 

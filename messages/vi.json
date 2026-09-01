@@ -1817,6 +1817,15 @@
       "notConvertible": "Phiếu này không thể tạo đơn hàng."
     },
     "printSelected": "In đã chọn",
+    "cancelSelected": "Hủy đã chọn",
+    "bulkCancel": {
+      "title": "Hủy nhiều đơn hàng",
+      "description": "Hủy {count} đơn đã chọn? Kho sẽ được hoàn lại và công nợ được điều chỉnh cho từng đơn.",
+      "resultTitle": "Kết quả hủy đơn",
+      "success": "Đã hủy thành công {count} đơn.",
+      "partial": "Đã hủy {cancelled} đơn. Có {failed} đơn không thể hủy và vẫn được giữ trong danh sách chọn.",
+      "failed": "Không thể hủy {count} đơn đã chọn. Hãy kiểm tra quyền hạn, trạng thái đơn hoặc hóa đơn điện tử."
+    },
     "batchEmpty": "Chưa chọn đơn nào để in — quay lại tick chọn.",
     "batchCount": "Đang in {count} hóa đơn — mỗi hóa đơn 1 trang",
     "paymentFilter": {

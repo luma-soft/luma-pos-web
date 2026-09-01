@@ -68,7 +68,7 @@ export function OrdersReport({ data, rows }: { data: ReportsData; rows: ReportIn
         <StatusCard icon={<Clock3 />} label="Đang xử lý" value={status.processing} color="text-amber-500" delta={change(status.processing, data.previous.orderStatus.processing)} inverse />
         <StatusCard icon={<XCircle />} label="Đã hủy" value={status.cancelled} color="text-red-600" delta={change(status.cancelled, data.previous.orderStatus.cancelled)} inverse />
       </div>
-      <ReportSurface title="Chi tiết đơn hàng" flush>
+      <ReportSurface title="Danh sách đơn hàng" flush>
         <ReportInvoicesTable rows={rows} />
       </ReportSurface>
     </div>

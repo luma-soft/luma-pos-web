@@ -84,7 +84,7 @@ describe("mobile report rows", () => {
     expect(customerHtml).toContain("text-er");
   });
 
-  test("invoice row exposes a 44px order link and all financial values", () => {
+  test("invoice row keeps financials compact and opens product details on demand", () => {
     const html = renderWithMessages(
       <ReportInvoiceMobileRow
         row={{
@@ -99,6 +99,7 @@ describe("mobile report rows", () => {
           profit: 300000,
           refund: 0,
           margin: 20,
+          productCount: 2,
         }}
       />,
     );
@@ -109,6 +110,9 @@ describe("mobile report rows", () => {
     expect(html).toContain("1.200.000");
     expect(html).toContain("300.000");
     expect(html).toContain("text-ok");
+    expect(html).toContain("2 sản phẩm");
+    expect(html).toContain('aria-label="Mở chi tiết đơn HD0001, gồm 2 sản phẩm"');
+    expect(html.match(/detailOrderId=order-1/g)).toHaveLength(1);
   });
 });
 
@@ -231,9 +235,11 @@ describe("mobile report controls", () => {
   test("orders, products, and customers use the taller desktop report table", () => {
     const invoicesSource = readFileSync("src/app/(app)/reports/report-invoices-table.tsx", "utf8");
     const detailsSource = readFileSync("src/app/(app)/reports/report-detail-tables.tsx", "utf8");
+    const dashboardSource = readFileSync("src/app/(app)/reports/report-dashboard.tsx", "utf8");
 
     expect(invoicesSource).toContain("minHeight={420}");
     expect(detailsSource).toContain("minHeight={420}");
+    expect(dashboardSource).toContain('<ReportSurface title="Danh sách đơn hàng" flush>');
   });
 
   test("overview uses a full-width four-color trend without secondary summaries", () => {

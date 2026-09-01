@@ -67,6 +67,12 @@ export const mergeOrdersSchema = z.object({
 });
 export type MergeOrdersInput = z.input<typeof mergeOrdersSchema>;
 
+export const cancelOrdersSchema = z
+  .array(z.uuid())
+  .min(1)
+  .max(100)
+  .transform((ids) => [...new Set(ids)]);
+
 export const addPaymentSchema = z.object({
   orderId: z.uuid(),
   amount: z.number().positive(),

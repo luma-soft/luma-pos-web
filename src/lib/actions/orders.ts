@@ -2,7 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import {
-  type CreateOrderInput, type AddPaymentInput, createOrderSchema,
+  type CreateOrderInput,
+  type AddPaymentInput,
+  cancelOrdersSchema,
+  createOrderSchema,
 } from "@/lib/schemas/order";
 import {
   type ActionResult, requireSalesAccess, requireManager,
@@ -97,10 +100,38 @@ export async function cancelQuote(quoteId: string): Promise<ActionResult> {
 export async function cancelOrder(orderId: string): Promise<ActionResult> {
   const gate = await requireManager();
   if (!gate.ok) return gate;
-  const result = await cancelOrderForUser(gate.userId, orderId);
+  const result = await cancelOrderForUser(gate.userId, gate.storeId, orderId);
   if (result.ok) {
     revalidatePath(Routes.Orders);
     revalidatePath(Routes.order(orderId));
   }
   return result;
+}
+
+/** Hủy nhiều đơn theo best-effort; các đơn lỗi được giữ lại để UI cho thử lại. */
+export async function cancelOrders(
+  orderIds: string[],
+): Promise<ActionResult<{ cancelled: number; failedIds: string[] }>> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const parsed = cancelOrdersSchema.safeParse(orderIds);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+
+  let cancelled = 0;
+  const failedIds: string[] = [];
+  for (const orderId of parsed.data) {
+    const result = await cancelOrderForUser(
+      gate.userId,
+      gate.storeId,
+      orderId,
+    );
+    if (result.ok) cancelled += 1;
+    else failedIds.push(orderId);
+  }
+
+  if (cancelled > 0) {
+    revalidatePath(Routes.Orders);
+    revalidatePath(Routes.Sales);
+  }
+  return { ok: true, data: { cancelled, failedIds } };
 }

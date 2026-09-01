@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -14,9 +14,11 @@ import {
   OrderStatusBadge,
   PaymentStatusBadge,
 } from "../../orders/status-badges";
-import { FileX2 } from "lucide-react";
+import { FileX2, Loader2, XCircle } from "lucide-react";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import type { PrintTemplate } from "@/lib/print/template-shared";
+import { useConfirmDialog } from "@/components/confirm-dialog-provider";
+import { cancelOrders } from "@/lib/actions/orders";
 import { SalesTableEmptyState } from "./sales-table-empty-state";
 
 export function normalizeOrderBatchSelection(
@@ -97,14 +99,19 @@ export function OrderBatchToolbar({
   selectedCount,
   selectedIds,
   templates,
+  cancelling,
+  onCancel,
   labels,
 }: {
   selectedCount: number;
   selectedIds: string[];
   templates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[];
+  cancelling: boolean;
+  onCancel: () => void;
   labels: {
     merge: string;
     print: string;
+    cancel: string;
     selected?: string;
   };
 }) {
@@ -142,6 +149,20 @@ export function OrderBatchToolbar({
             {labels.print}
           </button>
         )}
+        <button
+          type="button"
+          disabled={selectedCount === 0 || cancelling}
+          onClick={onCancel}
+          aria-label={labels.cancel}
+          className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-er hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:hover:bg-red-950/40 lg:min-h-0 lg:min-w-0"
+        >
+          {cancelling ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <XCircle className="h-4 w-4" />
+          )}
+          {labels.cancel}
+        </button>
       </div>
     </div>
   );
@@ -227,8 +248,10 @@ export function OrdersTable({
 }) {
   const t = useTranslations();
   const router = useRouter();
+  const dialog = useConfirmDialog();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [cancelling, startCancelTransition] = useTransition();
   const [internalSelectedIds, setInternalSelectedIds] = useState<Set<string>>(
     new Set(),
   );
@@ -263,6 +286,46 @@ export function OrdersTable({
     const next = new URLSearchParams(searchParams.toString());
     next.set("detailOrderId", order.id);
     router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  }
+
+  async function cancelSelectedOrders() {
+    const ids = selectedVisibleIds;
+    if (ids.length === 0 || cancelling) return;
+    const confirmed = await dialog.confirm({
+      title: t("orders.bulkCancel.title"),
+      description: t("orders.bulkCancel.description", { count: ids.length }),
+      confirmLabel: t("orders.cancelSelected"),
+      variant: "destructive",
+    });
+    if (!confirmed) return;
+
+    startCancelTransition(async () => {
+      const result = await cancelOrders(ids);
+      if (!result.ok) {
+        await dialog.alert({
+          description: t(result.error as never),
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const failed = new Set(result.data.failedIds);
+      setSelectedIds(failed);
+      router.refresh();
+      await dialog.alert({
+        title: t("orders.bulkCancel.resultTitle"),
+        description:
+          failed.size === 0
+            ? t("orders.bulkCancel.success", { count: result.data.cancelled })
+            : result.data.cancelled > 0
+              ? t("orders.bulkCancel.partial", {
+                  cancelled: result.data.cancelled,
+                  failed: failed.size,
+                })
+              : t("orders.bulkCancel.failed", { count: failed.size }),
+        variant: failed.size > 0 ? "warning" : "default",
+      });
+    });
   }
   const columns: DataTableColumn<OrderListRow>[] = [
     {
@@ -394,9 +457,12 @@ export function OrdersTable({
             selectedCount={selectedVisibleIds.length}
             selectedIds={selectedVisibleIds}
             templates={printTemplates}
+            cancelling={cancelling}
+            onCancel={cancelSelectedOrders}
             labels={{
               merge: t("merge.title"),
               print: t("orders.printSelected"),
+              cancel: t("orders.cancelSelected"),
               selected: t("orders.selectedCount", {
                 count: selectedVisibleIds.length,
               }),

@@ -89,6 +89,18 @@ mock.module("@/lib/actions/products", () => ({
   }),
   bulkStopSellingProducts: async () => ({ ok: true }),
 }));
+mock.module("@/lib/actions/orders", () => ({
+  cancelOrders: async (ids: string[]) => ({
+    ok: true,
+    data: { cancelled: ids.length, failedIds: [] },
+  }),
+}));
+mock.module("@/components/confirm-dialog-provider", () => ({
+  useConfirmDialog: () => ({
+    confirm: async () => true,
+    alert: async () => undefined,
+  }),
+}));
 mock.module("@/lib/actions/extras", () => ({
   createPromotion: async () => ({ ok: true }),
   togglePromotion: async () => ({ ok: true }),
@@ -856,22 +868,33 @@ describe("final mobile table surfaces", () => {
       selectedCount: 2,
       selectedIds: ["order-mobile-1", "order-mobile-2"],
       templates: [],
+      cancelling: false,
+      onCancel: () => calls.push("cancel:selected-orders"),
       labels: {
         merge: "Gộp đơn",
         print: "In đã chọn",
+        cancel: "Hủy đã chọn",
       },
     });
     const toolbarHtml = renderToStaticMarkup(toolbar);
+    const toolbarButtons = elementsOfType(toolbar, "button");
+    const cancelButton = toolbarButtons.find(
+      (button) => button.props["aria-label"] === "Hủy đã chọn",
+    );
 
     expect(toolbarHtml).toContain('formAction="/orders/merge"');
     expect(toolbarHtml).toContain("In đã chọn");
+    expect(toolbarHtml).toContain("Hủy đã chọn");
     expect(toolbarHtml).toContain(">2<");
-    expect(toolbarHtml.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(toolbarHtml.match(/min-h-11/g)?.length).toBeGreaterThanOrEqual(3);
     expect(toolbarHtml).toContain("justify-end");
     expect(toolbarHtml).not.toContain("Tick chọn nhiều đơn để in cùng lúc");
+    expect(cancelButton?.props.type).toBe("button");
+    (cancelButton?.props.onClick as () => void)();
     expect(calls).toEqual([
       "toggle:order-mobile-1",
       "open:order-mobile-1",
+      "cancel:selected-orders",
     ]);
 
     const manyOrders = Array.from({ length: 31 }, (_, index) => ({

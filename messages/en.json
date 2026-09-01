@@ -1817,6 +1817,15 @@
       "notConvertible": "This document cannot be converted into an order."
     },
     "printSelected": "Print selected",
+    "cancelSelected": "Cancel selected",
+    "bulkCancel": {
+      "title": "Cancel multiple orders",
+      "description": "Cancel the {count} selected orders? Stock will be restored and debt adjusted for each order.",
+      "resultTitle": "Order cancellation result",
+      "success": "Successfully cancelled {count} orders.",
+      "partial": "Cancelled {cancelled} orders. {failed} orders could not be cancelled and remain selected.",
+      "failed": "The {count} selected orders could not be cancelled. Check your permissions, the order status, or e-invoice state."
+    },
     "batchEmpty": "No orders selected — go back and tick some.",
     "batchCount": "Printing {count} invoices — one per page",
     "paymentFilter": {
