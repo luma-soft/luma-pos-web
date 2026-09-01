@@ -1,8 +1,16 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import type { LucideIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { positionFloatingMenu } from "@/lib/floating-menu-position";
 
 export type LumaActionMenuItem = {
   key: string;
@@ -32,13 +40,45 @@ export function LumaActionMenu({
   const menuId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<{
+    left: number;
+    top: number;
+    maxHeight: number;
+  } | null>(null);
+
+  const updateMenuPosition = useCallback(() => {
+    const trigger = triggerRef.current?.getBoundingClientRect();
+    const menuElement = menuRef.current;
+    if (!trigger || !menuElement || typeof window === "undefined") return;
+    const menu = menuElement.getBoundingClientRect();
+    setMenuPosition(
+      positionFloatingMenu({
+        trigger,
+        menu: { width: menu.width, height: menuElement.scrollHeight },
+        viewport: { width: window.innerWidth, height: window.innerHeight },
+        preferredSide: side,
+        gap: 8,
+      }),
+    );
+  }, [side]);
+
+  useLayoutEffect(() => {
+    if (open) updateMenuPosition();
+  }, [open, updateMenuPosition]);
 
   useEffect(() => {
     if (!open) return;
     const closeOutside = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (
+        !rootRef.current?.contains(target) &&
+        !menuRef.current?.contains(target)
+      ) {
+        setOpen(false);
+      }
     };
     const closeWithEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
@@ -47,11 +87,15 @@ export function LumaActionMenu({
     };
     document.addEventListener("mousedown", closeOutside);
     document.addEventListener("keydown", closeWithEscape);
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
     return () => {
       document.removeEventListener("mousedown", closeOutside);
       document.removeEventListener("keydown", closeWithEscape);
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
     };
-  }, [open]);
+  }, [open, updateMenuPosition]);
 
   function focusItem(direction: 1 | -1) {
     const enabled = itemRefs.current.filter(
@@ -83,20 +127,31 @@ export function LumaActionMenu({
         {TriggerIcon && <TriggerIcon className="h-4 w-4" />}
         {iconOnly ? <span className="sr-only">{label}</span> : label}
       </button>
-      {open && (
+      {open && typeof document !== "undefined" && createPortal(
         <div
+          ref={menuRef}
           id={menuId}
           role="menu"
+          style={menuPosition
+            ? {
+                position: "fixed",
+                left: menuPosition.left,
+                top: menuPosition.top,
+                maxHeight: menuPosition.maxHeight,
+              }
+            : {
+                position: "fixed",
+                left: 0,
+                top: 0,
+                visibility: "hidden",
+              }}
           onKeyDown={(event) => {
             if (event.key === "ArrowDown" || event.key === "ArrowUp") {
               event.preventDefault();
               focusItem(event.key === "ArrowDown" ? 1 : -1);
             }
           }}
-          className={cn(
-            "absolute right-0 z-50 w-56 overflow-hidden rounded-lg border border-border bg-surface p-1 shadow-e2",
-            side === "top" ? "bottom-full mb-2" : "top-full mt-2",
-          )}
+          className="z-[100] w-56 overflow-x-hidden overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-e2"
         >
           {items.map((item, index) => {
             const Icon = item.icon;
@@ -120,7 +175,8 @@ export function LumaActionMenu({
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

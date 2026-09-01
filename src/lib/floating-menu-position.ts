@@ -15,23 +15,34 @@ export interface FloatingMenuViewport {
   height: number;
 }
 
+export type FloatingMenuSide = "auto" | "top" | "bottom";
+
 export function positionFloatingMenu({
   trigger,
   menu,
   viewport,
+  preferredSide = "auto",
   margin = 8,
   gap = 4,
 }: {
   trigger: FloatingMenuRect;
   menu: FloatingMenuSize;
   viewport: FloatingMenuViewport;
+  preferredSide?: FloatingMenuSide;
   margin?: number;
   gap?: number;
 }) {
   const availableAbove = Math.max(0, trigger.top - margin - gap);
-  const availableBelow = Math.max(0, viewport.height - trigger.bottom - margin - gap);
+  const availableBelow = Math.max(
+    0,
+    viewport.height - trigger.bottom - margin - gap,
+  );
   const placeAbove =
-    menu.height <= availableAbove || availableAbove >= availableBelow;
+    preferredSide === "top"
+      ? menu.height <= availableAbove || availableAbove >= availableBelow
+      : preferredSide === "bottom"
+        ? menu.height > availableBelow && availableAbove > availableBelow
+        : menu.height <= availableAbove || availableAbove >= availableBelow;
   const maxHeight = placeAbove ? availableAbove : availableBelow;
   const visibleHeight = Math.min(menu.height, maxHeight);
   const top = placeAbove

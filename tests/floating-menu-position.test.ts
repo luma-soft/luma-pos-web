@@ -22,4 +22,44 @@ describe("floating menu positioning", () => {
       maxHeight: 724,
     });
   });
+
+  test("honors a preferred bottom side when both sides have room", () => {
+    const result = positionFloatingMenu({
+      trigger: { left: 500, right: 544, top: 360, bottom: 404 },
+      menu: { width: 224, height: 142 },
+      viewport: { width: 1280, height: 800 },
+      preferredSide: "bottom",
+      margin: 8,
+      gap: 4,
+    });
+
+    expect(result.top).toBe(408);
+  });
+
+  test("honors a preferred top side when both sides have room", () => {
+    const result = positionFloatingMenu({
+      trigger: { left: 500, right: 544, top: 360, bottom: 404 },
+      menu: { width: 224, height: 142 },
+      viewport: { width: 1280, height: 800 },
+      preferredSide: "top",
+      margin: 8,
+      gap: 4,
+    });
+
+    expect(result.top).toBe(214);
+  });
+
+  test("flips a bottom menu above when the viewport has too little room below", () => {
+    const result = positionFloatingMenu({
+      trigger: { left: 500, right: 544, top: 700, bottom: 744 },
+      menu: { width: 224, height: 142 },
+      viewport: { width: 1280, height: 800 },
+      preferredSide: "bottom",
+      margin: 8,
+      gap: 4,
+    });
+
+    expect(result.top).toBe(554);
+    expect(result.maxHeight).toBe(688);
+  });
 });
