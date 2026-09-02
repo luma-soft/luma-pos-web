@@ -76,6 +76,35 @@ describe("camera quote copy and price controls", () => {
     );
   });
 
+  test("uses the full desktop price cell as the edit control", () => {
+    const html = renderToStaticMarkup(
+      <CameraPriceListClient
+        models={[model]}
+        memoryLabels={["Thẻ nhớ 32GB", "Thẻ nhớ 64GB"]}
+        canEdit
+        brandName="EZVIZ"
+      />,
+    );
+    const desktopTableStart = html.indexOf(
+      'data-testid="camera-price-list-row"',
+    );
+    const desktopTableEnd = html.indexOf("</table>", desktopTableStart);
+    const desktopTable = html.slice(desktopTableStart, desktopTableEnd);
+    const editablePriceCells =
+      desktopTable.match(
+        /<button[^>]*data-testid="camera-price-edit-cell"[^>]*>.*?<\/button>/g,
+      ) ?? [];
+
+    expect(editablePriceCells).toHaveLength(2);
+    expect(desktopTable).toContain(
+      'aria-label="Sửa giá EZVIZ C6N G1 2K 3MP · Thẻ nhớ 32GB"',
+    );
+    expect(desktopTable).toContain(
+      'aria-label="Sửa giá EZVIZ C6N G1 2K 3MP · Thẻ nhớ 64GB"',
+    );
+    expect(editablePriceCells.every((cell) => !cell.includes("<svg"))).toBe(true);
+  });
+
   test("renders one accessible three-mode copy trigger on every camera surface", () => {
     const html = renderToStaticMarkup(
       <CameraPriceListClient

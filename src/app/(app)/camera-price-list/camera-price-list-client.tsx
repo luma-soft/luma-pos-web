@@ -681,23 +681,27 @@ export function CameraPriceListClient({
                     return (
                       <td
                         key={label}
-                        className="border border-slate-300 px-3 py-3 text-right font-extrabold text-[#14344d]"
+                        className="border border-slate-300 p-0 text-[#14344d]"
                       >
-                        {variant && <>
-                          <span>{formatCurrency(variant.price)}</span>
-                          {canEdit && (
+                        {variant &&
+                          (canEdit ? (
                             <button
+                              type="button"
+                              data-testid="camera-price-edit-cell"
                               onClick={(event) => {
                                 event.stopPropagation();
                                 openPriceEditor(item, variant, label, "price");
                               }}
-                              className="ml-2 align-middle text-slate-400 hover:text-[#0b7b74] min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
-                              aria-label={`Sửa giá ${item.model}`}
+                              className="block h-16 w-full px-3 py-3 text-right font-extrabold transition hover:bg-teal-100/70 focus-visible:outline-2 focus-visible:outline-[#0b7b74]"
+                              aria-label={`Sửa giá ${item.model} · ${label}`}
                             >
-                              <Edit3 className="inline h-3.5 w-3.5" />
+                              {formatCurrency(variant.price)}
                             </button>
-                          )}
-                        </>}
+                          ) : (
+                            <span className="block px-3 py-3 text-right font-extrabold">
+                              {formatCurrency(variant.price)}
+                            </span>
+                          ))}
                       </td>
                     );
                   })}
