@@ -125,7 +125,7 @@ export const mediaObjects = pgTable("media_objects", {
   storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id, { onDelete: "cascade" }),
   provider: text("provider").$type<MediaProvider>().notNull().default("r2"),
   visibility: text("visibility").$type<MediaVisibility>().notNull(),
-  purpose: text("purpose").$type<"product-image" | "project-document" | "service-evidence" | "ai-attachment">().notNull(),
+  purpose: text("purpose").$type<"product-image" | "project-document" | "service-evidence" | "ai-attachment" | "library-asset">().notNull(),
   targetId: uuid("target_id").notNull(),
   domain: text("domain").notNull(),
   bucket: text("bucket").notNull(),
@@ -156,7 +156,7 @@ export const mediaObjects = pgTable("media_objects", {
 }, (t) => [
   check("media_objects_provider_check", sql`${t.provider} in ('r2', 'supabase')`),
   check("media_objects_visibility_check", sql`${t.visibility} in ('public', 'private')`),
-  check("media_objects_purpose_check", sql`${t.purpose} in ('product-image', 'project-document', 'service-evidence', 'ai-attachment')`),
+  check("media_objects_purpose_check", sql`${t.purpose} in ('product-image', 'project-document', 'service-evidence', 'ai-attachment', 'library-asset')`),
   check("media_objects_status_check", sql`${t.status} in ('pending', 'ready', 'quarantined', 'deleted')`),
   check("media_objects_size_check", sql`${t.sizeBytes} > 0`),
   check("media_objects_cleanup_claim_check", sql`(${t.cleanupClaimedAt} is null) = (${t.cleanupClaimToken} is null)`),
@@ -174,6 +174,40 @@ export const mediaObjects = pgTable("media_objects", {
     columns: [t.storeId, t.createdBy],
     foreignColumns: [profiles.storeId, profiles.id],
     name: "media_objects_created_by_tenant_fk",
+  }).onDelete("no action"),
+]);
+
+export const mediaLibraryItems = pgTable("media_library_items", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id, { onDelete: "cascade" }),
+  mediaObjectId: uuid("media_object_id").notNull(),
+  album: text("album").notNull().default("Chưa phân loại"),
+  title: text("title").notNull(),
+  note: text("note"),
+  tags: text("tags").array().notNull().default(sql`ARRAY[]::text[]`),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+}, (t) => [
+  check("media_library_items_album_check", sql`char_length(btrim(${t.album})) between 1 and 80`),
+  check("media_library_items_title_check", sql`char_length(btrim(${t.title})) between 1 and 160`),
+  check("media_library_items_note_check", sql`${t.note} is null or char_length(${t.note}) <= 500`),
+  check("media_library_items_tags_check", sql`cardinality(${t.tags}) <= 12`),
+  unique("media_library_items_media_unique").on(t.storeId, t.mediaObjectId),
+  index("media_library_items_store_album_created_idx")
+    .on(t.storeId, t.album, t.createdAt)
+    .where(sql`${t.deletedAt} is null`),
+  index("media_library_items_store_media_idx").on(t.storeId, t.mediaObjectId),
+  foreignKey({
+    columns: [t.storeId, t.mediaObjectId],
+    foreignColumns: [mediaObjects.storeId, mediaObjects.id],
+    name: "media_library_items_media_tenant_fk",
+  }).onDelete("no action"),
+  foreignKey({
+    columns: [t.storeId, t.createdBy],
+    foreignColumns: [profiles.storeId, profiles.id],
+    name: "media_library_items_created_by_tenant_fk",
   }).onDelete("no action"),
 ]);
 
@@ -2818,6 +2852,18 @@ export const mediaObjectsRelations = relations(mediaObjects, ({ one, many }) => 
   products: many(productMedia),
   handoverDocuments: many(serviceHandoverDocumentMedia),
   migrationItems: many(mediaMigrationItems),
+  libraryItems: many(mediaLibraryItems),
+}));
+
+export const mediaLibraryItemsRelations = relations(mediaLibraryItems, ({ one }) => ({
+  mediaObject: one(mediaObjects, {
+    fields: [mediaLibraryItems.mediaObjectId],
+    references: [mediaObjects.id],
+  }),
+  creator: one(profiles, {
+    fields: [mediaLibraryItems.createdBy],
+    references: [profiles.id],
+  }),
 }));
 
 export const productMediaRelations = relations(productMedia, ({ one }) => ({

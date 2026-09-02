@@ -70,6 +70,7 @@
     "delivery": "Giao hàng",
     "projects": "Công trình",
     "services": "Thi công & Dịch vụ",
+    "library": "Thư viện mẫu",
     "promotions": "Khuyến mãi",
     "einvoices": "HĐ điện tử",
     "groups": {
@@ -100,6 +101,55 @@
     "mobileInventory": "Kho",
     "mobileOrders": "Đơn",
     "returns": "Trả hàng"
+  },
+  "mediaLibrary": {
+    "title": "Thư viện mẫu",
+    "subtitle": "Ảnh, video sản phẩm và file báo giá dùng chung cho cả cửa hàng",
+    "upload": "Tải tệp lên",
+    "uploadTitle": "Thêm vào thư viện",
+    "uploadHint": "Ảnh tối đa 25 MB, tài liệu 100 MB, video 512 MB mỗi tệp.",
+    "chooseFiles": "Chọn ảnh, video hoặc tài liệu",
+    "chooseFilesHint": "Có thể chọn nhiều tệp cùng lúc",
+    "selectedFiles": "Đã chọn {count} tệp",
+    "album": "Album / nhóm mẫu",
+    "albumPlaceholder": "Ví dụ: Đèn thả phòng khách",
+    "albumAll": "Tất cả album",
+    "existingAlbums": "Album đang có",
+    "note": "Ghi chú chung",
+    "notePlaceholder": "Thông tin mẫu, hãng, giá tham khảo...",
+    "tags": "Nhãn",
+    "tagsPlaceholder": "đèn, phòng khách, 2026 (ngăn cách bằng dấu phẩy)",
+    "searchPlaceholder": "Tìm tên mẫu, album, nhãn...",
+    "typeAll": "Mọi loại tệp",
+    "types": {
+      "image": "Hình ảnh",
+      "video": "Video",
+      "document": "Tài liệu"
+    },
+    "itemsCount": "{count} tệp",
+    "emptyTitle": "Chưa có tệp phù hợp",
+    "emptyDescription": "Tải ảnh mẫu, video sản phẩm hoặc file báo giá đầu tiên lên thư viện.",
+    "usageLibrary": "Dung lượng thư viện",
+    "usageTotal": "Toàn bộ media Luma",
+    "usageObjects": "{count} tệp đã lưu",
+    "unlimitedHint": "Không đặt trần tổng dung lượng",
+    "privateHint": "Lưu riêng tư trên R2; liên kết xem tự hết hạn",
+    "open": "Mở tệp",
+    "download": "Tải xuống",
+    "createdBy": "Thêm bởi {name}",
+    "unknownCreator": "nhân viên",
+    "deleteTitle": "Xóa tệp khỏi thư viện?",
+    "deleteDescription": "Tệp “{title}” và dữ liệu lưu trữ tương ứng sẽ được xóa. Thao tác này không thể hoàn tác.",
+    "uploading": "Đang tải {current}/{total}: {name}",
+    "uploaded": "Đã tải lên {count} tệp.",
+    "partialUpload": "Đã tải {success} tệp; {failed} tệp bị lỗi. Có thể thử lại các tệp còn lại.",
+    "invalidFile": "{name}: định dạng không được hỗ trợ hoặc vượt giới hạn dung lượng.",
+    "removeSelection": "Bỏ tệp {name}",
+    "errors": {
+      "load": "Không thể tải lại thư viện.",
+      "upload": "Không thể tải tệp lên. Hãy thử lại.",
+      "delete": "Không thể xóa tệp. Hãy thử lại."
+    }
   },
   "notifications": {
     "title": "Thông báo",
@@ -263,6 +313,7 @@
       "customersHint": "Hồ sơ, công nợ và lịch sử mua",
       "suppliersHint": "Nhà cung cấp, công nợ và lịch sử nhập",
       "projectsHint": "Công trình, báo giá và tiến độ",
+      "libraryHint": "Ảnh, video mẫu và file báo giá dùng chung",
       "productsHint": "Danh mục hàng hóa và dịch vụ",
       "categoriesHint": "Nhóm sản phẩm và cấu trúc danh mục",
       "purchasesHint": "Phiếu nhập và lịch sử nhập hàng",
@@ -2839,6 +2890,8 @@
     "empty": "Chưa có công trình nào",
     "emptyHint": "Tạo công trình để gắn vào đơn khi bán ở POS.",
     "editTitle": "Sửa công trình",
+    "deleteTitle": "Xóa công trình?",
+    "deleteConfirm": "Công trình “{name}” sẽ bị xóa vĩnh viễn cùng toàn bộ ảnh, tài liệu, lệnh việc và dữ liệu dịch vụ liên quan. Đơn hàng và hóa đơn vẫn được giữ lại nhưng không còn liên kết với công trình này.",
     "viewDetail": "Xem chi tiết",
     "relatedOrders": "Đơn / báo giá liên quan",
     "cols": {
@@ -2852,7 +2905,10 @@
     },
     "noCustomer": "— Không gắn khách —",
     "markDone": "Hoàn tất",
-    "reopen": "Mở lại"
+    "reopen": "Mở lại",
+    "errors": {
+      "deleteConflict": "Không thể xóa vì một hoặc nhiều tệp vẫn đang được dùng ở nơi khác."
+    }
   },
   "services": {
     "title": "Thi công & Dịch vụ",

@@ -22,6 +22,10 @@ const MEDIA_A_2 = "00000000-0000-4000-8000-000000000072";
 const MEDIA_A_3 = "00000000-0000-4000-8000-000000000073";
 const MEDIA_B = "00000000-0000-4000-8000-000000000074";
 const MEDIA_DELETE_CREATOR = "00000000-0000-4000-8000-000000000075";
+const LIBRARY_MEDIA_A = "00000000-0000-4000-8000-000000000076";
+const LIBRARY_MEDIA_B = "00000000-0000-4000-8000-000000000077";
+const LIBRARY_ITEM_A = "00000000-0000-4000-8000-000000000078";
+const LIBRARY_ITEM_B = "00000000-0000-4000-8000-000000000079";
 const RUN_A = "00000000-0000-4000-8000-000000000081";
 const RUN_B = "00000000-0000-4000-8000-000000000082";
 const RUN_DELETE_CREATOR = "00000000-0000-4000-8000-000000000083";
@@ -32,6 +36,7 @@ const mediaTables = [
   "service_handover_document_media",
   "media_migration_runs",
   "media_migration_items",
+  "media_library_items",
 ];
 
 async function applySqlFile(path) {
@@ -79,6 +84,16 @@ function mediaValues(id, storeId, suffix, createdBy = null) {
     'projects', 'private-media',
     'stores/${storeId}/projects/2026/08/${id}/original.pdf',
     '${suffix}.pdf', 'application/pdf', 1024, 'ready', ${creator}, now(), now() + interval '10 minutes'
+  )`;
+}
+
+function libraryMediaValues(id, storeId, suffix, createdBy = null) {
+  const creator = createdBy ? `'${createdBy}'` : "null";
+  return `(
+    '${id}', '${storeId}', 'r2', 'private', 'library-asset', '${storeId}',
+    'library', 'private-media',
+    'stores/${storeId}/library/2026/09/${id}/original.jpg',
+    '${suffix}.jpg', 'image/jpeg', 1024, 'ready', ${creator}, now(), now() + interval '10 minutes'
   )`;
 }
 
@@ -151,7 +166,14 @@ beforeAll(async () => {
       ${mediaValues(MEDIA_A_2, STORE_A, "media-a-2")},
       ${mediaValues(MEDIA_A_3, STORE_A, "media-a-3")},
       ${mediaValues(MEDIA_B, STORE_B, "media-b", PROFILE_B)},
-      ${mediaValues(MEDIA_DELETE_CREATOR, STORE_A, "creator-delete", PROFILE_DELETE)};
+      ${mediaValues(MEDIA_DELETE_CREATOR, STORE_A, "creator-delete", PROFILE_DELETE)},
+      ${libraryMediaValues(LIBRARY_MEDIA_A, STORE_A, "library-a", PROFILE_A)},
+      ${libraryMediaValues(LIBRARY_MEDIA_B, STORE_B, "library-b", PROFILE_B)};
+
+    insert into media_library_items (id, store_id, media_object_id, album, title, created_by)
+    values
+      ('${LIBRARY_ITEM_A}', '${STORE_A}', '${LIBRARY_MEDIA_A}', 'Đèn trang trí', 'Đèn A', '${PROFILE_A}'),
+      ('${LIBRARY_ITEM_B}', '${STORE_B}', '${LIBRARY_MEDIA_B}', 'Thiết bị vệ sinh', 'Thiết bị B', '${PROFILE_B}');
 
     insert into media_migration_runs (id, store_id, status, created_by)
     values
@@ -205,6 +227,8 @@ describe("media schema executable tenant security", () => {
     const activeRows = await authenticatedQuery(PROFILE_A, "select id, store_id from media_objects order by id");
     expect(activeRows.rows.length).toBeGreaterThan(0);
     expect(activeRows.rows.every((row) => row.store_id === STORE_A)).toBe(true);
+    const libraryRows = await authenticatedQuery(PROFILE_A, "select id, store_id from media_library_items order by id");
+    expect(libraryRows.rows).toEqual([{ id: LIBRARY_ITEM_A, store_id: STORE_A }]);
 
     await database.exec(`update stores set status = 'suspended' where id = '${STORE_B}'`);
     const inactiveRows = await authenticatedQuery(PROFILE_B, "select id from media_objects");
@@ -263,6 +287,8 @@ describe("media schema executable tenant security", () => {
       `insert into media_migration_items (
         store_id, run_id, source_provider, source_bucket, source_key, media_object_id
       ) values ('${STORE_A}', '${RUN_A}', 'supabase', 'legacy', 'cross-media', '${MEDIA_B}')`,
+      `insert into media_library_items (store_id, media_object_id, album, title)
+       values ('${STORE_A}', '${LIBRARY_MEDIA_B}', 'Cross', 'Cross-store media')`,
     ];
     for (const statement of crossStoreStatements) {
       await expect(database.exec(statement)).rejects.toThrow();
@@ -310,6 +336,7 @@ describe("media schema executable tenant security", () => {
       "product_media_store_media_object_idx",
       "service_handover_document_media_store_media_object_idx",
       "media_migration_items_store_media_object_idx",
+      "media_library_items_store_media_idx",
     ];
     const indexes = await database.query(`
       select indexname, indexdef

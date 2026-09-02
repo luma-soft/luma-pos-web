@@ -5,6 +5,7 @@ import {
   aiChatMessages,
   brands,
   mediaMigrationItems,
+  mediaLibraryItems,
   mediaObjects,
   productMedia,
   serviceAttachments,
@@ -87,6 +88,11 @@ export async function getLiveMediaReferenceStateInTransaction(
       eq(mediaMigrationItems.storeId, input.storeId),
       eq(mediaMigrationItems.mediaObjectId, input.mediaId),
       ne(mediaMigrationItems.status, "rolled_back"),
+    )).limit(1),
+    transaction.select({ id: mediaLibraryItems.id }).from(mediaLibraryItems).where(and(
+      eq(mediaLibraryItems.storeId, input.storeId),
+      eq(mediaLibraryItems.mediaObjectId, input.mediaId),
+      isNull(mediaLibraryItems.deletedAt),
     )).limit(1),
     transaction.select({ id: serviceSignatures.id })
       .from(serviceSignatures)

@@ -1,5 +1,9 @@
 import { z } from "zod";
 import { canonicalUuidCoordinateSchema } from "@/lib/media/uuid-coordinate";
+import {
+  LIBRARY_VIDEO_MAX_BYTES,
+  mediaLibraryMaxBytesForMime,
+} from "@/lib/media/library-schema";
 
 export const MEDIA_PURPOSES = {
   "product-image": {
@@ -26,6 +30,12 @@ export const MEDIA_PURPOSES = {
     maxBytes: 15 * 1024 * 1024,
     mime: /^(image\/|application\/pdf$|text\/)/,
   },
+  "library-asset": {
+    domain: "library",
+    visibility: "private",
+    maxBytes: LIBRARY_VIDEO_MAX_BYTES,
+    mime: /^(image\/|video\/|application\/|text\/)/,
+  },
 } as const;
 
 export type MediaPurpose = keyof typeof MEDIA_PURPOSES;
@@ -47,6 +57,10 @@ const MIME_EXTENSIONS = {
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
   "text/csv": "csv",
   "text/plain": "txt",
+  "video/mp4": "mp4",
+  "video/quicktime": "mov",
+  "video/webm": "webm",
+  "video/x-m4v": "m4v",
 } as const;
 
 export type ManagedMediaMimeType = keyof typeof MIME_EXTENSIONS;
@@ -65,6 +79,7 @@ const baseUploadIntentSchema = z.object({
     "project-document",
     "service-evidence",
     "ai-attachment",
+    "library-asset",
   ]),
   targetId: canonicalUuidCoordinateSchema,
   fileName: z.string()
@@ -100,6 +115,25 @@ export const uploadIntentSchema = baseUploadIntentSchema.superRefine((input, con
       path: ["sizeBytes"],
       message: "Media exceeds the purpose limit",
     });
+  }
+  if (input.purpose === "library-asset") {
+    const maxBytes = mediaLibraryMaxBytesForMime(input.mimeType);
+    if (maxBytes === null) {
+      context.addIssue({
+        code: "custom",
+        path: ["mimeType"],
+        message: "Unsupported library media type",
+      });
+    } else if (input.sizeBytes > maxBytes) {
+      context.addIssue({
+        code: "too_big",
+        origin: "number",
+        maximum: maxBytes,
+        inclusive: true,
+        path: ["sizeBytes"],
+        message: "Library media exceeds its type limit",
+      });
+    }
   }
 });
 

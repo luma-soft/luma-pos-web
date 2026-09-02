@@ -96,6 +96,12 @@ export function createMediaTargetAuthorizer(
           ? "allowed"
           : "not_found";
       }
+      case "library-asset": {
+        if (!uuidCoordinatesEqual(targetId, actor.storeId)) return "not_found";
+        return actor.role === "owner" || actor.role === "manager"
+          ? "allowed"
+          : "forbidden";
+      }
     }
   };
 }

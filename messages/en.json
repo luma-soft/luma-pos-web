@@ -70,6 +70,7 @@
     "delivery": "Delivery",
     "projects": "Projects",
     "services": "Projects & Services",
+    "library": "Media library",
     "promotions": "Promotions",
     "einvoices": "E-invoices",
     "groups": {
@@ -100,6 +101,55 @@
     "mobileInventory": "Inventory",
     "mobileOrders": "Orders",
     "returns": "Returns"
+  },
+  "mediaLibrary": {
+    "title": "Media library",
+    "subtitle": "Shared product photos, videos, and quotation files for the whole store",
+    "upload": "Upload files",
+    "uploadTitle": "Add to library",
+    "uploadHint": "Up to 25 MB per image, 100 MB per document, and 512 MB per video.",
+    "chooseFiles": "Choose photos, videos, or documents",
+    "chooseFilesHint": "You can select multiple files at once",
+    "selectedFiles": "{count} files selected",
+    "album": "Album / sample group",
+    "albumPlaceholder": "For example: Living room pendant lights",
+    "albumAll": "All albums",
+    "existingAlbums": "Existing albums",
+    "note": "Shared note",
+    "notePlaceholder": "Model details, brand, reference price...",
+    "tags": "Tags",
+    "tagsPlaceholder": "lighting, living room, 2026 (comma separated)",
+    "searchPlaceholder": "Search name, album, or tag...",
+    "typeAll": "All file types",
+    "types": {
+      "image": "Images",
+      "video": "Videos",
+      "document": "Documents"
+    },
+    "itemsCount": "{count} files",
+    "emptyTitle": "No matching files",
+    "emptyDescription": "Upload the first sample photo, product video, or quotation file.",
+    "usageLibrary": "Library storage",
+    "usageTotal": "All Luma media",
+    "usageObjects": "{count} stored files",
+    "unlimitedHint": "No total app storage cap",
+    "privateHint": "Private R2 storage with expiring view links",
+    "open": "Open file",
+    "download": "Download",
+    "createdBy": "Added by {name}",
+    "unknownCreator": "a team member",
+    "deleteTitle": "Remove this file from the library?",
+    "deleteDescription": "“{title}” and its stored object will be deleted. This cannot be undone.",
+    "uploading": "Uploading {current}/{total}: {name}",
+    "uploaded": "Uploaded {count} files.",
+    "partialUpload": "Uploaded {success} files; {failed} failed. You can retry the remaining files.",
+    "invalidFile": "{name}: unsupported format or file exceeds its size limit.",
+    "removeSelection": "Remove {name}",
+    "errors": {
+      "load": "Could not refresh the library.",
+      "upload": "Could not upload this file. Please try again.",
+      "delete": "Could not delete this file. Please try again."
+    }
   },
   "notifications": {
     "title": "Notifications",
@@ -263,6 +313,7 @@
       "customersHint": "Profiles, debt, and purchase history",
       "suppliersHint": "Suppliers, payables, and purchase history",
       "projectsHint": "Projects, quotes, and progress",
+      "libraryHint": "Shared sample photos, videos, and quotation files",
       "productsHint": "Goods and service catalog",
       "categoriesHint": "Product groups and category structure",
       "purchasesHint": "Purchase receipts and receiving history",
@@ -2839,6 +2890,8 @@
     "empty": "No projects yet",
     "emptyHint": "Create projects to attach to POS sales.",
     "editTitle": "Edit project",
+    "deleteTitle": "Delete project?",
+    "deleteConfirm": "The project “{name}” will be permanently deleted together with all related photos, documents, work orders, and service data. Orders and invoices will be kept but will no longer be linked to this project.",
     "viewDetail": "View detail",
     "relatedOrders": "Related orders / quotes",
     "cols": {
@@ -2852,7 +2905,10 @@
     },
     "noCustomer": "— No customer —",
     "markDone": "Mark done",
-    "reopen": "Reopen"
+    "reopen": "Reopen",
+    "errors": {
+      "deleteConflict": "This project cannot be deleted because one or more files are still used elsewhere."
+    }
   },
   "services": {
     "title": "Projects & Services",

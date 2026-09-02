@@ -11,6 +11,7 @@ import {
   Camera,
   Cpu,
   Lightbulb,
+  Images,
   Wrench,
 } from "lucide-react";
 import { Routes } from "@/lib/routes";
@@ -46,6 +47,7 @@ const GROUPS: Group[] = [
       { href: Routes.Inventory, icon: Warehouse, key: "nav.groups.inventory" },
       { href: Routes.Partners, icon: Users, key: "nav.groups.partners" },
       { href: Routes.Services, icon: Wrench, key: "nav.services" },
+      { href: Routes.Library, icon: Images, key: "nav.library" },
       { href: Routes.CameraQuote, icon: Camera, key: "mobile.more.cameraQuote", newTab: true },
       { href: Routes.HunonicPriceList, icon: Cpu, key: "mobile.more.hunonicPriceList", newTab: true },
       { href: Routes.RangDongSmartPriceList, icon: Lightbulb, key: "mobile.more.rangDongPriceList", newTab: true },
