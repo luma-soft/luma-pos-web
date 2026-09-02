@@ -122,13 +122,33 @@ describe("ProjectMediaPanel", () => {
     );
 
     expect(html).toContain("Thêm ảnh hoặc tệp");
-    expect(html).toContain("Nghiệm thu");
-    expect(html).toContain("nghiem-thu-tang-1.pdf");
-    expect(html).toContain('aria-label="Mở nghiem-thu-tang-1.pdf"');
-    expect(html).toContain('aria-label="Tải xuống nghiem-thu-tang-1.pdf"');
-    expect(html).toContain("lucide-file-text");
+    expect(html).toContain('role="tablist"');
+    expect(html).toContain('role="tabpanel" aria-label="Ảnh"');
+    expect(html).toContain("Tài liệu");
+    expect(html).not.toContain("nghiem-thu-tang-1.pdf");
+    expect(html).toContain('aria-label="Mở khao-sat.jpg"');
+    expect(html).toContain('aria-label="Tải xuống khao-sat.jpg"');
+    expect(html).toContain("grid-cols-2");
     expect(html).toContain('alt="khao-sat.jpg"');
     expect(html).not.toMatch(/<select|<datalist|role="combobox"/);
+  });
+
+  test("separates media by MIME type and renders a document grid with its actions", async () => {
+    const media = await loadMediaModule();
+    expect(media?.filterProjectMediaKind).toBeFunction();
+    if (!media) return;
+    expect(media.filterProjectMediaKind(FILES, "photos").map((item) => item.id)).toEqual(["attachment-survey"]);
+    const documents = media.filterProjectMediaKind(FILES, "documents");
+    expect(documents.map((item) => item.id)).toEqual(["attachment-acceptance"]);
+    expect(media.filterProjectMediaKind([{ ...FILES[1], mimeType: "IMAGE/HEIC" }], "photos")).toHaveLength(1);
+    const html = renderWithMessages(<media.ProjectMediaListView state="ready" items={documents} kind="documents" />);
+    expect(html).toContain('data-testid="project-media-grid"');
+    expect(html).toContain('aria-label="Mở nghiem-thu-tang-1.pdf"');
+    expect(html).toContain('aria-label="Tải xuống nghiem-thu-tang-1.pdf"');
+    expect(html).toContain('aria-label="Xóa nghiem-thu-tang-1.pdf"');
+    expect(html).toContain("lucide-file-text");
+    expect(html).not.toContain("khao-sat.jpg");
+    expect(renderWithMessages(<media.ProjectMediaListView state="ready" items={[]} kind="documents" />)).toContain("Chưa có tài liệu");
   });
 
   test("renders grammatical English singular counts", async () => {
@@ -565,7 +585,9 @@ describe("redesigned project dossier integration", () => {
     expect(aftercare).toContain("1 tệp đính kèm");
     expect(finance).toContain('data-project-media-phases="all"');
     expect(finance).toContain('data-project-media-upload-signal="disabled"');
-    expect(finance).toContain("nghiem-thu-tang-1.pdf");
+    expect(finance).toContain('role="tabpanel" aria-label="Ảnh"');
+    expect(finance).toContain("Tài liệu");
+    expect(finance).toContain("khao-sat.jpg");
   });
 });
 

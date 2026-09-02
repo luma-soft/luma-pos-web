@@ -36,7 +36,14 @@ import { RowPreviewModal } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/label";
+import { SegmentedTabs } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { ProjectImageViewport } from "./project-image-viewport";
+
+export type ProjectMediaKind = "photos" | "documents";
+export function filterProjectMediaKind(items: readonly ProjectMediaItem[], kind: ProjectMediaKind) {
+  return items.filter((item) => item.mimeType.toLowerCase().startsWith("image/") === (kind === "photos"));
+}
 
 export const PROJECT_MEDIA_PHASES = [
   ["survey", "Khảo sát"],
@@ -704,6 +711,7 @@ export function ProjectMediaListView({
   onDownload,
   onDelete,
   busyIds,
+  kind,
 }: {
   state: ProjectMediaListState;
   items: readonly ProjectMediaItem[];
@@ -713,15 +721,16 @@ export function ProjectMediaListView({
   onDownload?: (item: ProjectMediaItem) => void;
   onDelete?: (item: ProjectMediaItem) => void;
   busyIds?: ReadonlySet<string>;
+  kind?: ProjectMediaKind;
 }) {
   const t = useTranslations("projectMedia");
   const locale = useLocale();
 
   if (state === "loading") {
     return (
-      <div role="status" aria-busy="true" aria-label={t("loadingLabel")} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div role="status" aria-busy="true" aria-label={t("loadingLabel")} className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
         {[0, 1, 2].map((index) => (
-          <div key={index} className="h-40 animate-pulse rounded-xl border border-border-soft bg-surface-2" />
+          <div key={index} className="aspect-square animate-pulse rounded-xl border border-border-soft bg-surface-2" />
         ))}
       </div>
     );
@@ -737,47 +746,50 @@ export function ProjectMediaListView({
   if (items.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center">
-        <ImageIcon aria-hidden="true" className="mx-auto h-7 w-7 text-slate-400" />
-        <p className="mt-3 text-sm text-slate-500">{t("empty")}</p>
+        {kind === "documents" ? <FileText aria-hidden="true" className="mx-auto h-7 w-7 text-slate-400" /> : <ImageIcon aria-hidden="true" className="mx-auto h-7 w-7 text-slate-400" />}
+        <p className="mt-3 text-sm text-slate-500">{t(kind ? kind === "photos" ? "emptyPhotos" : "emptyDocuments" : "empty")}</p>
       </div>
     );
   }
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    <div data-testid="project-media-grid" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
       {items.map((item) => {
-        const image = item.mimeType.startsWith("image/");
+        const image = item.mimeType.toLowerCase().startsWith("image/");
         const busy = busyIds?.has(item.id) ?? false;
         return (
           <article
             key={item.id}
             data-attachment-id={item.id}
             data-media-id={item.mediaId}
-            className="group overflow-hidden rounded-xl border border-border-soft bg-surface transition-shadow hover:shadow-sm"
+            className="group flex flex-col overflow-hidden rounded-xl border border-border-soft bg-surface transition-shadow hover:shadow-sm"
           >
-            <div className="relative flex h-28 items-center justify-center overflow-hidden bg-surface-2">
+            <button type="button" disabled={busy} onClick={() => onOpen?.(item)}
+              aria-label={t("openFile", { fileName: item.fileName })}
+              className="relative flex aspect-square w-full items-center justify-center overflow-hidden bg-surface-2 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 disabled:opacity-50">
               {image && item.signedUrl ? (
                 <NextImage
                   src={item.signedUrl}
                   alt={item.caption || item.fileName}
                   width={480}
-                  height={224}
+                  height={480}
                   className="h-full w-full object-cover"
                   unoptimized
                 />
               ) : image ? (
                 <ImageIcon aria-hidden="true" className="h-9 w-9 text-slate-400" />
               ) : (
-                <FileText aria-hidden="true" className="h-9 w-9 text-primary-600" />
+                <span className="flex flex-col items-center gap-2 text-primary-600"><FileText aria-hidden="true" className="h-9 w-9" /><span className="text-xs font-semibold">{item.fileName.split(".").pop()?.toUpperCase()}</span></span>
               )}
               <span className="absolute left-2 top-2 rounded-full bg-surface/95 px-2 py-1 text-[11px] font-semibold text-slate-700 shadow-sm">
                 {t(`phases.${item.phase}`)}
               </span>
-            </div>
-            <div className="p-3">
+              {busy && <span role="status" className="absolute inset-0 grid place-items-center bg-surface/60"><LoaderCircle aria-label={t("loadingLabel")} className="h-5 w-5 animate-spin" /></span>}
+            </button>
+            <div className="flex flex-1 flex-col p-3">
               <h3 className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100" title={item.fileName}>{item.fileName}</h3>
               {item.caption && <p className="mt-1 line-clamp-2 text-xs text-slate-500">{item.caption}</p>}
-              <p className="mt-2 text-[11px] text-slate-400">
+              <p className="mt-2 mb-3 text-[11px] text-slate-400">
                 {formatProjectMediaBytes(item.sizeBytes)} · {new Intl.DateTimeFormat(locale, { dateStyle: "short" }).format(new Date(item.createdAt))}
               </p>
               {(item.documentIds?.length ?? 0) > 0 && (
@@ -785,16 +797,7 @@ export function ProjectMediaListView({
                   {t("linkedRecords", { count: item.documentIds?.length ?? 0 })}
                 </p>
               )}
-              <div className="mt-3 flex items-center justify-end gap-1 border-t border-border-soft pt-2">
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => onOpen?.(item)}
-                  aria-label={t("openFile", { fileName: item.fileName })}
-                  className="grid h-11 w-11 place-items-center rounded-lg text-slate-500 hover:bg-surface-2 hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:opacity-50 lg:h-9 lg:w-9"
-                >
-                  {busy ? <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" /> : <ImageIcon aria-hidden="true" className="h-4 w-4" />}
-                </button>
+              <div className="mt-auto flex items-center justify-end gap-1 border-t border-border-soft pt-2">
                 <button
                   type="button"
                   disabled={busy}
@@ -907,6 +910,9 @@ function ProjectMediaPanelBody({
   const [listState, setListState] = useState<ProjectMediaListState>(initialItems ? "ready" : "loading");
   const [listError, setListError] = useState("");
   const [selectedPhase, setSelectedPhase] = useState<string>("all");
+  const [selectedKind, setSelectedKind] = useState<ProjectMediaKind>("photos");
+  const [imagePreview, setImagePreview] = useState<ProjectMediaItem | null>(null);
+  const [imagePreviewRevision, setImagePreviewRevision] = useState(0);
   const [busyIds, setBusyIds] = useState<Set<string>>(() => new Set());
   const [uploaderOpen, setUploaderOpen] = useState(false);
   const [uploaderPhase, setUploaderPhase] = useState<ProjectMediaPhase>(phaseFilter?.[0] ?? "survey");
@@ -920,6 +926,7 @@ function ProjectMediaPanelBody({
   const panelRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const uploaderFocusRootRef = useRef<HTMLDivElement>(null);
+  const imageFocusRootRef = useRef<HTMLDivElement>(null);
   const [localRequestCoordinator] = useState<ProjectMediaRequestCoordinator>(() => ({
       mutationRevision: { current: 0 },
       requestSequence: { current: 0 },
@@ -1013,12 +1020,13 @@ function ProjectMediaPanelBody({
   }, [openUploadSignal?.sequence]);
 
   useEffect(() => {
-    if (!uploaderOpen) return;
+    if (!uploaderOpen && !imagePreview) return;
     const previouslyFocused = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null;
     const restoreParentDialog = suspendParentProjectMediaDialog(panelRef.current);
-    const childDialog = uploaderFocusRootRef.current?.closest('[role="dialog"][aria-modal="true"]');
+    const focusRoot = imagePreview ? imageFocusRootRef.current : uploaderFocusRootRef.current;
+    const childDialog = focusRoot?.closest('[role="dialog"][aria-modal="true"]');
 
     function focusableElements() {
       if (!childDialog) return [];
@@ -1026,10 +1034,16 @@ function ProjectMediaPanelBody({
         .filter((element) => element.getClientRects().length > 0);
     }
 
-    const initialTarget = focusableElements()[0] ?? uploaderFocusRootRef.current;
+    const initialTarget = focusableElements()[0] ?? focusRoot;
     initialTarget?.focus();
 
     function trapFocus(event: KeyboardEvent) {
+      if (event.key === "Escape" && imagePreview) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        setImagePreview(null);
+        return;
+      }
       if (event.key !== "Tab") return;
       const target = projectMediaModalFocusTarget(
         focusableElements(),
@@ -1047,7 +1061,7 @@ function ProjectMediaPanelBody({
       restoreParentDialog();
       if (previouslyFocused?.isConnected) previouslyFocused.focus();
     };
-  }, [uploaderOpen]);
+  }, [uploaderOpen, imagePreview]);
 
   const filterOptions = useMemo(() => {
     const allowed = phaseFilter
@@ -1059,11 +1073,14 @@ function ProjectMediaPanelBody({
     !phaseFilter
     || phaseFilter.includes(option.value as ProjectMediaPhase)
   )), [phaseFilter, phaseOptions]);
-  const visibleItems = filterProjectMediaItems(
+  const phaseItems = filterProjectMediaItems(
     items,
     phaseFilter,
     selectedPhase === "all" ? undefined : selectedPhase as ProjectMediaPhase,
   );
+  const photos = filterProjectMediaKind(phaseItems, "photos");
+  const documents = filterProjectMediaKind(phaseItems, "documents");
+  const visibleItems = selectedKind === "photos" ? photos : documents;
   const failedCount = queue.filter((item) => item.status === "failed").length;
   const retryableFailedCount = retryableProjectMediaUploadCount(queue);
   const queuedCount = queue.filter((item) => item.status === "queued").length;
@@ -1183,13 +1200,17 @@ function ProjectMediaPanelBody({
 
   async function openFresh(item: ProjectMediaItem) {
     setBusyIds((current) => new Set(current).add(item.id));
-    const preview = window.open("about:blank", "_blank");
+    const image = item.mimeType.toLowerCase().startsWith("image/");
+    const preview = image ? null : window.open("about:blank", "_blank");
     if (preview) preview.opener = null;
     try {
       const refreshed = await refreshItems(true);
       const resolved = refreshed?.find((candidate) => candidate.id === item.id);
       if (!resolved?.signedUrl) throw new Error("PROJECT_MEDIA_SIGNED_URL_MISSING");
-      navigateProjectMediaPreview(preview, resolved.signedUrl);
+      if (image) {
+        setImagePreview(resolved);
+        setImagePreviewRevision((revision) => revision + 1);
+      } else navigateProjectMediaPreview(preview, resolved.signedUrl);
     } catch {
       preview?.close();
       setListError(t("openError"));
@@ -1255,7 +1276,7 @@ function ProjectMediaPanelBody({
           </span>
           <div className="min-w-0">
             <h2 id={titleId} className="font-semibold">{t("title")}</h2>
-            <p className="mt-1 text-xs text-slate-500">{t("subtitle", { count: visibleItems.length })}</p>
+            <p className="mt-1 text-xs text-slate-500">{t("subtitle", { count: phaseItems.length })}</p>
           </div>
         </div>
         <Button type="button" size="sm" onClick={() => openUploader()}>
@@ -1264,6 +1285,18 @@ function ProjectMediaPanelBody({
         </Button>
       </header>
       <div className="p-4">
+        <div className="mb-4" onKeyDown={(event) => {
+          if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+          event.preventDefault();
+          const next = event.key === "Home" ? "photos" : event.key === "End" ? "documents" : selectedKind === "photos" ? "documents" : "photos";
+          setSelectedKind(next);
+          event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next === "photos" ? 0 : 1]?.focus();
+        }}>
+          <SegmentedTabs<ProjectMediaKind> items={[
+            { id: "photos", label: t("photos"), count: photos.length },
+            { id: "documents", label: t("documents"), count: documents.length },
+          ]} value={selectedKind} onChange={setSelectedKind} />
+        </div>
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="w-full sm:w-56">
             <ProjectMediaPhasePicker
@@ -1281,18 +1314,32 @@ function ProjectMediaPanelBody({
         {listError && listState === "ready" && (
           <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-er">{listError}</p>
         )}
-        <ProjectMediaListView
-          state={listState}
-          items={visibleItems}
-          error={listError}
-          onRetry={() => void refreshItems()}
-          onOpen={(item) => void openFresh(item)}
-          onDownload={downloadFresh}
-          onDelete={(item) => void removeItem(item)}
-          busyIds={busyIds}
-        />
+        <div role="tabpanel" aria-label={t(selectedKind)} tabIndex={0}>
+          <ProjectMediaListView
+            state={listState}
+            items={visibleItems}
+            error={listError}
+            onRetry={() => void refreshItems()}
+            onOpen={(item) => void openFresh(item)}
+            onDownload={downloadFresh}
+            onDelete={(item) => void removeItem(item)}
+            busyIds={busyIds}
+            kind={selectedKind}
+          />
+        </div>
       </div>
       <p className="sr-only" aria-live="polite" aria-atomic="true">{announcement}</p>
+      {imagePreview?.signedUrl && typeof document !== "undefined" && createPortal(
+        <RowPreviewModal open title={t("previewTitle")} subtitle={<span title={imagePreview.fileName}>{imagePreview.fileName}</span>}
+          closeLabel={t("close")} onClose={() => setImagePreview(null)} size="full" bodyClassName="overflow-hidden p-0 sm:p-0"
+          footer={<div className="flex items-center justify-between gap-3">
+            <p className="min-w-0 truncate text-xs text-slate-500" title={imagePreview.caption ?? undefined}>{imagePreview.caption || t(`phases.${imagePreview.phase}`)} · {formatProjectMediaBytes(imagePreview.sizeBytes)}</p>
+            <Button type="button" variant="ghost" size="sm" aria-label={t("downloadFile", { fileName: imagePreview.fileName })} onClick={() => downloadFresh(imagePreview)}><Download className="h-4 w-4" /></Button>
+          </div>}>
+          <div ref={imageFocusRootRef} className="h-full">
+            <ProjectImageViewport key={imagePreviewRevision} url={imagePreview.signedUrl} fileName={imagePreview.fileName} onRetry={() => void openFresh(imagePreview)} />
+          </div>
+        </RowPreviewModal>, document.body)}
 
       {uploaderOpen && typeof document !== "undefined" && createPortal(<RowPreviewModal
         open={uploaderOpen}

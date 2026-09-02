@@ -2810,6 +2810,15 @@
     }
   },
   "projectMedia": {
+    "photos": "Photos",
+    "documents": "Documents",
+    "emptyPhotos": "No photos in this view.",
+    "emptyDocuments": "No documents in this view.",
+    "previewTitle": "View photo",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fitImage": "Fit to screen",
+    "zoomHint": "Pinch, double tap or scroll to zoom",
     "title": "Project photos & files",
     "subtitle": "{count, plural, one {# photo or file in this view} other {# photos or files in this view}}",
     "add": "Add photos or files",

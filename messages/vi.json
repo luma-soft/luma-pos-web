@@ -2810,6 +2810,15 @@
     }
   },
   "projectMedia": {
+    "photos": "Ảnh",
+    "documents": "Tài liệu",
+    "emptyPhotos": "Chưa có ảnh trong mục này.",
+    "emptyDocuments": "Chưa có tài liệu trong mục này.",
+    "previewTitle": "Xem ảnh",
+    "zoomIn": "Phóng to",
+    "zoomOut": "Thu nhỏ",
+    "fitImage": "Vừa màn hình",
+    "zoomHint": "Chụm hai ngón, chạm đúp hoặc cuộn để phóng to",
     "title": "Ảnh & hồ sơ công trình",
     "subtitle": "{count} ảnh hoặc tệp trong chế độ xem",
     "add": "Thêm ảnh hoặc tệp",
