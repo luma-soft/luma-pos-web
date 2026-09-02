@@ -404,9 +404,44 @@ export function CameraPriceListClient({
         canvasWrap(ctx, value, 804, y + 30, 530, 22);
         y += rowHeight;
       });
+
+    const suitableSectionX = 540;
+    const suitableSectionWidth = 815;
+    y += 30;
+    ctx.font = "17px Arial";
+    const suitableLines = item.suitableFor.flatMap((recommendation) =>
+      canvasLines(ctx, `• ${recommendation}`, suitableSectionWidth - 40),
+    );
+    const suitableSectionHeight = Math.max(
+      76,
+      59 + suitableLines.length * 26,
+    );
+    ctx.fillStyle = "#f0fdfa";
+    ctx.fillRect(
+      suitableSectionX,
+      y,
+      suitableSectionWidth,
+      suitableSectionHeight,
+    );
+    ctx.strokeStyle = "#99f6e4";
+    ctx.strokeRect(
+      suitableSectionX,
+      y,
+      suitableSectionWidth,
+      suitableSectionHeight,
+    );
+    ctx.fillStyle = "#0b7b74";
+    ctx.font = "800 17px Arial";
+    ctx.fillText("PHÙ HỢP CHO", suitableSectionX + 20, y + 31);
+    ctx.fillStyle = "#334155";
+    ctx.font = "17px Arial";
+    suitableLines.forEach((line, lineIndex) => {
+      ctx.fillText(line, suitableSectionX + 20, y + 64 + lineIndex * 26);
+    });
+
     ctx.fillStyle = "#14344d";
     ctx.font = "17px Arial";
-    y += 42;
+    y += suitableSectionHeight + 42;
     const description = item.description;
     const descriptionLines = canvasWrap(ctx, description, 540, y, 790, 24);
     y = Math.max(900, y + descriptionLines * 24 + 42);
@@ -481,8 +516,15 @@ export function CameraPriceListClient({
       contentBottom + 146,
     );
 
+    const outputCanvas = document.createElement("canvas");
+    outputCanvas.width = canvas.width;
+    outputCanvas.height = Math.ceil(contentBottom + 190);
+    const outputContext = outputCanvas.getContext("2d");
+    if (!outputContext) return;
+    outputContext.drawImage(canvas, 0, 0);
+
     await deliverCanvasImage({
-      canvas,
+      canvas: outputCanvas,
       downloadName: `${mode === "price-summary" ? "bao-gia-camera-rut-gon" : "bao-gia-camera-day-du"}-${String(index + 1).padStart(2, "0")}.png`,
       copiedMessage: mode === "price-summary"
         ? `Đã sao chép ảnh giá gói ${item.model}.`
