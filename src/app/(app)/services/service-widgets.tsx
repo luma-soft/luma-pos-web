@@ -1006,7 +1006,7 @@ export function ServiceMaterialEditor({
         }}
         title={t(initial ? "services.materials.edit" : "services.materials.create")}
         closeLabel={t("common.close")}
-        size="lg"
+        size="xl"
         footer={(
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy} tx="common.cancel" />
