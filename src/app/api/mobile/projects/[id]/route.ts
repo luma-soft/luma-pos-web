@@ -1,4 +1,4 @@
-import { updateProject } from "@/lib/actions/extras";
+import { deleteProject, updateProject } from "@/lib/actions/extras";
 import { getProjectDetail } from "@/lib/data/projects";
 import { getServiceFormOptions } from "@/lib/data/services";
 import { requireMobileManager, requireMobileUser } from "@/lib/mobile/auth";
@@ -49,4 +49,16 @@ export async function PATCH(
     return mobileAction({ ok: false, error: "errors.invalidData" });
   }
   return mobileAction(await updateProject({ ...(body as Record<string, unknown>), id } as Parameters<typeof updateProject>[0]));
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const gate = await requireMobileManager();
+  const blocked = mobileGate(gate);
+  if (blocked) return blocked;
+
+  const { id } = await params;
+  return mobileAction(await deleteProject(id));
 }

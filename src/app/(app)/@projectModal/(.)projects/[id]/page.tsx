@@ -31,6 +31,7 @@ export default async function ProjectDetailModalPage({
         detail={detail}
         serviceOptions={serviceOptions}
         presentation="modal"
+        canDelete={["owner", "manager"].includes(context.role)}
       />
     </ProjectDetailDialog>
   );

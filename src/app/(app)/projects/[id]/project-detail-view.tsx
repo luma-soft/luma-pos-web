@@ -29,6 +29,7 @@ import { ProjectServiceTab, ProjectServiceTabs } from "./project-service-tabs";
 import { MobileRecordCard, MobileRecordField } from "@/components/mobile-ui";
 import { DirectPrintButton } from "@/components/print/direct-print-button";
 import { ProjectRedesignedExperience } from "./project-redesigned-experience";
+import { ProjectDeleteButton } from "./project-delete-button";
 
 type ServiceOptions = Awaited<ReturnType<typeof getServiceFormOptions>> | null;
 type Translator = Awaited<ReturnType<typeof getTranslations>>;
@@ -37,12 +38,14 @@ type ProjectDetailViewProps = {
   detail: ProjectDetail;
   serviceOptions: ServiceOptions;
   presentation: "page" | "modal";
+  canDelete?: boolean;
 };
 
 export async function ProjectDetailView({
   detail,
   serviceOptions,
   presentation,
+  canDelete = false,
 }: ProjectDetailViewProps) {
   const t = await getTranslations();
 
@@ -53,6 +56,7 @@ export async function ProjectDetailView({
           project={detail.project}
           serviceOptions={serviceOptions}
           t={t}
+          canDelete={canDelete}
         />
       )}
       {presentation === "modal" && (
@@ -61,6 +65,7 @@ export async function ProjectDetailView({
             project={detail.project}
             serviceOptions={serviceOptions}
             t={t}
+            canDelete={canDelete}
           />
         </div>
       )}
@@ -77,10 +82,12 @@ function ProjectDetailHeader({
   project,
   serviceOptions,
   t,
+  canDelete,
 }: {
   project: ProjectDetail["project"];
   serviceOptions: ServiceOptions;
   t: Translator;
+  canDelete?: boolean;
 }) {
   return (
     <MobileDetailHeader
@@ -94,6 +101,7 @@ function ProjectDetailHeader({
           project={project}
           serviceOptions={serviceOptions}
           t={t}
+          canDelete={canDelete}
         />
       }
     />
@@ -104,10 +112,12 @@ export function ProjectDetailActions({
   project,
   serviceOptions,
   t,
+  canDelete = false,
 }: {
   project: ProjectDetail["project"];
   serviceOptions: ServiceOptions;
   t: Translator;
+  canDelete?: boolean;
 }) {
   return (
     <div
@@ -119,6 +129,12 @@ export function ProjectDetailActions({
           project={project}
           customers={serviceOptions.customerOptions}
           triggerVariant="outline"
+        />
+      )}
+      {canDelete && (
+        <ProjectDeleteButton
+          projectId={project.id}
+          projectName={project.name}
         />
       )}
       {project.serviceType && <Link href={Routes.projectQuote({ projectId: project.id, projectName: project.name, customerId: project.customerId })} className="inline-flex h-11 items-center justify-center rounded-lg bg-primary-600 px-3 text-xs font-medium text-white hover:bg-primary-700 lg:h-8 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0">{t("quotes.createQuote")}</Link>}

@@ -20,6 +20,7 @@ import { isServiceSnapshotJobLocked } from "@/lib/services/field-api";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { evaluateServiceProjectClose } from "@/lib/services/project-close";
 import { writeAuditLog } from "@/lib/audit";
+import { deleteProjectCore } from "@/lib/projects/delete-project";
 
 // ============ Công trình ============
 
@@ -164,6 +165,49 @@ export async function toggleProjectStatus(id: string): Promise<ActionResult> {
     return { ok: true, data: undefined };
   } catch (e) {
     console.error("toggleProjectStatus failed:", e);
+    return { ok: false, error: "errors.serverError" };
+  }
+}
+
+const deleteProjectSchema = z.uuid();
+
+export async function deleteProject(id: string): Promise<ActionResult> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const parsed = deleteProjectSchema.safeParse(id);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+
+  try {
+    const result = await deleteProjectCore(db, {
+      storeId: gate.storeId,
+      projectId: parsed.data,
+      actorId: gate.userId,
+    });
+    if (result.outcome === "not_found") {
+      return { ok: false, error: "errors.notFound" };
+    }
+    if (result.outcome === "conflict") {
+      console.error("deleteProject blocked:", result.reason);
+      return { ok: false, error: "projects.errors.deleteConflict" };
+    }
+
+    await writeAuditLog({
+      actorUserId: gate.userId,
+      source: "manual",
+      action: "project.delete",
+      entityType: "project",
+      entityId: result.projectId,
+      metadata: {
+        managedMediaCount: result.managedMediaCount,
+        legacyObjectCount: result.legacyObjectCount,
+      },
+    });
+    revalidatePath(Routes.Partners);
+    revalidatePath(Routes.Projects);
+    revalidatePath(Routes.Services);
+    return { ok: true, data: undefined };
+  } catch (e) {
+    console.error("deleteProject failed:", e);
     return { ok: false, error: "errors.serverError" };
   }
 }

@@ -23,6 +23,7 @@ export default async function ProjectDetailPage({
       detail={detail}
       serviceOptions={serviceOptions}
       presentation="page"
+      canDelete={["owner", "manager"].includes(context.role)}
     />
   );
 }

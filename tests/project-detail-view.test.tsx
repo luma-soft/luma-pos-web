@@ -244,6 +244,28 @@ describe("ProjectDetailView", () => {
     );
   });
 
+  test("renders the destructive project action only for managers", async () => {
+    const { ProjectDetailActions } = await importProjectDetailView();
+    const renderActions = (canDelete: boolean) => renderToStaticMarkup(
+      <NextIntlClientProvider
+        locale="vi"
+        messages={viMessages}
+        timeZone="Asia/Ho_Chi_Minh"
+      >
+        <ProjectDetailActions
+          project={detail.project}
+          serviceOptions={null}
+          t={createTranslator({ locale: "vi", messages: viMessages })}
+          canDelete={canDelete}
+        />
+      </NextIntlClientProvider>,
+    );
+
+    expect(renderActions(false)).not.toContain("Xóa");
+    expect(renderActions(true)).toContain("Xóa");
+    expect(renderActions(true)).toContain("border-red-200");
+  });
+
   test("renders semantic icons for every redesigned project flow tab", async () => {
     const html = await renderServiceProjectDetail();
 
