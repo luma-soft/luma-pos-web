@@ -85,6 +85,21 @@ export const Routes = {
     if (input.customerId) params.set("customerId", input.customerId);
     return `/pos?${params.toString()}` as const;
   },
+  projectInvoice: (input: {
+    projectId: string;
+    projectName: string;
+    customerId?: string | null;
+    items: Array<{ productId: string; unitName: string; quantity: number }>;
+  }) => {
+    const params = new URLSearchParams({
+      draft: "invoice",
+      projectId: input.projectId,
+      projectName: input.projectName,
+    });
+    if (input.customerId) params.set("customerId", input.customerId);
+    for (const item of input.items) params.append("item", JSON.stringify(item));
+    return `/pos?${params.toString()}` as const;
+  },
 } as const;
 
 export type Route = typeof Routes[keyof typeof Routes];

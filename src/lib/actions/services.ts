@@ -50,6 +50,8 @@ import {
   type ServiceJobCreateInput,
   serviceJobMaterialSchema,
   type ServiceJobMaterialInput,
+  serviceInstallationBatchSchema,
+  type ServiceInstallationBatchInput,
   serviceCostEntrySchema,
   type ServiceCostEntryInput,
   serviceMaterialStockSyncSchema,
@@ -81,6 +83,7 @@ import {
   syncServiceJobPrimaryAssigneeCore,
 } from "@/lib/services/job-assignment";
 import { completeMaintenanceOccurrenceForJobCore } from "@/lib/services/maintenance-lifecycle";
+import { saveServiceInstallationBatchCore } from "@/lib/services/installation-items";
 
 const requireServiceManager = () => requireFeatureRole("field_services", ["owner", "manager"]);
 const requireServiceStockAccess = () => requireFeatureRole("field_services", ["owner", "manager", "warehouse"]);
@@ -484,6 +487,86 @@ export async function saveServiceJobMaterial(
   } catch (error) {
     console.error("saveServiceJobMaterial failed:", error);
     return { ok: false, error: "errors.serverError" };
+  }
+}
+
+export async function saveServiceInstallationBatch(
+  input: ServiceInstallationBatchInput,
+): Promise<ActionResult<{ materialIds: string[]; assetCount: number }>> {
+  const gate = await requireServiceManager();
+  if (!gate.ok) return gate;
+  const parsed = serviceInstallationBatchSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const value = parsed.data;
+
+  if (!await isServiceProject(gate.storeId, value.projectId)) {
+    return { ok: false, error: "services.errors.projectRequired" };
+  }
+  if (!await serviceLinksAreValid(gate.storeId, value.projectId, {
+    jobId: value.jobId,
+    materialOrderId: value.invoiceMode === "link" ? value.materialOrderId : undefined,
+  })) {
+    return { ok: false, error: "services.errors.relationMismatch" };
+  }
+
+  try {
+    const result = await db.transaction((tx) => saveServiceInstallationBatchCore(tx, {
+      ...value,
+      storeId: gate.storeId,
+      createdBy: gate.userId,
+    }));
+    revalidateServiceProject(result.projectId);
+    if (value.stockMode !== "plan") revalidatePath(Routes.Inventory);
+    await auditServiceMutation(
+      gate.userId,
+      "save_service_installation_batch",
+      "service_project",
+      value.projectId,
+      {
+        jobId: value.jobId,
+        itemCount: value.items.length,
+        assetCount: result.assetCount,
+        stockMode: value.stockMode,
+        invoiceMode: value.invoiceMode,
+      },
+    );
+    return {
+      ok: true,
+      data: { materialIds: result.materialIds, assetCount: result.assetCount },
+    };
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "";
+    if (code === "SERVICE_PROJECT_NOT_FOUND") {
+      return { ok: false, error: "services.errors.projectRequired" };
+    }
+    if (code === "SERVICE_RELATION_MISMATCH") {
+      return { ok: false, error: "services.errors.relationMismatch" };
+    }
+    if (code === "SERVICE_PRODUCT_NOT_FOUND") {
+      return { ok: false, error: "errors.notFound" };
+    }
+    if (code === "SERVICE_MUTATION_PAYLOAD_CONFLICT") {
+      return { ok: false, error: "errors.invalidData" };
+    }
+    if (code === "INVALID_SERVICE_MATERIAL_UNIT") {
+      return { ok: false, error: "services.errors.invalidMaterialUnit" };
+    }
+    if (code === "SERVICE_MATERIAL_WAREHOUSE_MISMATCH") {
+      return { ok: false, error: "services.errors.materialWarehouseMismatch" };
+    }
+    if (code === "SERVICE_MATERIAL_RESERVATION_EXCEEDS_PLAN") {
+      return { ok: false, error: "services.errors.reservationExceedsPlan" };
+    }
+    if (code === "INSUFFICIENT_SERVICE_MATERIAL_STOCK" || code === "INSUFFICIENT_BATCH_STOCK") {
+      return { ok: false, error: "services.errors.insufficientMaterialStock" };
+    }
+    console.error("saveServiceInstallationBatch failed:", error);
+    return {
+      ok: false,
+      error: isUniqueViolation(error)
+        ? "services.errors.duplicateSerial"
+        : "errors.serverError",
+    };
   }
 }
 

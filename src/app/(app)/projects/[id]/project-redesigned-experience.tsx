@@ -23,7 +23,6 @@ import { evaluateServiceProjectClose } from "@/lib/services/project-close";
 import type { getServiceFormOptions } from "@/lib/data/services";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import {
-  InstalledAssetQuickCreate,
   ServiceChecklistEditor,
   ServiceCostEditor,
   ServiceHandoverEditor,
@@ -31,10 +30,10 @@ import {
   ServiceJobQuickCreate,
   ServiceJobStatusAction,
   ServiceMaintenanceEditor,
-  ServiceMaterialEditor,
   WarrantyClaimQuickCreate,
   WarrantyClaimStatusAction,
 } from "../../services/service-widgets";
+import { ServiceInstallationBatchCreate } from "../../services/service-installation-batch-create";
 import { ProjectServiceTab, ProjectServiceTabs } from "./project-service-tabs";
 import { CameraAccessPanel } from "./camera-access-panel";
 import { TradeRecordEditor } from "./trade-record-editor";
@@ -78,7 +77,7 @@ export function ProjectRedesignedExperience({
   });
   const tabs = {
     execution: jobs.length,
-    devices: assets.length,
+    installation: assets.length + detail.materials.length,
     aftercare: detail.maintenancePlans.filter((plan) => plan.isActive).length + openClaims.length,
     finance: detail.handoverDocuments.length + detail.costEntries.length,
   };
@@ -94,8 +93,8 @@ export function ProjectRedesignedExperience({
         <ProjectServiceTab id="execution" label="Thi công" icon={<Wrench />} count={tabs.execution}>
           <ExecutionTab detail={detail} serviceOptions={serviceOptions} />
         </ProjectServiceTab>
-        <ProjectServiceTab id="devices" label="Thiết bị" icon={<Camera />} count={tabs.devices}>
-          <DevicesTab detail={detail} cameraAssets={cameraAssets} />
+        <ProjectServiceTab id="installation" label="Vật tư & thiết bị" icon={<PackageCheck />} count={tabs.installation}>
+          <InstallationTab detail={detail} cameraAssets={cameraAssets} serviceOptions={serviceOptions} />
         </ProjectServiceTab>
         <ProjectServiceTab id="aftercare" label="Sau lắp đặt" icon={<ClipboardCheck />} count={tabs.aftercare}>
           <AftercareTab detail={detail} serviceOptions={serviceOptions} />
@@ -223,19 +222,58 @@ function ExecutionTab({ detail, serviceOptions }: { detail: ProjectDetail; servi
           return <article key={job.id} className="overflow-hidden rounded-xl border border-border bg-surface"><header className="flex flex-wrap items-start gap-3 border-b border-border-soft p-4"><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${meta.soft} ${meta.tone}`}><Icon className="h-5 w-5" /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="font-mono text-xs font-semibold text-slate-500">{job.code}</p><TradePill type={concreteType} /></div><h3 className="mt-1 font-semibold">{job.title}</h3><p className="mt-1 text-xs text-slate-500">{job.assignedToName ?? "Chưa phân công"}{job.scheduledAt ? ` · ${formatDate(job.scheduledAt)}` : ""}</p></div><ServiceJobStatusAction jobId={job.id} status={job.status} /></header><div className="grid gap-4 p-4 md:grid-cols-2"><div><div className="mb-2 flex items-center justify-between"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Checklist</p><span className="font-mono text-xs">{completed}/{job.checklist.length}</span></div><ServiceChecklistEditor jobId={job.id} checklist={job.checklist} /></div><div className="space-y-3"><div className="rounded-lg bg-surface-2 p-3"><p className="text-xs font-semibold text-slate-500">Hồ sơ bộ môn</p><p className="mt-1 text-sm font-semibold">{record ? "Đã có dữ liệu kiểm tra" : "Chưa ghi phép đo / chứng cứ"}</p>{record?.measurements?.slice(0, 3).map((measurement, index) => <p key={index} className="mt-1 text-xs text-slate-600">{measurement.label}: {measurement.value}{measurement.unit ? ` ${measurement.unit}` : ""}</p>)}</div><div className="rounded-lg bg-surface-2 p-3"><p className="text-xs font-semibold text-slate-500">Vật tư</p><p className="mt-1 text-sm font-semibold">{materialByJob.get(job.id)?.length ?? 0} dòng vật tư</p></div><div className="flex flex-wrap justify-end gap-2">{editableType && <TradeRecordEditor jobId={job.id} serviceType={editableType} initial={job.tradeRecord} />}<ServiceJobEdit job={job} projectType={project.serviceType!} assignees={serviceOptions.assigneeOptions} orders={detail.orders.map((order) => ({ id: order.id, code: order.code, status: order.status }))} /></div></div></div></article>;
         })}</div> : <Empty text="Chưa có lệnh việc. Tạo lệnh theo đúng bộ môn để bắt đầu thi công." />}
       </Panel>
-      <Panel title="Vật tư thi công" subtitle={`${materials.length} dòng vật tư`} action={<ServiceMaterialEditor jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} />}>
-        {materials.length ? <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">{materials.map((material) => <div key={material.id} className="rounded-xl border border-border-soft p-3"><p className="text-sm font-semibold">{material.productName}</p><p className="mt-1 text-xs text-slate-500">{material.jobCode} · {material.sku}</p><p className="mt-2 text-xs">Đã dùng <strong>{Number(material.usedQuantity)}</strong> / {Number(material.plannedQuantity)} {material.unitName}</p></div>)}</div> : <Empty text="Chưa lập vật tư cho các lệnh việc." />}
-      </Panel>
     </div>
   );
 }
 
-function DevicesTab({ detail, cameraAssets }: { detail: ProjectDetail; cameraAssets: ProjectDetail["assets"] }) {
-  const { project, jobs, assets } = detail;
+function InstallationTab({
+  detail,
+  cameraAssets,
+  serviceOptions,
+}: {
+  detail: ProjectDetail;
+  cameraAssets: ProjectDetail["assets"];
+  serviceOptions: ServiceOptions;
+}) {
+  const { project, jobs, assets, materials, orders } = detail;
   return (
     <div className="space-y-4">
-      <Panel title="Thiết bị & tài sản đã lắp" subtitle={`${assets.length} thiết bị`} action={<InstalledAssetQuickCreate projectId={project.id} serviceType={project.serviceType} jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))} />}>
-        {assets.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{assets.map((asset) => <div key={asset.id} className="rounded-xl border border-border-soft p-3"><div className="flex items-start gap-3"><InstalledAssetPhotoThumbnail assetId={asset.id} assetName={asset.name} /><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate font-semibold">{asset.name}</p><p className="mt-1 truncate text-xs text-slate-500">{[asset.brand, asset.model].filter(Boolean).join(" ") || asset.assetKind}</p></div><StatusPill status={asset.status} /></div><dl className="mt-3 grid grid-cols-2 gap-2 text-xs"><div><dt className="text-slate-500">Vị trí</dt><dd className="mt-0.5 truncate font-medium">{asset.locationLabel ?? "—"}</dd></div><div><dt className="text-slate-500">Serial</dt><dd className="mt-0.5 truncate font-mono">{asset.serialNumber ?? "—"}</dd></div></dl></div></div></div>)}</div> : <Empty text="Chưa ghi nhận thiết bị đã lắp." />}
+      <Panel
+        title="Vật tư & thiết bị"
+        subtitle={`${materials.length} dòng sử dụng · ${assets.length} thiết bị theo dõi`}
+        action={(
+          <ServiceInstallationBatchCreate
+            project={{ id: project.id, name: project.name, customerId: project.customerId }}
+            jobs={jobs.map((job) => ({ id: job.id, code: job.code, title: job.title }))}
+            orders={orders.map((order) => ({ id: order.id, code: order.code, status: order.status }))}
+            warehouses={serviceOptions.warehouseOptions}
+          />
+        )}
+      >
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,.9fr)_minmax(0,1.1fr)]">
+          <section>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Sử dụng cho thi công</h3>
+              <span className="text-xs font-semibold text-slate-400">{materials.length} dòng</span>
+            </div>
+            {materials.length ? (
+              <div className="space-y-2">
+                {materials.map((material) => {
+                  const issued = Number(material.issuedBaseQuantity) > 0;
+                  const reserved = Number(material.reservedBaseQuantity) > 0;
+                  return <div key={material.id} className="rounded-xl border border-border-soft p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate text-sm font-semibold">{material.productName}</p><p className="mt-1 truncate text-xs text-slate-500">{material.jobCode} · {material.sku}</p></div><span className={`shrink-0 rounded-lg px-2 py-1 text-[11px] font-semibold ${issued ? "bg-primary-50 text-primary-700" : reserved ? "bg-blue-50 text-blue-700" : "bg-surface-2 text-slate-500"}`}>{issued ? "Đã xuất kho" : reserved ? "Đã giữ hàng" : "Chưa xử lý kho"}</span></div><p className="mt-2 text-xs">Đã dùng <strong>{Number(material.usedQuantity)}</strong> / {Number(material.plannedQuantity)} {material.unitName}</p></div>;
+                })}
+              </div>
+            ) : <Empty text="Chưa có sản phẩm sử dụng cho thi công." />}
+          </section>
+          <section>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Thiết bị theo dõi</h3>
+              <span className="text-xs font-semibold text-slate-400">{assets.length} thiết bị</span>
+            </div>
+            {assets.length ? <div className="grid gap-3 sm:grid-cols-2">{assets.map((asset) => <div key={asset.id} className="rounded-xl border border-border-soft p-3"><div className="flex items-start gap-3"><InstalledAssetPhotoThumbnail assetId={asset.id} assetName={asset.name} /><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div className="min-w-0"><p className="truncate font-semibold">{asset.name}</p><p className="mt-1 truncate text-xs text-slate-500">{[asset.brand, asset.model].filter(Boolean).join(" ") || asset.assetKind}</p></div><StatusPill status={asset.status} /></div><dl className="mt-3 grid grid-cols-2 gap-2 text-xs"><div><dt className="text-slate-500">Vị trí</dt><dd className="mt-0.5 truncate font-medium">{asset.locationLabel ?? "—"}</dd></div><div><dt className="text-slate-500">Serial</dt><dd className="mt-0.5 truncate font-mono">{asset.serialNumber ?? "—"}</dd></div></dl></div></div></div>)}</div> : <Empty text="Chưa ghi nhận thiết bị theo dõi." />}
+          </section>
+        </div>
       </Panel>
       {(project.serviceType === "camera" || project.serviceType === "mixed") && (
         <Panel title="Truy cập Camera/NVR an toàn" subtitle="Thông tin bí mật được mã hóa riêng; không xuất hiện trong biên bản bàn giao.">

@@ -73,15 +73,30 @@ function initialContextFromParams(params: PosSearchParams): PosInitialContext | 
   if (one(params.draft) === "return_quick") {
     return { kind: "return_quick", projectId: "", projectName: "" };
   }
-  if (one(params.draft) !== "quote") return null;
+  const kind = one(params.draft);
+  if (kind !== "quote" && kind !== "invoice") return null;
   const projectId = one(params.projectId);
   const customerId = one(params.customerId);
-  const projectName = one(params.projectName)?.trim() || "Báo giá";
+  const projectName = one(params.projectName)?.trim() || (kind === "quote" ? "Báo giá" : "Hóa đơn");
+  const rawItems = Array.isArray(params.item) ? params.item : params.item ? [params.item] : [];
+  const items = rawItems.slice(0, 50).flatMap((raw) => {
+    try {
+      const item = JSON.parse(raw) as Record<string, unknown>;
+      const itemProductId = typeof item.productId === "string" ? item.productId : "";
+      const unitName = typeof item.unitName === "string" ? item.unitName.trim() : "";
+      const quantity = Number(item.quantity);
+      if (!UUID_RE.test(itemProductId) || !unitName || !Number.isFinite(quantity) || quantity <= 0) return [];
+      return [{ productId: itemProductId, unitName, quantity }];
+    } catch {
+      return [];
+    }
+  });
   return {
-    kind: "quote",
+    kind,
     projectId: projectId && UUID_RE.test(projectId) ? projectId : "",
     projectName,
     customerId: customerId && UUID_RE.test(customerId) ? customerId : "",
+    items,
   };
 }
 
@@ -93,6 +108,7 @@ export default async function POSPage({ searchParams }: { searchParams: Promise<
   const aiProductIds = csvUuids(params.aiProducts);
   const includeProductIds = [
     ...(sourceInvoice?.items?.map((item) => item.productId) ?? []),
+    ...(initialContext?.items?.map((item) => item.productId) ?? []),
     ...aiProductIds,
   ];
   const [data, settings, t, orderPrintTemplate, quotePrintTemplate, bookingPrintTemplate, returnPrintTemplate] = await Promise.all([

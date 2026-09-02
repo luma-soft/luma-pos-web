@@ -182,12 +182,13 @@ export type PosSourceInvoice = {
 };
 
 export type PosInitialContext = {
-  kind: "quote" | "return_quick";
+  kind: "invoice" | "quote" | "return_quick";
   customerId?: string;
   projectId: string;
   projectName: string;
   cameraQuote?: boolean;
   cameraId?: string;
+  items?: Array<{ productId: string; unitName: string; quantity: number }>;
 };
 
 /**
@@ -246,7 +247,7 @@ function makeInvoice(id?: string): PosDraft {
   return makeDraft(id, "invoice");
 }
 
-function makeDraftFromContext(context: PosInitialContext, id = SOURCE_INV_ID): PosDraft {
+function makeDraftFromContext(context: PosInitialContext, products: PosProduct[], id = SOURCE_INV_ID): PosDraft {
   return {
     ...makeDraft(id, context.kind),
     cameraQuote: context.cameraQuote,
@@ -254,6 +255,21 @@ function makeDraftFromContext(context: PosInitialContext, id = SOURCE_INV_ID): P
     customerId: context.customerId ?? "",
     projectId: context.projectId,
     projectName: context.projectName,
+    cart: (context.items ?? []).flatMap((item) => {
+      const product = products.find((candidate) => candidate.id === item.productId);
+      if (!product) return [];
+      const alternateUnit = item.unitName === product.baseUnit
+        ? null
+        : product.units.find((unit) => unit.unitName === item.unitName) ?? null;
+      return [{
+        key: `${item.productId}-${item.unitName}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+        product,
+        unitName: item.unitName,
+        unitMultiplier: alternateUnit ? Number(alternateUnit.multiplier) : 1,
+        unitPrice: unitPriceFor(product, alternateUnit),
+        quantity: item.quantity,
+      }];
+    }),
   };
 }
 
@@ -568,7 +584,7 @@ export function PosClient({
     ...(initialSourceInvoice
       ? [makeDraftFromSource(initialSourceInvoice, data.products, SOURCE_INV_ID)]
       : initialContext
-        ? [makeDraftFromContext(initialContext)]
+        ? [makeDraftFromContext(initialContext, data.products)]
         : []),
   ]);
   const [activeId, setActiveId] = useState(initialSourceInvoice || initialContext ? SOURCE_INV_ID : FIRST_INV_ID);

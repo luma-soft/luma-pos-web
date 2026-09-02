@@ -247,12 +247,12 @@ describe("ProjectDetailView", () => {
   test("renders semantic icons for every redesigned project flow tab", async () => {
     const html = await renderServiceProjectDetail();
 
-    for (const id of ["overview", "execution", "devices", "aftercare", "finance"]) {
+    for (const id of ["overview", "execution", "installation", "aftercare", "finance"]) {
       expect(html).toContain(`data-project-tab-icon="${id}"`);
     }
     expect(html).toContain('class="lucide lucide-house"');
     expect(html).toContain('class="lucide lucide-wrench"');
-    expect(html).toContain('class="lucide lucide-camera"');
+    expect(html).toContain('class="lucide lucide-package-check"');
     expect(html).toContain('class="lucide lucide-clipboard-check"');
     expect(html).toContain('class="lucide lucide-file-text"');
   });

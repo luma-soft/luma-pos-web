@@ -690,6 +690,7 @@ export function RowPreviewModal({
   size = "full",
   closeLabel = "Đóng",
   bodyClassName,
+  panelClassName,
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
@@ -700,6 +701,7 @@ export function RowPreviewModal({
   size?: "md" | "lg" | "xl" | "full";
   closeLabel?: string;
   bodyClassName?: string;
+  panelClassName?: string;
 }) {
   const titleId = useId();
 
@@ -727,6 +729,7 @@ export function RowPreviewModal({
           size === "lg" && "max-h-[92dvh] sm:max-w-2xl",
           size === "xl" && "max-h-[92dvh] sm:max-w-4xl",
           size === "full" && "h-full max-h-[900px] sm:max-w-6xl",
+          panelClassName,
         )}
         onMouseDown={(event) => event.stopPropagation()}
       >

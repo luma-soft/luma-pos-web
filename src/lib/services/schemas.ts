@@ -86,6 +86,108 @@ export const serviceJobMaterialSchema = z.object({
 
 export type ServiceJobMaterialInput = z.input<typeof serviceJobMaterialSchema>;
 
+const serviceInstallationItemSchema = z.object({
+  clientDraftId: z.string().trim().min(1).max(80),
+  productId: z.uuid(),
+  unitName: z.string().trim().min(1).max(30),
+  quantity: z.coerce.number().positive().max(999999),
+  tracking: z.enum(["consumable", "asset"]),
+  serialNumbers: z.array(z.string().trim().min(1).max(200)).max(50).default([]),
+  assetKind: z.string().trim().max(100).optional(),
+  name: z.string().trim().max(300).optional(),
+  model: z.string().trim().max(200).optional(),
+});
+
+export const serviceInstallationBatchSchema = z.object({
+  projectId: z.uuid(),
+  jobId: z.uuid(),
+  requestId: z.string().trim().min(8).max(100),
+  stockMode: z.enum(["plan", "reserve", "issue"]).default("plan"),
+  warehouseId: z.uuid().nullable().optional(),
+  invoiceMode: z.enum(["none", "link", "create"]).default("none"),
+  materialOrderId: z.uuid().nullable().optional(),
+  locationLabel: z.string().trim().max(300).optional(),
+  installedAt: z.iso.datetime({ local: true }).nullable().optional(),
+  note: z.string().trim().max(2000).optional(),
+  items: z.array(serviceInstallationItemSchema).min(1).max(50),
+}).superRefine((value, context) => {
+  if (value.stockMode !== "plan" && !value.warehouseId) {
+    context.addIssue({
+      code: "custom",
+      message: "warehouseId is required when reserving or issuing stock",
+      path: ["warehouseId"],
+    });
+  }
+  if (value.invoiceMode === "link" && !value.materialOrderId) {
+    context.addIssue({
+      code: "custom",
+      message: "materialOrderId is required when linking an invoice",
+      path: ["materialOrderId"],
+    });
+  }
+  if (value.invoiceMode !== "link" && value.materialOrderId) {
+    context.addIssue({
+      code: "custom",
+      message: "materialOrderId is only valid when linking an invoice",
+      path: ["materialOrderId"],
+    });
+  }
+  if (value.invoiceMode !== "none" && value.stockMode !== "plan") {
+    context.addIssue({
+      code: "custom",
+      message: "invoice-backed installation items must let the invoice own stock",
+      path: ["stockMode"],
+    });
+  }
+
+  const keys = new Set<string>();
+  let assetCount = 0;
+  value.items.forEach((item, index) => {
+    const key = `${item.productId}:${item.unitName.toLocaleLowerCase("vi")}`;
+    if (keys.has(key)) {
+      context.addIssue({
+        code: "custom",
+        message: "product and unit must be unique within a batch",
+        path: ["items", index, "productId"],
+      });
+    }
+    keys.add(key);
+    if (item.tracking === "asset") {
+      if (!Number.isInteger(item.quantity)) {
+        context.addIssue({
+          code: "custom",
+          message: "tracked asset quantity must be an integer",
+          path: ["items", index, "quantity"],
+        });
+      }
+      assetCount += item.quantity;
+      if (item.serialNumbers.length > item.quantity) {
+        context.addIssue({
+          code: "custom",
+          message: "serial count cannot exceed asset quantity",
+          path: ["items", index, "serialNumbers"],
+        });
+      }
+    } else if (item.serialNumbers.length > 0) {
+      context.addIssue({
+        code: "custom",
+        message: "consumable items cannot have serial numbers",
+        path: ["items", index, "serialNumbers"],
+      });
+    }
+  });
+  if (assetCount > 50) {
+    context.addIssue({
+      code: "custom",
+      message: "a batch can create at most 50 tracked assets",
+      path: ["items"],
+    });
+  }
+});
+
+export type ServiceInstallationBatchInput = z.input<typeof serviceInstallationBatchSchema>;
+export type ServiceInstallationBatch = z.output<typeof serviceInstallationBatchSchema>;
+
 export const serviceMaterialStockSyncSchema = z.object({
   materialId: z.uuid(),
   warehouseId: z.uuid(),
