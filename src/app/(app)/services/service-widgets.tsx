@@ -428,9 +428,15 @@ export function WarrantyClaimsTable({ rows }: { rows: WarrantyClaimRow[] }) {
 export function ServiceJobQuickCreate({
   projects,
   assignees,
+  triggerLabel,
+  triggerClassName,
+  showTriggerIcon = true,
 }: {
   projects: ProjectOption[];
   assignees: AssigneeOption[];
+  triggerLabel?: ReactNode;
+  triggerClassName?: string;
+  showTriggerIcon?: boolean;
 }) {
   const t = useTranslations();
   const router = useRouter();
@@ -473,7 +479,10 @@ export function ServiceJobQuickCreate({
 
   return (
     <>
-      <Button type="button" onClick={() => setOpen(true)}><Plus className="h-4 w-4" />{t("services.jobs.create")}</Button>
+      <Button type="button" className={triggerClassName} onClick={() => setOpen(true)}>
+        {showTriggerIcon && <Plus className="h-4 w-4" />}
+        {triggerLabel ?? t("services.jobs.create")}
+      </Button>
       <RowPreviewModal
         open={open}
         onClose={() => {

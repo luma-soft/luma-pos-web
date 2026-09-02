@@ -271,6 +271,16 @@ describe("ProjectDetailView", () => {
     expect(html).toContain('lucide-camera');
   });
 
+  test("renders the next create-job action as an interactive button", async () => {
+    const html = await renderServiceProjectDetail();
+    const overview = html.slice(
+      html.indexOf('id="project-service-panel-overview"'),
+      html.indexOf('id="project-service-panel-execution"'),
+    );
+
+    expect(overview).toMatch(/<button[^>]*>[^<]*(?:<[^>]+>[^<]*<\/[^>]+>)*Tạo lệnh việc<\/button>/);
+  });
+
   test("renders semantic section icons throughout the camera access vault", async () => {
     const html = await renderServiceProjectDetail();
 

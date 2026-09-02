@@ -89,7 +89,7 @@ export function ProjectRedesignedExperience({
       <ProjectMediaUploadCoordinator key={project.id} initialItems={detail.projectAttachments}>
         <ProjectServiceTabs initialActive="overview">
         <ProjectServiceTab id="overview" label="Tổng quan" icon={<House />}>
-          <OverviewTab detail={detail} />
+          <OverviewTab detail={detail} serviceOptions={serviceOptions} />
         </ProjectServiceTab>
         <ProjectServiceTab id="execution" label="Thi công" icon={<Wrench />} count={tabs.execution}>
           <ExecutionTab detail={detail} serviceOptions={serviceOptions} />
@@ -140,7 +140,7 @@ function ProgressRing({ value }: { value: number }) {
   );
 }
 
-function OverviewTab({ detail }: { detail: ProjectDetail }) {
+function OverviewTab({ detail, serviceOptions }: { detail: ProjectDetail; serviceOptions: ServiceOptions }) {
   const { project, jobs, assets, claims, maintenancePlans, orders, statusLogs } = detail;
   const nextAction = deriveNextAction(detail);
   const recent = [
@@ -154,7 +154,15 @@ function OverviewTab({ detail }: { detail: ProjectDetail }) {
           <div className="flex flex-col gap-4 rounded-xl border border-primary-200 bg-gradient-to-r from-primary-50 to-surface px-4 py-4 sm:flex-row sm:items-center">
             <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary-100 text-primary-700">{nextAction.icon}</span>
             <div className="min-w-0 flex-1"><p className="font-semibold">{nextAction.title}</p><p className="mt-1 text-sm text-slate-500">{nextAction.hint}</p></div>
-            <span className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white">{nextAction.cta}</span>
+            {nextAction.kind === "create-job"
+              ? <ServiceJobQuickCreate
+                  projects={[{ id: project.id, name: project.name, serviceType: project.serviceType }]}
+                  assignees={serviceOptions.assigneeOptions}
+                  triggerLabel={nextAction.cta}
+                  triggerClassName="shrink-0"
+                  showTriggerIcon={false}
+                />
+              : <span className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white">{nextAction.cta}</span>}
           </div>
         </Panel>
         {project.serviceType === "mixed" && <TradeProgress jobs={jobs} />}
@@ -346,10 +354,10 @@ function serviceStageLabel(stage: ProjectDetail["project"]["serviceStage"]) {
 
 function deriveNextAction(detail: ProjectDetail) {
   const workAlreadyComplete = detail.project.progressPercent >= 100 || detail.project.serviceStage === "completed";
-  if (detail.jobs.length === 0 && !workAlreadyComplete) return { icon: <HardHat className="h-5 w-5" />, title: "Tạo lệnh việc đầu tiên", hint: "Chia phạm vi thi công theo đúng bộ môn và phân công người phụ trách.", cta: "Tạo lệnh việc" };
-  if (detail.jobs.some((job) => !["completed", "cancelled"].includes(job.status))) return { icon: <Wrench className="h-5 w-5" />, title: "Tiếp tục thi công", hint: "Hoàn tất checklist, phép đo, chứng cứ và chữ ký cho các lệnh đang mở.", cta: "Xem thi công" };
-  if (detail.assets.length === 0) return { icon: <PackageCheck className="h-5 w-5" />, title: "Ghi nhận thiết bị đã lắp", hint: "Lưu vị trí, serial, thông số và thời hạn bảo hành.", cta: "Thêm thiết bị" };
-  if (!detail.maintenancePlans.some((plan) => plan.isActive)) return { icon: <CalendarClock className="h-5 w-5" />, title: "Lập lịch bảo trì đầu tiên", hint: "Thiết bị đã được ghi nhận nhưng chưa có lịch kiểm tra định kỳ.", cta: "Lập lịch bảo trì" };
-  if (!detail.handoverDocuments.some((document) => document.type === "handover" && document.status === "signed")) return { icon: <ClipboardCheck className="h-5 w-5" />, title: "Hoàn tất nghiệm thu & bàn giao", hint: "Tổng hợp hồ sơ theo bộ môn và lấy chữ ký bàn giao.", cta: "Lập hồ sơ" };
-  return { icon: <CircleDollarSign className="h-5 w-5" />, title: "Đối soát tài chính & đóng công trình", hint: "Kiểm tra chi phí, hồ sơ và các điều kiện còn lại trước khi đóng.", cta: "Kiểm tra hồ sơ" };
+  if (detail.jobs.length === 0 && !workAlreadyComplete) return { kind: "create-job" as const, icon: <HardHat className="h-5 w-5" />, title: "Tạo lệnh việc đầu tiên", hint: "Chia phạm vi thi công theo đúng bộ môn và phân công người phụ trách.", cta: "Tạo lệnh việc" };
+  if (detail.jobs.some((job) => !["completed", "cancelled"].includes(job.status))) return { kind: "execution" as const, icon: <Wrench className="h-5 w-5" />, title: "Tiếp tục thi công", hint: "Hoàn tất checklist, phép đo, chứng cứ và chữ ký cho các lệnh đang mở.", cta: "Xem thi công" };
+  if (detail.assets.length === 0) return { kind: "devices" as const, icon: <PackageCheck className="h-5 w-5" />, title: "Ghi nhận thiết bị đã lắp", hint: "Lưu vị trí, serial, thông số và thời hạn bảo hành.", cta: "Thêm thiết bị" };
+  if (!detail.maintenancePlans.some((plan) => plan.isActive)) return { kind: "maintenance" as const, icon: <CalendarClock className="h-5 w-5" />, title: "Lập lịch bảo trì đầu tiên", hint: "Thiết bị đã được ghi nhận nhưng chưa có lịch kiểm tra định kỳ.", cta: "Lập lịch bảo trì" };
+  if (!detail.handoverDocuments.some((document) => document.type === "handover" && document.status === "signed")) return { kind: "handover" as const, icon: <ClipboardCheck className="h-5 w-5" />, title: "Hoàn tất nghiệm thu & bàn giao", hint: "Tổng hợp hồ sơ theo bộ môn và lấy chữ ký bàn giao.", cta: "Lập hồ sơ" };
+  return { kind: "finance" as const, icon: <CircleDollarSign className="h-5 w-5" />, title: "Đối soát tài chính & đóng công trình", hint: "Kiểm tra chi phí, hồ sơ và các điều kiện còn lại trước khi đóng.", cta: "Kiểm tra hồ sơ" };
 }
