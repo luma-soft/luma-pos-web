@@ -39,7 +39,9 @@ import {
   resizeInstalledAssetProductDrafts,
 } from "@/lib/services/installed-asset-quantity";
 import {
+  createInstalledAssetCatalogDraftId,
   installedAssetCatalogFeedback,
+  isInstalledAssetBatchDraftReady,
   validateInstalledAssetBatchDrafts,
 } from "@/lib/services/schemas";
 import { cn } from "@/lib/utils";
@@ -711,14 +713,13 @@ export function InstalledAssetBatchCreate({
                       draft={draft}
                       index={index}
                       expanded={expandedDraftId === draft.clientDraftId}
-                      complete={Boolean(
-                        locationLabel.trim()
-                        && installedOn
-                        && draft.name.trim()
-                        && draft.assetKind.trim()
-                        && draft.serialNumber.trim()
-                        && draft.photos.length,
-                      )}
+                      complete={isInstalledAssetBatchDraftReady({
+                        clientDraftId: draft.clientDraftId,
+                        locationLabel,
+                        installedOn,
+                        name: draft.name,
+                        assetKind: draft.assetKind,
+                      })}
                       canDelete={source === "catalog"}
                       onToggle={() => setExpandedDraftId(
                         expandedDraftId === draft.clientDraftId ? null : draft.clientDraftId,
@@ -1046,7 +1047,7 @@ function CatalogThumb({ product }: { product: ProductCatalogItem }) {
 
 function makeCatalogDraft(product: ProductCatalogItem, serviceType?: string | null): AssetDraft {
   return {
-    clientDraftId: `product-${product.id}-${crypto.randomUUID()}`,
+    clientDraftId: createInstalledAssetCatalogDraftId(),
     productId: product.id,
     sku: product.sku,
     catalogImageUrl: product.imageUrls?.[0] ?? null,

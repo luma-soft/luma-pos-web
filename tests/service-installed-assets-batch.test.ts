@@ -53,6 +53,34 @@ describe("installed asset batch input", () => {
     expect(resized.drafts).toHaveLength(50);
   });
 
+  it("generates catalog draft ids that satisfy the batch schema", () => {
+    const clientDraftId = serviceSchemas.createInstalledAssetCatalogDraftId(
+      "33333333-3333-4333-8333-333333333333",
+    );
+
+    expect(clientDraftId).toBe("product-33333333-3333-4333-8333-333333333333");
+    expect(serviceSchemas.installedAssetBatchCreateSchema.safeParse({
+      projectId,
+      requestId: "project-assets-20260902-001",
+      assets: [{
+        clientDraftId,
+        productId,
+        assetKind: "camera",
+        name: "Camera cửa trước",
+      }],
+    }).success).toBe(true);
+  });
+
+  it("treats serial numbers and photos as optional when showing draft readiness", () => {
+    expect(serviceSchemas.isInstalledAssetBatchDraftReady({
+      clientDraftId: "camera-front",
+      locationLabel: "Nhà khách",
+      installedOn: "2026-09-01",
+      name: "Camera cửa trước",
+      assetKind: "camera",
+    })).toBe(true);
+  });
+
   it("reports the exact common and per-device fields that block saving", () => {
     const validate = (
       serviceSchemas as typeof serviceSchemas & {
@@ -513,5 +541,18 @@ describe("installed asset visual and interaction contract", () => {
       expect(mobileIcons).toContain(`'${icon}'`);
     }
     expect(mobileFlow).not.toContain("Icons.");
+  });
+
+  it("uses the shared catalog id and readiness contracts in the web flow", () => {
+    const source = readFileSync(
+      "src/app/(app)/services/installed-asset-batch-create.tsx",
+      "utf8",
+    );
+
+    expect(source).toContain("createInstalledAssetCatalogDraftId()");
+    expect(source).toContain("isInstalledAssetBatchDraftReady({");
+    expect(source).not.toContain('clientDraftId: `product-${product.id}-${crypto.randomUUID()}`');
+    expect(source).not.toContain("&& draft.serialNumber.trim()");
+    expect(source).not.toContain("&& draft.photos.length");
   });
 });

@@ -166,10 +166,16 @@ export const installedAssetCreateSchema = z.object({
 
 export type InstalledAssetCreateInput = z.input<typeof installedAssetCreateSchema>;
 
+export const INSTALLED_ASSET_CLIENT_DRAFT_ID_MAX_LENGTH = 80;
+
+export function createInstalledAssetCatalogDraftId(randomId = crypto.randomUUID()) {
+  return `product-${randomId}`;
+}
+
 const installedAssetBatchDraftSchema = installedAssetCreateSchema.omit({
   projectId: true,
 }).extend({
-  clientDraftId: z.string().trim().min(1).max(80),
+  clientDraftId: z.string().trim().min(1).max(INSTALLED_ASSET_CLIENT_DRAFT_ID_MAX_LENGTH),
 });
 
 export const installedAssetBatchCreateSchema = z.object({
@@ -276,6 +282,24 @@ export function validateInstalledAssetBatchDrafts(value: {
     issues,
     message: messageParts.join(" "),
   };
+}
+
+export function isInstalledAssetBatchDraftReady(value: {
+  clientDraftId: string;
+  locationLabel: string;
+  installedOn: string;
+  name: string;
+  assetKind: string;
+}) {
+  return validateInstalledAssetBatchDrafts({
+    locationLabel: value.locationLabel,
+    installedOn: value.installedOn,
+    assets: [{
+      clientDraftId: value.clientDraftId,
+      name: value.name,
+      assetKind: value.assetKind,
+    }],
+  }).valid;
 }
 
 export function installedAssetCatalogFeedback(
