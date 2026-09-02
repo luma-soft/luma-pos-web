@@ -31,6 +31,11 @@ export type MobilePermissionMatrix = Record<
   MobilePermissionGrant
 >;
 
+// Temporary product policy: keep the sensitive-action PIN workflow dormant.
+// This does not promote restricted roles; it only removes re-authentication
+// from permissions a role already owns directly.
+export const mobileSensitiveApprovalEnabled = false;
+
 const denied = (): MobilePermissionGrant => ({
   allowed: false,
   reauthRequired: false,
@@ -43,11 +48,17 @@ const direct = (reauthRequired = false): MobilePermissionGrant => ({
   managerApprovalAllowed: false,
 });
 
-const approval = (): MobilePermissionGrant => ({
-  allowed: false,
-  reauthRequired: false,
-  managerApprovalAllowed: true,
-});
+const sensitiveDirect = (): MobilePermissionGrant =>
+  direct(mobileSensitiveApprovalEnabled);
+
+const approval = (): MobilePermissionGrant =>
+  mobileSensitiveApprovalEnabled
+    ? {
+        allowed: false,
+        reauthRequired: false,
+        managerApprovalAllowed: true,
+      }
+    : denied();
 
 function emptyMatrix(): MobilePermissionMatrix {
   return Object.fromEntries(
@@ -61,33 +72,26 @@ export function permissionMatrixForRole(role: Role): MobilePermissionMatrix {
 
   if (role === "owner") {
     for (const permission of mobilePermissionKeys) {
-      const sensitive = ![
-        "dashboard.view",
-        "service.field",
-        "pos.sell",
-        "catalog.manage",
-        "reports.view",
-      ].includes(permission);
-      matrix[permission] = direct(sensitive);
+      matrix[permission] = direct();
     }
     return matrix;
   }
 
   if (role === "manager") {
     matrix["service.field"] = direct();
-    matrix["service.credentials"] = direct(true);
+    matrix["service.credentials"] = sensitiveDirect();
     matrix["reports.view"] = direct();
     matrix["pos.sell"] = direct();
     matrix["catalog.manage"] = direct();
-    matrix["price.override"] = direct(true);
-    matrix["discount.override_limit"] = direct(true);
-    matrix["refund.create"] = direct(true);
-    matrix["order.void"] = direct(true);
-    matrix["stock.adjust"] = direct(true);
-    matrix["cash.manage"] = direct(true);
-    matrix["payment.reconcile"] = direct(true);
-    matrix["customer.erase"] = direct(true);
-    matrix["settings.sensitive"] = direct(true);
+    matrix["price.override"] = sensitiveDirect();
+    matrix["discount.override_limit"] = sensitiveDirect();
+    matrix["refund.create"] = sensitiveDirect();
+    matrix["order.void"] = sensitiveDirect();
+    matrix["stock.adjust"] = sensitiveDirect();
+    matrix["cash.manage"] = sensitiveDirect();
+    matrix["payment.reconcile"] = sensitiveDirect();
+    matrix["customer.erase"] = sensitiveDirect();
+    matrix["settings.sensitive"] = sensitiveDirect();
     return matrix;
   }
 

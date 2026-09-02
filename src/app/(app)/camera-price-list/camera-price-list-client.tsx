@@ -663,8 +663,9 @@ export function CameraPriceListClient({
               {filtered.map((item, index) => (
                 <tr
                   key={item.id}
+                  data-testid="camera-price-list-row"
                   onClick={() => scrollToPackage(item.id)}
-                  className={`${index % 2 ? "bg-slate-100" : "bg-white"} cursor-pointer hover:bg-teal-50/60`}
+                  className={`${index % 2 ? "bg-slate-100" : "bg-white"} h-16 cursor-pointer hover:bg-teal-50/60`}
                 >
                   <td className="border border-slate-300 px-3 py-3 text-center text-slate-600">
                     {String(index + 1).padStart(2, "0")}

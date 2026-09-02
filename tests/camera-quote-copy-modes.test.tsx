@@ -61,6 +61,21 @@ describe("camera quote copy modes", () => {
 });
 
 describe("camera quote copy and price controls", () => {
+  test("keeps desktop camera rows comfortably tall", () => {
+    const html = renderToStaticMarkup(
+      <CameraPriceListClient
+        models={[model]}
+        memoryLabels={["Thẻ nhớ 32GB", "Thẻ nhớ 64GB"]}
+        canEdit
+        brandName="EZVIZ"
+      />,
+    );
+
+    expect(html).toMatch(
+      /data-testid="camera-price-list-row"[^>]*class="[^"]*\bh-16\b/,
+    );
+  });
+
   test("renders one accessible three-mode copy trigger on every camera surface", () => {
     const html = renderToStaticMarkup(
       <CameraPriceListClient

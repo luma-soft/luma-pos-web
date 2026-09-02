@@ -1,12 +1,39 @@
 import { describe, expect, test } from "bun:test";
 import {
   approvalModeFor,
+  authorizeMobileSensitiveAction,
   createApprovalCredential,
   hashApprovalToken,
 } from "../src/lib/auth/mobile-approval";
 
 describe("mobile approval credentials", () => {
-  test("manager re-auth must use the same manager identity", () => {
+  test("owner sensitive actions succeed without an approval token", async () => {
+    const result = await authorizeMobileSensitiveAction({
+      request: new Request("https://lumapos.test/api/mobile/invoices/order-1/cancel"),
+      storeId: "store-a",
+      requesterId: "owner-1",
+      requesterRole: "owner",
+      permission: "order.void",
+      scope: "order:order-1",
+    });
+
+    expect(result).toEqual({ ok: true });
+  });
+
+  test("restricted roles are denied without exposing the hidden PIN flow", async () => {
+    const result = await authorizeMobileSensitiveAction({
+      request: new Request("https://lumapos.test/api/mobile/invoices/order-1/cancel"),
+      storeId: "store-a",
+      requesterId: "cashier-1",
+      requesterRole: "cashier",
+      permission: "order.void",
+      scope: "order:order-1",
+    });
+
+    expect(result).toEqual({ ok: false, error: "errors.forbidden" });
+  });
+
+  test("hidden PIN flow does not issue credentials for manager actions", () => {
     expect(approvalModeFor({
       requesterRole: "manager",
       requesterId: "manager-1",
@@ -15,7 +42,7 @@ describe("mobile approval credentials", () => {
       approverId: "manager-1",
       approverStoreId: "store-a",
       permission: "refund.create",
-    })).toBe("reauth");
+    })).toBeNull();
 
     expect(approvalModeFor({
       requesterRole: "manager",
@@ -28,7 +55,7 @@ describe("mobile approval credentials", () => {
     })).toBeNull();
   });
 
-  test("cashier sensitive action requires a manager or owner", () => {
+  test("hidden PIN flow does not issue credentials for cashier actions", () => {
     expect(approvalModeFor({
       requesterRole: "cashier",
       requesterId: "cashier-1",
@@ -37,7 +64,7 @@ describe("mobile approval credentials", () => {
       approverId: "manager-1",
       approverStoreId: "store-a",
       permission: "order.void",
-    })).toBe("manager");
+    })).toBeNull();
 
     expect(approvalModeFor({
       requesterRole: "cashier",
