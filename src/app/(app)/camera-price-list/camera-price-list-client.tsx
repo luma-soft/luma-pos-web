@@ -734,10 +734,11 @@ export function CameraPriceListClient({
                                 event.stopPropagation();
                                 openPriceEditor(item, variant, label, "price");
                               }}
-                              className="block h-16 w-full px-3 py-3 text-right font-extrabold transition hover:bg-teal-100/70 focus-visible:outline-2 focus-visible:outline-[#0b7b74]"
+                              className="group flex h-16 w-full items-center justify-end gap-2 px-3 py-3 text-right font-extrabold transition hover:bg-teal-100/70 focus-visible:outline-2 focus-visible:outline-[#0b7b74]"
                               aria-label={`Sửa giá ${item.model} · ${label}`}
                             >
-                              {formatCurrency(variant.price)}
+                              <span>{formatCurrency(variant.price)}</span>
+                              <Edit3 className="h-3.5 w-3.5 shrink-0 text-slate-400 transition group-hover:text-[#0b7b74]" />
                             </button>
                           ) : (
                             <span className="block px-3 py-3 text-right font-extrabold">

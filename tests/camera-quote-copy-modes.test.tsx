@@ -76,7 +76,7 @@ describe("camera quote copy and price controls", () => {
     );
   });
 
-  test("uses the full desktop price cell as the edit control", () => {
+  test("uses the full desktop price cell as the edit control and keeps the edit icon", () => {
     const html = renderToStaticMarkup(
       <CameraPriceListClient
         models={[model]}
@@ -102,7 +102,7 @@ describe("camera quote copy and price controls", () => {
     expect(desktopTable).toContain(
       'aria-label="Sửa giá EZVIZ C6N G1 2K 3MP · Thẻ nhớ 64GB"',
     );
-    expect(editablePriceCells.every((cell) => !cell.includes("<svg"))).toBe(true);
+    expect(editablePriceCells.every((cell) => cell.includes("<svg"))).toBe(true);
   });
 
   test("renders one accessible three-mode copy trigger on every camera surface", () => {
