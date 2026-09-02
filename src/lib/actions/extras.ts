@@ -19,6 +19,7 @@ import { Routes } from "@/lib/routes";
 import { isServiceSnapshotJobLocked } from "@/lib/services/field-api";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { evaluateServiceProjectClose } from "@/lib/services/project-close";
+import { writeAuditLog } from "@/lib/audit";
 
 // ============ Công trình ============
 
@@ -293,5 +294,79 @@ export async function updateProject(input: UpdateProjectInput): Promise<ActionRe
         ? "services.errors.signedSnapshotLocked"
         : "errors.serverError",
     };
+  }
+}
+
+const manualProjectCompletionSchema = z.object({ id: z.uuid() });
+
+/**
+ * Explicit manager override for operationally finished service projects.
+ * This intentionally bypasses job, acceptance, and signature close guards,
+ * but never mutates child jobs or manufactures acceptance records.
+ */
+export async function completeServiceProjectManually(
+  input: z.input<typeof manualProjectCompletionSchema>,
+): Promise<ActionResult> {
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const parsed = manualProjectCompletionSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+
+  try {
+    const [current] = await db.select({
+      id: projects.id,
+      status: projects.status,
+      serviceType: projects.serviceType,
+      serviceStage: projects.serviceStage,
+      progressPercent: projects.progressPercent,
+    }).from(projects).where(and(
+      eq(projects.storeId, gate.storeId),
+      eq(projects.id, parsed.data.id),
+    )).limit(1);
+    if (!current) return { ok: false, error: "errors.notFound" };
+    if (!current.serviceType) {
+      return { ok: false, error: "errors.invalidData" };
+    }
+
+    await db.update(projects).set({
+      status: "done",
+      serviceStage: "completed",
+      progressPercent: 100,
+    }).where(and(
+      eq(projects.storeId, gate.storeId),
+      eq(projects.id, parsed.data.id),
+    ));
+
+    await writeAuditLog({
+      actorUserId: gate.userId,
+      source: "mobile",
+      action: "service_project.manual_complete",
+      entityType: "service_project",
+      entityId: parsed.data.id,
+      before: {
+        status: current.status,
+        serviceStage: current.serviceStage,
+        progressPercent: current.progressPercent,
+      },
+      after: {
+        status: "done",
+        serviceStage: "completed",
+        progressPercent: 100,
+      },
+      metadata: {
+        bypassedCloseRequirements: true,
+        childJobsMutated: false,
+        acceptanceRecordsCreated: false,
+      },
+    });
+
+    revalidatePath(Routes.Partners);
+    revalidatePath(Routes.Projects);
+    revalidatePath(Routes.Services);
+    revalidatePath(Routes.project(parsed.data.id));
+    return { ok: true, data: undefined };
+  } catch (error) {
+    console.error("completeServiceProjectManually failed:", error);
+    return { ok: false, error: "errors.serverError" };
   }
 }
