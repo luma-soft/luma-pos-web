@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { Plus } from "lucide-react";
+import { PencilLine, Plus } from "lucide-react";
 import { RowPreviewModal } from "@/components/data-table";
 import { CustomerCreateDialog, type CustomerCreateResult } from "@/components/partners/customer-create-dialog";
 import { Button } from "@/components/ui/button";
@@ -33,8 +33,7 @@ export function ProjectQuickCreate({
   const [address, setAddress] = useState("");
   const [serviceType, setServiceType] = useState("camera");
   const [targetEndsOn, setTargetEndsOn] = useState("");
-  const [siteContactName, setSiteContactName] = useState("");
-  const [siteContactPhone, setSiteContactPhone] = useState("");
+  const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const customerOptions = [
@@ -85,15 +84,14 @@ export function ProjectQuickCreate({
           address: address || undefined,
           serviceType: serviceType as "camera" | "electrical" | "plumbing" | "mixed",
           targetEndsOn: targetEndsOn || null,
-          siteContactName: siteContactName || undefined,
-          siteContactPhone: siteContactPhone || undefined,
+          note: note || undefined,
         })
       : await createProject({ name, customerId: customerId || null, address: address || undefined });
     setBusy(false);
     if (res.ok) {
       setOpen(false); setName(""); setAddress(""); setTargetEndsOn("");
       setNameSuggested(false); setCustomerId("");
-      setSiteContactName(""); setSiteContactPhone("");
+      setNote("");
       router.refresh();
     } else setError(t(res.error as never));
   }
@@ -157,8 +155,7 @@ export function ProjectQuickCreate({
             <>
               <Field label={t("services.fields.type")}><Select value={serviceType} onChange={(e) => chooseServiceType(e.target.value)} options={[{ value: "camera", label: t("services.types.camera") }, { value: "electrical", label: t("services.types.electrical") }, { value: "plumbing", label: t("services.types.plumbing") }, { value: "mixed", label: t("services.types.mixed") }]} rootClassName="w-full" /></Field>
               <Field label={t("services.fields.targetEndsOn")}><Input type="date" value={targetEndsOn} onChange={(e) => setTargetEndsOn(e.target.value)} /></Field>
-              <Field label={t("services.fields.siteContactName")}><Input value={siteContactName} onChange={(e) => setSiteContactName(e.target.value)} /></Field>
-              <Field label={t("services.fields.siteContactPhone")}><Input value={siteContactPhone} onChange={(e) => setSiteContactPhone(e.target.value)} /></Field>
+              <Field label={t("customers.fields.note")} className="sm:col-span-2"><Textarea value={note} onChange={(e) => setNote(e.target.value)} /></Field>
             </>
           )}
           {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
@@ -212,7 +209,7 @@ export function ProjectEdit({
 }: {
   project: EditableProject;
   customers: { id: string; name: string }[];
-  triggerVariant?: "link" | "outline";
+  triggerVariant?: "link" | "outline" | "icon";
 }) {
   const t = useTranslations();
   const router = useRouter();
@@ -225,11 +222,7 @@ export function ProjectEdit({
   const [note, setNote] = useState(project.note ?? "");
   const [status, setStatus] = useState(project.status);
   const [serviceType, setServiceType] = useState<string>(project.serviceType ?? "camera");
-  const [serviceStage, setServiceStage] = useState<string>(project.serviceStage ?? "planning");
-  const [startsOn, setStartsOn] = useState(project.startsOn ?? "");
   const [targetEndsOn, setTargetEndsOn] = useState(project.targetEndsOn ?? "");
-  const [siteContactName, setSiteContactName] = useState(project.siteContactName ?? "");
-  const [siteContactPhone, setSiteContactPhone] = useState(project.siteContactPhone ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const isServiceProject = Boolean(project.serviceType);
@@ -254,16 +247,16 @@ export function ProjectEdit({
       name,
       customerId: customerId || null,
       address: address || undefined,
-      note: note || undefined,
+      note: isServiceProject ? project.note ?? undefined : note,
       status: isServiceProject
-        ? serviceStage === "completed" || serviceStage === "cancelled" ? "done" : "active"
+        ? project.status === "done" ? "done" : "active"
         : status === "done" ? "done" : "active",
       serviceType: isServiceProject ? serviceType as "camera" | "electrical" | "plumbing" | "mixed" : undefined,
-      serviceStage: isServiceProject ? serviceStage as "planning" | "quoted" | "active" | "paused" | "completed" | "warranty" | "cancelled" : undefined,
-      startsOn: isServiceProject ? startsOn || null : undefined,
+      serviceStage: isServiceProject ? project.serviceStage ?? undefined : undefined,
+      startsOn: isServiceProject ? project.startsOn : undefined,
       targetEndsOn: isServiceProject ? targetEndsOn || null : undefined,
-      siteContactName: isServiceProject ? siteContactName || undefined : undefined,
-      siteContactPhone: isServiceProject ? siteContactPhone || undefined : undefined,
+      siteContactName: isServiceProject ? project.siteContactName ?? undefined : undefined,
+      siteContactPhone: isServiceProject ? project.siteContactPhone ?? undefined : undefined,
     });
     setBusy(false);
     if (res.ok) {
@@ -276,14 +269,28 @@ export function ProjectEdit({
 
   return (
     <>
-      <Button
-        type="button"
-        variant={triggerVariant}
-        size="sm"
-        onClick={() => setOpen(true)}
-        className={triggerVariant === "link" ? "h-auto px-0 text-xs min-h-11 min-w-11 lg:min-h-0 lg:min-w-0" : undefined}
-        tx="common.edit"
-      />
+      {triggerVariant === "icon" ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => setOpen(true)}
+          title={t("common.edit")}
+          aria-label={t("common.edit")}
+          className="rounded-xl bg-primary-50 text-primary-700 transition hover:-translate-y-0.5 hover:bg-primary-100"
+        >
+          <PencilLine className="h-4 w-4" />
+        </Button>
+      ) : (
+        <Button
+          type="button"
+          variant={triggerVariant}
+          size="sm"
+          onClick={() => setOpen(true)}
+          className={triggerVariant === "link" ? "h-auto px-0 text-xs min-h-11 min-w-11 lg:min-h-0 lg:min-w-0" : undefined}
+          tx="common.edit"
+        />
+      )}
       <RowPreviewModal
         open={open && !customerCreateOpen}
         onClose={() => {
@@ -330,16 +337,14 @@ export function ProjectEdit({
           {isServiceProject ? (
             <>
               <Field label={t("services.fields.type")}><Select value={serviceType} onChange={(e) => setServiceType(e.target.value)} options={[{ value: "camera", label: t("services.types.camera") }, { value: "electrical", label: t("services.types.electrical") }, { value: "plumbing", label: t("services.types.plumbing") }, { value: "mixed", label: t("services.types.mixed") }]} rootClassName="w-full" /></Field>
-              <Field label={t("services.fields.stage")}><Select value={serviceStage} onChange={(e) => setServiceStage(e.target.value)} options={["planning", "quoted", "active", "paused", "completed", "warranty", "cancelled"].map((value) => ({ value, label: t(`services.stages.${value}` as never) }))} rootClassName="w-full" /></Field>
-              <Field label={t("services.fields.startsOn")}><Input type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} /></Field>
               <Field label={t("services.fields.targetEndsOn")}><Input type="date" value={targetEndsOn} onChange={(e) => setTargetEndsOn(e.target.value)} /></Field>
-              <Field label={t("services.fields.siteContactName")}><Input value={siteContactName} onChange={(e) => setSiteContactName(e.target.value)} /></Field>
-              <Field label={t("services.fields.siteContactPhone")}><Input value={siteContactPhone} onChange={(e) => setSiteContactPhone(e.target.value)} /></Field>
             </>
           ) : (
             <Field label={t("orders.cols.status")}><Select value={status} onChange={(e) => setStatus(e.target.value)} options={[{ value: "active", label: t("projects.status.active") }, { value: "done", label: t("projects.status.done") }]} /></Field>
           )}
-          <Field label={t("customers.fields.note")} className="sm:col-span-2"><Textarea value={note} onChange={(e) => setNote(e.target.value)} /></Field>
+          {!isServiceProject && (
+            <Field label={t("customers.fields.note")} className="sm:col-span-2"><Textarea value={note} onChange={(e) => setNote(e.target.value)} /></Field>
+          )}
           {error && <Text as="p" variant="destructive" size="xs" className="sm:col-span-2" text={error} />}
         </div>
       </RowPreviewModal>

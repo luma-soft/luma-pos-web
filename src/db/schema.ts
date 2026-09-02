@@ -1470,6 +1470,30 @@ export const projects = pgTable("projects", {
   index("projects_customer_idx").on(t.customerId),
 ]);
 
+export const projectNotes = pgTable("project_notes", {
+  storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id, { onDelete: "cascade" }),
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  createdBy: uuid("created_by").references(() => profiles.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  check("project_notes_content_check", sql`char_length(btrim(${t.content})) > 0`),
+  unique("project_notes_store_id_id_unique").on(t.storeId, t.id),
+  index("project_notes_project_updated_idx").on(t.storeId, t.projectId, t.updatedAt),
+  foreignKey({
+    columns: [t.storeId, t.projectId],
+    foreignColumns: [projects.storeId, projects.id],
+    name: "project_notes_project_tenant_fk",
+  }).onDelete("cascade"),
+  foreignKey({
+    columns: [t.storeId, t.createdBy],
+    foreignColumns: [profiles.storeId, profiles.id],
+    name: "project_notes_created_by_tenant_fk",
+  }).onDelete("no action"),
+]);
+
 // ============= Thi công & dịch vụ =============
 
 export const serviceJobs = pgTable("service_jobs", {

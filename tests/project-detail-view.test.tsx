@@ -180,6 +180,7 @@ async function renderServiceProjectDetail() {
       warehouseOptions: [],
     },
     presentation: "page",
+    canDelete: true,
   });
 
   return renderToStaticMarkup(
@@ -211,7 +212,7 @@ describe("ProjectDetailView", () => {
     expect(createTranslator({ locale: "en", messages: enMessages })("services.materials.product")).toBe("Product");
   });
 
-  test("renders project actions as two separated buttons in the modal toolbar", async () => {
+  test("renders compact project actions without the quote shortcut", async () => {
     const { ProjectDetailActions } = await importProjectDetailView();
     const html = renderToStaticMarkup(
       <NextIntlClientProvider
@@ -230,18 +231,16 @@ describe("ProjectDetailView", () => {
             warehouseOptions: [],
           }}
           t={createTranslator({ locale: "vi", messages: viMessages })}
+          canDelete
         />
       </NextIntlClientProvider>,
     );
 
     expect(html).toContain('data-project-detail-actions="true"');
     expect(html).toContain("flex-wrap items-center justify-end gap-2");
-    expect(html).toMatch(
-      /<button[^>]*class="[^"]*border-border[^"]*"[^>]*>Sửa<\/button>/,
-    );
-    expect(html).toMatch(
-      /<a[^>]*class="[^"]*h-11[^"]*text-xs[^"]*lg:h-8[^"]*"[^>]*>Tạo báo giá<\/a>/,
-    );
+    expect(html).toContain('aria-label="Sửa"');
+    expect(html).toContain("lucide-pencil-line");
+    expect(html).not.toContain("Tạo báo giá");
   });
 
   test("renders the destructive project action only for managers", async () => {
@@ -266,54 +265,36 @@ describe("ProjectDetailView", () => {
     expect(renderActions(true)).toContain("border-red-200");
   });
 
-  test("renders semantic icons for every redesigned project flow tab", async () => {
+  test("renders only the focused project flow tabs", async () => {
     const html = await renderServiceProjectDetail();
 
-    for (const id of ["overview", "execution", "installation", "aftercare", "finance"]) {
+    for (const id of ["overview", "devices", "media"]) {
       expect(html).toContain(`data-project-tab-icon="${id}"`);
     }
     expect(html).toContain('class="lucide lucide-house"');
-    expect(html).toContain('class="lucide lucide-wrench"');
-    expect(html).toContain('class="lucide lucide-package-check"');
-    expect(html).toContain('class="lucide lucide-clipboard-check"');
-    expect(html).toContain('class="lucide lucide-file-text"');
+    expect(html).toContain('class="lucide lucide-server"');
+    expect(html).toContain('class="lucide lucide-images"');
+    expect(html).not.toContain('data-project-tab-icon="execution"');
+    expect(html).not.toContain('data-project-tab-icon="finance"');
   });
 
-  test("renders semantic metric and activity icons in the project overview", async () => {
+  test("renders the simple status, devices and notes overview", async () => {
     const html = await renderServiceProjectDetail();
 
-    for (const id of ["progress", "devices", "jobs", "warranty"]) {
-      expect(html).toContain(`data-project-pulse-icon="${id}"`);
-    }
+    expect(html).toContain('data-project-experience="simple"');
+    expect(html).toContain("Trạng thái");
+    expect(html).toContain("Thiết bị đã lắp");
+    expect(html).toContain("Danh sách ghi chú");
+    expect(html).toContain('href="/projects/project-1/notes"');
     expect(html).toContain('lucide-server');
-    expect(html).toContain('lucide-clipboard-list');
-    expect(html).toContain('data-project-activity-icon="status"');
-    expect(html).toContain('data-project-activity-icon="asset"');
-    expect(html).toContain('lucide-shield-check');
-    expect(html).toContain('lucide-camera');
   });
 
-  test("renders the next create-job action as an interactive button", async () => {
+  test("keeps advanced construction actions out of the simple flow", async () => {
     const html = await renderServiceProjectDetail();
-    const overview = html.slice(
-      html.indexOf('id="project-service-panel-overview"'),
-      html.indexOf('id="project-service-panel-execution"'),
-    );
-
-    expect(overview).toMatch(/<button[^>]*>[^<]*(?:<[^>]+>[^<]*<\/[^>]+>)*Tạo lệnh việc<\/button>/);
-  });
-
-  test("renders semantic section icons throughout the camera access vault", async () => {
-    const html = await renderServiceProjectDetail();
-
-    for (const id of ["connection", "secrets", "viewers", "history"]) {
-      expect(html).toContain(`data-camera-vault-section="${id}"`);
-    }
-    expect(html).toContain('lucide-earth');
-    expect(html).toContain('lucide-lock-keyhole');
-    expect(html).toContain('lucide-users');
-    expect(html).toContain('lucide-history');
-    expect(html.match(/data-camera-secret-visibility="hidden"/g)).toHaveLength(6);
+    expect(html).not.toContain("Tạo lệnh việc");
+    expect(html).not.toContain("Lập kế hoạch");
+    expect(html).not.toContain("Nghiệm thu &amp; bàn giao");
+    expect(html).not.toContain("Tài chính &amp; hồ sơ");
   });
 
   test("keeps mixed-project dependency and coordination icons explicit", () => {

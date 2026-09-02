@@ -1,4 +1,4 @@
-import { describe, expect, mock, test } from "bun:test";
+import { describe, expect, mock, setSystemTime, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { Children, isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -111,6 +111,7 @@ mock.module("@/lib/actions/extras", () => ({
 mock.module("@/lib/actions/services", () => ({
   createServiceProject: async () => ({ ok: true }),
   createInstalledAsset: async () => ({ ok: true }),
+  createInstalledAssetsBatch: async () => ({ ok: true }),
   createServiceJob: async () => ({ ok: true }),
   createWarrantyClaim: async () => ({ ok: true }),
   deleteServiceCostEntry: async () => ({ ok: true }),
@@ -322,15 +323,21 @@ describe("final mobile table surfaces", () => {
       productName: "Camera H6C Pro",
       baseUnit: "cái",
     };
-    const html = renderWithMessages(
-      <PromotionMobileRow
+    setSystemTime(new Date("2026-08-01T12:00:00+07:00"));
+    let html: string;
+    try {
+      html = renderWithMessages(
+        <PromotionMobileRow
         row={row}
         renderActions={(actionRow) => {
           actionCalls.push([actionRow.id, actionRow.isActive]);
           return <button type="button" className="min-h-11 min-w-11">Tạm dừng</button>;
         }}
       />,
-    );
+      );
+    } finally {
+      setSystemTime();
+    }
 
     expect(html).toContain("Giảm giá camera dự án");
     expect(html).toContain("Camera H6C Pro · cái");
@@ -470,20 +477,15 @@ describe("final mobile table surfaces", () => {
     );
     expect(html).toContain("Lắp camera nhà xưởng Bình Minh");
     expect(html).not.toContain("Công trình không được chọn");
-    expect(html).toContain("Camera");
     expect(html).toContain('data-project-trade-icon="camera"');
     expect(html).toContain('lucide-camera');
-    expect(html).toContain('data-project-stage-icon="active"');
-    expect(html).toContain('lucide-hard-hat');
+    expect(html).not.toContain('data-project-stage-icon="active"');
     expect(html).toContain("Công ty Bình Minh");
-    expect(html).toContain("65%");
-    expect(html).toContain("2/5");
-    expect(html).toContain(">4<");
-    expect(html).toContain(">1<");
-    expect(html).toContain("Đang thi công");
-    expect(html).toContain("KCN Sóng Thần, Bình Dương");
-    expect(html).toContain("2 lệnh việc chưa hoàn tất");
-    expect(html).toContain("4 thiết bị đang lắp đặt");
+    expect(html).not.toContain("65%");
+    expect(html).not.toContain("2/5");
+    expect(html).not.toContain("Lập kế hoạch");
+    expect(html).toContain("4 thiết bị");
+    expect(html).toContain("Quá hạn");
     expect(html).toContain("Xem chi tiết");
     expect(html).toContain('href="/projects/service-project-1"');
     expect(html).toMatch(
@@ -510,16 +512,16 @@ describe("final mobile table surfaces", () => {
     expect(desktopNameHtml).toMatch(
       /<a [^>]*href="\/projects\/service-project-1"[^>]*>Lắp camera nhà xưởng Bình Minh<\/a>/,
     );
-    const stageColumn = (
+    const statusColumn = (
       tableProps.columns as Array<{
         key: string;
         render: (row: typeof row) => ReactNode;
       }>
-    ).find((column) => column.key === "stage");
-    expect(stageColumn).toBeDefined();
-    const desktopStageHtml = renderToStaticMarkup(stageColumn!.render(row));
-    expect(desktopStageHtml).toContain('data-project-stage-icon="active"');
-    expect(desktopStageHtml).toContain('lucide-hard-hat');
+    ).find((column) => column.key === "status");
+    expect(statusColumn).toBeDefined();
+    const desktopStatusHtml = renderToStaticMarkup(statusColumn!.render(row));
+    expect(desktopStatusHtml).toContain("Quá hạn");
+    expect(desktopStatusHtml).not.toContain("Lập kế hoạch");
     expect(isValidElement(desktopName)).toBe(true);
     const desktopNameProps = elementsOfType(desktopName, Link)[0]?.props as {
       onClick?: (event: unknown) => void;

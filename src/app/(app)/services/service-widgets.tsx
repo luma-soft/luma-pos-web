@@ -5,17 +5,14 @@ import { useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
-  CalendarClock,
+  CalendarDays,
   Camera,
   CheckCircle2,
-  CirclePause,
-  CircleX,
+  ChevronRight,
   Droplets,
-  FileText,
-  HardHat,
   Network,
   Plus,
-  ShieldCheck,
+  Server,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -86,16 +83,6 @@ const projectTradeIcons: Record<"camera" | "electrical" | "plumbing" | "mixed", 
   mixed: { icon: Network, tone: "bg-violet-50 text-violet-700" },
 };
 
-const projectStageIcons: Record<string, LucideIcon> = {
-  planning: CalendarClock,
-  quoted: FileText,
-  active: HardHat,
-  paused: CirclePause,
-  completed: CheckCircle2,
-  warranty: ShieldCheck,
-  cancelled: CircleX,
-};
-
 function ProjectTradeIcon({ type, compact = false }: { type: string | null; compact?: boolean }) {
   const resolvedType = type === "electrical" || type === "plumbing" || type === "mixed" ? type : "camera";
   const meta = projectTradeIcons[resolvedType];
@@ -111,24 +98,6 @@ function ProjectTradeIcon({ type, compact = false }: { type: string | null; comp
       )}
     >
       <Icon className={compact ? "h-3.5 w-3.5" : "h-5 w-5"} />
-    </span>
-  );
-}
-
-function ProjectStageBadge({ stage, label }: { stage: string | null; label: string }) {
-  const resolvedStage = stage && projectStageIcons[stage] ? stage : "planning";
-  const Icon = projectStageIcons[resolvedStage];
-  const success = stage === "completed";
-  return (
-    <span
-      data-project-stage-icon={resolvedStage}
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium",
-        success ? "bg-in-soft text-in" : "bg-surface-2 text-slate-600",
-      )}
-    >
-      <Icon aria-hidden="true" className="h-3.5 w-3.5" />
-      {label}
     </span>
   );
 }
@@ -171,13 +140,15 @@ export function ServiceDashboardFilters({
         ]}
         className="min-w-36"
       />
-      <Select
-        size="sm"
-        value={status}
-        onChange={(event) => update("status", event.target.value)}
-        options={[{ value: "", label: t("services.filters.allStatuses") }, ...statuses]}
-        className="min-w-44"
-      />
+      {tab !== "projects" && (
+        <Select
+          size="sm"
+          value={status}
+          onChange={(event) => update("status", event.target.value)}
+          options={[{ value: "", label: t("services.filters.allStatuses") }, ...statuses]}
+          className="min-w-44"
+        />
+      )}
     </div>
   );
 }
@@ -191,7 +162,7 @@ export function ServiceProjectMobileRow({
 }) {
   const t = useTranslations();
   return (
-    <article className="min-w-0 space-y-4 p-4">
+    <article className="min-w-0 p-4">
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="flex min-w-0 items-start gap-3">
           <ProjectTradeIcon type={row.serviceType} />
@@ -204,45 +175,26 @@ export function ServiceProjectMobileRow({
                 {row.name}
               </Link>
             </h3>
-            <p className="mt-1 break-words text-xs font-medium text-slate-600 dark:text-slate-300">
-              {serviceTypeLabel(t, row.serviceType)}
-            </p>
-            <p className="mt-1 break-words text-xs text-slate-500">{row.customerName ?? "—"}</p>
+            <p className="mt-1 break-words text-xs text-slate-500">{row.customerName ?? t("projects.noCustomer")}</p>
           </div>
         </div>
-        <ProjectStageBadge stage={row.serviceStage} label={row.serviceStage ? t(`services.stages.${row.serviceStage}` as never) : "—"} />
+        <ChevronRight aria-hidden="true" className="mt-2 h-5 w-5 shrink-0 text-slate-400" />
       </div>
-      <dl className="grid grid-cols-2 gap-x-3 gap-y-4 text-sm">
-        <div className="min-w-0">
-          <dt className="text-xs font-medium text-slate-500">{t("services.fields.progress")}</dt>
-          <dd className="mt-1 font-semibold tabular-nums">{row.progressPercent}%</dd>
-        </div>
-        <div className="min-w-0">
-          <dt className="text-xs font-medium text-slate-500">{t("services.tabs.jobs")}</dt>
-          <dd className="mt-1 font-semibold tabular-nums">{row.openJobCount}/{row.jobCount}</dd>
-        </div>
-        <div className="min-w-0">
-          <dt className="text-xs font-medium text-slate-500">{t("services.fields.assets")}</dt>
-          <dd className="mt-1 font-semibold tabular-nums">{row.assetCount}</dd>
-        </div>
-        <div className="min-w-0">
-          <dt className="text-xs font-medium text-slate-500">{t("services.tabs.warranty")}</dt>
-          <dd className="mt-1 font-semibold tabular-nums">{row.openClaimCount}</dd>
-        </div>
-      </dl>
-      <div className="grid gap-2 border-t border-border-soft pt-3 text-sm text-slate-600 dark:text-slate-300">
-        <p className="break-words">{row.address ?? "—"}</p>
-        <p>{t("services.summary.openJobs", { count: row.openJobCount })}</p>
-        <p>{t("services.summary.assets", { count: row.assetCount })}</p>
-      </div>
-      <div className="flex min-h-11 flex-wrap items-center justify-end gap-2 border-t border-border-soft pt-3">
+      <div className="mt-4 flex min-h-11 flex-wrap items-center gap-3 border-t border-border-soft pt-3 text-xs font-medium text-slate-500">
+        <span className="inline-flex items-center gap-1.5">
+          <Server className="h-4 w-4" />
+          {row.assetCount} thiết bị
+        </span>
+        <ProjectStatusText row={row} />
+        <span className="ml-auto flex items-center gap-2">
         <Link
           href={Routes.project(row.id)}
-          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border border-border px-3 text-sm font-semibold text-primary-600 hover:bg-surface-2"
+          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3 text-sm font-semibold text-primary-600 transition hover:bg-primary-50"
         >
           {t("projects.viewDetail")}
         </Link>
         {renderActions(row)}
+        </span>
       </div>
     </article>
   );
@@ -256,13 +208,14 @@ export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProject
       key: "name",
       label: t("projects.cols.name"),
       required: true,
+      width: "28%",
       render: (row) => (
         <div className="flex min-w-0 items-center gap-2.5">
           <ProjectTradeIcon type={row.serviceType} />
           <Link
             href={Routes.project(row.id)}
             onClick={stopRowToggle}
-            className="min-w-0 truncate font-semibold text-primary-600 hover:underline"
+            className="min-w-0 whitespace-normal break-words font-semibold text-primary-600 hover:underline"
           >
             {row.name}
           </Link>
@@ -281,21 +234,13 @@ export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProject
       ),
     },
     { key: "customer", label: t("orders.cols.customer"), defaultVisible: true, render: (row) => row.customerName ?? "—" },
+    { key: "assets", label: "Thiết bị", defaultVisible: true, align: "right", render: (row) => row.assetCount },
     {
-      key: "progress",
-      label: t("services.fields.progress"),
-      defaultVisible: true,
-      align: "right",
-      render: (row) => `${row.progressPercent}%`,
-    },
-    { key: "jobs", label: t("services.tabs.jobs"), defaultVisible: true, align: "right", render: (row) => `${row.openJobCount}/${row.jobCount}` },
-    { key: "assets", label: t("services.fields.assets"), defaultVisible: true, align: "right", render: (row) => row.assetCount },
-    { key: "claims", label: t("services.tabs.warranty"), defaultVisible: true, align: "right", render: (row) => row.openClaimCount },
-    {
-      key: "stage",
-      label: t("services.fields.stage"),
+      key: "status",
+      label: t("orders.cols.status"),
       required: true,
-      render: (row) => <ProjectStageBadge stage={row.serviceStage} label={row.serviceStage ? t(`services.stages.${row.serviceStage}` as never) : "—"} />,
+      width: "24%",
+      render: (row) => <ProjectStatusText row={row} />,
     },
     {
       key: "actions",
@@ -313,7 +258,7 @@ export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProject
       rows={rows}
       columns={columns}
       getRowId={(row) => row.id}
-      minWidth="980px"
+      minWidth="720px"
       onRowClick={(row) => router.push(Routes.project(row.id))}
       renderMobileRow={({ row }) => (
         <ServiceProjectMobileRow
@@ -325,6 +270,53 @@ export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProject
       )}
     />
   );
+}
+
+function ProjectStatusText({ row }: { row: ServiceProjectRow }) {
+  const completed = row.status === "done" || row.serviceStage === "completed";
+  if (completed) {
+    return (
+      <span className="inline-flex items-center gap-1.5 font-semibold text-ok">
+        <CheckCircle2 className="h-4 w-4" />
+        Hoàn thành
+      </span>
+    );
+  }
+  if (!row.targetEndsOn) {
+    return <span className="text-slate-500">Đang thực hiện</span>;
+  }
+  const days = projectDeadlineDays(row.targetEndsOn);
+  const label = days < 0
+    ? `${formatProjectDay(row.targetEndsOn)} · Quá hạn ${-days} ngày`
+    : days === 0
+      ? `${formatProjectDay(row.targetEndsOn)} · Hôm nay`
+      : days <= 4
+        ? `${formatProjectDay(row.targetEndsOn)} · Sắp đến hạn`
+        : formatProjectDay(row.targetEndsOn);
+  return (
+    <span className={cn(
+      "inline-flex items-center gap-1.5 whitespace-normal font-semibold",
+      days < 0 ? "text-er" : days <= 4 ? "text-warn" : "text-slate-500",
+    )}>
+      <CalendarDays className="h-4 w-4 shrink-0" />
+      {label}
+    </span>
+  );
+}
+
+function projectDeadlineDays(value: string) {
+  const target = new Date(`${value}T00:00:00`);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((target.getTime() - today.getTime()) / 86_400_000);
+}
+
+function formatProjectDay(value: string) {
+  return new Intl.DateTimeFormat("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(new Date(`${value}T00:00:00`));
 }
 
 export function ServiceJobsTable({ rows }: { rows: ServiceJobRow[] }) {

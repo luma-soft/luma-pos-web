@@ -7,6 +7,7 @@ import { db } from "@/db";
 import {
   customers,
   products,
+  projectNotes,
   projects,
   promotions,
   serviceCoordinationPoints,
@@ -100,18 +101,30 @@ export async function createProject(input: CreateProjectInput): Promise<ActionRe
   const parsed = projectSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
+  const initialNote = v.note?.trim();
   try {
     if (v.customerId) {
       const [customer] = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.storeId, context.storeId), eq(customers.id, v.customerId))).limit(1);
       if (!customer) return { ok: false, error: "errors.invalidData" };
     }
-    const [row] = await db.insert(projects).values({
-      storeId: context.storeId,
-      name: v.name.trim(),
-      customerId: v.customerId ?? null,
-      address: v.address?.trim() || null,
-      note: v.note || null,
-    }).returning({ id: projects.id });
+    const row = await db.transaction(async (tx) => {
+      const [created] = await tx.insert(projects).values({
+        storeId: context.storeId,
+        name: v.name.trim(),
+        customerId: v.customerId ?? null,
+        address: v.address?.trim() || null,
+        note: initialNote || null,
+      }).returning({ id: projects.id });
+      if (initialNote) {
+        await tx.insert(projectNotes).values({
+          storeId: context.storeId,
+          projectId: created.id,
+          content: initialNote,
+          createdBy: context.userId,
+        });
+      }
+      return created;
+    });
     revalidatePath(Routes.Partners);
     revalidatePath(Routes.Services);
     revalidatePath(Routes.Projects);

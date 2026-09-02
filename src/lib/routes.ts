@@ -77,6 +77,7 @@ export const Routes = {
   customer: (id: string) => `/customers/${id}` as const,
   supplier: (id: string) => `/suppliers/${id}` as const,
   project: (id: string) => `/projects/${id}` as const,
+  projectNotes: (id: string) => `/projects/${id}/notes` as const,
   projectQuote: (input: { projectId: string; projectName: string; customerId?: string | null }) => {
     const params = new URLSearchParams({
       draft: "quote",

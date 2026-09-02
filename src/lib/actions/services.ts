@@ -7,6 +7,7 @@ import {
   installedAssets,
   orders,
   products,
+  projectNotes,
   projects,
   serviceCostEntries,
   serviceHandoverDocuments,
@@ -205,21 +206,33 @@ export async function createServiceProject(
   const parsed = serviceProjectCreateSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const value = parsed.data;
+  const initialNote = value.note?.trim();
 
   try {
-    const [project] = await db.insert(projects).values({
-      storeId: gate.storeId,
-      name: value.name,
-      customerId: value.customerId ?? null,
-      address: value.address || null,
-      serviceType: value.serviceType,
-      serviceStage: value.serviceStage,
-      startsOn: value.startsOn ?? null,
-      targetEndsOn: value.targetEndsOn ?? null,
-      siteContactName: value.siteContactName || null,
-      siteContactPhone: value.siteContactPhone || null,
-      note: value.note || null,
-    }).returning({ id: projects.id });
+    const project = await db.transaction(async (tx) => {
+      const [created] = await tx.insert(projects).values({
+        storeId: gate.storeId,
+        name: value.name,
+        customerId: value.customerId ?? null,
+        address: value.address || null,
+        serviceType: value.serviceType,
+        serviceStage: value.serviceStage,
+        startsOn: value.startsOn ?? null,
+        targetEndsOn: value.targetEndsOn ?? null,
+        siteContactName: value.siteContactName || null,
+        siteContactPhone: value.siteContactPhone || null,
+        note: initialNote || null,
+      }).returning({ id: projects.id });
+      if (initialNote) {
+        await tx.insert(projectNotes).values({
+          storeId: gate.storeId,
+          projectId: created.id,
+          content: initialNote,
+          createdBy: gate.userId,
+        });
+      }
+      return created;
+    });
     revalidateServiceProject(project.id);
     return { ok: true, data: project };
   } catch (error) {

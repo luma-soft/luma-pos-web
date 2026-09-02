@@ -28,8 +28,8 @@ import { ProjectEdit } from "../project-widgets";
 import { ProjectServiceTab, ProjectServiceTabs } from "./project-service-tabs";
 import { MobileRecordCard, MobileRecordField } from "@/components/mobile-ui";
 import { DirectPrintButton } from "@/components/print/direct-print-button";
-import { ProjectRedesignedExperience } from "./project-redesigned-experience";
 import { ProjectDeleteButton } from "./project-delete-button";
+import { ProjectSimpleExperience } from "./project-simple-experience";
 
 type ServiceOptions = Awaited<ReturnType<typeof getServiceFormOptions>> | null;
 type Translator = Awaited<ReturnType<typeof getTranslations>>;
@@ -70,7 +70,11 @@ export async function ProjectDetailView({
         </div>
       )}
       {detail.project.serviceType && serviceOptions ? (
-        <ProjectRedesignedExperience detail={detail} serviceOptions={serviceOptions} />
+        <ProjectSimpleExperience
+          detail={detail}
+          serviceOptions={serviceOptions}
+          canManage={canDelete}
+        />
       ) : (
         <ProjectDetailBody detail={detail} serviceOptions={serviceOptions} t={t} />
       )}
@@ -124,11 +128,11 @@ export function ProjectDetailActions({
       data-project-detail-actions="true"
       className="flex flex-wrap items-center justify-end gap-2"
     >
-      {serviceOptions && (
+      {serviceOptions && canDelete && (
         <ProjectEdit
           project={project}
           customers={serviceOptions.customerOptions}
-          triggerVariant="outline"
+          triggerVariant="icon"
         />
       )}
       {canDelete && (
@@ -137,7 +141,6 @@ export function ProjectDetailActions({
           projectName={project.name}
         />
       )}
-      {project.serviceType && <Link href={Routes.projectQuote({ projectId: project.id, projectName: project.name, customerId: project.customerId })} className="inline-flex h-11 items-center justify-center rounded-lg bg-primary-600 px-3 text-xs font-medium text-white hover:bg-primary-700 lg:h-8 min-w-11 lg:min-w-0 min-w-11 lg:min-w-0">{t("quotes.createQuote")}</Link>}
     </div>
   );
 }
