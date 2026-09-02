@@ -18,6 +18,7 @@ export async function GET(request: Request) {
 
   const status = searchParam(request, "status");
   const serviceType = searchParam(request, "serviceType");
+  const urgency = searchParam(request, "urgency");
   return mobileOk(await getServiceProjectsPage(gate.storeId, {
     q: searchParam(request, "q"),
     status: status === "active" || status === "done" ? status : undefined,
@@ -26,6 +27,9 @@ export async function GET(request: Request) {
       || serviceType === "plumbing"
       || serviceType === "mixed"
       ? serviceType
+      : undefined,
+    urgency: urgency === "attention" || urgency === "overdue"
+      ? urgency
       : undefined,
     page: numberParam(request, "page", 1),
     pageSize: numberParam(request, "pageSize", 20),

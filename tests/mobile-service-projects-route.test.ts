@@ -45,7 +45,7 @@ describe("GET /api/mobile/services/projects", () => {
   test("forwards search, status, service type, and pagination", async () => {
     const response = await getProjects(
       new Request(
-        "https://luma.test/api/mobile/services/projects?q=alpha&status=active&serviceType=camera&page=2&pageSize=20",
+        "https://luma.test/api/mobile/services/projects?q=alpha&status=active&serviceType=camera&urgency=overdue&page=2&pageSize=20",
       ),
     );
 
@@ -54,6 +54,7 @@ describe("GET /api/mobile/services/projects", () => {
       q: "alpha",
       status: "active",
       serviceType: "camera",
+      urgency: "overdue",
       page: 2,
       pageSize: 20,
     }]);

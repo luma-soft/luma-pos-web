@@ -21,7 +21,7 @@ for (const file of readdirSync(`${projectRoot}/drizzle`)
 }
 
 mock.module("@/db", () => ({ db, schema }));
-const { getServiceDashboard } = await import(
+const { getServiceDashboard, getServiceProjectsPage } = await import(
   `${projectRoot}/src/lib/data/services.ts`
 );
 
@@ -58,4 +58,76 @@ test("service project rows expose the financial summary required by mobile", asy
   expect(row?.orderCount).toBe(1);
   expect(Number(row?.totalValue)).toBe(120000);
   expect(Number(row?.remaining)).toBe(100000);
+});
+
+test("deadline summaries are disjoint and urgency filters return matching projects", async () => {
+  const { rows: [{ today }] } = await client.query(
+    "select current_date::text as today",
+  );
+  const shiftDate = (days) => {
+    const value = new Date(`${today}T00:00:00Z`);
+    value.setUTCDate(value.getUTCDate() + days);
+    return value.toISOString().slice(0, 10);
+  };
+
+  const [overdue] = await db.insert(projects).values({
+    name: "Camera overdue paused",
+    status: "active",
+    serviceType: "camera",
+    serviceStage: "paused",
+    targetEndsOn: shiftDate(-2),
+  }).returning();
+  await db.insert(projects).values([
+    {
+      storeId: overdue.storeId,
+      name: "Camera due soon",
+      status: "active",
+      serviceType: "camera",
+      serviceStage: "active",
+      targetEndsOn: shiftDate(2),
+    },
+    {
+      storeId: overdue.storeId,
+      name: "Camera completed late",
+      status: "done",
+      serviceType: "camera",
+      serviceStage: "completed",
+      targetEndsOn: shiftDate(-5),
+    },
+    {
+      storeId: overdue.storeId,
+      name: "Camera completed stage",
+      status: "active",
+      serviceType: "camera",
+      serviceStage: "completed",
+      targetEndsOn: shiftDate(-6),
+    },
+    {
+      storeId: overdue.storeId,
+      name: "Camera later",
+      status: "active",
+      serviceType: "camera",
+      serviceStage: "active",
+      targetEndsOn: shiftDate(10),
+    },
+  ]);
+
+  const all = await getServiceProjectsPage(overdue.storeId);
+  expect(all.summary).toEqual({ attention: 1, overdue: 1 });
+
+  const overduePage = await getServiceProjectsPage(overdue.storeId, {
+    urgency: "overdue",
+  });
+  expect(overduePage.rows.map((row) => row.name)).toEqual([
+    "Camera overdue paused",
+  ]);
+  expect(overduePage.summary).toEqual({ attention: 1, overdue: 1 });
+
+  const attentionPage = await getServiceProjectsPage(overdue.storeId, {
+    urgency: "attention",
+  });
+  expect(attentionPage.rows.map((row) => row.name)).toEqual([
+    "Camera due soon",
+  ]);
+  expect(attentionPage.summary).toEqual({ attention: 1, overdue: 1 });
 });

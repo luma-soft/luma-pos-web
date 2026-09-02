@@ -15,6 +15,7 @@ export type ServiceProjectListQuery = {
   q?: string;
   status?: "active" | "done";
   serviceType?: "camera" | "electrical" | "plumbing" | "mixed";
+  urgency?: "attention" | "overdue";
   page?: number;
   pageSize?: number;
 };
@@ -42,7 +43,18 @@ export async function getServiceProjectsPage(
     );
     if (search) conditions.push(search);
   }
-  const where = and(...conditions)!;
+  const activeProjectPredicate = sql<boolean>`${projects.status} = 'active' and ${projects.serviceStage} is distinct from 'completed'`;
+  const overduePredicate = sql<boolean>`${activeProjectPredicate} and ${projects.targetEndsOn} is not null and ${projects.targetEndsOn} < current_date`;
+  const attentionPredicate = sql<boolean>`${activeProjectPredicate} and not (${overduePredicate}) and (${projects.serviceStage} = 'paused' or (${projects.targetEndsOn} is not null and ${projects.targetEndsOn} between current_date and current_date + 4) or exists (select 1 from ${warrantyClaims} where ${warrantyClaims.storeId} = ${storeId} and ${warrantyClaims.projectId} = ${projects.id} and ${warrantyClaims.status} not in ('closed','void')))`;
+  const summaryWhere = and(...conditions)!;
+  const listWhere = and(
+    ...conditions,
+    query.urgency === "overdue"
+      ? overduePredicate
+      : query.urgency === "attention"
+        ? attentionPredicate
+        : undefined,
+  )!;
 
   const projectSelection = {
     id: projects.id,
@@ -73,21 +85,21 @@ export async function getServiceProjectsPage(
     db.select(projectSelection)
       .from(projects)
       .leftJoin(customers, eq(projects.customerId, customers.id))
-      .where(where)
+      .where(listWhere)
       .orderBy(desc(projects.createdAt), desc(projects.id))
       .limit(pageSize)
       .offset((page - 1) * pageSize),
     db.select({ value: count() })
       .from(projects)
       .leftJoin(customers, eq(projects.customerId, customers.id))
-      .where(where),
+      .where(listWhere),
     db.select({
-      attention: sql<number>`count(*) filter (where ${projects.status} = 'active' and (${projects.serviceStage} = 'paused' or (${projects.targetEndsOn} is not null and ${projects.targetEndsOn} <= current_date + 4) or exists (select 1 from ${warrantyClaims} where ${warrantyClaims.storeId} = ${storeId} and ${warrantyClaims.projectId} = ${projects.id} and ${warrantyClaims.status} not in ('closed','void'))))::int`,
-      overdue: sql<number>`count(*) filter (where ${projects.status} = 'active' and ${projects.targetEndsOn} is not null and ${projects.targetEndsOn} < current_date)::int`,
+      attention: sql<number>`count(*) filter (where ${attentionPredicate})::int`,
+      overdue: sql<number>`count(*) filter (where ${overduePredicate})::int`,
     })
       .from(projects)
       .leftJoin(customers, eq(projects.customerId, customers.id))
-      .where(where),
+      .where(summaryWhere),
   ]);
 
   const total = totalRows[0]?.value ?? 0;
