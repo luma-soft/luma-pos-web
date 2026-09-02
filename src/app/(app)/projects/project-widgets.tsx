@@ -130,6 +130,8 @@ export function ProjectQuickCreate({
             <Select
               value={customerId}
               onChange={(e) => chooseCustomer(e.target.value)}
+              searchable
+              searchPlaceholder={t("common.search")}
               options={[
                 { value: "", label: t("projects.noCustomer") },
                 ...customerOptions.map((c) => ({ value: c.id, label: c.name })),
@@ -304,6 +306,8 @@ export function ProjectEdit({
             <Select
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
+              searchable
+              searchPlaceholder={t("common.search")}
               options={[
                 { value: "", label: t("projects.noCustomer") },
                 ...customerOptions.map((c) => ({ value: c.id, label: c.name })),
