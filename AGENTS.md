@@ -6,6 +6,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ## Database migrations
 
+- Dùng credentials của `DATABASE_URL` hiện có; không hỏi lại người dùng về biến kết nối migration riêng. Nếu URL là Supabase pooler cổng 6543, thử endpoint session cùng host/credentials ở cổng 5432 và truyền qua `MIGRATION_DATABASE_URL` cho riêng tiến trình runner. Giữ nguyên kiểm tra session/advisory lock; không in credentials.
 - Khi thay đổi schema hoặc thêm/sửa file trong `drizzle/`, phải tự động chạy `bun run src/db/apply-migrations.ts` trên database được cấu hình sau khi kiểm tra migration. Không được chỉ tạo file migration rồi bàn giao.
 - Sau khi chạy, phải xác minh không còn migration pending và truy vấn được các bảng/cột vừa thay đổi trước khi báo hoàn tất.
 - Dùng migration runner có tracking `_migrations`; không dùng `db:push` chỉ để apply một migration đã tồn tại.

@@ -517,6 +517,40 @@ export const products = pgTable("products", {
   index("products_total_stock_idx").on(t.totalStock), // lọc/sắp theo tồn (trang Tồn kho)
 ]);
 
+// Catalog names and aliases preserve attribute identity across renames/imports.
+// Product-spec triggers maintain usage, so even legacy writers respect deletion.
+export const productAttributes = pgTable("product_attributes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  nameKey: text("name_key").generatedAlwaysAs(sql`public.product_attribute_name_key(name)`),
+}, (t) => [
+  unique("product_attributes_store_name_unique").on(t.storeId, t.nameKey),
+  unique("product_attributes_store_id_unique").on(t.storeId, t.id),
+  check("product_attributes_name_check", sql`${t.nameKey} <> '' and left(${t.nameKey}, 2) <> '__'`),
+]);
+
+export const productAttributeAliases = pgTable("product_attribute_aliases", {
+  storeId: uuid("store_id").notNull(),
+  nameKey: text("name_key").notNull(),
+  attributeId: uuid("attribute_id").notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.storeId, t.nameKey] }),
+  index("product_attribute_aliases_attribute_idx").on(t.storeId, t.attributeId),
+  foreignKey({ columns: [t.storeId, t.attributeId], foreignColumns: [productAttributes.storeId, productAttributes.id], name: "product_attribute_aliases_attribute_fk" }).onDelete("cascade"),
+]);
+
+export const productAttributeProducts = pgTable("product_attribute_products", {
+  storeId: uuid("store_id").notNull(),
+  productId: uuid("product_id").notNull(),
+  attributeId: uuid("attribute_id").notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.storeId, t.productId, t.attributeId] }),
+  index("product_attribute_products_usage_idx").on(t.storeId, t.attributeId),
+  foreignKey({ columns: [t.storeId, t.productId], foreignColumns: [products.storeId, products.id], name: "product_attribute_products_product_fk" }).onDelete("cascade"),
+  foreignKey({ columns: [t.storeId, t.attributeId], foreignColumns: [productAttributes.storeId, productAttributes.id], name: "product_attribute_products_attribute_fk" }).onDelete("restrict"),
+]);
+
 export const productMedia = pgTable("product_media", {
   id: uuid("id").primaryKey().defaultRandom(),
   storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id, { onDelete: "cascade" }),
