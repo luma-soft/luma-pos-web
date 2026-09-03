@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   useForm,
@@ -13,7 +13,7 @@ import {
   ArrowLeft,
   ImagePlus,
   Info,
-  Loader2,
+  Link2,
   Tag,
   Trash2,
   X,
@@ -302,7 +302,7 @@ export function NewProductForm({
       className={cn(
         "flex flex-col space-y-0",
         isModal
-          ? "h-full bg-surface"
+          ? "h-full min-h-0 bg-surface"
           : "min-h-dvh bg-slate-50 dark:bg-slate-950",
       )}
     >
@@ -384,7 +384,7 @@ export function NewProductForm({
 
       <div
         className={cn(
-          "flex-1 overflow-auto overscroll-contain p-4 sm:p-6 w-full space-y-4",
+          "min-h-0 flex-1 overflow-auto overscroll-contain p-4 sm:p-6 w-full space-y-4",
           isModal ? "mx-auto max-w-7xl" : "mx-auto max-w-5xl",
         )}
       >
@@ -492,7 +492,6 @@ function InfoTab({
   publicMediaBaseUrl,
   categories,
   brands,
-  suppliers,
   priceBooks,
   comboProducts,
   initialManagedImages,
@@ -500,41 +499,45 @@ function InfoTab({
   const { watch } = useFormCtx();
   const productKind = watch("productKind") ?? "product";
   return (
-    <>
-      <BasicInfoSection
-        storeId={storeId}
-        publicMediaBaseUrl={publicMediaBaseUrl}
-        categories={categories}
-        brands={brands}
-        suppliers={suppliers}
-        initialManagedImages={initialManagedImages}
-      />
-      {productKind === "combo" && (
-        <ComboItemsField products={comboProducts ?? []} />
-      )}
-      <Section
-        titleTx="products.sections.pricing"
-        descriptionTx="products.sections.pricingDesc"
-      >
-        <PricingFields priceBooks={priceBooks ?? []} />
-      </Section>
-      {productKind === "product" && (
-        <>
-          <Section
-            titleTx="products.sections.stock"
-            descriptionTx="products.sections.stockDesc"
-          >
-            <StockFields />
-          </Section>
-          <Section
-            titleTx="products.sections.physical"
-            descriptionTx="products.sections.physicalDesc"
-          >
-            <PhysicalFields />
-          </Section>
-        </>
-      )}
-    </>
+    <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_240px]">
+      <div className="min-w-0 space-y-5">
+        <BasicInfoSection categories={categories} brands={brands} />
+        {productKind === "combo" && (
+          <ComboItemsField products={comboProducts ?? []} />
+        )}
+        <Section
+          titleTx="products.sections.pricing"
+          className="rounded-none border-x-0 border-b-0 shadow-none"
+        >
+          <PricingFields priceBooks={priceBooks ?? []} />
+        </Section>
+        {productKind === "product" && (
+          <>
+            <Section
+              titleTx="products.sections.stock"
+              className="rounded-none border-x-0 border-b-0 shadow-none"
+            >
+              <StockFields />
+            </Section>
+            <Section
+              titleTx="products.sections.physical"
+              descriptionTx="products.sections.physicalDesc"
+              defaultOpen={false}
+              className="rounded-none border-x-0 border-b-0 shadow-none"
+            >
+              <PhysicalFields />
+            </Section>
+          </>
+        )}
+      </div>
+      <aside className="min-w-0 border-t border-border pt-5 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+        <ImageUploadGrid
+          storeId={storeId}
+          publicMediaBaseUrl={publicMediaBaseUrl}
+          initialManagedImages={initialManagedImages ?? []}
+        />
+      </aside>
+    </div>
   );
 }
 
@@ -1073,10 +1076,7 @@ function VariantChildrenPreview() {
 function BasicInfoSection({
   categories,
   brands,
-  storeId,
-  publicMediaBaseUrl,
-  initialManagedImages = [],
-}: NewProductFormProps) {
+}: Pick<NewProductFormProps, "categories" | "brands">) {
   const t = useTranslations();
   const { register, watch, setValue } = useFormCtx();
   const [extraCats, setExtraCats] = useState<{ id: string; name: string }[]>(
@@ -1087,89 +1087,79 @@ function BasicInfoSection({
   >([]);
 
   return (
-    <Section title="" collapsible={false}>
-      <div className="grid grid-cols-1 md:grid-cols-[1fr_180px] gap-6">
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <Field labelTx="products.fields.sku">
-              <Input
-                {...register("sku")}
-                placeholderTx="products.fields.skuPlaceholder"
-              />
-            </Field>
-            <Field labelTx="products.fields.barcode">
-              <Input
-                {...register("barcode")}
-                placeholderTx="products.fields.barcodePlaceholder"
-              />
-            </Field>
-          </div>
-
-          <FormField name="name" labelTx="products.fields.name" required>
-            {(field) => (
-              <Input
-                {...field}
-                placeholderTx="products.fields.namePlaceholder"
-              />
-            )}
-          </FormField>
-
-          <div className="grid grid-cols-2 gap-4">
-            <FormField
-              name="categoryId"
-              labelTx="products.fields.category"
-              required
-            >
-              {(field) => (
-                <Combobox
-                  value={field.value ?? ""}
-                  onChange={field.onChange}
-                  allowClear={false}
-                  placeholder={t("products.fields.categoryPlaceholder")}
-                  options={[...categories, ...extraCats].map((c) => ({
-                    value: c.id,
-                    label: c.name,
-                  }))}
-                  onCreate={async (name) => {
-                    const r = await createCategory(name);
-                    if (r.ok) {
-                      setExtraCats((x) => [...x, r.data]);
-                      return r.data.id;
-                    }
-                    return null;
-                  }}
-                />
-              )}
-            </FormField>
-            <Field labelTx="products.fields.brand">
-              <Combobox
-                value={watch("brandId") ?? ""}
-                onChange={(v) => setValue("brandId", v)}
-                placeholder={t("products.fields.brandPlaceholder")}
-                options={[...brands, ...extraBrands].map((b) => ({
-                  value: b.id,
-                  label: b.name,
-                }))}
-                onCreate={async (name) => {
-                  const r = await createBrand(name);
-                  if (r.ok) {
-                    setExtraBrands((x) => [...x, r.data]);
-                    return r.data.id;
-                  }
-                  return null;
-                }}
-              />
-            </Field>
-          </div>
-        </div>
-
-        <ImageUploadGrid
-          storeId={storeId}
-          publicMediaBaseUrl={publicMediaBaseUrl}
-          initialManagedImages={initialManagedImages}
-        />
+    <div className="space-y-4 px-1 sm:px-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Field labelTx="products.fields.sku">
+          <Input
+            {...register("sku")}
+            placeholderTx="products.fields.skuPlaceholder"
+          />
+        </Field>
+        <Field labelTx="products.fields.barcode">
+          <Input
+            {...register("barcode")}
+            placeholderTx="products.fields.barcodePlaceholder"
+          />
+        </Field>
       </div>
-    </Section>
+
+      <FormField name="name" labelTx="products.fields.name" required>
+        {(field) => (
+          <Input
+            {...field}
+            placeholderTx="products.fields.namePlaceholder"
+          />
+        )}
+      </FormField>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <FormField
+          name="categoryId"
+          labelTx="products.fields.category"
+          required
+        >
+          {(field) => (
+            <Combobox
+              value={field.value ?? ""}
+              onChange={field.onChange}
+              allowClear={false}
+              placeholder={t("products.fields.categoryPlaceholder")}
+              options={[...categories, ...extraCats].map((c) => ({
+                value: c.id,
+                label: c.name,
+              }))}
+              onCreate={async (name) => {
+                const r = await createCategory(name);
+                if (r.ok) {
+                  setExtraCats((x) => [...x, r.data]);
+                  return r.data.id;
+                }
+                return null;
+              }}
+            />
+          )}
+        </FormField>
+        <Field labelTx="products.fields.brand">
+          <Combobox
+            value={watch("brandId") ?? ""}
+            onChange={(v) => setValue("brandId", v)}
+            placeholder={t("products.fields.brandPlaceholder")}
+            options={[...brands, ...extraBrands].map((b) => ({
+              value: b.id,
+              label: b.name,
+            }))}
+            onCreate={async (name) => {
+              const r = await createBrand(name);
+              if (r.ok) {
+                setExtraBrands((x) => [...x, r.data]);
+                return r.data.id;
+              }
+              return null;
+            }}
+          />
+        </Field>
+      </div>
+    </div>
   );
 }
 
@@ -1196,6 +1186,14 @@ function ImageUploadGrid({
   const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState("");
   const [urlInput, setUrlInput] = useState("");
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const [showAllImages, setShowAllImages] = useState(false);
+  const [selectedUrl, setSelectedUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const galleryId = useId();
+  const previewUrl = selectedUrl && urls.includes(selectedUrl) ? selectedUrl : urls[0];
+  const previewIndex = urls.indexOf(previewUrl);
+  const visibleUrls = showAllImages ? urls : urls.slice(0, 4);
 
   function setImageState(
     nextUrls: string[],
@@ -1218,6 +1216,7 @@ function ImageUploadGrid({
   }
 
   function addImageUrl() {
+    if (uploading || urls.length >= MAX_IMAGES) return;
     const value = urlInput.trim();
     setErr("");
     try {
@@ -1228,7 +1227,9 @@ function ImageUploadGrid({
         return;
       }
       setImageState([...urls, value], managedImages);
+      setSelectedUrl(value);
       setUrlInput("");
+      setShowUrlInput(false);
     } catch {
       setErr(t("products.fields.imageUrlInvalid"));
     }
@@ -1286,107 +1287,151 @@ function ImageUploadGrid({
   };
 
   return (
-    <div>
-      {urls.length < MAX_IMAGES && (
-        <div className="mb-3 flex flex-col gap-2">
-          <Input
-            type="url"
-            value={urlInput}
-            onChange={(event) => setUrlInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                addImageUrl();
-              }
-            }}
-            placeholder={t("products.fields.imageUrlPlaceholder")}
-            aria-label={t("products.fields.imageUrl")}
+    <div className="mx-auto w-full max-w-sm space-y-3 lg:max-w-none" aria-busy={uploading}>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold">{t("products.fields.image")}</h2>
+        <span className="text-xs tabular-nums text-slate-500">{urls.length}/{MAX_IMAGES}</span>
+      </div>
+      {previewUrl ? (
+        <div className="relative mx-auto h-[200px] w-full max-w-[220px] overflow-hidden rounded-xl border border-border bg-white">
+          <Image
+            src={previewUrl}
+            alt={t("products.fields.imagePreview", { index: previewIndex + 1 })}
+            fill
+            sizes="220px"
+            className="object-contain p-3"
+            unoptimized
           />
+          {previewIndex === 0 && (
+            <span className="absolute left-2 top-2 rounded bg-primary-600 px-2 py-1 text-xs font-medium text-white">
+              {t("products.fields.primaryImage")}
+            </span>
+          )}
           <Button
             type="button"
-            variant="secondary"
-            onClick={addImageUrl}
-            disabled={!urlInput.trim()}
-            tx="products.fields.addImageUrl"
-            className="w-full"
-          />
+            variant="outline"
+            size="iconSm"
+            disabled={uploading}
+            onClick={() => void remove(previewUrl)}
+            className="absolute right-2 top-2 h-11 w-11 bg-surface lg:h-9 lg:w-9"
+            aria-label={t("products.fields.removeImage", { index: previewIndex + 1 })}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      ) : (
+        <div className="flex h-[160px] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-surface-2 text-slate-500">
+          <ImagePlus className="h-7 w-7" />
+          <span className="text-sm">{t("products.fields.noImages")}</span>
         </div>
       )}
-      <div className="grid grid-cols-2 gap-2">
-        {urls.map((u, i) => (
-          <div
-            key={u}
-            className={cn(
-              "relative aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 group",
-              i === 0 && "col-span-2",
-            )}
-          >
-            <Image
-              src={u}
-              alt=""
-              fill
-              sizes="240px"
-              className="object-cover"
-              unoptimized
-            />
-            {i === 0 && (
-              <span className="absolute top-1 left-1 bg-primary-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
-                {t("products.fields.primaryImage")}
-              </span>
-            )}
+      {urls.length > 1 && (
+        <div id={`${galleryId}-thumbnails`} className="grid grid-cols-4 gap-2">
+          {visibleUrls.map((url, index) => (
             <button
+              key={url}
               type="button"
-              onClick={() => void remove(u)}
-              className="absolute right-1 top-1 grid h-11 w-11 place-items-center rounded-full bg-black/55 text-white opacity-100 transition lg:h-9 lg:w-9 lg:opacity-0 lg:group-hover:opacity-100"
-              aria-label={t("common.delete")}
+              onClick={() => setSelectedUrl(url)}
+              aria-label={t("products.fields.imagePreview", { index: index + 1 })}
+              aria-pressed={url === previewUrl}
+              className={cn(
+                "relative aspect-square min-h-11 overflow-hidden rounded-lg border bg-white transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600",
+                url === previewUrl ? "border-primary-600 ring-1 ring-primary-600" : "border-border hover:border-primary-400",
+              )}
             >
-              <X className="w-4 h-4" />
+              <Image src={url} alt="" fill sizes="64px" className="object-contain p-1" unoptimized />
             </button>
-          </div>
-        ))}
-        {urls.length < MAX_IMAGES && (
-          <label
-            className={cn(
-              "flex min-h-11 min-w-11 aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 text-slate-400 transition hover:border-primary-500 dark:border-slate-700 dark:bg-slate-800/50",
-              urls.length === 0 && "col-span-2",
-            )}
-          >
-            {uploading ? (
-              <Loader2 className="w-6 h-6 animate-spin" />
-            ) : (
-              <ImagePlus className="w-6 h-6" />
-            )}
-            <span className="text-xs">{t("products.fields.addImage")}</span>
-            <input
-              type="file"
-              accept={PRODUCT_IMAGE_ACCEPT}
-              multiple
-              disabled={uploading}
-              onChange={(e) => {
-                upload(e.target.files);
-                e.target.value = "";
-              }}
-              className="hidden"
-            />
-          </label>
-        )}
-      </div>
-      {drafts.length > 0 && !uploading && (
+          ))}
+        </div>
+      )}
+      {urls.length > 4 && (
         <Button
           type="button"
-          variant="secondary"
-          onClick={() => void uploadFiles(drafts)}
-          className="mt-2 w-full"
+          variant="ghost"
+          className="w-full"
+          aria-expanded={showAllImages}
+          aria-controls={`${galleryId}-thumbnails`}
+          onClick={() => setShowAllImages((value) => !value)}
         >
+          {showAllImages ? t("products.fields.collapseImages") : t("products.fields.showAllImages", { count: urls.length })}
+        </Button>
+      )}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={PRODUCT_IMAGE_ACCEPT}
+        multiple
+        disabled={uploading || urls.length >= MAX_IMAGES}
+        onChange={(event) => {
+          void upload(event.target.files);
+          event.target.value = "";
+        }}
+        className="hidden"
+      />
+      {urls.length < MAX_IMAGES && (
+        <>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            loading={uploading}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {!uploading && <ImagePlus className="h-4 w-4" />}
+            {t("products.fields.addImage")}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            disabled={uploading}
+            aria-expanded={showUrlInput}
+            aria-controls={`${galleryId}-url`}
+            onClick={() => setShowUrlInput((value) => !value)}
+          >
+            <Link2 className="h-4 w-4" />
+            {t("products.fields.addFromUrl")}
+          </Button>
+          {showUrlInput && (
+            <div id={`${galleryId}-url`} className="space-y-2">
+              <Input
+                type="url"
+                autoFocus
+                value={urlInput}
+                disabled={uploading}
+                onChange={(event) => setUrlInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addImageUrl();
+                  }
+                }}
+                placeholder={t("products.fields.imageUrlPlaceholder")}
+                aria-label={t("products.fields.imageUrl")}
+                aria-invalid={Boolean(err)}
+                aria-describedby={err ? `${galleryId}-error` : undefined}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={addImageUrl}
+                disabled={uploading || !urlInput.trim()}
+                tx="products.fields.addImageUrl"
+                className="w-full"
+              />
+            </div>
+          )}
+        </>
+      )}
+      {drafts.length > 0 && !uploading && (
+        <Button type="button" variant="secondary" onClick={() => void uploadFiles(drafts)} className="w-full">
           {t("common.retry")}
         </Button>
       )}
       {err ? (
-        <p className="text-xs text-red-600 mt-2">{err}</p>
+        <p id={`${galleryId}-error`} role="alert" className="text-xs text-red-600">{err}</p>
       ) : (
-        <p className="text-xs text-slate-500 mt-2">
-          {t("products.fields.imageHint")}
-        </p>
+        <p className="text-xs leading-relaxed text-slate-500">{t("products.fields.imageHint")}</p>
       )}
     </div>
   );

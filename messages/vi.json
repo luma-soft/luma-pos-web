@@ -1013,7 +1013,7 @@
       "itemsRequired": "Combo phải có ít nhất một thành phần."
     },
     "saveAndCreate": "Lưu & Tạo thêm",
-    "saveAndCreateSameType": "Lưu & Thêm hàng hóa cùng loại",
+    "saveAndCreateSameType": "Lưu & tạo tương tự",
     "directSale": "Bán trực tiếp",
     "tabs": {
       "info": "Thông tin",
@@ -1038,6 +1038,12 @@
       "imageUrl": "URL ảnh",
       "imageUrlPlaceholder": "https://...",
       "addImageUrl": "Thêm URL",
+      "addFromUrl": "Thêm từ URL",
+      "noImages": "Chưa có ảnh",
+      "imagePreview": "Xem ảnh {index}",
+      "removeImage": "Xóa ảnh {index}",
+      "showAllImages": "Xem tất cả {count} ảnh",
+      "collapseImages": "Thu gọn ảnh",
       "imageUrlInvalid": "URL ảnh không hợp lệ",
       "baseUnit": "Đơn vị tính",
       "unitName": "Tên đơn vị",

@@ -1013,7 +1013,7 @@
       "itemsRequired": "A combo must contain at least one item."
     },
     "saveAndCreate": "Save & New",
-    "saveAndCreateSameType": "Save & Add Same Type",
+    "saveAndCreateSameType": "Save & create similar",
     "directSale": "Direct sale",
     "tabs": {
       "info": "Info",
@@ -1038,6 +1038,12 @@
       "imageUrl": "Image URL",
       "imageUrlPlaceholder": "https://...",
       "addImageUrl": "Add URL",
+      "addFromUrl": "Add from URL",
+      "noImages": "No images yet",
+      "imagePreview": "View image {index}",
+      "removeImage": "Remove image {index}",
+      "showAllImages": "View all {count} images",
+      "collapseImages": "Show fewer images",
       "imageUrlInvalid": "Invalid image URL",
       "baseUnit": "Base unit",
       "unitName": "Unit name",
