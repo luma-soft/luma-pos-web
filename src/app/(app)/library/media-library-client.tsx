@@ -8,7 +8,6 @@ import {
   ChevronDown,
   FileText,
   Film,
-  Folder,
   HardDrive,
   Image as ImageIcon,
   Images,
@@ -17,19 +16,22 @@ import {
   Play,
   Plus,
   RefreshCw,
-  Search,
   X,
 } from "lucide-react";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
+import {
+  FilterTriggerButton,
+  ListSearchFilterBar,
+  ListSearchInput,
+} from "@/components/list-search-filter";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import type {
   MediaLibraryItem,
   MediaLibrarySnapshot,
 } from "@/lib/media/library-types";
 import { cn } from "@/lib/utils";
 import { LibraryPreview } from "./library-preview";
+import { LibraryFilterDrawer } from "./library-filter-drawer";
 import { LibraryUploadDialog } from "./library-upload-dialog";
 import {
   formatLibraryBytes,
@@ -55,6 +57,7 @@ export function MediaLibraryClient({
   const [query, setQuery] = useState("");
   const [album, setAlbum] = useState("");
   const [kind, setKind] = useState("");
+  const [filterOpen, setFilterOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [preview, setPreview] = useState<MediaLibraryItem | null>(null);
   const [loading, setLoading] = useState(false);
@@ -201,63 +204,29 @@ export function MediaLibraryClient({
         </div>
       </header>
 
-      <div className="mx-auto flex max-w-[1600px] gap-6 px-3 py-4 sm:px-6 lg:gap-8 lg:px-8 lg:py-6">
-        <aside
-          className="hidden w-48 shrink-0 lg:block"
-          aria-label={t("albumsTitle")}
-        >
-          <h2 className="mb-3 px-3 text-xs font-semibold text-slate-500">
-            {t("albumsTitle")}
-          </h2>
-          <nav className="space-y-1">
-            {[
-              { name: "", count: snapshot.usage.libraryObjects },
-              ...snapshot.albums,
-            ].map((entry) => (
-              <button
-                key={entry.name}
-                type="button"
-                aria-pressed={album === entry.name}
-                onClick={() => setAlbum(entry.name)}
-                className={cn(
-                  "flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm transition focus-visible:outline-2 focus-visible:outline-primary-600",
-                  album === entry.name
-                    ? "bg-primary-50 font-semibold text-primary-700 dark:bg-primary-950/40 dark:text-primary-200"
-                    : "text-slate-600 hover:bg-surface-2 dark:text-slate-300",
-                )}
-              >
-                {entry.name ? (
-                  <Folder className="h-4 w-4 shrink-0" />
-                ) : (
-                  <LayoutGrid className="h-4 w-4 shrink-0" />
-                )}
-                <span
-                  className="min-w-0 flex-1 break-words py-2"
-                  title={entry.name || t("albumAll")}
-                >
-                  {entry.name || t("albumAll")}
-                </span>
-                <span className="text-xs tabular-nums opacity-60">
-                  {entry.count}
-                </span>
-              </button>
-            ))}
-          </nav>
-        </aside>
-        <div className="min-w-0 flex-1 space-y-4">
+      <div className="mx-auto max-w-[1600px] px-3 py-4 sm:px-6 lg:px-8 lg:py-6">
+        <div className="min-w-0 space-y-4">
           <section aria-label={t("filters")} className="space-y-3">
             <div className="flex items-center gap-2">
-              <div className="min-w-0 flex-1">
-                <Input
-                  type="search"
-                  aria-label={t("searchPlaceholder")}
-                  placeholder={t("searchPlaceholder")}
-                  value={query}
-                  maxLength={200}
-                  onChange={(event) => setQuery(event.target.value)}
-                  leftIcon={<Search />}
-                />
-              </div>
+              <ListSearchFilterBar
+                search={
+                  <ListSearchInput
+                    placeholder={t("searchPlaceholder")}
+                    value={query}
+                    maxLength={200}
+                    onChange={(event) => setQuery(event.target.value)}
+                  />
+                }
+                filter={
+                  <FilterTriggerButton
+                    label={t("filterButton")}
+                    active={Boolean(album)}
+                    aria-haspopup="dialog"
+                    aria-expanded={filterOpen}
+                    onClick={() => setFilterOpen(true)}
+                  />
+                }
+              />
               <button
                 type="button"
                 onClick={() => void load()}
@@ -270,22 +239,6 @@ export function MediaLibraryClient({
                   className={cn("h-4 w-4", loading && "animate-spin")}
                 />
               </button>
-            </div>
-            <div className="lg:hidden">
-              <Select
-                value={album}
-                onValueChange={setAlbum}
-                options={[
-                  { value: "", label: t("albumAll") },
-                  ...snapshot.albums.map((entry) => ({
-                    value: entry.name,
-                    label: `${entry.name} (${entry.count})`,
-                  })),
-                ]}
-                rootClassName="w-full"
-                searchable={snapshot.albums.length > 8}
-                aria-label={t("album")}
-              />
             </div>
             <div className="flex items-center justify-between gap-2 border-b border-border">
               <div
@@ -437,6 +390,15 @@ export function MediaLibraryClient({
           )}
         </div>
       </div>
+      {filterOpen && (
+        <LibraryFilterDrawer
+          albums={snapshot.albums}
+          totalCount={snapshot.usage.libraryObjects}
+          album={album}
+          onApply={setAlbum}
+          onClose={() => setFilterOpen(false)}
+        />
+      )}
       {uploadOpen && (
         <LibraryUploadDialog
           storeId={storeId}

@@ -14,6 +14,7 @@ export function LibraryDialog({
   footer,
   busy = false,
   wide = false,
+  placement = "center",
   onClose,
 }: {
   title: string;
@@ -22,6 +23,7 @@ export function LibraryDialog({
   footer?: ReactNode;
   busy?: boolean;
   wide?: boolean;
+  placement?: "center" | "drawer";
   onClose: () => void;
 }) {
   const common = useTranslations("common");
@@ -67,8 +69,11 @@ export function LibraryDialog({
           onClose();
       }}
       className={cn(
-        "fixed inset-0 m-auto hidden h-dvh max-h-dvh w-full max-w-none flex-col overflow-hidden border-0 bg-surface p-0 text-foreground shadow-e2 backdrop:bg-slate-950/50 backdrop:backdrop-blur-[2px] open:flex sm:h-fit sm:max-h-[calc(100dvh-4rem)] sm:max-w-3xl sm:rounded-2xl sm:border sm:border-border",
-        wide && "sm:max-w-5xl",
+        "fixed inset-0 hidden h-dvh max-h-dvh w-full flex-col overflow-hidden border-0 bg-surface p-0 text-foreground shadow-e2 backdrop:bg-slate-950/50 backdrop:backdrop-blur-[2px] open:flex",
+        placement === "drawer"
+          ? "m-0 ml-auto max-w-[460px]"
+          : "m-auto max-w-none sm:h-fit sm:max-h-[calc(100dvh-4rem)] sm:max-w-3xl sm:rounded-2xl sm:border sm:border-border",
+        placement === "center" && wide && "sm:max-w-5xl",
       )}
     >
       <header className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-4 py-3 sm:px-6 sm:py-4">

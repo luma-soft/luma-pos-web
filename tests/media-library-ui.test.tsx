@@ -123,7 +123,10 @@ describe("library bilingual server composition", () => {
       expect(html).toContain(copy.storageDetails);
       expect(html).toContain(copy.usageTotal);
       expect(html).toContain(copy.privateShort);
-      expect(html).toContain('aria-haspopup="listbox"');
+      expect(html).toContain(copy.filterButton);
+      expect(html).toContain('aria-haspopup="dialog"');
+      expect(html).toContain('aria-expanded="false"');
+      expect(html).not.toMatch(/<aside\b/);
       expect(html).not.toMatch(/<(?:select|datalist)\b/);
     });
 
