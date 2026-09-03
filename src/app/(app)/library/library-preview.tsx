@@ -72,15 +72,32 @@ export function LibraryPreview({
               {t("privateShort")}
             </span>
           )}
-          <a
-            href={`/api/mobile/library?open=${encodeURIComponent(item.id)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white transition hover:bg-primary-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
-          >
-            <ArrowDownToLine className="h-4 w-4" />
-            {t("download")}
-          </a>
+          <div className="flex items-center gap-2">
+            {!failed && resolved?.kind === "image" && (
+              <button
+                type="button"
+                aria-label={t(zoomed ? "zoomOut" : "zoomIn")}
+                title={t(zoomed ? "zoomOut" : "zoomIn")}
+                onClick={() => setZoomed((value) => !value)}
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-lg border border-border bg-surface text-slate-600 shadow-e1 transition hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
+              >
+                {zoomed ? (
+                  <ZoomOut className="h-5 w-5" />
+                ) : (
+                  <ZoomIn className="h-5 w-5" />
+                )}
+              </button>
+            )}
+            <a
+              href={`/api/mobile/library?open=${encodeURIComponent(item.id)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white transition hover:bg-primary-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
+            >
+              <ArrowDownToLine className="h-4 w-4" />
+              {t("download")}
+            </a>
+          </div>
         </div>
       }
     >
@@ -106,35 +123,21 @@ export function LibraryPreview({
               className="h-6 w-6 animate-spin text-primary-600"
             />
           ) : resolved.kind === "image" ? (
-            <>
-              <div
-                className={cn(
-                  "relative h-[45dvh] w-full sm:h-[55dvh]",
-                  zoomed && "min-h-[80dvh] min-w-[160%]",
-                )}
-              >
-                <NextImage
-                  unoptimized
-                  fill
-                  src={resolved.url}
-                  alt={resolved.title}
-                  className="object-contain p-3"
-                  sizes="80vw"
-                />
-              </div>
-              <button
-                type="button"
-                aria-label={t(zoomed ? "zoomOut" : "zoomIn")}
-                onClick={() => setZoomed((value) => !value)}
-                className="sticky bottom-3 right-3 ml-auto mr-3 grid h-11 w-11 place-items-center rounded-lg border border-border bg-surface text-slate-600 shadow-e1"
-              >
-                {zoomed ? (
-                  <ZoomOut className="h-5 w-5" />
-                ) : (
-                  <ZoomIn className="h-5 w-5" />
-                )}
-              </button>
-            </>
+            <div
+              className={cn(
+                "relative h-[45dvh] w-full sm:h-[55dvh]",
+                zoomed && "min-h-[80dvh] min-w-[160%]",
+              )}
+            >
+              <NextImage
+                unoptimized
+                fill
+                src={resolved.url}
+                alt={resolved.title}
+                className="object-contain p-3"
+                sizes="80vw"
+              />
+            </div>
           ) : resolved.kind === "video" ? (
             <video
               controls
