@@ -80,7 +80,8 @@ export function LibraryDialog({
         <div className="min-w-0">
           <h2
             id={titleId}
-            className="truncate text-lg font-bold tracking-tight sm:text-xl"
+            title={title}
+            className="max-w-[36ch] truncate text-lg font-bold tracking-tight sm:text-xl"
           >
             {title}
           </h2>
