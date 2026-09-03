@@ -18,6 +18,8 @@ import {
   createNotificationEventInTx,
 } from "@/lib/notifications/events-core";
 import { publishCommittedNotification } from "@/lib/notifications/outbox";
+import { recordActivity } from "@/lib/audit/activity-log";
+import { activityValuesEqual } from "@/lib/products/product-activity";
 
 type PurchaseCalcInput = Pick<CreatePurchaseOutput, "items" | "discount" | "vatRate" | "amountPaid">;
 
@@ -64,6 +66,8 @@ export async function createPurchase(
       const ids = v.items.map((i) => i.productId);
       const found = await tx.select({
         id: products.id,
+        name: products.name,
+        sku: products.sku,
         trackBatches: products.trackBatches,
         shelfLifeDays: products.shelfLifeDays,
       }).from(products).where(and(eq(products.storeId, gate.storeId), inArray(products.id, ids)));
@@ -207,6 +211,12 @@ export async function createPurchase(
         },
       });
 
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: profileId, action: "purchase.created", entityType: "purchase", entityId: po.id,
+        after: { code: po.code, status: "received", total: totals.total, amountPaid: totals.paid, itemCount: v.items.length },
+        affectedRecords: v.items.map((item) => ({ type: "product", id: item.productId, name: found.find((product) => product.id === item.productId)?.name, code: found.find((product) => product.id === item.productId)?.sku, quantity: item.quantity, unitCost: item.unitCost })),
+        metadata: { purchaseCode: po.code, supplierId: v.supplierId, warehouseId: v.warehouseId },
+      });
       return { po, notification };
     });
 
@@ -242,13 +252,15 @@ export async function updatePurchase(
     const currentShift = profileId ? await getCurrentShift(gate.storeId, profileId) : null;
 
     const result = await db.transaction(async (tx) => {
-      const [po] = await tx.select().from(purchaseOrders).where(and(eq(purchaseOrders.storeId, gate.storeId), eq(purchaseOrders.id, v.id))).limit(1);
+      const [po] = await tx.select().from(purchaseOrders).where(and(eq(purchaseOrders.storeId, gate.storeId), eq(purchaseOrders.id, v.id))).limit(1).for("update");
       if (!po) throw new Error("PURCHASE_NOT_FOUND");
       if (po.status !== "received" && po.status !== "draft") throw new Error("NOT_EDITABLE");
 
       const ids = v.items.map((i) => i.productId);
       const found = await tx.select({
         id: products.id,
+        name: products.name,
+        sku: products.sku,
         trackBatches: products.trackBatches,
         shelfLifeDays: products.shelfLifeDays,
       }).from(products).where(and(eq(products.storeId, gate.storeId), inArray(products.id, ids)));
@@ -257,6 +269,13 @@ export async function updatePurchase(
       if (!batchValidation.ok) throw new Error(batchValidation.error);
 
       const oldItems = await tx.select().from(purchaseOrderItems).where(and(eq(purchaseOrderItems.storeId, gate.storeId), eq(purchaseOrderItems.purchaseOrderId, po.id)));
+      const comparableItems = (items: { productId: string; quantity: string | number; unitCost: string | number; discount: string | number; batchNumber?: string | null; expiryDate?: string | null }[]) => items.map((item) => ({
+        productId: item.productId, quantity: Number(item.quantity), unitCost: Number(item.unitCost), discount: Number(item.discount), batchNumber: item.batchNumber ?? null, expiryDate: item.expiryDate ?? null,
+      })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+      const purchaseChanged = po.status !== "received" || po.supplierId !== v.supplierId || po.warehouseId !== v.warehouseId
+        || Number(po.total) !== totals.total || Number(po.amountPaid) !== totals.paid || Number(po.discount) !== v.discount || Number(po.vatRate) !== v.vatRate
+        || po.invoiceNumber !== (v.invoiceNumber?.trim()?.slice(0, 50) || null) || po.note !== (v.note || null)
+        || !activityValuesEqual(comparableItems(oldItems), comparableItems(v.items));
       const oldLots = oldItems.length > 0
         ? await tx.select().from(stockLots).where(and(eq(stockLots.storeId, gate.storeId), inArray(stockLots.purchaseOrderItemId, oldItems.map((item) => item.id))))
         : [];
@@ -505,6 +524,13 @@ export async function updatePurchase(
             actorId: profileId,
             relatedAdjustments,
           });
+      if (purchaseChanged) await recordActivity(tx, {
+        storeId: gate.storeId, actorId: profileId, action: "purchase.updated", entityType: "purchase", entityId: po.id,
+        before: { code: po.code, status: po.status, total: Number(po.total), amountPaid: Number(po.amountPaid), itemCount: oldItems.length },
+        after: { code: po.code, status: "received", total: totals.total, amountPaid: totals.paid, itemCount: v.items.length },
+        affectedRecords: v.items.map((item) => ({ type: "product", id: item.productId, name: found.find((product) => product.id === item.productId)?.name, code: found.find((product) => product.id === item.productId)?.sku, quantity: item.quantity, unitCost: item.unitCost })),
+        metadata: { purchaseCode: po.code, supplierId: v.supplierId, warehouseId: v.warehouseId },
+      });
       return {
         notification,
         updatedAt: committedMutation.committedAt,
@@ -544,7 +570,7 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
     const currentShift = profileId ? await getCurrentShift(gate.storeId, profileId) : null;
 
     const result = await db.transaction(async (tx) => {
-      const [po] = await tx.select().from(purchaseOrders).where(and(eq(purchaseOrders.storeId, gate.storeId), eq(purchaseOrders.id, id))).limit(1);
+      const [po] = await tx.select().from(purchaseOrders).where(and(eq(purchaseOrders.storeId, gate.storeId), eq(purchaseOrders.id, id))).limit(1).for("update");
       if (!po) throw new Error("PURCHASE_NOT_FOUND");
       if (po.status === "cancelled") throw new Error("ALREADY_CANCELLED");
       if (po.status === "returned") throw new Error("NOT_EDITABLE");
@@ -616,6 +642,12 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
       }
 
       await tx.update(purchaseOrders).set({ status: "cancelled" }).where(and(eq(purchaseOrders.storeId, gate.storeId), eq(purchaseOrders.id, po.id)));
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: profileId, action: "purchase.cancelled", entityType: "purchase", entityId: po.id,
+        before: { code: po.code, status: po.status, total: Number(po.total), amountPaid: Number(po.amountPaid) },
+        after: { code: po.code, status: "cancelled" },
+        metadata: { purchaseCode: po.code, supplierId: po.supplierId, warehouseId: po.warehouseId },
+      });
       return { debtNotification };
     });
 

@@ -1,3 +1,5 @@
+import { recordActivity } from "@/lib/audit/activity-log";
+import { serviceActivitySnapshot } from "@/lib/services/activity";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type * as schema from "@/db/schema";
@@ -76,6 +78,7 @@ async function buildAuthoritativeSignedSnapshot(
 ) {
   const jobRows = await tx.select({
       id: serviceJobs.id,
+    storeId: serviceJobs.storeId,
       projectId: serviceJobs.projectId,
       code: serviceJobs.code,
       serviceType: serviceJobs.serviceType,
@@ -215,6 +218,7 @@ async function requireAssignedJob(
 ) {
   const jobRows = await tx.select({
       id: serviceJobs.id,
+    storeId: serviceJobs.storeId,
       projectId: serviceJobs.projectId,
       serviceType: serviceJobs.serviceType,
       status: serviceJobs.status,
@@ -253,6 +257,7 @@ export async function requireLockedServiceJobAccess(
 ) {
   const [job] = await tx.select({
     id: serviceJobs.id,
+    storeId: serviceJobs.storeId,
     projectId: serviceJobs.projectId,
     serviceType: serviceJobs.serviceType,
     status: serviceJobs.status,
@@ -325,10 +330,14 @@ async function idempotentFieldMutation<T extends Record<string, unknown>>(
   operation: string,
   mutate: () => Promise<T>,
 ): Promise<T> {
+  const [job] = await tx.select({ storeId: serviceJobs.storeId, code: serviceJobs.code, title: serviceJobs.title,
+    projectId: serviceJobs.projectId }).from(serviceJobs).where(eq(serviceJobs.id, input.jobId)).limit(1);
+  if (!job) throw new Error("SERVICE_JOB_NOT_FOUND");
   const inputHash = hashSignedDocument(canonicalizeSignedDocument(
     JSON.parse(JSON.stringify(input)) as JsonValue,
   ));
   const [claimed] = await tx.insert(serviceFieldMutations).values({
+    storeId: job.storeId,
     actorId: actor.userId,
     jobId: input.jobId,
     clientMutationId: input.clientMutationId,
@@ -365,7 +374,24 @@ async function idempotentFieldMutation<T extends Record<string, unknown>>(
     return existing.result as T;
   }
 
+  const materialId = "materialId" in input && typeof input.materialId === "string" ? input.materialId : null;
+  const entityType = materialId ? "service_material" : "service_job";
+  const entityId = materialId ?? input.jobId;
+  const before = await serviceActivitySnapshot(tx, job.storeId, entityType, entityId);
   const result = await mutate();
+  const after = await serviceActivitySnapshot(tx, job.storeId, entityType, entityId);
+  const quietNoop = ["job.checklist", "job.material_usage"].includes(operation)
+    && JSON.stringify(before) === JSON.stringify(after);
+  if (!quietNoop) await recordActivity(tx, {
+    storeId: job.storeId, actorId: actor.userId, source: "mobile",
+    action: `service.field.${operation}`, entityType, entityId,
+    before, after: { ...after,
+      ...(operation.startsWith("visit.") ? { visitStatus: result.status } : {}),
+      ...(operation === "job.signature" ? { signedAt: result.signedAt } : {}),
+      ...(operation === "job.asset_created" ? { assetName: result.name } : {}),
+    },
+    metadata: { projectId: job.projectId, jobId: input.jobId },
+  });
   await tx.update(serviceFieldMutations)
     .set({ result })
     .where(eq(serviceFieldMutations.id, claimed.id));
@@ -382,6 +408,7 @@ export async function checkInServiceVisitCore(
   return idempotentFieldMutation(tx, actor, input, "visit.check_in", async () => {
     requireCheckInStatus(job.status);
     const [visit] = await tx.insert(serviceVisits).values({
+      storeId: job.storeId,
       jobId: input.jobId,
       profileId: actor.userId,
       status: "active",
@@ -392,6 +419,7 @@ export async function checkInServiceVisitCore(
     }).onConflictDoNothing().returning({ id: serviceVisits.id });
     if (!visit) throw new Error("SERVICE_ACTIVE_VISIT_EXISTS");
     await tx.insert(serviceTimeEntries).values({
+      storeId: job.storeId,
       jobId: input.jobId,
       visitId: visit.id,
       profileId: actor.userId,
@@ -404,6 +432,7 @@ export async function checkInServiceVisitCore(
         updatedAt: now,
       }).where(eq(serviceJobs.id, input.jobId));
       await tx.insert(serviceStatusLogs).values({
+      storeId: job.storeId,
         jobId: input.jobId,
         fromStatus: job.status,
         toStatus: "in_progress",
@@ -412,6 +441,7 @@ export async function checkInServiceVisitCore(
       });
     }
     await tx.insert(serviceJobEvents).values({
+      storeId: job.storeId,
       jobId: input.jobId,
       eventType: "visit.checked_in",
       actorId: actor.userId,
@@ -428,7 +458,7 @@ export async function checkOutServiceVisitCore(
   input: ServiceVisitMutationInput,
   now = new Date(),
 ) {
-  await requireLockedServiceJobAccess(tx, actor, input.jobId);
+  const job = await requireLockedServiceJobAccess(tx, actor, input.jobId);
   return idempotentFieldMutation(tx, actor, input, "visit.check_out", async () => {
     const [visit] = await tx.select({ id: serviceVisits.id })
       .from(serviceVisits)
@@ -459,6 +489,7 @@ export async function checkOutServiceVisitCore(
       .returning({ id: serviceTimeEntries.id });
     if (!timeEntry) throw new Error("SERVICE_ACTIVE_TIME_ENTRY_NOT_FOUND");
     await tx.insert(serviceJobEvents).values({
+      storeId: job.storeId,
       jobId: input.jobId,
       eventType: "visit.checked_out",
       actorId: actor.userId,
@@ -501,6 +532,7 @@ export async function updateFieldChecklistCore(
         updatedAt: serviceJobs.updatedAt,
       });
     await tx.insert(serviceJobEvents).values({
+      storeId: job.storeId,
       jobId: input.jobId,
       eventType: "job.checklist_updated",
       actorId: actor.userId,
@@ -562,6 +594,7 @@ export async function createServiceSignatureCore(
       isNull(serviceSignatures.invalidatedAt),
     ));
     const [signature] = await tx.insert(serviceSignatures).values({
+      storeId: job.storeId,
       projectId: job.projectId,
       jobId: input.jobId,
       documentId: null,
@@ -576,6 +609,7 @@ export async function createServiceSignatureCore(
       evidence: { source: "authoritative-server-snapshot" },
     }).returning({ id: serviceSignatures.id });
     await tx.insert(serviceJobEvents).values({
+      storeId: job.storeId,
       jobId: input.jobId,
       eventType: "job.signed",
       actorId: actor.userId,
@@ -612,6 +646,7 @@ export async function createFieldInstalledAssetCore(
       });
     }
     const [asset] = await tx.insert(installedAssets).values({
+      storeId: job.storeId,
       projectId: job.projectId,
       jobId: input.jobId,
       productId: input.productId ?? null,
@@ -641,6 +676,7 @@ export async function createFieldInstalledAssetCore(
       updatedAt: serviceJobs.updatedAt,
     }).from(serviceJobs).where(eq(serviceJobs.id, input.jobId)).limit(1);
     await tx.insert(serviceJobEvents).values({
+      storeId: job.storeId,
       jobId: input.jobId,
       eventType: "job.asset_created",
       actorId: actor.userId,
@@ -701,6 +737,7 @@ export async function updateFieldMaterialUsageCore(
     });
     if (!material) throw new Error("SERVICE_MATERIAL_NOT_FOUND");
     await tx.insert(serviceJobEvents).values({
+      storeId: job.storeId,
       jobId: input.jobId,
       eventType: "job.material_usage_updated",
       actorId: actor.userId,
@@ -825,8 +862,9 @@ export async function completeFieldServiceJobCore(
       completedAt: now,
       updatedAt: now,
     }).where(eq(serviceJobs.id, input.jobId));
-    await completeMaintenanceOccurrenceForJobCore(tx, input.jobId, now);
+    await completeMaintenanceOccurrenceForJobCore(tx, input.jobId, now, actor.userId);
     await tx.insert(serviceStatusLogs).values({
+      storeId: job.storeId,
       jobId: input.jobId,
       fromStatus: job.status,
       toStatus: "completed",
@@ -835,6 +873,7 @@ export async function completeFieldServiceJobCore(
       createdAt: now,
     });
     await tx.insert(serviceJobEvents).values({
+      storeId: job.storeId,
       jobId: input.jobId,
       eventType: "job.completed",
       actorId: actor.userId,

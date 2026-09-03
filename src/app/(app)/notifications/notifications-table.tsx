@@ -15,7 +15,8 @@ import {
   activityRecordHref, activityRecordLabel, activityRelatedRecords, activityText,
   type NotificationActivity,
 } from "@/lib/audit/activity-presentation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { activityChanges, activityFieldKinds, activityItems, type ActivityChange, type ActivityField } from "@/lib/audit/activity-details";
 
 export type AuditRow = NotificationActivity;
 type Translator = ReturnType<typeof useTranslations>;
@@ -89,6 +90,9 @@ function titleFor(row: AuditRow, t: Translator) {
 }
 
 function actorFor(row: AuditRow, t: Translator) {
+  const metadata = activityObject(row.metadata);
+  if (metadata.channel === "customer_portal") return activityText(metadata.customerName) ?? t("notifications.activity.customerActor");
+  if (metadata.submittedByCustomer === true) return t("notifications.activity.customerActor");
   return row.actorNameSnapshot?.trim() || (row.source === "system"
     ? t("notifications.systemActor")
     : t("notifications.activity.unknownActor"));
@@ -100,6 +104,91 @@ function statusText(status: AuditStatus, t: Translator) {
 
 function sourceText(source: AuditSource, t: Translator) {
   return t(`notifications.sources.${source}`);
+}
+
+
+function valueFor(key: ActivityField, value: unknown, t: Translator, locale: string): string {
+  if (value === null || value === undefined || value === "") return t("notifications.activity.emptyValue");
+  const kind = activityFieldKinds[key];
+  if (kind === "boolean" && typeof value === "boolean") return t(`notifications.activity.values.${value ? "yes" : "no"}`);
+  if ((kind === "number" || kind === "money") && Number.isFinite(Number(value))) {
+    return new Intl.NumberFormat(locale, kind === "money"
+      ? { style: "currency", currency: "VND", maximumFractionDigits: 0 }
+      : { maximumFractionDigits: 4 }).format(Number(value));
+  }
+  if (kind === "collection" && Array.isArray(value)) return t("notifications.activity.itemCount", { count: value.length });
+  if (kind === "date" && typeof value === "string" && !Number.isNaN(Date.parse(value))) {
+    return new Intl.DateTimeFormat(locale, { dateStyle: "medium", ...(value.includes("T") ? { timeStyle: "short" as const } : {}) }).format(new Date(value));
+  }
+  if (kind === "enum" && typeof value === "string") {
+    const path = `notifications.activity.values.${value.replaceAll(".", "_")}`;
+    return t.has(path) ? t(path) : t("notifications.activity.updatedValue");
+  }
+  if (typeof value !== "string" && typeof value !== "number") return t("notifications.activity.updatedValue");
+  if (/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(String(value))) return t("notifications.activity.updatedValue");
+  return truncateText(String(value), 600);
+}
+
+function changeText(change: ActivityChange, t: Translator, locale: string) {
+  const label = t(`notifications.activity.fields.${change.key}`);
+  const before = valueFor(change.key, change.before, t, locale);
+  const after = valueFor(change.key, change.after, t, locale);
+  return `${label}: ${change.hasBefore && change.hasAfter ? `${before} → ${after}` : change.hasAfter ? after : before}`;
+}
+
+function ActivityChanges({ row }: { row: AuditRow }) {
+  const t = useTranslations();
+  const locale = useLocale();
+  const changes = activityChanges(row).filter((change) => !["items", "replacementItems"].includes(change.key));
+  const fields = activityObject(row.metadata).changedFields;
+  const changedFields = Array.isArray(fields) ? fields.filter((field): field is string => typeof field === "string") : [];
+  const changedLabels = changedFields.flatMap((field) => {
+    const path = `notifications.activity.fields.${field}`;
+    return t.has(path) ? [t(path)] : [];
+  });
+  return <>
+    {changes.length > 0 && <section>
+      <h3 className="mb-3 font-semibold">{t("notifications.activity.changes")}</h3>
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-canvas text-xs text-slate-500"><tr>
+            <th className="p-3 font-medium" scope="col">{t("notifications.activity.field")}</th>
+            <th className="p-3 font-medium" scope="col">{t("notifications.activity.before")}</th>
+            <th className="p-3 font-medium" scope="col">{t("notifications.activity.after")}</th>
+          </tr></thead>
+          <tbody>{changes.map((change) => <tr className="border-t border-border" key={change.key}>
+            <th scope="row" className="w-1/3 p-3 align-top font-medium">{t(`notifications.activity.fields.${change.key}`)}</th>
+            <td className="max-w-56 break-words p-3 align-top text-slate-500">{valueFor(change.key, change.before, t, locale)}</td>
+            <td className="max-w-56 break-words p-3 align-top font-medium">{valueFor(change.key, change.after, t, locale)}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+    </section>}
+    {changedFields.length > 0 && <p className="text-slate-600">{t("notifications.activity.settingsChanged", { count: changedFields.length })}{changedLabels.length > 0 && ` ${changedLabels.join(", ")}.`}</p>}
+    {(["items", "replacementItems"] as const).map((field) => {
+      const items = activityItems(row, field);
+      if (!items.length) return null;
+      const showBefore = items.some((item) => item.beforeQuantity !== undefined);
+      const showPrice = items.some((item) => item.unitPrice !== undefined);
+      return <details key={field} open={items.length <= 8} className="rounded-xl border border-border">
+        <summary className="cursor-pointer p-3 font-semibold">{t(`notifications.activity.fields.${field}`)} · {items.length}</summary>
+        <div className="overflow-x-auto"><table className="w-full text-left text-sm">
+          <thead className="bg-canvas text-xs text-slate-500"><tr>
+            <th scope="col" className="p-3 font-medium">{t("notifications.activity.product")}</th>
+            {showBefore && <th scope="col" className="p-3 text-right font-medium">{t("notifications.activity.before")}</th>}
+            <th scope="col" className="p-3 text-right font-medium">{t("notifications.activity.fields.quantity")}</th>
+            {showPrice && <th scope="col" className="p-3 text-right font-medium">{t("notifications.activity.fields.unitPrice")}</th>}
+          </tr></thead>
+          <tbody>{items.map((item, index) => <tr key={index} className="border-t border-border">
+            <th scope="row" className="p-3 font-medium">{truncateText(item.name)}{item.unit && <span className="ml-1 text-xs font-normal text-slate-500">({item.unit})</span>}</th>
+            {showBefore && <td className="p-3 text-right text-slate-500">{valueFor("quantity", item.beforeQuantity, t, locale)}</td>}
+            <td className="p-3 text-right">{valueFor("quantity", item.quantity, t, locale)}</td>
+            {showPrice && <td className="p-3 text-right">{valueFor("unitPrice", item.unitPrice, t, locale)}</td>}
+          </tr>)}</tbody>
+        </table></div>
+      </details>;
+    })}
+  </>;
 }
 
 export function NotificationsTable({ rows }: { rows: AuditRow[] }) {
@@ -149,6 +238,8 @@ export function NotificationMobileRow({ row, expanded, toggle }: { row: AuditRow
 }
 
 function ActivityCell({ row, t }: { row: AuditRow; t: Translator }) {
+  const locale = useLocale();
+  const summary = activityChanges(row).filter((change) => ["quantity", "amount", "amountPaid", "total", "currentDebt", "status"].includes(change.key)).slice(0, 2).map((change) => changeText(change, t, locale)).join(" · ");
   const entity = activityEntity(row);
   const prompt = activityPrompt(row.prompt);
   const related = activityRelatedRecords(row).map(activityRecordLabel).filter(Boolean).join(", ");
@@ -161,6 +252,7 @@ function ActivityCell({ row, t }: { row: AuditRow; t: Translator }) {
       <div className="min-w-0">
         <div className="whitespace-normal font-semibold leading-5">{titleFor(row, t)}</div>
         {description && <div className="mt-1 line-clamp-2 whitespace-normal text-xs leading-5 text-slate-500">{truncateText(description)}</div>}
+        {summary && <div className="mt-1 whitespace-normal text-xs font-medium text-slate-600">{summary}</div>}
         {entity?.context && <div className="mt-0.5 line-clamp-1 text-xs text-slate-400">{entity.context}</div>}
       </div>
     </div>
@@ -206,8 +298,9 @@ function ExpandedAudit({ row }: { row: AuditRow }) {
         {serviceType && t.has(serviceKey) && <div><dt className="text-xs text-slate-500">{t("notifications.activity.serviceType")}</dt><dd className="mt-1 font-medium">{t(serviceKey)}</dd></div>}
         {version !== null && <div><dt className="text-xs text-slate-500">{t("notifications.activity.version")}</dt><dd className="mt-1 font-medium">{t("notifications.activity.versionValue", { version })}</dd></div>}
       </dl>}
+      <ActivityChanges row={row} />
       {prompt && <section><h3 className="mb-2 text-xs font-semibold text-slate-500">{t("notifications.prompt")}</h3><p className="whitespace-pre-wrap break-words leading-6 text-slate-600">{truncateText(prompt, 1400)}</p></section>}
-      {!entity && !prompt && records.length === 0 && <p className="text-slate-500">{t("notifications.activity.noDescription")}</p>}
+      {!entity && !prompt && records.length === 0 && activityChanges(row).length === 0 && <p className="text-slate-500">{t("notifications.activity.noDescription")}</p>}
       {records.length > 0 && (
         <div>
           <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">{t("notifications.relatedRecords")}</div>

@@ -2,7 +2,8 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import type { ActionResult, Role } from "@/lib/actions/common";
-import { writeAuditLog, type AuditSource } from "@/lib/audit";
+import type { AuditSource } from "@/lib/audit";
+import { recordActivity } from "@/lib/audit/activity-log";
 import {
   canApplyStaffSettingsMutation,
   type StaffSettingsMutation,
@@ -34,6 +35,7 @@ export async function applyStaffSettingsMutation(input: {
       const [target] = await tx
         .select({
           id: profiles.id,
+          name: profiles.fullName,
           role: profiles.role,
           isActive: profiles.isActive,
         })
@@ -42,7 +44,7 @@ export async function applyStaffSettingsMutation(input: {
           eq(profiles.id, input.mutation.id),
           eq(profiles.storeId, input.storeId),
         ))
-        .limit(1);
+        .limit(1).for("update");
       if (!target) return { status: "not_found" } as const;
 
       if (
@@ -61,6 +63,11 @@ export async function applyStaffSettingsMutation(input: {
         return { status: "forbidden" } as const;
       }
 
+      const before = { name: target.name, role: target.role, active: target.isActive };
+      const after = input.mutation.action === "role"
+        ? { ...before, role: input.mutation.role }
+        : { ...before, active: input.mutation.active };
+      if (before.role === after.role && before.active === after.active) return { status: "unchanged" } as const;
       if (input.mutation.action === "role") {
         await tx
           .update(profiles)
@@ -72,14 +79,12 @@ export async function applyStaffSettingsMutation(input: {
           .set({ isActive: input.mutation.active })
           .where(and(eq(profiles.id, target.id), eq(profiles.storeId, input.storeId)));
       }
-      return {
-        status: "updated",
-        before: { role: target.role, active: target.isActive },
-        after:
-          input.mutation.action === "role"
-            ? { role: input.mutation.role, active: target.isActive }
-            : { role: target.role, active: input.mutation.active },
-      } as const;
+      await recordActivity(tx, {
+        storeId: input.storeId, actorId: input.actorId, source: input.source,
+        action: `settings.staff_${input.mutation.action}_updated`, entityType: "profile", entityId: target.id,
+        before, after,
+      });
+      return { status: "updated" } as const;
     });
 
     if (outcome.status === "not_found") {
@@ -89,16 +94,6 @@ export async function applyStaffSettingsMutation(input: {
       return { ok: false, error: "errors.forbidden" };
     }
 
-    await writeAuditLog({
-      actorId: input.actorId,
-      source: input.source,
-      action: `settings.staff_${input.mutation.action}_updated`,
-      entityType: "profile",
-      entityId: input.mutation.id,
-      status: "succeeded",
-      before: outcome.before,
-      after: outcome.after,
-    });
     return { ok: true, data: { id: input.mutation.id } };
   } catch (error) {
     console.error("applyStaffSettingsMutation failed:", error);

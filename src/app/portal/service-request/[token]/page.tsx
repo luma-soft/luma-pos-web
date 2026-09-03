@@ -22,13 +22,8 @@ export default async function ServiceRequestPage({
   const { token } = await params;
   if (token.length < 40) notFound();
   const tokenHash = hashCustomerRequestToken(token);
-  const globalLimit = await db.transaction((tx) => consumePublicRateLimitCore(tx, {
-    key: "customer-request:page:global",
-    limit: 10_000,
-    windowSeconds: 60,
-  }));
-  if (!globalLimit.allowed) notFound();
   const [request] = await db.select({
+    storeId: serviceCustomerRequests.storeId,
     projectName: projects.name,
     status: serviceCustomerRequests.status,
     submittedAt: serviceCustomerRequests.submittedAt,
@@ -49,7 +44,15 @@ export default async function ServiceRequestPage({
   if (!request || !isCustomerRequestTokenViewable({
     expiresAt: request.tokenExpiresAt,
   })) notFound();
+  const storeLimit = await db.transaction((tx) => consumePublicRateLimitCore(tx, {
+    storeId: request.storeId,
+    key: "customer-request:page:store",
+    limit: 10_000,
+    windowSeconds: 60,
+  }));
+  if (!storeLimit.allowed) notFound();
   const tokenLimit = await db.transaction((tx) => consumePublicRateLimitCore(tx, {
+    storeId: request.storeId,
     key: `customer-request:page:token:${tokenHash}`,
     limit: 60,
     windowSeconds: 3600,

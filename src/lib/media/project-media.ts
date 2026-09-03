@@ -8,6 +8,7 @@ import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { db } from "@/db";
+import { recordActivity } from "@/lib/audit/activity-log";
 import {
   mediaObjects,
   projects,
@@ -1758,7 +1759,7 @@ export function createDatabaseProjectMediaRepository(
           : undefined,
       };
       return database.transaction(async (transaction: DatabaseLike) => {
-        const [project] = await transaction.select({ id: projects.id })
+        const [project] = await transaction.select({ id: projects.id, name: projects.name })
           .from(projects).where(and(
             eq(projects.storeId, coordinates.storeId),
             eq(projects.id, coordinates.projectId),
@@ -1855,6 +1856,11 @@ export function createDatabaseProjectMediaRepository(
               sortOrder: Number(nextSortOrder),
             });
           }
+          await recordActivity(transaction, {
+            storeId: coordinates.storeId, actorId: coordinates.actorId, action: "service.project.attachment.created", entityType: "service_attachment", entityId: attachment.id,
+            after: { name: attachment.fileName, phase: attachment.phase, sizeBytes: attachment.sizeBytes, caption: attachment.caption },
+            metadata: { projectId: coordinates.projectId, projectName: project.name, documentId: coordinates.documentId },
+          });
           return {
             ...attachment,
             mediaId: media.id,
@@ -1991,6 +1997,11 @@ export function createDatabaseProjectMediaRepository(
             sortOrder: Number(nextSortOrder),
           });
         }
+        await recordActivity(transaction, {
+          storeId: coordinates.storeId, actorId: coordinates.actorId, action: "service.project.attachment.created", entityType: "service_attachment", entityId: attachment.id,
+          after: { name: attachment.fileName, phase: attachment.phase, sizeBytes: attachment.sizeBytes, caption: attachment.caption },
+          metadata: { projectId: coordinates.projectId, projectName: project.name, documentId: coordinates.documentId },
+        });
         return {
           ...attachment,
           mediaId: media.id,
@@ -2072,6 +2083,13 @@ export function createDatabaseProjectMediaRepository(
           if (mediaResult.outcome !== "deleted") {
             throw new ProjectMediaDeleteRollback(mediaResult.outcome);
           }
+          const [project] = await transaction.select({ name: projects.name }).from(projects)
+            .where(and(eq(projects.storeId, coordinates.storeId), eq(projects.id, coordinates.projectId))).limit(1);
+          await recordActivity(transaction, {
+            storeId: coordinates.storeId, actorId: coordinates.actorId, action: "service.project.attachment.deleted", entityType: "service_attachment", entityId: attachment.id,
+            before: { name: attachment.fileName, phase: attachment.projectPhase, sizeBytes: attachment.sizeBytes, caption: attachment.caption },
+            metadata: { projectId: coordinates.projectId, projectName: project?.name },
+          });
           return { outcome: "deleted" as const, id: attachment.id };
         });
       } catch (error) {

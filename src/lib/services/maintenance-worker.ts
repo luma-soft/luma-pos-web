@@ -3,6 +3,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type * as schema from "@/db/schema";
 import {
   profiles,
+  projects,
   serviceJobAssignments,
   serviceJobEvents,
   serviceJobs,
@@ -12,6 +13,7 @@ import {
 } from "@/db/schema";
 import { createDefaultChecklist } from "@/lib/services/domain";
 import { requireActiveTechnicianCore } from "@/lib/services/job-assignment";
+import { recordActivity } from "@/lib/audit/activity-log";
 export { completeMaintenanceOccurrenceForJobCore } from "@/lib/services/maintenance-lifecycle";
 
 type ServiceTransaction = Parameters<
@@ -30,10 +32,18 @@ export async function markOverdueMaintenanceOccurrencesCore(
   const overdue = await tx.select({
     storeId: serviceMaintenanceOccurrences.storeId,
     id: serviceMaintenanceOccurrences.id,
+    planId: serviceMaintenanceOccurrences.planId,
+    projectId: serviceMaintenanceOccurrences.projectId,
+    dueOn: serviceMaintenanceOccurrences.dueOn,
+    name: serviceMaintenancePlans.title,
+    projectName: projects.name,
     jobId: serviceMaintenanceOccurrences.jobId,
+    jobCode: serviceJobs.code,
     assignedTo: serviceJobs.assignedTo,
   }).from(serviceMaintenanceOccurrences)
-    .leftJoin(serviceJobs, eq(serviceMaintenanceOccurrences.jobId, serviceJobs.id))
+    .leftJoin(serviceJobs, and(eq(serviceMaintenanceOccurrences.jobId, serviceJobs.id), eq(serviceMaintenanceOccurrences.storeId, serviceJobs.storeId)))
+    .leftJoin(serviceMaintenancePlans, and(eq(serviceMaintenanceOccurrences.planId, serviceMaintenancePlans.id), eq(serviceMaintenanceOccurrences.storeId, serviceMaintenancePlans.storeId)))
+    .leftJoin(projects, and(eq(serviceMaintenanceOccurrences.projectId, projects.id), eq(serviceMaintenanceOccurrences.storeId, projects.storeId)))
     .where(and(
       inArray(serviceMaintenanceOccurrences.status, ["scheduled", "overdue"]),
       lt(serviceMaintenanceOccurrences.dueOn, today),
@@ -42,11 +52,22 @@ export async function markOverdueMaintenanceOccurrencesCore(
 
   const scheduledIds = overdue.map((item) => item.id);
   if (scheduledIds.length > 0) {
-    await tx.update(serviceMaintenanceOccurrences).set({ status: "overdue" })
+    const changed = await tx.update(serviceMaintenanceOccurrences).set({ status: "overdue" })
       .where(and(
         inArray(serviceMaintenanceOccurrences.id, scheduledIds),
         eq(serviceMaintenanceOccurrences.status, "scheduled"),
-      ));
+      )).returning({ id: serviceMaintenanceOccurrences.id });
+    const byId = new Map(overdue.map((occurrence) => [occurrence.id, occurrence]));
+    for (const row of changed) {
+      const occurrence = byId.get(row.id)!;
+      await recordActivity(tx, {
+        storeId: occurrence.storeId, actorId: null, source: "system", action: "service.maintenance.occurrence.overdue",
+        entityType: "service_maintenance_plan", entityId: occurrence.planId,
+        before: { name: occurrence.name, code: occurrence.jobCode, status: "scheduled", dueOn: occurrence.dueOn },
+        after: { name: occurrence.name, code: occurrence.jobCode, status: "overdue", dueOn: occurrence.dueOn },
+        metadata: { projectId: occurrence.projectId, projectName: occurrence.projectName, jobId: occurrence.jobId, planId: occurrence.planId, occurrenceId: occurrence.id },
+      });
+    }
   }
 
   const alerts = [];
@@ -206,6 +227,13 @@ export async function generateMaintenanceOccurrenceCore(
     actorId: null,
     payload: { planId: plan.id, occurrenceId: occurrence.id, dueOn: plan.nextDueOn },
     createdAt: now,
+  });
+  const [project] = await tx.select({ name: projects.name }).from(projects)
+    .where(and(eq(projects.storeId, plan.storeId), eq(projects.id, plan.projectId))).limit(1);
+  await recordActivity(tx, {
+    storeId: plan.storeId, actorId: null, source: "system", action: "service.maintenance.occurrence.created", entityType: "service_job", entityId: job.id,
+    after: { name: plan.title, code: maintenanceJobCode(plan.id, plan.nextDueOn), status: "scheduled", dueOn: plan.nextDueOn },
+    metadata: { projectId: plan.projectId, projectName: project?.name, jobId: job.id, planId: plan.id, occurrenceId: occurrence.id, serviceType },
   });
   return {
     storeId: plan.storeId,

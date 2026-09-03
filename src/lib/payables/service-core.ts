@@ -1,6 +1,5 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import {
-  auditLogs,
   purchaseOrders,
   supplierPayableAllocations,
   supplierPayableEntries,
@@ -10,6 +9,7 @@ import {
 import { generateCode } from "@/lib/actions/common";
 import { fundForMethod, recordCashTx } from "@/lib/cash";
 import { createDebtChangedEventInTx } from "@/lib/notifications/events-core";
+import { recordActivity } from "@/lib/audit/activity-log";
 
 // Drizzle Postgres and PGlite expose the same runtime transaction API.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -100,7 +100,7 @@ export async function paySupplierPayable(
   try {
     return await database.transaction(async (tx: DbLike) => {
       const [supplier] = await tx
-        .select({ id: suppliers.id, currentDebt: suppliers.currentDebt })
+        .select({ id: suppliers.id, code: suppliers.code, name: suppliers.name, currentDebt: suppliers.currentDebt })
         .from(suppliers)
         .where(and(eq(suppliers.storeId, actor.storeId), eq(suppliers.id, input.supplierId)))
         .limit(1)
@@ -187,7 +187,7 @@ export async function paySupplierPayable(
           createdBy: actor.profileId,
           confirmedAt: new Date(),
         })
-        .returning({ id: supplierPayableReceipts.id });
+        .returning({ id: supplierPayableReceipts.id, code: supplierPayableReceipts.code });
 
       if (allocations.length > 0) {
         await tx.insert(supplierPayableAllocations).values(
@@ -223,25 +223,28 @@ export async function paySupplierPayable(
         .update(suppliers)
         .set({ currentDebt: sql`${suppliers.currentDebt} - ${amount.toFixed(2)}` })
         .where(and(eq(suppliers.storeId, actor.storeId), eq(suppliers.id, input.supplierId)));
-      await tx.insert(auditLogs).values({
+      await recordActivity(tx, {
         storeId: actor.storeId,
         actorId: actor.profileId,
-        source: actor.source ?? "manual",
+        source: actor.source,
         action: "supplier_payable.payment.create",
         entityType: "supplier_payable_receipt",
         entityId: receipt.id,
         before: { supplierId: input.supplierId, currentDebt: Number(supplier.currentDebt) },
         after: {
+          code: receipt.code,
+          supplierName: supplier.name,
           supplierId: input.supplierId,
           currentDebt: money(Number(supplier.currentDebt) - amount),
           amount,
           method: input.method,
         },
         affectedRecords: [
-          { entityType: "supplier", entityId: input.supplierId },
+          { type: "supplier", id: input.supplierId, code: supplier.code, name: supplier.name },
           ...allocations.map((allocation) => ({
-            entityType: "purchase_order",
-            entityId: allocation.purchaseOrderId,
+            type: "purchase_order",
+            id: allocation.purchaseOrderId,
+            code: purchases.get(allocation.purchaseOrderId)!.code,
           })),
         ],
         metadata: {
@@ -288,7 +291,7 @@ export async function createSupplierPayableEntry(
   try {
     return await database.transaction(async (tx: DbLike) => {
       const [supplier] = await tx
-        .select({ id: suppliers.id, currentDebt: suppliers.currentDebt })
+        .select({ id: suppliers.id, code: suppliers.code, name: suppliers.name, currentDebt: suppliers.currentDebt })
         .from(suppliers)
         .where(and(eq(suppliers.storeId, actor.storeId), eq(suppliers.id, input.supplierId)))
         .limit(1)
@@ -353,29 +356,31 @@ export async function createSupplierPayableEntry(
           createdBy: actor.profileId,
           approvedBy: actor.profileId,
         })
-        .returning({ id: supplierPayableEntries.id });
+        .returning({ id: supplierPayableEntries.id, code: supplierPayableEntries.code });
       await tx
         .update(suppliers)
         .set({ currentDebt: sql`${suppliers.currentDebt} + ${amount.toFixed(2)}` })
         .where(and(eq(suppliers.storeId, actor.storeId), eq(suppliers.id, input.supplierId)));
-      await tx.insert(auditLogs).values({
+      await recordActivity(tx, {
         storeId: actor.storeId,
         actorId: actor.profileId,
-        source: actor.source ?? "manual",
+        source: actor.source,
         action: "supplier_payable.adjustment.create",
         entityType: "supplier_payable_entry",
         entityId: entry.id,
         before: { supplierId: input.supplierId, currentDebt: Number(supplier.currentDebt) },
         after: {
+          code: entry.code,
+          supplierName: supplier.name,
           supplierId: input.supplierId,
           currentDebt: money(Number(supplier.currentDebt) + amount),
           amount,
           reason: input.reason.trim(),
         },
         affectedRecords: [
-          { entityType: "supplier", entityId: input.supplierId },
+          { type: "supplier", id: input.supplierId, code: supplier.code, name: supplier.name },
           ...(input.purchaseOrderId
-            ? [{ entityType: "purchase_order", entityId: input.purchaseOrderId }]
+            ? [{ type: "purchase_order", id: input.purchaseOrderId }]
             : []),
         ],
         metadata: {

@@ -1,11 +1,12 @@
 "use server";
 
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { customers, orders, orderItems, warehouses } from "@/db/schema";
 import { desc } from "drizzle-orm";
 import { type ActionResult, generateCode, toMoney, toQty } from "./common";
+import { recordActivity } from "@/lib/audit/activity-log";
 
 /**
  * Đặt hàng qua portal (xác thực bằng portalToken, KHÔNG cần đăng nhập).
@@ -35,10 +36,10 @@ export async function createPortalOrder(input: PortalOrderInput): Promise<Action
     const { products } = await import("@/db/schema");
     const { inArray } = await import("drizzle-orm");
     const ids = v.items.map((i) => i.productId);
-    const productRows = await db.select().from(products).where(inArray(products.id, ids));
+    const productRows = await db.select().from(products).where(and(eq(products.storeId, customer.storeId), inArray(products.id, ids)));
     const byId = new Map(productRows.map((p) => [p.id, p]));
 
-    const [wh] = await db.select({ id: warehouses.id }).from(warehouses).orderBy(desc(warehouses.isDefault)).limit(1);
+    const [wh] = await db.select({ id: warehouses.id }).from(warehouses).where(eq(warehouses.storeId, customer.storeId)).orderBy(desc(warehouses.isDefault)).limit(1);
 
     const priceFor = (p: typeof productRows[number]) => {
       const pick =
@@ -58,6 +59,7 @@ export async function createPortalOrder(input: PortalOrderInput): Promise<Action
 
     const result = await db.transaction(async (tx) => {
       const [order] = await tx.insert(orders).values({
+        storeId: customer.storeId,
         code: generateCode("DO"), // đơn online chờ xác nhận
         documentType: "quote",
         status: "quote",
@@ -71,6 +73,7 @@ export async function createPortalOrder(input: PortalOrderInput): Promise<Action
       }).returning({ code: orders.code, id: orders.id });
 
       await tx.insert(orderItems).values(lines.map((l) => ({
+        storeId: customer.storeId,
         orderId: order.id,
         productId: l.p.id,
         productName: l.p.name,
@@ -80,6 +83,16 @@ export async function createPortalOrder(input: PortalOrderInput): Promise<Action
         unitPrice: toMoney(l.unitPrice),
         total: toMoney(l.total),
       })));
+
+      await recordActivity(tx, {
+        storeId: customer.storeId, actorId: null, source: "manual", action: "quote.portal.created", entityType: "order", entityId: order.id,
+        after: {
+          code: order.code, customerName: customer.name, total: subtotal, status: "quote", projectName: v.projectName || null,
+          note: v.note || null, items: lines.map((line) => ({ productName: line.p.name, quantity: line.quantity, unitPrice: line.unitPrice })),
+        },
+        affectedRecords: [{ type: "order", id: order.id, code: order.code }, { type: "customer", id: customer.id, name: customer.name }],
+        metadata: { channel: "customer_portal", customerName: customer.name },
+      });
 
       return order;
     });

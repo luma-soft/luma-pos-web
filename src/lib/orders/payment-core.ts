@@ -3,6 +3,7 @@ import { customers, orders, payments } from "@/db/schema";
 import { recordCashTx, fundForMethod } from "@/lib/cash";
 import { addPaymentSchema, type AddPaymentInput } from "@/lib/schemas/order";
 import { createDebtChangedEventInTx } from "@/lib/notifications/events-core";
+import { recordActivity } from "@/lib/audit/activity-log";
 
 // Drizzle Postgres and PGlite expose the same runtime transaction API.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -133,6 +134,15 @@ export async function addManualPaymentCore(
           actorId: actor.profileId,
         });
       }
+      await recordActivity(tx, {
+        storeId: actor.storeId, actorId: actor.profileId, action: "order.payment.recorded", entityType: "order", entityId: order.id,
+        before: { code: order.code, amountPaid: alreadyPaid, paymentStatus: order.paymentStatus },
+        after: {
+          code: order.code, total, amount: value.amount, amountPaid: newPaid, method: value.method,
+          paymentStatus: newPaid >= total - 1e-9 ? "paid" : "partial", note: value.note?.trim() || null,
+        },
+        affectedRecords: [{ type: "order", id: order.id, code: order.code }, { type: "payment", id: payment.id }],
+      });
       return {
         ok: true as const,
         data: {

@@ -3,6 +3,7 @@ import { and, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { cashTransactions, paymentRefunds, payments, returns } from "@/db/schema";
 import type { GatewayProvider } from "@/lib/payments/gateways";
 import type { PaymentActionResult } from "@/lib/payments/service-core";
+import { recordActivity } from "@/lib/audit/activity-log";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type DbLike = any;
@@ -13,6 +14,20 @@ const toMoney = (value: number) => value.toFixed(2);
 function refundReference(provider: GatewayProvider, clientRequestId: string) {
   const digest = createHash("sha256").update(clientRequestId).digest("hex").slice(0, 24).toUpperCase();
   return `RF-${provider.toUpperCase()}-${digest}`;
+}
+
+async function recordRefundResultActivity(tx: DbLike, refund: typeof paymentRefunds.$inferSelect, status: string) {
+  if (refund.status === status) return;
+  const [ret] = await tx.select({ code: returns.code }).from(returns)
+    .where(and(eq(returns.storeId, refund.storeId), eq(returns.id, refund.returnId))).limit(1);
+  await recordActivity(tx, {
+    storeId: refund.storeId, actorId: null, source: "system", action: `payment.refund.${status === "pending" ? "updated" : status}`,
+    entityType: "return", entityId: refund.returnId, status: status === "failed" ? "failed" : "succeeded",
+    before: { code: ret?.code, status: refund.status },
+    after: { code: ret?.code, status, amount: Number(refund.amount), provider: refund.provider, reference: refund.reference },
+    affectedRecords: [{ type: "return", id: refund.returnId, code: ret?.code }, { type: "payment", id: refund.paymentId }],
+    metadata: { initiatedBy: refund.createdBy },
+  });
 }
 
 export async function createPendingGatewayRefund(
@@ -63,6 +78,7 @@ export async function createPendingGatewayRefund(
       const provider = payment.provider as GatewayProvider;
       const reference = input.reference?.trim() || refundReference(provider, clientRequestId);
       const [created] = await tx.insert(paymentRefunds).values({
+        storeId: ret.storeId,
         returnId: ret.id,
         paymentId: payment.id,
         provider,
@@ -71,6 +87,11 @@ export async function createPendingGatewayRefund(
         amount: toMoney(amount),
         createdBy: input.createdBy ?? null,
       }).returning({ id: paymentRefunds.id });
+      await recordActivity(tx, {
+        storeId: ret.storeId, actorId: input.createdBy ?? null, action: "payment.refund.requested", entityType: "return", entityId: ret.id,
+        after: { code: ret.code, amount, provider, reference, status: "pending" },
+        affectedRecords: [{ type: "return", id: ret.id, code: ret.code }, { type: "payment", id: payment.id }],
+      });
       return { ok: true, data: { id: created.id, reference, provider, existing: false } };
     });
   } catch (error) {
@@ -122,6 +143,7 @@ export async function recordGatewayRefundResult(
           rawPayload: input.rawPayload,
           updatedAt: new Date(),
         }).where(eq(paymentRefunds.id, refund.id));
+        await recordRefundResultActivity(tx, refund, "pending");
         return { ok: true, data: { status: "pending", duplicate: false } };
       }
 
@@ -135,6 +157,7 @@ export async function recordGatewayRefundResult(
           rawPayload: input.rawPayload,
           updatedAt: new Date(),
         }).where(eq(paymentRefunds.id, refund.id));
+        await recordRefundResultActivity(tx, refund, status);
         return { ok: true, data: { status, duplicate: false } };
       }
 
@@ -152,6 +175,7 @@ export async function recordGatewayRefundResult(
         .where(eq(payments.id, refund.paymentId)).limit(1).for("update");
       if (!payment) throw new Error("REFUND_SOURCE_NOT_FOUND");
       await tx.insert(cashTransactions).values({
+        storeId: refund.storeId,
         code: `RF-${refund.id.slice(0, 8).toUpperCase()}`,
         shiftId: payment.shiftId,
         type: "out",
@@ -169,6 +193,7 @@ export async function recordGatewayRefundResult(
       if (Number(totals?.total ?? 0) >= Number(payment.amount) - 1e-9) {
         await tx.update(payments).set({ status: "refunded" }).where(eq(payments.id, payment.id));
       }
+      await recordRefundResultActivity(tx, refund, "confirmed");
       return { ok: true, data: { status: "confirmed", duplicate: false } };
     });
   } catch (error) {

@@ -2,6 +2,7 @@ import { and, desc, eq, gte, lte, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { auditLogs, profiles } from "@/db/schema";
 import { getProfileId } from "@/lib/actions/common";
+import { sanitizeActivityValue } from "@/lib/audit/activity-log";
 
 export type AuditSource = "manual" | "ai" | "mobile" | "pos" | "system";
 export type AuditStatus =
@@ -15,6 +16,7 @@ export type AuditStatus =
 type Jsonish = Record<string, unknown> | unknown[] | null;
 
 export type AuditLogInput = {
+  storeId?: string;
   actorUserId?: string | null;
   actorId?: string | null;
   source: AuditSource;
@@ -31,15 +33,16 @@ export type AuditLogInput = {
 };
 
 async function actorSnapshot(actorId: string | null) {
-  if (!actorId) return { actorId: null, actorNameSnapshot: null };
+  if (!actorId) return { actorId: null, actorNameSnapshot: null, storeId: null };
   const [profile] = await db
-    .select({ id: profiles.id, fullName: profiles.fullName })
+    .select({ id: profiles.id, fullName: profiles.fullName, storeId: profiles.storeId })
     .from(profiles)
     .where(eq(profiles.id, actorId))
     .limit(1);
   return {
     actorId: profile?.id ?? null,
     actorNameSnapshot: profile?.fullName ?? null,
+    storeId: profile?.storeId ?? null,
   };
 }
 
@@ -49,7 +52,11 @@ export async function writeAuditLog(input: AuditLogInput) {
       input.actorId ??
       (input.actorUserId ? await getProfileId(input.actorUserId) : null);
     const actor = await actorSnapshot(actorId);
+    const storeId = input.storeId ?? actor.storeId;
+    if (!storeId) throw new Error("ACTIVITY_STORE_REQUIRED");
+    if (actor.storeId && actor.storeId !== storeId) throw new Error("ACTIVITY_ACTOR_STORE_MISMATCH");
     await db.insert(auditLogs).values({
+      storeId,
       actorId: actor.actorId,
       actorNameSnapshot: actor.actorNameSnapshot,
       source: input.source,
@@ -59,10 +66,10 @@ export async function writeAuditLog(input: AuditLogInput) {
       status: input.status ?? "succeeded",
       prompt: input.prompt ?? null,
       parsedIntent: input.parsedIntent ?? null,
-      before: input.before ?? null,
-      after: input.after ?? null,
-      affectedRecords: input.affectedRecords ?? null,
-      metadata: input.metadata ?? null,
+      before: sanitizeActivityValue(input.before ?? null) as Jsonish,
+      after: sanitizeActivityValue(input.after ?? null) as Jsonish,
+      affectedRecords: sanitizeActivityValue(input.affectedRecords ?? null) as Record<string, unknown>[] | null,
+      metadata: sanitizeActivityValue(input.metadata ?? null) as Record<string, unknown> | null,
     });
   } catch (e) {
     console.error("writeAuditLog failed:", e);

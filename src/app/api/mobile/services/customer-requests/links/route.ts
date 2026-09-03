@@ -1,3 +1,4 @@
+import { recordActivity } from "@/lib/audit/activity-log";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -19,6 +20,7 @@ export async function POST(request: Request) {
   const gate = await requireMobileServiceManager();
   const blocked = mobileGate(gate);
   if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate);
   const parsed = serviceCustomerRequestLinkSchema.safeParse(await readJson(request));
   if (!parsed.success) return mobileError("errors.invalidData", 400);
   const value = parsed.data;
@@ -32,7 +34,7 @@ export async function POST(request: Request) {
     customerPhone: customers.phone,
   }).from(projects)
     .leftJoin(customers, eq(projects.customerId, customers.id))
-    .where(eq(projects.id, value.projectId))
+    .where(and(eq(projects.storeId, gate.storeId), eq(projects.id, value.projectId)))
     .limit(1);
   if (!project) return mobileError("errors.notFound", 404);
   const customerId = value.customerId ?? project.customerId;
@@ -51,7 +53,9 @@ export async function POST(request: Request) {
   }
   const token = createCustomerRequestToken();
   const expiresAt = new Date(Date.now() + value.expiresInDays * 24 * 60 * 60 * 1000);
-  const [row] = await db.insert(serviceCustomerRequests).values({
+  const row = await db.transaction(async (tx) => {
+    const [created] = await tx.insert(serviceCustomerRequests).values({
+    storeId: gate.storeId,
     code: generateCode("YC"),
     projectId: project.id,
     customerId,
@@ -62,6 +66,11 @@ export async function POST(request: Request) {
     tokenHash: hashCustomerRequestToken(token),
     tokenExpiresAt: expiresAt,
   }).returning({ id: serviceCustomerRequests.id, code: serviceCustomerRequests.code });
+    await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId, source: "mobile",
+      action: "service.customer_request.link.created", entityType: "service_customer_request", entityId: created.id,
+      after: { code: created.code, name: project.name }, metadata: { projectId: project.id, expiresAt } });
+    return created;
+  });
   const origin = new URL(request.url).origin;
   return mobileOk({
     ...row,

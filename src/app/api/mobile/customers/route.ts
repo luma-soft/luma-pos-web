@@ -45,6 +45,6 @@ export async function POST(request: Request) {
   if (!body) return mobileAction({ ok: false, error: "errors.invalidData" });
 
   return mobileAction(
-    await createCustomerCore(gate.storeId, body as Parameters<typeof createCustomerCore>[1])
+    await createCustomerCore(gate.storeId, body as Parameters<typeof createCustomerCore>[1], gate.userId)
   );
 }

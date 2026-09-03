@@ -20,7 +20,8 @@ import { Routes } from "@/lib/routes";
 import { isServiceSnapshotJobLocked } from "@/lib/services/field-api";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { evaluateServiceProjectClose } from "@/lib/services/project-close";
-import { writeAuditLog } from "@/lib/audit";
+import { recordActivity } from "@/lib/audit/activity-log";
+import { trackServiceChange } from "@/lib/services/activity";
 import { deleteProjectCore } from "@/lib/projects/delete-project";
 
 // ============ Công trình ============
@@ -107,7 +108,7 @@ export async function createProject(input: CreateProjectInput): Promise<ActionRe
       const [customer] = await db.select({ id: customers.id }).from(customers).where(and(eq(customers.storeId, context.storeId), eq(customers.id, v.customerId))).limit(1);
       if (!customer) return { ok: false, error: "errors.invalidData" };
     }
-    const row = await db.transaction(async (tx) => {
+    const row = await db.transaction(async (tx) => trackServiceChange(tx, context, { action: "project.created", entityType: "project", createdId: (row) => row.id }, async () => {
       const [created] = await tx.insert(projects).values({
         storeId: context.storeId,
         name: v.name.trim(),
@@ -124,7 +125,7 @@ export async function createProject(input: CreateProjectInput): Promise<ActionRe
         });
       }
       return created;
-    });
+    }));
     revalidatePath(Routes.Partners);
     revalidatePath(Routes.Services);
     revalidatePath(Routes.Projects);
@@ -158,7 +159,7 @@ export async function toggleProjectStatus(id: string): Promise<ActionResult> {
     ) {
       return { ok: false, error: "services.errors.projectCloseBlocked" };
     }
-    await db.update(projects).set({
+    await db.transaction((tx) => trackServiceChange(tx, context, { action: "project.status.changed", entityType: "project", id }, async () => tx.update(projects).set({
       status: sql`case when ${projects.status} = 'active' then 'done' else 'active' end`,
       serviceStage: sql`case
         when ${projects.serviceType} is null then ${projects.serviceStage}
@@ -170,7 +171,7 @@ export async function toggleProjectStatus(id: string): Promise<ActionResult> {
         when ${projects.status} = 'active' then 100
         else ${projects.progressPercent}
       end`,
-    }).where(and(eq(projects.storeId, context.storeId), eq(projects.id, id)));
+    }).where(and(eq(projects.storeId, context.storeId), eq(projects.id, id)))));
     revalidatePath(Routes.Partners);
     revalidatePath(Routes.Services);
     revalidatePath(Routes.Projects);
@@ -204,17 +205,6 @@ export async function deleteProject(id: string): Promise<ActionResult> {
       return { ok: false, error: "projects.errors.deleteConflict" };
     }
 
-    await writeAuditLog({
-      actorUserId: gate.userId,
-      source: "manual",
-      action: "project.delete",
-      entityType: "project",
-      entityId: result.projectId,
-      metadata: {
-        managedMediaCount: result.managedMediaCount,
-        legacyObjectCount: result.legacyObjectCount,
-      },
-    });
     revalidatePath(Routes.Partners);
     revalidatePath(Routes.Projects);
     revalidatePath(Routes.Services);
@@ -247,13 +237,17 @@ export async function createPromotion(input: CreatePromotionInput): Promise<Acti
   try {
     const [product] = await db.select({ id: products.id }).from(products).where(and(eq(products.storeId, gate.storeId), eq(products.id, v.productId))).limit(1);
     if (!product) return { ok: false, error: "errors.invalidData" };
-    await db.insert(promotions).values({
+    await db.transaction(async (tx) => {
+      const [row] = await tx.insert(promotions).values({
       storeId: gate.storeId,
       name: v.name.trim(),
       productId: v.productId,
       tiers: v.tiers.sort((a, b) => a.minQty - b.minQty),
       startsAt: v.startsAt ? new Date(v.startsAt) : null,
       endsAt: v.endsAt ? new Date(v.endsAt) : null,
+    }).returning({ id: promotions.id, name: promotions.name, isActive: promotions.isActive, tiers: promotions.tiers });
+      await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId, action: "promotion.created",
+        entityType: "promotion", entityId: row.id, after: row });
     });
     revalidatePath(Routes.Promotions);
     revalidatePath(Routes.POS);
@@ -267,7 +261,16 @@ export async function createPromotion(input: CreatePromotionInput): Promise<Acti
 export async function togglePromotion(id: string): Promise<ActionResult> {
   const gate = await requireManager(); if (!gate.ok) return gate;
   try {
-    await db.update(promotions).set({ isActive: sql`not ${promotions.isActive}` }).where(and(eq(promotions.storeId, gate.storeId), eq(promotions.id, id)));
+    await db.transaction(async (tx) => {
+      const [before] = await tx.select({ name: promotions.name, isActive: promotions.isActive }).from(promotions)
+        .where(and(eq(promotions.storeId, gate.storeId), eq(promotions.id, id))).limit(1).for("update");
+      if (!before) return;
+      const [after] = await tx.update(promotions).set({ isActive: !before.isActive })
+        .where(and(eq(promotions.storeId, gate.storeId), eq(promotions.id, id)))
+        .returning({ name: promotions.name, isActive: promotions.isActive });
+      await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId, action: "promotion.status.changed",
+        entityType: "promotion", entityId: id, before, after });
+    });
     revalidatePath(Routes.Promotions);
     revalidatePath(Routes.POS);
     return { ok: true, data: undefined };
@@ -285,7 +288,12 @@ export async function generatePortalToken(customerId: string): Promise<ActionRes
     const token = Array.from(crypto.getRandomValues(new Uint8Array(20)))
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
-    const [updated] = await db.update(customers).set({ portalToken: token }).where(and(eq(customers.storeId, gate.storeId), eq(customers.id, customerId))).returning({ id: customers.id });
+    const updated = await db.transaction(async (tx) => {
+      const [row] = await tx.update(customers).set({ portalToken: token }).where(and(eq(customers.storeId, gate.storeId), eq(customers.id, customerId))).returning({ id: customers.id, name: customers.name });
+      if (row) await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId,
+        action: "customer.portal_link.renewed", entityType: "customer", entityId: row.id, after: { name: row.name } });
+      return row;
+    });
     if (!updated) return { ok: false, error: "errors.notFound" };
     revalidatePath(Routes.customer(customerId));
     return { ok: true, data: { token } };
@@ -322,7 +330,7 @@ export async function updateProject(input: UpdateProjectInput): Promise<ActionRe
     }
     const isServiceProject = Boolean(effectiveServiceType);
     const serviceStage = v.status === "done" ? "completed" : v.serviceStage;
-    await db.update(projects).set({
+    await db.transaction((tx) => trackServiceChange(tx, gate, { action: "project.updated", entityType: "project", id: v.id }, async () => tx.update(projects).set({
       name: v.name.trim(),
       customerId: v.customerId ?? null,
       address: v.address?.trim() || null,
@@ -337,7 +345,7 @@ export async function updateProject(input: UpdateProjectInput): Promise<ActionRe
         siteContactPhone: v.siteContactPhone || null,
         ...(v.status === "done" ? { progressPercent: 100 } : {}),
       } : {}),
-    }).where(and(eq(projects.storeId, gate.storeId), eq(projects.id, v.id)));
+    }).where(and(eq(projects.storeId, gate.storeId), eq(projects.id, v.id)))));
     revalidatePath(Routes.Partners);
     revalidatePath(Routes.Projects);
     revalidatePath(Routes.Services);
@@ -385,37 +393,17 @@ export async function completeServiceProjectManually(
       return { ok: false, error: "errors.invalidData" };
     }
 
-    await db.update(projects).set({
+    await db.transaction((tx) => trackServiceChange(tx, gate, {
+      action: "service_project.manual_complete", entityType: "service_project", id: parsed.data.id,
+      metadata: { bypassedCloseRequirements: true, childJobsMutated: false, acceptanceRecordsCreated: false },
+    }, async () => tx.update(projects).set({
       status: "done",
       serviceStage: "completed",
       progressPercent: 100,
     }).where(and(
       eq(projects.storeId, gate.storeId),
       eq(projects.id, parsed.data.id),
-    ));
-
-    await writeAuditLog({
-      actorUserId: gate.userId,
-      source: "mobile",
-      action: "service_project.manual_complete",
-      entityType: "service_project",
-      entityId: parsed.data.id,
-      before: {
-        status: current.status,
-        serviceStage: current.serviceStage,
-        progressPercent: current.progressPercent,
-      },
-      after: {
-        status: "done",
-        serviceStage: "completed",
-        progressPercent: 100,
-      },
-      metadata: {
-        bypassedCloseRequirements: true,
-        childJobsMutated: false,
-        acceptanceRecordsCreated: false,
-      },
-    });
+    ))));
 
     revalidatePath(Routes.Partners);
     revalidatePath(Routes.Projects);

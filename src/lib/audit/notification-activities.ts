@@ -9,6 +9,11 @@ export async function getNotificationActivities(storeId: string, userId: string)
   const rows = await getAuditLogs({ storeId, notificationUserId: userId, limit: 100 });
   const actorIds = [...new Set(rows.filter((row) => !row.actorNameSnapshot?.trim()).flatMap((row) => row.actorId ? [row.actorId] : []))];
   const productIds = [...new Set(rows.flatMap((row) => ["product", "product_price"].includes(row.entityType) && row.entityId ? [row.entityId] : []))];
+  const projectIds = [...new Set(rows.flatMap((row) => {
+    const id = ["project", "service_project"].includes(row.entityType) ? row.entityId
+      : activityText(activityObject(row.metadata).projectId) ?? activityText(activityObject(row.after).projectId);
+    return id && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(id) ? [id] : [];
+  }))];
   const jobIds = new Set<string>();
   const tradeRecordIds: string[] = [];
   for (const row of rows) {
@@ -23,7 +28,7 @@ export async function getNotificationActivities(storeId: string, userId: string)
   if (jobIds.size) jobConditions.push(inArray(serviceJobs.id, [...jobIds]));
   if (tradeRecordIds.length) jobConditions.push(inArray(serviceJobTradeRecords.id, tradeRecordIds));
 
-  const [actors, productRows, jobs] = await Promise.all([
+  const [actors, productRows, jobs, projectRows] = await Promise.all([
     actorIds.length ? db.select({ id: profiles.id, name: profiles.fullName }).from(profiles)
       .where(and(eq(profiles.storeId, storeId), inArray(profiles.id, actorIds))) : [],
     productIds.length ? db.select({ id: products.id, code: products.sku, name: products.name }).from(products)
@@ -35,10 +40,13 @@ export async function getNotificationActivities(storeId: string, userId: string)
       .leftJoin(projects, and(eq(projects.id, serviceJobs.projectId), eq(projects.storeId, storeId)))
       .leftJoin(serviceJobTradeRecords, and(eq(serviceJobTradeRecords.jobId, serviceJobs.id), eq(serviceJobTradeRecords.storeId, storeId)))
       .where(and(eq(serviceJobs.storeId, storeId), or(...jobConditions))) : [],
+    projectIds.length ? db.select({ id: projects.id, name: projects.name }).from(projects)
+      .where(and(eq(projects.storeId, storeId), inArray(projects.id, projectIds))) : [],
   ]);
 
   const actorNames = new Map(actors.map((actor) => [actor.id, actor.name]));
   const entities = new Map<string, ActivityRecord>();
+  for (const project of projectRows) entities.set(project.id, { ...project, type: "project", code: null, href: Routes.project(project.id) });
   for (const product of productRows) entities.set(product.id, { ...product, type: "product" });
   for (const job of jobs) {
     const record = {
@@ -52,6 +60,11 @@ export async function getNotificationActivities(storeId: string, userId: string)
     ...row,
     actorNameSnapshot: row.actorNameSnapshot?.trim() || actorNames.get(row.actorId ?? "") || null,
     resolvedEntity: entities.get(row.entityId ?? "") ?? (row.entityType.startsWith("service_")
-      ? entities.get(activityText(activityObject(row.metadata).jobId) ?? "") : null) ?? null,
+      ? entities.get(activityText(activityObject(row.metadata).jobId) ?? "") : null)
+      ?? (() => {
+        const projectId = activityText(activityObject(row.metadata).projectId) ?? activityText(activityObject(row.after).projectId);
+        const project = entities.get(projectId ?? "");
+        return project ? { ...project, context: project.name } : null;
+      })(),
   }));
 }

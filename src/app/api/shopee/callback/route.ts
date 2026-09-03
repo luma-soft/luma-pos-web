@@ -6,6 +6,7 @@ import { Routes } from "@/lib/routes";
 import { exchangeShopeeAuthorizationCode } from "@/lib/shopee/client";
 import { getShopeeSettings } from "@/lib/data/settings";
 import { peekShopeeCallbackStoreId, readShopeeCallbackState } from "@/lib/shopee/callback-state";
+import { recordActivity } from "@/lib/audit/activity-log";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -56,31 +57,39 @@ export async function GET(req: Request) {
       try {
         const token = await exchangeShopeeAuthorizationCode(storeId, { code, shopId });
         const expiresAt = token.expireIn ? new Date(Date.now() + token.expireIn * 1000) : null;
-        await db.insert(marketplaceTokens)
-          .values({
-            storeId,
-            shopId: shopRow.id,
-            accessToken: token.accessToken,
-            refreshToken: token.refreshToken,
-            expiresAt,
-            scopes: ["product", "order", "chat", "logistics"],
-          })
-          .onConflictDoUpdate({
-            target: [marketplaceTokens.shopId],
-            set: {
+        await db.transaction(async (tx) => {
+          await tx.insert(marketplaceTokens)
+            .values({
+              storeId,
+              shopId: shopRow.id,
               accessToken: token.accessToken,
               refreshToken: token.refreshToken,
               expiresAt,
               scopes: ["product", "order", "chat", "logistics"],
-              updatedAt: sql`now()`,
-            },
+            })
+            .onConflictDoUpdate({
+              target: [marketplaceTokens.shopId],
+              set: {
+                accessToken: token.accessToken,
+                refreshToken: token.refreshToken,
+                expiresAt,
+                scopes: ["product", "order", "chat", "logistics"],
+                updatedAt: sql`now()`,
+              },
+            });
+          await tx.update(marketplaceShops).set({
+            status: "connected",
+            tokenExpiresAt: expiresAt,
+            metadata: { authorizationCodeReceived: true, tokenExchange: "ok" },
+            updatedAt: sql`now()`,
+          }).where(and(eq(marketplaceShops.storeId, storeId), eq(marketplaceShops.id, shopRow.id)));
+          const [connected] = await tx.select({ name: marketplaceShops.shopName }).from(marketplaceShops)
+            .where(and(eq(marketplaceShops.storeId, storeId), eq(marketplaceShops.id, shopRow.id))).limit(1);
+          await recordActivity(tx, {
+            storeId, actorId: null, source: "system", action: "marketplace.shop.connected", entityType: "marketplace_shop", entityId: shopRow.id,
+            after: { name: connected?.name, provider: "shopee", status: "connected" },
           });
-        await db.update(marketplaceShops).set({
-          status: "connected",
-          tokenExpiresAt: expiresAt,
-          metadata: { authorizationCodeReceived: true, tokenExchange: "ok" },
-          updatedAt: sql`now()`,
-        }).where(and(eq(marketplaceShops.storeId, storeId), eq(marketplaceShops.id, shopRow.id)));
+        });
       } catch (tokenError) {
         await db.update(marketplaceShops).set({
           status: "authorized",

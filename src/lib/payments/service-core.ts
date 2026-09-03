@@ -18,6 +18,7 @@ import type { GatewayProvider } from "@/lib/payments/gateways";
 import type { GatewayInquiryResult } from "@/lib/payments/gateway-adapter";
 import { consumeTrackedStockLots } from "@/lib/inventory/stock-lot-service";
 import { createNotificationEventInTx } from "@/lib/notifications/events-core";
+import { recordActivity } from "@/lib/audit/activity-log";
 
 export type PaymentActionResult<T = undefined> =
   | { ok: true; data: T }
@@ -53,6 +54,33 @@ function safeAmount(value: number) {
 function paymentStatusFor(total: number, paid: number) {
   if (paid >= total - 1e-9) return "paid";
   return paid > 0 ? "partial" : "unpaid";
+}
+
+async function recordPaymentActivityInTx(
+  tx: DbLike,
+  payment: typeof payments.$inferSelect,
+  action: string,
+  previousStatus: string | null,
+  actorId: string | null = null,
+  system = true,
+  reason?: string,
+) {
+  const [order] = await tx.select().from(orders)
+    .where(and(eq(orders.storeId, payment.storeId), eq(orders.id, payment.orderId))).limit(1);
+  if (!order) throw new Error("ORDER_NOT_FOUND");
+  await recordActivity(tx, {
+    storeId: payment.storeId, actorId, ...(system ? { source: "system" as const } : {}),
+    action, entityType: "order", entityId: order.id,
+    status: payment.status === "failed" ? "failed" : "succeeded",
+    before: previousStatus ? { code: order.code, status: previousStatus } : null,
+    after: {
+      code: order.code, status: payment.status, amount: Number(payment.amount), method: payment.method,
+      provider: payment.provider, reference: payment.reference, total: Number(order.total),
+      amountPaid: Number(order.amountPaid), orderStatus: order.status,
+    },
+    affectedRecords: [{ type: "order", id: order.id, code: order.code }, { type: "payment", id: payment.id }],
+    metadata: { reason: reason?.slice(0, 240) ?? null },
+  });
 }
 
 async function finalizeDraftOrderInTx(
@@ -149,6 +177,8 @@ async function confirmPaymentInTx(
     accountNumber?: string | null;
     confirmedAt?: Date;
     source?: ConfirmSource;
+    actorId?: string | null;
+    reason?: string;
   }
 ) {
   const nextPaymentStatus = input.source === "api"
@@ -181,7 +211,7 @@ async function confirmPaymentInTx(
     throw new Error("PAYMENT_NOT_CONFIRMABLE");
   }
 
-  const [order] = await tx.select().from(orders).where(eq(orders.id, payment.orderId)).limit(1);
+  const [order] = await tx.select().from(orders).where(eq(orders.id, payment.orderId)).limit(1).for("update");
   if (!order) throw new Error("ORDER_NOT_FOUND");
 
   const amount = Number(payment.amount);
@@ -213,6 +243,7 @@ async function confirmPaymentInTx(
   }
 
   await tx.insert(cashTransactions).values({
+    storeId: order.storeId,
     code: generatePaymentReference("PT"),
     shiftId: payment.shiftId ?? order.shiftId ?? null,
     type: "in",
@@ -243,6 +274,19 @@ async function confirmPaymentInTx(
         ? Math.max(total - newPaid, 0).toFixed(2)
         : (-amount).toFixed(2),
     },
+  });
+  await recordActivity(tx, {
+    storeId: order.storeId, actorId: input.actorId ?? null,
+    ...(!input.actorId ? { source: "system" as const } : {}),
+    action: input.source === "api" ? "order.payment.reconciled" : "order.payment.confirmed",
+    entityType: "order", entityId: order.id,
+    before: { code: order.code, amountPaid: alreadyPaid, paymentStatus: order.paymentStatus, status: order.status },
+    after: {
+      code: order.code, total, amount, amountPaid: newPaid, paymentStatus: paymentStatusFor(total, newPaid),
+      status: draftOrder ? "completed" : order.status, method: payment.method, provider: payment.provider,
+    },
+    affectedRecords: [{ type: "order", id: order.id, code: order.code }, { type: "payment", id: payment.id }],
+    metadata: { initiatedBy: payment.createdBy ?? null, reason: input.reason?.slice(0, 240) ?? null },
   });
   return {
     alreadyConfirmed: false,
@@ -338,6 +382,7 @@ export async function createPendingSepayPayment(
       }
       const shiftId = await currentShiftIdForProfile(tx, input.createdBy);
       const [payment] = await tx.insert(payments).values({
+        storeId: order.storeId,
         orderId: order.id,
         shiftId,
         amount: toMoney(amount),
@@ -350,7 +395,9 @@ export async function createPendingSepayPayment(
         reference,
         note: input.note?.trim() || null,
         createdBy: input.createdBy ?? null,
-      }).returning({ id: payments.id, reference: payments.reference });
+      }).returning();
+
+      await recordPaymentActivityInTx(tx, payment, "payment.requested", null, input.createdBy ?? null, false);
 
       return { ok: true, data: { id: payment.id, reference: payment.reference ?? reference } };
     });
@@ -436,6 +483,7 @@ export async function createPendingGatewayPayment(
       if (amount > remaining + 1e-9) throw new Error("AMOUNT_EXCEEDS_REMAINING");
       const shiftId = await currentShiftIdForProfile(tx, input.createdBy);
       const [payment] = await tx.insert(payments).values({
+        storeId: order.storeId,
         orderId: order.id,
         shiftId,
         amount: toMoney(amount),
@@ -447,7 +495,8 @@ export async function createPendingGatewayPayment(
         expiresAt: new Date(Date.now() + GATEWAY_PAYMENT_TIMEOUT_MS),
         note: input.note?.trim() || null,
         createdBy: input.createdBy ?? null,
-      }).returning({ id: payments.id });
+      }).returning();
+      await recordPaymentActivityInTx(tx, payment, "payment.requested", null, input.createdBy ?? null, false);
       return {
         ok: true,
         data: { id: payment.id, reference, existing: false },
@@ -537,7 +586,7 @@ export async function failGatewayPayment(
           eq(payments.status, "pending"),
           inArray(payments.provider, ["momo", "zalopay", "vnpay"]),
         ))
-        .returning({ id: payments.id });
+        .returning();
       if (changed.length === 0) {
         return { ok: false, error: "payments.errors.notConfirmable" };
       }
@@ -546,6 +595,7 @@ export async function failGatewayPayment(
         .update(orders)
         .set({ status: "cancelled", updatedAt: sql`now()` })
         .where(and(eq(orders.id, pending.orderId), eq(orders.status, "draft")));
+      await recordPaymentActivityInTx(tx, changed[0], "payment.failed", "pending");
       return { ok: true, data: undefined };
     });
   } catch (error) {
@@ -559,10 +609,16 @@ export async function cancelDraftOrder(
   orderId: string,
 ): Promise<PaymentActionResult> {
   try {
-    await db
-      .update(orders)
-      .set({ status: "cancelled", updatedAt: sql`now()` })
-      .where(and(eq(orders.id, orderId), eq(orders.status, "draft")));
+    await db.transaction(async (tx: DbLike) => {
+      const [order] = await tx.update(orders)
+        .set({ status: "cancelled", updatedAt: sql`now()` })
+        .where(and(eq(orders.id, orderId), eq(orders.status, "draft"))).returning();
+      if (order) await recordActivity(tx, {
+        storeId: order.storeId, actorId: null, source: "system", action: "order.cancelled", entityType: "order", entityId: order.id,
+        before: { code: order.code, status: "draft" }, after: { code: order.code, status: "cancelled", total: Number(order.total) },
+        metadata: { reason: "payment_unavailable" },
+      });
+    });
     return { ok: true, data: undefined };
   } catch (error) {
     console.error("cancelDraftOrder failed:", error);
@@ -606,10 +662,11 @@ export async function getGatewayPaymentStatus(
     const expiresAt = payment.expiresAt ?? new Date(payment.createdAt.getTime() + GATEWAY_PAYMENT_TIMEOUT_MS);
     let status = payment.status;
     if (status === "pending" && expiresAt.getTime() <= Date.now()) {
-      await db
-        .update(payments)
-        .set({ status: "expired" })
-        .where(and(eq(payments.id, payment.id), eq(payments.status, "pending")));
+      await db.transaction(async (tx: DbLike) => {
+        const [changed] = await tx.update(payments).set({ status: "expired" })
+          .where(and(eq(payments.id, payment.id), eq(payments.status, "pending"))).returning();
+        if (changed) await recordPaymentActivityInTx(tx, changed, "payment.expired", "pending");
+      });
       status = "expired";
     }
     return {
@@ -916,6 +973,8 @@ export async function confirmPaymentFromProvider(
     accountNumber?: string | null;
     confirmedAt?: Date;
     source?: ConfirmSource;
+    actorId?: string | null;
+    reason?: string;
   }
 ): Promise<PaymentActionResult<{ alreadyConfirmed: boolean } & PaymentNotificationResult>> {
   try {
@@ -935,7 +994,7 @@ export async function confirmPaymentFromProvider(
   }
 }
 
-export async function expirePendingPayment(db: DbLike, paymentId: string): Promise<PaymentActionResult> {
+export async function expirePendingPayment(db: DbLike, paymentId: string, actorId: string | null = null, reason?: string): Promise<PaymentActionResult> {
   try {
     return await db.transaction(async (tx: DbLike) => {
       const [pending] = await tx
@@ -952,7 +1011,7 @@ export async function expirePendingPayment(db: DbLike, paymentId: string): Promi
         .update(payments)
         .set({ status: "expired" })
         .where(and(eq(payments.id, paymentId), eq(payments.status, "pending")))
-        .returning({ id: payments.id });
+        .returning();
       if (changed.length === 0) {
         return { ok: false, error: "payments.errors.notConfirmable" };
       }
@@ -960,6 +1019,7 @@ export async function expirePendingPayment(db: DbLike, paymentId: string): Promi
         .update(orders)
         .set({ status: "cancelled", updatedAt: sql`now()` })
         .where(and(eq(orders.id, pending.orderId), eq(orders.status, "draft")));
+      await recordPaymentActivityInTx(tx, changed[0], "payment.expired", "pending", actorId, !actorId, reason);
       return { ok: true, data: undefined };
     });
   } catch (e) {
@@ -1003,14 +1063,16 @@ export async function getSepayPaymentStatus(
     );
     if (status === "pending" && expiresAt.getTime() <= Date.now()) {
       await db.transaction(async (tx: DbLike) => {
-        await tx
+        const [changed] = await tx
           .update(payments)
           .set({ status: "expired" })
-          .where(and(eq(payments.id, paymentId), eq(payments.status, "pending")));
+          .where(and(eq(payments.id, paymentId), eq(payments.status, "pending"))).returning();
+        if (!changed) return;
         await tx
           .update(orders)
           .set({ status: "cancelled", updatedAt: sql`now()` })
           .where(and(eq(orders.id, payment.orderId), eq(orders.status, "draft")));
+        await recordPaymentActivityInTx(tx, changed, "payment.expired", "pending");
       });
       status = "expired";
     }
@@ -1052,14 +1114,12 @@ export async function getPaymentReconciliation(
 }>> {
   try {
     const staleBefore = new Date(Date.now() - SEPAY_PAYMENT_TIMEOUT_MS);
-    await db
-      .update(payments)
-      .set({ status: "expired" })
-      .where(and(
-        eq(payments.provider, "sepay"),
-        eq(payments.status, "pending"),
-        lt(payments.createdAt, staleBefore),
-      ));
+    await db.transaction(async (tx: DbLike) => {
+      const changed = await tx.update(payments).set({ status: "expired" }).where(and(
+        eq(payments.provider, "sepay"), eq(payments.status, "pending"), lt(payments.createdAt, staleBefore),
+      )).returning();
+      for (const payment of changed) await recordPaymentActivityInTx(tx, payment, "payment.expired", "pending");
+    });
 
     const status = input.status ?? "actionable";
     const limit = Math.max(1, Math.min(200, Math.trunc(input.limit ?? 100)));
@@ -1300,6 +1360,7 @@ export async function reconcilePaymentWithEvent(
     paymentId: string;
     eventId: string;
     actorId?: string | null;
+    reason?: string;
   }
 ): Promise<PaymentActionResult<{
   alreadyReconciled: boolean;
@@ -1383,6 +1444,8 @@ export async function reconcilePaymentWithEvent(
         accountNumber: event.accountNumber,
         confirmedAt: event.transactionDate ?? undefined,
         source: "api",
+        actorId: input.actorId ?? null,
+        reason: input.reason,
       });
       return {
         ok: true,

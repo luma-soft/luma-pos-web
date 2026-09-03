@@ -15,5 +15,5 @@ export async function POST(
     return mobileAction({ ok: false, error: "errors.invalidData" });
   }
 
-  return mobileAction(await expirePendingPayment(trimmedId));
+  return mobileAction(await expirePendingPayment(trimmedId, gate.userId));
 }

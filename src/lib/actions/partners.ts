@@ -13,6 +13,7 @@ import {
 import { type ActionResult, generateCode, requireManager, requireStockAccess } from "./common";
 import { createCustomerCore, updateCustomerCore } from "@/lib/customers/write";
 import { Routes } from "@/lib/routes";
+import { recordActivity } from "@/lib/audit/activity-log";
 
 export async function createCustomer(
   input: CreateCustomerOutput
@@ -20,7 +21,7 @@ export async function createCustomer(
   const gate = await requireManager();
   if (!gate.ok) return gate;
   // Lõi tách riêng. Xem src/lib/customers/write.ts.
-  const result = await createCustomerCore(gate.storeId, input);
+  const result = await createCustomerCore(gate.storeId, input, gate.userId);
   if (result.ok) revalidatePath(Routes.Customers);
   return result;
 }
@@ -42,14 +43,27 @@ export async function updateSupplier(input: UpdateSupplierInput): Promise<Action
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
   try {
-    await db.update(suppliers).set({
-      name: v.name,
-      phone: v.phone?.slice(0, 20) || null,
-      email: v.email || null,
-      address: v.address || null,
-      taxCode: v.taxCode?.slice(0, 30) || null,
-      note: v.note || null,
-    }).where(and(eq(suppliers.storeId, gate.storeId), eq(suppliers.id, v.id)));
+    await db.transaction(async (tx) => {
+      const [current] = await tx.select().from(suppliers)
+        .where(and(eq(suppliers.storeId, gate.storeId), eq(suppliers.id, v.id))).limit(1).for("update");
+      if (!current) throw new Error("SUPPLIER_NOT_FOUND");
+      const next = {
+        name: v.name,
+        phone: v.phone?.slice(0, 20) || null,
+        email: v.email || null,
+        address: v.address || null,
+        taxCode: v.taxCode?.slice(0, 30) || null,
+        note: v.note || null,
+      };
+      const changedFields = (Object.keys(next) as Array<keyof typeof next>).filter((key) => current[key] !== next[key]);
+      if (!changedFields.length) return;
+      await tx.update(suppliers).set(next).where(and(eq(suppliers.storeId, gate.storeId), eq(suppliers.id, v.id)));
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "supplier.updated", entityType: "supplier", entityId: v.id,
+        before: { code: current.code, name: current.name }, after: { code: current.code, name: next.name },
+        metadata: { changedFields },
+      });
+    });
     revalidatePath(Routes.Suppliers);
     revalidatePath(Routes.Partners);
     revalidatePath(`/suppliers/${v.id}`);
@@ -65,7 +79,7 @@ export type { UpdateCustomerInput } from "@/lib/schemas/order";
 export async function updateCustomer(input: UpdateCustomerInput): Promise<ActionResult> {
   const gate = await requireManager(); if (!gate.ok) return gate;
   // Lõi tách riêng. Xem src/lib/customers/write.ts.
-  const result = await updateCustomerCore(gate.storeId, input);
+  const result = await updateCustomerCore(gate.storeId, input, gate.userId);
   if (result.ok) {
     revalidatePath(Routes.Customers);
     revalidatePath(Routes.Partners);
@@ -86,7 +100,18 @@ export async function setCustomerActive(input: z.input<typeof setCustomerActiveS
   const v = parsed.data;
 
   try {
-    await db.update(customers).set({ isActive: v.isActive }).where(and(eq(customers.storeId, gate.storeId), eq(customers.id, v.id)));
+    await db.transaction(async (tx) => {
+      const [current] = await tx.select({ code: customers.code, name: customers.name, isActive: customers.isActive }).from(customers)
+        .where(and(eq(customers.storeId, gate.storeId), eq(customers.id, v.id))).limit(1).for("update");
+      if (!current) throw new Error("CUSTOMER_NOT_FOUND");
+      if (current.isActive === v.isActive) return;
+      await tx.update(customers).set({ isActive: v.isActive }).where(and(eq(customers.storeId, gate.storeId), eq(customers.id, v.id)));
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId,
+        action: v.isActive ? "customer.activated" : "customer.deactivated", entityType: "customer", entityId: v.id,
+        before: current, after: { ...current, isActive: v.isActive },
+      });
+    });
     revalidatePath(Routes.Customers);
     revalidatePath(Routes.Partners);
     revalidatePath(`/customers/${v.id}`);
@@ -106,16 +131,23 @@ export async function createSupplier(
   const v = parsed.data;
 
   try {
-    const [row] = await db.insert(suppliers).values({
-      storeId: gate.storeId,
-      code: generateCode("NCC"),
-      name: v.name.trim(),
-      phone: v.phone?.trim() || null,
-      email: v.email?.trim() || null,
-      address: v.address?.trim() || null,
-      taxCode: v.taxCode?.trim() || null,
-      note: v.note || null,
-    }).returning({ id: suppliers.id });
+    const row = await db.transaction(async (tx) => {
+      const [created] = await tx.insert(suppliers).values({
+        storeId: gate.storeId,
+        code: generateCode("NCC"),
+        name: v.name.trim(),
+        phone: v.phone?.trim() || null,
+        email: v.email?.trim() || null,
+        address: v.address?.trim() || null,
+        taxCode: v.taxCode?.trim() || null,
+        note: v.note || null,
+      }).returning({ id: suppliers.id, code: suppliers.code, name: suppliers.name });
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "supplier.created", entityType: "supplier", entityId: created.id,
+        after: { code: created.code, name: created.name },
+      });
+      return created;
+    });
 
     revalidatePath(Routes.Suppliers);
     return { ok: true, data: { id: row.id } };

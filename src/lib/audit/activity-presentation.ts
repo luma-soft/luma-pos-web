@@ -8,6 +8,7 @@ export type ActivityRecord = {
   name: string | null;
   context?: string | null;
   href?: string | null;
+  deleted?: boolean;
 };
 
 export type NotificationActivity = Awaited<ReturnType<typeof getAuditLogs>>[number] & {
@@ -36,6 +37,7 @@ export function activityRecordLabel(record: ActivityRecord) {
 }
 
 export function activityRecordHref(record: ActivityRecord) {
+  if (record.deleted) return null;
   if (record.href?.startsWith("/") && !record.href.startsWith("//") && !record.href.includes("\\")) return record.href;
   if (!record.id || record.id === "draft") return null;
   const id = encodeURIComponent(record.id);
@@ -43,6 +45,7 @@ export function activityRecordHref(record: ActivityRecord) {
     case "product": case "product_price": return Routes.product(record.id);
     case "customer": return `/partners?tab=customers&expandedCustomer=${id}`;
     case "supplier": return `/partners?tab=suppliers&expanded=${id}`;
+    case "booking": return Routes.salesOrder(record.id, "confirmed");
     case "quote": return Routes.salesOrder(record.id, "quote");
     case "order": case "invoice": return Routes.salesOrder(record.id, "completed");
     case "purchase_order": case "purchase": case "inbound": return Routes.purchase(id);
@@ -71,13 +74,20 @@ export function activityEntity(row: NotificationActivity): ActivityRecord | null
   const after = activityObject(row.after);
   const before = activityObject(row.before);
   const related = activityRelatedRecords(row).find((record) => record.id === row.entityId);
-  // Preserve historical names/codes when recorded, resolving current records only as a fallback.
+  // Snapshot identity remains stable after renames; current records supply links/context only.
+  const metadata = activityObject(row.metadata);
+  const projectId = activityText(metadata.projectId) ?? activityText(after.projectId) ?? activityText(before.projectId);
+  const deleted = row.status === "succeeded" && (metadata.deleted === true || /(?:\.|_)(?:deleted|delete)$/.test(row.action))
+    && !row.action.includes("note.") && !row.action.includes("evidence.") && !row.action.includes("attachment.");
+  const isTradeRecord = row.entityType === "service_job_trade_record";
   const record: ActivityRecord = {
-    id: row.entityId,
-    type: row.entityType,
+    id: isTradeRecord ? row.resolvedEntity?.id ?? row.entityId : row.entityId,
+    type: isTradeRecord ? "service_job" : row.entityType,
     code: readableText(after.code) ?? readableText(after.sku) ?? related?.code ?? readableText(before.code) ?? readableText(before.sku) ?? row.resolvedEntity?.code ?? null,
-    name: readableText(after.name) ?? readableText(after.title) ?? related?.name ?? readableText(before.name) ?? row.resolvedEntity?.name ?? null,
-    ...((row.resolvedEntity?.type === "service_job") ? row.resolvedEntity : {}),
+    name: readableText(after.name) ?? readableText(after.title) ?? related?.name ?? readableText(before.name) ?? readableText(before.title) ?? row.resolvedEntity?.name ?? null,
+    context: row.resolvedEntity?.context,
+    href: row.resolvedEntity?.href ?? (projectId && uuid.test(projectId) ? Routes.project(projectId) : null),
+    deleted,
   };
   return activityRecordLabel(record) ? record : null;
 }

@@ -1,3 +1,4 @@
+import { recordActivity } from "@/lib/audit/activity-log";
 import { and, eq, sql } from "drizzle-orm";
 import {
   products,
@@ -172,6 +173,14 @@ export async function syncServiceJobMaterialStockCore(
     note: `${material.jobCode} · ${material.productName}`,
     createdBy: input.createdBy,
   });
+  await recordActivity(tx, {
+    storeId: input.storeId, actorId: input.createdBy,
+    action: "service.material.stock.synced", entityType: "service_material", entityId: material.id,
+    before: { name: material.productName, issuedBaseQuantity },
+    after: { name: material.productName, issuedBaseQuantity: stockSync.targetBaseQuantity },
+    metadata: { projectId: material.projectId, warehouseId, quantity: delta },
+    affectedRecords: [{ type: "product", id: material.productId, name: material.productName }],
+  });
   return { projectId: material.projectId, issuedBaseQuantity: stockSync.targetBaseQuantity };
 }
 
@@ -184,6 +193,7 @@ async function loadServiceMaterialForAllocation(tx: InventoryTransaction, storeI
     plannedQuantity: serviceJobMaterials.plannedQuantity,
     usedQuantity: serviceJobMaterials.usedQuantity,
     baseUnit: products.baseUnit,
+    productName: products.name,
   }).from(serviceJobMaterials)
     .innerJoin(serviceJobs, eq(serviceJobMaterials.jobId, serviceJobs.id))
     .innerJoin(products, eq(serviceJobMaterials.productId, products.id))
@@ -227,12 +237,19 @@ export async function reserveServiceJobMaterialStockCore(
     remainingQuantity: toQty(quantityBase),
     createdBy: input.createdBy,
   });
+  await recordActivity(tx, {
+    storeId: input.storeId, actorId: input.createdBy, action: "service.material.reserved",
+    entityType: "service_material", entityId: material.id,
+    before: { name: material.productName, reservedQuantity: Number(reserved?.reserved ?? 0) },
+    after: { name: material.productName, reservedQuantity: Number(reserved?.reserved ?? 0) + quantityBase },
+    metadata: { projectId: material.projectId, warehouseId: input.warehouseId, quantity: quantityBase },
+  });
   return { projectId: material.projectId, quantityBase };
 }
 
 export async function releaseServiceJobMaterialReservationsCore(
   tx: InventoryTransaction,
-  input: { storeId: string; materialId: string },
+  input: { storeId: string; materialId: string; createdBy?: string | null },
 ) {
   const allocations = await tx.select({ id: serviceMaterialAllocations.id, warehouseId: serviceMaterialAllocations.warehouseId, remainingQuantity: serviceMaterialAllocations.remainingQuantity })
     .from(serviceMaterialAllocations).where(and(eq(serviceMaterialAllocations.storeId, input.storeId), eq(serviceMaterialAllocations.materialId, input.materialId), eq(serviceMaterialAllocations.status, "reserved"))).for("update");
@@ -241,7 +258,13 @@ export async function releaseServiceJobMaterialReservationsCore(
       .where(and(eq(stockLevels.storeId, input.storeId), eq(stockLevels.productId, sql`(select ${serviceJobMaterials.productId} from ${serviceJobMaterials} where ${serviceJobMaterials.storeId} = ${input.storeId} and ${serviceJobMaterials.id} = ${input.materialId})`), eq(stockLevels.warehouseId, allocation.warehouseId)));
     await tx.update(serviceMaterialAllocations).set({ status: "released", remainingQuantity: "0", releasedAt: new Date() }).where(and(eq(serviceMaterialAllocations.storeId, input.storeId), eq(serviceMaterialAllocations.id, allocation.id)));
   }
-  const [material] = await tx.select({ projectId: serviceJobs.projectId }).from(serviceJobMaterials).innerJoin(serviceJobs, eq(serviceJobMaterials.jobId, serviceJobs.id)).where(and(eq(serviceJobMaterials.storeId, input.storeId), eq(serviceJobMaterials.id, input.materialId))).limit(1);
+  const material = await loadServiceMaterialForAllocation(tx, input.storeId, input.materialId);
   if (!material) throw new Error("SERVICE_MATERIAL_NOT_FOUND");
+  if (allocations.length) await recordActivity(tx, {
+    storeId: input.storeId, actorId: input.createdBy ?? null, action: "service.material.reservation.released",
+    entityType: "service_material", entityId: input.materialId,
+    before: { name: material.productName, reservedQuantity: allocations.reduce((sum, item) => sum + Number(item.remainingQuantity), 0) },
+    after: { name: material.productName, reservedQuantity: 0 }, metadata: { projectId: material.projectId },
+  });
   return { projectId: material.projectId };
 }

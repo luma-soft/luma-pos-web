@@ -23,7 +23,7 @@ export async function PATCH(
     status?: unknown;
   };
   if (payload.scope === "ticket" || payload.status === "servedAll") {
-    return mobileAction(await serveTicketForUser(gate.storeId, ticketId));
+    return mobileAction(await serveTicketForUser(gate.storeId, ticketId, gate.userId));
   }
 
   const status =
@@ -37,5 +37,5 @@ export async function PATCH(
   const itemId =
     typeof payload.itemId === "string" ? payload.itemId : ticketId;
 
-  return mobileAction(await setTicketItemStatusForUser(gate.storeId, itemId, status));
+  return mobileAction(await setTicketItemStatusForUser(gate.storeId, itemId, status, gate.userId));
 }

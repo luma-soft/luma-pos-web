@@ -12,6 +12,7 @@ import { type ActionResult, getProfileId, generateCode, requireStockAccess, toMo
 import { Routes } from "@/lib/routes";
 import { consumeTrackedStockLots } from "@/lib/inventory/stock-lot-service";
 import { canCreateInternalUse } from "@/lib/inventory/internal-use-policy";
+import { recordActivity } from "@/lib/audit/activity-log";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type StockItem = { productId: string; unitMultiplier: string; quantity: string; unitCost: string };
@@ -114,6 +115,12 @@ export async function createInternalUse(
       if (status === "approved") {
         await postStock(tx, gate.storeId, { id: issue.id, code: issue.code, warehouseId, reason: v.reason || null }, items, profileId);
       }
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: profileId, action: "internal_use.created", entityType: "internal_use", entityId: issue.id,
+        after: { code: issue.code, status, total: totalCost, itemCount: v.items.length, department: v.department, reason: v.reason },
+        affectedRecords: v.items.map((item) => ({ type: "product", id: item.productId, name: item.productName, quantity: item.quantity })),
+        metadata: { code: issue.code, warehouseId },
+      });
       return { ...issue, status };
     });
 
@@ -136,11 +143,18 @@ export async function approveInternalUse(id: string): Promise<ActionResult> {
   try {
     const profileId = await getProfileId(gate.userId);
     await db.transaction(async (tx) => {
-      const [issue] = await tx.select().from(internalUseIssues).where(and(eq(internalUseIssues.storeId, gate.storeId), eq(internalUseIssues.id, id))).limit(1);
+      const [issue] = await tx.select().from(internalUseIssues).where(and(eq(internalUseIssues.storeId, gate.storeId), eq(internalUseIssues.id, id))).limit(1).for("update");
       if (!issue || issue.status !== "pending") throw new Error("INVALID_STATE");
       const items = await tx.select().from(internalUseItems).where(and(eq(internalUseItems.storeId, gate.storeId), eq(internalUseItems.issueId, id)));
       await postStock(tx, gate.storeId, { id: issue.id, code: issue.code, warehouseId: issue.warehouseId, reason: issue.reason }, items, profileId);
       await tx.update(internalUseIssues).set({ status: "approved", approvedBy: profileId, approvedAt: sql`now()` }).where(and(eq(internalUseIssues.storeId, gate.storeId), eq(internalUseIssues.id, id)));
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: profileId, action: "internal_use.approved", entityType: "internal_use", entityId: id,
+        before: { code: issue.code, status: issue.status },
+        after: { code: issue.code, status: "approved", total: Number(issue.totalCost), itemCount: items.length },
+        affectedRecords: items.map((item) => ({ type: "product", id: item.productId, name: item.productName, quantity: Number(item.quantity) })),
+        metadata: { code: issue.code, warehouseId: issue.warehouseId },
+      });
     });
     revalidatePath(Routes.Inventory);
     return { ok: true, data: undefined };

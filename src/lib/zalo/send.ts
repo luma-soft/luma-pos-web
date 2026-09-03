@@ -5,6 +5,7 @@ import { formatCurrency } from "@/lib/utils";
 import { getOrder } from "@/lib/data/orders";
 import { getZaloConfig } from "./config";
 import { sendOaTextMessage, sendZnsTemplate } from "./client";
+import { recordActivity } from "@/lib/audit/activity-log";
 
 export type ZaloSendKind = "portal_link" | "invoice";
 
@@ -33,20 +34,31 @@ async function logZaloEvent(input: ZaloSendPrepared, status: string, details: {
   zaloMessageId?: string | null;
   errorCode?: string | null;
   errorMessage?: string | null;
-}, actorId?: string | null) {
-  await db.insert(zaloMessageEvents).values({
-    kind: input.kind,
-    status,
-    customerId: input.customerId ?? null,
-    orderId: input.orderId ?? null,
-    invoiceId: input.invoiceId ?? null,
-    phone: input.phone,
-    templateId: input.templateId,
-    zaloMessageId: details.zaloMessageId ?? null,
-    payloadSummary: input.payloadSummary,
-    errorCode: details.errorCode ?? null,
-    errorMessage: details.errorMessage?.slice(0, 500) ?? null,
-    createdBy: actorId ?? null,
+}, storeId: string, actorId?: string | null) {
+  await db.transaction(async (tx) => {
+    await tx.insert(zaloMessageEvents).values({
+      storeId,
+      kind: input.kind,
+      status,
+      customerId: input.customerId ?? null,
+      orderId: input.orderId ?? null,
+      invoiceId: input.invoiceId ?? null,
+      phone: input.phone,
+      templateId: input.templateId,
+      zaloMessageId: details.zaloMessageId ?? null,
+      payloadSummary: input.payloadSummary,
+      errorCode: details.errorCode ?? null,
+      errorMessage: details.errorMessage?.slice(0, 500) ?? null,
+      createdBy: actorId ?? null,
+    });
+    if (status === "sent") {
+      await recordActivity(tx, {
+        storeId, actorId: actorId ?? null,
+        action: input.kind === "invoice" ? "zalo.invoice.sent" : "zalo.portal_link.sent",
+        entityType: input.orderId ? "order" : "customer", entityId: input.orderId ?? input.customerId,
+        after: { code: input.payloadSummary.orderCode, name: input.payloadSummary.customerName, status: "sent" },
+      });
+    }
   });
 }
 
@@ -143,13 +155,13 @@ export async function sendZaloMessage(input: ZaloSendInput) {
       tracking_id: `${prepared.kind}:${prepared.orderId ?? prepared.customerId ?? Date.now()}`,
     });
   if (result.ok) {
-    await logZaloEvent(prepared, "sent", { zaloMessageId: result.messageId }, input.actorId);
+    await logZaloEvent(prepared, "sent", { zaloMessageId: result.messageId }, input.storeId, input.actorId);
     return { ok: true as const, data: { messageId: result.messageId } };
   }
   await logZaloEvent(prepared, "failed", {
     errorCode: result.errorCode,
     errorMessage: result.errorMessage,
-  }, input.actorId);
+  }, input.storeId, input.actorId);
   if (result.errorCode === "missing_zalo_user_id") return { ok: false as const, error: "zalo.errors.missingZaloUserId" };
   return { ok: false as const, error: "zalo.errors.sendFailed" };
 }

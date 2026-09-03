@@ -4,9 +4,10 @@ import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-d
 import { z } from "zod";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { stockLevels, stockMovements, stocktakeItems, stocktakes } from "@/db/schema";
+import { products, stockLevels, stockMovements, stocktakeItems, stocktakes } from "@/db/schema";
 import { type ActionResult, requireManager, requireStockAccess, getProfileId, generateCode, toQty } from "./common";
 import { Routes } from "@/lib/routes";
+import { recordActivity } from "@/lib/audit/activity-log";
 import {
   consumeTrackedStockLots,
   receiveUnspecifiedTrackedStockLot,
@@ -61,6 +62,9 @@ export async function createStocktake(
           inArray(stockLevels.productId, ids),
         ));
       const sysByProduct = new Map(levels.map((l) => [l.productId, Number(l.quantity)]));
+      const productRows = await tx.select({ id: products.id, name: products.name, sku: products.sku }).from(products)
+        .where(and(eq(products.storeId, gate.storeId), inArray(products.id, ids)));
+      const productsById = new Map(productRows.map((product) => [product.id, product]));
 
       await tx.insert(stocktakeItems).values(
         v.items.map((i) => ({
@@ -72,6 +76,12 @@ export async function createStocktake(
         }))
       );
 
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: profileId, action: "stocktake.created", entityType: "stocktake", entityId: st.id,
+        after: { code: st.code, status: "draft", itemCount: v.items.length },
+        affectedRecords: v.items.map((item) => ({ type: "product", id: item.productId, name: productsById.get(item.productId)?.name, code: productsById.get(item.productId)?.sku, beforeQuantity: sysByProduct.get(item.productId) ?? 0, quantity: item.actualQty })),
+        metadata: { code: st.code, warehouseId: v.warehouseId },
+      });
       return st;
     });
 
@@ -101,12 +111,16 @@ export async function balanceStocktake(id: string): Promise<ActionResult> {
     const profileId = await getProfileId(userId);
 
     await db.transaction(async (tx) => {
-      const [st] = await tx.select().from(stocktakes).where(and(eq(stocktakes.storeId, gate.storeId), eq(stocktakes.id, id))).limit(1);
+      const [st] = await tx.select().from(stocktakes).where(and(eq(stocktakes.storeId, gate.storeId), eq(stocktakes.id, id))).limit(1).for("update");
       if (!st) throw new Error("NOT_FOUND");
       if (st.status !== "draft") throw new Error("NOT_DRAFT");
 
       const items = await tx.select().from(stocktakeItems).where(and(eq(stocktakeItems.storeId, gate.storeId), eq(stocktakeItems.stocktakeId, id)));
+      const productRows = items.length ? await tx.select({ id: products.id, name: products.name, sku: products.sku }).from(products)
+        .where(and(eq(products.storeId, gate.storeId), inArray(products.id, items.map((item) => item.productId)))) : [];
+      const productsById = new Map(productRows.map((product) => [product.id, product]));
 
+      const stockChanges: { type: string; id: string; name?: string; code?: string; beforeQuantity: number; quantity: number }[] = [];
       for (const i of items) {
         const [level] = await tx
           .select({ quantity: stockLevels.quantity })
@@ -120,6 +134,7 @@ export async function balanceStocktake(id: string): Promise<ActionResult> {
         const current = Number(level?.quantity ?? 0);
         const actual = Number(i.actualQty);
         const diff = actual - current;
+        if (Math.abs(diff) > 1e-9) stockChanges.push({ type: "product", id: i.productId, name: productsById.get(i.productId)?.name, code: productsById.get(i.productId)?.sku, beforeQuantity: current, quantity: actual });
 
         if (diff < -1e-9) {
           await consumeTrackedStockLots(tx, {
@@ -172,6 +187,13 @@ export async function balanceStocktake(id: string): Promise<ActionResult> {
         status: "balanced",
         balancedAt: sql`now()`,
       }).where(and(eq(stocktakes.storeId, gate.storeId), eq(stocktakes.id, id)));
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: profileId, action: "stocktake.balanced", entityType: "stocktake", entityId: id,
+        before: { code: st.code, status: st.status },
+        after: { code: st.code, status: "balanced", itemCount: items.length, changedCount: stockChanges.length },
+        affectedRecords: stockChanges,
+        metadata: { code: st.code, warehouseId: st.warehouseId },
+      });
     });
 
     revalidatePath(Routes.Stocktakes);
@@ -194,9 +216,14 @@ export async function cancelStocktake(id: string): Promise<ActionResult> {
   if (!gate.ok) return gate;
   try {
     await db.transaction(async (tx) => {
-      const [st] = await tx.select().from(stocktakes).where(and(eq(stocktakes.storeId, gate.storeId), eq(stocktakes.id, id))).limit(1);
+      const [st] = await tx.select().from(stocktakes).where(and(eq(stocktakes.storeId, gate.storeId), eq(stocktakes.id, id))).limit(1).for("update");
       if (!st || st.status !== "draft") throw new Error("NOT_DRAFT");
       await tx.update(stocktakes).set({ status: "cancelled" }).where(and(eq(stocktakes.storeId, gate.storeId), eq(stocktakes.id, id)));
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "stocktake.cancelled", entityType: "stocktake", entityId: id,
+        before: { code: st.code, status: st.status }, after: { code: st.code, status: "cancelled" },
+        metadata: { code: st.code, warehouseId: st.warehouseId },
+      });
     });
     revalidatePath(Routes.Stocktakes);
     return { ok: true, data: undefined };

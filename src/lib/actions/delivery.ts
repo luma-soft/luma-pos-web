@@ -8,6 +8,7 @@ import { orders, trips, tripStops } from "@/db/schema";
 import { type ActionResult, getProfileId, generateCode } from "./common";
 import { Routes } from "@/lib/routes";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { recordActivity } from "@/lib/audit/activity-log";
 
 const createTripSchema = z.object({
   vehicle: z.string().min(1, { error: "validation.required" }),
@@ -31,7 +32,7 @@ export async function createTrip(input: CreateTripInput): Promise<ActionResult<{
   try {
     const profileId = await getProfileId(context.userId);
     const result = await db.transaction(async (tx) => {
-      const ownedOrders = await tx.select({ id: orders.id }).from(orders).where(and(
+      const ownedOrders = await tx.select({ id: orders.id, code: orders.code }).from(orders).where(and(
         eq(orders.storeId, context.storeId),
         inArray(orders.id, v.orderIds),
       ));
@@ -44,11 +45,16 @@ export async function createTrip(input: CreateTripInput): Promise<ActionResult<{
         status: "planned",
         note: v.note || null,
         createdBy: profileId,
-      }).returning({ id: trips.id });
+      }).returning({ id: trips.id, code: trips.code });
 
       await tx.insert(tripStops).values(
         v.orderIds.map((orderId, i) => ({ storeId: context.storeId, tripId: trip.id, orderId, sortOrder: i }))
       );
+      await recordActivity(tx, {
+        storeId: context.storeId, actorId: profileId, action: "delivery.trip.created", entityType: "trip", entityId: trip.id,
+        after: { code: trip.code, vehicle: v.vehicle, driver: v.driver, status: "planned", orderCount: ownedOrders.length },
+        affectedRecords: ownedOrders.map((order) => ({ type: "order", id: order.id, code: order.code })),
+      });
       return trip;
     });
     revalidatePath(Routes.Delivery);
@@ -67,7 +73,18 @@ export async function startTrip(tripId: string): Promise<ActionResult> {
     return { ok: false, error: "errors.unauthorized" };
   }
   try {
-    const [updated] = await db.update(trips).set({ status: "ongoing", departAt: sql`now()` }).where(and(eq(trips.id, tripId), eq(trips.storeId, context.storeId))).returning({ id: trips.id });
+    const updated = await db.transaction(async (tx) => {
+      const [current] = await tx.select({ code: trips.code, status: trips.status }).from(trips)
+        .where(and(eq(trips.id, tripId), eq(trips.storeId, context.storeId))).limit(1).for("update");
+      if (!current) return false;
+      if (current.status !== "planned") return true;
+      await tx.update(trips).set({ status: "ongoing", departAt: sql`now()` }).where(and(eq(trips.id, tripId), eq(trips.storeId, context.storeId)));
+      await recordActivity(tx, {
+        storeId: context.storeId, actorId: context.userId, action: "delivery.trip.started", entityType: "trip", entityId: tripId,
+        before: current, after: { code: current.code, status: "ongoing" },
+      });
+      return true;
+    });
     if (!updated) return { ok: false, error: "errors.notFound" };
     revalidatePath(Routes.Delivery);
     return { ok: true, data: undefined };
@@ -86,6 +103,14 @@ export async function markStopDelivered(stopId: string): Promise<ActionResult> {
   }
   try {
     await db.transaction(async (tx) => {
+      const [current] = await tx.select().from(tripStops)
+        .where(and(eq(tripStops.id, stopId), eq(tripStops.storeId, context.storeId))).limit(1).for("update");
+      if (!current) throw new Error("STOP_NOT_FOUND");
+      if (current.status === "delivered") return;
+      const [trip] = await tx.select({ id: trips.id, code: trips.code, status: trips.status }).from(trips)
+        .where(and(eq(trips.id, current.tripId), eq(trips.storeId, context.storeId))).limit(1).for("update");
+      const [order] = await tx.select({ id: orders.id, code: orders.code }).from(orders)
+        .where(and(eq(orders.id, current.orderId), eq(orders.storeId, context.storeId))).limit(1);
       const [stop] = await tx.update(tripStops)
         .set({ status: "delivered", deliveredAt: sql`now()` })
         .where(and(eq(tripStops.id, stopId), eq(tripStops.storeId, context.storeId)))
@@ -101,6 +126,17 @@ export async function markStopDelivered(stopId: string): Promise<ActionResult> {
         await tx.update(trips).set({ status: "done" }).where(and(eq(trips.id, stop.tripId), eq(trips.storeId, context.storeId)));
       } else {
         await tx.update(trips).set({ status: "ongoing" }).where(and(eq(trips.id, stop.tripId), eq(trips.storeId, context.storeId)));
+      }
+      await recordActivity(tx, {
+        storeId: context.storeId, actorId: context.userId, action: "delivery.stop.delivered", entityType: "trip", entityId: stop.tripId,
+        before: { status: current.status }, after: { code: trip?.code, orderCode: order?.code, status: "delivered" },
+        affectedRecords: order ? [{ type: "order", id: order.id, code: order.code }] : [],
+      });
+      if (pending.c === 0 && trip?.status !== "done") {
+        await recordActivity(tx, {
+          storeId: context.storeId, actorId: context.userId, action: "delivery.trip.completed", entityType: "trip", entityId: stop.tripId,
+          before: { code: trip?.code, status: trip?.status }, after: { code: trip?.code, status: "done" },
+        });
       }
     });
     revalidatePath(Routes.Delivery);

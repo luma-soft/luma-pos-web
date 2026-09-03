@@ -20,6 +20,10 @@ export function mobileConflict(
   return NextResponse.json({ ok: false, error, conflict }, { status: 409 });
 }
 
+// A rejected gate always returns a response; preserve that narrowing in route handlers.
+export function mobileGate(gate: { ok: false; error: string }): ReturnType<typeof mobileError>;
+export function mobileGate(gate: { ok: true }): null;
+export function mobileGate(gate: { ok: true } | { ok: false; error: string }): ReturnType<typeof mobileError> | null;
 export function mobileGate(gate: { ok: true } | { ok: false; error: string }) {
   if (gate.ok) return null;
   return mobileError(

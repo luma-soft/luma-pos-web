@@ -91,8 +91,8 @@ export async function confirmPaymentFromProvider(input: Parameters<typeof confir
   );
 }
 
-export async function expirePendingPayment(paymentId: string) {
-  return expirePendingPaymentCore(db, paymentId);
+export async function expirePendingPayment(paymentId: string, actorId: string | null = null, reason?: string) {
+  return expirePendingPaymentCore(db, paymentId, actorId, reason);
 }
 
 export async function getSepayPaymentStatus(paymentId: string) {

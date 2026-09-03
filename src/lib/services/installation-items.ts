@@ -1,3 +1,4 @@
+import { recordActivity } from "@/lib/audit/activity-log";
 import { createHash } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import {
@@ -41,7 +42,7 @@ export async function saveServiceInstallationBatchCore(
   tx: InventoryTransaction,
   input: ServiceInstallationBatchCoreInput,
 ) {
-  const [project] = await tx.select({ id: projects.id, serviceType: projects.serviceType })
+  const [project] = await tx.select({ id: projects.id, name: projects.name, serviceType: projects.serviceType })
     .from(projects)
     .where(and(eq(projects.storeId, input.storeId), eq(projects.id, input.projectId)))
     .limit(1)
@@ -178,6 +179,13 @@ export async function saveServiceInstallationBatchCore(
     eventType: "installation_batch_saved",
     actorId: input.createdBy,
     payload: { requestId: input.requestId, inputHash, result },
+  });
+  await recordActivity(tx, {
+    storeId: input.storeId, actorId: input.createdBy, action: "service.installation.saved",
+    entityType: "service_project", entityId: input.projectId,
+    after: { name: project.name, itemCount: input.items.length, assetCount, stockMode: input.stockMode },
+    affectedRecords: productRows.map((product) => ({ type: "product", id: product.id, name: product.name })),
+    metadata: { jobId: input.jobId, projectId: input.projectId, invoiceMode: input.invoiceMode },
   });
   return result;
 }

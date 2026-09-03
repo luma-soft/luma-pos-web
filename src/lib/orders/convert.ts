@@ -6,6 +6,8 @@ import { type ActionResult, getProfileId, generateCode, toQty } from "@/lib/acti
 import { Routes } from "@/lib/routes";
 import { createNotificationEventInTx } from "@/lib/notifications/events-core";
 import { publishCommittedNotification } from "@/lib/notifications/outbox";
+import { recordActivity } from "@/lib/audit/activity-log";
+import { orderActivitySnapshot, orderActivityType } from "@/lib/orders/activity";
 
 /**
  * Lõi chốt báo giá/đặt hàng → đơn bán — KHÔNG phải server action (nhận userId đã xác thực).
@@ -20,7 +22,7 @@ export async function convertQuoteToOrderForUser(
       const profileId = await getProfileId(userId);
 
     const result = await db.transaction(async (tx) => {
-      const [order] = await tx.select().from(orders).where(and(eq(orders.id, quoteId), eq(orders.storeId, storeId))).limit(1);
+      const [order] = await tx.select().from(orders).where(and(eq(orders.id, quoteId), eq(orders.storeId, storeId))).limit(1).for("update");
       if (!order) throw new Error("ORDER_NOT_FOUND");
       if (order.status !== "quote" && order.status !== "confirmed") throw new Error("NOT_CONVERTIBLE");
       if (!order.warehouseId) throw new Error("NO_WAREHOUSE");
@@ -92,6 +94,12 @@ export async function convertQuoteToOrderForUser(
         },
       });
 
+      await recordActivity(tx, {
+        storeId, actorId: profileId, action: `${orderActivityType(order)}.converted`, entityType: "order", entityId: order.id,
+        before: orderActivitySnapshot(order),
+        after: orderActivitySnapshot({ ...order, code: newCode, documentType: "sale", status: "completed" }),
+        metadata: { sourceOrderCode: order.code },
+      });
       return { code: newCode, notification };
     });
 

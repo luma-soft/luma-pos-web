@@ -40,6 +40,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   try {
     const updated = await updateProjectNote({
       storeId: gate.storeId,
+      actorId: gate.userId,
       projectId: id,
       noteId,
       content: parsed.data.content,
@@ -65,6 +66,7 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
   try {
     const deleted = await deleteProjectNote({
       storeId: gate.storeId,
+      actorId: gate.userId,
       projectId: id,
       noteId,
     });

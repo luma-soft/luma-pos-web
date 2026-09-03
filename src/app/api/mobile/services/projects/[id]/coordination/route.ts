@@ -1,7 +1,6 @@
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  auditLogs,
   profiles,
   projects,
   serviceCoordinationPoints,
@@ -11,6 +10,8 @@ import {
 } from "@/db/schema";
 import { requireMobileServiceManager, requireMobileServiceAccess } from "@/lib/mobile/auth";
 import { mobileError, mobileGate, mobileOk, readJson } from "@/lib/mobile/response";
+import { recordActivity } from "@/lib/audit/activity-log";
+import { activityValuesEqual } from "@/lib/products/product-activity";
 import {
   serviceCoordinationUpdateSchema,
   serviceCoordinationPointSchema,
@@ -20,7 +21,7 @@ import {
 type RouteContext = { params: Promise<{ id: string }> };
 
 async function loadMixedProject(storeId: string, projectId: string) {
-  const [project] = await db.select({ id: projects.id }).from(projects).where(and(
+  const [project] = await db.select({ id: projects.id, name: projects.name }).from(projects).where(and(
     eq(projects.storeId, storeId),
     eq(projects.id, projectId),
     eq(projects.serviceType, "mixed"),
@@ -95,14 +96,15 @@ export async function POST(request: Request, { params }: RouteContext) {
   const gate = await requireMobileServiceManager();
   if (!gate.ok) return mobileGate(gate);
   const { id } = await params;
-  if (!await loadMixedProject(gate.storeId, id)) return mobileError("errors.notFound", 404);
+  const project = await loadMixedProject(gate.storeId, id);
+  if (!project) return mobileError("errors.notFound", 404);
   const body = await readJson(request);
   if (!body || typeof body !== "object") return mobileError("errors.invalidData");
   const kind = "kind" in body ? String(body.kind) : "point";
   if (kind === "dependency") {
     const parsed = serviceJobDependencySchema.safeParse({ ...body, projectId: id });
     if (!parsed.success) return mobileError("errors.invalidData");
-    const jobs = await db.select({ id: serviceJobs.id }).from(serviceJobs).where(and(
+    const jobs = await db.select({ id: serviceJobs.id, name: serviceJobs.title, code: serviceJobs.code }).from(serviceJobs).where(and(
       eq(serviceJobs.storeId, gate.storeId),
       eq(serviceJobs.projectId, id),
     ));
@@ -110,13 +112,20 @@ export async function POST(request: Request, { params }: RouteContext) {
     if (!jobIds.has(parsed.data.predecessorJobId) || !jobIds.has(parsed.data.successorJobId)) {
       return mobileError("services.errors.relationMismatch", 409);
     }
-    const [dependency] = await db.insert(serviceJobDependencies).values({
-      storeId: gate.storeId,
-      ...parsed.data,
-      note: parsed.data.note || null,
-      createdBy: gate.userId,
-    }).returning();
-    await audit(gate.storeId, gate.userId, "service.coordination.dependency_created", dependency.id, id);
+    const dependency = await db.transaction(async (tx) => {
+      const [dependency] = await tx.insert(serviceJobDependencies).values({
+        storeId: gate.storeId,
+        ...parsed.data,
+        note: parsed.data.note || null,
+        createdBy: gate.userId,
+      }).returning();
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, source: "mobile", action: "service.coordination.dependency_created", entityType: "service_coordination", entityId: dependency.id,
+        after: dependencySnapshot(dependency), metadata: { projectId: id, projectName: project.name },
+        affectedRecords: jobs.filter((job) => [dependency.predecessorJobId, dependency.successorJobId].includes(job.id)).map((job) => ({ type: "service_job", ...job })),
+    });
+    return dependency;
+    });
     return mobileOk(dependency);
   }
   const parsed = serviceCoordinationPointSchema.safeParse({ ...body, projectId: id });
@@ -130,20 +139,26 @@ export async function POST(request: Request, { params }: RouteContext) {
     )).limit(1);
     if (!assignee) return mobileError("errors.invalidData");
   }
-  const [point] = await db.insert(serviceCoordinationPoints).values({
-    storeId: gate.storeId,
-    projectId: id,
-    title: parsed.data.title,
-    locationLabel: parsed.data.locationLabel || null,
-    serviceTypes: parsed.data.serviceTypes,
-    status: parsed.data.status,
-    description: parsed.data.description || null,
-    assignedTo: parsed.data.assignedTo ?? null,
-    dueAt: parsed.data.dueAt ? new Date(parsed.data.dueAt) : null,
-    isAcceptanceRequired: parsed.data.isAcceptanceRequired,
-    createdBy: gate.userId,
-  }).returning();
-  await audit(gate.storeId, gate.userId, "service.coordination.point_created", point.id, id);
+  const point = await db.transaction(async (tx) => {
+    const [point] = await tx.insert(serviceCoordinationPoints).values({
+      storeId: gate.storeId,
+      projectId: id,
+      title: parsed.data.title,
+      locationLabel: parsed.data.locationLabel || null,
+      serviceTypes: parsed.data.serviceTypes,
+      status: parsed.data.status,
+      description: parsed.data.description || null,
+      assignedTo: parsed.data.assignedTo ?? null,
+      dueAt: parsed.data.dueAt ? new Date(parsed.data.dueAt) : null,
+      isAcceptanceRequired: parsed.data.isAcceptanceRequired,
+      createdBy: gate.userId,
+    }).returning();
+    await recordActivity(tx, {
+      storeId: gate.storeId, actorId: gate.userId, source: "mobile", action: "service.coordination.point_created", entityType: "service_coordination", entityId: point.id,
+      after: pointSnapshot(point), metadata: { projectId: id, projectName: project.name },
+  });
+  return point;
+  });
   return mobileOk(point);
 }
 
@@ -151,32 +166,38 @@ export async function PATCH(request: Request, { params }: RouteContext) {
   const gate = await requireMobileServiceManager();
   if (!gate.ok) return mobileGate(gate);
   const { id } = await params;
-  if (!await loadMixedProject(gate.storeId, id)) return mobileError("errors.notFound", 404);
+  const project = await loadMixedProject(gate.storeId, id);
+  if (!project) return mobileError("errors.notFound", 404);
   const body = await readJson(request);
   const parsed = serviceCoordinationUpdateSchema.safeParse(body);
   if (!parsed.success) return mobileError("errors.invalidData");
 
   if (parsed.data.kind === "dependency") {
-    const [dependency] = await db.update(serviceJobDependencies).set({
-      status: parsed.data.status,
-      ...(parsed.data.dependencyType !== undefined
-        ? { dependencyType: parsed.data.dependencyType }
-        : {}),
-      ...(parsed.data.note !== undefined ? { note: parsed.data.note || null } : {}),
-      updatedAt: new Date(),
-    }).where(and(
-      eq(serviceJobDependencies.storeId, gate.storeId),
-      eq(serviceJobDependencies.projectId, id),
-      eq(serviceJobDependencies.id, parsed.data.id),
-    )).returning();
+    const value = parsed.data;
+    const dependency = await db.transaction(async (tx) => {
+      const [before] = await tx.select().from(serviceJobDependencies).where(and(
+        eq(serviceJobDependencies.storeId, gate.storeId), eq(serviceJobDependencies.projectId, id), eq(serviceJobDependencies.id, value.id),
+      )).limit(1).for("update");
+      if (!before) return null;
+      const [dependency] = await tx.update(serviceJobDependencies).set({
+        status: value.status,
+        ...(value.dependencyType !== undefined
+          ? { dependencyType: value.dependencyType }
+          : {}),
+        ...(value.note !== undefined ? { note: value.note || null } : {}),
+        updatedAt: new Date(),
+      }).where(and(
+        eq(serviceJobDependencies.storeId, gate.storeId),
+        eq(serviceJobDependencies.projectId, id),
+        eq(serviceJobDependencies.id, value.id),
+      )).returning();
+      if (!activityValuesEqual(dependencySnapshot(before), dependencySnapshot(dependency))) await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, source: "mobile", action: "service.coordination.dependency_updated", entityType: "service_coordination", entityId: dependency.id,
+        before: dependencySnapshot(before), after: dependencySnapshot(dependency), metadata: { projectId: id, projectName: project.name },
+    });
+    return dependency;
+    });
     if (!dependency) return mobileError("errors.notFound", 404);
-    await audit(
-      gate.storeId,
-      gate.userId,
-      "service.coordination.dependency_updated",
-      dependency.id,
-      id,
-    );
     return mobileOk(dependency);
   }
 
@@ -189,58 +210,53 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     )).limit(1);
     if (!assignee) return mobileError("errors.invalidData");
   }
-  const [point] = await db.update(serviceCoordinationPoints).set({
-    status: parsed.data.status,
-    ...(parsed.data.title !== undefined ? { title: parsed.data.title } : {}),
-    ...(parsed.data.locationLabel !== undefined
-      ? { locationLabel: parsed.data.locationLabel || null }
-      : {}),
-    ...(parsed.data.serviceTypes !== undefined
-      ? { serviceTypes: parsed.data.serviceTypes }
-      : {}),
-    ...(parsed.data.description !== undefined
-      ? { description: parsed.data.description || null }
-      : {}),
-    ...(parsed.data.assignedTo !== undefined
-      ? { assignedTo: parsed.data.assignedTo }
-      : {}),
-    ...(parsed.data.dueAt !== undefined
-      ? { dueAt: parsed.data.dueAt ? new Date(parsed.data.dueAt) : null }
-      : {}),
-    ...(parsed.data.isAcceptanceRequired !== undefined
-      ? { isAcceptanceRequired: parsed.data.isAcceptanceRequired }
-      : {}),
-    updatedAt: new Date(),
-  }).where(and(
-    eq(serviceCoordinationPoints.storeId, gate.storeId),
-    eq(serviceCoordinationPoints.projectId, id),
-    eq(serviceCoordinationPoints.id, parsed.data.id),
-  )).returning();
+  const value = parsed.data;
+  const point = await db.transaction(async (tx) => {
+    const [before] = await tx.select().from(serviceCoordinationPoints).where(and(
+      eq(serviceCoordinationPoints.storeId, gate.storeId), eq(serviceCoordinationPoints.projectId, id), eq(serviceCoordinationPoints.id, value.id),
+    )).limit(1).for("update");
+    if (!before) return null;
+    const [point] = await tx.update(serviceCoordinationPoints).set({
+      status: value.status,
+      ...(value.title !== undefined ? { title: value.title } : {}),
+      ...(value.locationLabel !== undefined
+        ? { locationLabel: value.locationLabel || null }
+        : {}),
+      ...(value.serviceTypes !== undefined
+        ? { serviceTypes: value.serviceTypes }
+        : {}),
+      ...(value.description !== undefined
+        ? { description: value.description || null }
+        : {}),
+      ...(value.assignedTo !== undefined
+        ? { assignedTo: value.assignedTo }
+        : {}),
+      ...(value.dueAt !== undefined
+        ? { dueAt: value.dueAt ? new Date(value.dueAt) : null }
+        : {}),
+      ...(value.isAcceptanceRequired !== undefined
+        ? { isAcceptanceRequired: value.isAcceptanceRequired }
+        : {}),
+      updatedAt: new Date(),
+    }).where(and(
+      eq(serviceCoordinationPoints.storeId, gate.storeId),
+      eq(serviceCoordinationPoints.projectId, id),
+      eq(serviceCoordinationPoints.id, value.id),
+    )).returning();
+    if (!activityValuesEqual(pointSnapshot(before), pointSnapshot(point))) await recordActivity(tx, {
+      storeId: gate.storeId, actorId: gate.userId, source: "mobile", action: "service.coordination.point_updated", entityType: "service_coordination", entityId: point.id,
+      before: pointSnapshot(before), after: pointSnapshot(point), metadata: { projectId: id, projectName: project.name },
+  });
+  return point;
+  });
   if (!point) return mobileError("errors.notFound", 404);
-  await audit(
-    gate.storeId,
-    gate.userId,
-    "service.coordination.point_updated",
-    point.id,
-    id,
-  );
   return mobileOk(point);
 }
 
-async function audit(
-  storeId: string,
-  actorId: string,
-  action: string,
-  entityId: string,
-  projectId: string,
-) {
-  await db.insert(auditLogs).values({
-    storeId,
-    actorId,
-    source: "mobile",
-    action,
-    entityType: "service_coordination",
-    entityId,
-    metadata: { projectId },
-  });
+function dependencySnapshot(row: typeof serviceJobDependencies.$inferSelect) {
+  return { status: row.status, dependencyType: row.dependencyType, note: row.note, predecessorJobId: row.predecessorJobId, successorJobId: row.successorJobId };
+}
+
+function pointSnapshot(row: typeof serviceCoordinationPoints.$inferSelect) {
+  return { name: row.title, status: row.status, locationLabel: row.locationLabel, serviceTypes: row.serviceTypes, description: row.description, assignedTo: row.assignedTo, dueAt: row.dueAt?.toISOString() ?? null, isAcceptanceRequired: row.isAcceptanceRequired };
 }

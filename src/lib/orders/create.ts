@@ -17,6 +17,8 @@ import { consumeTrackedStockLots, restoreTrackedStockLots } from "@/lib/inventor
 import { createNotificationEventInTx } from "@/lib/notifications/events-core";
 import { publishCommittedNotification } from "@/lib/notifications/outbox";
 import { resolveStoreContextForUser } from "@/lib/auth/store-context";
+import { recordActivity } from "@/lib/audit/activity-log";
+import { orderActivitySnapshot, orderActivityType } from "@/lib/orders/activity";
 
 function revalidateOrderPaths(sourceOrderId?: string) {
   try {
@@ -131,7 +133,7 @@ export async function createOrderForUser(
 
     const result = await db.transaction(async (tx) => {
       const [sourceOrder] = v.source
-        ? await tx.select().from(orders).where(and(eq(orders.storeId, storeId), eq(orders.id, v.source.orderId))).limit(1)
+        ? await tx.select().from(orders).where(and(eq(orders.storeId, storeId), eq(orders.id, v.source.orderId))).limit(1).for("update")
         : [];
       if (v.source && !sourceOrder) throw new Error("SOURCE_NOT_FOUND");
       const sourceIsSale = sourceOrder?.status === "completed";
@@ -311,7 +313,32 @@ export async function createOrderForUser(
           category: "sale", refType: "order", refId: order.id,
           note: order.code, createdBy: profileId, shiftId: currentShift?.id ?? null,
         });
+        await recordActivity(tx, {
+          storeId, actorId: profileId, action: "order.payment.recorded", entityType: "order", entityId: order.id,
+          before: { code: order.code, amountPaid: 0, paymentStatus: "unpaid" },
+          after: { code: order.code, total, amount: paid, amountPaid: paid, method: v.payment.method, paymentStatus },
+          metadata: { atCreation: true },
+        });
       }
+
+      await recordActivity(tx, {
+        storeId, actorId: profileId,
+        action: `${orderActivityType(orderInsert)}.${v.source?.mode === "edit" ? "updated" : "created"}`,
+        entityType: "order", entityId: order.id,
+        before: v.source?.mode === "edit" ? orderActivitySnapshot(sourceOrder) : null,
+        after: {
+          ...orderActivitySnapshot(orderInsert),
+          items: trustedItems.map((item) => ({
+            productId: item.productId, productName: item.productName, unitName: item.unitName,
+            quantity: item.quantity, unitPrice: item.unitPrice,
+          })),
+        },
+        affectedRecords: [
+          { type: "order", id: order.id, code: order.code },
+          ...(sourceOrder ? [{ type: "order", id: sourceOrder.id, code: sourceOrder.code }] : []),
+        ],
+        metadata: { sourceMode: v.source?.mode ?? null, sourceOrderCode: sourceOrder?.code ?? null },
+      });
 
       // Phiếu đặt hàng giữ số lượng tại kho nhưng chưa trừ tồn thực tế.
       if (isBooking) {

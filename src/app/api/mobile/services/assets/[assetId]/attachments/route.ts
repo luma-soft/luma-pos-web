@@ -1,3 +1,4 @@
+import { recordActivity } from "@/lib/audit/activity-log";
 import { createHash } from "node:crypto";
 import { and, asc, count, eq, isNull, ne } from "drizzle-orm";
 import { db } from "@/db";
@@ -25,6 +26,7 @@ import { serviceAssetAttachmentMetadataSchema } from "@/lib/services/schemas";
 async function loadAsset(storeId: string, assetId: string) {
   const [asset] = await db.select({
     id: installedAssets.id,
+    name: installedAssets.name,
     projectId: installedAssets.projectId,
     jobId: installedAssets.jobId,
   }).from(installedAssets).where(and(
@@ -250,6 +252,7 @@ export async function POST(
           isNull(serviceAttachments.deletedAt),
         )).limit(1);
 
+        let created = false;
         if (!persisted) {
           const [{ total }] = await tx.select({
             total: count(serviceAttachments.id),
@@ -274,7 +277,7 @@ export async function POST(
             sizeBytes: file.size,
             fileName: file.name,
           });
-          await tx.insert(serviceAttachments).values({
+          const inserted = await tx.insert(serviceAttachments).values({
             storeId: gate.storeId,
             projectId: asset.projectId,
             assetId,
@@ -291,7 +294,8 @@ export async function POST(
             isPrimary: false,
             caption: parsed.data.caption || null,
             createdBy: gate.userId,
-          }).onConflictDoNothing();
+          }).onConflictDoNothing().returning({ id: serviceAttachments.id });
+          created = inserted.length > 0;
           [persisted] = await tx.select({
             id: serviceAttachments.id,
             mediaObjectId: serviceAttachments.mediaObjectId,
@@ -312,6 +316,7 @@ export async function POST(
           )).limit(1);
         }
         if (!persisted) throw new Error("SERVICE_ASSET_ATTACHMENT_IDEMPOTENCY_CONFLICT");
+        const primaryChanged = parsed.data.isPrimary && !persisted.isPrimary;
         if (parsed.data.isPrimary) {
           await tx.update(serviceAttachments).set({ isPrimary: false }).where(and(
             eq(serviceAttachments.storeId, gate.storeId),
@@ -323,6 +328,11 @@ export async function POST(
           await tx.update(serviceAttachments).set({ isPrimary: true }).where(eq(serviceAttachments.id, persisted.id));
           persisted.isPrimary = true;
          }
+         if (created || primaryChanged) await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId, source: "mobile",
+           action: created ? "service.asset.photo.added" : "service.asset.photo.primary_changed",
+           entityType: "installed_asset", entityId: assetId,
+           after: { name: asset.name, fileName: persisted.fileName, isPrimary: persisted.isPrimary },
+           metadata: { projectId: asset.projectId } });
          return [persisted];
        });
     } catch (error) {

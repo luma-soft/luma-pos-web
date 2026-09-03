@@ -1,3 +1,4 @@
+import { recordActivity } from "@/lib/audit/activity-log";
 import { createHash } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -117,11 +118,15 @@ export async function POST(
           createdAt: serviceAttachments.createdAt,
         });
         await tx.insert(serviceJobEvents).values({
+          storeId: gate.storeId,
           jobId: id,
           eventType: "job.attachment_added",
           actorId: gate.userId,
           payload: { attachmentId: rows[0].id, category: parsed.data.category },
         });
+        await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId, source: "mobile",
+          action: "service.evidence.added", entityType: "service_job", entityId: id,
+          after: { fileName: file.name, category: parsed.data.category }, metadata: { projectId: detail.projectId, jobId: id } });
         return rows;
       });
       return mobileOk(attachment);

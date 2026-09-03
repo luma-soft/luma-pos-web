@@ -8,6 +8,7 @@ import { priceBooks, productPrices, products } from "@/db/schema";
 import { type ActionResult, requireManager, toMoney } from "./common";
 import { Routes } from "@/lib/routes";
 import { pricingSellableProductCondition } from "@/lib/data/pricing";
+import { recordActivity } from "@/lib/audit/activity-log";
 
 export type PriceFormulaBase = "current" | "cost" | "lastPurchase";
 
@@ -34,64 +35,90 @@ export async function applyPriceFormulaAll(input: {
 }): Promise<ActionResult<{ count: number }>> {
   const gate = await requireManager(); if (!gate.ok) return gate;
   try {
-    const [book] = await db.select({ isDefault: priceBooks.isDefault }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, input.priceBookId))).limit(1);
-    if (!book) return { ok: false, error: "errors.invalidData" };
+    const result = await db.transaction(async (tx) => {
+      const [book] = await tx.select({ name: priceBooks.name, isDefault: priceBooks.isDefault }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, input.priceBookId))).limit(1).for("update");
+      if (!book) return null;
+      const before = await tx.select({ id: products.id, name: products.name, sku: products.sku, retailPrice: products.retailPrice })
+        .from(products).where(and(eq(products.storeId, gate.storeId), pricingSellableProductCondition())).for("update");
+      const overrides = book.isDefault ? [] : await tx.select({ productId: productPrices.productId, price: productPrices.price })
+        .from(productPrices).where(and(eq(productPrices.storeId, gate.storeId), eq(productPrices.priceBookId, input.priceBookId)));
+      const previousPrices = new Map(overrides.map((row) => [row.productId, row.price]));
 
-    if (book.isDefault) {
-      const base = input.base === "cost" ? sql`${products.costPrice}`
-        : input.base === "lastPurchase" ? sql`coalesce(${products.lastPurchasePrice}, ${products.costPrice})`
-        : sql`${products.retailPrice}`;
-      await db
-        .update(products)
-        .set({
-          retailPrice: priceExpr(base, input.op, input.amount, input.unit),
-          updatedAt: sql`now()`,
-        })
+      if (book.isDefault) {
+        const base = input.base === "cost" ? sql`${products.costPrice}`
+          : input.base === "lastPurchase" ? sql`coalesce(${products.lastPurchasePrice}, ${products.costPrice})`
+          : sql`${products.retailPrice}`;
+        await tx
+          .update(products)
+          .set({
+            retailPrice: priceExpr(base, input.op, input.amount, input.unit),
+            updatedAt: sql`now()`,
+          })
+          .where(and(eq(products.storeId, gate.storeId), pricingSellableProductCondition()));
+      } else {
+        const currentPrice = alias(productPrices, "current_price");
+        const base = input.base === "cost"
+          ? sql`${products.costPrice}`
+          : input.base === "lastPurchase"
+            ? sql`coalesce(${products.lastPurchasePrice}, ${products.costPrice})`
+            : sql`coalesce(${currentPrice.price}, ${products.retailPrice})`;
+        await tx
+          .insert(productPrices)
+          .select(
+            tx
+              .select({
+                id: sql<string>`gen_random_uuid()`.as("id"),
+                storeId: sql<string>`${gate.storeId}`.as("store_id"),
+                priceBookId: sql<string>`${input.priceBookId}`.as(
+                  "price_book_id",
+                ),
+                productId: products.id,
+                price: priceExpr(base, input.op, input.amount, input.unit).as(
+                  "price",
+                ),
+              })
+              .from(products)
+              .leftJoin(
+                currentPrice,
+                and(
+                  eq(currentPrice.productId, products.id),
+                  eq(currentPrice.priceBookId, input.priceBookId),
+                ),
+              )
+              .where(and(eq(products.storeId, gate.storeId), pricingSellableProductCondition())),
+          )
+          .onConflictDoUpdate({
+            target: [productPrices.priceBookId, productPrices.productId],
+            set: { price: sql`excluded.price` },
+          });
+      }
+
+      const [{ n }] = await tx
+        .select({ n: sql<number>`count(*)::int` })
+        .from(products)
         .where(and(eq(products.storeId, gate.storeId), pricingSellableProductCondition()));
-    } else {
-      const currentPrice = alias(productPrices, "current_price");
-      const base = input.base === "cost"
-        ? sql`${products.costPrice}`
-        : input.base === "lastPurchase"
-          ? sql`coalesce(${products.lastPurchasePrice}, ${products.costPrice})`
-          : sql`coalesce(${currentPrice.price}, ${products.retailPrice})`;
-      await db
-        .insert(productPrices)
-        .select(
-          db
-            .select({
-              storeId: sql<string>`${gate.storeId}`.as("store_id"),
-              priceBookId: sql<string>`${input.priceBookId}`.as(
-                "price_book_id",
-              ),
-              productId: products.id,
-              price: priceExpr(base, input.op, input.amount, input.unit).as(
-                "price",
-              ),
-            })
-            .from(products)
-            .leftJoin(
-              currentPrice,
-              and(
-                eq(currentPrice.productId, products.id),
-                eq(currentPrice.priceBookId, input.priceBookId),
-              ),
-            )
-            .where(and(eq(products.storeId, gate.storeId), pricingSellableProductCondition())),
-        )
-        .onConflictDoUpdate({
-          target: [productPrices.priceBookId, productPrices.productId],
-          set: { price: sql`excluded.price` },
-        });
-    }
-
-    const [{ n }] = await db
-      .select({ n: sql<number>`count(*)::int` })
-      .from(products)
-      .where(and(eq(products.storeId, gate.storeId), pricingSellableProductCondition()));
+      const after = book.isDefault
+        ? await tx.select({ productId: products.id, price: products.retailPrice }).from(products)
+          .where(and(eq(products.storeId, gate.storeId), pricingSellableProductCondition()))
+        : await tx.select({ productId: productPrices.productId, price: productPrices.price }).from(productPrices)
+          .where(and(eq(productPrices.storeId, gate.storeId), eq(productPrices.priceBookId, input.priceBookId)));
+      const nextPrices = new Map(after.map((row) => [row.productId, Number(row.price)]));
+      const changes = before.flatMap((row) => {
+        const previous = Number(previousPrices.get(row.id) ?? row.retailPrice);
+        const price = nextPrices.get(row.id) ?? previous;
+        return previous === price && (book.isDefault || previousPrices.has(row.id)) ? [] : [{ type: "product", id: row.id, code: row.sku, name: row.name, beforePrice: previous, price }];
+    });
+    if (changes.length) await recordActivity(tx, {
+      storeId: gate.storeId, actorId: gate.userId, action: "price_book.formula.applied", entityType: "price_book", entityId: input.priceBookId,
+      after: { name: book.name, changedCount: changes.length }, affectedRecords: changes,
+      metadata: { priceBookName: book.name, base: input.base, operator: input.op, amount: input.amount, unit: input.unit },
+    });
+    return Number(n);
+    });
+    if (result == null) return { ok: false, error: "errors.invalidData" };
     revalidatePath(Routes.Pricing);
     revalidatePath(Routes.POS);
-    return { ok: true, data: { count: Number(n) } };
+    return { ok: true, data: { count: result } };
   } catch (e) { console.error("applyPriceFormulaAll failed:", e); return { ok: false, error: "errors.serverError" }; }
 }
 
@@ -101,8 +128,12 @@ export async function createPriceBook(name: string): Promise<ActionResult<{ id: 
   const n = name.trim();
   if (!n) return { ok: false, error: "errors.invalidData" };
   try {
-    const [{ max }] = await db.select({ max: sql<number>`coalesce(max(${priceBooks.sortOrder}), 0)` }).from(priceBooks).where(eq(priceBooks.storeId, gate.storeId));
-    const [row] = await db.insert(priceBooks).values({ storeId: gate.storeId, name: n, sortOrder: Number(max) + 1 }).returning({ id: priceBooks.id, name: priceBooks.name });
+    const row = await db.transaction(async (tx) => {
+      const [{ max }] = await tx.select({ max: sql<number>`coalesce(max(${priceBooks.sortOrder}), 0)` }).from(priceBooks).where(eq(priceBooks.storeId, gate.storeId));
+      const [row] = await tx.insert(priceBooks).values({ storeId: gate.storeId, name: n, sortOrder: Number(max) + 1 }).returning({ id: priceBooks.id, name: priceBooks.name });
+      await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId, action: "price_book.created", entityType: "price_book", entityId: row.id, after: { name: row.name } });
+      return row;
+    });
     revalidatePath(Routes.Pricing);
     return { ok: true, data: row };
   } catch (e) { console.error("createPriceBook failed:", e); return { ok: false, error: "errors.serverError" }; }
@@ -114,7 +145,12 @@ export async function renamePriceBook(id: string, name: string): Promise<ActionR
   const n = name.trim();
   if (!n) return { ok: false, error: "errors.invalidData" };
   try {
-    await db.update(priceBooks).set({ name: n }).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, id)));
+    await db.transaction(async (tx) => {
+      const [before] = await tx.select({ name: priceBooks.name }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, id))).limit(1).for("update");
+      if (!before || before.name === n) return;
+      await tx.update(priceBooks).set({ name: n }).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, id)));
+      await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId, action: "price_book.renamed", entityType: "price_book", entityId: id, before, after: { name: n } });
+    });
     revalidatePath(Routes.Pricing);
     return { ok: true, data: undefined };
   } catch (e) { console.error("renamePriceBook failed:", e); return { ok: false, error: "errors.serverError" }; }
@@ -124,10 +160,15 @@ export async function renamePriceBook(id: string, name: string): Promise<ActionR
 export async function deletePriceBook(id: string): Promise<ActionResult> {
   const gate = await requireManager(); if (!gate.ok) return gate;
   try {
-    const [book] = await db.select({ isDefault: priceBooks.isDefault }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, id))).limit(1);
-    if (!book) return { ok: false, error: "errors.invalidData" };
-    if (book.isDefault) return { ok: false, error: "pricing.errors.cannotDeleteDefault" };
-    await db.delete(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, id)));
+    const error = await db.transaction(async (tx) => {
+      const [book] = await tx.select({ name: priceBooks.name, isDefault: priceBooks.isDefault }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, id))).limit(1).for("update");
+      if (!book) return "errors.invalidData";
+      if (book.isDefault) return "pricing.errors.cannotDeleteDefault";
+      await tx.delete(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, id)));
+      await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId, action: "price_book.deleted", entityType: "price_book", entityId: id, before: { name: book.name } });
+      return null;
+    });
+    if (error) return { ok: false, error };
     revalidatePath(Routes.Pricing);
     return { ok: true, data: undefined };
   } catch (e) { console.error("deletePriceBook failed:", e); return { ok: false, error: "errors.serverError" }; }
@@ -145,21 +186,38 @@ export async function setProductPrice(input: {
 }): Promise<ActionResult> {
   const gate = await requireManager(); if (!gate.ok) return gate;
   try {
-    const [book] = await db.select({ isDefault: priceBooks.isDefault }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, input.priceBookId))).limit(1);
-    if (!book) return { ok: false, error: "errors.invalidData" };
+    const result = await db.transaction(async (tx) => {
+      const [book] = await tx.select({ name: priceBooks.name, isDefault: priceBooks.isDefault }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, input.priceBookId))).limit(1);
+      if (!book) return false;
+      const [product] = await tx.select({ name: products.name, sku: products.sku, retailPrice: products.retailPrice }).from(products)
+        .where(and(eq(products.storeId, gate.storeId), eq(products.id, input.productId))).limit(1).for("update");
+      if (!product) return false;
+      const [override] = book.isDefault ? [] : await tx.select({ price: productPrices.price }).from(productPrices)
+        .where(and(eq(productPrices.storeId, gate.storeId), eq(productPrices.priceBookId, input.priceBookId), eq(productPrices.productId, input.productId))).limit(1);
+      const beforePrice = book.isDefault ? Number(product.retailPrice) : override ? Number(override.price) : null;
+      const afterPrice = !book.isDefault && input.price == null ? null : Number(toMoney(Math.max(0, input.price ?? 0)));
+      if (beforePrice === afterPrice) return true;
 
-    if (book.isDefault) {
-      await db.update(products).set({ retailPrice: toMoney(Math.max(0, input.price ?? 0)), updatedAt: sql`now()` }).where(and(eq(products.storeId, gate.storeId), eq(products.id, input.productId)));
-    } else if (input.price == null) {
-      await db.delete(productPrices).where(and(eq(productPrices.storeId, gate.storeId), eq(productPrices.priceBookId, input.priceBookId), eq(productPrices.productId, input.productId)));
-    } else {
-      await db.insert(productPrices)
-        .values({ storeId: gate.storeId, priceBookId: input.priceBookId, productId: input.productId, price: toMoney(Math.max(0, input.price)) })
-        .onConflictDoUpdate({
-          target: [productPrices.priceBookId, productPrices.productId],
-          set: { price: toMoney(Math.max(0, input.price)) },
-        });
-    }
+      if (book.isDefault) {
+        await tx.update(products).set({ retailPrice: toMoney(Math.max(0, input.price ?? 0)), updatedAt: sql`now()` }).where(and(eq(products.storeId, gate.storeId), eq(products.id, input.productId)));
+      } else if (input.price == null) {
+        await tx.delete(productPrices).where(and(eq(productPrices.storeId, gate.storeId), eq(productPrices.priceBookId, input.priceBookId), eq(productPrices.productId, input.productId)));
+      } else {
+        await tx.insert(productPrices)
+          .values({ storeId: gate.storeId, priceBookId: input.priceBookId, productId: input.productId, price: toMoney(Math.max(0, input.price)) })
+          .onConflictDoUpdate({
+            target: [productPrices.priceBookId, productPrices.productId],
+            set: { price: toMoney(Math.max(0, input.price)) },
+          });
+      }
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "product.price_book.updated", entityType: "product", entityId: input.productId,
+        before: { name: product.name, sku: product.sku, price: beforePrice }, after: { name: product.name, sku: product.sku, price: afterPrice },
+        metadata: { productName: product.name, productSku: product.sku, priceBookId: input.priceBookId, priceBookName: book.name, usesRetailPrice: afterPrice == null },
+    });
+    return true;
+    });
+    if (!result) return { ok: false, error: "errors.invalidData" };
     revalidatePath(Routes.Pricing);
     revalidatePath(Routes.POS);
     return { ok: true, data: undefined };

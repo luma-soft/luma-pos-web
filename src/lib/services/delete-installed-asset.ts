@@ -1,3 +1,4 @@
+import { recordActivity } from "@/lib/audit/activity-log";
 import { and, eq, sql } from "drizzle-orm";
 import {
   installedAssets,
@@ -10,7 +11,7 @@ type DatabaseLike = any; // eslint-disable-line @typescript-eslint/no-explicit-a
 
 export async function deleteInstalledAssetCore(
   database: DatabaseLike,
-  input: { storeId: string; assetId: string },
+  input: { storeId: string; assetId: string; actorId?: string | null },
 ) {
   return database.transaction(async (tx: DatabaseLike) => {
     const scope = and(
@@ -19,6 +20,7 @@ export async function deleteInstalledAssetCore(
     );
     const [asset] = await tx.select({
       id: installedAssets.id,
+      name: installedAssets.name,
       projectId: installedAssets.projectId,
     }).from(installedAssets).where(scope).for("update").limit(1);
     if (!asset) return { outcome: "not_found" } as const;
@@ -52,6 +54,9 @@ export async function deleteInstalledAssetCore(
     // Existing database guards enforce completed/cancelled job immutability
     // and invalidate affected signatures. Any rejection rolls back photo edits.
     await tx.delete(installedAssets).where(scope);
+    await recordActivity(tx, { storeId: input.storeId, actorId: input.actorId ?? null,
+      action: "service.asset.deleted", entityType: "installed_asset", entityId: asset.id,
+      before: { name: asset.name }, metadata: { projectId: asset.projectId, deleted: true } });
     return { outcome: "deleted", projectId: asset.projectId as string } as const;
   });
 }

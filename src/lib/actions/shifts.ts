@@ -8,6 +8,7 @@ import { getCurrentShift, shiftExpectedCash } from "@/lib/data/shifts";
 import { type ActionResult, requireUser, getProfileId, generateCode, toMoney, isUniqueViolation } from "./common";
 import { Routes } from "@/lib/routes";
 import { resolveStoreContextForUser } from "@/lib/auth/store-context";
+import { recordActivity } from "@/lib/audit/activity-log";
 
 export async function openShift(openingFloat: number): Promise<ActionResult<{ id: string; code: string }>> {
   let userId: string;
@@ -24,13 +25,20 @@ export async function openShiftForUser(userId: string, openingFloat: number): Pr
     if (!profileId) return { ok: false, error: "errors.invalidData" };
     const existing = await getCurrentShift(context.storeId, profileId);
     if (existing) return { ok: false, error: "shifts.errors.alreadyOpen" };
-    const [row] = await db.insert(shifts).values({
-      storeId: context.storeId,
-      code: generateCode("CA"),
-      userId: profileId,
-      openingFloat: toMoney(openingFloat),
-      status: "open",
-    }).returning({ id: shifts.id, code: shifts.code });
+    const row = await db.transaction(async (tx) => {
+      const [created] = await tx.insert(shifts).values({
+        storeId: context.storeId,
+        code: generateCode("CA"),
+        userId: profileId,
+        openingFloat: toMoney(openingFloat),
+        status: "open",
+      }).returning({ id: shifts.id, code: shifts.code });
+      await recordActivity(tx, {
+        storeId: context.storeId, actorId: profileId, action: "shift.opened", entityType: "shift", entityId: created.id,
+        after: { code: created.code, openingFloat, status: "open" },
+      });
+      return created;
+    });
     revalidatePath(Routes.Finance);
     return { ok: true, data: row };
   } catch (e) {
@@ -57,14 +65,23 @@ export async function closeShiftForUser(userId: string, countedCash: number, not
     if (!shift) return { ok: false, error: "shifts.errors.noOpen" };
     const expected = await shiftExpectedCash(context.storeId, Number(shift.openingFloat), shift.id);
     const variance = countedCash - expected;
-    await db.update(shifts).set({
-      status: "closed",
-      closedAt: new Date(),
-      expectedCash: toMoney(expected),
-      countedCash: toMoney(countedCash),
-      variance: toMoney(variance),
-      note: note || null,
-    }).where(and(eq(shifts.storeId, context.storeId), eq(shifts.id, shift.id), eq(shifts.status, "open")));
+    const closed = await db.transaction(async (tx) => {
+      const [updated] = await tx.update(shifts).set({
+        status: "closed",
+        closedAt: new Date(),
+        expectedCash: toMoney(expected),
+        countedCash: toMoney(countedCash),
+        variance: toMoney(variance),
+        note: note || null,
+      }).where(and(eq(shifts.storeId, context.storeId), eq(shifts.id, shift.id), eq(shifts.status, "open"))).returning({ id: shifts.id });
+      if (!updated) return false;
+      await recordActivity(tx, {
+        storeId: context.storeId, actorId: profileId, action: "shift.closed", entityType: "shift", entityId: shift.id,
+        before: { code: shift.code, status: "open" }, after: { code: shift.code, status: "closed", expectedCash: expected, countedCash, variance },
+      });
+      return true;
+    });
+    if (!closed) return { ok: false, error: "shifts.errors.noOpen" };
     revalidatePath(Routes.Finance);
     return { ok: true, data: { variance } };
   } catch (e) {
@@ -122,7 +139,13 @@ export async function handoverShiftForUser(input: {
         status: "open",
         handoverFromShiftId: shift.id,
         note: input.note?.trim() || null,
-      }).returning({ id: shifts.id });
+      }).returning({ id: shifts.id, code: shifts.code });
+      await recordActivity(tx, {
+        storeId: context.storeId, actorId: profileId, action: "shift.handed_over", entityType: "shift", entityId: shift.id,
+        before: { code: shift.code, status: "open" },
+        after: { code: shift.code, status: "closed", expectedCash: expected, countedCash: input.countedCash, variance, targetName: target[0].fullName, nextShiftCode: next.code },
+        affectedRecords: [{ type: "shift", id: next.id, code: next.code }, { type: "profile", id: input.targetProfileId, name: target[0].fullName }],
+      });
       return next;
     });
     revalidatePath(Routes.Finance);

@@ -1,5 +1,7 @@
 "use server";
 
+import { isDeepStrictEqual } from "node:util";
+
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -20,7 +22,7 @@ import {
   stockMovements,
   warehouses,
 } from "@/db/schema";
-import { writeAuditLog } from "@/lib/audit";
+import { recordActivity } from "@/lib/audit/activity-log";
 import { completeAiText, loadAiProviderConfig, parseJsonText } from "@/lib/ai/provider-adapter";
 import { consumeAiUsage, recordAiTokenUsage } from "@/lib/ai/usage";
 import { consumeTrackedStockLots } from "@/lib/inventory/stock-lot-service";
@@ -147,7 +149,7 @@ async function getProductForListing(storeId: string, productId: string) {
   return product ?? null;
 }
 
-async function enqueueShopeeJob(input: {
+async function enqueueShopeeJob(database: Pick<typeof db, "insert">, input: {
   storeId: string;
   type: string;
   idempotencyKey: string;
@@ -155,7 +157,7 @@ async function enqueueShopeeJob(input: {
   userId?: string;
   shopId?: string | null;
 }) {
-  await db.insert(marketplaceSyncJobs)
+  await database.insert(marketplaceSyncJobs)
     .values({
       storeId: input.storeId,
       provider: "shopee",
@@ -179,36 +181,34 @@ export async function connectShopeeDemoShop(): Promise<ActionResult<{ shopId: st
   const gate = await requireMarketplaceOwner();
   if (!gate.ok) return gate;
   try {
-    const [shop] = await db.insert(marketplaceShops)
-      .values({
+    const shop = await db.transaction(async (tx) => {
+      const [created] = await tx.insert(marketplaceShops)
+        .values({
+          storeId: gate.storeId,
+          provider: "shopee",
+          shopId: `demo-${Date.now()}`,
+          shopName: "Shopee Demo Shop",
+          region: "VN",
+          status: "connected",
+          connectedAt: new Date(),
+          tokenExpiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+          createdBy: gate.userId,
+          metadata: { mode: "demo", note: "Replace with Shopee OAuth callback in production." },
+        })
+        .returning({ id: marketplaceShops.id });
+      await tx.insert(marketplaceTokens).values({
         storeId: gate.storeId,
-        provider: "shopee",
-        shopId: `demo-${Date.now()}`,
-        shopName: "Shopee Demo Shop",
-        region: "VN",
-        status: "connected",
-        connectedAt: new Date(),
-        tokenExpiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
-        createdBy: gate.userId,
-        metadata: { mode: "demo", note: "Replace with Shopee OAuth callback in production." },
-      })
-      .returning({ id: marketplaceShops.id });
-    await db.insert(marketplaceTokens).values({
-      storeId: gate.storeId,
-      shopId: shop.id,
-      accessToken: "demo-access-token",
-      refreshToken: "demo-refresh-token",
-      expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
-      scopes: ["product", "order", "chat"],
-    });
-    await writeAuditLog({
-      actorUserId: gate.userId,
-      source: "manual",
-      action: "connect_shopee_demo_shop",
-      entityType: "marketplace_shop",
-      entityId: shop.id,
-      status: "succeeded",
-      metadata: { provider: "shopee" },
+        shopId: created.id,
+        accessToken: "demo-access-token",
+        refreshToken: "demo-refresh-token",
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+        scopes: ["product", "order", "chat"],
+      });
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "marketplace.shop.connected", entityType: "marketplace_shop", entityId: created.id,
+        after: { name: "Shopee Demo Shop", provider: "shopee", status: "connected", mode: "demo" },
+      });
+      return created;
     });
     revalidatePath(Routes.Settings);
     revalidatePath(Routes.OnlineSales);
@@ -223,18 +223,16 @@ export async function disconnectShopeeShop(shopId: string): Promise<ActionResult
   const gate = await requireMarketplaceOwner();
   if (!gate.ok) return gate;
   try {
-    await db.update(marketplaceShops).set({
-      status: "disconnected",
-      disconnectedAt: new Date(),
-      updatedAt: sql`now()`,
-    }).where(and(eq(marketplaceShops.id, shopId), eq(marketplaceShops.provider, "shopee"), eq(marketplaceShops.storeId, gate.storeId)));
-    await writeAuditLog({
-      actorUserId: gate.userId,
-      source: "manual",
-      action: "disconnect_shopee_shop",
-      entityType: "marketplace_shop",
-      entityId: shopId,
-      status: "succeeded",
+    await db.transaction(async (tx) => {
+      const [shop] = await tx.select({ name: marketplaceShops.shopName, status: marketplaceShops.status }).from(marketplaceShops)
+        .where(and(eq(marketplaceShops.id, shopId), eq(marketplaceShops.provider, "shopee"), eq(marketplaceShops.storeId, gate.storeId))).limit(1).for("update");
+      if (!shop || shop.status === "disconnected") return;
+      await tx.update(marketplaceShops).set({ status: "disconnected", disconnectedAt: new Date(), updatedAt: sql`now()` })
+        .where(and(eq(marketplaceShops.id, shopId), eq(marketplaceShops.storeId, gate.storeId)));
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "marketplace.shop.disconnected", entityType: "marketplace_shop", entityId: shopId,
+        before: shop, after: { name: shop.name, status: "disconnected", provider: "shopee" },
+      });
     });
     revalidatePath(Routes.Settings);
     revalidatePath(Routes.OnlineSales);
@@ -252,42 +250,40 @@ export async function updateMarketplaceShopSyncPolicy(input: MarketplaceShopSync
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
   try {
-    const [shop] = await db
-      .select({ id: marketplaceShops.id, provider: marketplaceShops.provider, metadata: marketplaceShops.metadata })
-      .from(marketplaceShops)
-      .where(and(eq(marketplaceShops.id, v.shopId), eq(marketplaceShops.storeId, gate.storeId)))
-      .limit(1);
-    if (!shop) return { ok: false, error: "marketplace.errors.shopNotFound" };
+    const found = await db.transaction(async (tx) => {
+      const [shop] = await tx
+        .select({ id: marketplaceShops.id, provider: marketplaceShops.provider, metadata: marketplaceShops.metadata, name: marketplaceShops.shopName })
+        .from(marketplaceShops)
+        .where(and(eq(marketplaceShops.id, v.shopId), eq(marketplaceShops.storeId, gate.storeId)))
+        .limit(1).for("update");
+      if (!shop) return false;
 
-    const currentMetadata = shop.metadata && typeof shop.metadata === "object" && !Array.isArray(shop.metadata)
-      ? shop.metadata as Record<string, unknown>
-      : {};
-    const syncPolicy = {
-      warehouseId: v.warehouseId || "",
-      syncStock: v.syncStock,
-      syncPrice: v.syncPrice,
-      importOrders: v.importOrders,
-      syncMessages: v.syncMessages,
-      autoCreateCustomer: v.autoCreateCustomer,
-      stockBuffer: v.stockBuffer,
-      minStockThreshold: v.minStockThreshold,
-      outOfStockBehavior: v.outOfStockBehavior,
-    };
-    await db.update(marketplaceShops).set({
-      metadata: { ...currentMetadata, syncPolicy },
-      updatedAt: sql`now()`,
-    }).where(and(eq(marketplaceShops.id, v.shopId), eq(marketplaceShops.storeId, gate.storeId)));
-    await writeAuditLog({
-      actorUserId: gate.userId,
-      source: "manual",
-      action: "update_marketplace_sync_policy",
-      entityType: "marketplace_shop",
-      entityId: v.shopId,
-      status: "succeeded",
-      before: { syncPolicy: currentMetadata.syncPolicy ?? null },
-      after: { syncPolicy },
-      metadata: { provider: shop.provider },
+      const currentMetadata = shop.metadata && typeof shop.metadata === "object" && !Array.isArray(shop.metadata)
+        ? shop.metadata as Record<string, unknown>
+        : {};
+      const syncPolicy = {
+        warehouseId: v.warehouseId || "",
+        syncStock: v.syncStock,
+        syncPrice: v.syncPrice,
+        importOrders: v.importOrders,
+        syncMessages: v.syncMessages,
+        autoCreateCustomer: v.autoCreateCustomer,
+        stockBuffer: v.stockBuffer,
+        minStockThreshold: v.minStockThreshold,
+        outOfStockBehavior: v.outOfStockBehavior,
+      };
+      if (isDeepStrictEqual(currentMetadata.syncPolicy, syncPolicy)) return true;
+      await tx.update(marketplaceShops).set({
+        metadata: { ...currentMetadata, syncPolicy },
+        updatedAt: sql`now()`,
+      }).where(and(eq(marketplaceShops.id, v.shopId), eq(marketplaceShops.storeId, gate.storeId)));
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "marketplace.shop.sync_policy.updated", entityType: "marketplace_shop", entityId: v.shopId,
+        after: { name: shop.name, provider: shop.provider, ...syncPolicy }, metadata: { changedFields: Object.keys(syncPolicy) },
+      });
+      return true;
     });
+    if (!found) return { ok: false, error: "marketplace.errors.shopNotFound" };
     revalidatePath(Routes.OnlineSales);
     return { ok: true, data: undefined };
   } catch (e) {
@@ -423,29 +419,19 @@ export async function saveShopeeListingDraft(input: ShopeeListingDraftInput): Pr
   const v = parsed.data;
   try {
     const payload = { ...v, provider: "shopee", updatedBy: gate.userId };
-    const [row] = await db.insert(marketplaceProductMappings)
-      .values({
-        storeId: gate.storeId,
-        provider: "shopee",
-        shopId: v.shopId ?? null,
-        productId: v.productId,
-        externalSku: v.sku,
-        status: v.action === "draft" ? "draft" : "ready",
-        title: v.title,
-        categoryId: v.categoryId,
-        categoryPath: v.categoryPath,
-        price: toMoney(v.price),
-        stock: toQty(v.stock),
-        syncMode: v.syncMode,
-        minStockThreshold: toQty(v.minStockThreshold),
-        outOfStockBehavior: v.outOfStockBehavior,
-        draftPayload: payload,
-        createdBy: gate.userId,
-      })
-      .onConflictDoUpdate({
-        target: [marketplaceProductMappings.storeId, marketplaceProductMappings.provider, marketplaceProductMappings.productId],
-        set: {
+    const row = await db.transaction(async (tx) => {
+      const [product] = await tx.select({ id: products.id, name: products.name, sku: products.sku }).from(products)
+        .where(and(eq(products.storeId, gate.storeId), eq(products.id, v.productId))).limit(1).for("update");
+      if (!product) throw new Error("PRODUCT_NOT_FOUND");
+      const [current] = await tx.select().from(marketplaceProductMappings)
+        .where(and(eq(marketplaceProductMappings.storeId, gate.storeId), eq(marketplaceProductMappings.provider, "shopee"), eq(marketplaceProductMappings.productId, v.productId))).limit(1);
+      if (current && isDeepStrictEqual(current.draftPayload, payload)) return current;
+      const [row] = await tx.insert(marketplaceProductMappings)
+        .values({
+          storeId: gate.storeId,
+          provider: "shopee",
           shopId: v.shopId ?? null,
+          productId: v.productId,
           externalSku: v.sku,
           status: v.action === "draft" ? "draft" : "ready",
           title: v.title,
@@ -457,20 +443,45 @@ export async function saveShopeeListingDraft(input: ShopeeListingDraftInput): Pr
           minStockThreshold: toQty(v.minStockThreshold),
           outOfStockBehavior: v.outOfStockBehavior,
           draftPayload: payload,
-          updatedAt: sql`now()`,
-        },
-      })
-      .returning({ id: marketplaceProductMappings.id });
-    if (v.aiSuggestionId) {
-      await db.update(aiListingSuggestions).set({ mappingId: row.id, editedFields: v.editedFields }).where(and(eq(aiListingSuggestions.id, v.aiSuggestionId), eq(aiListingSuggestions.storeId, gate.storeId)));
-    }
-    await enqueueShopeeJob({
-      storeId: gate.storeId,
-      type: v.action === "draft" ? "listing_draft_saved" : "listing_validate",
-      idempotencyKey: `shopee:listing:${v.productId}:${v.action}`,
-      payload,
-      userId: gate.userId,
-      shopId: v.shopId ?? null,
+          createdBy: gate.userId,
+        })
+        .onConflictDoUpdate({
+          target: [marketplaceProductMappings.storeId, marketplaceProductMappings.provider, marketplaceProductMappings.productId],
+          set: {
+            shopId: v.shopId ?? null,
+            externalSku: v.sku,
+            status: v.action === "draft" ? "draft" : "ready",
+            title: v.title,
+            categoryId: v.categoryId,
+            categoryPath: v.categoryPath,
+            price: toMoney(v.price),
+            stock: toQty(v.stock),
+            syncMode: v.syncMode,
+            minStockThreshold: toQty(v.minStockThreshold),
+            outOfStockBehavior: v.outOfStockBehavior,
+            draftPayload: payload,
+            updatedAt: sql`now()`,
+          },
+        })
+        .returning({ id: marketplaceProductMappings.id });
+      if (v.aiSuggestionId) {
+        await tx.update(aiListingSuggestions).set({ mappingId: row.id, editedFields: v.editedFields }).where(and(eq(aiListingSuggestions.id, v.aiSuggestionId), eq(aiListingSuggestions.storeId, gate.storeId)));
+      }
+      await enqueueShopeeJob(tx, {
+        storeId: gate.storeId,
+        type: v.action === "draft" ? "listing_draft_saved" : "listing_validate",
+        idempotencyKey: `shopee:listing:${v.productId}:${v.action}`,
+        payload,
+        userId: gate.userId,
+        shopId: v.shopId ?? null,
+      });
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "marketplace.listing.draft_saved", entityType: "marketplace_product_mapping", entityId: row.id,
+        before: current ? { name: current.title, price: current.price, stock: current.stock } : null,
+        after: { name: v.title, code: v.sku, price: v.price, stock: v.stock, status: v.action === "draft" ? "draft" : "ready" },
+        affectedRecords: [{ type: "product", id: product.id, code: product.sku, name: product.name }],
+      });
+      return row;
     });
     revalidatePath(Routes.Inventory);
     revalidatePath(Routes.OnlineSales);
@@ -490,32 +501,35 @@ export async function publishShopeeListing(input: ShopeeListingDraftInput): Prom
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
   try {
-    const externalItemId = `pending-${v.productId.slice(0, 8)}-${Date.now()}`;
-    await db.update(marketplaceProductMappings).set({
-      status: "published",
-      externalItemId,
-      lastPayload: { ...v, provider: "shopee" },
-      lastResponse: { status: "queued", externalItemId, message: "Queued for Shopee API adapter" },
-      lastSyncAt: new Date(),
-      lastError: null,
-      updatedAt: sql`now()`,
-    }).where(and(eq(marketplaceProductMappings.id, saved.data.mappingId), eq(marketplaceProductMappings.storeId, gate.storeId)));
-    await enqueueShopeeJob({
-      storeId: gate.storeId,
-      type: "listing_publish",
-      idempotencyKey: `shopee:publish:${saved.data.mappingId}`,
-      payload: { ...v, mappingId: saved.data.mappingId, externalItemId },
-      userId: gate.userId,
-      shopId: v.shopId ?? null,
-    });
-    await writeAuditLog({
-      actorUserId: gate.userId,
-      source: "manual",
-      action: "publish_shopee_listing",
-      entityType: "marketplace_product_mapping",
-      entityId: saved.data.mappingId,
-      status: "succeeded",
-      metadata: { productId: v.productId, externalItemId },
+    const externalItemId = await db.transaction(async (tx) => {
+      const [current] = await tx.select().from(marketplaceProductMappings)
+        .where(and(eq(marketplaceProductMappings.id, saved.data.mappingId), eq(marketplaceProductMappings.storeId, gate.storeId))).limit(1).for("update");
+      if (!current) throw new Error("LISTING_NOT_FOUND");
+      if (current.status === "published" && current.externalItemId && isDeepStrictEqual(current.lastPayload, { ...v, provider: "shopee" })) return current.externalItemId;
+      const externalItemId = `pending-${v.productId.slice(0, 8)}-${Date.now()}`;
+      await tx.update(marketplaceProductMappings).set({
+        status: "published",
+        externalItemId,
+        lastPayload: { ...v, provider: "shopee" },
+        lastResponse: { status: "queued", externalItemId, message: "Queued for Shopee API adapter" },
+        lastSyncAt: new Date(),
+        lastError: null,
+        updatedAt: sql`now()`,
+      }).where(and(eq(marketplaceProductMappings.id, saved.data.mappingId), eq(marketplaceProductMappings.storeId, gate.storeId)));
+      await enqueueShopeeJob(tx, {
+        storeId: gate.storeId,
+        type: "listing_publish",
+        idempotencyKey: `shopee:publish:${saved.data.mappingId}`,
+        payload: { ...v, mappingId: saved.data.mappingId, externalItemId },
+        userId: gate.userId,
+        shopId: v.shopId ?? null,
+      });
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "marketplace.listing.publish_requested", entityType: "marketplace_product_mapping", entityId: saved.data.mappingId,
+        status: "confirmed", after: { name: v.title, code: v.sku, price: v.price, stock: v.stock, status: "queued" },
+        affectedRecords: [{ type: "product", id: v.productId, code: v.sku, name: v.title }],
+      });
+      return externalItemId;
     });
     revalidatePath(Routes.Inventory);
     revalidatePath(Routes.OnlineSales);
@@ -530,13 +544,23 @@ export async function unpublishShopeeListing(mappingId: string): Promise<ActionR
   const gate = await requireMarketplaceManager();
   if (!gate.ok) return gate;
   try {
-    await db.update(marketplaceProductMappings).set({ status: "unlisted", updatedAt: sql`now()` }).where(and(eq(marketplaceProductMappings.id, mappingId), eq(marketplaceProductMappings.storeId, gate.storeId)));
-    await enqueueShopeeJob({
-      storeId: gate.storeId,
-      type: "listing_unpublish",
-      idempotencyKey: `shopee:unpublish:${mappingId}`,
-      payload: { mappingId },
-      userId: gate.userId,
+    await db.transaction(async (tx) => {
+      const [current] = await tx.select().from(marketplaceProductMappings)
+        .where(and(eq(marketplaceProductMappings.id, mappingId), eq(marketplaceProductMappings.storeId, gate.storeId))).limit(1).for("update");
+      if (!current || current.status === "unlisted") return;
+      await tx.update(marketplaceProductMappings).set({ status: "unlisted", updatedAt: sql`now()` }).where(and(eq(marketplaceProductMappings.id, mappingId), eq(marketplaceProductMappings.storeId, gate.storeId)));
+      await enqueueShopeeJob(tx, {
+        storeId: gate.storeId,
+        type: "listing_unpublish",
+        idempotencyKey: `shopee:unpublish:${mappingId}`,
+        payload: { mappingId },
+        userId: gate.userId,
+      });
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "marketplace.listing.unpublish_requested", entityType: "marketplace_product_mapping", entityId: mappingId,
+        status: "confirmed", before: { name: current.title, status: current.status }, after: { name: current.title, status: "queued" },
+        affectedRecords: [{ type: "product", id: current.productId, name: current.title }],
+      });
     });
     revalidatePath(Routes.Inventory);
     revalidatePath(Routes.OnlineSales);
@@ -582,8 +606,12 @@ export async function importShopeeOrder(input: ImportShopeeOrderInput): Promise<
           address: v.deliveryAddress || null,
           type: "retail",
           note: `Imported from Shopee order ${v.orderSn}`,
-        }).returning({ id: customers.id });
+        }).returning({ id: customers.id, code: customers.code, name: customers.name });
         customerId = customer.id;
+        await recordActivity(tx, {
+          storeId: gate.storeId, actorId: gate.userId, action: "customer.created", entityType: "customer", entityId: customer.id,
+          after: { code: customer.code, name: customer.name }, metadata: { origin: "shopee" },
+        });
       }
       const isCancelled = v.status.toLowerCase().includes("cancel");
       const [order] = await tx.insert(orders).values({
@@ -654,6 +682,12 @@ export async function importShopeeOrder(input: ImportShopeeOrderInput): Promise<
         externalStatus: v.status,
         rawPayload: v.rawPayload,
       });
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "marketplace.order.imported", entityType: "order", entityId: order.id,
+        after: { code: order.code, customerName: v.buyerName, total, status: isCancelled ? "cancelled" : "completed", itemCount: v.items.length },
+        affectedRecords: v.items.map((item) => ({ type: "product", id: item.productId, name: item.name, quantity: item.quantity })),
+        metadata: { provider: "shopee", externalOrderSn: v.orderSn },
+      });
       const notification = isCancelled
         ? null
         : await createNotificationEventInTx(tx, {
@@ -696,21 +730,30 @@ export async function sendMarketplaceMessage(input: SendMarketplaceMessageInput)
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
   try {
-    await db.insert(marketplaceMessages).values({
-      storeId: gate.storeId,
-      threadId: v.threadId,
-      direction: "out",
-      body: v.body,
-      sentBy: gate.userId,
-      rawPayload: { status: "queued" },
-    });
-    await db.update(marketplaceMessageThreads).set({ lastMessageAt: new Date(), updatedAt: sql`now()` }).where(and(eq(marketplaceMessageThreads.id, v.threadId), eq(marketplaceMessageThreads.storeId, gate.storeId)));
-    await enqueueShopeeJob({
-      storeId: gate.storeId,
-      type: "message_send",
-      idempotencyKey: `shopee:message:${v.threadId}:${Date.now()}`,
-      payload: { threadId: v.threadId, body: v.body },
-      userId: gate.userId,
+    await db.transaction(async (tx) => {
+      const [thread] = await tx.select({ name: marketplaceMessageThreads.buyerName }).from(marketplaceMessageThreads)
+        .where(and(eq(marketplaceMessageThreads.id, v.threadId), eq(marketplaceMessageThreads.storeId, gate.storeId))).limit(1).for("update");
+      if (!thread) throw new Error("THREAD_NOT_FOUND");
+      await tx.insert(marketplaceMessages).values({
+        storeId: gate.storeId,
+        threadId: v.threadId,
+        direction: "out",
+        body: v.body,
+        sentBy: gate.userId,
+        rawPayload: { status: "queued" },
+      });
+      await tx.update(marketplaceMessageThreads).set({ lastMessageAt: new Date(), updatedAt: sql`now()` }).where(and(eq(marketplaceMessageThreads.id, v.threadId), eq(marketplaceMessageThreads.storeId, gate.storeId)));
+      await enqueueShopeeJob(tx, {
+        storeId: gate.storeId,
+        type: "message_send",
+        idempotencyKey: `shopee:message:${v.threadId}:${Date.now()}`,
+        payload: { threadId: v.threadId, body: v.body },
+        userId: gate.userId,
+      });
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "marketplace.message.queued", entityType: "marketplace_message_thread", entityId: v.threadId,
+        status: "confirmed", after: { name: thread.name, provider: "shopee", status: "queued" },
+      });
     });
     revalidatePath(Routes.OnlineSales);
     return { ok: true, data: undefined };

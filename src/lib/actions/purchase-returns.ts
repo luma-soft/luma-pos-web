@@ -20,6 +20,7 @@ import { getCurrentShift } from "@/lib/data/shifts";
 import { consumeTrackedStockLots } from "@/lib/inventory/stock-lot-service";
 import { createDebtChangedEventInTx } from "@/lib/notifications/events-core";
 import { publishCommittedNotification } from "@/lib/notifications/outbox";
+import { recordActivity } from "@/lib/audit/activity-log";
 
 export async function searchPurchaseReturnProducts(q: string, warehouseId: string): Promise<PurchaseReturnProductRow[]> {
   const gate = await requireStockAccess();
@@ -203,6 +204,12 @@ export async function createPurchaseReturn(
         actorId: profileId,
       });
 
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: profileId, action: "purchase_return.created", entityType: "purchase_return", entityId: ret.id,
+        after: { code: ret.code, status: "completed", total: totals.total, refundAmount: totals.refundAmount, debtAmount: totals.debtAmount, itemCount: v.items.length },
+        affectedRecords: v.items.map((item) => ({ type: "product", id: item.productId, code: productsById.get(item.productId)?.sku, name: productsById.get(item.productId)?.name, quantity: item.quantity, unitCost: item.returnUnitCost })),
+        metadata: { purchaseReturnCode: ret.code, supplierId: v.supplierId, warehouseId: v.warehouseId, purchaseId: v.purchaseOrderId },
+      });
       return { ret, debtNotification };
     });
 

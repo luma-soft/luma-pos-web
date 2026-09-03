@@ -3,6 +3,7 @@ import type { InventoryTransaction } from "@/lib/inventory/stock-lot-service";
 import { categories, products, stockLevels, stockMovements, warehouses } from "@/db/schema";
 import { isProductStockManaged } from "@/lib/product-stock";
 import { productStockAdjustmentSchema, type ProductStockAdjustment } from "./stock-adjustment";
+import { recordActivity } from "@/lib/audit/activity-log";
 
 /** Runs inside the product update transaction; never changes opening stock. */
 export async function applyProductStockAdjustment(
@@ -21,6 +22,8 @@ export async function applyProductStockAdjustment(
   if (quantity === expectedQuantity) return;
 
   const [product] = await tx.select({
+    name: products.name,
+    sku: products.sku,
     productKind: products.productKind,
     categoryName: categories.name,
     isVariantParent: products.isVariantParent,
@@ -97,5 +100,17 @@ export async function applyProductStockAdjustment(
     refId: input.productId,
     note: "Điều chỉnh tồn kho khi sửa sản phẩm",
     createdBy: input.createdBy,
+  });
+  const [warehouse] = await tx.select({ name: warehouses.name }).from(warehouses)
+    .where(and(eq(warehouses.storeId, input.storeId), eq(warehouses.id, warehouseId))).limit(1);
+  await recordActivity(tx, {
+    storeId: input.storeId,
+    actorId: input.createdBy,
+    action: "product.stock.adjusted",
+    entityType: "product",
+    entityId: input.productId,
+    before: { name: product.name, sku: product.sku, quantity: current, warehouseName: warehouse?.name },
+    after: { name: product.name, sku: product.sku, quantity, warehouseName: warehouse?.name },
+    metadata: { productName: product.name, productSku: product.sku, warehouseId, quantityDelta: quantity - current },
   });
 }

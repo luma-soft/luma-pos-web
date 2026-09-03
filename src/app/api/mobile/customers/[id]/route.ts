@@ -41,7 +41,7 @@ export async function PATCH(
     await updateCustomerCore(gate.storeId, {
       ...(body as Record<string, unknown>),
       id,
-    } as Parameters<typeof updateCustomerCore>[1])
+    } as Parameters<typeof updateCustomerCore>[1], gate.userId)
   );
 }
 

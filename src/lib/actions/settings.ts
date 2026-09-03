@@ -22,14 +22,14 @@ import {
   type StaffRole,
   type MobileNotificationSettingsPatch,
   type StorePrefsPatch,
+  type StorePrefs,
   type ZaloSettingsInput,
 } from "@/lib/schemas/settings";
 import {
-  persistNotificationSettingsPatch,
   persistStorePrefsMutation,
-  persistStorePrefsPatch,
 } from "@/lib/settings/notification-settings-core";
-import { writeAuditLog } from "@/lib/audit";
+import { recordActivity } from "@/lib/audit/activity-log";
+import { mergeMobileNotificationSettings } from "@/lib/settings/mobile-settings-access";
 import { buildAiProviderConfig, completeAiText, completeAiVision } from "@/lib/ai/provider-adapter";
 import { type ActionResult, requireManager, requireOwner, requireUser } from "./common";
 import { resolveStoreContextForUser } from "@/lib/auth/store-context";
@@ -108,6 +108,48 @@ function blankToNull(value?: string) {
   return trimmed ? trimmed : null;
 }
 
+function changedSettingsFields(before: unknown, after: unknown, prefix = ""): string[] {
+  if (JSON.stringify(before) === JSON.stringify(after)) return [];
+  if (before && after && typeof before === "object" && typeof after === "object" && !Array.isArray(before) && !Array.isArray(after)) {
+    const previous = before as Record<string, unknown>;
+    const next = after as Record<string, unknown>;
+    return [...new Set([...Object.keys(previous), ...Object.keys(next)])]
+      .flatMap((key) => changedSettingsFields(previous[key], next[key], prefix ? `${prefix}.${key}` : key));
+  }
+  return [prefix];
+}
+
+// Preferences can contain credentials and connection strings. Only changed field
+// names and explicit non-secret integration switches belong in the activity feed.
+function preferenceActivitySummary(prefs: StorePrefs, section?: "ai" | "zalo" | "shopee") {
+  if (section === "ai") return { provider: prefs.ai.provider, textModel: prefs.ai.textModel, visionModel: prefs.ai.visionModel, monthlyUsageLimit: prefs.ai.monthlyUsageLimit };
+  if (section === "zalo") return { enabled: prefs.zalo.enabled, deliveryMode: prefs.zalo.deliveryMode };
+  if (section === "shopee") return { enabled: prefs.shopee.enabled, environment: prefs.shopee.environment, syncInventory: prefs.shopee.syncInventory, syncOrders: prefs.shopee.syncOrders, syncMessages: prefs.shopee.syncMessages };
+  return {};
+}
+
+async function persistSettingsWithActivity<T>(
+  storeId: string,
+  actorId: string,
+  action: string,
+  mutate: (current: StorePrefs) => { next: StorePrefs; value: T },
+  section?: "ai" | "zalo" | "shopee",
+) {
+  return db.transaction(async (tx) => {
+    const persisted = await persistStorePrefsMutation(tx, storeId, mutate);
+    const changedFields = changedSettingsFields(persisted.before, persisted.after);
+    if (changedFields.length) {
+      await recordActivity(tx, {
+        storeId, actorId, action, entityType: "store_settings", entityId: storeId,
+        before: preferenceActivitySummary(persisted.before, section),
+        after: preferenceActivitySummary(persisted.after, section),
+        metadata: { changedFields },
+      });
+    }
+    return persisted;
+  });
+}
+
 export async function updateStoreSettings(input: StoreSettingsInput): Promise<ActionResult> {
   const gate = await requireManager();
   if (!gate.ok) return gate;
@@ -115,9 +157,19 @@ export async function updateStoreSettings(input: StoreSettingsInput): Promise<Ac
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
   try {
-    await db.insert(storeSettings)
-      .values({ id: gate.storeId, storeId: gate.storeId, ...v })
-      .onConflictDoUpdate({ target: storeSettings.storeId, set: { ...v, updatedAt: sql`now()` } });
+    await db.transaction(async (tx) => {
+      const [current] = await tx.select().from(storeSettings).where(eq(storeSettings.storeId, gate.storeId)).limit(1).for("update");
+      const changedFields = (Object.keys(v) as Array<keyof typeof v>).filter((key) => current?.[key] !== v[key]);
+      if (current && !changedFields.length) return;
+      await tx.insert(storeSettings)
+        .values({ id: gate.storeId, storeId: gate.storeId, ...v })
+        .onConflictDoUpdate({ target: storeSettings.storeId, set: { ...v, updatedAt: sql`now()` } });
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "settings.store.updated", entityType: "store_settings", entityId: gate.storeId,
+        before: current ? { name: current.name, industry: current.industry, currency: current.currency, locale: current.locale } : null,
+        after: { name: v.name, industry: v.industry, currency: v.currency, locale: v.locale }, metadata: { changedFields },
+      });
+    });
     revalidatePath(Routes.Settings);
     return { ok: true, data: undefined };
   } catch (e) {
@@ -142,7 +194,9 @@ export async function updateStorePrefsForUser(
   try {
     const context = await resolveStoreContextForUser(userId);
     if (!context) return { ok: false, error: "errors.unauthorized" };
-    await persistStorePrefsPatch(db, context.storeId, parsed.data);
+    await persistSettingsWithActivity(context.storeId, userId, "settings.preferences.updated", (current) => ({
+      next: { ...current, ...parsed.data }, value: undefined,
+    }));
     revalidatePath(Routes.Settings);
     revalidatePath(Routes.POS);
     return { ok: true, data: undefined };
@@ -163,7 +217,9 @@ export async function updateNotificationSettingsForUser(
   try {
     const context = await resolveStoreContextForUser(userId);
     if (!context) return { ok: false, error: "errors.unauthorized" };
-    await persistNotificationSettingsPatch(db, context.storeId, parsed.data);
+    await persistSettingsWithActivity(context.storeId, userId, "settings.notifications.updated", (current) => ({
+      next: { ...current, notifications: mergeMobileNotificationSettings(current.notifications, parsed.data) }, value: undefined,
+    }));
     revalidatePath(Routes.Settings);
     revalidatePath(Routes.POS);
     return { ok: true, data: undefined };
@@ -181,7 +237,7 @@ export async function updateAiSettings(input: AiSettingsInput): Promise<ActionRe
   const v = parsed.data;
   try {
     const requested = input && typeof input === "object" ? input as Record<string, unknown> : {};
-    const persisted = await persistStorePrefsMutation(db, gate.storeId, (current) => {
+    await persistSettingsWithActivity(gate.storeId, gate.userId, "settings.ai.updated", (current) => {
       const nextKey = v.clearOpenaiApiKey
         ? ""
         : (v.openaiApiKey?.trim() || current.ai.openaiApiKey);
@@ -205,37 +261,8 @@ export async function updateAiSettings(input: AiSettingsInput): Promise<ActionRe
         next: { ...current, ai: nextAi },
         value: { currentAi: current.ai, nextAi },
       };
-    });
-    const { currentAi, nextAi } = persisted.value;
-    await writeAuditLog({
-      actorUserId: gate.userId,
-      source: "manual",
-      action: "update_ai_settings",
-      entityType: "store_settings",
-      entityId: gate.storeId,
-      status: "succeeded",
-      before: {
-        provider: currentAi.provider,
-        textModel: currentAi.textModel,
-        visionModel: currentAi.visionModel || currentAi.openaiVisionModel,
-        openaiApiKeySet: Boolean(currentAi.openaiApiKey),
-        openaiVisionModel: currentAi.openaiVisionModel,
-        attachmentsBucket: currentAi.attachmentsBucket,
-        monthlyUsageLimit: currentAi.monthlyUsageLimit,
-        showFloatingLauncher: currentAi.showFloatingLauncher,
-      },
-      after: {
-        provider: nextAi.provider,
-        textModel: nextAi.textModel,
-        visionModel: nextAi.visionModel,
-        openaiApiKeySet: Boolean(nextAi.openaiApiKey),
-        openaiVisionModel: nextAi.openaiVisionModel,
-        attachmentsBucket: nextAi.attachmentsBucket,
-        monthlyUsageLimit: nextAi.monthlyUsageLimit,
-        showFloatingLauncher: nextAi.showFloatingLauncher,
-      },
-      metadata: { keyChanged: v.clearOpenaiApiKey || Boolean(v.openaiApiKey?.trim()) },
-    });
+    }, "ai");
+
     revalidatePath(Routes.Settings);
     return { ok: true, data: undefined };
   } catch (e) {
@@ -251,7 +278,7 @@ export async function updateZaloSettings(input: ZaloSettingsInput): Promise<Acti
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
   try {
-    const persisted = await persistStorePrefsMutation(db, gate.storeId, (current) => {
+    await persistSettingsWithActivity(gate.storeId, gate.userId, "settings.zalo.updated", (current) => {
       const nextAppSecret = v.clearAppSecret
         ? ""
         : (v.appSecret?.trim() || current.zalo.appSecret);
@@ -286,50 +313,8 @@ export async function updateZaloSettings(input: ZaloSettingsInput): Promise<Acti
         next: { ...current, zalo: nextZalo },
         value: { currentZalo: current.zalo, nextZalo },
       };
-    });
-    const { currentZalo, nextZalo } = persisted.value;
-    await writeAuditLog({
-      actorUserId: gate.userId,
-      source: "manual",
-      action: "update_zalo_settings",
-      entityType: "store_settings",
-      entityId: gate.storeId,
-      status: "succeeded",
-      before: {
-        enabled: currentZalo.enabled,
-        deliveryMode: currentZalo.deliveryMode,
-        oaId: currentZalo.oaId,
-        appId: currentZalo.appId,
-        appSecretSet: Boolean(currentZalo.appSecret),
-        accessTokenSet: Boolean(currentZalo.accessToken),
-        refreshTokenSet: Boolean(currentZalo.refreshToken),
-        webhookSecretSet: Boolean(currentZalo.webhookSecret),
-        portalTemplateId: currentZalo.portalTemplateId,
-        invoiceTemplateId: currentZalo.invoiceTemplateId,
-        debtTemplateId: currentZalo.debtTemplateId,
-      },
-      after: {
-        enabled: nextZalo.enabled,
-        deliveryMode: nextZalo.deliveryMode,
-        oaId: nextZalo.oaId,
-        appId: nextZalo.appId,
-        appSecretSet: Boolean(nextZalo.appSecret),
-        accessTokenSet: Boolean(nextZalo.accessToken),
-        refreshTokenSet: Boolean(nextZalo.refreshToken),
-        webhookSecretSet: Boolean(nextZalo.webhookSecret),
-        portalTemplateId: nextZalo.portalTemplateId,
-        invoiceTemplateId: nextZalo.invoiceTemplateId,
-        debtTemplateId: nextZalo.debtTemplateId,
-      },
-      metadata: {
-        secretsChanged: [
-          v.clearAppSecret || Boolean(v.appSecret?.trim()) ? "appSecret" : null,
-          v.clearAccessToken || Boolean(v.accessToken?.trim()) ? "accessToken" : null,
-          v.clearRefreshToken || Boolean(v.refreshToken?.trim()) ? "refreshToken" : null,
-          v.clearWebhookSecret || Boolean(v.webhookSecret?.trim()) ? "webhookSecret" : null,
-        ].filter(Boolean),
-      },
-    });
+    }, "zalo");
+
     revalidatePath(Routes.Settings);
     return { ok: true, data: undefined };
   } catch (e) {
@@ -345,7 +330,7 @@ export async function updateShopeeSettings(input: ShopeeSettingsInput): Promise<
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
   try {
-    const persisted = await persistStorePrefsMutation(db, gate.storeId, (current) => {
+    await persistSettingsWithActivity(gate.storeId, gate.userId, "settings.shopee.updated", (current) => {
       const nextPartnerKey = v.clearPartnerKey
         ? ""
         : (v.partnerKey?.trim() || current.shopee.partnerKey);
@@ -369,39 +354,8 @@ export async function updateShopeeSettings(input: ShopeeSettingsInput): Promise<
         next: { ...current, shopee: nextShopee },
         value: { currentShopee: current.shopee, nextShopee },
       };
-    });
-    const { currentShopee, nextShopee } = persisted.value;
-    await writeAuditLog({
-      actorUserId: gate.userId,
-      source: "manual",
-      action: "update_shopee_settings",
-      entityType: "store_settings",
-      entityId: gate.storeId,
-      status: "succeeded",
-      before: {
-        enabled: currentShopee.enabled,
-        environment: currentShopee.environment,
-        region: currentShopee.region,
-        partnerId: currentShopee.partnerId,
-        partnerKeySet: Boolean(currentShopee.partnerKey),
-        defaultShopId: currentShopee.defaultShopId,
-        syncInventory: currentShopee.syncInventory,
-        syncOrders: currentShopee.syncOrders,
-        syncMessages: currentShopee.syncMessages,
-      },
-      after: {
-        enabled: nextShopee.enabled,
-        environment: nextShopee.environment,
-        region: nextShopee.region,
-        partnerId: nextShopee.partnerId,
-        partnerKeySet: Boolean(nextShopee.partnerKey),
-        defaultShopId: nextShopee.defaultShopId,
-        syncInventory: nextShopee.syncInventory,
-        syncOrders: nextShopee.syncOrders,
-        syncMessages: nextShopee.syncMessages,
-      },
-      metadata: { partnerKeyChanged: v.clearPartnerKey || Boolean(v.partnerKey?.trim()) },
-    });
+    }, "shopee");
+
     revalidatePath(Routes.Settings);
     return { ok: true, data: undefined };
   } catch (e) {
@@ -546,6 +500,10 @@ export async function setStaffActive(id: string, active: boolean): Promise<Actio
   return { ok: true, data: undefined };
 }
 
+function bankAccountActivitySummary(account: typeof paymentBankAccounts.$inferSelect) {
+  return { name: account.accountName, bankCode: account.bankCode, provider: account.provider, enabled: account.enabled, isDefault: account.isDefault, webhookEnabled: account.webhookEnabled };
+}
+
 export async function savePaymentBankAccount(input: PaymentBankAccountInput): Promise<ActionResult> {
   const gate = await requireManager();
   if (!gate.ok) return gate;
@@ -554,6 +512,19 @@ export async function savePaymentBankAccount(input: PaymentBankAccountInput): Pr
   const v = parsed.data;
   try {
     await db.transaction(async (tx) => {
+      const [current] = v.id ? await tx.select().from(paymentBankAccounts)
+        .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, v.id))).limit(1).for("update") : [];
+      if (v.id && !current) throw new Error("BANK_ACCOUNT_NOT_FOUND");
+      const next = {
+        provider: v.provider, bankCode: v.bankCode, gateway: blankToNull(v.gateway),
+        accountNumber: v.accountNumber, subAccount: blankToNull(v.subAccount), accountName: v.accountName,
+        isDefault: v.isDefault, enabled: v.enabled, webhookEnabled: v.webhookEnabled,
+        webhookSecret: blankToNull(v.webhookSecret) ?? current?.webhookSecret ?? null,
+        apiKey: blankToNull(v.apiKey) ?? current?.apiKey ?? null, note: blankToNull(v.note),
+      };
+      const changedFields = (Object.keys(next) as Array<keyof typeof next>).filter((key) => current?.[key] !== next[key]);
+      if (current && !changedFields.length) return;
+      let accountId = v.id;
       if (v.isDefault) {
         await tx
           .update(paymentBankAccounts)
@@ -561,45 +532,12 @@ export async function savePaymentBankAccount(input: PaymentBankAccountInput): Pr
           .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.provider, v.provider)));
       }
       if (v.id) {
-        const [current] = await tx
-          .select({ webhookSecret: paymentBankAccounts.webhookSecret, apiKey: paymentBankAccounts.apiKey })
-          .from(paymentBankAccounts)
-          .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, v.id)))
-          .limit(1);
-        await tx.update(paymentBankAccounts)
-          .set({
-            provider: v.provider,
-            bankCode: v.bankCode,
-            gateway: blankToNull(v.gateway),
-            accountNumber: v.accountNumber,
-            subAccount: blankToNull(v.subAccount),
-            accountName: v.accountName,
-            isDefault: v.isDefault,
-            enabled: v.enabled,
-            webhookEnabled: v.webhookEnabled,
-            webhookSecret: blankToNull(v.webhookSecret) ?? current?.webhookSecret ?? null,
-            apiKey: blankToNull(v.apiKey) ?? current?.apiKey ?? null,
-            note: blankToNull(v.note),
-            updatedAt: sql`now()`,
-          })
+        await tx.update(paymentBankAccounts).set({ ...next, updatedAt: sql`now()` })
           .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, v.id)));
       } else {
-        await tx.insert(paymentBankAccounts).values({
-          storeId: gate.storeId,
-          provider: v.provider,
-          bankCode: v.bankCode,
-          gateway: blankToNull(v.gateway),
-          accountNumber: v.accountNumber,
-          subAccount: blankToNull(v.subAccount),
-          accountName: v.accountName,
-          isDefault: v.isDefault,
-          enabled: v.enabled,
-          webhookEnabled: v.webhookEnabled,
-          webhookSecret: blankToNull(v.webhookSecret),
-          apiKey: blankToNull(v.apiKey),
-          note: blankToNull(v.note),
-          createdBy: gate.userId,
-        });
+        const [created] = await tx.insert(paymentBankAccounts).values({ storeId: gate.storeId, ...next, createdBy: gate.userId })
+          .returning({ id: paymentBankAccounts.id });
+        accountId = created.id;
       }
       const [defaultAccount] = await tx
         .select({ id: paymentBankAccounts.id })
@@ -620,6 +558,13 @@ export async function savePaymentBankAccount(input: PaymentBankAccountInput): Pr
             .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, firstEnabled.id)));
         }
       }
+      const [saved] = await tx.select().from(paymentBankAccounts)
+        .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, accountId!))).limit(1);
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: current ? "settings.bank_account.updated" : "settings.bank_account.created",
+        entityType: "payment_bank_account", entityId: accountId,
+        before: current ? bankAccountActivitySummary(current) : null, after: bankAccountActivitySummary(saved), metadata: { changedFields },
+      });
     });
     revalidatePath(Routes.Settings);
     return { ok: true, data: undefined };
@@ -635,10 +580,12 @@ export async function setPaymentBankAccountEnabled(id: string, enabled: boolean)
   try {
     await db.transaction(async (tx) => {
       const [current] = await tx
-        .select({ provider: paymentBankAccounts.provider, isDefault: paymentBankAccounts.isDefault })
+        .select()
         .from(paymentBankAccounts)
         .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, id)))
-        .limit(1);
+        .limit(1).for("update");
+      if (!current) throw new Error("BANK_ACCOUNT_NOT_FOUND");
+      if (current.enabled === enabled) return;
       await tx.update(paymentBankAccounts)
         .set({ enabled, ...(enabled ? {} : { isDefault: false }), updatedAt: sql`now()` })
         .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, id)));
@@ -656,6 +603,10 @@ export async function setPaymentBankAccountEnabled(id: string, enabled: boolean)
             .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, next.id)));
         }
       }
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "settings.bank_account.enabled_changed", entityType: "payment_bank_account", entityId: id,
+        before: bankAccountActivitySummary(current), after: { ...bankAccountActivitySummary(current), enabled, isDefault: enabled ? current.isDefault : false },
+      });
     });
     revalidatePath(Routes.Settings);
     return { ok: true, data: undefined };
@@ -671,17 +622,22 @@ export async function setDefaultPaymentBankAccount(id: string): Promise<ActionRe
   try {
     await db.transaction(async (tx) => {
       const [target] = await tx
-        .select({ provider: paymentBankAccounts.provider })
+        .select()
         .from(paymentBankAccounts)
         .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, id)))
-        .limit(1);
+        .limit(1).for("update");
       if (!target) return;
+      if (target.isDefault && target.enabled) return;
       await tx.update(paymentBankAccounts)
         .set({ isDefault: false, updatedAt: sql`now()` })
         .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.provider, target.provider)));
       await tx.update(paymentBankAccounts)
         .set({ isDefault: true, enabled: true, updatedAt: sql`now()` })
         .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, id)));
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "settings.bank_account.default_changed", entityType: "payment_bank_account", entityId: id,
+        before: bankAccountActivitySummary(target), after: { ...bankAccountActivitySummary(target), enabled: true, isDefault: true },
+      });
     });
     revalidatePath(Routes.Settings);
     return { ok: true, data: undefined };
@@ -697,10 +653,10 @@ export async function deletePaymentBankAccount(id: string): Promise<ActionResult
   try {
     await db.transaction(async (tx) => {
       const [current] = await tx
-        .select({ provider: paymentBankAccounts.provider, isDefault: paymentBankAccounts.isDefault })
+        .select()
         .from(paymentBankAccounts)
         .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, id)))
-        .limit(1);
+        .limit(1).for("update");
       if (!current) return;
       await tx.delete(paymentBankAccounts).where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, id)));
       if (current.isDefault) {
@@ -717,6 +673,10 @@ export async function deletePaymentBankAccount(id: string): Promise<ActionResult
             .where(and(eq(paymentBankAccounts.storeId, gate.storeId), eq(paymentBankAccounts.id, next.id)));
         }
       }
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "settings.bank_account.deleted", entityType: "payment_bank_account", entityId: id,
+        before: bankAccountActivitySummary(current), after: null,
+      });
     });
     revalidatePath(Routes.Settings);
     return { ok: true, data: undefined };

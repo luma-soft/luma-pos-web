@@ -1,3 +1,4 @@
+import { recordActivity } from "@/lib/audit/activity-log";
 import { createHash, randomUUID } from "node:crypto";
 import { and, eq, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import sharp from "sharp";
@@ -164,13 +165,14 @@ export function canTransitionCustomerRequest(
 
 export async function consumePublicRateLimitCore(
   tx: ServiceTransaction,
-  input: { key: string; limit: number; windowSeconds: number; now?: Date },
+  input: { storeId: string; key: string; limit: number; windowSeconds: number; now?: Date },
 ) {
   const now = input.now ?? new Date();
   const windowMs = input.windowSeconds * 1000;
   const windowStart = new Date(Math.floor(now.getTime() / windowMs) * windowMs);
   const [bucket] = await tx.insert(servicePublicRateLimits).values({
-    bucketKey: input.key,
+    storeId: input.storeId,
+    bucketKey: `${input.storeId}:${input.key}`,
     windowStart,
     requestCount: 1,
     expiresAt: new Date(windowStart.getTime() + windowMs * 2),
@@ -220,6 +222,10 @@ export async function submitCustomerRequestCore(
   const now = input.now ?? new Date();
   const [current] = await tx.select({
     id: serviceCustomerRequests.id,
+    storeId: serviceCustomerRequests.storeId,
+    code: serviceCustomerRequests.code,
+    title: serviceCustomerRequests.title,
+    internalNote: serviceCustomerRequests.internalNote,
     status: serviceCustomerRequests.status,
     submittedAt: serviceCustomerRequests.submittedAt,
     tokenExpiresAt: serviceCustomerRequests.tokenExpiresAt,
@@ -285,6 +291,7 @@ export async function submitCustomerRequestCore(
   if (input.attachments?.length) {
     await tx.insert(serviceCustomerRequestAttachments).values(
       input.attachments.map((attachment) => ({
+        storeId: current.storeId,
         requestId: current.id,
         bucket: attachment.bucket,
         path: attachment.path,
@@ -302,18 +309,25 @@ export async function submitCustomerRequestCore(
     ));
   }
   const managers = await tx.select({ id: profiles.id }).from(profiles).where(and(
+    eq(profiles.storeId, current.storeId),
     eq(profiles.isActive, true),
     inArray(profiles.role, ["owner", "manager"]),
   ));
   if (managers.length > 0) {
     await tx.insert(serviceCustomerRequestNotifications).values(
       managers.map((manager) => ({
+        storeId: current.storeId,
         requestId: current.id,
         recipientId: manager.id,
         notificationType: "submitted",
       })),
     ).onConflictDoNothing();
   }
+  await recordActivity(tx, { storeId: current.storeId, actorId: null, source: "system",
+    action: "service.customer_request.submitted", entityType: "service_customer_request", entityId: current.id,
+    after: { code: updated.code, name: input.title, status: updated.status, priority: input.priority },
+    metadata: { submittedByCustomer: true, attachmentCount: input.attachments?.length ?? 0 },
+  });
   return {
     ...updated,
     responseDueAt,
@@ -335,6 +349,10 @@ export async function manageCustomerRequestCore(
 ) {
   const [current] = await tx.select({
     id: serviceCustomerRequests.id,
+    storeId: serviceCustomerRequests.storeId,
+    code: serviceCustomerRequests.code,
+    title: serviceCustomerRequests.title,
+    internalNote: serviceCustomerRequests.internalNote,
     projectId: serviceCustomerRequests.projectId,
     status: serviceCustomerRequests.status,
     linkedJobId: serviceCustomerRequests.linkedJobId,
@@ -382,6 +400,14 @@ export async function manageCustomerRequestCore(
         : current.resolvedAt,
     updatedAt: now,
   }).where(eq(serviceCustomerRequests.id, current.id)).returning();
+  if (current.status !== updated.status || current.linkedJobId !== updated.linkedJobId || current.internalNote !== updated.internalNote) {
+    await recordActivity(tx, { storeId: current.storeId, actorId: input.actorId,
+      action: "service.customer_request.updated", entityType: "service_customer_request", entityId: current.id,
+      before: { code: current.code, name: current.title, status: current.status, jobId: current.linkedJobId },
+      after: { code: updated.code, name: updated.title, status: updated.status, jobId: updated.linkedJobId },
+      metadata: { projectId: current.projectId, noteChanged: current.internalNote !== updated.internalNote },
+    });
+  }
   return updated;
 }
 
@@ -395,8 +421,14 @@ export async function stageCustomerRequestStorageCleanupCore(
 ) {
   const now = input.now ?? new Date();
   if (input.objects.length === 0) return [];
+  const [request] = await tx.select({ storeId: serviceCustomerRequests.storeId })
+    .from(serviceCustomerRequests)
+    .where(eq(serviceCustomerRequests.id, input.requestId))
+    .limit(1);
+  if (!request) throw new Error("CUSTOMER_REQUEST_NOT_FOUND");
   return tx.insert(serviceCustomerRequestStorageCleanup).values(
     input.objects.map((object) => ({
+      storeId: request.storeId,
       requestId: input.requestId,
       bucket: object.bucket,
       path: object.path,

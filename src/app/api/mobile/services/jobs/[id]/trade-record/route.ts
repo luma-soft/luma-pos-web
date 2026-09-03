@@ -1,7 +1,7 @@
+import { recordActivity } from "@/lib/audit/activity-log";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  auditLogs,
   serviceJobAssignments,
   serviceJobs,
   serviceJobTradeRecords,
@@ -22,6 +22,8 @@ async function loadAuthorizedJob(
 ) {
   const [job] = await db.select({
     id: serviceJobs.id,
+    code: serviceJobs.code,
+    title: serviceJobs.title,
     projectId: serviceJobs.projectId,
     serviceType: serviceJobs.serviceType,
     assignedTo: serviceJobs.assignedTo,
@@ -87,7 +89,14 @@ export async function PUT(request: Request, { params }: RouteContext) {
     return mobileError("errors.invalidData");
   }
   const now = new Date();
-  const [record] = await db.insert(serviceJobTradeRecords).values({
+  const record = await db.transaction(async (tx) => {
+    const [lockedJob] = await tx.select({ status: serviceJobs.status }).from(serviceJobs)
+      .where(and(eq(serviceJobs.storeId, gate.storeId), eq(serviceJobs.id, id))).limit(1).for("update");
+    if (!lockedJob || ["completed", "cancelled"].includes(lockedJob.status)) throw new Error("SERVICE_FIELD_JOB_TERMINAL");
+    const [before] = await tx.select().from(serviceJobTradeRecords)
+      .where(and(eq(serviceJobTradeRecords.storeId, gate.storeId), eq(serviceJobTradeRecords.jobId, id))).limit(1);
+    if (before && JSON.stringify(before.data) === JSON.stringify(parsed.data)) return before;
+    const [saved] = await tx.insert(serviceJobTradeRecords).values({
     storeId: gate.storeId,
     jobId: id,
     serviceType: job.serviceType,
@@ -102,19 +111,14 @@ export async function PUT(request: Request, { params }: RouteContext) {
       updatedAt: now,
     },
   }).returning();
-  await db.insert(auditLogs).values({
-    storeId: gate.storeId,
-    actorId: gate.userId,
-    source: "mobile",
-    action: "service.trade_record.updated",
-    entityType: "service_job_trade_record",
-    entityId: record.id,
-    metadata: {
-      projectId: job.projectId,
-      jobId: id,
-      serviceType: job.serviceType,
-      version: record.version,
-    },
+    await recordActivity(tx, {
+      storeId: gate.storeId, actorId: gate.userId, source: "mobile",
+      action: "service.trade_record.updated", entityType: "service_job_trade_record", entityId: saved.id,
+      before: before ? { version: before.version } : null,
+      after: { code: job.code, name: job.title, version: saved.version, serviceType: job.serviceType },
+      metadata: { projectId: job.projectId, jobId: id, serviceType: job.serviceType, version: saved.version },
+    });
+    return saved;
   });
   return mobileOk(record);
 }

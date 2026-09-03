@@ -18,23 +18,32 @@ import {
 import { Routes } from "@/lib/routes";
 import { createDebtChangedEventInTx } from "@/lib/notifications/events-core";
 import { publishCommittedNotification } from "@/lib/notifications/outbox";
+import { recordActivity } from "@/lib/audit/activity-log";
+import { orderActivitySnapshot, orderActivityType } from "@/lib/orders/activity";
+import { resolveStoreContextForUser } from "@/lib/auth/store-context";
 
 export async function cancelQuoteForUser(
-  _userId: string,
+  userId: string,
   quoteId: string
 ): Promise<ActionResult> {
   try {
+    const context = await resolveStoreContextForUser(userId);
+    if (!context) return { ok: false, error: "errors.unauthorized" };
     await db.transaction(async (tx) => {
       const [order] = await tx
         .select()
         .from(orders)
-        .where(eq(orders.id, quoteId))
-        .limit(1);
+        .where(and(eq(orders.storeId, context.storeId), eq(orders.id, quoteId)))
+        .limit(1).for("update");
       if (!order || order.status !== "quote") throw new Error("NOT_A_QUOTE");
       await tx
         .update(orders)
         .set({ status: "cancelled", updatedAt: sql`now()` })
-        .where(eq(orders.id, quoteId));
+        .where(and(eq(orders.storeId, context.storeId), eq(orders.id, quoteId)));
+      await recordActivity(tx, {
+        storeId: context.storeId, actorId: userId, action: "quote.cancelled", entityType: "order", entityId: quoteId,
+        before: orderActivitySnapshot(order), after: orderActivitySnapshot({ ...order, status: "cancelled" }),
+      });
     });
     return { ok: true, data: undefined };
   } catch (e) {
@@ -60,7 +69,7 @@ export async function cancelOrderForUser(
         .select()
         .from(orders)
         .where(and(eq(orders.id, orderId), eq(orders.storeId, storeId)))
-        .limit(1);
+        .limit(1).for("update");
       if (!order) throw new Error("ORDER_NOT_FOUND");
       if (order.status === "cancelled") throw new Error("ALREADY_CANCELLED");
       if (order.status === "merged") throw new Error("ALREADY_CANCELLED");
@@ -166,6 +175,10 @@ export async function cancelOrderForUser(
           updatedAt: sql`now()`,
         })
         .where(and(eq(orders.storeId, storeId), eq(orders.id, orderId)));
+      await recordActivity(tx, {
+        storeId, actorId: profileId, action: `${orderActivityType(order)}.cancelled`, entityType: "order", entityId: orderId,
+        before: orderActivitySnapshot(order), after: orderActivitySnapshot({ ...order, status: "cancelled" }),
+      });
       return { debtNotification };
     });
 

@@ -10,6 +10,7 @@ import {
 import { generateCode } from "@/lib/actions/common";
 import { fundForMethod, recordCashTx } from "@/lib/cash";
 import { createDebtChangedEventInTx } from "@/lib/notifications/events-core";
+import { recordActivity } from "@/lib/audit/activity-log";
 
 // Drizzle Postgres and PGlite expose the same runtime transaction API.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -88,7 +89,7 @@ export async function collectCustomerReceivable(
 
   try {
     return await database.transaction(async (tx: DbLike) => {
-      const [customer] = await tx.select({ id: customers.id, currentDebt: customers.currentDebt })
+      const [customer] = await tx.select({ id: customers.id, code: customers.code, name: customers.name, currentDebt: customers.currentDebt })
         .from(customers).where(and(eq(customers.storeId, actor.storeId), eq(customers.id, input.customerId))).limit(1).for("update");
       if (!customer) throw new Error("CUSTOMER_NOT_FOUND");
 
@@ -120,7 +121,7 @@ export async function collectCustomerReceivable(
         code: generateCode("PTN"), customerId: input.customerId, amount: amount.toFixed(2),
         method: input.method, reference: input.reference?.trim() || null, note: input.note?.trim() || null,
         clientRequestId: input.clientRequestId.trim(), createdBy: actor.profileId, confirmedAt: new Date(),
-      }).returning({ id: customerReceivableReceipts.id });
+      }).returning({ id: customerReceivableReceipts.id, code: customerReceivableReceipts.code });
 
       const allocationRows = [] as Array<typeof customerReceivableAllocations.$inferInsert>;
       for (let index = 0; index < allocations.length; index += 1) {
@@ -151,6 +152,16 @@ export async function collectCustomerReceivable(
       });
       await tx.update(customers).set({ currentDebt: sql`${customers.currentDebt} - ${amount.toFixed(2)}` })
         .where(and(eq(customers.storeId, actor.storeId), eq(customers.id, input.customerId)));
+      await recordActivity(tx, {
+        storeId: actor.storeId, actorId: actor.profileId,
+        action: "customer.receivable.collected", entityType: "customer_receivable_receipt", entityId: receipt.id,
+        before: { currentDebt: Number(customer.currentDebt) },
+        after: { code: receipt.code, customerName: customer.name, amount, method: input.method, currentDebt: money(Number(customer.currentDebt) - amount) },
+        affectedRecords: [
+          { type: "customer", id: customer.id, code: customer.code, name: customer.name },
+          ...allocations.map((allocation) => ({ type: "order", id: allocation.orderId, code: invoices.get(allocation.orderId)!.code })),
+        ],
+      });
       const notification = await createDebtChangedEventInTx(tx, {
         storeId: actor.storeId,
         entityType: "customer", entityId: input.customerId, operationType: "receivable_collection",
@@ -177,7 +188,7 @@ export async function createCustomerReceivableEntry(
   }
   try {
     return await database.transaction(async (tx: DbLike) => {
-      const [customer] = await tx.select({ id: customers.id, currentDebt: customers.currentDebt })
+      const [customer] = await tx.select({ id: customers.id, code: customers.code, name: customers.name, currentDebt: customers.currentDebt })
         .from(customers).where(and(eq(customers.storeId, actor.storeId), eq(customers.id, input.customerId))).limit(1).for("update");
       if (!customer) throw new Error("CUSTOMER_NOT_FOUND");
       const [existing] = await tx.select({ id: customerReceivableEntries.id, customerId: customerReceivableEntries.customerId, amount: customerReceivableEntries.amount })
@@ -192,9 +203,16 @@ export async function createCustomerReceivableEntry(
         orderId: input.orderId || null, type: input.type, amount: amount.toFixed(2), reason: input.reason.trim(),
         reference: input.reference?.trim() || null, note: input.note?.trim() || null,
         clientRequestId: input.clientRequestId.trim(), createdBy: actor.profileId, approvedBy: actor.profileId,
-      }).returning({ id: customerReceivableEntries.id });
+      }).returning({ id: customerReceivableEntries.id, code: customerReceivableEntries.code });
       await tx.update(customers).set({ currentDebt: sql`${customers.currentDebt} + ${amount.toFixed(2)}` })
         .where(and(eq(customers.storeId, actor.storeId), eq(customers.id, input.customerId)));
+      await recordActivity(tx, {
+        storeId: actor.storeId, actorId: actor.profileId,
+        action: "customer.receivable.adjusted", entityType: "customer_receivable_entry", entityId: entry.id,
+        before: { currentDebt: Number(customer.currentDebt) },
+        after: { code: entry.code, customerName: customer.name, amount, type: input.type, reason: input.reason.trim(), currentDebt: money(Number(customer.currentDebt) + amount) },
+        affectedRecords: [{ type: "customer", id: customer.id, code: customer.code, name: customer.name }],
+      });
       const notification = await createDebtChangedEventInTx(tx, {
         storeId: actor.storeId,
         entityType: "customer", entityId: input.customerId, operationType: input.type,

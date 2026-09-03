@@ -71,14 +71,14 @@ export async function POST(request: Request) {
   if (!paymentId || reason.length < 3) return mobileError("errors.invalidData");
 
   if (action === "expire") {
-    const result = await expirePendingPayment(paymentId);
-    await writeAuditLog({
+    const result = await expirePendingPayment(paymentId, gate.userId, reason);
+    if (!result.ok) await writeAuditLog({
       actorUserId: gate.userId,
       source: "mobile",
       action: "expire_provider_payment",
       entityType: "payment",
       entityId: paymentId,
-      status: result.ok ? "succeeded" : "failed",
+      status: "failed",
       metadata: { reason: reason.slice(0, 240) },
     });
     return mobileAction(result);
@@ -102,14 +102,15 @@ export async function POST(request: Request) {
     paymentId,
     eventId,
     actorId: gate.userId,
+    reason,
   });
-  await writeAuditLog({
+  if (!result.ok) await writeAuditLog({
     actorUserId: gate.userId,
     source: "mobile",
     action: "reconcile_provider_payment",
     entityType: "payment",
     entityId: paymentId,
-    status: result.ok ? "succeeded" : "failed",
+    status: "failed",
     affectedRecords: [{ type: "payment_webhook_event", id: eventId }],
     metadata: { reason: reason.slice(0, 240) },
   });

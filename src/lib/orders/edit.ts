@@ -7,6 +7,8 @@ import { updateOrderSchema, type UpdateOrderInput } from "@/lib/schemas/order";
 import { type ActionResult, getProfileId, generateCode, toMoney, toQty } from "@/lib/actions/common";
 import { normalizeOrderItems } from "@/lib/orders/normalize";
 import { resolveStoreContextForUser } from "@/lib/auth/store-context";
+import { recordActivity } from "@/lib/audit/activity-log";
+import { orderActivitySnapshot, orderActivityType, orderItemActivitySnapshot } from "@/lib/orders/activity";
 
 /**
  * Lõi sửa đơn — KHÔNG phải server action (nhận userId đã xác thực).
@@ -26,7 +28,7 @@ export async function updateOrderForUser(userId: string, input: UpdateOrderInput
     const trustedItems = await normalizeOrderItems(storeId, v.items);
 
     await db.transaction(async (tx) => {
-      const [order] = await tx.select().from(orders).where(and(eq(orders.storeId, storeId), eq(orders.id, v.orderId))).limit(1);
+      const [order] = await tx.select().from(orders).where(and(eq(orders.storeId, storeId), eq(orders.id, v.orderId))).limit(1).for("update");
       if (!order) throw new Error("ORDER_NOT_FOUND");
       if (order.status !== "completed" && order.status !== "quote") throw new Error("NOT_EDITABLE");
       const [hasReturn] = await tx.select({ id: returns.id }).from(returns)
@@ -117,6 +119,23 @@ export async function updateOrderForUser(userId: string, input: UpdateOrderInput
         note: v.note || null,
         updatedAt: sql`now()`,
       }).where(and(eq(orders.storeId, storeId), eq(orders.id, v.orderId)));
+      const before = { ...orderActivitySnapshot(order), items: orderItemActivitySnapshot(oldItems) };
+      const after = {
+        ...orderActivitySnapshot({
+          ...order, total: toMoney(total), discount: toMoney(v.discount), shippingFee: toMoney(v.shippingFee),
+          paymentStatus, projectName: v.projectName || null, note: v.note || null,
+        }),
+        items: trustedItems.map((item) => ({
+          productId: item.productId, productName: item.productName, unitName: item.unitName,
+          quantity: item.quantity, unitPrice: item.unitPrice,
+        })),
+      };
+      if (JSON.stringify(before) !== JSON.stringify(after)) {
+        await recordActivity(tx, {
+          storeId, actorId: profileId, action: `${orderActivityType(order)}.updated`, entityType: "order", entityId: order.id,
+          before, after,
+        });
+      }
     });
 
     return { ok: true, data: undefined };
@@ -150,7 +169,7 @@ export async function mergeOrdersForUser(userId: string, orderIds: string[]): Pr
     const profileId = await getProfileId(userId);
 
     const result = await db.transaction(async (tx) => {
-      const sources = await tx.select().from(orders).where(and(eq(orders.storeId, storeId), inArray(orders.id, orderIds)));
+      const sources = await tx.select().from(orders).where(and(eq(orders.storeId, storeId), inArray(orders.id, orderIds))).orderBy(orders.id).for("update");
       if (sources.length !== orderIds.length) throw new Error("ORDER_NOT_FOUND");
       if (sources.some((o) => o.status !== "completed")) throw new Error("ONLY_COMPLETED");
       const customerIds = new Set(sources.map((o) => o.customerId ?? ""));
@@ -196,6 +215,12 @@ export async function mergeOrdersForUser(userId: string, orderIds: string[]): Pr
         updatedAt: sql`now()`,
       }).where(and(eq(orders.storeId, storeId), inArray(orders.id, orderIds)));
 
+      await recordActivity(tx, {
+        storeId, actorId: profileId, action: "order.merged", entityType: "order", entityId: merged.id,
+        before: { orders: sources.map(orderActivitySnapshot) },
+        after: { code: merged.code, total, amountPaid: paid, status: "completed", paymentStatus: paid >= total ? "paid" : paid > 0 ? "partial" : "unpaid" },
+        affectedRecords: [{ type: "order", id: merged.id, code: merged.code }, ...sources.map((order) => ({ type: "order", id: order.id, code: order.code }))],
+      });
       return merged;
     });
 

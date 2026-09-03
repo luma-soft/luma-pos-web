@@ -1,3 +1,4 @@
+import { recordActivity } from "@/lib/audit/activity-log";
 import {
   and,
   eq,
@@ -198,7 +199,7 @@ export async function deleteProjectCore(
   try {
     return await database.transaction(async (tx: DatabaseLike) => {
       const [project] = await tx
-        .select({ id: projects.id })
+        .select({ id: projects.id, name: projects.name })
         .from(projects)
         .where(and(eq(projects.storeId, storeId), eq(projects.id, projectId)))
         .for("update")
@@ -476,6 +477,9 @@ export async function deleteProjectCore(
         );
       }
 
+      await recordActivity(tx, { storeId, actorId: input.actorId, action: "project.deleted",
+        entityType: "project", entityId: projectId, before: { name: project.name },
+        metadata: { deleted: true, managedMediaCount: managedMedia.length, legacyObjectCount: legacyObjects.size } });
       return {
         outcome: "deleted",
         projectId,

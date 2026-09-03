@@ -33,7 +33,7 @@ import { CURRENT_STORE_FEATURE_DEFAULTS } from "@/lib/tenancy/store-features";
 
 const PORTAL_MEDIA_ACTOR_ID = "00000000-0000-4000-8000-000000000000";
 
-async function consumeLimit(input: { key: string; limit: number; windowSeconds: number }) {
+async function consumeLimit(input: { storeId: string; key: string; limit: number; windowSeconds: number }) {
   return db.transaction((tx) => consumePublicRateLimitCore(tx, input));
 }
 
@@ -71,16 +71,11 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ token: string }> },
 ) {
-  const globalBlocked = limited(await consumeLimit({
-    key: "customer-request:get:global",
-    limit: 10_000,
-    windowSeconds: 60,
-  }));
-  if (globalBlocked) return globalBlocked;
   const { token } = await params;
   if (token.length < 40) return mobileError("errors.notFound", 404);
   const tokenHash = hashCustomerRequestToken(token);
   const [row] = await db.select({
+    storeId: serviceCustomerRequests.storeId,
     code: serviceCustomerRequests.code,
     projectName: projects.name,
     title: serviceCustomerRequests.title,
@@ -104,7 +99,15 @@ export async function GET(
   if (!row || !isCustomerRequestTokenViewable({ expiresAt: row.tokenExpiresAt })) {
     return mobileError("errors.notFound", 404);
   }
+  const storeBlocked = limited(await consumeLimit({
+    storeId: row.storeId,
+    key: "customer-request:get:store",
+    limit: 10_000,
+    windowSeconds: 60,
+  }));
+  if (storeBlocked) return storeBlocked;
   const tokenBlocked = limited(await consumeLimit({
+    storeId: row.storeId,
     key: `customer-request:get:token:${tokenHash}`,
     limit: 60,
     windowSeconds: 3600,
@@ -134,12 +137,6 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ token: string }> },
 ) {
-  const globalBlocked = limited(await consumeLimit({
-    key: "customer-request:submit:global",
-    limit: 1_000,
-    windowSeconds: 60,
-  }));
-  if (globalBlocked) return globalBlocked;
   const { token } = await params;
   if (token.length < 40) return mobileError("errors.notFound", 404);
   const tokenHash = hashCustomerRequestToken(token);
@@ -163,7 +160,15 @@ export async function POST(
     submittedAt: current.submittedAt,
     expiresAt: current.tokenExpiresAt,
   })) return mobileError("errors.notFound", 404);
+  const storeBlocked = limited(await consumeLimit({
+    storeId: current.storeId,
+    key: "customer-request:submit:store",
+    limit: 1_000,
+    windowSeconds: 60,
+  }));
+  if (storeBlocked) return storeBlocked;
   const tokenBlocked = limited(await consumeLimit({
+    storeId: current.storeId,
     key: `customer-request:submit:token:${tokenHash}`,
     limit: 10,
     windowSeconds: 900,

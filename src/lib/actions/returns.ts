@@ -49,12 +49,20 @@ import {
 } from "@/lib/notifications/events-core";
 import { publishCommittedNotification } from "@/lib/notifications/outbox";
 import { resolveStoreContextForUser } from "@/lib/auth/store-context";
+import { recordActivity } from "@/lib/audit/activity-log";
 
 const GATEWAY_REFUND_METHODS = new Set<GatewayProvider>(["momo", "zalopay", "vnpay"]);
 const isGatewayRefundMethod = (value: string): value is GatewayProvider =>
   GATEWAY_REFUND_METHODS.has(value as GatewayProvider);
 
 type ReturnTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+function returnLineActivitySnapshot(rows: (typeof returnItems.$inferInsert)[]) {
+  return rows.map((row) => ({
+    productId: row.productId, productName: row.productName, unitName: row.unitName,
+    quantity: Number(row.quantity), unitPrice: Number(row.unitPrice), restock: row.restock,
+  }));
+}
 
 async function stockTargetsForReturnedItem(
   tx: ReturnTransaction,
@@ -559,6 +567,22 @@ export async function createExchangeForUser(
         },
       });
 
+      await recordActivity(tx, {
+        storeId, actorId: profileId, action: "return.exchanged", entityType: "return", entityId: returned.id,
+        after: {
+          code: returned.code, orderCode: order.code, exchangeOrderCode: exchangeOrder.code,
+          totalRefund: returnTotal, total: replacementTotal, amountPaid: paid, difference,
+          method: difference >= 0 ? v.settlementMethod : v.refundMethod, status: "completed",
+          refundStatus: gatewayRefund ? "pending" : null, reason: v.reason, note: v.note || null,
+          items: returnLineActivitySnapshot(returnedRows),
+          replacementItems: replacementItems.map((item) => ({ productName: item.productName, quantity: item.quantity, unitPrice: item.unitPrice })),
+        },
+        affectedRecords: [
+          { type: "return", id: returned.id, code: returned.code },
+          { type: "order", id: order.id, code: order.code },
+          { type: "order", id: exchangeOrder.id, code: exchangeOrder.code },
+        ],
+      });
       return {
         returnId: returned.id,
         returnCode: returned.code,
@@ -667,7 +691,7 @@ export async function createReturnForUser(
     const currentShift = profileId ? await getCurrentShift(storeId, profileId) : null;
 
     const result = await db.transaction(async (tx) => {
-      const [order] = await tx.select().from(orders).where(and(eq(orders.storeId, storeId), eq(orders.id, v.orderId))).limit(1);
+      const [order] = await tx.select().from(orders).where(and(eq(orders.storeId, storeId), eq(orders.id, v.orderId))).limit(1).for("update");
       if (!order) throw new Error("ORDER_NOT_FOUND");
       // chỉ trả hàng trên đơn bán thật (không quote/merged/cancelled/draft)
       if (order.status !== "completed" && order.status !== "returned") throw new Error("ORDER_CANCELLED");
@@ -866,6 +890,15 @@ export async function createReturnForUser(
           })
         : null;
 
+      await recordActivity(tx, {
+        storeId, actorId: profileId, action: "return.created", entityType: "return", entityId: ret.id,
+        after: {
+          code: ret.code, orderCode: order.code, totalRefund, method: v.refundMethod, reason: v.reason,
+          note: v.note || null, status: "completed", refundStatus: gatewayRefund ? "pending" : "completed",
+          items: returnLineActivitySnapshot(rows),
+        },
+        affectedRecords: [{ type: "return", id: ret.id, code: ret.code }, { type: "order", id: order.id, code: order.code }],
+      });
       return {
         ...ret,
         ...(gatewayRefund ? { gatewayRefundId: gatewayRefund.id } : {}),
@@ -918,12 +951,20 @@ export async function updateReturnMetadata(
   const parsed = updateReturnMetadataSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
 
-  const [updated] = await db.update(returns).set({
-    reason: parsed.data.reason,
-    note: parsed.data.note?.trim() || null,
-    updatedAt: sql`now()`,
-  }).where(and(eq(returns.storeId, gate.storeId), eq(returns.id, returnId), eq(returns.status, "completed")))
-    .returning({ id: returns.id });
+  const updated = await db.transaction(async (tx) => {
+    const [ret] = await tx.select().from(returns)
+      .where(and(eq(returns.storeId, gate.storeId), eq(returns.id, returnId), eq(returns.status, "completed"))).limit(1).for("update");
+    if (!ret) return null;
+    const changes = { reason: parsed.data.reason, note: parsed.data.note?.trim() || null };
+    if (ret.reason === changes.reason && ret.note === changes.note) return ret;
+    await tx.update(returns).set({ ...changes, updatedAt: sql`now()` })
+      .where(and(eq(returns.storeId, gate.storeId), eq(returns.id, returnId)));
+    await recordActivity(tx, {
+      storeId: gate.storeId, actorId: gate.userId, action: "return.updated", entityType: "return", entityId: ret.id,
+      before: { code: ret.code, reason: ret.reason, note: ret.note }, after: { code: ret.code, ...changes },
+    });
+    return ret;
+  });
   if (!updated) return { ok: false, error: "returns.errors.notEditable" };
   revalidatePath(Routes.Sales);
   revalidatePath(`/returns/${returnId}/print`);
@@ -1073,6 +1114,12 @@ export async function cancelReturn(returnId: string): Promise<ActionResult> {
           updatedAt: sql`now()`,
         }).where(and(eq(orders.storeId, gate.storeId), eq(orders.id, ret.orderId)));
       }
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: profileId, action: "return.cancelled", entityType: "return", entityId: ret.id,
+        before: { code: ret.code, status: ret.status, totalRefund: Number(ret.totalRefund), method: ret.refundMethod },
+        after: { code: ret.code, status: "cancelled", totalRefund: Number(ret.totalRefund), method: ret.refundMethod },
+        affectedRecords: [{ type: "return", id: ret.id, code: ret.code }, ...(ret.orderId ? [{ type: "order", id: ret.orderId }] : [])],
+      });
       return { debtNotification, orderId: ret.orderId };
     });
 
@@ -1315,6 +1362,14 @@ export async function createPosReturn(
             actorId: profileId,
           })
         : null;
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: profileId, action: "return.created", entityType: "return", entityId: ret.id,
+        after: {
+          code: ret.code, orderCode: order?.code ?? null, totalRefund, method: v.refundMethod,
+          reason: v.reason, note: v.note || null, status: "completed", items: returnLineActivitySnapshot(rows),
+        },
+        affectedRecords: [{ type: "return", id: ret.id, code: ret.code }, ...(order ? [{ type: "order", id: order.id, code: order.code }] : [])],
+      });
       return { ret, debtNotification };
     });
 

@@ -7,6 +7,8 @@ import { db } from "@/db";
 import { products, categories, stockLevels, stockMovements, warehouses } from "@/db/schema";
 import { Routes } from "@/lib/routes";
 import { type ActionResult, requireStockAccess, getProfileId } from "./common";
+import { recordActivity } from "@/lib/audit/activity-log";
+import { activityValuesEqual } from "@/lib/products/product-activity";
 
 /** 1 dòng CSV đã map sang field LumaPOS (tất cả là chuỗi thô). */
 const importRowSchema = z.object({
@@ -113,6 +115,7 @@ export async function importProducts(rows: unknown, dryRun: boolean): Promise<Ac
 
     let created = 0, updated = 0;
     await db.transaction(async (tx) => {
+      const affectedRecords: Record<string, unknown>[] = [];
       // Tạo nhóm hàng còn thiếu
       for (const name of newCategories) {
         const [row] = await tx.insert(categories).values({ storeId: gate.storeId, name: name.trim() }).returning({ id: categories.id });
@@ -127,6 +130,12 @@ export async function importProducts(rows: unknown, dryRun: boolean): Promise<Ac
 
         const existingId = r.sku ? skuToId.get(r.sku) : undefined;
         let productId: string;
+        const [previous] = existingId ? await tx.select({ name: products.name, sku: products.sku, barcode: products.barcode, categoryId: products.categoryId, baseUnit: products.baseUnit, retailPrice: products.retailPrice, costPrice: products.costPrice })
+          .from(products).where(and(eq(products.storeId, gate.storeId), eq(products.id, existingId))).limit(1).for("update") : [];
+        const before = previous ? { ...previous, retailPrice: Number(previous.retailPrice), costPrice: Number(previous.costPrice) } : null;
+        const after = { name: r.name, sku: previous?.sku ?? r.sku, barcode: r.barcode || null, categoryId: categoryId || previous?.categoryId || null, baseUnit: r.unit || previous?.baseUnit || "cái", retailPrice: Number(retail.toFixed(2)), costPrice: Number(cost.toFixed(2)) };
+        let changed = !before || !activityValuesEqual(before, after);
+        let stockChange: { beforeQuantity: number; quantity: number } | undefined;
 
         if (existingId) {
           await tx.update(products).set({
@@ -147,6 +156,7 @@ export async function importProducts(rows: unknown, dryRun: boolean): Promise<Ac
             baseUnit: r.unit || "cái", costPrice: String(cost), retailPrice: String(retail), isActive: true,
           }).returning({ id: products.id });
           productId = row.id;
+          after.sku = sku;
           if (r.sku) skuToId.set(r.sku, productId); // tránh tạo trùng trong cùng file
           created++;
         }
@@ -157,6 +167,10 @@ export async function importProducts(rows: unknown, dryRun: boolean): Promise<Ac
             .where(and(eq(stockLevels.storeId, gate.storeId), eq(stockLevels.productId, productId), eq(stockLevels.warehouseId, wh.id))).limit(1);
           const before = cur ? Number(cur.q) : 0;
           const delta = stock - before;
+          if (delta !== 0) {
+            changed = true;
+            stockChange = { beforeQuantity: before, quantity: stock };
+          }
           await tx.insert(stockLevels).values({ storeId: gate.storeId, productId, warehouseId: wh.id, quantity: String(stock) })
             .onConflictDoUpdate({ target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId], set: { quantity: String(stock), updatedAt: sql`now()` } });
           if (delta !== 0) {
@@ -168,7 +182,14 @@ export async function importProducts(rows: unknown, dryRun: boolean): Promise<Ac
             });
           }
         }
+        if (changed) affectedRecords.push({ type: "product", id: productId, code: after.sku, name: r.name, before, after, ...stockChange });
       }
+      if (affectedRecords.length || newCategories.length) await recordActivity(tx, {
+        storeId: gate.storeId, actorId: profileId, action: "product.imported", entityType: "product",
+        after: { createdCount: created, updatedCount: updated, changedCount: affectedRecords.length, categoryCount: newCategories.length },
+        affectedRecords,
+        metadata: { totalRows: clean.length, skippedRows: errors.length, categoryNames: newCategories, warehouseId: wh?.id },
+      });
     });
 
     revalidatePath(Routes.Products);

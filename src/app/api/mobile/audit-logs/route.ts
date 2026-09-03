@@ -18,12 +18,12 @@ function dateParam(request: Request, key: string) {
 
 export async function GET(request: Request) {
   const gate = await requireMobileRole(MOBILE_AUDIT_ROLES);
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate);
 
   const source = searchParam(request, "source");
   const status = searchParam(request, "status");
   const rows = await getAuditLogs({
+    storeId: gate.storeId,
     source: source && SOURCES.has(source) ? source as AuditSource : undefined,
     status: status && STATUSES.has(status) ? status as AuditStatus : undefined,
     action: searchParam(request, "action"),

@@ -16,6 +16,7 @@ import {
   type EInvoiceProviderAdapter,
   type EInvoiceProviderRequest,
 } from "@/lib/einvoice/provider";
+import { recordActivity } from "@/lib/audit/activity-log";
 
 const lockTimeoutMs = 5 * 60_000;
 
@@ -61,6 +62,7 @@ export async function processEInvoiceRequest(
     };
   }
 
+  let attemptResultReceived = false;
   try {
     const [order, settings, lines] = await Promise.all([
       db.select().from(orders).where(and(eq(orders.storeId, claimed.storeId), eq(orders.id, claimed.orderId))).limit(1),
@@ -136,9 +138,9 @@ export async function processEInvoiceRequest(
       attemptCount: claimed.attemptCount,
       now,
     });
-    await db
-      .update(einvoices)
-      .set({
+    attemptResultReceived = true;
+    await db.transaction(async (tx) => {
+      const [updated] = await tx.update(einvoices).set({
         status: result.status,
         attemptCount: result.attemptCount,
         lastAttemptAt: now,
@@ -151,8 +153,20 @@ export async function processEInvoiceRequest(
         lockedAt: null,
         lockToken: null,
         updatedAt: new Date(),
-      })
-      .where(and(eq(einvoices.storeId, claimed.storeId), eq(einvoices.id, claimed.id), eq(einvoices.lockToken, lockToken)));
+      }).where(and(eq(einvoices.storeId, claimed.storeId), eq(einvoices.id, claimed.id), eq(einvoices.lockToken, lockToken))).returning({ id: einvoices.id });
+      if (updated) await recordActivity(tx, {
+        storeId: claimed.storeId, actorId: null, source: "system",
+        action: result.status === "issued" ? "einvoice.issued" : result.status === "queued" ? "einvoice.retry_scheduled" : "einvoice.failed",
+        entityType: "order", entityId: claimed.orderId, status: result.status === "error" ? "failed" : "succeeded",
+        before: { code: orderRow.code, status: "processing", attemptCount: claimed.attemptCount },
+        after: {
+          code: orderRow.code, status: result.status, number: result.number, serial: result.serial,
+          buyerName: claimed.buyerName, total: Number(orderRow.total), provider: claimed.provider,
+          attemptCount: result.attemptCount, nextAttemptAt: result.nextAttemptAt,
+        },
+        affectedRecords: [{ type: "order", id: claimed.orderId, code: orderRow.code }, { type: "einvoice", id: claimed.id }],
+      });
+    });
 
     if (result.status === "issued" && result.number) {
       return { ok: true, status: "issued", number: result.number };
@@ -174,9 +188,11 @@ export async function processEInvoiceRequest(
     const message = error instanceof Error && error.message.startsWith("einvoice.")
       ? error.message
       : "errors.serverError";
-    await db
-      .update(einvoices)
-      .set({
+    // A provider may already have issued the invoice. Keep its processing lease
+    // when persistence fails so recovery uses the same provider request identity.
+    if (attemptResultReceived) return { ok: false, status: "error", error: message };
+    await db.transaction(async (tx) => {
+      const [updated] = await tx.update(einvoices).set({
         status: "error",
         attemptCount: claimed.attemptCount + 1,
         lastAttemptAt: now,
@@ -185,8 +201,19 @@ export async function processEInvoiceRequest(
         lockedAt: null,
         lockToken: null,
         updatedAt: new Date(),
-      })
-      .where(and(eq(einvoices.storeId, claimed.storeId), eq(einvoices.id, claimed.id), eq(einvoices.lockToken, lockToken)));
+      }).where(and(eq(einvoices.storeId, claimed.storeId), eq(einvoices.id, claimed.id), eq(einvoices.lockToken, lockToken))).returning({ id: einvoices.id });
+      if (updated) {
+        const [order] = await tx.select({ code: orders.code }).from(orders)
+          .where(and(eq(orders.storeId, claimed.storeId), eq(orders.id, claimed.orderId))).limit(1);
+        await recordActivity(tx, {
+          storeId: claimed.storeId, actorId: null, source: "system", action: "einvoice.failed",
+          entityType: "order", entityId: claimed.orderId, status: "failed",
+          before: { code: order?.code, status: "processing", attemptCount: claimed.attemptCount },
+          after: { code: order?.code, status: "error", buyerName: claimed.buyerName, provider: claimed.provider, attemptCount: claimed.attemptCount + 1 },
+          metadata: { reason: message },
+        });
+      }
+    });
     return { ok: false, status: "error", error: message };
   }
 }

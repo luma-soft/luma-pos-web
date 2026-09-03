@@ -79,7 +79,8 @@ import {
   type WarrantyClaimUpdateInput,
 } from "@/lib/services/schemas";
 import { Routes } from "@/lib/routes";
-import { writeAuditLog } from "@/lib/audit";
+import { recordActivity } from "@/lib/audit/activity-log";
+import { trackServiceChange } from "@/lib/services/activity";
 import { releaseServiceJobMaterialReservationsCore, reserveServiceJobMaterialStockCore, syncServiceJobMaterialStockCore } from "@/lib/services/material-stock";
 import {
   requireActiveTechnicianCore,
@@ -97,10 +98,6 @@ function revalidateServiceProject(projectId?: string) {
   revalidatePath(Routes.Partners);
   revalidatePath(Routes.Projects);
   if (projectId) revalidatePath(Routes.project(projectId));
-}
-
-async function auditServiceMutation(actorUserId: string, action: string, entityType: string, entityId: string | null, metadata?: Record<string, unknown>) {
-  await writeAuditLog({ actorUserId, source: "manual", action, entityType, entityId, metadata });
 }
 
 function isInvalidServiceAssignee(error: unknown) {
@@ -212,7 +209,7 @@ export async function createServiceProject(
   const initialNote = value.note?.trim();
 
   try {
-    const project = await db.transaction(async (tx) => {
+    const project = await db.transaction(async (tx) => trackServiceChange(tx, gate, { action: "project.created", entityType: "service_project", createdId: (row) => row.id }, async () => {
       const [created] = await tx.insert(projects).values({
         storeId: gate.storeId,
         name: value.name,
@@ -235,7 +232,7 @@ export async function createServiceProject(
         });
       }
       return created;
-    });
+    }));
     revalidateServiceProject(project.id);
     return { ok: true, data: project };
   } catch (error) {
@@ -268,7 +265,7 @@ export async function createServiceJob(
     })) return { ok: false, error: "services.errors.relationMismatch" };
 
     const code = generateCode("DV");
-    const job = await db.transaction(async (tx) => {
+    const job = await db.transaction(async (tx) => trackServiceChange(tx, gate, { action: "service.job.created", entityType: "service_job", createdId: (row) => row.id }, async () => {
       await requireActiveTechnicianCore(tx, gate.storeId, value.assignedTo);
       const [created] = await tx.insert(serviceJobs).values({
         storeId: gate.storeId,
@@ -288,10 +285,10 @@ export async function createServiceJob(
       await syncServiceJobPrimaryAssigneeCore(
         tx, gate.storeId, created.id, value.assignedTo, gate.userId,
       );
+      await tx.update(projects).set({ serviceStage: "active" }).where(and(eq(projects.storeId, gate.storeId), eq(projects.id, value.projectId)));
       return created;
-    });
+    }));
 
-    await db.update(projects).set({ serviceStage: "active" }).where(and(eq(projects.storeId, gate.storeId), eq(projects.id, value.projectId)));
     revalidateServiceProject(value.projectId);
     return { ok: true, data: job };
   } catch (error) {
@@ -334,7 +331,7 @@ export async function updateServiceJob(
       materialOrderId: value.materialOrderId,
     })) return { ok: false, error: "services.errors.relationMismatch" };
 
-    await db.transaction(async (tx) => {
+    await db.transaction(async (tx) => trackServiceChange(tx, gate, { action: "service.job.updated", entityType: "service_job", id: value.jobId }, async () => {
       const now = new Date();
       const assigneeId = await syncServiceJobPrimaryAssigneeCore(
         tx, gate.storeId, value.jobId, value.assignedTo, gate.userId, now, false,
@@ -350,7 +347,7 @@ export async function updateServiceJob(
         materialOrderId: value.materialOrderId ?? null,
         updatedAt: now,
       }).where(and(eq(serviceJobs.storeId, gate.storeId), eq(serviceJobs.id, value.jobId)));
-    });
+    }));
     revalidateServiceProject(current.projectId);
     return { ok: true, data: undefined };
   } catch (error) {
@@ -377,7 +374,7 @@ export async function transitionServiceJob(
   const value = parsed.data;
 
   try {
-    const result = await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => trackServiceChange(tx, gate, { action: "service.job.status.changed", entityType: "service_job", id: value.jobId }, async () => {
       const now = new Date();
       const [current] = await tx.select({
         projectId: serviceJobs.projectId,
@@ -394,7 +391,7 @@ export async function transitionServiceJob(
       }
       if (current.status === value.status) {
         if (value.status === "completed") {
-          await completeMaintenanceOccurrenceForJobCore(tx, value.jobId, now);
+          await completeMaintenanceOccurrenceForJobCore(tx, value.jobId, now, gate.userId);
         }
         return { ok: true as const, projectId: current.projectId };
       }
@@ -405,7 +402,7 @@ export async function transitionServiceJob(
         updatedAt: now,
       }).where(and(eq(serviceJobs.storeId, gate.storeId), eq(serviceJobs.id, value.jobId)));
       if (value.status === "completed") {
-        await completeMaintenanceOccurrenceForJobCore(tx, value.jobId, now);
+        await completeMaintenanceOccurrenceForJobCore(tx, value.jobId, now, gate.userId);
       }
       await tx.insert(serviceStatusLogs).values({
         storeId: gate.storeId,
@@ -435,7 +432,7 @@ export async function transitionServiceJob(
       await tx.update(projects).set({ progressPercent, serviceStage })
         .where(and(eq(projects.storeId, gate.storeId), eq(projects.id, current.projectId)));
       return { ok: true as const, projectId: current.projectId };
-    });
+    }));
 
     if (!result.ok) return result;
     revalidateServiceProject(result.projectId);
@@ -457,9 +454,9 @@ export async function updateServiceChecklist(
   )) return { ok: false, error: "errors.invalidData" };
 
   try {
-    const [job] = await db.update(serviceJobs).set({ checklist, updatedAt: new Date() })
+    const [job] = await db.transaction((tx) => trackServiceChange(tx, gate, { action: "service.job.checklist.updated", entityType: "service_job", id: jobId }, async () => tx.update(serviceJobs).set({ checklist, updatedAt: new Date() })
       .where(and(eq(serviceJobs.storeId, gate.storeId), eq(serviceJobs.id, jobId)))
-      .returning({ projectId: serviceJobs.projectId });
+      .returning({ projectId: serviceJobs.projectId })));
     if (!job) return { ok: false, error: "errors.notFound" };
     revalidateServiceProject(job.projectId);
     return { ok: true, data: undefined };
@@ -479,22 +476,32 @@ export async function saveServiceJobMaterial(
   const value = parsed.data;
 
   try {
-    await db.insert(serviceJobMaterials).values({
-      storeId: gate.storeId,
-      jobId: value.jobId,
-      productId: value.productId,
-      unitName: value.unitName,
-      plannedQuantity: toQty(value.plannedQuantity),
-      usedQuantity: toQty(value.usedQuantity),
-      note: value.note || null,
-    }).onConflictDoUpdate({
-      target: [serviceJobMaterials.jobId, serviceJobMaterials.productId, serviceJobMaterials.unitName],
-      set: {
-        plannedQuantity: toQty(value.plannedQuantity),
-        usedQuantity: toQty(value.usedQuantity),
-        note: value.note || null,
-        updatedAt: new Date(),
-      },
+    await db.transaction(async (tx) => {
+      const [existing] = await tx.select({ id: serviceJobMaterials.id }).from(serviceJobMaterials)
+        .where(and(eq(serviceJobMaterials.storeId, gate.storeId), eq(serviceJobMaterials.jobId, value.jobId),
+          eq(serviceJobMaterials.productId, value.productId), eq(serviceJobMaterials.unitName, value.unitName))).limit(1);
+      await trackServiceChange(tx, gate, {
+        action: "service.material.updated", entityType: "service_material", id: existing?.id,
+        createdId: (rows) => rows[0]?.id,
+      }, async () => {
+        return tx.insert(serviceJobMaterials).values({
+          storeId: gate.storeId,
+          jobId: value.jobId,
+          productId: value.productId,
+          unitName: value.unitName,
+          plannedQuantity: toQty(value.plannedQuantity),
+          usedQuantity: toQty(value.usedQuantity),
+          note: value.note || null,
+        }).onConflictDoUpdate({
+          target: [serviceJobMaterials.jobId, serviceJobMaterials.productId, serviceJobMaterials.unitName],
+          set: {
+            plannedQuantity: toQty(value.plannedQuantity),
+            usedQuantity: toQty(value.usedQuantity),
+            note: value.note || null,
+            updatedAt: new Date(),
+          },
+        }).returning({ id: serviceJobMaterials.id });
+      });
     });
     const [job] = await db.select({ projectId: serviceJobs.projectId })
       .from(serviceJobs).where(and(eq(serviceJobs.storeId, gate.storeId), eq(serviceJobs.id, value.jobId))).limit(1);
@@ -533,19 +540,6 @@ export async function saveServiceInstallationBatch(
     }));
     revalidateServiceProject(result.projectId);
     if (value.stockMode !== "plan") revalidatePath(Routes.Inventory);
-    await auditServiceMutation(
-      gate.userId,
-      "save_service_installation_batch",
-      "service_project",
-      value.projectId,
-      {
-        jobId: value.jobId,
-        itemCount: value.items.length,
-        assetCount: result.assetCount,
-        stockMode: value.stockMode,
-        invoiceMode: value.invoiceMode,
-      },
-    );
     return {
       ok: true,
       data: { materialIds: result.materialIds, assetCount: result.assetCount },
@@ -630,7 +624,6 @@ export async function reserveServiceJobMaterial(
     const result = await db.transaction((tx) => reserveServiceJobMaterialStockCore(tx, { ...parsed.data, storeId: gate.storeId, createdBy: gate.userId }));
     revalidateServiceProject(result.projectId);
     revalidatePath(Routes.Inventory);
-    await auditServiceMutation(gate.userId, "reserve_material", "service_material", parsed.data.materialId, { warehouseId: parsed.data.warehouseId, quantity: parsed.data.quantity });
     return { ok: true, data: { quantityBase: result.quantityBase } };
   } catch (error) {
     const code = error instanceof Error ? error.message : "";
@@ -647,10 +640,9 @@ export async function releaseServiceJobMaterialReservations(materialId: string):
   const gate = await requireServiceStockAccess();
   if (!gate.ok) return gate;
   try {
-    const result = await db.transaction((tx) => releaseServiceJobMaterialReservationsCore(tx, { storeId: gate.storeId, materialId }));
+    const result = await db.transaction((tx) => releaseServiceJobMaterialReservationsCore(tx, { storeId: gate.storeId, materialId, createdBy: gate.userId }));
     revalidateServiceProject(result.projectId);
     revalidatePath(Routes.Inventory);
-    await auditServiceMutation(gate.userId, "release_material_reservation", "service_material", materialId);
     return { ok: true, data: undefined };
   } catch (error) {
     if (error instanceof Error && error.message === "SERVICE_MATERIAL_NOT_FOUND") return { ok: false, error: "errors.notFound" };
@@ -694,16 +686,14 @@ export async function saveServiceHandoverDocument(
         record: current,
         jobId: value.jobId,
       })) return { ok: false, error: "services.errors.relationMismatch" };
-      const [document] = await db.update(serviceHandoverDocuments).set(values)
-        .where(and(eq(serviceHandoverDocuments.storeId, gate.storeId), eq(serviceHandoverDocuments.id, value.id))).returning({ id: serviceHandoverDocuments.id });
+      const [document] = await db.transaction((tx) => trackServiceChange(tx, gate, { action: "service.handover.updated", entityType: "service_handover_document", id: value.id }, async () => tx.update(serviceHandoverDocuments).set(values)
+        .where(and(eq(serviceHandoverDocuments.storeId, gate.storeId), eq(serviceHandoverDocuments.id, value.id!))).returning({ id: serviceHandoverDocuments.id })));
       revalidateServiceProject(value.projectId);
-      await auditServiceMutation(gate.userId, "update_service_handover", "service_handover_document", value.id);
       return { ok: true, data: document };
     }
-    const [document] = await db.insert(serviceHandoverDocuments).values({ storeId: gate.storeId, ...values, createdBy: gate.userId })
-      .returning({ id: serviceHandoverDocuments.id });
+    const [document] = await db.transaction((tx) => trackServiceChange(tx, gate, { action: "service.handover.created", entityType: "service_handover_document", createdId: (rows) => rows[0]?.id }, async () => tx.insert(serviceHandoverDocuments).values({ storeId: gate.storeId, ...values, createdBy: gate.userId })
+      .returning({ id: serviceHandoverDocuments.id })));
     revalidateServiceProject(value.projectId);
-    await auditServiceMutation(gate.userId, "create_service_handover", "service_handover_document", document.id);
     return { ok: true, data: document };
   } catch (error) {
     console.error("saveServiceHandoverDocument failed:", error);
@@ -715,8 +705,8 @@ export async function deleteServiceHandoverDocument(id: string): Promise<ActionR
   const gate = await requireServiceManager();
   if (!gate.ok) return gate;
   try {
-    const [document] = await db.delete(serviceHandoverDocuments).where(and(eq(serviceHandoverDocuments.storeId, gate.storeId), eq(serviceHandoverDocuments.id, id)))
-      .returning({ projectId: serviceHandoverDocuments.projectId });
+    const [document] = await db.transaction((tx) => trackServiceChange(tx, gate, { action: "service.handover.deleted", entityType: "service_handover_document", id }, async () => tx.delete(serviceHandoverDocuments).where(and(eq(serviceHandoverDocuments.storeId, gate.storeId), eq(serviceHandoverDocuments.id, id)))
+      .returning({ projectId: serviceHandoverDocuments.projectId })));
     if (!document) return { ok: false, error: "errors.notFound" };
     revalidateServiceProject(document.projectId);
     return { ok: true, data: undefined };
@@ -756,7 +746,7 @@ export async function saveServiceMaintenancePlan(
       note: value.note || null,
       updatedAt: new Date(),
     };
-    const mutation = await db.transaction(async (tx) => {
+    const mutation = await db.transaction(async (tx) => trackServiceChange(tx, gate, { action: value.id ? "service.maintenance.updated" : "service.maintenance.created", entityType: "service_maintenance_plan", id: value.id, createdId: (result) => result.outcome === "saved" ? result.plan.id : undefined }, async () => {
       await requireActiveTechnicianCore(tx, gate.storeId, value.assignedTo);
       if (value.id) {
         const [current] = await tx.select({
@@ -790,7 +780,7 @@ export async function saveServiceMaintenancePlan(
         .values({ storeId: gate.storeId, ...values, createdBy: gate.userId })
         .returning({ id: serviceMaintenancePlans.id });
       return { outcome: "saved" as const, plan };
-    });
+    }));
     if (mutation.outcome === "notFound") return { ok: false, error: "errors.notFound" };
     if (mutation.outcome === "relationMismatch") {
       return { ok: false, error: "services.errors.relationMismatch" };
@@ -800,12 +790,6 @@ export async function saveServiceMaintenancePlan(
     }
     const plan = mutation.plan;
     revalidateServiceProject(value.projectId);
-    await auditServiceMutation(
-      gate.userId,
-      value.id ? "update_service_maintenance" : "create_service_maintenance",
-      "service_maintenance_plan",
-      plan.id,
-    );
     return { ok: true, data: plan };
   } catch (error) {
     if (isInvalidServiceAssignee(error)) {
@@ -834,7 +818,7 @@ export async function deleteServiceMaintenancePlan(id: string): Promise<ActionRe
     if (history) {
       return { ok: false, error: "services.errors.maintenanceHistoryExists" };
     }
-    const [plan] = await db.delete(serviceMaintenancePlans).where(and(eq(serviceMaintenancePlans.storeId, gate.storeId), eq(serviceMaintenancePlans.id, id))).returning({ projectId: serviceMaintenancePlans.projectId });
+    const [plan] = await db.transaction((tx) => trackServiceChange(tx, gate, { action: "service.maintenance.deleted", entityType: "service_maintenance_plan", id }, async () => tx.delete(serviceMaintenancePlans).where(and(eq(serviceMaintenancePlans.storeId, gate.storeId), eq(serviceMaintenancePlans.id, id))).returning({ projectId: serviceMaintenancePlans.projectId })));
     if (!plan) return { ok: false, error: "errors.notFound" };
     revalidateServiceProject(plan.projectId);
     return { ok: true, data: undefined };
@@ -876,7 +860,7 @@ export async function saveServiceCostEntry(
         projectId: value.projectId,
         record: current,
       })) return { ok: false, error: "services.errors.relationMismatch" };
-      const [entry] = await db.update(serviceCostEntries).set({
+      const [entry] = await db.transaction((tx) => trackServiceChange(tx, gate, { action: "service.cost.updated", entityType: "service_cost_entry", id: value.id }, async () => tx.update(serviceCostEntries).set({
         jobId: value.jobId ?? null,
         type: value.type,
         description: value.description,
@@ -887,12 +871,11 @@ export async function saveServiceCostEntry(
         incurredOn: value.incurredOn,
         note: value.note || null,
         updatedAt: new Date(),
-      }).where(and(eq(serviceCostEntries.storeId, gate.storeId), eq(serviceCostEntries.id, value.id))).returning({ id: serviceCostEntries.id });
+      }).where(and(eq(serviceCostEntries.storeId, gate.storeId), eq(serviceCostEntries.id, value.id!))).returning({ id: serviceCostEntries.id })));
       revalidateServiceProject(value.projectId);
-      await auditServiceMutation(gate.userId, "update_service_cost", "service_cost_entry", value.id);
       return { ok: true, data: entry };
     }
-    const [entry] = await db.insert(serviceCostEntries).values({
+    const [entry] = await db.transaction((tx) => trackServiceChange(tx, gate, { action: "service.cost.created", entityType: "service_cost_entry", createdId: (rows) => rows[0]?.id }, async () => tx.insert(serviceCostEntries).values({
       storeId: gate.storeId,
       projectId: value.projectId,
       jobId: value.jobId ?? null,
@@ -905,9 +888,8 @@ export async function saveServiceCostEntry(
       incurredOn: value.incurredOn,
       note: value.note || null,
       createdBy: gate.userId,
-    }).returning({ id: serviceCostEntries.id });
+    }).returning({ id: serviceCostEntries.id })));
     revalidateServiceProject(value.projectId);
-    await auditServiceMutation(gate.userId, "create_service_cost", "service_cost_entry", entry.id, { type: value.type, amount });
     return { ok: true, data: entry };
   } catch (error) {
     console.error("saveServiceCostEntry failed:", error);
@@ -919,8 +901,8 @@ export async function deleteServiceCostEntry(id: string): Promise<ActionResult> 
   const gate = await requireServiceManager();
   if (!gate.ok) return gate;
   try {
-    const [entry] = await db.delete(serviceCostEntries).where(and(eq(serviceCostEntries.storeId, gate.storeId), eq(serviceCostEntries.id, id)))
-      .returning({ projectId: serviceCostEntries.projectId });
+    const [entry] = await db.transaction((tx) => trackServiceChange(tx, gate, { action: "service.cost.deleted", entityType: "service_cost_entry", id }, async () => tx.delete(serviceCostEntries).where(and(eq(serviceCostEntries.storeId, gate.storeId), eq(serviceCostEntries.id, id)))
+      .returning({ projectId: serviceCostEntries.projectId })));
     if (!entry) return { ok: false, error: "errors.notFound" };
     revalidateServiceProject(entry.projectId);
     return { ok: true, data: undefined };
@@ -952,7 +934,7 @@ export async function createInstalledAsset(
         .limit(1);
       if (!product) return { ok: false, error: "errors.notFound" };
     }
-    const [asset] = await db.insert(installedAssets).values({
+    const [asset] = await db.transaction((tx) => trackServiceChange(tx, gate, { action: "service.asset.created", entityType: "installed_asset", createdId: (rows) => rows[0]?.id }, async () => tx.insert(installedAssets).values({
       storeId: gate.storeId,
       projectId: value.projectId,
       jobId: value.jobId ?? null,
@@ -970,7 +952,7 @@ export async function createInstalledAsset(
       supplierWarrantyEndsOn: value.supplierWarrantyEndsOn ?? null,
       note: value.note || null,
       createdBy: gate.userId,
-    }).returning({ id: installedAssets.id });
+    }).returning({ id: installedAssets.id })));
     revalidateServiceProject(value.projectId);
     return { ok: true, data: asset };
   } catch (error) {
@@ -1061,7 +1043,7 @@ export async function createInstalledAssetsBatch(
       const missing = value.assets.filter((asset) => !existingKeys.has(requestKeyByDraft.get(asset.clientDraftId)!));
 
       if (missing.length > 0) {
-        await tx.insert(installedAssets).values(missing.map((asset) => ({
+        const inserted = await tx.insert(installedAssets).values(missing.map((asset) => ({
           storeId: gate.storeId,
           projectId: value.projectId,
           jobId: asset.jobId ?? null,
@@ -1080,7 +1062,13 @@ export async function createInstalledAssetsBatch(
           note: asset.note || null,
           clientRequestId: requestKeyByDraft.get(asset.clientDraftId)!,
           createdBy: gate.userId,
-        }))).onConflictDoNothing();
+        }))).onConflictDoNothing().returning({ id: installedAssets.id, name: installedAssets.name });
+        if (inserted.length) await recordActivity(tx, {
+          storeId: gate.storeId, actorId: gate.userId, action: "service.assets.created",
+          entityType: "service_project", entityId: value.projectId,
+          after: { assetCount: inserted.length }, metadata: { projectId: value.projectId },
+          affectedRecords: inserted.map((asset) => ({ type: "installed_asset", ...asset })),
+        });
       }
 
       const persisted = await tx.select({
@@ -1120,13 +1108,6 @@ export async function createInstalledAssetsBatch(
     }
 
     revalidateServiceProject(value.projectId);
-    await auditServiceMutation(
-      gate.userId,
-      "create_installed_assets_batch",
-      "installed_asset",
-      null,
-      { projectId: value.projectId, requestId: value.requestId, count: result.rows.length },
-    );
     return { ok: true, data: result.rows };
   } catch (error) {
     console.error("createInstalledAssetsBatch failed:", error);
@@ -1146,12 +1127,9 @@ export async function deleteInstalledAsset(assetId: string): Promise<ActionResul
     return { ok: false, error: "errors.invalidData" };
   }
   try {
-    const result = await deleteInstalledAssetCore(db, { storeId: gate.storeId, assetId });
+    const result = await deleteInstalledAssetCore(db, { storeId: gate.storeId, assetId, actorId: gate.userId });
     if (result.outcome === "not_found") return { ok: false, error: "errors.notFound" };
     if (result.outcome === "linked") return { ok: false, error: "services.errors.assetDeleteLinked" };
-    await auditServiceMutation(gate.userId, "service.asset.delete", "installed_asset", assetId, {
-      projectId: result.projectId,
-    });
     revalidateServiceProject(result.projectId);
     return { ok: true, data: undefined };
   } catch (error) {
@@ -1184,7 +1162,7 @@ export async function updateInstalledAsset(
       return { ok: false, error: "services.errors.relationMismatch" };
     }
 
-    await db.update(installedAssets).set({
+    await db.transaction((tx) => trackServiceChange(tx, gate, { action: "service.asset.updated", entityType: "installed_asset", id: value.assetId }, async () => tx.update(installedAssets).set({
       jobId: value.jobId ?? null,
       productId: value.productId ?? null,
       assetKind: value.assetKind,
@@ -1201,7 +1179,7 @@ export async function updateInstalledAsset(
       status: value.status,
       note: value.note || null,
       updatedAt: new Date(),
-    }).where(and(eq(installedAssets.storeId, gate.storeId), eq(installedAssets.id, value.assetId)));
+    }).where(and(eq(installedAssets.storeId, gate.storeId), eq(installedAssets.id, value.assetId)))));
     revalidateServiceProject(current.projectId);
     return { ok: true, data: undefined };
   } catch (error) {
@@ -1234,7 +1212,7 @@ export async function createWarrantyClaim(
       return { ok: false, error: "services.errors.relationMismatch" };
     }
     const code = generateCode("BH");
-    const [claim] = await db.insert(warrantyClaims).values({
+    const [claim] = await db.transaction((tx) => trackServiceChange(tx, gate, { action: "service.warranty.created", entityType: "warranty_claim", createdId: (rows) => rows[0]?.id }, async () => tx.insert(warrantyClaims).values({
       storeId: gate.storeId,
       projectId: value.projectId,
       jobId: value.jobId ?? null,
@@ -1245,7 +1223,7 @@ export async function createWarrantyClaim(
       priority: value.priority,
       scheduledAt: value.scheduledAt ? new Date(value.scheduledAt) : null,
       createdBy: gate.userId,
-    }).returning({ id: warrantyClaims.id, code: warrantyClaims.code });
+    }).returning({ id: warrantyClaims.id, code: warrantyClaims.code })));
     revalidateServiceProject(value.projectId);
     return { ok: true, data: claim };
   } catch (error) {
@@ -1273,7 +1251,7 @@ export async function updateWarrantyClaim(
   const value = parsed.data;
 
   try {
-    const result = await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => trackServiceChange(tx, gate, { action: "service.warranty.updated", entityType: "warranty_claim", id: value.claimId }, async () => {
       const [current] = await tx.select({
         projectId: warrantyClaims.projectId,
         jobId: warrantyClaims.jobId,
@@ -1334,7 +1312,7 @@ export async function updateWarrantyClaim(
         outcome: "updated" as const,
         projectId: current.projectId,
       };
-    });
+    }));
     if (result.outcome === "notFound") {
       return { ok: false, error: "errors.notFound" };
     }
@@ -1366,7 +1344,7 @@ export async function transitionWarrantyClaim(
   const value = parsed.data;
 
   try {
-    const result = await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => trackServiceChange(tx, gate, { action: "service.warranty.status.changed", entityType: "warranty_claim", id: value.claimId }, async () => {
       const [current] = await tx.select({
         projectId: warrantyClaims.projectId,
         status: warrantyClaims.status,
@@ -1404,13 +1382,10 @@ export async function transitionWarrantyClaim(
       await tx.update(projects).set({ serviceStage })
         .where(and(eq(projects.storeId, gate.storeId), eq(projects.id, current.projectId)));
       return { ok: true as const, projectId: current.projectId };
-    });
+    }));
 
     if (!result.ok) return result;
     revalidateServiceProject(result.projectId);
-    await auditServiceMutation(gate.userId, "transition_warranty_claim", "warranty_claim", value.claimId, {
-      status: value.status,
-    });
     return { ok: true, data: undefined };
   } catch (error) {
     console.error("transitionWarrantyClaim failed:", error);

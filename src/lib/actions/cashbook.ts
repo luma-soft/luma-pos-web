@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { cashTransactions } from "@/db/schema";
 import { type ActionResult, requireManager, getProfileId, generateCode } from "./common";
 import { Routes } from "@/lib/routes";
-import { writeAuditLog } from "@/lib/audit";
+import { recordActivity } from "@/lib/audit/activity-log";
 import { getCurrentShift } from "@/lib/data/shifts";
 import { resolveStoreContextForUser } from "@/lib/auth/store-context";
 
@@ -36,52 +36,42 @@ export async function createCashTxForUser(userId: string, input: CreateCashTxInp
     if (!context) return { ok: false, error: "errors.unauthorized" };
     const profileId = await getProfileId(userId);
     const currentShift = profileId ? await getCurrentShift(context.storeId, profileId) : null;
-    await db.insert(cashTransactions).values({
-      storeId: context.storeId,
-      code: generateCode(v.type === "in" ? "PT" : "PC"),
-      shiftId: currentShift?.id ?? null,
-      type: v.type,
-      fund: v.fund,
-      amount: v.amount.toFixed(2),
-      category: v.category,
-      refType: "manual",
-      note: v.note,
-      createdBy: profileId,
-    });
-    await writeAuditLog({
-      actorId: profileId,
-      source: "manual",
-      action: "create_cash_transaction",
-      entityType: "cash_transaction",
-      status: "succeeded",
-      after: {
+    await db.transaction(async (tx) => {
+      const [entry] = await tx.insert(cashTransactions).values({
+        storeId: context.storeId,
+        code: generateCode(v.type === "in" ? "PT" : "PC"),
+        shiftId: currentShift?.id ?? null,
         type: v.type,
         fund: v.fund,
-        amount: v.amount,
+        amount: v.amount.toFixed(2),
         category: v.category,
+        refType: "manual",
         note: v.note,
-      },
-      metadata: { route: Routes.Cashbook },
+        createdBy: profileId,
+      }).returning({ id: cashTransactions.id, code: cashTransactions.code });
+      await recordActivity(tx, {
+        storeId: context.storeId,
+        actorId: profileId,
+        action: "cash.transaction.created",
+        entityType: "cash_transaction",
+        entityId: entry.id,
+        status: "succeeded",
+        after: {
+          code: entry.code,
+          type: v.type,
+          fund: v.fund,
+          amount: v.amount,
+          category: v.category,
+          note: v.note,
+        },
+        metadata: { route: Routes.Cashbook },
+      });
     });
     revalidatePath(Routes.Cashbook);
     revalidatePath(Routes.Notifications);
     return { ok: true, data: undefined };
   } catch (e) {
     console.error("createCashTx failed:", e);
-    await writeAuditLog({
-      actorUserId: userId,
-      source: "manual",
-      action: "create_cash_transaction",
-      entityType: "cash_transaction",
-      status: "failed",
-      after: {
-        type: v.type,
-        fund: v.fund,
-        amount: v.amount,
-        category: v.category,
-      },
-      metadata: { error: e instanceof Error ? e.message : String(e) },
-    });
     return { ok: false, error: "errors.serverError" };
   }
 }

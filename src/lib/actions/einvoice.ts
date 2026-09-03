@@ -14,6 +14,7 @@ import {
 } from "@/lib/einvoice/provider";
 import { deriveEInvoiceFallbackVatRate } from "@/lib/einvoice/tax";
 import { requireStoreFeature } from "@/lib/auth/store-context";
+import { recordActivity } from "@/lib/audit/activity-log";
 
 type EInvoiceRequestResult = {
   status: "issued" | "queued" | "processing";
@@ -103,17 +104,32 @@ export async function issueEInvoiceForUser(input: IssueEInvoiceInput): Promise<A
       updatedAt: queuedAt,
       note: null,
     };
-    let invoiceId: string;
-    if (existing) {
-      await db.update(einvoices).set(values).where(and(eq(einvoices.storeId, context.storeId), eq(einvoices.id, existing.id)));
-      invoiceId = existing.id;
-    } else {
-      const [created] = await db
-        .insert(einvoices)
-        .values(values)
-        .returning({ id: einvoices.id });
-      invoiceId = created.id;
-    }
+    const queued = await db.transaction(async (tx) => {
+      await tx.select({ id: orders.id }).from(orders)
+        .where(and(eq(orders.storeId, context.storeId), eq(orders.id, order.id))).for("update");
+      const [current] = await tx.select().from(einvoices)
+        .where(and(eq(einvoices.storeId, context.storeId), eq(einvoices.orderId, order.id))).limit(1).for("update");
+      if (current?.status === "issued" || current?.status === "processing") return { id: current.id, status: current.status };
+      if (current?.status === "queued" && current.requestId === v.requestId
+        && current.buyerName === values.buyerName && current.buyerTaxCode === values.buyerTaxCode
+        && current.buyerAddress === values.buyerAddress && current.buyerEmail === values.buyerEmail
+        && Number(current.vatRate) === fallbackVatRate && current.provider === provider) {
+        return { id: current.id, status: "queued" as const };
+      }
+      const [saved] = current
+        ? await tx.update(einvoices).set(values).where(and(eq(einvoices.storeId, context.storeId), eq(einvoices.id, current.id))).returning({ id: einvoices.id })
+        : await tx.insert(einvoices).values(values).returning({ id: einvoices.id });
+      await recordActivity(tx, {
+        storeId: context.storeId, actorId: context.userId, action: "einvoice.requested", entityType: "order", entityId: order.id,
+        before: current ? { code: order.code, status: current.status, buyerName: current.buyerName, provider: current.provider } : null,
+        after: { code: order.code, status: "queued", buyerName: v.buyerName, provider, total, vatRate: fallbackVatRate },
+        affectedRecords: [{ type: "order", id: order.id, code: order.code }, { type: "einvoice", id: saved.id }],
+      });
+      return { id: saved.id, status: "queued" as const };
+    });
+    if (queued.status === "issued") return { ok: false, error: "einvoice.errors.alreadyIssued" };
+    if (queued.status === "processing") return { ok: true, data: { status: "processing", number: null } };
+    const invoiceId = queued.id;
 
     const processed = await processEInvoiceRequest(invoiceId, { storeId: context.storeId });
     revalidatePath(Routes.Sales);

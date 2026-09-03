@@ -1,3 +1,4 @@
+import { recordActivity } from "@/lib/audit/activity-log";
 import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
@@ -53,6 +54,7 @@ export async function deleteServiceEvidenceCore(
   };
   const [attachment] = await tx.select({
     id: serviceAttachments.id,
+    fileName: serviceAttachments.fileName,
     bucket: serviceAttachments.bucket,
     path: serviceAttachments.path,
     createdBy: serviceAttachments.createdBy,
@@ -69,6 +71,10 @@ export async function deleteServiceEvidenceCore(
 
   const [job] = await tx.select({
       status: serviceJobs.status,
+      storeId: serviceJobs.storeId,
+      code: serviceJobs.code,
+      title: serviceJobs.title,
+      projectId: serviceJobs.projectId,
       assignedTo: serviceJobs.assignedTo,
     }).from(serviceJobs)
       .where(eq(serviceJobs.id, coordinates.jobId))
@@ -128,6 +134,7 @@ export async function deleteServiceEvidenceCore(
   if (!deleted) throw new Error("SERVICE_ATTACHMENT_NOT_FOUND");
 
   await tx.insert(serviceJobEvents).values({
+    storeId: job.storeId,
     jobId: coordinates.jobId,
     eventType: "job.attachment_deleted",
     actorId: canonicalActor.userId,
@@ -135,6 +142,10 @@ export async function deleteServiceEvidenceCore(
     createdAt: now,
   });
 
+  await recordActivity(tx, { storeId: job.storeId, actorId: canonicalActor.userId, source: "mobile",
+    action: "service.evidence.deleted", entityType: "service_job", entityId: coordinates.jobId,
+    before: { fileName: attachment.fileName }, after: { code: job.code, name: job.title },
+    metadata: { projectId: job.projectId, jobId: coordinates.jobId } });
   return { id: attachment.id, storagePending: true };
 }
 

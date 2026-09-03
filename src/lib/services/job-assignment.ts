@@ -1,13 +1,13 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type * as schema from "@/db/schema";
 import {
   profiles,
-  auditLogs,
   serviceJobAssignments,
   serviceJobEvents,
   serviceJobs,
 } from "@/db/schema";
+import { recordActivity } from "@/lib/audit/activity-log";
 
 type ServiceTransaction = Parameters<
   Parameters<NodePgDatabase<typeof schema>["transaction"]>[0]
@@ -99,6 +99,9 @@ export async function assignServiceJobCore(
   const now = input.now ?? new Date();
   const [job] = await tx.select({
     id: serviceJobs.id,
+    code: serviceJobs.code,
+    title: serviceJobs.title,
+    projectId: serviceJobs.projectId,
     assignedTo: serviceJobs.assignedTo,
   }).from(serviceJobs)
     .where(and(eq(serviceJobs.storeId, input.storeId), eq(serviceJobs.id, input.jobId)))
@@ -109,6 +112,23 @@ export async function assignServiceJobCore(
   if (input.assignmentRole === "crew" && job.assignedTo === input.profileId) {
     throw new Error("SERVICE_ASSIGNMENT_PRIMARY_CONFLICT");
   }
+  const [currentAssignment] = await tx.select().from(serviceJobAssignments)
+    .where(and(
+      eq(serviceJobAssignments.jobId, input.jobId),
+      eq(serviceJobAssignments.storeId, input.storeId),
+      eq(serviceJobAssignments.profileId, input.profileId),
+      isNull(serviceJobAssignments.removedAt),
+    )).limit(1);
+  if (currentAssignment?.assignmentRole === input.assignmentRole
+    && (input.assignmentRole !== "primary" || job.assignedTo === input.profileId)) {
+    return currentAssignment;
+  }
+  const previousProfileId = input.assignmentRole === "primary"
+    ? job.assignedTo ?? currentAssignment?.profileId ?? null
+    : currentAssignment?.profileId ?? null;
+  const assignees = await tx.select({ id: profiles.id, name: profiles.fullName }).from(profiles)
+    .where(and(eq(profiles.storeId, input.storeId), inArray(profiles.id, [...new Set([input.profileId, ...(previousProfileId ? [previousProfileId] : [])])])));
+  const assigneeNames = new Map(assignees.map((profile) => [profile.id, profile.name]));
 
   if (input.assignmentRole === "primary") {
     await syncServiceJobPrimaryAssigneeCore(
@@ -147,21 +167,31 @@ export async function assignServiceJobCore(
       assignmentRole: input.assignmentRole,
     },
   });
-  await tx.insert(auditLogs).values({
+  await recordActivity(tx, {
     storeId: input.storeId,
     actorId: input.actorId,
-    source: "manual",
     action: "service_job.assignment.upsert",
     entityType: "service_job",
     entityId: input.jobId,
+    before: {
+      code: job.code,
+      title: job.title,
+      profileId: previousProfileId,
+      assigneeName: previousProfileId ? assigneeNames.get(previousProfileId) ?? null : null,
+      assignmentRole: input.assignmentRole === "primary" && job.assignedTo ? "primary" : currentAssignment?.assignmentRole ?? null,
+    },
     after: {
+      code: job.code,
+      title: job.title,
       profileId: input.profileId,
+      assigneeName: assigneeNames.get(input.profileId) ?? null,
       assignmentRole: input.assignmentRole,
     },
-    affectedRecords: [{
-      entityType: "service_job_assignment",
-      entityId: input.profileId,
-    }],
+    affectedRecords: [
+      { type: "service_job", id: job.id, code: job.code, name: job.title },
+      ...assignees.map((profile) => ({ type: "profile", id: profile.id, name: profile.name })),
+    ],
+    metadata: { projectId: job.projectId },
   });
   const [assignment] = await tx.select().from(serviceJobAssignments)
     .where(and(
@@ -188,6 +218,9 @@ export async function unassignServiceJobCore(
   const now = input.now ?? new Date();
   const [job] = await tx.select({
     id: serviceJobs.id,
+    code: serviceJobs.code,
+    title: serviceJobs.title,
+    projectId: serviceJobs.projectId,
     assignedTo: serviceJobs.assignedTo,
   }).from(serviceJobs)
     .where(and(eq(serviceJobs.storeId, input.storeId), eq(serviceJobs.id, input.jobId)))
@@ -222,21 +255,27 @@ export async function unassignServiceJobCore(
       assignmentRole: assignment.assignmentRole,
     },
   });
-  await tx.insert(auditLogs).values({
+  const [assignee] = await tx.select({ name: profiles.fullName }).from(profiles)
+    .where(and(eq(profiles.storeId, input.storeId), eq(profiles.id, input.profileId))).limit(1);
+  await recordActivity(tx, {
     storeId: input.storeId,
     actorId: input.actorId,
-    source: "manual",
     action: "service_job.assignment.remove",
     entityType: "service_job",
     entityId: input.jobId,
     before: {
+      code: job.code,
+      title: job.title,
       profileId: input.profileId,
+      assigneeName: assignee?.name ?? null,
       assignmentRole: assignment.assignmentRole,
     },
-    affectedRecords: [{
-      entityType: "service_job_assignment",
-      entityId: input.profileId,
-    }],
+    after: { code: job.code, title: job.title, profileId: null, assigneeName: null, assignmentRole: null },
+    affectedRecords: [
+      { type: "service_job", id: job.id, code: job.code, name: job.title },
+      { type: "profile", id: input.profileId, name: assignee?.name },
+    ],
+    metadata: { projectId: job.projectId },
   });
   return assignment;
 }

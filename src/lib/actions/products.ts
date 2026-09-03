@@ -44,6 +44,8 @@ import {
   resolveLegacyProductImageIdsInTransaction,
 } from "@/lib/products/product-media";
 import { imageMediaIdsSchema } from "@/lib/products/product-media-schema";
+import { recordActivity } from "@/lib/audit/activity-log";
+import { activityValuesEqual, productActivityChanges, readProductActivitySnapshot } from "@/lib/products/product-activity";
 
 /** Tạo nhóm hàng mới từ form (combobox "+ thêm"). Trả id. */
 export async function createCategory(
@@ -54,10 +56,14 @@ export async function createCategory(
   const n = name.trim();
   if (!n) return { ok: false, error: "errors.invalidData" };
   try {
-    const [row] = await db
-      .insert(categories)
-      .values({ storeId: gate.storeId, name: n })
-      .returning({ id: categories.id, name: categories.name });
+    const row = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(categories)
+        .values({ storeId: gate.storeId, name: n })
+        .returning({ id: categories.id, name: categories.name });
+      await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId, action: "category.created", entityType: "category", entityId: row.id, after: { name: row.name } });
+      return row;
+    });
     revalidatePath(Routes.Products);
     return { ok: true, data: row };
   } catch (e) {
@@ -76,10 +82,14 @@ export async function createCategoryNode(input: {
   const n = input.name.trim();
   if (!n) return { ok: false, error: "errors.invalidData" };
   try {
-    const [row] = await db
-      .insert(categories)
-      .values({ storeId: gate.storeId, name: n, parentId: input.parentId || null })
-      .returning({ id: categories.id });
+    const row = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(categories)
+        .values({ storeId: gate.storeId, name: n, parentId: input.parentId || null })
+        .returning({ id: categories.id });
+      await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId, action: "category.created", entityType: "category", entityId: row.id, after: { name: n, parentId: input.parentId || null } });
+      return row;
+    });
     revalidatePath(Routes.Categories);
     revalidatePath(Routes.Products);
     return { ok: true, data: row };
@@ -105,7 +115,13 @@ export async function updateCategory(
   if (input.parentId !== undefined)
     patch.parentId = input.parentId === id ? null : input.parentId || null;
   try {
-    await db.update(categories).set(patch).where(and(eq(categories.storeId, gate.storeId), eq(categories.id, id)));
+    await db.transaction(async (tx) => {
+      const [before] = await tx.select({ name: categories.name, parentId: categories.parentId }).from(categories)
+        .where(and(eq(categories.storeId, gate.storeId), eq(categories.id, id))).limit(1).for("update");
+      if (!before || activityValuesEqual(before, { ...before, ...patch })) return;
+      await tx.update(categories).set(patch).where(and(eq(categories.storeId, gate.storeId), eq(categories.id, id)));
+      await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId, action: "category.updated", entityType: "category", entityId: id, before, after: { ...before, ...patch } });
+    });
     revalidatePath(Routes.Categories);
     revalidatePath(Routes.Products);
     return { ok: true, data: undefined };
@@ -120,15 +136,21 @@ export async function deleteCategory(id: string): Promise<ActionResult> {
   const gate = await requireStockAccess();
   if (!gate.ok) return gate;
   try {
-    await db
-      .update(products)
-      .set({ categoryId: null })
-      .where(and(eq(products.storeId, gate.storeId), eq(products.categoryId, id)));
-    await db
-      .update(categories)
-      .set({ parentId: null })
-      .where(and(eq(categories.storeId, gate.storeId), eq(categories.parentId, id)));
-    await db.delete(categories).where(and(eq(categories.storeId, gate.storeId), eq(categories.id, id)));
+    await db.transaction(async (tx) => {
+      const [before] = await tx.select({ name: categories.name }).from(categories)
+        .where(and(eq(categories.storeId, gate.storeId), eq(categories.id, id))).limit(1).for("update");
+      if (!before) return;
+      await tx
+        .update(products)
+        .set({ categoryId: null })
+        .where(and(eq(products.storeId, gate.storeId), eq(products.categoryId, id)));
+      await tx
+        .update(categories)
+        .set({ parentId: null })
+        .where(and(eq(categories.storeId, gate.storeId), eq(categories.parentId, id)));
+      await tx.delete(categories).where(and(eq(categories.storeId, gate.storeId), eq(categories.id, id)));
+      await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId, action: "category.deleted", entityType: "category", entityId: id, before });
+    });
     revalidatePath(Routes.Categories);
     revalidatePath(Routes.Products);
     return { ok: true, data: undefined };
@@ -153,10 +175,14 @@ export async function createBrand(
       .where(and(eq(brands.storeId, gate.storeId), eq(brands.name, n)))
       .limit(1);
     if (existing) return { ok: true, data: existing };
-    const [row] = await db
-      .insert(brands)
-      .values({ storeId: gate.storeId, name: n })
-      .returning({ id: brands.id, name: brands.name });
+    const row = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(brands)
+        .values({ storeId: gate.storeId, name: n })
+        .returning({ id: brands.id, name: brands.name });
+      await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId, action: "brand.created", entityType: "brand", entityId: row.id, after: { name: row.name } });
+      return row;
+    });
     revalidatePath(Routes.Products);
     return { ok: true, data: row };
   } catch (e) {
@@ -320,18 +346,27 @@ export async function updateProductPrices(
   const v = parsed.data;
 
   try {
-    await db
-      .update(products)
-      .set({
-        retailPrice: String(v.retailPrice),
-        wholesalePrice:
-          v.wholesalePrice != null ? String(v.wholesalePrice) : null,
-        contractorPrice:
-          v.contractorPrice != null ? String(v.contractorPrice) : null,
-        agentPrice: v.agentPrice != null ? String(v.agentPrice) : null,
-        updatedAt: sql`now()`,
-      })
-      .where(and(eq(products.storeId, gate.storeId), eq(products.id, v.productId)));
+    await db.transaction(async (tx) => {
+      const [before] = await tx.select({ name: products.name, sku: products.sku, retailPrice: products.retailPrice, wholesalePrice: products.wholesalePrice, contractorPrice: products.contractorPrice, agentPrice: products.agentPrice })
+        .from(products).where(and(eq(products.storeId, gate.storeId), eq(products.id, v.productId))).limit(1).for("update");
+      if (!before) return;
+      const previous = { name: before.name, sku: before.sku, retailPrice: Number(before.retailPrice), wholesalePrice: before.wholesalePrice == null ? null : Number(before.wholesalePrice), contractorPrice: before.contractorPrice == null ? null : Number(before.contractorPrice), agentPrice: before.agentPrice == null ? null : Number(before.agentPrice) };
+      const after = { name: before.name, sku: before.sku, retailPrice: v.retailPrice, wholesalePrice: v.wholesalePrice, contractorPrice: v.contractorPrice, agentPrice: v.agentPrice };
+      if (activityValuesEqual(previous, after)) return;
+      await tx
+        .update(products)
+        .set({
+          retailPrice: String(v.retailPrice),
+          wholesalePrice:
+            v.wholesalePrice != null ? String(v.wholesalePrice) : null,
+          contractorPrice:
+            v.contractorPrice != null ? String(v.contractorPrice) : null,
+          agentPrice: v.agentPrice != null ? String(v.agentPrice) : null,
+          updatedAt: sql`now()`,
+        })
+        .where(and(eq(products.storeId, gate.storeId), eq(products.id, v.productId)));
+      await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId, action: "product.prices.updated", entityType: "product", entityId: v.productId, before: previous, after });
+    });
 
     revalidatePath("/pricing");
     revalidatePath(Routes.Products);
@@ -412,10 +447,10 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
   try {
     await db.transaction(async (tx) => {
       const [target] = await tx
-        .select({ id: products.id, isVariantParent: products.isVariantParent })
+        .select({ id: products.id, name: products.name, sku: products.sku, isVariantParent: products.isVariantParent })
         .from(products)
         .where(and(eq(products.storeId, gate.storeId), eq(products.id, parsed.data)))
-        .limit(1);
+        .limit(1).for("update");
       if (!target) return;
 
       if (target.isVariantParent) {
@@ -424,6 +459,7 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
           .where(and(eq(products.storeId, gate.storeId), eq(products.parentProductId, target.id)));
       }
       await tx.delete(products).where(and(eq(products.storeId, gate.storeId), eq(products.id, target.id)));
+      await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId, action: "product.deleted", entityType: "product", entityId: target.id, before: { name: target.name, sku: target.sku }, metadata: { includesVariants: target.isVariantParent } });
     });
     revalidatePath(Routes.Products);
     revalidatePath(Routes.Inventory);
@@ -458,34 +494,50 @@ export async function setProductActive(
   const v = parsed.data;
 
   try {
-    const [target] = await db
-      .select({ id: products.id, isVariantParent: products.isVariantParent })
-      .from(products)
-      .where(and(eq(products.storeId, gate.storeId), eq(products.id, v.productId)))
-      .limit(1);
-    if (!target) return { ok: false, error: "errors.invalidData" };
+    const updated = await db.transaction(async (tx) => {
+      const [target] = await tx
+        .select({ id: products.id, name: products.name, sku: products.sku, isVariantParent: products.isVariantParent })
+        .from(products)
+        .where(and(eq(products.storeId, gate.storeId), eq(products.id, v.productId)))
+        .limit(1);
+      if (!target) return false;
+      const condition = and(eq(products.storeId, gate.storeId), target.isVariantParent
+        ? or(eq(products.id, target.id), eq(products.parentProductId, target.id))
+        : eq(products.id, target.id));
+      const before = await tx.select({ id: products.id, name: products.name, code: products.sku, isActive: products.isActive, lifecycleStatus: products.lifecycleStatus })
+        .from(products).where(condition).for("update");
+      const changes = before.filter((row) => row.isActive !== v.isActive || row.lifecycleStatus !== (v.isActive ? "active" : "archived"));
 
-    await db
-      .update(products)
-      .set({
-        isActive: v.isActive,
-        lifecycleStatus: v.isActive ? "active" : "archived",
-        updatedAt: sql`now()`,
-      })
-      .where(and(
-        eq(products.storeId, gate.storeId),
-        target.isVariantParent
-          ? or(
-              eq(products.id, target.id),
-              eq(products.parentProductId, target.id),
-            )
-          : eq(products.id, target.id),
-      ));
+      await tx
+        .update(products)
+        .set({
+          isActive: v.isActive,
+          lifecycleStatus: v.isActive ? "active" : "archived",
+          updatedAt: sql`now()`,
+        })
+        .where(and(
+          eq(products.storeId, gate.storeId),
+          target.isVariantParent
+            ? or(
+                eq(products.id, target.id),
+                eq(products.parentProductId, target.id),
+              )
+            : eq(products.id, target.id),
+        ));
+      if (changes.length) await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "product.status.changed", entityType: "product", entityId: target.id,
+        before: { name: target.name, sku: target.sku, products: changes },
+        after: { name: target.name, sku: target.sku, isActive: v.isActive, lifecycleStatus: v.isActive ? "active" : "archived" },
+        affectedRecords: changes.map((row) => ({ type: "product", id: row.id, code: row.code, name: row.name })),
+    });
+    return true;
+    });
+    if (!updated) return { ok: false, error: "errors.invalidData" };
 
     revalidatePath(Routes.Products);
     revalidatePath(Routes.Inventory);
     revalidatePath(Routes.POS);
-    revalidatePath(`/products/${target.id}`);
+    revalidatePath(`/products/${v.productId}`);
     return { ok: true, data: undefined };
   } catch (e) {
     console.error("setProductActive failed:", e);
@@ -503,26 +555,37 @@ export async function bulkStopSellingProducts(
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
 
   try {
-    const targets = await db
-      .select({ id: products.id, isVariantParent: products.isVariantParent })
-      .from(products)
-      .where(and(eq(products.storeId, gate.storeId), inArray(products.id, parsed.data)));
-    const parentIds = targets
-      .filter((target) => target.isVariantParent)
-      .map((target) => target.id);
-    const conditions = [inArray(products.id, parsed.data)];
-    if (parentIds.length > 0) {
-      conditions.push(inArray(products.parentProductId, parentIds));
-    }
-    const updated = await db
-      .update(products)
-      .set({
-        isActive: false,
-        lifecycleStatus: "archived",
-        updatedAt: sql`now()`,
-      })
-      .where(and(eq(products.storeId, gate.storeId), or(...conditions)))
-      .returning({ id: products.id });
+    const updated = await db.transaction(async (tx) => {
+      const targets = await tx
+        .select({ id: products.id, isVariantParent: products.isVariantParent })
+        .from(products)
+        .where(and(eq(products.storeId, gate.storeId), inArray(products.id, parsed.data)));
+      const parentIds = targets
+        .filter((target) => target.isVariantParent)
+        .map((target) => target.id);
+      const conditions = [inArray(products.id, parsed.data)];
+      if (parentIds.length > 0) {
+        conditions.push(inArray(products.parentProductId, parentIds));
+      }
+      const before = await tx.select({ id: products.id, name: products.name, code: products.sku, isActive: products.isActive, lifecycleStatus: products.lifecycleStatus })
+        .from(products).where(and(eq(products.storeId, gate.storeId), or(...conditions))).for("update");
+      const changes = before.filter((row) => row.isActive || row.lifecycleStatus !== "archived");
+      const updated = await tx
+        .update(products)
+        .set({
+          isActive: false,
+          lifecycleStatus: "archived",
+          updatedAt: sql`now()`,
+        })
+        .where(and(eq(products.storeId, gate.storeId), or(...conditions)))
+        .returning({ id: products.id });
+      if (changes.length) await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "product.bulk.stopped", entityType: "product",
+        before: { products: changes }, after: { isActive: false, lifecycleStatus: "archived", changedCount: changes.length },
+        affectedRecords: changes.map((row) => ({ type: "product", id: row.id, code: row.code, name: row.name })),
+    });
+    return updated;
+    });
 
     revalidatePath(Routes.Products);
     revalidatePath(Routes.Inventory);
@@ -554,15 +617,16 @@ export async function bulkDeleteProducts(
     try {
       const removed = await db.transaction(async (tx) => {
         const [target] = await tx
-          .select({ id: products.id, isVariantParent: products.isVariantParent })
+          .select({ id: products.id, name: products.name, sku: products.sku, isVariantParent: products.isVariantParent })
           .from(products)
           .where(and(eq(products.storeId, gate.storeId), eq(products.id, id)))
-          .limit(1);
+          .limit(1).for("update");
         if (!target) return false;
         if (target.isVariantParent) {
           await tx.delete(products).where(and(eq(products.storeId, gate.storeId), eq(products.parentProductId, id)));
         }
         await tx.delete(products).where(and(eq(products.storeId, gate.storeId), eq(products.id, id)));
+        await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId, action: "product.deleted", entityType: "product", entityId: id, before: { name: target.name, sku: target.sku }, metadata: { bulk: true, includesVariants: target.isVariantParent } });
         return true;
       });
       if (removed) deleted += 1;
@@ -590,18 +654,28 @@ export async function setCameraMaterial(input: {
   const gate = await requireFeatureRole("camera_quote_builder", ["owner", "manager", "warehouse"]);
   if (!gate.ok) return gate;
   try {
-    const [current] = await db
-      .select({ specs: products.specs })
-      .from(products)
-      .where(and(eq(products.storeId, gate.storeId), eq(products.id, input.productId)))
-      .limit(1);
-    if (!current) return { ok: false, error: "errors.invalidData" };
-    const specs = current.specs && typeof current.specs === "object" && !Array.isArray(current.specs)
-      ? { ...(current.specs as Record<string, unknown>) }
-      : {};
-    if (input.enabled) specs.__cameraQuoteMaterial = true;
-    else delete specs.__cameraQuoteMaterial;
-    await db.update(products).set({ specs: Object.keys(specs).length > 0 ? specs : null }).where(and(eq(products.storeId, gate.storeId), eq(products.id, input.productId)));
+    const updated = await db.transaction(async (tx) => {
+      const [current] = await tx
+        .select({ name: products.name, sku: products.sku, specs: products.specs })
+        .from(products)
+        .where(and(eq(products.storeId, gate.storeId), eq(products.id, input.productId)))
+        .limit(1).for("update");
+      if (!current) return false;
+      const specs = current.specs && typeof current.specs === "object" && !Array.isArray(current.specs)
+        ? { ...(current.specs as Record<string, unknown>) }
+        : {};
+      const wasEnabled = specs.__cameraQuoteMaterial === true;
+      if (wasEnabled === input.enabled) return true;
+      if (input.enabled) specs.__cameraQuoteMaterial = true;
+      else delete specs.__cameraQuoteMaterial;
+      await tx.update(products).set({ specs: Object.keys(specs).length > 0 ? specs : null }).where(and(eq(products.storeId, gate.storeId), eq(products.id, input.productId)));
+      await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "product.camera_material.changed", entityType: "product", entityId: input.productId,
+        before: { name: current.name, sku: current.sku, enabled: wasEnabled }, after: { name: current.name, sku: current.sku, enabled: input.enabled },
+    });
+    return true;
+    });
+    if (!updated) return { ok: false, error: "errors.invalidData" };
     revalidatePath(Routes.Inventory);
     revalidatePath(Routes.POS);
     return { ok: true, data: undefined };
@@ -689,9 +763,11 @@ export async function updateProduct(
         })
         .from(products)
         .where(and(eq(products.storeId, gate.storeId), eq(products.id, v.id)))
-        .limit(1);
+        .limit(1).for("update");
 
       if (!current) throw new Error("PRODUCT_NOT_FOUND");
+      const beforeActivity = await readProductActivitySnapshot(tx, gate.storeId, v.id);
+      const changedRelatedProducts: { type: string; id: string; name: string; code?: string }[] = [];
       if (
         v.productKind !== undefined &&
         v.productKind !== current.productKind
@@ -858,6 +934,8 @@ export async function updateProduct(
           ? baseNameFromChildName(v.name, current.variantName)
           : null;
         if (baseName) {
+          const [parentBefore] = await tx.select({ name: products.name, sku: products.sku }).from(products)
+            .where(and(eq(products.storeId, gate.storeId), eq(products.id, current.parentProductId))).limit(1);
           await tx
             .update(products)
             .set({ name: baseName, updatedAt: sql`now()` })
@@ -871,10 +949,12 @@ export async function updateProduct(
               updatedAt: sql`now()`,
             })
             .where(and(eq(products.storeId, gate.storeId), eq(products.id, v.id)));
+          if (parentBefore && parentBefore.name !== baseName) changedRelatedProducts.push({ type: "product", id: current.parentProductId, code: parentBefore.sku, name: baseName });
         }
 
         const hasPatch = Object.keys(patch).length > 1;
         for (const sibling of siblingRows) {
+          const siblingBefore = await readProductActivitySnapshot(tx, gate.storeId, sibling.id);
           const nextPatch = {
             ...(hasPatch ? patch : {}),
             ...(baseName
@@ -903,9 +983,22 @@ export async function updateProduct(
               })),
             });
           }
+          const siblingAfter = await readProductActivitySnapshot(tx, gate.storeId, sibling.id);
+          if (siblingBefore && siblingAfter && productActivityChanges(siblingBefore, siblingAfter)) {
+            changedRelatedProducts.push({ type: "product", id: sibling.id, code: siblingAfter.sku, name: siblingAfter.name });
+          }
         }
       }
       await syncProductPriceBookPrices(gate.storeId, v.id, v.priceBookPrices, tx);
+      const afterActivity = await readProductActivitySnapshot(tx, gate.storeId, v.id);
+      const changes = beforeActivity && afterActivity ? productActivityChanges(beforeActivity, afterActivity) : null;
+      if (afterActivity && (changes || changedRelatedProducts.length)) await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "product.updated", entityType: "product", entityId: v.id,
+        before: changes?.before ?? { name: beforeActivity?.name, sku: beforeActivity?.sku },
+        after: changes?.after ?? { name: afterActivity.name, sku: afterActivity.sku },
+        affectedRecords: changedRelatedProducts,
+        metadata: { productName: afterActivity.name, productSku: afterActivity.sku, relatedProductCount: changedRelatedProducts.length },
+      });
     }, v.stockAdjustment ? { isolationLevel: "serializable" } : undefined);
 
     revalidatePath(Routes.Products);
@@ -1130,6 +1223,12 @@ export async function createProduct(
             })),
           );
         }
+        await syncProductPriceBookPrices(storeId, product.id, v.priceBookPrices, tx);
+        await recordActivity(tx, {
+          storeId, actorId: userId, action: "product.created", entityType: "product", entityId: product.id,
+          after: { name: v.name.trim(), sku, productKind: v.productKind, costPrice: v.costPrice, retailPrice: v.retailPrice, quantity: v.productKind === "product" && defaultWh ? v.initialStock : undefined, status: v.lifecycleStatus, isActive: v.lifecycleStatus === "active" && v.directSale },
+          metadata: { productName: v.name.trim(), productSku: sku },
+        });
         return product;
       }
 
@@ -1173,6 +1272,7 @@ export async function createProduct(
       await insertUnits(parent.id);
       await insertSuppliers(parent.id);
 
+      const createdVariants: { type: string; id: string; name: string; code: string; quantity: number }[] = [];
       for (const [index, child] of variantChildren.entries()) {
         const childWholesale =
           child.wholesalePrice != null
@@ -1232,12 +1332,18 @@ export async function createProduct(
           child.minLevel,
           child.costPrice,
         );
+        createdVariants.push({ type: "product", id: childProduct.id, name: childProductName(v.name, child.variantName), code: child.sku?.trim() || generateVariantSku(sku, index), quantity: defaultWh ? child.initialStock : 0 });
       }
 
+      await syncProductPriceBookPrices(storeId, parent.id, v.priceBookPrices, tx);
+      await recordActivity(tx, {
+        storeId, actorId: userId, action: "product.created", entityType: "product", entityId: parent.id,
+        after: { name: v.name.trim(), sku, productKind: "product", costPrice: v.costPrice, retailPrice: v.retailPrice, variantCount: createdVariants.length, status: v.lifecycleStatus },
+        affectedRecords: createdVariants,
+        metadata: { productName: v.name.trim(), productSku: sku },
+      });
       return parent;
     });
-
-    await syncProductPriceBookPrices(storeId, result.id, v.priceBookPrices);
 
     revalidatePath(Routes.Products);
     revalidatePath(Routes.Inventory);
