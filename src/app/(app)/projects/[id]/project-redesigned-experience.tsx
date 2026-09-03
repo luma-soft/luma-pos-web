@@ -377,7 +377,7 @@ function projectMediaPhaseForDocument(type: string): ProjectMediaPhase | null {
   return "acceptance";
 }
 function TradePill({ type }: { type: "camera" | "electrical" | "plumbing" }) { const meta = tradeMeta[type]; const Icon = meta.icon; return <span className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold ${meta.soft} ${meta.tone}`}><Icon className="h-3 w-3" />{meta.label}</span>; }
-function serviceTypeLabel(type: ProjectDetail["project"]["serviceType"] | "camera" | "electrical" | "plumbing") { return type === "camera" ? "Camera" : type === "electrical" ? "Điện" : type === "plumbing" ? "Nước" : type === "mixed" ? "Hỗn hợp" : "—"; }
+function serviceTypeLabel(type: ProjectDetail["project"]["serviceType"] | "camera" | "electrical" | "plumbing") { return type === "camera" ? "Camera" : type === "electrical" ? "Điện" : type === "plumbing" ? "Nước" : type === "mixed" ? "Khác" : "—"; }
 
 function serviceStageLabel(stage: ProjectDetail["project"]["serviceStage"]) {
   return stage === "quoted" ? "Báo giá"

@@ -3022,7 +3022,7 @@
       "camera": "Camera",
       "electrical": "Electrical",
       "plumbing": "Plumbing",
-      "mixed": "Mixed"
+      "mixed": "Other"
     },
     "stages": {
       "planning": "Survey",
