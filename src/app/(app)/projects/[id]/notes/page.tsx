@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { requireStoreContext } from "@/lib/auth/store-context";
-import { listProjectNotes } from "@/lib/data/project-notes";
 import { getProjectDetail } from "@/lib/data/projects";
 import { Routes } from "@/lib/routes";
 import { canReadProjectNotes } from "@/lib/mobile/project-note-access";
@@ -20,7 +19,6 @@ export default async function ProjectNotesPage({
   const detail = await getProjectDetail(context.storeId, id);
   if (!detail) notFound();
   if (!canReadProjectNotes({ ok: true, ...context }, detail.project.serviceType)) notFound();
-  const notes = await listProjectNotes(context.storeId, id);
 
   return (
     <main className="mx-auto w-full max-w-3xl p-4 sm:p-6">
@@ -31,13 +29,9 @@ export default async function ProjectNotesPage({
         subtitle={detail.project.name}
       />
       <ProjectNotesClient
+        key={id}
         projectId={id}
         canManage={["owner", "manager"].includes(context.role)}
-        initialNotes={notes.map((note) => ({
-          ...note,
-          createdAt: note.createdAt.toISOString(),
-          updatedAt: note.updatedAt.toISOString(),
-        }))}
       />
     </main>
   );

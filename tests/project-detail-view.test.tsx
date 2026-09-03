@@ -268,7 +268,7 @@ describe("ProjectDetailView", () => {
   test("renders only the focused project flow tabs", async () => {
     const html = await renderServiceProjectDetail();
 
-    for (const id of ["overview", "devices", "media"]) {
+    for (const id of ["overview", "devices", "media", "notes"]) {
       expect(html).toContain(`data-project-tab-icon="${id}"`);
     }
     expect(html).toContain('class="lucide lucide-house"');
@@ -278,14 +278,16 @@ describe("ProjectDetailView", () => {
     expect(html).not.toContain('data-project-tab-icon="finance"');
   });
 
-  test("renders the simple status, devices and notes overview", async () => {
+  test("keeps notes inside a project tab without a separate-page link", async () => {
     const html = await renderServiceProjectDetail();
 
     expect(html).toContain('data-project-experience="simple"');
     expect(html).toContain("Trạng thái");
     expect(html).toContain("Thiết bị đã lắp");
     expect(html).toContain("Danh sách ghi chú");
-    expect(html).toContain('href="/projects/project-1/notes"');
+    expect(html).toContain('role="tabpanel" id="project-service-panel-notes"');
+    expect(html).toContain("Đang tải ghi chú…");
+    expect(html).not.toContain('href="/projects/project-1/notes"');
     expect(html).toContain('lucide-server');
   });
 

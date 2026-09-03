@@ -30,7 +30,12 @@ export async function GET(_request: Request, { params }: RouteContext) {
   if (!canReadProjectNotes(gate, project.serviceType)) {
     return mobileError("errors.forbidden", 403);
   }
-  return mobileOk(await listProjectNotes(gate.storeId, id));
+  try {
+    return mobileOk(await listProjectNotes(gate.storeId, id));
+  } catch (error) {
+    console.error("list project notes failed:", error);
+    return mobileError("errors.serverError", 500);
+  }
 }
 
 export async function POST(request: Request, { params }: RouteContext) {

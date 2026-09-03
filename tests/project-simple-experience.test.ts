@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 const read = (path: string) => readFileSync(path, "utf8");
 
 describe("simple project experience", () => {
-  test("uses the focused overview, device and media experience", () => {
+  test("uses the focused overview, device, media and notes experience", () => {
     const detailView = read("src/app/(app)/projects/[id]/project-detail-view.tsx");
     const simpleView = read("src/app/(app)/projects/[id]/project-simple-experience.tsx");
 
@@ -12,7 +12,9 @@ describe("simple project experience", () => {
     expect(simpleView).toContain('id="overview"');
     expect(simpleView).toContain('id="devices"');
     expect(simpleView).toContain('id="media"');
-    expect(simpleView).toContain("Danh sách ghi chú");
+    expect(simpleView).toContain('id="notes" label="Ghi chú"');
+    expect(simpleView).toContain("<ProjectNotesClient");
+    expect(simpleView).not.toContain("Routes.projectNotes");
     expect(simpleView).not.toContain('label="Thi công"');
     expect(simpleView).not.toContain('label="Tài chính & hồ sơ"');
   });

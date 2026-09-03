@@ -6,6 +6,7 @@ afterAll(() => mock.restore());
 const created: Array<Record<string, string>> = [];
 const updated: Array<Record<string, string>> = [];
 const deleted: Array<Record<string, string>> = [];
+let listError: Error | null = null;
 
 mock.module("@/lib/mobile/auth", () => createMobileAuthMock({
   requireMobileUser: async () => ({
@@ -29,7 +30,10 @@ mock.module("@/lib/data/project-notes", () => ({
     storeId === "store-1" && id === "project-1"
       ? { id: "project-1", serviceType: "camera" }
       : null,
-  listProjectNotes: async () => [{ id: "note-1", content: "Ghi chú cũ" }],
+  listProjectNotes: async () => {
+    if (listError) throw listError;
+    return [{ id: "note-1", content: "Ghi chú cũ" }];
+  },
   createProjectNote: async (input: Record<string, string>) => {
     created.push(input);
     return { id: "note-2", content: input.content };
@@ -98,6 +102,20 @@ describe("mobile project note CRUD", () => {
       ok: true,
       data: [{ id: "note-1", content: "Ghi chú cũ" }],
     });
+  });
+
+  test("returns a recoverable JSON error when the notes query fails", async () => {
+    listError = new Error('relation "project_notes" does not exist');
+    try {
+      const response = await getNotes(
+        new Request("https://luma.test/api/mobile/projects/project-1/notes"),
+        { params: Promise.resolve({ id: "project-1" }) },
+      );
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({ ok: false, error: "errors.serverError" });
+    } finally {
+      listError = null;
+    }
   });
 
   test("creates, edits and deletes a tenant-scoped note", async () => {

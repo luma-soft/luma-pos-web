@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Clock3, NotebookPen, PencilLine, Plus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Clock3, Loader2, NotebookPen, PencilLine, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 
@@ -27,17 +27,59 @@ export function ProjectNotesClient({
   canManage,
 }: {
   projectId: string;
-  initialNotes: ProjectNoteView[];
+  initialNotes?: ProjectNoteView[];
   canManage: boolean;
 }) {
   const router = useRouter();
   const t = useTranslations();
   const { confirm } = useConfirmDialog();
   const [notes, setNotes] = useState(initialNotes);
+  const [loading, setLoading] = useState(initialNotes === undefined);
+  const [loadError, setLoadError] = useState("");
   const [editing, setEditing] = useState<ProjectNoteView | null | undefined>();
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  const fetchNotes = useCallback(async (signal?: AbortSignal) => {
+    const response = await fetch(`/api/mobile/projects/${projectId}/notes`, {
+      cache: "no-store",
+      signal,
+    });
+    const payload = await response.json().catch(() => null) as ApiEnvelope<ProjectNoteView[]> | null;
+    if (!response.ok || !payload?.ok || !Array.isArray(payload.data)) {
+      throw new Error(payload?.error ? t(payload.error as never) : "Không thể tải ghi chú. Vui lòng thử lại.");
+    }
+    return payload.data;
+  }, [projectId, t]);
+
+  useEffect(() => {
+    if (initialNotes !== undefined) return;
+    const controller = new AbortController();
+    void fetchNotes(controller.signal).then((data) => {
+      if (controller.signal.aborted) return;
+      setNotes(data);
+      setLoadError("");
+      setLoading(false);
+    }, (cause: unknown) => {
+      if (controller.signal.aborted) return;
+      setLoadError(describeLoadError(cause));
+      setLoading(false);
+    });
+    return () => controller.abort();
+  }, [initialNotes, fetchNotes]);
+
+  async function loadNotes() {
+    setLoading(true);
+    try {
+      setNotes(await fetchNotes());
+      setLoadError("");
+    } catch (cause) {
+      setLoadError(describeLoadError(cause));
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function openCreate() {
     setEditing(null);
@@ -52,14 +94,7 @@ export function ProjectNotesClient({
   }
 
   async function reload() {
-    const response = await fetch(`/api/mobile/projects/${projectId}/notes`, {
-      cache: "no-store",
-    });
-    const payload = await response.json() as ApiEnvelope<ProjectNoteView[]>;
-    if (!response.ok || !payload.ok || !payload.data) {
-      throw new Error(payload.error ? t(payload.error as never) : "Không thể tải ghi chú");
-    }
-    setNotes(payload.data);
+    await loadNotes();
     router.refresh();
   }
 
@@ -120,9 +155,9 @@ export function ProjectNotesClient({
   return (
     <>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <p className="text-sm font-medium text-slate-500">{notes.length} ghi chú</p>
+        <p className="text-sm font-medium text-slate-500">{notes ? `${notes.length} ghi chú` : "Danh sách ghi chú"}</p>
         {canManage && (
-          <Button type="button" onClick={openCreate} disabled={busy}>
+          <Button type="button" onClick={openCreate} disabled={busy || loading || notes === undefined}>
             <Plus className="h-4 w-4" />
             Thêm ghi chú
           </Button>
@@ -135,13 +170,30 @@ export function ProjectNotesClient({
         </p>
       )}
 
-      {notes.length === 0 ? (
+      {loadError && (
+        <div role="alert" className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-er-soft px-3 py-2 text-sm text-er">
+          <p>{loadError}</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => void loadNotes()} disabled={loading}>
+            <RotateCw className="h-4 w-4" />
+            Thử lại
+          </Button>
+        </div>
+      )}
+
+      {loading && (
+        <p role="status" className="flex items-center justify-center gap-2 py-8 text-sm text-slate-500">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Đang tải ghi chú…
+        </p>
+      )}
+
+      {notes?.length === 0 && !loading && !loadError ? (
         <section className="rounded-2xl bg-surface-2 px-5 py-12 text-center">
           <NotebookPen className="mx-auto h-9 w-9 text-primary-600" />
           <h2 className="mt-3 font-semibold">Chưa có ghi chú</h2>
           <p className="mt-1 text-sm text-slate-500">Lưu yêu cầu của khách hoặc việc cần nhớ cho công trình.</p>
         </section>
-      ) : (
+      ) : notes && notes.length > 0 ? (
         <div className="space-y-3">
           {notes.map((note) => (
             <article key={note.id} className="rounded-2xl border border-border bg-surface px-4 pb-3 pt-4 shadow-sm">
@@ -165,7 +217,7 @@ export function ProjectNotesClient({
             </article>
           ))}
         </div>
-      )}
+      ) : null}
 
       <RowPreviewModal
         open={editing !== undefined}
@@ -205,4 +257,10 @@ function formatNoteTime(value: string) {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function describeLoadError(cause: unknown) {
+  return cause instanceof Error && !(cause instanceof TypeError)
+    ? cause.message
+    : "Không thể tải ghi chú. Vui lòng thử lại.";
 }

@@ -1,8 +1,5 @@
-import Link from "next/link";
 import {
-  CalendarDays,
   CheckCircle2,
-  ChevronRight,
   FileStack,
   House,
   Images,
@@ -13,7 +10,6 @@ import {
 
 import type { ProjectDetail } from "@/lib/data/projects";
 import type { getServiceFormOptions } from "@/lib/data/services";
-import { Routes } from "@/lib/routes";
 import { InstalledAssetQuickCreate } from "../../services/service-widgets";
 import { InstalledAssetPhotoThumbnail } from "./installed-asset-photo-thumbnail";
 import {
@@ -22,12 +18,12 @@ import {
 } from "./project-media-panel";
 import { ProjectCompletionButton } from "./project-completion-button";
 import { ProjectServiceTab, ProjectServiceTabs } from "./project-service-tabs";
+import { ProjectNotesClient } from "./notes/project-notes-client";
 
 type ServiceOptions = Awaited<ReturnType<typeof getServiceFormOptions>>;
 
 export function ProjectSimpleExperience({
   detail,
-  serviceOptions,
   canManage,
 }: {
   detail: ProjectDetail;
@@ -76,22 +72,7 @@ export function ProjectSimpleExperience({
                 </dl>
               </section>
 
-              <div className="space-y-3">
-                <Link
-                  href={Routes.projectNotes(project.id)}
-                  className="group flex min-h-24 items-center gap-3 rounded-xl border border-border bg-surface p-4 transition hover:-translate-y-0.5 hover:border-primary-300 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                >
-                  <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary-50 text-primary-700">
-                    <NotebookPen className="h-5 w-5" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <strong className="block text-sm">Danh sách ghi chú</strong>
-                    <span className="mt-1 block truncate text-xs text-slate-500">
-                      {project.note?.trim() || "Thêm thông tin cần nhớ cho công trình"}
-                    </span>
-                  </span>
-                  <ChevronRight className="h-5 w-5 text-slate-400 transition group-hover:translate-x-0.5" />
-                </Link>
+              <div>
                 <div className="grid grid-cols-2 gap-3">
                   <QuickStat icon={<Server />} label="Thiết bị đã lắp" value={assets.length} />
                   <QuickStat icon={<FileStack />} label="Ảnh & tài liệu" value={detail.projectAttachments.length} />
@@ -155,6 +136,10 @@ export function ProjectSimpleExperience({
 
           <ProjectServiceTab id="media" label="Ảnh & tài liệu" icon={<Images />} count={detail.projectAttachments.length}>
             <CoordinatedProjectMediaPanel projectId={project.id} />
+          </ProjectServiceTab>
+
+          <ProjectServiceTab id="notes" label="Ghi chú" icon={<NotebookPen />}>
+            <ProjectNotesClient key={project.id} projectId={project.id} canManage={canManage} />
           </ProjectServiceTab>
         </ProjectServiceTabs>
       </ProjectMediaUploadCoordinator>
