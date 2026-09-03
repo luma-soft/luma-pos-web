@@ -1,6 +1,8 @@
 export { Button, type ButtonProps } from "./button";
 export { buttonVariants, type ButtonVariantProps } from "./button-variants";
 export { Input, Textarea, type InputProps, type TextareaProps } from "./input";
+export { Checkbox } from "./checkbox";
+export { DateInput } from "./date-input";
 export { NumberInput, type NumberInputProps } from "./number-input";
 export {
   QuantityInput,

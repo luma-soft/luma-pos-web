@@ -1,5 +1,7 @@
 "use client";
 
+import { DateInput } from "@/components/ui/date-input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -199,11 +201,11 @@ function CustomerRows({
   const columns: DataTableColumn<CustomerRow>[] = [
     {
       key: "select",
-      label: <input type="checkbox" className="h-4 w-4 rounded border-slate-300" aria-label={t("customers.selectAll")} />,
+      label: <Checkbox className="h-4 w-4" aria-label={t("customers.selectAll")} />,
       required: true,
       width: "44px",
       align: "center",
-      render: (customer) => <input type="checkbox" className="h-4 w-4 rounded border-slate-300" aria-label={customer.name} onClick={stopRowToggle} />,
+      render: (customer) => <Checkbox className="h-4 w-4" aria-label={customer.name} onClick={stopRowToggle} />,
     },
     { key: "code", label: t("customers.cols.code"), defaultVisible: true, width: "130px", render: (customer) => <span className="font-medium">{customer.code ?? "—"}</span> },
     { key: "name", label: t("customers.cols.name"), required: true, render: (customer) => <span className="font-semibold text-slate-900 dark:text-slate-100">{customer.name}</span> },
@@ -789,8 +791,8 @@ function DateRangeFilter({
       <div className="grid grid-cols-[auto_1fr] gap-2">
         <CalendarDays className="mt-2.5 h-4 w-4 text-primary-600" />
         <div className="grid gap-2">
-          <input type="date" name={fromName} defaultValue={fromValue ?? ""} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" aria-label={t("customers.filters.from")} />
-          <input type="date" name={toName} defaultValue={toValue ?? ""} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" aria-label={t("customers.filters.to")} />
+          <DateInput type="date" name={fromName} defaultValue={fromValue ?? ""} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" aria-label={t("customers.filters.from")} />
+          <DateInput type="date" name={toName} defaultValue={toValue ?? ""} className="h-10 rounded-lg border border-border bg-surface px-3 text-sm min-h-11 lg:min-h-0 min-w-11 lg:min-w-0" aria-label={t("customers.filters.to")} />
         </div>
       </div>
     </div>

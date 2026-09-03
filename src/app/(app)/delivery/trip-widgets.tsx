@@ -1,5 +1,6 @@
 "use client";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -52,8 +53,7 @@ export function TripCreate({ orders }: { orders: { id: string; label: string }[]
         {orders.length === 0 && <p className="p-4 text-sm text-slate-400">{t("delivery.noOrders")}</p>}
         {orders.map((o) => (
           <label key={o.id} className="flex min-h-11 min-w-11 items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-surface-2 lg:min-h-0 lg:min-w-0">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={selected.includes(o.id)}
               onChange={(e) => setSelected((s) => e.target.checked ? [...s, o.id] : s.filter((x) => x !== o.id))}
             />

@@ -1,5 +1,6 @@
 "use client";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -199,7 +200,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
                 </Field>
               </div>
               <label className="mt-3 flex min-h-11 items-center gap-2 text-sm font-semibold lg:min-h-0 min-w-11 lg:min-w-0">
-                <input type="checkbox" checked={selected.isDefault} onChange={(event) => patch({ isDefault: event.target.checked })} />
+                <Checkbox checked={selected.isDefault} onChange={(event) => patch({ isDefault: event.target.checked })} />
                 {t("printSettings.defaultTemplate")}
               </label>
             </Panel>
@@ -217,7 +218,7 @@ export function PrintSettingsForm({ templates, storeDefaults }: { templates: Pri
               <div className="grid gap-2 sm:grid-cols-2">
                 {TOGGLES.map((key) => (
                   <label key={key} className="flex min-h-11 items-center gap-2 text-sm lg:min-h-0 min-w-11 lg:min-w-0">
-                    <input type="checkbox" checked={Boolean(selected.options[key])} onChange={(event) => patchOption(key, event.target.checked)} />
+                    <Checkbox checked={Boolean(selected.options[key])} onChange={(event) => patchOption(key, event.target.checked)} />
                     {t(`printSettings.toggles.${key}`)}
                   </label>
                 ))}

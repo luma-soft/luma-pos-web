@@ -1,5 +1,6 @@
 "use client";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -154,7 +155,7 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
                 <Field label={t("labelSettings.sortOrder")}><NumberInput value={selected.sortOrder} min={0} max={9999} onChange={(value) => patch({ sortOrder: value ?? selected.sortOrder })} className={inputCls} /></Field>
               </div>
               <label className="mt-3 flex min-h-11 items-center gap-2 text-sm font-semibold lg:min-h-0 min-w-11 lg:min-w-0">
-                <input type="checkbox" checked={selected.isDefault} onChange={(event) => patch({ isDefault: event.target.checked })} />
+                <Checkbox checked={selected.isDefault} onChange={(event) => patch({ isDefault: event.target.checked })} />
                 {t("labelSettings.defaultTemplate")}
               </label>
             </Panel>
@@ -195,7 +196,7 @@ export function LabelSettingsForm({ templates }: { templates: LabelTemplate[] })
               <div className="grid gap-2 sm:grid-cols-2">
                 {TOGGLES.map((key) => (
                   <label key={key} className="flex min-h-11 items-center gap-2 text-sm lg:min-h-0 min-w-11 lg:min-w-0">
-                    <input type="checkbox" checked={Boolean(selected[key])} onChange={(event) => patch({ [key]: event.target.checked })} />
+                    <Checkbox checked={Boolean(selected[key])} onChange={(event) => patch({ [key]: event.target.checked })} />
                     {t(`labelSettings.toggles.${key}`)}
                   </label>
                 ))}

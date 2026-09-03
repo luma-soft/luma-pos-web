@@ -1,5 +1,6 @@
 "use client";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -700,7 +701,7 @@ export function PurchaseForm({
             </div>
             <div className="flex justify-between items-center text-base font-semibold pt-1"><span>{t("purchases.needPay")}</span><span className="text-primary-600 tabular-nums">{formatCurrency(total)}</span></div>
 
-            <label className="flex min-h-11 min-w-11 items-center gap-2 pt-1 text-sm lg:min-h-0 lg:min-w-0"><input type="checkbox" checked={payFull} onChange={(e) => setPayFull(e.target.checked)} className="rounded text-primary-600" />{t("purchases.payFull")}</label>
+            <label className="flex min-h-11 min-w-11 items-center gap-2 pt-1 text-sm lg:min-h-0 lg:min-w-0"><Checkbox checked={payFull} onChange={(e) => setPayFull(e.target.checked)}  />{t("purchases.payFull")}</label>
             {!payFull && (
               <div className="flex justify-between items-center gap-2"><span className="text-slate-500">{t("purchases.amountPaid")}</span><MoneyInput value={amountPaid || ""} placeholder="0" onChange={(v) => setAmountPaid(v ?? 0)} className={cn(numCls, "w-36")} /></div>
             )}

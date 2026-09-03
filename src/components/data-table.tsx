@@ -1,5 +1,6 @@
 "use client";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import { Fragment, isValidElement, type ReactNode, type SyntheticEvent, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronUp, Columns3, X } from "lucide-react";
@@ -656,12 +657,11 @@ function ColumnVisibilityMenu<T>({
                       column.required ? "text-slate-400" : "cursor-pointer text-slate-600 hover:bg-surface-2 hover:text-slate-900 dark:text-slate-300 dark:hover:text-slate-100",
                     )}
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={checked}
                       disabled={column.required}
                       onChange={() => onToggle(column.key)}
-                      className="h-3.5 w-3.5 rounded border-slate-300 accent-primary-600"
+                      className="h-3.5 w-3.5"
                     />
                     <span className="truncate">{column.label}</span>
                   </label>

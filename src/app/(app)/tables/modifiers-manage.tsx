@@ -1,5 +1,6 @@
 "use client";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -107,8 +108,8 @@ export function ModifiersManage({ groups, categories }: { groups: ModifierGroup[
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <label className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm hover:bg-surface-2 min-w-11"><input type="checkbox" checked={form.multi} onChange={(e) => setForm((f) => ({ ...f, multi: e.target.checked }))} />{t("modifiers.multiSelect")}</label>
-                <label className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm hover:bg-surface-2 min-w-11"><input type="checkbox" checked={form.required} onChange={(e) => setForm((f) => ({ ...f, required: e.target.checked }))} />{t("modifiers.required")}</label>
+                <label className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm hover:bg-surface-2 min-w-11"><Checkbox checked={form.multi} onChange={(e) => setForm((f) => ({ ...f, multi: e.target.checked }))} />{t("modifiers.multiSelect")}</label>
+                <label className="flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm hover:bg-surface-2 min-w-11"><Checkbox checked={form.required} onChange={(e) => setForm((f) => ({ ...f, required: e.target.checked }))} />{t("modifiers.required")}</label>
               </div>
 
               <div>

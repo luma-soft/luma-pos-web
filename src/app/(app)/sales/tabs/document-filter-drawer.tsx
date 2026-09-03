@@ -1,5 +1,6 @@
 "use client";
 
+import { Toggle } from "@/components/ui/toggle";
 import {
   useCallback,
   useEffect,
@@ -731,17 +732,12 @@ export function DocumentFilterDrawer({
                           Mặc định được ẩn khỏi danh sách
                         </span>
                       </span>
-                      <input
-                        type="checkbox"
-                        name="includeCancelled"
-                        value="1"
+                      {draft.includeCancelled && <input type="hidden" name="includeCancelled" value="1" />}
+                      <Toggle
+                        aria-label="Hiện phiếu đã hủy"
                         checked={draft.includeCancelled}
-                        onChange={(event) =>
-                          updateDraft({ includeCancelled: event.target.checked })
-                        }
-                        className="peer sr-only"
+                        onChange={(checked) => updateDraft({ includeCancelled: checked })}
                       />
-                      <span className="relative h-7 w-12 rounded-full bg-slate-200 transition peer-checked:bg-primary-600 after:absolute after:left-1 after:top-1 after:size-5 after:rounded-full after:bg-white after:transition peer-checked:after:translate-x-5" />
                     </label>
                   </>
                 )}

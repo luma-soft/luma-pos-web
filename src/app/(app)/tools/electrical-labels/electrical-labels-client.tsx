@@ -1,5 +1,7 @@
 "use client";
 
+import { ColorPicker } from "@/components/ui/color-picker";
+import { Checkbox } from "@/components/ui/checkbox";
 import * as React from "react";
 import { createPortal } from "react-dom";
 import {
@@ -450,9 +452,8 @@ export function ElectricalLabelsClient() {
                   <Text as="span" weight="medium">{t("uppercase")}</Text>
                   <Text as="span" variant="muted" size="xs" className="mt-0.5 block">{t("uppercaseHint")}</Text>
                 </span>
-                <input
-                  type="checkbox"
-                  className="size-5 accent-primary-600"
+                <Checkbox
+                  className="size-5"
                   checked={settings.uppercase}
                   onChange={(event) => setSettings((current) => ({ ...current, uppercase: event.target.checked }))}
                 />
@@ -527,23 +528,7 @@ function CircuitColorPicker({
 }) {
   return (
     <div className="relative mt-1 flex w-fit gap-1 lg:block">
-      <label
-        className="relative grid size-11 cursor-pointer place-items-center overflow-hidden rounded-lg border border-border bg-surface shadow-sm transition-colors hover:border-primary-400 focus-within:ring-2 focus-within:ring-primary-500/30 lg:size-9"
-        title={chooseLabel}
-      >
-        {color ? (
-          <span className="absolute inset-1 rounded-md" style={{ backgroundColor: color }} aria-hidden="true" />
-        ) : (
-          <Ban className="size-4 text-slate-400" aria-hidden="true" />
-        )}
-        <input
-          type="color"
-          value={color ?? "#0f766e"}
-          onChange={(event) => onChange(event.target.value)}
-          aria-label={chooseLabel}
-          className="absolute inset-0 cursor-pointer opacity-0"
-        />
-      </label>
+      <ColorPicker value={color} onChange={onChange} label={chooseLabel} />
       {color && (
         <button
           type="button"

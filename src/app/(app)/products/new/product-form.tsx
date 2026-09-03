@@ -1,5 +1,6 @@
 "use client";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -448,10 +449,8 @@ function FormActions({
       )}
     >
       <label className="flex min-h-11 min-w-11 cursor-pointer items-center gap-2 text-sm lg:min-h-0 lg:min-w-0">
-        <input
-          type="checkbox"
+        <Checkbox
           {...registerDirectSale}
-          className="rounded text-primary-600 focus:ring-primary-500"
         />
         <span>{t("products.directSale")}</span>
       </label>
@@ -787,10 +786,9 @@ function SiblingApplySection({ siblingCount }: { siblingCount: number }) {
     <Section title={t("products.variants.applyTitle")} collapsible={false}>
       <div className="space-y-3">
         <label className="flex items-start gap-3 rounded-xl border border-border bg-surface px-4 py-3 min-h-11 min-w-11">
-          <input
-            type="checkbox"
+          <Checkbox
             {...register("applyToSiblings.enabled")}
-            className="mt-1 rounded text-primary-600 focus:ring-primary-500"
+            className="mt-1"
           />
           <span className="min-w-0">
             <span className="flex items-center gap-1.5 text-sm font-semibold">
@@ -810,11 +808,9 @@ function SiblingApplySection({ siblingCount }: { siblingCount: number }) {
                 key={opt}
                 className="flex min-h-11 min-w-11 items-center gap-2 rounded-lg bg-surface px-3 py-2 text-sm lg:min-h-0 lg:min-w-0"
               >
-                <input
-                  type="checkbox"
+                <Checkbox
                   value={opt}
                   {...register("applyToSiblings.fields")}
-                  className="rounded text-primary-600 focus:ring-primary-500"
                 />
                 <span>{t(`products.variants.applyFields.${opt}`)}</span>
               </label>
@@ -1056,10 +1052,8 @@ function VariantChildrenPreview() {
                 </td>
                 <td className="block p-0 lg:table-cell lg:px-3 lg:py-2 lg:text-center">
                   <label className="inline-flex min-h-11 min-w-11 items-center gap-2 text-xs font-semibold text-slate-500 lg:min-h-0 lg:min-w-0">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     {...register(`variantChildren.${idx}.directSale`)}
-                    className="rounded text-primary-600 focus:ring-primary-500"
                   />
                   <span className="lg:hidden">{t("products.variants.sale")}</span>
                   </label>

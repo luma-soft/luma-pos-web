@@ -1,5 +1,7 @@
 "use client";
 
+import { DateInput } from "@/components/ui/date-input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
@@ -2130,11 +2132,10 @@ export function PosClient({
               <div className="flex items-center justify-between gap-3">
                 <div className="text-sm font-semibold">{t(isReturnInvoiceDraft ? "pos.returns.invoiceTitle" : "pos.returns.quickTitle")}</div>
                 <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-300">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={returnRestock ?? true}
                     onChange={(e) => setReturnRestock(e.target.checked)}
-                    className="h-4 w-4 rounded border-border accent-primary-600"
+                    className="h-4 w-4"
                   />
                   {t("pos.returns.restock")}
                 </label>
@@ -2220,7 +2221,7 @@ export function PosClient({
           {isBookingDraft && (
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-500">{t("pos.deliveryTime")}</label>
-              <input
+              <DateInput
                 type="datetime-local"
                 value={deliveryDate ?? ""}
                 onChange={(e) => setDeliveryDate(e.target.value)}

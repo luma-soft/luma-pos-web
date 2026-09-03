@@ -389,11 +389,9 @@ export function LibraryUploadDialog({
                   })
                 : "")}
           {progress && (
-            <progress
-              value={progress.index - 1}
-              max={files.length}
-              className="mt-3 block h-1 w-full accent-primary-600"
-            />
+            <div role="progressbar" aria-valuenow={progress.index - 1} aria-valuemin={0} aria-valuemax={files.length} aria-label={t("uploading", { current: progress.index, total: files.length, name: progress.name })} className="mt-3 h-1 w-full overflow-hidden rounded-full bg-primary-100">
+              <div className="h-full rounded-full bg-primary-600 transition-[width]" style={{ width: `${files.length ? ((progress.index - 1) / files.length) * 100 : 0}%` }} />
+            </div>
           )}
         </div>
       )}

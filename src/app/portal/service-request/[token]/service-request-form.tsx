@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Select } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 
 export function ServiceRequestForm({
@@ -23,6 +25,8 @@ export function ServiceRequestForm({
   canSubmit: boolean;
 }) {
   const t = useTranslations("serviceRequestPortal");
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [fileNames, setFileNames] = useState<string[]>([]);
   const locale = useLocale();
   const [sent, setSent] = useState(!canSubmit);
   const [statusView, setStatusView] = useState(initialStatus);
@@ -89,16 +93,23 @@ export function ServiceRequestForm({
         {t("subject")}
         <input name="title" required minLength={3} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
       </label>
-      <label className="block text-sm font-semibold">
-        {t("evidence")}
+      <div className="block text-sm font-semibold">
+        <span>{t("evidence")}</span>
         <input
+          ref={fileRef}
           name="evidence"
           type="file"
           multiple
           accept="image/jpeg,image/png,image/webp"
-          className="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2 text-sm"
+          className="hidden"
+          onChange={(event) => setFileNames(Array.from(event.target.files ?? []).map((file) => file.name))}
         />
-      </label>
+        <Button type="button" variant="outline" className="mt-1 w-full justify-start" onClick={() => fileRef.current?.click()}>
+          <span className="min-w-0 truncate" title={fileNames.length ? fileNames.join(", ") : undefined}>
+            {fileNames.length ? fileNames.join(", ") : locale.startsWith("vi") ? "Chọn ảnh" : "Choose images"}
+          </span>
+        </Button>
+      </div>
       <label className="block text-sm font-semibold">
         {t("description")}
         <textarea name="description" required minLength={5} rows={5} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2" />
@@ -115,12 +126,8 @@ export function ServiceRequestForm({
       </div>
       <label className="block text-sm font-semibold">
         {t("priority")}
-        <select name="priority" defaultValue="normal" className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2">
-          <option value="low">{t("priorities.low")}</option>
-          <option value="normal">{t("priorities.normal")}</option>
-          <option value="high">{t("priorities.high")}</option>
-          <option value="urgent">{t("priorities.urgent")}</option>
-        </select>
+        <Select name="priority" defaultValue="normal" aria-label={t("priority")} rootClassName="mt-1 w-full"
+          options={["low", "normal", "high", "urgent"].map((value) => ({ value, label: t(`priorities.${value}`) }))} />
       </label>
       {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
       <button disabled={busy} className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white disabled:opacity-50">

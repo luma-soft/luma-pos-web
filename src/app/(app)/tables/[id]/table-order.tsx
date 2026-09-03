@@ -1,5 +1,6 @@
 "use client";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -197,7 +198,7 @@ export function TableOrder({
                   {split && (
                     <label className="grid h-11 w-11 shrink-0 place-items-center rounded-xl hover:bg-surface-2">
                       <span className="sr-only">{c.productName}</span>
-                      <input type="checkbox" checked={selected.includes(c.lineId)} onChange={() => toggleSelect(c.lineId)} className="size-5 accent-primary-600" />
+                      <Checkbox checked={selected.includes(c.lineId)} onChange={() => toggleSelect(c.lineId)} className="size-5" />
                     </label>
                   )}
                   <div className="min-w-[8rem] flex-1">

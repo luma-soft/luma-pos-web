@@ -1,5 +1,6 @@
 "use client";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -81,15 +82,14 @@ export function OrderSelectionCheckbox({
       className="inline-grid size-11 cursor-pointer place-items-center lg:size-4"
       title={disabled ? disabledReason : undefined}
     >
-      <input
+      <Checkbox
         ref={ref}
-        type="checkbox"
         checked={checked}
         disabled={disabled}
         onChange={onChange}
         onClick={stopRowToggle}
         aria-label={label}
-        className="h-4 w-4 rounded border-slate-300 accent-primary-600 disabled:cursor-not-allowed disabled:opacity-50"
+        className="h-4 w-4"
       />
     </label>
   );

@@ -1,3 +1,6 @@
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Pagination } from "@/components/pagination";
@@ -41,38 +44,30 @@ export async function ServiceDispatchPanel({
       <Section collapsible={false}>
         <form className="flex flex-wrap gap-2" method="get">
           <input type="hidden" name="tab" value="dispatch" />
-          <select name="scope" defaultValue={params.scope ?? "week"} className="min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm">
-            <option value="today">{t("today")}</option>
-            <option value="week">{t("sevenDays")}</option>
-          </select>
-          <select name="status" defaultValue={params.status ?? ""} className="min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm">
-            <option value="">{t("allStatuses")}</option>
-            <option value="new,scheduled">{t("newScheduled")}</option>
-            <option value="in_progress">{t("inProgress")}</option>
-            <option value="waiting_materials,waiting_customer">{t("waiting")}</option>
-            <option value="completed">{t("completed")}</option>
-          </select>
-          <select name="priority" defaultValue={params.priority ?? ""} className="min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm">
-            <option value="">{t("allPriorities")}</option>
-            <option value="urgent">{priorities("urgent")}</option>
-            <option value="high">{priorities("high")}</option>
-            <option value="normal">{priorities("normal")}</option>
-            <option value="low">{priorities("low")}</option>
-          </select>
-          <select name="technicianId" defaultValue={params.technicianId ?? ""} className="min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm">
-            <option value="">{t("allTechnicians")}</option>
-            {technicians.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select>
+          <Select name="scope" defaultValue={params.scope ?? "week"} aria-label={t("filterSchedule")}
+            options={[{ value: "today", label: t("today") }, { value: "week", label: t("sevenDays") }]} />
+          <Select name="status" defaultValue={params.status ?? ""} aria-label={t("allStatuses")}
+            options={[
+              { value: "", label: t("allStatuses") },
+              { value: "new,scheduled", label: t("newScheduled") },
+              { value: "in_progress", label: t("inProgress") },
+              { value: "waiting_materials,waiting_customer", label: t("waiting") },
+              { value: "completed", label: t("completed") },
+            ]} />
+          <Select name="priority" defaultValue={params.priority ?? ""} aria-label={t("allPriorities")}
+            options={[{ value: "", label: t("allPriorities") }, ...["urgent", "high", "normal", "low"].map((value) => ({ value, label: priorities(value) }))]} />
+          <Select name="technicianId" defaultValue={params.technicianId ?? ""} aria-label={t("allTechnicians")} searchable
+            options={[{ value: "", label: t("allTechnicians") }, ...technicians.map((item) => ({ value: item.id, label: item.name }))]} />
           <label className="inline-flex min-h-11 min-w-11 items-center gap-2 rounded-lg border border-border px-3 text-sm">
-            <input type="checkbox" name="unassigned" value="true" defaultChecked={params.unassigned === "true"} />
+            <Checkbox name="unassigned" value="true" defaultChecked={params.unassigned === "true"} />
             {t("unassigned")}
           </label>
           <label className="inline-flex min-h-11 min-w-11 items-center gap-2 rounded-lg border border-border px-3 text-sm">
-            <input type="checkbox" name="slaOverdue" value="true" defaultChecked={params.slaOverdue === "true"} />
+            <Checkbox name="slaOverdue" value="true" defaultChecked={params.slaOverdue === "true"} />
             {t("slaOverdue")}
           </label>
           <label className="inline-flex min-h-11 min-w-11 items-center gap-2 rounded-lg border border-border px-3 text-sm">
-            <input type="checkbox" name="maintenanceOverdue" value="true" defaultChecked={params.maintenanceOverdue === "true"} />
+            <Checkbox name="maintenanceOverdue" value="true" defaultChecked={params.maintenanceOverdue === "true"} />
             {t("maintenanceOverdue")}
           </label>
           <button className="min-h-11 min-w-11 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white" type="submit">
@@ -135,8 +130,8 @@ export async function ServiceReportPanel({ data }: { data: ReportData }) {
       <Section collapsible={false}>
         <form className="flex flex-wrap items-end gap-2" method="get">
           <input type="hidden" name="tab" value="reporting" />
-          <label className="text-xs text-slate-500">{t("fromDate")}<input className="ml-2 min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm" type="date" name="from" /></label>
-          <label className="text-xs text-slate-500">{t("beforeDate")}<input className="ml-2 min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm" type="date" name="to" /></label>
+          <label className="text-xs text-slate-500">{t("fromDate")}<Input className="mt-1 min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm" type="date" name="from" /></label>
+          <label className="text-xs text-slate-500">{t("beforeDate")}<Input className="mt-1 min-h-11 min-w-11 rounded-lg border border-border bg-surface px-3 text-sm" type="date" name="to" /></label>
           <button className="min-h-11 min-w-11 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white" type="submit">{t("viewReport")}</button>
         </form>
       </Section>

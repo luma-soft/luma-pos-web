@@ -1,5 +1,6 @@
 "use client";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -390,7 +391,7 @@ export function PurchaseReturnForm({ options }: { options: PurchaseFormOptions }
             </div>
             <label className="flex min-h-11 min-w-11 items-center justify-between gap-3 rounded-lg border border-border-soft px-3 py-2 lg:min-h-0 lg:min-w-0">
               <span className="text-slate-600 dark:text-slate-300">{t("purchaseReturns.applyDebt")}</span>
-              <input type="checkbox" checked={applyDebt} onChange={(event) => setApplyDebt(event.target.checked)} className="rounded text-primary-600" />
+              <Checkbox checked={applyDebt} onChange={(event) => setApplyDebt(event.target.checked)}  />
             </label>
             <SummaryLine label={t("purchaseReturns.debtAmount")} value={formatCurrency(debtAmount)} />
             {unsettled > 0 && <SummaryLine label={t("purchaseReturns.unsettledAmount")} value={formatCurrency(unsettled)} tone="warn" />}

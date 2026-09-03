@@ -1,5 +1,6 @@
 "use client";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -618,7 +619,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
               </div>
             </div>
             <label className="mt-4 flex min-h-11 min-w-11 items-start gap-2 text-sm lg:min-h-0 lg:min-w-0">
-              <input type="checkbox" checked={fAll} onChange={(e) => setFAll(e.target.checked)} className="mt-0.5" />
+              <Checkbox checked={fAll} onChange={(e) => setFAll(e.target.checked)} className="mt-0.5" />
               <span>{t("pricing.formula.applyAll", { n: total })} <b>{formulaBook.name}</b></span>
             </label>
             <div className="mt-5 flex justify-end gap-2">

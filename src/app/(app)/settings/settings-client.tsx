@@ -1,5 +1,7 @@
 "use client";
 
+import { useConfirmDialog } from "@/components/confirm-dialog-provider";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
@@ -818,6 +820,7 @@ function SePayNotificationsSection({ L }: { L: boolean }) {
 }
 
 function SePayAccountsSection({ L, accounts, canManage }: { L: boolean; accounts: PaymentBankAccountRow[]; canManage: boolean }) {
+  const dialog = useConfirmDialog();
   const t = useTranslations("settings.payments.sepay");
   const [form, setForm] = useState<PaymentBankAccountInput>(EMPTY_BANK_ACCOUNT);
   const [formOpen, setFormOpen] = useState(false);
@@ -883,8 +886,8 @@ function SePayAccountsSection({ L, accounts, canManage }: { L: boolean; accounts
       setMessage(res.ok ? t("saved") : t("saveError"));
     });
   };
-  const remove = (account: PaymentBankAccountRow) => {
-    const ok = window.confirm(t("deleteConfirm", { account: account.accountNumber }));
+  const remove = async (account: PaymentBankAccountRow) => {
+    const ok = await dialog.confirm({ description: t("deleteConfirm", { account: account.accountNumber }), variant: "destructive" });
     if (!ok) return;
     start(async () => {
       const res = await deletePaymentBankAccount(account.id);
@@ -1418,7 +1421,7 @@ function ZaloSecretInput({
         onChange={(e) => onValueChange(id, e.target.value)}
       />
       <label className="mt-1 flex min-h-11 items-center gap-2 text-[11px] text-slate-500 lg:min-h-0 min-w-11 lg:min-w-0">
-        <input type="checkbox" checked={clear} disabled={!canEdit} onChange={(e) => onClearChange(id, e.target.checked)} />
+        <Checkbox checked={clear} disabled={!canEdit} onChange={(e) => onClearChange(id, e.target.checked)} />
         {L ? "Xóa giá trị đang lưu" : "Clear saved value"}
       </label>
     </div>
@@ -1513,7 +1516,7 @@ function ShopeeSettingsSection({ L, prefs, canEdit }: { L: boolean; prefs: Store
                 onChange={(e) => set("partnerKey", e.target.value)}
               />
               <label className="mt-1 flex min-h-11 items-center gap-2 text-[11px] text-slate-500 lg:min-h-0 min-w-11 lg:min-w-0">
-                <input type="checkbox" checked={clearPartnerKey} disabled={!canEdit} onChange={(e) => { setClearPartnerKey(e.target.checked); mark(); }} />
+                <Checkbox checked={clearPartnerKey} disabled={!canEdit} onChange={(e) => { setClearPartnerKey(e.target.checked); mark(); }} />
                 {L ? "Xóa partner key đang lưu" : "Clear saved partner key"}
               </label>
             </div>
@@ -1797,7 +1800,7 @@ function AiSection({ L, prefs, canEdit, usage }: { L: boolean; prefs: StorePrefs
               />
               <span className="text-[11px] text-slate-500">{providerKeyHelp(form.provider, L)}</span>
               <label className="mt-1 flex min-h-11 items-center gap-2 text-[11px] text-slate-500 lg:min-h-0 min-w-11 lg:min-w-0">
-                <input type="checkbox" checked={clearOpenaiApiKey} disabled={!canEdit} onChange={(e) => toggleClearKey(e.target.checked)} />
+                <Checkbox checked={clearOpenaiApiKey} disabled={!canEdit} onChange={(e) => toggleClearKey(e.target.checked)} />
                 {L ? "Xóa API key đang lưu" : "Clear saved API key"}
               </label>
             </div>

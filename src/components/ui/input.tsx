@@ -5,6 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import type { TxValues } from "./_tx";
+import { DateInput } from "./date-input";
 
 const inputVariants = cva(
   "flex w-full rounded-lg border bg-surface px-3 text-sm transition-[border-color,background-color] duration-150 placeholder:text-slate-400 focus:border-primary-600 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50",
@@ -42,6 +43,10 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, size, variant, leftIcon, rightIcon, placeholder, placeholderTx, placeholderTxOptions, ...props }, ref) => {
     const t = useTranslations();
     const finalPlaceholder = placeholderTx ? t(placeholderTx, placeholderTxOptions) : placeholder;
+
+    if (props.type === "date" || props.type === "datetime-local") {
+      return <DateInput {...props} type={props.type === "date" ? "date" : "datetime-local"} ref={ref} placeholder={finalPlaceholder} className={cn(inputVariants({ size, variant }), className)} />;
+    }
 
     if (leftIcon || rightIcon) {
       return (

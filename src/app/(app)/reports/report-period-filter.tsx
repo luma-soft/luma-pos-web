@@ -1,5 +1,6 @@
 "use client";
 
+import { DateInput } from "@/components/ui/date-input";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -100,7 +101,7 @@ export function ReportPeriodFilter({
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="space-y-1.5 text-sm font-medium text-slate-600 dark:text-slate-300">
             <span className="block">{t("reports.period.from")}</span>
-            <input
+            <DateInput
               type="date"
               value={customFrom}
               max={customTo}
@@ -110,7 +111,7 @@ export function ReportPeriodFilter({
           </label>
           <label className="space-y-1.5 text-sm font-medium text-slate-600 dark:text-slate-300">
             <span className="block">{t("reports.period.to")}</span>
-            <input
+            <DateInput
               type="date"
               value={customTo}
               min={customFrom}

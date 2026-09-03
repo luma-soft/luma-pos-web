@@ -1,5 +1,6 @@
 "use client";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   useCallback,
   useEffect,
@@ -560,14 +561,13 @@ export function SelectionCheckbox({
   }, [indeterminate]);
   return (
     <label className="inline-grid size-11 cursor-pointer place-items-center lg:size-4">
-      <input
+      <Checkbox
         ref={ref}
-        type="checkbox"
         checked={checked}
         onChange={onChange}
         onClick={stopRowToggle}
         aria-label={label}
-        className="h-4 w-4 rounded border-slate-300 accent-primary-600"
+        className="h-4 w-4"
       />
     </label>
   );

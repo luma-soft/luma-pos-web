@@ -1,3 +1,4 @@
+import { Checkbox } from "@/components/ui/checkbox";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getLocale } from "next-intl/server";
@@ -217,7 +218,7 @@ function ShopPolicyForm({
         ].map(([name, label, checked]) => (
           <label key={String(name)} className="flex min-h-11 min-w-11 items-center justify-between gap-3 rounded-lg border border-border-soft bg-canvas px-3 py-2 text-sm font-semibold lg:min-h-0 lg:min-w-0">
             <span>{label}</span>
-            <input name={String(name)} type="checkbox" defaultChecked={Boolean(checked)} className="h-4 w-4" />
+            <Checkbox name={String(name)} defaultChecked={Boolean(checked)} className="h-4 w-4" />
           </label>
         ))}
       </div>
