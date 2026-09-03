@@ -1,5 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
+import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { db } from "@/db";
 import { orders, orderItems, customers, stockLevels, stockMovements } from "@/db/schema";
 import { type ActionResult, getProfileId, generateCode, toQty } from "@/lib/actions/common";

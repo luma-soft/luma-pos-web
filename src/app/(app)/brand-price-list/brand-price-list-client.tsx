@@ -102,7 +102,14 @@ export function BrandPriceListClient({
   canEdit,
   palette,
 }: Props) {
-  const [products, setProducts] = useState(initialProducts);
+  // Quote-image overrides are drafts. Keep those prices, but always read the
+  // product names, availability and images from the latest server projection.
+  const [priceOverrides, setPriceOverrides] = useState<Record<string, number>>({});
+  const products = useMemo(() => initialProducts.map((product) => (
+    priceOverrides[product.id] === undefined
+      ? product
+      : { ...product, retailPrice: priceOverrides[product.id] }
+  )), [initialProducts, priceOverrides]);
   const [query, setQuery] = useState("");
   const [editing, setEditing] = useState<BrandPriceListProduct | null>(null);
   const [price, setPrice] = useState<number | null>(null);
@@ -132,11 +139,7 @@ export function BrandPriceListClient({
       setNotice("Giá chưa hợp lệ.");
       return;
     }
-    setProducts((current) =>
-      current.map((product) =>
-        product.id === editing.id ? { ...product, retailPrice: value } : product,
-      ),
-    );
+    setPriceOverrides((current) => ({ ...current, [editing.id]: value }));
     setEditing(null);
     setNotice("Đã áp dụng giá tạm thời cho ảnh báo giá.");
   }

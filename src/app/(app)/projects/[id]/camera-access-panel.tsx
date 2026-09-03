@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { CheckCircle2, Clipboard, Eye, EyeOff, Globe2, History, LockKeyhole, RefreshCw, ShieldCheck, Trash2, UserPlus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useAppDataQuery } from "@/components/use-app-data-query";
 
 type CameraAsset = {
   id: string;
@@ -120,26 +123,33 @@ async function readApiPayload<T>(response: Response): Promise<T> {
   }
 }
 
+async function readVaultSummary(assetId: string, signal: AbortSignal): Promise<VaultSummary> {
+  const response = await fetch(`/api/mobile/services/assets/${assetId}/camera-vault`, { cache: "no-store", signal });
+  const payload = await readApiPayload<{ ok: boolean; data?: VaultSummary; error?: string }>(response);
+  if (!response.ok || !payload.ok || !payload.data) throw new Error(payload.error ?? "errors.serverError");
+  return payload.data;
+}
+
 export function CameraAccessPanel({ assets }: { assets: CameraAsset[] }) {
+  const router = useRouter();
+  const t = useTranslations();
   const [selectedId, setSelectedId] = useState(assets[0]?.id ?? "");
-  const [summary, setSummary] = useState<VaultSummary | null>(null);
   const [revealed, setRevealed] = useState<VaultCredentials | null>(null);
   const [pin, setPin] = useState("");
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<VaultCredentials>(emptyCredentials);
   const [viewerId, setViewerId] = useState("");
   const [viewerPermissions, setViewerPermissions] = useState<ViewerPermissions>(defaultViewerPermissions);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
+  const [mutating, setBusy] = useState(false);
+  const [mutationMessage, setMessage] = useState("");
   const selected = useMemo(
     () => assets.find((asset) => asset.id === selectedId) ?? assets[0],
     [assets, selectedId],
   );
-
-  useEffect(() => {
-    if (!selected?.id) return;
-    void loadSummary(selected.id);
-  }, [selected?.id]);
+  const { state: summaryQuery, refresh: refreshSummary } = useAppDataQuery(selected?.id ?? null, readVaultSummary);
+  const summary = summaryQuery?.data ?? null;
+  const busy = mutating || Boolean(summaryQuery?.loading);
+  const message = summaryQuery?.error ? t(summaryQuery.error as never) : mutationMessage;
 
   useEffect(() => {
     if (!revealed) return;
@@ -151,23 +161,7 @@ export function CameraAccessPanel({ assets }: { assets: CameraAsset[] }) {
     return () => window.clearTimeout(timeout);
   }, [revealed]);
 
-  async function loadSummary(assetId: string) {
-    setBusy(true);
-    setMessage("");
-    try {
-      const response = await fetch(`/api/mobile/services/assets/${assetId}/camera-vault`, {
-        cache: "no-store",
-      });
-      const payload = await readApiPayload<{ ok: boolean; data?: VaultSummary; error?: string }>(response);
-      if (!response.ok || !payload.ok || !payload.data) throw new Error(payload.error ?? "Không tải được cấu hình truy cập");
-      setSummary(payload.data);
-    } catch (error) {
-      setSummary(null);
-      setMessage(error instanceof Error ? error.message : "Không tải được cấu hình truy cập");
-    } finally {
-      setBusy(false);
-    }
-  }
+  async function loadSummary() { await refreshSummary(); }
 
   function selectAsset(assetId: string) {
     if (assetId === selected?.id) return;
@@ -250,7 +244,8 @@ export function CameraAccessPanel({ assets }: { assets: CameraAsset[] }) {
       setPin("");
       setRevealed(null);
       setMessage("Đã lưu cấu hình mã hóa và ghi lịch sử thay đổi.");
-      await loadSummary(selected.id);
+      await loadSummary();
+      router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Không lưu được cấu hình");
     } finally {
@@ -301,7 +296,8 @@ export function CameraAccessPanel({ assets }: { assets: CameraAsset[] }) {
       const payload = await readApiPayload<{ ok: boolean; error?: string }>(response);
       if (!response.ok || !payload.ok) throw new Error(payload.error ?? "Không cập nhật được quyền truy cập");
       setMessage(method === "DELETE" ? "Đã thu hồi quyền và ghi lịch sử." : "Đã cập nhật quyền và ghi lịch sử.");
-      await loadSummary(selected.id);
+      await loadSummary();
+      router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Không cập nhật được quyền truy cập");
     } finally {
@@ -359,7 +355,7 @@ export function CameraAccessPanel({ assets }: { assets: CameraAsset[] }) {
                 <p className="text-xs text-slate-500">Truy cập an toàn · không lưu bí mật khi ngoại tuyến</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={() => selected && loadSummary(selected.id)} disabled={busy}>
+            <Button variant="outline" size="sm" onClick={() => selected && loadSummary()} disabled={busy}>
               <RefreshCw className={cn("h-4 w-4", busy && "animate-spin")} />
               Làm mới
             </Button>

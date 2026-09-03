@@ -2,9 +2,12 @@
 
 import { type ClipboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
+import { commitSuccessfulMutation } from "@/lib/sync/confirmed-mutation";
 import { useTenantClientScope } from "@/components/tenant-client-scope";
 import { getAssistantActionPresets } from "./action-presets";
 import { deleteJson, getJson, postJson, putJson, uploadAiAttachment } from "./api";
+import { waitForAutosavedSessionId } from "./session-sync";
 import type {
   AssistantActionPreset,
   AssistantActionPresetId,
@@ -68,6 +71,7 @@ function serverSessions(value: unknown, defaultTitle: string): AiSessionSummary[
 }
 
 export function useAssistantState(surface: AssistantSurface): AssistantController {
+  const router = useRouter();
   const t = useTranslations();
   const storageScope = useTenantClientScope();
   const defaultSessionTitle = t("ai.defaultSessionTitle");
@@ -79,6 +83,7 @@ export function useAssistantState(surface: AssistantSurface): AssistantControlle
   const [msgs, setMsgs] = useState<Msg[]>(() => readChatHistory(chatHistoryKey));
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<AiSessionSummary[]>([]);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const [activePresetId, setActivePresetId] = useState<AssistantActionPresetId | null>(null);
   const [serverHydrated, setServerHydrated] = useState(false);
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
@@ -88,6 +93,10 @@ export function useAssistantState(surface: AssistantSurface): AssistantControlle
   const [listening, setListening] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const syncInFlightRef = useRef<Promise<unknown> | null>(null);
+  const sessionMutationRevision = useRef(0);
+  const sessionListRequest = useRef(0);
+  const sessionDetailRequest = useRef(0);
   const uploadSessionIdRef = useRef<string | null>(null);
   const uploadSessionPromiseRef = useRef<Promise<string> | null>(null);
   const activePreset = actionPresetById(actionPresets, activePresetId);
@@ -101,7 +110,10 @@ export function useAssistantState(surface: AssistantSurface): AssistantControlle
   }, [chatHistoryKey, msgs]);
 
   const loadServerSession = useCallback(async (id: string) => {
+    const request = ++sessionDetailRequest.current;
+    const revision = sessionMutationRevision.current;
     const loaded = await getJson(`/api/mobile/ai/sessions?sessionId=${id}`);
+    if (request !== sessionDetailRequest.current || revision !== sessionMutationRevision.current) return;
     const messages = Array.isArray((loaded as { messages?: unknown }).messages)
       ? (loaded as { messages: unknown[] }).messages
       : [];
@@ -111,8 +123,10 @@ export function useAssistantState(surface: AssistantSurface): AssistantControlle
   }, [actionPresets, sessionPresetKey]);
 
   const refreshSessions = useCallback(async (selectLatest = false) => {
+    const request = ++sessionListRequest.current;
     const data = await getJson(`/api/mobile/ai/sessions?surface=${surface}`);
     const next = serverSessions(data, defaultSessionTitle);
+    if (request !== sessionListRequest.current) return next;
     setSessions(next);
     if (selectLatest && next[0]) await loadServerSession(next[0].id);
     return next;
@@ -140,17 +154,23 @@ export function useAssistantState(surface: AssistantSurface): AssistantControlle
     if (!serverHydrated) return;
     if (msgs.length === 0) return;
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    const revision = sessionMutationRevision.current;
     syncTimerRef.current = setTimeout(() => {
-      void putJson("/api/mobile/ai/sessions", {
+      const sync = putJson("/api/mobile/ai/sessions", {
         sessionId,
         surface,
         title: activePreset?.sessionTitle ?? (msgs.find((msg) => msg.role === "user")?.text.slice(0, 80) || defaultSessionTitle),
         messages: sanitizeMessagesForStorage(msgs),
       }).then((data) => {
         const id = (data as { session?: { id?: unknown } }).session?.id;
+        if (typeof id === "string" && id) uploadSessionIdRef.current = id;
+        if (revision !== sessionMutationRevision.current) return data;
         if (typeof id === "string") setSessionId(id);
         void refreshSessions(false).catch(() => {});
+        return data;
       }).catch(() => {});
+      syncInFlightRef.current = sync;
+      void sync.finally(() => { if (syncInFlightRef.current === sync) syncInFlightRef.current = null; });
     }, 500);
     return () => {
       if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
@@ -389,6 +409,9 @@ export function useAssistantState(surface: AssistantSurface): AssistantControlle
             record: confirmedPosDraft ? recordWithPosDraftHref(result.record, preview) : result.record,
           }
         : item));
+      if (event === "confirmed" && (!result.status || result.status === "confirmed" || result.status === "succeeded")) {
+        router.refresh();
+      }
     } catch (e) {
       setMsgs((m) => m.map((item, i) => i === index
         ? { ...item, state: "failed", result: e instanceof Error ? e.message : t("errors.serverError") }
@@ -403,51 +426,86 @@ export function useAssistantState(surface: AssistantSurface): AssistantControlle
     if (typeof window !== "undefined") window.localStorage.removeItem(chatHistoryKey);
   }
 
-  async function clearMessages() {
-    clearLocalMessages();
-    if (sessionId) {
-      await putJson("/api/mobile/ai/sessions", {
-        sessionId,
-        surface,
-        title: sessions.find((item) => item.id === sessionId)?.title ?? defaultSessionTitle,
-        messages: [],
-      }).catch(() => {});
-      setSessions((current) => current.map((item) => item.id === sessionId ? { ...item, messageCount: 0 } : item));
+  async function mutateSession(
+    mutate: (persistedId: string | null) => Promise<unknown>,
+    commit: (persistedId: string | null) => void,
+  ) {
+    if (busy) return false;
+    setBusy(true);
+    setSessionError(null);
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+    sessionMutationRevision.current += 1;
+    sessionListRequest.current += 1;
+    try {
+      // Finish an earlier autosave first so it cannot restore deleted/cleared
+      // history or overwrite an explicit rename after the mutation commits.
+      const persistedId = await waitForAutosavedSessionId(
+        sessionId ?? uploadSessionIdRef.current,
+        syncInFlightRef.current,
+      );
+      return await commitSuccessfulMutation({
+        mutate: () => mutate(persistedId),
+        commit: () => commit(persistedId),
+        onError: () => setSessionError(t("errors.serverError")),
+      });
+    } finally {
+      setBusy(false);
     }
   }
 
+  async function clearMessages() {
+    return mutateSession(async (persistedId) => {
+      if (persistedId) await putJson("/api/mobile/ai/sessions", {
+        sessionId: persistedId,
+        surface,
+        title: sessions.find((item) => item.id === persistedId)?.title ?? defaultSessionTitle,
+        messages: [],
+      });
+    }, (persistedId) => {
+      clearLocalMessages();
+      if (persistedId) setSessionId(persistedId);
+      setSessions((current) => current.map((item) => item.id === persistedId ? { ...item, messageCount: 0 } : item));
+      void refreshSessions(false).catch(() => {});
+    });
+  }
+
   async function deleteSession() {
-    if (!sessionId || busy) return;
+    if (!sessionId || busy) return false;
     const currentId = sessionId;
-    clearLocalMessages();
-    if (sessionId) {
-      await deleteJson(`/api/mobile/ai/sessions?sessionId=${sessionId}`).catch(() => {});
+    return mutateSession(() => deleteJson(`/api/mobile/ai/sessions?sessionId=${currentId}`), () => {
+      clearLocalMessages();
+      uploadSessionIdRef.current = null;
       setSessionId(null);
       setActivePresetId(null);
       const map = readSessionPresetMap(sessionPresetKey, actionPresets);
       delete map[currentId];
       writeSessionPresetMap(sessionPresetKey, map);
       setSessions((current) => current.filter((item) => item.id !== currentId));
-    }
+    });
   }
 
   async function newSession(preset?: AssistantActionPreset | null) {
-    setMsgs([]);
-    setInput("");
-    setActivePresetId(preset?.id ?? null);
-    const data = await postJson("/api/mobile/ai/sessions", { surface, title: preset?.sessionTitle ?? defaultSessionTitle });
-    const id = (data as { session?: { id?: unknown } }).session?.id;
-    if (typeof id === "string") {
-      setSessionId(id);
+    let newId = "";
+    const saved = await mutateSession(async () => {
+      const data = await postJson("/api/mobile/ai/sessions", { surface, title: preset?.sessionTitle ?? defaultSessionTitle });
+      const id = (data as { session?: { id?: unknown } }).session?.id;
+      if (typeof id !== "string" || !id) throw new Error("errors.serverError");
+      newId = id;
+    }, () => {
+      setMsgs([]);
+      setInput("");
+      setActivePresetId(preset?.id ?? null);
+      uploadSessionIdRef.current = newId;
+      setSessionId(newId);
       const map = readSessionPresetMap(sessionPresetKey, actionPresets);
       if (preset) {
-        map[id] = preset.id;
+        map[newId] = preset.id;
       } else {
-        delete map[id];
+        delete map[newId];
       }
       writeSessionPresetMap(sessionPresetKey, map);
-    }
-    await refreshSessions(false).catch(() => {});
+    });
+    if (saved) await refreshSessions(false).catch(() => {});
   }
 
   async function startActionSession(preset: AssistantActionPreset) {
@@ -460,16 +518,17 @@ export function useAssistantState(surface: AssistantSurface): AssistantControlle
   }
 
   async function renameSession(title: string) {
-    if (!sessionId) return;
+    if (!sessionId) return false;
     const nextTitle = title.trim().slice(0, 120);
-    if (!nextTitle) return;
-    await putJson("/api/mobile/ai/sessions", {
+    if (!nextTitle) return false;
+    return mutateSession(() => putJson("/api/mobile/ai/sessions", {
       sessionId,
       surface,
       title: nextTitle,
       messages: sanitizeMessagesForStorage(msgs),
-    }).catch(() => {});
-    setSessions((items) => items.map((item) => item.id === sessionId ? { ...item, title: nextTitle } : item));
+    }), () => {
+      setSessions((items) => items.map((item) => item.id === sessionId ? { ...item, title: nextTitle } : item));
+    });
   }
 
   return {
@@ -484,6 +543,7 @@ export function useAssistantState(surface: AssistantSurface): AssistantControlle
     msgs,
     sessions,
     sessionId,
+    sessionError,
     busy,
     listening,
     surface,

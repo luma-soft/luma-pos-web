@@ -1,4 +1,4 @@
-import { revalidatePath } from "next/cache";
+import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { db } from "@/db";
 import { addPaymentSchema, type AddPaymentInput } from "@/lib/schemas/order";
 import { type ActionResult, getProfileId, UnauthorizedError } from "@/lib/actions/common";

@@ -1,5 +1,6 @@
 import {
   PRODUCT_CATALOG_SCHEMA_VERSION,
+  catalogRevisionChanged,
   type ProductCatalogSnapshot,
 } from "@/lib/product-catalog";
 
@@ -68,7 +69,27 @@ export async function readProductCatalogSnapshot(
 export async function writeProductCatalogSnapshot(
   snapshot: ProductCatalogSnapshot,
 ): Promise<void> {
-  await run("readwrite", (store) => store.put(snapshot, snapshot.scopeId));
+  const database = await openDatabase();
+  if (!database) return;
+  await new Promise<void>((resolve) => {
+    // Compare and write in one transaction: a delayed tab must not overwrite a
+    // newer shared catalog written by another tab after a successful mutation.
+    const transaction = database.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.get(snapshot.scopeId);
+    request.onsuccess = () => {
+      const current = request.result as ProductCatalogSnapshot | undefined;
+      if (
+        current?.schemaVersion === snapshot.schemaVersion &&
+        catalogRevisionChanged(snapshot.revision, current.revision)
+      ) return;
+      store.put(snapshot, snapshot.scopeId);
+    };
+    transaction.oncomplete = transaction.onabort = transaction.onerror = () => {
+      database.close();
+      resolve();
+    };
+  });
 }
 
 export async function clearProductCatalogSnapshot(scopeId: string): Promise<void> {

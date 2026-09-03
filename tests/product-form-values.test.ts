@@ -46,6 +46,24 @@ const product = {
 };
 
 describe("product form unit identity", () => {
+  test.each([-1, 0, 5, -1.25, 3.125])("editing preserves current stock %s without treating it as opening stock", (totalStock) => {
+    const values = productToFormInitialValues({
+      ...product,
+      totalStock: String(totalStock),
+    } as never, "edit", {}, publicMedia);
+    expect(values.currentStock).toBe(totalStock);
+    expect(values.initialStock).toBe(0);
+  });
+
+  test.each(["copy", "sameType"] as const)("%s never inherits the original inventory", (mode) => {
+    const values = productToFormInitialValues({
+      ...product,
+      totalStock: "-1",
+    } as never, mode, {}, publicMedia);
+    expect(values.currentStock).toBeUndefined();
+    expect(values.initialStock).toBe(0);
+  });
+
   test("retains unit ids only when editing the original product", () => {
     expect(productToFormInitialValues(product as never, "edit", {}, publicMedia).units?.[0]?.id).toBe(unitId);
     expect(productToFormInitialValues(product as never, "copy", {}, publicMedia).units?.[0]?.id).toBeUndefined();

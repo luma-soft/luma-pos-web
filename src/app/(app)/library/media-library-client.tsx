@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { LibraryPreview } from "./library-preview";
 import { LibraryFilterDrawer } from "./library-filter-drawer";
 import { LibraryUploadDialog } from "./library-upload-dialog";
+import { useAppDataRevision } from "@/components/app-data-sync-provider";
 import {
   formatLibraryBytes,
   libraryCanDelete,
@@ -59,6 +60,7 @@ export function MediaLibraryClient({
   const common = useTranslations("common");
   const locale = useLocale();
   const confirmDialog = useConfirmDialog();
+  const dataRevision = useAppDataRevision();
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [query, setQuery] = useState("");
   const [album, setAlbum] = useState("");
@@ -66,7 +68,8 @@ export function MediaLibraryClient({
   const [kind, setKind] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [preview, setPreview] = useState<MediaLibraryItem | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  const preview = snapshot.items.find((item) => item.id === previewId) ?? null;
   const [loading, setLoading] = useState(false);
   const [appending, setAppending] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -117,7 +120,7 @@ export function MediaLibraryClient({
     requestVersion.current += 1;
     const timer = setTimeout(() => void load(), 250);
     return () => clearTimeout(timer);
-  }, [load]);
+  }, [load, dataRevision]);
   useEffect(
     () => () => {
       requestVersion.current += 1;
@@ -132,7 +135,7 @@ export function MediaLibraryClient({
 
   async function removeItem(item: MediaLibraryItem) {
     if (!libraryCanDelete(item, snapshot.canManage)) return;
-    setPreview(null);
+    setPreviewId(null);
     const confirmed = await confirmDialog.confirm({
       title: t("deleteTitle"),
       description: t("deleteDescription", { title: item.title }),
@@ -358,7 +361,7 @@ export function MediaLibraryClient({
                   key={item.id}
                   item={item}
                   locale={locale}
-                  onOpen={() => setPreview(item)}
+                  onOpen={() => setPreviewId(item.id)}
                 />
               ))}
             </section>
@@ -423,7 +426,7 @@ export function MediaLibraryClient({
         <LibraryPreview
           item={preview}
           canManage={snapshot.canManage}
-          onClose={() => setPreview(null)}
+          onClose={() => setPreviewId(null)}
           onDelete={() => void removeItem(preview)}
         />
       )}

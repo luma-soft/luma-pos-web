@@ -53,7 +53,8 @@ export function CustomerRequestsManager({
   const t = useTranslations("services.requests");
   const locale = useLocale();
   const router = useRouter();
-  const [selected, setSelected] = useState<RequestRow | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = rows.find((row) => row.id === selectedId) ?? null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
@@ -71,7 +72,7 @@ export function CustomerRequestsManager({
       setError(t("updateFailed"));
       return;
     }
-    setSelected(null);
+    setSelectedId(null);
     router.refresh();
   }
 
@@ -112,7 +113,7 @@ export function CustomerRequestsManager({
                   {row.resolvedAt ? t("resolved") : row.resolutionDueAt ? new Date(row.resolutionDueAt).toLocaleString(locale) : t("notConfigured")}
                 </td>
                 <td className="px-3 py-3">{row.linkedJobCode ?? "—"}</td>
-                <td className="px-3 py-3 text-right"><Button size="sm" variant="outline" onClick={() => { setSelected(row); setNote(row.internalNote ?? ""); }}>{t("details")}</Button></td>
+                <td className="px-3 py-3 text-right"><Button size="sm" variant="outline" onClick={() => { setSelectedId(row.id); setNote(row.internalNote ?? ""); }}>{t("details")}</Button></td>
               </tr>
             ))}
           </tbody>
@@ -120,11 +121,11 @@ export function CustomerRequestsManager({
         {rows.length === 0 && <p className="p-6 text-center text-sm text-slate-500">{t("empty")}</p>}
       </div>
       {selected && (
-        <div className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/45 p-4" onMouseDown={() => setSelected(null)}>
+        <div className="fixed inset-0 z-[90] grid place-items-center bg-slate-950/45 p-4" onMouseDown={() => setSelectedId(null)}>
           <div className="w-full max-w-2xl rounded-2xl bg-surface p-5 shadow-xl" onMouseDown={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-3">
               <div><p className="font-mono text-xs text-slate-500">{selected.code}</p><h3 className="text-lg font-bold">{selected.title}</h3><p className="mt-1 text-sm text-slate-600">{selected.description}</p></div>
-              <Button size="sm" variant="ghost" onClick={() => setSelected(null)}>{t("close")}</Button>
+              <Button size="sm" variant="ghost" onClick={() => setSelectedId(null)}>{t("close")}</Button>
             </div>
             <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
               <div><dt className="text-xs text-slate-500">{t("contact")}</dt><dd className="font-semibold">{selected.contactName} · {selected.contactPhone ?? "—"}</dd></div>

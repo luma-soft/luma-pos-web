@@ -1,4 +1,4 @@
-import { revalidatePath } from "next/cache";
+import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { db } from "@/db";
 import { getProfileId } from "@/lib/actions/common";
 import { getCurrentShift } from "@/lib/data/shifts";

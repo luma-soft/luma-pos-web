@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Clock3, Loader2, NotebookPen, PencilLine, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -10,6 +10,7 @@ import { RowPreviewModal } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/input";
 import { Field } from "@/components/ui/label";
+import { useAppDataQuery } from "@/components/use-app-data-query";
 
 export type ProjectNoteView = {
   id: string;
@@ -33,16 +34,13 @@ export function ProjectNotesClient({
   const router = useRouter();
   const t = useTranslations();
   const { confirm } = useConfirmDialog();
-  const [notes, setNotes] = useState(initialNotes);
-  const [loading, setLoading] = useState(initialNotes === undefined);
-  const [loadError, setLoadError] = useState("");
   const [editing, setEditing] = useState<ProjectNoteView | null | undefined>();
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const fetchNotes = useCallback(async (signal?: AbortSignal) => {
-    const response = await fetch(`/api/mobile/projects/${projectId}/notes`, {
+  const fetchNotes = useCallback(async (id: string, signal: AbortSignal) => {
+    const response = await fetch(`/api/mobile/projects/${id}/notes`, {
       cache: "no-store",
       signal,
     });
@@ -51,35 +49,11 @@ export function ProjectNotesClient({
       throw new Error(payload?.error ? t(payload.error as never) : "Không thể tải ghi chú. Vui lòng thử lại.");
     }
     return payload.data;
-  }, [projectId, t]);
-
-  useEffect(() => {
-    if (initialNotes !== undefined) return;
-    const controller = new AbortController();
-    void fetchNotes(controller.signal).then((data) => {
-      if (controller.signal.aborted) return;
-      setNotes(data);
-      setLoadError("");
-      setLoading(false);
-    }, (cause: unknown) => {
-      if (controller.signal.aborted) return;
-      setLoadError(describeLoadError(cause));
-      setLoading(false);
-    });
-    return () => controller.abort();
-  }, [initialNotes, fetchNotes]);
-
-  async function loadNotes() {
-    setLoading(true);
-    try {
-      setNotes(await fetchNotes());
-      setLoadError("");
-    } catch (cause) {
-      setLoadError(describeLoadError(cause));
-    } finally {
-      setLoading(false);
-    }
-  }
+  }, [t]);
+  const { state: noteQuery, refresh: loadNotes } = useAppDataQuery(projectId, fetchNotes);
+  const notes = noteQuery?.data ?? initialNotes;
+  const loading = Boolean(noteQuery?.loading && notes === undefined);
+  const loadError = noteQuery?.error ? "Không thể tải ghi chú. Vui lòng thử lại." : "";
 
   function openCreate() {
     setEditing(null);
@@ -257,10 +231,4 @@ function formatNoteTime(value: string) {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(value));
-}
-
-function describeLoadError(cause: unknown) {
-  return cause instanceof Error && !(cause instanceof TypeError)
-    ? cause.message
-    : "Không thể tải ghi chú. Vui lòng thử lại.";
 }

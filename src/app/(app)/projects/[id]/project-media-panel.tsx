@@ -17,6 +17,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useLocale, useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
 import {
   Camera,
   Check,
@@ -41,6 +42,7 @@ import { cn } from "@/lib/utils";
 import type { MediaFileMetadata } from "@/lib/media/file-metadata-types";
 import { ProjectImageViewport } from "./project-image-viewport";
 import { ProjectFileInfo } from "./project-file-info";
+import { useAppDataRevision } from "@/components/app-data-sync-provider";
 
 export type ProjectMediaKind = "photos" | "documents";
 export function filterProjectMediaKind(items: readonly ProjectMediaItem[], kind: ProjectMediaKind) {
@@ -909,6 +911,8 @@ function ProjectMediaPanelBody({
   requestCoordinator,
 }: ProjectMediaPanelProps) {
   const t = useTranslations("projectMedia");
+  const router = useRouter();
+  const dataRevision = useAppDataRevision();
   const dialog = useConfirmDialog();
   const phaseOptions = useProjectMediaPhaseOptions();
   const [localItems, setLocalItems] = useState<ProjectMediaItem[]>(() => initialItems ? [...initialItems] : []);
@@ -1010,10 +1014,10 @@ function ProjectMediaPanelBody({
       request.controller.abort();
       finishProjectMediaRequest(listRequests, request);
     };
-    // Load once per project. Local mutations and coordinator updates keep the
-    // signed descriptor collection coherent without triggering duplicate GETs.
+    // Also refetch after another successful mutation refreshes the app's server
+    // data; local upload drafts and filter controls stay mounted.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loadItems, projectId]);
+  }, [dataRevision, loadItems, projectId]);
 
   useEffect(() => {
     if (!openUploadSignal) return;
@@ -1176,6 +1180,7 @@ function ProjectMediaPanelBody({
         return Array.from(byId.values());
       });
       setListState("ready");
+      router.refresh();
     }
     setUploading(false);
     const failures = results.filter((result) => result.status === "failed").length;
@@ -1255,6 +1260,7 @@ function ProjectMediaPanelBody({
       });
       if (!deleted) return;
       mutateItems((current) => current.filter((candidate) => candidate.id !== item.id));
+      router.refresh();
       setAnnouncement(t("deletedAnnouncement", { fileName: item.fileName }));
     } catch {
       setListError(t("deleteError"));
@@ -1487,7 +1493,18 @@ export function ProjectMediaUploadCoordinator({
   children: ReactNode;
 }) {
   const [signal, setSignal] = useState<ProjectMediaOpenUploadSignal | null>(null);
-  const [items, setItems] = useState<ProjectMediaItem[]>([...initialItems]);
+  const [local, setLocal] = useState({ source: initialItems, items: [...initialItems] });
+  const items = local.source === initialItems
+    ? local.items
+    : mergeProjectMediaItems(local.items, initialItems);
+  const setItems = useCallback<Dispatch<SetStateAction<ProjectMediaItem[]>>>((update) => {
+    setLocal((current) => {
+      const base = current.source === initialItems
+        ? current.items
+        : mergeProjectMediaItems(current.items, initialItems);
+      return { source: initialItems, items: typeof update === "function" ? update(base) : update };
+    });
+  }, [initialItems]);
   const sequence = useRef(0);
   const [requestCoordinator] = useState<ProjectMediaRequestCoordinator>(() => ({
     mutationRevision: { current: 0 },

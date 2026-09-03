@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { imageMediaIdsSchema } from "@/lib/products/product-media-schema";
+import { stockQuantitySchema } from "@/lib/products/stock-adjustment";
 
 export const productUnitSchema = z.object({
   id: z.uuid().optional(),
@@ -83,6 +84,8 @@ export const createProductSchema = z.object({
 
   // Stock
   initialStock: z.number().min(0).default(0),
+  // Edit-only display/input; opening stock remains create-only and nonnegative.
+  currentStock: stockQuantitySchema.optional(),
   minLevel: z.number().min(0).default(0),
   maxLevel: z.number().min(0).default(999_999_999),
 

@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { paymentBankAccounts, storeSettings } from "@/db/schema";

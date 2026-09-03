@@ -36,6 +36,7 @@ import { OrderStatusBadge } from "../../orders/status-badges";
 import type { PrintTemplate } from "@/lib/print/template-shared";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import { CustomerReceivableActions } from "@/components/partners/customer-receivable-actions";
+import { useAppDataQuery } from "@/components/use-app-data-query";
 import {
   DEFAULT_PARTNER_DEBT_FILTER,
   PartnerDebtFilterControl,
@@ -59,6 +60,24 @@ type OrderPreview = {
   items: Array<{ id: string; productName: string; unitName: string; quantity: string | number; unitPrice: string | number; discount: string | number; total: string | number }>;
   payments: Array<{ id: string; createdAt: string; method: string; amount: string | number; note: string | null }>;
 };
+
+async function loadOrderPreview(orderId: string, signal: AbortSignal): Promise<OrderPreview> {
+  const response = await fetch(`/api/orders/${encodeURIComponent(orderId)}/preview`, { cache: "no-store", signal });
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) throw new Error("errors.serverError");
+  return payload.data.order as OrderPreview;
+}
+
+function useOrderPreview() {
+  const t = useTranslations();
+  const [orderId, setOrderId] = useState<string | null>(null);
+  const { state } = useAppDataQuery(orderId, loadOrderPreview);
+  return {
+    openOrderPreview: setOrderId,
+    closeOrderPreview: () => setOrderId(null),
+    preview: state && { loading: state.loading, order: state.data, error: state.error ? t(state.error as never) : undefined },
+  };
+}
 
 const CUSTOMER_EXPAND_TABS: CustomerExpandTab[] = ["info", "sales", "debt"];
 const CUSTOMER_TYPES = ["retail", "wholesale", "contractor", "agent"] as const;
@@ -369,22 +388,7 @@ function CustomerInfoPanel({ customer }: { customer: CustomerRow }) {
 
 function CustomerSalesPanel({ customer, returnPrintTemplates }: { customer: CustomerRow; returnPrintTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[] }) {
   const t = useTranslations();
-  const [preview, setPreview] = useState<{ loading: boolean; error?: string; order?: OrderPreview } | null>(null);
-
-  async function openOrderPreview(orderId: string) {
-    setPreview({ loading: true });
-    try {
-      const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}/preview`, { cache: "no-store" });
-      const json = await res.json();
-      if (!res.ok || !json.ok) {
-        setPreview({ loading: false, error: t("errors.serverError" as never) });
-        return;
-      }
-      setPreview({ loading: false, order: json.data.order as OrderPreview });
-    } catch {
-      setPreview({ loading: false, error: t("errors.serverError" as never) });
-    }
-  }
+  const { preview, openOrderPreview, closeOrderPreview } = useOrderPreview();
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
@@ -441,7 +445,7 @@ function CustomerSalesPanel({ customer, returnPrintTemplates }: { customer: Cust
         </>
       )}
 
-      <OrderPreviewDialog preview={preview} onClose={() => setPreview(null)} />
+      <OrderPreviewDialog preview={preview} onClose={closeOrderPreview} />
     </div>
   );
 }
@@ -449,26 +453,11 @@ function CustomerSalesPanel({ customer, returnPrintTemplates }: { customer: Cust
 function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
   const t = useTranslations();
   const [filter, setFilter] = useState(DEFAULT_PARTNER_DEBT_FILTER);
-  const [preview, setPreview] = useState<{ loading: boolean; error?: string; order?: OrderPreview } | null>(null);
+  const { preview, openOrderPreview, closeOrderPreview } = useOrderPreview();
   const rows = useMemo(
     () => customer.debtLedger.filter((row) => matchesPartnerDebtFilter(row, filter)),
     [customer.debtLedger, filter],
   );
-
-  async function openOrderPreview(orderId: string) {
-    setPreview({ loading: true });
-    try {
-      const res = await fetch(`/api/orders/${encodeURIComponent(orderId)}/preview`, { cache: "no-store" });
-      const json = await res.json();
-      if (!res.ok || !json.ok) {
-        setPreview({ loading: false, error: t("errors.serverError" as never) });
-        return;
-      }
-      setPreview({ loading: false, order: json.data.order as OrderPreview });
-    } catch {
-      setPreview({ loading: false, error: t("errors.serverError" as never) });
-    }
-  }
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
@@ -534,7 +523,7 @@ function CustomerDebtPanel({ customer }: { customer: CustomerRow }) {
         </>
       )}
 
-      <OrderPreviewDialog preview={preview} onClose={() => setPreview(null)} />
+      <OrderPreviewDialog preview={preview} onClose={closeOrderPreview} />
     </div>
   );
 }

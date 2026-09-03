@@ -73,6 +73,7 @@ export function AssistantChatSurface({
     msgs,
     sessions,
     sessionId,
+    sessionError,
     busy,
     listening,
     surface,
@@ -142,13 +143,11 @@ export function AssistantChatSurface({
   async function submitRenameSession() {
     const title = sessionTitleDraft.trim();
     if (!title) return;
-    await renameSession(title);
-    setSessionDialog(null);
+    if (await renameSession(title)) setSessionDialog(null);
   }
 
   async function confirmDeleteSession() {
-    await deleteSession();
-    setSessionDialog(null);
+    if (await deleteSession()) setSessionDialog(null);
   }
 
   const sessionOptions = [
@@ -285,6 +284,7 @@ export function AssistantChatSurface({
                   {t("ai.session.deleteWarning", { title: sessionTitleDraft || t("ai.defaultSessionTitle") })}
                 </div>
               )}
+              {sessionError && <p role="alert" className="mt-3 text-sm text-er">{sessionError}</p>}
             </div>
             <div className="flex items-center justify-end gap-2 border-t border-border-soft bg-canvas px-4 py-3">
               <Button type="button" onClick={() => setSessionDialog(null)} variant="outline" size="sm">
@@ -304,6 +304,7 @@ export function AssistantChatSurface({
         </div>
       )}
 
+      {sessionError && !sessionDialog && <p role="alert" className="px-4 py-2 text-sm text-er">{sessionError}</p>}
       {msgs.length > 0 && (
         <div className={cn(
           "shrink-0 flex items-center justify-between gap-3 bg-canvas/25",

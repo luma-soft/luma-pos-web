@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { z } from "zod";
 import { and, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -31,7 +31,10 @@ import {
   requireManager,
   requireFeatureRole,
   toMoney,
+  getProfileId,
 } from "./common";
+import { productStockAdjustmentSchema } from "@/lib/products/stock-adjustment";
+import { applyProductStockAdjustment } from "@/lib/products/product-stock-adjustment";
 import { syncProductUnits } from "@/lib/products/product-unit-sync";
 import { getPublicMediaConfig } from "@/lib/media/config";
 import {
@@ -234,6 +237,7 @@ async function syncProductPriceBookPrices(
   storeId: string,
   productId: string,
   input: Record<string, number | null | undefined> | undefined,
+  connection: Pick<typeof db, "select" | "delete" | "insert"> = db,
 ) {
   const entries = Object.entries(input ?? {});
   if (entries.length === 0) return;
@@ -241,7 +245,7 @@ async function syncProductPriceBookPrices(
   const bookIds = [...new Set(entries.map(([id]) => id).filter(Boolean))];
   if (bookIds.length === 0) return;
 
-  const validBooks = await db
+  const validBooks = await connection
     .select({ id: priceBooks.id, isDefault: priceBooks.isDefault })
     .from(priceBooks)
     .where(and(eq(priceBooks.storeId, storeId), inArray(priceBooks.id, bookIds)));
@@ -253,7 +257,7 @@ async function syncProductPriceBookPrices(
     .filter(([bookId, price]) => nonDefaultIds.has(bookId) && price == null)
     .map(([bookId]) => bookId);
   if (toDelete.length > 0) {
-    await db
+    await connection
       .delete(productPrices)
       .where(
         and(
@@ -273,7 +277,7 @@ async function syncProductPriceBookPrices(
       price: toMoney(Math.max(0, Number(price))),
     }));
   if (toUpsert.length > 0) {
-    await db
+    await connection
       .insert(productPrices)
       .values(toUpsert)
       .onConflictDoUpdate({
@@ -341,6 +345,7 @@ export async function updateProductPrices(
 
 const updateProductSchema = z.object({
   id: z.uuid(),
+  stockAdjustment: productStockAdjustmentSchema.optional(),
   productKind: z.enum(["product", "service", "combo"]).optional(),
   sku: z.string().trim().min(1),
   barcode: z.string().trim().optional(),
@@ -606,7 +611,7 @@ export async function setCameraMaterial(input: {
   }
 }
 
-/** Cập nhật thông tin SP (không đụng tồn kho — tồn quản lý ở Kho/Kiểm kho). */
+/** Cập nhật SP; chỉ điều chỉnh tồn khi gửi kèm số lượng mới và mốc tồn đã đọc. */
 export async function updateProduct(
   input: UpdateProductInput,
 ): Promise<ActionResult> {
@@ -622,6 +627,11 @@ export async function updateProduct(
   const publicMedia = getPublicMediaConfig();
 
   try {
+    if (v.stockAdjustment && v.stockAdjustment.quantity !== v.stockAdjustment.expectedQuantity) {
+      const stockGate = await requireManager();
+      if (!stockGate.ok) return stockGate;
+    }
+    const stockActorId = v.stockAdjustment ? await getProfileId(gate.userId) : null;
     await db.transaction(async (tx) => {
       const [current] = await tx
         .select({
@@ -640,6 +650,15 @@ export async function updateProduct(
       ) {
         throw new Error("PRODUCT_KIND_IMMUTABLE");
       }
+
+      await applyProductStockAdjustment(tx, {
+        storeId: gate.storeId,
+        productId: v.id,
+        createdBy: stockActorId,
+        adjustment: v.stockAdjustment,
+        nextTrackBatches: v.trackBatches,
+        nextCategoryId: v.categoryId,
+      });
 
       if (v.imageMediaIds !== undefined || v.imageUrls !== undefined) {
         const imageMediaIds = v.imageMediaIds
@@ -838,8 +857,8 @@ export async function updateProduct(
           }
         }
       }
-    });
-    await syncProductPriceBookPrices(gate.storeId, v.id, v.priceBookPrices);
+      await syncProductPriceBookPrices(gate.storeId, v.id, v.priceBookPrices, tx);
+    }, v.stockAdjustment ? { isolationLevel: "serializable" } : undefined);
 
     revalidatePath(Routes.Products);
     revalidatePath(Routes.Inventory);
@@ -852,9 +871,16 @@ export async function updateProduct(
       PRODUCT_NOT_FOUND: "errors.invalidData",
       PRODUCT_KIND_IMMUTABLE: "products.errors.kindImmutable",
       PRODUCT_UNIT_NOT_FOUND: "errors.invalidData",
+      PRODUCT_STOCK_CHANGED: "products.errors.stockChanged",
+      PRODUCT_STOCK_REQUIRES_INVENTORY: "products.errors.stockAdjustmentNeedsInventory",
+      PRODUCT_STOCK_NOT_MANAGED: "products.errors.stockNotManaged",
+      PRODUCT_STOCK_WAREHOUSE_MISSING: "products.errors.stockWarehouseMissing",
     };
     const message = e instanceof Error ? e.message : "";
     if (known[message]) return { ok: false, error: known[message] };
+    if (v.stockAdjustment && ["40001", "40P01"].includes(pgErrorCode(e) ?? "")) {
+      return { ok: false, error: "products.errors.stockChanged" };
+    }
     if (e instanceof ProductMediaValidationError) {
       return { ok: false, error: e.error };
     }

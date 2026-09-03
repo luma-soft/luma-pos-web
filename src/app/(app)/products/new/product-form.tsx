@@ -52,6 +52,7 @@ import type { ProductFormOptions } from "@/lib/data/products";
 import type { PriceBookRow } from "@/lib/data/price-books";
 import { AI_WORKFLOW_DRAFT_STORAGE_KEY, tenantStorageKey } from "@/components/ai-assistant/utils";
 import { useTenantClientScope } from "@/components/tenant-client-scope";
+import { changedProductStock } from "@/lib/products/stock-adjustment";
 import {
   PRODUCT_IMAGE_ACCEPT,
   deleteUploadedProductImage,
@@ -239,6 +240,7 @@ export function NewProductForm({
         specs: specsWithOrderNote(specs, values.invoiceNote),
         applyToSiblings: values.applyToSiblings,
         units: values.units,
+        stockAdjustment: changedProductStock(values.currentStock, form.formState.defaultValues?.currentStock),
       });
       if (res.ok) {
         const href =
@@ -1568,13 +1570,16 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
 
 function StockFields() {
   const { setValue, watch } = useFormCtx();
+  const currentStock = watch("currentStock");
+  const editingStock = currentStock !== undefined;
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <Field labelTx="products.stock.current">
         <NumberInput
-          value={watch("initialStock")}
-          onChange={(v) => setValue("initialStock", v ?? 0)}
-          min={0}
+          value={editingStock ? currentStock : watch("initialStock")}
+          onChange={(v) => setValue(editingStock ? "currentStock" : "initialStock", v ?? 0)}
+          min={editingStock ? undefined : 0}
+          decimals={4}
         />
       </Field>
       <Field labelTx="products.stock.min">

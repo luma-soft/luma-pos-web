@@ -16,6 +16,9 @@ import { getTheme, getMode } from "@/lib/theme/cookie";
 import { getStoreSettings } from "@/lib/data/settings";
 import { ProductCatalogProvider } from "@/components/product-catalog-provider";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { getProductCatalogRevision } from "@/lib/data/product-catalog";
+import { AppDataSyncProvider } from "@/components/app-data-sync-provider";
+import { randomUUID } from "node:crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -46,10 +49,12 @@ export default async function AppLayout({
   const mode = await getMode();
   const role = await getRole(user.id);
   const catalogScopeId = `${context.storeId}:${user.id}:${role}`;
+  const catalogRevision = await getProductCatalogRevision(context.storeId);
 
   return (
     <TenantClientScopeProvider scopeId={catalogScopeId}>
-    <ProductCatalogProvider userId={user.id} scopeId={catalogScopeId}>
+    <AppDataSyncProvider revision={randomUUID()}>
+    <ProductCatalogProvider key={catalogScopeId} userId={user.id} scopeId={catalogScopeId} serverRevision={catalogRevision}>
     <div className="flex min-h-dvh bg-canvas">
       <MobileNavBackdrop />
 
@@ -86,6 +91,7 @@ export default async function AppLayout({
       {projectModal}
     </div>
     </ProductCatalogProvider>
+    </AppDataSyncProvider>
     </TenantClientScopeProvider>
   );
 }

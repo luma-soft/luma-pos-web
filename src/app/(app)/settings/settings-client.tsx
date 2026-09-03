@@ -13,6 +13,7 @@ import { Routes } from "@/lib/routes";
 import { ONLINE_SALES_ENABLED } from "@/lib/features";
 import { cn } from "@/lib/utils";
 import { normalizeSearch } from "@/lib/normalize";
+import { useAppDataQuery } from "@/components/use-app-data-query";
 import {
   deletePaymentBankAccount,
   loadSettingsAiUsage,
@@ -284,6 +285,24 @@ const btnS = "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 
 const btnF = "inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-600 text-white text-xs font-semibold hover:brightness-110 transition lg:min-h-0 lg:min-w-0";
 const searchableTouch = "[&>button]:h-11 lg:[&>button]:h-10";
 
+async function readSettingsStaff() {
+  const result = await loadSettingsStaff();
+  if (!result.ok) throw new Error(result.error);
+  return result.data;
+}
+
+async function readSettingsBankAccounts() {
+  const result = await loadSettingsPaymentBankAccounts();
+  if (!result.ok) throw new Error(result.error);
+  return result.data;
+}
+
+async function readSettingsAiUsage() {
+  const result = await loadSettingsAiUsage();
+  if (!result.ok) throw new Error(result.error);
+  return result.data;
+}
+
 export function SettingsClient({
   store,
   canManage,
@@ -308,48 +327,20 @@ export function SettingsClient({
     ? initialTab as SectionId
     : null;
   const [active, setActive] = useState<SectionId>(normalizedInitialTab ?? "store");
-  const [staff, setStaff] = useState<StaffRow[] | null>(null);
-  const [bankAccounts, setBankAccounts] = useState<PaymentBankAccountRow[] | null>(null);
-  const [aiUsage, setAiUsage] = useState<AiUsageStatus | null>(null);
-  const [lazyLoading, setLazyLoading] = useState<Partial<Record<"staff" | "payments" | "ai", boolean>>>({});
-  const [lazyError, setLazyError] = useState<Partial<Record<"staff" | "payments" | "ai", string>>>({});
+  const { state: staffQuery } = useAppDataQuery(active === "staff" ? "staff" : null, readSettingsStaff);
+  const { state: bankQuery } = useAppDataQuery(active === "payments" ? "payments" : null, readSettingsBankAccounts);
+  const { state: usageQuery } = useAppDataQuery(active === "ai" ? "ai" : null, readSettingsAiUsage);
+  const staff = staffQuery?.data;
+  const bankAccounts = bankQuery?.data;
+  const aiUsage = usageQuery?.data;
+  const lazyLoading = { staff: staffQuery?.loading, payments: bankQuery?.loading, ai: usageQuery?.loading };
+  const lazyError = { staff: staffQuery?.error, payments: bankQuery?.error, ai: usageQuery?.error };
   useEffect(() => {
     if (normalizedInitialTab) return;
     const saved = localStorage.getItem("lp-settings-active") as SectionId | null;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time client sync of persisted section (SSR-safe)
     if (saved && SEC_META[saved] && isVisibleSection(saved)) setActive(saved);
   }, [normalizedInitialTab]);
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      if (active === "staff" && staff === null) {
-        setLazyLoading((prev) => ({ ...prev, staff: true }));
-        const res = await loadSettingsStaff().catch(() => null);
-        if (cancelled) return;
-        if (res?.ok) setStaff(res.data);
-        else setLazyError((prev) => ({ ...prev, staff: res?.error ?? "errors.serverError" }));
-        setLazyLoading((prev) => ({ ...prev, staff: false }));
-      }
-      if (active === "payments" && bankAccounts === null) {
-        setLazyLoading((prev) => ({ ...prev, payments: true }));
-        const res = await loadSettingsPaymentBankAccounts().catch(() => null);
-        if (cancelled) return;
-        if (res?.ok) setBankAccounts(res.data);
-        else setLazyError((prev) => ({ ...prev, payments: res?.error ?? "errors.serverError" }));
-        setLazyLoading((prev) => ({ ...prev, payments: false }));
-      }
-      if (active === "ai" && aiUsage === null) {
-        setLazyLoading((prev) => ({ ...prev, ai: true }));
-        const res = await loadSettingsAiUsage().catch(() => null);
-        if (cancelled) return;
-        if (res?.ok) setAiUsage(res.data);
-        else setLazyError((prev) => ({ ...prev, ai: res?.error ?? "errors.serverError" }));
-        setLazyLoading((prev) => ({ ...prev, ai: false }));
-      }
-    }
-    void load();
-    return () => { cancelled = true; };
-  }, [active, aiUsage, bankAccounts, staff]);
   const pick = (id: SectionId) => { setActive(id); localStorage.setItem("lp-settings-active", id); };
   const sec = SEC_META[active];
   return (
@@ -498,22 +489,36 @@ function StoreSection({ L, locale, store, canManage }: { L: boolean; locale: str
 }
 
 function StaffRowItem({ s, i, L, canManage }: { s: StaffRow; i: number; L: boolean; canManage: boolean }) {
-  const [role, setRole] = useState(s.role);
-  const [active, setActive] = useState(s.isActive);
-  const [, start] = useTransition();
+  const t = useTranslations();
+  const role = s.role;
+  const active = s.isActive;
+  const [error, setError] = useState("");
+  const [pending, start] = useTransition();
+  function save(action: () => ReturnType<typeof updateStaffRole>) {
+    setError("");
+    start(async () => {
+      try {
+        const result = await action();
+        if (!result.ok) setError(t(result.error as never));
+      } catch {
+        setError(t("errors.serverError"));
+      }
+    });
+  }
   const initial = ((s.fullName.trim().split(" ").pop() ?? "?")[0] ?? "?").toUpperCase();
   return (
     <tr className="grid grid-cols-2 gap-3 border-b border-border-soft p-3 last:border-0 hover:bg-surface-2 md:table-row md:p-0">
       <td className="col-span-2 block p-0 md:table-cell md:px-3 md:py-2.5"><div className="flex items-center gap-2">
         <span className="w-7 h-7 rounded-full grid place-items-center text-[11px] font-extrabold text-white shrink-0" style={{ background: AVATAR_COLORS[i % AVATAR_COLORS.length] }}>{initial}</span>
         <span className="font-bold text-xs">{s.fullName}</span>
-      </div></td>
+      </div>{error && <p role="alert" className="mt-1 text-xs text-er">{error}</p>}</td>
       <td className="block p-0 md:table-cell md:px-3 md:py-2.5">
         <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400 md:hidden">{L ? "Vai trò" : "Role"}</div>
         {canManage ? (
           <Select
             value={role}
-            onChange={(e) => { const r = e.target.value as StaffRole; setRole(r); start(() => { updateStaffRole(s.id, r); }); }}
+            onChange={(e) => { const r = e.target.value as StaffRole; save(() => updateStaffRole(s.id, r)); }}
+            disabled={pending}
             size="sm"
             options={STAFF_ROLES.map((r) => ({ value: r, label: L ? ROLE_TEXT[r][1] : ROLE_TEXT[r][0] }))}
             className="min-h-11 text-xs lg:min-h-0"
@@ -527,7 +532,7 @@ function StaffRowItem({ s, i, L, canManage }: { s: StaffRow; i: number; L: boole
       <td className="col-span-2 flex min-h-11 items-center justify-between p-0 md:table-cell md:px-3 md:py-2.5">
         <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 md:hidden">{L ? "Trạng thái" : "Status"}</div>
         {canManage
-          ? <TouchTargetToggle checked={active} onChange={(v) => { setActive(v); start(() => { setStaffActive(s.id, v); }); }} aria-label="active" />
+          ? <TouchTargetToggle checked={active} disabled={pending} onChange={(v) => save(() => setStaffActive(s.id, v))} aria-label="active" />
           : <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold", active ? "bg-ok-soft text-ok" : "bg-surface-2 text-slate-400")}>{active ? (L ? "Hoạt động" : "Active") : (L ? "Vô hiệu" : "Inactive")}</span>}
       </td>
     </tr>

@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { type ActionResult, requireManager } from "./common";
 import { Routes } from "@/lib/routes";
 import { type UpdateOrderInput } from "@/lib/schemas/order";

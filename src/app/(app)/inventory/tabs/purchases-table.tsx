@@ -27,7 +27,8 @@ function purchaseOwed(purchase: PurchaseRow) {
 
 export function PurchasesTable({ rows, printTemplates }: { rows: PurchaseRow[]; printTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[] }) {
   const t = useTranslations();
-  const [selectedPurchase, setSelectedPurchase] = useState<PurchaseRow | null>(null);
+  const [selectedPurchaseId, setSelectedPurchaseId] = useState<string | null>(null);
+  const selectedPurchase = rows.find((row) => row.id === selectedPurchaseId) ?? null;
   const columns: DataTableColumn<PurchaseRow>[] = [
     { key: "code", label: t("purchases.cols.code"), required: true, render: (purchase) => <span className="font-semibold text-primary-600">{purchase.code}</span> },
     { key: "date", label: t("orders.cols.date"), defaultVisible: true, render: (purchase) => <span className="text-slate-500">{formatDate(purchase.createdAt)}</span> },
@@ -45,11 +46,11 @@ export function PurchasesTable({ rows, printTemplates }: { rows: PurchaseRow[]; 
         columns={columns}
         getRowId={(purchase) => purchase.id}
         minWidth="1080px"
-        onRowClick={setSelectedPurchase}
+        onRowClick={(purchase) => setSelectedPurchaseId(purchase.id)}
         renderMobileRow={({ row: purchase }) => {
           const owed = purchaseOwed(purchase);
           return (
-            <button type="button" onClick={() => setSelectedPurchase(purchase)} className="w-full p-3 text-left min-h-11">
+            <button type="button" onClick={() => setSelectedPurchaseId(purchase.id)} className="w-full p-3 text-left min-h-11">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="font-semibold text-primary-600">{purchase.code}</div>
@@ -68,7 +69,7 @@ export function PurchasesTable({ rows, printTemplates }: { rows: PurchaseRow[]; 
 
       <RowPreviewModal
         open={Boolean(selectedPurchase)}
-        onClose={() => setSelectedPurchase(null)}
+        onClose={() => setSelectedPurchaseId(null)}
         title={selectedPurchase?.code ?? ""}
         subtitle={selectedPurchase && (
           <span className="inline-flex items-center gap-2">

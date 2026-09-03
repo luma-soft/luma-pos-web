@@ -139,6 +139,7 @@ export type AssistantController = {
   msgs: Msg[];
   sessions: AiSessionSummary[];
   sessionId: string | null;
+  sessionError?: string | null;
   busy: boolean;
   listening: boolean;
   surface: AssistantSurface;
@@ -152,8 +153,8 @@ export type AssistantController = {
   newSession: (preset?: AssistantActionPreset | null) => Promise<void>;
   startActionSession: (preset: AssistantActionPreset) => Promise<void>;
   switchSession: (id: string) => Promise<void>;
-  renameSession: (title: string) => Promise<void>;
-  deleteSession: () => Promise<void>;
+  renameSession: (title: string) => Promise<boolean>;
+  deleteSession: () => Promise<boolean>;
   resolvePreview: (index: number, event: "confirmed" | "cancelled") => Promise<void>;
-  clearMessages: () => Promise<void>;
+  clearMessages: () => Promise<boolean>;
 };

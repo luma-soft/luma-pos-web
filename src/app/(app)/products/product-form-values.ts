@@ -90,5 +90,6 @@ export function productToFormInitialValues(
     invoiceNote: orderNote,
     directSale: product.isActive,
     initialStock: 0,
+    ...(mode === "edit" ? { currentStock: Number(product.totalStock ?? 0) } : {}),
   };
 }

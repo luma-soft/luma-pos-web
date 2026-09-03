@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -14,6 +14,7 @@ import type { getSuppliers } from "@/lib/data/partners";
 import { updateSupplier } from "@/lib/actions/partners";
 import { SupplierQuickCreate } from "../../suppliers/supplier-form";
 import { SupplierPayableActions } from "@/components/partners/supplier-payable-actions";
+import { useAppDataQuery } from "@/components/use-app-data-query";
 import {
   DEFAULT_PARTNER_DEBT_FILTER,
   PartnerDebtFilterControl,
@@ -94,6 +95,13 @@ type SupplierDebtRow = {
 const DETAIL_TABS: SupplierDetailTab[] = ["info", "history", "debt"];
 type SupplierDebtFilter = "" | "owing" | "clear";
 
+async function loadSupplierPreview(id: string, signal: AbortSignal): Promise<SupplierPreview> {
+  const response = await fetch(`/api/suppliers/${encodeURIComponent(id)}/preview`, { cache: "no-store", signal });
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) throw new Error("errors.serverError");
+  return payload.data as SupplierPreview;
+}
+
 export function SuppliersTable({
   rows,
   query,
@@ -108,11 +116,11 @@ export function SuppliersTable({
   const t = useTranslations();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const requestId = useRef(0);
   const [filterOpen, setFilterOpen] = useState(false);
   const [draftDebtFilter, setDraftDebtFilter] = useState<SupplierDebtFilter>(owing);
-  const [selectedSupplier, setSelectedSupplier] = useState<SupplierRow | null>(null);
-  const [preview, setPreview] = useState<{ loading: boolean; data?: SupplierPreview; error?: string } | null>(null);
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
+  const selectedSupplier = rows.find((row) => row.id === selectedSupplierId) ?? null;
+  const { state: preview, refresh: refreshPreview } = useAppDataQuery(selectedSupplier?.id ?? null, loadSupplierPreview);
   const [draft, setDraft] = useState<SupplierDraft | null>(null);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -157,36 +165,16 @@ export function SuppliersTable({
     },
   ];
 
-  async function openSupplier(row: SupplierRow) {
-    const currentRequest = ++requestId.current;
-    setSelectedSupplier(row);
-    setPreview({ loading: true });
+  function openSupplier(row: SupplierRow) {
+    setSelectedSupplierId(row.id);
     setEditing(false);
     setSaving(false);
     setSaveError("");
     setDraft(null);
-    try {
-      const response = await fetch(`/api/suppliers/${encodeURIComponent(row.id)}/preview`, { cache: "no-store" });
-      const json = await response.json();
-      if (currentRequest !== requestId.current) return;
-      if (!response.ok || !json.ok) {
-        setPreview({ loading: false, error: t("errors.serverError" as never) });
-        return;
-      }
-      const data = json.data as SupplierPreview;
-      setPreview({ loading: false, data });
-      setDraft(toSupplierDraft(data.supplier));
-    } catch {
-      if (currentRequest === requestId.current) {
-        setPreview({ loading: false, error: t("errors.serverError" as never) });
-      }
-    }
   }
 
   function closeSupplier() {
-    requestId.current += 1;
-    setSelectedSupplier(null);
-    setPreview(null);
+    setSelectedSupplierId(null);
     setDraft(null);
     setEditing(false);
     setSaving(false);
@@ -231,39 +219,13 @@ export function SuppliersTable({
       return;
     }
 
-    const updatedSupplier = {
-      ...preview.data.supplier,
-      name: draft.name.trim(),
-      phone: draft.phone.trim() || null,
-      email: draft.email.trim() || null,
-      address: draft.address.trim() || null,
-      taxCode: draft.taxCode.trim() || null,
-      note: draft.note.trim() || null,
-    };
-    setPreview((current) => current?.data ? { loading: false, data: { ...current.data, supplier: updatedSupplier } } : current);
-    setSelectedSupplier((current) => current ? {
-      ...current,
-      name: updatedSupplier.name,
-      phone: updatedSupplier.phone,
-      email: updatedSupplier.email,
-      address: updatedSupplier.address,
-      taxCode: updatedSupplier.taxCode,
-      note: updatedSupplier.note,
-    } : current);
-    setDraft(toSupplierDraft(updatedSupplier));
     setEditing(false);
+    await refreshPreview();
     router.refresh();
   }
 
   async function refreshSelectedSupplier() {
-    const supplierId = preview?.data?.supplier.id;
-    if (!supplierId) return;
-    const response = await fetch(`/api/suppliers/${encodeURIComponent(supplierId)}/preview`, { cache: "no-store" });
-    const json = await response.json();
-    if (!response.ok || !json.ok) return;
-    const data = json.data as SupplierPreview;
-    setPreview({ loading: false, data });
-    setSelectedSupplier((current) => current ? { ...current, currentDebt: String(data.supplier.currentDebt) } : current);
+    await refreshPreview();
     router.refresh();
   }
 
@@ -444,7 +406,7 @@ export function SuppliersTable({
             <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> {t("common.loading")}</span>
           </div>
         ) : preview?.error ? (
-          <div className="rounded-card border border-dashed border-border px-4 py-10 text-center text-sm font-medium text-er">{preview.error}</div>
+          <div className="rounded-card border border-dashed border-border px-4 py-10 text-center text-sm font-medium text-er">{t(preview.error as never)}</div>
         ) : preview?.data ? (
           <div className="flex min-h-0 flex-1 flex-col gap-3">
             {saveError && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">{saveError}</div>}

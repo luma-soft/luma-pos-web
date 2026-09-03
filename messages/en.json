@@ -1218,6 +1218,10 @@
       "skuExists": "SKU already exists — choose another.",
       "cannotDeleteReferenced": "Cannot delete a product with documents or stock movements. Stop selling it instead.",
       "kindImmutable": "Item type cannot be changed after creation.",
+      "stockChanged": "Stock changed while you were editing. Reload the product and check the quantity before saving.",
+      "stockAdjustmentNeedsInventory": "Items in multiple warehouses, batch-tracked items and variant groups must be adjusted in Stocktakes.",
+      "stockNotManaged": "Inventory is not tracked for this item.",
+      "stockWarehouseMissing": "No warehouse is configured. Set up a warehouse before adjusting stock.",
       "comboCannotContainItself": "A combo cannot contain itself.",
       "kindCannotHaveVariants": "Services and combos cannot have variants."
     },

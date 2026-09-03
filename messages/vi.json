@@ -1218,6 +1218,10 @@
       "skuExists": "SKU đã tồn tại — chọn mã khác.",
       "cannotDeleteReferenced": "Không thể xóa hàng hóa đã phát sinh chứng từ hoặc thẻ kho. Hãy ngừng kinh doanh thay thế.",
       "kindImmutable": "Không thể đổi loại hàng hóa sau khi đã tạo.",
+      "stockChanged": "Tồn kho đã thay đổi trong lúc chỉnh sửa. Vui lòng tải lại sản phẩm và kiểm tra số lượng trước khi lưu.",
+      "stockAdjustmentNeedsInventory": "Hàng có nhiều kho, quản lý lô hoặc nhóm biến thể cần điều chỉnh tại màn hình Kiểm kho.",
+      "stockNotManaged": "Hàng hóa này không quản lý tồn kho.",
+      "stockWarehouseMissing": "Chưa có kho để ghi nhận số lượng. Vui lòng thiết lập kho trước.",
       "comboCannotContainItself": "Combo không thể chứa chính nó.",
       "kindCannotHaveVariants": "Dịch vụ và combo không hỗ trợ biến thể."
     },
