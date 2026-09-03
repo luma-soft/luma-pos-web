@@ -3272,6 +3272,12 @@
     "assets": {
       "create": "Record installed asset",
       "edit": "Update installed asset",
+      "delete": "Delete device",
+      "deleteTitle": "Delete device?",
+      "deleteConfirm": "Delete “{name}” from this project? Device photos will remain in the project files. This does not change inventory or orders.",
+      "deleteKeep": "Keep device",
+      "deleting": "Processing…",
+      "deleted": "Device deleted",
       "afterInstallHint": "Record each installed camera here so its history and warranty stay tied to the correct asset.",
       "noJob": "— No linked work order —",
       "noProduct": "— No linked product —",
@@ -3401,7 +3407,9 @@
       "projectCloseBlocked": "The project cannot be closed yet. Complete its jobs, required coordination, and signed handover first.",
       "warrantyScopeImmutable": "This warranty request has evidence, so its job and asset can no longer be changed.",
       "duplicateCode": "The document code already exists. Try again.",
-      "duplicateSerial": "This asset serial already exists."
+      "duplicateSerial": "This asset serial already exists.",
+      "assetDeleteLinked": "This device is linked to warranty records or maintenance plans. Resolve these links before deleting it.",
+      "assetDeleteLocked": "Devices belonging to completed or cancelled work orders cannot be deleted."
     }
   },
   "promos": {

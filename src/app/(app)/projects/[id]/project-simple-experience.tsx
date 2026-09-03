@@ -12,6 +12,7 @@ import type { ProjectDetail } from "@/lib/data/projects";
 import type { getServiceFormOptions } from "@/lib/data/services";
 import { InstalledAssetQuickCreate } from "../../services/service-widgets";
 import { InstalledAssetPhotoThumbnail } from "./installed-asset-photo-thumbnail";
+import { InstalledAssetDeleteButton } from "./installed-asset-delete-button";
 import {
   CoordinatedProjectMediaPanel,
   ProjectMediaUploadCoordinator,
@@ -125,6 +126,11 @@ export function ProjectSimpleExperience({
                           </div>
                         </div>
                       </div>
+                      {canManage && (
+                        <div className="mt-2 flex justify-end">
+                          <InstalledAssetDeleteButton assetId={asset.id} assetName={asset.name} />
+                        </div>
+                      )}
                     </article>
                   ))}
                 </div>

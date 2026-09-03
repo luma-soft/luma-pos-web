@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -38,6 +39,7 @@ import {
 } from "@/lib/services/domain";
 import {
   isServiceSnapshotJobLocked,
+  isServiceFieldJobTerminal,
   serviceSnapshotMutationErrorKey,
 } from "@/lib/services/field-api";
 import {
@@ -85,6 +87,7 @@ import {
 } from "@/lib/services/job-assignment";
 import { completeMaintenanceOccurrenceForJobCore } from "@/lib/services/maintenance-lifecycle";
 import { saveServiceInstallationBatchCore } from "@/lib/services/installation-items";
+import { deleteInstalledAssetCore } from "@/lib/services/delete-installed-asset";
 
 const requireServiceManager = () => requireFeatureRole("field_services", ["owner", "manager"]);
 const requireServiceStockAccess = () => requireFeatureRole("field_services", ["owner", "manager", "warehouse"]);
@@ -1131,6 +1134,32 @@ export async function createInstalledAssetsBatch(
       ok: false,
       error: isUniqueViolation(error) || (error instanceof Error && error.message === "SERVICE_INSTALLED_ASSET_BATCH_CONFLICT")
         ? "services.errors.duplicateSerial"
+        : "errors.serverError",
+    };
+  }
+}
+
+export async function deleteInstalledAsset(assetId: string): Promise<ActionResult> {
+  const gate = await requireServiceManager();
+  if (!gate.ok) return gate;
+  if (!z.uuid().safeParse(assetId).success) {
+    return { ok: false, error: "errors.invalidData" };
+  }
+  try {
+    const result = await deleteInstalledAssetCore(db, { storeId: gate.storeId, assetId });
+    if (result.outcome === "not_found") return { ok: false, error: "errors.notFound" };
+    if (result.outcome === "linked") return { ok: false, error: "services.errors.assetDeleteLinked" };
+    await auditServiceMutation(gate.userId, "service.asset.delete", "installed_asset", assetId, {
+      projectId: result.projectId,
+    });
+    revalidateServiceProject(result.projectId);
+    return { ok: true, data: undefined };
+  } catch (error) {
+    console.error("deleteInstalledAsset failed:", error);
+    return {
+      ok: false,
+      error: isServiceSnapshotJobLocked(error) || isServiceFieldJobTerminal(error)
+        ? "services.errors.assetDeleteLocked"
         : "errors.serverError",
     };
   }

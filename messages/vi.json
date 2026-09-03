@@ -3272,6 +3272,12 @@
     "assets": {
       "create": "Ghi nhận thiết bị",
       "edit": "Cập nhật thiết bị",
+      "delete": "Xóa thiết bị",
+      "deleteTitle": "Xóa thiết bị?",
+      "deleteConfirm": "Xóa “{name}” khỏi công trình? Ảnh của thiết bị được giữ trong hồ sơ công trình. Thao tác này không thay đổi tồn kho hoặc đơn hàng.",
+      "deleteKeep": "Giữ lại",
+      "deleting": "Đang xử lý…",
+      "deleted": "Đã xóa thiết bị",
       "afterInstallHint": "Mỗi camera lắp xong nên ghi nhận tại đây để tra cứu lịch sử và bảo hành theo đúng thiết bị.",
       "noJob": "— Không gắn công việc —",
       "noProduct": "— Không liên kết hàng hóa —",
@@ -3401,7 +3407,9 @@
       "projectCloseBlocked": "Công trình chưa đủ điều kiện đóng. Hãy hoàn tất lệnh việc, xử lý điều phối bắt buộc và ký biên bản bàn giao.",
       "warrantyScopeImmutable": "Yêu cầu bảo hành đã có bằng chứng nên không thể đổi lệnh việc hoặc thiết bị.",
       "duplicateCode": "Mã chứng từ đã tồn tại, vui lòng thử lại.",
-      "duplicateSerial": "Serial thiết bị đã tồn tại."
+      "duplicateSerial": "Serial thiết bị đã tồn tại.",
+      "assetDeleteLinked": "Thiết bị đang liên kết với hồ sơ bảo hành hoặc lịch bảo trì. Hãy xử lý các liên kết này trước khi xóa.",
+      "assetDeleteLocked": "Không thể xóa thiết bị thuộc lệnh việc đã hoàn tất hoặc đã hủy."
     }
   },
   "promos": {
