@@ -38,7 +38,9 @@ import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/label";
 import { SegmentedTabs } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import type { MediaFileMetadata } from "@/lib/media/file-metadata-types";
 import { ProjectImageViewport } from "./project-image-viewport";
+import { ProjectFileInfo } from "./project-file-info";
 
 export type ProjectMediaKind = "photos" | "documents";
 export function filterProjectMediaKind(items: readonly ProjectMediaItem[], kind: ProjectMediaKind) {
@@ -67,6 +69,8 @@ export type ProjectMediaItem = {
   createdAt: Date | string;
   signedUrl?: string;
   documentIds?: string[];
+  metadata?: MediaFileMetadata | null;
+  creatorName?: string | null;
 };
 
 export type ProjectMediaOpenUploadSignal = {
@@ -875,6 +879,7 @@ function finishProjectMediaRequest(
 
 type ProjectMediaPanelProps = {
   projectId: string;
+  canManage?: boolean;
   phaseFilter?: readonly ProjectMediaPhase[];
   initialItems?: readonly ProjectMediaItem[];
   openUploadSignal?: ProjectMediaOpenUploadSignal | null;
@@ -892,6 +897,7 @@ export function ProjectMediaPanel(props: ProjectMediaPanelProps) {
 
 function ProjectMediaPanelBody({
   projectId,
+  canManage = false,
   phaseFilter,
   initialItems,
   openUploadSignal,
@@ -1336,8 +1342,13 @@ function ProjectMediaPanelBody({
             <p className="min-w-0 truncate text-xs text-slate-500" title={imagePreview.caption ?? undefined}>{imagePreview.caption || t(`phases.${imagePreview.phase}`)} · {formatProjectMediaBytes(imagePreview.sizeBytes)}</p>
             <Button type="button" variant="ghost" size="sm" aria-label={t("downloadFile", { fileName: imagePreview.fileName })} onClick={() => downloadFresh(imagePreview)}><Download className="h-4 w-4" /></Button>
           </div>}>
-          <div ref={imageFocusRootRef} className="h-full">
-            <ProjectImageViewport key={imagePreviewRevision} url={imagePreview.signedUrl} fileName={imagePreview.fileName} onRetry={() => void openFresh(imagePreview)} />
+          <div ref={imageFocusRootRef} className="flex h-full min-h-0 flex-col lg:flex-row">
+            <div className="min-h-0 min-w-0 flex-1">
+              <ProjectImageViewport key={imagePreviewRevision} url={imagePreview.signedUrl} fileName={imagePreview.fileName} onRetry={() => void openFresh(imagePreview)} />
+            </div>
+            <aside className="max-h-[45dvh] shrink-0 overflow-y-auto overscroll-contain bg-surface px-4 lg:max-h-full lg:w-72 lg:border-l lg:border-border">
+              <ProjectFileInfo item={imagePreview} canManage={canManage} />
+            </aside>
           </div>
         </RowPreviewModal>, document.body)}
 
@@ -1543,11 +1554,13 @@ export function ProjectMediaRecordLinks({ documentId }: { documentId: string }) 
 
 export function CoordinatedProjectMediaPanel({
   projectId,
+  canManage = false,
   phaseFilter,
   loadItems = true,
   receiveUploadSignal = true,
 }: {
   projectId: string;
+  canManage?: boolean;
   phaseFilter?: readonly ProjectMediaPhase[];
   loadItems?: boolean;
   receiveUploadSignal?: boolean;
@@ -1556,6 +1569,7 @@ export function CoordinatedProjectMediaPanel({
   return (
     <ProjectMediaPanel
       projectId={projectId}
+      canManage={canManage}
       phaseFilter={phaseFilter}
       initialItems={context.items}
       controlledItems={context.items}

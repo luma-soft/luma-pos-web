@@ -109,6 +109,7 @@ export async function POST(
           createdBy: gate.userId,
         }).returning({
           id: serviceAttachments.id,
+          mediaObjectId: serviceAttachments.mediaObjectId,
           category: serviceAttachments.category,
           fileName: serviceAttachments.fileName,
           mimeType: serviceAttachments.mimeType,

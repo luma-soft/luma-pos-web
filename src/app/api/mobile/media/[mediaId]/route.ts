@@ -29,9 +29,11 @@ export function createResolveMediaHandler(
     if (!gate.ok) return gateError(gate);
     try {
       const { mediaId } = await context.params;
-      return mobileOk(
+      const response = mobileOk(
         await (dependencies.service ?? getMediaService()).resolveMedia(gate, mediaId),
       );
+      response.headers.set("Cache-Control", "private, no-store");
+      return response;
     } catch (error) {
       const mapped = mediaServiceError(error);
       if (mapped.status === 500) console.error("resolve media failed", error);

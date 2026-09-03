@@ -4,6 +4,10 @@ import createNextIntlPlugin from "next-intl/plugin";
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ["mediainfo.js", "exifr"],
+  outputFileTracingIncludes: {
+    "/api/mobile/**": ["node_modules/mediainfo.js/dist/MediaInfoModule.wasm"],
+  },
   // Cho phép CI/sandbox build ra thư mục khác (mặc định .next)
   distDir: process.env.NEXT_DIST_DIR || ".next",
   turbopack: {

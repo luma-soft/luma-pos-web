@@ -135,7 +135,7 @@ export function ProjectSimpleExperience({
           </ProjectServiceTab>
 
           <ProjectServiceTab id="media" label="Ảnh & tài liệu" icon={<Images />} count={detail.projectAttachments.length}>
-            <CoordinatedProjectMediaPanel projectId={project.id} />
+            <CoordinatedProjectMediaPanel projectId={project.id} canManage={canManage} />
           </ProjectServiceTab>
 
           <ProjectServiceTab id="notes" label="Ghi chú" icon={<NotebookPen />}>

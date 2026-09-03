@@ -178,6 +178,7 @@ export async function getFieldServiceJobDetail(actor: FieldServiceActor, jobId: 
       .orderBy(asc(installedAssets.name)),
     db.select({
       id: serviceAttachments.id,
+      mediaObjectId: serviceAttachments.mediaObjectId,
       category: serviceAttachments.category,
       fileName: serviceAttachments.fileName,
       mimeType: serviceAttachments.mimeType,

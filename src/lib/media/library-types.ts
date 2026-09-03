@@ -1,3 +1,5 @@
+import type { MediaFileMetadata } from "@/lib/media/file-metadata-types";
+
 export type MediaLibraryItem = {
   id: string;
   mediaId: string;
@@ -13,6 +15,7 @@ export type MediaLibraryItem = {
   creatorName: string | null;
   url: string;
   thumbnailUrl: string | null;
+  metadata?: MediaFileMetadata | null;
 };
 
 export type MediaLibrarySnapshot = {

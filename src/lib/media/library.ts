@@ -17,6 +17,7 @@ import type {
 } from "@/lib/media/library-types";
 import { softDeleteMediaIfUnreferencedInTransaction } from "@/lib/media/repository-core";
 import { getObjectStorage } from "@/lib/media/storage";
+import { getMediaService, MediaServiceError } from "@/lib/media/service";
 import { canonicalUuidCoordinateSchema } from "@/lib/media/uuid-coordinate";
 import {
   buildMediaLibraryOverviewQuery,
@@ -44,7 +45,7 @@ export class MediaLibraryError extends Error {
 
 export function mediaLibraryError(error: unknown): { error: string; status: number } {
   if (error instanceof MediaLibraryQueryError) return { error: "errors.invalidData", status: 400 };
-  return error instanceof MediaLibraryError
+  return error instanceof MediaLibraryError || error instanceof MediaServiceError
     ? { error: error.error, status: error.status }
     : { error: "errors.serverError", status: 500 };
 }
@@ -111,7 +112,16 @@ async function signLibraryRow(row: MediaLibraryStorageRow): Promise<MediaLibrary
     note: row.note, tags: row.tags, kind, fileName: row.fileName, mimeType: row.mimeType,
     sizeBytes: row.sizeBytes, createdAt: row.createdAt, creatorName: row.creatorName,
     url, thumbnailUrl,
+    metadata: row.metadata ?? null,
   };
+}
+
+export async function extractMediaLibraryMetadata(actor: MediaActor, candidateId: string): Promise<MediaLibraryItem> {
+  requireManagerActor(actor);
+  // Resolve through the exact same tenant, purpose and non-deleted-item boundary.
+  const item = await resolveMediaLibraryItem(actor, candidateId);
+  await getMediaService().extractMetadata(actor, item.mediaId);
+  return resolveMediaLibraryItem(actor, candidateId);
 }
 
 export async function createMediaLibraryItem(

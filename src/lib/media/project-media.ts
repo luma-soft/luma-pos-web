@@ -35,8 +35,10 @@ import type {
   MarkMediaReadyInput,
   QuarantinePendingMediaInput,
   SaveMediaThumbnailInput,
+  SaveMediaMetadataInput,
   SoftDeleteMediaInput,
 } from "@/lib/media/repository";
+import { buildSaveMediaMetadataQuery, mediaRecordWithMetadata } from "@/lib/media/file-metadata-repository";
 import {
   getMediaService,
   type MediaRecord,
@@ -1145,7 +1147,7 @@ export function createDatabaseMediaRepository(
       if (created) {
         return { media: created as MediaRecord, created: true };
       }
-      const [existing] = await database.select().from(mediaObjects).where(and(
+      const [existing] = await database.select(mediaRecordWithMetadata).from(mediaObjects).where(and(
         eq(mediaObjects.storeId, values.storeId),
         eq(mediaObjects.id, values.id),
       )).limit(1);
@@ -1154,7 +1156,7 @@ export function createDatabaseMediaRepository(
         : null;
     },
     async getForStore(input: GetMediaForStoreInput) {
-      const [row] = await database.select().from(mediaObjects).where(and(
+      const [row] = await database.select(mediaRecordWithMetadata).from(mediaObjects).where(and(
         eq(mediaObjects.storeId, canonicalizeUuidCoordinate(input.storeId)),
         eq(mediaObjects.id, canonicalizeUuidCoordinate(input.mediaId)),
       )).limit(1);
@@ -1169,7 +1171,7 @@ export function createDatabaseMediaRepository(
         mediaId: canonicalizeUuidCoordinate(input.mediaId),
       };
       return database.transaction(async (transaction: DatabaseLike) => {
-        const [media] = await transaction.select().from(mediaObjects).where(and(
+        const [media] = await transaction.select(mediaRecordWithMetadata).from(mediaObjects).where(and(
           eq(mediaObjects.storeId, coordinates.storeId),
           eq(mediaObjects.id, coordinates.mediaId),
         )).limit(1).for("update");
@@ -1240,6 +1242,14 @@ export function createDatabaseMediaRepository(
         eq(mediaObjects.id, canonicalizeUuidCoordinate(input.mediaId)),
         eq(mediaObjects.status, "ready"),
       )).returning();
+      return (row as MediaRecord | undefined) ?? null;
+    },
+    async saveMetadata(input: SaveMediaMetadataInput) {
+      await database.execute(buildSaveMediaMetadataQuery(input));
+      const [row] = await database.select(mediaRecordWithMetadata).from(mediaObjects).where(and(
+        eq(mediaObjects.storeId, canonicalizeUuidCoordinate(input.storeId)),
+        eq(mediaObjects.id, canonicalizeUuidCoordinate(input.mediaId)),
+      )).limit(1);
       return (row as MediaRecord | undefined) ?? null;
     },
     async abandonPending(input: AbandonPendingMediaInput) {

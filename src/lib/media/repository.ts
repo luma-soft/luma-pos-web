@@ -16,6 +16,8 @@ import {
   canonicalizeUuidCoordinate,
 } from "@/lib/media/uuid-coordinate";
 import type { ReservedMediaUploadLock } from "@/lib/media/service";
+import { buildSaveMediaMetadataQuery, mediaRecordWithMetadata, type SaveMediaMetadataInput } from "@/lib/media/file-metadata-repository";
+export type { SaveMediaMetadataInput } from "@/lib/media/file-metadata-repository";
 
 export type CreatePendingMediaInput = {
   id: string;
@@ -219,7 +221,7 @@ export function buildGetMediaForStoreQuery(
   database: Pick<typeof db, "select">,
   input: GetMediaForStoreInput,
 ) {
-  return database.select()
+  return database.select(mediaRecordWithMetadata)
     .from(mediaObjects)
     .where(and(
       eq(mediaObjects.id, canonicalizeUuidCoordinate(input.mediaId)),
@@ -261,7 +263,7 @@ export function createDatabaseMediaRepository(database: typeof db) {
         mediaId: canonicalizeUuidCoordinate(input.mediaId),
       };
       return database.transaction(async (transaction) => {
-        const [media] = await transaction.select().from(mediaObjects).where(and(
+        const [media] = await transaction.select(mediaRecordWithMetadata).from(mediaObjects).where(and(
           eq(mediaObjects.id, coordinates.mediaId),
           eq(mediaObjects.storeId, coordinates.storeId),
         )).limit(1).for("update");
@@ -289,6 +291,11 @@ export function createDatabaseMediaRepository(database: typeof db) {
     },
     async saveThumbnail(input: SaveMediaThumbnailInput) {
       const [row] = await buildSaveMediaThumbnailQuery(database, input);
+      return row ?? null;
+    },
+    async saveMetadata(input: SaveMediaMetadataInput) {
+      await database.execute(buildSaveMediaMetadataQuery(input));
+      const [row] = await buildGetMediaForStoreQuery(database, input);
       return row ?? null;
     },
     async abandonPending(input: AbandonPendingMediaInput) {

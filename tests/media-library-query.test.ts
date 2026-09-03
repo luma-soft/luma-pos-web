@@ -45,6 +45,10 @@ beforeAll(async () => {
       original_file_name text, mime_type text, size_bytes bigint default 1024,
       thumbnail_size_bytes bigint, status text default 'ready', purpose text default 'library-asset'
     );
+    create table media_file_metadata (
+      store_id uuid not null, media_object_id uuid not null, metadata jsonb not null,
+      primary key (store_id, media_object_id)
+    );
     create table media_library_items (
       id uuid primary key, store_id uuid, media_object_id uuid, album text, title text,
       note text, tags text[] default '{}', created_at timestamptz,
@@ -157,5 +161,17 @@ describe("media library query boundaries", () => {
     await database.exec(`update media_library_items set deleted_at=now() where id='${idFor(2)}'; update media_objects set status='pending' where id='${idFor(3)}'`);
     expect(await execute(buildMediaLibraryResolveQuery(storeId, idFor(2)))).toEqual([]);
     expect(await execute(buildMediaLibraryResolveQuery(storeId, idFor(3)))).toEqual([]);
+  });
+
+  test("metadata uses both media and tenant coordinates without leaking unrelated GPS", async () => {
+    const metadata = { version: 1, status: "ready", extractedAt: "2026-09-03T00:00:00Z", latitude: 0, longitude: 0 };
+    await database.query("insert into media_file_metadata values ($1,$2,$3::jsonb),($4,$2,$5::jsonb)", [
+      storeId, idFor(1), JSON.stringify(metadata), otherStoreId, JSON.stringify({ ...metadata, latitude: 50 }),
+    ]);
+    const [row] = await execute<MediaLibraryStorageRow>(buildMediaLibraryResolveQuery(storeId, idFor(1)));
+    expect(row.metadata).toEqual(metadata);
+    expect((await resolveMediaLibraryItem(actor, idFor(1))).metadata).toEqual(metadata);
+    const snapshot = await getMediaLibrarySnapshot(actor, parseMediaLibraryQuery(new URLSearchParams({ q: "voi chau" })));
+    expect(snapshot.items[0].metadata).toEqual(metadata);
   });
 });

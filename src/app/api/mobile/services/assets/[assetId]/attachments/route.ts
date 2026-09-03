@@ -100,6 +100,7 @@ export async function GET(
     const signedUrl = await resolveAssetAttachmentUrl(gate, attachment, mediaTarget);
     return {
       id: attachment.id,
+      mediaObjectId: attachment.mediaObjectId,
       bucket: attachment.bucket,
       path: attachment.path,
       fileName: attachment.fileName,
@@ -185,6 +186,7 @@ export async function POST(
       });
       return mobileOk({
         id: existing.id,
+        mediaObjectId: existing.mediaObjectId,
         fileName: existing.fileName,
         mimeType: existing.mimeType,
         sizeBytes: existing.sizeBytes,
@@ -350,6 +352,7 @@ export async function POST(
     });
     return mobileOk({
       id: attachment.id,
+      mediaObjectId: attachment.mediaObjectId,
       path: attachment.path,
       fileName: attachment.fileName,
       mimeType: attachment.mimeType,

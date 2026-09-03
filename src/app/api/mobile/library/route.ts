@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { MediaActor } from "@/lib/media/authorization";
 import {
   createMediaLibraryItem,
+  extractMediaLibraryMetadata,
   deleteMediaLibraryItem,
   getMediaLibrarySnapshot,
   mediaLibraryError,
@@ -29,6 +30,7 @@ type MediaLibraryRouteDependencies = {
   list?: typeof getMediaLibrarySnapshot;
   resolve?: typeof resolveMediaLibraryItem;
   create?: typeof createMediaLibraryItem;
+  extractMetadata?: typeof extractMediaLibraryMetadata;
   update?: typeof updateMediaLibraryItem;
   remove?: typeof deleteMediaLibraryItem;
 };
@@ -84,9 +86,16 @@ export function createMediaLibraryHandlers(
       const authenticated = await gate();
       if (!authenticated.actor) return authenticated.response!;
       try {
+        const body = await readJson(request);
+        if (body && typeof body === "object" && "action" in body && body.action === "extract-metadata") {
+          if (!("id" in body) || typeof body.id !== "string") return mobileError("errors.invalidData", 400);
+          const response = mobileOk(await (dependencies.extractMetadata ?? extractMediaLibraryMetadata)(authenticated.actor, body.id));
+          response.headers.set("Cache-Control", "private, no-store");
+          return response;
+        }
         const item = await (dependencies.create ?? createMediaLibraryItem)(
           authenticated.actor,
-          await readJson(request),
+          body,
         );
         return mobileOk(item);
       } catch (error) {

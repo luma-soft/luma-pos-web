@@ -52,6 +52,8 @@ export interface ObjectStorage {
     signal?: AbortSignal;
   }): Promise<MediaObjectHead>;
   get(input: { bucket: string; key: string; signal?: AbortSignal }): Promise<Uint8Array>;
+  /** Bounded byte-range read; omitted by legacy providers that cannot honor ranges. */
+  getRange?(input: { bucket: string; key: string; offset: number; length: number; signal?: AbortSignal }): Promise<Uint8Array>;
   head(input: {
     bucket: string;
     key: string;

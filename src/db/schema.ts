@@ -8,6 +8,7 @@ import { relations, sql } from "drizzle-orm";
 import type { StorePrefs } from "@/lib/schemas/settings";
 import type { ServiceChecklistItem } from "@/lib/services/domain";
 import type { MediaProvider, MediaVisibility } from "@/lib/media/types";
+import type { MediaFileMetadata } from "@/lib/media/file-metadata-types";
 
 export type ServiceTradeRecordData = Record<string, unknown>;
 export type InstalledAssetSpecs = Record<string, unknown>;
@@ -175,6 +176,28 @@ export const mediaObjects = pgTable("media_objects", {
     foreignColumns: [profiles.storeId, profiles.id],
     name: "media_objects_created_by_tenant_fk",
   }).onDelete("no action"),
+]);
+
+// Server-only: construction GPS must not inherit media_objects' store-wide grants.
+export const mediaFileMetadata = pgTable("media_file_metadata", {
+  storeId: uuid("store_id").notNull(),
+  mediaObjectId: uuid("media_object_id").notNull(),
+  metadata: jsonb("metadata").$type<MediaFileMetadata>().notNull(),
+}, (t) => [
+  primaryKey({ name: "media_file_metadata_pkey", columns: [t.storeId, t.mediaObjectId] }),
+  foreignKey({
+    columns: [t.storeId, t.mediaObjectId],
+    foreignColumns: [mediaObjects.storeId, mediaObjects.id],
+    name: "media_file_metadata_object_tenant_fk",
+  }).onDelete("cascade"),
+  check("media_file_metadata_json_check", sql`coalesce((
+    jsonb_typeof(${t.metadata}) = 'object'
+    and ${t.metadata}->'version' = '1'::jsonb
+    and ${t.metadata}->>'status' in ('ready', 'empty', 'unsupported', 'failed')
+    and jsonb_typeof(${t.metadata}->'extractedAt') = 'string'
+    and octet_length(${t.metadata}::text) <= 16384
+    and ${t.metadata} ?& array['version', 'status', 'extractedAt']
+  ), false)`),
 ]);
 
 export const mediaLibraryItems = pgTable("media_library_items", {

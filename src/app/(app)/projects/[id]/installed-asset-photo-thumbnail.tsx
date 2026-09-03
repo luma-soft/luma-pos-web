@@ -2,14 +2,9 @@
 
 import Image from "next/image";
 import { ImageIcon } from "lucide-react";
-import { useEffect, useState } from "react";
-
-type AssetPhoto = {
-  id: string;
-  signedUrl: string;
-  isPrimary: boolean;
-  sortOrder: number;
-};
+import { useCallback, useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
+import { InstalledAssetPhotoPreview, loadInstalledAssetPhoto, type AssetPhoto } from "./installed-asset-photo-preview";
 
 export function InstalledAssetPhotoThumbnail({
   assetId,
@@ -18,43 +13,35 @@ export function InstalledAssetPhotoThumbnail({
   assetId: string;
   assetName: string;
 }) {
-  const [url, setUrl] = useState<string | null | undefined>(undefined);
+  const t = useTranslations("projectMedia");
+  const [photo, setPhoto] = useState<AssetPhoto | null | undefined>(undefined);
+  const [previewTrigger, setPreviewTrigger] = useState<HTMLElement | null>(null);
+  const closePreview = useCallback(() => setPreviewTrigger(null), []);
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetch(`/api/mobile/services/assets/${assetId}/attachments`, {
-      cache: "no-store",
-      signal: controller.signal,
-    })
-      .then(async (response) => {
-        if (!response.ok) return null;
-        const body = await response.json() as { ok?: boolean; data?: AssetPhoto[] };
-        const photos = body.ok && Array.isArray(body.data) ? body.data : [];
-        const primary = photos.find((photo) => photo.isPrimary) ?? photos[0];
-        return primary?.signedUrl ?? null;
-      })
-      .then((nextUrl) => {
-        if (!controller.signal.aborted) setUrl(nextUrl);
+    void loadInstalledAssetPhoto(assetId, null, controller.signal)
+      .then((next) => {
+        if (!controller.signal.aborted) setPhoto(next);
       })
       .catch(() => {
-        if (!controller.signal.aborted) setUrl(null);
+        if (!controller.signal.aborted) setPhoto(null);
       });
     return () => controller.abort();
   }, [assetId]);
 
+  if (photo) return <>
+    <button type="button" onClick={(event) => setPreviewTrigger(event.currentTarget)}
+      aria-label={t("openFile", { fileName: photo.fileName })} aria-haspopup="dialog"
+      className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-border-soft bg-surface-2 text-slate-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600">
+      <Image src={photo.signedUrl} alt={assetName} width={48} height={48} unoptimized className="h-full w-full object-cover" />
+    </button>
+    {previewTrigger && <InstalledAssetPhotoPreview assetId={assetId} assetName={assetName} photo={photo} trigger={previewTrigger} onClose={closePreview} />}
+  </>;
   return (
     <span className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-border-soft bg-surface-2 text-slate-400">
-      {url ? (
-        <Image
-          src={url}
-          alt={`Ảnh chính của ${assetName}`}
-          width={48}
-          height={48}
-          unoptimized
-          className="h-full w-full object-cover"
-        />
-      ) : url === undefined ? (
-        <span className="h-full w-full animate-pulse bg-slate-100" aria-label="Đang tải ảnh thiết bị" />
+      {photo === undefined ? (
+        <span className="h-full w-full animate-pulse bg-slate-100" aria-label={t("loadingLabel")} />
       ) : (
         <ImageIcon aria-hidden="true" className="h-5 w-5" />
       )}

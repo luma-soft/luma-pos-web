@@ -1,5 +1,6 @@
 import { sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
+import type { MediaFileMetadata } from "@/lib/media/file-metadata-types";
 
 import { normalizeSearch } from "@/lib/normalize";
 import type { MediaProvider } from "@/lib/media/types";
@@ -74,6 +75,7 @@ export type MediaLibraryStorageRow = {
   fileName: string;
   mimeType: string;
   sizeBytes: number;
+  metadata?: MediaFileMetadata | null;
 };
 
 export type MediaLibraryOverviewRow = {
@@ -101,7 +103,9 @@ const rowColumns = sql`
   to_char(l.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as "createdAt",
   p.full_name as "creatorName", m.provider, m.bucket, m.object_key as "objectKey",
   m.thumbnail_object_key as "thumbnailObjectKey", m.original_file_name as "fileName",
-  m.mime_type as "mimeType", m.size_bytes::float8 as "sizeBytes"
+  m.mime_type as "mimeType", m.size_bytes::float8 as "sizeBytes",
+  (select fm.metadata from media_file_metadata fm
+    where fm.store_id = m.store_id and fm.media_object_id = m.id) as metadata
 `;
 const combiningMarks = Array.from({ length: 112 }, (_, index) => String.fromCharCode(0x300 + index)).join("");
 

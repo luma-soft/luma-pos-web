@@ -111,6 +111,8 @@ const TENANT_CHILD_TABLES = [
   "ai_listing_suggestions",
   "internal_use_items",
   "product_media",
+  "media_file_metadata",
+  "media_library_items",
   "service_handover_document_media",
 ] as const;
 

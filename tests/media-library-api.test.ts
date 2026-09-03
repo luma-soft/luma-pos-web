@@ -84,6 +84,34 @@ describe("media library API", () => {
     expect(await response.json()).toEqual({ ok: false, error: "errors.forbidden" });
   });
 
+  test("metadata backfill binds the actor and item only, never trusts supplied EXIF", async () => {
+    const calls: unknown[] = [];
+    const handlers = createMediaLibraryHandlers({
+      authenticate: async () => gate,
+      extractMetadata: async (actor, id) => {
+        calls.push({ actor, id });
+        return { id, metadata: { version: 1, status: "ready" } } as never;
+      },
+    });
+    const response = await handlers.POST(new Request("https://luma.test/api/mobile/library", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "extract-metadata", id: gate.storeId, latitude: 99, storeId: "forged" }),
+    }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(calls).toEqual([{ actor: { storeId: gate.storeId, userId: gate.userId, role: gate.role, features: gate.features }, id: gate.storeId }]);
+    const { MediaServiceError } = await import("../src/lib/media/service");
+    const denied = createMediaLibraryHandlers({ authenticate: async () => gate,
+      extractMetadata: async () => { throw new MediaServiceError("errors.notFound", 404); },
+    });
+    const missing = await denied.POST(new Request("https://luma.test/api/mobile/library", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "extract-metadata", id: gate.storeId }),
+    }));
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toEqual({ ok: false, error: "errors.notFound" });
+  });
+
   test("forwards bounded filters and rejects malformed query parameters before repository access", async () => {
     const queries: unknown[] = [];
     const handlers = createMediaLibraryHandlers({

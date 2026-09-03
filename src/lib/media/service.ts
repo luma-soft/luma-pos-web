@@ -19,9 +19,12 @@ import {
   type RecoverReadyMediaAfterFailureInput,
   type RecoverReadyMediaAfterFailureResult,
   type SaveMediaThumbnailInput,
+  type SaveMediaMetadataInput,
   type SoftDeleteMediaInput,
   type SoftDeleteMediaResult,
 } from "@/lib/media/repository";
+import { extractFileMetadata } from "@/lib/media/file-metadata";
+import type { MediaFileMetadata } from "@/lib/media/file-metadata-types";
 import {
   extensionForMediaType,
   mediaIdSchema,
@@ -84,6 +87,7 @@ export type MediaRecord = {
   thumbnailObjectKey: string | null;
   thumbnailSizeBytes: number | null;
   sha256: string | null;
+  fileMetadata?: MediaFileMetadata | null;
 };
 
 export type MediaDescriptor = {
@@ -94,6 +98,10 @@ export type MediaDescriptor = {
   fileName: string;
   url: string;
   thumbnailUrl: string | null;
+  metadata?: MediaFileMetadata | null;
+  canExtractMetadata?: boolean;
+  createdAt?: string;
+  createdBy?: string | null;
 };
 
 export type ReservedMediaUploadLock = {
@@ -116,6 +124,7 @@ export type MediaRepository = {
   ): Promise<T | null>;
   markReady(input: Required<MarkMediaReadyInput>): Promise<MediaRecord | null>;
   saveThumbnail(input: SaveMediaThumbnailInput): Promise<MediaRecord | null>;
+  saveMetadata?(input: SaveMediaMetadataInput): Promise<MediaRecord | null>;
   abandonPending(input: AbandonPendingMediaInput): Promise<MediaRecord | null>;
   quarantinePending(input: QuarantinePendingMediaInput): Promise<MediaRecord | null>;
   recoverReadyAfterFailure(
@@ -170,6 +179,9 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
   const now = dependencies.now ?? (() => new Date());
   const createId = dependencies.randomUUID ?? nodeRandomUUID;
   const logger = dependencies.logger ?? console;
+  const metadataInFlight = new Map<string, Promise<MediaRecord>>();
+  const supportsMetadata = (media: MediaRecord) => media.visibility === "private"
+    && ["library-asset", "project-document", "service-evidence"].includes(media.purpose);
   const reservedUploadIoTimeoutMs = dependencies.reservedUploadIoTimeoutMs
     ?? RESERVED_UPLOAD_IO_TIMEOUT_MS;
   if (!Number.isFinite(reservedUploadIoTimeoutMs) || reservedUploadIoTimeoutMs <= 0) {
@@ -238,6 +250,10 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
       fileName: record.originalFileName,
       url,
       thumbnailUrl,
+      metadata: supportsMetadata(record) ? record.fileMetadata ?? null : null,
+      canExtractMetadata: supportsMetadata(record),
+      createdAt: record.createdAt.toISOString(),
+      createdBy: record.createdBy,
     };
   }
 
@@ -487,7 +503,7 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
       throw new MediaServiceError("errors.notFound", 404);
     }
     await requireTarget(actor, media.purpose, media.targetId, true);
-    if (media.status === "ready") return descriptor(media);
+    if (media.status === "ready") return descriptor(await saveMetadataForReadyMedia(media));
     if (media.status !== "pending") {
       throw new MediaServiceError("errors.notFound", 404);
     }
@@ -519,13 +535,55 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
         storeId: actor.storeId,
         mediaId,
       });
-      if (raced?.status === "ready") return descriptor(raced);
+      if (raced?.status === "ready") return descriptor(await saveMetadataForReadyMedia(raced));
       throw new MediaServiceError("media.uploadConflict", 409);
     }
     media = ready;
 
     media = await saveThumbnailForReadyMedia(media);
+    media = await saveMetadataForReadyMedia(media);
     return descriptor(media);
+  }
+
+  async function saveMetadataForReadyMedia(media: MediaRecord, bytes?: Uint8Array): Promise<MediaRecord> {
+    if (!supportsMetadata(media) || !dependencies.repository.saveMetadata) return media;
+    if (media.fileMetadata && (media.fileMetadata.status !== "failed"
+      || now().getTime() - Date.parse(media.fileMetadata.extractedAt) < 30_000)) return media;
+    const key = `${media.storeId}:${media.id}`;
+    const running = metadataInFlight.get(key);
+    if (running) return running;
+    const operation = (async () => {
+      const storage = media.provider === "r2" ? dependencies.storage : getObjectStorage(media.provider);
+      const metadata = await extractFileMetadata({
+        mimeType: media.mimeType, sizeBytes: media.sizeBytes, now,
+        read: async (length, offset, signal) => {
+          if (bytes) return bytes.subarray(offset, offset + length);
+          const coordinate = { bucket: media.bucket, key: media.objectKey, signal };
+          if (storage.getRange) return storage.getRange({ ...coordinate, offset, length });
+          if (offset !== 0 || length !== media.sizeBytes || length > 25 * 1024 * 1024) {
+            throw new Error("Metadata range unsupported");
+          }
+          return storage.get(coordinate);
+        },
+      });
+      const saved = await dependencies.repository.saveMetadata!({ storeId: media.storeId, mediaId: media.id, metadata });
+      return saved ?? await dependencies.repository.getForStore({ storeId: media.storeId, mediaId: media.id }) ?? media;
+    })().catch(() => {
+      // Metadata is enrichment, not a condition for keeping the uploaded original.
+      logger.error("media metadata persistence failed", { mediaId: media.id });
+      return media;
+    }).finally(() => { metadataInFlight.delete(key); });
+    // Every concurrent caller receives the same best-effort, non-rejecting work.
+    metadataInFlight.set(key, operation);
+    return operation;
+  }
+
+  async function extractMetadata(candidateActor: MediaActor, candidateMediaId: string) {
+    const media = await loadAuthorizedReady(candidateActor, candidateMediaId);
+    if (!supportsMetadata(media)) throw new MediaServiceError("errors.invalidData", 400);
+    const updated = await saveMetadataForReadyMedia(media);
+    if (updated.status !== "ready") throw new MediaServiceError("errors.notFound", 404);
+    return { metadata: updated.fileMetadata ?? null };
   }
 
   async function completeUpload(candidateActor: MediaActor, candidateMediaId: string) {
@@ -674,7 +732,7 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
     await requireTarget(actor, reservedMedia.purpose, reservedMedia.targetId, true);
 
     if (reservedMedia.status === "ready") {
-      const completed = await descriptor(reservedMedia);
+      const completed = await descriptor(await saveMetadataForReadyMedia(reservedMedia, bytes));
       return {
         mediaId: completed.id,
         path: reservedMedia.objectKey,
@@ -825,7 +883,7 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
       throw new MediaServiceError("media.uploadExpired", 410);
     }
 
-    const completedMedia = await saveThumbnailForReadyMedia(resolved.media);
+    const completedMedia = await saveMetadataForReadyMedia(await saveThumbnailForReadyMedia(resolved.media), bytes);
     const completed = await descriptor(completedMedia);
     return {
       mediaId: completed.id,
@@ -972,6 +1030,7 @@ export function createMediaService(dependencies: MediaServiceDependencies) {
     reserveManagedObject,
     resolveMedia,
     readMedia,
+    extractMetadata,
     deleteMedia,
     deleteManagedProductImageByPath,
   };

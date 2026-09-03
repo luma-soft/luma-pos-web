@@ -132,6 +132,27 @@ export class R2ObjectStorage implements ObjectStorage {
     return result.Body.transformToByteArray();
   }
 
+  async getRange(input: { bucket: string; key: string; offset: number; length: number; signal?: AbortSignal }): Promise<Uint8Array> {
+    if (!Number.isSafeInteger(input.offset) || input.offset < 0 || !Number.isSafeInteger(input.length)
+      || input.length < 1 || input.length > 25 * 1024 * 1024) throw new Error("Invalid metadata range");
+    const end = input.offset + input.length - 1;
+    if (!Number.isSafeInteger(end)) throw new Error("Invalid metadata range");
+    const result = await this.client.send(new GetObjectCommand({
+      Bucket: input.bucket, Key: input.key, Range: `bytes=${input.offset}-${end}`,
+    }), { abortSignal: input.signal });
+    const range = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(result.ContentRange ?? "");
+    if (!result.Body || result.ContentLength !== input.length || !range
+      || +range[1] !== input.offset || +range[2] !== end) {
+      // Do not consume an ignored Range response, which might be a 512 MB video.
+      const body = result.Body as { destroy?: () => void } | undefined;
+      body?.destroy?.();
+      throw new Error("Storage did not honor metadata range");
+    }
+    const bytes = await result.Body.transformToByteArray();
+    if (bytes.byteLength !== input.length) throw new Error("Truncated metadata range");
+    return bytes;
+  }
+
   async head(input: {
     bucket: string;
     key: string;

@@ -294,6 +294,29 @@ test("R2 download presigning uses a GET command with the requested expiry", asyn
 });
 
 describe("R2 object adapter", () => {
+  test("metadata ranges are exact and propagate cancellation", async () => {
+    const signal = new AbortController().signal;
+    const storage = r2WithClient(async (command, options) => {
+      expect(command).toBeInstanceOf(GetObjectCommand);
+      expect((command as GetObjectCommand).input.Range).toBe("bytes=100-102");
+      expect(options?.abortSignal).toBe(signal);
+      return { ContentRange: "bytes 100-102/512000000", ContentLength: 3, Body: { transformToByteArray: async () => new Uint8Array([1, 2, 3]) } };
+    });
+    expect(await storage.getRange({ bucket: "private", key: "video.mp4", offset: 100, length: 3, signal })).toEqual(new Uint8Array([1, 2, 3]));
+  });
+
+  test("never consumes ignored or oversized range responses", async () => {
+    let consumed = false;
+    let destroyed = false;
+    const storage = r2WithClient(async () => ({ ContentLength: 512 * 1024 * 1024, Body: {
+      transformToByteArray: async () => { consumed = true; return new Uint8Array(0); }, destroy: () => { destroyed = true; },
+    } }));
+    await expect(storage.getRange({ bucket: "private", key: "video.mp4", offset: 0, length: 32 })).rejects.toThrow("Storage did not honor");
+    expect(consumed).toBe(false);
+    expect(destroyed).toBe(true);
+    await expect(storage.getRange({ bucket: "private", key: "video.mp4", offset: -1, length: 32 })).rejects.toThrow("Invalid metadata range");
+  });
+
   test.each([
     [412, "definitive-no-write"],
     [400, "definitive-no-write"],

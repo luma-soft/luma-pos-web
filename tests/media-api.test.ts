@@ -1,6 +1,7 @@
 import { describe, expect, mock, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import sharp from "sharp";
 
 mock.module("server-only", () => ({}));
 mock.module("@/db", () => ({ db: {} }));
@@ -22,6 +23,7 @@ const { createDeleteMediaHandler, createResolveMediaHandler } = await import(
   "../src/app/api/mobile/media/[mediaId]/route"
 );
 const { createMediaService } = await import("../src/lib/media/service");
+const { createExtractMetadataHandler } = await import("../src/app/api/mobile/media/[mediaId]/metadata/route");
 const { createMediaTargetAuthorizer } = await import(
   "../src/lib/media/authorization"
 );
@@ -53,6 +55,95 @@ const gate: Extract<MobileGate, { ok: true }> = {
     einvoice: true,
   },
 };
+
+describe("shared original metadata", () => {
+  const context = { params: Promise.resolve({ mediaId: MEDIA_ID }) };
+  async function cameraImage() {
+    return sharp({ create: { width: 32, height: 24, channels: 3, background: "white" } }).jpeg()
+      .withExif({ IFD0: { Make: "Luma", Model: "Camera" }, IFD2: { DateTimeOriginal: "2026:08:01 10:04:05" } }).toBuffer();
+  }
+
+  test("upload completion stores metadata for library, project construction and service evidence", async () => {
+    const bytes = await cameraImage();
+    for (const purpose of ["library-asset", "project-document", "service-evidence"] as const) {
+      const record = pendingRecord({ purpose, mimeType: "image/jpeg", sizeBytes: bytes.length });
+      const harness = createHarness({ initial: [record], objectBytes: bytes });
+      harness.storageState.heads.set(`${record.bucket}:${record.objectKey}`, { sizeBytes: bytes.length, contentType: "image/jpeg", etag: null });
+      const response = await harness.complete(jsonRequest({}), context);
+      expect(response.status).toBe(200);
+      expect((await response.json()).data.metadata).toMatchObject({ status: "ready", make: "Luma", model: "Camera", capturedAt: "2026-08-01T10:04:05", width: 32, height: 24 });
+      expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.fileMetadata?.capturedAt).toBe("2026-08-01T10:04:05");
+      const reads = harness.storageState.downloads;
+      await harness.complete(jsonRequest({}), context);
+      expect(harness.storageState.downloads).toBe(reads);
+    }
+  });
+
+  test("metadata endpoint backfills once, shares concurrent work and never accepts client metadata", async () => {
+    const bytes = await cameraImage();
+    const record = pendingRecord({ status: "ready", mimeType: "image/jpeg", sizeBytes: bytes.length });
+    const harness = createHarness({ initial: [record], objectBytes: bytes });
+    const responses = await Promise.all([harness.metadata(jsonRequest({ latitude: 99, capturedAt: "fake" }), context), harness.metadata(jsonRequest({}), context)]);
+    for (const response of responses) {
+      expect(response.status).toBe(200);
+      const result = (await response.json()).data.metadata;
+      expect(result.capturedAt).toBe("2026-08-01T10:04:05");
+      expect(result.latitude).toBeUndefined();
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
+    }
+    expect(harness.storageState.downloads).toBe(1);
+    await harness.metadata(jsonRequest({}), context);
+    expect(harness.storageState.downloads).toBe(1);
+  });
+
+  test("tenant, assignment, lifecycle and purpose authorization happen before reading bytes", async () => {
+    const record = pendingRecord({ status: "ready", mimeType: "image/jpeg", sizeBytes: 10 });
+    for (const options of [
+      { initial: [{ ...record, storeId: OTHER_MEDIA_ID }] },
+      { initial: [record], authorize: "forbidden" as const },
+      { initial: [{ ...record, status: "deleted" as const }] },
+      { initial: [{ ...record, status: "pending" as const }] },
+      { initial: [{ ...record, purpose: "product-image" as const, visibility: "public" as const }] },
+    ]) {
+      const harness = createHarness(options);
+      const response = await harness.metadata(jsonRequest({}), context);
+      expect([400, 404]).toContain(response.status);
+      expect(harness.storageState.downloads).toBe(0);
+    }
+    let called = false;
+    const unauthorized = createExtractMetadataHandler({ authenticate: async () => ({ ok: false, error: "errors.unauthorized" }), service: { extractMetadata: async () => { called = true; return { metadata: null }; } } });
+    expect((await unauthorized(jsonRequest({}), context)).status).toBe(401);
+    expect(called).toBe(false);
+  });
+
+  test("failed parsing or persistence never rejects/removes a completed original", async () => {
+    const bytes = await cameraImage();
+    for (const metadataPersistenceFailure of [false, true]) {
+      const record = pendingRecord({ mimeType: "image/jpeg", sizeBytes: bytes.length });
+      const harness = createHarness({ initial: [record], objectBytes: metadataPersistenceFailure ? bytes : new Uint8Array(bytes.length), metadataPersistenceFailure });
+      harness.storageState.heads.set(`${record.bucket}:${record.objectKey}`, { sizeBytes: bytes.length, contentType: "image/jpeg", etag: null });
+      const response = await harness.complete(jsonRequest({}), context);
+      expect(response.status).toBe(200);
+      expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("ready");
+      expect(harness.storageState.removed).toEqual([]);
+      if (!metadataPersistenceFailure) expect((await response.json()).data.metadata.status).toBe("failed");
+    }
+  });
+
+  test("concurrent metadata persistence failure remains best-effort for every caller", async () => {
+    const bytes = await cameraImage();
+    const record = pendingRecord({ status: "ready", mimeType: "image/jpeg", sizeBytes: bytes.length });
+    const harness = createHarness({ initial: [record], objectBytes: bytes, metadataPersistenceFailure: true });
+    const responses = await Promise.all([
+      harness.complete(jsonRequest({}), context),
+      harness.metadata(jsonRequest({}), context),
+    ]);
+    for (const response of responses) expect(response.status).toBe(200);
+    expect(harness.storageState.downloads).toBe(1);
+    expect(harness.records.get(`${STORE_ID}:${MEDIA_ID}`)?.status).toBe("ready");
+    expect(harness.storageState.removed).toEqual([]);
+  });
+});
 
 function jsonRequest(body: unknown, url = "https://app.test/api/mobile/media/uploads") {
   return new Request(url, {
@@ -106,6 +197,7 @@ function createHarness(options: {
   failDownloadSign?: boolean;
   readyRecoveryOutcome?: "deleted" | "quarantined" | "referenced" | "conflict";
   readyRecoveryFailure?: boolean;
+  metadataPersistenceFailure?: boolean;
 } = {}) {
   const records = new Map(
     (options.initial ?? []).map((record) => [`${record.storeId}:${record.id}`, record]),
@@ -230,6 +322,16 @@ function createHarness(options: {
         thumbnailObjectKey: input.objectKey,
         thumbnailSizeBytes: input.sizeBytes,
       };
+      records.set(key, updated);
+      return updated;
+    },
+    async saveMetadata(input) {
+      if (options.metadataPersistenceFailure) throw new Error("Database unavailable");
+      const key = `${input.storeId}:${input.mediaId}`;
+      const current = records.get(key);
+      if (!current || current.status !== "ready") return null;
+      if (current.fileMetadata && current.fileMetadata.status !== "failed") return null;
+      const updated = { ...current, fileMetadata: input.metadata };
       records.set(key, updated);
       return updated;
     },
@@ -398,6 +500,7 @@ function createHarness(options: {
     complete: createCompleteUploadHandler({ authenticate, service }),
     resolve: createResolveMediaHandler({ authenticate, service }),
     remove: createDeleteMediaHandler({ authenticate, service }),
+    metadata: createExtractMetadataHandler({ authenticate, service }),
     async putOriginal(
       mediaId: string,
       body: Uint8Array,
@@ -616,6 +719,10 @@ describe("media completion API", () => {
         mimeType: "application/pdf",
         sizeBytes: 1024,
         fileName: "nghiem-thu.pdf",
+        metadata: { version: 1, status: "unsupported", extractedAt: NOW.toISOString() },
+        canExtractMetadata: true,
+        createdAt: NOW.toISOString(),
+        createdBy: USER_ID,
         url: expect.stringContaining("X-Amz-Expires=900"),
         thumbnailUrl: null,
       },

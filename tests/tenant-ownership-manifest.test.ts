@@ -20,6 +20,8 @@ describe("tenant ownership manifest", () => {
 
   test("classifies canonical media tables as tenant-owned", () => {
     expect(TABLE_OWNERSHIP.media_objects).toBe("tenant-root");
+    expect(TABLE_OWNERSHIP.media_file_metadata).toBe("tenant-child");
+    expect(TABLE_OWNERSHIP.media_library_items).toBe("tenant-child");
     expect(TABLE_OWNERSHIP.product_media).toBe("tenant-child");
     expect(TABLE_OWNERSHIP.service_handover_document_media).toBe("tenant-child");
     expect(TABLE_OWNERSHIP.media_migration_runs).toBe("operational/system");

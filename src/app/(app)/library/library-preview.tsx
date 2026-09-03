@@ -12,6 +12,7 @@ import {
   ZoomOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FileInfoPanel } from "@/components/media/file-info-panel";
 import type { MediaLibraryItem } from "@/lib/media/library-types";
 import { cn } from "@/lib/utils";
 import { LibraryDialog } from "./library-dialog";
@@ -187,18 +188,29 @@ export function LibraryPreview({
               ))}
             </div>
           )}
-          <div className="border-t border-border pt-4 text-xs leading-6 text-slate-500">
-            <p>
-              {new Intl.DateTimeFormat(locale, { dateStyle: "medium" }).format(
-                new Date(item.createdAt),
-              )}
-            </p>
-            <p>
-              {t("createdBy", {
-                name: item.creatorName ?? t("unknownCreator"),
-              })}
-            </p>
-          </div>
+          <FileInfoPanel
+            key={item.id}
+            fileName={item.fileName}
+            mimeType={item.mimeType}
+            sizeBytes={item.sizeBytes}
+            uploadedAt={item.createdAt}
+            uploaderName={(resolved ?? item).creatorName}
+            metadata={(resolved ?? item).metadata}
+            canManage={canManage && Boolean(resolved || failed)}
+            onExtract={async (signal) => {
+              const next = await libraryRequest<MediaLibraryItem>("/api/mobile/library", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "extract-metadata", id: item.id }),
+                signal,
+              });
+              if (!signal.aborted) {
+                setResolved(next);
+                setFailed(false);
+              }
+              return next.metadata ?? null;
+            }}
+          />
         </aside>
       </div>
     </LibraryDialog>
