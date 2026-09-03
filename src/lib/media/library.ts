@@ -1,9 +1,9 @@
 import "server-only";
 
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import { db } from "@/db";
-import { mediaLibraryItems, mediaObjects, profiles } from "@/db/schema";
+import { mediaLibraryItems, mediaObjects } from "@/db/schema";
 import type { MediaActor } from "@/lib/media/authorization";
 import {
   mediaLibraryItemInputSchema,
@@ -18,9 +18,19 @@ import type {
 import { softDeleteMediaIfUnreferencedInTransaction } from "@/lib/media/repository-core";
 import { getObjectStorage } from "@/lib/media/storage";
 import { canonicalUuidCoordinateSchema } from "@/lib/media/uuid-coordinate";
+import {
+  buildMediaLibraryOverviewQuery,
+  buildMediaLibraryPageQuery,
+  buildMediaLibraryResolveQuery,
+  encodeMediaLibraryCursor,
+  MediaLibraryQueryError,
+  parseMediaLibraryQuery,
+  type MediaLibraryOverviewRow,
+  type MediaLibraryQuery,
+  type MediaLibraryStorageRow,
+} from "@/lib/media/library-query";
 
 const LIBRARY_SIGNED_URL_SECONDS = 15 * 60;
-const LIBRARY_LIST_LIMIT = 1_000;
 
 export class MediaLibraryError extends Error {
   constructor(
@@ -33,6 +43,7 @@ export class MediaLibraryError extends Error {
 }
 
 export function mediaLibraryError(error: unknown): { error: string; status: number } {
+  if (error instanceof MediaLibraryQueryError) return { error: "errors.invalidData", status: 400 };
   return error instanceof MediaLibraryError
     ? { error: error.error, status: error.status }
     : { error: "errors.serverError", status: 500 };
@@ -46,115 +57,60 @@ function requireManagerActor(actor: MediaActor) {
 
 export async function getMediaLibrarySnapshot(
   actor: MediaActor,
+  query: MediaLibraryQuery = parseMediaLibraryQuery(new URLSearchParams()),
 ): Promise<MediaLibrarySnapshot> {
-  const [rows, totalUsage, libraryUsage] = await Promise.all([
-    db.select({
-      id: mediaLibraryItems.id,
-      mediaId: mediaLibraryItems.mediaObjectId,
-      album: mediaLibraryItems.album,
-      title: mediaLibraryItems.title,
-      note: mediaLibraryItems.note,
-      tags: mediaLibraryItems.tags,
-      createdAt: mediaLibraryItems.createdAt,
-      creatorName: profiles.fullName,
-      provider: mediaObjects.provider,
-      bucket: mediaObjects.bucket,
-      objectKey: mediaObjects.objectKey,
-      thumbnailObjectKey: mediaObjects.thumbnailObjectKey,
-      fileName: mediaObjects.originalFileName,
-      mimeType: mediaObjects.mimeType,
-      sizeBytes: mediaObjects.sizeBytes,
-    }).from(mediaLibraryItems)
-      .innerJoin(mediaObjects, and(
-        eq(mediaObjects.storeId, mediaLibraryItems.storeId),
-        eq(mediaObjects.id, mediaLibraryItems.mediaObjectId),
-      ))
-      .leftJoin(profiles, and(
-        eq(profiles.storeId, mediaLibraryItems.storeId),
-        eq(profiles.id, mediaLibraryItems.createdBy),
-      ))
-      .where(and(
-        eq(mediaLibraryItems.storeId, actor.storeId),
-        isNull(mediaLibraryItems.deletedAt),
-        eq(mediaObjects.status, "ready"),
-        eq(mediaObjects.purpose, "library-asset"),
-        eq(mediaObjects.targetId, actor.storeId),
-      ))
-      .orderBy(desc(mediaLibraryItems.createdAt))
-      .limit(LIBRARY_LIST_LIMIT),
-    db.select({
-      bytes: sql<string>`coalesce(sum(${mediaObjects.sizeBytes} + coalesce(${mediaObjects.thumbnailSizeBytes}, 0)), 0)::text`,
-      objects: sql<number>`count(*)::int`,
-    }).from(mediaObjects).where(and(
-      eq(mediaObjects.storeId, actor.storeId),
-      eq(mediaObjects.status, "ready"),
-    )),
-    db.select({
-      bytes: sql<string>`coalesce(sum(${mediaObjects.sizeBytes} + coalesce(${mediaObjects.thumbnailSizeBytes}, 0)), 0)::text`,
-      objects: sql<number>`count(*)::int`,
-    }).from(mediaLibraryItems).innerJoin(mediaObjects, and(
-      eq(mediaObjects.storeId, mediaLibraryItems.storeId),
-      eq(mediaObjects.id, mediaLibraryItems.mediaObjectId),
-    )).where(and(
-      eq(mediaLibraryItems.storeId, actor.storeId),
-      isNull(mediaLibraryItems.deletedAt),
-      eq(mediaObjects.status, "ready"),
-    )),
+  const [pageResult, overviewResult] = await Promise.all([
+    db.execute<MediaLibraryStorageRow>(buildMediaLibraryPageQuery(actor.storeId, query)),
+    db.execute<MediaLibraryOverviewRow>(buildMediaLibraryOverviewQuery(actor.storeId, query)),
   ]);
-
-  const items = await Promise.all(rows.map(async (row): Promise<MediaLibraryItem> => {
-    const kind = mediaLibraryKindForMime(row.mimeType);
-    if (!kind) throw new MediaLibraryError("errors.invalidData", 500);
-    const storage = getObjectStorage(row.provider);
-    const [url, thumbnailUrl] = await Promise.all([
-      storage.createDownloadUrl({
-        bucket: row.bucket,
-        key: row.objectKey,
-        expiresInSeconds: LIBRARY_SIGNED_URL_SECONDS,
-      }),
-      row.thumbnailObjectKey
-        ? storage.createDownloadUrl({
-            bucket: row.bucket,
-            key: row.thumbnailObjectKey,
-            expiresInSeconds: LIBRARY_SIGNED_URL_SECONDS,
-          })
-        : Promise.resolve(null),
-    ]);
-    return {
-      id: row.id,
-      mediaId: row.mediaId,
-      album: row.album,
-      title: row.title,
-      note: row.note,
-      tags: row.tags,
-      kind,
-      fileName: row.fileName,
-      mimeType: row.mimeType,
-      sizeBytes: row.sizeBytes,
-      createdAt: row.createdAt.toISOString(),
-      creatorName: row.creatorName,
-      url,
-      thumbnailUrl,
-    };
-  }));
-
-  const albumCounts = new Map<string, number>();
-  for (const item of items) {
-    albumCounts.set(item.album, (albumCounts.get(item.album) ?? 0) + 1);
-  }
+  const rows = pageResult.rows.slice(0, query.limit);
+  const overview = overviewResult.rows[0];
+  if (!overview) throw new MediaLibraryError("errors.serverError", 500);
+  const hasMore = pageResult.rows.length > query.limit;
+  const items = await Promise.all(rows.map(signLibraryRow));
 
   return {
     items,
-    albums: [...albumCounts.entries()]
-      .sort(([left], [right]) => left.localeCompare(right, "vi"))
-      .map(([name, count]) => ({ name, count })),
+    albums: overview.albums.sort((left, right) => left.name.localeCompare(right.name, "vi")),
     usage: {
-      libraryBytes: Number(libraryUsage[0]?.bytes ?? 0),
-      libraryObjects: libraryUsage[0]?.objects ?? 0,
-      totalBytes: Number(totalUsage[0]?.bytes ?? 0),
-      totalObjects: totalUsage[0]?.objects ?? 0,
+      libraryBytes: Number(overview.libraryBytes),
+      libraryObjects: overview.libraryObjects,
+      totalBytes: Number(overview.totalBytes),
+      totalObjects: overview.totalObjects,
     },
     canManage: actor.role === "owner" || actor.role === "manager",
+    page: {
+      nextCursor: hasMore ? encodeMediaLibraryCursor(rows[rows.length - 1]) : null,
+      hasMore,
+      totalItems: overview.totalItems,
+    },
+  };
+}
+
+export async function resolveMediaLibraryItem(actor: MediaActor, candidateId: string): Promise<MediaLibraryItem> {
+  const parsed = canonicalUuidCoordinateSchema.safeParse(candidateId);
+  if (!parsed.success) throw new MediaLibraryError("errors.notFound", 404);
+  const result = await db.execute<MediaLibraryStorageRow>(buildMediaLibraryResolveQuery(actor.storeId, parsed.data));
+  const row = result.rows[0];
+  if (!row) throw new MediaLibraryError("errors.notFound", 404);
+  return signLibraryRow(row);
+}
+
+async function signLibraryRow(row: MediaLibraryStorageRow): Promise<MediaLibraryItem> {
+  const kind = mediaLibraryKindForMime(row.mimeType);
+  if (!kind) throw new MediaLibraryError("errors.invalidData", 500);
+  const storage = getObjectStorage(row.provider);
+  const [url, thumbnailUrl] = await Promise.all([
+    storage.createDownloadUrl({ bucket: row.bucket, key: row.objectKey, expiresInSeconds: LIBRARY_SIGNED_URL_SECONDS }),
+    row.thumbnailObjectKey
+      ? storage.createDownloadUrl({ bucket: row.bucket, key: row.thumbnailObjectKey, expiresInSeconds: LIBRARY_SIGNED_URL_SECONDS })
+      : Promise.resolve(null),
+  ]);
+  return {
+    id: row.id, mediaId: row.mediaId, album: row.album, title: row.title,
+    note: row.note, tags: row.tags, kind, fileName: row.fileName, mimeType: row.mimeType,
+    sizeBytes: row.sizeBytes, createdAt: row.createdAt, creatorName: row.creatorName,
+    url, thumbnailUrl,
   };
 }
 

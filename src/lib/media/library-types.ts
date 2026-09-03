@@ -25,4 +25,9 @@ export type MediaLibrarySnapshot = {
     totalObjects: number;
   };
   canManage: boolean;
+  page?: {
+    nextCursor: string | null;
+    hasMore: boolean;
+    totalItems: number;
+  };
 };

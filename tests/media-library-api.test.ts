@@ -83,4 +83,69 @@ describe("media library API", () => {
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ ok: false, error: "errors.forbidden" });
   });
+
+  test("forwards bounded filters and rejects malformed query parameters before repository access", async () => {
+    const queries: unknown[] = [];
+    const handlers = createMediaLibraryHandlers({
+      authenticate: async () => gate,
+      list: async (_actor, query) => {
+        queries.push(query);
+        return { items: [], albums: [], usage: { libraryBytes: 0, libraryObjects: 0, totalBytes: 0, totalObjects: 0 }, canManage: true };
+      },
+    });
+    const response = await handlers.GET(new Request("https://luma.test/api/mobile/library?q=voi%20chau&album=old&kind=image&limit=20"));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(queries).toEqual([{ q: "voi chau", album: "old", kind: "image", limit: 20 }]);
+    for (const query of ["kind=audio", "cursor=broken", "limit=101"]) {
+      const invalid = await handlers.GET(new Request(`https://luma.test/api/mobile/library?${query}`));
+      expect(invalid.status).toBe(400);
+      expect(await invalid.json()).toEqual({ ok: false, error: "errors.invalidData" });
+    }
+    expect(queries.length).toBe(1);
+  });
+
+  test("resolves only authenticated item coordinates and redirects to the server-signed URL", async () => {
+    const calls: unknown[] = [];
+    const item = {
+      id: "33333333-3333-4333-8333-333333333333", mediaId: "media-1", album: "old", title: "Sample",
+      note: null, tags: [], kind: "image" as const, fileName: "sample.jpg", mimeType: "image/jpeg",
+      sizeBytes: 100, createdAt: "2026-09-01T00:00:00.000Z", creatorName: null,
+      url: "https://storage.luma.test/private/sample.jpg?signature=fresh", thumbnailUrl: null,
+    };
+    const handlers = createMediaLibraryHandlers({
+      authenticate: async () => gate,
+      resolve: async (actor, id) => { calls.push({ actor, id }); return item; },
+    });
+    const resolved = await handlers.GET(new Request(`https://luma.test/api/mobile/library?resolve=${item.id}&storeId=untrusted&mediaId=untrusted`));
+    expect(await resolved.json()).toEqual({ ok: true, data: item });
+    expect(resolved.headers.get("cache-control")).toBe("private, no-store");
+    const opened = await handlers.GET(new Request(`https://luma.test/api/mobile/library?open=${item.id}&url=https://evil.test`));
+    expect(opened.status).toBe(307);
+    expect(opened.headers.get("location")).toBe(item.url);
+    expect(opened.headers.get("cache-control")).toBe("private, no-store");
+    expect(calls).toEqual([
+      { actor: { storeId: gate.storeId, userId: gate.userId, role: gate.role, features: gate.features }, id: item.id },
+      { actor: { storeId: gate.storeId, userId: gate.userId, role: gate.role, features: gate.features }, id: item.id },
+    ]);
+  });
+
+  test("unauthorized and cross-store items cannot resolve or redirect", async () => {
+    const { MediaLibraryError } = await import("../src/lib/media/library");
+    for (const mode of ["resolve", "open"]) {
+      const request = new Request(`https://luma.test/api/mobile/library?${mode}=33333333-3333-4333-8333-333333333333`);
+      const unauthenticated = createMediaLibraryHandlers({
+        authenticate: async () => ({ ok: false, error: "errors.unauthorized" }),
+        resolve: async () => { throw new Error("Must not resolve unauthenticated requests"); },
+      });
+      expect((await unauthenticated.GET(request)).status).toBe(401);
+      const handlers = createMediaLibraryHandlers({
+        authenticate: async () => gate,
+        resolve: async () => { throw new MediaLibraryError("errors.notFound", 404); },
+      });
+      const response = await handlers.GET(request);
+      expect(response.status).toBe(404);
+      expect(response.headers.get("location")).toBeNull();
+    }
+  });
 });

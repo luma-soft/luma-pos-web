@@ -16,10 +16,13 @@ export interface TagInputProps {
   placeholderTxOptions?: TxValues;
   className?: string;
   disabled?: boolean;
+  maxTags?: number;
+  maxTagLength?: number;
+  "aria-label"?: string;
 }
 
 export const TagInput = React.forwardRef<HTMLInputElement, TagInputProps>(
-  ({ value, onChange, placeholder, placeholderTx, placeholderTxOptions, className, disabled }, ref) => {
+  ({ value, onChange, placeholder, placeholderTx, placeholderTxOptions, className, disabled, maxTags, maxTagLength, "aria-label": ariaLabel }, ref) => {
     const t = useTranslations();
     const [draft, setDraft] = React.useState("");
     const inputRef = React.useRef<HTMLInputElement>(null);
@@ -31,6 +34,7 @@ export const TagInput = React.forwardRef<HTMLInputElement, TagInputProps>(
       const v = raw.trim();
       if (!v) return;
       if (value.includes(v)) return;
+      if ((maxTags !== undefined && value.length >= maxTags) || (maxTagLength !== undefined && v.length > maxTagLength)) return;
       onChange([...value, v]);
       setDraft("");
     }
@@ -70,6 +74,7 @@ export const TagInput = React.forwardRef<HTMLInputElement, TagInputProps>(
               size="iconSm"
               onClick={(e) => { e.stopPropagation(); remove(idx); }}
               disabled={disabled}
+              aria-label={`${t("common.delete")}: ${tag}`}
               className="h-11 w-11 rounded-full p-0 hover:bg-primary-100 lg:h-4 lg:w-4"
             >
               <X className="w-3 h-3" />
@@ -81,7 +86,9 @@ export const TagInput = React.forwardRef<HTMLInputElement, TagInputProps>(
           type="text"
           style={{ outline: "none" }}
           value={draft}
-          disabled={disabled}
+          disabled={disabled || (maxTags !== undefined && value.length >= maxTags)}
+          maxLength={maxTagLength}
+          aria-label={ariaLabel}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={() => draft && add(draft)}

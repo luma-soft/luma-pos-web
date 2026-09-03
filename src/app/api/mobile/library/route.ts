@@ -1,11 +1,14 @@
+import { NextResponse } from "next/server";
 import type { MediaActor } from "@/lib/media/authorization";
 import {
   createMediaLibraryItem,
   deleteMediaLibraryItem,
   getMediaLibrarySnapshot,
   mediaLibraryError,
+  resolveMediaLibraryItem,
   updateMediaLibraryItem,
 } from "@/lib/media/library";
+import { MediaLibraryQueryError, parseMediaLibraryQuery } from "@/lib/media/library-query";
 import type { MobileGate } from "@/lib/mobile/auth";
 import { requireMobileUser } from "@/lib/mobile/auth";
 import { mobileError, mobileOk, readJson } from "@/lib/mobile/response";
@@ -24,6 +27,7 @@ function actorFromGate(gate: AllowedGate): MediaActor {
 type MediaLibraryRouteDependencies = {
   authenticate?: () => Promise<MobileGate>;
   list?: typeof getMediaLibrarySnapshot;
+  resolve?: typeof resolveMediaLibraryItem;
   create?: typeof createMediaLibraryItem;
   update?: typeof updateMediaLibraryItem;
   remove?: typeof deleteMediaLibraryItem;
@@ -49,13 +53,27 @@ export function createMediaLibraryHandlers(
   }
 
   return {
-    GET: async function GET() {
+    GET: async function GET(request?: Request) {
       const authenticated = await gate();
       if (!authenticated.actor) return authenticated.response!;
       try {
-        return mobileOk(await (dependencies.list ?? getMediaLibrarySnapshot)(
+        const params = request ? new URL(request.url).searchParams : new URLSearchParams();
+        if (params.has("resolve") || params.has("open")) {
+          if (params.getAll("resolve").length + params.getAll("open").length !== 1) throw new MediaLibraryQueryError();
+          const item = await (dependencies.resolve ?? resolveMediaLibraryItem)(
+            authenticated.actor,
+            params.get("resolve") ?? params.get("open") ?? "",
+          );
+          const response = params.has("open") ? NextResponse.redirect(item.url, 307) : mobileOk(item);
+          response.headers.set("Cache-Control", "private, no-store");
+          return response;
+        }
+        const response = mobileOk(await (dependencies.list ?? getMediaLibrarySnapshot)(
           authenticated.actor,
+          parseMediaLibraryQuery(params),
         ));
+        response.headers.set("Cache-Control", "private, no-store");
+        return response;
       } catch (error) {
         const mapped = mediaLibraryError(error);
         if (mapped.status === 500) console.error("list media library failed", error);
