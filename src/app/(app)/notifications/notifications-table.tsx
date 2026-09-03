@@ -7,13 +7,17 @@ import { Bot, CheckCircle2, Clock, ExternalLink, ShieldAlert, UserRound, XCircle
 import { Button } from "@/components/ui/button";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { cn, formatDate } from "@/lib/utils";
-import { Routes } from "@/lib/routes";
 import { NOTIFICATION_INBOX_CHANGED_EVENT } from "@/lib/notifications/inbox-count";
 import { OrderDetailLink } from "@/components/order-detail-link";
-import type { AuditSource, AuditStatus, getAuditLogs } from "@/lib/audit";
+import type { AuditSource, AuditStatus } from "@/lib/audit";
+import {
+  activityActionKey, activityEntity, activityObject, activityPrompt,
+  activityRecordHref, activityRecordLabel, activityRelatedRecords, activityText,
+  type NotificationActivity,
+} from "@/lib/audit/activity-presentation";
 import { useTranslations } from "next-intl";
 
-export type AuditRow = Awaited<ReturnType<typeof getAuditLogs>>[number];
+export type AuditRow = NotificationActivity;
 type Translator = ReturnType<typeof useTranslations>;
 
 function iconFor(source: AuditSource, status: AuditStatus) {
@@ -42,18 +46,6 @@ function sourceTone(source: AuditSource) {
       : source === "pos"
         ? "bg-ok-soft text-ok"
         : "bg-surface-2 text-slate-500";
-}
-
-function objectValue(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
-}
-
-function arrayValue(value: unknown): unknown[] {
-  return Array.isArray(value) ? value : [];
-}
-
-function textValue(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
 function redactText(value: string) {
@@ -85,8 +77,21 @@ function scrubPublicJson(value: unknown, depth = 0): unknown {
   return output;
 }
 
-function titleFor(row: AuditRow) {
-  return `${row.action.replaceAll("_", " ")} · ${row.entityType}`;
+function titleFor(row: AuditRow, t: Translator) {
+  const key = `notifications.activity.actions.${activityActionKey(row.action)}`;
+  if (t.has(key)) return t(key);
+  const title = activityText(activityObject(row.parsedIntent).title);
+  if (title && /\s/.test(title) && !title.includes("_")) return truncateText(title);
+  const entityKey = `notifications.activity.entities.${row.entityType}`;
+  return t("notifications.activity.fallbackTitle", {
+    entity: t.has(entityKey) ? t(entityKey) : t("notifications.recordFallback"),
+  });
+}
+
+function actorFor(row: AuditRow, t: Translator) {
+  return row.actorNameSnapshot?.trim() || (row.source === "system"
+    ? t("notifications.systemActor")
+    : t("notifications.activity.unknownActor"));
 }
 
 function statusText(status: AuditStatus, t: Translator) {
@@ -97,34 +102,13 @@ function sourceText(source: AuditSource, t: Translator) {
   return t(`notifications.sources.${source}`);
 }
 
-function recordHref(record: Record<string, unknown>) {
-  const href = textValue(record.href);
-  if (href?.startsWith("/")) return href;
-  const id = textValue(record.id);
-  const type = textValue(record.type);
-  if (!id || id === "draft") return null;
-  if (type === "product") return Routes.product(id);
-  if (type === "customer") return `/partners?tab=customers&expandedCustomer=${id}`;
-  if (type === "quote") return Routes.salesOrder(id, "quote");
-  if (type === "order" || type === "invoice") return Routes.salesOrder(id, "completed");
-  if (type === "purchase_order" || type === "purchase" || type === "inbound") return `/inventory?tab=purchases&expanded=${id}`;
-  if (type === "supplier") return `/partners?tab=suppliers&expanded=${id}`;
-  if (type === "pos_cart_draft") return "/pos";
-  if (type === "cashbook" || type === "cash_transaction") return "/finance?tab=cashbook";
-  return null;
-}
-
-function recordLabel(record: Record<string, unknown>, fallback: string) {
-  return textValue(record.code) ?? textValue(record.name) ?? textValue(record.label) ?? textValue(record.id) ?? textValue(record.type) ?? fallback;
-}
-
 export function NotificationsTable({ rows }: { rows: AuditRow[] }) {
   const t = useTranslations();
   const columns: DataTableColumn<AuditRow>[] = [
-    { key: "notification", label: t("notifications.columns.notification"), required: true, render: (row) => <ActivityCell row={row} t={t} /> },
-    { key: "source", label: t("notifications.columns.source"), defaultVisible: true, width: "120px", render: (row) => <span className={cn("inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold", sourceTone(row.source))}>{sourceText(row.source, t)}</span> },
+    { key: "notification", label: t("notifications.inbox.tabs.activity"), required: true, render: (row) => <ActivityCell row={row} t={t} /> },
+    { key: "source", label: t("notifications.columns.source"), defaultVisible: true, width: "100px", render: (row) => <span className={cn("inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold", sourceTone(row.source))}>{sourceText(row.source, t)}</span> },
     { key: "status", label: t("notifications.columns.status"), defaultVisible: true, width: "130px", render: (row) => <span className={cn("inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-bold", toneFor(row.status))}>{statusText(row.status, t)}</span> },
-    { key: "actor", label: t("notifications.columns.actor"), defaultVisible: true, render: (row) => <span className="inline-flex items-center gap-1.5 text-slate-600"><UserRound className="h-3.5 w-3.5" />{row.actorNameSnapshot ?? row.actorId ?? t("notifications.systemActor")}</span> },
+    { key: "actor", label: t("notifications.columns.actor"), defaultVisible: true, width: "160px", render: (row) => <span className="inline-flex items-start gap-1.5 whitespace-normal text-slate-600"><UserRound className="mt-0.5 h-3.5 w-3.5 shrink-0" />{actorFor(row, t)}</span> },
     { key: "time", label: t("notifications.columns.time"), defaultVisible: true, width: "160px", render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
   ];
   return (
@@ -136,6 +120,9 @@ export function NotificationsTable({ rows }: { rows: AuditRow[] }) {
       minWidth="1080px"
       renderMobileRow={({ row, expanded, toggle }) => <NotificationMobileRow row={row} expanded={expanded} toggle={toggle} />}
       renderDetail={(row) => <ExpandedAudit row={row} />}
+      detailTitle={(row) => titleFor(row, t)}
+      detailSubtitle={() => t("notifications.activity.detailSubtitle")}
+      detailSize="lg"
     />
   );
 }
@@ -155,22 +142,26 @@ export function NotificationMobileRow({ row, expanded, toggle }: { row: AuditRow
         <span className={cn("rounded-full px-2 py-1 text-xs font-bold", toneFor(row.status))}>{statusText(row.status, t)}</span>
       </div>
       <div className="mt-2 text-xs text-slate-400">
-        {row.actorNameSnapshot ?? row.actorId ?? t("notifications.systemActor")} · {formatDate(row.createdAt)}
+        {actorFor(row, t)} · {formatDate(row.createdAt)}
       </div>
     </button>
   );
 }
 
 function ActivityCell({ row, t }: { row: AuditRow; t: Translator }) {
+  const entity = activityEntity(row);
+  const prompt = activityPrompt(row.prompt);
+  const related = activityRelatedRecords(row).map(activityRecordLabel).filter(Boolean).join(", ");
+  const description = entity ? activityRecordLabel(entity) : related || prompt;
   return (
     <div className="flex min-w-0 items-start gap-3">
       <div className={cn("grid h-9 w-9 shrink-0 place-items-center rounded-xl", toneFor(row.status))}>
         {iconFor(row.source, row.status)}
       </div>
       <div className="min-w-0">
-        <div className="truncate font-semibold capitalize">{row.source === "ai" ? statusText(row.status, t) : titleFor(row)}</div>
-        <div className="mt-0.5 truncate font-mono text-xs text-slate-400">{row.entityId ?? "—"}</div>
-        {row.prompt && <div className="mt-1 line-clamp-2 text-xs text-slate-500">{t("notifications.prompt")}: {truncateText(row.prompt)}</div>}
+        <div className="whitespace-normal font-semibold leading-5">{titleFor(row, t)}</div>
+        {description && <div className="mt-1 line-clamp-2 whitespace-normal text-xs leading-5 text-slate-500">{truncateText(description)}</div>}
+        {entity?.context && <div className="mt-0.5 line-clamp-1 text-xs text-slate-400">{entity.context}</div>}
       </div>
     </div>
   );
@@ -178,22 +169,54 @@ function ActivityCell({ row, t }: { row: AuditRow; t: Translator }) {
 
 function ExpandedAudit({ row }: { row: AuditRow }) {
   const t = useTranslations();
-  const records = arrayValue(row.affectedRecords).map(objectValue).filter(Boolean) as Record<string, unknown>[];
+  const entity = activityEntity(row);
+  const href = entity ? activityRecordHref(entity) : null;
+  const records = activityRelatedRecords(row).filter((record) => activityRecordLabel(record) && record.id !== entity?.id);
+  const metadata = activityObject(row.metadata);
+  const serviceType = activityText(metadata.serviceType);
+  const serviceKey = `notifications.activity.serviceTypes.${serviceType}`;
+  const version = typeof metadata.version === "number" ? metadata.version : null;
+  const prompt = activityPrompt(row.prompt);
   return (
-    <div className="space-y-3 bg-surface px-4 py-4 text-sm">
+    <div className="space-y-6 bg-surface text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-xs font-bold uppercase tracking-wide text-slate-400">{t("notifications.detailTitle")}</div>
+        <span className={cn("inline-flex items-center gap-2 rounded-full px-3 py-1.5 font-semibold", toneFor(row.status))}>
+          {iconFor(row.source, row.status)}{statusText(row.status, t)}
+        </span>
         <AcknowledgeNotificationButton id={row.id} />
       </div>
+      <dl className="grid gap-4 border-b border-border pb-5 sm:grid-cols-3">
+        {[
+          [t("notifications.columns.actor"), actorFor(row, t)],
+          [t("notifications.columns.source"), sourceText(row.source, t)],
+          [t("notifications.columns.time"), formatDate(row.createdAt)],
+        ].map(([label, value]) => <div key={label}><dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1 font-medium">{value}</dd></div>)}
+      </dl>
+      {entity && (
+        <section className="space-y-3">
+          <h3 className="text-xs font-semibold text-slate-500">{t("notifications.activity.subject")}</h3>
+          <div className="text-base font-semibold">{activityRecordLabel(entity)}</div>
+          {entity.context && <p className="text-slate-600">{t("notifications.activity.project")}: {entity.context}</p>}
+          {href && <Link href={href} onClick={stopRowToggle} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary-600 px-4 font-semibold text-white hover:bg-primary-700">
+            {t(entity.type === "service_job" ? "notifications.activity.openProject" : "notifications.activity.openRecord")}<ExternalLink className="h-4 w-4" />
+          </Link>}
+        </section>
+      )}
+      {(serviceType || version !== null) && <dl className="flex flex-wrap gap-x-8 gap-y-3 rounded-xl bg-canvas p-4">
+        {serviceType && t.has(serviceKey) && <div><dt className="text-xs text-slate-500">{t("notifications.activity.serviceType")}</dt><dd className="mt-1 font-medium">{t(serviceKey)}</dd></div>}
+        {version !== null && <div><dt className="text-xs text-slate-500">{t("notifications.activity.version")}</dt><dd className="mt-1 font-medium">{t("notifications.activity.versionValue", { version })}</dd></div>}
+      </dl>}
+      {prompt && <section><h3 className="mb-2 text-xs font-semibold text-slate-500">{t("notifications.prompt")}</h3><p className="whitespace-pre-wrap break-words leading-6 text-slate-600">{truncateText(prompt, 1400)}</p></section>}
+      {!entity && !prompt && records.length === 0 && <p className="text-slate-500">{t("notifications.activity.noDescription")}</p>}
       {records.length > 0 && (
         <div>
           <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">{t("notifications.relatedRecords")}</div>
           <div className="flex flex-wrap gap-1.5">
             {records.slice(0, 10).map((record, index) => {
-              const href = recordHref(record);
-              const label = recordLabel(record, t("notifications.recordFallback"));
-              const recordId = textValue(record.id);
-              const recordType = textValue(record.type);
+              const href = activityRecordHref(record);
+              const label = activityRecordLabel(record);
+              const recordId = record.id;
+              const recordType = record.type;
               const chip = (
                 <span className="inline-flex min-h-11 items-center gap-1 rounded-full border border-border bg-surface px-2 text-[11px] font-semibold text-slate-600">
                   {label}
@@ -212,15 +235,12 @@ function ExpandedAudit({ row }: { row: AuditRow }) {
           </div>
         </div>
       )}
-      <pre className="max-h-72 overflow-auto rounded-lg bg-canvas p-3 text-[11px] leading-relaxed text-slate-600">
-        {JSON.stringify(scrubPublicJson({
-          parsedIntent: row.parsedIntent,
-          before: row.before,
-          after: row.after,
-          affectedRecords: row.affectedRecords,
-          metadata: row.metadata,
-        }), null, 2)}
-      </pre>
+      <details className="border-t border-border pt-4">
+        <summary className="w-fit cursor-pointer py-2 text-xs font-medium text-slate-500">{t("notifications.activity.technicalDetails")}</summary>
+        <pre className="mt-2 max-h-72 overflow-auto rounded-lg bg-canvas p-3 text-[11px] leading-relaxed text-slate-600">
+          {JSON.stringify(scrubPublicJson({ action: row.action, entityType: row.entityType, entityId: row.entityId, actorId: row.actorId, parsedIntent: row.parsedIntent, before: row.before, after: row.after, affectedRecords: row.affectedRecords, metadata: row.metadata }), null, 2)}
+        </pre>
+      </details>
     </div>
   );
 }

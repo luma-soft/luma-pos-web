@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -19,6 +19,7 @@ import {
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import { Routes } from "@/lib/routes";
+import { notificationHref } from "./notification-actions";
 import { NOTIFICATION_INBOX_CHANGED_EVENT } from "@/lib/notifications/inbox-count";
 import { NotificationsTable, type AuditRow } from "./notifications-table";
 import { NotificationsFilterDrawer } from "./notifications-filter-drawer";
@@ -40,44 +41,6 @@ type NotificationsPayload = {
   rows?: NotificationRow[];
   counts?: { all?: number; unread?: number };
 };
-
-function notificationHref(action?: NotificationAction) {
-  if (action?.href && (/^https?:\/\//i.test(action.href) || action.href.startsWith("/"))) {
-    return action.href;
-  }
-  const id = action?.id;
-  return switchTarget(action?.target, id);
-}
-
-function switchTarget(target?: string, id?: string) {
-  switch (target) {
-    case "aiRestocking":
-    case "restocking":
-      return "/inventory?tab=restocking";
-    case "inventory":
-      return Routes.Inventory;
-    case "purchases":
-      return id ? Routes.purchase(id) : Routes.Purchases;
-    case "invoices":
-    case "einvoice":
-      return id ? Routes.salesOrder(id) : `${Routes.Sales}?tab=orders`;
-    case "customers":
-    case "crm":
-    case "debt":
-      return id ? `/partners?tab=customers&expandedCustomer=${encodeURIComponent(id)}` : `${Routes.Partners}?tab=customers`;
-    case "reports":
-    case "sales":
-      return Routes.Reports;
-    case "shift":
-      return "/finance?tab=shifts";
-    case "paymentReconciliation":
-      return "/finance?tab=payments";
-    case "services":
-      return id ? `${Routes.Services}?job=${encodeURIComponent(id)}` : Routes.Services;
-    default:
-      return null;
-  }
-}
 
 function CategoryIcon({ category, className }: { category: string; className?: string }) {
   switch (notificationCategory(category)) {
@@ -119,11 +82,15 @@ function actionLabel(action: NotificationAction | undefined, t: ReturnType<typeo
 
 export function NotificationsClient({ activities }: { activities: AuditRow[] }) {
   const t = useTranslations("notifications.inbox");
+  const activityT = useTranslations("notifications.activity");
   const router = useRouter();
   const [tab, setTab] = useState<NotificationTab>("action");
   const [rows, setRows] = useState<NotificationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [updateError, setUpdateError] = useState(false);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const updating = useRef(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState<NotificationFilters>(defaultNotificationFilters);
   const [, startTransition] = useTransition();
@@ -183,20 +150,34 @@ export function NotificationsClient({ activities }: { activities: AuditRow[] }) 
   const activeFilterCount = countActiveNotificationFilters(filters);
 
   async function updateNotification(row: NotificationRow, dismissed = false) {
-    const response = await fetch(`/api/mobile/notifications/${encodeURIComponent(row.id)}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ read: true, dismissed }),
-    });
-    if (!response.ok) return false;
-    window.dispatchEvent(new Event(NOTIFICATION_INBOX_CHANGED_EVENT));
-    setRows((current) => dismissed
-      ? current.filter((item) => item.id !== row.id)
-      : current.map((item) => item.id === row.id ? { ...item, unread: false } : item));
-    return true;
+    if (updating.current) return false;
+    updating.current = true;
+    setPendingId(row.id);
+    setUpdateError(false);
+    try {
+      const response = await fetch(`/api/mobile/notifications/${encodeURIComponent(row.id)}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ read: true, dismissed }),
+      });
+      const payload = await response.json() as { ok?: boolean };
+      if (!response.ok || !payload.ok) throw new Error("notification_update_failed");
+      setRows((current) => dismissed
+        ? current.filter((item) => item.id !== row.id)
+        : current.map((item) => item.id === row.id ? { ...item, unread: false } : item));
+      window.dispatchEvent(new Event(NOTIFICATION_INBOX_CHANGED_EVENT));
+      return true;
+    } catch {
+      setUpdateError(true);
+      return false;
+    } finally {
+      updating.current = false;
+      setPendingId(null);
+    }
   }
 
   function runAction(row: NotificationRow) {
+    if (updating.current) return;
     const href = notificationHref(row.action);
     startTransition(async () => {
       await updateNotification(row);
@@ -213,7 +194,7 @@ export function NotificationsClient({ activities }: { activities: AuditRow[] }) 
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight">{t("title")}</h1>
             <p className="mt-1 text-base font-semibold text-slate-500">
-              {t("needsActionCount", { count: actionableRows.length })}
+              {tab === "activity" ? activityT("description") : t("needsActionCount", { count: actionableRows.length })}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -264,6 +245,11 @@ export function NotificationsClient({ activities }: { activities: AuditRow[] }) 
       </header>
 
       <main className="mx-auto mt-6 max-w-6xl">
+        {updateError && (
+          <p role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+            {t("updateError")}
+          </p>
+        )}
         {tab === "activity" ? (
           <NotificationsTable rows={activities} />
         ) : loading ? (
@@ -278,7 +264,8 @@ export function NotificationsClient({ activities }: { activities: AuditRow[] }) 
               <PriorityFocus
                 row={focus}
                 actionText={actionLabel(focus.action, t)}
-                processedText={t("processed")}
+                processedText={pendingId === focus.id ? t("processing") : t("processed")}
+                disabled={pendingId !== null}
                 priorityText={t("highPriority")}
                 impactText={t("impact")}
                 onAction={() => runAction(focus)}
@@ -293,6 +280,7 @@ export function NotificationsClient({ activities }: { activities: AuditRow[] }) 
                     key={row.id}
                     row={row}
                     actionText={actionLabel(row.action, t)}
+                    disabled={pendingId !== null}
                     onAction={() => runAction(row)}
                   />
                 ))}
@@ -307,6 +295,7 @@ export function NotificationsClient({ activities }: { activities: AuditRow[] }) 
                       key={row.id}
                       row={row}
                       actionText={row.action ? actionLabel(row.action, t) : null}
+                      disabled={pendingId !== null}
                       onAction={() => runAction(row)}
                     />
                   ))}
@@ -369,6 +358,7 @@ function PriorityFocus({
   processedText,
   priorityText,
   impactText,
+  disabled,
   onAction,
   onProcessed,
 }: {
@@ -377,6 +367,7 @@ function PriorityFocus({
   processedText: string;
   priorityText: string;
   impactText: string;
+  disabled: boolean;
   onAction: () => void;
   onProcessed: () => void;
 }) {
@@ -394,10 +385,10 @@ function PriorityFocus({
           <NotificationMeta row={row} />
         </div>
         <div className="flex shrink-0 flex-col gap-2 lg:w-48">
-          <button type="button" onClick={onAction} className="min-h-11 rounded-xl bg-red-600 px-4 font-extrabold text-white hover:bg-red-700 min-w-11 lg:min-w-0">
+          <button type="button" onClick={onAction} disabled={disabled} className="min-h-11 rounded-xl bg-red-600 px-4 font-extrabold text-white hover:bg-red-700 disabled:cursor-wait disabled:opacity-60 min-w-11 lg:min-w-0">
             {actionText}
           </button>
-          <button type="button" onClick={onProcessed} className="min-h-11 rounded-xl font-bold text-primary-700 hover:bg-primary-50 min-w-11 lg:min-w-0">
+          <button type="button" onClick={onProcessed} disabled={disabled} className="min-h-11 rounded-xl font-bold text-primary-700 hover:bg-primary-50 disabled:cursor-wait disabled:opacity-60 min-w-11 lg:min-w-0">
             {processedText}
           </button>
         </div>
@@ -417,7 +408,7 @@ function NotificationSection({ title, children }: { title: string; children: Rea
   );
 }
 
-function NotificationListRow({ row, actionText, onAction }: { row: NotificationRow; actionText: string | null; onAction: () => void }) {
+function NotificationListRow({ row, actionText, disabled, onAction }: { row: NotificationRow; actionText: string | null; disabled: boolean; onAction: () => void }) {
   const level = notificationLevel(row.priority);
   const category = notificationCategory(row.category);
   return (
@@ -436,7 +427,7 @@ function NotificationListRow({ row, actionText, onAction }: { row: NotificationR
       <CategoryBadge category={category} />
       <span className="hidden w-32 shrink-0 text-xs text-slate-500 md:block">{formatNotificationTime(row)}</span>
       {actionText ? (
-        <button type="button" onClick={onAction} className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-bold text-primary-700 hover:bg-primary-50 min-w-11 lg:min-w-0">
+        <button type="button" onClick={onAction} disabled={disabled} className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-lg px-2 text-sm font-bold text-primary-700 hover:bg-primary-50 disabled:cursor-wait disabled:opacity-60 min-w-11 lg:min-w-0">
           {actionText}
           <ChevronRight className="size-4" />
         </button>

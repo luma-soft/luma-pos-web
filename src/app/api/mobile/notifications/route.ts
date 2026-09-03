@@ -127,6 +127,7 @@ export async function GET(request: Request) {
         .from(mobileNotificationStates)
         .where(
           and(
+            eq(mobileNotificationStates.storeId, gate.storeId),
             eq(mobileNotificationStates.userId, stateUserId),
             inArray(mobileNotificationStates.notificationId, ids)
           )

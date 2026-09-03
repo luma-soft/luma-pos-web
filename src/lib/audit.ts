@@ -70,6 +70,7 @@ export async function writeAuditLog(input: AuditLogInput) {
 }
 
 export type AuditLogFilters = {
+  storeId?: string;
   source?: AuditSource;
   status?: AuditStatus;
   action?: string;
@@ -83,6 +84,7 @@ export type AuditLogFilters = {
 
 export async function getAuditLogs(filters: AuditLogFilters = {}) {
   const where: SQL[] = [];
+  if (filters.storeId) where.push(eq(auditLogs.storeId, filters.storeId));
   if (filters.source) where.push(eq(auditLogs.source, filters.source));
   if (filters.status) where.push(eq(auditLogs.status, filters.status));
   if (filters.action) where.push(eq(auditLogs.action, filters.action));

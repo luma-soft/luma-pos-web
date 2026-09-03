@@ -65,6 +65,7 @@ export async function PATCH(
   await db
     .insert(mobileNotificationStates)
     .values({
+      storeId: gate.storeId,
       userId: stateUserId,
       notificationId: id,
       read,
