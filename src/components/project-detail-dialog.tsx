@@ -84,7 +84,9 @@ export function ProjectDetailDialog({
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable_both-edges] [scrollbar-width:thin]">
+          {children}
+        </div>
       </div>
     </div>
   );
