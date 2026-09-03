@@ -28,8 +28,12 @@ export async function getProductAttributes(): Promise<ActionResult<ProductAttrib
       select a.id, a.name,
         coalesce((select jsonb_agg(n.name_key) from product_attribute_aliases n
           where n.store_id = a.store_id and n.attribute_id = a.id), '[]'::jsonb) as aliases,
-        (select count(*)::int from product_attribute_products u
-          where u.store_id = a.store_id and u.attribute_id = a.id) as "productCount"
+        (select count(distinct used.product_id)::int from (
+          select u.product_id from product_attribute_products u where u.store_id=a.store_id and u.attribute_id=a.id
+          union
+          select m.product_id from product_variant_group_attributes ga join product_variant_members m
+            on m.store_id=ga.store_id and m.group_id=ga.group_id where ga.store_id=a.store_id and ga.attribute_id=a.id
+        ) used) as "productCount"
       from product_attributes a where a.store_id = ${gate.storeId}
       order by a.name
     `);

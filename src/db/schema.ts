@@ -519,6 +519,28 @@ export const products = pgTable("products", {
 
 // Catalog names and aliases preserve attribute identity across renames/imports.
 // Product-spec triggers maintain usage, so even legacy writers respect deletion.
+export const productVariantGroups = pgTable("product_variant_groups", {
+  storeId: uuid("store_id").notNull(),
+  id: uuid("id").notNull(),
+  kind: text("kind").notNull(),
+  attributes: jsonb("attributes").$type<import("@/lib/products/variant-model").NormalizedVariantAttribute[]>().notNull().default([]),
+  excludedCombinationKeys: jsonb("excluded_combination_keys").$type<string[]>().notNull().default([]),
+  requiresReview: boolean("requires_review").notNull().default(false),
+  revision: integer("revision").notNull().default(0),
+}, (t) => [primaryKey({ columns: [t.storeId, t.id] }),
+  foreignKey({ columns: [t.storeId, t.id], foreignColumns: [products.storeId, products.id] }).onDelete("cascade"),
+  check("product_variant_groups_kind_check", sql`${t.kind} in ('native','related')`),
+]);
+
+export const productVariantMembers = pgTable("product_variant_members", {
+  storeId: uuid("store_id").notNull(), groupId: uuid("group_id").notNull(), productId: uuid("product_id").notNull(),
+  combinationKey: text("combination_key"), optionValueIds: jsonb("option_value_ids").$type<string[]>().notNull().default([]),
+}, (t) => [primaryKey({ columns: [t.storeId, t.productId] }),
+  foreignKey({ columns: [t.storeId, t.groupId], foreignColumns: [productVariantGroups.storeId, productVariantGroups.id] }).onDelete("cascade"),
+  foreignKey({ columns: [t.storeId, t.productId], foreignColumns: [products.storeId, products.id] }).onDelete("cascade"),
+  unique("product_variant_members_combination_unique").on(t.storeId, t.groupId, t.combinationKey),
+]);
+
 export const productAttributes = pgTable("product_attributes", {
   id: uuid("id").primaryKey().defaultRandom(),
   storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id, { onDelete: "cascade" }),
@@ -528,6 +550,23 @@ export const productAttributes = pgTable("product_attributes", {
   unique("product_attributes_store_name_unique").on(t.storeId, t.nameKey),
   unique("product_attributes_store_id_unique").on(t.storeId, t.id),
   check("product_attributes_name_check", sql`${t.nameKey} <> '' and left(${t.nameKey}, 2) <> '__'`),
+]);
+
+export const productVariantGroupAttributes = pgTable("product_variant_group_attributes", {
+  storeId: uuid("store_id").notNull(), groupId: uuid("group_id").notNull(), attributeId: uuid("attribute_id").notNull(),
+}, (t) => [primaryKey({ columns: [t.storeId, t.groupId, t.attributeId] }),
+  foreignKey({ columns: [t.storeId, t.groupId], foreignColumns: [productVariantGroups.storeId, productVariantGroups.id] }).onDelete("cascade"),
+  foreignKey({ columns: [t.storeId, t.attributeId], foreignColumns: [productAttributes.storeId, productAttributes.id] }).onDelete("restrict"),
+  index("product_variant_group_attributes_usage_idx").on(t.storeId, t.attributeId),
+]);
+
+export const productVariantRequests = pgTable("product_variant_requests", {
+  storeId: uuid("store_id").notNull().references(() => stores.id, { onDelete: "cascade" }),
+  requestId: uuid("request_id").notNull(), payloadHash: text("payload_hash").notNull(), groupId: uuid("group_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [primaryKey({ columns: [t.storeId, t.requestId] }),
+  foreignKey({ columns: [t.storeId, t.groupId], foreignColumns: [productVariantGroups.storeId, productVariantGroups.id] }).onDelete("cascade"),
+  index("product_variant_requests_group_idx").on(t.storeId, t.groupId),
 ]);
 
 export const productAttributeAliases = pgTable("product_attribute_aliases", {

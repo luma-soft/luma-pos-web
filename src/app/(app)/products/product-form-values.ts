@@ -2,9 +2,23 @@ import type { ProductDetail } from "@/lib/data/products";
 import { parseProductImagePublicUrl } from "@/lib/images/product-image-coordinate";
 import type { PublicMediaConfig } from "@/lib/media/config";
 import type { CreateProductInput } from "./new/schema";
+import { buildVariantCombinations, normalizeVariantAttributes, variantCombinationBudget } from "@/lib/products/variant-model";
 
-type ProductSeedMode = "edit" | "copy" | "sameType";
+export type ProductSeedMode = "edit" | "copy" | "sameType" | "groupEdit" | "groupAdd";
 const PRODUCT_ORDER_NOTE_SPEC_KEY = "__orderNote";
+
+/** Group forms must seed shared fields from the real root, never a child override. */
+export async function resolveProductFormSeed(
+  product: ProductDetail,
+  mode: ProductSeedMode,
+  loadProduct: (id: string) => Promise<ProductDetail | null>,
+): Promise<ProductDetail | null> {
+  const groupMode = mode === "groupEdit" || mode === "groupAdd" || mode === "sameType";
+  const groupId = product.variantGroup?.id;
+  if (!groupMode || !groupId || groupId === product.id) return product;
+  const root = await loadProduct(groupId);
+  return root?.id === groupId ? root : null;
+}
 
 export function productToFormInitialValues(
   product: ProductDetail,
@@ -15,7 +29,7 @@ export function productToFormInitialValues(
   const specs = (product.specs as Record<string, string[]> | null) ?? {};
   const orderNote = specs[PRODUCT_ORDER_NOTE_SPEC_KEY]?.[0] ?? "";
   const attributeSpecs = Object.entries(specs).filter(
-    ([name]) => name !== PRODUCT_ORDER_NOTE_SPEC_KEY,
+    ([name]) => !name.startsWith("__"),
   );
   const imageMedia = product.imageMedia ?? [];
   const shared: Partial<CreateProductInput> = {
@@ -51,21 +65,73 @@ export function productToFormInitialValues(
     attributes: attributeSpecs.map(([name, values]) => ({
       name,
       values: Array.isArray(values) ? values : [String(values)],
-      createsVariants: false,
+      createsVariants: mode !== "edit",
     })),
   };
 
-  if (mode === "sameType") {
+  const group = product.variantGroup;
+  const groupEditing = mode === "groupEdit" || mode === "groupAdd" || mode === "sameType" || (mode === "edit" && product.isVariantParent);
+  const copyGroup = mode === "copy" && product.isVariantParent && group;
+  if (groupEditing || copyGroup) {
+    const sourceAttributes = group?.attributes ?? attributeSpecs.map(([name, values]) => ({
+      name, values, createsVariants: true,
+    }));
+    let attributes = sourceAttributes;
+    try { attributes = normalizeVariantAttributes(sourceAttributes); } catch { /* Keep incomplete axes visible for explicit correction. */ }
+    const members = group?.members ?? [product];
+    const selectedMembers = members.filter((member) => !member.isVariantParent);
+    let combinations: ReturnType<typeof buildVariantCombinations> = [];
+    try {
+      combinations = buildVariantCombinations(attributes, mode === "copy" ? undefined : {
+        maxCombinations: variantCombinationBudget(selectedMembers.length, group?.excludedCombinationKeys?.length ?? 0),
+      });
+    } catch { /* Incomplete legacy groups require explicit assignments in the editor. */ }
+    const possibleMatches = selectedMembers.map((member) => {
+      const visibleSpecs = member.specs as Record<string, string[]> | null;
+      return combinations.find((combo) => Object.entries(combo.specs).every(([name, values]) => JSON.stringify(visibleSpecs?.[name]) === JSON.stringify(values)));
+    });
+    const children: NonNullable<CreateProductInput["variantChildren"]> = selectedMembers.map((member, index) => {
+      const visibleSpecs = Object.fromEntries(Object.entries((member.specs ?? {}) as Record<string, string[]>).filter(([name]) => !name.startsWith("__")));
+      const candidate = possibleMatches[index];
+      // Duplicated or missing selections require the user to assign the real SKU.
+      const match = candidate && possibleMatches.filter((other) => other?.combinationKey === candidate.combinationKey).length === 1 ? candidate : undefined;
+      return {
+        ...(mode !== "copy" ? { productId: member.id } : {}),
+        combinationKey: match?.combinationKey,
+        optionValueIds: match?.optionValueIds,
+        variantName: match?.variantName ?? member.variantName ?? member.name,
+        sku: mode === "copy" ? "" : member.sku,
+        barcode: mode === "copy" ? "" : member.barcode ?? "",
+        baseUnit: member.baseUnit,
+        costPrice: Number(member.costPrice),
+        retailPrice: Number(member.retailPrice),
+        wholesalePrice: member.wholesalePrice == null ? null : Number(member.wholesalePrice),
+        contractorPrice: member.contractorPrice == null ? null : Number(member.contractorPrice),
+        agentPrice: member.agentPrice == null ? null : Number(member.agentPrice),
+        initialStock: 0,
+        currentStock: Number(member.totalStock ?? 0),
+        directSale: member.isActive,
+        specs: match?.specs ?? visibleSpecs,
+        imageUrls: mode === "copy" ? [] : member.imageUrls ?? [],
+      };
+    });
     return {
       ...shared,
-      sku: "",
-      barcode: "",
-      name: "",
-      imageUrls: [],
+      variantContractVersion: 2,
+      variantOperation: mode === "copy" ? "create" : mode === "groupAdd" || mode === "sameType" ? "add" : "edit",
+      ...(mode !== "copy" ? { variantGroupId: group?.id ?? product.id, variantRevision: group?.revision ?? 0 } : {}),
+      attributes,
+      variantChildren: children,
+      excludedCombinationKeys: group?.excludedCombinationKeys ?? combinations.filter((combo) => !children.some((child) => child.combinationKey === combo.combinationKey)).map((combo) => combo.combinationKey),
+      sku: mode === "copy" ? "" : product.sku,
+      barcode: mode === "copy" ? "" : product.barcode ?? "",
+      name: group?.name ?? product.name,
+      imageUrls: mode === "copy" ? [] : product.imageUrls ?? [],
+      imageMediaIds: mode === "copy" ? [] : imageMedia.map((image) => image.mediaId),
       location: product.location ?? "",
-      description: "",
-      invoiceNote: "",
-      directSale: true,
+      description: product.description ?? "",
+      invoiceNote: orderNote,
+      directSale: product.isActive,
       initialStock: 0,
     };
   }

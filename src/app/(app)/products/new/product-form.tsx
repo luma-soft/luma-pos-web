@@ -42,6 +42,9 @@ import {
 } from "./schema";
 import { MultiUnitField } from "./multi-unit-field";
 import { AttributesField } from "./attributes-field";
+import { VariantChildrenField } from "./variant-children-field";
+import { normalizeVariantAttributes } from "@/lib/products/variant-model";
+import { saveProductVariantGroup } from "@/lib/actions/product-variants";
 import {
   createProduct,
   updateProduct,
@@ -50,7 +53,7 @@ import {
   createBrand,
 } from "@/lib/actions/products";
 import { Combobox } from "@/components/combobox";
-import type { ProductFormOptions } from "@/lib/data/products";
+import type { ProductDetail, ProductFormOptions } from "@/lib/data/products";
 import type { PriceBookRow } from "@/lib/data/price-books";
 import { AI_WORKFLOW_DRAFT_STORAGE_KEY, tenantStorageKey } from "@/components/ai-assistant/utils";
 import { useTenantClientScope } from "@/components/tenant-client-scope";
@@ -67,11 +70,6 @@ import {
 type Tab = "info" | "description" | "variants";
 
 const useFormCtx = () => useFormContext<CreateProductInput>();
-const EMPTY_ATTRIBUTES: NonNullable<CreateProductInput["attributes"]> = [];
-const EMPTY_VARIANT_CHILDREN: NonNullable<
-  CreateProductInput["variantChildren"]
-> = [];
-const EMPTY_IMAGE_URLS: string[] = [];
 const PRODUCT_ORDER_NOTE_SPEC_KEY = "__orderNote";
 
 type AiWorkflowDraft = {
@@ -103,6 +101,7 @@ export interface NewProductFormProps {
   isVariantChild?: boolean;
   siblingCount?: number;
   initialValues?: Partial<CreateProductInput>;
+  variantGroup?: ProductDetail["variantGroup"];
   initialManagedImages?: UploadedProductImage[];
   layout?: "page" | "modal";
   closeHref?: string;
@@ -123,6 +122,7 @@ export function NewProductForm({
   isVariantChild = false,
   siblingCount = 0,
   initialValues,
+  variantGroup,
   initialManagedImages = [],
   layout = "page",
   closeHref,
@@ -133,7 +133,7 @@ export function NewProductForm({
   const storageScope = useTenantClientScope();
   const t = useTranslations();
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>("info");
+  const [tab, setTab] = useState<Tab>(initialValues?.variantOperation === "add" ? "variants" : "info");
   const [submitIntent, setSubmitIntent] = useState<"save" | "sameType">("save");
   const isEdit = mode === "edit";
   const isModal = layout === "modal";
@@ -143,6 +143,17 @@ export function NewProductForm({
     else router.push(href);
   };
 
+  const [requestId] = useState(() => crypto.randomUUID());
+  const preparedAttributes = useMemo(() => {
+    const attributes = initialValues?.attributes ?? [];
+    // Normal SKU editing keeps its selected values. Group/create uses stable axes.
+    if (isEdit && !initialValues?.variantGroupId) return attributes;
+    try {
+      return [...attributes.filter((attribute) => attribute.createsVariants === false), ...normalizeVariantAttributes(attributes.map((attribute) => ({ ...attribute, values: attribute.values ?? [] })))];
+    } catch {
+      return attributes;
+    }
+  }, [initialValues, isEdit]);
   const form = useForm<CreateProductInput, unknown, CreateProductOutput>({
     resolver: zodResolver(createProductSchema),
     defaultValues: {
@@ -164,15 +175,19 @@ export function NewProductForm({
       dimUnit: "mm",
       baseUnit: creationKind === "combo" ? "combo" : "cái",
       units: [],
-      attributes: [],
+      variantContractVersion: 2,
+      variantOperation: "create",
+      excludedCombinationKeys: [],
+      requestId,
       variantChildren: [],
       comboItems: [],
       applyToSiblings: {
         enabled: false,
-        fields: ["name", "imageUrls", "description"],
+        fields: ["name", "imageUrls"],
       },
       directSale: true,
       ...initialValues,
+      attributes: preparedAttributes,
     },
   });
 
@@ -209,6 +224,13 @@ export function NewProductForm({
   }, [aiPreview, categories, form, isEdit, productId, storageScope]);
 
   async function onSubmit(values: CreateProductOutput) {
+    if (values.variantGroupId || values.variantChildren.length > 0) {
+      const result = await saveProductVariantGroup(values);
+      if (!result.ok) { form.setError("root", { message: result.error }); return; }
+      navigateAfterModal(submitIntent === "sameType" ? sameTypeHref(result.data.id) : isModal ? doneHref : Routes.product(result.data.id));
+      router.refresh();
+      return;
+    }
     if (isEdit && productId) {
       const defaults = createProductSchema.safeParse(form.formState.defaultValues);
       const stockAdjustment = changedProductStock(
@@ -295,6 +317,11 @@ export function NewProductForm({
   const close = () => navigateAfterModal(doneHref);
 
   const productKind = form.watch("productKind") ?? "product";
+  const groupEditing = Boolean(form.watch("variantGroupId"));
+  const variantEnabled = productKind === "product" && (!isEdit || groupEditing);
+  const hasVariants = variantEnabled && (form.watch("attributes") ?? []).some((attribute) => attribute.createsVariants !== false);
+  const rawError = form.formState.errors.root?.message ?? form.formState.errors.variantChildren?.message ?? form.formState.errors.attributes?.message;
+  const displayError = rawError && rawError.includes(".") && !rawError.includes(" ") ? t(rawError) : rawError;
 
   return (
     <Form
@@ -330,7 +357,7 @@ export function NewProductForm({
             id={isModal ? "product-editor-title" : undefined}
             as="h1"
             size="lg"
-            text={t(
+            text={groupEditing ? (form.watch("variantOperation") === "add" ? "Thêm biến thể" : "Sửa nhóm biến thể") : t(
               isEdit
                 ? `products.kind.editTitles.${productKind}`
                 : `products.kind.createTitles.${productKind}`,
@@ -350,6 +377,7 @@ export function NewProductForm({
         ) : (
           <FormActions
             loading={form.formState.isSubmitting}
+            showDirectSale={!groupEditing && !hasVariants}
             registerDirectSale={form.register("directSale")}
             onCancel={close}
             onIntent={setSubmitIntent}
@@ -371,15 +399,15 @@ export function NewProductForm({
                   : "border-transparent text-slate-600 hover:text-slate-900 dark:text-slate-400",
               )}
             >
-              {t(`products.tabs.${tk}`)}
+              {tk === "description" ? "Mô tả, ghi chú" : t(`products.tabs.${tk}`)}
             </button>
           ))}
         </div>
       </div>
 
-      {form.formState.errors.root && (
+      {rawError && (
         <div className="bg-red-50 dark:bg-red-950/40 border-b border-red-200 dark:border-red-900 px-4 sm:px-6 py-2 text-sm text-red-700 dark:text-red-400">
-          {t(form.formState.errors.root.message ?? "errors.serverError")}
+          {displayError}
         </div>
       )}
 
@@ -389,6 +417,10 @@ export function NewProductForm({
           isModal ? "mx-auto max-w-7xl" : "mx-auto max-w-5xl",
         )}
       >
+        {groupEditing && <div className="rounded-xl border border-primary-200 bg-primary-50 px-4 py-3 text-sm text-primary-800">
+          <p className="font-semibold">{form.watch("variantOperation") === "add" ? "Thêm biến thể vào nhóm" : "Sửa nhóm biến thể"}: {variantGroup?.name ?? form.watch("name")}</p>
+          <p className="mt-1">Giữ SKU đã có; hàng mới được thêm vào cùng nhóm. Nội dung riêng của từng SKU được giữ nguyên.</p>
+        </div>}
         {tab === "info" && (
           <InfoTab
             storeId={storeId}
@@ -400,6 +432,7 @@ export function NewProductForm({
             mode={mode}
             creationKind={creationKind}
             initialManagedImages={initialManagedImages}
+            groupEditing={groupEditing}
           />
         )}
         {tab === "variants" && (
@@ -407,15 +440,20 @@ export function NewProductForm({
             isEdit={isEdit}
             isVariantChild={isVariantChild}
             siblingCount={siblingCount}
+            groupEditing={groupEditing}
+            groupId={variantGroup?.id}
           />
         )}
+        <VariantChildrenField visible={tab === "variants"} enabled={variantEnabled} />
         {tab === "description" && <DescriptionTab />}
+        {hasVariants && !groupEditing && tab === "info" && <p className="text-sm text-slate-500">Giá chung dùng cho SKU mới. Nhập giá và tồn từng biến thể tại tab Đơn vị & thuộc tính.</p>}
       </div>
 
       {isModal && (
         <footer className="shrink-0 border-t border-border bg-surface px-4 py-3 pb-[calc(.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:pb-3">
           <FormActions
             loading={form.formState.isSubmitting}
+            showDirectSale={!groupEditing && !hasVariants}
             registerDirectSale={form.register("directSale")}
             onCancel={close}
             onIntent={setSubmitIntent}
@@ -432,12 +470,14 @@ function FormActions({
   registerDirectSale,
   onCancel,
   onIntent,
+  showDirectSale = true,
   align = "header",
 }: {
   loading: boolean;
   registerDirectSale: UseFormRegisterReturn<"directSale">;
   onCancel: () => void;
   onIntent: (intent: "save" | "sameType") => void;
+  showDirectSale?: boolean;
   align?: "header" | "footer";
 }) {
   const t = useTranslations();
@@ -448,12 +488,12 @@ function FormActions({
         align === "footer" && "grid grid-cols-1 sm:flex sm:justify-between",
       )}
     >
-      <label className="flex min-h-11 min-w-11 cursor-pointer items-center gap-2 text-sm lg:min-h-0 lg:min-w-0">
+      {showDirectSale && <label className="flex min-h-11 min-w-11 cursor-pointer items-center gap-2 text-sm lg:min-h-0 lg:min-w-0">
         <Checkbox
           {...registerDirectSale}
         />
         <span>{t("products.directSale")}</span>
-      </label>
+      </label>}
       <div
         className={cn(
           "ml-auto flex flex-wrap items-center gap-2",
@@ -494,22 +534,32 @@ function InfoTab({
   priceBooks,
   comboProducts,
   initialManagedImages,
-}: NewProductFormProps) {
+  groupEditing,
+}: NewProductFormProps & { groupEditing: boolean }) {
   const { watch } = useFormCtx();
   const productKind = watch("productKind") ?? "product";
+  const groupAdding = groupEditing && watch("variantOperation") === "add";
+  if (groupAdding) return <Section title="Thông tin nhóm" collapsible={false}>
+    <p className="mb-4 text-sm text-slate-500">Đang thêm SKU vào nhóm này. Thông tin chung được giữ nguyên; nhập thuộc tính, giá và tồn đầu của SKU mới ở tab Đơn vị &amp; thuộc tính.</p>
+    <dl className="grid gap-4 sm:grid-cols-2">
+      <div className="sm:col-span-2"><dt className="text-sm text-slate-500">Tên nhóm</dt><dd className="mt-1 font-medium">{watch("name")}</dd></div>
+      <div><dt className="text-sm text-slate-500">Nhóm hàng</dt><dd className="mt-1">{categories.find((category) => category.id === watch("categoryId"))?.name ?? "—"}</dd></div>
+      <div><dt className="text-sm text-slate-500">Thương hiệu</dt><dd className="mt-1">{brands.find((brand) => brand.id === watch("brandId"))?.name ?? "—"}</dd></div>
+    </dl>
+  </Section>;
   return (
     <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_240px]">
       <div className="min-w-0 space-y-5">
-        <BasicInfoSection categories={categories} brands={brands} />
+        <BasicInfoSection categories={categories} brands={brands} groupEditing={groupEditing} />
         {productKind === "combo" && (
           <ComboItemsField products={comboProducts ?? []} />
         )}
-        <Section
+        {!groupEditing && <Section
           titleTx="products.sections.pricing"
           className="rounded-none border-x-0 border-b-0 shadow-none"
         >
           <PricingFields priceBooks={priceBooks ?? []} />
-        </Section>
+        </Section>}
         {productKind === "product" && (
           <>
             <Section
@@ -518,14 +568,14 @@ function InfoTab({
             >
               <StockFields />
             </Section>
-            <Section
+            {!groupEditing && <Section
               titleTx="products.sections.physical"
               descriptionTx="products.sections.physicalDesc"
               defaultOpen={false}
               className="rounded-none border-x-0 border-b-0 shadow-none"
             >
               <PhysicalFields />
-            </Section>
+            </Section>}
           </>
         )}
       </div>
@@ -719,15 +769,19 @@ function ComboItemsField({
 }
 
 function DescriptionTab() {
-  const { register } = useFormCtx();
+  const { register, watch } = useFormCtx();
+  const groupEditing = Boolean(watch("variantGroupId"));
+  const groupAdding = groupEditing && watch("variantOperation") === "add";
   return (
     <div className="space-y-4">
-      <Section titleTx="products.description.main" collapsible={false}>
-        <Textarea {...register("description")} rows={8} />
+      <Section title="Mô tả và thông số kỹ thuật" description="Thông số như băng tần, nguồn cấp, MIMO và hướng dẫn cài đặt được ghi ở đây; không tạo thêm SKU." collapsible={false}>
+        {groupAdding
+          ? <div className="space-y-3"><p className="text-sm text-slate-500">Mô tả chung được giữ nguyên khi thêm SKU. Dùng Sửa nhóm biến thể để cập nhật nội dung này.</p><p className="whitespace-pre-wrap text-sm">{watch("description") || "Chưa có mô tả."}</p></div>
+          : <Textarea {...register("description")} aria-label="Mô tả và thông số kỹ thuật" rows={8} />}
       </Section>
-      <Section titleTx="products.description.invoiceNote" collapsible={false}>
-        <Textarea {...register("invoiceNote")} rows={4} />
-      </Section>
+      {!groupEditing && <Section titleTx="products.description.invoiceNote" collapsible={false}>
+        <Textarea {...register("invoiceNote")} aria-label="Mẫu ghi chú hóa đơn, đặt hàng" rows={4} />
+      </Section>}
     </div>
   );
 }
@@ -736,7 +790,11 @@ function VariantsTab({
   isEdit,
   isVariantChild,
   siblingCount,
+  groupEditing,
+  groupId,
 }: {
+  groupEditing: boolean;
+  groupId?: string;
   isEdit: boolean;
   isVariantChild: boolean;
   siblingCount: number;
@@ -744,21 +802,28 @@ function VariantsTab({
   return (
     <div className="space-y-4">
       <Section
-        titleTx="products.sections.units"
-        descriptionTx="products.sections.unitsDesc"
+        {...(groupEditing
+          ? {
+              title: "Đơn vị mặc định cho SKU mới",
+              description: "Chỉ áp dụng cho SKU mới tạo trong nhóm. Đơn vị của SKU đã có được giữ nguyên và hiển thị khóa trong bảng bên dưới.",
+            }
+          : {
+              titleTx: "products.sections.units",
+              descriptionTx: "products.sections.unitsDesc",
+            })}
         collapsible={false}
       >
         <MultiUnitField />
       </Section>
       <Section
-        titleTx="products.sections.attributes"
-        descriptionTx="products.sections.attributesDesc"
+        title="Thuộc tính tạo biến thể"
+        description="Chọn đặc điểm phân biệt hàng bán như phiên bản, màu, dung tích. Mỗi tổ hợp tương ứng một SKU."
         collapsible={false}
       >
-        <AttributesField />
-        {!isEdit && <VariantChildrenPreview />}
+        <AttributesField locked={isEdit && !groupEditing} />
+        {isEdit && !groupEditing && <p className="mt-3 text-sm text-slate-500">Giá trị này xác định SKU đang sửa. {groupId && <a className="font-medium text-primary-600 underline" href={`${Routes.productEdit(groupId)}?groupEdit=1`}>Sửa nhóm biến thể</a>}</p>}
       </Section>
-      {isEdit && isVariantChild && (
+      {isEdit && isVariantChild && !groupEditing && (
         <SiblingApplySection siblingCount={siblingCount} />
       )}
     </div>
@@ -768,13 +833,11 @@ function VariantsTab({
 const APPLY_FIELD_OPTIONS = [
   "name",
   "imageUrls",
-  "description",
   "category",
   "brand",
   "pricing",
   "units",
   "directSale",
-  "attributes",
 ] as const;
 
 function SiblingApplySection({ siblingCount }: { siblingCount: number }) {
@@ -822,255 +885,11 @@ function SiblingApplySection({ siblingCount }: { siblingCount: number }) {
   );
 }
 
-function buildVariantCombinations(
-  attributes: CreateProductInput["attributes"],
-) {
-  const grouped = new Map<string, Set<string>>();
-  for (const attr of attributes ?? []) {
-    const name = attr.name?.trim() ?? "";
-    if (!name) continue;
-    const values = (attr.values ?? [])
-      .map((value) => value.trim())
-      .filter(Boolean);
-    if (values.length === 0) continue;
-    const set = grouped.get(name) ?? new Set<string>();
-    for (const value of values) set.add(value);
-    grouped.set(name, set);
-  }
-
-  const usable = Array.from(grouped.entries()).map(([name, values]) => ({
-    name,
-    values: Array.from(values),
-  }));
-  const valueCount = usable.reduce(
-    (total, attr) => total + attr.values.length,
-    0,
-  );
-  if (valueCount < 2) return [];
-
-  const rows: Array<{ variantName: string; specs: Record<string, string[]> }> =
-    [];
-  const walk = (
-    idx: number,
-    picked: Array<{ name: string; value: string }>,
-  ) => {
-    if (idx === usable.length) {
-      rows.push({
-        variantName: picked.map((p) => p.value).join(" / "),
-        specs: Object.fromEntries(picked.map((p) => [p.name, [p.value]])),
-      });
-      return;
-    }
-    for (const value of usable[idx].values)
-      walk(idx + 1, [...picked, { name: usable[idx].name, value }]);
-  };
-  walk(0, []);
-  return rows;
-}
-
-function VariantChildrenPreview() {
-  const t = useTranslations();
-  const { register, watch, setValue } = useFormCtx();
-  const attributes = watch("attributes") ?? EMPTY_ATTRIBUTES;
-  const children = watch("variantChildren") ?? EMPTY_VARIANT_CHILDREN;
-  const parentName = watch("name") ?? "";
-  const baseUnit = watch("baseUnit") ?? "cái";
-  const costPrice = Number(watch("costPrice") ?? 0);
-  const retailPrice = Number(watch("retailPrice") ?? 0);
-  const wholesalePrice = watch("wholesalePrice") ?? null;
-  const contractorPrice = watch("contractorPrice") ?? null;
-  const agentPrice = watch("agentPrice") ?? null;
-  const minLevel = Number(watch("minLevel") ?? 0);
-  const imageUrls = watch("imageUrls") ?? EMPTY_IMAGE_URLS;
-
-  const generated = useMemo(
-    () => buildVariantCombinations(attributes),
-    [attributes],
-  );
-
-  useEffect(() => {
-    if (generated.length === 0) {
-      if (children.length > 0)
-        setValue("variantChildren", [], { shouldDirty: true });
-      return;
-    }
-    const byName = new Map(children.map((child) => [child.variantName, child]));
-    const next = generated.map((row) => {
-      const current = byName.get(row.variantName);
-      return {
-        variantName: row.variantName,
-        sku: current?.sku ?? "",
-        barcode: current?.barcode ?? "",
-        baseUnit: current?.baseUnit ?? baseUnit,
-        costPrice: current?.costPrice ?? costPrice,
-        retailPrice: current?.retailPrice ?? retailPrice,
-        wholesalePrice: current?.wholesalePrice ?? wholesalePrice,
-        contractorPrice: current?.contractorPrice ?? contractorPrice,
-        agentPrice: current?.agentPrice ?? agentPrice,
-        initialStock: current?.initialStock ?? 0,
-        minLevel: current?.minLevel ?? minLevel,
-        imageUrls: current?.imageUrls?.length ? current.imageUrls : imageUrls,
-        directSale: current?.directSale ?? true,
-        specs: row.specs,
-      };
-    });
-    if (JSON.stringify(next) !== JSON.stringify(children)) {
-      setValue("variantChildren", next, { shouldDirty: true });
-    }
-  }, [
-    agentPrice,
-    baseUnit,
-    children,
-    contractorPrice,
-    costPrice,
-    generated,
-    imageUrls,
-    minLevel,
-    retailPrice,
-    setValue,
-    wholesalePrice,
-  ]);
-
-  if (generated.length === 0) {
-    return (
-      <p className="mt-4 rounded-lg border border-dashed border-border bg-surface-2 px-3 py-2 text-sm text-slate-500">
-        {t("products.variants.childHint")}
-      </p>
-    );
-  }
-
-  return (
-    <div className="mt-4 overflow-hidden rounded-xl border border-border bg-surface">
-      <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
-        <div>
-          <div className="text-sm font-semibold">
-            {t("products.variants.childTitle")}
-          </div>
-          <div className="text-xs text-slate-500">
-            {t("products.variants.childCount", {
-              count: children.length,
-              name: parentName || t("products.variants.parentFallback"),
-            })}
-          </div>
-        </div>
-      </div>
-      <div className="overflow-visible lg:overflow-x-auto" data-mobile-audit="product-variants">
-        <table className="block w-full min-w-0 text-sm lg:table lg:min-w-[860px]">
-          <thead className="hidden bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-900/60 lg:table-header-group">
-            <tr>
-              <th className="px-3 py-2 font-semibold">
-                {t("products.variants.variant")}
-              </th>
-              <th className="px-3 py-2 font-semibold">SKU</th>
-              <th className="px-3 py-2 font-semibold">
-                {t("products.fields.barcode")}
-              </th>
-              <th className="px-3 py-2 font-semibold">{t("pos.unit")}</th>
-              <th className="px-3 py-2 font-semibold text-right">
-                {t("products.pricing.costPrice")}
-              </th>
-              <th className="px-3 py-2 font-semibold text-right">
-                {t("products.pricing.retailPrice")}
-              </th>
-              <th className="px-3 py-2 font-semibold text-right">
-                {t("products.variants.initialStock")}
-              </th>
-              <th className="px-3 py-2 font-semibold text-center">
-                {t("products.variants.sale")}
-              </th>
-            </tr>
-          </thead>
-          <tbody className="block divide-y divide-border-soft lg:table-row-group">
-            {children.map((child, idx) => (
-              <tr key={child.variantName} className="grid grid-cols-2 gap-3 p-3 lg:table-row lg:p-0">
-                <td className="col-span-2 block p-0 lg:table-cell lg:px-3 lg:py-2">
-                  <input
-                    type="hidden"
-                    {...register(`variantChildren.${idx}.variantName`)}
-                  />
-                  <div className="text-xs font-semibold text-slate-500 lg:hidden">{t("products.variants.variant")}</div>
-                  <div className="mt-1 break-words font-medium lg:mt-0">{child.variantName}</div>
-                </td>
-                <td className="col-span-2 block p-0 sm:col-span-1 lg:table-cell lg:px-3 lg:py-2">
-                  <div className="mb-1 text-xs font-semibold text-slate-500 lg:hidden">SKU</div>
-                  <Input className="min-h-11 lg:min-h-0"
-                    {...register(`variantChildren.${idx}.sku`)}
-                    placeholder={t("products.variants.autoSku")}
-                  />
-                </td>
-                <td className="col-span-2 block p-0 sm:col-span-1 lg:table-cell lg:px-3 lg:py-2">
-                  <div className="mb-1 text-xs font-semibold text-slate-500 lg:hidden">{t("products.fields.barcode")}</div>
-                  <Input className="min-h-11 lg:min-h-0" {...register(`variantChildren.${idx}.barcode`)} />
-                </td>
-                <td className="block p-0 lg:table-cell lg:px-3 lg:py-2">
-                  <div className="mb-1 text-xs font-semibold text-slate-500 lg:hidden">{t("pos.unit")}</div>
-                  <Input className="min-h-11 lg:min-h-0" {...register(`variantChildren.${idx}.baseUnit`)} />
-                </td>
-                <td className="block p-0 lg:table-cell lg:px-3 lg:py-2">
-                  <div className="mb-1 text-xs font-semibold text-slate-500 lg:hidden">{t("products.pricing.costPrice")}</div>
-                  <NumberInput
-                    min={0}
-                    value={child.costPrice}
-                    onChange={(costPrice) =>
-                      setValue(`variantChildren.${idx}.costPrice`, costPrice ?? 0, {
-                        shouldDirty: true,
-                        shouldValidate: true,
-                      })
-                    }
-                    className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-right lg:min-h-0"
-                  />
-                </td>
-                <td className="block p-0 lg:table-cell lg:px-3 lg:py-2">
-                  <div className="mb-1 text-xs font-semibold text-slate-500 lg:hidden">{t("products.pricing.retailPrice")}</div>
-                  <NumberInput
-                    min={0}
-                    value={child.retailPrice}
-                    onChange={(retailPrice) =>
-                      setValue(`variantChildren.${idx}.retailPrice`, retailPrice ?? 0, {
-                        shouldDirty: true,
-                        shouldValidate: true,
-                      })
-                    }
-                    className="min-h-11 w-full rounded-lg border border-border bg-surface px-3 py-2 text-right lg:min-h-0"
-                  />
-                </td>
-                <td className="col-span-2 block p-0 lg:table-cell lg:px-3 lg:py-2">
-                  <div className="mb-1 text-xs font-semibold text-slate-500 lg:hidden">{t("products.variants.initialStock")}</div>
-                  <QuantityInput
-                    min={0}
-                    value={Number(child.initialStock ?? 0)}
-                    onChange={(initialStock) =>
-                      setValue(`variantChildren.${idx}.initialStock`, initialStock, {
-                        shouldDirty: true,
-                        shouldValidate: true,
-                      })
-                    }
-                    className="w-full lg:w-[132px]"
-                    touchTargets
-                    inputLabel={`${child.variantName} — ${t("products.variants.initialStock")}`}
-                  />
-                </td>
-                <td className="block p-0 lg:table-cell lg:px-3 lg:py-2 lg:text-center">
-                  <label className="inline-flex min-h-11 min-w-11 items-center gap-2 text-xs font-semibold text-slate-500 lg:min-h-0 lg:min-w-0">
-                  <Checkbox
-                    {...register(`variantChildren.${idx}.directSale`)}
-                  />
-                  <span className="lg:hidden">{t("products.variants.sale")}</span>
-                  </label>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
 function BasicInfoSection({
   categories,
   brands,
-}: Pick<NewProductFormProps, "categories" | "brands">) {
+  groupEditing,
+}: Pick<NewProductFormProps, "categories" | "brands"> & { groupEditing: boolean }) {
   const t = useTranslations();
   const { register, watch, setValue } = useFormCtx();
   const [extraCats, setExtraCats] = useState<{ id: string; name: string }[]>(
@@ -1082,7 +901,7 @@ function BasicInfoSection({
 
   return (
     <div className="space-y-4 px-1 sm:px-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {!groupEditing && <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field labelTx="products.fields.sku">
           <Input
             {...register("sku")}
@@ -1095,7 +914,7 @@ function BasicInfoSection({
             placeholderTx="products.fields.barcodePlaceholder"
           />
         </Field>
-      </div>
+      </div>}
 
       <FormField name="name" labelTx="products.fields.name" required>
         {(field) => (
@@ -1153,6 +972,7 @@ function BasicInfoSection({
           />
         </Field>
       </div>
+      {groupEditing && <p className="text-sm text-slate-500">SKU, mã vạch, giá và tồn kho được chỉnh trên từng dòng ở tab Đơn vị &amp; thuộc tính.</p>}
     </div>
   );
 }
@@ -1624,6 +1444,9 @@ function StockFields() {
   const { setValue, watch } = useFormCtx();
   const currentStock = watch("currentStock");
   const editingStock = currentStock !== undefined;
+  const groupEditing = Boolean(watch("variantGroupId"));
+  const hasVariants = groupEditing || (!editingStock && (watch("attributes") ?? []).some((attribute) => attribute.createsVariants !== false));
+  if (hasVariants) return <p className="text-sm text-slate-500">Tồn được quản lý trên từng SKU trong tab Đơn vị & thuộc tính. Nhóm không có tồn riêng.</p>;
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <Field labelTx="products.stock.current">

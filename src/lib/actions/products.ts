@@ -46,6 +46,8 @@ import {
 import { imageMediaIdsSchema } from "@/lib/products/product-media-schema";
 import { recordActivity } from "@/lib/audit/activity-log";
 import { activityValuesEqual, productActivityChanges, readProductActivitySnapshot } from "@/lib/products/product-activity";
+import { saveProductVariantGroup } from "./product-variants";
+import { variantNameKey } from "@/lib/products/variant-model";
 
 /** Tạo nhóm hàng mới từ form (combobox "+ thêm"). Trả id. */
 export async function createCategory(
@@ -749,6 +751,9 @@ export async function updateProduct(
   const publicMedia = getPublicMediaConfig();
 
   try {
+    if (v.applyToSiblings?.enabled && v.applyToSiblings.fields.some((field) => field === "attributes" || field === "description")) {
+      return { ok: false, error: "products.variants.useGroupEditor" };
+    }
     if (v.stockAdjustment && v.stockAdjustment.quantity !== v.stockAdjustment.expectedQuantity) {
       const stockGate = await requireManager();
       if (!stockGate.ok) return stockGate;
@@ -760,12 +765,28 @@ export async function updateProduct(
           parentProductId: products.parentProductId,
           variantName: products.variantName,
           productKind: products.productKind,
+          specs: products.specs,
+          relatedProductId: products.relatedProductId,
+          isVariantParent: products.isVariantParent,
         })
         .from(products)
         .where(and(eq(products.storeId, gate.storeId), eq(products.id, v.id)))
         .limit(1).for("update");
 
       if (!current) throw new Error("PRODUCT_NOT_FOUND");
+      const hasGroup = current.parentProductId || current.relatedProductId || current.isVariantParent
+        || (await tx.execute(sql`select 1 from product_variant_groups where store_id=${gate.storeId}::uuid and id=${v.id}::uuid limit 1`)).rows.length
+        || (await tx.execute(sql`select 1 from products where store_id=${gate.storeId}::uuid and related_product_id=${v.id}::uuid limit 1`)).rows.length;
+      if (hasGroup) {
+        const catalog = await tx.execute<{ name_key: string; attribute_id: string }>(sql`
+          select name_key,attribute_id from product_attribute_aliases where store_id=${gate.storeId}::uuid
+        `);
+        const canonical = (specs: unknown) => Object.entries((specs ?? {}) as Record<string, unknown>)
+          .filter(([name]) => !name.startsWith("__"))
+          .map(([name, values]) => [catalog.rows.find((a) => a.name_key === variantNameKey(name))?.attribute_id ?? variantNameKey(name), values])
+          .sort(([a], [b]) => String(a).localeCompare(String(b)));
+        if (JSON.stringify(canonical(current.specs)) !== JSON.stringify(canonical(v.specs))) throw new Error("PRODUCT_VARIANT_IDENTITY");
+      }
       const beforeActivity = await readProductActivitySnapshot(tx, gate.storeId, v.id);
       const changedRelatedProducts: { type: string; id: string; name: string; code?: string }[] = [];
       if (
@@ -907,8 +928,6 @@ export async function updateProduct(
         const patch: Partial<typeof products.$inferInsert> = {
           updatedAt: sql`now()` as unknown as Date,
         };
-        if (fields.has("description"))
-          patch.description = v.description || null;
         if (fields.has("imageUrls") && v.imageUrls) {
           patch.imageUrls = externalProductImageUrls(v.imageUrls, publicMedia);
           patch.imageUpdatedAt = sql`now()` as unknown as Date;
@@ -916,9 +935,6 @@ export async function updateProduct(
         if (fields.has("category")) patch.categoryId = v.categoryId || null;
         if (fields.has("brand")) patch.brandId = v.brandId || null;
         if (fields.has("directSale")) patch.isActive = v.isActive;
-        if (fields.has("attributes"))
-          patch.specs =
-            v.specs && Object.keys(v.specs).length > 0 ? v.specs : null;
         if (fields.has("pricing")) {
           patch.costPrice = String(v.costPrice);
           patch.retailPrice = String(v.retailPrice);
@@ -1011,6 +1027,7 @@ export async function updateProduct(
     const known: Record<string, string> = {
       PRODUCT_NOT_FOUND: "errors.invalidData",
       PRODUCT_KIND_IMMUTABLE: "products.errors.kindImmutable",
+      PRODUCT_VARIANT_IDENTITY: "products.variants.useGroupEditor",
       PRODUCT_UNIT_NOT_FOUND: "errors.invalidData",
       PRODUCT_STOCK_CHANGED: "products.errors.stockChanged",
       PRODUCT_STOCK_REQUIRES_INVENTORY: "products.errors.stockAdjustmentNeedsInventory",
@@ -1046,6 +1063,13 @@ export async function createProduct(
     return { ok: false, error: "errors.invalidData" };
   }
   const v = parsed.data;
+  if (v.variantGroupId || v.variantChildren.length) {
+    if (v.variantContractVersion !== 2 && v.initialStock > 0 && v.variantChildren.length > 1
+      && v.variantChildren.every((child) => child.initialStock === v.initialStock)) {
+      return { ok: false, error: "products.variants.stockPerSku" };
+    }
+    return saveProductVariantGroup(v);
+  }
   const publicMedia = getPublicMediaConfig();
 
   const sku = v.sku?.trim() || generateSku();

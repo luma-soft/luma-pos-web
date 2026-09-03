@@ -1554,7 +1554,7 @@
     "directSale": "Bán trực tiếp",
     "tabs": {
       "info": "Thông tin",
-      "description": "Mô tả",
+      "description": "Mô tả, ghi chú",
       "variants": "Đơn vị & thuộc tính"
     },
     "fields": {
@@ -1606,8 +1606,8 @@
       "warrantyDesc": "Cấu hình thời gian bảo hành sản phẩm",
       "units": "Đơn vị tính",
       "unitsDesc": "Thêm đơn vị bán hoặc nhập như chai, lốc, thùng",
-      "attributes": "Thuộc tính sản phẩm",
-      "attributesDesc": "Thêm đặc điểm như màu sắc, kích thước, bề mặt, áp lực..."
+      "attributes": "Thuộc tính tạo biến thể",
+      "attributesDesc": "Chọn đặc điểm phân biệt hàng bán như phiên bản, màu, dung tích. Mỗi tổ hợp là một SKU."
     },
     "pricing": {
       "costPrice": "Giá vốn",
@@ -1831,7 +1831,27 @@
         "units": "Đơn vị tính",
         "directSale": "Bán trực tiếp",
         "attributes": "Thuộc tính"
-      }
+      },
+      "invalidAttributes": "Thuộc tính bị trùng hoặc không hợp lệ.",
+      "invalidValues": "Giá trị thuộc tính trống, bị trùng hoặc không hợp lệ.",
+      "tooMany": "Tối đa 200 tổ hợp mới trong mỗi lần lưu; các SKU đã có được giữ nguyên.",
+      "invalidExclusions": "Danh sách tổ hợp bỏ chọn không hợp lệ.",
+      "invalidCombination": "Tổ hợp biến thể không khớp thuộc tính hoặc đã bị trùng.",
+      "existingStock": "Tồn đầu chỉ áp dụng cho SKU mới. SKU đã có cần dùng điều chỉnh tồn.",
+      "missingCombinations": "Còn tổ hợp chưa có SKU. Hãy nhập hoặc bỏ chọn rõ các tổ hợp đó.",
+      "emptyGroup": "Cần ít nhất một SKU trong nhóm biến thể.",
+      "requestConflict": "Yêu cầu đã được lưu với dữ liệu khác. Tải lại trước khi tiếp tục.",
+      "invalidGroup": "Không tìm thấy nhóm biến thể hợp lệ.",
+      "groupChanged": "Nhóm đã thay đổi ở nơi khác. Tải lại để giữ dữ liệu mới nhất.",
+      "keepExisting": "Không thể bỏ SKU đã lưu khỏi nhóm bằng thao tác này.",
+      "assignExisting": "Hãy gán thuộc tính cho SKU hiện có trước khi thêm biến thể.",
+      "keepIdentity": "Thay đổi này làm đổi tổ hợp của SKU đã lưu. Hãy giữ giá trị đang dùng hoặc tạo SKU mới.",
+      "keepUnit": "Đơn vị gốc của SKU đã lưu phải được giữ nguyên trong màn sửa nhóm.",
+      "stockPerSku": "Nhập tồn đầu riêng cho từng SKU. Hãy cập nhật ứng dụng để tạo nhiều biến thể.",
+      "useGroupEditor": "Dùng Sửa nhóm biến thể để thay đổi thuộc tính. Mô tả riêng không áp dụng hàng loạt.",
+      "selectSku": "Chọn một SKU trước khi thực hiện thao tác kho.",
+      "barcodeExists": "Mã vạch đã được sử dụng. Mỗi SKU cần một mã vạch riêng.",
+      "unitBarcodePerSku": "Nhập mã vạch đơn vị riêng trên từng SKU sau khi tạo nhóm."
     },
     "errors": {
       "skuExists": "SKU đã tồn tại — chọn mã khác.",

@@ -11,7 +11,7 @@ import { parsePageSize } from "@/lib/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { ProductsTable } from "./products-table";
 import { NewProductForm } from "../../products/new/product-form";
-import { productToFormInitialValues } from "../../products/product-form-values";
+import { productToFormInitialValues, resolveProductFormSeed } from "../../products/product-form-values";
 import { ShopeeListingModal } from "./shopee-listing-modal";
 import { CAMERA_QUOTE_DETAIL_MATERIAL_SKUS, CAMERA_QUOTE_MATERIAL_SKUS } from "@/lib/data/camera-quote-constants";
 import { CameraMaterialSearch } from "./camera-material-search";
@@ -153,19 +153,22 @@ export async function ProductEditorModal({
   const publicMedia = getPublicMediaConfig();
   const modal = searchParams.productModal;
   if (!modal) return null;
-  if (!["create", "edit", "copy", "sameType"].includes(modal)) return null;
+  if (!["create", "edit", "copy", "sameType", "groupEdit", "groupAdd"].includes(modal)) return null;
 
-  const editId = modal === "edit" ? searchParams.productId : undefined;
+  const editId = modal === "edit" || modal === "groupEdit" ? searchParams.productId : undefined;
   const copyFrom = modal === "copy" ? searchParams.copyFrom : undefined;
-  const sameTypeAs = modal === "sameType" ? searchParams.sameTypeAs : undefined;
+  const sameTypeAs = modal === "sameType" || modal === "groupAdd" ? searchParams.sameTypeAs : undefined;
   const seedId = editId ?? copyFrom ?? sameTypeAs;
   if (seedId && !UUID_RE.test(seedId)) notFound();
 
-  const [options, priceBooks, seedProduct] = await Promise.all([
+  const [options, priceBooks, requestedProduct] = await Promise.all([
     getProductFormOptions(context.storeId),
     getPriceBooks(context.storeId),
     seedId ? getProduct(context.storeId, seedId) : Promise.resolve(null),
   ]);
+  if (seedId && !requestedProduct) notFound();
+  const seedMode = modal === "copy" ? "copy" : modal === "sameType" || modal === "groupAdd" ? "groupAdd" : modal === "groupEdit" ? "groupEdit" : "edit";
+  const seedProduct = requestedProduct ? await resolveProductFormSeed(requestedProduct, seedMode, (productId) => getProduct(context.storeId, productId)) : null;
   if (seedId && !seedProduct) notFound();
 
   const priceOverridesByBook = seedProduct ? await getPriceOverridesForProducts(context.storeId, [seedProduct.id]) : {};
@@ -173,12 +176,12 @@ export async function ProductEditorModal({
     ? Object.fromEntries(Object.entries(priceOverridesByBook).map(([bookId, prices]) => [bookId, prices[seedProduct.id]]))
     : {};
   const closeHref = closeHrefOverride ?? productModalHref(searchParams, {});
-  const mode = modal === "edit" ? "edit" : "create";
+  const mode = modal === "edit" || modal === "groupEdit" ? "edit" : "create";
   const requestedKind = ["product", "service", "combo"].includes(searchParams.productKind ?? "")
     ? searchParams.productKind as "product" | "service" | "combo"
     : "product";
   const initialValues = seedProduct
-    ? productToFormInitialValues(seedProduct, modal === "copy" ? "copy" : modal === "sameType" ? "sameType" : "edit", priceBookPrices, publicMedia)
+    ? productToFormInitialValues(seedProduct, seedMode, priceBookPrices, publicMedia)
     : undefined;
 
   return (
@@ -193,10 +196,11 @@ export async function ProductEditorModal({
           storeId={context.storeId}
           publicMediaBaseUrl={publicMedia.publicBaseUrl}
           mode={mode}
-          productId={editId}
+          productId={mode === "edit" ? seedProduct?.id : undefined}
           isVariantChild={Boolean(seedProduct?.parentProductId)}
           siblingCount={seedProduct?.siblings.length ?? 0}
           initialValues={initialValues}
+          variantGroup={seedProduct?.variantGroup}
           initialManagedImages={mode === "edit" ? seedProduct?.imageMedia : undefined}
           categories={options.categories}
           brands={options.brands}
@@ -250,7 +254,7 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
   });
 
   return (
-    <ProductSelectionProvider visibleIds={rows.map((row) => row.id)}>
+    <ProductSelectionProvider visibleIds={[...new Set(rows.flatMap((row) => view === "grouped" && row.variantGroup ? row.variantGroup.members.filter((member) => !member.isVariantParent).map((member) => member.id) : row.isVariantParent ? [] : [row.id]))]}>
       {!cameraMaterials && (
         <div className="mb-3 lg:hidden">
           <h2 className="text-xl font-bold tracking-tight text-slate-950 dark:text-white">{t("products.title")}</h2>
@@ -260,6 +264,7 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
       {!cameraMaterials && <ProductsToolbar params={params} categories={categories} brands={brands} suppliers={suppliers} resultCount={total} />}
       <ProductsTable
         rows={rows}
+        grouped={view === "grouped" && !cameraMaterials}
         resetScrollKey={[
           params.q,
           params.category,

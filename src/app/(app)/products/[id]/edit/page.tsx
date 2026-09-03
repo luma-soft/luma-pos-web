@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getProduct, getProductFormOptions } from "@/lib/data/products";
 import { getPriceBooks, getPriceOverridesForProducts } from "@/lib/data/price-books";
 import { NewProductForm } from "../../new/product-form";
-import { productToFormInitialValues } from "../../product-form-values";
+import { productToFormInitialValues, resolveProductFormSeed } from "../../product-form-values";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { getPublicMediaConfig } from "@/lib/media/config";
 
@@ -16,15 +16,18 @@ export default async function EditProductPage({ params, searchParams }: Props) {
   const sp = await searchParams;
   const context = await requireStoreContext();
   const publicMedia = getPublicMediaConfig();
-  const [product, options, priceBooks, priceOverridesByBook] = await Promise.all([
+  const [requestedProduct, options, priceBooks] = await Promise.all([
     getProduct(context.storeId, id),
     getProductFormOptions(context.storeId),
     getPriceBooks(context.storeId),
-    getPriceOverridesForProducts(context.storeId, [id]),
   ]);
+  if (!requestedProduct) notFound();
+  const seedMode = sp.groupEdit === "1" ? "groupEdit" : "edit";
+  const product = await resolveProductFormSeed(requestedProduct, seedMode, (productId) => getProduct(context.storeId, productId));
   if (!product) notFound();
+  const priceOverridesByBook = await getPriceOverridesForProducts(context.storeId, [product.id]);
   const priceBookPrices = Object.fromEntries(
-    Object.entries(priceOverridesByBook).map(([bookId, prices]) => [bookId, prices[id]])
+    Object.entries(priceOverridesByBook).map(([bookId, prices]) => [bookId, prices[product.id]])
   );
 
   return (
@@ -32,10 +35,11 @@ export default async function EditProductPage({ params, searchParams }: Props) {
       storeId={context.storeId}
       publicMediaBaseUrl={publicMedia.publicBaseUrl}
       mode="edit"
-      productId={id}
+      productId={product.id}
       isVariantChild={Boolean(product.parentProductId)}
       siblingCount={product.siblings.length}
-      initialValues={productToFormInitialValues(product, "edit", priceBookPrices, publicMedia)}
+      initialValues={productToFormInitialValues(product, seedMode, priceBookPrices, publicMedia)}
+      variantGroup={product.variantGroup}
       initialManagedImages={product.imageMedia}
       categories={options.categories}
       brands={options.brands}

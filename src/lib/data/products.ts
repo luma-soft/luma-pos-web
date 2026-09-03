@@ -4,7 +4,6 @@ import {
   count,
   desc,
   eq,
-  gte,
   inArray,
   or,
   sql,
@@ -43,6 +42,7 @@ import {
   buildRelatedProductLookup,
   selectRelatedProducts,
 } from "@/lib/products/related-products";
+import { projectVariantGroup, type StoredVariantGroup, type StoredVariantMember, type VariantCatalogEntry } from "@/lib/products/variant-group-read";
 
 export const PRODUCTS_PAGE_SIZE = 20;
 
@@ -61,11 +61,17 @@ export interface ProductListFilters {
   sort?: ProductListSort;
   status?: ProductStatusFilter;
   view?: ProductListView;
+  /** Keep legacy clients flat for imported KiotViet related-product families. */
+  groupRelated?: boolean;
   updatedSince?: string;
   page?: number;
   pageSize?: number;
   productSkus?: readonly string[];
   cameraMaterial?: boolean;
+  categoryIds?: readonly string[];
+  brandIds?: readonly string[];
+  supplierIds?: readonly string[];
+  warehouseId?: string;
 }
 
 export const PRODUCT_ORDER_NOTE_SPEC_KEY = "__orderNote";
@@ -96,11 +102,51 @@ function productComplianceFields(hasColumns: boolean) {
   };
 }
 
-export async function getProducts(storeId: string, filters: ProductListFilters = {}) {
+/** All filters must match the same sellable SKU, including inside a group. */
+function productFilterPredicate(alias: "member" | "products", storeId: string, filters: ProductListFilters, hasCompliance: boolean, groupSearch?: SQL) {
+  const field = (name: string) => sql.raw(`${alias}.${name}`);
+  const conditions: SQL[] = [];
+  const status = filters.status ?? "active";
+  if (status === "active") conditions.push(sql`${field("is_active")} = true`);
+  else if (status === "inactive") conditions.push(sql`${field("is_active")} = false`);
+  else if (hasCompliance && (status === "draft" || status === "archived")) conditions.push(sql`${field("lifecycle_status")} = ${status}`);
+  const q = filters.q?.trim();
+  if (q) conditions.push(or(
+    accentInsensitiveLike(field("name"), q), accentInsensitiveLike(field("sku"), q),
+    accentInsensitiveLike(field("barcode"), q), accentInsensitiveLike(sql`${field("specs")}::text`, q),
+    groupSearch,
+  )!);
+  for (const [column, single, multiple] of [
+    ["category_id", filters.categoryId, filters.categoryIds],
+    ["brand_id", filters.brandId, filters.brandIds],
+    ["supplier_id", filters.supplierId, filters.supplierIds],
+  ] as const) {
+    const ids = single ? [single] : multiple;
+    if (ids?.length) conditions.push(inArray(field(column), [...ids]));
+  }
+  if (filters.productKind) conditions.push(sql`${field("product_kind")} = ${filters.productKind}`);
+  const quantity = sql`coalesce((select sum(filter_stock.quantity) from stock_levels filter_stock
+    where filter_stock.store_id = ${storeId} and filter_stock.product_id = ${field("id")}
+      ${filters.warehouseId ? sql`and filter_stock.warehouse_id = ${filters.warehouseId}` : sql``}), 0)`;
+  if (filters.stock === "instock") conditions.push(sql`${quantity} > 0`);
+  else if (filters.stock === "out") conditions.push(sql`${quantity} <= 0`);
+  else if (filters.stock === "low") conditions.push(sql`${quantity} > 0 and ${quantity} <= ${field("min_stock")}`);
+  if (filters.updatedSince) {
+    const since = new Date(filters.updatedSince);
+    if (!Number.isNaN(since.getTime())) conditions.push(sql`${field("updated_at")} >= ${since.toISOString()}`);
+  }
+  if (filters.cameraMaterial) conditions.push(or(
+    filters.productSkus?.length ? inArray(field("sku"), [...filters.productSkus]) : undefined,
+    sql`${field("specs")}->>'__cameraQuoteMaterial' = 'true'`,
+  )!);
+  else if (filters.productSkus?.length) conditions.push(inArray(field("sku"), [...filters.productSkus]));
+  return and(...conditions) ?? sql`true`;
+}
+
+async function getBaseProducts(storeId: string, filters: ProductListFilters = {}, internal: { productIds?: readonly string[]; includeDetails?: boolean } = {}) {
   const page = Math.max(1, filters.page ?? 1);
-  const size = coercePageSize(filters.pageSize, DEFAULT_PAGE_SIZE);
+  const size = internal.productIds ? Math.max(1, internal.productIds.length) : coercePageSize(filters.pageSize, DEFAULT_PAGE_SIZE);
   const sort = filters.sort ?? "name";
-  const status: ProductStatusFilter = filters.status ?? "active";
   const view: ProductListView = filters.view ?? "grouped";
   const [hasComplianceColumns, hasRelatedProducts] = await Promise.all([
     hasProductComplianceColumns(),
@@ -110,133 +156,40 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
   const relatedProductIdField = hasRelatedProducts
     ? products.relatedProductId
     : sql<string | null>`null`;
+  const groupRelated = filters.groupRelated !== false;
   const conditions: SQL[] = [eq(products.storeId, storeId)];
   const exactProductId = filters.exactProductId;
+  const relatedLink = hasRelatedProducts && groupRelated ? sql`member.related_product_id = ${products.id}` : sql`false`;
+  const actualMember = sql`member.store_id = ${storeId} and member.is_variant_parent = false and (
+    member.parent_product_id = ${products.id} or ${relatedLink} or member.id = ${products.id}
+  )`;
+  const stockJoin = and(eq(stockLevels.productId, products.id), eq(stockLevels.storeId, storeId),
+    filters.warehouseId ? eq(stockLevels.warehouseId, filters.warehouseId) : undefined);
 
-  if (exactProductId) {
+  if (internal.productIds) {
+    conditions.push(inArray(products.id, [...internal.productIds]));
+  } else if (exactProductId) {
     conditions.push(eq(products.id, exactProductId));
-  } else if (filters.q?.trim()) {
-    const q = filters.q.trim();
-    const childSearch = sql`exists (
-      select 1 from products child
-      where child.parent_product_id = ${products.id}
-        and child.store_id = ${storeId}
-        and (
-          ${accentInsensitiveLike(sql`child.name`, q)}
-          or ${accentInsensitiveLike(sql`child.sku`, q)}
-          or ${accentInsensitiveLike(sql`child.barcode`, q)}
-        )
-    )`;
-    const search = or(
-      accentInsensitiveLike(products.name, q),
-      accentInsensitiveLike(products.sku, q),
-      accentInsensitiveLike(products.barcode, q),
-      view === "grouped" ? childSearch : undefined,
-    );
-    if (search) conditions.push(search);
-  }
-  if (!exactProductId && filters.categoryId) {
-    conditions.push(
-      view === "grouped"
-        ? or(
-            eq(products.categoryId, filters.categoryId),
-            sql`exists (
-              select 1 from products child
-              where child.parent_product_id = ${products.id}
-                and child.store_id = ${storeId}
-                and child.category_id = ${filters.categoryId}
-            )`,
-          )!
-        : eq(products.categoryId, filters.categoryId),
-    );
-  }
-  if (!exactProductId && filters.brandId) conditions.push(eq(products.brandId, filters.brandId));
-  if (!exactProductId && filters.supplierId) conditions.push(eq(products.supplierId, filters.supplierId));
-  if (!exactProductId && filters.productKind) conditions.push(eq(products.productKind, filters.productKind));
-  if (!exactProductId && filters.stock === "instock") conditions.push(sql`${products.totalStock} > 0`);
-  if (!exactProductId && filters.stock === "out") conditions.push(sql`${products.totalStock} <= 0`);
-  if (!exactProductId && filters.stock === "low") conditions.push(sql`${products.totalStock} > 0 and ${products.totalStock} <= ${products.minStock}`);
-  if (!exactProductId && filters.updatedSince) {
-    const since = new Date(filters.updatedSince);
-    if (!Number.isNaN(since.getTime())) {
-      conditions.push(
-        view === "grouped"
-          ? or(
-              gte(products.updatedAt, since),
-              sql`exists (
-                select 1 from products child
-                where child.parent_product_id = ${products.id}
-                  and child.store_id = ${storeId}
-                  and child.updated_at >= ${since}
-              )`,
-            )!
-          : gte(products.updatedAt, since),
-      );
-    }
-  }
-  if (!exactProductId && filters.productSkus?.length && !filters.cameraMaterial) {
-    conditions.push(inArray(products.sku, filters.productSkus));
-  }
-  if (!exactProductId && filters.cameraMaterial) {
-    conditions.push(
-      or(
-        filters.productSkus?.length ? inArray(products.sku, filters.productSkus) : undefined,
-        sql`${products.specs}->>'__cameraQuoteMaterial' = 'true'`,
-      )!,
-    );
-  }
-  if (exactProductId) {
-    // An exact lookup must find both variant parents and children regardless of
-    // the list's current status/view filters.
-  } else if (view === "grouped") {
-    conditions.push(sql`${products.parentProductId} is null`);
-    if (status === "active") {
-      conditions.push(
-        or(
-          eq(products.isActive, true),
-          sql`exists (
-          select 1 from products child
-          where child.parent_product_id = ${products.id}
-            and child.store_id = ${storeId}
-            and child.is_active = true
-        )`,
-        )!,
-      );
-    } else if (status === "inactive") {
-      conditions.push(
-        and(
-          eq(products.isActive, false),
-          sql`not exists (
-          select 1 from products child
-          where child.parent_product_id = ${products.id}
-            and child.store_id = ${storeId}
-            and child.is_active = true
-        )`,
-        )!,
-      );
-    } else if (hasComplianceColumns && (status === "draft" || status === "archived")) {
-      conditions.push(
-        or(
-          eq(products.lifecycleStatus, status),
-          sql`exists (
-            select 1 from products child
-            where child.parent_product_id = ${products.id}
-              and child.store_id = ${storeId}
-              and child.lifecycle_status = ${status}
-          )`,
-        )!,
-      );
-    }
   } else {
-    conditions.push(eq(products.isVariantParent, false));
-    if (status === "active") conditions.push(eq(products.isActive, true));
-    else if (status === "inactive")
-      conditions.push(eq(products.isActive, false));
-    else if (hasComplianceColumns && (status === "draft" || status === "archived"))
-      conditions.push(eq(products.lifecycleStatus, status));
+    const match = productFilterPredicate(view === "grouped" ? "member" : "products", storeId, filters, hasComplianceColumns,
+      view === "grouped" && filters.q?.trim() ? or(accentInsensitiveLike(products.name, filters.q.trim()), accentInsensitiveLike(products.sku, filters.q.trim())) : undefined);
+    if (view === "grouped") {
+      conditions.push(sql`${products.parentProductId} is null`);
+      if (hasRelatedProducts && groupRelated) conditions.push(sql`(${products.relatedProductId} is null or ${products.relatedProductId} = ${products.id}
+        or not exists (select 1 from products root where root.store_id = ${storeId} and root.id = ${products.relatedProductId}))`);
+      conditions.push(sql`exists (select 1 from products member where ${actualMember} and ${match})`);
+    } else {
+      conditions.push(eq(products.isVariantParent, false), match);
+    }
   }
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
+  const groupStockForSort = view === "grouped" && !exactProductId && !internal.productIds
+    ? sql`(select case when count(distinct member.base_unit) <= 1 then coalesce(sum(group_stock.quantity), 0) else null end
+        from products member left join stock_levels group_stock on group_stock.product_id = member.id and group_stock.store_id = ${storeId}
+          ${filters.warehouseId ? sql`and group_stock.warehouse_id = ${filters.warehouseId}` : sql``}
+        where ${actualMember})`
+    : sql`coalesce(sum(${stockLevels.quantity}), 0)`;
 
   const [rows, [{ total }]] = await Promise.all([
     db
@@ -356,12 +309,12 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
       .from(products)
       .leftJoin(categories, eq(products.categoryId, categories.id))
       .leftJoin(brands, eq(products.brandId, brands.id))
-      .leftJoin(stockLevels, eq(stockLevels.productId, products.id))
+      .leftJoin(stockLevels, stockJoin)
       .where(where)
       .groupBy(products.id, categories.name, brands.name)
       .orderBy(
         sort === "stock"
-          ? desc(products.totalStock)
+          ? sql`${groupStockForSort} desc nulls last`
           : sort === "updated"
             ? desc(products.updatedAt)
             : asc(products.name),
@@ -447,7 +400,7 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
           .from(products)
           .leftJoin(categories, eq(products.categoryId, categories.id))
           .leftJoin(brands, eq(products.brandId, brands.id))
-          .leftJoin(stockLevels, eq(stockLevels.productId, products.id))
+          .leftJoin(stockLevels, stockJoin)
           .where(and(eq(products.storeId, storeId), inArray(products.parentProductId, parentIds)))
           .groupBy(products.id, categories.name, brands.name)
           .orderBy(
@@ -486,7 +439,7 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
   }
 
   const stockLocationRows =
-    physicalProductIds.length > 0
+    physicalProductIds.length > 0 && internal.includeDetails !== false
       ? await db
           .select({
             productId: stockLevels.productId,
@@ -546,7 +499,7 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
   }
 
   const movementRows =
-    physicalProductIds.length > 0
+    physicalProductIds.length > 0 && internal.includeDetails !== false
       ? await db
           .select({
             id: stockMovements.id,
@@ -616,7 +569,7 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
     );
   }
 
-  const relatedLookup = buildRelatedProductLookup(hasRelatedProducts, rows);
+  const relatedLookup = internal.includeDetails === false ? null : buildRelatedProductLookup(hasRelatedProducts, rows);
   const relatedWhere = relatedLookup
     ? or(
         inArray(products.relatedProductId, relatedLookup.groupKeys),
@@ -643,11 +596,10 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
           reservedStock: sql<string>`coalesce(sum(${stockLevels.reserved}), 0)`,
         })
         .from(products)
-        .leftJoin(stockLevels, eq(stockLevels.productId, products.id))
+        .leftJoin(stockLevels, stockJoin)
         .where(and(eq(products.storeId, storeId), relatedWhere))
         .groupBy(products.id)
         .orderBy(asc(products.sku))
-        .limit(240)
     : [];
 
   return {
@@ -671,6 +623,70 @@ export async function getProducts(storeId: string, filters: ProductListFilters =
   };
 }
 
+type BaseProductListResult = Awaited<ReturnType<typeof getBaseProducts>>;
+type BaseProductListRow = BaseProductListResult["rows"][number];
+export type ProductVariantGroup = ReturnType<typeof projectVariantGroup<BaseProductListRow>>;
+export type ProductListRow = BaseProductListRow & {
+  variantGroup?: ProductVariantGroup;
+  combinationKey?: string;
+  optionValueIds?: string[];
+};
+export type ProductListResult = Omit<BaseProductListResult, "rows"> & { rows: ProductListRow[] };
+
+export async function getProducts(storeId: string, filters: ProductListFilters = {}): Promise<ProductListResult> {
+  const result = await getBaseProducts(storeId, filters);
+  if (!result.rows.length) return { ...result, rows: [] };
+  const hasRelated = await hasProductRelatedColumn();
+  const keys = [...new Set(result.rows.map((row) => row.parentProductId ?? row.relatedProductId ?? row.id))];
+  const coordinates = await db.select({
+    id: products.id, name: products.name, parentProductId: products.parentProductId,
+    relatedProductId: hasRelated ? products.relatedProductId : sql<string | null>`null`,
+    isVariantParent: products.isVariantParent,
+  }).from(products).where(and(eq(products.storeId, storeId), or(
+    inArray(products.id, keys), inArray(products.parentProductId, keys),
+    hasRelated ? inArray(products.relatedProductId, keys) : undefined,
+  )));
+  const available = await db.execute<{ present: boolean }>(sql`select to_regclass('public.product_variant_groups') is not null as present`);
+  const storedGroups = available.rows[0]?.present ? (await db.execute<StoredVariantGroup>(sql`select id, kind, attributes, excluded_combination_keys as "excludedCombinationKeys", revision, requires_review as "requiresReview"
+    from product_variant_groups where store_id = ${storeId} and ${inArray(sql`id`, keys)}`)).rows : [];
+  const groupRoots = coordinates.filter((candidate) => keys.includes(candidate.id) && (candidate.isVariantParent
+    || storedGroups.some((group) => group.id === candidate.id)
+    || coordinates.some((member) => member.relatedProductId === candidate.id && member.id !== candidate.id)));
+  if (!groupRoots.length) return { ...result, rows: result.rows };
+  const rootIds = groupRoots.map((root) => root.id);
+  const batchIds = coordinates.filter((candidate) => rootIds.includes(candidate.id)
+    || rootIds.includes(candidate.parentProductId ?? "") || rootIds.includes(candidate.relatedProductId ?? "")).map((candidate) => candidate.id);
+  const [batch, catalogResult] = await Promise.all([
+    getBaseProducts(storeId, { status: "all", view: "flat", warehouseId: filters.warehouseId }, { productIds: batchIds, includeDetails: false }),
+    db.execute<{ id: string; name: string; aliases: string[] }>(sql`select a.id, a.name,
+      coalesce((select json_agg(alias.name_key) from product_attribute_aliases alias where alias.store_id = a.store_id and alias.attribute_id = a.id), '[]'::json) as aliases
+      from product_attributes a where a.store_id = ${storeId}`),
+  ]);
+  let storedMembers: (StoredVariantMember & { groupId: string })[] = [];
+  if (available.rows[0]?.present) {
+    const members = await db.execute<StoredVariantMember & { groupId: string }>(sql`select group_id as "groupId", product_id as "productId", combination_key as "combinationKey", option_value_ids as "optionValueIds"
+        from product_variant_members where store_id = ${storeId} and ${inArray(sql`group_id`, rootIds)}`);
+    storedMembers = members.rows;
+  }
+  const groups = new Map<string, ProductVariantGroup>();
+  for (const root of groupRoots) {
+    const kind = root.isVariantParent ? "native" : "related";
+    const rootRow = batch.rows.find((member) => member.id === root.id);
+    const members = batch.rows.filter((member) => !member.isVariantParent && (kind === "native"
+      ? member.parentProductId === root.id : member.id === root.id || member.relatedProductId === root.id))
+      .map((member) => ({ ...member, description: member.description?.trim() ? member.description : rootRow?.description ?? member.description }));
+    if (!members.length) continue;
+    groups.set(root.id, projectVariantGroup({ id: root.id, name: root.name, kind, members,
+      catalog: catalogResult.rows as VariantCatalogEntry[], stored: storedGroups.find((group) => group.id === root.id),
+      identities: storedMembers.filter((member) => member.groupId === root.id) }));
+  }
+  return { ...result, rows: result.rows.map((row) => {
+    const group = groups.get(row.parentProductId ?? row.relatedProductId ?? row.id);
+    const identity = group?.members.find((member) => member.id === row.id);
+    return { ...row, description: identity?.description ?? row.description, combinationKey: identity?.combinationKey, optionValueIds: identity?.optionValueIds, variantGroup: group };
+  }) };
+}
+
 export async function getProductListItem(storeId: string, id: string) {
   const result = await getProducts(storeId, {
     exactProductId: id,
@@ -681,6 +697,22 @@ export async function getProductListItem(storeId: string, id: string) {
   });
   return result.rows[0] ?? null;
 }
+
+export async function getProduct(storeId: string, id: string) {
+  const [product, listRow] = await Promise.all([getBaseProduct(storeId, id), getProductListItem(storeId, id)]);
+  if (!product) return null;
+  let description = product.description?.trim() ? product.description : listRow?.description ?? product.description;
+  if (!description?.trim() && listRow?.variantGroup) {
+    const actualRoot = listRow.variantGroup.members.find((member) => member.id === listRow.variantGroup?.id);
+    description = actualRoot?.description ?? description;
+    if (!description?.trim() && listRow.variantGroup.kind === "native" && listRow.variantGroup.id !== id) {
+      description = (await getBaseProduct(storeId, listRow.variantGroup.id))?.description ?? description;
+    }
+  }
+  return { ...product, description, relatedProductId: listRow?.relatedProductId ?? null,
+    variantGroup: listRow?.variantGroup, combinationKey: listRow?.combinationKey, optionValueIds: listRow?.optionValueIds };
+}
+export type ProductDetail = NonNullable<Awaited<ReturnType<typeof getProduct>>>;
 
 export async function getMobileProducts(storeId: string, filters: ProductListFilters = {}) {
   // Keep mobile and web on the same grouped variant projection.
@@ -716,7 +748,7 @@ export async function getMobileProductOptions(storeId: string) {
 }
 
 /** Chi tiết 1 SP cho trang xem/sửa (gồm đơn vị quy đổi + tồn kho). */
-export async function getProduct(storeId: string, id: string) {
+async function getBaseProduct(storeId: string, id: string) {
   const complianceFields = productComplianceFields(
     await hasProductComplianceColumns(),
   );
@@ -892,7 +924,7 @@ export async function getProduct(storeId: string, id: string) {
     })),
   };
 }
-export type ProductDetail = NonNullable<Awaited<ReturnType<typeof getProduct>>>;
+
 
 // Danh mục/thương hiệu/NCC cho dropdown — cache 60s (ít thay đổi), dùng chung
 // nhiều trang (Sản phẩm, Thiết lập giá, Tồn kho) → đỡ query lặp.
@@ -951,7 +983,7 @@ export const getProductFormOptions = unstable_cache(
   { revalidate: 60 },
 );
 
-export type ProductListResult = Awaited<ReturnType<typeof getProducts>>;
+
 export type ProductFormOptions = Awaited<
   ReturnType<typeof getProductFormOptions>
 >;

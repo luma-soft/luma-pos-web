@@ -16,7 +16,7 @@ export function AttributeCatalogDialog({ attributes, create, draftAttributeIds, 
   draftAttributeIds: Set<string>;
   onClose: () => void;
   onChanged: () => Promise<void>;
-  onCreated: (name: string) => void;
+  onCreated: (name: string, attributeId: string) => void;
 }) {
   const t = useTranslations();
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -65,7 +65,7 @@ export function AttributeCatalogDialog({ attributes, create, draftAttributeIds, 
         const result = await createProductAttribute(name);
         if (!result.ok) { setError(result.error); return; }
         await onChanged();
-        onCreated(result.data.name);
+        onCreated(result.data.name, result.data.id);
         if (create) onClose();
         else open({ kind: "list" });
       } else {

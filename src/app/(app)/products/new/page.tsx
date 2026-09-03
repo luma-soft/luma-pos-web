@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getProduct, getProductFormOptions } from "@/lib/data/products";
 import { getPriceBooks, getPriceOverridesForProducts } from "@/lib/data/price-books";
 import { NewProductForm } from "./product-form";
-import { productToFormInitialValues } from "../product-form-values";
+import { productToFormInitialValues, resolveProductFormSeed } from "../product-form-values";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { getPublicMediaConfig } from "@/lib/media/config";
 
@@ -26,11 +26,14 @@ export default async function NewProductPage({ searchParams }: Props) {
   const seedId = copyFrom ?? sameTypeAs;
   if (seedId && !UUID_RE.test(seedId)) notFound();
 
-  const [options, priceBooks, seedProduct] = await Promise.all([
+  const [options, priceBooks, requestedProduct] = await Promise.all([
     getProductFormOptions(context.storeId),
     getPriceBooks(context.storeId),
     seedId ? getProduct(context.storeId, seedId) : Promise.resolve(null),
   ]);
+  if (seedId && !requestedProduct) notFound();
+  const seedMode = copyFrom ? "copy" : "sameType";
+  const seedProduct = requestedProduct ? await resolveProductFormSeed(requestedProduct, seedMode, (productId) => getProduct(context.storeId, productId)) : null;
   if (seedId && !seedProduct) notFound();
   const priceOverridesByBook = seedProduct ? await getPriceOverridesForProducts(context.storeId, [seedProduct.id]) : {};
   const priceBookPrices = Object.fromEntries(
@@ -46,7 +49,8 @@ export default async function NewProductPage({ searchParams }: Props) {
       suppliers={options.suppliers}
       comboProducts={options.comboProducts}
       priceBooks={priceBooks}
-      initialValues={seedProduct ? productToFormInitialValues(seedProduct, copyFrom ? "copy" : "sameType", priceBookPrices, publicMedia) : undefined}
+      initialValues={seedProduct ? productToFormInitialValues(seedProduct, seedMode, priceBookPrices, publicMedia) : undefined}
+      variantGroup={seedProduct?.variantGroup}
       initialManagedImages={undefined}
       aiPreview={aiPreview}
       creationKind={seedProduct?.productKind ?? creationKind}

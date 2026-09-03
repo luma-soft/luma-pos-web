@@ -1554,7 +1554,7 @@
     "directSale": "Direct sale",
     "tabs": {
       "info": "Info",
-      "description": "Description",
+      "description": "Description & notes",
       "variants": "Units & attributes"
     },
     "fields": {
@@ -1606,8 +1606,8 @@
       "warrantyDesc": "Product warranty configuration",
       "units": "Units of measure",
       "unitsDesc": "Add units like bottle, pack, case",
-      "attributes": "Product attributes",
-      "attributesDesc": "Add traits like color, size, surface, pressure..."
+      "attributes": "Variant attributes",
+      "attributesDesc": "Choose options such as version, color or capacity. Each combination is a SKU."
     },
     "pricing": {
       "costPrice": "Cost price",
@@ -1831,7 +1831,27 @@
         "units": "Units",
         "directSale": "Direct sale",
         "attributes": "Attributes"
-      }
+      },
+      "invalidAttributes": "Attributes are duplicated or invalid.",
+      "invalidValues": "Attribute values are empty, duplicated or invalid.",
+      "tooMany": "A maximum of 200 new combinations can be saved at once; existing SKUs are retained.",
+      "invalidExclusions": "Excluded combinations are invalid.",
+      "invalidCombination": "Variant combination does not match the attributes or is duplicated.",
+      "existingStock": "Opening stock applies only to new SKUs. Adjust existing stock separately.",
+      "missingCombinations": "Some combinations have no SKU. Enter them or explicitly exclude them.",
+      "emptyGroup": "At least one SKU is required in the variant group.",
+      "requestConflict": "This request was saved with different data. Reload before continuing.",
+      "invalidGroup": "A valid variant group was not found.",
+      "groupChanged": "The group changed elsewhere. Reload to retain the latest data.",
+      "keepExisting": "Existing SKUs cannot be removed from the group by this operation.",
+      "assignExisting": "Assign the existing SKU to a combination before adding variants.",
+      "keepIdentity": "This changes an existing SKU combination. Keep its values or create a new SKU.",
+      "keepUnit": "Keep the existing SKU base unit in the group editor.",
+      "stockPerSku": "Enter opening stock per SKU. Update the app to create multiple variants.",
+      "useGroupEditor": "Use the variant group editor to change attributes. Individual descriptions cannot be copied in bulk.",
+      "selectSku": "Select a SKU before performing an inventory action.",
+      "barcodeExists": "The barcode is already in use. Each SKU needs its own barcode.",
+      "unitBarcodePerSku": "Set unit barcodes individually on each SKU after creating the group."
     },
     "errors": {
       "skuExists": "SKU already exists — choose another.",

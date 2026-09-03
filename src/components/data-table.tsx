@@ -171,6 +171,7 @@ export function DataTableShell<T>({
   columns,
   getRowId,
   renderExpanded,
+  renderFollowingRows,
   renderDetail,
   detailTitle,
   detailSubtitle,
@@ -203,6 +204,8 @@ export function DataTableShell<T>({
   getRowId: (row: T) => string;
   /** Chỉ dùng cho nội dung phân cấp nằm ngay dưới dòng (ví dụ nhóm hàng cha-con). */
   renderExpanded?: (row: T) => ReactNode;
+  /** Additional sibling <tr> elements, using the active columns so group members stay aligned. */
+  renderFollowingRows?: (row: T, columns: DataTableColumn<T>[]) => ReactNode;
   /** Nội dung xem chi tiết của dòng; luôn hiển thị trong modal. */
   renderDetail?: (row: T) => ReactNode;
   detailTitle?: (row: T) => ReactNode;
@@ -582,6 +585,7 @@ export function DataTableShell<T>({
                           </td>
                         </tr>
                       )}
+                      {renderFollowingRows?.(row, visibleColumns)}
                     </Fragment>
                   );
                 })}

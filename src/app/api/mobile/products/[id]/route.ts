@@ -6,6 +6,8 @@ import {
   updateProductStock,
 } from "@/lib/actions/products";
 import { getProduct } from "@/lib/data/products";
+import { saveProductVariantGroup } from "@/lib/actions/product-variants";
+import type { CreateProductInput } from "@/app/(app)/products/new/schema";
 import { requireMobileStockAccess } from "@/lib/mobile/auth";
 import {
   mobileAction,
@@ -42,6 +44,9 @@ export async function PATCH(
   }
 
   const action = (body as Record<string, unknown>).action;
+  if (action === "save-variants") {
+    return mobileAction(await saveProductVariantGroup({ ...(body as CreateProductInput), variantGroupId: id }));
+  }
   if (action === "set-active") {
     const isActive = (body as Record<string, unknown>).isActive;
     if (typeof isActive !== "boolean") {

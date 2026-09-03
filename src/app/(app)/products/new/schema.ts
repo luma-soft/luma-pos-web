@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { imageMediaIdsSchema } from "@/lib/products/product-media-schema";
 import { stockQuantitySchema } from "@/lib/products/stock-adjustment";
+import { validateVariantSubmission, variantCombinationBudget, VariantValidationError } from "@/lib/products/variant-model";
 
 export const productUnitSchema = z.object({
   id: z.uuid().optional(),
@@ -11,12 +12,18 @@ export const productUnitSchema = z.object({
 });
 
 export const productAttributeSchema = z.object({
+  attributeId: z.string().min(1).optional(),
+  valueIds: z.array(z.string().min(1)).optional(),
   name: z.string().min(1, { error: "validation.required" }),
   values: z.array(z.string()).default([]),
   createsVariants: z.boolean().default(false),
 });
 
 export const productVariantChildSchema = z.object({
+  productId: z.uuid().optional(),
+  combinationKey: z.string().optional(),
+  optionValueIds: z.array(z.string()).optional(),
+  currentStock: z.number().optional(),
   variantName: z.string().min(1, { error: "validation.required" }),
   sku: z.string().optional(),
   barcode: z.string().optional(),
@@ -105,6 +112,12 @@ export const createProductSchema = z.object({
   // Attributes (replaces VLXD section)
   attributes: z.array(productAttributeSchema).default([]),
   variantChildren: z.array(productVariantChildSchema).default([]),
+  variantContractVersion: z.literal(2).optional(),
+  variantGroupId: z.uuid().optional(),
+  variantOperation: z.enum(["create", "edit", "add"]).default("create"),
+  variantRevision: z.number().int().min(0).optional(),
+  excludedCombinationKeys: z.array(z.string()).default([]),
+  requestId: z.uuid().optional(),
   comboItems: z.array(productComboItemSchema).default([]),
   applyToSiblings: siblingApplySchema.default({ enabled: false, fields: [] }),
 
@@ -114,6 +127,27 @@ export const createProductSchema = z.object({
 
   directSale: z.boolean().default(true),
 }).superRefine((value, ctx) => {
+  const hasVariants = value.variantChildren.length > 0 || value.variantGroupId || value.attributes.some((a) => value.variantContractVersion === 2 ? a.createsVariants : a.values.length > 1);
+  if (hasVariants) {
+    try {
+      validateVariantSubmission({
+        attributes: value.variantContractVersion === 2 ? value.attributes : value.attributes.map((a) => ({ ...a, createsVariants: true })),
+        children: value.variantChildren,
+        excludedCombinationKeys: value.excludedCombinationKeys,
+        allowPartial: value.variantOperation === "add",
+        // Preliminary client-shape validation only; the writer derives the
+        // authoritative budget from the locked group's persisted members.
+        maxCombinations: value.variantGroupId
+          ? variantCombinationBudget(new Set(value.variantChildren.flatMap((child) => child.productId ? [child.productId] : [])).size, value.excludedCombinationKeys.length)
+          : undefined,
+      });
+    } catch (error) {
+      ctx.addIssue({ code: "custom", path: ["variantChildren"], message: error instanceof VariantValidationError ? error.code : "errors.invalidData" });
+    }
+  }
+  if (value.variantContractVersion === 2 && hasVariants && !value.requestId) {
+    ctx.addIssue({ code: "custom", path: ["requestId"], message: "errors.invalidData" });
+  }
   if (value.productKind === "combo" && value.comboItems.length === 0) {
     ctx.addIssue({
       code: "custom",

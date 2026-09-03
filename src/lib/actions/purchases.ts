@@ -68,10 +68,12 @@ export async function createPurchase(
         id: products.id,
         name: products.name,
         sku: products.sku,
+        isVariantParent: products.isVariantParent,
         trackBatches: products.trackBatches,
         shelfLifeDays: products.shelfLifeDays,
       }).from(products).where(and(eq(products.storeId, gate.storeId), inArray(products.id, ids)));
       if (found.length !== new Set(ids).size) throw new Error("PRODUCT_NOT_FOUND");
+      if (found.some((product) => product.isVariantParent)) throw new Error("PRODUCT_VARIANT_PARENT");
       const batchValidation = validateReceiptBatchLines({ products: found, items: v.items });
       if (!batchValidation.ok) throw new Error(batchValidation.error);
 
@@ -228,6 +230,7 @@ export async function createPurchase(
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
     if (msg === "PRODUCT_NOT_FOUND") return { ok: false, error: "errors.invalidData" };
+    if (msg === "PRODUCT_VARIANT_PARENT") return { ok: false, error: "products.variants.selectSku" };
     if (msg.startsWith("purchases.errors.")) return { ok: false, error: msg };
     console.error("createPurchase failed:", e);
     return { ok: false, error: "errors.serverError" };
@@ -261,10 +264,12 @@ export async function updatePurchase(
         id: products.id,
         name: products.name,
         sku: products.sku,
+        isVariantParent: products.isVariantParent,
         trackBatches: products.trackBatches,
         shelfLifeDays: products.shelfLifeDays,
       }).from(products).where(and(eq(products.storeId, gate.storeId), inArray(products.id, ids)));
       if (found.length !== new Set(ids).size) throw new Error("PRODUCT_NOT_FOUND");
+      if (found.some((product) => product.isVariantParent)) throw new Error("PRODUCT_VARIANT_PARENT");
       const batchValidation = validateReceiptBatchLines({ products: found, items: v.items });
       if (!batchValidation.ok) throw new Error(batchValidation.error);
 
@@ -548,6 +553,7 @@ export async function updatePurchase(
       PURCHASE_NOT_FOUND: "purchases.errors.notFound",
       NOT_EDITABLE: "purchases.errors.notEditable",
       PRODUCT_NOT_FOUND: "errors.invalidData",
+      PRODUCT_VARIANT_PARENT: "products.variants.selectSku",
       BATCH_ALREADY_CONSUMED: "purchases.errors.batchAlreadyConsumed",
       "purchases.errors.batchRequired": "purchases.errors.batchRequired",
       "purchases.errors.expiryRequired": "purchases.errors.expiryRequired",

@@ -4,6 +4,7 @@ import {
   getMobileProducts,
 } from "@/lib/data/products";
 import type { ProductListView, ProductStatusFilter } from "@/lib/data/products";
+import { parseProductListSort } from "@/lib/inventory/product-list-policy";
 import {
   requireMobileStockAccess,
   requireMobileStockReadAccess,
@@ -27,9 +28,16 @@ export async function GET(request: Request) {
       categoryId: searchParam(request, "categoryId"),
       brandId: searchParam(request, "brandId"),
       supplierId: searchParam(request, "supplierId"),
+      categoryIds: searchParam(request, "categoryIds")?.split(",").filter(Boolean),
+      brandIds: searchParam(request, "brandIds")?.split(",").filter(Boolean),
+      supplierIds: searchParam(request, "supplierIds")?.split(",").filter(Boolean),
+      warehouseId: searchParam(request, "warehouseId"),
+      stock: searchParam(request, "stock") as "instock" | "low" | "out" | undefined,
+      sort: parseProductListSort(searchParam(request, "sort")),
       productKind: searchParam(request, "productKind") as "product" | "service" | "combo" | undefined,
-      status: searchParam(request, "status") as ProductStatusFilter | undefined,
+      status: (searchParam(request, "status") ?? searchParam(request, "lifecycle")) as ProductStatusFilter | undefined,
       view: searchParam(request, "view") as ProductListView | undefined,
+      groupRelated: searchParam(request, "variantContractVersion") === "2",
       updatedSince: searchParam(request, "updatedSince"),
       page: numberParam(request, "page", 1),
       pageSize: numberParam(request, "pageSize", 50),

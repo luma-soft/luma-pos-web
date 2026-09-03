@@ -26,6 +26,7 @@ type ProductSelectionContextValue = {
   selectedVisibleIds: string[];
   allSelected: boolean;
   toggle: (id: string) => void;
+  toggleMany: (ids: string[]) => void;
   toggleAll: () => void;
   replace: (ids: Set<string>) => void;
 };
@@ -77,6 +78,18 @@ export function ProductSelectionProvider({
     );
   }
 
+  function toggleMany(ids: string[]) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      const remove = ids.every((id) => current.has(id));
+      for (const id of ids) {
+        if (remove) next.delete(id);
+        else next.add(id);
+      }
+      return next;
+    });
+  }
+
   return (
     <ProductSelectionContext.Provider
       value={{
@@ -84,6 +97,7 @@ export function ProductSelectionProvider({
         selectedVisibleIds,
         allSelected,
         toggle,
+        toggleMany,
         toggleAll,
         replace: setSelectedIds,
       }}

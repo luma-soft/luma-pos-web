@@ -2,6 +2,7 @@
 
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -19,6 +20,7 @@ import {
   Ban,
   Barcode,
   ChevronLeft,
+  ChevronDown,
   ChevronRight,
   Copy,
   ImageIcon,
@@ -26,6 +28,7 @@ import {
   PackagePlus,
   Pencil,
   Plus,
+  Search,
   Store,
   Trash2,
   X,
@@ -57,6 +60,7 @@ import {
   productStockDisplay,
 } from "@/lib/product-stock";
 import { useProductSelection } from "./product-selection";
+import { matchesProductVariant, productVariantLabel, selectableProductIds } from "@/lib/products/variant-presentation";
 
 type ProductRow = ProductListResult["rows"][number];
 type StockMovementRow = ProductRow["stockMovements"][number];
@@ -112,6 +116,7 @@ export function buildProductUnitColumns({
   labels,
   selectedUnitName,
   onUnitChange,
+  grouped = false,
 }: {
   labels: {
     units: string;
@@ -122,11 +127,13 @@ export function buildProductUnitColumns({
   };
   selectedUnitName: (product: ProductRow) => string;
   onUnitChange: (product: ProductRow, unitName: string) => void;
+  grouped?: boolean;
 }): DataTableColumn<ProductRow>[] {
   const projection = (product: ProductRow) =>
     unitProjection(product, selectedUnitName(product));
 
   const costRange = (product: ProductRow) => {
+    if (grouped && product.variantGroup) return `Từ ${formatCurrency(Number(product.variantGroup.minCostPrice))}`;
     const projected = projection(product);
     if (!product.isVariantParent) return formatCurrency(projected.costPrice);
     return priceRange(
@@ -137,6 +144,7 @@ export function buildProductUnitColumns({
   };
 
   const retailRange = (product: ProductRow) => {
+    if (grouped && product.variantGroup) return `Từ ${formatCurrency(Number(product.variantGroup.minRetailPrice))}`;
     const selectedName = selectedUnitName(product);
     const projected = unitProjection(product, selectedName);
     if (!product.isVariantParent) return formatCurrency(projected.retailPrice);
@@ -162,7 +170,9 @@ export function buildProductUnitColumns({
       key: "units",
       label: labels.units,
       defaultVisible: true,
-      render: (product) => (
+      render: (product) => grouped && product.variantGroup ? (
+        <span className="text-slate-500">{product.variantGroup.totalStock === null ? "Nhiều đơn vị" : product.baseUnit}</span>
+      ) : (
         <ProductUnitSelector
           productName={product.name}
           baseUnit={product.baseUnit}
@@ -177,9 +187,12 @@ export function buildProductUnitColumns({
       label: labels.cost,
       defaultVisible: true,
       align: "right",
+      cellClassName: "!overflow-visible !whitespace-normal tabular-nums",
       render: costRange,
       sortValue: (product) =>
-        product.isVariantParent
+        grouped && product.variantGroup
+          ? Number(product.variantGroup.minCostPrice)
+          : product.isVariantParent
           ? Number(product.minCostPrice) * projection(product).multiplier
           : projection(product).costPrice,
     },
@@ -188,7 +201,7 @@ export function buildProductUnitColumns({
       label: labels.salePrice,
       defaultVisible: true,
       align: "right",
-      cellClassName: "font-semibold",
+      cellClassName: "font-semibold !overflow-visible !whitespace-normal tabular-nums",
       render: retailRange,
       sortValue: (product) => {
         const selectedName = selectedUnitName(product);
@@ -198,7 +211,9 @@ export function buildProductUnitColumns({
           unit?.priceOverride !== null
           && unit?.priceOverride !== undefined
           && Number.isFinite(Number(unit.priceOverride));
-        return product.isVariantParent && !hasOverride
+        return grouped && product.variantGroup
+          ? Number(product.variantGroup.minRetailPrice)
+          : product.isVariantParent && !hasOverride
           ? Number(product.minRetailPrice) * projected.multiplier
           : projected.retailPrice;
       },
@@ -219,6 +234,9 @@ export function buildProductUnitColumns({
           : "font-semibold text-slate-700 dark:text-slate-300";
       },
       render: (product) => {
+        if (grouped && product.variantGroup) {
+          return <span className="block whitespace-normal"><span className="block text-[10px] font-normal text-slate-500">Tổng tồn</span>{product.variantGroup.totalStock === null ? "Khác đơn vị" : `${formatNumber(Number(product.variantGroup.totalStock))} ${product.baseUnit}`}</span>;
+        }
         const projected = projection(product);
         return productStockDisplay(
           {
@@ -229,7 +247,9 @@ export function buildProductUnitColumns({
           labels.stockNotTracked,
         );
       },
-      sortValue: (product) => projection(product).totalStock,
+      sortValue: (product) => grouped && product.variantGroup
+        ? Number(product.variantGroup.totalStock ?? Number.POSITIVE_INFINITY)
+        : projection(product).totalStock,
     },
   ];
 }
@@ -238,18 +258,87 @@ export function ProductsTable({
   rows,
   resetScrollKey,
   selectionEnabled = true,
+  grouped = true,
   empty,
 }: {
   rows: ProductListResult["rows"];
   resetScrollKey?: string | number;
   selectionEnabled?: boolean;
+  grouped?: boolean;
   empty?: ReactNode;
 }) {
   const t = useTranslations();
   const router = useRouter();
-  const { selectedIds, selectedVisibleIds, allSelected, toggle, toggleAll } =
+  const params = useSearchParams();
+  const { selectedIds, selectedVisibleIds, allSelected, toggle, toggleMany, toggleAll } =
     useProductSelection();
   const [selectedUnits, setSelectedUnits] = useState<Record<string, string>>({});
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [groupSearch, setGroupSearch] = useState<Record<string, string>>({});
+  const [allVariants, setAllVariants] = useState<Record<string, boolean>>({});
+  const query = params.get("q") ?? "";
+  const expansionStorageKey = `luma:products:variants:${resetScrollKey ?? "default"}`;
+
+  useEffect(() => {
+    let active = true;
+    queueMicrotask(() => {
+      if (!active) return;
+      try {
+        const stored = JSON.parse(sessionStorage.getItem(expansionStorageKey) ?? "{}");
+        if (stored && typeof stored === "object" && !Array.isArray(stored)) {
+          setExpandedGroups(Object.fromEntries(Object.entries(stored).filter((entry): entry is [string, boolean] => typeof entry[1] === "boolean")));
+        }
+      } catch { /* Expansion state is an optional preference. */ }
+    });
+    return () => { active = false; };
+  }, [expansionStorageKey]);
+
+  const groupOf = (product: ProductRow) => grouped ? product.variantGroup : undefined;
+  const isExpanded = (product: ProductRow) => expandedGroups[product.id]
+    ?? Boolean(query.trim() && groupOf(product)?.members.some((member) => matchesProductVariant(member, query)));
+  const selectionIds = (product: ProductRow) => selectableProductIds(product, grouped);
+  const selected = (product: ProductRow) => {
+    const ids = selectionIds(product);
+    return ids.length > 0 && ids.every((id) => selectedIds.has(id));
+  };
+  const partiallySelected = (product: ProductRow) => !selected(product)
+    && selectionIds(product).some((id) => selectedIds.has(id));
+  const toggleProduct = (product: ProductRow) => toggleMany(selectionIds(product));
+
+  function toggleGroup(product: ProductRow) {
+    const next = { ...expandedGroups, [product.id]: !isExpanded(product) };
+    setExpandedGroups(next);
+    try { sessionStorage.setItem(expansionStorageKey, JSON.stringify(next)); } catch { /* Optional preference. */ }
+  }
+
+  function membersFor(product: ProductRow) {
+    const search = groupSearch[product.id] ?? "";
+    const members = groupOf(product)?.members.filter((member) => matchesProductVariant(member, search, { includeProductName: false })) ?? [];
+    if (query.trim()) members.sort((a, b) => Number(matchesProductVariant(b, query)) - Number(matchesProductVariant(a, query)));
+    return {
+      members: allVariants[product.id] ? members : members.slice(0, 8),
+      total: members.length,
+    };
+  }
+
+  function groupControls(product: ProductRow) {
+    const group = groupOf(product);
+    if (!group) return null;
+    const search = groupSearch[product.id] ?? "";
+    const { total, members } = membersFor(product);
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5 text-xs" onClick={stopRowToggle}>
+        <div className="relative min-w-48 flex-1 lg:max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input type="search" value={search} onChange={(event) => setGroupSearch((current) => ({ ...current, [product.id]: event.target.value }))} placeholder="Tìm SKU hoặc thuộc tính trong nhóm" aria-label={`Tìm biến thể ${product.name}`} className="min-h-11 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-600 lg:min-h-9" />
+        </div>
+        <span aria-live="polite" className="text-slate-500">{members.length} / {group.count} biến thể</span>
+        {members.length < total && <button type="button" onClick={() => setAllVariants((current) => ({ ...current, [product.id]: true }))} className="min-h-11 font-semibold text-primary-600 hover:underline lg:min-h-9">Xem tất cả {total} biến thể</button>}
+        {allVariants[product.id] && total > 8 && <button type="button" onClick={() => setAllVariants((current) => ({ ...current, [product.id]: false }))} className="min-h-11 font-semibold text-primary-600 hover:underline lg:min-h-9">Hiện ít hơn</button>}
+        <Link href={`${Routes.Inventory}?tab=products&productModal=groupAdd&sameTypeAs=${encodeURIComponent(group.id)}`} className="inline-flex min-h-11 items-center gap-1 font-semibold text-primary-600 hover:underline lg:min-h-9"><Plus className="h-4 w-4" />Thêm biến thể</Link>
+      </div>
+    );
+  }
 
   const selectedUnitName = (product: ProductRow) =>
     selectedUnits[product.id] ?? product.baseUnit;
@@ -280,8 +369,9 @@ export function ProductsTable({
       align: "center",
       render: (product) => (
         <SelectionCheckbox
-          checked={selectedIds.has(product.id)}
-          onChange={() => toggle(product.id)}
+          checked={selected(product)}
+          indeterminate={partiallySelected(product)}
+          onChange={() => toggleProduct(product)}
           label={t("products.bulk.selectProduct", {
             name: product.name,
           })}
@@ -295,11 +385,12 @@ export function ProductsTable({
       width: "30%",
       render: (product) => (
         <div className="flex items-center gap-3">
+          {groupOf(product) && <button type="button" onClick={(event) => { event.stopPropagation(); toggleGroup(product); }} aria-expanded={isExpanded(product)} aria-label={`${isExpanded(product) ? "Thu" : "Mở"} ${groupOf(product)!.count} biến thể ${product.name}`} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-primary-600 hover:bg-primary-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"><ChevronDown className={cn("h-4 w-4 transition-transform", !isExpanded(product) && "-rotate-90")} /></button>}
           <ProductThumbnail product={product} />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1.5">
               <div className="whitespace-normal break-words font-medium text-slate-900 dark:text-slate-100">{product.name}</div>
-              <ProductKindBadge kind={product.productKind} />
+              {groupOf(product) ? <span className="rounded-full bg-primary-50 px-2 py-0.5 text-xs font-semibold text-primary-700">{groupOf(product)!.count} biến thể</span> : <ProductKindBadge kind={product.productKind} />}
             </div>
             <div className="truncate text-xs text-slate-400">{product.sku}{product.barcode ? ` · ${product.barcode}` : ""}</div>
           </div>
@@ -317,8 +408,9 @@ export function ProductsTable({
       },
       selectedUnitName,
       onUnitChange: (product, unitName) => changeUnit(product.id, unitName),
+      grouped,
     }),
-    { key: "status", label: t("products.list.colStatus"), defaultVisible: true, render: (product) => <StatusBadge product={product} /> },
+    { key: "status", label: t("products.list.colStatus"), defaultVisible: true, render: (product) => groupOf(product) ? <span className="text-xs text-slate-500">{groupOf(product)!.members.filter((member) => member.isActive).length} đang bán</span> : <StatusBadge product={product} /> },
   ];
 
   return (
@@ -349,24 +441,49 @@ export function ProductsTable({
         mobileRowClassName="!rounded-none !border-x-0 !border-t-0 last:!border-b-0"
         onRowClick={openProduct}
         rowClassName={(product) =>
-          selectedIds.has(product.id)
+          selected(product)
             ? "bg-primary-50/50 dark:bg-primary-950/20"
             : undefined
         }
+        renderFollowingRows={(product, visibleColumns) => {
+          if (!groupOf(product) || !isExpanded(product)) return null;
+          const { members, total } = membersFor(product);
+          return <Fragment>
+            {members.map((member) => {
+              const child: ProductRow = { ...member, variantGroup: undefined };
+              return <tr key={`${product.id}:${child.id}`} className={cn("border-t border-border-soft bg-primary-50/20 hover:bg-primary-50/60 dark:bg-primary-950/10", selectedIds.has(child.id) && "bg-primary-50")}>
+                {visibleColumns.map((column) => <td key={column.key} className={cn("px-3 py-2.5 align-middle", column.align === "right" && "text-right tabular-nums", column.align === "center" && "text-center", column.key === "product" && "border-l-2 border-primary-200", typeof column.cellClassName === "function" ? column.cellClassName(child) : column.cellClassName)}>
+                  {column.key === "product" ? <Link href={Routes.productDetail(child.id)} scroll={false} className="flex min-h-11 items-center gap-3 pl-6 font-medium text-slate-900 hover:text-primary-600 dark:text-slate-100"><ProductThumbnail product={child} /><span className="min-w-0"><span className="block whitespace-normal break-words">{productVariantLabel(child)}</span><span className="block break-all text-xs font-normal text-slate-400">{child.sku}</span>{query && matchesProductVariant(child, query) && <span className="text-[10px] font-medium text-primary-600">Khớp tìm kiếm</span>}</span></Link> : column.render(child)}
+                </td>)}
+                <td className="bg-surface" />
+              </tr>;
+            })}
+            {total === 0 && <tr><td colSpan={visibleColumns.length + 1} className="px-4 py-5 text-center text-sm text-slate-500">Không tìm thấy biến thể.</td></tr>}
+            <tr className="border-y border-border-soft bg-primary-50/20"><td colSpan={visibleColumns.length + 1}>{groupControls(product)}</td></tr>
+          </Fragment>;
+        }}
         renderMobileRow={({ row: product }) => (
+          <>
+          {groupOf(product) && <button type="button" onClick={() => toggleGroup(product)} aria-expanded={isExpanded(product)} className="flex min-h-11 w-full items-center justify-between gap-2 bg-primary-50/60 px-3 text-sm font-semibold text-primary-700"><span>{groupOf(product)!.count} biến thể · {groupOf(product)!.totalStock === null ? "Nhiều đơn vị" : `Tổng tồn ${formatNumber(Number(groupOf(product)!.totalStock))} ${product.baseUnit}`}</span><ChevronDown className={cn("h-4 w-4", !isExpanded(product) && "-rotate-90")} /></button>}
           <ProductMobileRow
             product={product}
             selectionEnabled={selectionEnabled}
-            selected={selectedIds.has(product.id)}
+            selected={selected(product)}
             selectLabel={t("products.bulk.selectProduct", {
               name: product.name,
             })}
             stockNotTrackedLabel={t("products.stock.notTracked")}
             selectedUnitName={selectedUnitName(product)}
             onUnitChange={(unitName) => changeUnit(product.id, unitName)}
-            onToggle={() => toggle(product.id)}
+            onToggle={() => toggleProduct(product)}
             onOpen={() => openProduct(product)}
+            groupSummary={Boolean(groupOf(product))}
           />
+          {groupOf(product) && isExpanded(product) && <div className="ml-3 border-l-2 border-primary-200">
+            {membersFor(product).members.map((member) => <ProductMobileRow key={member.id} product={{ ...member, name: productVariantLabel(member), variantGroup: undefined }} selectionEnabled={selectionEnabled} selected={selectedIds.has(member.id)} selectLabel={t("products.bulk.selectProduct", { name: member.name })} stockNotTrackedLabel={t("products.stock.notTracked")} selectedUnitName={selectedUnitName(member)} onUnitChange={(unitName) => changeUnit(member.id, unitName)} onToggle={() => toggle(member.id)} onOpen={() => openProduct(member)} />)}
+            {groupControls(product)}
+          </div>}
+          </>
         )}
       />
     </>
@@ -463,6 +580,7 @@ export function ProductMobileRow({
   onUnitChange,
   onToggle,
   onOpen,
+  groupSummary = false,
 }: {
   product: ProductRow;
   selectionEnabled: boolean;
@@ -473,6 +591,7 @@ export function ProductMobileRow({
   onUnitChange: (unitName: string) => void;
   onToggle: () => void;
   onOpen: () => void;
+  groupSummary?: boolean;
 }) {
   const projected = unitProjection(product, selectedUnitName);
   const selectedUnit = selectedUnitDefinition(product, selectedUnitName);
@@ -480,7 +599,8 @@ export function ProductMobileRow({
     selectedUnit?.priceOverride !== null
     && selectedUnit?.priceOverride !== undefined
     && Number.isFinite(Number(selectedUnit.priceOverride));
-  const retailDisplay = product.isVariantParent && !hasRetailOverride
+  const group = groupSummary ? product.variantGroup : undefined;
+  const retailDisplay = group ? `Từ ${formatCurrency(Number(group.minRetailPrice))}` : product.isVariantParent && !hasRetailOverride
     ? priceRange(
         Number(product.minRetailPrice) * projected.multiplier,
         Number(product.maxRetailPrice) * projected.multiplier,
@@ -516,7 +636,7 @@ export function ProductMobileRow({
                 {retailDisplay}
               </p>
               <span className="inline-flex min-w-0 max-w-full justify-self-start break-words rounded-md bg-primary-50 px-2 py-1 text-[11px] font-semibold tabular-nums text-primary-700 dark:bg-primary-950/60 dark:text-primary-300 sm:col-start-1 sm:row-start-1">
-                {productStockDisplay(
+                {group ? (group.totalStock === null ? "Khác đơn vị" : `Tổng tồn ${formatNumber(Number(group.totalStock))} ${product.baseUnit}`) : productStockDisplay(
                   {
                     ...product,
                     totalStock: projected.totalStock,
@@ -528,7 +648,7 @@ export function ProductMobileRow({
             </div>
           </div>
         </button>
-        {product.unitDefinitions.length > 0 && (
+        {!group && product.unitDefinitions.length > 0 && (
           <div className="px-3 pb-3">
             <ProductUnitSelector
               productName={product.name}
@@ -625,7 +745,12 @@ export function ProductDetailView({
   surface?: "modal" | "page";
 }) {
   const t = useTranslations();
-  const [tab, setTab] = useState<ProductExpandTab>("info");
+  const router = useRouter();
+  const params = useSearchParams();
+  const initialTab = params.get("detailTab") as ProductExpandTab;
+  const [tab, setTab] = useState<ProductExpandTab>(PRODUCT_EXPAND_TABS.includes(initialTab) ? initialTab : "info");
+  const group = product.variantGroup;
+  const needsVariant = Boolean(group && product.isVariantParent);
   const specs = specEntries(product.specs);
   const orderNote = orderNoteFromSpecs(product.specs);
   const effectiveActive = product.isVariantParent
@@ -647,20 +772,30 @@ export function ProductDetailView({
 
   return (
     <div className={cn("bg-canvas px-3 py-3 sm:bg-surface sm:px-4 sm:py-4", surface === "modal" && "flex h-full min-h-0 flex-col", surface === "page" && "sm:rounded-card sm:border sm:border-border-soft")}>
+      {group && <div className="mb-4 shrink-0 rounded-xl border border-primary-100 bg-primary-50/40 p-3 dark:border-primary-900 dark:bg-primary-950/20">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{group.name} <span className="ml-1 text-xs font-medium text-primary-600">{group.count} biến thể</span></p>
+          {!product.isVariantParent && <Link href={`${Routes.Inventory}?tab=products&productModal=groupEdit&productId=${encodeURIComponent(group.id)}`} className="inline-flex min-h-9 items-center text-xs font-semibold text-primary-600 hover:underline">Chỉnh sửa nhóm biến thể</Link>}
+        </div>
+        <label htmlFor={`variant-${product.id}`} className="mb-1 block text-xs font-semibold text-slate-600 dark:text-slate-300">Biến thể đang xem</label>
+        <Select id={`variant-${product.id}`} value={needsVariant ? "" : product.id} options={group.members.map((member) => ({ value: member.id, label: `${productVariantLabel(member)} · ${member.sku} · ${formatCurrency(Number(member.retailPrice))} · Tồn ${formatNumber(Number(member.totalStock))} ${member.baseUnit}` }))} searchable searchPlaceholder="Tìm SKU hoặc thuộc tính" placeholder="Chọn biến thể để xem giá, tồn kho và thao tác" wrapLabel rootClassName="w-full" onValueChange={(id) => { if (id !== product.id) router.replace(`${Routes.productDetail(id)}?detailTab=${tab}`, { scroll: false }); }} />
+        {needsVariant && <p className="mt-2 text-xs text-slate-500">Tổng tồn {group.totalStock === null ? "theo từng đơn vị" : `${formatNumber(Number(group.totalStock))} ${product.baseUnit}`}. Chọn biến thể trước khi xem thẻ kho hoặc nhập hàng.</p>}
+      </div>}
       <div className="-mx-3 flex shrink-0 snap-x snap-mandatory items-center gap-5 overflow-x-auto border-b border-border-soft bg-surface px-3 text-sm font-semibold text-slate-500 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:-mx-4 sm:px-4 lg:mx-0 lg:gap-6 lg:px-0">
         {PRODUCT_EXPAND_TABS.map((key) => (
           <button
             key={key}
             type="button"
             onClick={() => setTab(key)}
+            disabled={needsVariant && (key === "stock" || key === "stockCard")}
             className={cn(
-              "min-h-11 shrink-0 snap-start border-b-2 px-1 pt-2 transition-colors lg:min-h-0 lg:px-0 lg:pb-2 lg:pt-0 min-w-11 lg:min-w-0",
+              "min-h-11 shrink-0 snap-start border-b-2 px-1 pt-2 transition-colors disabled:cursor-not-allowed disabled:opacity-40 lg:min-h-0 lg:px-0 lg:pb-2 lg:pt-0 min-w-11 lg:min-w-0",
               tab === key
                 ? "border-primary-600 text-primary-600"
                 : "border-transparent hover:text-slate-800 dark:hover:text-slate-200",
             )}
           >
-            {t(`products.expand.tabs.${key}`)}
+            {key === "related" && group ? "Biến thể" : t(`products.expand.tabs.${key}`)}
           </button>
         ))}
       </div>
@@ -668,6 +803,7 @@ export function ProductDetailView({
       <div className={cn("pt-3 sm:pt-4", surface === "modal" && "min-h-0 flex-1 overflow-y-auto")}>
         {tab === "info" && (
           <ProductInfoPanel
+            key={product.id}
             product={product}
             imageUrls={product.imageUrls ?? []}
             specs={specs}
@@ -677,13 +813,14 @@ export function ProductDetailView({
         {tab === "description" && (
           <ProductDescriptionPanel product={product} orderNote={orderNote} />
         )}
-        {tab === "stockCard" && <ProductStockCardPanel product={product} />}
-        {tab === "stock" && (
+        {tab === "stockCard" && !needsVariant && <ProductStockCardPanel product={product} />}
+        {tab === "stock" && !needsVariant && (
           <ProductStockPanel
             product={product}
             effectiveActive={effectiveActive}
           />
         )}
+        {needsVariant && (tab === "stock" || tab === "stockCard") && <EmptyPanel message="Chọn một biến thể để xem tồn kho và lịch sử của SKU đó." />}
         {tab === "related" && <RelatedProductsPanel product={product} />}
       </div>
 
@@ -921,40 +1058,7 @@ function ProductInfoPanel({
           </div>
         )}
 
-        {product.children.length > 0 && (
-          <div className="rounded-card border border-border-soft">
-            <div className="border-b border-border-soft px-3 py-2 text-sm font-semibold">
-              {t("products.expand.childSkus")}
-            </div>
-            <div className="divide-y divide-border-soft">
-              {product.children.map((child) => (
-                <Link
-                  key={child.id}
-                  href={Routes.productDetail(child.id)}
-                  className="grid grid-cols-[1fr_auto_auto] gap-3 px-3 py-2 text-sm hover:bg-surface-2 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
-                >
-                  <span className="min-w-0">
-                    <span className="block break-words font-medium">
-                      {child.variantName ?? child.name}
-                    </span>
-                    <span className="block text-xs text-slate-400">
-                      {child.sku}
-                    </span>
-                  </span>
-                  <span className="tabular-nums font-semibold">
-                    {formatCurrency(Number(child.retailPrice))}
-                  </span>
-                  <span className="tabular-nums text-slate-500">
-                    {productStockDisplay(
-                      { ...child, categoryName: product.categoryName },
-                      t("products.stock.notTracked"),
-                    )}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
+
       </div>
     </div>
   );
@@ -1345,13 +1449,17 @@ function ProductStockPanel({
 
 function RelatedProductsPanel({ product }: { product: ProductRow }) {
   const t = useTranslations();
-  const rows = product.relatedProducts;
+  const [search, setSearch] = useState("");
+  const rows = (product.variantGroup?.members ?? product.relatedProducts)
+    .filter((member) => matchesProductVariant(member, search, { includeProductName: false }));
 
-  if (rows.length === 0)
+  if (!product.variantGroup && product.relatedProducts.length === 0)
     return <EmptyPanel message={t("products.expand.relatedEmpty")} />;
 
   return (
     <>
+    <div className="relative mb-3 max-w-md"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tìm SKU hoặc thuộc tính" aria-label="Tìm trong các biến thể" className="min-h-11 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary-600" /></div>
+    {rows.length === 0 && <EmptyPanel message="Không tìm thấy biến thể." />}
     <div className="space-y-2 lg:hidden" data-mobile-audit="product-related">
       {rows.map((item) => (
         <article key={item.id} className="rounded-card border border-border-soft p-3 text-sm">
@@ -1364,7 +1472,7 @@ function RelatedProductsPanel({ product }: { product: ProductRow }) {
             </Link>
             <div className="shrink-0 font-semibold tabular-nums">{formatCurrency(Number(item.retailPrice))}</div>
           </div>
-          <div className="break-words font-medium">{item.name}</div>
+          <div className="break-words font-medium">{productVariantLabel(item)}</div>
           <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
             <div><dt className="text-slate-500">{t("products.expand.cols.costPrice")}</dt><dd className="mt-0.5 tabular-nums">{formatCurrency(Number(item.costPrice))}</dd></div>
             <div><dt className="text-right text-slate-500">{t("products.expand.cols.stock")}</dt><dd className="mt-0.5 text-right tabular-nums">{productStockDisplay({ ...item, categoryName: product.categoryName }, t("products.stock.notTracked"))}</dd></div>
@@ -1413,7 +1521,7 @@ function RelatedProductsPanel({ product }: { product: ProductRow }) {
                 </Link>
               </td>
               <td className="px-3 py-3 font-medium text-slate-900 dark:text-slate-100">
-                {item.name}
+                {productVariantLabel(item)}
               </td>
               <td className="px-3 py-3 text-right tabular-nums font-semibold">
                 {formatCurrency(Number(item.retailPrice))}
@@ -1490,7 +1598,8 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
     ? product.children.some((child) => child.isActive)
     : product.isActive;
   const nextActive = !effectiveActive;
-  const sameTypeSourceId = product.parentProductId ?? product.id;
+  const sameTypeSourceId = product.variantGroup?.id ?? product.parentProductId ?? product.id;
+  const variantSuffix = product.variantGroup && !product.isVariantParent ? ` ${productVariantLabel(product)}` : "";
 
   const updateMorePosition = useCallback(() => {
     const trigger = moreButtonRef.current?.getBoundingClientRect();
@@ -1671,23 +1780,24 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
             />
           <ActionLink
             icon={Pencil}
-            label={t("products.actions.edit")}
+            label={product.isVariantParent ? "Chỉnh sửa nhóm biến thể" : `${t("products.actions.edit")}${variantSuffix}`}
             href={
               pathname.startsWith("/products/")
                 ? `${Routes.productDetail(product.id)}?edit=1`
                 : productModalHref({
-                    productModal: "edit",
+                    productModal: product.isVariantParent ? "groupEdit" : "edit",
                     productId: product.id,
                   })
             }
             replace={pathname.startsWith("/products/")}
             tone="primary"
           />
-          <ActionLink
+          {!product.isVariantParent && <ActionLink
             icon={PackagePlus}
-            label={t("products.actions.purchase")}
+            label={`${t("products.actions.purchase")}${variantSuffix}`}
             href={Routes.purchaseNewForProduct(product.id)}
-          />
+          />}
+          {product.isVariantParent && <ActionLink icon={Plus} label="Thêm biến thể" href={productModalHref({ productModal: "groupAdd", sameTypeAs: sameTypeSourceId })} />}
           <div className="relative">
             <button
               ref={moreButtonRef}
@@ -1735,11 +1845,11 @@ function ProductActionBar({ product, cameraMaterials = false }: { product: Produ
                       href={productModalHref({ onlineProductId: product.id })}
                     />
                   )}
-                  <MenuActionLink icon={Barcode} label={t("products.actions.printLabels")} href={Routes.productLabels(product.id)} />
+                  {!product.isVariantParent && <MenuActionLink icon={Barcode} label={t("products.actions.printLabels")} href={Routes.productLabels(product.id)} />}
                   <MenuActionLink
                     icon={Plus}
-                    label={t("products.actions.addSameType")}
-                    href={productModalHref({ productModal: "sameType", sameTypeAs: sameTypeSourceId })}
+                    label={product.variantGroup ? "Thêm biến thể" : t("products.actions.addSameType")}
+                    href={productModalHref({ productModal: product.variantGroup ? "groupAdd" : "sameType", sameTypeAs: sameTypeSourceId })}
                   />
                   <MenuActionButton
                     icon={PackagePlus}
