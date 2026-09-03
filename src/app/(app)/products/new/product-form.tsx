@@ -44,6 +44,7 @@ import { AttributesField } from "./attributes-field";
 import {
   createProduct,
   updateProduct,
+  updateProductStock,
   createCategory,
   createBrand,
 } from "@/lib/actions/products";
@@ -208,6 +209,16 @@ export function NewProductForm({
 
   async function onSubmit(values: CreateProductOutput) {
     if (isEdit && productId) {
+      const defaults = createProductSchema.safeParse(form.formState.defaultValues);
+      const stockAdjustment = changedProductStock(
+        values.currentStock, form.formState.defaultValues?.currentStock,
+      );
+      // Compare every parsed field, not dirtyFields (programmatic edits may not
+      // mark dirty). Any metadata/image/unit edit keeps the full save path.
+      const stockOnly = stockAdjustment && defaults.success &&
+        !values.applyToSiblings.enabled &&
+        JSON.stringify({ ...values, currentStock: undefined }) ===
+          JSON.stringify({ ...defaults.data, currentStock: undefined });
       const specs =
         values.attributes.length > 0
           ? Object.fromEntries(
@@ -216,32 +227,34 @@ export function NewProductForm({
                 .map((a) => [a.name, a.values]),
             )
           : null;
-      const res = await updateProduct({
-        id: productId,
-        productKind: values.productKind,
-        sku: values.sku?.trim() || "",
-        barcode: values.barcode,
-        name: values.name,
-        categoryId: values.categoryId,
-        brandId: values.brandId,
-        baseUnit: values.baseUnit,
-        costPrice: values.costPrice,
-        retailPrice: values.retailPrice,
-        wholesalePrice: values.wholesalePrice ?? null,
-        contractorPrice: values.contractorPrice ?? null,
-        agentPrice: values.agentPrice ?? null,
-        priceBookPrices: values.priceBookPrices,
-        location: values.location,
-        description: values.description,
-        imageUrls: values.imageUrls,
-        imageMediaIds: values.imageMediaIds,
-        comboItems: values.comboItems,
-        isActive: values.directSale,
-        specs: specsWithOrderNote(specs, values.invoiceNote),
-        applyToSiblings: values.applyToSiblings,
-        units: values.units,
-        stockAdjustment: changedProductStock(values.currentStock, form.formState.defaultValues?.currentStock),
-      });
+      const res = stockOnly
+        ? await updateProductStock({ id: productId, stockAdjustment })
+        : await updateProduct({
+          id: productId,
+          productKind: values.productKind,
+          sku: values.sku?.trim() || "",
+          barcode: values.barcode,
+          name: values.name,
+          categoryId: values.categoryId,
+          brandId: values.brandId,
+          baseUnit: values.baseUnit,
+          costPrice: values.costPrice,
+          retailPrice: values.retailPrice,
+          wholesalePrice: values.wholesalePrice ?? null,
+          contractorPrice: values.contractorPrice ?? null,
+          agentPrice: values.agentPrice ?? null,
+          priceBookPrices: values.priceBookPrices,
+          location: values.location,
+          description: values.description,
+          imageUrls: values.imageUrls,
+          imageMediaIds: values.imageMediaIds,
+          comboItems: values.comboItems,
+          isActive: values.directSale,
+          specs: specsWithOrderNote(specs, values.invoiceNote),
+          applyToSiblings: values.applyToSiblings,
+          units: values.units,
+          stockAdjustment,
+        });
       if (res.ok) {
         const href =
           submitIntent === "sameType"

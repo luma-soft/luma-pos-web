@@ -3,6 +3,7 @@ import {
   setCameraMaterial,
   setProductActive,
   updateProduct,
+  updateProductStock,
 } from "@/lib/actions/products";
 import { getProduct } from "@/lib/data/products";
 import { requireMobileStockAccess } from "@/lib/mobile/auth";
@@ -32,12 +33,11 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const gate = await requireMobileStockAccess();
-  const blocked = mobileGate(gate);
-  if (blocked) return blocked;
+  if (!gate.ok) return mobileGate(gate)!;
 
   const { id } = await params;
   const body = await readJson(request);
-  if (!body || typeof body !== "object") {
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
     return mobileAction({ ok: false, error: "errors.invalidData" });
   }
 
@@ -67,12 +67,31 @@ export async function PATCH(
     );
   }
 
-  return mobileAction(
-    await updateProduct({
+  if (action === "set-stock" && Object.keys(body).some(
+    (key) => key !== "action" && key !== "stockAdjustment",
+  )) {
+    return mobileError("errors.invalidData");
+  }
+  const result = action === "set-stock"
+    ? await updateProductStock({
+      id,
+      stockAdjustment: (body as Parameters<typeof updateProductStock>[0]).stockAdjustment,
+    })
+    : await updateProduct({
       ...(body as Record<string, unknown>),
       id,
-    } as Parameters<typeof updateProduct>[0])
-  );
+    } as Parameters<typeof updateProduct>[0]);
+  if (!result.ok) return mobileAction(result);
+
+  // Return the committed projection in this round-trip. A failed read must not
+  // turn an already-committed mutation into an error the client might retry.
+  try {
+    const product = await getProduct(gate.storeId, id);
+    return mobileOk({ product, ...(!product ? { refreshRequired: true } : {}) });
+  } catch (error) {
+    console.error("Product saved, but detail refresh failed:", error);
+    return mobileOk({ product: null, refreshRequired: true });
+  }
 }
 
 export async function DELETE(

@@ -611,6 +611,54 @@ export async function setCameraMaterial(input: {
   }
 }
 
+const updateProductStockSchema = z.object({
+  id: z.uuid(),
+  stockAdjustment: productStockAdjustmentSchema.strict().refine(
+    ({ quantity, expectedQuantity }) => quantity !== expectedQuantity,
+  ),
+}).strict();
+
+/** Stock-only save: keep metadata/media/unit work out of the locked transaction. */
+export async function updateProductStock(
+  input: z.input<typeof updateProductStockSchema>,
+): Promise<ActionResult> {
+  // Managers are a subset of stock-access roles; the actor/store stay server-derived.
+  const gate = await requireManager();
+  if (!gate.ok) return gate;
+  const parsed = updateProductStockSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  const { id, stockAdjustment } = parsed.data;
+
+  try {
+    const createdBy = await getProfileId(gate.userId);
+    await db.transaction((tx) => applyProductStockAdjustment(tx, {
+      storeId: gate.storeId,
+      productId: id,
+      createdBy,
+      adjustment: stockAdjustment,
+    }), { isolationLevel: "serializable" });
+  } catch (e) {
+    const known: Record<string, string> = {
+      PRODUCT_NOT_FOUND: "errors.invalidData",
+      PRODUCT_STOCK_CHANGED: "products.errors.stockChanged",
+      PRODUCT_STOCK_REQUIRES_INVENTORY: "products.errors.stockAdjustmentNeedsInventory",
+      PRODUCT_STOCK_NOT_MANAGED: "products.errors.stockNotManaged",
+      PRODUCT_STOCK_WAREHOUSE_MISSING: "products.errors.stockWarehouseMissing",
+    };
+    const message = e instanceof Error ? e.message : "";
+    if (known[message]) return { ok: false, error: known[message] };
+    if (["40001", "40P01"].includes(pgErrorCode(e) ?? "")) {
+      return { ok: false, error: "products.errors.stockChanged" };
+    }
+    console.error("updateProductStock failed:", e);
+    return { ok: false, error: "errors.serverError" };
+  }
+
+  // One layout invalidation covers detail, list, inventory and POS consumers.
+  revalidatePath("/(app)", "layout");
+  return { ok: true, data: undefined };
+}
+
 /** Cập nhật SP; chỉ điều chỉnh tồn khi gửi kèm số lượng mới và mốc tồn đã đọc. */
 export async function updateProduct(
   input: UpdateProductInput,
