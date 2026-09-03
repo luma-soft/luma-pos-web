@@ -14,6 +14,7 @@ export function LibraryDialog({
   footer,
   busy = false,
   wide = false,
+  fixedHeight = false,
   placement = "center",
   onClose,
 }: {
@@ -23,6 +24,8 @@ export function LibraryDialog({
   footer?: ReactNode;
   busy?: boolean;
   wide?: boolean;
+  /** Preview panes own desktop scrolling inside a stable viewport-sized frame. */
+  fixedHeight?: boolean;
   placement?: "center" | "drawer";
   onClose: () => void;
 }) {
@@ -72,7 +75,10 @@ export function LibraryDialog({
         "fixed inset-0 hidden h-dvh max-h-dvh w-full flex-col overflow-hidden border-0 bg-surface p-0 text-foreground shadow-e2 backdrop:bg-slate-950/50 backdrop:backdrop-blur-[2px] open:flex",
         placement === "drawer"
           ? "m-0 ml-auto max-w-[460px]"
-          : "m-auto max-w-none sm:h-fit sm:max-h-[calc(100dvh-4rem)] sm:max-w-3xl sm:rounded-2xl sm:border sm:border-border",
+          : "m-auto max-w-none sm:max-h-[calc(100dvh-4rem)] sm:max-w-3xl sm:rounded-2xl sm:border sm:border-border",
+        placement === "center" && (fixedHeight
+          ? "sm:h-[min(800px,calc(100dvh-4rem))]"
+          : "sm:h-fit"),
         placement === "center" && wide && "sm:max-w-5xl",
       )}
     >
@@ -104,7 +110,10 @@ export function LibraryDialog({
           <X className="h-5 w-5" />
         </button>
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+      <div className={cn(
+        "min-h-0 flex-1 overflow-y-auto overscroll-contain",
+        placement === "center" && fixedHeight && "sm:overflow-hidden",
+      )}>
         {children}
       </div>
       {footer && (

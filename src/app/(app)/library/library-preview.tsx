@@ -59,6 +59,7 @@ export function LibraryPreview({
   return (
     <LibraryDialog
       wide
+      fixedHeight
       title={current.title}
       description={`${albumLabel} · ${sizeLabel}`}
       onClose={onClose}
@@ -108,34 +109,37 @@ export function LibraryPreview({
         </div>
       }
     >
-      <div className="grid sm:grid-cols-[minmax(0,1fr)_240px]">
-        <div className="relative grid min-h-64 place-items-center overflow-auto bg-surface-2 sm:min-h-[420px]">
-          {failed ? (
-            <div className="p-6 text-center text-sm">
-              <p>{t("errors.load")}</p>
-              <Button
-                variant="outline"
-                className="mt-3"
-                onClick={() => {
-                  setFailed(false);
-                  setAttempt((value) => value + 1);
-                }}
-              >
-                {t("retry")}
-              </Button>
-            </div>
-          ) : !resolved ? (
-            <LoaderCircle
-              aria-label={t("loading")}
-              className="h-6 w-6 animate-spin text-primary-600"
-            />
-          ) : resolved.kind === "image" ? (
-            <div
-              className={cn(
-                "relative h-[45dvh] w-full sm:h-[55dvh]",
-                zoomed && "min-h-[80dvh] min-w-[160%]",
-              )}
-            >
+      <div className="grid min-w-0 sm:h-full sm:min-h-0 sm:grid-cols-[minmax(0,1fr)_240px] sm:grid-rows-[minmax(0,1fr)]">
+        <div
+          role="region"
+          aria-label={current.title}
+          tabIndex={0}
+          className="relative h-[45dvh] min-h-64 min-w-0 overflow-auto overscroll-contain bg-surface-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-600 sm:h-full sm:min-h-0"
+        >
+          <div className={cn(
+            "relative grid h-full w-full place-items-center",
+            !failed && resolved?.kind === "image" && zoomed && "h-[160%] w-[160%]",
+          )}>
+            {failed ? (
+              <div className="p-6 text-center text-sm">
+                <p>{t("errors.load")}</p>
+                <Button
+                  variant="outline"
+                  className="mt-3"
+                  onClick={() => {
+                    setFailed(false);
+                    setAttempt((value) => value + 1);
+                  }}
+                >
+                  {t("retry")}
+                </Button>
+              </div>
+            ) : !resolved ? (
+              <LoaderCircle
+                aria-label={t("loading")}
+                className="h-6 w-6 animate-spin text-primary-600"
+              />
+            ) : resolved.kind === "image" ? (
               <NextImage
                 unoptimized
                 fill
@@ -144,26 +148,26 @@ export function LibraryPreview({
                 className="object-contain p-3"
                 sizes="80vw"
               />
-            </div>
-          ) : resolved.kind === "video" ? (
-            <video
-              controls
-              playsInline
-              preload="metadata"
-              src={resolved.url}
-              className="max-h-[55dvh] w-full"
-            />
-          ) : (
-            <div className="p-8 text-center">
-              <FileText className="mx-auto mb-4 h-14 w-14 stroke-[1.2] text-primary-600" />
-              <p className="max-w-xs break-words text-sm font-medium">
-                {resolved.fileName}
-              </p>
-              <p className="mt-2 text-xs text-slate-500">
-                {t("documentPreviewHint")}
-              </p>
-            </div>
-          )}
+            ) : resolved.kind === "video" ? (
+              <video
+                controls
+                playsInline
+                preload="metadata"
+                src={resolved.url}
+                className="h-full max-h-full w-full object-contain"
+              />
+            ) : (
+              <div className="p-8 text-center">
+                <FileText className="mx-auto mb-4 h-14 w-14 stroke-[1.2] text-primary-600" />
+                <p className="max-w-xs break-words text-sm font-medium">
+                  {resolved.fileName}
+                </p>
+                <p className="mt-2 text-xs text-slate-500">
+                  {t("documentPreviewHint")}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
         <LibraryPreviewDetails
           item={current}
@@ -200,7 +204,7 @@ export function LibraryPreviewDetails({ item, canManage, extractionReady = true,
   // Source permissions may have changed since the gallery snapshot. Do not show
   // cached source metadata or actions until the current association resolves.
   if (item.source && !extractionReady) return null;
-  return <aside className="min-w-0 space-y-5 p-4 sm:p-5">
+  return <aside className="min-h-0 min-w-0 space-y-5 p-4 sm:overflow-y-auto sm:overscroll-contain sm:p-5">
           <div>
             <h3 className="text-xs font-semibold text-slate-500">
               {t("album")}
