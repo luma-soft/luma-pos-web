@@ -11,6 +11,8 @@ import type { TxValues } from "./_tx";
 export interface SelectOption {
   value: string;
   label: string;
+  /** Secondary context displayed below the label in both trigger and menu. */
+  description?: string;
   /** i18n key for label */
   labelTx?: string;
 }
@@ -93,7 +95,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
     const normalizedQuery = normalizeSearch(searchQuery);
     const filteredOptions = normalizedQuery
       ? options.filter((option) =>
-          matchesSelectSearch(optionLabel(option, t), normalizedQuery),
+          matchesSelectSearch(`${optionLabel(option, t)} ${option.description ?? ""}`, normalizedQuery),
         )
       : options;
 
@@ -269,7 +271,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
             "relative min-h-11 min-w-11 w-full rounded-lg border bg-surface text-left transition-[border-color,background-color] duration-150 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 lg:min-h-0 lg:min-w-0",
             sizeCls,
             variantCls,
-            wrapLabel && "h-auto min-h-11 py-2 lg:min-h-10",
+            (wrapLabel || selected?.description) && "h-auto min-h-11 py-2 lg:h-auto lg:min-h-10",
             !selected && "text-slate-400",
             className,
             "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
@@ -277,6 +279,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
           {...props}
         >
           <span className={cn("block", wrapLabel ? "whitespace-normal break-words pr-1" : "truncate")}>{selectedLabel ?? "—"}</span>
+          {selected?.description && <span className="mt-1 block whitespace-normal text-xs font-normal text-slate-500">{selected.description}</span>}
           <ChevronDown className={cn("absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none transition-transform", open && "rotate-180")} />
         </button>
         {open && !disabled && menuStyle && typeof document !== "undefined" && createPortal(
@@ -337,6 +340,7 @@ export const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                       onSelect={() => pick(option.value)}
                       className={optionClassName}
                       label={optionLabel(option, t)}
+                      description={option.description}
                     />
                   );
                 })
@@ -374,12 +378,14 @@ export function SelectOptionRow({
   onSelect,
   className,
   label,
+  description,
 }: {
   active: boolean;
   wrapLabel: boolean;
   onSelect: () => void;
   className?: string;
   label: React.ReactNode;
+  description?: string;
 }) {
   return (
     <button
@@ -396,7 +402,10 @@ export function SelectOptionRow({
         "min-h-11 min-w-11 sm:min-h-11 sm:min-w-11 md:min-h-11 md:min-w-11",
       )}
     >
-      <span className={cn("min-w-0", wrapLabel ? "whitespace-normal break-words" : "truncate")}>{label}</span>
+      <span className={cn("min-w-0", wrapLabel ? "whitespace-normal break-words" : "truncate")}>
+        <span className="block">{label}</span>
+        {description && <span className="mt-1 block whitespace-normal text-xs font-normal text-slate-500">{description}</span>}
+      </span>
       {active && <Check className="h-4 w-4 shrink-0 text-primary-600" />}
     </button>
   );

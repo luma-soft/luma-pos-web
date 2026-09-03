@@ -38,7 +38,7 @@ const STATUSES = ["active", "inactive", "all"] as const;
 type Status = (typeof STATUSES)[number];
 const VIEWS = ["grouped", "flat"] as const;
 type View = (typeof VIEWS)[number];
-const PRODUCT_MODAL_KEYS = ["productModal", "productId", "copyFrom", "sameTypeAs", "productKind", "onlineListing", "onlineProductId", "shopeeProductId"] as const;
+const PRODUCT_MODAL_KEYS = ["productModal", "productId", "copyFrom", "copyGroup", "sameTypeAs", "productKind", "onlineListing", "onlineProductId", "shopeeProductId"] as const;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export async function ProductsTab({ searchParams }: { searchParams: SP }) {
@@ -167,7 +167,7 @@ export async function ProductEditorModal({
     seedId ? getProduct(context.storeId, seedId) : Promise.resolve(null),
   ]);
   if (seedId && !requestedProduct) notFound();
-  const seedMode = modal === "copy" ? "copy" : modal === "sameType" || modal === "groupAdd" ? "groupAdd" : modal === "groupEdit" ? "groupEdit" : "edit";
+  const seedMode = modal === "copy" ? (searchParams.copyGroup === "1" ? "groupCopy" : "copy") : modal === "sameType" || modal === "groupAdd" ? "groupAdd" : modal === "groupEdit" ? "groupEdit" : "edit";
   const seedProduct = requestedProduct ? await resolveProductFormSeed(requestedProduct, seedMode, (productId) => getProduct(context.storeId, productId)) : null;
   if (seedId && !seedProduct) notFound();
 

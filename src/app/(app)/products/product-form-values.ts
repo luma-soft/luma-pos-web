@@ -4,7 +4,7 @@ import type { PublicMediaConfig } from "@/lib/media/config";
 import type { CreateProductInput } from "./new/schema";
 import { buildVariantCombinations, normalizeVariantAttributes, variantCombinationBudget } from "@/lib/products/variant-model";
 
-export type ProductSeedMode = "edit" | "copy" | "sameType" | "groupEdit" | "groupAdd";
+export type ProductSeedMode = "edit" | "copy" | "groupCopy" | "sameType" | "groupEdit" | "groupAdd";
 const PRODUCT_ORDER_NOTE_SPEC_KEY = "__orderNote";
 
 /** Group forms must seed shared fields from the real root, never a child override. */
@@ -13,7 +13,7 @@ export async function resolveProductFormSeed(
   mode: ProductSeedMode,
   loadProduct: (id: string) => Promise<ProductDetail | null>,
 ): Promise<ProductDetail | null> {
-  const groupMode = mode === "groupEdit" || mode === "groupAdd" || mode === "sameType";
+  const groupMode = mode === "groupCopy" || mode === "groupEdit" || mode === "groupAdd" || mode === "sameType";
   const groupId = product.variantGroup?.id;
   if (!groupMode || !groupId || groupId === product.id) return product;
   const root = await loadProduct(groupId);
@@ -26,6 +26,7 @@ export function productToFormInitialValues(
   priceBookPrices: Record<string, string | number | null | undefined> = {},
   publicMedia?: PublicMediaConfig,
 ): Partial<CreateProductInput> {
+  const isCopy = mode === "copy" || mode === "groupCopy";
   const specs = (product.specs as Record<string, string[]> | null) ?? {};
   const orderNote = specs[PRODUCT_ORDER_NOTE_SPEC_KEY]?.[0] ?? "";
   const attributeSpecs = Object.entries(specs).filter(
@@ -55,7 +56,7 @@ export function productToFormInitialValues(
       id: mode === "edit" ? u.id : undefined,
       unitName: u.unitName,
       multiplier: Number(u.multiplier),
-      barcode: mode === "copy" ? "" : (u.barcode ?? ""),
+      barcode: isCopy ? "" : (u.barcode ?? ""),
       priceOverride: u.priceOverride != null ? Number(u.priceOverride) : null,
     })),
     comboItems: product.comboItems.map((item) => ({
@@ -71,7 +72,7 @@ export function productToFormInitialValues(
 
   const group = product.variantGroup;
   const groupEditing = mode === "groupEdit" || mode === "groupAdd" || mode === "sameType" || (mode === "edit" && product.isVariantParent);
-  const copyGroup = mode === "copy" && product.isVariantParent && group;
+  const copyGroup = isCopy && (product.isVariantParent || mode === "groupCopy") && group;
   if (groupEditing || copyGroup) {
     const sourceAttributes = group?.attributes ?? attributeSpecs.map(([name, values]) => ({
       name, values, createsVariants: true,
@@ -82,7 +83,7 @@ export function productToFormInitialValues(
     const selectedMembers = members.filter((member) => !member.isVariantParent);
     let combinations: ReturnType<typeof buildVariantCombinations> = [];
     try {
-      combinations = buildVariantCombinations(attributes, mode === "copy" ? undefined : {
+      combinations = buildVariantCombinations(attributes, isCopy ? undefined : {
         maxCombinations: variantCombinationBudget(selectedMembers.length, group?.excludedCombinationKeys?.length ?? 0),
       });
     } catch { /* Incomplete legacy groups require explicit assignments in the editor. */ }
@@ -96,12 +97,12 @@ export function productToFormInitialValues(
       // Duplicated or missing selections require the user to assign the real SKU.
       const match = candidate && possibleMatches.filter((other) => other?.combinationKey === candidate.combinationKey).length === 1 ? candidate : undefined;
       return {
-        ...(mode !== "copy" ? { productId: member.id } : {}),
+        ...(!isCopy ? { productId: member.id } : {}),
         combinationKey: match?.combinationKey,
         optionValueIds: match?.optionValueIds,
         variantName: match?.variantName ?? member.variantName ?? member.name,
-        sku: mode === "copy" ? "" : member.sku,
-        barcode: mode === "copy" ? "" : member.barcode ?? "",
+        sku: isCopy ? "" : member.sku,
+        barcode: isCopy ? "" : member.barcode ?? "",
         baseUnit: member.baseUnit,
         costPrice: Number(member.costPrice),
         retailPrice: Number(member.retailPrice),
@@ -112,22 +113,22 @@ export function productToFormInitialValues(
         currentStock: Number(member.totalStock ?? 0),
         directSale: member.isActive,
         specs: match?.specs ?? visibleSpecs,
-        imageUrls: mode === "copy" ? [] : member.imageUrls ?? [],
+        imageUrls: isCopy ? [] : member.imageUrls ?? [],
       };
     });
     return {
       ...shared,
       variantContractVersion: 2,
-      variantOperation: mode === "copy" ? "create" : mode === "groupAdd" || mode === "sameType" ? "add" : "edit",
-      ...(mode !== "copy" ? { variantGroupId: group?.id ?? product.id, variantRevision: group?.revision ?? 0 } : {}),
+      variantOperation: isCopy ? "create" : mode === "groupAdd" || mode === "sameType" ? "add" : "edit",
+      ...(!isCopy ? { variantGroupId: group?.id ?? product.id, variantRevision: group?.revision ?? 0 } : {}),
       attributes,
       variantChildren: children,
       excludedCombinationKeys: group?.excludedCombinationKeys ?? combinations.filter((combo) => !children.some((child) => child.combinationKey === combo.combinationKey)).map((combo) => combo.combinationKey),
-      sku: mode === "copy" ? "" : product.sku,
-      barcode: mode === "copy" ? "" : product.barcode ?? "",
+      sku: isCopy ? "" : product.sku,
+      barcode: isCopy ? "" : product.barcode ?? "",
       name: group?.name ?? product.name,
-      imageUrls: mode === "copy" ? [] : product.imageUrls ?? [],
-      imageMediaIds: mode === "copy" ? [] : imageMedia.map((image) => image.mediaId),
+      imageUrls: isCopy ? [] : product.imageUrls ?? [],
+      imageMediaIds: isCopy ? [] : imageMedia.map((image) => image.mediaId),
       location: product.location ?? "",
       description: product.description ?? "",
       invoiceNote: orderNote,
@@ -138,10 +139,10 @@ export function productToFormInitialValues(
 
   return {
     ...shared,
-    sku: mode === "copy" ? "" : product.sku,
-    barcode: mode === "copy" ? "" : (product.barcode ?? ""),
+    sku: isCopy ? "" : product.sku,
+    barcode: isCopy ? "" : (product.barcode ?? ""),
     name: product.name,
-    imageUrls: mode === "copy"
+    imageUrls: isCopy
       ? (product.imageUrls ?? []).filter(
           (url) =>
             (!publicMedia || !parseProductImagePublicUrl(url, publicMedia))

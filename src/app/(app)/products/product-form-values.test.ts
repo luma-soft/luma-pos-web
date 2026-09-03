@@ -42,6 +42,24 @@ test("copying a group clears persisted SKU identity and all opening stock", () =
   assert.deepEqual(draft.attributes?.[0].valueIds, ["e-option", "f-option"]);
 });
 
+test("group footer copies an imported sellable root and all siblings without changing ordinary SKU copy", () => {
+  const imported = { ...e, isVariantParent: false,
+    variantGroup: { ...grouped.variantGroup!, id: "e", kind: "related", members: [e, f] },
+  } as unknown as ProductDetail;
+  const draft = productToFormInitialValues(imported, "groupCopy");
+  assert.equal(draft.variantOperation, "create");
+  assert.equal(draft.variantGroupId, undefined);
+  assert.equal(draft.variantRevision, undefined);
+  assert.deepEqual(draft.variantChildren?.map((child) => [child.variantName, child.costPrice, child.retailPrice]), [
+    ["E", 1280000, 1490000], ["F", 990000, 1190000],
+  ]);
+  assert.ok(draft.variantChildren?.every((child) => !child.productId && !child.sku && !child.barcode && child.initialStock === 0));
+  const single = productToFormInitialValues(imported, "copy");
+  assert.equal(single.variantChildren, undefined);
+  assert.equal(single.sku, "");
+  assert.equal(single.initialStock, 0);
+});
+
 test("same-type action targets the existing group instead of making another parent", () => {
   const draft = productToFormInitialValues(grouped, "sameType");
   assert.equal(draft.variantOperation, "add");
@@ -92,7 +110,7 @@ test("v2 technical metadata with multiple values does not require variant rows",
 test("group entrypoints resolve the real root before seeding common fields", async () => {
   const child = { ...f, description: "Thông số riêng F", categoryId: "child-category", brandId: "child-brand",
     imageUrls: ["https://example.test/f.png"], variantGroup: grouped.variantGroup } as unknown as ProductDetail;
-  for (const mode of ["groupEdit", "groupAdd", "sameType"] as const) {
+  for (const mode of ["groupEdit", "groupAdd", "sameType", "groupCopy"] as const) {
     const source = await resolveProductFormSeed(child, mode, async (id) => {
       assert.equal(id, grouped.id);
       return grouped;
