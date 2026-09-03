@@ -5,6 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import {
   ArrowDownToLine,
   FileText,
+  Link2,
   LoaderCircle,
   LockKeyhole,
   Trash2,
@@ -13,10 +14,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FileInfoPanel } from "@/components/media/file-info-panel";
+import type { MediaFileMetadata } from "@/lib/media/file-metadata-types";
 import type { MediaLibraryItem } from "@/lib/media/library-types";
 import { cn } from "@/lib/utils";
 import { LibraryDialog } from "./library-dialog";
-import { formatLibraryBytes, libraryRequest } from "./library-utils";
+import { formatLibraryBytes, libraryCanDelete, libraryCanExtractMetadata, libraryItemSizeKnown, libraryItemSourcePreset, libraryItemUploadedAt, libraryRequest } from "./library-utils";
 
 export function LibraryPreview({
   item,
@@ -36,6 +38,10 @@ export function LibraryPreview({
   const [failed, setFailed] = useState(false);
   const [zoomed, setZoomed] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const current = resolved ?? item;
+  const sourcePreset = libraryItemSourcePreset(current);
+  const albumLabel = sourcePreset ? t(`sourceAlbums.${sourcePreset}`) : current.album;
+  const sizeLabel = libraryItemSizeKnown(current) ? formatLibraryBytes(current.sizeBytes, locale) : t("unknownSize");
   useEffect(() => {
     const controller = new AbortController();
     libraryRequest<MediaLibraryItem>(
@@ -53,12 +59,12 @@ export function LibraryPreview({
   return (
     <LibraryDialog
       wide
-      title={item.title}
-      description={`${item.album} · ${formatLibraryBytes(item.sizeBytes, locale)}`}
+      title={current.title}
+      description={`${albumLabel} · ${sizeLabel}`}
       onClose={onClose}
       footer={
         <div className="flex items-center justify-between gap-3">
-          {canManage ? (
+          {libraryCanDelete(current, canManage) ? (
             <Button
               variant="ghost"
               onClick={onDelete}
@@ -69,8 +75,8 @@ export function LibraryPreview({
             </Button>
           ) : (
             <span className="flex items-center gap-1.5 text-xs text-slate-500">
-              <LockKeyhole className="h-3.5 w-3.5" />
-              {t("privateShort")}
+              {current.source ? <Link2 className="h-3.5 w-3.5" /> : <LockKeyhole className="h-3.5 w-3.5" />}
+              {t(current.source ? "automatic" : "privateShort")}
             </span>
           )}
           <div className="flex items-center gap-2">
@@ -159,13 +165,53 @@ export function LibraryPreview({
             </div>
           )}
         </div>
-        <aside className="space-y-5 p-4 sm:p-5">
+        <LibraryPreviewDetails
+          item={current}
+          canManage={canManage}
+          extractionReady={Boolean(resolved || (!current.source && failed))}
+          onExtract={async (signal) => {
+            const next = await libraryRequest<MediaLibraryItem>("/api/mobile/library", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "extract-metadata", id: item.id }),
+              signal,
+            });
+            if (!signal.aborted) {
+              setResolved(next);
+              setFailed(false);
+            }
+            return next.metadata ?? null;
+          }}
+        />
+      </div>
+    </LibraryDialog>
+  );
+}
+
+export function LibraryPreviewDetails({ item, canManage, extractionReady = true, onExtract }: {
+  item: MediaLibraryItem;
+  canManage: boolean;
+  extractionReady?: boolean;
+  onExtract: (signal: AbortSignal) => Promise<MediaFileMetadata | null>;
+}) {
+  const t = useTranslations("mediaLibrary");
+  const fileInfo = useTranslations("fileInfo");
+  const sourcePreset = libraryItemSourcePreset(item);
+  // Source permissions may have changed since the gallery snapshot. Do not show
+  // cached source metadata or actions until the current association resolves.
+  if (item.source && !extractionReady) return null;
+  return <aside className="min-w-0 space-y-5 p-4 sm:p-5">
           <div>
             <h3 className="text-xs font-semibold text-slate-500">
               {t("album")}
             </h3>
-            <p className="mt-1.5 text-sm font-medium">{item.album}</p>
+            <p className="mt-1.5 break-words text-sm font-medium">{sourcePreset ? t(`sourceAlbums.${sourcePreset}`) : item.album}</p>
           </div>
+          {item.source && <div className="space-y-2 text-xs leading-5 text-slate-500">
+            <p className="flex items-center gap-1.5 font-semibold text-primary-700 dark:text-primary-300"><Link2 aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />{t("automatic")}</p>
+            <p className="break-words">{t("linkedSource", { source: item.source.label })}</p>
+            <p>{t("sourceReadOnlyHint")}</p>
+          </div>}
           {item.note && (
             <div>
               <h3 className="text-xs font-semibold text-slate-500">
@@ -191,28 +237,14 @@ export function LibraryPreview({
           <FileInfoPanel
             key={item.id}
             fileName={item.fileName}
-            mimeType={item.mimeType}
+            mimeType={item.mimeType === "image/*" ? fileInfo("unknown") : item.mimeType}
             sizeBytes={item.sizeBytes}
-            uploadedAt={item.createdAt}
-            uploaderName={(resolved ?? item).creatorName}
-            metadata={(resolved ?? item).metadata}
-            canManage={canManage && Boolean(resolved || failed)}
-            onExtract={async (signal) => {
-              const next = await libraryRequest<MediaLibraryItem>("/api/mobile/library", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "extract-metadata", id: item.id }),
-                signal,
-              });
-              if (!signal.aborted) {
-                setResolved(next);
-                setFailed(false);
-              }
-              return next.metadata ?? null;
-            }}
+            sizeKnown={libraryItemSizeKnown(item)}
+            uploadedAt={libraryItemUploadedAt(item)}
+            uploaderName={item.creatorName}
+            metadata={item.metadata}
+            canExtractMetadata={libraryCanExtractMetadata(item, canManage) && extractionReady}
+            onExtract={onExtract}
           />
-        </aside>
-      </div>
-    </LibraryDialog>
-  );
+        </aside>;
 }

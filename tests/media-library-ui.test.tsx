@@ -91,7 +91,7 @@ describe("library UI utilities", () => {
     expect(url.searchParams.get("album")).toBe("Báo giá/2026 + tháng 9");
     expect(url.searchParams.get("kind")).toBe("document");
     expect(url.searchParams.get("cursor")).toBe("cursor+/=_-");
-    expect(libraryListPath(" ", "", "", null)).toBe("/api/mobile/library");
+    expect(libraryListPath(" ", "", "", null)).toBe("/api/mobile/library?includeSources=1");
     for (const kind of ["image", "video", "document"]) {
       expect(new URL(libraryListPath("", "", kind), "https://luma.test").searchParams.get("kind")).toBe(kind);
     }

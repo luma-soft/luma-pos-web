@@ -1,4 +1,40 @@
 import { mediaLibraryItemInputSchema } from "@/lib/media/library-schema";
+import { MEDIA_LIBRARY_PRESETS, type MediaLibraryPreset } from "@/lib/media/library-source-types";
+import type { MediaLibraryAlbum, MediaLibraryItem } from "@/lib/media/library-types";
+
+export type LibraryAlbumSelection = { album: string; source: MediaLibraryPreset | "" };
+
+export function libraryManualAlbums(albums: readonly MediaLibraryAlbum[]) {
+  return albums.filter((entry) => !entry.system && !entry.source);
+}
+
+export function libraryAlbumKey(entry: MediaLibraryAlbum) {
+  return entry.source ? `auto:${entry.source}` : `manual:${entry.key ?? entry.name}`;
+}
+
+export function libraryAlbumSelection(entry: MediaLibraryAlbum): LibraryAlbumSelection {
+  return entry.source ? { album: "", source: entry.source } : { album: entry.name, source: "" };
+}
+
+export function libraryCanDelete(item: MediaLibraryItem, canManage: boolean) {
+  return !item.source && (item.canDelete ?? canManage);
+}
+
+export function libraryCanExtractMetadata(item: MediaLibraryItem, canManage: boolean) {
+  return item.canExtractMetadata ?? (!item.source && canManage);
+}
+
+export function libraryItemSizeKnown(item: MediaLibraryItem) {
+  return item.sizeKnown ?? (!item.source || item.sizeBytes > 0);
+}
+
+export function libraryItemUploadedAt(item: MediaLibraryItem) {
+  return item.uploadedAt !== undefined ? item.uploadedAt : item.source ? null : item.createdAt;
+}
+
+export function libraryItemSourcePreset(item: MediaLibraryItem) {
+  return item.source ? MEDIA_LIBRARY_PRESETS.find((preset) => preset.name === item.album)?.source : undefined;
+}
 
 export function formatLibraryBytes(bytes: number, locale: string) {
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -42,10 +78,12 @@ export function libraryListPath(
   album: string,
   kind: string,
   cursor?: string | null,
+  source?: MediaLibraryPreset | "",
 ) {
-  const params = new URLSearchParams();
+  const params = new URLSearchParams({ includeSources: "1" });
   if (query.trim()) params.set("q", query.trim());
-  if (album) params.set("album", album);
+  if (source) params.set("source", source);
+  else if (album) params.set("album", album);
   if (kind) params.set("kind", kind);
   if (cursor) params.set("cursor", cursor);
   return `/api/mobile/library${params.size ? `?${params}` : ""}`;

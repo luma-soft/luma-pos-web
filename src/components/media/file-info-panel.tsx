@@ -17,14 +17,15 @@ type FileInfoPanelProps = FileInfoDetails & {
   fileName: string;
   mimeType: string;
   sizeBytes: number;
-  uploadedAt: Date | string;
+  sizeKnown?: boolean;
+  uploadedAt?: Date | string | null;
   canManage?: boolean;
   onLoad?: (signal: AbortSignal) => Promise<FileInfoDetails>;
   onExtract?: (signal: AbortSignal) => Promise<MediaFileMetadata | null>;
 };
 
 /** One disclosure for original-file facts, shared by the library and project viewers. */
-export function FileInfoPanel({ fileName, mimeType, sizeBytes, uploadedAt, uploaderName,
+export function FileInfoPanel({ fileName, mimeType, sizeBytes, sizeKnown = true, uploadedAt, uploaderName,
   metadata, canManage = false, canExtractMetadata, onLoad, onExtract }: FileInfoPanelProps) {
   const t = useTranslations("fileInfo");
   const locale = useLocale();
@@ -38,7 +39,7 @@ export function FileInfoPanel({ fileName, mimeType, sizeBytes, uploadedAt, uploa
   const currentMetadata = extracted !== undefined ? extracted : loaded ? loaded.metadata : metadata;
   const currentUploader = loaded?.uploaderName ?? uploaderName;
   const canExtract = loaded?.canExtractMetadata ?? canExtractMetadata ?? canManage;
-  const uploadTimestamp = typeof uploadedAt === "string" ? uploadedAt : uploadedAt.toISOString();
+  const uploadTimestamp = typeof uploadedAt === "string" ? uploadedAt : uploadedAt?.toISOString();
   const timestamp = formatSourceTimestamp(uploadTimestamp, locale);
 
   async function load() {
@@ -88,7 +89,7 @@ export function FileInfoPanel({ fileName, mimeType, sizeBytes, uploadedAt, uploa
           <dl className="space-y-2.5">
             <InfoRow label={t("fileName")}>{fileName}</InfoRow>
             <InfoRow label={t("mimeType")}>{mimeType}</InfoRow>
-            <InfoRow label={t("size")}>{formatFileInfoBytes(sizeBytes, locale)}</InfoRow>
+            <InfoRow label={t("size")}>{sizeKnown ? formatFileInfoBytes(sizeBytes, locale) : t("unknown")}</InfoRow>
             <InfoRow label={t("uploadedAt")}>{timestamp ? `${timestamp.text}${timestamp.timezone ? ` · ${timestamp.timezone}` : ""}` : t("unknown")}</InfoRow>
             <InfoRow label={t("uploader")}>{currentUploader || t("unknown")}</InfoRow>
           </dl>

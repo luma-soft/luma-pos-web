@@ -124,13 +124,32 @@ describe("media library API", () => {
     const response = await handlers.GET(new Request("https://luma.test/api/mobile/library?q=voi%20chau&album=old&kind=image&limit=20"));
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
-    expect(queries).toEqual([{ q: "voi chau", album: "old", kind: "image", limit: 20 }]);
+    expect(queries).toEqual([{ q: "voi chau", album: "old", kind: "image", limit: 20, includeSources: false }]);
     for (const query of ["kind=audio", "cursor=broken", "limit=101"]) {
       const invalid = await handlers.GET(new Request(`https://luma.test/api/mobile/library?${query}`));
       expect(invalid.status).toBe(400);
       expect(await invalid.json()).toEqual({ ok: false, error: "errors.invalidData" });
     }
     expect(queries.length).toBe(1);
+  });
+
+  test("new clients opt in to source albums without conflating same-name manual albums", async () => {
+    const queries: unknown[] = [];
+    const handlers = createMediaLibraryHandlers({
+      authenticate: async () => gate,
+      list: async (_actor, query) => {
+        queries.push(query);
+        return { items: [], albums: [], usage: { libraryBytes: 0, libraryObjects: 0, totalBytes: 0, totalObjects: 0 }, canManage: true };
+      },
+    });
+    expect((await handlers.GET(new Request("https://luma.test/api/mobile/library?includeSources=1&source=products"))).status).toBe(200);
+    expect(queries[0]).toMatchObject({ includeSources: true, source: "products" });
+    expect((await handlers.GET(new Request("https://luma.test/api/mobile/library?includeSources=1&album=H%C3%A0ng%20h%C3%B3a"))).status).toBe(200);
+    expect(queries[1]).toMatchObject({ includeSources: true, album: "Hàng hóa" });
+    for (const query of ["source=products", "includeSources=0", "includeSources=1&source=unknown", "includeSources=1&source=products&album=Hàng%20hóa", "includeSources=1&includeSources=1"]) {
+      expect((await handlers.GET(new Request(`https://luma.test/api/mobile/library?${query}`))).status).toBe(400);
+    }
+    expect(queries).toHaveLength(2);
   });
 
   test("resolves only authenticated item coordinates and redirects to the server-signed URL", async () => {

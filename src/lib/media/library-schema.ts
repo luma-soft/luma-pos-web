@@ -7,7 +7,7 @@ export const LIBRARY_IMAGE_MAX_BYTES = 25 * 1024 * 1024;
 export const LIBRARY_DOCUMENT_MAX_BYTES = 100 * 1024 * 1024;
 export const LIBRARY_VIDEO_MAX_BYTES = 512 * 1024 * 1024;
 
-const LIBRARY_IMAGE_TYPES = new Set([
+export const MEDIA_LIBRARY_IMAGE_MIME_TYPES = [
   "image/avif",
   "image/gif",
   "image/heic",
@@ -15,7 +15,8 @@ const LIBRARY_IMAGE_TYPES = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
-]);
+] as const;
+const LIBRARY_IMAGE_TYPES = new Set<string>(MEDIA_LIBRARY_IMAGE_MIME_TYPES);
 
 const LIBRARY_VIDEO_TYPES = new Set([
   "video/mp4",

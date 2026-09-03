@@ -12,6 +12,7 @@ import {
   Image as ImageIcon,
   Images,
   LayoutGrid,
+  Link2,
   LockKeyhole,
   Play,
   Plus,
@@ -35,8 +36,13 @@ import { LibraryFilterDrawer } from "./library-filter-drawer";
 import { LibraryUploadDialog } from "./library-upload-dialog";
 import {
   formatLibraryBytes,
+  libraryCanDelete,
+  libraryItemSizeKnown,
+  libraryItemSourcePreset,
   libraryListPath,
+  libraryManualAlbums,
   libraryRequest,
+  type LibraryAlbumSelection,
 } from "./library-utils";
 
 export type LibraryNotice = { tone: "success" | "error"; text: string };
@@ -56,6 +62,7 @@ export function MediaLibraryClient({
   const [snapshot, setSnapshot] = useState(initialSnapshot);
   const [query, setQuery] = useState("");
   const [album, setAlbum] = useState("");
+  const [source, setSource] = useState<LibraryAlbumSelection["source"]>("");
   const [kind, setKind] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -75,7 +82,7 @@ export function MediaLibraryClient({
       setLoadFailed(false);
       try {
         const next = await libraryRequest<MediaLibrarySnapshot>(
-          libraryListPath(query, album, kind, cursor),
+          libraryListPath(query, album, kind, cursor, source),
         );
         if (version !== requestVersion.current) return;
         setSnapshot((current) => ({
@@ -99,7 +106,7 @@ export function MediaLibraryClient({
         }
       }
     },
-    [query, album, kind],
+    [query, album, kind, source],
   );
 
   useEffect(() => {
@@ -124,6 +131,7 @@ export function MediaLibraryClient({
   }, [notice]);
 
   async function removeItem(item: MediaLibraryItem) {
+    if (!libraryCanDelete(item, snapshot.canManage)) return;
     setPreview(null);
     const confirmed = await confirmDialog.confirm({
       title: t("deleteTitle"),
@@ -144,7 +152,7 @@ export function MediaLibraryClient({
     }
   }
 
-  const filtered = Boolean(query || album || kind);
+  const filtered = Boolean(query || album || kind || source);
   const total = snapshot.page?.totalItems ?? snapshot.items.length;
   return (
     <div className="min-h-full bg-canvas">
@@ -177,11 +185,7 @@ export function MediaLibraryClient({
             <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-600 [&::-webkit-details-marker]:hidden">
               <HardDrive className="h-3.5 w-3.5" />
               <span className="tabular-nums">
-                {formatLibraryBytes(snapshot.usage.libraryBytes, locale)}
-              </span>
-              <span aria-hidden>·</span>
-              <span>
-                {t("itemsCount", { count: snapshot.usage.libraryObjects })}
+                {t("uploadedUsage", { count: snapshot.usage.libraryObjects, size: formatLibraryBytes(snapshot.usage.libraryBytes, locale) })}
               </span>
               <ChevronDown className="h-3.5 w-3.5 transition group-open:rotate-180" />
               <span className="sr-only">{t("storageDetails")}</span>
@@ -200,6 +204,7 @@ export function MediaLibraryClient({
                 {t("privateShort")}
               </span>
             </div>
+            <p className="mt-2 max-w-3xl leading-5">{t("linkedStorageHint")}</p>
           </details>
         </div>
       </header>
@@ -220,7 +225,7 @@ export function MediaLibraryClient({
                 filter={
                   <FilterTriggerButton
                     label={t("filterButton")}
-                    active={Boolean(album)}
+                    active={Boolean(album || source)}
                     aria-haspopup="dialog"
                     aria-expanded={filterOpen}
                     onClick={() => setFilterOpen(true)}
@@ -301,12 +306,13 @@ export function MediaLibraryClient({
           {filtered && (
             <div className="flex min-h-11 items-center justify-between gap-2 text-xs text-slate-500">
               <span>
-                {album || t("albumAll")} · {t("itemsCount", { count: total })}
+                {source ? t(`sourceAlbums.${source}`) : album || t("albumAll")} · {t("itemsCount", { count: total })}
               </span>
               <button
                 type="button"
                 onClick={() => {
                   setAlbum("");
+                  setSource("");
                   setKind("");
                   setQuery("");
                 }}
@@ -316,6 +322,7 @@ export function MediaLibraryClient({
               </button>
             </div>
           )}
+          {source && <p className="flex items-start gap-2 text-xs leading-5 text-slate-500"><Link2 aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />{t("sourceReadOnlyHint")}</p>}
           {loading && !appending ? (
             <div
               aria-busy="true"
@@ -393,17 +400,18 @@ export function MediaLibraryClient({
       {filterOpen && (
         <LibraryFilterDrawer
           albums={snapshot.albums}
-          totalCount={snapshot.usage.libraryObjects}
+          totalCount={snapshot.albums.reduce((count, entry) => count + entry.count, 0)}
           album={album}
-          onApply={setAlbum}
+          source={source}
+          onApply={(selection) => { setAlbum(selection.album); setSource(selection.source); }}
           onClose={() => setFilterOpen(false)}
         />
       )}
       {uploadOpen && (
         <LibraryUploadDialog
           storeId={storeId}
-          albums={snapshot.albums.map((entry) => entry.name)}
-          initialAlbum={album}
+          albums={libraryManualAlbums(snapshot.albums).map((entry) => entry.name)}
+          initialAlbum={source ? "" : album}
           onClose={() => setUploadOpen(false)}
           onUploaded={async (message) => {
             setNotice(message);
@@ -434,6 +442,7 @@ export function LibraryTile({
 }) {
   const t = useTranslations("mediaLibrary");
   const Icon = kindIcons[item.kind];
+  const preset = libraryItemSourcePreset(item);
   return (
     <article className="group min-w-0">
       <button
@@ -459,6 +468,7 @@ export function LibraryTile({
             </span>
           </div>
         )}
+        {item.source && <span className="absolute left-2 top-2 flex items-center gap-1 rounded-md bg-surface/95 px-1.5 py-1 text-[10px] font-medium text-primary-700 shadow-sm dark:text-primary-300"><Link2 aria-hidden="true" className="h-3 w-3" />{t("automatic")}</span>}
         <span className="absolute bottom-2 right-2 flex items-center gap-1 rounded-md bg-surface/95 px-1.5 py-1 text-[10px] font-medium text-slate-600 shadow-sm dark:text-slate-300">
           {item.kind === "video" ? (
             <Play className="h-3 w-3" />
@@ -476,11 +486,12 @@ export function LibraryTile({
           {item.title}
         </h2>
         <p className="mt-1 truncate text-[11px] text-slate-500 sm:text-xs">
-          {item.album} <span className="px-0.5 opacity-50">·</span>{" "}
+          {preset ? t(`sourceAlbums.${preset}`) : item.album} <span className="px-0.5 opacity-50">·</span>{" "}
           <span className="tabular-nums">
-            {formatLibraryBytes(item.sizeBytes, locale)}
+            {libraryItemSizeKnown(item) ? formatLibraryBytes(item.sizeBytes, locale) : t("unknownSize")}
           </span>
         </p>
+        {item.source && <p className="mt-1 truncate text-[11px] text-slate-500" title={t("linkedSource", { source: item.source.label })}>{t("linkedSource", { source: item.source.label })}</p>}
       </div>
     </article>
   );

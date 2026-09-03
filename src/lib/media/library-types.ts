@@ -1,4 +1,13 @@
 import type { MediaFileMetadata } from "@/lib/media/file-metadata-types";
+import type { MediaLibraryPreset, MediaLibrarySource } from "@/lib/media/library-source-types";
+
+export type MediaLibraryAlbum = {
+  name: string;
+  count: number;
+  key?: string;
+  system?: boolean;
+  source?: MediaLibraryPreset;
+};
 
 export type MediaLibraryItem = {
   id: string;
@@ -16,11 +25,16 @@ export type MediaLibraryItem = {
   url: string;
   thumbnailUrl: string | null;
   metadata?: MediaFileMetadata | null;
+  source?: MediaLibrarySource;
+  canDelete?: boolean;
+  canExtractMetadata?: boolean;
+  sizeKnown?: boolean;
+  uploadedAt?: string | null;
 };
 
 export type MediaLibrarySnapshot = {
   items: MediaLibraryItem[];
-  albums: Array<{ name: string; count: number }>;
+  albums: MediaLibraryAlbum[];
   usage: {
     libraryBytes: number;
     libraryObjects: number;
