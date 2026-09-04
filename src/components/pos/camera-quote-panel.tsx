@@ -1,5 +1,7 @@
 "use client";
 
+import { posBasePrice } from "@/lib/pos/price-book-price";
+
 import { Minus, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
@@ -149,7 +151,11 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
   }
 
   function packageTotal(pkg: CameraQuotePackage) {
-    const getPrice = (id: string) => Number(byId.get(id)?.prices?.[priceBook] ?? byId.get(id)?.retailPrice ?? 0);
+    const getPrice = (id: string) => {
+      if (!id) return 0;
+      const product = byId.get(id);
+      return product ? posBasePrice(product, priceBook) ?? Number.NaN : 0;
+    };
     const base = getPrice(pkg.cameraId) + getPrice(pkg.cardId) + getPrice(pkg.installationId);
     const material = pkg.materialLines.reduce((sum, line) => sum + getPrice(line.productId) * line.quantity, 0);
     return (base + material) * pkg.quantity;
@@ -284,7 +290,7 @@ export function CameraQuotePanel({ products, packages, priceBook, onChange }: Pr
                 <div className="mt-3 flex items-center justify-end gap-3 border-t border-border-soft pt-3">
                   <div className="text-right">
                     <div className="text-[11px] text-slate-400">{t("pos.cameraQuote.packageTotal")}</div>
-                    <div className="font-black tabular-nums text-primary-700">{formatCurrency(packageTotal(pkg))}</div>
+                    <div className="font-black tabular-nums text-primary-700">{Number.isFinite(packageTotal(pkg)) ? formatCurrency(packageTotal(pkg)) : "Chưa có dữ liệu"}</div>
                   </div>
                 </div>
               </article>

@@ -1,6 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { products, productComboItems, productPrices, productUnits, promotions, priceBooks } from "@/db/schema";
+import { canViewPurchasePrices, isInternalPriceBook, resolvePriceBookPrice, systemPriceBookType } from "@/lib/pricing/system-price-books";
 import { applyPromo, isPromoActive } from "@/lib/promo";
 import type { CreateOrderOutput, UpdateOrderOutput } from "@/lib/schemas/order";
 
@@ -25,15 +26,13 @@ export type NormalizedOrderItem = {
 };
 
 function listedUnitPrice(
-  product: {
-    retailPrice: string;
-  },
+  product: { retailPrice: string },
   unit: { multiplier: string; priceOverride: string | null } | null,
-  priceBookPrice: string | undefined
+  base: number,
+  purchaseSource: boolean,
 ) {
-  const base = Number(priceBookPrice ?? product.retailPrice);
   if (!unit) return base;
-  if (unit.priceOverride != null) {
+  if (!purchaseSource && unit.priceOverride != null) {
     const retail = Number(product.retailPrice);
     const ratio = retail > 0 ? base / retail : 1;
     return Math.round(Number(unit.priceOverride) * ratio);
@@ -52,6 +51,7 @@ export async function normalizeOrderItems(
   storeId: string,
   rawItems: RawOrderItem[],
   invoicePriceBookId?: string | null,
+  role?: string,
 ): Promise<NormalizedOrderItem[]> {
   const productIds = [...new Set(rawItems.map((i) => i.productId))];
   if (productIds.length === 0) throw new Error("INVALID_ITEMS");
@@ -66,6 +66,7 @@ export async function normalizeOrderItems(
         name: products.name,
         baseUnit: products.baseUnit,
         costPrice: products.costPrice,
+        lastPurchasePrice: products.lastPurchasePrice,
         retailPrice: products.retailPrice,
         isActive: products.isActive,
         productKind: products.productKind,
@@ -89,7 +90,7 @@ export async function normalizeOrderItems(
       : Promise.resolve([]),
     requestedPriceBookIds.length > 0
       ? db
-          .select({ id: priceBooks.id, costBased: priceBooks.costBased })
+          .select({ id: priceBooks.id, costBased: priceBooks.costBased, systemType: priceBooks.systemType, isDefault: priceBooks.isDefault, managerOnly: priceBooks.managerOnly })
           .from(priceBooks)
           .where(and(eq(priceBooks.storeId, storeId), inArray(priceBooks.id, requestedPriceBookIds)))
       : Promise.resolve([]),
@@ -150,13 +151,14 @@ export async function normalizeOrderItems(
     const itemPriceBookId = item.priceBookId === undefined ? invoicePriceBookId ?? null : item.priceBookId;
     const itemPriceBook = itemPriceBookId ? priceBookById.get(itemPriceBookId) : undefined;
     if (itemPriceBookId && !itemPriceBook) throw new Error("PRICE_BOOK_NOT_FOUND");
-    const listedPrice = listedUnitPrice(
-      product,
-      unit,
-      itemPriceBook?.costBased ? product.costPrice : itemPriceBookId
-        ? priceByBookProduct.get(`${itemPriceBookId}:${product.id}`)
-        : undefined,
-    );
+    if (itemPriceBook && isInternalPriceBook(itemPriceBook) && !canViewPurchasePrices(role)) {
+      throw new Error("PRICE_BOOK_FORBIDDEN");
+    }
+    const base = resolvePriceBookPrice(itemPriceBook ?? { isDefault: true }, product,
+      itemPriceBookId ? priceByBookProduct.get(`${itemPriceBookId}:${product.id}`) : undefined);
+    if (base == null) throw new Error("PRICE_BOOK_PRICE_UNAVAILABLE");
+    const source = itemPriceBook ? systemPriceBookType(itemPriceBook) : "retail";
+    const listedPrice = listedUnitPrice(product, unit, base, source === "cost" || source === "purchase");
     const manualUnitPrice = item.manualUnitPrice;
     const lineDiscount = Math.max(0, item.lineDiscount ?? 0);
     const baseQty = item.quantity * multiplier;

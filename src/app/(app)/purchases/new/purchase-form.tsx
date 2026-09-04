@@ -154,6 +154,7 @@ export type PurchaseFormInitialValues = {
   warehouseId: string;
   discount: number;
   vatRate: number;
+  shippingFee?: number;
   invoiceNumber: string;
   amountPaid: number;
   note: string;
@@ -222,6 +223,7 @@ export function PurchaseForm({
   const [search, setSearch] = useState("");
   const [discount, setDiscount] = useState(initialValues?.discount ?? 0);
   const [vatRate, setVatRate] = useState(initialValues?.vatRate ?? 0);
+  const [shippingFee, setShippingFee] = useState(initialValues?.shippingFee ?? 0);
   const [invoiceNumber, setInvoiceNumber] = useState(initialValues?.invoiceNumber ?? "");
   const [amountPaid, setAmountPaid] = useState(initialValues?.amountPaid ?? 0);
   const [payFull, setPayFull] = useState(false);
@@ -340,6 +342,7 @@ export function PurchaseForm({
     if (!nextLines.length && unresolvedPending[0]) setSearch(unresolvedPending[0].sku ?? unresolvedPending[0].label);
     if (typeof payload.discount === "number" && (applyMode === "replace" || discount === 0)) setDiscount(payload.discount);
     if (typeof payload.vatRate === "number" && (applyMode === "replace" || vatRate === 0)) setVatRate(payload.vatRate);
+    if (typeof payload.shippingFee === "number" && Number.isFinite(payload.shippingFee) && (applyMode === "replace" || shippingFee === 0)) setShippingFee(Math.max(0, payload.shippingFee));
     if (typeof payload.invoiceNumber === "string" && (applyMode === "replace" || !invoiceNumber)) setInvoiceNumber(payload.invoiceNumber);
     if (typeof payload.amountPaid === "number" && (applyMode === "replace" || amountPaid === 0)) setAmountPaid(payload.amountPaid);
     if (typeof payload.note === "string" && (applyMode === "replace" || !note)) setNote(payload.note);
@@ -366,7 +369,7 @@ export function PurchaseForm({
   const subtotal = lines.reduce((s, l) => s + purchaseLineTotal(l), 0);
   const afterDiscount = Math.max(0, subtotal - discount);
   const tax = Math.round((afterDiscount * vatRate) / 100);
-  const total = afterDiscount + tax;
+  const total = afterDiscount + tax + shippingFee;
   const paid = payFull ? total : Math.min(amountPaid, total);
   const owed = total - paid;
 
@@ -397,7 +400,7 @@ export function PurchaseForm({
     setBusy(true); setError("");
     const payload = {
       supplierId, warehouseId,
-      discount, vatRate,
+      discount, vatRate, shippingFee,
       invoiceNumber: invoiceNumber || undefined,
       note: note || undefined,
       amountPaid: paid,
@@ -446,6 +449,7 @@ export function PurchaseForm({
     warehouseId !== defaultWarehouseId ||
     discount !== (initialValues?.discount ?? 0) ||
     vatRate !== (initialValues?.vatRate ?? 0) ||
+    shippingFee !== (initialValues?.shippingFee ?? 0) ||
     invoiceNumber !== (initialValues?.invoiceNumber ?? "") ||
     amountPaid !== (initialValues?.amountPaid ?? 0) ||
     note !== (initialValues?.note ?? "");
@@ -698,6 +702,10 @@ export function PurchaseForm({
                 <NumberInput min={0} max={100} value={vatRate} placeholder="0" suffix="%" thousandSeparator={false} onChange={(value) => setVatRate(value ?? 0)} className={cn(numCls, "w-20")} />
                 <span className="tabular-nums text-slate-500 w-24 text-right">{formatCurrency(tax)}</span>
               </div>
+            </div>
+            <div className="flex justify-between items-center gap-2">
+              <label htmlFor="purchase-shipping-fee" className="text-slate-500">Phí vận chuyển</label>
+              <MoneyInput id="purchase-shipping-fee" min={0} value={shippingFee || ""} placeholder="0" onChange={(value) => setShippingFee(value ?? 0)} className={cn(numCls, "w-32")} />
             </div>
             <div className="flex justify-between items-center text-base font-semibold pt-1"><span>{t("purchases.needPay")}</span><span className="text-primary-600 tabular-nums">{formatCurrency(total)}</span></div>
 

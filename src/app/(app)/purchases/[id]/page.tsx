@@ -195,6 +195,9 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
             {Number(purchase.tax) > 0 && (
               <div className="flex justify-between"><span className="text-slate-500">VAT {formatNumber(Number(purchase.vatRate))}%</span><span className="tabular-nums">{formatCurrency(Number(purchase.tax))}</span></div>
             )}
+            {Number(purchase.shippingFee) > 0 && (
+              <div className="flex justify-between"><span className="text-slate-500">Phí vận chuyển</span><span className="tabular-nums">{formatCurrency(Number(purchase.shippingFee))}</span></div>
+            )}
             <div className="flex justify-between pt-1 text-base font-semibold">
               <span>{t("orders.cols.total")}</span>
               <span className="tabular-nums text-primary-600">{formatCurrency(total)}</span>

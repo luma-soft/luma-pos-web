@@ -141,6 +141,7 @@ export const createPurchaseSchema = z.object({
   warehouseId: z.uuid(),
   discount: z.number().min(0).default(0),   // giảm giá cả phiếu (VND)
   vatRate: z.number().min(0).max(100).default(0), // % VAT
+  shippingFee: z.number().min(0).default(0),
   invoiceNumber: z.string().optional(),     // số hóa đơn đầu vào
   note: z.string().optional(),
   amountPaid: z.number().min(0).default(0),

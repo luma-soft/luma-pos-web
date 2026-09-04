@@ -25,7 +25,7 @@ export async function updateOrderForUser(userId: string, input: UpdateOrderInput
 
   try {
     const profileId = await getProfileId(userId);
-    const trustedItems = await normalizeOrderItems(storeId, v.items);
+    const trustedItems = await normalizeOrderItems(storeId, v.items, undefined, context.role);
 
     await db.transaction(async (tx) => {
       const [order] = await tx.select().from(orders).where(and(eq(orders.storeId, storeId), eq(orders.id, v.orderId))).limit(1).for("update");
@@ -141,7 +141,9 @@ export async function updateOrderForUser(userId: string, input: UpdateOrderInput
     return { ok: true, data: undefined };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
-    if (["PRODUCT_NOT_FOUND", "UNIT_NOT_FOUND", "INVALID_ITEMS"].includes(msg)) {
+    if (msg === "PRICE_BOOK_PRICE_UNAVAILABLE") return { ok: false, error: "pricing.errors.priceUnavailable" };
+    if (msg === "PRICE_BOOK_FORBIDDEN") return { ok: false, error: "errors.forbidden" };
+    if (["PRODUCT_NOT_FOUND", "UNIT_NOT_FOUND", "INVALID_ITEMS", "PRICE_BOOK_NOT_FOUND"].includes(msg)) {
       return { ok: false, error: "errors.invalidData" };
     }
     const known: Record<string, string> = {

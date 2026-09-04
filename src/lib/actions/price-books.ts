@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { priceBooks, productPrices, products } from "@/db/schema";
 import { type ActionResult, requireManager, toMoney } from "./common";
 import { Routes } from "@/lib/routes";
+import { isSystemPriceBook, isReservedPriceBookName } from "@/lib/pricing/system-price-books";
 import { pricingSellableProductCondition } from "@/lib/data/pricing";
 import { recordActivity } from "@/lib/audit/activity-log";
 
@@ -36,17 +37,21 @@ export async function applyPriceFormulaAll(input: {
   const gate = await requireManager(); if (!gate.ok) return gate;
   try {
     const result = await db.transaction(async (tx) => {
-      const [book] = await tx.select({ name: priceBooks.name, isDefault: priceBooks.isDefault }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, input.priceBookId))).limit(1).for("update");
+      const [book] = await tx.select({ name: priceBooks.name, isDefault: priceBooks.isDefault, systemType: priceBooks.systemType, costBased: priceBooks.costBased }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, input.priceBookId))).limit(1).for("update");
       if (!book) return null;
-      const before = await tx.select({ id: products.id, name: products.name, sku: products.sku, retailPrice: products.retailPrice })
+      if (isSystemPriceBook(book)) return "pricing.errors.systemReadOnly";
+      const before = await tx.select({ id: products.id, name: products.name, sku: products.sku, retailPrice: products.retailPrice, lastPurchasePrice: products.lastPurchasePrice })
         .from(products).where(and(eq(products.storeId, gate.storeId), pricingSellableProductCondition())).for("update");
+      if (input.base === "lastPurchase" && before.some((row) => row.lastPurchasePrice == null)) {
+        return "pricing.errors.priceUnavailable";
+      }
       const overrides = book.isDefault ? [] : await tx.select({ productId: productPrices.productId, price: productPrices.price })
         .from(productPrices).where(and(eq(productPrices.storeId, gate.storeId), eq(productPrices.priceBookId, input.priceBookId)));
       const previousPrices = new Map(overrides.map((row) => [row.productId, row.price]));
 
       if (book.isDefault) {
         const base = input.base === "cost" ? sql`${products.costPrice}`
-          : input.base === "lastPurchase" ? sql`coalesce(${products.lastPurchasePrice}, ${products.costPrice})`
+          : input.base === "lastPurchase" ? sql`${products.lastPurchasePrice}`
           : sql`${products.retailPrice}`;
         await tx
           .update(products)
@@ -60,7 +65,7 @@ export async function applyPriceFormulaAll(input: {
         const base = input.base === "cost"
           ? sql`${products.costPrice}`
           : input.base === "lastPurchase"
-            ? sql`coalesce(${products.lastPurchasePrice}, ${products.costPrice})`
+            ? sql`${products.lastPurchasePrice}`
             : sql`coalesce(${currentPrice.price}, ${products.retailPrice})`;
         await tx
           .insert(productPrices)
@@ -116,6 +121,7 @@ export async function applyPriceFormulaAll(input: {
     return Number(n);
     });
     if (result == null) return { ok: false, error: "errors.invalidData" };
+    if (typeof result === "string") return { ok: false, error: result };
     revalidatePath(Routes.Pricing);
     revalidatePath(Routes.POS);
     return { ok: true, data: { count: result } };
@@ -127,6 +133,7 @@ export async function createPriceBook(name: string): Promise<ActionResult<{ id: 
   const gate = await requireManager(); if (!gate.ok) return gate;
   const n = name.trim();
   if (!n) return { ok: false, error: "errors.invalidData" };
+  if (isReservedPriceBookName(n)) return { ok: false, error: "pricing.errors.systemReadOnly" };
   try {
     const row = await db.transaction(async (tx) => {
       const [{ max }] = await tx.select({ max: sql<number>`coalesce(max(${priceBooks.sortOrder}), 0)` }).from(priceBooks).where(eq(priceBooks.storeId, gate.storeId));
@@ -144,13 +151,17 @@ export async function renamePriceBook(id: string, name: string): Promise<ActionR
   const gate = await requireManager(); if (!gate.ok) return gate;
   const n = name.trim();
   if (!n) return { ok: false, error: "errors.invalidData" };
+  if (isReservedPriceBookName(n)) return { ok: false, error: "pricing.errors.systemReadOnly" };
   try {
-    await db.transaction(async (tx) => {
-      const [before] = await tx.select({ name: priceBooks.name }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, id))).limit(1).for("update");
-      if (!before || before.name === n) return;
+    const error = await db.transaction(async (tx) => {
+      const [before] = await tx.select({ name: priceBooks.name, systemType: priceBooks.systemType, isDefault: priceBooks.isDefault, costBased: priceBooks.costBased }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, id))).limit(1).for("update");
+      if (!before) return "errors.invalidData";
+      if (isSystemPriceBook(before)) return "pricing.errors.systemReadOnly";
+      if (before.name === n) return;
       await tx.update(priceBooks).set({ name: n }).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, id)));
       await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId, action: "price_book.renamed", entityType: "price_book", entityId: id, before, after: { name: n } });
     });
+    if (error) return { ok: false, error };
     revalidatePath(Routes.Pricing);
     return { ok: true, data: undefined };
   } catch (e) { console.error("renamePriceBook failed:", e); return { ok: false, error: "errors.serverError" }; }
@@ -161,9 +172,9 @@ export async function deletePriceBook(id: string): Promise<ActionResult> {
   const gate = await requireManager(); if (!gate.ok) return gate;
   try {
     const error = await db.transaction(async (tx) => {
-      const [book] = await tx.select({ name: priceBooks.name, isDefault: priceBooks.isDefault }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, id))).limit(1).for("update");
+      const [book] = await tx.select({ name: priceBooks.name, isDefault: priceBooks.isDefault, systemType: priceBooks.systemType, costBased: priceBooks.costBased }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, id))).limit(1).for("update");
       if (!book) return "errors.invalidData";
-      if (book.isDefault) return "pricing.errors.cannotDeleteDefault";
+      if (isSystemPriceBook(book)) return "pricing.errors.systemReadOnly";
       await tx.delete(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, id)));
       await recordActivity(tx, { storeId: gate.storeId, actorId: gate.userId, action: "price_book.deleted", entityType: "price_book", entityId: id, before: { name: book.name } });
       return null;
@@ -187,8 +198,9 @@ export async function setProductPrice(input: {
   const gate = await requireManager(); if (!gate.ok) return gate;
   try {
     const result = await db.transaction(async (tx) => {
-      const [book] = await tx.select({ name: priceBooks.name, isDefault: priceBooks.isDefault }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, input.priceBookId))).limit(1);
+      const [book] = await tx.select({ name: priceBooks.name, isDefault: priceBooks.isDefault, systemType: priceBooks.systemType, costBased: priceBooks.costBased }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, input.priceBookId))).limit(1);
       if (!book) return false;
+      if (isSystemPriceBook(book)) return "pricing.errors.systemReadOnly";
       const [product] = await tx.select({ name: products.name, sku: products.sku, retailPrice: products.retailPrice }).from(products)
         .where(and(eq(products.storeId, gate.storeId), eq(products.id, input.productId))).limit(1).for("update");
       if (!product) return false;
@@ -218,6 +230,7 @@ export async function setProductPrice(input: {
     return true;
     });
     if (!result) return { ok: false, error: "errors.invalidData" };
+    if (typeof result === "string") return { ok: false, error: result };
     revalidatePath(Routes.Pricing);
     revalidatePath(Routes.POS);
     return { ok: true, data: undefined };

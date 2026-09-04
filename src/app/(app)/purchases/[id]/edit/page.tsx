@@ -32,6 +32,7 @@ export default async function EditPurchasePage({ params }: { params: Promise<{ i
         warehouseId: purchase.warehouseId,
         discount: Number(purchase.discount),
         vatRate: Number(purchase.vatRate),
+        shippingFee: Number(purchase.shippingFee),
         invoiceNumber: purchase.invoiceNumber ?? "",
         amountPaid: Number(purchase.amountPaid),
         note: purchase.note ?? "",

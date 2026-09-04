@@ -1,6 +1,7 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { priceBooks, productPrices } from "@/db/schema";
+import type { SystemPriceBookType } from "@/lib/pricing/system-price-books";
 
 export interface PriceBookRow {
   id: string;
@@ -8,6 +9,7 @@ export interface PriceBookRow {
   isDefault: boolean;
   managerOnly: boolean;
   costBased: boolean;
+  systemType: SystemPriceBookType | null;
   sortOrder: number;
 }
 
@@ -20,6 +22,7 @@ export async function getPriceBooks(storeId: string, options?: { includeManagerO
       isDefault: priceBooks.isDefault,
       managerOnly: priceBooks.managerOnly,
       costBased: priceBooks.costBased,
+      systemType: priceBooks.systemType,
       sortOrder: priceBooks.sortOrder,
     })
     .from(priceBooks)
@@ -56,7 +59,8 @@ export async function getPriceOverrides(
   const rows = await db
     .select({ pid: productPrices.productId, price: productPrices.price })
     .from(productPrices)
-    .where(where);
+    .innerJoin(priceBooks, and(eq(priceBooks.id, productPrices.priceBookId), eq(priceBooks.storeId, storeId)))
+    .where(and(where, isNull(priceBooks.systemType), eq(priceBooks.isDefault, false), eq(priceBooks.costBased, false)));
   const m: Record<string, string> = {};
   for (const r of rows) m[r.pid] = r.price;
   return m;
@@ -74,7 +78,9 @@ export async function getPriceOverridesForProducts(
   const rows = await db
     .select({ book: productPrices.priceBookId, pid: productPrices.productId, price: productPrices.price })
     .from(productPrices)
+    .innerJoin(priceBooks, and(eq(priceBooks.id, productPrices.priceBookId), eq(priceBooks.storeId, storeId)))
     .where(and(
+      isNull(priceBooks.systemType), eq(priceBooks.isDefault, false), eq(priceBooks.costBased, false),
       eq(productPrices.storeId, storeId),
       inArray(productPrices.productId, productIds),
     ));

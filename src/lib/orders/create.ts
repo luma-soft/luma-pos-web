@@ -88,10 +88,12 @@ export async function createOrderForUser(
   const isBooking = v.mode === "booking";
   let trustedItems;
   try {
-    trustedItems = await normalizeOrderItems(storeId, v.items, v.priceBookId);
+    trustedItems = await normalizeOrderItems(storeId, v.items, v.priceBookId, context.role);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "";
-    if (["PRODUCT_NOT_FOUND", "UNIT_NOT_FOUND", "INVALID_ITEMS"].includes(msg)) {
+    if (msg === "PRICE_BOOK_PRICE_UNAVAILABLE") return { ok: false, error: "pricing.errors.priceUnavailable" };
+    if (msg === "PRICE_BOOK_FORBIDDEN") return { ok: false, error: "errors.forbidden" };
+    if (["PRODUCT_NOT_FOUND", "UNIT_NOT_FOUND", "INVALID_ITEMS", "PRICE_BOOK_NOT_FOUND"].includes(msg)) {
       return { ok: false, error: "errors.invalidData" };
     }
     throw e;

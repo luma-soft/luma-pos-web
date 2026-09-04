@@ -274,11 +274,11 @@ async function syncProductPriceBookPrices(
   if (bookIds.length === 0) return;
 
   const validBooks = await connection
-    .select({ id: priceBooks.id, isDefault: priceBooks.isDefault })
+    .select({ id: priceBooks.id, isDefault: priceBooks.isDefault, systemType: priceBooks.systemType, costBased: priceBooks.costBased })
     .from(priceBooks)
     .where(and(eq(priceBooks.storeId, storeId), inArray(priceBooks.id, bookIds)));
   const nonDefaultIds = new Set(
-    validBooks.filter((book) => !book.isDefault).map((book) => book.id),
+    validBooks.filter((book) => !book.isDefault && !book.systemType && !book.costBased).map((book) => book.id),
   );
 
   const toDelete = entries

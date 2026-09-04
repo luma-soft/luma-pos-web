@@ -21,7 +21,7 @@ import { publishCommittedNotification } from "@/lib/notifications/outbox";
 import { recordActivity } from "@/lib/audit/activity-log";
 import { activityValuesEqual } from "@/lib/products/product-activity";
 
-type PurchaseCalcInput = Pick<CreatePurchaseOutput, "items" | "discount" | "vatRate" | "amountPaid">;
+type PurchaseCalcInput = Pick<CreatePurchaseOutput, "items" | "discount" | "vatRate" | "shippingFee" | "amountPaid">;
 
 function purchaseLineTotal(i: { quantity: number; unitCost: number; discount: number }) {
   return Math.max(0, i.quantity * i.unitCost - i.discount);
@@ -31,7 +31,7 @@ function calcPurchaseTotals(v: PurchaseCalcInput) {
   const subtotal = v.items.reduce((s, i) => s + purchaseLineTotal(i), 0);
   const afterDiscount = Math.max(0, subtotal - v.discount);
   const tax = Math.round((afterDiscount * v.vatRate) / 100);
-  const total = afterDiscount + tax;
+  const total = afterDiscount + tax + v.shippingFee;
   const paid = Math.min(v.amountPaid, total);
   return { subtotal, tax, total, paid, owed: Math.max(0, total - paid) };
 }
@@ -87,6 +87,7 @@ export async function createPurchase(
         discount: toMoney(v.discount),
         vatRate: String(v.vatRate),
         tax: toMoney(totals.tax),
+        shippingFee: toMoney(v.shippingFee),
         total: toMoney(totals.total),
         amountPaid: toMoney(totals.paid),
         invoiceNumber: v.invoiceNumber?.trim()?.slice(0, 50) || null,
@@ -215,7 +216,7 @@ export async function createPurchase(
 
       await recordActivity(tx, {
         storeId: gate.storeId, actorId: profileId, action: "purchase.created", entityType: "purchase", entityId: po.id,
-        after: { code: po.code, status: "received", total: totals.total, amountPaid: totals.paid, itemCount: v.items.length },
+        after: { code: po.code, status: "received", total: totals.total, shippingFee: v.shippingFee, amountPaid: totals.paid, itemCount: v.items.length },
         affectedRecords: v.items.map((item) => ({ type: "product", id: item.productId, name: found.find((product) => product.id === item.productId)?.name, code: found.find((product) => product.id === item.productId)?.sku, quantity: item.quantity, unitCost: item.unitCost })),
         metadata: { purchaseCode: po.code, supplierId: v.supplierId, warehouseId: v.warehouseId },
       });
@@ -278,7 +279,7 @@ export async function updatePurchase(
         productId: item.productId, quantity: Number(item.quantity), unitCost: Number(item.unitCost), discount: Number(item.discount), batchNumber: item.batchNumber ?? null, expiryDate: item.expiryDate ?? null,
       })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
       const purchaseChanged = po.status !== "received" || po.supplierId !== v.supplierId || po.warehouseId !== v.warehouseId
-        || Number(po.total) !== totals.total || Number(po.amountPaid) !== totals.paid || Number(po.discount) !== v.discount || Number(po.vatRate) !== v.vatRate
+        || Number(po.total) !== totals.total || Number(po.amountPaid) !== totals.paid || Number(po.discount) !== v.discount || Number(po.vatRate) !== v.vatRate || Number(po.shippingFee) !== v.shippingFee
         || po.invoiceNumber !== (v.invoiceNumber?.trim()?.slice(0, 50) || null) || po.note !== (v.note || null)
         || !activityValuesEqual(comparableItems(oldItems), comparableItems(v.items));
       const oldLots = oldItems.length > 0
@@ -488,6 +489,7 @@ export async function updatePurchase(
           discount: toMoney(v.discount),
           vatRate: String(v.vatRate),
           tax: toMoney(totals.tax),
+          shippingFee: toMoney(v.shippingFee),
           total: toMoney(totals.total),
           amountPaid: toMoney(totals.paid),
           invoiceNumber: v.invoiceNumber?.trim()?.slice(0, 50) || null,
@@ -531,8 +533,8 @@ export async function updatePurchase(
           });
       if (purchaseChanged) await recordActivity(tx, {
         storeId: gate.storeId, actorId: profileId, action: "purchase.updated", entityType: "purchase", entityId: po.id,
-        before: { code: po.code, status: po.status, total: Number(po.total), amountPaid: Number(po.amountPaid), itemCount: oldItems.length },
-        after: { code: po.code, status: "received", total: totals.total, amountPaid: totals.paid, itemCount: v.items.length },
+        before: { code: po.code, status: po.status, total: Number(po.total), shippingFee: Number(po.shippingFee), amountPaid: Number(po.amountPaid), itemCount: oldItems.length },
+        after: { code: po.code, status: "received", total: totals.total, shippingFee: v.shippingFee, amountPaid: totals.paid, itemCount: v.items.length },
         affectedRecords: v.items.map((item) => ({ type: "product", id: item.productId, name: found.find((product) => product.id === item.productId)?.name, code: found.find((product) => product.id === item.productId)?.sku, quantity: item.quantity, unitCost: item.unitCost })),
         metadata: { purchaseCode: po.code, supplierId: v.supplierId, warehouseId: v.warehouseId },
       });
@@ -650,7 +652,7 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
       await tx.update(purchaseOrders).set({ status: "cancelled" }).where(and(eq(purchaseOrders.storeId, gate.storeId), eq(purchaseOrders.id, po.id)));
       await recordActivity(tx, {
         storeId: gate.storeId, actorId: profileId, action: "purchase.cancelled", entityType: "purchase", entityId: po.id,
-        before: { code: po.code, status: po.status, total: Number(po.total), amountPaid: Number(po.amountPaid) },
+        before: { code: po.code, status: po.status, total: Number(po.total), shippingFee: Number(po.shippingFee), amountPaid: Number(po.amountPaid) },
         after: { code: po.code, status: "cancelled" },
         metadata: { purchaseCode: po.code, supplierId: po.supplierId, warehouseId: po.warehouseId },
       });

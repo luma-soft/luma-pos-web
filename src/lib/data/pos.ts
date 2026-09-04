@@ -7,6 +7,8 @@ import type { Role } from "@/lib/actions/common";
 import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
 import { accentInsensitiveLike } from "@/lib/search";
 import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
+import { applySystemPriceBooks } from "@/lib/pos/system-price-projection";
+import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
 
 export interface PosUnit {
   unitName: string;
@@ -58,6 +60,7 @@ function posProductSelect(
     // Chỉ dùng nội bộ để gắn vào bảng giá vốn cho owner/manager bên dưới.
     // Không trả trực tiếp trường này ra client.
     costPrice: products.costPrice,
+    lastPurchasePrice: products.lastPurchasePrice,
     retailPrice: products.retailPrice,
     wholesalePrice: products.wholesalePrice,
     contractorPrice: products.contractorPrice,
@@ -120,7 +123,7 @@ function posProductSelect(
       from ${productUnits} where ${productUnits.productId} = ${products.id}
     ), '[]')`,
     // override giá theo bảng giá: { [priceBookId]: price }
-    prices: sql<Record<string, string>>`coalesce((
+    prices: sql<Record<string, string | null>>`coalesce((
       select json_object_agg(${productPrices.priceBookId}, ${productPrices.price})
       from ${productPrices} where ${productPrices.productId} = ${products.id}
     ), '{}')`,
@@ -143,25 +146,6 @@ function attachChildren<
     ...root,
     children: root.isVariantParent ? byParent.get(root.id) ?? [] : [],
   }));
-}
-
-/**
- * Bảng giá vốn không lưu product_prices, vì giá vốn có thể đổi sau mỗi phiếu nhập.
- * Chỉ nhúng giá vốn vào map giá khi caller đã được phép đọc bảng giá nội bộ.
- */
-type CostPriceBookProduct = {
-  costPrice: string;
-  prices: Record<string, string>;
-  children: CostPriceBookProduct[];
-};
-
-function applyCostPriceBooks(rows: CostPriceBookProduct[], costBookIds: string[]): void {
-  for (const product of rows) {
-    Object.assign(product.prices, Object.fromEntries(costBookIds.map((bookId) => [bookId, product.costPrice])));
-    applyCostPriceBooks(product.children, costBookIds);
-    // costPrice là dữ liệu nhạy cảm: chỉ trả ra dưới priceBookId nội bộ khi được phép.
-    delete (product as { costPrice?: string }).costPrice;
-  }
 }
 
 function activeRootCondition(storeId: string) {
@@ -258,7 +242,7 @@ export async function getPosData(storeId: string, options?: {
   const productsForPos = [...byId.values()];
 
   const priceBookRows = await getPriceBooks(storeId, {
-    includeManagerOnly: options?.role === "owner" || options?.role === "manager",
+    includeManagerOnly: canViewPurchasePrices(options?.role),
   });
 
   const [promoRows, projectRows, defaultBankAccount] = await Promise.all([
@@ -303,10 +287,7 @@ export async function getPosData(storeId: string, options?: {
     if (isPromoActive(p)) promoByProduct[p.productId] = p.tiers ?? [];
   }
 
-  const costBookIds = options?.role === "owner" || options?.role === "manager"
-    ? priceBookRows.filter((book) => book.costBased).map((book) => book.id)
-    : [];
-  applyCostPriceBooks(productsForPos as unknown as CostPriceBookProduct[], costBookIds);
+  applySystemPriceBooks(productsForPos as Parameters<typeof applySystemPriceBooks>[0], priceBookRows);
 
   return {
     warehouse: defaultWh ?? null,
@@ -399,14 +380,11 @@ export async function searchPosProductRows(
     return true;
   });
   // Kết quả tìm kiếm phải có cùng map bảng giá và quyền đọc giá vốn như lưới POS.
-  const costBookIds = options?.role === "owner" || options?.role === "manager"
-    ? (await getPriceBooks(storeId, { includeManagerOnly: true }))
-        .filter((book) => book.costBased).map((book) => book.id)
-    : [];
-  applyCostPriceBooks(rows as unknown as CostPriceBookProduct[], costBookIds);
+  const books = await getPriceBooks(storeId, { includeManagerOnly: canViewPurchasePrices(options?.role) });
+  applySystemPriceBooks(rows as Parameters<typeof applySystemPriceBooks>[0], books);
   return rows;
 }
 
 export type PosData = Awaited<ReturnType<typeof getPosData>>;
-export type PosProduct = PosData["products"][number];
+export type PosProduct = PosData["products"][number] & { priceBookTypes?: Record<string, "retail" | "cost" | "purchase" | null> };
 export type PosCustomer = PosData["customers"][number];

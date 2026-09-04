@@ -11,6 +11,8 @@ import {
   stockLevels,
   warehouses,
 } from "@/db/schema";
+import { getPriceBooks } from "@/lib/data/price-books";
+import { canViewPurchasePrices, resolvePriceBookPrice, systemPriceBookType } from "@/lib/pricing/system-price-books";
 import { UNMANAGED_STOCK_CATEGORY_NAME } from "@/lib/product-stock";
 import {
   PRODUCT_CATALOG_SCHEMA_VERSION,
@@ -47,7 +49,7 @@ async function buildProductCatalogSnapshot(
 ): Promise<ProductCatalogSnapshot> {
   const hasComplianceColumns = await hasProductComplianceColumns();
   const revisionBefore = await getProductCatalogRevision(storeId);
-  const [productRows, warehouseRows] = await Promise.all([
+  const [productRows, warehouseRows, books] = await Promise.all([
     db
       .select({
         id: products.id,
@@ -62,6 +64,7 @@ async function buildProductCatalogSnapshot(
         categoryName: categories.name,
         baseUnit: products.baseUnit,
         costPrice: products.costPrice,
+        lastPurchasePrice: products.lastPurchasePrice,
         retailPrice: products.retailPrice,
         wholesalePrice: products.wholesalePrice,
         contractorPrice: products.contractorPrice,
@@ -134,6 +137,7 @@ async function buildProductCatalogSnapshot(
       .from(warehouses)
       .where(eq(warehouses.storeId, storeId))
       .orderBy(desc(warehouses.isDefault), asc(warehouses.name)),
+    getPriceBooks(storeId, { includeManagerOnly: canViewPurchasePrices(role) }),
   ]);
   const revisionAfter = await getProductCatalogRevision(storeId);
   if (revisionBefore !== revisionAfter) {
@@ -149,17 +153,20 @@ async function buildProductCatalogSnapshot(
     savedAt: Date.now(),
     products: productRows.map((product) => ({
       ...product,
-      costPrice: ["owner", "manager", "warehouse"].includes(role)
-        ? product.costPrice
-        : null,
+      costPrice: canViewPurchasePrices(role) ? product.costPrice : null,
+      lastPurchasePrice: canViewPurchasePrices(role) ? product.lastPurchasePrice : null,
       imageUrls: product.imageUrls ?? [],
       units: product.units.map((unit) => ({
         ...unit,
         multiplier: String(unit.multiplier),
         priceOverride: unit.priceOverride == null ? null : String(unit.priceOverride),
       })),
+      priceBookTypes: Object.fromEntries(books.map((book) => [book.id, systemPriceBookType(book)])),
       prices: Object.fromEntries(
-        Object.entries(product.prices).map(([priceBookId, price]) => [priceBookId, String(price)]),
+        books.map((book) => {
+          const price = resolvePriceBookPrice(book, product, product.prices[book.id]);
+          return [book.id, price == null ? null : String(price)];
+        }),
       ),
       warehouseStock: product.warehouseStock.map((stock) => ({
         ...stock,

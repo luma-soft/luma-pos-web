@@ -1,3 +1,4 @@
+import { canViewPurchasePrices, isSystemPriceBook, resolvePriceBookPrice } from "@/lib/pricing/system-price-books";
 import {
   getPricingCategories,
   getPricingBrands,
@@ -23,10 +24,13 @@ export async function GET(request: Request) {
 
   const page = numberParam(request, "page", 1);
   const pageSize = numberParam(request, "pageSize", 50);
-  const sort = parsePricingSort(searchParam(request, "sort"));
+  const includePurchasePrices = canViewPurchasePrices(gate.role);
+  const requestedSort = parsePricingSort(searchParam(request, "sort"));
+  const sort = !includePurchasePrices && requestedSort === "cost" ? "updated" : requestedSort;
   const priceBookId = searchParam(request, "priceBookId");
-  const [books, categories, brands, suppliers, products] = await Promise.all([
-    getPriceBooks(gate.storeId),
+  const books = await getPriceBooks(gate.storeId, { includeManagerOnly: includePurchasePrices });
+  const visiblePriceBookId = books.some((book) => book.id === priceBookId) ? priceBookId : undefined;
+  const [categories, brands, suppliers, products] = await Promise.all([
     getPricingCategories(gate.storeId),
     getPricingBrands(gate.storeId),
     getPricingSuppliers(gate.storeId),
@@ -39,7 +43,7 @@ export async function GET(request: Request) {
       productKind: searchParam(request, "productKind"),
       lifecycle: searchParam(request, "lifecycle", "active"),
       sort,
-      priceBookId: sort === "retail" ? priceBookId : undefined,
+      priceBookId: sort === "retail" ? visiblePriceBookId : undefined,
       page,
       pageSize,
     }),
@@ -60,14 +64,15 @@ export async function GET(request: Request) {
     variantName: product.variantName,
     isVariantParent: product.isVariantParent,
     baseRetailPrice: product.baseRetailPrice,
-    costPrice: product.costPrice,
-    lastPurchasePrice: product.lastPurchasePrice,
+    costPrice: canViewPurchasePrices(gate.role) ? product.costPrice : null,
+    lastPurchasePrice: canViewPurchasePrices(gate.role) ? product.lastPurchasePrice : null,
     overridesByBookId: Object.fromEntries(
       books
         .filter((book) => !book.isDefault)
         .flatMap((book) => {
-          const override = overrides[book.id]?.[product.id];
-          return override == null ? [] : [[book.id, Number(override)]];
+          if (!isSystemPriceBook(book) && overrides[book.id]?.[product.id] == null) return [];
+          const price = resolvePriceBookPrice(book, { retailPrice: product.baseRetailPrice, costPrice: product.costPrice, lastPurchasePrice: product.lastPurchasePrice }, overrides[book.id]?.[product.id]);
+          return [[book.id, price]];
         }),
     ),
   }));

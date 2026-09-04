@@ -1,5 +1,7 @@
 "use client";
 
+import { posBasePrice, posUnitPrice } from "@/lib/pos/price-book-price";
+
 import { DateInput } from "@/components/ui/date-input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -413,22 +415,12 @@ function aiProductDraftItemsFromQuery(params: URLSearchParams) {
     .map((productId) => ({ productId, quantity: 1 }));
 }
 
-/** Giá gốc theo bảng giá đã chọn (id). Bảng mặc định/"" → retailPrice; bảng khác → override, fallback retailPrice. */
-function basePriceFor(p: PosProduct, priceBook: PriceBook = ""): number {
-  const ov = priceBook ? p.prices?.[priceBook] : undefined;
-  return Number(ov ?? p.retailPrice);
+function basePriceFor(p: PosProduct, priceBook: PriceBook = "", books?: PosData["priceBooks"]): number {
+  return posBasePrice(p, priceBook, books) ?? Number.NaN;
 }
 
-/** Giá của 1 đơn vị: priceOverride nếu có, không thì giá gốc × hệ số. */
-function unitPriceFor(p: PosProduct, unit: PosUnit | null, priceBook: PriceBook = ""): number {
-  const base = basePriceFor(p, priceBook);
-  if (!unit) return base;
-  if (unit.priceOverride != null) {
-    // override là giá lẻ của đơn vị đó — áp tỷ lệ nhóm khách như giá gốc
-    const ratio = Number(p.retailPrice) > 0 ? base / Number(p.retailPrice) : 1;
-    return Math.round(Number(unit.priceOverride) * ratio);
-  }
-  return Math.round(base * Number(unit.multiplier));
+function unitPriceFor(p: PosProduct, unit: PosUnit | null, priceBook: PriceBook = "", books?: PosData["priceBooks"]): number {
+  return posUnitPrice(p, unit, priceBook, books) ?? Number.NaN;
 }
 
 function productChildren(p: PosProduct): PosProduct[] {
@@ -440,12 +432,16 @@ function flattenProducts(products: PosProduct[]): PosProduct[] {
 }
 
 function priceLabelFor(p: PosProduct, priceBook: PriceBook = ""): string {
-  if (p.isVariantParent) {
-    const min = Number(p.minRetailPrice ?? p.retailPrice);
-    const max = Number(p.maxRetailPrice ?? p.retailPrice);
+  const children = productChildren(p);
+  if (p.isVariantParent && children.length) {
+    const values = children.map((child) => basePriceFor(child, priceBook));
+    if (values.some((price) => !Number.isFinite(price))) return "Chưa có dữ liệu";
+    const min = Math.min(...values);
+    const max = Math.max(...values);
     return min !== max ? `${formatCurrency(min)} - ${formatCurrency(max)}` : formatCurrency(max);
   }
-  return formatCurrency(basePriceFor(p, priceBook));
+  const price = basePriceFor(p, priceBook);
+  return Number.isFinite(price) ? formatCurrency(price) : "Chưa có dữ liệu";
 }
 
 function exceedsAvailableStock(stockManaged: boolean, stock: number, ordered: number, isReturn: boolean) {
@@ -803,16 +799,21 @@ export function PosClient({
           product,
           unitName: product.baseUnit,
           unitMultiplier: 1,
-          unitPrice: unitPriceFor(product, null, priceBook),
+          unitPrice: unitPriceFor(product, null, priceBook, data.priceBooks),
           quantity: item.quantity,
           note: t("pos.cameraQuote.packageNote", { n: String(packageIndex + 1).padStart(2, "0") }),
         }];
       });
     });
-  }, [productById, priceBook, t]);
+  }, [productById, priceBook, t, data.priceBooks]);
 
   function setCameraPackages(packages: CameraQuotePackage[]) {
-    patchActive({ cameraPackages: packages, cart: cameraPackagesToCart(packages) });
+    const nextCart = cameraPackagesToCart(packages);
+    if (nextCart.some((line) => !Number.isFinite(line.unitPrice))) {
+      setError(t("pricing.errors.priceUnavailable"));
+      return;
+    }
+    patchActive({ cameraPackages: packages, cart: nextCart });
   }
 
   useEffect(() => {
@@ -990,11 +991,16 @@ export function PosClient({
 
   /** Sửa giá/giảm giá 1 dòng (từ popup). */
   function applyLinePrice(key: string, linePriceBook: PriceBook | undefined, unitPrice: number, lineDiscount: number, free: boolean) {
+    const target = cart.find((line) => line.key === key);
+    if (target && !Number.isFinite(basePriceFor(target.product, linePriceBook ?? priceBook, data.priceBooks))) {
+      setError(t("pricing.errors.priceUnavailable"));
+      return;
+    }
     setCart((c) => c.map((l) =>
       {
         if (l.key !== key) return l;
         const unit = l.product.units.find((u) => u.unitName === l.unitName) ?? null;
-        const listedPrice = unitPriceFor(l.product, unit, linePriceBook ?? priceBook);
+        const listedPrice = unitPriceFor(l.product, unit, linePriceBook ?? priceBook, data.priceBooks);
         const nextUnitPrice = Math.max(0, unitPrice);
         const nextDiscount = Math.max(0, lineDiscount);
         if (free) {
@@ -1085,6 +1091,10 @@ export function PosClient({
       setVariantParent(p);
       return;
     }
+    if (!Number.isFinite(basePriceFor(p, priceBook, data.priceBooks))) {
+      setError(t("pricing.errors.priceUnavailable"));
+      return;
+    }
     setCart((c) => {
       const existing = c.find((l) => l.product.id === p.id && l.priceBook === undefined);
       if (existing) {
@@ -1096,7 +1106,7 @@ export function PosClient({
         product: p,
         unitName: unit.unitName,
         unitMultiplier: unit.unitMultiplier,
-        unitPrice: unitPriceFor(p, unit.alternateUnit, priceBook),
+        unitPrice: unitPriceFor(p, unit.alternateUnit, priceBook, data.priceBooks),
         quantity: 1,
       }];
     });
@@ -1104,6 +1114,10 @@ export function PosClient({
 
   const addQuantityToCart = useCallback((p: PosProduct, quantity: number) => {
     const safeQuantity = Math.max(1, Math.trunc(Number(quantity) || 1));
+    if (!Number.isFinite(basePriceFor(p, priceBook, data.priceBooks))) {
+      setError(t("pricing.errors.priceUnavailable"));
+      return;
+    }
     setCart((c) => {
       const existing = c.find((l) => l.product.id === p.id);
       if (existing) {
@@ -1115,11 +1129,11 @@ export function PosClient({
         product: p,
         unitName: unit.unitName,
         unitMultiplier: unit.unitMultiplier,
-        unitPrice: unitPriceFor(p, unit.alternateUnit, priceBook),
+        unitPrice: unitPriceFor(p, unit.alternateUnit, priceBook, data.priceBooks),
         quantity: safeQuantity,
       }];
     });
-  }, [priceBook, setCart]);
+  }, [priceBook, setCart, t, data.priceBooks]);
 
   const applyRawAiCartItems = useCallback((rawItems: unknown[], payload?: Record<string, unknown>) => {
     const { matched, unresolved } = matchAiCartDraftItems(rawItems, searchableProducts);
@@ -1223,6 +1237,11 @@ export function PosClient({
   }
 
   function changeUnit(key: string, unitName: string) {
+    const line = cart.find((item) => item.key === key);
+    if (line && !Number.isFinite(basePriceFor(line.product, line.priceBook ?? priceBook, data.priceBooks))) {
+      setError(t("pricing.errors.priceUnavailable"));
+      return;
+    }
     setCart((c) => c.map((l) => {
       if (l.key !== key) return l;
       const unit = resolvePosCartUnit(l.product.baseUnit, l.product.units, unitName);
@@ -1231,7 +1250,7 @@ export function PosClient({
         ...l,
         unitName: unit.unitName,
         unitMultiplier: unit.unitMultiplier,
-        unitPrice: unitPriceFor(l.product, unit.alternateUnit, l.priceBook ?? priceBook),
+        unitPrice: unitPriceFor(l.product, unit.alternateUnit, l.priceBook ?? priceBook, data.priceBooks),
         lineDiscount: 0,
         manualPrice: false,
       };
@@ -1262,11 +1281,16 @@ export function PosClient({
 
   /** Đổi bảng giá cho đơn đang mở, bỏ mọi bảng giá riêng của dòng và tính lại giá niêm yết. */
   function changePriceBook(pb: PriceBook) {
+    if (cart.some((line) => !Number.isFinite(basePriceFor(line.product, pb, data.priceBooks)))) {
+      setError(t("pricing.errors.priceUnavailable"));
+      return;
+    }
+    setError("");
     patchActive((inv) => ({
       priceBook: pb,
       cart: inv.cart.map((l) => {
         const unit = l.product.units.find((u) => u.unitName === l.unitName) ?? null;
-        const listedPrice = unitPriceFor(l.product, unit, pb);
+        const listedPrice = unitPriceFor(l.product, unit, pb, data.priceBooks);
         // Giá nhập tay vẫn được tôn trọng, nhưng không còn gắn với bảng giá riêng.
         if (l.manualPrice) {
           return {
@@ -1299,6 +1323,10 @@ export function PosClient({
 
   async function submitOrder(mode: "sale" | "quote" | "booking") {
     if (cart.length === 0 || !data.warehouse || submitting) return;
+    if (cart.some((line) => !Number.isFinite(basePriceFor(line.product, line.priceBook ?? priceBook, data.priceBooks)))) {
+      setError(t("pricing.errors.priceUnavailable"));
+      return;
+    }
     const submitMode = sourceInvoice ? sourceInvoice.kind === "quote" ? "quote" : sourceInvoice.kind === "booking" ? "booking" : mode : mode;
     const isCheckoutMode = submitMode === "sale";
     if (submitMode === "sale" && payMethod === "credit" && !customerId) {
@@ -2617,7 +2645,7 @@ function VariantPickerModal({
                       <span className="block text-xs text-slate-500">{child.sku}{child.barcode ? ` · ${child.barcode}` : ""}</span>
                     </span>
                     <span className="shrink-0 text-right">
-                      <span className="block text-sm font-semibold text-primary-600 tabular-nums">{formatCurrency(basePriceFor(child, priceBook))}</span>
+                      <span className="block text-sm font-semibold text-primary-600 tabular-nums">{priceLabelFor(child, priceBook)}</span>
                       {stockManaged && (
                         <span className={cn("block text-xs", stock <= 0 ? "text-er" : "text-slate-500")}>{formatNumber(stock)} {child.baseUnit}</span>
                       )}
@@ -2664,6 +2692,7 @@ function LinePriceEditor({
       },
     };
   });
+  const [priceError, setPriceError] = useState("");
   const changedRef = useRef(false);
   const onChangeRef = useRef(onChange);
   useEffect(() => {
@@ -2690,16 +2719,26 @@ function LinePriceEditor({
   }
 
   function changeBook(value: string) {
-    markChanged();
-    setSelectedBook(value);
     const selected = value === inheritedValue
       ? undefined
       : value === defaultBook?.id ? "" : value;
     const unit = line.product.units.find((item) => item.unitName === line.unitName) ?? null;
-    setEditor(createLinePriceEditorState(unitPriceFor(line.product, unit, selected ?? invoicePriceBook), 0));
+    const nextPrice = unitPriceFor(line.product, unit, selected ?? invoicePriceBook, priceBooks);
+    if (!Number.isFinite(nextPrice)) {
+      setPriceError(t("pricing.errors.priceUnavailable"));
+      return;
+    }
+    setPriceError("");
+    markChanged();
+    setSelectedBook(value);
+    setEditor(createLinePriceEditorState(nextPrice, 0));
   }
 
   function changeFree(free: boolean) {
+    if (!Number.isFinite(basePriceFor(line.product, free ? invoicePriceBook : selectedPriceBook() ?? invoicePriceBook, priceBooks))) {
+      setPriceError(t("pricing.errors.priceUnavailable"));
+      return;
+    }
     markChanged();
     // Miễn phí luôn theo bảng giá của hóa đơn; lúc bật lại sẽ khôi phục giá theo bảng này.
     if (free) setSelectedBook(inheritedValue);
@@ -2711,7 +2750,7 @@ function LinePriceEditor({
           ? undefined
           : selectedBook === defaultBook?.id ? "" : selectedBook;
         const unit = line.product.units.find((item) => item.unitName === line.unitName) ?? null;
-        return createLinePriceEditorState(unitPriceFor(line.product, unit, selected ?? invoicePriceBook), 0);
+        return createLinePriceEditorState(unitPriceFor(line.product, unit, selected ?? invoicePriceBook, priceBooks), 0);
       }
       return next;
     });
@@ -2742,11 +2781,14 @@ function LinePriceEditor({
         aria-labelledby="pos-price-editor-title"
         className="fixed left-1/2 top-1/2 z-60 w-100 max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 space-y-3 rounded-xl border border-border bg-surface p-4 text-sm shadow-e2"
       >
+        {priceError && <p role="alert" className="text-sm text-red-600">{priceError}</p>}
         <div id="pos-price-editor-title" className="mb-1 text-base font-semibold">{line.product.name}</div>
         <div className="flex items-center justify-between gap-2">
           <span className="text-slate-500 shrink-0">{t("pos.priceBook.title")}</span>
           <Select
             value={selectedBook}
+            wrapLabel
+            menuMinWidth={240}
             onChange={(event) => changeBook(event.target.value)}
             disabled={editor.free}
             size="sm"

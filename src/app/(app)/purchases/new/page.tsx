@@ -40,6 +40,7 @@ export default async function NewPurchasePage({ searchParams }: Props) {
           warehouseId: source.warehouseId,
           discount: Number(source.discount),
           vatRate: Number(source.vatRate),
+          shippingFee: Number(source.shippingFee),
           invoiceNumber: source.invoiceNumber ?? "",
           amountPaid: Number(source.amountPaid),
           note: source.note ?? "",

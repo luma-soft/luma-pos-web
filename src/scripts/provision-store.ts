@@ -71,10 +71,10 @@ try {
       where not exists (select 1 from public.warehouses where store_id = ${store.id}::uuid and is_default = true)
     `;
     await tx`
-      insert into public.price_books (store_id, name, is_default, manager_only, cost_based, sort_order)
-      select ${store.id}::uuid, seed.name, seed.is_default, seed.manager_only, seed.cost_based, seed.sort_order
-      from (values ('Giá bán lẻ', true, false, false, 0), ('Giá vốn', false, true, true, 1)) seed(name, is_default, manager_only, cost_based, sort_order)
-      where not exists (select 1 from public.price_books p where p.store_id = ${store.id}::uuid and p.name = seed.name)
+      insert into public.price_books (store_id, name, is_default, manager_only, cost_based, system_type, sort_order)
+      select ${store.id}::uuid, seed.name, seed.is_default, seed.manager_only, seed.cost_based, seed.system_type, seed.sort_order
+      from (values ('Giá Chung', true, false, false, 'retail', 0), ('Giá vốn', false, true, true, 'cost', 1), ('Giá Chưa Chiết Khấu', false, true, false, 'purchase', 2)) seed(name, is_default, manager_only, cost_based, system_type, sort_order)
+      where not exists (select 1 from public.price_books p where p.store_id = ${store.id}::uuid and p.system_type = seed.system_type)
     `;
     await tx`
       insert into public.print_templates (store_id, name, doc_type, paper_default, is_default, is_active, sort_order, store_name, options)

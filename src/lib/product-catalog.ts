@@ -1,6 +1,6 @@
 import { normalizeSearch } from "@/lib/normalize";
 
-export const PRODUCT_CATALOG_SCHEMA_VERSION = 4;
+export const PRODUCT_CATALOG_SCHEMA_VERSION = 5;
 
 export type CatalogUnit = {
   unitName: string;
@@ -29,6 +29,7 @@ export type ProductCatalogItem = {
   categoryName: string | null;
   baseUnit: string;
   costPrice: string | null;
+  lastPurchasePrice?: string | null;
   retailPrice: string;
   wholesalePrice: string | null;
   contractorPrice: string | null;
@@ -47,7 +48,8 @@ export type ProductCatalogItem = {
     quantity: string;
   }>;
   units: CatalogUnit[];
-  prices: Record<string, string>;
+  priceBookTypes?: Record<string, "retail" | "cost" | "purchase" | null>;
+  prices: Record<string, string | null>;
   warehouseStock: CatalogWarehouseStock[];
   updatedAt: string;
 };

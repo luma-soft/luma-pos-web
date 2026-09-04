@@ -14,6 +14,7 @@ import {
   brands,
   categories,
   productPrices,
+  priceBooks,
   productUnits,
   products,
   stockLevels,
@@ -78,7 +79,7 @@ export interface PricingProductRow {
   isVariantParent: boolean;
   baseRetailPrice: number;
   costPrice: number;
-  lastPurchasePrice: number;
+  lastPurchasePrice: number | null;
   availableStock: number;
 }
 
@@ -189,14 +190,15 @@ export async function getPricingPage(
   }
   const where = and(...conditions);
   const selectedPrice = query.priceBookId?.trim()
-    ? sql<string>`coalesce((
-        select pp.price
-        from ${productPrices} pp
-        where pp.product_id = ${products.id}
-          and pp.store_id = ${storeId}
-          and pp.price_book_id = ${query.priceBookId.trim()}
-        limit 1
-      ), ${products.retailPrice})`
+    ? sql<string>`(
+        select case
+          when b.system_type = 'cost' or b.cost_based then ${products.costPrice}
+          when b.system_type = 'purchase' then ${products.lastPurchasePrice}
+          when b.system_type = 'retail' or b.is_default then ${products.retailPrice}
+          else coalesce((select pp.price from ${productPrices} pp where pp.product_id = ${products.id}
+            and pp.store_id = ${storeId} and pp.price_book_id = b.id limit 1), ${products.retailPrice})
+        end from ${priceBooks} b where b.store_id = ${storeId} and b.id = ${query.priceBookId.trim()} limit 1
+      )`
     : products.retailPrice;
   const orderBy = pricingOrderBy(
     query.sort ?? "updated",
@@ -292,7 +294,7 @@ export async function getPricingPage(
       costPrice: Number(row.costPrice),
       lastPurchasePrice:
         row.lastPurchasePrice == null
-          ? Number(row.costPrice)
+          ? null
           : Number(row.lastPurchasePrice),
       availableStock: Number(row.availableStock),
     })),

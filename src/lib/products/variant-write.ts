@@ -194,8 +194,9 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
   }
   const bookIds = Object.keys(v.priceBookPrices);
   if (bookIds.length) {
-    const allowedBooks = await tx.select({ id: priceBooks.id }).from(priceBooks).where(and(eq(priceBooks.storeId, storeId), inArray(priceBooks.id, bookIds)));
+    const allowedBooks = await tx.select({ id: priceBooks.id, systemType: priceBooks.systemType, isDefault: priceBooks.isDefault, costBased: priceBooks.costBased }).from(priceBooks).where(and(eq(priceBooks.storeId, storeId), inArray(priceBooks.id, bookIds)));
     if (allowedBooks.length !== bookIds.length) fail("errors.invalidData");
+    if (allowedBooks.some((book) => book.systemType || book.isDefault || book.costBased)) fail("pricing.errors.systemReadOnly");
     for (const id of createdIds) for (const bookId of bookIds) {
       const price = v.priceBookPrices[bookId];
       if (price != null) await tx.insert(productPrices).values({ storeId, productId: id, priceBookId: bookId, price: String(price) });

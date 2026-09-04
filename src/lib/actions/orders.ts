@@ -34,6 +34,7 @@ export async function createOrder(
       gate.storeId,
       parsed.data.items,
       parsed.data.priceBookId,
+      gate.role,
     );
     const prefs = await getRawStorePrefs(gate.storeId);
     const requirement = evaluateOrderApprovalRequirement({
@@ -48,9 +49,12 @@ export async function createOrder(
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
+    if (message === "PRICE_BOOK_PRICE_UNAVAILABLE") return { ok: false, error: "pricing.errors.priceUnavailable" };
+    if (message === "PRICE_BOOK_FORBIDDEN") return { ok: false, error: "errors.forbidden" };
     if (
       [
         "PRODUCT_NOT_FOUND",
+        "PRICE_BOOK_NOT_FOUND",
         "UNIT_NOT_FOUND",
         "INVALID_ITEMS",
         "SENSITIVE_ORDER_REQUIRES_CLIENT_ID",

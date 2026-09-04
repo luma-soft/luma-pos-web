@@ -32,6 +32,7 @@ export async function GET(
     discount: Number(purchase.discount),
     vatRate: Number(purchase.vatRate),
     tax: Number(purchase.tax),
+    shippingFee: Number(purchase.shippingFee),
     total: Number(purchase.total),
     amountPaid: Number(purchase.amountPaid),
     note: purchase.note,

@@ -10,14 +10,16 @@ import { InstantProductSearch } from "./instant-product-search";
 import { InventoryFilterDrawer } from "./inventory-filter-drawer";
 import { ListSearchFilterBar } from "@/components/list-search-filter";
 import { requireStoreContext } from "@/lib/auth/store-context";
+import { canViewPurchasePrices, isSystemPriceBook, resolvePriceBookPrice } from "@/lib/pricing/system-price-books";
 
 type SP = Record<string, string | undefined>;
 type PriceBook = Awaited<ReturnType<typeof getPriceBooks>>[number];
 
 export async function PricingTab({ searchParams }: { searchParams: SP }) {
   const context = await requireStoreContext();
+  const includePurchasePrices = canViewPurchasePrices(context.role);
   const [books, options] = await Promise.all([
-    getPriceBooks(context.storeId),
+    getPriceBooks(context.storeId, { includeManagerOnly: includePurchasePrices }),
     getProductFormOptions(context.storeId),
   ]);
 
@@ -44,6 +46,7 @@ async function PricingContent({
   searchParams: SP;
 }) {
   const context = await requireStoreContext();
+  const includePurchasePrices = canViewPurchasePrices(context.role);
   const t = await getTranslations();
   const params = searchParams;
   const page = Number(params.page) || 1;
@@ -55,12 +58,16 @@ async function PricingContent({
   const overrideByBook = await getPriceOverridesForProducts(context.storeId, visibleIds);
   const tableRows = rows.map((p) => ({
     id: p.id, sku: p.sku, name: p.name, baseUnit: p.baseUnit,
-    costPrice: Number(p.costPrice),
-    lastPurchase: p.lastPurchasePrice != null ? Number(p.lastPurchasePrice) : Number(p.costPrice),
+    costPrice: includePurchasePrices ? Number(p.costPrice) : null,
+    lastPurchase: includePurchasePrices && p.lastPurchasePrice != null ? Number(p.lastPurchasePrice) : null,
     prices: Object.fromEntries(books.map((b) => {
-      if (b.isDefault) return [b.id, Number(p.retailPrice)];
       const ov = overrideByBook[b.id]?.[p.id];
-      return [b.id, ov != null ? Number(ov) : null];
+      if (!isSystemPriceBook(b)) return [b.id, ov != null ? Number(ov) : null];
+      return [b.id, resolvePriceBookPrice(b, {
+        retailPrice: Number(p.retailPrice),
+        costPrice: includePurchasePrices ? Number(p.costPrice) : null,
+        lastPurchasePrice: includePurchasePrices && p.lastPurchasePrice != null ? Number(p.lastPurchasePrice) : null,
+      })];
     })) as Record<string, number | null>,
   }));
 
@@ -74,9 +81,11 @@ async function PricingContent({
         />
       </div>
       <PricingTable
+        key={JSON.stringify([books, tableRows, params])}
         books={books}
         rows={tableRows}
         total={total}
+        canViewPurchasePrices={includePurchasePrices}
         resetScrollKey={[
           params.q,
           params.category,

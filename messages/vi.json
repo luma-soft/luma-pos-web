@@ -4175,6 +4175,8 @@
       "confirm": "Xóa bảng giá"
     },
     "errors": {
+      "priceUnavailable": "Sản phẩm chưa có dữ liệu cho bảng giá này. Hãy chọn bảng giá khác.",
+      "systemReadOnly": "Bảng giá hệ thống tự động cập nhật, không thể sửa hoặc xóa.",
       "cannotDeleteDefault": "Không thể xóa bảng giá mặc định"
     },
     "formula": {

@@ -411,10 +411,12 @@ export const priceBooks = pgTable("price_books", {
   managerOnly: boolean("manager_only").notNull().default(false),
   // Bảng giá vốn luôn lấy products.costPrice hiện tại, không dùng giá override tĩnh.
   costBased: boolean("cost_based").notNull().default(false),
+  systemType: text("system_type").$type<"retail" | "cost" | "purchase">(),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
   uniqueIndex("price_books_store_default_unique").on(t.storeId).where(sql`${t.isDefault} = true`),
+  uniqueIndex("price_books_store_system_unique").on(t.storeId, t.systemType).where(sql`${t.systemType} is not null`),
 ]);
 
 export const productPrices = pgTable("product_prices", {
@@ -1256,6 +1258,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   discount: decimal("discount", { precision: 14, scale: 2 }).notNull().default("0"), // giảm giá cả phiếu
   vatRate: decimal("vat_rate", { precision: 5, scale: 2 }).notNull().default("0"),    // % VAT
   tax: decimal("tax", { precision: 14, scale: 2 }).notNull().default("0"),            // tiền VAT
+  shippingFee: decimal("shipping_fee", { precision: 14, scale: 2 }).notNull().default("0"),
   total: decimal("total", { precision: 14, scale: 2 }).notNull().default("0"),
   amountPaid: decimal("amount_paid", { precision: 14, scale: 2 }).notNull().default("0"),
   invoiceNumber: varchar("invoice_number", { length: 50 }), // số hóa đơn đầu vào

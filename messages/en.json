@@ -4175,6 +4175,8 @@
       "confirm": "Delete price book"
     },
     "errors": {
+      "priceUnavailable": "This product has no price in this price book. Choose another price book.",
+      "systemReadOnly": "System price books update automatically and cannot be edited or deleted.",
       "cannotDeleteDefault": "Cannot delete default price book"
     },
     "formula": {

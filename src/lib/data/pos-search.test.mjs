@@ -17,6 +17,7 @@ const { searchPosProductRows } = await import("./pos");
 
 const storeId = randomUUID(), otherStoreId = randomUUID();
 const parentId = randomUUID(), productId = randomUUID(), zeroCostId = randomUUID();
+const purchaseBookId = randomUUID();
 const costBookId = randomUUID(), tradeBookId = randomUUID(), otherCostBookId = randomUUID();
 let accessRole = "owner";
 const salesGate = async () => ({ ok: true, storeId, role: accessRole });
@@ -53,14 +54,15 @@ beforeAll(async () => {
   }
   await database.insert(schema.warehouses).values({ storeId, name: "Main", isDefault: true });
   await database.insert(schema.priceBooks).values([
+    { id: purchaseBookId, storeId, name: "Giá Chưa Chiết Khấu", systemType: "purchase", managerOnly: true },
     { id: costBookId, storeId, name: "Giá vốn", costBased: true, managerOnly: true },
     { id: tradeBookId, storeId, name: "Giá thợ" },
     { id: otherCostBookId, storeId: otherStoreId, name: "Giá vốn", costBased: true, managerOnly: true },
   ]);
   await database.insert(schema.products).values([
     { id: parentId, storeId, sku: "RAP2200", name: "RAP2200", isVariantParent: true },
-    { id: productId, storeId, sku: "RAP2200-E", name: "RAP2200 E", parentProductId: parentId, costPrice: "1280000", retailPrice: "1490000" },
-    { id: zeroCostId, storeId, sku: "ZERO-COST", name: "Zero cost", costPrice: "0", retailPrice: "100000" },
+    { id: productId, storeId, sku: "RAP2200-E", name: "RAP2200 E", parentProductId: parentId, costPrice: "1280000", lastPurchasePrice: "1400000", retailPrice: "1490000" },
+    { id: zeroCostId, storeId, sku: "ZERO-COST", name: "Zero cost", costPrice: "0", lastPurchasePrice: "0", retailPrice: "100000" },
     { storeId: otherStoreId, sku: "RAP2200-OTHER", name: "RAP2200 other store", costPrice: "900000", retailPrice: "1200000" },
   ]);
   await database.insert(schema.productPrices).values({ storeId, productId, priceBookId: tradeBookId, price: "1400000" });
@@ -112,3 +114,25 @@ for (const role of ["owner", "cashier"]) {
     }
   });
 }
+
+for (const role of ["owner", "manager"]) {
+  test(`${role}: purchase source is gross, zero stays zero, unknown stays null`, async () => {
+    const rows = await searchPosProductRows(storeId, "RAP2200", { role });
+    const product = rows.find((row) => row.id === productId);
+    const parent = rows.find((row) => row.id === parentId);
+    expect(Number(product.prices[purchaseBookId])).toBe(1400000);
+    expect(product.priceBookTypes[purchaseBookId]).toBe("purchase");
+    expect(parent.prices[purchaseBookId]).toBeNull();
+    expect(product).not.toHaveProperty("lastPurchasePrice");
+    const zero = await searchPosProductRows(storeId, "ZERO-COST", { role });
+    expect(zero[0].prices[purchaseBookId]).toBe("0");
+  });
+}
+test("cashier cannot receive gross source through search or nested variants", async () => {
+  const rows = await searchPosProductRows(storeId, "RAP2200", { role: "cashier" });
+  for (const row of rows.flatMap((product) => [product, ...product.children])) {
+    expect(row.prices).not.toHaveProperty(purchaseBookId);
+    expect(row.priceBookTypes).not.toHaveProperty(purchaseBookId);
+    expect(row).not.toHaveProperty("lastPurchasePrice");
+  }
+});

@@ -1,5 +1,7 @@
 "use client";
 
+import { isSystemPriceBook } from "@/lib/pricing/system-price-books";
+
 import { Checkbox } from "@/components/ui/checkbox";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -167,7 +169,6 @@ export function NewProductForm({
       imageMediaIds: [],
       costPrice: 0,
       retailPrice: 0,
-      priceBookPrices: {},
       initialStock: 0,
       minLevel: 0,
       maxLevel: 999_999_999,
@@ -187,6 +188,7 @@ export function NewProductForm({
       },
       directSale: true,
       ...initialValues,
+      priceBookPrices: Object.fromEntries(Object.entries(initialValues?.priceBookPrices ?? {}).filter(([id]) => priceBooks.some((book) => book.id === id && !isSystemPriceBook(book)))),
       attributes: preparedAttributes,
     },
   });
@@ -1255,24 +1257,17 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
   const t = useTranslations();
   const { setValue, watch } = useFormCtx();
   const isCombo = watch("productKind") === "combo";
-  const retailPrice = Number(watch("retailPrice") ?? 0);
   const priceBookPrices = watch("priceBookPrices") ?? {};
   const [open, setOpen] = useState(false);
-  const [draftRetail, setDraftRetail] = useState(retailPrice);
   const [draftOverrides, setDraftOverrides] =
     useState<Record<string, number | null>>(priceBookPrices);
 
   function openPriceBooks() {
-    setDraftRetail(Number(watch("retailPrice") ?? 0));
     setDraftOverrides({ ...(watch("priceBookPrices") ?? {}) });
     setOpen(true);
   }
 
   function applyPriceBooks() {
-    setValue("retailPrice", draftRetail, {
-      shouldDirty: true,
-      shouldValidate: true,
-    });
     setValue("priceBookPrices", draftOverrides, {
       shouldDirty: true,
       shouldValidate: true,
@@ -1280,17 +1275,7 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
     setOpen(false);
   }
 
-  const activeBooks =
-    priceBooks.length > 0
-      ? priceBooks
-      : [
-          {
-            id: "retail",
-            name: t("products.pricing.retailPrice"),
-            isDefault: true,
-            sortOrder: 0,
-          },
-        ];
+  const activeBooks = priceBooks.filter((book) => !isSystemPriceBook(book));
 
   return (
     <>
@@ -1319,6 +1304,7 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
         <button
           type="button"
           onClick={openPriceBooks}
+          disabled={activeBooks.length === 0}
           className="inline-flex h-10 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold text-primary-600 hover:bg-primary-50 md:mt-[30px] dark:hover:bg-primary-950/30 min-h-11 min-w-11 lg:min-h-0 lg:min-w-0"
         >
           <Tag className="h-4 w-4" />
@@ -1372,9 +1358,7 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
                 </thead>
                 <tbody className="block divide-y divide-border-soft lg:table-row-group">
                   {activeBooks.map((book) => {
-                    const value = book.isDefault
-                      ? draftRetail
-                      : (draftOverrides[book.id] ?? null);
+                    const value = draftOverrides[book.id] ?? null;
                     return (
                       <tr key={book.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 py-3 lg:table-row lg:py-0">
                         <td className="col-span-2 block p-0 break-words font-medium lg:table-cell lg:px-4 lg:py-3">{book.name}</td>
@@ -1383,9 +1367,7 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
                           <NumberInput
                             value={value}
                             onChange={(next) => {
-                              if (book.isDefault) setDraftRetail(next ?? 0);
-                              else
-                                setDraftOverrides((current) => ({
+                              setDraftOverrides((current) => ({
                                   ...current,
                                   [book.id]: next,
                                 }));

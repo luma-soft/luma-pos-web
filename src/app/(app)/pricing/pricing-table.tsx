@@ -11,23 +11,30 @@ import { MoneyInput } from "@/components/ui/money-input";
 import { NumberInput } from "@/components/ui/number-input";
 import { Select } from "@/components/ui/select";
 import { createPriceBook, renamePriceBook, deletePriceBook, setProductPrice, applyPriceFormulaAll, type PriceFormulaBase } from "@/lib/actions/price-books";
+import { isSystemPriceBook } from "@/lib/pricing/system-price-books";
 
-export interface PricingBook { id: string; name: string; isDefault: boolean; sortOrder: number; }
+export interface PricingBook {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  sortOrder: number;
+  systemType?: "retail" | "cost" | "purchase" | null;
+  costBased?: boolean;
+}
 export interface PricingRow {
   id: string;
   sku: string;
   name: string;
   baseUnit: string;
-  costPrice: number;
-  lastPurchase: number;
+  costPrice: number | null;
+  lastPurchase: number | null;
   prices: Record<string, number | null>;
 }
 
 type PriceEditorLabels = {
-  costPrice: string;
-  lastPurchase: string;
   formulaTitle: string;
   belowCost: string;
+  noData: string;
 };
 
 export function PriceBookEditor({
@@ -48,14 +55,24 @@ export function PriceBookEditor({
   saving: boolean;
   saved: boolean;
   mobile?: boolean;
-  labels: Pick<PriceEditorLabels, "formulaTitle" | "belowCost">;
+  labels: PriceEditorLabels;
   onOpenFormula: () => void;
   onChange: (value: number | null) => void;
   onCommit: (value: number | null) => void;
 }) {
   const value = row.prices[book.id];
+  if (isSystemPriceBook(book)) {
+    return (
+      <span
+        aria-label={book.name}
+        className={cn("block py-2 text-sm tabular-nums", mobile ? "font-semibold" : "text-right", value == null && "text-slate-500")}
+      >
+        {value == null ? labels.noData : formatCurrency(value)}
+      </span>
+    );
+  }
   const fallback = book.id !== defaultBookId && value == null;
-  const belowCost = value != null && value > 0 && value < row.costPrice;
+  const belowCost = row.costPrice != null && value != null && value > 0 && value < row.costPrice;
 
   return (
     <div
@@ -134,16 +151,6 @@ export function PricingMobileRow({
         <h3 className="break-words text-sm font-semibold">{row.name}</h3>
         <p className="mt-1 text-xs text-slate-500">{row.sku} · {row.baseUnit}</p>
       </div>
-      <dl className="mt-3 grid grid-cols-2 gap-3 border-y border-border-soft py-3 text-sm">
-        <div className="min-w-0">
-          <dt className="text-xs font-medium text-slate-500">{labels.costPrice}</dt>
-          <dd className="mt-1 break-words font-semibold tabular-nums">{formatCurrency(row.costPrice)}</dd>
-        </div>
-        <div className="min-w-0">
-          <dt className="text-xs font-medium text-slate-500">{labels.lastPurchase}</dt>
-          <dd className="mt-1 break-words font-semibold tabular-nums">{formatCurrency(row.lastPurchase)}</dd>
-        </div>
-      </dl>
       <div className="mt-3 grid min-w-0 gap-3">
         {books.map((book) => {
           const key = `${row.id}:${book.id}`;
@@ -172,7 +179,7 @@ export function PricingMobileRow({
   );
 }
 
-export function PricingTable({ books: initialBooks, rows: initialRows, total, resetScrollKey }: { books: PricingBook[]; rows: PricingRow[]; total: number; resetScrollKey?: string | number }) {
+export function PricingTable({ books: initialBooks, rows: initialRows, total, resetScrollKey, canViewPurchasePrices = false }: { books: PricingBook[]; rows: PricingRow[]; total: number; resetScrollKey?: string | number; canViewPurchasePrices?: boolean }) {
   const t = useTranslations();
   const router = useRouter();
   const [books, setBooks] = useState(initialBooks);
@@ -192,17 +199,24 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
   const [applying, setApplying] = useState(false);
 
   function openFormula(rowId: string, bookId: string) {
+    const book = books.find((item) => item.id === bookId);
+    if (!book || isSystemPriceBook(book)) return;
     setFBase("current"); setFOp("+"); setFAmount(0); setFUnit("pct"); setFAll(false);
     setFormula({ rowId, bookId });
   }
-  function computeNew(row: PricingRow, bookId: string): number {
+  function computeNew(row: PricingRow, bookId: string): number | null {
+    if (fBase !== "current" && !canViewPurchasePrices) return null;
     const base = fBase === "cost" ? row.costPrice
       : fBase === "lastPurchase" ? row.lastPurchase
       : (row.prices[bookId] ?? row.prices[defaultBookId] ?? 0);
+    if (base == null) return null;
     const delta = fUnit === "pct" ? (base * fAmount) / 100 : fAmount;
     return Math.max(0, Math.round(base + (fOp === "-" ? -delta : delta)));
   }
   async function applyFormula(row: PricingRow, bookId: string) {
+    const book = books.find((item) => item.id === bookId);
+    const nextPrice = computeNew(row, bookId);
+    if (!book || isSystemPriceBook(book) || nextPrice == null) return;
     if (fAll) {
       setApplying(true); setError("");
       const res = await applyPriceFormulaAll({ priceBookId: bookId, base: fBase, op: fOp, amount: fAmount, unit: fUnit });
@@ -210,7 +224,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
       if (res.ok) { setFormula(null); router.refresh(); }
       else setError(t(res.error as never));
     } else {
-      await saveCell(row, bookId, computeNew(row, bookId));
+      await saveCell(row, bookId, nextPrice);
       setFormula(null);
     }
   }
@@ -262,6 +276,8 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
   }
 
   async function rename(id: string, name: string) {
+    const book = books.find((item) => item.id === id);
+    if (!book || isSystemPriceBook(book)) return;
     setEditing(null);
     const n = name.trim();
     if (!n) return;
@@ -271,6 +287,8 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
   }
 
   async function removeBook(id: string) {
+    const book = books.find((item) => item.id === id);
+    if (!book || isSystemPriceBook(book)) return;
     setError("");
     const res = await deletePriceBook(id);
     if (res.ok) {
@@ -288,6 +306,8 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
   }
 
   async function saveCell(row: PricingRow, bookId: string, value: number | null) {
+    const book = books.find((item) => item.id === bookId);
+    if (!book || isSystemPriceBook(book)) return;
     const k = cellKey(row.id, bookId);
     setRows((rs) => rs.map((r) => (r.id === row.id ? { ...r, prices: { ...r.prices, [bookId]: value } } : r)));
     setSavingCell((s) => new Set(s).add(k));
@@ -302,6 +322,8 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
   }
 
   function updateCell(rowId: string, bookId: string, value: number | null) {
+    const book = books.find((item) => item.id === bookId);
+    if (!book || isSystemPriceBook(book)) return;
     setRows((current) =>
       current.map((row) =>
         row.id === rowId
@@ -312,10 +334,9 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
   }
 
   const priceEditorLabels: PriceEditorLabels = {
-    costPrice: t("pricing.cols.costPrice"),
-    lastPurchase: t("pricing.cols.lastPurchase"),
     formulaTitle: t("pricing.formula.title"),
     belowCost: t("pricing.belowCost"),
+    noData: t("dashboard.noData"),
   };
 
   const columns: DataTableColumn<PricingRow>[] = [
@@ -331,27 +352,11 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
         </div>
       ),
     },
-    {
-      key: "costPrice",
-      label: t("pricing.cols.costPrice"),
-      defaultVisible: true,
-      align: "right",
-      width: "150px",
-      render: (r) => <span className="tabular-nums text-slate-500">{formatCurrency(r.costPrice)}</span>,
-    },
-    {
-      key: "lastPurchase",
-      label: t("pricing.cols.lastPurchase"),
-      defaultVisible: true,
-      align: "right",
-      width: "160px",
-      render: (r) => <span className="tabular-nums text-slate-500">{formatCurrency(r.lastPurchase)}</span>,
-    },
     ...books.map((b): DataTableColumn<PricingRow> => ({
       key: `book:${b.id}`,
       label: b.name,
       required: b.isDefault,
-      defaultVisible: b.isDefault,
+      defaultVisible: isSystemPriceBook(b),
       align: "right",
       width: "170px",
       render: (r) => {
@@ -373,7 +378,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
     })),
   ];
   const visibleBooks = books.filter(
-    (book) => book.isDefault || (visibleColumnKeys?.has(`book:${book.id}`) ?? false),
+    (book) => book.isDefault || (visibleColumnKeys?.has(`book:${book.id}`) ?? isSystemPriceBook(book)),
   );
 
   function setBookVisible(bookId: string, visible: boolean) {
@@ -412,7 +417,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
               className="absolute left-0 top-full z-50 mt-1 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-surface p-1.5 shadow-e2"
             >
               {books.map((b) => {
-                const visible = b.isDefault || (visibleColumnKeys?.has(`book:${b.id}`) ?? false);
+                const visible = b.isDefault || (visibleColumnKeys?.has(`book:${b.id}`) ?? isSystemPriceBook(b));
                 return (
                   <div key={b.id} className="group flex min-h-11 items-center gap-2 rounded-lg px-2 hover:bg-surface-2">
                     <button
@@ -464,15 +469,15 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
                         >
                           {b.name}
                         </button>
-                        <button
+                        {!isSystemPriceBook(b) && <button
                           type="button"
                           onClick={() => setEditing({ id: b.id, name: b.name })}
                           className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-surface hover:text-primary-600 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
                           title={t("common.edit")}
                         >
                           <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        {!b.isDefault && (
+                        </button>}
+                        {!isSystemPriceBook(b) && (
                           <button
                             type="button"
                             onClick={() => {
@@ -518,7 +523,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
         visibleColumnKeys={visibleColumnKeys}
         onColumnVisibilityChange={setVisibleColumnKeys}
         getRowId={(row) => row.id}
-        minWidth={`${Math.max(780, 610 + visibleBooks.length * 170)}px`}
+        minWidth={`${Math.max(640, 300 + visibleBooks.length * 170)}px`}
         maxHeight="calc(100dvh - 340px)"
         fillHeight
         resetScrollKey={resetScrollKey}
@@ -596,7 +601,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
               </button>
             </div>
             <div className="mt-4 text-sm">
-              {t("pricing.formula.newPrice")} <span className="font-bold text-primary-600">[{formatCurrency(computeNew(formulaRow, formulaBook.id))}]</span>
+              {t("pricing.formula.newPrice")} <span className="font-bold text-primary-600">[{computeNew(formulaRow, formulaBook.id) == null ? priceEditorLabels.noData : formatCurrency(computeNew(formulaRow, formulaBook.id)!)}]</span>
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-1.5 text-sm">
               <span className="text-slate-500">{t("pricing.formula.newPrice")} =</span>
@@ -604,10 +609,14 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
                 value={fBase}
                 onChange={(e) => setFBase(e.target.value as PriceFormulaBase)}
                 size="sm"
+                menuMinWidth={240}
+                wrapLabel
                 options={[
                   { value: "current", label: t("pricing.formula.baseCurrent") },
-                  { value: "cost", label: t("pricing.formula.baseCost") },
-                  { value: "lastPurchase", label: t("pricing.cols.lastPurchase") },
+                  ...(canViewPurchasePrices ? [
+                    { value: "cost", label: t("pricing.formula.baseCost") },
+                    { value: "lastPurchase", label: books.find((book) => book.systemType === "purchase")?.name ?? "Giá Chưa Chiết Khấu" },
+                  ] : []),
                 ]}
               />
               <button type="button" onClick={() => setFOp("+")} className={cn("grid h-11 w-11 place-items-center rounded-full border text-sm lg:h-7 lg:w-7", fOp === "+" ? "border-primary-600 bg-primary-600 text-white" : "border-border")}>+</button>
@@ -624,7 +633,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
             </label>
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => setFormula(null)} className="min-h-11 rounded-lg border border-border px-3 text-sm min-w-11">{t("common.cancel")}</button>
-              <button type="button" onClick={() => applyFormula(formulaRow, formulaBook.id)} disabled={applying} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white disabled:opacity-50 min-w-11">
+              <button type="button" onClick={() => applyFormula(formulaRow, formulaBook.id)} disabled={applying || computeNew(formulaRow, formulaBook.id) == null} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white disabled:opacity-50 min-w-11">
                 {applying && <Loader2 className="h-4 w-4 animate-spin" />} {t("common.done")}
               </button>
             </div>

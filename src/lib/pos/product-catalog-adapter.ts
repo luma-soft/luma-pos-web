@@ -43,6 +43,7 @@ export function catalogItemToPosProduct(
     baseUnit: product.baseUnit,
     // POS chỉ dùng giá vốn khi bảng giá nội bộ đã được server cho phép.
     costPrice: product.costPrice ?? "0",
+    lastPurchasePrice: product.lastPurchasePrice ?? null,
     retailPrice: product.retailPrice,
     wholesalePrice: product.wholesalePrice,
     contractorPrice: product.contractorPrice,
@@ -65,9 +66,10 @@ export function catalogItemToPosProduct(
       multiplier: unit.multiplier,
       priceOverride: unit.priceOverride,
     })),
+    priceBookTypes: product.priceBookTypes,
     prices: {
       ...product.prices,
-      ...Object.fromEntries(costPriceBookIds.map((bookId) => [bookId, product.costPrice ?? "0"])),
+      ...Object.fromEntries(costPriceBookIds.map((bookId) => [bookId, product.costPrice ?? null])),
     },
     children: children.map(mapChild),
   };
