@@ -114,33 +114,35 @@ export function PriceBookEditor({
       >
         <Calculator className="h-3.5 w-3.5" />
       </button>
-      <MoneyInput
-        value={value ?? ""}
-        placeholder={fallback ? formatCurrency(row.prices[defaultBookId] ?? 0) : catalogue ? labels.noData : "—"}
-        onChange={onChange}
-        onBlur={() => {
-          const next = value == null
-            ? (book.id === defaultBookId ? 0 : null)
-            : Math.max(0, value);
-          onCommit(next);
-        }}
-        className={cn(
-          mobile
-            ? "w-full min-w-11 rounded-lg border bg-surface px-3 text-right text-sm tabular-nums"
-            : "w-28 rounded-md border bg-surface px-2 py-1.5 text-right text-sm tabular-nums",
-          !mobile && catalogue && "w-32",
-          belowCost ? "border-red-400 text-er" : "border-slate-200 dark:border-slate-700",
-          fallback && "text-slate-400",
+      <div className={cn("relative min-w-0", mobile ? "flex-1" : catalogue ? "w-32" : "w-28")}>
+        <MoneyInput
+          value={value ?? ""}
+          placeholder={fallback ? formatCurrency(row.prices[defaultBookId] ?? 0) : catalogue ? labels.noData : "—"}
+          onChange={onChange}
+          onBlur={() => {
+            const next = value == null
+              ? (book.id === defaultBookId ? 0 : null)
+              : Math.max(0, value);
+            onCommit(next);
+          }}
+          className={cn(
+            "w-full border bg-surface pl-7 text-right text-sm tabular-nums",
+            mobile ? "rounded-lg pr-3" : "rounded-md py-1.5 pr-2",
+            belowCost ? "border-red-400 text-er" : "border-slate-200 dark:border-slate-700",
+            fallback && "text-slate-400",
+          )}
+          title={belowCost ? labels.belowCost : undefined}
+          aria-label={book.name}
+        />
+        {/* Keep save feedback inside the field: table cells clip overflow. */}
+        {(saving || saved) && (
+          <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2" aria-hidden="true">
+            {saving
+              ? <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
+              : <Check className="h-3.5 w-3.5 text-ok" />}
+          </span>
         )}
-        title={belowCost ? labels.belowCost : undefined}
-        aria-label={book.name}
-      />
-      {saving && (
-        <Loader2 className={cn("absolute h-3.5 w-3.5 animate-spin text-slate-400", mobile ? "right-2" : "-right-5")} />
-      )}
-      {saved && (
-        <Check className={cn("absolute h-3.5 w-3.5 text-ok", mobile ? "right-2" : "-right-5")} />
-      )}
+      </div>
     </div>
   );
 }
