@@ -58,6 +58,10 @@ async function PricingContent({
   const overrideByBook = await getPriceOverridesForProducts(context.storeId, visibleIds);
   const tableRows = rows.map((p) => ({
     id: p.id, sku: p.sku, name: p.name, baseUnit: p.baseUnit,
+    units: (p.unitDefinitions ?? []).map((unit) => ({
+      unitName: unit.unitName, multiplier: Number(unit.multiplier),
+      priceOverride: unit.priceOverride == null ? null : Number(unit.priceOverride),
+    })),
     costPrice: includePurchasePrices ? Number(p.costPrice) : null,
     lastPurchase: includePurchasePrices && p.lastPurchaseNetPrice != null ? Number(p.lastPurchaseNetPrice) : null,
     prices: Object.fromEntries(books.map((b) => {

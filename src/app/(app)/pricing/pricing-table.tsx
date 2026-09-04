@@ -13,6 +13,9 @@ import { Select } from "@/components/ui/select";
 import { createPriceBook, renamePriceBook, deletePriceBook, setProductPrice, applyPriceFormulaAll, type PriceFormulaBase } from "@/lib/actions/price-books";
 import { comparePriceBooks, isPriceBookReadOnly, isSystemPriceBook, systemPriceBookType, type SystemPriceBookType } from "@/lib/pricing/system-price-books";
 import { reconcilePricingRows } from "./pricing-rows";
+import { preparePricingPriceEdit } from "./pricing-price-edit";
+import { UnitPriceConfirmation } from "../products/new/unit-price-confirmation";
+import type { EditablePriceUnit, UnitPricingSnapshot } from "@/lib/products/unit-price-edit";
 
 export interface PricingBook {
   id: string;
@@ -27,6 +30,7 @@ export interface PricingRow {
   sku: string;
   name: string;
   baseUnit: string;
+  units?: EditablePriceUnit[];
   costPrice: number | null;
   lastPurchase: number | null;
   prices: Record<string, number | null>;
@@ -117,9 +121,14 @@ export function PriceBookEditor({
       </button>
       <div className={cn("relative min-w-0", mobile ? "flex-1" : catalogue ? "w-32" : "w-28")}>
         <MoneyInput
+          decimals={2}
           value={value ?? ""}
           placeholder={fallback ? formatCurrency(row.prices[defaultBookId] ?? 0) : catalogue ? labels.noData : "—"}
           onChange={onChange}
+          disabled={saving}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") { event.preventDefault(); event.currentTarget.blur(); }
+          }}
           onBlur={() => {
             const next = value == null
               ? (book.id === defaultBookId ? 0 : null)
@@ -209,6 +218,9 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
   const [books, setBooks] = useState(() => [...initialBooks].sort(comparePriceBooks));
   const [rows, setRows] = useState(initialRows);
   const [previousRows, setPreviousRows] = useState(initialRows);
+  const [committedRows, setCommittedRows] = useState(initialRows);
+  const [pendingPriceEdit, setPendingPriceEdit] = useState<NonNullable<ReturnType<typeof preparePricingPriceEdit>> | null>(null);
+  const savingCellsRef = useRef(new Set<string>());
   const [error, setError] = useState("");
   const [savingCell, setSavingCell] = useState<Set<string>>(new Set());
   const [savedCell, setSavedCell] = useState<Set<string>>(new Set());
@@ -219,6 +231,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
   if (previousRows !== initialRows) {
     setPreviousRows(initialRows);
     setRows(reconcilePricingRows(rows, previousRows, initialRows));
+    setCommittedRows(initialRows);
   }
 
   // popover "Đặt giá theo công thức"
@@ -258,7 +271,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
       if (res.ok) { setFormula(null); router.refresh(); }
       else setError(t(res.error as never));
     } else {
-      await saveCell(row, bookId, nextPrice);
+      await requestSaveCell(row, bookId, nextPrice);
       setFormula(null);
     }
   }
@@ -340,20 +353,64 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
     setDeletingBook(false);
   }
 
-  async function saveCell(row: PricingRow, bookId: string, value: number | null) {
+  async function saveCell(row: PricingRow, bookId: string, value: number | null, syncUnitPrices = false) {
     const book = books.find((item) => item.id === bookId);
     if (!book || isPriceBookReadOnly(book)) return;
     const k = cellKey(row.id, bookId);
+    if (savingCellsRef.current.has(k)) return;
+    savingCellsRef.current.add(k);
     setRows((rs) => rs.map((r) => (r.id === row.id ? { ...r, prices: { ...r.prices, [bookId]: value } } : r)));
     setSavingCell((s) => new Set(s).add(k));
     setSavedCell((s) => { const n = new Set(s); n.delete(k); return n; });
     setError("");
-    const res = await setProductPrice({ priceBookId: bookId, productId: row.id, price: value });
-    setSavingCell((s) => { const n = new Set(s); n.delete(k); return n; });
-    if (res.ok) {
+    try {
+      const res = await setProductPrice({ priceBookId: bookId, productId: row.id, price: value, ...(syncUnitPrices ? { unitPriceMode: "sync" as const } : {}) });
+      if (!res.ok) throw new Error(res.error);
+      const acknowledge = (current: PricingRow[]) => current.map((r) => r.id === row.id ? {
+        ...r, prices: { ...r.prices, [bookId]: value },
+        ...(syncUnitPrices ? { units: r.units?.map((unit) => ({ ...unit, priceOverride: null })) } : {}),
+      } : r);
+      setCommittedRows(acknowledge);
+      setRows(acknowledge);
       setSavedCell((s) => new Set(s).add(k));
       setTimeout(() => setSavedCell((s) => { const n = new Set(s); n.delete(k); return n; }), 1500);
-    } else setError(t(res.error as never));
+    } catch (cause) {
+      updateCell(row.id, bookId, row.prices[bookId] ?? null);
+      const message = cause instanceof Error && /^(errors|pricing\.errors)\./.test(cause.message) ? cause.message : "errors.serverError";
+      setError(t(message as never));
+    } finally {
+      savingCellsRef.current.delete(k);
+      setSavingCell((s) => { const n = new Set(s); n.delete(k); return n; });
+    }
+  }
+
+  async function requestSaveCell(row: PricingRow, bookId: string, value: number | null) {
+    if (pendingPriceEdit || savingCellsRef.current.has(cellKey(row.id, bookId))) return;
+    const committed = committedRows.find((candidate) => candidate.id === row.id);
+    if (!committed) return;
+    const edit = preparePricingPriceEdit(committed, books, bookId, value);
+    if (!edit) {
+      updateCell(row.id, bookId, committed.prices[bookId] ?? null);
+      return;
+    }
+    if (edit.required) setPendingPriceEdit(edit);
+    else await saveCell(committed, bookId, edit.price);
+  }
+
+  function cancelPriceEdit() {
+    if (!pendingPriceEdit) return;
+    updateCell(pendingPriceEdit.row.id, pendingPriceEdit.bookId, pendingPriceEdit.row.prices[pendingPriceEdit.bookId] ?? null);
+    setPendingPriceEdit(null);
+  }
+
+  function confirmPriceEdit(draft: UnitPricingSnapshot) {
+    if (!pendingPriceEdit) return;
+    const { row, bookId, price, before } = pendingPriceEdit;
+    const retail = books.find((book) => book.id === bookId)?.isDefault;
+    const syncUnits = !!retail && before.units.some((unit) => unit.priceOverride != null)
+      && draft.units.every((unit) => unit.priceOverride == null);
+    setPendingPriceEdit(null);
+    void saveCell(row, bookId, retail ? draft.retailPrice : price, syncUnits);
   }
 
   function updateCell(rowId: string, bookId: string, value: number | null) {
@@ -407,7 +464,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
             labels={priceEditorLabels}
             onOpenFormula={() => openFormula(r.id, b.id)}
             onChange={(value) => updateCell(r.id, b.id, value)}
-            onCommit={(value) => saveCell(r, b.id, value)}
+            onCommit={(value) => requestSaveCell(r, b.id, value)}
           />
         );
       },
@@ -576,10 +633,12 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
             labels={priceEditorLabels}
             onOpenFormula={openFormula}
             onPriceChange={updateCell}
-            onPriceCommit={saveCell}
+            onPriceCommit={requestSaveCell}
           />
         )}
       />
+      {pendingPriceEdit && <UnitPriceConfirmation name={pendingPriceEdit.row.name} before={pendingPriceEdit.before}
+        draft={pendingPriceEdit.draft} books={pendingPriceEdit.books} onCancel={cancelPriceEdit} onConfirm={confirmPriceEdit} />}
       {deleteCandidate && (
         <div
           className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/45 p-3 sm:p-6"

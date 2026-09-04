@@ -62,6 +62,19 @@ beforeEach(() => {
 });
 
 describe("pricing server-to-client data", () => {
+  test("passes fixed, zero and linked unit prices to the confirmation boundary", async () => {
+    productRows = [{ ...product, unitDefinitions: [
+      { unitName: "Cây", multiplier: "4.0000", priceOverride: "60000.00" },
+      { unitName: "Bó", multiplier: "20.0000", priceOverride: null },
+      { unitName: "Mẫu", multiplier: "0.2500", priceOverride: "0.00" },
+    ] }];
+    expect((await clientProps()).rows[0].units).toEqual([
+      { unitName: "Cây", multiplier: 4, priceOverride: 60000 },
+      { unitName: "Bó", multiplier: 20, priceOverride: null },
+      { unitName: "Mẫu", multiplier: 0.25, priceOverride: 0 },
+    ]);
+  });
+
   test("price revalidation preserves the table identity and scroll reset key", async () => {
     const before = await clientTable({ page: "2", q: "Ống" });
     overrides.list.p1 = "150000";

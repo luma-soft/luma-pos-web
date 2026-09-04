@@ -2,11 +2,12 @@ import { describe, expect, mock, test } from "bun:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+const priceWrites = [];
 mock.module("@/lib/actions/price-books", () => ({
   createPriceBook: async () => ({ ok: false }),
   renamePriceBook: async () => ({ ok: false }),
   deletePriceBook: async () => ({ ok: false }),
-  setProductPrice: async () => ({ ok: false }),
+  setProductPrice: async (input) => { priceWrites.push(input); return { ok: true }; },
   applyPriceFormulaAll: async () => ({ ok: false }),
 }));
 
@@ -48,6 +49,32 @@ function editor(book, value = row) {
 }
 
 describe("pricing table sources and editing", () => {
+  test.each(["desktop", "mobile"])("%s commit waits for multi-unit confirmation and ignores unchanged prices", async (layout) => {
+    priceWrites.length = 0;
+    const multiUnitRow = { ...row, units: [{ unitName: "cây", multiplier: 4, priceOverride: 480000 }] };
+    renderToStaticMarkup(createElement(PricingTable, { books, rows: [multiUnitRow], total: 1 }));
+    const commit = layout === "desktop"
+      ? (price) => tableProps.columns.find((column) => column.key === "book:retail").render(multiUnitRow).props.onCommit(price)
+      : (price) => tableProps.renderMobileRow({ row: multiUnitRow }).props.onPriceCommit(multiUnitRow, "retail", price);
+    await commit(130000);
+    expect(priceWrites).toEqual([]);
+    await commit(120000);
+    expect(priceWrites).toEqual([]);
+  });
+
+  test("a changed single-unit cell still saves directly", async () => {
+    priceWrites.length = 0;
+    renderToStaticMarkup(createElement(PricingTable, { books, rows: [{ ...row, units: [] }], total: 1 }));
+    await tableProps.columns.find((column) => column.key === "book:retail").render(row).props.onCommit(130000);
+    expect(priceWrites).toEqual([{ priceBookId: "retail", productId: row.id, price: 130000 }]);
+  });
+
+  test("price inputs preserve fractional prices from a synchronized unit source", () => {
+    const html = editor(books[0], { ...row, prices: { ...row.prices, retail: 41.67 } });
+    expect(html).toContain('inputMode="decimal"');
+    expect(html).toContain('value="41,67"');
+  });
+
   test.each(books.filter((book) => ["cost", "purchase"].includes(book.systemType)))("$name exposes no price input or formula action", (book) => {
     const html = editor(book);
     expect(html).not.toContain("<input");
