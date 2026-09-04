@@ -6,8 +6,9 @@ import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 
 import { DateInput } from "@/components/ui/date-input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Search, Plus, Trash2, Loader2, ShoppingCart, X, GripVertical, WifiOff, RefreshCw, Printer, CheckCircle2, FileText, ClipboardList, UserPlus, RotateCcw } from "lucide-react";
 import { formatCurrency, formatNumber, cn } from "@/lib/utils";
@@ -52,6 +53,7 @@ import {
   savePosDraftSnapshot,
 } from "@/lib/pos/draft-storage";
 import { buildPosOrderItemPayload } from "@/lib/pos/order-item-payload";
+import { buildExpectedPosPricing, countPosPricingConflicts, requestPosOrder } from "@/lib/pos/checkout-pricing";
 import { resolvePosCartUnit } from "@/lib/pos/cart-unit";
 import {
   createLinePriceEditorState,
@@ -510,6 +512,7 @@ export function PosClient({
   posPrefs: StorePrefs["pos"];
 }) {
   const t = useTranslations();
+  const router = useRouter();
   const { confirm } = useConfirmDialog();
   const priceBookSwitchPending = useRef(false);
   const priceBookSwitchMounted = useRef(true);
@@ -523,6 +526,9 @@ export function PosClient({
   const [submittingMode, setSubmittingMode] = useState<"sale" | "quote" | "booking" | "return" | null>(null);
   const submitting = submittingMode !== null;
   const [error, setError] = useState("");
+  const [pricingConflictId, setPricingConflictId] = useState<string | null>(null);
+  const [refreshingPricing, setRefreshingPricing] = useState(false);
+  const [pricingRoutePending, startPricingRefresh] = useTransition();
   const [sepayCheckout, setSepayCheckout] = useState<SepayCheckout | null>(null);
   // kéo thả: sắp xếp dòng trong giỏ + thả SP từ danh sách vào giỏ
   const [dragKey, setDragKey] = useState<string | null>(null);
@@ -616,6 +622,8 @@ export function PosClient({
   // load đơn đang soạn sau khi mount (tránh lệch SSR; defer cho react-compiler)
   useEffect(() => {
     if (initialSourceInvoice || initialContext) return;
+    // Route refresh must not rehydrate an older saved snapshot over a live cart.
+    if (hydratedScopeRef.current === storageScope) return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("aiDraft") === "1") {
       hydratedScopeRef.current = storageScope;
@@ -868,6 +876,7 @@ export function PosClient({
   // ===== offline (Mức A) =====
   const [online, setOnline] = useState(true);
   const [pending, setPending] = useState(0);
+  const [pricingConflicts, setPricingConflicts] = useState(0);
   const [aiUnresolvedItems, setAiUnresolvedItems] = useState<PosAiUnresolvedItem[]>([]);
   const [aiQuickOpen, setAiQuickOpen] = useState(false);
   const [aiHighlightedProductIds, setAiHighlightedProductIds] = useState<string[]>([]);
@@ -956,16 +965,18 @@ export function PosClient({
     for (const it of items) {
       if (!navigator.onLine) break;
       try {
-        const res = await createOrder(it.payload as Parameters<typeof createOrder>[0]);
-        if (res.ok) {
+        const res = await requestPosOrder(it.payload as Parameters<typeof createOrder>[0], createOrder);
+        if (res.kind === "created") {
           await removeOutbox(storageScope, it.localId);
           void productCatalog.refresh();
         }
-        else await markFailed(storageScope, it.localId, res.error); // lỗi nghiệp vụ → giữ lại, không lặp vô hạn
+        else if (res.kind === "rejected") await markFailed(storageScope, it.localId, res.error); // giữ nguyên snapshot để xử lý, không tự thử giá mới
+        else break;
       } catch { break; } // vẫn mất mạng → thử lại sau
     }
     const remain = await getOutbox(storageScope);
     setPending(remain.filter((x) => !x.failed).length);
+    setPricingConflicts(countPosPricingConflicts(remain));
     setSyncing(false); syncingRef.current = false;
   }
 
@@ -975,7 +986,12 @@ export function PosClient({
     queueMicrotask(() => {
       if (cancelled) return;
       setOnline(navigator.onLine);
-      getOutbox(storageScope).then((o) => { if (!cancelled) setPending(o.filter((x) => !x.failed).length); });
+      getOutbox(storageScope).then((o) => {
+        if (!cancelled) {
+          setPending(o.filter((x) => !x.failed).length);
+          setPricingConflicts(countPosPricingConflicts(o));
+        }
+      });
       flushOutbox();
     });
     const on = () => { setOnline(true); flushOutbox(); };
@@ -1378,7 +1394,7 @@ export function PosClient({
   }
 
   async function submitOrder(mode: "sale" | "quote" | "booking") {
-    if (cart.length === 0 || !data.warehouse || submitting) return;
+    if (cart.length === 0 || !data.warehouse || submitting || refreshingPricing || pricingRoutePending) return;
     if (cart.some((line) => !Number.isFinite(basePriceFor(line.product, line.priceBook ?? priceBook, data.priceBooks)))) {
       setError(t("pricing.errors.priceUnavailable"));
       return;
@@ -1414,10 +1430,12 @@ export function PosClient({
       shippingFee,
       priceBookId: priceBook || null,
       items: cart.map(buildPosOrderItemPayload),
+      expectedPricing: buildExpectedPosPricing(cart, (line) => effPrice(line).price),
       payment: { method: isCheckoutMode ? payMethod : "credit", amount: isCheckoutMode && payMethod !== "bank_transfer" ? paid : 0 },
     };
     setSubmittingMode(submitMode);
     setError("");
+    setPricingConflictId(null);
 
     // offline → xếp hàng chờ đồng bộ
     if (typeof navigator !== "undefined" && !navigator.onLine) {
@@ -1429,9 +1447,9 @@ export function PosClient({
       await queueOffline(payload);
       return;
     }
-    try {
-      const res = await createOrder(payload);
-      if (res.ok) {
+    const res = await requestPosOrder(payload, createOrder);
+    if (res.kind === "created") {
+      try {
         void productCatalog.refresh();
         if (submitMode === "sale" && payMethod === "bank_transfer") {
           const paymentRes = await fetch("/api/payments/sepay", {
@@ -1474,7 +1492,7 @@ export function PosClient({
           closeInvoice(activeId);
           setSepayCheckout({ ...paymentJson.data, orderId: res.data.id, orderCode: res.data.code, printJob });
           return;
-          }
+        }
         const printJob = buildPrintJob({
           template: submitMode === "quote" ? quotePrintTemplate : submitMode === "booking" ? bookingPrintTemplate : printTemplate,
           title: submitMode === "quote" ? t("print.titles.quote") : submitMode === "booking" ? t("print.titles.booking") : t("print.titles.order"),
@@ -1483,11 +1501,16 @@ export function PosClient({
         setSubmittingMode(null);
         closeInvoice(activeId);
         startPrint(printJob, submitMode === "quote" ? quotePrintTemplate.paperDefault : submitMode === "booking" ? bookingPrintTemplate.paperDefault : printDefaultSize);
-      } else {
+      } catch {
+        // The server already created the order. Never enqueue it again after a payment/print error.
         setSubmittingMode(null);
-        setError(t(res.error));
+        setError(t(payMethod === "bank_transfer" ? "pos.sepay.createFailed" : "errors.serverError"));
       }
-    } catch {
+    } else if (res.kind === "rejected") {
+      setSubmittingMode(null);
+      setError(t(res.error));
+      if (res.error === "pos.errors.pricingChanged") setPricingConflictId(activeId);
+    } else {
       if (payMethod === "bank_transfer") {
         setSubmittingMode(null);
         setError(t("pos.sepay.createFailed"));
@@ -1495,6 +1518,34 @@ export function PosClient({
       }
       // mất mạng giữa chừng → xếp hàng offline
       await queueOffline(payload);
+    }
+  }
+
+  /** Refresh choices only. The cashier explicitly reselects a unit/book; manual prices remain untouched. */
+  async function refreshCheckoutPricing() {
+    if (refreshingPricing || pricingRoutePending || submitting || !navigator.onLine) return;
+    const draftId = activeId;
+    const selectedProducts = [...new Map(cart.map((line) => [line.product.id, line.product])).values()];
+    setRefreshingPricing(true);
+    try {
+      // Cart products may be outside the first 200 POS products. Search each exact SKU.
+      const rows = await Promise.all(selectedProducts.map(async (product) => {
+        const matches = flattenProducts(await searchPosProducts(product.sku));
+        const fresh = matches.find((candidate) => candidate.id === product.id);
+        if (!fresh) throw new Error("PRODUCT_UNAVAILABLE");
+        return fresh;
+      }));
+      setInvoices((list) => list.map((invoice) => invoice.id === draftId
+        ? { ...invoice, cart: rehydrateCartProducts(invoice.cart, rows) }
+        : invoice));
+      void productCatalog.refresh();
+      // Fetch current price-book definitions and promotions without remounting the cart.
+      startPricingRefresh(() => router.refresh());
+      setError(t("pos.pricingConflict.reselect"));
+    } catch {
+      setError(t("pos.pricingConflict.refreshFailed"));
+    } finally {
+      setRefreshingPricing(false);
     }
   }
 
@@ -1944,15 +1995,16 @@ export function PosClient({
       style={keyboardInset > 0 ? { height: `calc(100% - ${keyboardInset}px)` } : undefined}
     >
       {/* trạng thái offline / đồng bộ */}
-      {(!online || pending > 0 || syncing || offlineSaved) && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 text-xs font-medium">
+      {(!online || pending > 0 || pricingConflicts > 0 || syncing || offlineSaved) && (
+        <div className="absolute top-2 left-1/2 w-max -translate-x-1/2 z-50 text-xs font-medium" style={{ maxWidth: "calc(100% - 1rem)" }} role="status">
           <span className={cn(
             "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full",
-            !online ? "bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-950/70 dark:text-amber-300"
+            !online || pricingConflicts > 0 ? "bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-950/70 dark:text-amber-300"
               : "bg-sky-100 text-sky-800 border border-sky-300 dark:bg-sky-950/70 dark:text-sky-300"
           )}>
             {!online ? <><WifiOff className="w-3.5 h-3.5" />{t("pos.offline.banner")}</>
               : syncing ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" />{t("pos.offline.syncing")}</>
+              : pricingConflicts > 0 ? <>{t("pos.pricingConflict.queued", { count: pricingConflicts })}</>
               : pending > 0 ? <><RefreshCw className="w-3.5 h-3.5" />{t("pos.offline.pending", { n: pending })}</>
               : <>{t("pos.offline.savedToast")}</>}
           </span>
@@ -2446,6 +2498,17 @@ export function PosClient({
             />
           </div>
           {error && <p className="text-xs text-red-600">{error}</p>}
+          {pricingConflictId === activeId && (
+            <button
+              type="button"
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full whitespace-normal")}
+              disabled={refreshingPricing || pricingRoutePending || submitting || !online}
+              onClick={() => void refreshCheckoutPricing()}
+            >
+              <RefreshCw className={cn("h-4 w-4 shrink-0", (refreshingPricing || pricingRoutePending) && "animate-spin")} />
+              {t("pos.pricingConflict.refresh")}
+            </button>
+          )}
 
           <div className="flex gap-2">
             <div className="relative">
@@ -2460,7 +2523,7 @@ export function PosClient({
               </button>
             </div>
             <button
-              disabled={(isReturnDraft ? !hasReturnQuantity : cart.length === 0) || submitting || !data.warehouse || !!sepayCheckout}
+              disabled={(isReturnDraft ? !hasReturnQuantity : cart.length === 0) || submitting || refreshingPricing || pricingRoutePending || !data.warehouse || !!sepayCheckout}
               onClick={submitActiveDraft}
               className="flex-1 py-3 rounded-xl bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white font-semibold flex items-center justify-center gap-2"
             >

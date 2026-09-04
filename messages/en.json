@@ -1321,7 +1321,14 @@
     },
     "errors": {
       "creditNeedsCustomer": "Credit sales require a saved customer.",
+      "pricingChanged": "Prices, promotions or unit conversions changed. The order has not been saved or paid; your cart is preserved. Refresh and review the prices before submitting again.",
       "emptyCart": "Cart is empty."
+    },
+    "pricingConflict": {
+      "refresh": "Refresh prices to reselect",
+      "reselect": "A pricing refresh was requested. Reselect the unit or price book for affected lines, then review the total before submitting again. Manually entered prices are unchanged.",
+      "refreshFailed": "Could not load all current prices. Your cart is preserved; check your connection and try refreshing again.",
+      "queued": "{count} offline orders need a pricing review. They are preserved and have not synced successfully."
     },
     "sepay": {
       "title": "Scan VietQR to pay",

@@ -29,8 +29,9 @@ export async function createOrder(
   if (!gate.ok) return gate;
   const parsed = createOrderSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
+  let trustedItems;
   try {
-    const trustedItems = await normalizeOrderItems(
+    trustedItems = await normalizeOrderItems(
       gate.storeId,
       parsed.data.items,
       parsed.data.priceBookId,
@@ -49,6 +50,9 @@ export async function createOrder(
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
+    if (parsed.data.expectedPricing && ["PRICE_BOOK_PRICE_UNAVAILABLE", "PRODUCT_NOT_FOUND", "UNIT_NOT_FOUND", "PRICE_BOOK_NOT_FOUND"].includes(message)) {
+      return { ok: false, error: "pos.errors.pricingChanged" };
+    }
     if (message === "PRICE_BOOK_PRICE_UNAVAILABLE") return { ok: false, error: "pricing.errors.priceUnavailable" };
     if (message === "PRICE_BOOK_FORBIDDEN") return { ok: false, error: "errors.forbidden" };
     if (
@@ -65,7 +69,7 @@ export async function createOrder(
     throw error;
   }
   // Lõi tách riêng. Xem src/lib/orders/create.ts.
-  return createOrderForUser(gate.userId, parsed.data);
+  return createOrderForUser(gate.userId, parsed.data, { items: trustedItems });
 }
 
 export async function addPayment(input: AddPaymentInput): Promise<ActionResult> {

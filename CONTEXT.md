@@ -33,6 +33,19 @@ revision invalidation to price books and promotions.
 Promotion time windows can change without a write/revision; mobile checkout
 therefore refreshes pricing metadata even when the revision is unchanged.
 
+## Checkout Pricing Expectation
+
+New web/mobile create-order requests carry the accepted final price per selling
+unit and conversion factor, ordered identically to the order lines. This is an
+expectation, not permission to override prices. The server resolves authoritative
+pricing in the order-writing transaction, then locks and rechecks the tenant's
+Catalog Revision before any order/payment/stock write. A mismatch rolls back and
+requires explicit review; offline conflicts retain their original payload.
+The revision lock remains held through commit. Contention can conservatively
+reject unrelated same-store activity, with bounded waits and safe rollback.
+Legacy requests remain accepted without a client-price expectation; historical
+quote conversion and subsequent payments retain their saved price semantics.
+
 ## Pricing Administration
 
 Pricing lists and bulk formulas share one filter definition. Bulk changes span

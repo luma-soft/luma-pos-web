@@ -2,15 +2,16 @@ import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-d
 import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  orders, orderItems, payments, customers, products, priceBooks, stockLevels, stockMovements, einvoices, returns,
+  orders, orderItems, payments, customers, products, stockLevels, stockMovements, einvoices, returns,
 } from "@/db/schema";
 import { createOrderSchema, type CreateOrderInput } from "@/lib/schemas/order";
 import {
-  type ActionResult, getProfileId, getRole, generateCode, toMoney, toQty, isUniqueViolation,
+  type ActionResult, getProfileId, generateCode, toMoney, toQty, isUniqueViolation, pgErrorCode,
 } from "@/lib/actions/common";
 import { recordCashTx, fundForMethod } from "@/lib/cash";
 import { Routes } from "@/lib/routes";
-import { normalizeOrderItems } from "@/lib/orders/normalize";
+import type { NormalizedOrderItem } from "@/lib/orders/normalize";
+import { CHECKOUT_PRICING_CHANGED, prepareCheckoutPricing } from "@/lib/orders/checkout-pricing";
 import { revalueInventoryProducts } from "@/lib/inventory/cost-valuation";
 import { getOrderStockRestorations, restoreOrderStockInTransaction } from "@/lib/inventory/order-stock-restoration";
 import { getCurrentShift } from "@/lib/data/shifts";
@@ -44,7 +45,9 @@ function revalidateOrderPaths(sourceOrderId?: string) {
  */
 export async function createOrderForUser(
   userId: string,
-  input: CreateOrderInput
+  input: CreateOrderInput,
+  // Server-only authorization context, never parsed from a client payload.
+  authorization?: { items: NormalizedOrderItem[] },
 ): Promise<ActionResult<{ id: string; code: string }>> {
   const parsed = createOrderSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
@@ -52,21 +55,6 @@ export async function createOrderForUser(
   const context = await resolveStoreContextForUser(userId);
   if (!context) return { ok: false, error: "errors.unauthorized" };
   const { storeId } = context;
-
-  const requestedPriceBookIds = [...new Set(v.items
-    .map((item) => item.priceBookId === undefined ? v.priceBookId : item.priceBookId)
-    .filter((id): id is string => Boolean(id)))];
-  if (requestedPriceBookIds.length > 0) {
-    const selectedPriceBooks = await db
-      .select({ id: priceBooks.id, managerOnly: priceBooks.managerOnly })
-      .from(priceBooks)
-      .where(and(eq(priceBooks.storeId, storeId), inArray(priceBooks.id, requestedPriceBookIds)));
-    if (selectedPriceBooks.length !== requestedPriceBookIds.length) return { ok: false, error: "errors.invalidData" };
-    if (selectedPriceBooks.some((priceBook) => priceBook.managerOnly)) {
-      const role = await getRole(userId);
-      if (role !== "owner" && role !== "manager") return { ok: false, error: "errors.forbidden" };
-    }
-  }
 
   const paymentPending = v.paymentPending === true;
   if (
@@ -85,57 +73,40 @@ export async function createOrderForUser(
     if (existing) return { ok: true, data: existing };
   }
 
-  // Server tự tính tiền — không tin client
   const isQuote = v.mode === "quote";
   const isBooking = v.mode === "booking";
-  let trustedItems;
-  try {
-    trustedItems = await normalizeOrderItems(storeId, v.items, v.priceBookId, context.role);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "";
-    if (msg === "PRICE_BOOK_PRICE_UNAVAILABLE") return { ok: false, error: "pricing.errors.priceUnavailable" };
-    if (msg === "PRICE_BOOK_FORBIDDEN") return { ok: false, error: "errors.forbidden" };
-    if (["PRODUCT_NOT_FOUND", "UNIT_NOT_FOUND", "INVALID_ITEMS", "PRICE_BOOK_NOT_FOUND"].includes(msg)) {
-      return { ok: false, error: "errors.invalidData" };
-    }
-    throw e;
-  }
-  const subtotal = trustedItems.reduce((s, i) => s + i.total, 0);
-  const afterDiscount = Math.max(0, subtotal - v.discount);
-  const productTaxRows = await db
-    .select({ id: products.id, vatRate: products.vatRate })
-    .from(products)
-    .where(and(eq(products.storeId, storeId), inArray(products.id, [...new Set(trustedItems.map((item) => item.productId))])));
-  const vatRateByProduct = new Map(
-    productTaxRows.map((product) => [
-      product.id,
-      product.vatRate == null ? null : Number(product.vatRate),
-    ]),
-  );
-  const tax = calculateProductTax({
-    lines: trustedItems.map((item) => ({
-      total: item.total,
-      vatRate: vatRateByProduct.get(item.productId) ?? null,
-    })),
-    discount: v.discount,
-    fallbackVatRate: v.taxRate,
-  });
-  const total = Math.max(0, afterDiscount + tax + v.shippingFee);
-  const paid = isQuote || isBooking || v.payment.method === "credit" ? 0 : Math.min(v.payment.amount, total);
-  const remaining = total - paid;
-  const paymentStatus = paymentPending
-    ? "unpaid"
-    : paid >= total
-      ? "paid"
-      : paid > 0
-        ? "deposit"
-        : "unpaid";
 
   try {
     const profileId = await getProfileId(userId);
     const currentShift = profileId ? await getCurrentShift(storeId, profileId) : null;
 
     const result = await db.transaction(async (tx) => {
+      await tx.execute(sql`set local lock_timeout = '2s'`);
+      if (v.clientId) {
+        // Serialize only retries of this tenant/request, not all checkouts.
+        // Recheck after the winner commits, before acquiring the pricing fence.
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`checkout:${storeId}:${v.clientId}`}, 0))`);
+        const [existing] = await tx.select({ id: orders.id, code: orders.code }).from(orders)
+          .where(and(eq(orders.storeId, storeId), eq(orders.clientId, v.clientId))).limit(1);
+        if (existing) return { order: existing, notification: null };
+      }
+      // Resolve and fence prices in this same transaction BEFORE any edit
+      // restoration, inventory, order, payment or audit write.
+      const { items: trustedItems, vatRateByProduct } = await prepareCheckoutPricing(
+        tx, storeId, v, context.role, authorization?.items,
+      );
+      const subtotal = trustedItems.reduce((s, i) => s + i.total, 0);
+      const afterDiscount = Math.max(0, subtotal - v.discount);
+      const tax = calculateProductTax({
+        lines: trustedItems.map((item) => ({ total: item.total, vatRate: vatRateByProduct.get(item.productId) ?? null })),
+        discount: v.discount,
+        fallbackVatRate: v.taxRate,
+      });
+      const total = Math.max(0, afterDiscount + tax + v.shippingFee);
+      const paid = isQuote || isBooking || v.payment.method === "credit" ? 0 : Math.min(v.payment.amount, total);
+      const remaining = total - paid;
+      const paymentStatus = paymentPending ? "unpaid" : paid >= total ? "paid" : paid > 0 ? "deposit" : "unpaid";
+
       const [sourceOrder] = v.source
         ? await tx.select().from(orders).where(and(eq(orders.storeId, storeId), eq(orders.id, v.source.orderId))).limit(1).for("update")
         : [];
@@ -423,7 +394,7 @@ export async function createOrderForUser(
         await revalueInventoryProducts(tx, storeId, affected.map((row) => row.productId));
       }
       return { order, notification };
-    });
+    }, { isolationLevel: "read committed" });
 
     if (result.notification?.created) {
       await publishCommittedNotification(result.notification.eventId);
@@ -446,6 +417,14 @@ export async function createOrderForUser(
       INSUFFICIENT_BATCH_STOCK: "pos.errors.insufficientStock",
     };
     const msg = e instanceof Error ? e.message : "";
+    if (msg === CHECKOUT_PRICING_CHANGED || ["40001", "40P01", "55P03"].includes(pgErrorCode(e) ?? "")) {
+      return { ok: false, error: CHECKOUT_PRICING_CHANGED };
+    }
+    if (msg === "PRICE_BOOK_FORBIDDEN") return { ok: false, error: "errors.forbidden" };
+    if (["PRICE_BOOK_PRICE_UNAVAILABLE", "PRODUCT_NOT_FOUND", "UNIT_NOT_FOUND", "PRICE_BOOK_NOT_FOUND"].includes(msg)) {
+      return { ok: false, error: v.expectedPricing ? CHECKOUT_PRICING_CHANGED : msg === "PRICE_BOOK_PRICE_UNAVAILABLE" ? "pricing.errors.priceUnavailable" : "errors.invalidData" };
+    }
+    if (msg === "INVALID_ITEMS") return { ok: false, error: "errors.invalidData" };
     if (known[msg]) return { ok: false, error: known[msg] };
     console.error("createOrder failed:", e);
     return { ok: false, error: "errors.serverError" };

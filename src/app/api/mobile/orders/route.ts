@@ -54,6 +54,9 @@ export async function POST(request: Request) {
     trustedItems = await normalizeOrderItems(gate.storeId, value.items, value.priceBookId, gate.role);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
+    if (value.expectedPricing && ["PRICE_BOOK_PRICE_UNAVAILABLE", "PRODUCT_NOT_FOUND", "UNIT_NOT_FOUND", "PRICE_BOOK_NOT_FOUND"].includes(message)) {
+      return mobileError("pos.errors.pricingChanged", 409);
+    }
     if (message === "PRICE_BOOK_PRICE_UNAVAILABLE") return mobileError("pricing.errors.priceUnavailable");
     if (message === "PRICE_BOOK_FORBIDDEN") return mobileError("errors.forbidden", 403);
     if (
@@ -94,5 +97,7 @@ export async function POST(request: Request) {
     if (!authorization.ok) return mobileError(authorization.error, 403);
   }
 
-  return mobileAction(await createOrderForUser(gate.userId, value));
+  const result = await createOrderForUser(gate.userId, value, { items: trustedItems });
+  if (!result.ok && result.error === "pos.errors.pricingChanged") return mobileError(result.error, 409);
+  return mobileAction(result);
 }

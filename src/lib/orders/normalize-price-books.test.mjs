@@ -132,6 +132,16 @@ test("a price-book ID from another store is rejected", async () => {
   await expect(normalizeOrderItems(storeId, [line({ priceBookId: foreignId })], null, "owner")).rejects.toThrow("PRICE_BOOK_NOT_FOUND");
 });
 
+test("custom manager-only books enforce permissions during transactional normalization", async () => {
+  await pg.query("update price_books set manager_only=true where id=$1", [customId]);
+  try {
+    await expect(database.transaction((tx) => normalizeOrderItems(storeId, [line({ priceBookId: customId })], null, "cashier", tx)))
+      .rejects.toThrow("PRICE_BOOK_FORBIDDEN");
+    const [item] = await database.transaction((tx) => normalizeOrderItems(storeId, [line({ priceBookId: customId })], null, "manager", tx));
+    expect(item.unitPrice).toBe(160);
+  } finally { await pg.query("update price_books set manager_only=false where id=$1", [customId]); }
+});
+
 test("cashier applies entered company discount without stacking the retail promotion", async () => {
   const items = await normalizeOrderItems(storeId, [
     line({ productId: companyProductId, unitName: "cây", quantity: 3, priceBookId: companyId, lineDiscount: 999, lineDiscountMode: "pct", lineDiscountValue: 20 }),

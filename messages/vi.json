@@ -1321,7 +1321,14 @@
     },
     "errors": {
       "creditNeedsCustomer": "Ghi nợ cần chọn khách hàng có hồ sơ.",
+      "pricingChanged": "Giá bán, khuyến mại hoặc quy đổi đơn vị đã thay đổi. Đơn chưa được lưu/thanh toán; giỏ hàng vẫn được giữ. Hãy làm mới và kiểm tra lại giá trước khi chốt.",
       "emptyCart": "Giỏ hàng trống."
+    },
+    "pricingConflict": {
+      "refresh": "Làm mới giá để chọn lại",
+      "reselect": "Đã yêu cầu làm mới dữ liệu giá. Chọn lại đơn vị hoặc bảng giá cho dòng cần cập nhật, rồi kiểm tra tổng tiền trước khi chốt lại. Giá nhập tay vẫn được giữ nguyên.",
+      "refreshFailed": "Chưa tải được đầy đủ giá mới. Giỏ hàng vẫn được giữ; hãy kiểm tra kết nối và thử làm mới lại.",
+      "queued": "Có {count} đơn offline cần kiểm tra lại giá. Đơn được giữ lại, chưa đồng bộ thành công."
     },
     "sepay": {
       "title": "Quét VietQR để thanh toán",

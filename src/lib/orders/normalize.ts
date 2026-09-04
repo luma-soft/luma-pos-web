@@ -57,6 +57,7 @@ export async function normalizeOrderItems(
   rawItems: RawOrderItem[],
   invoicePriceBookId?: string | null,
   role?: string,
+  database: Pick<typeof db, "select"> = db,
 ): Promise<NormalizedOrderItem[]> {
   const productIds = [...new Set(rawItems.map((i) => i.productId))];
   if (productIds.length === 0) throw new Error("INVALID_ITEMS");
@@ -64,8 +65,8 @@ export async function normalizeOrderItems(
     .map((item) => item.priceBookId === undefined ? invoicePriceBookId : item.priceBookId)
     .filter((id): id is string => Boolean(id)))];
 
-  const [productRows, unitRows, priceRows, priceBookRows, promoRows, comboRows] = await Promise.all([
-    db
+  const reads = [
+    database
       .select({
         id: products.id,
         name: products.name,
@@ -79,7 +80,7 @@ export async function normalizeOrderItems(
       })
       .from(products)
       .where(and(eq(products.storeId, storeId), inArray(products.id, productIds))),
-    db
+    database
       .select({
         productId: productUnits.productId,
         unitName: productUnits.unitName,
@@ -89,18 +90,18 @@ export async function normalizeOrderItems(
       .from(productUnits)
       .where(inArray(productUnits.productId, productIds)),
     requestedPriceBookIds.length > 0
-      ? db
+      ? database
           .select({ priceBookId: productPrices.priceBookId, productId: productPrices.productId, price: productPrices.price })
           .from(productPrices)
           .where(and(eq(productPrices.storeId, storeId), inArray(productPrices.priceBookId, requestedPriceBookIds), inArray(productPrices.productId, productIds)))
       : Promise.resolve([]),
     requestedPriceBookIds.length > 0
-      ? db
+      ? database
           .select({ id: priceBooks.id, name: priceBooks.name, costBased: priceBooks.costBased, systemType: priceBooks.systemType, isDefault: priceBooks.isDefault, managerOnly: priceBooks.managerOnly })
           .from(priceBooks)
           .where(and(eq(priceBooks.storeId, storeId), inArray(priceBooks.id, requestedPriceBookIds)))
       : Promise.resolve([]),
-    db
+    database
       .select({
         productId: promotions.productId,
         tiers: promotions.tiers,
@@ -110,7 +111,7 @@ export async function normalizeOrderItems(
       })
       .from(promotions)
       .where(and(eq(promotions.isActive, true), inArray(promotions.productId, productIds))),
-    db
+    database
       .select({
         comboProductId: productComboItems.comboProductId,
         componentProductId: productComboItems.componentProductId,
@@ -120,7 +121,12 @@ export async function normalizeOrderItems(
       .from(productComboItems)
       .innerJoin(products, eq(productComboItems.componentProductId, products.id))
       .where(and(eq(productComboItems.storeId, storeId), inArray(productComboItems.comboProductId, productIds))),
-  ]);
+  ] as const;
+  // Pool reads can run in parallel; a transaction has one physical connection.
+  // Do not queue simultaneous pg queries on that connection (unsupported in pg9).
+  const [productRows, unitRows, priceRows, priceBookRows, promoRows, comboRows] = database === db
+    ? await Promise.all(reads)
+    : [await reads[0], await reads[1], await reads[2], await reads[3], await reads[4], await reads[5]];
 
   const productById = new Map(productRows.map((p) => [p.id, p]));
   const priceByBookProduct = new Map(priceRows.map((p) => [`${p.priceBookId}:${p.productId}`, p.price]));
@@ -157,7 +163,7 @@ export async function normalizeOrderItems(
     const itemPriceBookId = item.priceBookId === undefined ? invoicePriceBookId ?? null : item.priceBookId;
     const itemPriceBook = itemPriceBookId ? priceBookById.get(itemPriceBookId) : undefined;
     if (itemPriceBookId && !itemPriceBook) throw new Error("PRICE_BOOK_NOT_FOUND");
-    if (itemPriceBook && isInternalPriceBook(itemPriceBook) && !canViewPurchasePrices(role)) {
+    if (itemPriceBook && (itemPriceBook.managerOnly || isInternalPriceBook(itemPriceBook)) && !canViewPurchasePrices(role)) {
       throw new Error("PRICE_BOOK_FORBIDDEN");
     }
     const base = resolvePriceBookPrice(itemPriceBook ?? { isDefault: true }, product,

@@ -63,7 +63,20 @@ Web/mobile dùng cùng chính sách khi đổi bảng giá:
 - Chọn khách hàng không tự đổi bảng giá theo các nhãn retail/wholesale/vip cố định. Giá chung vẫn là mặc định.
 - Khuyến mại tự động dùng số lượng đã quy đổi về đơn vị gốc và không cộng vào Giá chưa chiết khấu, giá nhập tay hoặc dòng có chiết khấu riêng. Chiết khấu tiền nhập ở POS là tiền trên mỗi đơn vị; draft mobile cũ lưu tiền cả dòng được chuyển đổi một lần để giữ nguyên tổng tiền.
 
-Catalog mobile lưu bảng giá và khuyến mại theo cửa hàng/người dùng; tập rỗng từ server xóa dữ liệu cũ, trường vắng mặt từ API cũ không xóa nhầm. Khi ứng dụng trở lại hoặc catalog thay đổi, cập nhật danh mục nhưng giữ snapshot giá/hệ số đang bán. Trước checkout, mobile kiểm tra lại catalog/khuyến mại, kể cả khi revision không đổi (khuyến mại có thể bắt đầu/kết thúc theo giờ). Nếu giá, hệ số hoặc tổng tiền thay đổi, dừng trước tạo đơn/thu tiền để người bán xem lại. Báo giá đã lưu dùng snapshot riêng. Bước kiểm tra này không phải khóa giá phía server trong khoảng giữa kiểm tra và tạo đơn.
+Catalog mobile lưu bảng giá và khuyến mại theo cửa hàng/người dùng; tập rỗng từ server xóa dữ liệu cũ, trường vắng mặt từ API cũ không xóa nhầm. Khi ứng dụng trở lại hoặc catalog thay đổi, cập nhật danh mục nhưng giữ snapshot giá/hệ số đang bán. Trước checkout, mobile kiểm tra lại catalog/khuyến mại, kể cả khi revision không đổi (khuyến mại có thể bắt đầu/kết thúc theo giờ). Nếu giá, hệ số hoặc tổng tiền thay đổi, dừng trước tạo đơn/thu tiền để người bán xem lại. Báo giá đã lưu dùng snapshot riêng. Kiểm tra client được bổ sung bằng chốt giá nguyên tử phía server bên dưới.
+
+## Chốt giá nguyên tử khi tạo đơn
+
+Web/mobile mới gửi `expectedPricing: { version: 1, lines }` cùng yêu cầu tạo đơn. Mỗi dòng theo đúng thứ tự `items`, gồm `productId`, `unitName`, `unitMultiplier`, `unitPrice`. Giá kỳ vọng là giá cuối **mỗi đơn vị đang bán**, sau khuyến mại/chiết khấu dòng, trước giảm toàn hóa đơn và VAT. Snapshot chỉ là điều kiện kiểm tra, không cho phép client ghi giá catalog hoặc vượt quyền giá nhập tay.
+
+Trong chính giao dịch `READ COMMITTED` ghi đơn, server đọc revision cửa hàng trước khi tính lại giá/hệ số/VAT, rồi khóa và so sánh lại revision. Nếu revision hoặc giá/hệ số kỳ vọng lệch, hủy giao dịch trước mọi thay đổi đơn, tiền, kho hoặc đơn gốc đang sửa. Nếu hợp lệ, giữ khóa đến khi commit: thay đổi catalog đến sau phải chờ chốt đơn xong. Giá/chiết khấu đã dùng để xét quyền cũng được so sánh lại trong giao dịch. Yêu cầu trùng `clientId` được tuần tự hóa theo cửa hàng/yêu cầu và trả lại cùng đơn đã ghi.
+
+- Xung đột trả `pos.errors.pricingChanged`; mobile dùng HTTP 409. Web/mobile giữ giỏ, không tạo thanh toán QR/MoMo, yêu cầu xem lại và chọn lại giá/đơn vị. Giá nhập tay có chủ đích không bị catalog ghi đè.
+- Outbox offline giữ nguyên snapshot và đánh dấu lỗi cần xử lý, không tự bỏ guard, đổi giá hoặc thử lại vô hạn. Nếu đã thu tiền mặt ngoài hệ thống, cần đối soát trước khi tạo lại đơn.
+- Dùng revision/trigger đã có từ `0104` và `0130`, không cần migration mới. Khóa theo cửa hàng khá rộng: cập nhật catalog/tồn kho khác trong cùng cửa hàng có thể gây yêu cầu thử lại. `NOWAIT` và `lock_timeout=2s` làm xung đột/đảo thứ tự khóa rollback an toàn; không cam kết không có deadlock.
+- Giữ tương thích client cũ và outbox cũ không có `expectedPricing`: server vẫn tính/ghi giá trong giao dịch nhưng không biết giá client đã xem để so sánh. Bảo vệ snapshot đầy đủ cần cả backend và client mới. Không đổi luồng thu thêm tiền/chuyển báo giá đã lưu sang đơn.
+
+Kiểm thử: chạy các file Bun có `mock.module` trong tiến trình riêng. `src/lib/orders/create-pricing-guard.test.mjs` mặc định dùng PGlite; `src/lib/orders/checkout-pricing-concurrency.test.mjs` chỉ chạy khi có `CHECKOUT_TEST_DATABASE_URL` đến PostgreSQL biệt lập tại `127.0.0.1`, database mới tên bắt đầu `luma_pricing_test`. Mỗi file cần database riêng/rỗng, tuyệt đối không dùng database cửa hàng. Bộ concurrency dùng nhiều kết nối thật và trigger catalog thật; bộ create chạy lõi tạo đơn thật, chỉ thay cộng tác viên auth/thông báo và ghi dấu giao dịch cho cash/audit/valuation. Đã chạy PostgreSQL 18.4: 6 ca khóa đồng thời và 17 ca tạo đơn/rollback/idempotency thành công; không phải kiểm thử end-to-end trên dữ liệu cửa hàng.
 
 ## Migration và kiểm tra
 

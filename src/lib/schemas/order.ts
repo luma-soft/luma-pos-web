@@ -1,6 +1,17 @@
 import { z } from "zod";
 
 /** Schema dùng chung client/server cho tạo đơn POS. */
+export const checkoutPricingSnapshotSchema = z.object({
+  version: z.literal(1),
+  // Ordered like items. Net price is per selected unit, before invoice discount/tax.
+  lines: z.array(z.object({
+    productId: z.uuid(),
+    unitName: z.string(),
+    unitMultiplier: z.number().positive(),
+    unitPrice: z.number().min(0),
+  }).strict()).min(1),
+}).strict();
+
 export const orderItemSchema = z.object({
   productId: z.uuid(),
   productName: z.string().min(1).optional(),
@@ -43,12 +54,22 @@ export const createOrderSchema = z.object({
   // Provider-first checkout creates a draft that must not reserve/consume
   // stock until the server confirms the external payment.
   paymentPending: z.boolean().optional().default(false),
+  // Optional only for compatibility with older clients and existing offline jobs.
+  expectedPricing: checkoutPricingSnapshotSchema.optional(),
   items: z.array(orderItemSchema).min(1, { error: "pos.errors.emptyCart" }),
   payment: z.object({
     method: z.enum(["cash", "bank_transfer", "card", "credit"]),
     amount: z.number().min(0),
     reference: z.string().trim().optional(),
   }),
+}).superRefine((value, ctx) => {
+  const snapshot = value.expectedPricing;
+  if (!snapshot) return;
+  if (snapshot.lines.length !== value.items.length || snapshot.lines.some((line, index) =>
+    line.productId !== value.items[index]?.productId || line.unitName !== value.items[index]?.unitName,
+  )) {
+    ctx.addIssue({ code: "custom", path: ["expectedPricing"], message: "Pricing snapshot must match the ordered items" });
+  }
 });
 
 export type CreateOrderInput = z.input<typeof createOrderSchema>;
