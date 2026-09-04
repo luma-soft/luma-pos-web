@@ -81,7 +81,7 @@ async function PricingContent({
         />
       </div>
       <PricingTable
-        key={JSON.stringify([books, tableRows, params])}
+        key={JSON.stringify([context.storeId, books, params])}
         books={books}
         rows={tableRows}
         total={total}

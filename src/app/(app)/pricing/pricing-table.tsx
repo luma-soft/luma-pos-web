@@ -12,6 +12,7 @@ import { NumberInput } from "@/components/ui/number-input";
 import { Select } from "@/components/ui/select";
 import { createPriceBook, renamePriceBook, deletePriceBook, setProductPrice, applyPriceFormulaAll, type PriceFormulaBase } from "@/lib/actions/price-books";
 import { comparePriceBooks, isPriceBookReadOnly, isSystemPriceBook, systemPriceBookType, type SystemPriceBookType } from "@/lib/pricing/system-price-books";
+import { reconcilePricingRows } from "./pricing-rows";
 
 export interface PricingBook {
   id: string;
@@ -207,10 +208,18 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
   const router = useRouter();
   const [books, setBooks] = useState(() => [...initialBooks].sort(comparePriceBooks));
   const [rows, setRows] = useState(initialRows);
+  const [previousRows, setPreviousRows] = useState(initialRows);
   const [error, setError] = useState("");
   const [savingCell, setSavingCell] = useState<Set<string>>(new Set());
   const [savedCell, setSavedCell] = useState<Set<string>>(new Set());
   const [visibleColumnKeys, setVisibleColumnKeys] = useState<Set<string> | undefined>();
+
+  // Revalidation must refresh prices without replacing the scroll container.
+  // Keep edits in other cells if a save response arrives while the user types.
+  if (previousRows !== initialRows) {
+    setPreviousRows(initialRows);
+    setRows(reconcilePricingRows(rows, previousRows, initialRows));
+  }
 
   // popover "Đặt giá theo công thức"
   const [formula, setFormula] = useState<{ rowId: string; bookId: string } | null>(null);

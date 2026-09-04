@@ -42,11 +42,15 @@ mock.module("@/lib/actions/price-books", () => ({
 const { PricingTab } = await import("./pricing.tsx");
 const { PricingTable } = await import("../../pricing/pricing-table.tsx");
 
-async function clientProps(searchParams = {}) {
+async function clientTable(searchParams = {}) {
   const tab = await PricingTab({ searchParams });
   const content = tab.props.children.props.children;
   const rendered = await content.type(content.props);
-  return rendered.props.children.find((child) => child?.type === PricingTable).props;
+  return rendered.props.children.find((child) => child?.type === PricingTable);
+}
+
+async function clientProps(searchParams = {}) {
+  return (await clientTable(searchParams)).props;
 }
 
 beforeEach(() => {
@@ -58,6 +62,26 @@ beforeEach(() => {
 });
 
 describe("pricing server-to-client data", () => {
+  test("price revalidation preserves the table identity and scroll reset key", async () => {
+    const before = await clientTable({ page: "2", q: "Ống" });
+    overrides.list.p1 = "150000";
+    productRows = [{ ...product, retailPrice: "130000" }];
+    const after = await clientTable({ page: "2", q: "Ống" });
+    expect(after.props.rows[0].prices.list).toBe(150000);
+    expect(after.props.rows[0].prices.retail).toBe(130000);
+    expect(after.key).toBe(before.key);
+    expect(after.props.resetScrollKey).toBe(before.props.resetScrollKey);
+  });
+
+  test("a new page or filter still resets the result set", async () => {
+    const before = await clientTable({ page: "2", q: "Ống" });
+    for (const params of [{ page: "3", q: "Ống" }, { page: "2", q: "Dây" }]) {
+      const after = await clientTable(params);
+      expect(after.key).not.toBe(before.key);
+      expect(after.props.resetScrollKey).not.toBe(before.props.resetScrollKey);
+    }
+  });
+
   test("cost, net purchase and retail use product sources while company catalogue uses its own override", async () => {
     const props = await clientProps();
     expect(props.rows[0].prices).toEqual({ retail: 120000, cost: 90000, purchase: null, list: 140000, trade: 110000 });
