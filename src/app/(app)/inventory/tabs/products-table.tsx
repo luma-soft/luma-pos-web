@@ -395,10 +395,19 @@ export function ProductsTable({
       cellClassName: "!whitespace-normal !overflow-visible",
       render: (product) => (
         <div className="flex items-center gap-2.5">
-          {groupOf(product) ? <button type="button" onClick={(event) => { event.stopPropagation(); toggleGroup(product); }} aria-expanded={isExpanded(product)} aria-label={t(isExpanded(product) ? "products.variants.collapse" : "products.variants.expand", { count: groupOf(product)!.count, name: product.name })} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-primary-600 hover:bg-primary-100"><ChevronDown className={cn("h-4 w-4 transition-transform", !isExpanded(product) && "-rotate-90")} /></button> : <span className="w-8 shrink-0" />}
           <ProductThumbnail product={product} />
           <div className="min-w-0">
-            {groupOf(product) && <div className="mb-1 font-semibold">{t("products.variants.groupCode", { count: groupOf(product)!.count })}</div>}
+            {groupOf(product) && (
+              <button
+                type="button"
+                onClick={(event) => { event.stopPropagation(); toggleGroup(product); }}
+                aria-expanded={isExpanded(product)}
+                aria-label={t(isExpanded(product) ? "products.variants.collapse" : "products.variants.expand", { count: groupOf(product)!.count, name: product.name })}
+                className="mb-1 block rounded-sm text-left font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600"
+              >
+                {t("products.variants.groupCode", { count: groupOf(product)!.count })}
+              </button>
+            )}
             <div className={cn("break-words", groupOf(product) ? "text-xs text-slate-500" : "font-medium")}>{product.sku}</div>
             {product.barcode && <div className="mt-0.5 break-all text-xs text-slate-400">{product.barcode}</div>}
           </div>
