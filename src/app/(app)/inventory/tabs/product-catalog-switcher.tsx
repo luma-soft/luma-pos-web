@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Routes } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
@@ -11,10 +11,11 @@ export function ProductCatalogSwitcher({
   categoryCount,
 }: {
   activeView: "products" | "categories";
-  productCount?: number;
-  categoryCount?: number;
+  productCount: number;
+  categoryCount: number;
 }) {
   const t = useTranslations();
+  const locale = useLocale();
   const options = [
     { id: "products", label: t("nav.products"), count: productCount },
     { id: "categories", label: t("categories.title"), count: categoryCount },
@@ -39,9 +40,7 @@ export function ProductCatalogSwitcher({
           )}
         >
           <span>{option.label}</span>
-          {option.count != null && (
-            <span className="text-xs tabular-nums opacity-75">{option.count.toLocaleString()}</span>
-          )}
+          <span className="text-xs tabular-nums opacity-75">{option.count.toLocaleString(locale)}</span>
         </Link>
       ))}
     </nav>

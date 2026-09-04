@@ -51,10 +51,13 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
   if (!cameraMaterials && catalogView === "categories") {
     const page = Number(params.page) || 1;
     const pageSize = parsePageSize(params.size);
-    const categoryData = await getCategoriesWithCounts(context.storeId, { page, pageSize });
+    const [categoryData, productData] = await Promise.all([
+      getCategoriesWithCounts(context.storeId, { page, pageSize }),
+      getProducts(context.storeId, { status: "active", view: "grouped", sort: DEFAULT_PRODUCT_LIST_SORT, page: 1, pageSize: 15 }),
+    ]);
     return (
       <>
-        <ProductCatalogSwitcher activeView="categories" categoryCount={categoryData.total} />
+        <ProductCatalogSwitcher activeView="categories" productCount={productData.total} categoryCount={categoryData.total} />
         <CategoriesManager categories={categoryData.rows} parentOptions={categoryData.roots} total={categoryData.total} />
         <Pagination page={page} pageCount={categoryData.pageCount} total={categoryData.total} pageSize={pageSize} unitLabel={t("categories.unitLabel")} />
       </>
@@ -66,7 +69,6 @@ export async function ProductsTab({ searchParams }: { searchParams: SP }) {
 
   return (
     <>
-      {!cameraMaterials && <ProductCatalogSwitcher activeView="products" />}
       {cameraMaterials && <div className="mb-4"><h2 className="text-lg font-bold">Vật tư lắp camera</h2><p className="text-sm text-slate-500">Thêm, sửa, xóa các vật tư dùng trong báo giá lắp đặt camera.</p></div>}
 
       {cameraMaterials && <CameraMaterialSearch value={params.q ?? ""} placeholder={t("products.list.searchPlaceholder")} />}
@@ -255,6 +257,7 @@ async function ProductsContent({ searchParams, cameraMaterials = false, categori
 
   return (
     <ProductSelectionProvider visibleIds={[...new Set(rows.flatMap((row) => view === "grouped" && row.variantGroup ? row.variantGroup.members.filter((member) => !member.isVariantParent).map((member) => member.id) : row.isVariantParent ? [] : [row.id]))]}>
+      {!cameraMaterials && <ProductCatalogSwitcher activeView="products" productCount={total} categoryCount={categories.length} />}
       {!cameraMaterials && (
         <div className="mb-3 lg:hidden">
           <h2 className="text-xl font-bold tracking-tight text-slate-950 dark:text-white">{t("products.title")}</h2>
