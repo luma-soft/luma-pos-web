@@ -355,7 +355,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
     ...books.map((b): DataTableColumn<PricingRow> => ({
       key: `book:${b.id}`,
       label: b.name,
-      required: b.isDefault,
+      required: isSystemPriceBook(b),
       defaultVisible: isSystemPriceBook(b),
       align: "right",
       width: "170px",
@@ -378,11 +378,12 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
     })),
   ];
   const visibleBooks = books.filter(
-    (book) => book.isDefault || (visibleColumnKeys?.has(`book:${book.id}`) ?? isSystemPriceBook(book)),
+    (book) => isSystemPriceBook(book) || visibleColumnKeys?.has(`book:${book.id}`),
   );
 
   function setBookVisible(bookId: string, visible: boolean) {
-    if (books.find((book) => book.id === bookId)?.isDefault) return;
+    const book = books.find((item) => item.id === bookId);
+    if (!book || isSystemPriceBook(book)) return;
     const key = `book:${bookId}`;
     setVisibleColumnKeys((current) => {
       const next = new Set(
@@ -417,15 +418,16 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
               className="absolute left-0 top-full z-50 mt-1 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-surface p-1.5 shadow-e2"
             >
               {books.map((b) => {
-                const visible = b.isDefault || (visibleColumnKeys?.has(`book:${b.id}`) ?? isSystemPriceBook(b));
+                const required = isSystemPriceBook(b);
+                const visible = required || !!visibleColumnKeys?.has(`book:${b.id}`);
                 return (
                   <div key={b.id} className="group flex min-h-11 items-center gap-2 rounded-lg px-2 hover:bg-surface-2">
                     <button
                       type="button"
                       role="menuitemcheckbox"
                       aria-checked={visible}
-                      aria-disabled={b.isDefault}
-                      disabled={b.isDefault}
+                      aria-disabled={required}
+                      disabled={required}
                       aria-label={t("pricing.bookVisibility", { name: b.name })}
                       title={t("pricing.bookVisibility", { name: b.name })}
                       onClick={() => setBookVisible(b.id, !visible)}
@@ -434,7 +436,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
                         visible
                           ? "border-primary-600 bg-primary-600 text-white"
                           : "border-slate-300 bg-surface text-transparent hover:border-primary-400",
-                        b.isDefault && "cursor-not-allowed opacity-70",
+                        required && "cursor-not-allowed opacity-70",
                         "min-h-11 lg:min-h-0 min-w-11 lg:min-w-0",
                       )}
                     >
@@ -458,12 +460,12 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
                           type="button"
                           role="menuitemcheckbox"
                           aria-checked={visible}
-                          aria-disabled={b.isDefault}
-                          disabled={b.isDefault}
+                          aria-disabled={required}
+                          disabled={required}
                           onClick={() => setBookVisible(b.id, !visible)}
                           className={cn(
                             "min-w-0 flex-1 truncate text-left text-sm",
-                            b.isDefault && "cursor-default font-semibold",
+                            required && "cursor-default font-semibold",
                             "min-h-11 lg:min-h-0 min-w-11 lg:min-w-0",
                           )}
                         >
