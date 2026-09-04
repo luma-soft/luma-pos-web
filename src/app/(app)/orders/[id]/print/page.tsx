@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { Routes } from "@/lib/routes";
 import { getOrder } from "@/lib/data/orders";
+import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
 import { getDefaultSepayBankAccount } from "@/lib/data/payment-bank-accounts";
 import { getPrintTemplate, type PaperSize } from "@/lib/print/template";
 import { buildSepayVietQrImageUrl } from "@/lib/payments/sepay";
@@ -90,8 +91,7 @@ export default async function PrintOrderPage({ params, searchParams }: Props) {
             name: i.productName,
             unitName: i.unitName,
             quantity: Number(i.quantity),
-            unitPrice: Number(i.unitPrice),
-            discount: Number(i.discount),
+            ...readOrderLinePricing(i),
             total: Number(i.total),
           }))}
           totals={totals}

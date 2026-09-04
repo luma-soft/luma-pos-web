@@ -3,6 +3,7 @@ import { resolvePriceBookPrice, systemPriceBookType, type SystemPriceBookType, t
 type ProductPriceSource = {
   costPrice?: string | null;
   lastPurchasePrice?: string | null;
+  lastPurchaseNetPrice?: string | null;
   retailPrice: string;
   priceBookTypes?: Record<string, SystemPriceBookType | null>;
   prices: Record<string, string | null>;
@@ -23,5 +24,6 @@ export function applySystemPriceBooks(
     applySystemPriceBooks(product.children, books);
     delete product.costPrice;
     delete product.lastPurchasePrice;
+    delete product.lastPurchaseNetPrice;
   }
 }

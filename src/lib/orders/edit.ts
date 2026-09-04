@@ -69,8 +69,14 @@ export async function updateOrderForUser(userId: string, input: UpdateOrderInput
           productName: i.productName,
           unitName: i.unitName,
           unitMultiplier: toQty(i.unitMultiplier),
+          priceBookId: i.priceBookId,
+          priceBookName: i.priceBookName,
           quantity: toQty(i.quantity),
           unitPrice: toMoney(i.unitPrice),
+          preDiscountUnitPrice: toMoney(i.preDiscountUnitPrice),
+          discount: toMoney(i.lineDiscount * i.quantity),
+          lineDiscountMode: i.lineDiscountMode,
+          lineDiscountValue: toMoney(i.lineDiscountValue),
           total: toMoney(i.quantity * i.unitPrice),
         }))
       );

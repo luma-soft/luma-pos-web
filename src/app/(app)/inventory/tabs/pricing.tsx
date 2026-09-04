@@ -10,7 +10,7 @@ import { InstantProductSearch } from "./instant-product-search";
 import { InventoryFilterDrawer } from "./inventory-filter-drawer";
 import { ListSearchFilterBar } from "@/components/list-search-filter";
 import { requireStoreContext } from "@/lib/auth/store-context";
-import { canViewPurchasePrices, isSystemPriceBook, resolvePriceBookPrice } from "@/lib/pricing/system-price-books";
+import { canViewPurchasePrices, comparePriceBooks, isSystemPriceBook, resolvePriceBookPrice } from "@/lib/pricing/system-price-books";
 
 type SP = Record<string, string | undefined>;
 type PriceBook = Awaited<ReturnType<typeof getPriceBooks>>[number];
@@ -26,7 +26,7 @@ export async function PricingTab({ searchParams }: { searchParams: SP }) {
   return (
     <>
       <Suspense fallback={<TableSkeleton cols={4} rows={10} />}>
-        <PricingContent books={books} categories={options.categories} brands={options.brands} suppliers={options.suppliers} searchParams={searchParams} />
+        <PricingContent books={[...books].sort(comparePriceBooks)} categories={options.categories} brands={options.brands} suppliers={options.suppliers} searchParams={searchParams} />
       </Suspense>
     </>
   );
@@ -52,22 +52,22 @@ async function PricingContent({
   const page = Number(params.page) || 1;
   const pageSize = parsePageSize(params.size);
 
-  const { rows, total, pageCount } = await getProducts(context.storeId, { q: params.q, categoryId: params.category, brandId: params.brandId, supplierId: params.supplierId, productKind: params.productKind as "product" | "service" | "combo" | undefined, stock: params.stock as "instock" | "low" | "out" | undefined, sort: params.sort as "name" | "stock" | "updated" | undefined, status: (params.status as "active" | "inactive" | "all" | undefined) ?? "active", page, pageSize });
+  const { rows, total, pageCount } = await getProducts(context.storeId, { view: "flat", q: params.q, categoryId: params.category, brandId: params.brandId, supplierId: params.supplierId, productKind: params.productKind as "product" | "service" | "combo" | undefined, stock: params.stock as "instock" | "low" | "out" | undefined, sort: params.sort as "name" | "stock" | "updated" | undefined, status: (params.status as "active" | "inactive" | "all" | undefined) ?? "active", page, pageSize });
 
   const visibleIds = rows.map((p) => p.id);
   const overrideByBook = await getPriceOverridesForProducts(context.storeId, visibleIds);
   const tableRows = rows.map((p) => ({
     id: p.id, sku: p.sku, name: p.name, baseUnit: p.baseUnit,
     costPrice: includePurchasePrices ? Number(p.costPrice) : null,
-    lastPurchase: includePurchasePrices && p.lastPurchasePrice != null ? Number(p.lastPurchasePrice) : null,
+    lastPurchase: includePurchasePrices && p.lastPurchaseNetPrice != null ? Number(p.lastPurchaseNetPrice) : null,
     prices: Object.fromEntries(books.map((b) => {
       const ov = overrideByBook[b.id]?.[p.id];
       if (!isSystemPriceBook(b)) return [b.id, ov != null ? Number(ov) : null];
       return [b.id, resolvePriceBookPrice(b, {
         retailPrice: Number(p.retailPrice),
         costPrice: includePurchasePrices ? Number(p.costPrice) : null,
-        lastPurchasePrice: includePurchasePrices && p.lastPurchasePrice != null ? Number(p.lastPurchasePrice) : null,
-      })];
+        lastPurchaseNetPrice: includePurchasePrices && p.lastPurchaseNetPrice != null ? Number(p.lastPurchaseNetPrice) : null,
+      }, ov)];
     })) as Record<string, number | null>,
   }));
 

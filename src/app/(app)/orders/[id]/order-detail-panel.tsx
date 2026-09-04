@@ -5,6 +5,7 @@ import { ExternalLink } from "lucide-react";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import type { OrderDetail } from "@/lib/data/orders";
+import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
 import { getStoreSettings } from "@/lib/data/settings";
 import { getPrintTemplate, getPrintTemplatesForDoc } from "@/lib/print/template";
 import type { ShareablePrintDocType } from "@/lib/print/share-document";
@@ -109,11 +110,14 @@ export async function OrderDetailPanel({
         <div className="min-w-0 space-y-4">
           <div className="overflow-hidden rounded-lg border border-border">
             <div className="divide-y divide-border-soft lg:hidden">
-              {order.items.map((item) => (
+              {order.items.map((item) => {
+                const pricing = readOrderLinePricing(item);
+                return (
                 <div key={item.id} className="p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 font-medium">
                       <OrderProductLink productId={item.productId} productName={item.productName} />
+                      {item.priceBookName && <div className="mt-1 text-xs font-normal text-slate-500">{item.priceBookName}</div>}
                       {(order.returnedByItem[item.id] ?? 0) > 0 && (
                         <div className="mt-1 text-xs font-normal text-warn">
                           {t("returns.returnedQty", { qty: formatNumber(order.returnedByItem[item.id]), unit: item.unitName })}
@@ -124,11 +128,12 @@ export async function OrderDetailPanel({
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                     <span>{formatNumber(Number(item.quantity))} {item.unitName}</span>
-                    <span>× {formatCurrency(Number(item.unitPrice))}</span>
-                    {Number(item.discount) > 0 && <span>{t("orders.cols.discount")}: {formatCurrency(Number(item.discount))}</span>}
+                    <span>× {formatCurrency(pricing.unitPrice)}</span>
+                    {pricing.discount > 0 && <span>{t("orders.cols.discount")}: {pricing.lineDiscountMode === "pct" && `${formatNumber(pricing.lineDiscountValue)}% · `}{formatCurrency(pricing.discount)}</span>}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
             <div className="hidden overflow-x-auto lg:block">
               <table className="w-full min-w-[760px] text-sm">
@@ -143,10 +148,13 @@ export async function OrderDetailPanel({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-soft">
-                  {order.items.map((item) => (
+                  {order.items.map((item) => {
+                    const pricing = readOrderLinePricing(item);
+                    return (
                     <tr key={item.id}>
                       <td className="px-3 py-3 font-medium">
                         <OrderProductLink productId={item.productId} productName={item.productName} />
+                        {item.priceBookName && <div className="mt-1 text-xs font-normal text-slate-500">{item.priceBookName}</div>}
                         {(order.returnedByItem[item.id] ?? 0) > 0 && (
                           <span className="ml-2 text-xs font-normal text-warn">
                             {t("returns.returnedQty", { qty: formatNumber(order.returnedByItem[item.id]), unit: item.unitName })}
@@ -155,11 +163,12 @@ export async function OrderDetailPanel({
                       </td>
                       <td className="px-3 py-3 text-slate-500">{item.unitName}</td>
                       <td className="px-3 py-3 text-right tabular-nums">{formatNumber(Number(item.quantity))}</td>
-                      <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(Number(item.unitPrice))}</td>
-                      <td className="px-3 py-3 text-right tabular-nums text-slate-500">{Number(item.discount) > 0 ? formatCurrency(Number(item.discount)) : "—"}</td>
+                      <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(pricing.unitPrice)}</td>
+                      <td className="px-3 py-3 text-right tabular-nums text-slate-500">{pricing.discount > 0 ? <>{pricing.lineDiscountMode === "pct" && <div>{formatNumber(pricing.lineDiscountValue)}%</div>}{formatCurrency(pricing.discount)}</> : "—"}</td>
                       <td className="px-3 py-3 text-right tabular-nums font-semibold">{formatCurrency(Number(item.total))}</td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

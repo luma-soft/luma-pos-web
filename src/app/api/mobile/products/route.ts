@@ -5,6 +5,7 @@ import {
 } from "@/lib/data/products";
 import type { ProductListView, ProductStatusFilter } from "@/lib/data/products";
 import { parseProductListSort } from "@/lib/inventory/product-list-policy";
+import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
 import {
   requireMobileStockAccess,
   requireMobileStockReadAccess,
@@ -45,7 +46,17 @@ export async function GET(request: Request) {
     getMobileProductOptions(gate.storeId),
   ]);
 
-  return mobileOk({ products, options });
+  const includeNetPurchase = canViewPurchasePrices(gate.role);
+  return mobileOk({ products: {
+    ...products,
+    rows: products.rows.map((row) => ({
+      ...row,
+      lastPurchaseNetPrice: includeNetPurchase ? row.lastPurchaseNetPrice : null,
+      ...(row.variantGroup ? { variantGroup: { ...row.variantGroup, members: row.variantGroup.members.map((member) => ({
+        ...member, lastPurchaseNetPrice: includeNetPurchase ? member.lastPurchaseNetPrice : null,
+      })) } } : {}),
+    })),
+  }, options });
 }
 
 export async function POST(request: Request) {

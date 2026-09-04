@@ -5,6 +5,7 @@ import { getPosData } from "@/lib/data/pos";
 import { CAMERA_QUOTE_UTILITY_SKUS } from "@/lib/data/camera-quote-constants";
 import { getStoreSettings } from "@/lib/data/settings";
 import { getOrder } from "@/lib/data/orders";
+import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
 import { getPrintTemplate } from "@/lib/print/template";
 import { Routes } from "@/lib/routes";
 import { formatDate } from "@/lib/utils";
@@ -58,14 +59,20 @@ async function sourceInvoiceFromParams(storeId: string, params: PosSearchParams)
     shippingFee: Number(order.shippingFee),
     tax: Number(order.tax ?? 0),
     subtotal: Number(order.subtotal),
-    items: order.items.map((item) => ({
-      productId: item.productId,
-      unitName: item.unitName,
-      quantity: Number(item.quantity),
-      unitPrice: Number(item.unitPrice),
-      lineDiscount: Number(item.discount ?? 0),
-      note: item.note ?? "",
-    })),
+    items: order.items.map((item) => {
+      const pricing = readOrderLinePricing(item);
+      return {
+        productId: item.productId,
+        unitName: item.unitName,
+        quantity: Number(item.quantity),
+        unitPrice: mode === "return" ? pricing.netUnitPrice : pricing.unitPrice,
+        lineDiscount: mode === "return" ? 0 : pricing.lineDiscount,
+        lineDiscountMode: mode === "return" ? "vnd" : pricing.lineDiscountMode,
+        lineDiscountValue: mode === "return" ? 0 : pricing.lineDiscountValue,
+        priceBookId: item.priceBookId,
+        note: item.note ?? "",
+      };
+    }),
   };
 }
 

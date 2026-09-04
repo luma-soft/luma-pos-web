@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getOrder } from "@/lib/data/orders";
+import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
 import { OrderEditForm } from "./order-edit-form";
 import { requireStoreContext } from "@/lib/auth/store-context";
 
@@ -19,14 +20,22 @@ export default async function OrderEditPage({ params }: { params: Promise<{ id: 
         discount: Number(order.discount),
         shippingFee: Number(order.shippingFee),
         amountPaid: Number(order.amountPaid),
-        items: order.items.map((i) => ({
-          productId: i.productId,
-          productName: i.productName,
-          unitName: i.unitName,
-          unitMultiplier: Number(i.unitMultiplier),
-          quantity: Number(i.quantity),
-          unitPrice: Number(i.unitPrice),
-        })),
+        items: order.items.map((i) => {
+          const pricing = readOrderLinePricing(i);
+          return {
+            productId: i.productId,
+            productName: i.productName,
+            unitName: i.unitName,
+            unitMultiplier: Number(i.unitMultiplier),
+            quantity: Number(i.quantity),
+            unitPrice: pricing.netUnitPrice,
+            preDiscountUnitPrice: pricing.unitPrice,
+            lineDiscount: pricing.lineDiscount,
+            lineDiscountMode: pricing.lineDiscountMode,
+            lineDiscountValue: pricing.lineDiscountValue,
+            priceBookId: i.priceBookId,
+          };
+        }),
       }}
     />
   );

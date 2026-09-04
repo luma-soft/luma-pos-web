@@ -13,7 +13,7 @@ export function posBasePrice(product: PriceProduct, bookId = "", books?: readonl
   const source = book ? systemPriceBookType(book) : product.priceBookTypes?.[bookId];
   const projected = bookId ? product.prices?.[bookId] : undefined;
   const value = source === "retail" ? product.retailPrice
-    : source === "cost" || source === "purchase" ? projected
+    : source === "cost" || source === "purchase" || source === "list" ? projected
     : projected === null ? null : projected ?? product.retailPrice;
   if (value == null) return null;
   const price = Number(value);
@@ -30,7 +30,7 @@ export function posUnitPrice(
   if (base == null || !unit) return base;
   const book = books?.find((candidate) => candidate.id === bookId);
   const source = book ? systemPriceBookType(book) : product.priceBookTypes?.[bookId];
-  if (source !== "cost" && source !== "purchase" && unit.priceOverride != null) {
+  if (source !== "cost" && source !== "purchase" && source !== "list" && unit.priceOverride != null) {
     const retail = Number(product.retailPrice);
     return Math.round(Number(unit.priceOverride) * (retail > 0 ? base / retail : 1));
   }

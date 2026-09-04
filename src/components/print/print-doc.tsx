@@ -9,6 +9,8 @@ export interface PrintLine {
   quantity: number;
   unitPrice: number;
   discount?: number;
+  lineDiscountMode?: "pct" | "vnd";
+  lineDiscountValue?: number;
   total: number;
 }
 
@@ -132,8 +134,8 @@ export function PrintDoc(p: PrintDocProps) {
               </td>
               <td className="border border-slate-400 px-2 py-1.5 text-center">{i.unitName}</td>
               <td className="border border-slate-400 px-2 py-1.5 text-center">{formatNumber(i.quantity)}</td>
-              <td className="border border-slate-400 px-2 py-1.5 text-right">{formatNumber(i.unitPrice)}</td>
-              {showLineDiscount && <td className="border border-slate-400 px-2 py-1.5 text-right">{Number(i.discount ?? 0) > 0 ? formatNumber(Number(i.discount)) : "—"}</td>}
+              <td className="border border-slate-400 px-2 py-1.5 text-right">{formatNumber(showLineDiscount || i.quantity <= 0 ? i.unitPrice : i.total / i.quantity)}</td>
+              {showLineDiscount && <td className="border border-slate-400 px-2 py-1.5 text-right">{Number(i.discount ?? 0) > 0 ? <>{i.lineDiscountMode === "pct" && <div>{formatNumber(i.lineDiscountValue ?? 0)}%</div>}{formatNumber(Number(i.discount))}</> : "—"}</td>}
               <td className="border border-slate-400 px-2 py-1.5 text-right">{formatNumber(i.total)}</td>
             </tr>
           ))}
@@ -244,11 +246,11 @@ function K80Doc(p: PrintDocProps) {
               {t.options.showSku && i.sku && <span className="ml-1 font-normal text-[9px] text-slate-600">[{i.sku}]</span>}
             </div>
             <div className="mt-0.5 flex items-end justify-between gap-3 text-[10px]">
-              <span className="text-slate-700">{formatNumber(i.quantity)} {i.unitName} × {formatNumber(i.unitPrice)}</span>
+              <span className="text-slate-700">{formatNumber(i.quantity)} {i.unitName} × {formatNumber(t.options.showLineDiscount || i.quantity <= 0 ? i.unitPrice : i.total / i.quantity)}</span>
               <span className="shrink-0 text-[11px] font-bold">{formatNumber(i.total)}</span>
             </div>
             {t.options.showLineDiscount && Number(i.discount ?? 0) > 0 && (
-              <div className="text-[9.5px] text-slate-700">{p.cols.discount ?? "Giảm giá"}: −{formatNumber(Number(i.discount))}</div>
+              <div className="text-[9.5px] text-slate-700">{p.cols.discount ?? "Giảm giá"}: {i.lineDiscountMode === "pct" && `${formatNumber(i.lineDiscountValue ?? 0)}% · `}−{formatNumber(Number(i.discount))}</div>
             )}
           </div>
         ))}

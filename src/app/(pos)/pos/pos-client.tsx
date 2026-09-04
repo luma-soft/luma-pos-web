@@ -17,7 +17,7 @@ import { MoneyInput } from "@/components/ui/money-input";
 import { Select } from "@/components/ui/select";
 import { Text } from "@/components/ui/text";
 import { QuantityInput } from "@/components/ui/quantity-input";
-import { PrintDoc } from "@/components/print/print-doc";
+import { PrintDoc, type PrintLine } from "@/components/print/print-doc";
 import { AiQuickActionButton } from "@/components/ai-quick-actions/ai-quick-action-button";
 import { AiQuickActionModal } from "@/components/ai-quick-actions/ai-quick-action-modal";
 import { CustomerCreateDialog, type CustomerCreateResult } from "@/components/partners/customer-create-dialog";
@@ -58,6 +58,7 @@ import {
   setLineDiscountMode,
   setLineFree,
   setLinePriceInput,
+  type LineDiscountMode,
 } from "@/lib/pos/line-price-editor";
 import { useProductCatalog } from "@/components/product-catalog-provider";
 import { catalogItemToPosProduct } from "@/lib/pos/product-catalog-adapter";
@@ -78,11 +79,13 @@ type CartLine = {
   quantity: number;
   returnSoldQuantity?: number;
   lineDiscount?: number;  // giảm giá tay (VND) trên mỗi đơn vị
-  manualPrice?: boolean;  // đã sửa giá/giảm giá tay → bỏ qua KM tự động
+  lineDiscountMode?: LineDiscountMode;
+  lineDiscountValue?: number;
+  manualPrice?: boolean;  // đã sửa đơn giá tay → bỏ qua KM tự động
   /** undefined = theo bảng giá của hóa đơn; "" = Giá Chung được chọn riêng. */
   priceBook?: PriceBook;
   /** Giá cần khôi phục khi thu ngân tắt trạng thái miễn phí. */
-  freeRestore?: { unitPrice: number; lineDiscount: number; priceBook?: PriceBook };
+  freeRestore?: { unitPrice: number; lineDiscount: number; lineDiscountMode?: LineDiscountMode; lineDiscountValue?: number; priceBook?: PriceBook };
   note?: string;
 };
 
@@ -135,7 +138,7 @@ type PosPrintJob = {
   partyName: string;
   partyPhone?: string | null;
   projectName?: string | null;
-  items: CartLine[];
+  items: PrintLine[];
   totals: { subtotal: number; discount: number; tax: number; shipping: number };
   grandTotal: number;
   paid: number;
@@ -181,6 +184,9 @@ export type PosSourceInvoice = {
     quantity: number;
     unitPrice: number;
     lineDiscount?: number;
+    lineDiscountMode?: LineDiscountMode;
+    lineDiscountValue?: number;
+    priceBookId?: string | null;
     note?: string;
   }>;
 };
@@ -297,6 +303,9 @@ function makeDraftFromSource(source: PosSourceInvoice, products: PosProduct[], i
           quantity: 0,
           returnSoldQuantity: item.quantity,
           lineDiscount: Math.max(0, item.lineDiscount ?? 0),
+          lineDiscountMode: item.lineDiscountMode,
+          lineDiscountValue: item.lineDiscountValue,
+          priceBook: item.priceBookId ?? "",
           manualPrice: true,
           note: item.note || undefined,
         }];
@@ -323,6 +332,9 @@ function makeDraftFromSource(source: PosSourceInvoice, products: PosProduct[], i
         unitPrice: Math.max(0, item.unitPrice),
         quantity: item.quantity,
         lineDiscount: Math.max(0, item.lineDiscount ?? 0),
+        lineDiscountMode: item.lineDiscountMode,
+        lineDiscountValue: item.lineDiscountValue,
+        priceBook: item.priceBookId ?? "",
         manualPrice: true,
         note: item.note || undefined,
       }];
@@ -976,21 +988,22 @@ export function PosClient({
     });
   }, [search, serverResults, data.products]);
 
-  /**
-   * Giá bán hiệu lực mỗi đơn vị. Nếu sửa giá tay → đơn giá − giảm giá tay
-   * (bỏ qua KM). Nếu không → áp KM bậc thang theo SL đơn vị gốc.
-   */
+  function usesCompanyPrice(l: CartLine) {
+    return data.priceBooks.find((book) => book.id === (l.priceBook ?? priceBook))?.systemType === "list";
+  }
+
+  /** Giá công ty và chiết khấu nhập tay không cộng dồn khuyến mại tự động. */
   function effPrice(l: CartLine): { price: number; pct: number } {
-    if (l.manualPrice) {
-      const price = Math.max(0, l.unitPrice - (l.lineDiscount ?? 0));
-      const pct = l.unitPrice > 0 ? Math.round((1 - price / l.unitPrice) * 100) : 0;
+    if (l.manualPrice || (l.lineDiscount ?? 0) > 0 || (l.lineDiscountValue ?? 0) > 0 || usesCompanyPrice(l)) {
+      const { sellPrice: price } = resolveLinePriceEditor(createLinePriceEditorState(l.unitPrice, l.lineDiscount ?? 0, l.lineDiscountMode, l.lineDiscountValue));
+      const pct = l.lineDiscountMode === "pct" ? Math.min(100, l.lineDiscountValue ?? 0) : l.unitPrice > 0 ? Math.round((1 - price / l.unitPrice) * 100) : 0;
       return { price, pct };
     }
     return applyPromo(l.unitPrice, data.promoByProduct[l.product.id], l.quantity * l.unitMultiplier);
   }
 
   /** Sửa giá/giảm giá 1 dòng (từ popup). */
-  function applyLinePrice(key: string, linePriceBook: PriceBook | undefined, unitPrice: number, lineDiscount: number, free: boolean) {
+  function applyLinePrice(key: string, linePriceBook: PriceBook | undefined, unitPrice: number, lineDiscount: number, free: boolean, lineDiscountMode: LineDiscountMode, lineDiscountValue: number) {
     const target = cart.find((line) => line.key === key);
     if (target && !Number.isFinite(basePriceFor(target.product, linePriceBook ?? priceBook, data.priceBooks))) {
       setError(t("pricing.errors.priceUnavailable"));
@@ -1009,11 +1022,15 @@ export function PosClient({
             priceBook: linePriceBook,
             unitPrice: 0,
             lineDiscount: 0,
+            lineDiscountMode: "vnd",
+            lineDiscountValue: 0,
             manualPrice: true,
             freeRestore: l.freeRestore ?? {
-              unitPrice: nextUnitPrice || listedPrice,
-              lineDiscount: nextDiscount,
-              priceBook: linePriceBook,
+              unitPrice: l.unitPrice || listedPrice,
+              lineDiscount: l.lineDiscount ?? 0,
+              lineDiscountMode: l.lineDiscountMode,
+              lineDiscountValue: l.lineDiscountValue,
+              priceBook: l.priceBook,
             },
           };
         }
@@ -1022,11 +1039,21 @@ export function PosClient({
           priceBook: linePriceBook,
           unitPrice: nextUnitPrice,
           lineDiscount: nextDiscount,
-          manualPrice: nextDiscount > 0 || nextUnitPrice !== listedPrice,
+          lineDiscountMode,
+          lineDiscountValue,
+          manualPrice: nextUnitPrice !== listedPrice,
           freeRestore: undefined,
         };
       }
     ));
+  }
+
+  function applyCompanyDiscount(value: number, mode: LineDiscountMode) {
+    setCart((lines) => lines.map((line) => {
+      if (!usesCompanyPrice(line) || line.unitPrice === 0) return line;
+      const discount = resolveLinePriceEditor(createLinePriceEditorState(line.unitPrice, 0, mode, value));
+      return { ...line, lineDiscount: discount.lineDiscount, lineDiscountMode: discount.lineDiscountMode, lineDiscountValue: discount.lineDiscountValue };
+    }));
   }
 
   const subtotal = cart.reduce((s, l) => s + effPrice(l).price * l.quantity, 0);
@@ -1071,7 +1098,20 @@ export function PosClient({
       partyName: customer?.name ?? t("pos.walkInCustomer"),
       partyPhone: customer?.phone,
       projectName: projectName || null,
-      items: printLines.map((line) => ({ ...line })),
+      items: printLines.map((line) => {
+        const effective = effPrice(line);
+        return {
+          id: line.key,
+          name: line.product.name,
+          unitName: line.unitName,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          discount: Math.max(0, (line.unitPrice - effective.price) * line.quantity),
+          lineDiscountMode: line.lineDiscountMode,
+          lineDiscountValue: line.lineDiscountValue,
+          total: effective.price * line.quantity,
+        };
+      }),
       totals: {
         subtotal,
         discount: discountVnd,
@@ -1252,6 +1292,8 @@ export function PosClient({
         unitMultiplier: unit.unitMultiplier,
         unitPrice: unitPriceFor(l.product, unit.alternateUnit, l.priceBook ?? priceBook, data.priceBooks),
         lineDiscount: 0,
+        lineDiscountMode: "vnd",
+        lineDiscountValue: 0,
         manualPrice: false,
       };
     }));
@@ -1306,6 +1348,8 @@ export function PosClient({
           priceBook: undefined,
           unitPrice: listedPrice,
           lineDiscount: 0,
+          lineDiscountMode: "vnd",
+          lineDiscountValue: 0,
           freeRestore: undefined,
         };
       }),
@@ -1862,7 +1906,7 @@ export function PosClient({
                   line={l}
                   invoicePriceBook={priceBook}
                   priceBooks={data.priceBooks}
-                  onChange={(book, price, disc, free) => applyLinePrice(l.key, book, price, disc, free)}
+                  onChange={(book, price, disc, free, mode, value) => applyLinePrice(l.key, book, price, disc, free, mode, value)}
                   onClose={() => setEditKey(null)}
                 />
               )}
@@ -2150,6 +2194,9 @@ export function PosClient({
               options={data.priceBooks.map((pb) => ({ value: pb.id, label: pb.name }))}
             />
           </div>
+          {!isReturnDraft && cart.some(usesCompanyPrice) && (
+            <CompanyLineDiscount count={cart.filter((line) => usesCompanyPrice(line) && line.unitPrice > 0).length} onApply={applyCompanyDiscount} />
+          )}
           {customer && Number(customer.currentDebt) > 0 && (
             <p className="text-xs text-warn">
               {t("pos.customerDebt", { debt: formatCurrency(Number(customer.currentDebt)) })}
@@ -2506,11 +2553,7 @@ export function PosClient({
             partyPhone={printJob.partyPhone}
             projectName={printJob.projectName || null}
             sellerLabel={t("orders.detail.seller")}
-            items={printJob.items.map((l) => {
-              const e = effPrice(l);
-              const lineDiscount = Math.max(0, (l.unitPrice - e.price) * l.quantity);
-              return { id: l.key, name: l.product.name, unitName: l.unitName, quantity: l.quantity, unitPrice: l.unitPrice, discount: lineDiscount, total: e.price * l.quantity };
-            })}
+            items={printJob.items}
             totals={[
               { label: t("pos.subtotal"), value: printJob.totals.subtotal, kind: "subtotal" },
               ...(printJob.totals.discount > 0 ? [{ label: t("pos.discount"), value: printJob.totals.discount, negative: true, kind: "discount" as const }] : []),
@@ -2661,6 +2704,28 @@ function VariantPickerModal({
   );
 }
 
+function CompanyLineDiscount({ count, onApply }: { count: number; onApply: (value: number, mode: LineDiscountMode) => void }) {
+  const [open, setOpen] = useState(false);
+  const [value, setValue] = useState(0);
+  const [mode, setMode] = useState<LineDiscountMode>("pct");
+  return (
+    <div className="rounded-lg border border-border bg-surface-2 p-2.5 text-xs">
+      <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="min-h-9 w-full text-left font-semibold text-primary-700 dark:text-primary-300">
+        Chiết khấu {count} dòng giá công ty
+      </button>
+      {open && (
+        <div className="space-y-2 pt-1">
+          <p className="text-slate-500">Áp dụng cho các dòng dùng Giá chưa chiết khấu. Số tiền tính trên mỗi đơn vị.</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <PosAmountModeInput value={value} mode={mode} onValueChange={setValue} onModeChange={setMode} />
+            <button type="button" disabled={count === 0} onClick={() => { onApply(value, mode); setOpen(false); }} className="min-h-11 rounded-lg bg-primary-600 px-3 font-semibold text-white hover:bg-primary-700 disabled:opacity-50">Áp dụng</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Popup sửa đơn giá + giảm giá (VND/%) cho 1 dòng — giống KiotViet. */
 function LinePriceEditor({
   line, invoicePriceBook, priceBooks, onChange, onClose,
@@ -2668,7 +2733,7 @@ function LinePriceEditor({
   line: CartLine;
   invoicePriceBook: PriceBook;
   priceBooks: PosData["priceBooks"];
-  onChange: (priceBook: PriceBook | undefined, unitPrice: number, lineDiscount: number, free: boolean) => void;
+  onChange: (priceBook: PriceBook | undefined, unitPrice: number, lineDiscount: number, free: boolean, discountMode: LineDiscountMode, discountValue: number) => void;
   onClose: () => void;
 }) {
   const t = useTranslations();
@@ -2681,14 +2746,16 @@ function LinePriceEditor({
   );
   const editablePrice = line.freeRestore?.unitPrice ?? line.unitPrice;
   const editableDiscount = line.freeRestore?.lineDiscount ?? line.lineDiscount ?? 0;
+  const editableDiscountMode = line.freeRestore?.lineDiscountMode ?? line.lineDiscountMode ?? "vnd";
+  const editableDiscountValue = line.freeRestore?.lineDiscountValue ?? line.lineDiscountValue ?? editableDiscount;
   const [editor, setEditor] = useState(() => {
-    if (!line.freeRestore) return createLinePriceEditorState(editablePrice, editableDiscount);
+    if (!line.freeRestore) return createLinePriceEditorState(editablePrice, editableDiscount, editableDiscountMode, editableDiscountValue);
     return {
       ...createLinePriceEditorState(0, 0),
       restore: {
         price: String(editablePrice),
-        discount: String(editableDiscount),
-        discountMode: "vnd" as const,
+        discount: String(editableDiscountValue),
+        discountMode: editableDiscountMode,
       },
     };
   });
@@ -2709,7 +2776,7 @@ function LinePriceEditor({
 
   useEffect(() => {
     if (!changedRef.current) return;
-    onChangeRef.current(selectedPriceBook(), resolved.unitPrice, resolved.lineDiscount, editor.free);
+    onChangeRef.current(selectedPriceBook(), resolved.unitPrice, resolved.lineDiscount, editor.free, resolved.lineDiscountMode, resolved.lineDiscountValue);
   // selectedPriceBook is derived only from the listed dependencies.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, selectedBook]);

@@ -1,6 +1,6 @@
 "use client";
 
-import { isSystemPriceBook } from "@/lib/pricing/system-price-books";
+import { isPriceBookReadOnly } from "@/lib/pricing/system-price-books";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
@@ -188,7 +188,7 @@ export function NewProductForm({
       },
       directSale: true,
       ...initialValues,
-      priceBookPrices: Object.fromEntries(Object.entries(initialValues?.priceBookPrices ?? {}).filter(([id]) => priceBooks.some((book) => book.id === id && !isSystemPriceBook(book)))),
+      priceBookPrices: Object.fromEntries(Object.entries(initialValues?.priceBookPrices ?? {}).filter(([id]) => priceBooks.some((book) => book.id === id && !book.isDefault && !isPriceBookReadOnly(book)))),
       attributes: preparedAttributes,
     },
   });
@@ -1275,7 +1275,7 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
     setOpen(false);
   }
 
-  const activeBooks = priceBooks.filter((book) => !isSystemPriceBook(book));
+  const activeBooks = priceBooks.filter((book) => !book.isDefault && !isPriceBookReadOnly(book));
 
   return (
     <>

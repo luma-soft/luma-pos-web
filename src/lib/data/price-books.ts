@@ -1,7 +1,8 @@
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db";
 import { priceBooks, productPrices } from "@/db/schema";
 import type { SystemPriceBookType } from "@/lib/pricing/system-price-books";
+import { comparePriceBooks } from "@/lib/pricing/system-price-books";
 
 export interface PriceBookRow {
   id: string;
@@ -15,7 +16,7 @@ export interface PriceBookRow {
 
 /** Danh sách bảng giá — mặc định lên đầu. */
 export async function getPriceBooks(storeId: string, options?: { includeManagerOnly?: boolean }): Promise<PriceBookRow[]> {
-  return db
+  const rows = await db
     .select({
       id: priceBooks.id,
       name: priceBooks.name,
@@ -29,7 +30,8 @@ export async function getPriceBooks(storeId: string, options?: { includeManagerO
     .where(options?.includeManagerOnly === false
       ? and(eq(priceBooks.storeId, storeId), eq(priceBooks.managerOnly, false))
       : eq(priceBooks.storeId, storeId))
-    .orderBy(desc(priceBooks.isDefault), asc(priceBooks.sortOrder), asc(priceBooks.name));
+    .orderBy(asc(priceBooks.sortOrder), asc(priceBooks.name));
+  return rows.sort(comparePriceBooks);
 }
 
 /**
@@ -60,7 +62,7 @@ export async function getPriceOverrides(
     .select({ pid: productPrices.productId, price: productPrices.price })
     .from(productPrices)
     .innerJoin(priceBooks, and(eq(priceBooks.id, productPrices.priceBookId), eq(priceBooks.storeId, storeId)))
-    .where(and(where, isNull(priceBooks.systemType), eq(priceBooks.isDefault, false), eq(priceBooks.costBased, false)));
+    .where(and(where, or(isNull(priceBooks.systemType), eq(priceBooks.systemType, "list")), eq(priceBooks.isDefault, false), eq(priceBooks.costBased, false)));
   const m: Record<string, string> = {};
   for (const r of rows) m[r.pid] = r.price;
   return m;
@@ -80,7 +82,7 @@ export async function getPriceOverridesForProducts(
     .from(productPrices)
     .innerJoin(priceBooks, and(eq(priceBooks.id, productPrices.priceBookId), eq(priceBooks.storeId, storeId)))
     .where(and(
-      isNull(priceBooks.systemType), eq(priceBooks.isDefault, false), eq(priceBooks.costBased, false),
+      or(isNull(priceBooks.systemType), eq(priceBooks.systemType, "list")), eq(priceBooks.isDefault, false), eq(priceBooks.costBased, false),
       eq(productPrices.storeId, storeId),
       inArray(productPrices.productId, productIds),
     ));

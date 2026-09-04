@@ -21,6 +21,7 @@ import {
   type ProductCatalogSnapshot,
 } from "@/lib/product-catalog";
 import { hasProductComplianceColumns } from "@/lib/db/schema-compat";
+import { lastPurchaseNetPriceSql } from "@/lib/pricing/last-purchase-net-price";
 import { productCompatibilityImageUrls } from "@/lib/products/product-media-read";
 
 export async function getProductCatalogRevision(storeId: string): Promise<string> {
@@ -65,6 +66,7 @@ async function buildProductCatalogSnapshot(
         baseUnit: products.baseUnit,
         costPrice: products.costPrice,
         lastPurchasePrice: products.lastPurchasePrice,
+        lastPurchaseNetPrice: lastPurchaseNetPriceSql(storeId),
         retailPrice: products.retailPrice,
         wholesalePrice: products.wholesalePrice,
         contractorPrice: products.contractorPrice,
@@ -155,6 +157,7 @@ async function buildProductCatalogSnapshot(
       ...product,
       costPrice: canViewPurchasePrices(role) ? product.costPrice : null,
       lastPurchasePrice: canViewPurchasePrices(role) ? product.lastPurchasePrice : null,
+      lastPurchaseNetPrice: canViewPurchasePrices(role) ? product.lastPurchaseNetPrice : null,
       imageUrls: product.imageUrls ?? [],
       units: product.units.map((unit) => ({
         ...unit,

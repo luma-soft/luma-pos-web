@@ -411,7 +411,7 @@ export const priceBooks = pgTable("price_books", {
   managerOnly: boolean("manager_only").notNull().default(false),
   // Bảng giá vốn luôn lấy products.costPrice hiện tại, không dùng giá override tĩnh.
   costBased: boolean("cost_based").notNull().default(false),
-  systemType: text("system_type").$type<"retail" | "cost" | "purchase">(),
+  systemType: text("system_type").$type<"retail" | "cost" | "purchase" | "list">(),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
@@ -1132,6 +1132,10 @@ export const orderItems = pgTable("order_items", {
   sourceSku: varchar("source_sku", { length: 50 }), // KiotViet historical source-unit SKU snapshot
   // Nguồn bảng giá của dòng; null = Giá Chung, null field ở bản ghi cũ = không lưu nguồn.
   priceBookId: uuid("price_book_id").references(() => priceBooks.id, { onDelete: "set null" }),
+  priceBookName: text("price_book_name"),
+  preDiscountUnitPrice: decimal("pre_discount_unit_price", { precision: 14, scale: 2 }),
+  lineDiscountMode: text("line_discount_mode").$type<"pct" | "vnd">(),
+  lineDiscountValue: decimal("line_discount_value", { precision: 14, scale: 2 }),
 
   quantity: decimal("quantity", { precision: 14, scale: 4 }).notNull(),
   unitPrice: decimal("unit_price", { precision: 14, scale: 2 }).notNull(),

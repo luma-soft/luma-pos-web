@@ -22,6 +22,7 @@ import { recordActivity } from "@/lib/audit/activity-log";
 import { activityValuesEqual } from "@/lib/products/product-activity";
 import { calculatePurchaseCosts } from "@/lib/purchases/cost-calculations";
 import { ensureInventoryCostBaselines, assertPurchaseCostPeriod, revalueInventoryProducts } from "@/lib/inventory/cost-valuation";
+import { updateReceiptCompanyPrices } from "@/lib/pricing/receipt-company-prices";
 
 type PurchaseCalcInput = Pick<CreatePurchaseOutput, "items" | "discount" | "vatRate" | "shippingFee" | "amountPaid">;
 
@@ -51,6 +52,7 @@ export async function createPurchase(
   const parsed = createPurchaseSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
+  if (v.items.some((item) => item.updateCompanyPrice) && gate.role !== "owner" && gate.role !== "manager") return { ok: false, error: "errors.forbidden" };
   const totals = calcPurchaseTotals(v);
 
   try {
@@ -168,6 +170,7 @@ export async function createPurchase(
           .onConflictDoNothing();
       }
       await revalueInventoryProducts(tx, gate.storeId, ids);
+      await updateReceiptCompanyPrices(tx, gate, po.id, v.items);
 
       // đặt NCC chính cho SP chưa có NCC chính
       await tx.update(products)
@@ -241,6 +244,7 @@ export async function updatePurchase(
   const parsed = updatePurchaseSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
+  if (v.items.some((item) => item.updateCompanyPrice) && gate.role !== "owner" && gate.role !== "manager") return { ok: false, error: "errors.forbidden" };
   const proposedTotals = calcPurchaseTotals(v);
 
   try {
@@ -507,6 +511,7 @@ export async function updatePurchase(
           `,
         });
       if (stockChanged) await revalueInventoryProducts(tx, gate.storeId, affectedIds);
+      await updateReceiptCompanyPrices(tx, gate, po.id, v.items);
 
       const notification = po.status === "draft"
         ? await createNotificationEventInTx(tx, {

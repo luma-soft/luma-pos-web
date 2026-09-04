@@ -73,7 +73,7 @@ try {
     await tx`
       insert into public.price_books (store_id, name, is_default, manager_only, cost_based, system_type, sort_order)
       select ${store.id}::uuid, seed.name, seed.is_default, seed.manager_only, seed.cost_based, seed.system_type, seed.sort_order
-      from (values ('Giá Chung', true, false, false, 'retail', 0), ('Giá vốn', false, true, true, 'cost', 1), ('Giá Chưa Chiết Khấu', false, true, false, 'purchase', 2)) seed(name, is_default, manager_only, cost_based, system_type, sort_order)
+      from (values ('Giá vốn', false, true, true, 'cost', 0), ('Giá nhập cuối', false, true, false, 'purchase', 1), ('Giá chưa chiết khấu', false, false, false, 'list', 2), ('Giá chung', true, false, false, 'retail', 3)) seed(name, is_default, manager_only, cost_based, system_type, sort_order)
       where not exists (select 1 from public.price_books p where p.store_id = ${store.id}::uuid and p.system_type = seed.system_type)
     `;
     await tx`

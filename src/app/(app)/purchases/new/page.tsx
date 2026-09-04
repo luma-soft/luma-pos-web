@@ -31,6 +31,7 @@ export default async function NewPurchasePage({ searchParams }: Props) {
   if (source) {
     return (
       <PurchaseForm
+        canEditCompanyPrices={context.role === "owner" || context.role === "manager"}
         options={options}
         initialProducts={initialProducts}
         mode="copy"
@@ -55,5 +56,5 @@ export default async function NewPurchasePage({ searchParams }: Props) {
     );
   }
 
-  return <PurchaseForm options={options} initialProducts={initialProducts} aiPreview={aiPreview} />;
+  return <PurchaseForm options={options} initialProducts={initialProducts} aiPreview={aiPreview} canEditCompanyPrices={context.role === "owner" || context.role === "manager"} />;
 }

@@ -51,11 +51,13 @@ export async function POST(request: Request) {
 
   let trustedItems;
   try {
-    trustedItems = await normalizeOrderItems(gate.storeId, value.items, value.priceBookId);
+    trustedItems = await normalizeOrderItems(gate.storeId, value.items, value.priceBookId, gate.role);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
+    if (message === "PRICE_BOOK_PRICE_UNAVAILABLE") return mobileError("pricing.errors.priceUnavailable");
+    if (message === "PRICE_BOOK_FORBIDDEN") return mobileError("errors.forbidden", 403);
     if (
-      ["PRODUCT_NOT_FOUND", "UNIT_NOT_FOUND", "INVALID_ITEMS"].includes(message)
+      ["PRODUCT_NOT_FOUND", "UNIT_NOT_FOUND", "INVALID_ITEMS", "PRICE_BOOK_NOT_FOUND"].includes(message)
     ) {
       return mobileError("errors.invalidData");
     }

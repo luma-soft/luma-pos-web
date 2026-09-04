@@ -280,7 +280,7 @@ async function syncProductPriceBookPrices(
     .from(priceBooks)
     .where(and(eq(priceBooks.storeId, storeId), inArray(priceBooks.id, bookIds)));
   const nonDefaultIds = new Set(
-    validBooks.filter((book) => !book.isDefault && !book.systemType && !book.costBased).map((book) => book.id),
+    validBooks.filter((book) => !book.isDefault && (!book.systemType || book.systemType === "list") && !book.costBased).map((book) => book.id),
   );
 
   const toDelete = entries

@@ -12,8 +12,13 @@ export const orderItemSchema = z.object({
   unitPrice: z.number().min(0).optional(),
   manualUnitPrice: z.number().min(0).optional(),
   lineDiscount: z.number().min(0).optional(),
+  lineDiscountMode: z.enum(["pct", "vnd"]).optional(),
+  lineDiscountValue: z.number().min(0).optional(),
   // Undefined kế thừa bảng giá hóa đơn; null chọn riêng Giá Chung.
   priceBookId: z.uuid().nullable().optional(),
+}).refine((item) => (item.lineDiscountMode === undefined) === (item.lineDiscountValue === undefined), {
+  message: "Discount mode and value must be provided together",
+  path: ["lineDiscountValue"],
 });
 
 export const createOrderSchema = z.object({
@@ -131,6 +136,7 @@ export const purchaseItemSchema = z.object({
   productId: z.uuid(),
   quantity: z.number().positive(), // theo đơn vị gốc
   unitCost: z.number().min(0),
+  updateCompanyPrice: z.boolean().default(false),
   discount: z.number().min(0).default(0), // giảm giá dòng (VND)
   batchNumber: z.string().trim().min(1).max(80).optional(),
   expiryDate: z.iso.date().optional(),

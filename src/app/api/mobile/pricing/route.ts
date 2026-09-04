@@ -66,12 +66,13 @@ export async function GET(request: Request) {
     baseRetailPrice: product.baseRetailPrice,
     costPrice: canViewPurchasePrices(gate.role) ? product.costPrice : null,
     lastPurchasePrice: canViewPurchasePrices(gate.role) ? product.lastPurchasePrice : null,
+    lastPurchaseNetPrice: canViewPurchasePrices(gate.role) ? product.lastPurchaseNetPrice : null,
     overridesByBookId: Object.fromEntries(
       books
         .filter((book) => !book.isDefault)
         .flatMap((book) => {
           if (!isSystemPriceBook(book) && overrides[book.id]?.[product.id] == null) return [];
-          const price = resolvePriceBookPrice(book, { retailPrice: product.baseRetailPrice, costPrice: product.costPrice, lastPurchasePrice: product.lastPurchasePrice }, overrides[book.id]?.[product.id]);
+          const price = resolvePriceBookPrice(book, { retailPrice: product.baseRetailPrice, costPrice: product.costPrice, lastPurchaseNetPrice: product.lastPurchaseNetPrice }, overrides[book.id]?.[product.id]);
           return [[book.id, price]];
         }),
     ),

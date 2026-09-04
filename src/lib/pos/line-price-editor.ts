@@ -15,11 +15,13 @@ export type LinePriceEditorState = {
 export function createLinePriceEditorState(
   unitPrice: number,
   lineDiscount: number,
+  discountMode: LineDiscountMode = "vnd",
+  discountValue?: number,
 ): LinePriceEditorState {
   return {
     price: String(unitPrice),
-    discount: String(lineDiscount),
-    discountMode: "vnd",
+    discount: String(discountValue ?? lineDiscount),
+    discountMode,
     free: unitPrice === 0,
   };
 }
@@ -77,14 +79,18 @@ export function setLineDiscountMode(
 }
 
 export function resolveLinePriceEditor(state: LinePriceEditorState) {
-  const unitPrice = state.free ? 0 : Math.max(0, Number(state.price) || 0);
+  const unitPrice = state.free ? 0 : Number(Math.max(0, Number(state.price) || 0).toFixed(2));
   const discountInput = state.free ? 0 : Math.max(0, Number(state.discount) || 0);
-  const lineDiscount = state.discountMode === "pct"
-    ? Math.round((unitPrice * discountInput) / 100)
-    : discountInput;
+  // Keep computation aligned with the stored two-decimal snapshot precision.
+  const lineDiscountValue = Number(Math.min(state.discountMode === "pct" ? 100 : unitPrice, discountInput).toFixed(2));
+  const lineDiscount = Math.min(unitPrice, state.discountMode === "pct"
+    ? Math.round((unitPrice * lineDiscountValue) / 100)
+    : lineDiscountValue);
   return {
     unitPrice,
     lineDiscount,
+    lineDiscountMode: state.discountMode,
+    lineDiscountValue,
     sellPrice: Math.max(0, unitPrice - lineDiscount),
   };
 }

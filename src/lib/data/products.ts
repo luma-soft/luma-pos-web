@@ -24,6 +24,7 @@ import {
   warehouses,
 } from "@/db/schema";
 import { accentInsensitiveLike } from "@/lib/search";
+import { lastPurchaseNetPriceSql } from "@/lib/pricing/last-purchase-net-price";
 import { coercePageSize, DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import {
   hasProductComplianceColumns,
@@ -206,6 +207,7 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
         baseUnit: products.baseUnit,
         costPrice: products.costPrice,
         lastPurchasePrice: products.lastPurchasePrice,
+        lastPurchaseNetPrice: lastPurchaseNetPriceSql(storeId),
         retailPrice: products.retailPrice,
         wholesalePrice: products.wholesalePrice,
         contractorPrice: products.contractorPrice,
@@ -345,6 +347,7 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
             baseUnit: products.baseUnit,
             costPrice: products.costPrice,
             lastPurchasePrice: products.lastPurchasePrice,
+            lastPurchaseNetPrice: lastPurchaseNetPriceSql(storeId),
             retailPrice: products.retailPrice,
             wholesalePrice: products.wholesalePrice,
             contractorPrice: products.contractorPrice,

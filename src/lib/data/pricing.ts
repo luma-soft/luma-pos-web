@@ -28,6 +28,7 @@ import {
   type PricingSort,
 } from "@/lib/pricing/pricing-policy";
 import { pricingStockCondition } from "@/lib/data/pricing-stock";
+import { lastPurchaseNetPriceSql } from "@/lib/pricing/last-purchase-net-price";
 import {
   productCompatibilityImageUrls,
   productManagedImageDescriptors,
@@ -80,6 +81,7 @@ export interface PricingProductRow {
   baseRetailPrice: number;
   costPrice: number;
   lastPurchasePrice: number | null;
+  lastPurchaseNetPrice: number | null;
   availableStock: number;
 }
 
@@ -193,7 +195,9 @@ export async function getPricingPage(
     ? sql<string>`(
         select case
           when b.system_type = 'cost' or b.cost_based then ${products.costPrice}
-          when b.system_type = 'purchase' then ${products.lastPurchasePrice}
+          when b.system_type = 'purchase' then ${lastPurchaseNetPriceSql(storeId)}
+          when b.system_type = 'list' then (select pp.price from ${productPrices} pp where pp.product_id = ${products.id}
+            and pp.store_id = ${storeId} and pp.price_book_id = b.id limit 1)
           when b.system_type = 'retail' or b.is_default then ${products.retailPrice}
           else coalesce((select pp.price from ${productPrices} pp where pp.product_id = ${products.id}
             and pp.store_id = ${storeId} and pp.price_book_id = b.id limit 1), ${products.retailPrice})
@@ -249,6 +253,7 @@ export async function getPricingPage(
         baseRetailPrice: products.retailPrice,
         costPrice: products.costPrice,
         lastPurchasePrice: products.lastPurchasePrice,
+        lastPurchaseNetPrice: lastPurchaseNetPriceSql(storeId),
         availableStock,
       })
       .from(products)
@@ -296,6 +301,7 @@ export async function getPricingPage(
         row.lastPurchasePrice == null
           ? null
           : Number(row.lastPurchasePrice),
+      lastPurchaseNetPrice: row.lastPurchaseNetPrice == null ? null : Number(row.lastPurchaseNetPrice),
       availableStock: Number(row.availableStock),
     })),
     total: Number(total),

@@ -1,17 +1,17 @@
 "use server";
 
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
-import { and, eq, sql, type SQL } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
+import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { priceBooks, productPrices, products } from "@/db/schema";
 import { type ActionResult, requireManager, toMoney } from "./common";
 import { Routes } from "@/lib/routes";
-import { isSystemPriceBook, isReservedPriceBookName } from "@/lib/pricing/system-price-books";
+import { isSystemPriceBook, isPriceBookReadOnly, isReservedPriceBookName } from "@/lib/pricing/system-price-books";
 import { pricingSellableProductCondition } from "@/lib/data/pricing";
 import { recordActivity } from "@/lib/audit/activity-log";
+import { lastPurchaseNetPriceSql } from "@/lib/pricing/last-purchase-net-price";
 
-export type PriceFormulaBase = "current" | "cost" | "lastPurchase";
+export type PriceFormulaBase = "current" | "cost" | "lastPurchase" | "list";
 
 /** Biểu thức giá mới = base ± (số VND hoặc % của base), kẹp >= 0, làm tròn 2 chữ số. */
 function priceExpr(base: SQL, op: "+" | "-", amount: number, unit: "vnd" | "pct"): SQL {
@@ -35,90 +35,58 @@ export async function applyPriceFormulaAll(input: {
   unit: "vnd" | "pct";
 }): Promise<ActionResult<{ count: number }>> {
   const gate = await requireManager(); if (!gate.ok) return gate;
+  if (!Number.isFinite(input.amount) || input.amount < 0 || !["current", "cost", "lastPurchase", "list"].includes(input.base) || !["+", "-"].includes(input.op) || !["vnd", "pct"].includes(input.unit)) return { ok: false, error: "errors.invalidData" };
   try {
     const result = await db.transaction(async (tx) => {
-      const [book] = await tx.select({ name: priceBooks.name, isDefault: priceBooks.isDefault, systemType: priceBooks.systemType, costBased: priceBooks.costBased }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, input.priceBookId))).limit(1).for("update");
+      const [book] = await tx.select({ name: priceBooks.name, isDefault: priceBooks.isDefault, systemType: priceBooks.systemType, costBased: priceBooks.costBased }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, input.priceBookId))).limit(1).for("no key update");
       if (!book) return null;
-      if (isSystemPriceBook(book)) return "pricing.errors.systemReadOnly";
-      const before = await tx.select({ id: products.id, name: products.name, sku: products.sku, retailPrice: products.retailPrice, lastPurchasePrice: products.lastPurchasePrice })
+      if (isPriceBookReadOnly(book)) return "pricing.errors.systemReadOnly";
+      const currentPrice = sql`(select pp.price from product_prices pp where pp.store_id = ${gate.storeId}
+        and pp.product_id = ${sql.raw('"products"."id"')} and pp.price_book_id = ${input.priceBookId} limit 1)`;
+      const listPrice = sql`(select pp.price from product_prices pp join price_books pb on pb.id = pp.price_book_id and pb.store_id = pp.store_id
+        where pp.store_id = ${gate.storeId} and pp.product_id = ${sql.raw('"products"."id"')} and pb.system_type = 'list' limit 1)`;
+      const base = input.base === "cost" ? sql`${products.costPrice}`
+        : input.base === "lastPurchase" ? lastPurchaseNetPriceSql(gate.storeId)
+        : input.base === "list" ? listPrice
+        : book.isDefault ? sql`${products.retailPrice}`
+        : book.systemType === "list" ? currentPrice
+        : sql`coalesce(${currentPrice}, ${products.retailPrice})`;
+      const before = await tx.select({ id: products.id, name: products.name, sku: products.sku,
+        retailPrice: products.retailPrice, basePrice: sql<string | null>`${base}`,
+        previousPrice: sql<string | null>`${book.isDefault ? sql`${products.retailPrice}` : currentPrice}` })
         .from(products).where(and(eq(products.storeId, gate.storeId), pricingSellableProductCondition())).for("update");
-      if (input.base === "lastPurchase" && before.some((row) => row.lastPurchasePrice == null)) {
-        return "pricing.errors.priceUnavailable";
-      }
-      const overrides = book.isDefault ? [] : await tx.select({ productId: productPrices.productId, price: productPrices.price })
-        .from(productPrices).where(and(eq(productPrices.storeId, gate.storeId), eq(productPrices.priceBookId, input.priceBookId)));
-      const previousPrices = new Map(overrides.map((row) => [row.productId, row.price]));
-
+      // A catalogue only applies to products with an explicit company price.
+      // Never manufacture a price for missing/non-applicable SKUs.
+      const applicable = before.filter((row) => row.basePrice != null);
+      if (!applicable.length) return "pricing.errors.priceUnavailable";
+      const target = and(eq(products.storeId, gate.storeId), inArray(products.id, applicable.map((row) => row.id)));
       if (book.isDefault) {
-        const base = input.base === "cost" ? sql`${products.costPrice}`
-          : input.base === "lastPurchase" ? sql`${products.lastPurchasePrice}`
-          : sql`${products.retailPrice}`;
-        await tx
-          .update(products)
-          .set({
-            retailPrice: priceExpr(base, input.op, input.amount, input.unit),
-            updatedAt: sql`now()`,
-          })
-          .where(and(eq(products.storeId, gate.storeId), pricingSellableProductCondition()));
+        await tx.update(products).set({ retailPrice: priceExpr(base, input.op, input.amount, input.unit), updatedAt: sql`now()` }).where(target);
       } else {
-        const currentPrice = alias(productPrices, "current_price");
-        const base = input.base === "cost"
-          ? sql`${products.costPrice}`
-          : input.base === "lastPurchase"
-            ? sql`${products.lastPurchasePrice}`
-            : sql`coalesce(${currentPrice.price}, ${products.retailPrice})`;
-        await tx
-          .insert(productPrices)
-          .select(
-            tx
-              .select({
-                id: sql<string>`gen_random_uuid()`.as("id"),
-                storeId: sql<string>`${gate.storeId}`.as("store_id"),
-                priceBookId: sql<string>`${input.priceBookId}`.as(
-                  "price_book_id",
-                ),
-                productId: products.id,
-                price: priceExpr(base, input.op, input.amount, input.unit).as(
-                  "price",
-                ),
-              })
-              .from(products)
-              .leftJoin(
-                currentPrice,
-                and(
-                  eq(currentPrice.productId, products.id),
-                  eq(currentPrice.priceBookId, input.priceBookId),
-                ),
-              )
-              .where(and(eq(products.storeId, gate.storeId), pricingSellableProductCondition())),
-          )
-          .onConflictDoUpdate({
-            target: [productPrices.priceBookId, productPrices.productId],
-            set: { price: sql`excluded.price` },
-          });
+        await tx.insert(productPrices).select(tx.select({
+          id: sql<string>`gen_random_uuid()`.as("id"), storeId: sql<string>`${gate.storeId}`.as("store_id"),
+          priceBookId: sql<string>`${input.priceBookId}`.as("price_book_id"), productId: products.id,
+          price: priceExpr(base, input.op, input.amount, input.unit).as("price"),
+        }).from(products).where(target)).onConflictDoUpdate({
+          target: [productPrices.priceBookId, productPrices.productId], set: { price: sql`excluded.price` },
+        });
       }
-
-      const [{ n }] = await tx
-        .select({ n: sql<number>`count(*)::int` })
-        .from(products)
-        .where(and(eq(products.storeId, gate.storeId), pricingSellableProductCondition()));
       const after = book.isDefault
-        ? await tx.select({ productId: products.id, price: products.retailPrice }).from(products)
-          .where(and(eq(products.storeId, gate.storeId), pricingSellableProductCondition()))
+        ? await tx.select({ productId: products.id, price: products.retailPrice }).from(products).where(target)
         : await tx.select({ productId: productPrices.productId, price: productPrices.price }).from(productPrices)
-          .where(and(eq(productPrices.storeId, gate.storeId), eq(productPrices.priceBookId, input.priceBookId)));
-      const nextPrices = new Map(after.map((row) => [row.productId, Number(row.price)]));
-      const changes = before.flatMap((row) => {
-        const previous = Number(previousPrices.get(row.id) ?? row.retailPrice);
-        const price = nextPrices.get(row.id) ?? previous;
-        return previous === price && (book.isDefault || previousPrices.has(row.id)) ? [] : [{ type: "product", id: row.id, code: row.sku, name: row.name, beforePrice: previous, price }];
-    });
-    if (changes.length) await recordActivity(tx, {
-      storeId: gate.storeId, actorId: gate.userId, action: "price_book.formula.applied", entityType: "price_book", entityId: input.priceBookId,
-      after: { name: book.name, changedCount: changes.length }, affectedRecords: changes,
-      metadata: { priceBookName: book.name, base: input.base, operator: input.op, amount: input.amount, unit: input.unit },
-    });
-    return Number(n);
+          .where(and(eq(productPrices.storeId, gate.storeId), eq(productPrices.priceBookId, input.priceBookId), inArray(productPrices.productId, applicable.map((row) => row.id))));
+      const next = new Map(after.map((row) => [row.productId, Number(row.price)]));
+      const changes = applicable.flatMap((row) => {
+        const previous = row.previousPrice == null ? null : Number(row.previousPrice);
+        const price = next.get(row.id)!;
+        return previous === price ? [] : [{ type: "product", id: row.id, code: row.sku, name: row.name, beforePrice: previous, price }];
+      });
+      if (changes.length) await recordActivity(tx, {
+        storeId: gate.storeId, actorId: gate.userId, action: "price_book.formula.applied", entityType: "price_book", entityId: input.priceBookId,
+        after: { name: book.name, changedCount: changes.length }, affectedRecords: changes,
+        metadata: { priceBookName: book.name, base: input.base, operator: input.op, amount: input.amount, unit: input.unit, skippedMissingPrices: before.length - applicable.length },
+      });
+      return applicable.length;
     });
     if (result == null) return { ok: false, error: "errors.invalidData" };
     if (typeof result === "string") return { ok: false, error: result };
@@ -196,11 +164,12 @@ export async function setProductPrice(input: {
   price: number | null;
 }): Promise<ActionResult> {
   const gate = await requireManager(); if (!gate.ok) return gate;
+  if (input.price != null && (!Number.isFinite(input.price) || input.price < 0)) return { ok: false, error: "errors.invalidData" };
   try {
     const result = await db.transaction(async (tx) => {
       const [book] = await tx.select({ name: priceBooks.name, isDefault: priceBooks.isDefault, systemType: priceBooks.systemType, costBased: priceBooks.costBased }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, input.priceBookId))).limit(1);
       if (!book) return false;
-      if (isSystemPriceBook(book)) return "pricing.errors.systemReadOnly";
+      if (isPriceBookReadOnly(book)) return "pricing.errors.systemReadOnly";
       const [product] = await tx.select({ name: products.name, sku: products.sku, retailPrice: products.retailPrice }).from(products)
         .where(and(eq(products.storeId, gate.storeId), eq(products.id, input.productId))).limit(1).for("update");
       if (!product) return false;
@@ -225,7 +194,7 @@ export async function setProductPrice(input: {
       await recordActivity(tx, {
         storeId: gate.storeId, actorId: gate.userId, action: "product.price_book.updated", entityType: "product", entityId: input.productId,
         before: { name: product.name, sku: product.sku, price: beforePrice }, after: { name: product.name, sku: product.sku, price: afterPrice },
-        metadata: { productName: product.name, productSku: product.sku, priceBookId: input.priceBookId, priceBookName: book.name, usesRetailPrice: afterPrice == null },
+        metadata: { productName: product.name, productSku: product.sku, priceBookId: input.priceBookId, priceBookName: book.name, usesRetailPrice: book.systemType !== "list" && afterPrice == null },
     });
     return true;
     });

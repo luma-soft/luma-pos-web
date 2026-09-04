@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, expect, mock, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, expect, mock, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
@@ -9,7 +9,8 @@ import * as schema from "../../db/schema";
 const pg = new PGlite();
 const database = drizzle(pg, { schema });
 const storeId = randomUUID(), userId = randomUUID();
-const retailId = randomUUID(), costId = randomUUID(), grossId = randomUUID(), customId = randomUUID();
+const retailId = randomUUID(), costId = randomUUID(), purchaseId = randomUUID(), listId = randomUUID(), customId = randomUUID();
+const receiptId = randomUUID();
 const knownId = randomUUID(), unknownId = randomUUID();
 mock.module("@/db", () => ({ db: database }));
 mock.module("@/lib/actions/common", () => ({
@@ -42,54 +43,112 @@ beforeAll(async () => {
     await pg.exec(`create table "${config.name}" (${columns.join(",")})`);
   }
 
-  await pg.exec("create unique index fixture_book_product on product_prices(price_book_id, product_id)");
+  await pg.exec(`
+    create unique index fixture_book_product on product_prices(price_book_id, product_id);
+    create table purchase_orders (id uuid primary key, store_id uuid not null, status text not null,
+      discount numeric not null default 0, cost_effective_at timestamptz, created_at timestamptz not null default now());
+    create table purchase_order_items (id uuid primary key default gen_random_uuid(), store_id uuid not null,
+      purchase_order_id uuid not null, product_id uuid not null, quantity numeric not null,
+      unit_multiplier numeric not null default 1, total numeric not null);
+  `);
   await database.insert(schema.priceBooks).values([
     { id: retailId, storeId, name: "Giá Chung", isDefault: true, systemType: "retail" },
     { id: costId, storeId, name: "Giá vốn", costBased: true, managerOnly: true, systemType: "cost" },
-    { id: grossId, storeId, name: "Giá Chưa Chiết Khấu", managerOnly: true, systemType: "purchase" },
+    { id: purchaseId, storeId, name: "Giá nhập cuối", managerOnly: true, systemType: "purchase" },
     { id: customId, storeId, name: "Giá thợ" },
+    { id: listId, storeId, name: "Giá chưa chiết khấu", systemType: "list" },
   ]);
   await database.insert(schema.products).values([
     { id: knownId, storeId, sku: "KNOWN", name: "Known", retailPrice: "200", costPrice: "90", lastPurchasePrice: "120" },
     { id: unknownId, storeId, sku: "UNKNOWN", name: "Unknown", retailPrice: "100", costPrice: "50", lastPurchasePrice: null },
   ]);
 });
+beforeEach(async () => {
+  await pg.exec("truncate product_prices, purchase_order_items, purchase_orders");
+  await pg.query("update products set retail_price = case when id = $1 then 200 else 100 end", [knownId]);
+  await pg.query("insert into purchase_orders (id, store_id, status) values ($1, $2, 'received')", [receiptId, storeId]);
+  await pg.query("insert into purchase_order_items (store_id, purchase_order_id, product_id, quantity, total) values ($1, $2, $3, 2, 160)", [storeId, receiptId, knownId]);
+});
 afterAll(async () => { await pg.close(); });
-for (const id of [retailId, costId, grossId]) {
-  test(`all administration actions refuse system book ${id}`, async () => {
+const { getPriceOverrides, getPriceOverridesForProducts } = await import("../data/price-books");
+const { resolvePriceBookPrice } = await import("../pricing/system-price-books");
+
+for (const [name, id] of [["retail", retailId], ["cost", costId], ["purchase", purchaseId], ["list", listId]]) {
+  test(`${name} system book cannot be renamed or deleted`, async () => {
     const expected = { ok: false, error: "pricing.errors.systemReadOnly" };
     expect(await renamePriceBook(id, "New name")).toEqual(expected);
     expect(await deletePriceBook(id)).toEqual(expected);
+  });
+}
+for (const [name, id] of [["cost", costId], ["purchase", purchaseId]]) {
+  test(`${name} source cannot be edited manually or by formula`, async () => {
+    const expected = { ok: false, error: "pricing.errors.systemReadOnly" };
     expect(await setProductPrice({ priceBookId: id, productId: knownId, price: 123 })).toEqual(expected);
     expect(await applyPriceFormulaAll({ priceBookId: id, base: "current", op: "+", amount: 1, unit: "pct" })).toEqual(expected);
   });
 }
-test("reserved automatic names cannot create a second custom book", async () => {
-  expect(await createPriceBook("  Giá   Chưa Chiết Khấu ")).toEqual({ ok: false, error: "pricing.errors.systemReadOnly" });
-});
-test("bulk formula with missing gross rejects atomically without falling back to cost", async () => {
-  expect(await applyPriceFormulaAll({ priceBookId: customId, base: "lastPurchase", op: "+", amount: 10, unit: "pct" }))
-    .toEqual({ ok: false, error: "pricing.errors.priceUnavailable" });
-  expect((await pg.query("select count(*)::int as n from product_prices")).rows[0].n).toBe(0);
-});
-test("custom prices remain editable and formula uses exact gross including zero", async () => {
-  expect((await setProductPrice({ priceBookId: customId, productId: knownId, price: 160 })).ok).toBe(true);
-  await pg.query("update products set last_purchase_price = 0 where id = $1", [unknownId]);
-  const result = await applyPriceFormulaAll({ priceBookId: customId, base: "lastPurchase", op: "+", amount: 10, unit: "pct" });
-  expect(result).toEqual({ ok: true, data: { count: 2 } });
-  const rows = (await pg.query("select product_id, price from product_prices order by price desc")).rows;
-  expect(rows).toEqual([{ product_id: knownId, price: "132.00" }, { product_id: unknownId, price: "0.00" }]);
+test.each(["  Giá   Chưa Chiết Khấu ", "Giá nhập cuối", "Giá vốn", "Giá chung"])("reserved name %s cannot create a second custom book", async (name) => {
+  expect(await createPriceBook(name)).toEqual({ ok: false, error: "pricing.errors.systemReadOnly" });
 });
 
-test("product edit reads cannot expose stale automatic overrides", async () => {
-  const { getPriceOverrides, getPriceOverridesForProducts } = await import("../data/price-books");
+test("retail edits update the product source and leave internal prices unchanged", async () => {
+  expect((await setProductPrice({ priceBookId: retailId, productId: knownId, price: 175 })).ok).toBe(true);
+  expect((await pg.query("select retail_price, cost_price, last_purchase_price from products where id = $1", [knownId])).rows[0])
+    .toEqual({ retail_price: "175.00", cost_price: "90.00", last_purchase_price: "120.00" });
+  expect((await pg.query("select count(*)::int as n from product_prices")).rows[0].n).toBe(0);
+});
+
+test("company catalogue edits and clearing preserve missing prices without retail fallback", async () => {
+  expect((await setProductPrice({ priceBookId: listId, productId: knownId, price: 250 })).ok).toBe(true);
+  expect(await getPriceOverrides(storeId, listId, [knownId])).toEqual({ [knownId]: "250.00" });
+  expect((await setProductPrice({ priceBookId: listId, productId: knownId, price: null })).ok).toBe(true);
+  const overrides = await getPriceOverrides(storeId, listId, [knownId]);
+  expect(overrides).toEqual({});
+  expect(resolvePriceBookPrice({ systemType: "list" }, { retailPrice: 200, lastPurchasePrice: 120 }, overrides[knownId])).toBeNull();
+  expect((await pg.query("select retail_price from products where id = $1", [knownId])).rows[0].retail_price).toBe("200.00");
+});
+
+test("catalogue-based discount updates only SKUs with a company price", async () => {
+  await setProductPrice({ priceBookId: listId, productId: knownId, price: 300 });
+  const result = await applyPriceFormulaAll({ priceBookId: retailId, base: "list", op: "-", amount: 20, unit: "pct" });
+  expect(result).toEqual({ ok: true, data: { count: 1 } });
+  expect((await pg.query("select id, retail_price from products order by sku")).rows)
+    .toEqual([{ id: knownId, retail_price: "240.00" }, { id: unknownId, retail_price: "100.00" }]);
+  expect(await getPriceOverrides(storeId, listId, [knownId])).toEqual({ [knownId]: "300.00" });
+});
+
+test("missing catalogue bases fail without creating prices or changing retail", async () => {
+  for (const [priceBookId, base] of [[retailId, "list"], [listId, "current"]]) {
+    expect(await applyPriceFormulaAll({ priceBookId, base, op: "+", amount: 10, unit: "pct" }))
+      .toEqual({ ok: false, error: "pricing.errors.priceUnavailable" });
+  }
+  expect((await pg.query("select retail_price from products order by sku")).rows).toEqual([{ retail_price: "200.00" }, { retail_price: "100.00" }]);
+  expect((await pg.query("select count(*)::int as n from product_prices")).rows[0].n).toBe(0);
+});
+
+test("net receipt formulas skip missing SKUs and retain their existing custom price", async () => {
+  await setProductPrice({ priceBookId: customId, productId: unknownId, price: 77 });
+  expect(await applyPriceFormulaAll({ priceBookId: customId, base: "lastPurchase", op: "+", amount: 10, unit: "pct" }))
+    .toEqual({ ok: true, data: { count: 1 } });
+  expect(await getPriceOverrides(storeId, customId)).toEqual({ [knownId]: "88.00", [unknownId]: "77.00" });
+});
+
+test("a zero net receipt is an available formula base", async () => {
+  await pg.query("insert into purchase_order_items (store_id, purchase_order_id, product_id, quantity, total) values ($1, $2, $3, 1, 0)", [storeId, receiptId, unknownId]);
+  expect(await applyPriceFormulaAll({ priceBookId: customId, base: "lastPurchase", op: "+", amount: 10, unit: "pct" }))
+    .toEqual({ ok: true, data: { count: 2 } });
+  expect(await getPriceOverrides(storeId, customId)).toEqual({ [knownId]: "88.00", [unknownId]: "0.00" });
+});
+
+test("price reads expose catalogue values but ignore stale internal overrides", async () => {
   await database.insert(schema.productPrices).values([
     { storeId, productId: knownId, priceBookId: costId, price: "888" },
-    { storeId, productId: knownId, priceBookId: grossId, price: "999" },
+    { storeId, productId: knownId, priceBookId: purchaseId, price: "999" },
+    { storeId, productId: knownId, priceBookId: listId, price: "250" },
+    { storeId, productId: knownId, priceBookId: customId, price: "160" },
   ]);
-  expect(await getPriceOverrides(storeId, grossId, [knownId])).toEqual({});
-  const overrides = await getPriceOverridesForProducts(storeId, [knownId]);
-  expect(overrides).not.toHaveProperty(costId);
-  expect(overrides).not.toHaveProperty(grossId);
-  expect(overrides[customId][knownId]).toBe("132.00");
+  expect(await getPriceOverrides(storeId, purchaseId, [knownId])).toEqual({});
+  expect(await getPriceOverridesForProducts(storeId, [knownId])).toEqual({
+    [listId]: { [knownId]: "250.00" }, [customId]: { [knownId]: "160.00" },
+  });
 });

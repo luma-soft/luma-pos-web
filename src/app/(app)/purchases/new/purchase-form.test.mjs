@@ -84,3 +84,28 @@ describe("purchase freight", () => {
     expect(doc.props.grandTotal).toBe(218000);
   });
 });
+
+describe("receipt company price opt-in", () => {
+  test.each([false, undefined])("capability %s keeps company price controls unavailable", (canEditCompanyPrices) => {
+    const html = renderToStaticMarkup(createElement(PurchaseForm, {
+      options, initialProducts: products, initialValues: initialValues(0),
+      mode: "edit", purchaseId, canEditCompanyPrices,
+    }));
+    expect(html).not.toContain("Cập nhật giá công ty");
+  });
+
+  test("manager controls are present and unchecked by default in both responsive layouts", () => {
+    const html = renderToStaticMarkup(createElement(PurchaseForm, {
+      options, initialProducts: products, initialValues: initialValues(0),
+      mode: "edit", purchaseId, canEditCompanyPrices: true,
+    }));
+    const labels = [...html.matchAll(/<label\b[^>]*>([\s\S]*?)<\/label>/g)]
+      .map((match) => match[1]).filter((label) => label.includes("Cập nhật giá công ty"));
+    expect(labels).toHaveLength(2);
+    for (const label of labels) {
+      const input = label.match(/<input\b[^>]*type="checkbox"[^>]*>/)?.[0];
+      expect(input).toBeDefined();
+      expect(input).not.toMatch(/\schecked(?:=|\s|>)/);
+    }
+  });
+});

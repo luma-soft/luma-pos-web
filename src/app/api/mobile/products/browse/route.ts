@@ -5,6 +5,7 @@ import {
   getPricingSuppliers,
 } from "@/lib/data/pricing";
 import { parsePricingSort } from "@/lib/pricing/pricing-policy";
+import { canViewPurchasePrices } from "@/lib/pricing/system-price-books";
 import { requireMobileStockReadAccess } from "@/lib/mobile/auth";
 import {
   mobileGate,
@@ -39,6 +40,7 @@ export async function GET(request: Request) {
   return mobileOk({
     rows: products.rows.map((product) => ({
       ...product,
+      lastPurchaseNetPrice: canViewPurchasePrices(gate.role) ? product.lastPurchaseNetPrice : null,
       imageUrl: product.imageUrls[0] ?? null,
     })),
     categories,

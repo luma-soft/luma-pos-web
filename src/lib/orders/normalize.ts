@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { products, productComboItems, productPrices, productUnits, promotions, priceBooks } from "@/db/schema";
 import { canViewPurchasePrices, isInternalPriceBook, resolvePriceBookPrice, systemPriceBookType } from "@/lib/pricing/system-price-books";
 import { applyPromo, isPromoActive } from "@/lib/promo";
+import { resolveLinePriceEditor } from "@/lib/pos/line-price-editor";
+import { lastPurchaseNetPriceSql } from "@/lib/pricing/last-purchase-net-price";
 import type { CreateOrderOutput, UpdateOrderOutput } from "@/lib/schemas/order";
 
 type RawOrderItem = CreateOrderOutput["items"][number] | UpdateOrderOutput["items"][number];
@@ -13,9 +15,12 @@ export type NormalizedOrderItem = {
   unitName: string;
   unitMultiplier: number;
   priceBookId: string | null;
+  priceBookName: string;
   quantity: number;
   preDiscountUnitPrice: number;
   lineDiscount: number;
+  lineDiscountMode: "pct" | "vnd";
+  lineDiscountValue: number;
   unitPrice: number;
   total: number;
   productKind: "product" | "service" | "combo";
@@ -67,6 +72,7 @@ export async function normalizeOrderItems(
         baseUnit: products.baseUnit,
         costPrice: products.costPrice,
         lastPurchasePrice: products.lastPurchasePrice,
+        lastPurchaseNetPrice: lastPurchaseNetPriceSql(storeId),
         retailPrice: products.retailPrice,
         isActive: products.isActive,
         productKind: products.productKind,
@@ -90,7 +96,7 @@ export async function normalizeOrderItems(
       : Promise.resolve([]),
     requestedPriceBookIds.length > 0
       ? db
-          .select({ id: priceBooks.id, costBased: priceBooks.costBased, systemType: priceBooks.systemType, isDefault: priceBooks.isDefault, managerOnly: priceBooks.managerOnly })
+          .select({ id: priceBooks.id, name: priceBooks.name, costBased: priceBooks.costBased, systemType: priceBooks.systemType, isDefault: priceBooks.isDefault, managerOnly: priceBooks.managerOnly })
           .from(priceBooks)
           .where(and(eq(priceBooks.storeId, storeId), inArray(priceBooks.id, requestedPriceBookIds)))
       : Promise.resolve([]),
@@ -158,15 +164,22 @@ export async function normalizeOrderItems(
       itemPriceBookId ? priceByBookProduct.get(`${itemPriceBookId}:${product.id}`) : undefined);
     if (base == null) throw new Error("PRICE_BOOK_PRICE_UNAVAILABLE");
     const source = itemPriceBook ? systemPriceBookType(itemPriceBook) : "retail";
-    const listedPrice = listedUnitPrice(product, unit, base, source === "cost" || source === "purchase");
+    const listedPrice = listedUnitPrice(product, unit, base, source === "cost" || source === "purchase" || source === "list");
     const manualUnitPrice = item.manualUnitPrice;
-    const lineDiscount = Math.max(0, item.lineDiscount ?? 0);
+    const discountValue = Math.max(0, item.lineDiscountValue ?? item.lineDiscount ?? 0);
     const baseQty = item.quantity * multiplier;
-    const promoPrice = manualUnitPrice == null
+    // Explicit customer discount replaces automatic promotions. Company list
+    // prices never participate in automatic retail promotions.
+    const promoPrice = manualUnitPrice == null && discountValue === 0 && source !== "list"
       ? applyPromo(listedPrice, promoByProduct.get(product.id), baseQty).price
       : listedPrice;
     const preDiscountUnitPrice = manualUnitPrice ?? promoPrice;
-    const unitPrice = Math.max(0, preDiscountUnitPrice - lineDiscount);
+    const { lineDiscount, lineDiscountMode, lineDiscountValue, sellPrice: unitPrice } = resolveLinePriceEditor({
+      price: String(preDiscountUnitPrice),
+      discount: String(discountValue),
+      discountMode: item.lineDiscountMode ?? "vnd",
+      free: false,
+    });
 
     return {
       productId: product.id,
@@ -174,9 +187,12 @@ export async function normalizeOrderItems(
       unitName: unit?.unitName ?? product.baseUnit,
       unitMultiplier: multiplier,
       priceBookId: itemPriceBookId,
+      priceBookName: itemPriceBook?.name ?? "Giá chung",
       quantity: item.quantity,
       preDiscountUnitPrice,
       lineDiscount,
+      lineDiscountMode,
+      lineDiscountValue,
       unitPrice,
       total: item.quantity * unitPrice,
       productKind: product.productKind,

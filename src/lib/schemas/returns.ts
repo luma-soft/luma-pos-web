@@ -89,7 +89,7 @@ export const createPosReturnSchema = z.object({
   reason: z.string().min(1, { error: "validation.required" }),
   refundMethod: z.enum(["cash", "bank_transfer", "debt_deduct"]),
   note: z.string().optional(),
-  items: z.array(orderItemSchema.extend({
+  items: z.array(orderItemSchema.safeExtend({
     restock: z.boolean().default(true),
   })).min(1, { error: "returns.errors.emptyItems" }),
 });

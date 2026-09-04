@@ -11,14 +11,14 @@ import { MoneyInput } from "@/components/ui/money-input";
 import { NumberInput } from "@/components/ui/number-input";
 import { Select } from "@/components/ui/select";
 import { createPriceBook, renamePriceBook, deletePriceBook, setProductPrice, applyPriceFormulaAll, type PriceFormulaBase } from "@/lib/actions/price-books";
-import { isSystemPriceBook } from "@/lib/pricing/system-price-books";
+import { comparePriceBooks, isPriceBookReadOnly, isSystemPriceBook, systemPriceBookType, type SystemPriceBookType } from "@/lib/pricing/system-price-books";
 
 export interface PricingBook {
   id: string;
   name: string;
   isDefault: boolean;
   sortOrder: number;
-  systemType?: "retail" | "cost" | "purchase" | null;
+  systemType?: SystemPriceBookType | null;
   costBased?: boolean;
 }
 export interface PricingRow {
@@ -36,6 +36,25 @@ type PriceEditorLabels = {
   belowCost: string;
   noData: string;
 };
+
+function priceColumnWidth(book: PricingBook): number {
+  switch (systemPriceBookType(book)) {
+    case "cost": return 130;
+    case "purchase": return 160;
+    case "list": return 190;
+    default: return 170;
+  }
+}
+
+function PricingBookLabel({ book }: { book: PricingBook }) {
+  const type = systemPriceBookType(book);
+  const description = type === "purchase"
+    ? "Đơn giá sau chiết khấu nhà cung cấp của lần nhập đã nhận gần nhất, chưa gồm thuế và phí."
+    : type === "list"
+      ? "Giá niêm yết công ty, dùng làm giá gốc để chiết khấu cho khách. Cập nhật độc lập với chiết khấu nhập hàng."
+      : undefined;
+  return description ? <span tabIndex={0} title={description} className="cursor-help underline decoration-dotted underline-offset-4">{book.name}</span> : book.name;
+}
 
 export function PriceBookEditor({
   row,
@@ -61,7 +80,7 @@ export function PriceBookEditor({
   onCommit: (value: number | null) => void;
 }) {
   const value = row.prices[book.id];
-  if (isSystemPriceBook(book)) {
+  if (isPriceBookReadOnly(book)) {
     return (
       <span
         aria-label={book.name}
@@ -71,7 +90,8 @@ export function PriceBookEditor({
       </span>
     );
   }
-  const fallback = book.id !== defaultBookId && value == null;
+  const catalogue = systemPriceBookType(book) === "list";
+  const fallback = !isSystemPriceBook(book) && book.id !== defaultBookId && value == null;
   const belowCost = row.costPrice != null && value != null && value > 0 && value < row.costPrice;
 
   return (
@@ -96,7 +116,7 @@ export function PriceBookEditor({
       </button>
       <MoneyInput
         value={value ?? ""}
-        placeholder={fallback ? formatCurrency(row.prices[defaultBookId] ?? 0) : "—"}
+        placeholder={fallback ? formatCurrency(row.prices[defaultBookId] ?? 0) : catalogue ? labels.noData : "—"}
         onChange={onChange}
         onBlur={() => {
           const next = value == null
@@ -108,6 +128,7 @@ export function PriceBookEditor({
           mobile
             ? "w-full min-w-11 rounded-lg border bg-surface px-3 text-right text-sm tabular-nums"
             : "w-28 rounded-md border bg-surface px-2 py-1.5 text-right text-sm tabular-nums",
+          !mobile && catalogue && "w-32",
           belowCost ? "border-red-400 text-er" : "border-slate-200 dark:border-slate-700",
           fallback && "text-slate-400",
         )}
@@ -152,12 +173,12 @@ export function PricingMobileRow({
         <p className="mt-1 text-xs text-slate-500">{row.sku} · {row.baseUnit}</p>
       </div>
       <div className="mt-3 grid min-w-0 gap-3">
-        {books.map((book) => {
+        {[...books].sort(comparePriceBooks).map((book) => {
           const key = `${row.id}:${book.id}`;
           return (
             <div key={book.id} className="min-w-0">
               <div className="mb-1.5 break-words text-xs font-semibold text-slate-600 dark:text-slate-300">
-                {book.name}
+                <PricingBookLabel book={book} />
               </div>
               <PriceBookEditor
                 row={row}
@@ -182,7 +203,7 @@ export function PricingMobileRow({
 export function PricingTable({ books: initialBooks, rows: initialRows, total, resetScrollKey, canViewPurchasePrices = false }: { books: PricingBook[]; rows: PricingRow[]; total: number; resetScrollKey?: string | number; canViewPurchasePrices?: boolean }) {
   const t = useTranslations();
   const router = useRouter();
-  const [books, setBooks] = useState(initialBooks);
+  const [books, setBooks] = useState(() => [...initialBooks].sort(comparePriceBooks));
   const [rows, setRows] = useState(initialRows);
   const [error, setError] = useState("");
   const [savingCell, setSavingCell] = useState<Set<string>>(new Set());
@@ -200,15 +221,17 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
 
   function openFormula(rowId: string, bookId: string) {
     const book = books.find((item) => item.id === bookId);
-    if (!book || isSystemPriceBook(book)) return;
+    if (!book || isPriceBookReadOnly(book)) return;
     setFBase("current"); setFOp("+"); setFAmount(0); setFUnit("pct"); setFAll(false);
     setFormula({ rowId, bookId });
   }
   function computeNew(row: PricingRow, bookId: string): number | null {
-    if (fBase !== "current" && !canViewPurchasePrices) return null;
+    if ((fBase === "cost" || fBase === "lastPurchase") && !canViewPurchasePrices) return null;
+    const book = books.find((item) => item.id === bookId);
     const base = fBase === "cost" ? row.costPrice
       : fBase === "lastPurchase" ? row.lastPurchase
-      : (row.prices[bookId] ?? row.prices[defaultBookId] ?? 0);
+      : fBase === "list" ? row.prices[listBookId] ?? null
+      : (row.prices[bookId] ?? (book && systemPriceBookType(book) === "list" ? null : row.prices[defaultBookId] ?? 0));
     if (base == null) return null;
     const delta = fUnit === "pct" ? (base * fAmount) / 100 : fAmount;
     return Math.max(0, Math.round(base + (fOp === "-" ? -delta : delta)));
@@ -216,7 +239,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
   async function applyFormula(row: PricingRow, bookId: string) {
     const book = books.find((item) => item.id === bookId);
     const nextPrice = computeNew(row, bookId);
-    if (!book || isSystemPriceBook(book) || nextPrice == null) return;
+    if (!book || isPriceBookReadOnly(book) || nextPrice == null) return;
     if (fAll) {
       setApplying(true); setError("");
       const res = await applyPriceFormulaAll({ priceBookId: bookId, base: fBase, op: fOp, amount: fAmount, unit: fUnit });
@@ -239,6 +262,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
   const bookMenuRef = useRef<HTMLDivElement>(null);
 
   const defaultBookId = books.find((b) => b.isDefault)?.id ?? books[0]?.id ?? "";
+  const listBookId = books.find((b) => systemPriceBookType(b) === "list")?.id ?? "";
   const cellKey = (rowId: string, bookId: string) => `${rowId}:${bookId}`;
   const formulaRow = formula ? rows.find((row) => row.id === formula.rowId) : null;
   const formulaBook = formula ? books.find((book) => book.id === formula.bookId) : null;
@@ -307,7 +331,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
 
   async function saveCell(row: PricingRow, bookId: string, value: number | null) {
     const book = books.find((item) => item.id === bookId);
-    if (!book || isSystemPriceBook(book)) return;
+    if (!book || isPriceBookReadOnly(book)) return;
     const k = cellKey(row.id, bookId);
     setRows((rs) => rs.map((r) => (r.id === row.id ? { ...r, prices: { ...r.prices, [bookId]: value } } : r)));
     setSavingCell((s) => new Set(s).add(k));
@@ -323,7 +347,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
 
   function updateCell(rowId: string, bookId: string, value: number | null) {
     const book = books.find((item) => item.id === bookId);
-    if (!book || isSystemPriceBook(book)) return;
+    if (!book || isPriceBookReadOnly(book)) return;
     setRows((current) =>
       current.map((row) =>
         row.id === rowId
@@ -344,7 +368,8 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
       key: "product",
       label: t("orders.cols.product"),
       required: true,
-      width: "300px",
+      width: "280px",
+      cellClassName: "whitespace-normal",
       render: (r) => (
         <div>
           <div className="font-medium">{r.name}</div>
@@ -354,11 +379,11 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
     },
     ...books.map((b): DataTableColumn<PricingRow> => ({
       key: `book:${b.id}`,
-      label: b.name,
+      label: <PricingBookLabel book={b} />,
       required: isSystemPriceBook(b),
       defaultVisible: isSystemPriceBook(b),
       align: "right",
-      width: "170px",
+      width: `${priceColumnWidth(b)}px`,
       render: (r) => {
         const k = cellKey(r.id, b.id);
         return (
@@ -525,7 +550,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
         visibleColumnKeys={visibleColumnKeys}
         onColumnVisibilityChange={setVisibleColumnKeys}
         getRowId={(row) => row.id}
-        minWidth={`${Math.max(640, 300 + visibleBooks.length * 170)}px`}
+        minWidth={`${Math.max(640, 324 + visibleBooks.reduce((sum, book) => sum + priceColumnWidth(book), 0))}px`}
         maxHeight="calc(100dvh - 340px)"
         fillHeight
         resetScrollKey={resetScrollKey}
@@ -615,9 +640,10 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
                 wrapLabel
                 options={[
                   { value: "current", label: t("pricing.formula.baseCurrent") },
+                  ...(listBookId ? [{ value: "list", label: books.find((book) => book.id === listBookId)!.name }] : []),
                   ...(canViewPurchasePrices ? [
                     { value: "cost", label: t("pricing.formula.baseCost") },
-                    { value: "lastPurchase", label: books.find((book) => book.systemType === "purchase")?.name ?? "Giá Chưa Chiết Khấu" },
+                    { value: "lastPurchase", label: books.find((book) => book.systemType === "purchase")?.name ?? "Giá nhập cuối" },
                   ] : []),
                 ]}
               />
@@ -633,6 +659,7 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
               <Checkbox checked={fAll} onChange={(e) => setFAll(e.target.checked)} className="mt-0.5" />
               <span>{t("pricing.formula.applyAll", { n: total })} <b>{formulaBook.name}</b></span>
             </label>
+            {fAll && <p className="mt-1 text-xs text-slate-500">Chỉ áp dụng cho sản phẩm có giá nền.</p>}
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" onClick={() => setFormula(null)} className="min-h-11 rounded-lg border border-border px-3 text-sm min-w-11">{t("common.cancel")}</button>
               <button type="button" onClick={() => applyFormula(formulaRow, formulaBook.id)} disabled={applying || computeNew(formulaRow, formulaBook.id) == null} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary-600 px-4 text-sm font-medium text-white disabled:opacity-50 min-w-11">

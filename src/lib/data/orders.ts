@@ -356,11 +356,11 @@ export async function getOrder(storeId: string, id: string) {
       customerDebt: customers.currentDebt,
       warehouseName: warehouses.name,
       priceBookName: sql<string | null>`(
-        select ${priceBooks.name} from ${orderItems}
+        select coalesce(${orderItems.priceBookName}, ${priceBooks.name}) from ${orderItems}
         left join ${priceBooks} on ${orderItems.priceBookId} = ${priceBooks.id}
         where ${orderItems.orderId} = ${orders.id}
           and ${orderItems.storeId} = ${storeId}
-          and ${orderItems.priceBookId} is not null
+          and (${orderItems.priceBookName} is not null or ${orderItems.priceBookId} is not null)
         limit 1
       )`,
       sellerName: profiles.fullName,

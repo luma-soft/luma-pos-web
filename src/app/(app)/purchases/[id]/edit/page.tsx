@@ -22,6 +22,7 @@ export default async function EditPurchasePage({ params }: { params: Promise<{ i
 
   return (
     <PurchaseForm
+      canEditCompanyPrices={context.role === "owner" || context.role === "manager"}
       options={options}
       initialProducts={initialProducts}
       mode="edit"

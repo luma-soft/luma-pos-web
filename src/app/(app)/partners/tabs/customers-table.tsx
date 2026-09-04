@@ -1,6 +1,7 @@
 "use client";
 
 import { DateInput } from "@/components/ui/date-input";
+import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
@@ -59,7 +60,14 @@ type OrderPreview = {
   discount: string | number;
   tax: string | number;
   shippingFee: string | number;
-  items: Array<{ id: string; productName: string; unitName: string; quantity: string | number; unitPrice: string | number; discount: string | number; total: string | number }>;
+  items: Array<{
+    id: string; productName: string; unitName: string; quantity: string | number;
+    unitPrice: string | number; discount: string | number; total: string | number;
+    preDiscountUnitPrice?: string | number | null;
+    lineDiscountMode?: "pct" | "vnd" | null;
+    lineDiscountValue?: string | number | null;
+    priceBookName?: string | null;
+  }>;
   payments: Array<{ id: string; createdAt: string; method: string; amount: string | number; note: string | null }>;
 };
 
@@ -67,7 +75,8 @@ async function loadOrderPreview(orderId: string, signal: AbortSignal): Promise<O
   const response = await fetch(`/api/orders/${encodeURIComponent(orderId)}/preview`, { cache: "no-store", signal });
   const payload = await response.json();
   if (!response.ok || !payload.ok) throw new Error("errors.serverError");
-  return payload.data.order as OrderPreview;
+  const order = payload.data.order as OrderPreview;
+  return { ...order, items: order.items.map((item) => ({ ...item, ...readOrderLinePricing(item) })) };
 }
 
 function useOrderPreview() {
@@ -574,12 +583,12 @@ function OrderPreviewDialog({
             {order.items.map((item) => (
               <article key={item.id} className="space-y-2 p-3 text-sm">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 break-words font-medium">{item.productName}<div className="mt-0.5 text-xs text-slate-400">{item.unitName}</div></div>
+                  <div className="min-w-0 break-words font-medium">{item.productName}<div className="mt-0.5 text-xs text-slate-400">{item.unitName}{item.priceBookName && ` · ${item.priceBookName}`}</div></div>
                   <div className="shrink-0 font-semibold tabular-nums">{formatCurrency(Number(item.total))}</div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs text-slate-500">
                   <span>{Number(item.quantity).toLocaleString("vi-VN")} × {formatCurrency(Number(item.unitPrice))}</span>
-                  <span className="text-right">{t("orders.cols.discount")}: {Number(item.discount) > 0 ? formatCurrency(Number(item.discount)) : "—"}</span>
+                  <span className="text-right">{t("orders.cols.discount")}: {Number(item.discount) > 0 ? <>{item.lineDiscountMode === "pct" && `${Number(item.lineDiscountValue).toLocaleString("vi-VN")}% · `}{formatCurrency(Number(item.discount))}</> : "—"}</span>
                 </div>
               </article>
             ))}
@@ -598,10 +607,10 @@ function OrderPreviewDialog({
               <tbody className="divide-y divide-border-soft">
                 {order.items.map((item) => (
                   <tr key={item.id}>
-                    <td className="px-3 py-3 font-medium">{item.productName}<div className="text-xs text-slate-400">{item.unitName}</div></td>
+                    <td className="px-3 py-3 font-medium">{item.productName}<div className="text-xs text-slate-400">{item.unitName}{item.priceBookName && ` · ${item.priceBookName}`}</div></td>
                     <td className="px-3 py-3 text-right tabular-nums">{Number(item.quantity).toLocaleString("vi-VN")}</td>
                     <td className="px-3 py-3 text-right tabular-nums">{formatCurrency(Number(item.unitPrice))}</td>
-                    <td className="px-3 py-3 text-right tabular-nums text-slate-500">{Number(item.discount) > 0 ? formatCurrency(Number(item.discount)) : "—"}</td>
+                    <td className="px-3 py-3 text-right tabular-nums text-slate-500">{Number(item.discount) > 0 ? <>{item.lineDiscountMode === "pct" && <div>{Number(item.lineDiscountValue).toLocaleString("vi-VN")}%</div>}{formatCurrency(Number(item.discount))}</> : "—"}</td>
                     <td className="px-3 py-3 text-right tabular-nums font-semibold">{formatCurrency(Number(item.total))}</td>
                   </tr>
                 ))}

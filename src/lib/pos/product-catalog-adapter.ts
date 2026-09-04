@@ -44,6 +44,7 @@ export function catalogItemToPosProduct(
     // POS chỉ dùng giá vốn khi bảng giá nội bộ đã được server cho phép.
     costPrice: product.costPrice ?? "0",
     lastPurchasePrice: product.lastPurchasePrice ?? null,
+    lastPurchaseNetPrice: product.lastPurchaseNetPrice ?? null,
     retailPrice: product.retailPrice,
     wholesalePrice: product.wholesalePrice,
     contractorPrice: product.contractorPrice,

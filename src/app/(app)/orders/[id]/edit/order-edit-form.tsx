@@ -21,6 +21,11 @@ interface Line {
   unitMultiplier: number;
   quantity: number;
   unitPrice: number;
+  preDiscountUnitPrice?: number;
+  lineDiscount?: number;
+  lineDiscountMode?: "pct" | "vnd";
+  lineDiscountValue?: number;
+  priceBookId?: string | null;
 }
 
 interface Props {
@@ -54,7 +59,11 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
   const newRemaining = Math.max(0, total - initial.amountPaid);
 
   function patch(idx: number, p: Partial<Line>) {
-    setItems((ls) => ls.map((l, i) => (i === idx ? { ...l, ...p } : l)));
+    setItems((ls) => ls.map((l, i) => (i === idx ? {
+      ...l,
+      ...p,
+      ...(p.unitPrice == null ? {} : { preDiscountUnitPrice: p.unitPrice, lineDiscount: 0, lineDiscountMode: "vnd" as const, lineDiscountValue: 0 }),
+    } : l)));
   }
 
   function addProduct(id: string) {
@@ -77,7 +86,7 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
       note: note || undefined,
       discount,
       shippingFee,
-      items: items.filter((l) => l.quantity > 0),
+      items: items.filter((l) => l.quantity > 0).map((line) => ({ ...line, manualUnitPrice: line.preDiscountUnitPrice ?? line.unitPrice })),
     });
     setBusy(false);
     if (res.ok) router.push(Routes.salesOrder(orderId, "completed"));

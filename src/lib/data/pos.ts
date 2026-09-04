@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
+import { lastPurchaseNetPriceSql } from "@/lib/pricing/last-purchase-net-price";
 import { categories, customers, orderItems, orders, paymentBankAccounts, products, productComboItems, productPrices, productUnits, projects, promotions, stockLevels, warehouses } from "@/db/schema";
 import { isPromoActive, type PromoTier } from "@/lib/promo";
 import { getPriceBooks } from "@/lib/data/price-books";
@@ -61,6 +62,7 @@ function posProductSelect(
     // Không trả trực tiếp trường này ra client.
     costPrice: products.costPrice,
     lastPurchasePrice: products.lastPurchasePrice,
+    lastPurchaseNetPrice: lastPurchaseNetPriceSql(storeId),
     retailPrice: products.retailPrice,
     wholesalePrice: products.wholesalePrice,
     contractorPrice: products.contractorPrice,
@@ -386,5 +388,5 @@ export async function searchPosProductRows(
 }
 
 export type PosData = Awaited<ReturnType<typeof getPosData>>;
-export type PosProduct = PosData["products"][number] & { priceBookTypes?: Record<string, "retail" | "cost" | "purchase" | null> };
+export type PosProduct = PosData["products"][number] & { priceBookTypes?: Record<string, "retail" | "cost" | "purchase" | "list" | null> };
 export type PosCustomer = PosData["customers"][number];
