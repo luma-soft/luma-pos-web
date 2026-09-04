@@ -108,4 +108,14 @@ describe("pricing table sources and editing", () => {
     expect(tableProps.columns.slice(1, 5).every((column) => column.required && column.defaultVisible)).toBe(true);
     expect(tableProps.columns[5].required).toBe(false);
   });
+
+  test("uses the toolbar book picker without reserving an empty column at the right edge", () => {
+    const html = renderToStaticMarkup(createElement(PricingTable, {
+      books, rows: [row], total: 1, canViewPurchasePrices: true,
+    }));
+    expect(html).toContain('aria-haspopup="menu"');
+    expect(tableProps.showColumnMenu).toBe(false);
+    const dataWidth = tableProps.columns.reduce((sum, column) => sum + parseInt(column.width, 10), 0);
+    expect(tableProps.minWidth).toBe(`${dataWidth}px`);
+  });
 });

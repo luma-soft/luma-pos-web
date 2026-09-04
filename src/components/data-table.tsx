@@ -190,6 +190,7 @@ export function DataTableShell<T>({
   onRowClick,
   toolbar,
   toolbarFloating = false,
+  showColumnMenu = true,
   visibleColumnKeys,
   onColumnVisibilityChange,
   maxHeight = "calc(100dvh - 250px)",
@@ -226,6 +227,8 @@ export function DataTableShell<T>({
   toolbar?: ReactNode;
   /** Đặt toolbar ở góc trên bảng mà không chiếm chiều cao dòng (desktop). */
   toolbarFloating?: boolean;
+  /** Tắt menu mặc định khi màn hình đã có bộ chọn cột riêng trên toolbar. */
+  showColumnMenu?: boolean;
   /** Điều khiển hiển thị cột từ UI bên ngoài bảng (ví dụ chip bảng giá). */
   visibleColumnKeys?: Set<string>;
   /** Đồng bộ thay đổi từ menu chọn cột về UI bên ngoài. */
@@ -309,6 +312,7 @@ export function DataTableShell<T>({
 
   const visibleKeys = visibleColumnKeys ?? storedVisible ?? defaultVisible;
   const visibleColumns = columns.filter((column) => column.required || visibleKeys.has(column.key));
+  const hasUtilityColumn = showColumnMenu || Boolean(renderExpanded);
   const displayRows = useMemo(() => {
     if (!sort) return rows;
     const column = columns.find((item) => item.key === sort.key);
@@ -450,7 +454,7 @@ export function DataTableShell<T>({
                 {visibleColumns.map((column) => (
                   <col key={column.key} style={column.width ? { width: column.width } : undefined} />
                 ))}
-                <col style={{ width: "44px" }} />
+                {hasUtilityColumn && <col style={{ width: "44px" }} />}
               </colgroup>
               <thead>
                 <tr className="bg-canvas text-left text-xs font-semibold text-slate-500 dark:text-slate-300">
@@ -524,7 +528,7 @@ export function DataTableShell<T>({
                       </th>
                     );
                   })}
-                  <th className="sticky right-0 top-0 z-20 bg-canvas px-2 py-2 text-right shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.35)]">{columnVisibilityMenu}</th>
+                  {hasUtilityColumn && <th className="sticky right-0 top-0 z-20 bg-canvas px-2 py-2 text-right shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.35)]">{showColumnMenu && columnVisibilityMenu}</th>}
                 </tr>
               </thead>
               <tbody>
@@ -534,7 +538,7 @@ export function DataTableShell<T>({
                       const cell = summaryCells.find((item) => item.key === column.key);
                       return <td key={column.key} className={cn("px-3 py-3", cell?.className)}>{cell?.content}</td>;
                     })}
-                    <td className="sticky right-0 z-10 bg-surface px-3 py-3" />
+                    {hasUtilityColumn && <td className="sticky right-0 z-10 bg-surface px-3 py-3" />}
                   </tr>
                 )}
                 {displayRows.map((row) => {
@@ -572,15 +576,15 @@ export function DataTableShell<T>({
                             </td>
                           );
                         })}
-                        <td className="sticky right-0 z-10 bg-surface px-3 py-3 text-right shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.25)]">
+                        {hasUtilityColumn && <td className="sticky right-0 z-10 bg-surface px-3 py-3 text-right shadow-[-6px_0_10px_-10px_rgba(15,23,42,0.25)]">
                           {expandable && (
                             <ChevronDown className={cn("ml-auto h-4 w-4 text-slate-400 transition-transform", expanded && "rotate-180")} />
                           )}
-                        </td>
+                        </td>}
                       </tr>
                       {expanded && renderExpanded && (
                         <tr className="border-t border-border-soft">
-                          <td colSpan={visibleColumns.length + 1} className="p-0">
+                          <td colSpan={visibleColumns.length + (hasUtilityColumn ? 1 : 0)} className="p-0">
                             {renderExpanded(row)}
                           </td>
                         </tr>

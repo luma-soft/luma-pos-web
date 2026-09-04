@@ -547,10 +547,11 @@ export function PricingTable({ books: initialBooks, rows: initialRows, total, re
         tableId="inventory.pricing"
         rows={rows}
         columns={columns}
+        showColumnMenu={false}
         visibleColumnKeys={visibleColumnKeys}
         onColumnVisibilityChange={setVisibleColumnKeys}
         getRowId={(row) => row.id}
-        minWidth={`${Math.max(640, 324 + visibleBooks.reduce((sum, book) => sum + priceColumnWidth(book), 0))}px`}
+        minWidth={`${Math.max(640, 280 + visibleBooks.reduce((sum, book) => sum + priceColumnWidth(book), 0))}px`}
         maxHeight="calc(100dvh - 340px)"
         fillHeight
         resetScrollKey={resetScrollKey}
