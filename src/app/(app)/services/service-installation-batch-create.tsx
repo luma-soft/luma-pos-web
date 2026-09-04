@@ -338,7 +338,7 @@ export function ServiceInstallationBatchCreate({
                         }
                       }}
                       className={cn(
-                        "grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border px-3 py-3 text-left sm:grid-cols-[minmax(0,1fr)_132px_150px_auto]",
+                        "grid w-full grid-cols-[minmax(0,1fr)_40px] items-center gap-3 rounded-xl border px-3 py-3 text-left sm:grid-cols-[minmax(0,1fr)_132px_150px_auto]",
                         activeDraft?.clientDraftId === draft.clientDraftId
                           ? "border-primary-300 bg-primary-50/50 dark:border-primary-700 dark:bg-primary-950/30"
                           : "border-border-soft hover:bg-surface-2",
@@ -362,13 +362,13 @@ export function ServiceInstallationBatchCreate({
                         "hidden rounded-lg px-2.5 py-1.5 text-center text-xs font-semibold sm:block",
                         draft.tracking === "asset" ? "bg-primary-50 text-primary-800" : "bg-amber-50 text-amber-700",
                       )}>{draft.tracking === "asset" ? "Thiết bị theo dõi" : "Vật tư tiêu hao"}</span>
-                      <span className="flex items-center justify-end gap-2">
-                        <span className="text-xs font-semibold sm:hidden">{draft.quantity} {draft.unitName}</span>
+                      <span className="contents sm:flex sm:items-center sm:justify-end sm:gap-2">
+                        <span className="col-span-2 row-start-2 text-right text-xs font-semibold [overflow-wrap:anywhere] sm:hidden">{draft.quantity} {draft.unitName}</span>
                         <button
                           type="button"
                           aria-label={`Xóa ${draft.product.name}`}
                           onClick={(event) => { event.stopPropagation(); removeDraft(draft.clientDraftId); }}
-                          className="grid h-10 w-10 place-items-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600"
+                          className="col-start-2 row-start-1 grid h-10 w-10 place-items-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 sm:col-auto sm:row-auto"
                         ><Trash2 className="h-4 w-4" /></button>
                       </span>
                     </div>

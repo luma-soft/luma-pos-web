@@ -143,13 +143,13 @@ export function PortalClient({ token, customerName, customerType, products }: Pr
                 const p = byId.get(id);
                 if (!p) return null;
                 return (
-                  <div key={id} className="py-2 flex items-center gap-2 text-sm">
-                    <div className="min-w-0 flex-1">
+                  <div key={id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 py-2 text-sm">
+                    <div className="min-w-0">
                       <div className="font-medium truncate">{p.name}</div>
-                      <div className="text-xs text-slate-400">{q} {p.baseUnit} × {formatCurrency(p.price)}</div>
+                      <div className="text-xs text-slate-400 [overflow-wrap:anywhere]">{q} {p.baseUnit} × {formatCurrency(p.price)}</div>
                     </div>
-                    <span className="tabular-nums font-medium">{formatCurrency(p.price * q)}</span>
-                    <button onClick={() => setQty(id, 0)} className="text-slate-300 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
+                    <span className="col-span-2 row-start-2 text-right tabular-nums font-medium [overflow-wrap:anywhere]">{formatCurrency(p.price * q)}</span>
+                    <button onClick={() => setQty(id, 0)} className="col-start-2 row-start-1 text-slate-300 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
                   </div>
                 );
               })}

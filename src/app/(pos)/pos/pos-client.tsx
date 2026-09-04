@@ -1687,23 +1687,23 @@ export function PosClient({
                     inputClassName={cn(stockInsufficient && "border-er text-er")}
                   />
                 </div>
-                <div className="mt-3 flex items-center justify-between gap-3">
-                  <div className="flex flex-col items-start gap-1">
+                <div className="mt-3 grid grid-cols-2 items-center gap-3">
+                  <div className="flex min-w-0 flex-col items-start gap-1">
                     <button
                       type="button"
                       disabled={isCameraQuoteDraft}
                       onClick={() => setEditKey(editKey === l.key ? null : l.key)}
-                      className="flex min-h-11 items-center text-sm tabular-nums text-slate-500 hover:text-primary-600"
+                      className="flex min-h-11 w-full min-w-0 items-center text-left text-sm tabular-nums text-slate-500 hover:text-primary-600 [overflow-wrap:anywhere]"
                     >
                       {formatCurrency(eff.price)}{posUnitSuffix(l.unitName)}
                     </button>
                     {linePriceBookName && (
-                      <span className="rounded bg-sky-50 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700 dark:bg-sky-950/40 dark:text-sky-300">
+                      <span className="max-w-full rounded bg-sky-50 px-1.5 py-0.5 text-[11px] font-semibold text-sky-700 [overflow-wrap:anywhere] dark:bg-sky-950/40 dark:text-sky-300">
                         {linePriceBookName}
                       </span>
                     )}
                   </div>
-                  <span className="text-base font-bold tabular-nums">{formatCurrency(eff.price * l.quantity)}</span>
+                  <span className="min-w-0 text-right text-base font-bold tabular-nums [overflow-wrap:anywhere]">{formatCurrency(eff.price * l.quantity)}</span>
                 </div>
                 <textarea
                   rows={1}

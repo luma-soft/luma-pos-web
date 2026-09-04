@@ -678,13 +678,23 @@ export function CameraPriceListClient({
           ))}
         </section>
         <section className="mt-4 hidden overflow-x-auto border border-slate-300 md:block">
-          <table className="w-full min-w-[1080px] border-collapse text-left text-sm">
+          <table
+            className="w-full table-fixed border-collapse text-left text-sm [overflow-wrap:anywhere]"
+            style={{ minWidth: Math.max(1080, 640 + 144 * memoryLabels.length) }}
+          >
+            <colgroup>
+              <col className="w-14" />
+              <col className="w-72" />
+              <col />
+              {memoryLabels.map((label) => <col key={label} className="w-36" />)}
+              <col className="w-24" />
+            </colgroup>
             <thead className="bg-[#0b7b74] text-white">
               <tr>
-                <th className="w-14 border-r border-white/40 px-3 py-3 text-center">
+                <th className="border-r border-white/40 px-3 py-3 text-center">
                   Gói
                 </th>
-                <th className="w-[28%] border-r border-white/40 px-3 py-3">
+                <th className="border-r border-white/40 px-3 py-3">
                   Model camera
                 </th>
                 <th className="border-r border-white/40 px-3 py-3">
@@ -693,12 +703,12 @@ export function CameraPriceListClient({
                 {memoryLabels.map((label) => (
                   <th
                     key={label}
-                    className="w-36 border-r border-white/40 px-3 py-3 text-right"
+                    className="border-r border-white/40 px-3 py-3 text-right"
                   >
                     {label}
                   </th>
                 ))}
-                <th className="w-24" />
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -734,10 +744,10 @@ export function CameraPriceListClient({
                                 event.stopPropagation();
                                 openPriceEditor(item, variant, label, "price");
                               }}
-                              className="group flex h-16 w-full items-center justify-end gap-2 px-3 py-3 text-right font-extrabold transition hover:bg-teal-100/70 focus-visible:outline-2 focus-visible:outline-[#0b7b74]"
+                              className="group flex min-h-16 w-full min-w-0 items-center justify-end gap-2 px-3 py-3 text-right font-extrabold transition hover:bg-teal-100/70 focus-visible:outline-2 focus-visible:outline-[#0b7b74]"
                               aria-label={`Sửa giá ${item.model} · ${label}`}
                             >
-                              <span>{formatCurrency(variant.price)}</span>
+                              <span className="min-w-0">{formatCurrency(variant.price)}</span>
                               <Edit3 className="h-3.5 w-3.5 shrink-0 text-slate-400 transition group-hover:text-[#0b7b74]" />
                             </button>
                           ) : (
@@ -913,7 +923,11 @@ export function CameraPriceListClient({
                       </div>
                     ))}
                   </div>
-                  <table className="mt-6 hidden w-full border-collapse text-sm sm:table">
+                  <table className="mt-6 hidden w-full table-fixed border-collapse text-sm [overflow-wrap:anywhere] sm:table">
+                    <colgroup>
+                      <col className="w-40" />
+                      {item.variants.map((variant) => <col key={variant.id} />)}
+                    </colgroup>
                     <thead className="bg-[#07817a] text-white">
                       <tr>
                         <th className="border border-white/40 px-3 py-2 text-left">
@@ -947,13 +961,13 @@ export function CameraPriceListClient({
                               : "bg-white"
                           }
                         >
-                          <td className="whitespace-nowrap border border-slate-300 px-3 py-2">
+                          <td className="border border-slate-300 px-3 py-2">
                             {label}
                           </td>
                           {item.variants.map((variant, variantIndex) => (
                             <td
                               key={variant.id}
-                              className="whitespace-nowrap border border-slate-300 px-3 py-2 text-right"
+                              className="border border-slate-300 px-3 py-2 text-right"
                             >
                               <span>{formatCurrency(variant[key])}</span>
                               {canEdit && (

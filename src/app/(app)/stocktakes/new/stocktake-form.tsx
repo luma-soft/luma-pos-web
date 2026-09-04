@@ -303,15 +303,23 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                 })}
               </div>
               <div className="hidden overflow-x-auto lg:block">
-                <table className="w-full min-w-210 text-sm">
+                <table className="w-full min-w-[920px] table-fixed text-sm">
+                <colgroup>
+                  <col />
+                  <col className="w-24" />
+                  <col className="w-36" />
+                  <col className="w-28" />
+                  <col className="w-48" />
+                  <col className="w-16" />
+                </colgroup>
                 <thead>
                   <tr className="border-b border-border-soft bg-canvas text-left text-[11px] text-slate-500">
                     <th className="px-4 py-3 font-semibold">{t("orders.cols.product")}</th>
                     <th className="px-4 py-3 font-semibold text-right">{t("stocktakes.cols.systemQty")}</th>
-                    <th className="w-36 px-4 py-3 font-semibold text-right">{t("stocktakes.cols.actualQty")}</th>
+                    <th className="px-4 py-3 font-semibold text-right">{t("stocktakes.cols.actualQty")}</th>
                     <th className="px-4 py-3 font-semibold text-right">{t("stocktakes.cols.diff")}</th>
                     <th className="px-4 py-3 font-semibold text-right">{t("stocktakes.cols.diffValue")}</th>
-                    <th className="w-12"></th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border-soft">
@@ -319,11 +327,11 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                     const diff = l.actualQty - l.product.stock;
                     return (
                       <tr key={l.product.id} className="transition hover:bg-surface-2/70">
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 [overflow-wrap:anywhere]">
                           <div className="font-semibold">{l.product.name}</div>
                           <div className="font-mono text-xs text-slate-400">{l.product.sku} · {l.product.baseUnit}</div>
                         </td>
-                        <td className="px-4 py-3 text-right tabular-nums text-slate-500">{formatNumber(l.product.stock)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-slate-500 [overflow-wrap:anywhere]">{formatNumber(l.product.stock)}</td>
                         <td className="px-4 py-3 text-right">
                           <QuantityInput
                             min={0}
@@ -333,10 +341,10 @@ export function StocktakeForm({ activeWarehouseId, warehouses }: { activeWarehou
                             className="ml-auto w-28"
                           />
                         </td>
-                        <td className={cn("px-4 py-3 text-right tabular-nums font-semibold", diff > 0 ? "text-ok" : diff < 0 ? "text-er" : "text-slate-400")}>
+                        <td className={cn("px-4 py-3 text-right tabular-nums font-semibold [overflow-wrap:anywhere]", diff > 0 ? "text-ok" : diff < 0 ? "text-er" : "text-slate-400")}>
                           {Math.abs(diff) < 1e-9 ? <Check className="inline h-4 w-4 text-ok" /> : `${diff > 0 ? "+" : ""}${formatNumber(diff)}`}
                         </td>
-                        <td className={cn("px-4 py-3 text-right tabular-nums", diff !== 0 ? (diff > 0 ? "text-ok" : "text-er") : "text-slate-400")}>
+                        <td className={cn("px-4 py-3 text-right tabular-nums [overflow-wrap:anywhere]", diff !== 0 ? (diff > 0 ? "text-ok" : "text-er") : "text-slate-400")}>
                           {diff !== 0 ? formatCurrency(diff * l.product.costPrice) : "—"}
                         </td>
                         <td className="px-4 py-3">

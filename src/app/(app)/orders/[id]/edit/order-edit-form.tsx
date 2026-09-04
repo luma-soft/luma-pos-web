@@ -122,22 +122,30 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
           ))}
         </div>
         <div className="hidden overflow-x-auto lg:block">
-          <table data-testid="order-edit-desktop-table" className="w-full min-w-[760px] text-sm">
+          <table data-testid="order-edit-desktop-table" className="w-full min-w-[840px] table-fixed text-sm">
+            <colgroup>
+              <col />
+              <col className="w-20" />
+              <col className="w-36" />
+              <col className="w-40" />
+              <col className="w-44" />
+              <col className="w-12" />
+            </colgroup>
             <thead>
               <tr className="bg-canvas text-left text-xs uppercase text-slate-500">
                 <th className="px-4 py-3 font-semibold">{t("orders.cols.product")}</th>
                 <th className="px-4 py-3 font-semibold">{t("orders.cols.unit")}</th>
-                <th className="px-4 py-3 font-semibold text-right w-28">{t("orders.cols.qty")}</th>
-                <th className="px-4 py-3 font-semibold text-right w-36">{t("orders.cols.unitPrice")}</th>
+                <th className="px-4 py-3 font-semibold text-right">{t("orders.cols.qty")}</th>
+                <th className="px-4 py-3 font-semibold text-right">{t("orders.cols.unitPrice")}</th>
                 <th className="px-4 py-3 font-semibold text-right">{t("orders.cols.lineTotal")}</th>
-                <th className="w-10"></th>
+                <th></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-soft">
             {items.map((l, idx) => (
               <tr key={`${l.productId}-${idx}`}>
-                <td className="px-4 py-2.5 font-medium">{l.productName}</td>
-                <td className="px-4 py-2.5 text-slate-500">{l.unitName}</td>
+                <td className="px-4 py-2.5 font-medium [overflow-wrap:anywhere]">{l.productName}</td>
+                <td className="px-4 py-2.5 text-slate-500 [overflow-wrap:anywhere]">{l.unitName}</td>
                 <td className="px-4 py-2.5 text-right">
                   <QuantityInput
                     min={0}
@@ -150,9 +158,9 @@ export function OrderEditForm({ orderId, orderCode, initial }: Props) {
                 <td className="px-4 py-2.5 text-right">
                   <MoneyInput value={l.unitPrice}
                     onChange={(v) => patch(idx, { unitPrice: v ?? 0 })}
-                    className={cn(inputCls, "w-32 text-right")} />
+                    className={cn(inputCls, "w-full text-right")} />
                 </td>
-                <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatCurrency(l.quantity * l.unitPrice)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums font-medium [overflow-wrap:anywhere]">{formatCurrency(l.quantity * l.unitPrice)}</td>
                 <td className="px-4 py-2.5">
                   <button onClick={() => setItems((ls) => ls.filter((_, i) => i !== idx))} className="inline-flex min-h-11 min-w-11 items-center justify-center text-slate-400 hover:text-red-500 lg:min-h-0 lg:min-w-0">
                     <Trash2 className="w-4 h-4" />

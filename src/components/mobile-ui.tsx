@@ -61,12 +61,12 @@ export function MobileRecordField({ label, value, tone = "neutral", className }:
 export function MobileFormLineCard({ title, subtitle, amount, children, actions }: MobileFormLineCardProps) {
   return (
     <section className="rounded-2xl border border-border bg-surface p-3 shadow-e1 lg:hidden">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
+      <div className="grid min-w-0 grid-cols-1 gap-2">
+        <div className="min-w-0">
           <h3 className="truncate text-sm font-black">{title}</h3>
           {subtitle != null && <p className="mt-0.5 truncate text-xs font-medium text-slate-400">{subtitle}</p>}
         </div>
-        {amount != null && <div className="shrink-0 text-right text-sm font-black tabular-nums">{amount}</div>}
+        {amount != null && <div className="min-w-0 text-right text-sm font-black tabular-nums [overflow-wrap:anywhere]">{amount}</div>}
       </div>
       <div className="mt-3">{children}</div>
       {actions != null && <div className="mt-3 flex min-h-11 items-center gap-2 border-t border-border-soft pt-2">{actions}</div>}
