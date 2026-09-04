@@ -29,6 +29,19 @@ Chiết khấu làm tròn trên mỗi đơn vị trước khi nhân số lượn
 
 Đơn mới lưu giá trước giảm, loại/giá trị chiết khấu đã nhập, tổng tiền giảm của dòng, giá sau giảm, tên/ID bảng giá. Chiết khấu dòng `discount` là **tổng dòng**, `unit_price` vẫn là giá **sau giảm** để giữ tương thích tổng tiền. Xem lại, sửa/sao chép và in dùng các giá trị đã lưu. Dữ liệu cũ không bị suy diễn tỷ lệ chiết khấu; bộ đọc dùng tổng tiền đã ghi để tránh trừ giảm hai lần.
 
+## Sửa sản phẩm có nhiều đơn vị
+
+Web và mobile giữ ID đơn vị, hệ số thập phân và giá riêng khi sửa thông tin sản phẩm. `priceOverride: null` nghĩa là quy đổi từ Giá chung; `0` là giá riêng hợp lệ. Client cũ bỏ qua trường giá riêng không được xóa giá đã có. Tiền lưu tối đa 2 số lẻ, hệ số 4 số lẻ; bản xem trước và dữ liệu gửi lưu dùng cùng độ chính xác.
+
+Form hiển thị giá gốc cùng tên đơn vị; đơn vị bổ sung có giá riêng hoặc giá quy đổi. Khi bấm **Lưu** một SKU hiện có, thay đổi giá/hệ số/đơn vị sẽ mở xác nhận trước/sau; sửa tên, mô tả hoặc mã vạch không bật xác nhận giá. Web dùng dialog, mobile dùng Luma modal sheet. Hủy xác nhận không gửi cập nhật.
+
+- **Giữ giá riêng** (mặc định): giữ giá đã nhập, gồm giá riêng bằng 0; đơn vị không có giá riêng tiếp tục theo giá gốc.
+- **Đồng bộ theo tỷ lệ**: chọn đơn vị làm nguồn. Giá gốc = giá nguồn / hệ số, làm tròn 2 số lẻ; xóa giá riêng của các đơn vị về `null`, giá quy đổi làm tròn đến đồng. Nếu nhiều giá vừa sửa không cùng tỷ lệ, phải chọn rõ nguồn trước khi xác nhận.
+- Chỉ đổi giá vốn hoặc bảng riêng: xem trước ảnh hưởng của bảng đó, không đề nghị xóa giá riêng của Giá chung. Đồng bộ Giá chung không ghi lại giá gốc của các bảng khác; giá đơn vị thuộc bảng tự tạo vẫn theo chính sách tỷ lệ hiện có và được xem trước nếu thay đổi.
+- Không tự lan giá sang SKU khác. Luồng sửa nhóm biến thể giữ quy tắc riêng. Nếu người dùng đã chọn áp dụng giá/đơn vị cho sản phẩm cùng loại, web cảnh báo phạm vi đó; bảng xem trước chỉ đại diện SKU đang sửa.
+
+Mobile POS đọc giá riêng theo cùng chính sách web. Đổi đơn vị/bảng giá lấy giá hiện hành; chỉ sửa số lượng/chiết khấu của dòng đã lưu giữ giá và hệ số lịch sử. Đơn giá nhập tay thuộc đơn vị đang bán, không bị nhân hệ số hai lần.
+
 ## Migration và kiểm tra
 
 `0129_four_price_books.sql` đã áp dụng bằng migration runner có tracking/session lock. Giữ ID bảng nhập nội bộ cũ; tạo ID mới cho bảng công ty và lưu tên bảng cũ trên các dòng đơn lịch sử trước khi đổi tên. Không sửa giá trị sản phẩm hoặc tổng chứng từ. Catalog web tăng schema version để bỏ giá nhập gross đã cache dưới loại purchase cũ.

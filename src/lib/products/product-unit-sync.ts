@@ -61,7 +61,6 @@ export async function syncProductUnits(
   for (const [index, unit] of validUnits.entries()) {
     const unitName = unit.unitName.trim();
     const barcode = unit.barcode?.trim() || null;
-    const priceOverride = unit.priceOverride ?? null;
     let current = unit.id ? existingById.get(unit.id) : undefined;
 
     if (unit.id && (!current || !remainingIds.has(unit.id))) {
@@ -73,6 +72,14 @@ export async function syncProductUnits(
           remainingIds.has(candidate.id) && candidate.unitName === unitName,
       );
     }
+
+    // Legacy metadata-only clients may omit the price. Only an explicit null
+    // opts an existing unit back into linked pricing; zero is a fixed price.
+    const priceOverride = unit.priceOverride !== undefined
+      ? unit.priceOverride
+      : current?.priceOverride != null
+        ? Number(current.priceOverride)
+        : null;
 
     if (!current) {
       await tx.insert(productUnits).values({

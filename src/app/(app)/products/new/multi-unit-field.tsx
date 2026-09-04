@@ -12,6 +12,7 @@ export function MultiUnitField() {
   const { control, register, watch, setValue } =
     useFormContext<CreateProductInput>();
   const baseUnit = watch("baseUnit") || "cái";
+  const retailPrice = watch("retailPrice") ?? 0;
   const { fields, append, remove } = useFieldArray({
     control,
     name: "units",
@@ -47,7 +48,7 @@ export function MultiUnitField() {
                 className="min-w-0"
                 hint={t("products.units.multiplierHint", {
                   unit: watch(`units.${idx}.unitName`) || "?",
-                  count: formatNumber(watch(`units.${idx}.multiplier`) || 1),
+                  count: new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 4 }).format(watch(`units.${idx}.multiplier`) || 1),
                   base: baseUnit,
                 })}
               >
@@ -56,7 +57,7 @@ export function MultiUnitField() {
                   onChange={(v) => setValue(`units.${idx}.multiplier`, v ?? 1)}
                   min={0}
                   decimals={4}
-                  thousandSeparator={false}
+                  aria-label={`Hệ số quy đổi ${watch(`units.${idx}.unitName`) || "đơn vị"}`}
                 />
               </Field>
 
@@ -71,9 +72,18 @@ export function MultiUnitField() {
                 <NumberInput
                   value={watch(`units.${idx}.priceOverride`) ?? null}
                   onChange={(v) => setValue(`units.${idx}.priceOverride`, v)}
-                  suffix="đ"
+                  suffix={`đ/${watch(`units.${idx}.unitName`) || "đơn vị"}`}
+                  decimals={2}
+                  aria-label={`Giá riêng mỗi ${watch(`units.${idx}.unitName`) || "đơn vị"}`}
+                  placeholder={formatNumber(Math.round(retailPrice * (watch(`units.${idx}.multiplier`) || 1)))}
                   min={0}
                 />
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  {watch(`units.${idx}.priceOverride`) == null
+                    ? `Quy đổi: ${formatNumber(Math.round(retailPrice * (watch(`units.${idx}.multiplier`) || 1)))} đ/${watch(`units.${idx}.unitName`) || "đơn vị"}`
+                    : "Giá riêng · Không tự đổi theo giá gốc"}
+                </p>
+                <p className="text-xs leading-5 text-slate-500">Để trống để dùng giá quy đổi.</p>
               </Field>
 
               <Button

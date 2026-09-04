@@ -3,7 +3,7 @@
 import { isPriceBookReadOnly } from "@/lib/pricing/system-price-books";
 
 import { Checkbox } from "@/components/ui/checkbox";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   useForm,
@@ -43,6 +43,8 @@ import {
   type CreateProductOutput,
 } from "./schema";
 import { MultiUnitField } from "./multi-unit-field";
+import { UnitPriceConfirmation } from "./unit-price-confirmation";
+import { buildUnitPriceReview, normalizeUnitPriceDraft, type UnitPricingSnapshot, type UnitPriceBook } from "@/lib/products/unit-price-edit";
 import { AttributesField } from "./attributes-field";
 import { VariantChildrenField } from "./variant-children-field";
 import { normalizeVariantAttributes } from "@/lib/products/variant-model";
@@ -192,6 +194,40 @@ export function NewProductForm({
       attributes: preparedAttributes,
     },
   });
+  const initialPricing = useRef<UnitPricingSnapshot>({
+    baseUnit: form.getValues("baseUnit") ?? "cái",
+    retailPrice: form.getValues("retailPrice") ?? 0,
+    costPrice: form.getValues("costPrice") ?? 0,
+    priceBookPrices: { ...form.getValues("priceBookPrices") },
+    // RHF mutates nested field values in place. The comparison baseline must
+    // not share unit objects with the editable form.
+    units: (form.getValues("units") ?? []).map((unit) => ({ ...unit })),
+  });
+  const [pendingPriceEdit, setPendingPriceEdit] = useState<CreateProductOutput | null>(null);
+  const priceEditResolver = useRef<((value: CreateProductOutput | null) => void) | null>(null);
+  const submitting = useRef(false);
+  const submitFocus = useRef<HTMLElement | null>(null);
+  const restoreSubmitFocus = useRef(false);
+  const reviewBooks: UnitPriceBook[] = priceBooks.filter((book) => !book.isDefault && !isPriceBookReadOnly(book)).map((book) => ({
+    key: book.id, label: book.name, kind: book.systemType === "list" ? "list" : "custom",
+  }));
+  const resolvePriceEdit = useCallback((value: CreateProductOutput | null) => {
+    const resolve = priceEditResolver.current;
+    priceEditResolver.current = null;
+    setPendingPriceEdit(null);
+    resolve?.(value);
+  }, []);
+  const cancelPriceEdit = useCallback(() => {
+    restoreSubmitFocus.current = true;
+    resolvePriceEdit(null);
+  }, [resolvePriceEdit]);
+  useEffect(() => () => { priceEditResolver.current?.(null); priceEditResolver.current = null; }, []);
+  useEffect(() => {
+    if (!form.formState.isSubmitting && restoreSubmitFocus.current) {
+      restoreSubmitFocus.current = false;
+      submitFocus.current?.focus();
+    }
+  }, [form.formState.isSubmitting]);
 
   useEffect(() => {
     if (!aiPreview) return;
@@ -226,6 +262,32 @@ export function NewProductForm({
   }, [aiPreview, categories, form, isEdit, productId, storageScope]);
 
   async function onSubmit(values: CreateProductOutput) {
+    if (submitting.current) return;
+    submitting.current = true;
+    try {
+      try {
+        values = normalizeUnitPriceDraft(values);
+      } catch (error) {
+        form.setError("root", { message: error instanceof Error ? error.message : "errors.invalidData" });
+        return;
+      }
+      // Group/variant edits retain their explicit SKU workflow; never propagate
+      // a single unit price across different products here.
+      if (isEdit && !values.variantGroupId && values.variantChildren.length === 0 && buildUnitPriceReview(initialPricing.current, values, reviewBooks).required) {
+        const accepted = await new Promise<CreateProductOutput | null>((resolve) => {
+          priceEditResolver.current = resolve;
+          setPendingPriceEdit(values);
+        });
+        if (!accepted) return;
+        values = accepted;
+      }
+      await saveValues(values);
+    } finally {
+      submitting.current = false;
+    }
+  }
+
+  async function saveValues(values: CreateProductOutput) {
     if (values.variantGroupId || values.variantChildren.length > 0) {
       const result = await saveProductVariantGroup(values);
       if (!result.ok) { form.setError("root", { message: result.error }); return; }
@@ -329,6 +391,10 @@ export function NewProductForm({
     <Form
       form={form}
       onSubmit={onSubmit}
+      onSubmitCapture={(event) => {
+        const trigger = (event.nativeEvent as SubmitEvent).submitter;
+        submitFocus.current = trigger instanceof HTMLElement ? trigger : document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      }}
       className={cn(
         "flex flex-col space-y-0",
         isModal
@@ -463,6 +529,9 @@ export function NewProductForm({
           />
         </footer>
       )}
+      {pendingPriceEdit && <UnitPriceConfirmation name={pendingPriceEdit.name} before={initialPricing.current} draft={pendingPriceEdit} books={reviewBooks}
+        siblingScope={pendingPriceEdit.applyToSiblings.enabled ? { count: siblingCount, pricing: pendingPriceEdit.applyToSiblings.fields.includes("pricing"), units: pendingPriceEdit.applyToSiblings.fields.includes("units") } : undefined}
+        onCancel={cancelPriceEdit} onConfirm={resolvePriceEdit} />}
     </Form>
   );
 }
@@ -512,6 +581,7 @@ function FormActions({
         <Button
           type="submit"
           variant="secondary"
+          disabled={loading}
           onClick={() => onIntent("sameType")}
           tx="products.saveAndCreateSameType"
           className={align === "footer" ? "order-3 col-span-2 w-full sm:order-none sm:w-auto" : undefined}
@@ -1257,6 +1327,9 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
   const t = useTranslations();
   const { setValue, watch } = useFormCtx();
   const isCombo = watch("productKind") === "combo";
+  const baseUnit = watch("baseUnit") || "cái";
+  const units = (watch("units") ?? []).filter((unit) => !(unit.unitName === baseUnit && unit.multiplier === 1));
+  const retailPrice = watch("retailPrice") ?? 0;
   const priceBookPrices = watch("priceBookPrices") ?? {};
   const [open, setOpen] = useState(false);
   const [draftOverrides, setDraftOverrides] =
@@ -1287,7 +1360,9 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
           <NumberInput
             value={watch("costPrice")}
             onChange={(v) => setValue("costPrice", v ?? 0)}
-            suffix="đ"
+            suffix={`đ/${baseUnit}`}
+            decimals={2}
+            aria-label={`Giá vốn mỗi ${baseUnit}`}
             min={0}
             readOnly={isCombo}
             className={cn(isCombo && "bg-surface-2 text-slate-600")}
@@ -1297,7 +1372,9 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
           <NumberInput
             value={watch("retailPrice")}
             onChange={(v) => setValue("retailPrice", v ?? 0)}
-            suffix="đ"
+            suffix={`đ/${baseUnit}`}
+            decimals={2}
+            aria-label={`Giá bán mỗi ${baseUnit}`}
             min={0}
           />
         </Field>
@@ -1311,6 +1388,16 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
           {t("products.pricing.setupPriceBooks")}
         </button>
       </div>
+
+      {units.length > 0 && <div className="mt-3 border-t border-border-soft pt-3 text-sm" aria-label="Giá bán theo đơn vị">
+        <p className="mb-2 font-medium">Giá bán theo đơn vị</p>
+        <ul className="space-y-2">{units.map((unit, index) => <li key={unit.id ?? index} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <span className="text-slate-500">1 {unit.unitName || "đơn vị"} = {new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 4 }).format(unit.multiplier)} {baseUnit}</span>
+          <span><span className="font-semibold tabular-nums">{new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(unit.priceOverride ?? Math.round(retailPrice * unit.multiplier))} đ/{unit.unitName || "đơn vị"}</span>
+            <span className="ml-2 text-xs text-slate-500">{unit.priceOverride == null ? "Quy đổi" : "Giá riêng"}</span></span>
+        </li>)}</ul>
+        <p className="mt-2 text-xs text-slate-500">Sửa giá riêng tại Đơn vị &amp; thuộc tính. Thay đổi giá sẽ được xác nhận trước khi lưu.</p>
+      </div>}
 
       {open && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/45 p-0 sm:p-6">
@@ -1372,7 +1459,9 @@ function PricingFields({ priceBooks }: { priceBooks: PriceBookRow[] }) {
                                   [book.id]: next,
                                 }));
                             }}
-                            suffix="đ"
+                            suffix={`đ/${baseUnit}`}
+                            decimals={2}
+                            aria-label={`${book.name} mỗi ${baseUnit}`}
                             min={0}
                             className="min-h-11 w-full lg:ml-auto lg:max-w-[260px] lg:min-h-0"
                           />
