@@ -1,7 +1,7 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  customers, einvoices, orderItems, orders, payments, returnItems, returns, stockLevels, stockMovements,
+  customers, einvoices, orderItems, orders, payments, products, returnItems, returns, stockLevels, stockMovements,
 } from "@/db/schema";
 import { updateOrderSchema, type UpdateOrderInput } from "@/lib/schemas/order";
 import { type ActionResult, getProfileId, generateCode, toMoney, toQty } from "@/lib/actions/common";
@@ -9,6 +9,9 @@ import { normalizeOrderItems } from "@/lib/orders/normalize";
 import { resolveStoreContextForUser } from "@/lib/auth/store-context";
 import { recordActivity } from "@/lib/audit/activity-log";
 import { orderActivitySnapshot, orderActivityType, orderItemActivitySnapshot } from "@/lib/orders/activity";
+import { revalueInventoryProducts } from "@/lib/inventory/cost-valuation";
+import { getOrderStockRestorations, restoreOrderStockInTransaction } from "@/lib/inventory/order-stock-restoration";
+import { consumeTrackedStockLots } from "@/lib/inventory/stock-lot-service";
 
 /**
  * Lõi sửa đơn — KHÔNG phải server action (nhận userId đã xác thực).
@@ -39,17 +42,19 @@ export async function updateOrderForUser(userId: string, input: UpdateOrderInput
 
       const isQuote = order.status === "quote";
       const oldItems = await tx.select().from(orderItems).where(and(eq(orderItems.storeId, storeId), eq(orderItems.orderId, v.orderId)));
+      const restorations = !isQuote ? await getOrderStockRestorations(tx, storeId, order, oldItems) : [];
+      const newStockItems = !isQuote && order.warehouseId ? trustedItems.flatMap((item) => item.stockItems) : [];
+      const stockProductIds = [...new Set([...restorations, ...newStockItems].map((item) => item.productId))].sort();
+      if (stockProductIds.length) {
+        await tx.select({ id: products.id }).from(products)
+          .where(and(eq(products.storeId, storeId), inArray(products.id, stockProductIds))).orderBy(products.id).for("update");
+      }
 
       // 1. Hoàn kho dòng cũ (đơn thật mới đụng kho)
-      if (!isQuote && order.warehouseId) {
-        for (const i of oldItems) {
-          const baseQty = Number(i.quantity) * Number(i.unitMultiplier);
-          await tx.update(stockLevels).set({
-            quantity: sql`${stockLevels.quantity} + ${toQty(baseQty)}`,
-            updatedAt: sql`now()`,
-          }).where(and(eq(stockLevels.storeId, storeId), eq(stockLevels.productId, i.productId), eq(stockLevels.warehouseId, order.warehouseId)));
-        }
-      }
+      await restoreOrderStockInTransaction(tx, {
+        storeId, orderId: order.id, orderCode: order.code, targets: restorations,
+        refType: "order_edit_cancel", createdBy: profileId,
+      });
       await tx.delete(orderItems).where(and(eq(orderItems.storeId, storeId), eq(orderItems.orderId, v.orderId)));
 
       // 2. Dòng mới
@@ -71,8 +76,12 @@ export async function updateOrderForUser(userId: string, input: UpdateOrderInput
       );
 
       if (!isQuote && order.warehouseId) {
-        for (const i of trustedItems) {
-          const baseQty = i.quantity * i.unitMultiplier;
+        for (const i of newStockItems) {
+          const baseQty = i.quantity;
+          await consumeTrackedStockLots(tx, {
+            storeId, productId: i.productId, warehouseId: order.warehouseId, quantity: baseQty,
+            refType: "order", refId: order.id, createdBy: profileId,
+          });
           await tx
             .insert(stockLevels)
             .values({ storeId, productId: i.productId, warehouseId: order.warehouseId, quantity: toQty(-baseQty) })
@@ -80,18 +89,12 @@ export async function updateOrderForUser(userId: string, input: UpdateOrderInput
               target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
               set: { quantity: sql`${stockLevels.quantity} - ${toQty(baseQty)}`, updatedAt: sql`now()` },
             });
+          await tx.insert(stockMovements).values({
+            storeId, productId: i.productId, warehouseId: order.warehouseId,
+            type: "sale", quantity: toQty(-baseQty), refType: "order", refId: order.id,
+            note: `Sửa đơn ${order.code}: xuất dòng mới`, createdBy: profileId,
+          });
         }
-        await tx.insert(stockMovements).values({
-          storeId,
-          productId: trustedItems[0].productId,
-          warehouseId: order.warehouseId,
-          type: "adjust",
-          quantity: toQty(0),
-          refType: "order_edit",
-          refId: order.id,
-          note: `Sửa đơn ${order.code}: kho đã hoàn dòng cũ và trừ theo dòng mới`,
-          createdBy: profileId,
-        });
       }
 
       // 3. Nợ & tổng mua theo chênh lệch (paid giữ nguyên)
@@ -119,6 +122,7 @@ export async function updateOrderForUser(userId: string, input: UpdateOrderInput
         note: v.note || null,
         updatedAt: sql`now()`,
       }).where(and(eq(orders.storeId, storeId), eq(orders.id, v.orderId)));
+      await revalueInventoryProducts(tx, storeId, stockProductIds);
       const before = { ...orderActivitySnapshot(order), items: orderItemActivitySnapshot(oldItems) };
       const after = {
         ...orderActivitySnapshot({

@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { recordManualInventoryCost } from "@/lib/inventory/cost-valuation";
 import { and, eq, inArray, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type * as schema from "@/db/schema";
@@ -152,6 +153,7 @@ export async function saveVariantGroupInTransaction(tx: Tx, storeId: string, use
       lifecycleStatus: current && current.isActive === child.directSale ? current.lifecycleStatus : child.directSale ? "active" : "archived" };
     if (current) {
       if (child.baseUnit !== current.baseUnit) fail("products.variants.keepUnit");
+      await recordManualInventoryCost(tx, storeId, id, child.costPrice);
       const name = current.variantName && current.name.endsWith(` - ${current.variantName}`)
         ? `${current.name.slice(0, -(` - ${current.variantName}`).length)} - ${child.variantName}` : current.name;
       await tx.update(products).set({ ...(id === groupId && v.variantOperation === "edit" ? commonEdit : {}), ...commercial,

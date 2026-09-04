@@ -791,10 +791,39 @@ export const stockMovements = pgTable("stock_movements", {
   refId: uuid("ref_id"),
   note: text("note"),
   createdBy: uuid("created_by").references(() => profiles.id),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).default(sql`clock_timestamp()`).notNull(),
 }, (t) => [
   index("stock_movements_product_idx").on(t.productId),
   index("stock_movements_ref_idx").on(t.refType, t.refId),
+  index("stock_movements_store_product_time_idx").on(t.storeId, t.productId, t.createdAt),
+]);
+
+// A reconciled (or explicitly retained legacy) starting state for subsequent
+// moving-average replay. Manual valuation changes append separate events.
+export const inventoryCostBaselines = pgTable("inventory_cost_baselines", {
+  storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id),
+  productId: uuid("product_id").notNull(),
+  quantity: decimal("quantity", { precision: 14, scale: 4 }).notNull(),
+  unitCost: decimal("unit_cost", { precision: 14, scale: 2 }).notNull(),
+  grossUnitCost: decimal("gross_unit_cost", { precision: 14, scale: 2 }),
+  effectiveAt: timestamp("effective_at", { withTimezone: true }).default(sql`clock_timestamp()`).notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.storeId, t.productId] }),
+  foreignKey({ columns: [t.storeId, t.productId], foreignColumns: [products.storeId, products.id] }).onDelete("cascade"),
+  check("inventory_cost_baselines_nonnegative", sql`${t.unitCost} >= 0 AND (${t.grossUnitCost} IS NULL OR ${t.grossUnitCost} >= 0)`),
+]);
+
+export const inventoryCostAdjustments = pgTable("inventory_cost_adjustments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  storeId: uuid("store_id").notNull().$defaultFn(missingStoreId).references(() => stores.id),
+  productId: uuid("product_id").notNull(),
+  unitCost: decimal("unit_cost", { precision: 14, scale: 2 }).notNull(),
+  effectiveAt: timestamp("effective_at", { withTimezone: true }).default(sql`clock_timestamp()`).notNull(),
+  reason: text("reason").notNull(),
+}, (t) => [
+  foreignKey({ columns: [t.storeId, t.productId], foreignColumns: [products.storeId, products.id] }).onDelete("cascade"),
+  index("inventory_cost_adjustments_product_time_idx").on(t.storeId, t.productId, t.effectiveAt),
+  check("inventory_cost_adjustments_nonnegative", sql`${t.unitCost} >= 0`),
 ]);
 
 // ============= Customers =============
@@ -1265,6 +1294,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   note: text("note"),
   createdBy: uuid("created_by").references(() => profiles.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  costEffectiveAt: timestamp("cost_effective_at", { withTimezone: true }),
 }, (t) => [uniqueIndex("purchase_orders_store_code_unique").on(t.storeId, t.code)]);
 
 export const purchaseOrderItems = pgTable("purchase_order_items", {

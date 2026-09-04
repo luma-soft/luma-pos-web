@@ -1,5 +1,5 @@
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   orders, orderItems, payments, customers, products, priceBooks, stockLevels, stockMovements, einvoices, returns,
@@ -11,9 +11,11 @@ import {
 import { recordCashTx, fundForMethod } from "@/lib/cash";
 import { Routes } from "@/lib/routes";
 import { normalizeOrderItems } from "@/lib/orders/normalize";
+import { revalueInventoryProducts } from "@/lib/inventory/cost-valuation";
+import { getOrderStockRestorations, restoreOrderStockInTransaction } from "@/lib/inventory/order-stock-restoration";
 import { getCurrentShift } from "@/lib/data/shifts";
 import { calculateProductTax } from "@/lib/orders/product-tax";
-import { consumeTrackedStockLots, restoreTrackedStockLots } from "@/lib/inventory/stock-lot-service";
+import { consumeTrackedStockLots } from "@/lib/inventory/stock-lot-service";
 import { createNotificationEventInTx } from "@/lib/notifications/events-core";
 import { publishCommittedNotification } from "@/lib/notifications/outbox";
 import { resolveStoreContextForUser } from "@/lib/auth/store-context";
@@ -157,46 +159,17 @@ export async function createOrderForUser(
         if (hasEInvoice) throw new Error("SOURCE_HAS_EINVOICE");
 
         if (sourceIsSale && sourceOrder.warehouseId) {
-          const sourceStockMovements = await tx
-            .select({
-              productId: stockMovements.productId,
-              quantity: stockMovements.quantity,
-            })
-            .from(stockMovements)
-            .where(and(
-              eq(stockMovements.storeId, storeId),
-              eq(stockMovements.refType, "order"),
-              eq(stockMovements.refId, sourceOrder.id),
-              eq(stockMovements.type, "sale"),
-            ));
-          for (const movement of sourceStockMovements) {
-            const baseQty = Math.abs(Number(movement.quantity));
-            await restoreTrackedStockLots(tx, {
-              storeId,
-              productId: movement.productId,
-              quantity: baseQty,
-              sourceRefType: "order",
-              sourceRefId: sourceOrder.id,
-              refType: "order_edit_cancel",
-              refId: sourceOrder.id,
-              createdBy: profileId,
-            });
-            await tx.update(stockLevels).set({
-              quantity: sql`${stockLevels.quantity} + ${toQty(baseQty)}`,
-              updatedAt: sql`now()`,
-            }).where(and(eq(stockLevels.storeId, storeId), eq(stockLevels.productId, movement.productId), eq(stockLevels.warehouseId, sourceOrder.warehouseId)));
-            await tx.insert(stockMovements).values({
-              storeId,
-              productId: movement.productId,
-              warehouseId: sourceOrder.warehouseId,
-              type: "return_in",
-              quantity: toQty(baseQty),
-              refType: "order_edit_cancel",
-              refId: sourceOrder.id,
-              note: `Hủy đơn gốc ${sourceOrder.code} để sửa`,
-              createdBy: profileId,
-            });
-          }
+          const sourceItems = await tx.select().from(orderItems)
+            .where(and(eq(orderItems.storeId, storeId), eq(orderItems.orderId, sourceOrder.id)));
+          const targets = await getOrderStockRestorations(tx, storeId, sourceOrder, sourceItems);
+          const affectedIds = [...new Set([...targets.map((target) => target.productId),
+            ...trustedItems.flatMap((item) => item.stockItems.map((stockItem) => stockItem.productId))])].sort();
+          if (affectedIds.length) await tx.select({ id: products.id }).from(products)
+            .where(and(eq(products.storeId, storeId), inArray(products.id, affectedIds))).orderBy(asc(products.id)).for("update");
+          await restoreOrderStockInTransaction(tx, {
+            storeId, orderId: sourceOrder.id, orderCode: sourceOrder.code, targets,
+            refType: "order_edit_cancel", createdBy: profileId,
+          });
         }
 
         // Phiếu đặt cũ đã giữ tồn nhưng chưa xuất kho: giải phóng trước khi tạo phiếu thay thế.
@@ -439,6 +412,11 @@ export async function createOrderForUser(
             },
           });
 
+      if (v.source?.mode === "edit" && sourceIsSale) {
+        const affected = await tx.selectDistinct({ productId: stockMovements.productId }).from(stockMovements)
+          .where(and(eq(stockMovements.storeId, storeId), inArray(stockMovements.refId, [sourceOrder.id, order.id])));
+        await revalueInventoryProducts(tx, storeId, affected.map((row) => row.productId));
+      }
       return { order, notification };
     });
 

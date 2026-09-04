@@ -50,12 +50,19 @@ import {
 import { publishCommittedNotification } from "@/lib/notifications/outbox";
 import { resolveStoreContextForUser } from "@/lib/auth/store-context";
 import { recordActivity } from "@/lib/audit/activity-log";
+import { revalueInventoryProducts } from "@/lib/inventory/cost-valuation";
 
 const GATEWAY_REFUND_METHODS = new Set<GatewayProvider>(["momo", "zalopay", "vnpay"]);
 const isGatewayRefundMethod = (value: string): value is GatewayProvider =>
   GATEWAY_REFUND_METHODS.has(value as GatewayProvider);
 
 type ReturnTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function revalueReturnStock(tx: ReturnTransaction, storeId: string, refIds: string[]) {
+  const affected = await tx.selectDistinct({ productId: stockMovements.productId }).from(stockMovements)
+    .where(and(eq(stockMovements.storeId, storeId), inArray(stockMovements.refId, refIds)));
+  await revalueInventoryProducts(tx, storeId, affected.map((row) => row.productId));
+}
 
 function returnLineActivitySnapshot(rows: (typeof returnItems.$inferInsert)[]) {
   return rows.map((row) => ({
@@ -218,9 +225,11 @@ export async function createExchangeForUser(
 
   let replacementItems: NormalizedOrderItem[];
   try {
-    replacementItems = await normalizeOrderItems(storeId, v.exchangeItems);
+    replacementItems = await normalizeOrderItems(storeId, v.exchangeItems, undefined, context.role);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
+    if (message === "PRICE_BOOK_FORBIDDEN") return { ok: false, error: "errors.forbidden" };
+    if (message === "PRICE_BOOK_PRICE_UNAVAILABLE") return { ok: false, error: "pricing.errors.priceUnavailable" };
     if (["PRODUCT_NOT_FOUND", "UNIT_NOT_FOUND", "INVALID_ITEMS"].includes(message)) {
       return { ok: false, error: "errors.invalidData" };
     }
@@ -583,6 +592,7 @@ export async function createExchangeForUser(
           { type: "order", id: exchangeOrder.id, code: exchangeOrder.code },
         ],
       });
+      await revalueReturnStock(tx, storeId, [returned.id, exchangeOrder.id]);
       return {
         returnId: returned.id,
         returnCode: returned.code,
@@ -899,6 +909,7 @@ export async function createReturnForUser(
         },
         affectedRecords: [{ type: "return", id: ret.id, code: ret.code }, { type: "order", id: order.id, code: order.code }],
       });
+      await revalueReturnStock(tx, storeId, [ret.id]);
       return {
         ...ret,
         ...(gatewayRefund ? { gatewayRefundId: gatewayRefund.id } : {}),
@@ -1120,6 +1131,7 @@ export async function cancelReturn(returnId: string): Promise<ActionResult> {
         after: { code: ret.code, status: "cancelled", totalRefund: Number(ret.totalRefund), method: ret.refundMethod },
         affectedRecords: [{ type: "return", id: ret.id, code: ret.code }, ...(ret.orderId ? [{ type: "order", id: ret.orderId }] : [])],
       });
+      await revalueReturnStock(tx, gate.storeId, [ret.id]);
       return { debtNotification, orderId: ret.orderId };
     });
 
@@ -1159,7 +1171,7 @@ export async function createPosReturn(
   try {
     const profileId = await getProfileId(gate.userId);
     const currentShift = profileId ? await getCurrentShift(gate.storeId, profileId) : null;
-    const trustedItems = await normalizeOrderItems(gate.storeId, v.items, v.priceBookId);
+    const trustedItems = await normalizeOrderItems(gate.storeId, v.items, v.priceBookId, gate.role);
 
     const result = await db.transaction(async (tx) => {
       const [order] = v.orderId
@@ -1370,6 +1382,7 @@ export async function createPosReturn(
         },
         affectedRecords: [{ type: "return", id: ret.id, code: ret.code }, ...(order ? [{ type: "order", id: order.id, code: order.code }] : [])],
       });
+      await revalueReturnStock(tx, gate.storeId, [ret.id]);
       return { ret, debtNotification };
     });
 
@@ -1392,6 +1405,8 @@ export async function createPosReturn(
       DEBT_TOO_SMALL: "returns.errors.debtTooSmall",
     };
     if (known[msg]) return { ok: false, error: known[msg] };
+    if (msg === "PRICE_BOOK_FORBIDDEN") return { ok: false, error: "errors.forbidden" };
+    if (msg === "PRICE_BOOK_PRICE_UNAVAILABLE") return { ok: false, error: "pricing.errors.priceUnavailable" };
     console.error("createPosReturn failed:", e);
     return { ok: false, error: "errors.serverError" };
   }

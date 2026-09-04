@@ -1,5 +1,7 @@
 "use server";
 
+import { recordManualInventoryCost } from "@/lib/inventory/cost-valuation";
+
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -138,6 +140,7 @@ export async function importProducts(rows: unknown, dryRun: boolean): Promise<Ac
         let stockChange: { beforeQuantity: number; quantity: number } | undefined;
 
         if (existingId) {
+          await recordManualInventoryCost(tx, gate.storeId, existingId, cost);
           await tx.update(products).set({
             name: r.name,
             barcode: r.barcode || null,

@@ -1,4 +1,5 @@
 import type { db } from "@/db";
+import { recordManualInventoryCost } from "@/lib/inventory/cost-valuation";
 import {
   brands,
   categories,
@@ -154,6 +155,7 @@ export function createKiotVietProductSyncTransaction(input: {
         updatedAt: now,
       } as const;
       if (productId) {
+        await recordManualInventoryCost(transaction, storeId, productId, source.costPrice);
         await transaction
           .update(products)
           .set(managedValues)

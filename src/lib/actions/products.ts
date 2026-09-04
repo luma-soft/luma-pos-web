@@ -1,5 +1,7 @@
 "use server";
 
+import { recordManualInventoryCost } from "@/lib/inventory/cost-valuation";
+
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { z } from "zod";
 import { and, eq, inArray, ne, or, sql } from "drizzle-orm";
@@ -822,6 +824,7 @@ export async function updateProduct(
         });
       }
 
+      await recordManualInventoryCost(tx, gate.storeId, v.id, v.costPrice);
       await tx
         .update(products)
         .set({
@@ -982,6 +985,7 @@ export async function updateProduct(
               : {}),
             updatedAt: sql`now()`,
           };
+          if (fields.has("pricing")) await recordManualInventoryCost(tx, gate.storeId, sibling.id, v.costPrice);
           await tx
             .update(products)
             .set(nextPatch)

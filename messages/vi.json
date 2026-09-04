@@ -2928,12 +2928,14 @@
     "payFull": "Thanh toán đủ cho NCC",
     "amountPaid": "Đã trả NCC",
     "receiveNow": "Lưu & nhận hàng ngay",
-    "receiveHint": "Nhận hàng ngay: cộng tồn kho, cập nhật giá vốn theo giá nhập, phần chưa trả ghi vào nợ NCC.",
+    "receiveHint": "Nhận hàng ngay: cộng tồn kho, tính giá vốn bình quân gồm chiết khấu, VAT và phí nhập; phần chưa trả ghi vào nợ NCC.",
     "errors": {
       "emptyItems": "Phiếu nhập cần ít nhất 1 sản phẩm.",
       "notFound": "Không tìm thấy phiếu nhập.",
       "notEditable": "Phiếu nhập này không thể sửa hoặc hủy.",
-      "alreadyCancelled": "Phiếu nhập đã hủy trước đó."
+      "alreadyCancelled": "Phiếu nhập đã hủy trước đó.",
+      "costHistoryLocked": "Phiếu này đã dùng để chốt giá vốn cũ. Chỉ sửa được ghi chú, thông tin hóa đơn và thanh toán.",
+      "costLedgerMismatch": "Tồn kho chưa khớp sổ tính giá vốn. Vui lòng đối soát biến động kho trước khi lưu phiếu."
     },
     "detail": {
       "items": "Hàng nhập ({count})",

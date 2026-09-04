@@ -20,20 +20,16 @@ import {
 import { publishCommittedNotification } from "@/lib/notifications/outbox";
 import { recordActivity } from "@/lib/audit/activity-log";
 import { activityValuesEqual } from "@/lib/products/product-activity";
+import { calculatePurchaseCosts } from "@/lib/purchases/cost-calculations";
+import { ensureInventoryCostBaselines, assertPurchaseCostPeriod, revalueInventoryProducts } from "@/lib/inventory/cost-valuation";
 
 type PurchaseCalcInput = Pick<CreatePurchaseOutput, "items" | "discount" | "vatRate" | "shippingFee" | "amountPaid">;
 
-function purchaseLineTotal(i: { quantity: number; unitCost: number; discount: number }) {
-  return Math.max(0, i.quantity * i.unitCost - i.discount);
-}
-
 function calcPurchaseTotals(v: PurchaseCalcInput) {
-  const subtotal = v.items.reduce((s, i) => s + purchaseLineTotal(i), 0);
-  const afterDiscount = Math.max(0, subtotal - v.discount);
-  const tax = Math.round((afterDiscount * v.vatRate) / 100);
-  const total = afterDiscount + tax + v.shippingFee;
+  const costs = calculatePurchaseCosts(v);
+  const { subtotal, tax, total } = costs;
   const paid = Math.min(v.amountPaid, total);
-  return { subtotal, tax, total, paid, owed: Math.max(0, total - paid) };
+  return { ...costs, subtotal, tax, total, paid, owed: Math.max(0, total - paid) };
 }
 
 function revalidatePurchasePaths(id?: string) {
@@ -76,6 +72,7 @@ export async function createPurchase(
       if (found.some((product) => product.isVariantParent)) throw new Error("PRODUCT_VARIANT_PARENT");
       const batchValidation = validateReceiptBatchLines({ products: found, items: v.items });
       if (!batchValidation.ok) throw new Error(batchValidation.error);
+      await ensureInventoryCostBaselines(tx, gate.storeId, ids);
 
       const [po] = await tx.insert(purchaseOrders).values({
         storeId: gate.storeId,
@@ -83,8 +80,9 @@ export async function createPurchase(
         supplierId: v.supplierId,
         warehouseId: v.warehouseId,
         status: "received",
+        costEffectiveAt: sql`clock_timestamp()`,
         subtotal: toMoney(totals.subtotal),
-        discount: toMoney(v.discount),
+        discount: toMoney(totals.discount),
         vatRate: String(v.vatRate),
         tax: toMoney(totals.tax),
         shippingFee: toMoney(v.shippingFee),
@@ -96,7 +94,7 @@ export async function createPurchase(
       }).returning({ id: purchaseOrders.id, code: purchaseOrders.code });
 
       const receiptItems: { id: string }[] = [];
-      for (const i of v.items) {
+      for (const [index, i] of v.items.entries()) {
         const [receiptItem] = await tx.insert(purchaseOrderItems).values({
           storeId: gate.storeId,
           purchaseOrderId: po.id,
@@ -104,7 +102,7 @@ export async function createPurchase(
           quantity: toQty(i.quantity),
           unitCost: toMoney(i.unitCost),
           discount: toMoney(i.discount),
-          total: toMoney(purchaseLineTotal(i)),
+          total: toMoney(totals.lines[index].netTotal),
           batchNumber: i.batchNumber ?? null,
           expiryDate: i.expiryDate ?? null,
         }).returning({ id: purchaseOrderItems.id });
@@ -134,7 +132,7 @@ export async function createPurchase(
           warehouseId: v.warehouseId,
           type: "purchase",
           quantity: toQty(i.quantity),
-          unitCost: toMoney(i.unitCost),
+          unitCost: toMoney(totals.lines[index].landedUnitCost),
           refType: "purchase",
           refId: po.id,
           note: po.code,
@@ -152,7 +150,7 @@ export async function createPurchase(
             expiryDate: i.expiryDate ?? null,
             receivedQuantity: toQty(i.quantity),
             availableQuantity: toQty(i.quantity),
-            unitCost: toMoney(i.unitCost),
+            unitCost: toMoney(totals.lines[index].landedUnitCost),
             createdBy: profileId,
           }).returning({ id: stockLots.id });
           await recordStockLotReceipt(tx, {
@@ -164,19 +162,12 @@ export async function createPurchase(
           });
         }
 
-        // giá vốn = giá nhập sau chiết khấu dòng; giá nhập cuối = giá trên phiếu (chưa chiết khấu)
-        const netUnit = i.quantity > 0 ? purchaseLineTotal(i) / i.quantity : i.unitCost;
-        await tx.update(products).set({
-          costPrice: toMoney(netUnit),
-          lastPurchasePrice: toMoney(i.unitCost),
-          updatedAt: sql`now()`,
-        }).where(and(eq(products.storeId, gate.storeId), eq(products.id, i.productId)));
-
         // tự gắn NCC vào SP (import từ nhập hàng) — không trùng
         await tx.insert(productSuppliers)
           .values({ storeId: gate.storeId, productId: i.productId, supplierId: v.supplierId, costPrice: toMoney(i.unitCost) })
           .onConflictDoNothing();
       }
+      await revalueInventoryProducts(tx, gate.storeId, ids);
 
       // đặt NCC chính cho SP chưa có NCC chính
       await tx.update(products)
@@ -232,6 +223,7 @@ export async function createPurchase(
     const msg = e instanceof Error ? e.message : "";
     if (msg === "PRODUCT_NOT_FOUND") return { ok: false, error: "errors.invalidData" };
     if (msg === "PRODUCT_VARIANT_PARENT") return { ok: false, error: "products.variants.selectSku" };
+    if (msg === "COST_LEDGER_MISMATCH") return { ok: false, error: "purchases.errors.costLedgerMismatch" };
     if (msg.startsWith("purchases.errors.")) return { ok: false, error: msg };
     console.error("createPurchase failed:", e);
     return { ok: false, error: "errors.serverError" };
@@ -249,7 +241,7 @@ export async function updatePurchase(
   const parsed = updatePurchaseSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: "errors.invalidData" };
   const v = parsed.data;
-  const totals = calcPurchaseTotals(v);
+  const proposedTotals = calcPurchaseTotals(v);
 
   try {
     const profileId = await getProfileId(userId);
@@ -271,29 +263,43 @@ export async function updatePurchase(
       }).from(products).where(and(eq(products.storeId, gate.storeId), inArray(products.id, ids)));
       if (found.length !== new Set(ids).size) throw new Error("PRODUCT_NOT_FOUND");
       if (found.some((product) => product.isVariantParent)) throw new Error("PRODUCT_VARIANT_PARENT");
-      const batchValidation = validateReceiptBatchLines({ products: found, items: v.items });
-      if (!batchValidation.ok) throw new Error(batchValidation.error);
-
       const oldItems = await tx.select().from(purchaseOrderItems).where(and(eq(purchaseOrderItems.storeId, gate.storeId), eq(purchaseOrderItems.purchaseOrderId, po.id)));
       const comparableItems = (items: { productId: string; quantity: string | number; unitCost: string | number; discount: string | number; batchNumber?: string | null; expiryDate?: string | null }[]) => items.map((item) => ({
         productId: item.productId, quantity: Number(item.quantity), unitCost: Number(item.unitCost), discount: Number(item.discount), batchNumber: item.batchNumber ?? null, expiryDate: item.expiryDate ?? null,
       })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
-      const purchaseChanged = po.status !== "received" || po.supplierId !== v.supplierId || po.warehouseId !== v.warehouseId
+      const stockChanged = po.status !== "received" || po.warehouseId !== v.warehouseId
+        || Number(po.discount) !== v.discount || Number(po.vatRate) !== v.vatRate || Number(po.shippingFee) !== v.shippingFee
+        || !activityValuesEqual(comparableItems(oldItems), comparableItems(v.items));
+      // Imported receipts retain their original line rounding when only notes,
+      // invoice reference, supplier or payment changes. Do not rebuild stock.
+      const paid = Math.min(v.amountPaid, Number(po.total));
+      const totals = stockChanged ? proposedTotals : { ...proposedTotals,
+        subtotal: Number(po.subtotal), discount: Number(po.discount), tax: Number(po.tax), total: Number(po.total),
+        paid, owed: Math.max(0, Number(po.total) - paid),
+      };
+      const affectedIds = [...new Set([...ids, ...oldItems.map((item) => item.productId)])];
+      if (stockChanged) {
+        await ensureInventoryCostBaselines(tx, gate.storeId, affectedIds);
+        await assertPurchaseCostPeriod(tx, gate.storeId, po, affectedIds);
+        const batchValidation = validateReceiptBatchLines({ products: found, items: v.items });
+        if (!batchValidation.ok) throw new Error(batchValidation.error);
+      }
+      const purchaseChanged = stockChanged || po.supplierId !== v.supplierId
         || Number(po.total) !== totals.total || Number(po.amountPaid) !== totals.paid || Number(po.discount) !== v.discount || Number(po.vatRate) !== v.vatRate || Number(po.shippingFee) !== v.shippingFee
         || po.invoiceNumber !== (v.invoiceNumber?.trim()?.slice(0, 50) || null) || po.note !== (v.note || null)
         || !activityValuesEqual(comparableItems(oldItems), comparableItems(v.items));
       const oldLots = oldItems.length > 0
         ? await tx.select().from(stockLots).where(and(eq(stockLots.storeId, gate.storeId), inArray(stockLots.purchaseOrderItemId, oldItems.map((item) => item.id))))
         : [];
-      if (oldLots.some((lot) => Number(lot.availableQuantity) < Number(lot.receivedQuantity))) {
+      if (stockChanged && oldLots.some((lot) => Number(lot.availableQuantity) < Number(lot.receivedQuantity))) {
         throw new Error("BATCH_ALREADY_CONSUMED");
       }
       const oldPaid = po.status === "received" ? Number(po.amountPaid) : 0;
       const oldOwed = po.status === "received" ? Math.max(0, Number(po.total) - oldPaid) : 0;
 
-      if (po.status === "received") {
+      if (stockChanged && po.status === "received") {
         for (const i of oldItems) {
-          const qty = Number(i.quantity);
+          const qty = Number(i.quantity) * Number(i.unitMultiplier);
           await tx.update(stockLevels).set({
             quantity: sql`${stockLevels.quantity} - ${toQty(qty)}`,
             updatedAt: sql`now()`,
@@ -314,89 +320,84 @@ export async function updatePurchase(
         }
       }
 
-      if (oldLots.length > 0) {
-        await tx.delete(stockLots).where(and(eq(stockLots.storeId, gate.storeId), inArray(stockLots.id, oldLots.map((lot) => lot.id))));
-      }
-      await tx.delete(purchaseOrderItems).where(and(eq(purchaseOrderItems.storeId, gate.storeId), eq(purchaseOrderItems.purchaseOrderId, po.id)));
-      const receiptItems: { id: string }[] = [];
-      for (const i of v.items) {
-        const [receiptItem] = await tx.insert(purchaseOrderItems).values({
-          storeId: gate.storeId,
-          purchaseOrderId: po.id,
-          productId: i.productId,
-          quantity: toQty(i.quantity),
-          unitCost: toMoney(i.unitCost),
-          discount: toMoney(i.discount),
-          total: toMoney(purchaseLineTotal(i)),
-          batchNumber: i.batchNumber ?? null,
-          expiryDate: i.expiryDate ?? null,
-        }).returning({ id: purchaseOrderItems.id });
-        receiptItems.push(receiptItem);
-      }
-
-      for (const [index, i] of v.items.entries()) {
-        await tx
-          .insert(stockLevels)
-          .values({
+      if (stockChanged) {
+        if (oldLots.length > 0) {
+          await tx.delete(stockLots).where(and(eq(stockLots.storeId, gate.storeId), inArray(stockLots.id, oldLots.map((lot) => lot.id))));
+        }
+        await tx.delete(purchaseOrderItems).where(and(eq(purchaseOrderItems.storeId, gate.storeId), eq(purchaseOrderItems.purchaseOrderId, po.id)));
+        const receiptItems: { id: string }[] = [];
+        for (const [index, i] of v.items.entries()) {
+          const [receiptItem] = await tx.insert(purchaseOrderItems).values({
             storeId: gate.storeId,
+            purchaseOrderId: po.id,
             productId: i.productId,
-            warehouseId: v.warehouseId,
             quantity: toQty(i.quantity),
-          })
-          .onConflictDoUpdate({
-            target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
-            set: {
-              quantity: sql`${stockLevels.quantity} + ${toQty(i.quantity)}`,
-              updatedAt: sql`now()`,
-            },
-          });
-
-        await tx.insert(stockMovements).values({
-          storeId: gate.storeId,
-          productId: i.productId,
-          warehouseId: v.warehouseId,
-          type: "purchase",
-          quantity: toQty(i.quantity),
-          unitCost: toMoney(i.unitCost),
-          refType: "purchase_edit",
-          refId: po.id,
-          note: `Sửa phiếu nhập ${po.code}`,
-          createdBy: profileId,
-        });
-
-        const productPolicy = found.find((product) => product.id === i.productId);
-        if (productPolicy?.trackBatches) {
-          const [lot] = await tx.insert(stockLots).values({
-            storeId: gate.storeId,
-            productId: i.productId,
-            warehouseId: v.warehouseId,
-            purchaseOrderItemId: receiptItems[index].id,
-            batchNumber: i.batchNumber!.trim(),
-            expiryDate: i.expiryDate ?? null,
-            receivedQuantity: toQty(i.quantity),
-            availableQuantity: toQty(i.quantity),
             unitCost: toMoney(i.unitCost),
-            createdBy: profileId,
-          }).returning({ id: stockLots.id });
-          await recordStockLotReceipt(tx, {
-            stockLotId: lot.id,
-            quantity: i.quantity,
-            refType: "purchase_edit",
-            refId: po.id,
-            createdBy: profileId,
-          });
+            discount: toMoney(i.discount),
+            total: toMoney(totals.lines[index].netTotal),
+            batchNumber: i.batchNumber ?? null,
+            expiryDate: i.expiryDate ?? null,
+          }).returning({ id: purchaseOrderItems.id });
+          receiptItems.push(receiptItem);
         }
 
-        const netUnit = i.quantity > 0 ? purchaseLineTotal(i) / i.quantity : i.unitCost;
-        await tx.update(products).set({
-          costPrice: toMoney(netUnit),
-          lastPurchasePrice: toMoney(i.unitCost),
-          updatedAt: sql`now()`,
-        }).where(and(eq(products.storeId, gate.storeId), eq(products.id, i.productId)));
+        for (const [index, i] of v.items.entries()) {
+          await tx
+            .insert(stockLevels)
+            .values({
+              storeId: gate.storeId,
+              productId: i.productId,
+              warehouseId: v.warehouseId,
+              quantity: toQty(i.quantity),
+            })
+            .onConflictDoUpdate({
+              target: [stockLevels.storeId, stockLevels.productId, stockLevels.warehouseId],
+              set: {
+                quantity: sql`${stockLevels.quantity} + ${toQty(i.quantity)}`,
+                updatedAt: sql`now()`,
+              },
+            });
 
-        await tx.insert(productSuppliers)
-          .values({ storeId: gate.storeId, productId: i.productId, supplierId: v.supplierId, costPrice: toMoney(i.unitCost) })
-          .onConflictDoNothing();
+          await tx.insert(stockMovements).values({
+            storeId: gate.storeId,
+            productId: i.productId,
+            warehouseId: v.warehouseId,
+            type: "purchase",
+            quantity: toQty(i.quantity),
+            unitCost: toMoney(totals.lines[index].landedUnitCost),
+            refType: "purchase_edit",
+            refId: po.id,
+            note: `Sửa phiếu nhập ${po.code}`,
+            createdBy: profileId,
+          });
+
+          const productPolicy = found.find((product) => product.id === i.productId);
+          if (productPolicy?.trackBatches) {
+            const [lot] = await tx.insert(stockLots).values({
+              storeId: gate.storeId,
+              productId: i.productId,
+              warehouseId: v.warehouseId,
+              purchaseOrderItemId: receiptItems[index].id,
+              batchNumber: i.batchNumber!.trim(),
+              expiryDate: i.expiryDate ?? null,
+              receivedQuantity: toQty(i.quantity),
+              availableQuantity: toQty(i.quantity),
+              unitCost: toMoney(totals.lines[index].landedUnitCost),
+              createdBy: profileId,
+            }).returning({ id: stockLots.id });
+            await recordStockLotReceipt(tx, {
+              stockLotId: lot.id,
+              quantity: i.quantity,
+              refType: "purchase_edit",
+              refId: po.id,
+              createdBy: profileId,
+            });
+          }
+
+          await tx.insert(productSuppliers)
+            .values({ storeId: gate.storeId, productId: i.productId, supplierId: v.supplierId, costPrice: toMoney(i.unitCost) })
+            .onConflictDoNothing();
+        }
       }
 
       await tx.update(products)
@@ -485,8 +486,9 @@ export async function updatePurchase(
           supplierId: v.supplierId,
           warehouseId: v.warehouseId,
           status: "received",
+          ...(po.status === "draft" ? { costEffectiveAt: sql`clock_timestamp()` } : {}),
           subtotal: toMoney(totals.subtotal),
-          discount: toMoney(v.discount),
+          discount: toMoney(totals.discount),
           vatRate: String(v.vatRate),
           tax: toMoney(totals.tax),
           shippingFee: toMoney(v.shippingFee),
@@ -504,6 +506,7 @@ export async function updatePurchase(
             )
           `,
         });
+      if (stockChanged) await revalueInventoryProducts(tx, gate.storeId, affectedIds);
 
       const notification = po.status === "draft"
         ? await createNotificationEventInTx(tx, {
@@ -554,6 +557,8 @@ export async function updatePurchase(
     const known: Record<string, string> = {
       PURCHASE_NOT_FOUND: "purchases.errors.notFound",
       NOT_EDITABLE: "purchases.errors.notEditable",
+      COST_HISTORY_LOCKED: "purchases.errors.costHistoryLocked",
+      COST_LEDGER_MISMATCH: "purchases.errors.costLedgerMismatch",
       PRODUCT_NOT_FOUND: "errors.invalidData",
       PRODUCT_VARIANT_PARENT: "products.variants.selectSku",
       BATCH_ALREADY_CONSUMED: "purchases.errors.batchAlreadyConsumed",
@@ -586,6 +591,9 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
       let debtNotification = null;
       if (po.status === "received") {
         const items = await tx.select().from(purchaseOrderItems).where(and(eq(purchaseOrderItems.storeId, gate.storeId), eq(purchaseOrderItems.purchaseOrderId, po.id)));
+        const productIds = items.map((item) => item.productId);
+        await ensureInventoryCostBaselines(tx, gate.storeId, productIds);
+        await assertPurchaseCostPeriod(tx, gate.storeId, po, productIds);
         const receiptLots = items.length > 0
           ? await tx.select().from(stockLots).where(and(eq(stockLots.storeId, gate.storeId), inArray(stockLots.purchaseOrderItemId, items.map((item) => item.id))))
           : [];
@@ -596,7 +604,7 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
           await tx.delete(stockLots).where(and(eq(stockLots.storeId, gate.storeId), inArray(stockLots.id, receiptLots.map((lot) => lot.id))));
         }
         for (const i of items) {
-          const qty = Number(i.quantity);
+          const qty = Number(i.quantity) * Number(i.unitMultiplier);
           await tx.update(stockLevels).set({
             quantity: sql`${stockLevels.quantity} - ${toQty(qty)}`,
             updatedAt: sql`now()`,
@@ -650,6 +658,11 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
       }
 
       await tx.update(purchaseOrders).set({ status: "cancelled" }).where(and(eq(purchaseOrders.storeId, gate.storeId), eq(purchaseOrders.id, po.id)));
+      if (po.status === "received") {
+        const items = await tx.select({ productId: purchaseOrderItems.productId }).from(purchaseOrderItems)
+          .where(and(eq(purchaseOrderItems.storeId, gate.storeId), eq(purchaseOrderItems.purchaseOrderId, po.id)));
+        await revalueInventoryProducts(tx, gate.storeId, items.map((item) => item.productId));
+      }
       await recordActivity(tx, {
         storeId: gate.storeId, actorId: profileId, action: "purchase.cancelled", entityType: "purchase", entityId: po.id,
         before: { code: po.code, status: po.status, total: Number(po.total), shippingFee: Number(po.shippingFee), amountPaid: Number(po.amountPaid) },
@@ -669,6 +682,8 @@ export async function cancelPurchase(id: string): Promise<ActionResult> {
     const known: Record<string, string> = {
       PURCHASE_NOT_FOUND: "purchases.errors.notFound",
       ALREADY_CANCELLED: "purchases.errors.alreadyCancelled",
+      COST_HISTORY_LOCKED: "purchases.errors.costHistoryLocked",
+      COST_LEDGER_MISMATCH: "purchases.errors.costLedgerMismatch",
       NOT_EDITABLE: "purchases.errors.notEditable",
       BATCH_ALREADY_CONSUMED: "purchases.errors.batchAlreadyConsumed",
     };

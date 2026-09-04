@@ -27,7 +27,7 @@ async function createDomainTables() {
   const enums = new Set<string>();
   for (const table of [schema.products, schema.categories, schema.brands, schema.suppliers, schema.warehouses,
     schema.profiles, schema.stockLevels, schema.stockMovements, schema.productUnits, schema.productSuppliers,
-    schema.priceBooks, schema.productPrices]) {
+    schema.priceBooks, schema.productPrices, schema.inventoryCostBaselines, schema.inventoryCostAdjustments]) {
     const config = getTableConfig(table);
     for (const column of config.columns) if (column.enumValues?.length && !enums.has(column.getSQLType())) {
       await pg.exec(`create type ${column.getSQLType()} as enum (${column.enumValues.map(quote).join(",")})`);

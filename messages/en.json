@@ -2928,12 +2928,14 @@
     "payFull": "Pay supplier in full",
     "amountPaid": "Paid to supplier",
     "receiveNow": "Save & receive now",
-    "receiveHint": "Receive now: stock is added, cost price updated, unpaid balance recorded as supplier debt.",
+    "receiveHint": "Receive now: stock is added, average cost includes discounts, VAT and freight; unpaid balance is recorded as supplier debt.",
     "errors": {
       "emptyItems": "Add at least 1 product.",
       "notFound": "Purchase receipt not found.",
       "notEditable": "This purchase receipt cannot be edited or cancelled.",
-      "alreadyCancelled": "This purchase receipt was already cancelled."
+      "alreadyCancelled": "This purchase receipt was already cancelled.",
+      "costHistoryLocked": "This receipt is included in a closed historical cost balance. Only notes, invoice details and payments can be changed.",
+      "costLedgerMismatch": "Stock does not match the cost ledger. Reconcile stock movements before saving this receipt."
     },
     "detail": {
       "items": "Purchased items ({count})",
