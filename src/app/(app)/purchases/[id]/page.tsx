@@ -6,6 +6,7 @@ import { Routes } from "@/lib/routes";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
 import { MobileRecordCard, MobileRecordField } from "@/components/mobile-ui";
 import { PurchaseDetailActionGroup } from "@/components/purchase-detail-action-group";
+import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { getPurchase } from "@/lib/data/inventory";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
@@ -71,7 +72,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
             <div className="px-4 py-3 border-b border-border flex items-center justify-between gap-3">
               <div>
                 <Text as="h2" weight="semibold" text={t("purchases.detail.items", { count: purchase.items.length })} />
-                <Text as="p" variant="muted" size="xs" text={purchase.supplierName} />
+                <p className="text-xs"><PartnerDetailLink kind="supplier" partnerId={purchase.supplierId} name={purchase.supplierName} /></p>
               </div>
               <ReceiptText className="h-5 w-5 text-slate-400" />
             </div>
@@ -176,9 +177,7 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
             <h2 className="font-semibold mb-1">{t("purchases.detail.info")}</h2>
             <div className="flex justify-between gap-3">
               <span className="text-slate-500">{t("purchases.cols.supplier")}</span>
-              <Link href={Routes.supplier(purchase.supplierId)} className="inline-flex min-h-11 min-w-11 items-center justify-end text-right font-medium text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">
-                {purchase.supplierName}
-              </Link>
+              <PartnerDetailLink kind="supplier" partnerId={purchase.supplierId} name={purchase.supplierName} className="justify-end text-right font-medium" />
             </div>
             <div className="flex justify-between gap-3"><span className="text-slate-500">{t("purchases.cols.warehouse")}</span><span className="text-right">{purchase.warehouseName}</span></div>
             <div className="flex justify-between gap-3"><span className="text-slate-500">{t("orders.cols.date")}</span><span className="text-right">{formatDate(purchase.createdAt)}</span></div>

@@ -15,6 +15,7 @@ import { SharePrintDocButton } from "./share-print-doc-button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { OrderDetailActionGroup } from "@/components/order-detail-action-group";
 import { OrderProductLink } from "@/components/order-product-link";
+import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { BookingCreateOrderButton, QuoteDeleteButton } from "../../quotes/quote-actions";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import { requireStoreContext } from "@/lib/auth/store-context";
@@ -81,7 +82,9 @@ export async function OrderDetailPanel({
       <div className={cn("mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between", compact && "mb-4")}>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="truncate text-xl font-bold text-slate-900 dark:text-slate-100">{order.customerName ?? t("orders.walkIn")}</h2>
+            <h2 className="truncate text-xl font-bold text-slate-900 dark:text-slate-100">
+              <PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} />
+            </h2>
             <span className="text-sm font-semibold text-slate-500">{order.code}</span>
             <OrderStatusBadge status={order.status} />
             {!isQuote && <PaymentStatusBadge status={order.paymentStatus} />}
@@ -278,7 +281,7 @@ export async function OrderDetailPanel({
             {order.customerId ? (
               <>
                 <InfoLine label={t("orders.cols.customer")}>
-                  <Link href={Routes.customer(order.customerId)} className="inline-flex min-h-11 min-w-11 items-center font-medium text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">{order.customerName}</Link>
+                  <PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} className="font-medium" />
                 </InfoLine>
                 <InfoLine label={t("customers.cols.phone")} value={order.customerPhone ?? "—"} />
                 <InfoLine label={t("customers.cols.debt")} value={formatCurrency(Number(order.customerDebt ?? 0))} valueClassName={Number(order.customerDebt ?? 0) > 0 ? "text-er" : "text-slate-500"} strong />

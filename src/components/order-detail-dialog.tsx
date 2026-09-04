@@ -10,7 +10,7 @@ export function OrderDetailDialog({
   children,
 }: {
   title: string;
-  subtitle: string;
+  subtitle: ReactNode;
   children: ReactNode;
 }) {
   const router = useRouter();

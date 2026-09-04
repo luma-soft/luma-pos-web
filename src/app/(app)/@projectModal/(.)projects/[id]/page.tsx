@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { ProjectDetailDialog } from "@/components/project-detail-dialog";
+import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { getProjectDetail } from "@/lib/data/projects";
 import { requireStoreContext } from "@/lib/auth/store-context";
 import { getServiceFormOptions } from "@/lib/data/services";
@@ -24,7 +25,7 @@ export default async function ProjectDetailModalPage({
   return (
     <ProjectDetailDialog
       title={detail.project.name}
-      subtitle={detail.project.customerName ?? t("projects.noCustomer")}
+      subtitle={<PartnerDetailLink kind="customer" partnerId={detail.project.customerId} name={detail.project.customerName ?? t("projects.noCustomer")} />}
       closeLabel={t("common.close")}
     >
       <ProjectDetailView

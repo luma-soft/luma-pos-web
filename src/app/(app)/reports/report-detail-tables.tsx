@@ -1,5 +1,7 @@
 "use client";
 
+import { PartnerDetailLink } from "@/components/partner-detail-link";
+
 import { useTranslations } from "next-intl";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { MobileRecordField } from "@/components/mobile-ui";
@@ -115,7 +117,7 @@ export function ReportCustomersTable({ rows }: { rows: ReportCustomerRow[] }) {
       required: true,
       render: (row) => (
         <span className="font-medium">
-          {row.customerName}
+          <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName} />
           {row.customerType && row.customerType !== "retail" ? ` (${t(`customers.types.${row.customerType}` as never)})` : ""}
         </span>
       ),
@@ -188,7 +190,7 @@ export function ReportCustomerMobileRow({ row }: { row: ReportCustomerRow }) {
   return (
     <div className="p-3">
       <div className="break-words text-sm font-black leading-snug">
-        {row.customerName}
+        <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName} />
         {row.customerType && row.customerType !== "retail" ? ` (${t(`customers.types.${row.customerType}` as never)})` : ""}
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-2">

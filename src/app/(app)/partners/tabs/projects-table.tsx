@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { useTranslations } from "next-intl";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { Routes } from "@/lib/routes";
@@ -23,7 +24,7 @@ export function ProjectMobileRow({
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="break-words text-sm font-semibold text-primary-600">{row.name}</h3>
-          <p className="mt-1 break-words text-xs text-slate-500">{row.customerName ?? "—"}</p>
+          <p className="mt-1 break-words text-xs text-slate-500"><PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} /></p>
         </div>
         <Status row={row} />
       </div>
@@ -58,7 +59,7 @@ export function ProjectsTable({ rows, customers }: { rows: ProjectRow[]; custome
   const t = useTranslations();
   const columns: DataTableColumn<ProjectRow>[] = [
     { key: "name", label: t("projects.cols.name"), required: true, render: (row) => <span className="font-semibold text-primary-600">{row.name}</span> },
-    { key: "customer", label: t("orders.cols.customer"), defaultVisible: true, render: (row) => row.customerName ?? "—" },
+    { key: "customer", label: t("orders.cols.customer"), defaultVisible: true, render: (row) => <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} /> },
     { key: "address", label: t("customers.fields.address"), defaultVisible: false, render: (row) => <span className="text-slate-500">{row.address ?? "—"}</span> },
     { key: "orders", label: t("projects.cols.orders"), defaultVisible: true, align: "right", width: "110px", render: (row) => row.orderCount },
     { key: "value", label: t("projects.cols.value"), defaultVisible: true, align: "right", render: (row) => formatCurrency(Number(row.totalValue)) },
@@ -109,7 +110,7 @@ export function ProjectsTable({ rows, customers }: { rows: ProjectRow[]; custome
         <div className="space-y-4 bg-surface px-4 py-4">
           <div className="grid gap-4 md:grid-cols-4">
             <Info label={t("projects.cols.name")} value={row.name} />
-            <Info label={t("orders.cols.customer")} value={row.customerName ?? "—"} />
+            <Info label={t("orders.cols.customer")} value={<PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} />} />
             <Info label={t("projects.cols.orders")} value={String(row.orderCount)} />
             <Info label={t("orders.cols.remaining")} value={formatCurrency(Number(row.remaining))} tone={Number(row.remaining) > 0 ? "danger" : undefined} />
           </div>
@@ -131,7 +132,7 @@ function Status({ row }: { row: ProjectRow }) {
   return <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium", row.status === "active" ? "bg-in-soft text-in" : "bg-surface-2 text-slate-500")}>{t(`projects.status.${row.status}` as never)}</span>;
 }
 
-function Info({ label, value, tone }: { label: string; value: string; tone?: "danger" }) {
+function Info({ label, value, tone }: { label: string; value: ReactNode; tone?: "danger" }) {
   return (
     <div className="border-b border-border-soft pb-2">
       <div className="text-xs font-semibold text-slate-500">{label}</div>

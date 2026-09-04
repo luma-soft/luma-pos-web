@@ -1,11 +1,12 @@
 "use client";
 
 import { DateInput } from "@/components/ui/date-input";
+import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { readOrderLinePricing } from "@/lib/orders/line-pricing-snapshot";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   Ban,
@@ -52,6 +53,7 @@ type OrderPreview = {
   id: string;
   code: string;
   status: string;
+  customerId: string | null;
   customerName: string | null;
   createdAt: string;
   total: string | number;
@@ -109,18 +111,22 @@ export function CustomersTable({
   filters,
   returnPrintTemplates,
   aiPreview = false,
+  initialDetailId = null,
+  initialDetailCustomer = null,
 }: {
   data: CustomerListResult;
   filters: CustomerFilters;
   returnPrintTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[];
   aiPreview?: boolean;
+  initialDetailId?: string | null;
+  initialDetailCustomer?: CustomerRow | null;
 }) {
   const t = useTranslations();
   const [filterOpen, setFilterOpen] = useState(false);
   return (
     <div className="min-w-0">
       <section className="min-w-0">
-        <CustomerRows data={data} filters={filters} returnPrintTemplates={returnPrintTemplates} aiPreview={aiPreview} onOpenFilters={() => setFilterOpen(true)} />
+        <CustomerRows data={data} filters={filters} returnPrintTemplates={returnPrintTemplates} aiPreview={aiPreview} initialDetailId={initialDetailId} initialDetailCustomer={initialDetailCustomer} onOpenFilters={() => setFilterOpen(true)} />
 
         <Pagination
           page={data.page}
@@ -194,19 +200,33 @@ function CustomerRows({
   returnPrintTemplates,
   aiPreview,
   onOpenFilters,
+  initialDetailId,
+  initialDetailCustomer,
 }: {
   data: CustomerListResult;
   filters: CustomerFilters;
   returnPrintTemplates: Pick<PrintTemplate, "id" | "name" | "paperDefault">[];
   aiPreview: boolean;
   onOpenFilters: () => void;
+  initialDetailId: string | null;
+  initialDetailCustomer: CustomerRow | null;
 }) {
   const t = useTranslations();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [createOpen, setCreateOpen] = useState(aiPreview);
-  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(initialDetailId);
   const [detailTab, setDetailTab] = useState<CustomerExpandTab>("info");
-  const selectedCustomer = data.rows.find((customer) => customer.id === selectedCustomerId) ?? null;
+  const selectedCustomer = data.rows.find((customer) => customer.id === selectedCustomerId)
+    ?? (initialDetailCustomer?.id === selectedCustomerId ? initialDetailCustomer : null);
+  function closeCustomer() {
+    setSelectedCustomerId(null);
+    if (searchParams.has("detailCustomerId")) {
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete("detailCustomerId");
+      router.replace(`${Routes.Partners}?${next.toString()}`, { scroll: false });
+    }
+  }
   const columns: DataTableColumn<CustomerRow>[] = [
     {
       key: "select",
@@ -217,7 +237,7 @@ function CustomerRows({
       render: (customer) => <Checkbox className="h-4 w-4" aria-label={customer.name} onClick={stopRowToggle} />,
     },
     { key: "code", label: t("customers.cols.code"), defaultVisible: true, width: "130px", render: (customer) => <span className="font-medium">{customer.code ?? "—"}</span> },
-    { key: "name", label: t("customers.cols.name"), required: true, render: (customer) => <span className="font-semibold text-slate-900 dark:text-slate-100">{customer.name}</span> },
+    { key: "name", label: t("customers.cols.name"), required: true, render: (customer) => <PartnerDetailLink kind="customer" partnerId={customer.id} name={customer.name} className="font-semibold" /> },
     { key: "phone", label: t("customers.cols.phone"), defaultVisible: true, width: "130px", render: (customer) => <span className="text-slate-600 dark:text-slate-300">{customer.phone ?? "—"}</span> },
     { key: "debt", label: t("customers.cols.debtCurrent"), defaultVisible: true, align: "right", width: "150px", cellClassName: (customer) => Number(customer.currentDebt) > 0 ? "font-semibold text-er" : "font-semibold text-slate-400", render: (customer) => formatCurrency(Number(customer.currentDebt)) },
     { key: "grossSales", label: t("customers.cols.totalGrossSales"), defaultVisible: true, align: "right", width: "170px", render: (customer) => formatCurrency(Number(customer.grossSales)) },
@@ -263,14 +283,14 @@ function CustomerRows({
           setDetailTab("info");
         }}
         renderMobileRow={({ row: customer }) => (
-          <button type="button" onClick={() => {
-            setSelectedCustomerId(customer.id);
-            setDetailTab("info");
-          }} className="w-full p-3 text-left min-h-11">
+          <article className="w-full p-3 text-left min-h-11">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="truncate font-semibold">{customer.name}</div>
-                <div className="text-xs text-slate-400">{customer.code ?? "—"} · {customer.phone ?? "—"}</div>
+                <div className="truncate font-semibold"><PartnerDetailLink kind="customer" partnerId={customer.id} name={customer.name} /></div>
+                <button type="button" onClick={() => {
+                  setSelectedCustomerId(customer.id);
+                  setDetailTab("info");
+                }} className="inline-flex min-h-11 min-w-11 items-center text-xs text-slate-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{customer.code ?? t("customers.expand.profile")} · {customer.phone ?? "—"}</button>
               </div>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
@@ -278,7 +298,7 @@ function CustomerRows({
               <Metric label={t("customers.cols.totalGrossSales")} value={formatCurrency(Number(customer.grossSales))} />
               <Metric label={t("customers.cols.totalSalesNet")} value={formatCurrency(Number(customer.totalSpent))} />
             </div>
-          </button>
+          </article>
         )}
       />
       <CustomerCreateDialog
@@ -291,15 +311,15 @@ function CustomerRows({
         }}
       />
       <RowPreviewModal
-        open={Boolean(selectedCustomer)}
-        onClose={() => setSelectedCustomerId(null)}
+        open={Boolean(selectedCustomerId)}
+        onClose={closeCustomer}
         title={selectedCustomer?.name ?? t("customers.expand.profile")}
         subtitle={selectedCustomer ? [selectedCustomer.code, selectedCustomer.phone].filter(Boolean).join(" · ") : undefined}
         closeLabel={t("common.close")}
         bodyClassName="flex flex-col !overflow-hidden"
         footer={selectedCustomer && <CustomerDetailFooter customer={selectedCustomer} tab={detailTab} />}
       >
-        {selectedCustomer && <CustomerDetail customer={selectedCustomer} tab={detailTab} returnPrintTemplates={returnPrintTemplates} onTabChange={setDetailTab} />}
+        {selectedCustomer ? <CustomerDetail customer={selectedCustomer} tab={detailTab} returnPrintTemplates={returnPrintTemplates} onTabChange={setDetailTab} /> : <div className="p-8 text-center text-sm text-slate-500">{t("errors.notFound")}</div>}
       </RowPreviewModal>
     </>
   );
@@ -556,7 +576,7 @@ function OrderPreviewDialog({
       open={Boolean(preview)}
       onClose={onClose}
       title={order ? order.code : t("orders.title")}
-      subtitle={order ? `${order.customerName ?? t("orders.walkIn")} · ${formatDate(order.createdAt)}` : undefined}
+      subtitle={order ? <><PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} /> · {formatDate(order.createdAt)}</> : undefined}
       footer={order && (
         <div className="flex justify-end">
           <OrderDetailLink orderId={order.id} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary-600 px-4 text-sm font-semibold text-white hover:brightness-110 lg:min-h-10 min-w-11 lg:min-w-0">
@@ -575,7 +595,7 @@ function OrderPreviewDialog({
       ) : order ? (
         <div className="space-y-5">
           <div className="grid gap-3 text-sm md:grid-cols-3">
-            <InfoField label={t("orders.cols.customer")} value={order.customerName ?? t("orders.walkIn")} />
+            <InfoField label={t("orders.cols.customer")} value={<PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} />} />
             <InfoField label={t("orders.cols.date")} value={formatDate(order.createdAt)} />
             <InfoField label={t("orders.cols.status")} value={order.status} />
           </div>
@@ -856,7 +876,7 @@ function HiddenFilterInputs({ filters, includeQ = true }: { filters: CustomerFil
   );
 }
 
-function InfoField({ label, value, icon: Icon }: { label: string; value?: string | null; icon?: LucideIcon }) {
+function InfoField({ label, value, icon: Icon }: { label: string; value?: React.ReactNode; icon?: LucideIcon }) {
   const t = useTranslations();
   return (
     <div className="border-b border-border-soft pb-2">

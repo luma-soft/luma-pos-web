@@ -522,6 +522,15 @@ async function getBaseProducts(storeId: string, filters: ProductListFilters = {}
             when ${stockMovements.refType} = 'internal_use' then (select iu.code from internal_use_issues iu where iu.id = ${stockMovements.refId} limit 1)
             else ${stockMovements.note}
           end`,
+            partnerId: sql<string | null>`case
+            when ${stockMovements.refType} = 'order' then (
+              select o.customer_id from orders o where o.id = ${stockMovements.refId} and o.store_id = ${storeId} limit 1
+            )
+            when ${stockMovements.refType} = 'purchase' then (
+              select po.supplier_id from purchase_orders po where po.id = ${stockMovements.refId} and po.store_id = ${storeId} limit 1
+            )
+            else null
+          end`,
             partnerName: sql<string | null>`case
             when ${stockMovements.refType} = 'order' then coalesce((
               select c.name from orders o left join customers c on c.id = o.customer_id where o.id = ${stockMovements.refId} limit 1

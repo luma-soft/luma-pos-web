@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Loader2, Pencil, Truck, X } from "lucide-react";
@@ -107,19 +108,24 @@ export function SuppliersTable({
   query,
   owing,
   pageSize,
+  initialDetailId = null,
+  initialDetailSupplier = null,
 }: {
   rows: SupplierRow[];
   query: string;
   owing: SupplierDebtFilter;
   pageSize: number;
+  initialDetailId?: string | null;
+  initialDetailSupplier?: SupplierRow | null;
 }) {
   const t = useTranslations();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [filterOpen, setFilterOpen] = useState(false);
   const [draftDebtFilter, setDraftDebtFilter] = useState<SupplierDebtFilter>(owing);
-  const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(null);
-  const selectedSupplier = rows.find((row) => row.id === selectedSupplierId) ?? null;
+  const [selectedSupplierId, setSelectedSupplierId] = useState<string | null>(initialDetailId);
+  const selectedSupplier = rows.find((row) => row.id === selectedSupplierId)
+    ?? (initialDetailSupplier?.id === selectedSupplierId ? initialDetailSupplier : null);
   const { state: preview, refresh: refreshPreview } = useAppDataQuery(selectedSupplier?.id ?? null, loadSupplierPreview);
   const [draft, setDraft] = useState<SupplierDraft | null>(null);
   const [editing, setEditing] = useState(false);
@@ -151,7 +157,7 @@ export function SuppliersTable({
     setFilterOpen(false);
   }
   const columns: DataTableColumn<SupplierRow>[] = [
-    { key: "name", label: t("suppliers.cols.name"), required: true, render: (row) => <span className="font-semibold text-primary-600">{row.name}</span> },
+    { key: "name", label: t("suppliers.cols.name"), required: true, render: (row) => <PartnerDetailLink kind="supplier" partnerId={row.id} name={row.name} className="font-semibold" /> },
     { key: "code", label: t("customers.cols.code"), defaultVisible: true, render: (row) => <span className="text-slate-500">{row.code}</span> },
     { key: "phone", label: t("customers.cols.phone"), defaultVisible: true, render: (row) => <span className="text-slate-500">{row.phone ?? "—"}</span> },
     { key: "tax", label: t("customers.fields.taxCode"), defaultVisible: true, render: (row) => <span className="text-slate-500">{row.taxCode ?? "—"}</span> },
@@ -175,6 +181,11 @@ export function SuppliersTable({
 
   function closeSupplier() {
     setSelectedSupplierId(null);
+    if (searchParams.has("detailSupplierId")) {
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete("detailSupplierId");
+      router.replace(`${Routes.Partners}?${next.toString()}`, { scroll: false });
+    }
     setDraft(null);
     setEditing(false);
     setSaving(false);
@@ -277,15 +288,15 @@ export function SuppliersTable({
         renderMobileRow={({ row }) => {
           const debt = Number(row.currentDebt);
           return (
-            <button type="button" onClick={() => openSupplier(row)} className="w-full p-3 text-left min-h-11">
+            <article className="w-full p-3 text-left min-h-11">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="truncate font-semibold">{row.name}</div>
-                  <div className="text-xs text-slate-400">{row.phone ?? row.code}</div>
+                  <div className="truncate font-semibold"><PartnerDetailLink kind="supplier" partnerId={row.id} name={row.name} /></div>
+                  <button type="button" onClick={() => openSupplier(row)} className="inline-flex min-h-11 min-w-11 items-center text-xs text-slate-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500">{row.phone ?? row.code ?? t("suppliers.title")}</button>
                 </div>
                 {debt > 0 ? <span className="shrink-0 text-sm font-semibold tabular-nums text-warn">{formatCurrency(debt)}</span> : <span className="text-slate-300">—</span>}
               </div>
-            </button>
+            </article>
           );
         }}
       />
@@ -374,7 +385,7 @@ export function SuppliersTable({
       )}
 
       <RowPreviewModal
-        open={Boolean(selectedSupplier)}
+        open={Boolean(selectedSupplierId)}
         onClose={closeSupplier}
         title={preview?.data?.supplier.name ?? selectedSupplier?.name ?? t("suppliers.title")}
         subtitle={selectedSupplier ? `${preview?.data?.supplier.code ?? selectedSupplier.code ?? "—"} · ${t("suppliers.cols.debt")}: ${formatCurrency(Number(preview?.data?.supplier.currentDebt ?? selectedSupplier.currentDebt))}` : undefined}
@@ -401,7 +412,7 @@ export function SuppliersTable({
           </div>
         )}
       >
-        {preview?.loading ? (
+        {!selectedSupplier ? <div className="p-8 text-center text-sm text-slate-500">{t("errors.notFound")}</div> : preview?.loading ? (
           <div className="grid min-h-64 place-items-center text-sm font-semibold text-slate-500">
             <span className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> {t("common.loading")}</span>
           </div>

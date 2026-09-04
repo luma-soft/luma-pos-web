@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
+import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { useTranslations } from "next-intl";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { Routes } from "@/lib/routes";
@@ -25,7 +27,7 @@ export function PurchaseReturnsTable({ rows }: { rows: PurchaseReturnRow[] }) {
   const columns: DataTableColumn<PurchaseReturnRow>[] = [
     { key: "code", label: t("purchaseReturns.cols.code"), required: true, render: (row) => <span className="font-semibold text-primary-600">{row.code}</span> },
     { key: "time", label: t("purchaseReturns.cols.time"), defaultVisible: true, render: (row) => <span className="text-slate-500">{formatDate(row.createdAt)}</span> },
-    { key: "supplier", label: t("purchaseReturns.cols.supplier"), defaultVisible: true, render: (row) => row.supplierName },
+    { key: "supplier", label: t("purchaseReturns.cols.supplier"), defaultVisible: true, render: (row) => <PartnerDetailLink kind="supplier" partnerId={row.supplierId} name={row.supplierName} /> },
     { key: "subtotal", label: t("purchaseReturns.cols.subtotal"), defaultVisible: true, align: "right", render: (row) => formatCurrency(Number(row.subtotal)) },
     { key: "discount", label: t("purchaseReturns.cols.discount"), defaultVisible: true, align: "right", render: (row) => Number(row.discount) > 0 ? formatCurrency(Number(row.discount)) : "—" },
     { key: "tax", label: t("purchaseReturns.cols.tax"), defaultVisible: true, align: "right", render: (row) => Number(row.tax) > 0 ? formatCurrency(Number(row.tax)) : "—" },
@@ -43,19 +45,20 @@ export function PurchaseReturnsTable({ rows }: { rows: PurchaseReturnRow[] }) {
       renderDetail={(row) => <ExpandedPurchaseReturn row={row} />}
       detailSize="full"
       renderMobileRow={({ row, toggle }) => (
-        <button type="button" onClick={toggle} className="w-full p-3 text-left min-h-11">
-          <div className="flex items-start justify-between gap-2">
+        <div className="relative w-full p-3 text-left">
+          <button type="button" onClick={toggle} aria-label={row.code} className="absolute inset-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" />
+          <div className="pointer-events-none flex items-start justify-between gap-2">
             <div className="min-w-0">
               <div className="font-semibold text-primary-600">{row.code}</div>
-              <div className="text-xs text-slate-400">{formatDate(row.createdAt)} · {row.supplierName}</div>
+              <div className="text-xs text-slate-400">{formatDate(row.createdAt)} · <PartnerDetailLink kind="supplier" partnerId={row.supplierId} name={row.supplierName} className="pointer-events-auto relative z-10" /></div>
             </div>
             <StatusBadge status={row.status} />
           </div>
-          <div className="mt-2 flex items-center justify-between text-sm">
+          <div className="pointer-events-none mt-2 flex items-center justify-between text-sm">
             <span className="font-semibold tabular-nums">{formatCurrency(Number(row.totalRefund))}</span>
             <span className={cn("text-xs font-semibold", settlementClass(row.settlementStatus))}>{t(`purchaseReturns.settlement.${row.settlementStatus}` as never)}</span>
           </div>
-        </button>
+        </div>
       )}
     />
   );
@@ -127,7 +130,7 @@ function ExpandedPurchaseReturn({ row }: { row: PurchaseReturnRow }) {
           </table>
         </div>
         <div className="space-y-2 rounded-lg border border-border-soft p-3 text-sm">
-          <Info label={t("purchaseReturns.cols.supplier")} value={row.supplierName} />
+          <Info label={t("purchaseReturns.cols.supplier")} value={<PartnerDetailLink kind="supplier" partnerId={row.supplierId} name={row.supplierName} />} />
           <Info label={t("purchases.cols.warehouse")} value={row.warehouseName} />
           <Info label={t("purchaseReturns.refundAmount")} value={formatCurrency(Number(row.refundAmount))} />
           <Info label={t("purchaseReturns.debtAmount")} value={formatCurrency(Number(row.debtAmount))} />
@@ -140,7 +143,7 @@ function ExpandedPurchaseReturn({ row }: { row: PurchaseReturnRow }) {
   );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+function Info({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex justify-between gap-3">
       <span className="text-slate-500">{label}</span>

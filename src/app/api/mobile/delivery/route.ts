@@ -36,6 +36,7 @@ export async function GET() {
       .select({
         id: orders.id,
         code: orders.code,
+        customerId: orders.customerId,
         customerName: sql<string>`coalesce(${customers.name}, 'Khách lẻ')`,
         deliveryAddress: orders.deliveryAddress,
         total: orders.total,
@@ -67,6 +68,7 @@ export async function GET() {
             deliveredAt: tripStops.deliveredAt,
             sortOrder: tripStops.sortOrder,
             orderCode: orders.code,
+            customerId: orders.customerId,
             customerName: sql<string>`coalesce(${customers.name}, 'Khách lẻ')`,
             deliveryAddress: orders.deliveryAddress,
             total: orders.total,

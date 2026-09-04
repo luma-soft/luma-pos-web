@@ -138,6 +138,7 @@ export async function getDashboard(storeId: string, requestedRange?: DashboardRa
       status: orders.status,
       projectName: orders.projectName,
       createdAt: orders.createdAt,
+      customerId: orders.customerId,
       customerName: customers.name,
       customerType: customers.type,
     })

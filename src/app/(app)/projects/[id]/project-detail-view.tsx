@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { getTranslations } from "next-intl/server";
 import { Routes } from "@/lib/routes";
 import { MobileDetailHeader } from "@/components/mobile-detail-header";
@@ -98,7 +99,7 @@ function ProjectDetailHeader({
       backHref={`${Routes.Services}?tab=projects`}
       backLabel={t("common.back")}
       title={project.name}
-      subtitle={project.customerName ?? t("projects.noCustomer")}
+      subtitle={<PartnerDetailLink kind="customer" partnerId={project.customerId} name={project.customerName ?? t("projects.noCustomer")} />}
       stackActionsOnMobile
       actions={
         <ProjectDetailActions
@@ -588,7 +589,7 @@ function ProjectDetailBody({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[320px_1fr]">
         <div className="bg-surface border border-border rounded-card p-4 text-sm space-y-3">
           <Info label={t("projects.cols.name")} value={project.name} />
-          <Info label={t("orders.cols.customer")} value={project.customerName ?? "—"} />
+          <Info label={t("orders.cols.customer")} value={<PartnerDetailLink kind="customer" partnerId={project.customerId} name={project.customerName ?? "—"} />} />
           {project.serviceType && <Info label={t("services.fields.type")} value={t(`services.types.${project.serviceType}` as never)} />}
           {project.serviceStage && <Info label={t("services.fields.stage")} value={t(`services.stages.${project.serviceStage}` as never)} />}
           <Info label={t("customers.fields.address")} value={project.address ?? "—"} />
@@ -623,7 +624,7 @@ function ProjectOverviewDetails({ project, orders, t }: ProjectOverviewDetailsPr
     <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
       <div className="bg-surface border border-border rounded-card p-4 text-sm space-y-3">
         <Info label={t("projects.cols.name")} value={project.name} />
-        <Info label={t("orders.cols.customer")} value={project.customerName ?? "—"} />
+        <Info label={t("orders.cols.customer")} value={<PartnerDetailLink kind="customer" partnerId={project.customerId} name={project.customerName ?? "—"} />} />
         {project.serviceType && <Info label={t("services.fields.type")} value={t(`services.types.${project.serviceType}` as never)} />}
         {project.serviceStage && <Info label={t("services.fields.stage")} value={t(`services.stages.${project.serviceStage}` as never)} />}
         <Info label={t("customers.fields.address")} value={project.address ?? "—"} />
@@ -658,7 +659,7 @@ function RelatedOrders({ orders, t }: Pick<ProjectOverviewDetailsProps, "orders"
                   {order.code}
                 </OrderDetailLink>
               )}
-              subtitle={`${formatDate(order.createdAt)} · ${order.customerName ?? t("orders.walkIn")}`}
+              subtitle={<>{formatDate(order.createdAt)} · <PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} /></>}
               status={<div className="flex flex-wrap justify-end gap-1.5"><OrderStatusBadge status={order.status} /><PaymentStatusBadge status={order.paymentStatus} /></div>}
             >
               <MobileRecordField label={t("orders.cols.total")} value={formatCurrency(Number(order.total))} />
@@ -690,7 +691,7 @@ function RelatedOrders({ orders, t }: Pick<ProjectOverviewDetailsProps, "orders"
                 <tr key={order.id}>
                   <td className="px-4 py-3"><OrderDetailLink orderId={order.id} className="font-semibold text-primary-600 hover:underline">{order.code}</OrderDetailLink></td>
                   <td className="px-4 py-3 text-slate-500">{formatDate(order.createdAt)}</td>
-                  <td className="px-4 py-3">{order.customerName ?? t("orders.walkIn")}</td>
+                  <td className="px-4 py-3"><PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} /></td>
                   <td className="px-4 py-3"><div className="flex flex-wrap gap-1.5"><OrderStatusBadge status={order.status} /><PaymentStatusBadge status={order.paymentStatus} /></div></td>
                   <td className="px-4 py-3 text-right font-semibold tabular-nums">{formatCurrency(Number(order.total))}</td>
                   <td className="px-4 py-3 text-right font-semibold text-er tabular-nums">{remaining > 0 ? formatCurrency(remaining) : "—"}</td>
@@ -713,7 +714,7 @@ function Metric({ label, value, danger }: { label: string; value: string; danger
   );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
+function Info({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between gap-3 border-b border-border-soft pb-2 last:border-b-0">
       <span className="text-slate-500">{label}</span>

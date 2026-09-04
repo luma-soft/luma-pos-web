@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import type { ProjectDetail } from "@/lib/data/projects";
+import { PartnerDetailLink } from "@/components/partner-detail-link";
 import type { getServiceFormOptions } from "@/lib/data/services";
 import { InstalledAssetQuickCreate } from "../../services/service-widgets";
 import { InstalledAssetPhotoThumbnail } from "./installed-asset-photo-thumbnail";
@@ -64,7 +65,7 @@ export function ProjectSimpleExperience({
                   <h2 className="font-semibold">Thông tin công trình</h2>
                 </header>
                 <dl>
-                  <InfoRow label="Khách hàng" value={project.customerName ?? "—"} />
+                  <InfoRow label="Khách hàng" value={<PartnerDetailLink kind="customer" partnerId={project.customerId} name={project.customerName ?? "—"} />} />
                   <InfoRow label="Địa chỉ" value={project.address ?? "—"} />
                   <InfoRow
                     label="Lịch dự kiến"
@@ -165,7 +166,7 @@ function SummaryMetric({ icon, label, value }: { icon: React.ReactNode; label: s
   );
 }
 
-function InfoRow({ label, value }: { label: string; value: string }) {
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 border-b border-border-soft px-4 py-3 text-sm last:border-0">
       <dt className="text-slate-500">{label}</dt>

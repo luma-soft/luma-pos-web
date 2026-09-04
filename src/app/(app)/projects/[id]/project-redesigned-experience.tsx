@@ -19,6 +19,7 @@ import {
   Droplets,
 } from "lucide-react";
 import type { ProjectDetail } from "@/lib/data/projects";
+import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { evaluateServiceProjectClose } from "@/lib/services/project-close";
 import type { getServiceFormOptions } from "@/lib/data/services";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -171,7 +172,7 @@ function OverviewTab({ detail, serviceOptions }: { detail: ProjectDetail; servic
       </div>
       <div className="space-y-4">
         <Panel title="Thông tin công trình" flush>
-          <InfoRow label="Khách hàng" value={project.customerName ?? "—"} />
+          <InfoRow label="Khách hàng" value={<PartnerDetailLink kind="customer" partnerId={project.customerId} name={project.customerName ?? "—"} />} />
           <InfoRow label="Địa chỉ" value={project.address ?? "—"} />
           <InfoRow label="Liên hệ" value={[project.siteContactName, project.siteContactPhone].filter(Boolean).join(" · ") || "—"} />
           <InfoRow label="Dịch vụ" value={serviceTypeLabel(project.serviceType)} />
@@ -363,7 +364,7 @@ function Panel({ title, subtitle, action, children, flush = false }: { title: st
 }
 
 function Empty({ text }: { text: string }) { return <div className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-slate-500">{text}</div>; }
-function InfoRow({ label, value }: { label: string; value: string }) { return <div className="grid grid-cols-[120px_1fr] gap-3 border-b border-border-soft px-4 py-3 text-sm last:border-0"><span className="text-slate-500">{label}</span><span className="font-medium">{value}</span></div>; }
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) { return <div className="grid grid-cols-[120px_1fr] gap-3 border-b border-border-soft px-4 py-3 text-sm last:border-0"><span className="text-slate-500">{label}</span><span className="font-medium">{value}</span></div>; }
 function MiniStat({ label, value }: { label: string; value: number }) { return <div className="rounded-lg bg-surface-2 px-2 py-3"><p className="text-xl font-bold">{value}</p><p className="mt-1 text-[11px] text-slate-500">{label}</p></div>; }
 function RecordCard({ title, meta, detail, action, children }: { title: string; meta: string; detail: string; action?: React.ReactNode; children?: React.ReactNode }) { return <div className="rounded-xl border border-border-soft p-3"><div className="flex items-start gap-2"><FileText className="mt-0.5 h-4 w-4 shrink-0 text-primary-600" /><div className="min-w-0 flex-1"><p className="text-sm font-semibold">{title}</p><p className="mt-1 text-xs text-slate-500">{meta}</p><p className="mt-2 text-xs">{detail}</p>{children}</div>{action}</div></div>; }
 function FinanceMetric({ label, value, success }: { label: string; value: number; success?: boolean }) { return <div className="rounded-xl border border-border bg-surface p-4"><p className="text-xs text-slate-500">{label}</p><p className={success ? "mt-2 text-xl font-bold text-ok" : "mt-2 text-xl font-bold"}>{formatCurrency(value)}</p></div>; }

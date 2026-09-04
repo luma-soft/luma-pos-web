@@ -1,5 +1,7 @@
 "use client";
 
+import { PartnerDetailLink } from "@/components/partner-detail-link";
+
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -175,7 +177,7 @@ export function ServiceProjectMobileRow({
                 {row.name}
               </Link>
             </h3>
-            <p className="mt-1 break-words text-xs text-slate-500">{row.customerName ?? t("projects.noCustomer")}</p>
+            <p className="mt-1 break-words text-xs text-slate-500"><PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? t("projects.noCustomer")} /></p>
           </div>
         </div>
         <ChevronRight aria-hidden="true" className="mt-2 h-5 w-5 shrink-0 text-slate-400" />
@@ -233,7 +235,7 @@ export function ServiceProjectsTable({ rows, customers }: { rows: ServiceProject
         </span>
       ),
     },
-    { key: "customer", label: t("orders.cols.customer"), defaultVisible: true, render: (row) => row.customerName ?? "—" },
+    { key: "customer", label: t("orders.cols.customer"), defaultVisible: true, render: (row) => <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? "—"} /> },
     { key: "assets", label: "Thiết bị", defaultVisible: true, align: "right", render: (row) => row.assetCount },
     {
       key: "status",

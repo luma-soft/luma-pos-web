@@ -5,6 +5,7 @@ import { PackageOpen } from "lucide-react";
 import { DataTableShell, type DataTableColumn } from "@/components/data-table";
 import { MobileRecordField } from "@/components/mobile-ui";
 import { OrderDetailLink } from "@/components/order-detail-link";
+import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import type { ReportInvoiceRow } from "@/lib/data/reports";
 
@@ -29,7 +30,7 @@ export function ReportInvoicesTable({ rows }: { rows: ReportInvoiceRow[] }) {
       key: "customer",
       label: t("orders.cols.customer"),
       defaultVisible: true,
-      render: (invoice) => <span className="font-medium">{invoice.customerName}</span>,
+      render: (invoice) => <PartnerDetailLink kind="customer" partnerId={invoice.customerId} name={invoice.customerName} className="font-medium" />,
     },
     {
       key: "status",
@@ -104,7 +105,7 @@ export function ReportInvoiceMobileRow({ row }: { row: ReportInvoiceRow }) {
     <div className="p-3">
       <OrderSummaryLink row={row} mobile />
       <div className="text-xs font-medium text-slate-400">
-        {formatDate(row.createdAt)} · {row.customerName}
+        {formatDate(row.createdAt)} · <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName} />
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-2">
         <MobileRecordField

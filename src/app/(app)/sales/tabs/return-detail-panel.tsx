@@ -4,6 +4,7 @@ import type { getReturn } from "@/lib/data/returns";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { OrderDetailLink } from "@/components/order-detail-link";
+import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { getPrintTemplatesForDoc } from "@/lib/print/template";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
 import { requireStoreContext } from "@/lib/auth/store-context";
@@ -20,7 +21,7 @@ export async function ReturnDetailPanel({ ret, compact = false }: { ret: ReturnD
       <div className={cn("mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between", compact && "mb-4")}>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="truncate text-xl font-bold text-slate-900 dark:text-slate-100">{ret.customerName ?? t("orders.walkIn")}</h2>
+            <h2 className="truncate text-xl font-bold text-slate-900 dark:text-slate-100"><PartnerDetailLink kind="customer" partnerId={ret.customerId} name={ret.customerName ?? t("orders.walkIn")} /></h2>
             <span className="text-sm font-semibold text-slate-500">{ret.code}</span>
             <span className={cn(
               "inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold",
@@ -98,7 +99,7 @@ export async function ReturnDetailPanel({ ret, compact = false }: { ret: ReturnD
         <div className="space-y-3 text-sm">
           <div className="space-y-2 rounded-lg border border-border-soft p-3">
             <div className="font-semibold">{t("orders.detail.customer")}</div>
-            <InfoLine label={t("orders.cols.customer")} value={ret.customerName ?? t("orders.walkIn")} />
+            <InfoLine label={t("orders.cols.customer")}><PartnerDetailLink kind="customer" partnerId={ret.customerId} name={ret.customerName ?? t("orders.walkIn")} /></InfoLine>
             <InfoLine label={t("customers.cols.phone")} value={ret.customerPhone ?? "—"} />
           </div>
 

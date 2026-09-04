@@ -83,11 +83,9 @@ function parseMoneyBound(value?: string) {
   return Number.isFinite(n) && n >= 0 ? n : undefined;
 }
 
-function buildCustomerConditions(storeId: string, filters: CustomerFilters) {
-  const conditions: SQL[] = [
-    eq(customers.storeId, storeId),
-    eq(customers.isActive, true),
-  ];
+function buildCustomerConditions(storeId: string, filters: CustomerFilters, includeInactive = false) {
+  const conditions: SQL[] = [eq(customers.storeId, storeId)];
+  if (!includeInactive) conditions.push(eq(customers.isActive, true));
 
   if (filters.customerId) conditions.push(eq(customers.id, filters.customerId));
 
@@ -137,11 +135,11 @@ const customerHistoryOrderStatus = sql`${orders.status} in ('completed', 'return
 export async function getCustomers(
   storeId: string,
   filters: CustomerFilters = {},
-  options: { includeHistory?: boolean } = {},
+  options: { includeHistory?: boolean; includeInactive?: boolean } = {},
 ) {
   const page = Math.max(1, filters.page ?? 1);
   const size = coercePageSize(filters.pageSize);
-  const conditions = buildCustomerConditions(storeId, filters);
+  const conditions = buildCustomerConditions(storeId, filters, options.includeInactive === true && Boolean(filters.customerId));
   const where = and(...conditions);
 
   const [baseRows, [{ total }], [moneyAgg], [grossAgg]] = await Promise.all([
@@ -502,7 +500,7 @@ export async function getCustomerPartnerDetail(storeId: string, id: string) {
   const result = await getCustomers(
     storeId,
     { customerId: id, page: 1, pageSize: 1 },
-    { includeHistory: true },
+    { includeHistory: true, includeInactive: true },
   );
   return result.rows[0] ?? null;
 }

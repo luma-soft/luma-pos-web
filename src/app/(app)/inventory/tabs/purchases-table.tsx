@@ -11,6 +11,7 @@ import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
 import type { getPurchases } from "@/lib/data/inventory";
 import type { PrintTemplate } from "@/lib/print/template-shared";
 import { PrintTemplateMenu } from "@/components/print/print-template-menu";
+import { PartnerDetailLink } from "@/components/partner-detail-link";
 
 type PurchaseRow = Awaited<ReturnType<typeof getPurchases>>["rows"][number];
 
@@ -32,7 +33,7 @@ export function PurchasesTable({ rows, printTemplates }: { rows: PurchaseRow[]; 
   const columns: DataTableColumn<PurchaseRow>[] = [
     { key: "code", label: t("purchases.cols.code"), required: true, render: (purchase) => <span className="font-semibold text-primary-600">{purchase.code}</span> },
     { key: "date", label: t("orders.cols.date"), defaultVisible: true, render: (purchase) => <span className="text-slate-500">{formatDate(purchase.createdAt)}</span> },
-    { key: "supplier", label: t("purchases.cols.supplier"), defaultVisible: true, render: (purchase) => purchase.supplierName },
+    { key: "supplier", label: t("purchases.cols.supplier"), defaultVisible: true, render: (purchase) => <PartnerDetailLink kind="supplier" partnerId={purchase.supplierId} name={purchase.supplierName} /> },
     { key: "warehouse", label: t("purchases.cols.warehouse"), defaultVisible: true, render: (purchase) => <span className="text-slate-500">{purchase.warehouseName}</span> },
     { key: "total", label: t("orders.cols.total"), defaultVisible: true, align: "right", cellClassName: "font-semibold", render: (purchase) => formatCurrency(Number(purchase.total)) },
     { key: "owed", label: t("purchases.cols.owed"), defaultVisible: true, align: "right", cellClassName: (purchase) => purchaseOwed(purchase) > 0 ? "font-semibold text-warn" : "text-slate-400", render: (purchase) => purchaseOwed(purchase) > 0 ? formatCurrency(purchaseOwed(purchase)) : "—" },
@@ -50,19 +51,20 @@ export function PurchasesTable({ rows, printTemplates }: { rows: PurchaseRow[]; 
         renderMobileRow={({ row: purchase }) => {
           const owed = purchaseOwed(purchase);
           return (
-            <button type="button" onClick={() => setSelectedPurchaseId(purchase.id)} className="w-full p-3 text-left min-h-11">
-              <div className="flex items-start justify-between gap-2">
+            <div className="relative w-full p-3 text-left">
+              <button type="button" onClick={() => setSelectedPurchaseId(purchase.id)} aria-label={purchase.code} className="absolute inset-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500" />
+              <div className="pointer-events-none flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="font-semibold text-primary-600">{purchase.code}</div>
-                  <div className="text-xs text-slate-400">{formatDate(purchase.createdAt)} · {purchase.supplierName}</div>
+                  <div className="text-xs text-slate-400">{formatDate(purchase.createdAt)} · <PartnerDetailLink kind="supplier" partnerId={purchase.supplierId} name={purchase.supplierName} className="pointer-events-auto relative z-10" /></div>
                 </div>
                 <StatusBadge status={purchase.status} />
               </div>
-              <div className="mt-2 flex items-center justify-between text-sm">
+              <div className="pointer-events-none mt-2 flex items-center justify-between text-sm">
                 <span className="font-semibold tabular-nums">{formatCurrency(Number(purchase.total))}</span>
                 {owed > 0 && <span className="font-semibold tabular-nums text-warn">{formatCurrency(owed)}</span>}
               </div>
-            </button>
+            </div>
           );
         }}
       />
@@ -107,7 +109,7 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-sm font-semibold">{t("purchases.detail.items", { count: purchase.items.length })}</div>
-            <div className="text-xs text-slate-400">{purchase.supplierName}</div>
+            <div className="text-xs text-slate-400"><PartnerDetailLink kind="supplier" partnerId={purchase.supplierId} name={purchase.supplierName} /></div>
           </div>
           <ReceiptText className="h-5 w-5 text-slate-400" />
         </div>
@@ -184,11 +186,9 @@ function PurchaseDetailContent({ purchase }: { purchase: PurchaseRow }) {
         <div className="space-y-2 rounded-lg border border-border-soft p-3">
           <div className="font-semibold">{t("purchases.detail.info")}</div>
           <InfoLine label={t("purchases.cols.supplier")}>
-            <Link href={Routes.supplier(purchase.supplierId)} className="inline-flex min-h-11 min-w-11 items-center font-medium text-primary-600 hover:underline lg:min-h-0 lg:min-w-0">
-              {purchase.supplierName}
-            </Link>
+            <PartnerDetailLink kind="supplier" partnerId={purchase.supplierId} name={purchase.supplierName} className="text-right font-medium" />
           </InfoLine>
-          {purchase.supplierPhone && <InfoLine label={t("customers.phone")} value={purchase.supplierPhone} />}
+          {purchase.supplierPhone && <InfoLine label={t("customers.cols.phone")} value={purchase.supplierPhone} />}
           <InfoLine label={t("purchases.cols.warehouse")} value={purchase.warehouseName} />
           <InfoLine label={t("orders.cols.date")} value={formatDate(purchase.createdAt)} />
           {purchase.createdByName && <InfoLine label={t("purchases.detail.receiver")} value={purchase.createdByName} />}

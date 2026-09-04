@@ -47,6 +47,7 @@ import {
 import { Routes } from "@/lib/routes";
 import { ONLINE_SALES_ENABLED } from "@/lib/features";
 import { OrderDetailLink } from "@/components/order-detail-link";
+import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { deleteProduct, setProductActive } from "@/lib/actions/products";
 import { setCameraMaterial } from "@/lib/actions/products";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
@@ -1302,7 +1303,7 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
           </div>
           <div className="text-xs text-slate-500">{formatDate(movement.createdAt)} · {t(movementTypeKey(movement.type) as never)}</div>
           <dl className="grid grid-cols-2 gap-2 text-xs">
-            <div><dt className="text-slate-500">{t("products.expand.cols.partner")}</dt><dd className="mt-0.5 break-words">{movement.partnerName || "—"}</dd></div>
+            <div><dt className="text-slate-500">{t("products.expand.cols.partner")}</dt><dd className="mt-0.5 break-words"><PartnerDetailLink kind={movement.refType === "purchase" ? "supplier" : "customer"} partnerId={movement.partnerId} name={movement.partnerName || "—"} /></dd></div>
             <div><dt className="text-right text-slate-500">{t("products.expand.cols.stockAfter")}</dt><dd className="mt-0.5 text-right font-semibold tabular-nums">{formatNumber(Number(movement.stockAfter))}</dd></div>
             <div><dt className="text-slate-500">{t("products.expand.cols.transactionPrice")}</dt><dd className="mt-0.5 tabular-nums">{moneyOrDash(movement.transactionPrice)}</dd></div>
             <div><dt className="text-right text-slate-500">{t("products.expand.cols.costPrice")}</dt><dd className="mt-0.5 text-right tabular-nums">{moneyOrDash(movement.unitCost)}</dd></div>
@@ -1353,7 +1354,7 @@ function ProductStockCardPanel({ product }: { product: ProductRow }) {
                 {t(movementTypeKey(movement.type) as never)}
               </td>
               <td className="px-3 py-3 text-slate-700 dark:text-slate-200">
-                {movement.partnerName || "—"}
+                <PartnerDetailLink kind={movement.refType === "purchase" ? "supplier" : "customer"} partnerId={movement.partnerId} name={movement.partnerName || "—"} />
               </td>
               <td className="px-3 py-3 text-right tabular-nums">
                 {moneyOrDash(movement.transactionPrice)}

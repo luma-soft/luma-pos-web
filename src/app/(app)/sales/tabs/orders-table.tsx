@@ -21,6 +21,7 @@ import type { PrintTemplate } from "@/lib/print/template-shared";
 import { useConfirmDialog } from "@/components/confirm-dialog-provider";
 import { cancelOrders } from "@/lib/actions/orders";
 import { SalesTableEmptyState } from "./sales-table-empty-state";
+import { PartnerDetailLink } from "@/components/partner-detail-link";
 
 export function normalizeOrderBatchSelection(
   selectedIds: Set<string>,
@@ -201,23 +202,30 @@ export function OrderMobileRow({
           label={order.code}
         />
       </div>
-      <button
-        type="button"
-        onClick={onOpen}
-        className="min-h-11 min-w-11 flex-1 p-3 text-left"
-      >
-        <div className="flex items-start justify-between gap-3">
+      <div className="relative min-h-11 min-w-0 flex-1 p-3 text-left">
+        <button
+          type="button"
+          onClick={onOpen}
+          aria-label={order.code}
+          className="absolute inset-0 rounded-lg focus-visible:outline-2 focus-visible:outline-primary-500"
+        />
+        <div className="pointer-events-none relative flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="font-semibold text-primary-600">{order.code}</div>
             <div className="break-words text-xs text-slate-400">
               {formatDate(order.createdAt)} ·{" "}
-              {order.customerName ?? labels.walkIn} ·{" "}
+              <PartnerDetailLink
+                kind="customer"
+                partnerId={order.customerId}
+                name={order.customerName ?? labels.walkIn}
+                className="pointer-events-auto relative inline-flex min-h-11 items-center"
+              /> ·{" "}
               {channelLabel(order.sourceMode)}
             </div>
           </div>
           <OrderStatusBadge status={order.status} />
         </div>
-        <div className="mt-2 flex items-center justify-between gap-3 text-sm">
+        <div className="pointer-events-none relative mt-2 flex items-center justify-between gap-3 text-sm">
           <span className="font-semibold tabular-nums">
             {formatCurrency(Number(order.total))}
           </span>
@@ -229,7 +237,7 @@ export function OrderMobileRow({
             <PaymentStatusBadge status={order.paymentStatus} />
           )}
         </div>
-      </button>
+      </div>
     </div>
   );
 }
@@ -372,7 +380,7 @@ export function OrdersTable({
       key: "customer",
       label: t("orders.cols.customer"),
       defaultVisible: true,
-      render: (order) => order.customerName ?? t("orders.walkIn"),
+      render: (order) => <PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? t("orders.walkIn")} />,
     },
     {
       key: "channel",

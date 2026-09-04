@@ -124,6 +124,7 @@ export async function getReportInvoices(
       code: orders.code,
       status: orders.status,
       createdAt: orders.createdAt,
+      customerId: orders.customerId,
       customerName: sql<string>`coalesce(${customers.name}, 'Khách lẻ')`,
       total: orders.total,
       amountPaid: orders.amountPaid,

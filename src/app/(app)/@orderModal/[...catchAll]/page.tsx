@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { OrderDetailDialog } from "@/components/order-detail-dialog";
+import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { getOrder } from "@/lib/data/orders";
 import { OrderDetailPanel } from "@/app/(app)/orders/[id]/order-detail-panel";
 import { requireStoreContext } from "@/lib/auth/store-context";
@@ -19,7 +20,7 @@ export default async function OrderModalCatchAll({ searchParams }: Props) {
   return (
     <OrderDetailDialog
       title={order.code}
-      subtitle={order.customerName ?? "Khách lẻ"}
+      subtitle={<PartnerDetailLink kind="customer" partnerId={order.customerId} name={order.customerName ?? "Khách lẻ"} />}
     >
       <OrderDetailPanel order={order} compact />
     </OrderDetailDialog>

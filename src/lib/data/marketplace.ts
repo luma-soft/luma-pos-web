@@ -118,6 +118,7 @@ export async function getShopeeDashboard(storeId: string) {
           orderId: marketplaceOrderMappings.orderId,
           orderCode: orders.code,
           total: orders.total,
+          customerId: orders.customerId,
           customerName: customers.name,
         })
         .from(marketplaceOrderMappings)
@@ -149,6 +150,7 @@ export async function getShopeeInbox(storeId: string) {
         buyerName: marketplaceMessageThreads.buyerName,
         status: marketplaceMessageThreads.status,
         lastMessageAt: marketplaceMessageThreads.lastMessageAt,
+        customerId: marketplaceMessageThreads.customerId,
         customerName: customers.name,
         orderCode: orders.code,
       })

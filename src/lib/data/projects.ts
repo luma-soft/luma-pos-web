@@ -188,6 +188,7 @@ export async function getProjectDetail(storeId: string, id: string) {
       total: orders.total,
       amountPaid: orders.amountPaid,
       createdAt: orders.createdAt,
+      customerId: orders.customerId,
       customerName: customers.name,
       projectName: orders.projectName,
     })

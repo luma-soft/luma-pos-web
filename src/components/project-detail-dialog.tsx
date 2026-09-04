@@ -24,7 +24,7 @@ export function ProjectDetailDialog({
   children,
 }: {
   title: string;
-  subtitle: string;
+  subtitle: ReactNode;
   closeLabel: string;
   children: ReactNode;
 }) {

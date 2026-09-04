@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PartnerDetailLink } from "@/components/partner-detail-link";
 import { getLocale, getTranslations } from "next-intl/server";
 import { Routes } from "@/lib/routes";
 import { cn, formatCurrency, formatDate, formatNumber } from "@/lib/utils";
@@ -350,7 +351,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                       </OrderDetailLink>
                     </td>
                     <td className="px-4 py-3">
-                      {o.customerName ?? t("orders.walkIn")}
+                      <PartnerDetailLink kind="customer" partnerId={o.customerId} name={o.customerName ?? t("orders.walkIn")} />
                       {o.customerType && o.customerType !== "retail" && (
                         <Text as="span" variant="muted" size="xs" text={` (${t(`customers.types.${o.customerType}` as never)})`} />
                       )}
@@ -389,7 +390,7 @@ export default async function DashboardPage({ searchParams }: PageProps) {
                           {initials}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <Link href={Routes.customer(c.id)} className="font-semibold text-[13px] hover:underline truncate block">{c.name}</Link>
+                          <PartnerDetailLink kind="customer" partnerId={c.id} name={c.name} className="font-semibold text-[13px] truncate" />
                           <div className={cn("text-xs", pct != null && pct > 85 ? "text-er" : "text-slate-400")}>
                             {pct != null ? t("dashboard.pctOfLimit", { pct }) : t("dashboard.noLimit")}
                           </div>

@@ -261,6 +261,7 @@ export async function getOrders(storeId: string, filters: OrderListFilters = {})
       amountPaid: orders.amountPaid,
       sourceMode: orders.sourceMode,
       createdAt: orders.createdAt,
+      customerId: orders.customerId,
       customerName: customers.name,
       customerType: customers.type,
       itemCount: sql<number>`(

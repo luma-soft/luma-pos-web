@@ -5,6 +5,7 @@ import { FileX2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { DataTableShell, stopRowToggle, type DataTableColumn } from "@/components/data-table";
 import { OrderDetailLink } from "@/components/order-detail-link";
+import { PartnerDetailLink } from "@/components/partner-detail-link";
 import type { ReturnListRow } from "@/lib/data/returns";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { SalesTableEmptyState } from "./sales-table-empty-state";
@@ -49,7 +50,7 @@ export function ReturnsTable({
       key: "customer",
       label: t("orders.cols.customer"),
       defaultVisible: true,
-      render: (row) => row.customerName ?? t("orders.walkIn"),
+      render: (row) => <PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? t("orders.walkIn")} />,
     },
     {
       key: "reason",
@@ -135,7 +136,7 @@ export function ReturnsTable({
               {row.orderCode}
             </OrderDetailLink>
           )}
-          <p className="text-sm font-medium">{row.customerName ?? t("orders.walkIn")}</p>
+          <p className="text-sm font-medium"><PartnerDetailLink kind="customer" partnerId={row.customerId} name={row.customerName ?? t("orders.walkIn")} className="inline-flex min-h-11 items-center" /></p>
           <p className="text-xs text-slate-500">
             {row.reason ? t(`returns.reasons.${row.reason}` as never) : "—"} · {t(`returns.refundMethods.${row.refundMethod}`)}
           </p>
