@@ -43,12 +43,12 @@ export function StockActionMenu() {
     <div ref={root} className="relative ml-auto flex items-center gap-2">
       <Link
         href={`${Routes.Inventory}?tab=stock#stock-history`}
-        className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-primary-700 shadow-e1 transition hover:bg-surface-2 dark:text-primary-300 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0"
+        className="inline-flex min-h-11 min-w-11 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-primary-700 shadow-e1 transition hover:bg-surface-2 dark:text-primary-300 lg:min-h-10 lg:min-w-0"
       >
         <History className="h-4 w-4" />
         {t("inventory.actions.history")}
       </Link>
-      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="inline-flex min-h-10 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-slate-700 shadow-e1 transition hover:bg-surface-2 dark:text-slate-200 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0 min-h-11 lg:min-h-0 min-w-11 lg:min-w-0">
+      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="inline-flex min-h-11 min-w-11 items-center gap-2 rounded-full border border-border bg-surface px-4 text-sm font-semibold text-slate-700 shadow-e1 transition hover:bg-surface-2 dark:text-slate-200 lg:min-h-10 lg:min-w-0">
         <ClipboardCheck className="h-4 w-4 text-primary-600" />
         {t("inventory.actions.warehouseActions")}
         <ChevronDown className={cn("h-4 w-4 text-slate-400 transition", open && "rotate-180")} />
