@@ -7,5 +7,5 @@ export async function GET(request: Request) {
   if (!gate.ok) return mobileGate(gate)!;
 
   const query = searchParam(request, "q", "") ?? "";
-  return mobileOk(await searchPosProductRows(gate.storeId, query));
+  return mobileOk(await searchPosProductRows(gate.storeId, query, { role: gate.role }));
 }

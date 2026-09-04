@@ -336,7 +336,11 @@ export async function getMobilePosData(storeId: string, role: Role) {
  * toàn bộ SP active để khớp đúng kết quả như trang Sản phẩm, không bị giới hạn
  * 200 SP của lưới mặc định.
  */
-export async function searchPosProductRows(storeId: string, q: string): Promise<PosProduct[]> {
+export async function searchPosProductRows(
+  storeId: string,
+  q: string,
+  options?: { role?: Role },
+): Promise<PosProduct[]> {
   const hasComplianceColumns = await hasProductComplianceColumns();
   const [defaultWh] = await db
     .select({ id: warehouses.id })
@@ -389,11 +393,18 @@ export async function searchPosProductRows(storeId: string, q: string): Promise<
 
   const rootsWithChildren = attachChildren(rootRows, pickerChildren);
   const seen = new Set<string>();
-  return [...childRows.map((p) => ({ ...p, children: [] })), ...rootsWithChildren].filter((p) => {
+  const rows = [...childRows.map((p) => ({ ...p, children: [] })), ...rootsWithChildren].filter((p) => {
     if (seen.has(p.id)) return false;
     seen.add(p.id);
     return true;
   });
+  // Kết quả tìm kiếm phải có cùng map bảng giá và quyền đọc giá vốn như lưới POS.
+  const costBookIds = options?.role === "owner" || options?.role === "manager"
+    ? (await getPriceBooks(storeId, { includeManagerOnly: true }))
+        .filter((book) => book.costBased).map((book) => book.id)
+    : [];
+  applyCostPriceBooks(rows as unknown as CostPriceBookProduct[], costBookIds);
+  return rows;
 }
 
 export type PosData = Awaited<ReturnType<typeof getPosData>>;

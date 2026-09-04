@@ -9,5 +9,5 @@ export async function searchPosProducts(q: string): Promise<PosProduct[]> {
   if (!q.trim()) return [];
   const gate = await requireSalesAccess();
   if (!gate.ok) return [];
-  return searchPosProductRows(gate.storeId, q.trim());
+  return searchPosProductRows(gate.storeId, q.trim(), { role: gate.role });
 }
