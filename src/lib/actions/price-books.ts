@@ -3,13 +3,14 @@
 import { revalidateAppData as revalidatePath } from "@/lib/sync/revalidate-app-data";
 import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
-import { priceBooks, productPrices, products } from "@/db/schema";
+import { priceBooks, productPrices, productUnits, products } from "@/db/schema";
 import { type ActionResult, requireManager, toMoney } from "./common";
 import { Routes } from "@/lib/routes";
 import { isSystemPriceBook, isPriceBookReadOnly, isReservedPriceBookName } from "@/lib/pricing/system-price-books";
-import { pricingSellableProductCondition } from "@/lib/data/pricing";
+import { pricingFilterCondition, pricingSellableProductCondition } from "@/lib/data/pricing";
 import { recordActivity } from "@/lib/audit/activity-log";
 import { lastPurchaseNetPriceSql } from "@/lib/pricing/last-purchase-net-price";
+import { planPriceEdit, priceFormulaFiltersSchema, type PriceFormulaFilters, type UnitPriceMode } from "@/lib/pricing/price-edit";
 
 export type PriceFormulaBase = "current" | "cost" | "lastPurchase" | "list";
 
@@ -23,7 +24,8 @@ function priceExpr(base: SQL, op: "+" | "-", amount: number, unit: "vnd" | "pct"
 }
 
 /**
- * Áp công thức đặt giá cho TẤT CẢ sản phẩm trong 1 bảng giá (giống KiotViet).
+ * Áp công thức cho SKU đủ điều kiện trong bộ lọc, trên tất cả các trang.
+ * Client cũ không gửi filters vẫn áp toàn danh mục như hợp đồng cũ.
  * base "current" = giá hiện tại của bảng (mặc định: retailPrice; bảng khác: override ?? retailPrice).
  * base "cost"    = giá vốn.
  */
@@ -33,14 +35,19 @@ export async function applyPriceFormulaAll(input: {
   op: "+" | "-";
   amount: number;
   unit: "vnd" | "pct";
+  filters?: PriceFormulaFilters;
+  unitPriceMode?: UnitPriceMode;
 }): Promise<ActionResult<{ count: number }>> {
   const gate = await requireManager(); if (!gate.ok) return gate;
+  const filters = priceFormulaFiltersSchema.safeParse(input.filters === undefined ? {} : input.filters);
+  if (!filters.success || (input.unitPriceMode !== undefined && input.unitPriceMode !== "keep" && input.unitPriceMode !== "sync")) return { ok: false, error: "errors.invalidData" };
   if (!Number.isFinite(input.amount) || input.amount < 0 || !["current", "cost", "lastPurchase", "list"].includes(input.base) || !["+", "-"].includes(input.op) || !["vnd", "pct"].includes(input.unit)) return { ok: false, error: "errors.invalidData" };
   try {
     const result = await db.transaction(async (tx) => {
       const [book] = await tx.select({ name: priceBooks.name, isDefault: priceBooks.isDefault, systemType: priceBooks.systemType, costBased: priceBooks.costBased }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, input.priceBookId))).limit(1).for("no key update");
       if (!book) return null;
       if (isPriceBookReadOnly(book)) return "pricing.errors.systemReadOnly";
+      if (input.unitPriceMode === "sync" && !book.isDefault) return "errors.invalidData";
       const currentPrice = sql`(select pp.price from product_prices pp where pp.store_id = ${gate.storeId}
         and pp.product_id = ${sql.raw('"products"."id"')} and pp.price_book_id = ${input.priceBookId} limit 1)`;
       const listPrice = sql`(select pp.price from product_prices pp join price_books pb on pb.id = pp.price_book_id and pb.store_id = pp.store_id
@@ -54,7 +61,7 @@ export async function applyPriceFormulaAll(input: {
       const before = await tx.select({ id: products.id, name: products.name, sku: products.sku,
         retailPrice: products.retailPrice, basePrice: sql<string | null>`${base}`,
         previousPrice: sql<string | null>`${book.isDefault ? sql`${products.retailPrice}` : currentPrice}` })
-        .from(products).where(and(eq(products.storeId, gate.storeId), pricingSellableProductCondition())).for("update");
+        .from(products).where(and(pricingFilterCondition(gate.storeId, filters.data), pricingSellableProductCondition())).for("update");
       // A catalogue only applies to products with an explicit company price.
       // Never manufacture a price for missing/non-applicable SKUs.
       const applicable = before.filter((row) => row.basePrice != null);
@@ -71,6 +78,12 @@ export async function applyPriceFormulaAll(input: {
           target: [productPrices.priceBookId, productPrices.productId], set: { price: sql`excluded.price` },
         });
       }
+      const clearedUnits = input.unitPriceMode === "sync"
+        ? await tx.select({ id: productUnits.id, productId: productUnits.productId, unitName: productUnits.unitName, priceOverride: productUnits.priceOverride }).from(productUnits)
+          .where(and(eq(productUnits.storeId, gate.storeId), inArray(productUnits.productId, applicable.map((row) => row.id)), sql`${productUnits.priceOverride} is not null`)).for("update")
+        : [];
+      if (clearedUnits.length) await tx.update(productUnits).set({ priceOverride: null })
+        .where(and(eq(productUnits.storeId, gate.storeId), inArray(productUnits.id, clearedUnits.map((unit) => unit.id))));
       const after = book.isDefault
         ? await tx.select({ productId: products.id, price: products.retailPrice }).from(products).where(target)
         : await tx.select({ productId: productPrices.productId, price: productPrices.price }).from(productPrices)
@@ -81,10 +94,10 @@ export async function applyPriceFormulaAll(input: {
         const price = next.get(row.id)!;
         return previous === price ? [] : [{ type: "product", id: row.id, code: row.sku, name: row.name, beforePrice: previous, price }];
       });
-      if (changes.length) await recordActivity(tx, {
+      if (changes.length || clearedUnits.length) await recordActivity(tx, {
         storeId: gate.storeId, actorId: gate.userId, action: "price_book.formula.applied", entityType: "price_book", entityId: input.priceBookId,
         after: { name: book.name, changedCount: changes.length }, affectedRecords: changes,
-        metadata: { priceBookName: book.name, base: input.base, operator: input.op, amount: input.amount, unit: input.unit, skippedMissingPrices: before.length - applicable.length },
+        metadata: { priceBookName: book.name, base: input.base, operator: input.op, amount: input.amount, unit: input.unit, filters: filters.data, unitPriceMode: input.unitPriceMode ?? "keep", clearedUnitOverrides: clearedUnits, skippedMissingPrices: before.length - applicable.length },
       });
       return applicable.length;
     });
@@ -162,39 +175,52 @@ export async function setProductPrice(input: {
   priceBookId: string;
   productId: string;
   price: number | null;
+  unitName?: string;
+  unitPriceMode?: UnitPriceMode;
 }): Promise<ActionResult> {
   const gate = await requireManager(); if (!gate.ok) return gate;
-  if (input.price != null && (!Number.isFinite(input.price) || input.price < 0)) return { ok: false, error: "errors.invalidData" };
+  if (input.price !== null && (!Number.isFinite(input.price) || input.price < 0)) return { ok: false, error: "errors.invalidData" };
+  if ((input.unitName !== undefined && (typeof input.unitName !== "string" || !input.unitName.trim())) || (input.unitPriceMode !== undefined && input.unitPriceMode !== "keep" && input.unitPriceMode !== "sync")) return { ok: false, error: "errors.invalidData" };
   try {
     const result = await db.transaction(async (tx) => {
-      const [book] = await tx.select({ name: priceBooks.name, isDefault: priceBooks.isDefault, systemType: priceBooks.systemType, costBased: priceBooks.costBased }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, input.priceBookId))).limit(1);
+      const [book] = await tx.select({ name: priceBooks.name, isDefault: priceBooks.isDefault, systemType: priceBooks.systemType, costBased: priceBooks.costBased }).from(priceBooks).where(and(eq(priceBooks.storeId, gate.storeId), eq(priceBooks.id, input.priceBookId))).limit(1).for("no key update");
       if (!book) return false;
       if (isPriceBookReadOnly(book)) return "pricing.errors.systemReadOnly";
-      const [product] = await tx.select({ name: products.name, sku: products.sku, retailPrice: products.retailPrice }).from(products)
+      const [product] = await tx.select({ name: products.name, sku: products.sku, retailPrice: products.retailPrice, baseUnit: products.baseUnit }).from(products)
         .where(and(eq(products.storeId, gate.storeId), eq(products.id, input.productId))).limit(1).for("update");
       if (!product) return false;
+      const units = (await tx.select({ id: productUnits.id, unitName: productUnits.unitName, multiplier: productUnits.multiplier, priceOverride: productUnits.priceOverride }).from(productUnits)
+        .where(and(eq(productUnits.storeId, gate.storeId), eq(productUnits.productId, input.productId))).for("update"))
+        .map((unit) => ({ ...unit, multiplier: Number(unit.multiplier), priceOverride: unit.priceOverride == null ? null : Number(unit.priceOverride) }));
       const [override] = book.isDefault ? [] : await tx.select({ price: productPrices.price }).from(productPrices)
         .where(and(eq(productPrices.storeId, gate.storeId), eq(productPrices.priceBookId, input.priceBookId), eq(productPrices.productId, input.productId))).limit(1);
       const beforePrice = book.isDefault ? Number(product.retailPrice) : override ? Number(override.price) : null;
-      const afterPrice = !book.isDefault && input.price == null ? null : Number(toMoney(Math.max(0, input.price ?? 0)));
-      if (beforePrice === afterPrice) return true;
+      let planned;
+      try {
+        planned = planPriceEdit({ baseUnit: product.baseUnit, retailPrice: Number(product.retailPrice), units }, book, beforePrice, input.price, input.unitName, input.unitPriceMode);
+      } catch { return "errors.invalidData"; }
+      const afterPrice = planned.basePrice;
+      const changedUnits = planned.units.filter((unit) => unit.priceOverride !== units.find((before) => before.id === unit.id)?.priceOverride);
+      if (beforePrice === afterPrice && !changedUnits.length) return true;
 
       if (book.isDefault) {
-        await tx.update(products).set({ retailPrice: toMoney(Math.max(0, input.price ?? 0)), updatedAt: sql`now()` }).where(and(eq(products.storeId, gate.storeId), eq(products.id, input.productId)));
-      } else if (input.price == null) {
+        await tx.update(products).set({ retailPrice: toMoney(afterPrice!), updatedAt: sql`now()` }).where(and(eq(products.storeId, gate.storeId), eq(products.id, input.productId)));
+      } else if (afterPrice == null) {
         await tx.delete(productPrices).where(and(eq(productPrices.storeId, gate.storeId), eq(productPrices.priceBookId, input.priceBookId), eq(productPrices.productId, input.productId)));
       } else {
         await tx.insert(productPrices)
-          .values({ storeId: gate.storeId, priceBookId: input.priceBookId, productId: input.productId, price: toMoney(Math.max(0, input.price)) })
+          .values({ storeId: gate.storeId, priceBookId: input.priceBookId, productId: input.productId, price: toMoney(afterPrice) })
           .onConflictDoUpdate({
             target: [productPrices.priceBookId, productPrices.productId],
-            set: { price: toMoney(Math.max(0, input.price)) },
+            set: { price: toMoney(afterPrice) },
           });
       }
+      for (const unit of changedUnits) await tx.update(productUnits).set({ priceOverride: unit.priceOverride == null ? null : toMoney(unit.priceOverride) })
+        .where(and(eq(productUnits.storeId, gate.storeId), eq(productUnits.productId, input.productId), eq(productUnits.id, unit.id!)));
       await recordActivity(tx, {
         storeId: gate.storeId, actorId: gate.userId, action: "product.price_book.updated", entityType: "product", entityId: input.productId,
-        before: { name: product.name, sku: product.sku, price: beforePrice }, after: { name: product.name, sku: product.sku, price: afterPrice },
-        metadata: { productName: product.name, productSku: product.sku, priceBookId: input.priceBookId, priceBookName: book.name, usesRetailPrice: book.systemType !== "list" && afterPrice == null },
+        before: { name: product.name, sku: product.sku, price: beforePrice, units }, after: { name: product.name, sku: product.sku, price: afterPrice, units: planned.units },
+        metadata: { productName: product.name, productSku: product.sku, priceBookId: input.priceBookId, priceBookName: book.name, unitName: input.unitName ?? product.baseUnit, unitPriceMode: input.unitPriceMode ?? "keep", usesRetailPrice: book.systemType !== "list" && afterPrice == null },
     });
     return true;
     });

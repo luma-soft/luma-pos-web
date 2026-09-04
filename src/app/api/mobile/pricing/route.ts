@@ -55,6 +55,8 @@ export async function GET(request: Request) {
     sku: product.sku,
     barcode: product.barcode,
     name: product.name,
+    baseUnit: product.baseUnit,
+    units: product.units,
     categoryId: product.categoryId,
     categoryName: product.categoryName,
     imageUrl: product.imageUrls[0] ?? null,

@@ -25,7 +25,7 @@ const dialect = new PgDialect();
 const quote = (value) => `'${value.replaceAll("'", "''")}'`;
 beforeAll(async () => {
   const enums = new Set();
-  for (const table of [schema.products, schema.productPrices, schema.priceBooks]) {
+  for (const table of [schema.products, schema.productPrices, schema.priceBooks, schema.productUnits]) {
     const config = getTableConfig(table);
     for (const column of config.columns) {
       if (!column.enumValues?.length || enums.has(column.getSQLType())) continue;
@@ -64,8 +64,8 @@ beforeAll(async () => {
   ]);
 });
 beforeEach(async () => {
-  await pg.exec("truncate product_prices, purchase_order_items, purchase_orders");
-  await pg.query("update products set retail_price = case when id = $1 then 200 else 100 end", [knownId]);
+  await pg.exec("truncate product_prices, product_units, purchase_order_items, purchase_orders");
+  await pg.query("update products set base_unit = 'm', is_active = true, lifecycle_status = 'active', retail_price = case when id = $1 then 200 else 100 end", [knownId]);
   await pg.query("insert into purchase_orders (id, store_id, status) values ($1, $2, 'received')", [receiptId, storeId]);
   await pg.query("insert into purchase_order_items (store_id, purchase_order_id, product_id, quantity, total) values ($1, $2, $3, 2, 160)", [storeId, receiptId, knownId]);
 });
@@ -151,4 +151,72 @@ test("price reads expose catalogue values but ignore stale internal overrides", 
   expect(await getPriceOverridesForProducts(storeId, [knownId])).toEqual({
     [listId]: { [knownId]: "250.00" }, [customId]: { [knownId]: "160.00" },
   });
+});
+
+test("filtered formula updates only matching SKUs, not the rest of the store", async () => {
+  expect(await applyPriceFormulaAll({ priceBookId: retailId, base: "current", op: "+", amount: 10, unit: "vnd", filters: { q: "Unknown" } }))
+    .toEqual({ ok: true, data: { count: 1 } });
+  expect((await pg.query("select retail_price from products where id = $1", [knownId])).rows[0].retail_price).toBe("200.00");
+  expect((await pg.query("select retail_price from products where id = $1", [unknownId])).rows[0].retail_price).toBe("110.00");
+});
+
+test("invalid filters fail closed instead of broadening a bulk update", async () => {
+  for (const filters of [null, [], { categoryIds: "not-an-array" }, { lifecycle: "typo" }, { unknownKey: "x" }]) {
+    expect(await applyPriceFormulaAll({ priceBookId: retailId, base: "current", op: "+", amount: 10, unit: "vnd", filters }))
+      .toEqual({ ok: false, error: "errors.invalidData" });
+  }
+});
+
+async function addUnits(productId = knownId) {
+  await database.insert(schema.productUnits).values([
+    { storeId, productId, unitName: "m", multiplier: "1", priceOverride: "999" },
+    { storeId, productId, unitName: "cây", multiplier: "4", priceOverride: "700" },
+    { storeId, productId, unitName: "bó", multiplier: "20", priceOverride: null },
+  ]);
+}
+
+test("retail alternate keep changes only its own override, including zero and clearing", async () => {
+  await addUnits();
+  for (const price of [33.33, 0, null]) {
+    expect((await setProductPrice({ productId: knownId, priceBookId: retailId, unitName: "cây", price, unitPriceMode: "keep" })).ok).toBe(true);
+    const [{ price_override }] = (await pg.query("select price_override from product_units where product_id=$1 and unit_name='cây'", [knownId])).rows;
+    expect(price_override).toBe(price == null ? null : price.toFixed(2));
+    expect((await pg.query("select retail_price from products where id=$1", [knownId])).rows[0].retail_price).toBe("200.00");
+  }
+});
+
+test("retail synchronize from an alternate converts base and clears overrides atomically", async () => {
+  await addUnits();
+  expect((await setProductPrice({ productId: knownId, priceBookId: retailId, unitName: "cây", price: 493.32, unitPriceMode: "sync" })).ok).toBe(true);
+  expect((await pg.query("select retail_price from products where id=$1", [knownId])).rows[0].retail_price).toBe("123.33");
+  expect((await pg.query("select price_override from product_units where product_id=$1", [knownId])).rows.every((row) => row.price_override == null)).toBe(true);
+});
+
+test("list/custom unit edits only update their book base, not retail overrides", async () => {
+  await addUnits();
+  expect((await setProductPrice({ productId: knownId, priceBookId: listId, unitName: "cây", price: 600 })).ok).toBe(true);
+  expect(await getPriceOverrides(storeId, listId)).toEqual({ [knownId]: "150.00" });
+  // Retail cây=700, retail m=200: custom cây uses a 3.5 ratio, not multiplier 4.
+  expect((await setProductPrice({ productId: knownId, priceBookId: customId, unitName: "cây", price: 350 })).ok).toBe(true);
+  expect(await getPriceOverrides(storeId, customId)).toEqual({ [knownId]: "100.00" });
+  expect((await pg.query("select price_override from product_units where product_id=$1 and unit_name='cây'", [knownId])).rows[0].price_override).toBe("700.00");
+});
+
+test("invalid units, retail null base, and nonretail synchronization are rejected", async () => {
+  await addUnits();
+  for (const input of [
+    { priceBookId: retailId, unitName: "missing", price: 10 },
+    { priceBookId: retailId, unitName: "m", price: null },
+    { priceBookId: listId, unitName: "m", price: 10, unitPriceMode: "sync" },
+    { priceBookId: retailId, unitName: "cây", price: null, unitPriceMode: "sync" },
+  ]) expect(await setProductPrice({ productId: knownId, ...input })).toEqual({ ok: false, error: "errors.invalidData" });
+});
+
+test("bulk unit sync clears overrides only inside the filtered applicable scope", async () => {
+  await addUnits(knownId);
+  await addUnits(unknownId);
+  expect(await applyPriceFormulaAll({ priceBookId: retailId, base: "current", op: "+", amount: 10, unit: "vnd", filters: { q: "Unknown" }, unitPriceMode: "sync" }))
+    .toEqual({ ok: true, data: { count: 1 } });
+  expect((await pg.query("select price_override from product_units where product_id=$1 and unit_name='cây'", [knownId])).rows[0].price_override).toBe("700.00");
+  expect((await pg.query("select price_override from product_units where product_id=$1", [unknownId])).rows.every((row) => row.price_override == null)).toBe(true);
 });

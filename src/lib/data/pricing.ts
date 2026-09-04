@@ -71,9 +71,11 @@ export interface PricingProductRow {
   shelfLifeDays: number | null;
   minStock: number;
   units: Array<{
+    id: string;
     unitName: string;
     multiplier: number;
     barcode: string | null;
+    priceOverride: number | null;
   }>;
   parentProductId: string | null;
   variantName: string | null;
@@ -111,17 +113,8 @@ export function pricingSellableProductCondition(): SQL {
   )!;
 }
 
-export async function getPricingPage(
-  storeId: string,
-  query: PricingQuery = {},
-): Promise<PricingProductPage> {
-  const page = Math.max(1, Math.trunc(query.page ?? 1));
-  const pageSize = coercePageSize(query.pageSize, 50);
-  const conditions: SQL[] = [
-    eq(products.storeId, storeId),
-    eq(products.isVariantParent, false),
-  ];
-  const availableStock = query.warehouseId?.trim()
+function pricingAvailableStock(storeId: string, query: PricingQuery) {
+  return query.warehouseId?.trim()
     ? sql<string>`coalesce((
         select sl.quantity
         from ${stockLevels} sl
@@ -131,6 +124,12 @@ export async function getPricingPage(
         limit 1
       ), 0)`
     : products.totalStock;
+}
+
+/** Shared listing/mutation filters, intentionally independent of pagination. */
+export function pricingFilterCondition(storeId: string, query: PricingQuery = {}): SQL {
+  const conditions: SQL[] = [eq(products.storeId, storeId), eq(products.isVariantParent, false)];
+  const availableStock = pricingAvailableStock(storeId, query);
   const lifecycle = query.lifecycle ?? "active";
   const q = query.q?.trim();
   if (q) {
@@ -190,7 +189,14 @@ export async function getPricingPage(
   } else if (query.stock === "unmanaged") {
     conditions.push(eq(products.productKind, "service"));
   }
-  const where = and(...conditions);
+  return and(...conditions)!;
+}
+
+export async function getPricingPage(storeId: string, query: PricingQuery = {}): Promise<PricingProductPage> {
+  const page = Math.max(1, Math.trunc(query.page ?? 1));
+  const pageSize = coercePageSize(query.pageSize, 50);
+  const availableStock = pricingAvailableStock(storeId, query);
+  const where = pricingFilterCondition(storeId, query);
   const selectedPrice = query.priceBookId?.trim()
     ? sql<string>`(
         select case
@@ -234,18 +240,22 @@ export async function getPricingPage(
         minStock: products.minStock,
         units: sql<
           Array<{
+            id: string;
             unitName: string;
             multiplier: string;
             barcode: string | null;
+            priceOverride: string | null;
           }>
         >`coalesce((
           select json_agg(json_build_object(
+            'id', pu.id,
             'unitName', pu.unit_name,
             'multiplier', pu.multiplier,
-            'barcode', pu.barcode
+            'barcode', pu.barcode,
+            'priceOverride', pu.price_override
           ) order by pu.sort_order)
           from ${productUnits} pu
-          where pu.product_id = ${products.id}
+          where pu.product_id = ${products.id} and pu.store_id = ${storeId}
         ), '[]')`,
         parentProductId: products.parentProductId,
         variantName: products.variantName,
@@ -288,9 +298,11 @@ export async function getPricingPage(
       shelfLifeDays: row.shelfLifeDays,
       minStock: Number(row.minStock),
       units: row.units.map((unit) => ({
+        id: unit.id,
         unitName: unit.unitName,
         multiplier: Number(unit.multiplier),
         barcode: unit.barcode,
+        priceOverride: unit.priceOverride == null ? null : Number(unit.priceOverride),
       })),
       parentProductId: row.parentProductId,
       variantName: row.variantName,
